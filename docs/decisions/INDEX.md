@@ -124,6 +124,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261119-step61-stream-audience](D-20261119-step61-stream-audience.md)** Stream SSE của kernel đưa event tới "người được nêu tên" — 2026-11-19
 - **[D-20261121-module-selection](D-20261121-module-selection.md)** Bật / tắt module bằng `AUTOXIDE_MODULES`, ba hạng module — 2026-11-21
 - **[D-20261121-provider-accounts](D-20261121-provider-accounts.md)** Một cách cho mọi bộ nối nhà cung cấp: tài khoản theo khách, webhook theo khách — 2026-11-21
+- **[D-20261122-provider-environments](D-20261122-provider-environments.md)** Bộ nối: URL webhook đầy đủ theo khách, môi trường thử theo khách, xác thực lại khi đổi tài khoản — 2026-11-22
 
 ## Database, dữ liệu, job, event
 

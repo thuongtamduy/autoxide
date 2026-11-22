@@ -45,7 +45,6 @@ use super::{DatabaseRegistry, ScopeExt, TenantContext, TenantId, TenantScoped, T
 use crate::access::{Permission, Principal, Risk};
 use crate::error::{Error, FieldError};
 use crate::event::{Actor, Event, EventInfo, Outbox};
-use crate::mcp::Tool;
 use crate::migration::prelude::*;
 use crate::response::{Data, Problem};
 use crate::secret::SecretKey;
@@ -640,6 +639,7 @@ impl SettingsService {
         value: &str,
     ) -> Result<SettingState, Error> {
         let setting = self.catalog.find(name)?;
+        connection_step_up(&setting, principal)?;
         let name = setting.name;
         let value = value.trim();
         if value.is_empty() || value.chars().count() > VALUE_MAX {
@@ -740,6 +740,7 @@ impl SettingsService {
         name: &str,
     ) -> Result<(), Error> {
         let setting = self.catalog.find(name)?;
+        connection_step_up(&setting, principal)?;
         let name = setting.name;
         let transaction = tenant.database().begin_write().await?;
         let deleted = Entity::delete_many()
@@ -757,6 +758,16 @@ impl SettingsService {
         self.forget(tenant.id());
         Ok(())
     }
+}
+
+/// Đặt / bỏ một trường của kết nối đối tác (nhóm `connection`) đổi nơi tiền về hay nơi dữ liệu đi:
+/// đòi lần xác thực gần đây của phiên (step-up) như việc nhạy cảm, dù `kernel.settings.manage`
+/// không thuộc loại rủi ro cao (D-20261122-provider-environments). Cài đặt thường không bị đòi.
+fn connection_step_up(setting: &TenantSetting, principal: &Principal) -> Result<(), Error> {
+    if setting.group == Some(CONNECTION_GROUP) {
+        principal.require_fresh(&SETTINGS_MANAGE)?;
+    }
+    Ok(())
 }
 
 fn subject(name: &str) -> String {
@@ -853,7 +864,7 @@ async fn list_settings(
     request_body = SettingInput,
     responses(
         (status = 200, description = "The setting as stored (without a secret value).", body = Data<SettingState>),
-        (status = 401, description = "Not signed in; code `unauthorized` or the code of the authentication module.", body = Problem),
+        (status = 401, description = "Not signed in (code `unauthorized` or the code of the authentication module), or a setting of the `connection` group needs a recent sign-in: code `step_up_required`, confirm with `POST /api/v1/auth/me/reauth` and retry.", body = Problem),
         (status = 403, description = "Missing permission `kernel.settings.manage`; code `permission_denied`.", body = Problem),
         (status = 422, description = "No module takes this setting (code `tenant_setting_unknown`) or the value is empty or too long; see `errors`.", body = Problem),
     )
@@ -882,7 +893,7 @@ async fn set_setting(
     params(("name" = String, Path, description = "Name of the setting.")),
     responses(
         (status = 204, description = "The setting is unset (or never was)."),
-        (status = 401, description = "Not signed in; code `unauthorized` or the code of the authentication module.", body = Problem),
+        (status = 401, description = "Not signed in (code `unauthorized` or the code of the authentication module), or a setting of the `connection` group needs a recent sign-in: code `step_up_required`, confirm with `POST /api/v1/auth/me/reauth` and retry.", body = Problem),
         (status = 403, description = "Missing permission `kernel.settings.manage`; code `permission_denied`.", body = Problem),
         (status = 422, description = "No module takes this setting; code `tenant_setting_unknown`.", body = Problem),
     )
@@ -972,7 +983,7 @@ async fn list_tenant_settings(
     request_body = SettingInput,
     responses(
         (status = 200, description = "The setting as stored (without a secret value).", body = Data<SettingState>),
-        (status = 401, description = "Not signed in; code `unauthorized` or the code of the authentication module.", body = Problem),
+        (status = 401, description = "Not signed in (code `unauthorized` or the code of the authentication module), or a setting of the `connection` group needs a recent sign-in: code `step_up_required`, confirm with `POST /api/v1/auth/me/reauth` and retry.", body = Problem),
         (status = 403, description = "Missing permission `kernel.tenants.manage` (`permission_denied`), or not an account of the platform tenant (`tenant_platform_only`).", body = Problem),
         (status = 404, description = "No such tenant; code `tenant_not_found`.", body = Problem),
         (status = 409, description = "The tenant is being moved to another placement; code `tenant_moving`.", body = Problem),
@@ -1008,7 +1019,7 @@ async fn set_tenant_setting(
     ),
     responses(
         (status = 204, description = "The setting is unset (or never was)."),
-        (status = 401, description = "Not signed in; code `unauthorized` or the code of the authentication module.", body = Problem),
+        (status = 401, description = "Not signed in (code `unauthorized` or the code of the authentication module), or a setting of the `connection` group needs a recent sign-in: code `step_up_required`, confirm with `POST /api/v1/auth/me/reauth` and retry.", body = Problem),
         (status = 403, description = "Missing permission `kernel.tenants.manage` (`permission_denied`), or not an account of the platform tenant (`tenant_platform_only`).", body = Problem),
         (status = 404, description = "No such tenant; code `tenant_not_found`.", body = Problem),
         (status = 409, description = "The tenant is being moved to another placement; code `tenant_moving`.", body = Problem),
@@ -1042,96 +1053,8 @@ pub(crate) fn routes(service: Arc<SettingsService>, registry: DatabaseRegistry) 
         )
 }
 
-// Đầu vào của tool `list_settings`: cùng bộ lọc với REST.
-/// Which settings to list.
-#[derive(Debug, Default, Deserialize, Validate, ToSchema)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct ListSettings {
-    /// Only settings of this group, e.g. `connection` (connections to partner services). Omit
-    /// for every setting.
-    #[schema(example = "connection")]
-    group: Option<String>,
-}
-
-// Tool MCP: liệt kê, đặt cấu hình KHÔNG bí mật, bỏ cấu hình. Không có tool ghi secret (đặc tả 33,
-// D-258): giá trị bí mật không đi qua ngữ cảnh của agent — đặt bằng REST.
-/// Input of `kernel.set_setting`.
-#[derive(Debug, Deserialize, Validate, ToSchema)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct SetSetting {
-    /// Name of the setting, `<module>.<key>`.
-    #[schema(example = "kernel.public_url")]
-    name: String,
-    /// The value.
-    #[schema(example = "https://shop.example")]
-    value: String,
-}
-
-/// Input of `kernel.delete_setting`.
-#[derive(Debug, Deserialize, Validate, ToSchema)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct DeleteSetting {
-    /// Name of the setting.
-    #[schema(example = "kernel.public_url")]
-    name: String,
-}
-
-/// The answer of `kernel.delete_setting`.
-#[derive(Debug, Serialize, ToSchema)]
-pub(crate) struct SettingDeleted {
-    name: String,
-    deleted: bool,
-}
-
-pub(crate) fn tools(service: Arc<SettingsService>) -> Vec<Tool> {
-    let (setter, remover) = (service.clone(), service.clone());
-    vec![
-        Tool::new(
-            "set_setting",
-            "Set a setting of the current tenant that is not secret, e.g. a plain field of its \
-             account at a partner (`<module>.connection.<kind>.<field>`). Secret settings (API \
-             keys, passwords) are refused with `kernel.setting_secret_rest_only`: a person sets \
-             them with `PUT /api/v1/kernel/settings/{name}`, so the value never passes through \
-             an agent.",
-            move |tenant: TenantContext, principal: Principal, input: SetSetting| {
-                let service = setter.clone();
-                async move {
-                    service.put_plain(&tenant, &principal, &input.name, &input.value).await
-                }
-            },
-        )
-        .requires(SETTINGS_MANAGE),
-        Tool::new(
-            "delete_setting",
-            "Remove a setting of the current tenant; the module then works as when it was never \
-             set (a partner connection stops working until it is set again).",
-            move |tenant: TenantContext, principal: Principal, input: DeleteSetting| {
-                let service = remover.clone();
-                async move {
-                    service.delete(&tenant, &principal, &input.name).await?;
-                    Ok(SettingDeleted { name: input.name, deleted: true })
-                }
-            },
-        )
-        .requires(SETTINGS_MANAGE)
-        .destructive(),
-        Tool::new(
-            "list_settings",
-            "List the settings of the current tenant: every setting the installed modules take \
-             per tenant, whether it is set, and its value unless it is secret. `group: \
-             \"connection\"` lists only the connections to partner services (mail server, AI \
-             provider…).",
-            move |tenant: TenantContext, _principal: Principal, filter: ListSettings| {
-                let service = service.clone();
-                async move { service.list(&tenant, filter.group.as_deref()).await }
-            },
-        )
-        .requires(SETTINGS_MANAGE)
-        .read_only(),
-    ]
-}
-
-// --- Migration ------------------------------------------------------------------------------
+mod tools;
+pub(crate) use tools::tools;
 
 /// Bảng `kernel_tenant_settings` (cấp khách hàng, có `tenant_id` từ đầu).
 pub(crate) struct CreateTenantSettings;

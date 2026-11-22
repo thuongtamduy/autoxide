@@ -189009,7 +189009,7 @@
                 }
               }
             },
-            "description": "Not signed in; code `unauthorized` or the code of the authentication module."
+            "description": "Not signed in (code `unauthorized` or the code of the authentication module), or a setting of the `connection` group needs a recent sign-in: code `step_up_required`, confirm with `POST /api/v1/auth/me/reauth` and retry."
           },
           "403": {
             "content": {
@@ -189123,7 +189123,7 @@
                 }
               }
             },
-            "description": "Not signed in; code `unauthorized` or the code of the authentication module."
+            "description": "Not signed in (code `unauthorized` or the code of the authentication module), or a setting of the `connection` group needs a recent sign-in: code `step_up_required`, confirm with `POST /api/v1/auth/me/reauth` and retry."
           },
           "403": {
             "content": {
@@ -192577,7 +192577,7 @@
                 }
               }
             },
-            "description": "Not signed in; code `unauthorized` or the code of the authentication module."
+            "description": "Not signed in (code `unauthorized` or the code of the authentication module), or a setting of the `connection` group needs a recent sign-in: code `step_up_required`, confirm with `POST /api/v1/auth/me/reauth` and retry."
           },
           "403": {
             "content": {
@@ -192720,7 +192720,7 @@
                 }
               }
             },
-            "description": "Not signed in; code `unauthorized` or the code of the authentication module."
+            "description": "Not signed in (code `unauthorized` or the code of the authentication module), or a setting of the `connection` group needs a recent sign-in: code `step_up_required`, confirm with `POST /api/v1/auth/me/reauth` and retry."
           },
           "403": {
             "content": {

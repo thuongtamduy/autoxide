@@ -58,7 +58,9 @@ exists:
 | Test the connection | `POST /api/v1/kernel/settings/{name}/test` | `kernel.test_connection` |
 | See the webhook addresses | `GET /api/v1/kernel/connections/webhooks` | `kernel.list_connection_webhooks` |
 
-All of them need the permission `kernel.settings.manage`, which is marked as sensitive.
+All of them need the permission `kernel.settings.manage`, which is marked as sensitive. Setting or
+removing a `connection` setting also needs a recent sign-in (`step_up_required` otherwise), because it
+changes where money or data goes; every change is in the audit log, by name only.
 
 A setting that holds an address chosen by the tenant must be checked when it is stored
 (`.checked(…)` with `autoxide_kernel::net::check_target_url`) and the client must use
@@ -155,6 +157,31 @@ The receiving routes are `POST /api/v1/ledger/webhooks/{provider}/{hook}` (payme
 of webhook adds a route of the same shape and resolves the tenant with
 `ProviderAccounts::resolve_webhook`.
 
+### The webhook address in a request
+
+Some providers want the address in every request (an `ipnUrl`, a `CallbackUrl`). Ask for the tenant's
+full address with `ProviderAccounts::webhook_url(&tenant, path)`: it is built from the server's
+`AUTOXIDE_HTTP_PUBLIC_URL` and fails with `public_url_missing` when that is not set. Never build it from
+the `Host` header of a request. `ProviderAccounts::webhook_token(&tenant, path)` gives only the last
+part.
+
+### Sandbox accounts
+
+A provider's test account usually works only against the provider's sandbox address. When the provider
+has one, declare a tenant setting `<module>.connection.<kind>.environment` checked with
+`Environment::check` (`production`, the default, or `sandbox`), and two operator settings,
+`AUTOXIDE_<NAME>_API_URL` and `AUTOXIDE_<NAME>_SANDBOX_API_URL`. The tenant chooses between the two
+fixed addresses with `Environment::pick`; it never types an address. A kernel sandbox tenant never
+reaches a real adapter at all: the kernel gives it the simulated partners.
+
+## Carriers use the carrier accounts of `shipping`
+
+A shipping adapter is different: the module `shipping` already keeps carrier accounts per tenant
+(several per tenant, credentials encrypted), and `ShippingCarrier` receives the account in every call.
+Such an adapter declares no `connection` settings and no `ConnectionProbe` — the account is tested with
+`ShippingCarrier::check` — and uses only `http_client`, `send`, the signature helpers and the webhook
+functions above.
+
 ## 5. Test without the network
 
 ```rust
@@ -182,6 +209,15 @@ twice, and two tenants with two accounts that never mix.
 
 ## 6. Register and document
 
-- Add the module to `crates/app/src/modules.rs`, before the module that uses the contract.
+- Add the module to `crates/app/src/modules.rs`, before the module that uses the contract, and its
+  crate to `Cargo.toml` and `crates/app/Cargo.toml`.
+- Implement `Module::description`, `Module::stability` (`Stability::Experimental` until the adapter
+  has run against the real service) and `Module::depends_on` (what `start` requires).
+- Add the module's name to the experimental list in `crates/app/src/e2e/module_selection.rs`, a line
+  to the table in `docs/MODULES.md` and `docs/MODULES.vi.md`, and its name to the module list expected
+  in `crates/app/tests/integration/cli.rs`.
+- Tests that need another module (`ledger`, `invoices`, `shipping`…) go in `crates/app/src/e2e/`; a
+  module's own tests may not call another module's `module()`.
+- Say in the adapter's guide how to turn it on: `AUTOXIDE_MODULES=official,<name>`.
 - Add `locales/vi.json` for every error code of the adapter.
 - Add a changelog fragment and, for a compliance feature, the legal basis in a decision record.
