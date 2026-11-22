@@ -24,7 +24,7 @@ use autoxide_kernel::error::FieldError;
 use serde_json::{Map, Value};
 use uuid::Uuid;
 
-use super::body::BodyInfo;
+use super::body::{self, BodyInfo};
 
 /// `type` ở gốc của thân `layout`.
 pub(crate) const TYPE: &str = "layout";
@@ -55,6 +55,7 @@ pub(crate) type Usable = BTreeMap<&'static str, Arc<BlockInfo>>;
 struct Checker<'a> {
     blocks: &'a Blocks,
     usable: &'a Usable,
+    embed_hosts: &'a [String],
     errors: Vec<FieldError>,
     ids: BTreeSet<String>,
     count: usize,
@@ -66,6 +67,7 @@ pub(crate) fn check(
     body: &Value,
     blocks: &Blocks,
     usable: &Usable,
+    embed_hosts: &[String],
 ) -> Result<BodyInfo, Vec<FieldError>> {
     let size = serde_json::to_vec(body).map(|bytes| bytes.len()).unwrap_or(usize::MAX);
     if size > MAX_BYTES {
@@ -82,6 +84,7 @@ pub(crate) fn check(
     let mut checker = Checker {
         blocks,
         usable,
+        embed_hosts,
         errors: Vec::new(),
         ids: BTreeSet::new(),
         count: 0,
@@ -205,6 +208,7 @@ impl Checker<'_> {
             self.error(error);
         }
         collect(&info.schema, &props, &mut self.info);
+        self.block_rules(name, &props, node.get("children"), at);
         if let Some(visibility) = node.get("visibility") {
             self.visibility(visibility, &format!("{at}.visibility"));
         }
@@ -226,6 +230,65 @@ impl Checker<'_> {
                 )
                 .with_param("block", name),
             ),
+        }
+    }
+
+    /// Luật của riêng vài khối nền mà JSON Schema con của kernel không nói được.
+    fn block_rules(&mut self, name: &str, props: &Value, children: Option<&Value>, at: &str) {
+        match name {
+            // Video: đúng một nguồn; nhúng chỉ từ host cho phép như node `embed` của thân `rich`.
+            "content.video" => {
+                let embed = props.get("embed_url").and_then(Value::as_str);
+                if props.get("media_id").is_some() == embed.is_some() {
+                    self.error(FieldError::new(
+                        format!("{at}.props"),
+                        "invalid",
+                        "give exactly one of `media_id` and `embed_url`",
+                    ));
+                }
+                if let Some(url) = embed
+                    && !body::embed_host_allowed(url, self.embed_hosts)
+                {
+                    self.error(
+                        FieldError::new(
+                            format!("{at}.props.embed_url"),
+                            "host_not_allowed",
+                            "must be an `https://` address on one of: {hosts}",
+                        )
+                        .with_param("hosts", self.embed_hosts.join(", ")),
+                    );
+                }
+            }
+            // Cột: 2–4 khối con (mỗi khối con là một cột).
+            "content.columns" => {
+                let count = children.and_then(Value::as_array).map_or(0, Vec::len);
+                if !(2..=4).contains(&count) {
+                    self.error(
+                        FieldError::new(
+                            format!("{at}.children"),
+                            "range",
+                            "must hold {min} to {max} columns",
+                        )
+                        .with_param("min", 2)
+                        .with_param("max", 4),
+                    );
+                }
+            }
+            // Bản ghi nhúng: service kiểm loại đã đăng ký và bản ghi có thật (như thân `rich`).
+            "content.embed" => {
+                let kind = props.get("kind").and_then(Value::as_str);
+                let id = props.get("id").and_then(Value::as_str);
+                if let (Some(kind), Some(id)) = (kind, id) {
+                    self.info.records.insert((kind.to_owned(), id.to_owned()));
+                }
+            }
+            // Chân trang pháp lý tự gắn dưới mọi trang: đặt thêm trong bố cục là thừa và gỡ được.
+            crate::publishing::blocks::LEGAL_FOOTER => self.error(FieldError::new(
+                format!("{at}.block"),
+                "not_allowed",
+                "is added below every page by itself; do not place it",
+            )),
+            _ => {}
         }
     }
 

@@ -514,6 +514,14 @@ async fn dossier_dien_tu_ho_so_that() {
         let answer = app.get("/api/v1/compliance/public/owner").send().await.unwrap();
         assert_eq!(answer.status(), StatusCode::OK, "{}", answer.text());
         assert_eq!(answer.json()["data"]["legal_name"], "Cong ty TNHH Vi Du");
+        // Khối chân trang pháp lý (bước 67) trả cùng dữ liệu; website chưa thông báo: không logo.
+        let tenant = app.default_tenant();
+        let site = autoxide_kernel::tenancy::Site::whole(&tenant);
+        let request = autoxide_kernel::blocks::BlockRequest::new(&tenant, &site, "vi");
+        let footer = autoxide_kernel::blocks::BlockRef::new("f", json!({}));
+        let data = app.blocks().resolve(&request, &[("compliance.legal_footer", footer)]).await;
+        assert_eq!(data["f"]["owner"]["legal_name"], "Cong ty TNHH Vi Du", "{data:?}");
+        assert_eq!(data["f"]["badge"], serde_json::Value::Null);
 
         // MCP: cùng service, cùng permission.
         let mcp = app.mcp("admin").await.unwrap();

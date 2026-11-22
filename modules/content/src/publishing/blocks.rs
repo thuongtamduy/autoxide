@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 use autoxide_kernel::blocks::{BlockRef, BlockRequest};
 use autoxide_kernel::error::Error;
 use autoxide_kernel::tenancy::{OrgId, Site, TenantContext};
-use serde_json::Value;
+use serde_json::{Map, Value};
 use uuid::Uuid;
 
 use crate::entries::layout;
@@ -17,7 +17,15 @@ use crate::service::ContentService;
 pub(crate) struct PublicLayout {
     pub body: Value,
     pub data: BTreeMap<String, Value>,
+    /// Chân trang pháp lý tự gắn (khối `compliance.legal_footer`), khi khách có module đó.
+    pub legal_footer: Option<Value>,
 }
+
+/// Khối chân trang pháp lý của `compliance`: tự gắn dưới mọi trang, không đặt trong bố cục.
+pub(crate) const LEGAL_FOOTER: &str = "compliance.legal_footer";
+/// `id` giả của chân trang pháp lý trong lần đọc dữ liệu khối: không phải `id` hợp lệ của khối
+/// (`$`), nên không trùng khối nào của trang.
+const LEGAL_FOOTER_ID: &str = "$legal_footer";
 
 impl ContentService {
     /// Khối khách `tenant` đang dùng được, theo tên.
@@ -55,14 +63,19 @@ impl ContentService {
         }
         let usable = self.usable_blocks(tenant).await?;
         let body = layout::public(&parsed, &usable);
-        let refs: Vec<(&str, BlockRef)> = layout::blocks_of(&body)
+        let mut refs: Vec<(&str, BlockRef)> = layout::blocks_of(&body)
             .into_iter()
             .filter(|(name, _, _)| usable.get(name).is_some_and(|info| info.block.has_data))
             .map(|(name, id, props)| (name, BlockRef::new(id, props.clone())))
             .collect();
+        let footer = usable.contains_key(LEGAL_FOOTER);
+        if footer {
+            refs.push((LEGAL_FOOTER, BlockRef::new(LEGAL_FOOTER_ID, Value::Object(Map::new()))));
+        }
         let request = BlockRequest::new(tenant, site, locale);
-        let data = self.blocks.resolve(&request, &refs).await;
-        Ok(Some(PublicLayout { body, data }))
+        let mut data = self.blocks.resolve(&request, &refs).await;
+        let legal_footer = data.remove(LEGAL_FOOTER_ID).filter(|value| footer && !value.is_null());
+        Ok(Some(PublicLayout { body, data, legal_footer }))
     }
 
     /// Website của mục có nút `org` (bước 34), cả khách khi không có hay nút không còn.
