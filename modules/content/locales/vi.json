@@ -294,5 +294,13 @@
   "text:Use to show the scheduled banners of a placement, managed in one place; use a fixed block for text that belongs to this page only.": "Dùng để hiện banner có lịch của một vị trí, quản lý ở một chỗ; chữ chỉ thuộc trang này thì dùng khối cố định.",
   "field:give exactly one of `media_id` and `embed_url`": "chọn đúng một trong `media_id` và `embed_url`",
   "field:must hold {min} to {max} columns": "phải có từ {min} tới {max} cột",
-  "field:is added below every page by itself; do not place it": "được tự gắn dưới mọi trang; đừng đặt khối này"
+  "field:is added below every page by itself; do not place it": "được tự gắn dưới mọi trang; đừng đặt khối này",
+  "content.shared_section_not_found": "Không có khu dùng chung {id}.",
+  "content.shared_section_in_use": "Khu dùng chung đang được {count} trang dùng; hãy gỡ khỏi các trang đó trước.",
+  "field:a shared section cannot hold another shared section": "khu dùng chung không chứa được khu dùng chung khác",
+  "field:there is no shared section {id}": "không có khu dùng chung {id}",
+  "field:must be 1 to {max} characters": "phải dài 1 đến {max} ký tự",
+  "text:Shared section": "Khu dùng chung",
+  "text:Use to place a shared section (the same blocks on many pages, edited in one place) by its id.": "Dùng để đặt một khu dùng chung (cùng các khối trên nhiều trang, sửa ở một chỗ) theo ID.",
+  "text:A shared section was created, changed (every page using it changes too; `pages` counts them) or deleted.": "Một khu dùng chung được tạo, sửa (mọi trang dùng nó đổi theo; `pages` là số trang) hay bị xoá."
 }

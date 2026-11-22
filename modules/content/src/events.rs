@@ -61,6 +61,7 @@ events! {
     (MenuChanged, "content.menu_changed", "A navigation menu was replaced."),
     (RedirectChanged, "content.redirect_changed", "A redirect was created, changed or deleted by hand."),
     (PlacementChanged, "content.placement_changed", "A display placement for banners was created, changed or deleted."),
+    (SharedSectionChanged, "content.shared_section_changed", "A shared section was created, changed (every page using it changes too; `pages` counts them) or deleted."),
     (BannerChanged, "content.banner_changed", "A banner was created, changed, reordered, archived (also when the promotion it links to ended) or deleted."),
 }
 

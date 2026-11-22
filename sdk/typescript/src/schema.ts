@@ -12158,6 +12158,22 @@ export type Data_SetupView = {
 };
 
 /** Envelope of a single result. */
+export type Data_SharedSectionResponse = {
+  /** A shared section: blocks placed on many pages with the block `content.shared_section`. */
+  data: {
+    created_at: string;
+    created_by?: string | null;
+    id: string;
+    /** A block layout, as the `layout` body of a page. */
+    layout: Record<string, unknown>;
+    name: string;
+    /** The organization unit that owns it (the root unit: the whole tenant). */
+    org_id: string;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_ShippingAddress = {
   /** An address of a buyer's address book. */
   data: {
@@ -24981,6 +24997,23 @@ export type Page_SessionResponse = {
 };
 
 /** One page of a list. */
+export type Page_SharedSectionResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    created_at: string;
+    created_by?: string | null;
+    id: string;
+    /** A block layout, as the `layout` body of a page. */
+    layout: Record<string, unknown>;
+    name: string;
+    /** The organization unit that owns it (the root unit: the whole tenant). */
+    org_id: string;
+    updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_ShippingAddress = {
   /** The items of this page, in the requested order. */
   data: {
@@ -29426,6 +29459,32 @@ export type SetupView = {
 
 /** How urgent a piece of work is. */
 export type Severity = "blocking" | "attention" | "info";
+
+/** A shared section to create or replace. */
+export type SharedSectionRequest = {
+  /**
+   * `{"type": "layout", "schema": 1, "sections": [block…]}`, checked like a page layout; it cannot
+   * hold another shared section.
+   */
+  layout: Record<string, unknown>;
+  /** Name shown to editors, 1 to 120 characters. */
+  name: string;
+  /** Owning organization unit (create only); left out: the whole tenant. */
+  org_id?: string | null;
+};
+
+/** A shared section: blocks placed on many pages with the block `content.shared_section`. */
+export type SharedSectionResponse = {
+  created_at: string;
+  created_by?: string | null;
+  id: string;
+  /** A block layout, as the `layout` body of a page. */
+  layout: Record<string, unknown>;
+  name: string;
+  /** The organization unit that owns it (the root unit: the whole tenant). */
+  org_id: string;
+  updated_at: string;
+};
 
 /** An address of a buyer's address book. */
 export type ShippingAddress = {
@@ -38843,6 +38902,73 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/content/shared-sections": {
+    /** List shared sections. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_SharedSectionResponse;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a shared section. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: SharedSectionRequest;
+      responses: {
+        201: Data_SharedSectionResponse;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/content/shared-sections/{id}": {
+    /** Get a shared section. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_SharedSectionResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Replace a shared section. */
+    put: {
+      parameters: { header: { "If-Match": string; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: SharedSectionRequest;
+      responses: {
+        200: Data_SharedSectionResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        412: Problem;
+        422: Problem;
+        428: Problem;
+        default: Problem;
+      };
+    };
+    /** Delete a shared section. */
+    delete: {
+      parameters: { header: { "If-Match": string; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        412: Problem;
+        428: Problem;
         default: Problem;
       };
     };

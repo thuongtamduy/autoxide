@@ -35,6 +35,7 @@ mod restriction;
 mod sandbox;
 mod service;
 mod setup;
+mod shared;
 mod suggest;
 mod taxonomy;
 mod templates;

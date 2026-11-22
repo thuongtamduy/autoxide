@@ -15,6 +15,7 @@ mod placements;
 mod public;
 mod public_banners;
 mod redirects;
+mod shared_sections;
 mod templates;
 #[cfg(test)]
 mod tests;
@@ -98,6 +99,15 @@ pub(crate) fn routes(service: Arc<ContentService>) -> OpenApiRouter {
             redirects::get_redirect,
             redirects::update_redirect,
             redirects::delete_redirect
+        ))
+        .routes(routes!(
+            shared_sections::list_shared_sections,
+            shared_sections::create_shared_section
+        ))
+        .routes(routes!(
+            shared_sections::get_shared_section,
+            shared_sections::put_shared_section,
+            shared_sections::delete_shared_section
         ))
         .routes(routes!(templates::list_templates))
         .routes(routes!(templates::draft_from_template))
