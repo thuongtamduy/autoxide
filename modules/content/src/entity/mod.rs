@@ -16,6 +16,7 @@ pub(crate) mod revision;
 pub(crate) mod schedule;
 pub(crate) mod term;
 pub(crate) mod term_translation;
+pub(crate) mod theme;
 pub(crate) mod translation_request;
 pub(crate) mod tree_lock;
 

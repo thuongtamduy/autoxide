@@ -466,8 +466,8 @@ sẵn, không sinh code; kết quả luôn là bản nháp.
       website bán hàng
 - [x] Đọc công khai trả bố cục kèm dữ liệu khối, một lần gọi mỗi loại khối, khối lỗi không hỏng trang, ETag;
       đo p99 trang 50 khối trên cả hai database (D-20261122-layout-public)
-- [ ] Bộ giao diện của website (token màu, chữ, khoảng cách, kế thừa theo nút, kiểm tương phản), khu dùng chung
-      nhiều trang, thư viện trang mẫu theo ngành
+- [x] Bộ giao diện của website (token màu, chữ, khoảng cách, kế thừa theo nút, kiểm tương phản) — D-20261122-theme-tokens
+- [ ] Khu dùng chung nhiều trang, thư viện trang mẫu theo ngành
 - [ ] Chủ đề theo mùa, ngày lễ, khung giờ (D-234): bản chủ đề ghi đè một phần theme gốc theo lịch (một lần, hằng
       ngày, hằng tuần, theo múi giờ của website), ưu tiên khi trùng, thư viện chủ đề mẫu, chép sang năm sau, xem
       trước ở một thời điểm; hiệu ứng trang trí chỉ trong danh sách cho phép, không chạy ở trang thanh toán

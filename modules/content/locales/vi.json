@@ -259,5 +259,12 @@
   "text:Section": "Phần",
   "text:Use to group blocks into a band of the page with its own background and spacing.": "Dùng để gom khối thành một dải của trang với nền và khoảng cách riêng.",
   "text:Heading": "Tiêu đề",
-  "text:Use for the title of the page or of a section; level 1 only once per page.": "Dùng cho tiêu đề của trang hay của một phần; cấp 1 chỉ một lần mỗi trang."
+  "text:Use for the title of the page or of a section; level 1 only once per page.": "Dùng cho tiêu đề của trang hay của một phần; cấp 1 chỉ một lần mỗi trang.",
+  "text:Change the look of websites (colors, fonts, spacing, logo) for the organization units in reach.": "Đổi giao diện của website (màu, chữ, khoảng cách, logo) ở các nút trong phạm vi.",
+  "text:The theme of a website (colors, fonts, spacing, logo) was changed.": "Giao diện của một website (màu, chữ, khoảng cách, logo) đã đổi.",
+  "field:is not a theme token; known: {known}": "không phải token giao diện; các token có: {known}",
+  "field:must be a color written `#rrggbb`": "phải là màu viết dạng `#rrggbb`",
+  "field:must be one of the allowed fonts: {fonts}": "phải là một font trong danh sách cho phép: {fonts}",
+  "field:must be a whole number in {range}": "phải là số nguyên trong khoảng {range}",
+  "field:media item {id} does not exist or is not public": "ảnh {id} không có hoặc chưa công khai"
 }

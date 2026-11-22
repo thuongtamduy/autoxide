@@ -26,6 +26,7 @@ mod tests_compliance;
 mod tests_tenancy;
 #[cfg(test)]
 mod tests_web;
+mod themes;
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -98,6 +99,7 @@ pub(crate) fn routes(service: Arc<ContentService>) -> OpenApiRouter {
             redirects::update_redirect,
             redirects::delete_redirect
         ))
+        .routes(routes!(themes::get_theme, themes::put_theme))
         .routes(routes!(templates::list_templates))
         .routes(routes!(templates::draft_from_template))
         .routes(routes!(public::preview_token))
