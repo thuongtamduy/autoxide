@@ -66,6 +66,7 @@
   "field:may contain only letters, digits, `-`, `_`, `.` and `/`": "chỉ được có chữ, số, `-`, `_`, `.` và `/`",
   "field:may name at most {max} users": "chỉ được nhắc tối đa {max} người",
   "field:may only name columns of the export: {columns}": "chỉ được nêu các cột của bản xuất: {columns}",
+  "field:must be `production` or `sandbox`": "phải là `production` hoặc `sandbox`",
   "field:must be 1 to 100 characters": "phải dài 1 đến 100 ký tự",
   "field:must be 1 to 100 characters long": "phải dài 1 đến 100 ký tự",
   "field:must be 1 to 200 characters long": "phải dài 1 đến 200 ký tự",
