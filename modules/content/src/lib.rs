@@ -38,6 +38,7 @@ mod setup;
 mod suggest;
 mod taxonomy;
 mod templates;
+mod theme;
 mod tools;
 mod usages;
 mod work;

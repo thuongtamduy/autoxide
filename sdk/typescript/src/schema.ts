@@ -4503,6 +4503,16 @@ export type ContentTemplateVariable = {
   required: boolean;
 };
 
+/** A text and background color pair below the WCAG AA contrast (a warning; the theme is saved). */
+export type ContrastWarning = {
+  /** Token of the background color, e.g. `color.background`. */
+  background: string;
+  /** Token of the text color, e.g. `color.text`. */
+  foreground: string;
+  /** Contrast ratio, rounded to two decimals; WCAG AA asks at least 4.5 for normal text. */
+  ratio: number;
+};
+
 /** A conversation between a customer and a unit (shop or marketplace store). */
 export type Conversation = {
   assignee_user_id?: string | null;
@@ -13299,6 +13309,27 @@ export type Data_TextView = {
     locale: string;
     /** The tenant's wording, when set. */
     text?: string | null;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ThemeResponse = {
+  /** The theme of a website: what this unit sets, and what its website ends up with. */
+  data: {
+    /**
+     * Every token the website uses: the server defaults, then the root unit's tokens, … then
+     * this unit's. Flat names, ready to become CSS variables (`color.primary` → `--color-primary`).
+     */
+    effective: Record<string, unknown>;
+    /** The organization unit (website); the root unit is the whole tenant. */
+    org_id: string;
+    /** Tokens this unit sets itself, overriding the units above it. Empty: it inherits all. */
+    tokens: Record<string, unknown>;
+    /**
+     * Text and background colors of `effective` below the WCAG AA contrast of 4.5:1. A warning:
+     * the theme is saved anyway.
+     */
+    warnings: ContrastWarning[];
   };
 };
 
@@ -31719,6 +31750,40 @@ export type TextView = {
   text?: string | null;
 };
 
+/** The tokens a unit sets. */
+export type ThemeRequest = {
+  /**
+   * Replaces every token this unit sets; a token left out or `null` is inherited. Colors
+   * (`color.primary`, `color.on_primary`, `color.secondary`, `color.on_secondary`,
+   * `color.background`, `color.surface`, `color.text`, `color.muted`, `color.success`,
+   * `color.error`) are `#rrggbb`; `font.heading` / `font.body` one of the allowed fonts
+   * (`system`, `Inter`, `Roboto`, `Open Sans`, `Noto Sans`, `Noto Serif`, `Be Vietnam Pro`,
+   * `Montserrat`, `Lora`, `Merriweather`, `Playfair Display`, `Source Sans 3`);
+   * `font.size_base` 12–24 (px); `content_width` 640–1920 (px); `radius` `none` / `small` /
+   * `medium` / `large` / `full`; `spacing` `compact` / `normal` / `relaxed`; `button.style`
+   * `solid` / `outline` / `soft`; `logo_media_id` / `background_media_id` a public media item.
+   */
+  tokens: Record<string, unknown>;
+};
+
+/** The theme of a website: what this unit sets, and what its website ends up with. */
+export type ThemeResponse = {
+  /**
+   * Every token the website uses: the server defaults, then the root unit's tokens, … then
+   * this unit's. Flat names, ready to become CSS variables (`color.primary` → `--color-primary`).
+   */
+  effective: Record<string, unknown>;
+  /** The organization unit (website); the root unit is the whole tenant. */
+  org_id: string;
+  /** Tokens this unit sets itself, overriding the units above it. Empty: it inherits all. */
+  tokens: Record<string, unknown>;
+  /**
+   * Text and background colors of `effective` below the WCAG AA contrast of 4.5:1. A warning:
+   * the theme is saved anyway.
+   */
+  warnings: ContrastWarning[];
+};
+
 /** A top-level comment with its first replies. */
 export type ThreadComment = PublicComment & {
   /**
@@ -39028,6 +39093,34 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/content/themes/{org_id}": {
+    /** Get the theme of a website. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { org_id: string }; };
+      responses: {
+        200: Data_ThemeResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Replace the theme tokens of a website. */
+    put: {
+      parameters: { header: { "If-Match": string; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { org_id: string }; };
+      requestBody: ThemeRequest;
+      responses: {
+        200: Data_ThemeResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        412: Problem;
+        422: Problem;
+        428: Problem;
         default: Problem;
       };
     };

@@ -295,5 +295,12 @@
   "text:Use to show the scheduled banners of a placement, managed in one place; use a fixed block for text that belongs to this page only.": "Dùng để hiện banner có lịch của một vị trí, quản lý ở một chỗ; chữ chỉ thuộc trang này thì dùng khối cố định.",
   "field:give exactly one of `media_id` and `embed_url`": "chọn đúng một trong `media_id` và `embed_url`",
   "field:must hold {min} to {max} columns": "phải có từ {min} tới {max} cột",
-  "field:is added below every page by itself; do not place it": "được tự gắn dưới mọi trang; đừng đặt khối này"
+  "field:is added below every page by itself; do not place it": "được tự gắn dưới mọi trang; đừng đặt khối này",
+  "text:Change the look of websites (colors, fonts, spacing, logo) for the organization units in reach.": "Đổi giao diện của website (màu, chữ, khoảng cách, logo) ở các nút trong phạm vi.",
+  "text:The theme of a website (colors, fonts, spacing, logo) was changed.": "Giao diện của một website (màu, chữ, khoảng cách, logo) đã đổi.",
+  "field:is not a theme token; known: {known}": "không phải token giao diện; các token có: {known}",
+  "field:must be a color written `#rrggbb`": "phải là màu viết dạng `#rrggbb`",
+  "field:must be one of the allowed fonts: {fonts}": "phải là một font trong danh sách cho phép: {fonts}",
+  "field:must be a whole number in {range}": "phải là số nguyên trong khoảng {range}",
+  "field:media item {id} does not exist or is not public": "ảnh {id} không có hoặc chưa công khai"
 }

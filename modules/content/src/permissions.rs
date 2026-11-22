@@ -50,6 +50,12 @@ pub(crate) const CONTENT_BANNERS: Permission = Permission::new(
 )
 .scoped();
 
+pub(crate) const CONTENT_THEMES: Permission = Permission::new(
+    "content.themes.manage",
+    "Change the look of websites (colors, fonts, spacing, logo) for the organization units in reach.",
+)
+.scoped();
+
 // Theo nút (bước 34, D-208): đọc, viết, đăng, xoá áp theo độ sâu — người của một cửa hàng chỉ làm
 // trên bài của cửa hàng mình. `content.manage` (danh mục, thẻ, tác giả, chuyển hướng) giữ cấp khách.
 
@@ -63,6 +69,7 @@ pub(crate) fn all() -> Vec<Permission> {
         CONTENT_DELETE,
         CONTENT_MANAGE,
         CONTENT_BANNERS,
+        CONTENT_THEMES,
     ]
 }
 
