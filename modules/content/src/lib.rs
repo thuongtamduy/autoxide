@@ -23,6 +23,7 @@ mod entries;
 mod events;
 mod export;
 mod find;
+mod health;
 mod http;
 mod mcp;
 mod migration;
@@ -238,6 +239,8 @@ impl Module for ContentModule {
         context.personal_data(service.clone())?;
         context.work_source(Arc::new(work::Review))?;
         context.summary_metric(Arc::new(work::Review))?;
+        // Kiểm tra sức khoẻ website (bước 67): phát hiện của lần kiểm gần nhất.
+        context.work_source(Arc::new(health::Health))?;
         context.finder_source(Arc::new(find::Entries))?;
         // Gợi ý tìm của website (D-201): bài viết và trang đang công khai.
         context.suggest_source(Arc::new(suggest::Entries))?;

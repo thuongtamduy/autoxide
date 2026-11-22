@@ -20,6 +20,7 @@ mod agent;
 mod blocks_base;
 mod bulk;
 mod embed;
+mod health;
 mod layout;
 mod layout_public;
 mod ops;

@@ -476,6 +476,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261122-base-blocks](D-20261122-base-blocks.md)** Khối nền của `content`, chân trang pháp lý `compliance.legal_footer` tự gắn ngoài bố cục — 2026-11-22
 - **[D-20261122-layout-public](D-20261122-layout-public.md)** Đọc công khai trang dựng từ khối: dữ liệu khối trong `blocks_data`, ETag theo cả câu trả lời; số đo p99 — 2026-11-22
 - **[D-20261122-page-layout](D-20261122-page-layout.md)** Thân `layout` của trang: cùng cột `body`, sửa từng phần bằng JSON Patch tự viết, khoá sửa tách mục riêng — 2026-11-22
+- **[D-20261122-site-health](D-20261122-site-health.md)** Kiểm tra sức khoẻ website: chạy theo yêu cầu, một dòng kết quả mỗi website, nguồn hộp việc — 2026-11-22
 
 ## Tiền, thuế, chứng từ
 

@@ -479,8 +479,11 @@ sẵn, không sinh code; kết quả luôn là bản nháp.
       51, mục dùng lại nháp / lịch sử / bản dịch / SEO, trang chi tiết dựng sẵn, khối danh sách, API công khai có lọc
 - [ ] AI tạo trang và sửa tiếp bằng trò chuyện (job, kết quả qua bộ kiểm, thử lại có giới hạn, bản nháp
       `ai_assisted`, lịch sử trò chuyện để hoàn tác); bộ nháp chiến dịch từ một chương trình khuyến mại
-- [ ] Kiểm tra sức khoẻ website vào hộp việc: thiếu SEO / alt, link gãy, khối tham chiếu bản ghi đã ẩn, đường dẫn
-      404 nhiều → gợi ý chuyển hướng; tool MCP như REST; hướng dẫn EN + VI cho người viết module khai khối
+- [x] Kiểm tra sức khoẻ website vào hộp việc, chạy theo yêu cầu: thiếu mô tả SEO / alt, tiêu đề trùng, link gãy,
+      bản ghi nhúng đã ẩn, đếm ngược đã qua (D-20261122-site-health)
+- [ ] Kiểm tra sức khoẻ website, phần sau: job hằng ngày mọi website, đếm đường dẫn 404 (bảng
+      `content_not_found_paths`, không lưu IP) → gợi ý chuyển hướng; tool MCP như REST cho khối, bố cục, giao diện,
+      loại nội dung, AI trang, sức khoẻ (hướng dẫn EN + VI cho người viết module khai khối: PR riêng)
 - [ ] Thử A/B hai phiên bản trang (D-231, sau bước 57), **sau 1.0** — D-20261122-step67-after-1-0): chia cố định theo người xem (F5 không đổi), bot thấy bản
       gốc, chỉ thử bố cục và nội dung (không thử giá), số liệu và độ tin cậy, người chọn bản thắng
 - [ ] AI tạo ảnh (D-231), **sau 1.0** — D-20261122-step67-after-1-0): `ImageModel` mặc định tắt, chỉ banner / ảnh nền / minh hoạ, cờ `ai_generated` và nhãn,
