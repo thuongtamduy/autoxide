@@ -335,9 +335,13 @@ pub(crate) async fn resolution(
     path: &str,
 ) -> Result<(Resolution, Option<Timestamp>), Error> {
     Ok(match service.resolve(tenant, site, locale, path).await? {
-        Resolved::Entry(row) => {
+        Resolved::Entry(mut row) => {
             let version = row.updated_at;
             let layout = service.public_layout(tenant, site, &row.locale, &row.body).await?;
+            // Ảnh của khu dùng chung đã mở rộng cũng vào `body_media`.
+            if let Some(layout) = &layout {
+                row.body = layout.body.to_string();
+            }
             let view = service.public_views(tenant, vec![*row]).await?.into_iter().next();
             let view =
                 view.ok_or_else(|| Error::internal("public view of a published entry is missing"))?;

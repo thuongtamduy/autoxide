@@ -17,6 +17,7 @@ mod m0020_published_custom_fields;
 mod m0021_banners;
 mod m0022_edit_locks;
 mod m0023_themes;
+mod m0024_shared_sections;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 use autoxide_kernel::tenancy::migration::TenantTable;
@@ -164,5 +165,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(m0022_edit_locks::Migration),
         // Bộ giao diện của website: token ghi đè theo nút (bước 67).
         Box::new(m0023_themes::Migration),
+        // Khu dùng chung nhiều trang (bước 67).
+        Box::new(m0024_shared_sections::Migration),
     ]
 }
