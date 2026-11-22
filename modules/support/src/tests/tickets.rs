@@ -60,7 +60,7 @@ async fn nguoi_mua_khong_thay_ghi_chu_noi_bo() {
 
         // Thông báo: người được nhắc tên, người mua nhận câu trả lời.
         deliver(app).await;
-        let kinds: Vec<String> = harness.notifier.sent().iter().map(|n| n.kind.clone()).collect();
+        let kinds: Vec<String> = harness.notifier.calls().iter().map(|n| n.kind.clone()).collect();
         assert!(kinds.contains(&"support.mentioned".to_owned()), "{kinds:?}");
         assert!(kinds.contains(&"support.ticket_replied".to_owned()), "{kinds:?}");
 

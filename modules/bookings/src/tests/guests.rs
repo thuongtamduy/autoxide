@@ -14,8 +14,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 use super::bookings::drain;
-use super::fakes::FakeNotifier;
 use super::{Shop, admin, app_with, call, service, set_setting};
+use autoxide_notifications::api::testing::FakeNotifier;
 
 struct Setup {
     shop: Shop,
@@ -114,7 +114,7 @@ async fn nhac_lich_khong_gui_hai_lan() {
 
         remind_now(shop).await;
         remind_now(shop).await;
-        let sent = setup.notifier.sent.lock().unwrap().clone();
+        let sent = setup.notifier.calls();
         assert_eq!(sent.len(), 1, "{sent:?}");
         assert_eq!(sent[0].kind, "bookings.reminder");
         assert!(sent[0].dedupe_key.contains(":2h:"), "{}", sent[0].dedupe_key);
@@ -125,7 +125,7 @@ async fn nhac_lich_khong_gui_hai_lan() {
         admin(shop, "POST", &format!("/bookings/bookings/{id}/reschedule"), Some(moved), StatusCode::OK).await;
         remind_now(shop).await;
         remind_now(shop).await;
-        assert_eq!(setup.notifier.sent.lock().unwrap().len(), 2);
+        assert_eq!(setup.notifier.calls().len(), 2);
 
         // Lịch đã huỷ không được nhắc.
         let other = json!({"service_id": setup.service, "starts_at": in_minutes(60), "customer": {"name": "Ann"}});
@@ -133,7 +133,7 @@ async fn nhac_lich_khong_gui_hai_lan() {
         let other = booked["data"]["booking"]["id"].as_str().unwrap();
         admin(shop, "POST", &format!("/bookings/bookings/{other}/cancel"), Some(json!({})), StatusCode::OK).await;
         remind_now(shop).await;
-        assert_eq!(setup.notifier.sent.lock().unwrap().len(), 2);
+        assert_eq!(setup.notifier.calls().len(), 2);
     })
     .await
     .unwrap();

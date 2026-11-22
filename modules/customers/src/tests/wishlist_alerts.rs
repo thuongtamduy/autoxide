@@ -28,9 +28,7 @@ async fn like(shop: &Shop, who: &str, product: Uuid, variant: Option<Uuid>) {
 /// Tin báo yêu thích đã gửi.
 fn alerts(shop: &Shop) -> Vec<Value> {
     shop.notifier
-        .0
-        .lock()
-        .unwrap()
+        .sent()
         .iter()
         .filter(|sent| sent.kind == "customers.wishlist_alert")
         .map(|sent| json!({"to": format!("{:?}", sent.recipient), "params": sent.params}))
@@ -67,13 +65,13 @@ async fn bat_bao_can_dong_y_mac_dinh_tat() {
         assert_eq!(answer["code"], "customers.wishlist_alert_consent_required");
 
         turn_on(&shop, "buyer", true, true).await;
-        assert_eq!(*shop.consents.1.lock().unwrap(), vec![Uuid::from_u128(BUYER)]);
+        assert_eq!(super::alert_subscribers(&shop.consents), vec![Uuid::from_u128(BUYER)]);
         let body = json!({"back_in_stock": false, "price_drop": false});
         let (status, answer) = call(&shop, "PUT", "/me/wishlist/alerts", "buyer", Some(body)).await;
         assert_eq!(status, StatusCode::OK, "{answer}");
         assert_eq!(answer["data"]["price_drop"], false);
         // Tắt cả hai: rút đồng ý.
-        assert!(shop.consents.1.lock().unwrap().is_empty());
+        assert!(super::alert_subscribers(&shop.consents).is_empty());
     })
     .await
     .unwrap();
@@ -202,7 +200,10 @@ async fn rut_dong_y_thi_tat_va_xoa_hang_doi() {
         like(&shop, "buyer", product, None).await;
         reprice(&shop, product, variant, 80_000).await;
         // Rút ở chỗ khác (link huỷ nhận của `notifications`): sổ đồng ý đổi rồi phát event.
-        shop.consents.1.lock().unwrap().clear();
+        shop.consents.deny(
+            autoxide_compliance::api::ConsentSubject::User(Uuid::from_u128(BUYER)),
+            autoxide_compliance::api::ConsentKey::new(crate::wishlist_alerts::PURPOSE, "", ""),
+        );
         shop.compliance_event(&ConsentWithdrawn(json!({
             "consent_id": Uuid::now_v7(), "purpose": crate::wishlist_alerts::PURPOSE,
             "scope": "", "channel": "",

@@ -14,6 +14,10 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
+/// Sổ đồng ý giả cho test của module khác (feature `testing`).
+#[cfg(feature = "testing")]
+pub mod testing;
+
 /// Việc cần định danh trước (Luật TMĐT 2025 Điều 17).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]

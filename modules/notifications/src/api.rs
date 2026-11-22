@@ -16,6 +16,10 @@ use serde_json::Value;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
+/// Bộ gửi thông báo giả cho test của module khác (feature `testing`).
+#[cfg(feature = "testing")]
+pub mod testing;
+
 /// Group of a notification kind: decides whether preferences and consent apply.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
