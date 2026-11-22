@@ -573,8 +573,8 @@ bước 35.
       `children` theo thứ tự hiển thị, chỉ danh mục đang hiện), `catalog.product` có `image`; khối "Bán chạy" của
       bảng xổ là danh sách sản phẩm công khai lọc theo danh mục, sắp `best_selling`
 - [x] Tạo sản phẩm nháp từ ảnh bằng AI (tên, mô tả, danh mục trong cây của khách, thuộc tính, SEO — D-229)
-- [ ] Khối `catalog.product_grid`, `product_card`, `collection` cho trang dựng từ khối — **chờ sổ khối của
-      bước 67** (`Module::blocks()`, `BlockData` chưa có trong kernel)
+- [x] Khối `catalog.product_grid`, `product_card`, `collection` cho trang dựng từ khối (bước 67,
+      D-20261122-commerce-blocks)
 - [x] Website bán hàng (web-build-api-gaps, 16/11/2026): thông tin hiển thị theo biến thể trong `by-slug`, theo
       ngôn ngữ (vd số người dùng, trong hộp có gì, cách dùng / chăm sóc, dùng được máy rửa bát) — thuộc tính khai
       theo loại sản phẩm, không viết cứng ngành nào; catalog công khai lọc theo người bán và đường dẫn trang sản
@@ -646,7 +646,7 @@ quốc gia; NĐ 239/2026 sửa NĐ 81/2018 — cần đối chiếu văn bản h
 - [x] Công khai và nhắc: event giá sau giảm tự động cho danh sách công khai; flash sale công khai với suất
       còn là số thật; nhắc khi flash sale bắt đầu (đồng ý riêng cho một lần nhắc, D-225)
 - [x] Chạy thử chương trình trên giỏ mẫu, kiểm xung đột, lịch, số liệu chương trình (D-222)
-- [ ] Khối `promotions.flash_sale`, `promotions.voucher_claim` cho trang dựng từ khối (D-229, bước 67);
+- [x] Khối `promotions.flash_sale`, `promotions.voucher_claim` cho trang dựng từ khối (D-229, bước 67);
       `promotions.promotion` trong sổ đối tượng (chỉ công khai khi đang chạy) để menu của website trỏ tới (D-238)
 - [x] Website bán hàng (16/11/2026): `GET /public/promotions` trả số thông báo khuyến mại với Sở Công Thương và
       mức giảm tối đa theo luật đang áp (dữ liệu có ngày hiệu lực, luật số hai)
@@ -728,9 +728,9 @@ tiền qua `PaymentGateway` và sổ cái của bước 36.
       hạn; không chia sẻ danh sách giữa các khách
 - [x] Trả góp qua đối tác (trait của bước 36); bảo hành theo số serial hay theo đơn: phiếu bảo hành, tiếp
       nhận, trạng thái xử lý, hạn bảo hành
-- [ ] Khối `orders.add_to_cart`, `buy_now`, `reviews` cho trang dựng từ khối (D-229) và `orders.cart_link` cho đầu
+- [x] Khối `orders.add_to_cart`, `buy_now`, `reviews` cho trang dựng từ khối (D-229) và `orders.cart_link` cho đầu
       trang (D-234); câu trả lời tự động về trạng thái đơn cho `support` (`FactSource`, chỉ cho chủ đơn — D-230)
-      — phần `FactSource` đã xong (D-20261120-step45-guest-orders); khối chờ `Module::blocks` của bước 67
+      — `FactSource`: D-20261120-step45-guest-orders; khối: D-20261122-commerce-blocks
 - [x] Ô người mua nhập lúc đặt hàng (D-235): `orders.order` là đích trường tự định nghĩa (P19 của bước 51) có mức
       `buyer_input`; checkout kiểm cùng bộ gom lỗi; mail xác nhận đọc được các trường này
 - [x] Trả trước một phần cho hàng đặt trước (D-232): tỉ lệ hay số tiền, phần còn lại thu khi sẵn sàng giao,

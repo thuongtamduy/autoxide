@@ -171,5 +171,9 @@
   "field:exactly one of `sale_price_minor` / `value_bp`; limits at least 1; each product once": "đúng một trong `sale_price_minor` / `value_bp`; giới hạn tối thiểu 1; mỗi sản phẩm một lần",
   "field:not a product of your unit": "không phải sản phẩm của đơn vị bạn",
   "field:send 1 to {max} products": "gửi từ 1 tới {max} sản phẩm",
-  "field:this product is already in the promotion": "sản phẩm này đã có trong chương trình"
+  "field:this product is already in the promotion": "sản phẩm này đã có trong chương trình",
+  "text:Flash sale": "Flash sale",
+  "text:Use to show a flash sale with its countdown, sale prices and units left; never write prices or dates into text.": "Dùng để hiện flash sale kèm đếm ngược, giá giảm và suất còn lại; không bao giờ viết giá hay ngày vào chữ.",
+  "text:Save a voucher": "Lưu voucher",
+  "text:Use to let buyers save a voucher of a running public promotion to use at checkout.": "Dùng để người mua lưu voucher của một chương trình công khai đang chạy, dùng khi thanh toán."
 }

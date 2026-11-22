@@ -2,6 +2,7 @@
 //! như binary bằng `TestApp` của testkit, với `dyn Catalog` giả (biến thể, giá tham chiếu, sàn giá
 //! đặt sẵn); gọi qua REST, MCP và `dyn Promotions`.
 
+mod blocks;
 mod evaluate;
 mod insights;
 mod participations;
