@@ -14,15 +14,10 @@ pub(crate) use autoxide_compliance::api::testing::FakeConsentLedger;
 use autoxide_kernel::time::Timestamp;
 pub(crate) use autoxide_notifications::api::testing::FakeNotifier;
 use jiff::SignedDuration;
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
-use autoxide_catalog::api::{
-    BundleComponent, Catalog, FloorAction, PriceFloor, PriceQuery, PriceSnapshot, ProductKind,
-    ProductStatus, SaleMode, VariantSnapshot,
-};
+use autoxide_catalog::api::Catalog;
 use autoxide_kernel::access::Scope;
-use autoxide_kernel::error::Error;
 use autoxide_kernel::money::{Currency, Money};
 use autoxide_kernel::tenancy::{DEFAULT_TENANT, OrgId, OrgTree, TenantContext, root_of};
 use autoxide_testkit::{TestApp, TestDatabase};
@@ -51,154 +46,30 @@ pub(crate) fn money(minor: i64) -> Money {
     Money::new(minor, vnd())
 }
 
-/// (sản phẩm, nút sở hữu, danh mục) của biến thể giả.
-pub(crate) type FakeVariant = (Uuid, OrgId, Vec<Uuid>);
-/// Lịch sử giá: (từ lúc, giá).
-pub(crate) type PriceHistory = Vec<(Timestamp, Money)>;
-
-/// `dyn Catalog` giả: biến thể và lịch sử giá đặt sẵn.
-#[derive(Default)]
-pub(crate) struct FakeCatalog {
-    pub variants: Mutex<HashMap<Uuid, FakeVariant>>,
-    /// Lịch sử giá mỗi biến thể: (từ lúc, giá).
-    pub prices: Mutex<HashMap<Uuid, PriceHistory>>,
-    pub floors: Mutex<HashMap<Uuid, (Money, FloorAction)>>,
-    /// Nguồn giá giảm tự động promotions cắm vào (`CatalogExtensions`).
-    pub sale_source: Mutex<Option<Arc<dyn autoxide_catalog::api::SalePriceSource>>>,
-}
-
-impl autoxide_catalog::api::CatalogExtensions for FakeCatalog {
-    fn set_sale_price_source(
-        &self,
-        source: Arc<dyn autoxide_catalog::api::SalePriceSource>,
-    ) -> bool {
-        let mut slot = self.sale_source.lock().unwrap();
-        if slot.is_some() {
-            return false;
-        }
-        *slot = Some(source);
-        true
-    }
-}
-
-impl FakeCatalog {
-    /// Thêm biến thể của nút `org` trong các danh mục `categories`, giá `price` từ 30 ngày trước.
-    pub(crate) fn add(&self, org: OrgId, price: i64, categories: &[Uuid]) -> Uuid {
-        let variant = Uuid::now_v7();
-        self.variants.lock().unwrap().insert(variant, (Uuid::now_v7(), org, categories.to_vec()));
-        self.prices.lock().unwrap().insert(
-            variant,
-            vec![(Timestamp::now() - SignedDuration::from_hours(24 * 30), money(price))],
-        );
-        variant
-    }
-
-    fn snapshot(&self, id: Uuid) -> Option<VariantSnapshot> {
-        let variants = self.variants.lock().unwrap();
-        let (product, org, categories) = variants.get(&id)?.clone();
-        // `VariantSnapshot` là `#[non_exhaustive]` ở crate khác: dựng qua JSON.
-        serde_json::from_value(json!({
-            "variant_id": id, "product_id": product, "org_id": org, "kind": ProductKind::Physical,
-            "status": ProductStatus::Active, "variant_active": true, "sku": id.to_string(),
-            "barcode": null, "name": "Item", "variant_label": "", "locale": "vi",
-            "tax_category": "vat.standard", "category_ids": categories, "weight_grams": null,
-            "length_mm": null, "width_mm": null, "height_mm": null, "requires_shipping": true,
-            "track_inventory": true, "sale_mode": SaleMode::InStock, "preorder_available_on": null,
-            "preorder_limit": null, "preorder_ends_at": null, "allow_backorder": false,
-            "lot_tracked": false, "serial_tracked": false, "warranty_months": null,
-            "image_media_id": null, "updated_at": Timestamp::now(),
-        }))
-        .ok()
-    }
-
-    fn price(&self, id: Uuid, at: Timestamp, before: bool) -> Option<PriceSnapshot> {
-        let prices = self.prices.lock().unwrap();
-        let (from, amount) = prices
-            .get(&id)?
-            .iter()
-            .filter(|(from, _)| if before { *from < at } else { *from <= at })
-            .max_by_key(|(from, _)| *from)?
-            .to_owned();
-        serde_json::from_value(json!({
-            "variant_id": id, "price_list_id": Uuid::nil(), "price_id": Uuid::nil(),
-            "amount": amount, "tax_inclusive": true, "compare_at": null, "valid_from": from,
-            "valid_to": null,
-        }))
-        .ok()
-    }
-}
-
-#[async_trait::async_trait]
-impl Catalog for FakeCatalog {
-    async fn variants(
-        &self,
-        _tenant: &TenantContext,
-        ids: &[Uuid],
-        _locale: Option<&str>,
-    ) -> Result<Vec<VariantSnapshot>, Error> {
-        Ok(ids.iter().filter_map(|id| self.snapshot(*id)).collect())
-    }
-
-    async fn variant_by_code(
-        &self,
-        _tenant: &TenantContext,
-        _code: &str,
-        _locale: Option<&str>,
-    ) -> Result<Option<VariantSnapshot>, Error> {
-        Ok(None)
-    }
-
-    async fn prices(
-        &self,
-        _tenant: &TenantContext,
-        query: &PriceQuery,
-    ) -> Result<Vec<PriceSnapshot>, Error> {
-        Ok(query.variant_ids.iter().filter_map(|id| self.price(*id, query.at, false)).collect())
-    }
-
-    async fn reference_prices(
-        &self,
-        _tenant: &TenantContext,
-        query: &PriceQuery,
-    ) -> Result<Vec<PriceSnapshot>, Error> {
-        Ok(query.variant_ids.iter().filter_map(|id| self.price(*id, query.at, true)).collect())
-    }
-
-    async fn price_floors(
-        &self,
-        _tenant: &TenantContext,
-        _org_id: OrgId,
-        _currency: Currency,
-        variant_ids: &[Uuid],
-    ) -> Result<Vec<PriceFloor>, Error> {
-        let floors = self.floors.lock().unwrap();
-        Ok(variant_ids
-            .iter()
-            .filter_map(|id| {
-                let (floor, action) = floors.get(id)?;
-                serde_json::from_value(json!({
-                    "variant_id": id, "guard_id": Uuid::nil(), "min_price": floor,
-                    "min_margin_bp": null, "unit_cost": null, "floor": floor, "action": action,
-                }))
-                .ok()
-            })
-            .collect())
-    }
-
-    async fn bundle_components(
-        &self,
-        _tenant: &TenantContext,
-        _variant_ids: &[Uuid],
-    ) -> Result<HashMap<Uuid, Vec<BundleComponent>>, Error> {
-        Ok(HashMap::new())
-    }
-}
-
 /// Cây gốc → chuỗi → cửa hàng A, B.
 pub(crate) struct Tree {
     pub chain: OrgId,
     pub a: OrgId,
     pub b: OrgId,
+}
+
+pub(crate) use autoxide_catalog::api::testing::FakeCatalog;
+
+/// Cách `promotions` thêm hàng vào catalog giả dùng chung.
+pub(crate) trait CatalogExt {
+    /// Thêm biến thể của nút `org` trong các danh mục `categories`, giá `price` từ 30 ngày trước.
+    fn add(&self, org: OrgId, price: i64, categories: &[Uuid]) -> Uuid;
+}
+
+impl CatalogExt for FakeCatalog {
+    fn add(&self, org: OrgId, price: i64, categories: &[Uuid]) -> Uuid {
+        let id = Uuid::now_v7();
+        let mut variant = autoxide_catalog::api::testing::variant(id, org);
+        variant.category_ids = categories.to_vec();
+        self.insert_variant(variant);
+        self.set_price(id, money(price));
+        id
+    }
 }
 
 pub(crate) struct Setup {
@@ -222,7 +93,7 @@ impl Setup {
     pub(crate) fn cart(&self, lines: &[(Uuid, i64)]) -> Cart {
         let mut cart = Cart::new(self.tree.a, vnd(), Timestamp::now());
         for (index, (variant, quantity)) in lines.iter().enumerate() {
-            let price = self.catalog.price(*variant, Timestamp::now(), false).unwrap().amount;
+            let price = self.catalog.price_of(*variant, Timestamp::now()).unwrap();
             cart.lines.push(CartLine::new(format!("l{index}"), *variant, *quantity, price));
         }
         cart

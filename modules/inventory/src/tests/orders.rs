@@ -1,6 +1,7 @@
 //! Event của `orders` (module giả phát): xác nhận, huỷ, nhập lại hàng trả về, huỷ riêng phần đặt
 //! trước — nhận lại nhiều lần vẫn chỉ áp một lần.
 
+use super::CatalogExt as _;
 use autoxide_kernel::time::Timestamp;
 use jiff::SignedDuration;
 use std::sync::Arc;

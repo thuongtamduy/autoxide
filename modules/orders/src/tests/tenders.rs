@@ -2,6 +2,7 @@
 //! `OrderExtensions::add_tender`: phần còn lại thu qua đối tác, trả đủ thì đơn xác nhận ngay, tender
 //! lạ hay tender lỗi thì mọi chỗ giữ được trả.
 
+use super::CatalogExt as _;
 use autoxide_kernel::time::Timestamp;
 use std::sync::{Arc, Mutex};
 

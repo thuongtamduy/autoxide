@@ -1,6 +1,7 @@
 //! Ví voucher: cấp không nhân đôi, quota khi nhiều người nhận cùng lúc, chỉ chủ ví dùng được,
 //! lưu / nhập mã nhận qua REST, dữ liệu cá nhân, xoá tài khoản.
 
+use super::CatalogExt as _;
 use std::sync::Arc;
 
 use autoxide_kernel::reference::Submitted;

@@ -2,16 +2,12 @@
 //! chốt riêng, `eta` trong báo giá, giờ sẵn sàng và hạn giữ hàng của nhận tại cửa hàng, ước tính
 //! công khai bằng đúng báo giá của giỏ một dòng. Cả SQLite và Postgres.
 
+use autoxide_catalog::api::testing::FakeCatalog;
 use autoxide_kernel::time::{Date, Timestamp};
 use jiff::SignedDuration;
-use std::collections::HashMap;
 
-use autoxide_catalog::api::{
-    BundleComponent, Catalog, PriceFloor, PriceQuery, PriceSnapshot, VariantSnapshot,
-};
-use autoxide_kernel::error::Error;
-use autoxide_kernel::money::Currency;
-use autoxide_kernel::tenancy::{OrgId, TenantContext};
+use autoxide_catalog::api::Catalog;
+use autoxide_kernel::tenancy::OrgId;
 
 use super::rates::{Tree, method, rates, zone};
 use super::*;
@@ -20,87 +16,21 @@ fn vnd(amount: i64) -> Value {
     json!({"amount": amount.to_string(), "currency": "VND"})
 }
 
-/// Catalog giả: một biến thể 300 g của cửa hàng A, giá 200 000đ.
-struct FakeCatalog {
-    variant: VariantSnapshot,
-}
-
-impl FakeCatalog {
-    fn new(org: OrgId) -> Self {
-        let variant = serde_json::from_value(json!({
-            "variant_id": Uuid::from_u128(0xA1), "product_id": Uuid::from_u128(0xB1), "org_id": org,
-            "kind": "physical", "status": "active", "variant_active": true, "sku": "TEE-1", "barcode": null,
-            "name": "Ao", "variant_label": "", "locale": "vi", "tax_category": "vat.standard",
-            "category_ids": [], "weight_grams": 300, "length_mm": null, "width_mm": null, "height_mm": null,
-            "requires_shipping": true, "track_inventory": true, "sale_mode": "in_stock",
-            "preorder_available_on": null, "preorder_limit": null, "preorder_ends_at": null,
-            "allow_backorder": false, "lot_tracked": false, "serial_tracked": false,
-            "warranty_months": null, "image_media_id": null, "updated_at": Timestamp::now(),
-        }))
-        .unwrap();
-        FakeCatalog { variant }
-    }
-}
-
-#[async_trait::async_trait]
-impl Catalog for FakeCatalog {
-    async fn variants(
-        &self,
-        _: &TenantContext,
-        ids: &[Uuid],
-        _: Option<&str>,
-    ) -> Result<Vec<VariantSnapshot>, Error> {
-        Ok(ids
-            .iter()
-            .filter(|id| **id == self.variant.variant_id)
-            .map(|_| self.variant.clone())
-            .collect())
-    }
-    async fn variant_by_code(
-        &self,
-        _: &TenantContext,
-        _: &str,
-        _: Option<&str>,
-    ) -> Result<Option<VariantSnapshot>, Error> {
-        Ok(None)
-    }
-    async fn prices(
-        &self,
-        _: &TenantContext,
-        query: &PriceQuery,
-    ) -> Result<Vec<PriceSnapshot>, Error> {
-        Ok(vec![
-            serde_json::from_value(json!({
-                "variant_id": self.variant.variant_id, "price_list_id": Uuid::from_u128(1),
-                "price_id": Uuid::from_u128(2), "amount": vnd(200_000), "tax_inclusive": true,
-                "compare_at": null, "valid_from": query.at, "valid_to": null,
-            }))
-            .unwrap(),
-        ])
-    }
-    async fn reference_prices(
-        &self,
-        _: &TenantContext,
-        _: &PriceQuery,
-    ) -> Result<Vec<PriceSnapshot>, Error> {
-        Ok(Vec::new())
-    }
-    async fn price_floors(
-        &self,
-        _: &TenantContext,
-        _: OrgId,
-        _: Currency,
-        _: &[Uuid],
-    ) -> Result<Vec<PriceFloor>, Error> {
-        Ok(Vec::new())
-    }
-    async fn bundle_components(
-        &self,
-        _: &TenantContext,
-        _: &[Uuid],
-    ) -> Result<HashMap<Uuid, Vec<BundleComponent>>, Error> {
-        Ok(HashMap::new())
-    }
+/// Catalog giả: một biến thể 300 g của cửa hàng `org` (SKU `TEE-1`), giá 200 000đ.
+fn tee_shop(org: OrgId) -> FakeCatalog {
+    let catalog = FakeCatalog::new();
+    let id = Uuid::from_u128(0xA1);
+    let mut variant = autoxide_catalog::api::testing::variant(id, org);
+    variant.product_id = Uuid::from_u128(0xB1);
+    variant.sku = "TEE-1".to_owned();
+    variant.name = "Ao".to_owned();
+    variant.weight_grams = Some(300);
+    catalog.insert_variant(variant);
+    catalog.set_price(
+        id,
+        autoxide_kernel::money::Money::new(200_000, autoxide_kernel::money::Currency::VND),
+    );
+    catalog
 }
 
 /// Cửa hàng có catalog giả, phương thức "standard" 20 000đ toàn quốc, giao 1–2 ngày, miễn phí từ
@@ -118,7 +48,7 @@ async fn dated_shop(test: &TestDatabase) -> (TestApp, Tree, String, String) {
             &staff,
         )
         .provide::<dyn AdministrativeUnits>(Arc::new(FakeUnits))
-        .provide::<dyn Catalog>(Arc::new(FakeCatalog::new(tree.a)))
+        .provide::<dyn Catalog>(Arc::new(tee_shop(tree.a)))
         .module(crate::module())
         .build()
         .await

@@ -2,6 +2,7 @@
 //! `partially_paid`, hàng về đủ → mời trả phần còn lại, chưa trả thì chưa giao, quá hạn → huỷ và giữ
 //! lại theo điều kiện đã chụp, người mua huỷ trước mốc chốt → hoàn đủ.
 
+use super::CatalogExt as _;
 use autoxide_kernel::money::Currency;
 use autoxide_kernel::time::Timestamp;
 use autoxide_ledger::api::AccountKey;

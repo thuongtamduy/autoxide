@@ -1,6 +1,7 @@
 //! Ô người mua nhập lúc đặt hàng (D-235), trả góp qua đối tác, bảo hành theo serial / theo dòng,
 //! hạn huỷ / đổi trả và cách trả trên giỏ cho website.
 
+use super::CatalogExt as _;
 use autoxide_kernel::access::Scope;
 use autoxide_kernel::time::Timestamp;
 use autoxide_testkit::TestDatabase;

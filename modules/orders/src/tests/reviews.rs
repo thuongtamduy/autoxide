@@ -3,6 +3,7 @@
 //! gửi đồng thời), lật trang theo "hữu ích", xoá tài khoản, bản nháp tóm tắt AI chờ duyệt, nhãn
 //! `verified_buyer`.
 
+use super::CatalogExt as _;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;

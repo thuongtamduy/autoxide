@@ -296,6 +296,8 @@ autoxide-ledger = { git = "https://github.com/thuongtamduy/autoxide", tag = "vX.
 
 The same pattern exists for the other traits modules most often call: `autoxide_notifications::api::testing::FakeNotifier` (keeps what your module sent — `sent()` with the real `dedupe_key` rule, `calls()` with every call, `kinds()` declared) and `autoxide_compliance::api::testing::FakeConsentLedger` (consents in memory with the real "broader key" rule; set them up with `allow` / `deny`, read them back with `state_of` / `records`, make the ledger fail with `set_failing`).
 
+`autoxide_catalog::api::testing::FakeCatalog` holds variants (build one with `variant(id, org)` and change what your tests need, then `insert_variant`), a price history per variant (`set_price`, `push_price`, `set_price_history`; current and reference prices follow it like the real catalog), price floors, bundles and display prices, and it accepts a sale-price source (`CatalogExtensions`).
+
 ## 6. The rules of the core, checked on your crate
 
 Inside the Autoxide repository, `cargo xtask check` enforces the module rules. For a crate anywhere else, run the same source rules from a checkout of Autoxide at the tag you build on:

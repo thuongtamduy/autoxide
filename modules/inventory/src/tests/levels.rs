@@ -1,5 +1,6 @@
 //! Dòng tồn, sổ biến động, điều chỉnh có lý do, giá vốn bình quân, cảnh báo tồn thấp, rò rỉ.
 
+use super::CatalogExt as _;
 use autoxide_testkit::{TestApp, TestDatabase, branch_leak_check, leak_check, tool};
 use axum::http::StatusCode;
 use sea_orm::ConnectionTrait;

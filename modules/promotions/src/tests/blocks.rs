@@ -2,6 +2,7 @@
 //! trình công khai cho lưu; chương trình của website khác, không công khai hay không cho lưu thì
 //! khối ẩn (`null`). Chạy trên cả SQLite và Postgres.
 
+use super::CatalogExt as _;
 use autoxide_kernel::blocks::{BlockRef, BlockRequest};
 use autoxide_kernel::tenancy::Site;
 use autoxide_testkit::TestDatabase;

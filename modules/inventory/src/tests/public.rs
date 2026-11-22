@@ -1,6 +1,7 @@
 //! Tình trạng hàng công khai (D-200): không lộ số lớn, đổi ngay sau khi giữ chỗ, ETag → 304,
 //! đặt trước hiện `preorder`, combo tính từ thành phần.
 
+use super::CatalogExt as _;
 use autoxide_kernel::time::Timestamp;
 use jiff::SignedDuration;
 use std::sync::Arc;

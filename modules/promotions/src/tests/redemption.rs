@@ -1,6 +1,7 @@
 //! Giữ → xác nhận → trả lượt, chạy đồng thời trên database thật (gate chạy cả SQLite và
 //! Postgres): không vượt giới hạn, không giữ hai lần, trả đúng bộ đếm đã giữ.
 
+use super::CatalogExt as _;
 use autoxide_kernel::time::Timestamp;
 use jiff::SignedDuration;
 use std::sync::Arc;
