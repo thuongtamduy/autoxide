@@ -285,6 +285,16 @@ pub(crate) fn lookup_too_many(retry_after: u64) -> Error {
     .with_retry_after(retry_after)
 }
 
+pub(crate) fn payment_retry_too_many(retry_after: u64) -> Error {
+    Error::too_many_requests(
+        "orders.payment_retry_too_many",
+        "The payment of this order was started again too many times. Try again in {retry_after} \
+         seconds.",
+    )
+    .with_param("retry_after", retry_after)
+    .with_retry_after(retry_after)
+}
+
 pub(crate) fn lookup_code_invalid() -> Error {
     Error::new(
         ErrorKind::Validation,

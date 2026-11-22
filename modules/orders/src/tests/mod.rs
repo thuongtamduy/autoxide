@@ -12,6 +12,7 @@ mod fakes;
 mod guests;
 mod invoices_pos;
 mod lifecycle;
+mod payment_retry;
 mod pickups;
 mod preorders;
 mod returns;

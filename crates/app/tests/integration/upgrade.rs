@@ -442,19 +442,28 @@ async fn nang_cap_tu_ban_phat_hanh_truoc_giu_nguyen_du_lieu() {
         let version = docker(&image, directory.path(), &environment, &["--version"], None, None);
         assert!(version.status.success(), "{}", text(&version));
         let old_version = parse_version(String::from_utf8_lossy(&version.stdout).trim());
-        let migrated = docker(&image, directory.path(), &environment, &["migrate", "up"], None, None);
+        // Từ 0.18 module hạng thử nghiệm phải được bật bằng `AUTOXIDE_MODULES` ngay ở bản cũ
+        // (D-20261121-module-selection), nếu không bản cũ không phục vụ `newsletter` để ghi dữ liệu
+        // mẫu. Bản mới bên dưới vẫn chạy thiếu dòng này trước, để kiểm `doctor` chỉ đúng dòng cần thêm.
+        let mut old_environment = environment.clone();
+        if old_version >= (0, 18, 0) {
+            old_environment.push(("AUTOXIDE_MODULES".to_owned(), "official,newsletter".to_owned()));
+        }
+        let migrated =
+            docker(&image, directory.path(), &old_environment, &["migrate", "up"], None, None);
         assert!(migrated.status.success(), "old `migrate up`: {}", text(&migrated));
         let user = docker(
             &image,
             directory.path(),
-            &environment,
+            &old_environment,
             &["user", "create", "--email", EMAIL, "--name", "Admin", "--admin", "--password-stdin"],
             Some(PASSWORD),
             None,
         );
         assert!(user.status.success(), "old `user create`: {}", text(&user));
         let name = format!("autoxide-upgrade-{}", uuid::Uuid::now_v7());
-        let started = docker(&image, directory.path(), &environment, &["serve"], None, Some(&name));
+        let started =
+            docker(&image, directory.path(), &old_environment, &["serve"], None, Some(&name));
         assert!(started.status.success(), "old `serve`: {}", text(&started));
         let container = Container(name);
         let logs = || text(&Command::new("docker").args(["logs", &container.0]).output().unwrap());

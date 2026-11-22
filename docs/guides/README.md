@@ -24,6 +24,7 @@ older curl, replace `--json '…'` with `-H 'Content-Type: application/json' -H 
 - [Trying changes in a sandbox](sandbox.md): a test copy of your tenant, simulated partners, bringing drafts back
 - [Automating work with rules](automations.md): triggers, conditions, MCP tools as actions, approvals, alerts on unusual figures
 - [Building a mobile or desktop app](mobile.md): SDKs, tokens and PKCE, push, offline sync, WebSocket, in-app purchases
+- [Adding blocks for pages built from blocks](page-blocks.md): declaring a block, its props, data at read time, what the AI sees (for developers)
 - [Writing a provider adapter](provider-adapters.md): per-tenant accounts, secrets, webhooks, testing without the network (for developers)
 - [Sending SMS through eSMS](providers/esms.md): what to get from eSMS, the tenant's account settings, testing, errors (experimental)
 - [Confirming bank transfers with SePay](sepay.md): your own SePay account per tenant, the webhook address, VietQR payments confirmed by themselves (experimental)

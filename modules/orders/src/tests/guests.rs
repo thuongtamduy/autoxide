@@ -57,13 +57,13 @@ impl SupportFacts for FakeSupport {
     }
 }
 
-struct Guests {
-    shop: Shop,
-    sms: Arc<FakeSmsSender>,
+pub(super) struct Guests {
+    pub shop: Shop,
+    pub sms: Arc<FakeSmsSender>,
     support: Arc<FakeSupport>,
 }
 
-async fn guests(test: &TestDatabase, with_support: bool) -> Guests {
+pub(super) async fn guests(test: &TestDatabase, with_support: bool) -> Guests {
     let sms = Arc::new(FakeSmsSender::new());
     let support = Arc::new(FakeSupport::default());
     let (sms_in, support_in) = (sms.clone(), support.clone());
@@ -105,7 +105,7 @@ fn last_code(sms: &FakeSmsSender) -> String {
 }
 
 /// Gọi `/api/v1/orders{uri}` không đăng nhập, kèm `Order-Token` và `Idempotency-Key` nếu có.
-async fn public(
+pub(super) async fn public(
     shop: &Shop,
     method: &str,
     uri: &str,
@@ -130,7 +130,7 @@ async fn public(
 }
 
 /// Tra đơn rồi xác nhận mã: trả token xem đơn.
-async fn access_token(guests: &Guests, number: &str) -> String {
+pub(super) async fn access_token(guests: &Guests, number: &str) -> String {
     let (status, sent) = public(
         &guests.shop,
         "POST",

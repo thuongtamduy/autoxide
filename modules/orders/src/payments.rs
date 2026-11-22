@@ -81,6 +81,46 @@ pub(crate) struct Action {
     pub redirect_url: Option<String>,
     pub qr_payload: Option<String>,
     pub transfer_code: Option<String>,
+    /// `kind = none`: vì sao lượt thu chưa khởi tạo được (đối tác từ chối…). Dòng cũ không có.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<StartFailure>,
+}
+
+/// Lỗi lần khởi tạo lượt thu gần nhất, giữ đủ để dịch lại theo ngôn ngữ của người gọi: `code` (cũng
+/// là i18n key), câu mẫu tiếng Anh và giá trị điền. Lỗi nội bộ chỉ có mã và câu chung (không lộ
+/// nguyên nhân gốc).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) struct StartFailure {
+    pub code: String,
+    pub template: String,
+    #[serde(default)]
+    pub params: Vec<(String, String)>,
+}
+
+impl StartFailure {
+    pub(crate) fn of(error: &Error) -> StartFailure {
+        StartFailure {
+            code: error.code().to_owned(),
+            template: error.template().to_owned(),
+            params: error
+                .params()
+                .map(|(name, value)| (name.to_owned(), value.to_owned()))
+                .collect(),
+        }
+    }
+
+    /// Dựng lại `Error` (chỉ để lấy thông báo đã dịch qua `Translations::message`).
+    pub(crate) fn to_error(&self) -> Error {
+        let mut error = Error::new(
+            autoxide_kernel::error::ErrorKind::Validation,
+            self.code.clone(),
+            self.template.clone(),
+        );
+        for (name, value) in &self.params {
+            error = error.with_param(name.clone(), value);
+        }
+        error
+    }
 }
 
 impl OrdersService {
@@ -151,13 +191,24 @@ impl OrdersService {
                 } else {
                     error
                 }
-            })?
-            .into_inner();
+            });
+        let created = match created {
+            Ok(created) => created.into_inner(),
+            Err(error) => {
+                // Ghi lý do vào khoản (`payment_actions[].error`): người mua và client biết phải sửa
+                // gì trước khi mở lại lượt thu. Ghi hỏng thì chỉ log — lỗi gốc vẫn trả về.
+                if let Err(failed) = self.record_start_failure(tenant, row.id, &error).await {
+                    tracing::warn!(order_id = %order_id, code = failed.code(), "payment failure not recorded");
+                }
+                return Err(error);
+            }
+        };
         let action = Action {
             kind: if created.checkout_url.is_some() { "redirect" } else { "qr" }.to_owned(),
             redirect_url: created.checkout_url.clone(),
             qr_payload: created.qr_payload.clone(),
             transfer_code: created.transfer_code.clone(),
+            error: None,
         };
         let mut updated: payment::ActiveModel = row.into();
         updated.ledger_payment_id = Set(Some(created.id));
@@ -178,6 +229,35 @@ impl OrdersService {
             .exec(&transaction)
             .await?;
         transaction.commit().await?;
+        Ok(())
+    }
+
+    /// Khoản `payment_id` chưa có lượt thu ở `ledger`: ghi `kind = none` kèm lỗi lần khởi tạo vừa rồi.
+    async fn record_start_failure(
+        &self,
+        tenant: &TenantContext,
+        payment_id: Uuid,
+        error: &Error,
+    ) -> Result<(), Error> {
+        let action = Action {
+            kind: "none".to_owned(),
+            redirect_url: None,
+            qr_payload: None,
+            transfer_code: None,
+            error: Some(StartFailure::of(error)),
+        };
+        let raw = serde_json::to_string(&action).map_err(Error::internal)?;
+        payment::Entity::update_many()
+            .col_expr(payment::Column::Action, sea_orm::sea_query::Expr::value(raw))
+            .col_expr(
+                payment::Column::UpdatedAt,
+                sea_orm::sea_query::Expr::value(crate::service::now()),
+            )
+            .filter(payment::Column::Id.eq(payment_id))
+            .filter(payment::Column::LedgerPaymentId.is_null())
+            .scoped(tenant)
+            .exec(tenant.database().write())
+            .await?;
         Ok(())
     }
 

@@ -32,6 +32,7 @@ mod lifecycle;
 mod migration;
 mod notices;
 mod orders_read;
+mod payment_retry;
 mod payments;
 mod permissions;
 mod pickups;

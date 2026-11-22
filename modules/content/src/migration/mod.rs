@@ -21,6 +21,8 @@ mod m0024_shared_sections;
 mod m0025_page_templates;
 mod m0026_theme_variants;
 mod m0027_site_regions;
+mod m0028_content_types;
+mod m0029_ai_turns;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 use autoxide_kernel::tenancy::migration::TenantTable;
@@ -176,5 +178,9 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(m0026_theme_variants::Migration),
         // Đầu trang, chân trang của website (bước 67, D-234).
         Box::new(m0027_site_regions::Migration),
+        // Loại nội dung tự định nghĩa và cột `type_id` của mục (bước 67, D-235).
+        Box::new(m0028_content_types::Migration),
+        // AI tạo và sửa trang: lịch sử trò chuyện của trang (bước 67).
+        Box::new(m0029_ai_turns::Migration),
     ]
 }

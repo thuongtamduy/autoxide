@@ -3,6 +3,7 @@
 //! đăng ký qua `routes!` để có tài liệu OpenAPI (luật kiến trúc 6).
 
 mod actions;
+mod ai_pages;
 mod assist;
 mod banners;
 mod edit_lock;
@@ -32,6 +33,7 @@ mod tests_tenancy;
 mod tests_web;
 mod theme_variants;
 mod themes;
+mod types;
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -64,6 +66,9 @@ pub(crate) fn routes(service: Arc<ContentService>) -> OpenApiRouter {
             edit_lock::acquire_edit_lock,
             edit_lock::release_edit_lock
         ))
+        .routes(routes!(ai_pages::compose_page))
+        .routes(routes!(ai_pages::edit_page))
+        .routes(routes!(ai_pages::ai_thread))
         .routes(routes!(actions::publish_entry))
         .routes(routes!(actions::unpublish_entry))
         .routes(routes!(actions::archive_entry))
@@ -138,6 +143,9 @@ pub(crate) fn routes(service: Arc<ContentService>) -> OpenApiRouter {
         .routes(routes!(site::get_site_region, site::put_site_region))
         .routes(routes!(site::publish_site_region))
         .routes(routes!(site::public_site))
+        .routes(routes!(types::list_types, types::create_type))
+        .routes(routes!(types::get_type, types::update_type, types::delete_type))
+        .routes(routes!(types::public_type_entries))
         .routes(routes!(templates::list_templates))
         .routes(routes!(templates::draft_from_template))
         .routes(routes!(public::preview_token))

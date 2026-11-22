@@ -266,6 +266,7 @@ impl Seed {
                 tenant_id,
                 org_id: row.org_id,
                 kind: row.kind.clone(),
+                type_id: None,
                 locale: row.locale.clone(),
                 translation_group_id: row.translation_group_id,
                 parent_id: None,

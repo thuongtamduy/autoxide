@@ -127,10 +127,12 @@ thật (P7).
       database; hướng dẫn "mở một cửa hàng" `docs/guides/shop.md` + `.vi.md` làm theo được từ quickstart; chỗ vướng tìm
       ra thì sửa hoặc ghi thành mục — `crates/app/src/e2e/shop.rs`; sửa kèm (D-20261122-shop-flow-fixes): báo phí mang
       người nhận và kích thước kiện, cổng thanh toán mặc định theo khách, `provider.not_configured` là "kênh chưa bật"
-  - [ ] Chỗ vướng còn lại (tìm ra ở P8): người mua vãng lai không tự mở lại được lượt thu khi lần đầu hỏng (vd thiếu
-        `return_url` của MoMo) — chỉ nhân viên (`POST /orders/{id}/payment-link`) hay người mua đã đăng nhập; thêm
-        đường cho token xem đơn (`Order-Token`); đặt hàng vẫn trả 201 với `payment_actions[].kind = none` khi đối tác
-        từ chối — cân nhắc báo lý do trong câu trả lời
+  - [x] Chỗ vướng còn lại (tìm ra ở P8): người mua tự mở lại lượt thu khi lần đầu hỏng (vd thiếu `return_url` của
+        MoMo) hay link hết hạn — vãng lai bằng token xem đơn (`POST /public/orders/{id}/payment-link`, header
+        `Order-Token`), đã đăng nhập bằng `POST /me/orders/{id}/payment-link`; cùng logic với
+        `POST /{id}/payment-link` của nhân viên, `return_url` mới tuỳ chọn, chống trùng theo `Idempotency-Key`, tối đa
+        10 lần một giờ mỗi đơn. Đặt hàng khi đối tác từ chối vẫn trả 201 với `kind = none`, thêm
+        `payment_actions[].error` (`code` ổn định + `message` theo ngôn ngữ người gọi)
 - [ ] P9 — **Ghi nợ, chủ dự án hoãn ngày 22/11/2026** (không chặn 1.0 khi chưa mở lại):
   - [ ] Chế độ "nghỉ": module tắt vẫn tham gia dữ liệu cá nhân và vòng đời khách (xuất, xoá, dời khách)
   - [ ] Mẫu câu OTP khách tự sửa cho khớp template đã đăng ký với nhà mạng (đang viết cứng ở `compliance`, `orders`,
@@ -479,12 +481,18 @@ sẵn, không sinh code; kết quả luôn là bản nháp.
 - [x] Đầu trang và chân trang của cả website (D-234, D-20261122-public-site): bố cục khối có nháp / đăng, theo ngôn ngữ, kế thừa theo nút,
       bản chủ đề kèm được bản riêng; `GET /public/site` một lời gọi cho khung website, cache tới đúng mốc đổi chủ
       đề, không query khi cache nóng; đo p99 trên cả hai database
-- [ ] Loại nội dung tự định nghĩa (D-235): khách tạo loại (đội ngũ, dự án, chi nhánh…) với trường riêng của bước
-      51, mục dùng lại nháp / lịch sử / bản dịch / SEO, trang chi tiết dựng sẵn, khối danh sách, API công khai có lọc
-- [ ] AI tạo trang và sửa tiếp bằng trò chuyện (job, kết quả qua bộ kiểm, thử lại có giới hạn, bản nháp
-      `ai_assisted`, lịch sử trò chuyện để hoàn tác); bộ nháp chiến dịch từ một chương trình khuyến mại
+- [x] Loại nội dung tự định nghĩa (D-235), phần chính: khách tạo loại (đội ngũ, dự án, chi nhánh…) với trường riêng
+      của bước 51 (đích `content.type.<key>`), mục `kind = custom` dùng lại nháp / lịch sử / bản dịch / SEO, đường dẫn
+      theo tiền tố, API công khai của loại (D-20261122-content-types)
+- [ ] Loại nội dung tự định nghĩa, phần sau: trang chi tiết dựng sẵn (`detail_layout`, khối `content.entry_field`),
+      khối `content.type_list`, lọc `cf.<key>` ở danh sách công khai, AI gợi ý bộ trường (bản nháp), hạn mức theo gói
+- [x] AI tạo trang và sửa tiếp bằng trò chuyện (job, kết quả qua bộ kiểm, thử lại có giới hạn, bản nháp
+      `ai_assisted`, lịch sử trò chuyện để hoàn tác) — D-20261122-ai-pages
+- [ ] Bộ nháp chiến dịch từ một chương trình khuyến mại (trang đích, banner, chiến dịch `newsletter`, mỗi thứ là bản
+      nháp ở module của nó); hạn mức `content.ai_page_generations` theo gói
 - [ ] Kiểm tra sức khoẻ website vào hộp việc: thiếu SEO / alt, link gãy, khối tham chiếu bản ghi đã ẩn, đường dẫn
-      404 nhiều → gợi ý chuyển hướng; tool MCP như REST; hướng dẫn EN + VI cho người viết module khai khối
+      404 nhiều → gợi ý chuyển hướng; tool MCP như REST cho khối, bố cục, giao diện, loại nội dung, AI trang
+- [x] Hướng dẫn EN + VI cho người viết module khai khối (`docs/guides/page-blocks.md`, mục 9b của MODULE_GUIDE)
 - [ ] Thử A/B hai phiên bản trang (D-231, sau bước 57), **sau 1.0** — D-20261122-step67-after-1-0): chia cố định theo người xem (F5 không đổi), bot thấy bản
       gốc, chỉ thử bố cục và nội dung (không thử giá), số liệu và độ tin cậy, người chọn bản thắng
 - [ ] AI tạo ảnh (D-231), **sau 1.0** — D-20261122-step67-after-1-0): `ImageModel` mặc định tắt, chỉ banner / ảnh nền / minh hoạ, cờ `ai_generated` và nhãn,

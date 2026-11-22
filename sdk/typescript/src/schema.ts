@@ -191,6 +191,17 @@ export type AdministrativeUnitDetail = AdministrativeUnit & {
   parent?: AdministrativeUnit | null;
 };
 
+/** A request to the AI page builder. */
+export type AiPageRequest = {
+  /**
+   * What the page should be, or what to change, in plain words (1 to 2000 characters), e.g.
+   * "a summer sale landing page with a hero, three reasons to buy and an FAQ".
+   */
+  instruction: string;
+  /** `edit` only: block ids to limit the change to. */
+  selection?: string[] | null;
+};
+
 /** What the AI features of this server can do now. */
 export type AiStatus = {
   /** Daily token limit; 0 means no limit. */
@@ -211,6 +222,34 @@ export type AiStatus = {
   provider: string;
   /** Tokens used today (UTC), text and embeddings together. */
   tokens_today: number;
+};
+
+/** One request to the AI page builder and its outcome. */
+export type AiTurnResponse = {
+  created_at: string;
+  entry_id: string;
+  /** Why it failed, e.g. `content.ai_result_invalid`, `content.ai_conflict`, `ai.disabled`. */
+  error_code?: string | null;
+  finished_at?: string | null;
+  id: string;
+  /** What the person asked. */
+  instruction: string;
+  /** `compose` (a whole page) or `edit` (a change to the current layout). */
+  kind: string;
+  /**
+   * The revision before the change: restore it (`POST /entries/{id}/revisions/{revision_id}/restore`)
+   * to undo.
+   */
+  previous_revision_id?: string | null;
+  requested_by: string;
+  /** The draft revision holding the result; publish the page to show it. */
+  revision_id?: string | null;
+  /** Blocks the change was limited to (`edit`). */
+  selection?: string[] | null;
+  /** `queued`, `running`, `succeeded` or `failed`. */
+  status: string;
+  /** Calls made to the model (a refused answer is retried at most twice). */
+  tries: number;
 };
 
 /** Something about the server that needs attention. */
@@ -4503,6 +4542,54 @@ export type ContentTemplateVariable = {
   required: boolean;
 };
 
+/** A content type to create, or the fields to change. */
+export type ContentTypeRequest = {
+  active?: boolean | null;
+  /** `none`, `rich` (default) or `layout`. */
+  body?: string | null;
+  has_seo?: boolean | null;
+  /**
+   * `people`, `briefcase`, `map_pin`, `star`, `question`, `calendar`, `image`, `document`, `tag`,
+   * `building`, `gift` or `chat`.
+   */
+  icon?: string | null;
+  /** Required on create: 1 to 64 lower-case letters, digits or `_`. */
+  key?: string | null;
+  /** Required on create: `{"one": {language: text}, "many": {language: text}}`. */
+  labels?: Record<string, unknown> | null;
+  listable?: boolean | null;
+  /** The website (organization unit), create only; left out: the whole tenant. */
+  org_id?: string | null;
+  /** Address segment of the entries' pages, e.g. `du-an`; required when `routable`. */
+  path_prefix?: string | null;
+  routable?: boolean | null;
+};
+
+/** A custom content type of the tenant (team, projects, branches…). */
+export type ContentTypeResponse = {
+  /** Switched off: entries stop being public (nothing is lost). */
+  active: boolean;
+  /** Body of the entries: `none`, `rich` or `layout`. */
+  body: string;
+  has_seo: boolean;
+  icon: string;
+  id: string;
+  /**
+   * `snake_case`; cannot change once the type has entries. Its own fields are custom fields of
+   * target `content.type.<key>` (`/api/v1/kernel/custom-fields`).
+   */
+  key: string;
+  /** `{"one": {"en": "Project"}, "many": {"en": "Projects"}}`. */
+  labels: Record<string, unknown>;
+  /** Entries are listed publicly at `GET /public/types/{key}/entries`. */
+  listable: boolean;
+  org_id: string;
+  path_prefix?: string | null;
+  /** Entries have their own page at `/<path_prefix>/<slug>`. */
+  routable: boolean;
+  updated_at: string;
+};
+
 /** A text and background color pair below the WCAG AA contrast (a warning; the theme is saved). */
 export type ContrastWarning = {
   /** Token of the background color, e.g. `color.background`. */
@@ -4981,6 +5068,11 @@ export type CreateEntryRequest = EntryFieldsInput & {
   org_id?: string | null;
   /** Parent page (pages only). */
   parent_id?: string | null;
+  /**
+   * With `kind = custom`: the custom content type (`GET /types`); its own fields go in
+   * `custom_fields`.
+   */
+  type_id?: string | null;
 };
 
 /** What to export. The body may be omitted. */
@@ -5603,6 +5695,37 @@ export type Data_AiStatus = {
     provider: string;
     /** Tokens used today (UTC), text and embeddings together. */
     tokens_today: number;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_AiTurnResponse = {
+  /** One request to the AI page builder and its outcome. */
+  data: {
+    created_at: string;
+    entry_id: string;
+    /** Why it failed, e.g. `content.ai_result_invalid`, `content.ai_conflict`, `ai.disabled`. */
+    error_code?: string | null;
+    finished_at?: string | null;
+    id: string;
+    /** What the person asked. */
+    instruction: string;
+    /** `compose` (a whole page) or `edit` (a change to the current layout). */
+    kind: string;
+    /**
+     * The revision before the change: restore it (`POST /entries/{id}/revisions/{revision_id}/restore`)
+     * to undo.
+     */
+    previous_revision_id?: string | null;
+    requested_by: string;
+    /** The draft revision holding the result; publish the page to show it. */
+    revision_id?: string | null;
+    /** Blocks the change was limited to (`edit`). */
+    selection?: string[] | null;
+    /** `queued`, `running`, `succeeded` or `failed`. */
+    status: string;
+    /** Calls made to the model (a refused answer is retried at most twice). */
+    tries: number;
   };
 };
 
@@ -7713,6 +7836,34 @@ export type Data_ConnectionTest = {
 };
 
 /** Envelope of a single result. */
+export type Data_ContentTypeResponse = {
+  /** A custom content type of the tenant (team, projects, branches…). */
+  data: {
+    /** Switched off: entries stop being public (nothing is lost). */
+    active: boolean;
+    /** Body of the entries: `none`, `rich` or `layout`. */
+    body: string;
+    has_seo: boolean;
+    icon: string;
+    id: string;
+    /**
+     * `snake_case`; cannot change once the type has entries. Its own fields are custom fields of
+     * target `content.type.<key>` (`/api/v1/kernel/custom-fields`).
+     */
+    key: string;
+    /** `{"one": {"en": "Project"}, "many": {"en": "Projects"}}`. */
+    labels: Record<string, unknown>;
+    /** Entries are listed publicly at `GET /public/types/{key}/entries`. */
+    listable: boolean;
+    org_id: string;
+    path_prefix?: string | null;
+    /** Entries have their own page at `/<path_prefix>/<slug>`. */
+    routable: boolean;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_Conversation = {
   /** A conversation between a customer and a unit (shop or marketplace store). */
   data: {
@@ -8386,6 +8537,8 @@ export type Data_EntryResponse = {
      * (`POST /entries/{source}/translate`) or update it by hand.
      */
     translation_outdated: boolean;
+    /** The custom content type of an entry of kind `custom` (`GET /types`); `null` otherwise. */
+    type_id?: string | null;
     updated_at: string;
     /**
      * The entry's `ETag` (as `GET /entries/{id}` sends it): send it in `If-Match` to change the
@@ -10543,6 +10696,7 @@ export type Data_OrdersPaymentAction = {
   /** What the buyer does next to pay one amount. */
   data: {
     amount: Money;
+    error?: OrdersPaymentStartError | null;
     expires_at?: string | null;
     /**
      * `redirect` (go to `redirect_url`), `qr` (show `qr_payload`), `cod` (pay on delivery) or
@@ -15024,6 +15178,7 @@ export type Data_Vec_OrdersDocument = {
 export type Data_Vec_OrdersPaymentAction = {
   data: {
     amount: Money;
+    error?: OrdersPaymentStartError | null;
     expires_at?: string | null;
     /**
      * `redirect` (go to `redirect_url`), `qr` (show `qr_payload`), `cod` (pay on delivery) or
@@ -16806,6 +16961,8 @@ export type EntryResponse = {
    * (`POST /entries/{source}/translate`) or update it by hand.
    */
   translation_outdated: boolean;
+  /** The custom content type of an entry of kind `custom` (`GET /types`); `null` otherwise. */
+  type_id?: string | null;
   updated_at: string;
   /**
    * The entry's `ETag` (as `GET /entries/{id}` sends it): send it in `If-Match` to change the
@@ -18429,7 +18586,7 @@ export type JobRunView = {
 };
 
 /** What an entry is. */
-export type Kind = "post" | "page";
+export type Kind = "post" | "page" | "custom";
 
 /** A kind of report figure a module declares. */
 export type KindResponse = {
@@ -21313,6 +21470,7 @@ export type OrdersOrderTotals = {
 /** What the buyer does next to pay one amount. */
 export type OrdersPaymentAction = {
   amount: Money;
+  error?: OrdersPaymentStartError | null;
   expires_at?: string | null;
   /**
    * `redirect` (go to `redirect_url`), `qr` (show `qr_payload`), `cod` (pay on delivery) or
@@ -21330,6 +21488,23 @@ export type OrdersPaymentAction = {
   status_token: string;
   /** Transfer content the bank transfer must carry. */
   transfer_code?: string | null;
+};
+
+/** Where to send the buyer back after paying. */
+export type OrdersPaymentLinkRequest = {
+  /**
+   * Where the payment partner sends the buyer back (some partners need it, e.g. MoMo); omitted:
+   * the shop's default.
+   */
+  return_url?: string | null;
+};
+
+/** Why a payment could not be started. */
+export type OrdersPaymentStartError = {
+  /** Stable error code, as in a `Problem` (e.g. `momo.return_url_required`). */
+  code: string;
+  /** What to fix, in the language of `Accept-Language`. */
+  message: string;
 };
 
 /** An order waiting in store. */
@@ -21964,6 +22139,38 @@ export type Page_AdministrativeUnit = {
     valid_from: string;
     /** First day no longer in force; `null` while in force. */
     valid_to?: string | null;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_AiTurnResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    created_at: string;
+    entry_id: string;
+    /** Why it failed, e.g. `content.ai_result_invalid`, `content.ai_conflict`, `ai.disabled`. */
+    error_code?: string | null;
+    finished_at?: string | null;
+    id: string;
+    /** What the person asked. */
+    instruction: string;
+    /** `compose` (a whole page) or `edit` (a change to the current layout). */
+    kind: string;
+    /**
+     * The revision before the change: restore it (`POST /entries/{id}/revisions/{revision_id}/restore`)
+     * to undo.
+     */
+    previous_revision_id?: string | null;
+    requested_by: string;
+    /** The draft revision holding the result; publish the page to show it. */
+    revision_id?: string | null;
+    /** Blocks the change was limited to (`edit`). */
+    selection?: string[] | null;
+    /** `queued`, `running`, `succeeded` or `failed`. */
+    status: string;
+    /** Calls made to the model (a refused answer is retried at most twice). */
+    tries: number;
   }[];
   pagination: Pagination;
 };
@@ -22915,6 +23122,35 @@ export type Page_ComplianceWebsite = {
 };
 
 /** One page of a list. */
+export type Page_ContentTypeResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** Switched off: entries stop being public (nothing is lost). */
+    active: boolean;
+    /** Body of the entries: `none`, `rich` or `layout`. */
+    body: string;
+    has_seo: boolean;
+    icon: string;
+    id: string;
+    /**
+     * `snake_case`; cannot change once the type has entries. Its own fields are custom fields of
+     * target `content.type.<key>` (`/api/v1/kernel/custom-fields`).
+     */
+    key: string;
+    /** `{"one": {"en": "Project"}, "many": {"en": "Projects"}}`. */
+    labels: Record<string, unknown>;
+    /** Entries are listed publicly at `GET /public/types/{key}/entries`. */
+    listable: boolean;
+    org_id: string;
+    path_prefix?: string | null;
+    /** Entries have their own page at `/<path_prefix>/<slug>`. */
+    routable: boolean;
+    updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_Conversation = {
   /** The items of this page, in the requested order. */
   data: {
@@ -23247,6 +23483,8 @@ export type Page_EntryResponse = {
      * (`POST /entries/{source}/translate`) or update it by hand.
      */
     translation_outdated: boolean;
+    /** The custom content type of an entry of kind `custom` (`GET /types`); `null` otherwise. */
+    type_id?: string | null;
     updated_at: string;
     /**
      * The entry's `ETag` (as `GET /entries/{id}` sends it): send it in `If-Match` to change the
@@ -38701,7 +38939,7 @@ export interface paths {
   "/api/v1/content/entries": {
     /** List posts and pages (drafts included). */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { kind?: "post" | "page"; locale?: string; status?: "draft" | "published" | "archived"; parent_id?: string; q?: string; term_id?: string; author_id?: string; translation_group_id?: string; sort?: "created_at" | "updated_at"; review_requested?: boolean; scheduled?: boolean; created_by?: string; ai_generated?: boolean; missing_locale?: string; owner_org?: string; site?: string; tags_any?: string; tags_all?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { kind?: "post" | "page" | "custom"; type_id?: string; locale?: string; status?: "draft" | "published" | "archived"; parent_id?: string; q?: string; term_id?: string; author_id?: string; translation_group_id?: string; sort?: "created_at" | "updated_at"; review_requested?: boolean; scheduled?: boolean; created_by?: string; ai_generated?: boolean; missing_locale?: string; owner_org?: string; site?: string; tags_any?: string; tags_all?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_EntryResponse;
         401: Problem;
@@ -38780,6 +39018,52 @@ export interface paths {
         409: Problem;
         412: Problem;
         428: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/content/entries/{id}/ai/compose": {
+    /** Ask the AI to build the page's block layout. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: AiPageRequest;
+      responses: {
+        202: Data_AiTurnResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/content/entries/{id}/ai/edit": {
+    /** Ask the AI to change the page's block layout. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: AiPageRequest;
+      responses: {
+        202: Data_AiTurnResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/content/entries/{id}/ai/thread": {
+    /** List the AI conversation of a page. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_AiTurnResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -39446,7 +39730,7 @@ export interface paths {
   "/api/v1/content/public/search": {
     /** Search published posts and pages by meaning and words (public). */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { q: string; locale?: string; kind?: "post" | "page"; limit?: number; site?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { q: string; locale?: string; kind?: "post" | "page" | "custom"; limit?: number; site?: string }; };
       responses: {
         200: Page_SearchHit;
         403: Problem;
@@ -39499,6 +39783,19 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; path: { taxonomy: Taxonomy; slug: string }; query: { locale: string }; };
       responses: {
         200: Data_PublicTermPage;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/content/public/types/{key}/entries": {
+    /** List the published entries of a content type (public). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { key: string }; query: { locale?: string; site?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_PublicEntryResponse;
         403: Problem;
         404: Problem;
         422: Problem;
@@ -39602,7 +39899,7 @@ export interface paths {
   "/api/v1/content/search": {
     /** Search posts and pages by meaning and words. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { q: string; locale?: string; kind?: "post" | "page"; limit?: number }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { q: string; locale?: string; kind?: "post" | "page" | "custom"; limit?: number }; };
       responses: {
         200: Page_SearchHit;
         401: Problem;
@@ -39998,6 +40295,73 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/content/types": {
+    /** List custom content types. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_ContentTypeResponse;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a custom content type. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: ContentTypeRequest;
+      responses: {
+        201: Data_ContentTypeResponse;
+        401: Problem;
+        403: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/content/types/{key}": {
+    /** Get a custom content type. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { key: string }; };
+      responses: {
+        200: Data_ContentTypeResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Change a custom content type. */
+    patch: {
+      parameters: { header: { "If-Match": string; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { key: string }; };
+      requestBody: ContentTypeRequest;
+      responses: {
+        200: Data_ContentTypeResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        412: Problem;
+        422: Problem;
+        428: Problem;
+        default: Problem;
+      };
+    };
+    /** Delete a custom content type. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { key: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
         default: Problem;
       };
     };
@@ -46522,6 +46886,23 @@ export interface paths {
       };
     };
   };
+  "/api/v1/orders/me/orders/{id}/payment-link": {
+    /** Start the payment of your order again. */
+    post: {
+      parameters: { header: { "Idempotency-Key"?: string | null; "Accept-Language"?: string }; path: { id: string }; };
+      requestBody: OrdersPaymentLinkRequest;
+      responses: {
+        200: Data_Vec_OrdersPaymentAction;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        429: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/orders/me/orders/{id}/payments": {
     /** Pay the balance of your order. */
     post: {
@@ -46828,6 +47209,23 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/public/orders/{id}/payment-link": {
+    /** Start the payment of a guest order again. */
+    post: {
+      parameters: { header: { "Order-Token": string; "Idempotency-Key"?: string | null; "Accept-Language"?: string }; path: { id: string }; };
+      requestBody: OrdersPaymentLinkRequest;
+      responses: {
+        200: Data_Vec_OrdersPaymentAction;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        429: Problem;
         default: Problem;
       };
     };

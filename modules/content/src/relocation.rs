@@ -14,6 +14,7 @@ pub(crate) fn relocation() -> Relocation {
             "content_page_templates",
             "content_theme_variants",
             "content_site_regions",
+            "content_types",
         ])
         .follow("content_published", "entry_id", "content_entries")
         .follow("content_revisions", "entry_id", "content_entries")
@@ -22,6 +23,7 @@ pub(crate) fn relocation() -> Relocation {
         .follow("content_entry_authors", "entry_id", "content_entries")
         .follow("content_translation_requests", "source_entry_id", "content_entries")
         .follow("content_embeddings", "entry_id", "content_entries")
+        .follow("content_ai_turns", "entry_id", "content_entries")
         .follow("content_custom_index", "record_id", "content_entries")
         .copy_on_split(&[
             "content_terms",

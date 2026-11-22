@@ -536,6 +536,30 @@
         ],
         "description": "An administrative unit with the unit above it."
       },
+      "AiPageRequest": {
+        "additionalProperties": false,
+        "description": "A request to the AI page builder.",
+        "properties": {
+          "instruction": {
+            "description": "What the page should be, or what to change, in plain words (1 to 2000 characters), e.g.\n\"a summer sale landing page with a hero, three reasons to buy and an FAQ\".",
+            "type": "string"
+          },
+          "selection": {
+            "description": "`edit` only: block ids to limit the change to.",
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "instruction"
+        ],
+        "type": "object"
+      },
       "AiStatus": {
         "description": "What the AI features of this server can do now.",
         "properties": {
@@ -593,6 +617,95 @@
           "embedding_dimensions",
           "tokens_today",
           "daily_token_limit"
+        ],
+        "type": "object"
+      },
+      "AiTurnResponse": {
+        "description": "One request to the AI page builder and its outcome.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "entry_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "error_code": {
+            "description": "Why it failed, e.g. `content.ai_result_invalid`, `content.ai_conflict`, `ai.disabled`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "finished_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "instruction": {
+            "description": "What the person asked.",
+            "type": "string"
+          },
+          "kind": {
+            "description": "`compose` (a whole page) or `edit` (a change to the current layout).",
+            "type": "string"
+          },
+          "previous_revision_id": {
+            "description": "The revision before the change: restore it (`POST /entries/{id}/revisions/{revision_id}/restore`)\nto undo.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "requested_by": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "revision_id": {
+            "description": "The draft revision holding the result; publish the page to show it.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "selection": {
+            "description": "Blocks the change was limited to (`edit`).",
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "`queued`, `running`, `succeeded` or `failed`.",
+            "type": "string"
+          },
+          "tries": {
+            "description": "Calls made to the model (a refused answer is retried at most twice).",
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "entry_id",
+          "kind",
+          "instruction",
+          "status",
+          "tries",
+          "requested_by",
+          "created_at"
         ],
         "type": "object"
       },
@@ -13309,6 +13422,147 @@
         ],
         "type": "object"
       },
+      "ContentTypeRequest": {
+        "additionalProperties": false,
+        "description": "A content type to create, or the fields to change.",
+        "properties": {
+          "active": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "body": {
+            "description": "`none`, `rich` (default) or `layout`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "has_seo": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "icon": {
+            "description": "`people`, `briefcase`, `map_pin`, `star`, `question`, `calendar`, `image`, `document`, `tag`,\n`building`, `gift` or `chat`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "key": {
+            "description": "Required on create: 1 to 64 lower-case letters, digits or `_`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "labels": {
+            "description": "Required on create: `{\"one\": {language: text}, \"many\": {language: text}}`.",
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "listable": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "org_id": {
+            "description": "The website (organization unit), create only; left out: the whole tenant.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "path_prefix": {
+            "description": "Address segment of the entries' pages, e.g. `du-an`; required when `routable`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "routable": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "ContentTypeResponse": {
+        "description": "A custom content type of the tenant (team, projects, branches…).",
+        "properties": {
+          "active": {
+            "description": "Switched off: entries stop being public (nothing is lost).",
+            "type": "boolean"
+          },
+          "body": {
+            "description": "Body of the entries: `none`, `rich` or `layout`.",
+            "type": "string"
+          },
+          "has_seo": {
+            "type": "boolean"
+          },
+          "icon": {
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "key": {
+            "description": "`snake_case`; cannot change once the type has entries. Its own fields are custom fields of\ntarget `content.type.<key>` (`/api/v1/kernel/custom-fields`).",
+            "type": "string"
+          },
+          "labels": {
+            "description": "`{\"one\": {\"en\": \"Project\"}, \"many\": {\"en\": \"Projects\"}}`.",
+            "type": "object"
+          },
+          "listable": {
+            "description": "Entries are listed publicly at `GET /public/types/{key}/entries`.",
+            "type": "boolean"
+          },
+          "org_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "path_prefix": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "routable": {
+            "description": "Entries have their own page at `/<path_prefix>/<slug>`.",
+            "type": "boolean"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "key",
+          "labels",
+          "icon",
+          "routable",
+          "body",
+          "has_seo",
+          "listable",
+          "active",
+          "org_id",
+          "updated_at"
+        ],
+        "type": "object"
+      },
       "ContrastWarning": {
         "description": "A text and background color pair below the WCAG AA contrast (a warning; the theme is saved).",
         "properties": {
@@ -14668,6 +14922,14 @@
               },
               "parent_id": {
                 "description": "Parent page (pages only).",
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "type_id": {
+                "description": "With `kind = custom`: the custom content type (`GET /types`); its own fields go in\n`custom_fields`.",
                 "format": "uuid",
                 "type": [
                   "string",
@@ -16560,6 +16822,104 @@
               "embedding_dimensions",
               "tokens_today",
               "daily_token_limit"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_AiTurnResponse": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "One request to the AI page builder and its outcome.",
+            "properties": {
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "entry_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "error_code": {
+                "description": "Why it failed, e.g. `content.ai_result_invalid`, `content.ai_conflict`, `ai.disabled`.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "finished_at": {
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "instruction": {
+                "description": "What the person asked.",
+                "type": "string"
+              },
+              "kind": {
+                "description": "`compose` (a whole page) or `edit` (a change to the current layout).",
+                "type": "string"
+              },
+              "previous_revision_id": {
+                "description": "The revision before the change: restore it (`POST /entries/{id}/revisions/{revision_id}/restore`)\nto undo.",
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "requested_by": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "revision_id": {
+                "description": "The draft revision holding the result; publish the page to show it.",
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "selection": {
+                "description": "Blocks the change was limited to (`edit`).",
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "status": {
+                "description": "`queued`, `running`, `succeeded` or `failed`.",
+                "type": "string"
+              },
+              "tries": {
+                "description": "Calls made to the model (a refused answer is retried at most twice).",
+                "format": "int32",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "id",
+              "entry_id",
+              "kind",
+              "instruction",
+              "status",
+              "tries",
+              "requested_by",
+              "created_at"
             ],
             "type": "object"
           }
@@ -23117,6 +23477,82 @@
         ],
         "type": "object"
       },
+      "Data_ContentTypeResponse": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A custom content type of the tenant (team, projects, branches…).",
+            "properties": {
+              "active": {
+                "description": "Switched off: entries stop being public (nothing is lost).",
+                "type": "boolean"
+              },
+              "body": {
+                "description": "Body of the entries: `none`, `rich` or `layout`.",
+                "type": "string"
+              },
+              "has_seo": {
+                "type": "boolean"
+              },
+              "icon": {
+                "type": "string"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "key": {
+                "description": "`snake_case`; cannot change once the type has entries. Its own fields are custom fields of\ntarget `content.type.<key>` (`/api/v1/kernel/custom-fields`).",
+                "type": "string"
+              },
+              "labels": {
+                "description": "`{\"one\": {\"en\": \"Project\"}, \"many\": {\"en\": \"Projects\"}}`.",
+                "type": "object"
+              },
+              "listable": {
+                "description": "Entries are listed publicly at `GET /public/types/{key}/entries`.",
+                "type": "boolean"
+              },
+              "org_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "path_prefix": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "routable": {
+                "description": "Entries have their own page at `/<path_prefix>/<slug>`.",
+                "type": "boolean"
+              },
+              "updated_at": {
+                "format": "date-time",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "key",
+              "labels",
+              "icon",
+              "routable",
+              "body",
+              "has_seo",
+              "listable",
+              "active",
+              "org_id",
+              "updated_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_Conversation": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -25128,6 +25564,14 @@
               "translation_outdated": {
                 "description": "`true` when the source changed after this AI translation was made: translate it again\n(`POST /entries/{source}/translate`) or update it by hand.",
                 "type": "boolean"
+              },
+              "type_id": {
+                "description": "The custom content type of an entry of kind `custom` (`GET /types`); `null` otherwise.",
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
               },
               "updated_at": {
                 "format": "date-time",
@@ -31960,6 +32404,17 @@
             "properties": {
               "amount": {
                 "$ref": "#/components/schemas/Money"
+              },
+              "error": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/OrdersPaymentStartError",
+                    "description": "Only with `kind = none`, when starting the payment failed: why (e.g. the payment partner\nrefused). Fix the cause, then start the payment again from the order."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               },
               "expires_at": {
                 "format": "date-time",
@@ -46153,6 +46608,17 @@
                 "amount": {
                   "$ref": "#/components/schemas/Money"
                 },
+                "error": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/OrdersPaymentStartError",
+                      "description": "Only with `kind = none`, when starting the payment failed: why (e.g. the payment partner\nrefused). Fix the cause, then start the payment again from the order."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
                 "expires_at": {
                   "format": "date-time",
                   "type": [
@@ -51683,6 +52149,14 @@
             "description": "`true` when the source changed after this AI translation was made: translate it again\n(`POST /entries/{source}/translate`) or update it by hand.",
             "type": "boolean"
           },
+          "type_id": {
+            "description": "The custom content type of an entry of kind `custom` (`GET /types`); `null` otherwise.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "updated_at": {
             "format": "date-time",
             "type": "string"
@@ -56847,7 +57321,8 @@
         "description": "What an entry is.",
         "enum": [
           "post",
-          "page"
+          "page",
+          "custom"
         ],
         "type": "string"
       },
@@ -65118,6 +65593,17 @@
           "amount": {
             "$ref": "#/components/schemas/Money"
           },
+          "error": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/OrdersPaymentStartError",
+                "description": "Only with `kind = none`, when starting the payment failed: why (e.g. the payment partner\nrefused). Fix the cause, then start the payment again from the order."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "expires_at": {
             "format": "date-time",
             "type": [
@@ -65173,6 +65659,38 @@
           "amount",
           "status",
           "status_token"
+        ],
+        "type": "object"
+      },
+      "OrdersPaymentLinkRequest": {
+        "additionalProperties": false,
+        "description": "Where to send the buyer back after paying.",
+        "properties": {
+          "return_url": {
+            "description": "Where the payment partner sends the buyer back (some partners need it, e.g. MoMo); omitted:\nthe shop's default.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "OrdersPaymentStartError": {
+        "description": "Why a payment could not be started.",
+        "properties": {
+          "code": {
+            "description": "Stable error code, as in a `Problem` (e.g. `momo.return_url_required`).",
+            "type": "string"
+          },
+          "message": {
+            "description": "What to fix, in the language of `Accept-Language`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
         ],
         "type": "object"
       },
@@ -67228,6 +67746,112 @@
                 "kind",
                 "level",
                 "valid_from"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
+      "Page_AiTurnResponse": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "One request to the AI page builder and its outcome.",
+              "properties": {
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "entry_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "error_code": {
+                  "description": "Why it failed, e.g. `content.ai_result_invalid`, `content.ai_conflict`, `ai.disabled`.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "finished_at": {
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "instruction": {
+                  "description": "What the person asked.",
+                  "type": "string"
+                },
+                "kind": {
+                  "description": "`compose` (a whole page) or `edit` (a change to the current layout).",
+                  "type": "string"
+                },
+                "previous_revision_id": {
+                  "description": "The revision before the change: restore it (`POST /entries/{id}/revisions/{revision_id}/restore`)\nto undo.",
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "requested_by": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "revision_id": {
+                  "description": "The draft revision holding the result; publish the page to show it.",
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "selection": {
+                  "description": "Blocks the change was limited to (`edit`).",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": [
+                    "array",
+                    "null"
+                  ]
+                },
+                "status": {
+                  "description": "`queued`, `running`, `succeeded` or `failed`.",
+                  "type": "string"
+                },
+                "tries": {
+                  "description": "Calls made to the model (a refused answer is retried at most twice).",
+                  "format": "int32",
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "id",
+                "entry_id",
+                "kind",
+                "instruction",
+                "status",
+                "tries",
+                "requested_by",
+                "created_at"
               ],
               "type": "object"
             },
@@ -70456,6 +71080,90 @@
         ],
         "type": "object"
       },
+      "Page_ContentTypeResponse": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "A custom content type of the tenant (team, projects, branches…).",
+              "properties": {
+                "active": {
+                  "description": "Switched off: entries stop being public (nothing is lost).",
+                  "type": "boolean"
+                },
+                "body": {
+                  "description": "Body of the entries: `none`, `rich` or `layout`.",
+                  "type": "string"
+                },
+                "has_seo": {
+                  "type": "boolean"
+                },
+                "icon": {
+                  "type": "string"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "key": {
+                  "description": "`snake_case`; cannot change once the type has entries. Its own fields are custom fields of\ntarget `content.type.<key>` (`/api/v1/kernel/custom-fields`).",
+                  "type": "string"
+                },
+                "labels": {
+                  "description": "`{\"one\": {\"en\": \"Project\"}, \"many\": {\"en\": \"Projects\"}}`.",
+                  "type": "object"
+                },
+                "listable": {
+                  "description": "Entries are listed publicly at `GET /public/types/{key}/entries`.",
+                  "type": "boolean"
+                },
+                "org_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "path_prefix": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "routable": {
+                  "description": "Entries have their own page at `/<path_prefix>/<slug>`.",
+                  "type": "boolean"
+                },
+                "updated_at": {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "key",
+                "labels",
+                "icon",
+                "routable",
+                "body",
+                "has_seo",
+                "listable",
+                "active",
+                "org_id",
+                "updated_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
       "Page_Conversation": {
         "description": "One page of a list.",
         "properties": {
@@ -71539,6 +72247,14 @@
                 "translation_outdated": {
                   "description": "`true` when the source changed after this AI translation was made: translate it again\n(`POST /entries/{source}/translate`) or update it by hand.",
                   "type": "boolean"
+                },
+                "type_id": {
+                  "description": "The custom content type of an entry of kind `custom` (`GET /types`); `null` otherwise.",
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 },
                 "updated_at": {
                   "format": "date-time",
@@ -151506,7 +152222,7 @@
         "operationId": "content_list_content_entries",
         "parameters": [
           {
-            "description": "`post` or `page`.",
+            "description": "`post`, `page` or `custom`.",
             "in": "query",
             "name": "kind",
             "required": false,
@@ -151514,8 +152230,19 @@
               "description": "What an entry is.",
               "enum": [
                 "post",
-                "page"
+                "page",
+                "custom"
               ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only entries of this custom content type.",
+            "in": "query",
+            "name": "type_id",
+            "required": false,
+            "schema": {
+              "format": "uuid",
               "type": "string"
             }
           },
@@ -151812,14 +152539,21 @@
         ],
         "x-autoxide-filters": [
           {
-            "description": "`post` or `page`.",
+            "description": "`post`, `page` or `custom`.",
             "kind": "string",
             "name": "kind",
             "operator": "eq",
             "values": [
               "post",
-              "page"
+              "page",
+              "custom"
             ]
+          },
+          {
+            "description": "Only entries of this custom content type.",
+            "kind": "uuid",
+            "name": "type_id",
+            "operator": "eq"
           },
           {
             "description": "Only this language.",
@@ -152615,6 +153349,441 @@
         "x-permissions": [
           "content.write",
           "content.write_own"
+        ]
+      }
+    },
+    "/api/v1/content/entries/{id}/ai/compose": {
+      "post": {
+        "description": "Requires `content.write` (or `content.write_own` on your page) and the plan feature\n`content.ai_suggestions`. Runs in the background: follow it with `GET /entries/{id}/ai/thread`.\nThe AI only assembles blocks of `GET /api/v1/kernel/blocks`; its answer goes through the same\nlayout checks as a person's and becomes a **draft** marked `ai_assisted` — never published by\nitself. A refused answer is retried at most twice.",
+        "operationId": "content_compose_content_page_with_ai",
+        "parameters": [
+          {
+            "description": "Id of the page.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiPageRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_AiTurnResponse"
+                }
+              }
+            },
+            "description": "Queued."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission (`permission_denied`, `content.not_owner`), or the plan lacks `content.ai_suggestions`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No entry has this id; code `content.not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The instruction is empty or too long, or the entry is a post; see `errors`."
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "AI is off on this server; code `ai.disabled`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ask the AI to build the page's block layout.",
+        "tags": [
+          "content"
+        ],
+        "x-permissions": [
+          "content.write",
+          "content.write_own"
+        ]
+      }
+    },
+    "/api/v1/content/entries/{id}/ai/edit": {
+      "post": {
+        "description": "Requires `content.write` (or `content.write_own` on your page) and the plan feature\n`content.ai_suggestions`. Like `compose`, on the current layout: say what to change (\"make the\nhero red\", \"add a buy now button\"); `selection` limits it to some blocks. The result is a new\ndraft; the turn keeps the revision before it to undo.",
+        "operationId": "content_edit_content_page_with_ai",
+        "parameters": [
+          {
+            "description": "Id of the page.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiPageRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_AiTurnResponse"
+                }
+              }
+            },
+            "description": "Queued."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission, or the plan lacks `content.ai_suggestions`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No entry has this id; code `content.not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The instruction is invalid, or the page has no block layout yet; see `errors`."
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "AI is off on this server; code `ai.disabled`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ask the AI to change the page's block layout.",
+        "tags": [
+          "content"
+        ],
+        "x-permissions": [
+          "content.write",
+          "content.write_own"
+        ]
+      }
+    },
+    "/api/v1/content/entries/{id}/ai/thread": {
+      "get": {
+        "description": "Requires `content.read`. Every request with who asked, its outcome and the revisions to compare\nor undo, newest first.",
+        "operationId": "content_list_content_page_ai_thread",
+        "parameters": [
+          {
+            "description": "Id of the page.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_AiTurnResponse"
+                }
+              }
+            },
+            "description": "A page of turns."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `content.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No entry has this id; code `content.not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A paging value is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the AI conversation of a page.",
+        "tags": [
+          "content"
+        ],
+        "x-autoxide-filters": [
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "content.list_content_page_ai_thread",
+        "x-permissions": [
+          "content.read"
         ]
       }
     },
@@ -158774,7 +159943,8 @@
               "description": "What an entry is.",
               "enum": [
                 "post",
-                "page"
+                "page",
+                "custom"
               ],
               "type": "string"
             }
@@ -159416,6 +160586,184 @@
         "tags": [
           "content"
         ],
+        "x-public": true
+      }
+    },
+    "/api/v1/content/public/types/{key}/entries": {
+      "get": {
+        "description": "No sign-in needed. Only types switched on with `listable`; newest first. Each entry is like\n`GET /public/resolve` gives it (with the type's `public` custom fields). `Cache-Control: no-cache`.",
+        "operationId": "content_list_content_public_type_entries",
+        "parameters": [
+          {
+            "description": "Key of the content type.",
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "A language of the website; left out: its default.",
+            "in": "query",
+            "name": "locale",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The website (organization unit) asking, when it is not called on its own domain; a domain\nbound to a unit chooses it already. Content of that unit and of the units above it is\nshown. Omitted: the website of the whole tenant.",
+            "in": "query",
+            "name": "site",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_PublicEntryResponse"
+                }
+              }
+            },
+            "description": "A page of published entries."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No listable content type has this key; code `content.type_not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The language or a paging value is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {},
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the published entries of a content type (public).",
+        "tags": [
+          "content"
+        ],
+        "x-autoxide-filters": [
+          {
+            "description": "A language of the website; left out: its default.",
+            "kind": "string",
+            "name": "locale",
+            "operator": "eq"
+          },
+          {
+            "description": "The website (organization unit) asking, when it is not called on its own domain; a domain\nbound to a unit chooses it already. Content of that unit and of the units above it is\nshown. Omitted: the website of the whole tenant.",
+            "kind": "uuid",
+            "name": "site",
+            "operator": "eq"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "content.list_content_public_type_entries",
         "x-public": true
       }
     },
@@ -160396,7 +161744,8 @@
               "description": "What an entry is.",
               "enum": [
                 "post",
-                "page"
+                "page",
+                "custom"
               ],
               "type": "string"
             }
@@ -164264,6 +165613,647 @@
           "content.read",
           "content.write",
           "content.write_own"
+        ]
+      }
+    },
+    "/api/v1/content/types": {
+      "get": {
+        "description": "Requires `content.read`.",
+        "operationId": "content_list_content_types",
+        "parameters": [
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_ContentTypeResponse"
+                }
+              }
+            },
+            "description": "A page of content types."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `content.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A paging value is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List custom content types.",
+        "tags": [
+          "content"
+        ],
+        "x-autoxide-filters": [
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "content.list_content_types",
+        "x-permissions": [
+          "content.read"
+        ]
+      },
+      "post": {
+        "description": "Requires `content.types.manage`. Then define its fields as custom fields of target\n`content.type.<key>` and create entries with `POST /entries` (`kind: \"custom\"`, `type_id`).",
+        "operationId": "content_create_content_type",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContentTypeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ContentTypeResponse"
+                }
+              }
+            },
+            "description": "Created.",
+            "headers": {
+              "Location": {
+                "description": "Address of the new type.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `content.types.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The key or address prefix is taken (`content.type_key_taken`, `content.path_prefix_taken`), or the tenant has the most types allowed (`content.types_limit`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a custom content type.",
+        "tags": [
+          "content"
+        ],
+        "x-permissions": [
+          "content.types.manage"
+        ]
+      }
+    },
+    "/api/v1/content/types/{key}": {
+      "delete": {
+        "description": "Requires `content.types.manage`. A type that still has entries is not deleted (`409`).",
+        "operationId": "content_delete_content_type",
+        "parameters": [
+          {
+            "description": "Key of the content type.",
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `content.types.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No content type has this key; code `content.type_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The type still has entries; code `content.type_in_use` with `count`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete a custom content type.",
+        "tags": [
+          "content"
+        ],
+        "x-permissions": [
+          "content.types.manage"
+        ]
+      },
+      "get": {
+        "description": "Requires `content.read`.",
+        "operationId": "content_get_content_type",
+        "parameters": [
+          {
+            "description": "Key of the content type.",
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ContentTypeResponse"
+                }
+              }
+            },
+            "description": "The content type.",
+            "headers": {
+              "ETag": {
+                "description": "Version: send it back in `If-Match` when changing it.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `content.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No content type has this key; code `content.type_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a custom content type.",
+        "tags": [
+          "content"
+        ],
+        "x-permissions": [
+          "content.read"
+        ]
+      },
+      "patch": {
+        "description": "Requires `content.types.manage`; `If-Match` is required. Only the fields sent change. The key\ncannot change once the type has entries; switching the type off (`active: false`) takes its\nentries off the website without losing them.",
+        "operationId": "content_update_content_type",
+        "parameters": [
+          {
+            "description": "Key of the content type.",
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Required: the `ETag` you read (or `*`). Otherwise `412`.",
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContentTypeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ContentTypeResponse"
+                }
+              }
+            },
+            "description": "The content type after the change.",
+            "headers": {
+              "ETag": {
+                "description": "New version.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `content.types.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No content type has this key; code `content.type_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The key cannot change (`content.type_key_locked`), or the new key or prefix is taken."
+          },
+          "412": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "It changed since you read it; code `precondition_failed`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid; see `errors`."
+          },
+          "428": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "`If-Match` is missing; code `precondition_required`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Change a custom content type.",
+        "tags": [
+          "content"
+        ],
+        "x-permissions": [
+          "content.types.manage"
         ]
       }
     },
@@ -223049,6 +225039,145 @@
         "x-permissions": []
       }
     },
+    "/api/v1/orders/me/orders/{id}/payment-link": {
+      "post": {
+        "description": "Signed in: an order you placed. Same as `POST /public/orders/{id}/payment-link` for a guest\norder: when the payment could not be started at checkout or its link expired, starts it again\nand returns the payment actions. Sending the same `Idempotency-Key` again returns the payment\nactions without starting anything. At most 10 times an hour per order.",
+        "operationId": "orders_restart_my_order_payment",
+        "parameters": [
+          {
+            "description": "Id of the order.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Key of this attempt; resend the same key when retrying.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrdersPaymentLinkRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_OrdersPaymentAction"
+                }
+              }
+            },
+            "description": "The payment actions of the order."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; code `unauthenticated`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such order of yours; code `orders.order_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The order is not waiting for payment (`orders.invalid_transition`), its deadline passed (`orders.payment_expired`) or the time to pay the balance passed (`orders.balance_overdue`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The payment partner refused the payment (its code, e.g. `momo.return_url_required`), the payment method is not usable (`orders.payment_method_unavailable`), the same `Idempotency-Key` with another body (`orders.idempotency_key_reused`), or invalid values (see `errors`)."
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Started again too many times; code `orders.payment_retry_too_many`, see `Retry-After`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Start the payment of your order again.",
+        "tags": [
+          "orders"
+        ],
+        "x-permissions": []
+      }
+    },
     "/api/v1/orders/me/orders/{id}/payments": {
       "post": {
         "description": "Signed in: for your order with pre-ordered items paid in part, once the balance is asked (the\nitems are ready). Returns the balance payment to follow; a link that expired is opened again\nwhile the time to pay lasts. Calling again returns the same payment.",
@@ -225420,6 +227549,157 @@
           {}
         ],
         "summary": "Print a document of a guest order.",
+        "tags": [
+          "orders"
+        ],
+        "x-public": true
+      }
+    },
+    "/api/v1/orders/public/orders/{id}/payment-link": {
+      "post": {
+        "description": "Public with the `Order-Token` header. When the payment could not be started at checkout\n(`payment_actions[].kind = none`, see its `error`) or its link expired: for an order waiting for\npayment before its deadline, starts it again and returns the payment actions; for an order with\npre-ordered items whose balance was asked, opens the balance payment again. A payment still\nvalid is returned as is. Sending the same `Idempotency-Key` again returns the payment actions\nwithout starting anything. At most 10 times an hour per order.",
+        "operationId": "orders_restart_guest_order_payment",
+        "parameters": [
+          {
+            "description": "Id of the order.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Access token of the order.",
+            "in": "header",
+            "name": "Order-Token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Key of this attempt; resend the same key when retrying.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrdersPaymentLinkRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_OrdersPaymentAction"
+                }
+              }
+            },
+            "description": "The payment actions of the order."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing, wrong or expired token; code `orders.lookup_token_invalid`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The token opens another order; code `orders.order_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The order is not waiting for payment (`orders.invalid_transition`), its deadline passed (`orders.payment_expired`) or the time to pay the balance passed (`orders.balance_overdue`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The payment partner refused the payment (its code, e.g. `momo.return_url_required`), the payment method is not usable (`orders.payment_method_unavailable`), the same `Idempotency-Key` with another body (`orders.idempotency_key_reused`), or invalid values (see `errors`)."
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Started again too many times; code `orders.payment_retry_too_many`, see `Retry-After`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {}
+        ],
+        "summary": "Start the payment of a guest order again.",
         "tags": [
           "orders"
         ],

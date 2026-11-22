@@ -15,6 +15,8 @@ pub struct Model {
     pub org_id: Option<Uuid>,
     /// `post` hoặc `page`.
     pub kind: String,
+    /// Loại nội dung tự định nghĩa của mục `kind = custom` (bước 67, D-235).
+    pub type_id: Option<Uuid>,
     pub locale: String,
     pub translation_group_id: Uuid,
     pub parent_id: Option<Uuid>,

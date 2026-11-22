@@ -26,6 +26,8 @@ use crate::service::ContentService;
 pub(crate) struct EntryResponse {
     id: Uuid,
     kind: Kind,
+    /// The custom content type of an entry of kind `custom` (`GET /types`); `null` otherwise.
+    type_id: Option<Uuid>,
     /// Language, a BCP 47 code.
     #[schema(example = "vi")]
     locale: String,
@@ -161,6 +163,7 @@ fn entry_response(
         term_ids,
         author_ids,
         kind: Kind::parse(&entry.kind).unwrap_or(Kind::Post),
+        type_id: entry.type_id,
         status: Status::of(&entry),
         body: serde_json::from_str(&entry.body).unwrap_or(Value::Null),
         id: entry.id,
@@ -217,9 +220,11 @@ pub(crate) async fn tagged(
 #[derive(Debug, Clone, Default, Deserialize, IntoParams)]
 #[into_params(parameter_in = Query)]
 pub(crate) struct EntriesQuery {
-    /// `post` or `page`.
+    /// `post`, `page` or `custom`.
     #[param(value_type = Option<Kind>, inline)]
     pub kind: Option<String>,
+    /// Only entries of this custom content type.
+    pub type_id: Option<Uuid>,
     /// Only this language.
     #[param(example = "vi")]
     pub locale: Option<String>,
@@ -320,7 +325,8 @@ impl EntriesQuery {
                 .missing_locale
                 .map(|locale| locale.trim().to_owned())
                 .filter(|locale| !locale.is_empty()),
-            kind: choice(self.kind.as_deref(), "kind", "`post`, `page`", problems),
+            kind: choice(self.kind.as_deref(), "kind", "`post`, `page`, `custom`", problems),
+            type_id: self.type_id,
             locale: self
                 .locale
                 .map(|locale| locale.trim().to_owned())
@@ -417,6 +423,9 @@ impl From<EntryFieldsInput> for EntryFields {
 #[derive(Debug, Deserialize, Validate, ToSchema)]
 pub(crate) struct CreateEntryRequest {
     pub kind: Kind,
+    /// With `kind = custom`: the custom content type (`GET /types`); its own fields go in
+    /// `custom_fields`.
+    pub type_id: Option<Uuid>,
     /// Language; omitted: the default language.
     pub locale: Option<String>,
     /// Parent page (pages only).
@@ -507,6 +516,7 @@ pub(crate) async fn create_entry(
 ) -> Result<Created<EntryResponse>, Error> {
     let new = NewEntry {
         kind: input.kind,
+        type_id: input.type_id,
         locale: input.locale,
         parent_id: input.parent_id,
         org_id: input.org_id,

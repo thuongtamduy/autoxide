@@ -24,6 +24,7 @@ Ví dụ `curl` gửi JSON bằng `--json '…'`, cần curl 7.82 trở lên (`c
 - [Thử thay đổi trong sandbox](sandbox.vi.md): bản thử của khách, đối tác giả lập, đem bản nháp về
 - [Tự động hoá công việc bằng luật](automations.vi.md): kích hoạt, điều kiện, tool MCP làm hành động, duyệt, cảnh báo số liệu bất thường
 - [Làm app điện thoại hay app máy tính](mobile.vi.md): SDK, token và PKCE, thông báo đẩy, đồng bộ khi mất mạng, WebSocket, mua trong ứng dụng
+- [Thêm khối cho trang dựng từ khối](page-blocks.vi.md): khai khối, props, dữ liệu lúc đọc trang, AI thấy gì (cho người phát triển)
 - [Viết một bộ nối nhà cung cấp](provider-adapters.vi.md): tài khoản theo khách, secret, webhook, test không ra mạng (cho người phát triển)
 - [Gửi SMS qua eSMS](providers/esms.vi.md): lấy gì ở eSMS, cấu hình tài khoản của khách, thử kết nối, lỗi (thử nghiệm)
 - [Xác nhận chuyển khoản bằng SePay](sepay.vi.md): tài khoản SePay riêng của từng khách, địa chỉ webhook, thanh toán VietQR tự được xác nhận (thử nghiệm)

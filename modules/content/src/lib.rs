@@ -43,6 +43,7 @@ mod taxonomy;
 mod templates;
 mod theme;
 mod tools;
+mod types;
 mod usages;
 mod work;
 
@@ -95,6 +96,14 @@ impl Module for ContentModule {
                 permissions::CONTENT_WRITE,
             )
             .visibilities(&["internal", "public"]),
+            // Loại nội dung tự định nghĩa (bước 67, D-235): mỗi loại một bộ trường `content.type.<key>`.
+            autoxide_kernel::custom_fields::CustomFieldTarget::new(
+                types::TARGET,
+                permissions::CONTENT_READ,
+                permissions::CONTENT_WRITE,
+            )
+            .visibilities(&["internal", "public"])
+            .with_subtypes(),
         ]
     }
 
@@ -302,6 +311,10 @@ impl Module for ContentModule {
                 JobRegistration::new(
                     translate::TRANSLATE,
                     Arc::new(translate::Translator(service.clone())),
+                ),
+                JobRegistration::new(
+                    crate::ai::pages::AI_PAGE,
+                    Arc::new(crate::ai::pages::AiPages(service.clone())),
                 ),
                 JobRegistration::new(semantic::INDEX, Arc::new(semantic::Indexer(service.clone()))),
                 JobRegistration::new(semantic::CATCH_UP, Arc::new(semantic::CatchUp(service))),
