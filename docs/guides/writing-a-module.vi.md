@@ -276,6 +276,8 @@ autoxide-ledger = { git = "https://github.com/thuongtamduy/autoxide", tag = "vX.
 
 `autoxide_ledger::api::testing::FakeLedger` giữ bút toán, lượt thu và lượt hoàn trong bộ nhớ, chống trùng như sổ cái thật. Đăng ký `ledger.module()` trước module của bạn, đọc những gì module đã làm (`entries()`, `payments()`, `refunds()`, `balance`), và báo một lượt thu đã thu bằng `ledger.succeed(&tenant, &payment)` — nó ghi `ledger.payment_succeeded` vào outbox như sổ cái thật, nên bộ nghe của bạn chạy khi bạn cho dispatcher giao hết event.
 
+Các trait module hay gọi khác cũng có bản giả như vậy: `autoxide_notifications::api::testing::FakeNotifier` (nhớ những gì module của bạn đã gửi — `sent()` theo đúng luật `dedupe_key`, `calls()` mọi lời gọi, `kinds()` các loại đã khai) và `autoxide_compliance::api::testing::FakeConsentLedger` (đồng ý trong bộ nhớ, đúng luật "khoá rộng hơn" của sổ thật; dựng bằng `allow` / `deny`, đọc lại bằng `state_of` / `records`, giả sổ lỗi bằng `set_failing`).
+
 ## 6. Luật của core, kiểm trên crate của bạn
 
 Trong repo Autoxide, `cargo xtask check` giữ các luật của module. Với một crate ở nơi khác, chạy đúng các luật đọc mã nguồn đó từ một bản checkout của Autoxide ở tag bạn dựa vào:

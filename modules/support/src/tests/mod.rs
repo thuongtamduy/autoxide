@@ -9,13 +9,14 @@ mod sla;
 mod tickets;
 mod tools;
 
+pub(crate) use autoxide_notifications::api::testing::FakeNotifier;
 use std::sync::{Arc, Mutex};
 
 use autoxide_kernel::access::{Principal, Scope};
 use autoxide_kernel::error::Error;
-use autoxide_kernel::tenancy::{DEFAULT_TENANT, TenantContext, TenantId, root_of};
+use autoxide_kernel::tenancy::{DEFAULT_TENANT, TenantContext, root_of};
 use autoxide_media::api::{Media, MediaRef, MediaVisibility};
-use autoxide_notifications::api::{Notification, NotificationKind, Notifier, Outcome};
+use autoxide_notifications::api::Notifier;
 use autoxide_testkit::{TestApp, TestAppBuilder, TestDatabase};
 use axum::http::{Method, StatusCode};
 use serde_json::Value;
@@ -35,41 +36,15 @@ pub(crate) const STAFF: [(&str, Scope); 5] = [
     ("support.auto_reply.manage", Scope::Tenant),
 ];
 
-/// Thông báo đã gửi (giữ lại để test đọc).
-#[derive(Default)]
-pub(crate) struct FakeNotifier(pub Mutex<Vec<Notification>>);
-
-impl FakeNotifier {
-    pub(crate) fn sent(&self) -> Vec<Notification> {
-        self.0.lock().unwrap().clone()
-    }
-
-    /// Mã xác thực cuối cùng đã gửi.
-    pub(crate) fn last_code(&self) -> String {
-        let sent = self.sent();
-        let code = sent
-            .iter()
-            .rev()
-            .find(|notification| notification.kind == "support.verification_code")
-            .expect("a verification code was sent");
-        code.params["code"].as_str().unwrap().to_owned()
-    }
-}
-
-#[async_trait::async_trait]
-impl Notifier for FakeNotifier {
-    fn declare(&self, _kind: NotificationKind) -> Result<(), Error> {
-        Ok(())
-    }
-
-    async fn notify(
-        &self,
-        _tenant: TenantId,
-        notification: Notification,
-    ) -> Result<Outcome, Error> {
-        self.0.lock().unwrap().push(notification);
-        Ok(Outcome::default())
-    }
+/// Mã xác thực cuối cùng đã gửi.
+pub(crate) fn last_code(notifier: &FakeNotifier) -> String {
+    let sent = notifier.calls();
+    let code = sent
+        .iter()
+        .rev()
+        .find(|notification| notification.kind == "support.verification_code")
+        .expect("a verification code was sent");
+    code.params["code"].as_str().unwrap().to_owned()
 }
 
 /// Thư viện media giả: item `id` do người `owner` tải lên.

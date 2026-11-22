@@ -107,7 +107,7 @@ async fn tin_quang_cao_khong_gui_khi_chua_dong_y_va_hoan_ngoai_khung_gio() {
         assert_eq!(outcome.skipped[0].reason, SkipReason::NoConsent);
 
         // Đồng ý kênh `push`, nhưng khung giờ `push` mở sau 2 giờ nữa: hoãn.
-        fx.ledger.allow(ConsentSubject::User(Uuid::from_u128(2)), "push");
+        fx.ledger.allow(ConsentSubject::User(Uuid::from_u128(2)), ConsentKey::new("marketing", "", "push"));
         let from = (Timestamp::now() + SignedDuration::from_hours(2)).truncate(jiff::Unit::Hour);
         let window = json!({"from": from.format("%H:%M").to_string(), "to": (from + SignedDuration::from_hours(1)).format("%H:%M").to_string()});
         fx.rules.0.lock().unwrap().insert(
@@ -120,7 +120,7 @@ async fn tin_quang_cao_khong_gui_khi_chua_dong_y_va_hoan_ngoai_khung_gio() {
         assert_eq!(statuses(&fx.app, "ad-2").await["mobile_push"].0, "deferred");
 
         // Rút đồng ý trước giờ mở khung: kiểm lại ngay trước khi gửi → bỏ.
-        fx.ledger.deny(&ConsentSubject::User(Uuid::from_u128(2)));
+        fx.ledger.forget(&ConsentSubject::User(Uuid::from_u128(2)));
         fx.rules.0.lock().unwrap().insert(
             "notifications.send_windows".to_owned(),
             json!({"utc_offset_minutes": 0, "marketing": {"push": null}}),
@@ -145,7 +145,7 @@ async fn tin_quang_cao_khong_gui_khi_chua_dong_y_va_hoan_ngoai_khung_gio() {
         );
 
         // Đồng ý lại, trong khung: gửi.
-        fx.ledger.allow(ConsentSubject::User(Uuid::from_u128(2)), "push");
+        fx.ledger.allow(ConsentSubject::User(Uuid::from_u128(2)), ConsentKey::new("marketing", "", "push"));
         fx.notifier.notify(DEFAULT_TENANT, to_alice(&MOBILE_PROMO, "ad-3")).await.unwrap();
         run_jobs(&fx.app).await;
         assert_eq!(fx.mobile_push.count(), 1);

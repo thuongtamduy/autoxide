@@ -141,7 +141,8 @@ thật (P7).
 - [ ] P10 — Trải nghiệm người viết module (dev và AI agent viết module không phải chép code của core):
   - [x] Bản giả dùng chung của trait module: `autoxide_ledger::api::testing::FakeLedger` (feature `testing`) thay sáu
         bản chép tay ở test của các module thương mại; quy ước `api::testing` cho bản giả khác
-        (D-20261122-module-test-fakes)
+        (D-20261122-module-test-fakes); theo cùng quy ước: `autoxide_notifications::api::testing::FakeNotifier` thay
+        bảy bản, `autoxide_compliance::api::testing::FakeConsentLedger` thay năm bản
   - [ ] Hàm gộp migration bảng phụ trợ của kernel (outbox, job) cho module mới, dùng trong ví dụ module ngoài và
         hướng dẫn `docs/guides/writing-a-module.md` + `.vi.md`
   - [ ] Bản mẫu khởi tạo repo module ngoài bằng một lệnh: workspace riêng chạy được ngay (module, migration, route có

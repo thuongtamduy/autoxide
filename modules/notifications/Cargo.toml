@@ -11,6 +11,11 @@ keywords.workspace = true
 categories.workspace = true
 publish.workspace = true
 
+[features]
+# `api::testing::FakeNotifier` cho test của module khác. Chỉ bật ở `[dev-dependencies]`
+# (D-20261122-module-test-fakes).
+testing = []
+
 [dependencies]
 jiff.workspace = true
 async-trait.workspace = true
@@ -29,6 +34,8 @@ uuid.workspace = true
 validator.workspace = true
 
 [dev-dependencies]
+# Sổ đồng ý giả dùng chung (`autoxide_compliance::api::testing`).
+autoxide-compliance = { workspace = true, features = ["testing"] }
 autoxide-testkit.workspace = true
 tokio.workspace = true
 

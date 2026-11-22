@@ -8,13 +8,14 @@ mod stream;
 mod voice;
 
 use autoxide_kernel::time::Timestamp;
+pub(crate) use autoxide_notifications::api::testing::FakeNotifier;
 use jiff::SignedDuration;
 use std::sync::{Arc, Mutex};
 
 use autoxide_kernel::access::{Principal, Scope};
 use autoxide_kernel::error::Error;
-use autoxide_kernel::tenancy::{DEFAULT_TENANT, OrgId, TenantContext, TenantId, root_of};
-use autoxide_notifications::api::{Notification, NotificationKind, Notifier, Outcome};
+use autoxide_kernel::tenancy::{DEFAULT_TENANT, OrgId, TenantContext, root_of};
+use autoxide_notifications::api::Notifier;
 use autoxide_support::api::{AutoResponder, InboundQuestion, ReplyDecision};
 use autoxide_testkit::{TestApp, TestAppBuilder, TestDatabase};
 use axum::http::{Method, StatusCode};
@@ -41,36 +42,6 @@ pub(crate) const STAFF: [(&str, Scope); 6] = [
     ("conversations.recordings.read", Scope::Tenant),
     ("conversations.voice.manage", Scope::Tenant),
 ];
-
-/// Thông báo đã gửi (giữ lại để test đọc).
-#[derive(Default)]
-pub(crate) struct FakeNotifier(pub Mutex<Vec<Notification>>);
-
-impl FakeNotifier {
-    pub(crate) fn sent(&self) -> Vec<Notification> {
-        self.0.lock().unwrap().clone()
-    }
-}
-
-#[async_trait::async_trait]
-impl Notifier for FakeNotifier {
-    fn declare(&self, _kind: NotificationKind) -> Result<(), Error> {
-        Ok(())
-    }
-
-    async fn notify(
-        &self,
-        _tenant: TenantId,
-        notification: Notification,
-    ) -> Result<Outcome, Error> {
-        let mut sent = self.0.lock().unwrap();
-        // Như `notifications`: cùng khoá chống trùng thì không gửi lần hai.
-        if !sent.iter().any(|known| known.dedupe_key == notification.dedupe_key) {
-            sent.push(notification);
-        }
-        Ok(Outcome::default())
-    }
-}
 
 /// Bộ trả lời tự động giả, đứng chỗ `AutoResponder` của `support`: trả quyết định định sẵn và ghi lại
 /// câu hỏi nhận được.

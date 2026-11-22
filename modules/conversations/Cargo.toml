@@ -34,6 +34,8 @@ uuid.workspace = true
 validator.workspace = true
 
 [dev-dependencies]
+# Bộ gửi thông báo giả dùng chung (`autoxide_notifications::api::testing`).
+autoxide-notifications = { workspace = true, features = ["testing"] }
 autoxide-testkit.workspace = true
 # Đọc thân stream SSE trong test thời gian thực.
 http-body-util.workspace = true

@@ -7,14 +7,12 @@ mod ingest;
 mod privacy;
 mod reports;
 
+use autoxide_compliance::api::testing::FakeConsentLedger;
 use autoxide_kernel::time::Timestamp;
-use std::collections::HashSet;
 use std::net::IpAddr;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
-use autoxide_compliance::api::{
-    Consent, ConsentEvidence, ConsentKey, ConsentLedger, ConsentSubject,
-};
+use autoxide_compliance::api::{ConsentKey, ConsentLedger, ConsentSubject};
 use autoxide_kernel::access::Scope;
 use autoxide_kernel::analytics::{
     AnalyticsCatalog, AnalyticsEvent, Funnel, Prop, PropKind, ServerHit,
@@ -25,9 +23,7 @@ use autoxide_kernel::http::ClientInfo;
 use autoxide_kernel::module::Module;
 use autoxide_kernel::report::org_field;
 use autoxide_kernel::secret::SecretKey;
-use autoxide_kernel::tenancy::{
-    DEFAULT_TENANT, OrgId, OrgTree, Site, TenantContext, TenantId, root_of,
-};
+use autoxide_kernel::tenancy::{DEFAULT_TENANT, OrgId, OrgTree, Site, TenantContext, root_of};
 use autoxide_testkit::{TestApp, TestDatabase};
 use serde_json::{Value, json};
 use uuid::Uuid;
@@ -100,77 +96,14 @@ impl Module for Shop {
     }
 }
 
-/// Sổ đồng ý giả: tập người dùng đã đồng ý `analytics.personal`.
-#[derive(Default)]
-pub(super) struct FakeLedger {
-    pub granted: Mutex<HashSet<Uuid>>,
+/// Người `user` đồng ý `analytics.personal` (dựng dữ liệu, không qua module).
+pub(super) fn grant_personal(ledger: &FakeConsentLedger, user: Uuid) {
+    ledger.allow(ConsentSubject::User(user), ConsentKey::new(crate::api::PERSONAL_PURPOSE, "", ""));
 }
 
-impl FakeLedger {
-    pub fn grant(&self, user: Uuid) {
-        self.granted.lock().unwrap().insert(user);
-    }
-
-    pub fn withdraw(&self, user: Uuid) {
-        self.granted.lock().unwrap().remove(&user);
-    }
-
-    fn has(&self, subject: &ConsentSubject, key: &ConsentKey) -> bool {
-        match subject {
-            ConsentSubject::User(user) => {
-                key.purpose == crate::api::PERSONAL_PURPOSE
-                    && self.granted.lock().unwrap().contains(user)
-            }
-            _ => false,
-        }
-    }
-}
-
-#[async_trait::async_trait]
-impl ConsentLedger for FakeLedger {
-    async fn grant(
-        &self,
-        _: TenantId,
-        _: ConsentSubject,
-        _: ConsentKey,
-        _: ConsentEvidence,
-        _: &str,
-    ) -> Result<Consent, Error> {
-        Err(Error::internal("not used in these tests"))
-    }
-
-    async fn withdraw(
-        &self,
-        _: TenantId,
-        _: ConsentSubject,
-        _: ConsentKey,
-        _: &str,
-        _: &str,
-    ) -> Result<Consent, Error> {
-        Err(Error::internal("not used in these tests"))
-    }
-
-    async fn is_granted(
-        &self,
-        _: TenantId,
-        subject: &ConsentSubject,
-        key: &ConsentKey,
-    ) -> Result<bool, Error> {
-        Ok(self.has(subject, key))
-    }
-
-    async fn granted_many(
-        &self,
-        _: TenantId,
-        subjects: &[ConsentSubject],
-        key: &ConsentKey,
-    ) -> Result<Vec<bool>, Error> {
-        Ok(subjects.iter().map(|subject| self.has(subject, key)).collect())
-    }
-
-    async fn get(&self, _: TenantId, _: Uuid) -> Result<Option<Consent>, Error> {
-        Ok(None)
-    }
+/// Người `user` rút đồng ý `analytics.personal`.
+pub(super) fn withdraw_personal(ledger: &FakeConsentLedger, user: Uuid) {
+    ledger.deny(ConsentSubject::User(user), ConsentKey::new(crate::api::PERSONAL_PURPOSE, "", ""));
 }
 
 /// Cây gốc → A, B (hai website của hai cửa hàng).
@@ -182,7 +115,7 @@ pub(super) struct Tree {
 pub(super) struct Harness {
     pub app: TestApp,
     pub service: Arc<AnalyticsService>,
-    pub ledger: Arc<FakeLedger>,
+    pub ledger: Arc<FakeConsentLedger>,
     pub tenant: TenantContext,
     pub tree: Tree,
 }
@@ -194,7 +127,7 @@ pub(super) const READ: &str = "analytics.read";
 pub(super) async fn harness(test: &TestDatabase) -> Harness {
     let org = || OrgId::from_uuid(Uuid::now_v7());
     let tree = Tree { a: org(), b: org() };
-    let ledger = Arc::new(FakeLedger::default());
+    let ledger = Arc::new(FakeConsentLedger::new());
     let consents: Arc<dyn ConsentLedger> = ledger.clone();
     let app = TestApp::builder(test)
         .provide::<dyn ConsentLedger>(consents.clone())

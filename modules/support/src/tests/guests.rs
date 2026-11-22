@@ -36,7 +36,7 @@ async fn vang_lai_phai_xac_thuc_truoc_tin_thu_hai() {
         let (status, _) =
             call(app, "POST", &verify, "", Some(json!({"token": token, "code": "000000x"}))).await;
         assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
-        let code = harness.notifier.last_code();
+        let code = super::last_code(&harness.notifier);
         assert_eq!(code.len(), 6);
         let (status, verified) =
             call(app, "POST", &verify, "", Some(json!({"token": token, "code": code}))).await;
@@ -124,7 +124,7 @@ async fn gop_phieu_vang_lai_vao_tai_khoan() {
 
         // Xác thực phiếu đầu; phiếu thứ hai (chưa xác thực) không được gộp.
         let code = {
-            let sent = harness.notifier.sent();
+            let sent = harness.notifier.calls();
             let mut codes = sent.iter().filter(|n| n.kind == "support.verification_code");
             codes.next().unwrap().params["code"].as_str().unwrap().to_owned()
         };
@@ -160,7 +160,7 @@ async fn doan_ma_dong_thoi_van_bi_dem_du_lan_thu() {
         // cả loạt cùng thấy 0 lần thử, nên giới hạn 5 lần mất tác dụng và mã đúng vẫn dùng được.
         let (status, _) = call(app, "POST", &verify, "", Some(json!({"token": token}))).await;
         assert_eq!(status, StatusCode::OK);
-        let code = harness.notifier.last_code();
+        let code = super::last_code(&harness.notifier);
         let wrong =
             json!({"token": token, "code": if code == "000000" { "111111" } else { "000000" }});
         let guess = || call(app, "POST", &verify, "", Some(wrong.clone()));

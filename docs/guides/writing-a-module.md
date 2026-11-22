@@ -276,6 +276,8 @@ autoxide-ledger = { git = "https://github.com/thuongtamduy/autoxide", tag = "vX.
 
 `autoxide_ledger::api::testing::FakeLedger` keeps entries, payments and refunds in memory with the same replay rules as the real ledger. Register `ledger.module()` before your module, read what your module did (`entries()`, `payments()`, `refunds()`, `balance`), and report a payment as collected with `ledger.succeed(&tenant, &payment)` — it writes `ledger.payment_succeeded` to the outbox like the real ledger, so your listener runs once you drain the dispatcher.
 
+The same pattern exists for the other traits modules most often call: `autoxide_notifications::api::testing::FakeNotifier` (keeps what your module sent — `sent()` with the real `dedupe_key` rule, `calls()` with every call, `kinds()` declared) and `autoxide_compliance::api::testing::FakeConsentLedger` (consents in memory with the real "broader key" rule; set them up with `allow` / `deny`, read them back with `state_of` / `records`, make the ledger fail with `set_failing`).
+
 ## 6. The rules of the core, checked on your crate
 
 Inside the Autoxide repository, `cargo xtask check` enforces the module rules. For a crate anywhere else, run the same source rules from a checkout of Autoxide at the tag you build on:
