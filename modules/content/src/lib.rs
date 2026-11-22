@@ -297,6 +297,10 @@ impl Module for ContentModule {
                     translate::TRANSLATE,
                     Arc::new(translate::Translator(service.clone())),
                 ),
+                JobRegistration::new(
+                    crate::ai::pages::AI_PAGE,
+                    Arc::new(crate::ai::pages::AiPages(service.clone())),
+                ),
                 JobRegistration::new(semantic::INDEX, Arc::new(semantic::Indexer(service.clone()))),
                 JobRegistration::new(semantic::CATCH_UP, Arc::new(semantic::CatchUp(service))),
             ]

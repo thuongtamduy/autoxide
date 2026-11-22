@@ -3,6 +3,7 @@
 //! đăng ký qua `routes!` để có tài liệu OpenAPI (luật kiến trúc 6).
 
 mod actions;
+mod ai_pages;
 mod assist;
 mod banners;
 pub(crate) mod entries;
@@ -53,6 +54,9 @@ pub(crate) fn routes(service: Arc<ContentService>) -> OpenApiRouter {
         .routes(routes!(entries::list_entries, entries::create_entry))
         .routes(routes!(entries::get_entry, entries::update_entry, actions::delete_entry))
         .routes(routes!(layout::put_layout, layout::patch_layout))
+        .routes(routes!(ai_pages::compose_page))
+        .routes(routes!(ai_pages::edit_page))
+        .routes(routes!(ai_pages::ai_thread))
         .routes(routes!(actions::publish_entry))
         .routes(routes!(actions::unpublish_entry))
         .routes(routes!(actions::archive_entry))

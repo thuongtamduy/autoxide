@@ -58,6 +58,17 @@ impl ContentService {
             wanted.push(("og_media_id".to_owned(), id));
         }
         wanted.extend(in_body.iter().map(|id| ("body".to_owned(), *id)));
+        self.check_media_ids(tenant, wanted, public, problems).await
+    }
+
+    /// Ảnh `wanted` (trường báo lỗi, ID) có tồn tại — và, khi `public`, có công khai — không.
+    pub(crate) async fn check_media_ids(
+        &self,
+        tenant: &TenantContext,
+        wanted: Vec<(String, Uuid)>,
+        public: bool,
+        problems: &mut Vec<FieldError>,
+    ) -> Result<(), Error> {
         if wanted.is_empty() {
             return Ok(());
         }

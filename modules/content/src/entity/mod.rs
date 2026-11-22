@@ -1,5 +1,6 @@
 //! Entity (SeaORM) của các bảng `content_…`. Chỉ dùng trong module này.
 
+pub(crate) mod ai_turn;
 pub(crate) mod author;
 pub(crate) mod banner;
 pub(crate) mod embedding;

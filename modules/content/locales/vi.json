@@ -294,5 +294,14 @@
   "text:Use to show the scheduled banners of a placement, managed in one place; use a fixed block for text that belongs to this page only.": "Dùng để hiện banner có lịch của một vị trí, quản lý ở một chỗ; chữ chỉ thuộc trang này thì dùng khối cố định.",
   "field:give exactly one of `media_id` and `embed_url`": "chọn đúng một trong `media_id` và `embed_url`",
   "field:must hold {min} to {max} columns": "phải có từ {min} tới {max} cột",
-  "field:is added below every page by itself; do not place it": "được tự gắn dưới mọi trang; đừng đặt khối này"
+  "field:is added below every page by itself; do not place it": "được tự gắn dưới mọi trang; đừng đặt khối này",
+  "content.ai_result_invalid": "AI chưa tạo được bố cục hợp lệ sau {tries} lần; hãy mô tả cụ thể hơn.",
+  "content.ai_conflict": "Có người sửa trang trong lúc AI làm; hãy yêu cầu lại trên bản hiện tại.",
+  "text:An AI request on a page finished: its result is a new draft (never published); `revision_id` holds it.": "Một yêu cầu AI cho trang đã xong: kết quả là bản nháp mới (không bao giờ tự đăng), nằm ở `revision_id`.",
+  "field:only pages have a block layout": "chỉ trang mới có bố cục khối",
+  "field:the page has no block layout yet; compose one first": "trang chưa có bố cục khối; hãy tạo bố cục trước",
+  "field:must name at most {max} blocks": "chỉ được nêu tối đa {max} khối",
+  "field:is not a JSON Patch: {error}": "không phải JSON Patch: {error}",
+  "field:is not JSON: {error}": "không phải JSON: {error}",
+  "field:must be 1 to {max} characters": "phải dài 1 đến {max} ký tự"
 }
