@@ -156,6 +156,20 @@ impl Module for BookmarksModule {
 Những luật quan trọng nhất, mỗi luật có trong file ví dụ nêu tên:
 
 - **Bảng** (`migration/`, `entity.rs`): tên `bookmarks_…`; ID là UUIDv7 sinh trong ứng dụng; bảng giữ dữ liệu của khách hàng có cột `tenant_id`, và mọi khoá, mọi index bắt đầu bằng cột đó; không foreign key sang bảng của module khác — chỉ giữ ID. Migration viết bằng schema builder, không viết SQL, để một migration chạy được trên cả hai database, và cái nào cũng có `down`. Migration đã phát hành thì không sửa: thêm cái mới.
+- **Bảng phụ trợ** (`migration/mod.rs`): `Outbox::record` cần bảng `bookmarks_events`, job queue cần bảng `bookmarks_jobs`. Đừng tự viết — kernel định nghĩa chúng, và một lời gọi thêm cả hai ở dạng hiện tại, sau migration của chính bạn:
+
+  ```rust
+  use autoxide_kernel::migration::{HelperTable, helper_tables};
+
+  pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
+      let mut migrations: Vec<Box<dyn MigrationTrait>> =
+          vec![Box::new(m0001_create_bookmark::Migration)];
+      migrations.extend(helper_tables("bookmarks", &[HelperTable::Events, HelperTable::Jobs]));
+      migrations
+  }
+  ```
+
+  Chỉ xin thứ module dùng (`&[HelperTable::Events]` cho module không có job). Mỗi bảng phụ trợ là một chuỗi migration riêng, tên cố định, nên bảng cần thêm về sau là một lời gọi nữa **ở cuối** danh sách, không bao giờ sửa lời gọi trước. Module chính thức của core giữ danh sách từng bước cũ của mình, vì các tên đó đã ghi trong database đang chạy.
 - **Logic ở service** (`service.rs`): mọi hàm nhận `TenantContext` của khách, đọc qua `tenant.database().read()`, ghi trong một transaction `begin_write()` ngắn, và lọc mọi truy vấn bằng `.scoped(tenant)`. Lệnh ghi lưu event của nó trong cùng transaction (`Outbox::record`).
 - **Handler và tool chỉ gọi service** (`http.rs`, `tools.rs`): lấy dữ liệu vào (`ValidJson<T>`), kiểm permission (`principal.require(&BOOKMARKS_WRITE)?`), gọi một hàm của service, trả `Data<T>`, `Page<T>` hoặc `Created<T>`. Route đăng ký bằng `routes!` để có mặt trong tài liệu OpenAPI; dòng `///` và `description` của từng response được chép vào đó, nên viết bằng tiếng Anh cho người gọi API.
 - **Lỗi** mang một `code` ổn định có tiền tố module (`bookmarks.url_taken`) và câu tiếng Anh; câu tiếng Việt nằm dưới cùng mã đó trong `locales/vi.json`.
@@ -301,7 +315,7 @@ Các crate của core chưa có trên crates.io; cho tới khi có, git tag là 
 ## Danh sách kiểm
 
 - [ ] Crate của module chỉ mở `pub mod api` và `pub fn module`
-- [ ] Bảng tên `<module>_…`, ID UUIDv7, `tenant_id` đứng đầu mọi khoá và index, migration có `down`
+- [ ] Bảng tên `<module>_…`, ID UUIDv7, `tenant_id` đứng đầu mọi khoá và index, migration có `down`; bảng event và job lấy từ `helper_tables`
 - [ ] Permission đã khai; mọi handler và tool đòi một permission
 - [ ] Logic chỉ ở service; mỗi lệnh ghi lưu event trong cùng transaction
 - [ ] Mọi route có tài liệu: tóm tắt, permission, từng response

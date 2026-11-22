@@ -337,6 +337,7 @@ async fn module_nhan_database_va_khai_route() {
                     "/approvals/{id}".to_owned(),
                     "/approvals/{id}/approve".to_owned(),
                     "/approvals/{id}/reject".to_owned(),
+                    "/blocks".to_owned(),
                     "/bulk/{resource}/{action}".to_owned(),
                     "/client-config".to_owned(),
                     "/connections/webhooks".to_owned(),

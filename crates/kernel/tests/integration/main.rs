@@ -11,6 +11,7 @@ mod approvals_work;
 mod backlog;
 mod backup;
 mod backup_schedule;
+mod blocks;
 mod can;
 mod can_plan;
 mod cdn_cache;
