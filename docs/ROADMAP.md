@@ -132,6 +132,15 @@ thật (P7).
   - [ ] 139 endpoint GET trả `Data<Vec<T>>` không phân trang: endpoint mới trả `Page<T>`, khai deprecation cho cái cũ
   - [ ] Rustdoc tiếng Anh cho phần công khai của kernel, testkit và `autoxide` (docs.rs)
   - [ ] Chạy thử năm bộ nối của P7 bằng tài khoản thử thật; đối chiếu các điểm "(?)" của MoMo với trang tài liệu gốc
+- [ ] P10 — Trải nghiệm người viết module (dev và AI agent viết module không phải chép code của core):
+  - [ ] Bản giả dùng chung của trait module: `autoxide_ledger::api::testing::FakeLedger` (feature `testing`) thay sáu
+        bản chép tay ở test của các module thương mại; quy ước `api::testing` cho bản giả khác
+  - [x] Hàm gộp migration bảng phụ trợ của kernel (outbox, job) cho module mới: `helper_tables`
+        (D-20261122-module-helpers), dùng trong `examples/external-module/` và hướng dẫn
+        `docs/guides/writing-a-module.md` + `.vi.md`; `notes` giữ danh sách cũ (đổi là đổi tên migration đã áp dụng)
+  - [ ] Bản mẫu khởi tạo repo module ngoài bằng một lệnh: workspace riêng chạy được ngay (module, migration, route có
+        OpenAPI, test `TestApp::builder` trên cả hai database, CI mẫu, README EN + VI); có test sinh khung rồi build và
+        test nó
 
 ## Giai đoạn B — Lớp cho giao diện và phân quyền
 

@@ -156,6 +156,20 @@ impl Module for BookmarksModule {
 The rules that matter most, each shown in the example file named:
 
 - **Tables** (`migration/`, `entity.rs`): named `bookmarks_…`; ids are UUIDv7 made in the application; a table that holds a customer's data has a `tenant_id` column, and every key and index starts with it; no foreign key to a table of another module — keep the id only. Migrations are written with the schema builder, not SQL, so one migration runs on both databases, and each has a `down`. A released migration is never edited: add a new one.
+- **Helper tables** (`migration/mod.rs`): `Outbox::record` needs a `bookmarks_events` table and the job queue a `bookmarks_jobs` table. Do not write them yourself — the kernel defines them, and one call adds both in their current shape after your own migrations:
+
+  ```rust
+  use autoxide_kernel::migration::{HelperTable, helper_tables};
+
+  pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
+      let mut migrations: Vec<Box<dyn MigrationTrait>> =
+          vec![Box::new(m0001_create_bookmark::Migration)];
+      migrations.extend(helper_tables("bookmarks", &[HelperTable::Events, HelperTable::Jobs]));
+      migrations
+  }
+  ```
+
+  Ask only for what the module uses (`&[HelperTable::Events]` for a module without jobs). Each helper table is its own chain of migrations with fixed names, so a table you need later is one more call **at the end** of the list, never a change to an earlier one. The official modules of the core keep their older step-by-step lists, because those names are already recorded in existing databases.
 - **Logic in the service** (`service.rs`): every method takes the `TenantContext` of the customer, reads through `tenant.database().read()`, writes in one short `begin_write()` transaction, and filters every query with `.scoped(tenant)`. A write records its event in the same transaction (`Outbox::record`).
 - **Handlers and tools only call the service** (`http.rs`, `tools.rs`): take the input (`ValidJson<T>`), check the permission (`principal.require(&BOOKMARKS_WRITE)?`), call one service method, return `Data<T>`, `Page<T>` or `Created<T>`. Routes are registered with `routes!`, which puts them in the OpenAPI document; the `///` comment and every response `description` are copied there, so write them in English for the API's callers.
 - **Errors** carry a stable `code` with the module prefix (`bookmarks.url_taken`) and an English text; the Vietnamese text goes under the same code in `locales/vi.json`.
@@ -290,7 +304,7 @@ The core crates are not on crates.io yet; until they are, the git tag is the way
 ## Checklist
 
 - [ ] The module crate exposes only `pub mod api` and `pub fn module`
-- [ ] Tables named `<module>_…`, UUIDv7 ids, `tenant_id` first in every key and index, migrations with `down`
+- [ ] Tables named `<module>_…`, UUIDv7 ids, `tenant_id` first in every key and index, migrations with `down`; event and job tables from `helper_tables`
 - [ ] Permissions declared; every handler and tool requires one
 - [ ] Logic only in the service; each write records its event in the same transaction
 - [ ] Every route documented: summary, permission, every response
