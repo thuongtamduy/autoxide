@@ -18,6 +18,7 @@ use crate::testing::FakeMedia;
 
 mod agent;
 mod bulk;
+mod edit_lock;
 mod embed;
 mod layout;
 mod layout_public;

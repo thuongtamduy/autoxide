@@ -8189,6 +8189,25 @@ export type Data_DryRun = {
 };
 
 /** Envelope of a single result. */
+export type Data_EditLock = {
+  /** Who is editing an entry, and until when. */
+  data: {
+    /** When the holder first took the lock. */
+    acquired_at: string;
+    /** The API key holding the lock, when the holder works through one (e.g. an agent). */
+    api_key_id?: string | null;
+    /** The entry being edited. */
+    entry_id: string;
+    /** When the lock lapses unless the holder renews it (`POST` again). */
+    expires_at: string;
+    /** `true` when you hold the lock (same user and same API key). */
+    mine: boolean;
+    /** The user holding the lock. */
+    user_id: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_EditedComment = {
   /** A comment just changed, for its author. */
   data: PublicComment & {
@@ -10215,6 +10234,24 @@ export type Data_OpsBacklog = {
   data: {
     checked_at: string;
     databases: DatabaseBacklog[];
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_Option_EditLock = {
+  data: null | {
+    /** When the holder first took the lock. */
+    acquired_at: string;
+    /** The API key holding the lock, when the holder works through one (e.g. an agent). */
+    api_key_id?: string | null;
+    /** The entry being edited. */
+    entry_id: string;
+    /** When the lock lapses unless the holder renews it (`POST` again). */
+    expires_at: string;
+    /** `true` when you hold the lock (same user and same API key). */
+    mine: boolean;
+    /** The user holding the lock. */
+    user_id: string;
   };
 };
 
@@ -16313,6 +16350,22 @@ export type EditCommentRequest = {
   /** Guests: the `edit_token` received when posting. Signed-in authors omit it. */
   edit_token?: string | null;
   format?: Format | null;
+};
+
+/** Who is editing an entry, and until when. */
+export type EditLock = {
+  /** When the holder first took the lock. */
+  acquired_at: string;
+  /** The API key holding the lock, when the holder works through one (e.g. an agent). */
+  api_key_id?: string | null;
+  /** The entry being edited. */
+  entry_id: string;
+  /** When the lock lapses unless the holder renews it (`POST` again). */
+  expires_at: string;
+  /** `true` when you hold the lock (same user and same API key). */
+  mine: boolean;
+  /** The user holding the lock. */
+  user_id: string;
 };
 
 /** A comment just changed, for its author. */
@@ -38126,6 +38179,43 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/content/entries/{id}/edit-lock": {
+    /** See who is editing an entry. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_Option_EditLock;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Take or renew the edit lock of an entry. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_EditLock;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+    /** Release your edit lock of an entry. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
         default: Problem;
       };
     };

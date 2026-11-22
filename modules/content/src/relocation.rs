@@ -24,5 +24,5 @@ pub(crate) fn relocation() -> Relocation {
         ])
         .follow("content_menu_items", "menu_id", "content_menus")
         .stay(&["content_redirects"])
-        .ephemeral(&["content_tree_locks", "content_embedding_state"])
+        .ephemeral(&["content_tree_locks", "content_embedding_state", "content_edit_locks"])
 }
