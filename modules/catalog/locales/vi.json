@@ -206,5 +206,11 @@
   "catalog.ai_images_unavailable": "Tạo sản phẩm nháp từ ảnh cần mô hình AI đọc được ảnh; mô hình cấu hình trên máy chủ này không đọc được (hoặc chưa cài module `ai`).",
   "catalog.ai_images_unreadable": "Không đọc được ảnh nào: dùng ảnh JPEG, PNG, GIF hay WebP trong thư viện media.",
   "field:must have 1 to 8 images": "phải có từ 1 tới 8 ảnh",
-  "field:is not in the media library": "không có trong thư viện media"
+  "field:is not in the media library": "không có trong thư viện media",
+  "text:Product grid": "Lưới sản phẩm",
+  "text:Use to show several products: hand-picked ones, a category, products on sale or best sellers; prices always come from the catalog.": "Dùng để hiện nhiều sản phẩm: chọn tay, theo danh mục, đang giảm giá hay bán chạy; giá luôn lấy từ catalog.",
+  "text:Product": "Sản phẩm",
+  "text:Use to feature one product with its picture, current price and rating.": "Dùng để giới thiệu một sản phẩm kèm ảnh, giá hiện tại và điểm đánh giá.",
+  "text:Collection": "Bộ sưu tập",
+  "text:Use to show the products of a collection the shop prepared, in the collection's order.": "Dùng để hiện sản phẩm của một bộ sưu tập cửa hàng đã soạn, theo thứ tự của bộ sưu tập."
 }
