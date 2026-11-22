@@ -55,12 +55,13 @@ impl ContentService {
         if !body.contains("\"layout\"") {
             return Ok(None);
         }
-        let Ok(parsed) = serde_json::from_str::<Value>(body) else {
+        let Ok(mut parsed) = serde_json::from_str::<Value>(body) else {
             return Ok(None);
         };
         if !layout::is_layout(&parsed) {
             return Ok(None);
         }
+        self.expand_shared_sections(tenant, &mut parsed).await?;
         let usable = self.usable_blocks(tenant).await?;
         let body = layout::public(&parsed, &usable);
         let mut refs: Vec<(&str, BlockRef)> = layout::blocks_of(&body)

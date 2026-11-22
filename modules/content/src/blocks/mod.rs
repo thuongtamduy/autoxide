@@ -364,6 +364,22 @@ pub(crate) const PLACEMENT: BlockType = BlockType::new(
 )
 .with_data();
 
+/// Khu dùng chung nhiều trang: lúc đọc công khai được thay bằng nội dung hiện tại của khu.
+pub(crate) const SHARED_SECTION: BlockType = BlockType::new(
+    "content.shared_section",
+    BlockCategory::Layout,
+    "Shared section",
+    "Use to place a shared section (the same blocks on many pages, edited in one place) by its id.",
+    r#"{
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id"],
+        "properties": {
+            "id": {"type": "string", "format": "uuid", "description": "A shared section of `GET /api/v1/content/shared-sections`."}
+        }
+    }"#,
+);
+
 pub(crate) fn all() -> Vec<BlockType> {
     vec![
         SECTION,
@@ -384,5 +400,6 @@ pub(crate) fn all() -> Vec<BlockType> {
         EMBED,
         SEARCH_BOX,
         PLACEMENT,
+        SHARED_SECTION,
     ]
 }

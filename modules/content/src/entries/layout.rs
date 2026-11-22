@@ -282,6 +282,12 @@ impl Checker<'_> {
                     self.info.records.insert((kind.to_owned(), id.to_owned()));
                 }
             }
+            // Khu dùng chung: service kiểm khu có thật (cùng chỗ kiểm bản ghi nhúng).
+            "content.shared_section" => {
+                if let Some(id) = props.get("id").and_then(Value::as_str) {
+                    self.info.records.insert((crate::shared::KIND.to_owned(), id.to_owned()));
+                }
+            }
             // Chân trang pháp lý tự gắn dưới mọi trang: đặt thêm trong bố cục là thừa và gỡ được.
             crate::publishing::blocks::LEGAL_FOOTER => self.error(FieldError::new(
                 format!("{at}.block"),
