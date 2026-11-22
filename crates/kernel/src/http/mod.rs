@@ -156,6 +156,8 @@ pub struct Extras {
     pub idempotency: Option<Arc<dyn IdempotencyStore>>,
     /// Endpoint deprecated do các module khai: `(tên module, khai báo)`.
     pub deprecations: Vec<(&'static str, Deprecation)>,
+    /// Tên các module hạng thử nghiệm: mọi operation của chúng mang `x-stability` (bước 70 P3).
+    pub experimental: Vec<&'static str>,
     /// Giới hạn thân request riêng của route do module khai: `(tên module, khai báo)`.
     pub body_limits: Vec<(&'static str, BodyLimit)>,
     /// Tool MCP của các module, tên đầy đủ (`Modules::tools`). Endpoint `/mcp` có mặt
@@ -213,6 +215,12 @@ impl Extras {
     /// Sets the deprecated endpoints: `(module name, declaration)`.
     pub fn deprecations(mut self, deprecations: Vec<(&'static str, Deprecation)>) -> Self {
         self.deprecations = deprecations;
+        self
+    }
+
+    /// Sets the names of the experimental modules: their operations are marked `x-stability`.
+    pub fn experimental(mut self, experimental: Vec<&'static str>) -> Self {
+        self.experimental = experimental;
         self
     }
 
@@ -351,6 +359,7 @@ pub fn build(
         .split_for_parts();
     openapi::finish(&mut openapi, extras.idempotency.is_some());
     let deprecated = Arc::new(deprecation::apply(&mut openapi, &extras.deprecations));
+    deprecation::mark_experimental(&mut openapi, &extras.experimental);
 
     // Tài liệu không đổi trong lúc chạy: đổi thành JSON một lần rồi trả lại mãi. `Bytes` clone
     // chỉ tăng bộ đếm tham chiếu, không chép cả tài liệu (hơn 1 MB) mỗi request (D-158).

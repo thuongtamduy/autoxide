@@ -49,7 +49,7 @@ use autoxide_kernel::database::Database;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::http::{self, Extras};
 use autoxide_kernel::idempotency::IdempotencyStore;
-use autoxide_kernel::module::{Module, Modules, StartContext};
+use autoxide_kernel::module::{Module, Modules, Selection, StartContext};
 use autoxide_kernel::tenancy::{
     DatabaseRegistry, NewPlacement, NewTenant, OrgId, PlacementKind, TenancyConfig, TenancyMode,
     TenantAdmin, TenantContext, TenantDomains,
@@ -121,6 +121,8 @@ pub struct TestAppBuilder<'a> {
     test: &'a TestDatabase,
     settings: Vec<(String, String)>,
     modules: Vec<Box<dyn Module>>,
+    /// Module có trong chương trình nhưng tắt ([`TestAppBuilder::module_turned_off`]).
+    turned_off: Vec<Box<dyn Module>>,
     provided: Vec<Provision>,
     users: HashMap<String, Principal>,
     multi: bool,
@@ -147,6 +149,7 @@ impl TestApp {
             test,
             settings: Vec::new(),
             modules: Vec::new(),
+            turned_off: Vec::new(),
             provided: Vec::new(),
             users: HashMap::new(),
             multi: false,
@@ -338,6 +341,14 @@ impl<'a> TestAppBuilder<'a> {
         self
     }
 
+    /// Một module có trong chương trình nhưng TẮT, như khi `AUTOXIDE_MODULES` không bật nó: không
+    /// được đăng ký, migration của nó không chạy, nhưng chương trình biết nó tồn tại
+    /// (`Modules::inactive`). Để thử việc chương trình làm gì với dữ liệu module đó để lại.
+    pub fn module_turned_off(mut self, module: impl Module + 'static) -> Self {
+        self.turned_off.push(Box::new(module));
+        self
+    }
+
     /// Công bố một trait thay cho module thật, vd `provide::<dyn Storage>(Arc::new(fake))`.
     /// Mọi thứ `provide` được công bố bởi module `testkit`, đứng trước mọi module khác.
     pub fn provide<T>(mut self, api: Arc<T>) -> Self
@@ -498,7 +509,20 @@ impl<'a> TestAppBuilder<'a> {
             modules.push(Box::new(Provider(self.provided)));
         }
         modules.extend(self.modules);
-        let mut modules = Modules::new(modules).map_err(|e| fail("modules", e))?;
+        let mut modules = if self.turned_off.is_empty() {
+            // Không qua bộ chọn: test của một module thường thay module nó cần bằng bản giả
+            // (`provide`), nên `Module::depends_on` không có module thật để trỏ tới.
+            Modules::new(modules).map_err(|e| fail("modules", e))?
+        } else {
+            // Module tắt đi qua đúng bộ chọn của chương trình thật: `all` trừ từng tên.
+            let mut selection = "all".to_owned();
+            for module in &self.turned_off {
+                selection.push_str(&format!(",-{}", module.name()));
+            }
+            modules.extend(self.turned_off);
+            let selection = Selection::parse(&selection).map_err(|e| fail("modules", e))?;
+            Modules::select(modules, &selection).map_err(|e| fail("modules", e))?
+        };
         let configured = modules.configure(&mut reader);
         let (config, _) = reader
             .finish(config.and_then(|config| configured.map(|()| config)))
@@ -600,6 +624,7 @@ impl<'a> TestAppBuilder<'a> {
             .authenticator(authenticator)
             .idempotency(modules.api::<dyn IdempotencyStore>())
             .deprecations(modules.deprecations())
+            .experimental(modules.experimental())
             .body_limits(modules.body_limits())
             .tools(modules.tools().map_err(|e| fail("tools", e))?)
             .resources(modules.mcp_resources().map_err(|e| fail("resources", e))?)

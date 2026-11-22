@@ -153,6 +153,8 @@ pub struct Tool {
     input_schema: Value,
     handler: Arc<dyn ToolHandler>,
     deprecation: Option<ToolDeprecation>,
+    /// Tool của module thử nghiệm (gắn bởi `Modules::tools`, bước 70 P3).
+    experimental: bool,
     /// Khai tường minh: mọi người đã đăng nhập gọi được (service tự giới hạn vào dữ liệu của họ).
     any_signed_in: bool,
     /// Lệnh rủi ro: agent gọi thì bị từ chối, chỉ sang REST để xin duyệt (bước 51 P12).
@@ -187,6 +189,7 @@ impl Tool {
                 .unwrap_or(Value::Null),
             handler: Arc::new(Typed { handler, input: PhantomData }),
             deprecation: None,
+            experimental: false,
             any_signed_in: false,
             approval_for_agent: false,
         }
@@ -290,6 +293,16 @@ impl Tool {
     /// Tool đã deprecated thì có (gắn bởi `Modules::tools` từ `Module::deprecations`).
     pub fn deprecation(&self) -> Option<&ToolDeprecation> {
         self.deprecation.as_ref()
+    }
+
+    /// Tool thuộc module thử nghiệm: tham số và kết quả có thể đổi giữa các bản.
+    pub fn is_experimental(&self) -> bool {
+        self.experimental
+    }
+
+    pub(crate) fn experimental(mut self, experimental: bool) -> Self {
+        self.experimental = experimental;
+        self
     }
 
     pub(crate) fn deprecated(mut self, deprecation: ToolDeprecation) -> Self {

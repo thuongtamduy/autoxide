@@ -481,14 +481,15 @@ impl Modules {
             self.modules.iter().map(|module| (module.name(), module.relocation())).collect(),
         )
         .map_err(|problems| ModuleError(problems.join("; ")))?;
-        self.moves.fill(
-            self.names(),
-            self.control_plane_tables(),
+        self.moves.fill(crate::tenancy::moves::Setup {
+            modules: self.names(),
+            control_plane: self.control_plane_tables(),
             migrator,
             placements,
             retained,
             policies,
-        );
+            inactive: self.inactive.iter().map(|module| module.name).collect(),
+        });
         self.backlog.fill(self.job_modules(), self.events.modules());
         Ok(())
     }

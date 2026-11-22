@@ -356,6 +356,17 @@ async fn run_tasks(runtime: &Runtime, names: &[String]) -> Result<(), String> {
     let tasks = runtime.modules.tasks().map_err(|error| error.to_string())?;
     for name in names {
         let Some((_, task)) = tasks.iter().find(|(full, _)| full == name) else {
+            // Task của module đang tắt (bước 70 P1): bỏ qua kèm cảnh báo, để người chọn tập module
+            // nhỏ hơn không phải sửa thêm danh sách task (vd của quickstart). Tên sai thật vẫn là lỗi.
+            let owner = name.split('.').next().unwrap_or_default();
+            if runtime.modules.inactive().iter().any(|module| module.name == owner) {
+                tracing::warn!(
+                    task = %name,
+                    module = owner,
+                    "startup task skipped: its module is turned off (AUTOXIDE_MODULES)"
+                );
+                continue;
+            }
             return Err(format!(
                 "AUTOXIDE_STARTUP_TASKS: there is no task `{name}`; run `autoxide task` to list \
                  them"

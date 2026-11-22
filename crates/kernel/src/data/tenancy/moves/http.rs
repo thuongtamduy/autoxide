@@ -67,7 +67,7 @@ pub(crate) struct MoveRequest {
         (status = 401, description = "Not signed in; code `unauthorized` or the code of the authentication module.", body = Problem),
         (status = 403, description = "Missing permission `kernel.tenants.move` (`permission_denied`), or not an account of the platform tenant (`tenant_platform_only`).", body = Problem),
         (status = 404, description = "No such tenant or placement; code `tenant_not_found` or `tenant_placement_not_found`.", body = Problem),
-        (status = 409, description = "The move cannot run now; code `tenant_move_platform`, `tenant_move_same_placement`, `tenant_move_not_active`, `tenant_move_running`, `tenant_move_unfinished`, `tenant_move_schema_differs`, `tenant_move_same_database` or `tenant_placement_behind`. A dry run lists every reason.", body = Problem),
+        (status = 409, description = "The move cannot run now; code `tenant_move_platform`, `tenant_move_same_placement`, `tenant_move_not_active`, `tenant_move_running`, `tenant_move_unfinished`, `tenant_move_schema_differs`, `tenant_move_same_database`, `tenant_move_modules_off` or `tenant_placement_behind`. A dry run lists every reason.", body = Problem),
         (status = 422, description = "A value is invalid; see `errors`.", body = Problem),
         (status = 503, description = "A database cannot be reached; code `tenant_move_unreachable`.", body = Problem),
     )
