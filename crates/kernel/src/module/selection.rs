@@ -504,6 +504,11 @@ impl Modules {
         Ok((dormant, unreachable))
     }
 
+    /// Giá trị `AUTOXIDE_MODULES` người cài đã đặt, nguyên văn; `None`: mặc định của chương trình.
+    pub fn selection_text(&self) -> Option<&str> {
+        self.selection_text.as_deref()
+    }
+
     /// Người cài tự đặt `AUTOXIDE_MODULES` (không phải mặc định của chương trình).
     pub fn selection_is_explicit(&self) -> bool {
         self.selection_text.is_some()

@@ -11,7 +11,6 @@ publish.workspace = true
 async-trait.workspace = true
 autoxide-kernel.workspace = true
 axum.workspace = true
-jiff.workspace = true
 sea-orm.workspace = true
 serde.workspace = true
 serde_json.workspace = true

@@ -19,17 +19,24 @@ if [ -f ../../Cargo.lock ]; then
   cp ../../Cargo.lock Cargo.lock
 fi
 
+# On CI every program is built once and run once: building the libraries unoptimized is faster than
+# the time their tests save. On your machine the profile of Cargo.toml (opt-level 1) stays.
+PROFILE=()
+if [ -n "${GITHUB_ACTIONS:-}" ]; then
+  PROFILE=(--config 'profile.dev.package."*".opt-level=0')
+fi
+
 echo "== format"
 cargo fmt --check -p acme-bookmarks -p acme-server
 echo "== lints"
-cargo clippy --workspace --all-targets -- -D warnings
+cargo clippy --workspace --all-targets ${PROFILE[@]+"${PROFILE[@]}"} -- -D warnings
 echo "== tests on SQLite"
-env -u TEST_DATABASE_URL cargo test --workspace
+env -u TEST_DATABASE_URL cargo test --workspace ${PROFILE[@]+"${PROFILE[@]}"}
 if [ -n "${POSTGRES_URL:-}" ]; then
   echo "== tests on PostgreSQL"
   # Every test creates a database of its own: keep the number of tests running at once below the
   # connection limit of the server.
-  TEST_DATABASE_URL="$POSTGRES_URL" cargo test --workspace -- --test-threads=4
+  TEST_DATABASE_URL="$POSTGRES_URL" cargo test --workspace ${PROFILE[@]+"${PROFILE[@]}"} -- --test-threads=4
 else
   echo "== tests on PostgreSQL: skipped (set POSTGRES_URL to run them)"
 fi

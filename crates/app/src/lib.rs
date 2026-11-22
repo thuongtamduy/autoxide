@@ -83,6 +83,13 @@ enum Command {
     /// on start.) Only one process applies migrations at a time: the others wait for it.
     Migrate(commands::migrate::Arguments),
 
+    /// List every module of this program: tier, on or off, what it depends on, leftover data.
+    ///
+    /// Shows the official modules and the ones this binary added, as chosen by AUTOXIDE_MODULES.
+    /// For a module that is turned off it says whether the database still holds its data. Reads
+    /// only; `--json` prints the same for programs and agents.
+    Modules(commands::modules::Arguments),
+
     /// Print the OpenAPI document of the whole API as JSON.
     ///
     /// The same document is served at `/api/v1/openapi.json`. Connects to the
@@ -256,6 +263,7 @@ fn dispatch(command: Command) -> ExitCode {
         Command::Doctor(arguments) => commands::doctor::run(&arguments),
         Command::Jobs(arguments) => commands::jobs::run(&arguments),
         Command::Migrate(arguments) => commands::migrate::run(&arguments),
+        Command::Modules(arguments) => commands::modules::run(&arguments),
         Command::Openapi => commands::openapi::run(),
         Command::McpManifest => commands::mcp_manifest::run(),
         Command::Placement(arguments) => commands::placement::run(&arguments),

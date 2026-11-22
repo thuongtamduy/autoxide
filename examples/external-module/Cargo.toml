@@ -30,7 +30,6 @@ autoxide-testkit = { path = "../../crates/testkit" }
 # a module only adds what its own code uses.
 async-trait = "0.1"
 axum = "0.8"
-jiff = { version = "1", default-features = false, features = ["std"] }
 sea-orm = { version = "2.0", default-features = false, features = ["macros"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

@@ -117,6 +117,9 @@ Mistakes are reported at startup, by every command, with what to write instead:
 
 `autoxide doctor` prints the modules that run and those that are turned off (the first line of
 `autoxide serve`'s log says the same), and `autoxide config` shows the value in use.
+`autoxide modules` lists every module of the program — also modules a binary of your own added —
+with its tier, whether it is on, what it depends on and, for a module that is off, whether the
+database still holds its data; `autoxide modules --json` prints the same for programs and agents.
 
 Settings of a module that is turned off are not read: a leftover `AUTOXIDE_NEWSLETTER_…` line in
 `.env` is ignored. A task in `AUTOXIDE_STARTUP_TASKS` whose module is off is skipped with a warning

@@ -9,8 +9,7 @@ use std::time::Duration;
 
 use autoxide_kernel::error::Error;
 use autoxide_kernel::job::{JobContext, JobHandler, Schedule};
-use autoxide_kernel::time::Timestamp;
-use jiff::SignedDuration;
+use autoxide_kernel::time::{SignedDuration, Timestamp};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
 use crate::entity::{Column, Entity};

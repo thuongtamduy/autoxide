@@ -116,6 +116,9 @@ Viết sai thì mọi lệnh báo ngay lúc khởi động, kèm cách viết đ
 
 `autoxide doctor` in module nào đang chạy và module nào tắt (dòng đầu của log `autoxide serve`
 cũng nói vậy), và `autoxide config` cho thấy giá trị đang dùng.
+`autoxide modules` liệt kê mọi module của chương trình — kể cả module mà binary của bạn thêm —
+kèm hạng, đang bật hay tắt, phụ thuộc và, với module đang tắt, database còn dữ liệu của nó không;
+`autoxide modules --json` in đúng những thứ đó cho chương trình và agent.
 
 Cấu hình của module đang tắt không được đọc: dòng `AUTOXIDE_NEWSLETTER_…` còn sót trong `.env` bị
 bỏ qua. Task trong `AUTOXIDE_STARTUP_TASKS` mà module của nó đang tắt thì được bỏ qua kèm một cảnh

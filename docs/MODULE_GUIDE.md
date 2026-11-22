@@ -70,7 +70,10 @@ committed migration is never edited — add a new one. Every migration has a `do
 - Add an index for every list and every lookup, and a unique index for every
   uniqueness rule — the database, not a prior `SELECT`, settles concurrent writes.
 - Modules that record events add `autoxide_kernel::event::outbox_migration(...)`; modules
-  with background jobs add `autoxide_kernel::job::jobs_migration(...)`.
+  with background jobs add `autoxide_kernel::job::jobs_migration(...)`. A **new** module gets both
+  tables in their current shape with one call,
+  `migrations.extend(autoxide_kernel::migration::helper_tables("<module>", &[HelperTable::Events, HelperTable::Jobs]))`,
+  instead of listing each historical step as the existing modules do.
 
 Entities use SeaORM (`src/entity.rs`). Read with `Database::read()`, write with
 `Database::write()`, and group writes in `Database::begin_write()`. Keep write
