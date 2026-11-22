@@ -1,0 +1,2 @@
+- The example module in its own repository (`examples/external-module`, and so `cargo xtask new-module
+  --external`) now pins the same Rust toolchain as the core (1.100.0).

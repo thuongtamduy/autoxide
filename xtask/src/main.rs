@@ -62,6 +62,7 @@ mod semver;
 mod source;
 mod tenancy;
 mod tenant_scope;
+mod toolchain;
 mod upgrade;
 mod workspace;
 
@@ -303,6 +304,7 @@ fn check() -> ExitCode {
         violations.extend(changelog::check(&workspace.root)?);
         violations.extend(metric_labels::check(&workspace.root)?);
         violations.extend(deploy_metrics::check(&workspace.root)?);
+        violations.extend(toolchain::check(&workspace.root)?);
         // Hình dạng thống nhất của API trên docs/openapi.json (D-20261121-api-shape).
         let shape = api_shape::check(&workspace.root)?;
         for warning in &shape.warnings {
