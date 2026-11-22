@@ -345,5 +345,13 @@
   "field:is required": "là bắt buộc",
   "field:must be a lower-case address segment such as `du-an`, not `api`, `public` or `preview`": "phải là một đoạn đường dẫn chữ thường như `du-an`, không phải `api`, `public` hay `preview`",
   "field:a content type with pages needs an address prefix": "loại nội dung có trang cần tiền tố đường dẫn",
-  "field:must be {\"one\": {language: text}, \"many\": {language: text}} with texts of 1 to 80 characters": "phải có dạng {\"one\": {ngôn ngữ: chữ}, \"many\": {ngôn ngữ: chữ}}, mỗi chữ dài 1 đến 80 ký tự"
+  "field:must be {\"one\": {language: text}, \"many\": {language: text}} with texts of 1 to 80 characters": "phải có dạng {\"one\": {ngôn ngữ: chữ}, \"many\": {ngôn ngữ: chữ}}, mỗi chữ dài 1 đến 80 ký tự",
+  "content.ai_result_invalid": "AI chưa tạo được bố cục hợp lệ sau {tries} lần; hãy mô tả cụ thể hơn.",
+  "content.ai_conflict": "Có người sửa trang trong lúc AI làm; hãy yêu cầu lại trên bản hiện tại.",
+  "text:An AI request on a page finished: its result is a new draft (never published); `revision_id` holds it.": "Một yêu cầu AI cho trang đã xong: kết quả là bản nháp mới (không bao giờ tự đăng), nằm ở `revision_id`.",
+  "field:only pages have a block layout": "chỉ trang mới có bố cục khối",
+  "field:the page has no block layout yet; compose one first": "trang chưa có bố cục khối; hãy tạo bố cục trước",
+  "field:must name at most {max} blocks": "chỉ được nêu tối đa {max} khối",
+  "field:is not a JSON Patch: {error}": "không phải JSON Patch: {error}",
+  "field:is not JSON: {error}": "không phải JSON: {error}"
 }

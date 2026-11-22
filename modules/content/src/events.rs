@@ -64,6 +64,7 @@ events! {
     (ThemeChanged, "content.theme_changed", "The theme of a website (colors, fonts, spacing, logo) was changed."),
     (SharedSectionChanged, "content.shared_section_changed", "A shared section was created, changed (every page using it changes too; `pages` counts them) or deleted."),
     (TypeChanged, "content.type_changed", "A custom content type was created, changed (also switched off) or deleted."),
+    (AiDraftReady, "content.ai_draft_ready", "An AI request on a page finished: its result is a new draft (never published); `revision_id` holds it."),
     (BannerChanged, "content.banner_changed", "A banner was created, changed, reordered, archived (also when the promotion it links to ended) or deleted."),
 }
 

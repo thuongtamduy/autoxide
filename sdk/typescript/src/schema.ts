@@ -191,6 +191,17 @@ export type AdministrativeUnitDetail = AdministrativeUnit & {
   parent?: AdministrativeUnit | null;
 };
 
+/** A request to the AI page builder. */
+export type AiPageRequest = {
+  /**
+   * What the page should be, or what to change, in plain words (1 to 2000 characters), e.g.
+   * "a summer sale landing page with a hero, three reasons to buy and an FAQ".
+   */
+  instruction: string;
+  /** `edit` only: block ids to limit the change to. */
+  selection?: string[] | null;
+};
+
 /** What the AI features of this server can do now. */
 export type AiStatus = {
   /** Daily token limit; 0 means no limit. */
@@ -211,6 +222,34 @@ export type AiStatus = {
   provider: string;
   /** Tokens used today (UTC), text and embeddings together. */
   tokens_today: number;
+};
+
+/** One request to the AI page builder and its outcome. */
+export type AiTurnResponse = {
+  created_at: string;
+  entry_id: string;
+  /** Why it failed, e.g. `content.ai_result_invalid`, `content.ai_conflict`, `ai.disabled`. */
+  error_code?: string | null;
+  finished_at?: string | null;
+  id: string;
+  /** What the person asked. */
+  instruction: string;
+  /** `compose` (a whole page) or `edit` (a change to the current layout). */
+  kind: string;
+  /**
+   * The revision before the change: restore it (`POST /entries/{id}/revisions/{revision_id}/restore`)
+   * to undo.
+   */
+  previous_revision_id?: string | null;
+  requested_by: string;
+  /** The draft revision holding the result; publish the page to show it. */
+  revision_id?: string | null;
+  /** Blocks the change was limited to (`edit`). */
+  selection?: string[] | null;
+  /** `queued`, `running`, `succeeded` or `failed`. */
+  status: string;
+  /** Calls made to the model (a refused answer is retried at most twice). */
+  tries: number;
 };
 
 /** Something about the server that needs attention. */
@@ -5656,6 +5695,37 @@ export type Data_AiStatus = {
     provider: string;
     /** Tokens used today (UTC), text and embeddings together. */
     tokens_today: number;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_AiTurnResponse = {
+  /** One request to the AI page builder and its outcome. */
+  data: {
+    created_at: string;
+    entry_id: string;
+    /** Why it failed, e.g. `content.ai_result_invalid`, `content.ai_conflict`, `ai.disabled`. */
+    error_code?: string | null;
+    finished_at?: string | null;
+    id: string;
+    /** What the person asked. */
+    instruction: string;
+    /** `compose` (a whole page) or `edit` (a change to the current layout). */
+    kind: string;
+    /**
+     * The revision before the change: restore it (`POST /entries/{id}/revisions/{revision_id}/restore`)
+     * to undo.
+     */
+    previous_revision_id?: string | null;
+    requested_by: string;
+    /** The draft revision holding the result; publish the page to show it. */
+    revision_id?: string | null;
+    /** Blocks the change was limited to (`edit`). */
+    selection?: string[] | null;
+    /** `queued`, `running`, `succeeded` or `failed`. */
+    status: string;
+    /** Calls made to the model (a refused answer is retried at most twice). */
+    tries: number;
   };
 };
 
@@ -22069,6 +22139,38 @@ export type Page_AdministrativeUnit = {
     valid_from: string;
     /** First day no longer in force; `null` while in force. */
     valid_to?: string | null;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_AiTurnResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    created_at: string;
+    entry_id: string;
+    /** Why it failed, e.g. `content.ai_result_invalid`, `content.ai_conflict`, `ai.disabled`. */
+    error_code?: string | null;
+    finished_at?: string | null;
+    id: string;
+    /** What the person asked. */
+    instruction: string;
+    /** `compose` (a whole page) or `edit` (a change to the current layout). */
+    kind: string;
+    /**
+     * The revision before the change: restore it (`POST /entries/{id}/revisions/{revision_id}/restore`)
+     * to undo.
+     */
+    previous_revision_id?: string | null;
+    requested_by: string;
+    /** The draft revision holding the result; publish the page to show it. */
+    revision_id?: string | null;
+    /** Blocks the change was limited to (`edit`). */
+    selection?: string[] | null;
+    /** `queued`, `running`, `succeeded` or `failed`. */
+    status: string;
+    /** Calls made to the model (a refused answer is retried at most twice). */
+    tries: number;
   }[];
   pagination: Pagination;
 };
@@ -38916,6 +39018,52 @@ export interface paths {
         409: Problem;
         412: Problem;
         428: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/content/entries/{id}/ai/compose": {
+    /** Ask the AI to build the page's block layout. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: AiPageRequest;
+      responses: {
+        202: Data_AiTurnResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/content/entries/{id}/ai/edit": {
+    /** Ask the AI to change the page's block layout. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: AiPageRequest;
+      responses: {
+        202: Data_AiTurnResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/content/entries/{id}/ai/thread": {
+    /** List the AI conversation of a page. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_AiTurnResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
         default: Problem;
       };
     };

@@ -536,6 +536,30 @@
         ],
         "description": "An administrative unit with the unit above it."
       },
+      "AiPageRequest": {
+        "additionalProperties": false,
+        "description": "A request to the AI page builder.",
+        "properties": {
+          "instruction": {
+            "description": "What the page should be, or what to change, in plain words (1 to 2000 characters), e.g.\n\"a summer sale landing page with a hero, three reasons to buy and an FAQ\".",
+            "type": "string"
+          },
+          "selection": {
+            "description": "`edit` only: block ids to limit the change to.",
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "instruction"
+        ],
+        "type": "object"
+      },
       "AiStatus": {
         "description": "What the AI features of this server can do now.",
         "properties": {
@@ -593,6 +617,95 @@
           "embedding_dimensions",
           "tokens_today",
           "daily_token_limit"
+        ],
+        "type": "object"
+      },
+      "AiTurnResponse": {
+        "description": "One request to the AI page builder and its outcome.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "entry_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "error_code": {
+            "description": "Why it failed, e.g. `content.ai_result_invalid`, `content.ai_conflict`, `ai.disabled`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "finished_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "instruction": {
+            "description": "What the person asked.",
+            "type": "string"
+          },
+          "kind": {
+            "description": "`compose` (a whole page) or `edit` (a change to the current layout).",
+            "type": "string"
+          },
+          "previous_revision_id": {
+            "description": "The revision before the change: restore it (`POST /entries/{id}/revisions/{revision_id}/restore`)\nto undo.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "requested_by": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "revision_id": {
+            "description": "The draft revision holding the result; publish the page to show it.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "selection": {
+            "description": "Blocks the change was limited to (`edit`).",
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "`queued`, `running`, `succeeded` or `failed`.",
+            "type": "string"
+          },
+          "tries": {
+            "description": "Calls made to the model (a refused answer is retried at most twice).",
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "entry_id",
+          "kind",
+          "instruction",
+          "status",
+          "tries",
+          "requested_by",
+          "created_at"
         ],
         "type": "object"
       },
@@ -16709,6 +16822,104 @@
               "embedding_dimensions",
               "tokens_today",
               "daily_token_limit"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_AiTurnResponse": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "One request to the AI page builder and its outcome.",
+            "properties": {
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "entry_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "error_code": {
+                "description": "Why it failed, e.g. `content.ai_result_invalid`, `content.ai_conflict`, `ai.disabled`.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "finished_at": {
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "instruction": {
+                "description": "What the person asked.",
+                "type": "string"
+              },
+              "kind": {
+                "description": "`compose` (a whole page) or `edit` (a change to the current layout).",
+                "type": "string"
+              },
+              "previous_revision_id": {
+                "description": "The revision before the change: restore it (`POST /entries/{id}/revisions/{revision_id}/restore`)\nto undo.",
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "requested_by": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "revision_id": {
+                "description": "The draft revision holding the result; publish the page to show it.",
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "selection": {
+                "description": "Blocks the change was limited to (`edit`).",
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "status": {
+                "description": "`queued`, `running`, `succeeded` or `failed`.",
+                "type": "string"
+              },
+              "tries": {
+                "description": "Calls made to the model (a refused answer is retried at most twice).",
+                "format": "int32",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "id",
+              "entry_id",
+              "kind",
+              "instruction",
+              "status",
+              "tries",
+              "requested_by",
+              "created_at"
             ],
             "type": "object"
           }
@@ -67535,6 +67746,112 @@
                 "kind",
                 "level",
                 "valid_from"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
+      "Page_AiTurnResponse": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "One request to the AI page builder and its outcome.",
+              "properties": {
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "entry_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "error_code": {
+                  "description": "Why it failed, e.g. `content.ai_result_invalid`, `content.ai_conflict`, `ai.disabled`.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "finished_at": {
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "instruction": {
+                  "description": "What the person asked.",
+                  "type": "string"
+                },
+                "kind": {
+                  "description": "`compose` (a whole page) or `edit` (a change to the current layout).",
+                  "type": "string"
+                },
+                "previous_revision_id": {
+                  "description": "The revision before the change: restore it (`POST /entries/{id}/revisions/{revision_id}/restore`)\nto undo.",
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "requested_by": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "revision_id": {
+                  "description": "The draft revision holding the result; publish the page to show it.",
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "selection": {
+                  "description": "Blocks the change was limited to (`edit`).",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": [
+                    "array",
+                    "null"
+                  ]
+                },
+                "status": {
+                  "description": "`queued`, `running`, `succeeded` or `failed`.",
+                  "type": "string"
+                },
+                "tries": {
+                  "description": "Calls made to the model (a refused answer is retried at most twice).",
+                  "format": "int32",
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "id",
+                "entry_id",
+                "kind",
+                "instruction",
+                "status",
+                "tries",
+                "requested_by",
+                "created_at"
               ],
               "type": "object"
             },
@@ -153032,6 +153349,441 @@
         "x-permissions": [
           "content.write",
           "content.write_own"
+        ]
+      }
+    },
+    "/api/v1/content/entries/{id}/ai/compose": {
+      "post": {
+        "description": "Requires `content.write` (or `content.write_own` on your page) and the plan feature\n`content.ai_suggestions`. Runs in the background: follow it with `GET /entries/{id}/ai/thread`.\nThe AI only assembles blocks of `GET /api/v1/kernel/blocks`; its answer goes through the same\nlayout checks as a person's and becomes a **draft** marked `ai_assisted` — never published by\nitself. A refused answer is retried at most twice.",
+        "operationId": "content_compose_content_page_with_ai",
+        "parameters": [
+          {
+            "description": "Id of the page.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiPageRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_AiTurnResponse"
+                }
+              }
+            },
+            "description": "Queued."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission (`permission_denied`, `content.not_owner`), or the plan lacks `content.ai_suggestions`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No entry has this id; code `content.not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The instruction is empty or too long, or the entry is a post; see `errors`."
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "AI is off on this server; code `ai.disabled`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ask the AI to build the page's block layout.",
+        "tags": [
+          "content"
+        ],
+        "x-permissions": [
+          "content.write",
+          "content.write_own"
+        ]
+      }
+    },
+    "/api/v1/content/entries/{id}/ai/edit": {
+      "post": {
+        "description": "Requires `content.write` (or `content.write_own` on your page) and the plan feature\n`content.ai_suggestions`. Like `compose`, on the current layout: say what to change (\"make the\nhero red\", \"add a buy now button\"); `selection` limits it to some blocks. The result is a new\ndraft; the turn keeps the revision before it to undo.",
+        "operationId": "content_edit_content_page_with_ai",
+        "parameters": [
+          {
+            "description": "Id of the page.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiPageRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_AiTurnResponse"
+                }
+              }
+            },
+            "description": "Queued."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission, or the plan lacks `content.ai_suggestions`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No entry has this id; code `content.not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The instruction is invalid, or the page has no block layout yet; see `errors`."
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "AI is off on this server; code `ai.disabled`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ask the AI to change the page's block layout.",
+        "tags": [
+          "content"
+        ],
+        "x-permissions": [
+          "content.write",
+          "content.write_own"
+        ]
+      }
+    },
+    "/api/v1/content/entries/{id}/ai/thread": {
+      "get": {
+        "description": "Requires `content.read`. Every request with who asked, its outcome and the revisions to compare\nor undo, newest first.",
+        "operationId": "content_list_content_page_ai_thread",
+        "parameters": [
+          {
+            "description": "Id of the page.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_AiTurnResponse"
+                }
+              }
+            },
+            "description": "A page of turns."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `content.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No entry has this id; code `content.not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A paging value is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the AI conversation of a page.",
+        "tags": [
+          "content"
+        ],
+        "x-autoxide-filters": [
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "content.list_content_page_ai_thread",
+        "x-permissions": [
+          "content.read"
         ]
       }
     },
