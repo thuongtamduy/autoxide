@@ -90,7 +90,7 @@ async fn view_da_luu_kiem_theo_schema_bo_loc() {
 #[tokio::test]
 async fn xuat_danh_sach_bai_theo_bo_loc() {
     TestDatabase::run(async |test| {
-        let media: Arc<dyn Media> = Arc::new(FakeMedia::default());
+        let media: Arc<dyn Media> = Arc::new(FakeMedia::new().tagging_locale());
         let text: Arc<dyn TextModel> = Arc::new(FakeTextModel::disabled());
         let embedder: Arc<dyn Embedder> = Arc::new(FakeEmbedder::disabled());
         let storage: Arc<dyn autoxide_kernel::storage::Storage> =
@@ -264,7 +264,7 @@ async fn luu_tru_hang_loat_co_ket_qua_tung_bai() {
 async fn hoan_giao_viec_va_buoc_thiet_lap() {
     TestDatabase::run(async |test| {
         // Mỗi người một ID (app chung cho `admin` và `reader` cùng ID 1): giao việc tra quyền theo ID.
-        let media: Arc<dyn Media> = Arc::new(FakeMedia::default());
+        let media: Arc<dyn Media> = Arc::new(FakeMedia::new().tagging_locale());
         let text: Arc<dyn TextModel> = Arc::new(FakeTextModel::disabled());
         let embedder: Arc<dyn Embedder> = Arc::new(FakeEmbedder::disabled());
         let app = TestApp::builder(test)
@@ -399,7 +399,7 @@ async fn hoan_giao_viec_va_buoc_thiet_lap() {
 #[tokio::test]
 async fn ghi_chu_tren_ban_ghi() {
     TestDatabase::run(async |test| {
-        let media: Arc<dyn Media> = Arc::new(FakeMedia::default());
+        let media: Arc<dyn Media> = Arc::new(FakeMedia::new().tagging_locale());
         let text: Arc<dyn TextModel> = Arc::new(FakeTextModel::disabled());
         let embedder: Arc<dyn Embedder> = Arc::new(FakeEmbedder::disabled());
         let app = TestApp::builder(test)

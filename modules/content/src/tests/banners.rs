@@ -2,6 +2,7 @@
 //! nhánh, theo trang, cache, thứ tự, chương trình khuyến mại kết thúc. Chạy trên cả hai database.
 
 use autoxide_kernel::time::Timestamp;
+use autoxide_media::api::testing::FakeMedia;
 use jiff::SignedDuration;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -11,7 +12,6 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::event::{Delivered, EventHandler};
 use autoxide_kernel::resource::{Resource, ResourceResolver};
 use autoxide_kernel::tenancy::{DEFAULT_TENANT, OrgId, OrgTree, Site, TenantContext, TenantId};
-use autoxide_media::api::{Media, MediaRef, MediaVisibility};
 use serde_json::json;
 
 use super::*;
@@ -20,44 +20,13 @@ use crate::banners::placements::PlacementInput;
 use crate::banners::public::PageContext;
 use crate::service::ContentService;
 
-/// Thư viện ảnh giả có kích thước: ID → (công khai, rộng, cao).
-#[derive(Default)]
-struct SizedMedia(Mutex<HashMap<Uuid, (bool, i32, i32)>>);
-
-impl SizedMedia {
-    fn add(&self, public: bool, width: i32, height: i32) -> Uuid {
-        let id = Uuid::now_v7();
-        self.0.lock().unwrap().insert(id, (public, width, height));
-        id
-    }
-}
-
-#[async_trait::async_trait]
-impl Media for SizedMedia {
-    async fn find_many(&self, _: &TenantContext, ids: &[Uuid]) -> Result<Vec<MediaRef>, Error> {
-        let known = self.0.lock().unwrap();
-        Ok(ids
-            .iter()
-            .filter_map(|id| {
-                let (public, width, height) = *known.get(id)?;
-                Some(MediaRef {
-                    id: *id,
-                    visibility: if public {
-                        MediaVisibility::Public
-                    } else {
-                        MediaVisibility::Private
-                    },
-                    content_type: "image/jpeg".to_owned(),
-                    width: Some(width),
-                    height: Some(height),
-                    alt: "ảnh".to_owned(),
-                    alt_ai_assisted: false,
-                    url: format!("/api/v1/media/{id}/content?v=1"),
-                    variants: Vec::new(),
-                })
-            })
-            .collect())
-    }
+/// Ảnh mới cỡ `width` × `height` (công khai hay riêng tư), `alt` "ảnh".
+fn sized(media: &FakeMedia, public: bool, width: i32, height: i32) -> Uuid {
+    media.add_with(public, |item| {
+        item.width = Some(width);
+        item.height = Some(height);
+        item.alt = "ảnh".to_owned();
+    })
 }
 
 /// Sổ đối tượng giả cho một loại: ID → công khai không.
@@ -75,7 +44,7 @@ impl ResourceResolver for Objects {
 
 struct Harness {
     service: Arc<ContentService>,
-    media: Arc<SizedMedia>,
+    media: Arc<FakeMedia>,
     tenant: TenantContext,
     products: Arc<Objects>,
     categories: Arc<Objects>,
@@ -84,7 +53,7 @@ struct Harness {
 async fn harness(test: &TestDatabase) -> Harness {
     let (service, _, database) = service(test, config(&[])).await;
     let mut service = Arc::try_unwrap(service).ok().unwrap();
-    let media = Arc::new(SizedMedia::default());
+    let media = Arc::new(FakeMedia::new());
     service.media = media.clone();
     let products = Arc::new(Objects("p", Mutex::default()));
     let categories = Arc::new(Objects("c", Mutex::default()));
@@ -262,7 +231,7 @@ async fn anh_sai_ti_le_hay_qua_nho_bi_tu_choi_kem_co_can() {
         input.min_width = Some(1800);
         input.min_height = Some(600);
         h.service.create_placement(&h.tenant, &manager(), input).await.unwrap();
-        let wrong_ratio = h.media.add(true, 1800, 900);
+        let wrong_ratio = sized(&h.media, true, 1800, 900);
         let error = h
             .service
             .create_banner(&h.tenant, &manager(), image("hero", wrong_ratio), Via::Rest)
@@ -274,7 +243,7 @@ async fn anh_sai_ti_le_hay_qua_nho_bi_tu_choi_kem_co_can() {
             "{}",
             error.message()
         );
-        let small = h.media.add(true, 900, 300);
+        let small = sized(&h.media, true, 900, 300);
         let error = h
             .service
             .create_banner(&h.tenant, &manager(), image("hero", small), Via::Rest)
@@ -282,16 +251,16 @@ async fn anh_sai_ti_le_hay_qua_nho_bi_tu_choi_kem_co_can() {
             .unwrap_err();
         assert_eq!(error.code(), "content.banner_image_size_invalid");
         // anh_dien_thoai_kiem_ti_le_rieng: ảnh điện thoại theo 4:5, không theo 3:1.
-        let good = h.media.add(true, 1800, 600);
+        let good = sized(&h.media, true, 1800, 600);
         let mut banner = image("hero", good);
-        banner.fields.mobile_media_id = Some(h.media.add(true, 1800, 600));
+        banner.fields.mobile_media_id = Some(sized(&h.media, true, 1800, 600));
         let error = h
             .service
             .create_banner(&h.tenant, &manager(), banner.clone(), Via::Rest)
             .await
             .unwrap_err();
         assert_eq!(error.code(), "content.banner_image_size_invalid");
-        banner.fields.mobile_media_id = Some(h.media.add(true, 800, 1000));
+        banner.fields.mobile_media_id = Some(sized(&h.media, true, 800, 1000));
         h.service.create_banner(&h.tenant, &manager(), banner, Via::Rest).await.unwrap();
     })
     .await
@@ -306,7 +275,7 @@ async fn anh_banner_rieng_tu_bi_tu_choi() {
             .create_placement(&h.tenant, &manager(), placement("hero", "single", "image"))
             .await
             .unwrap();
-        let private = h.media.add(false, 100, 100);
+        let private = sized(&h.media, false, 100, 100);
         let error = h
             .service
             .create_banner(&h.tenant, &manager(), image("hero", private), Via::Rest)
@@ -332,7 +301,7 @@ async fn dai_chu_chi_nhan_banner_chu() {
             .create_placement(&h.tenant, &manager(), placement("top", "strip", "text"))
             .await
             .unwrap();
-        let picture = h.media.add(true, 100, 100);
+        let picture = sized(&h.media, true, 100, 100);
         let error = h
             .service
             .create_banner(&h.tenant, &manager(), image("top", picture), Via::Rest)

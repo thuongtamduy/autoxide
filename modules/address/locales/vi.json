@@ -1,4 +1,5 @@
 {
+  "field:is no longer in force": "không còn hiệu lực",
   "address.country_unsupported": "Chưa có danh mục đơn vị hành chính cho quốc gia `{country}`.",
   "address.import_unreadable": "Không đọc được `{file}`: {reason}.",
   "address.unit_not_found": "Không có đơn vị hành chính mã `{code}`.",

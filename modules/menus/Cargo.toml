@@ -31,6 +31,8 @@ uuid.workspace = true
 validator.workspace = true
 
 [dev-dependencies]
+# Thư viện media giả dùng chung (`autoxide_media::api::testing`).
+autoxide-media = { workspace = true, features = ["testing"] }
 autoxide-testkit.workspace = true
 # MCP client thật cho test tool của module.
 serde_json.workspace = true

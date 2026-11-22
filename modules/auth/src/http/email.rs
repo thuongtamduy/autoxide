@@ -275,7 +275,7 @@ mod tests {
 
     /// Token trong mail cuối cùng.
     fn token(services: &crate::testing::Services) -> String {
-        let sent = services.mails.sent.lock().unwrap();
+        let sent = services.mails.sent();
         let text = &sent.last().unwrap().text;
         text.split_whitespace().find(|word| word.len() == 43).unwrap().to_owned()
     }
@@ -344,10 +344,10 @@ mod tests {
             let path = format!("/users/{ada_id}/email/verification");
             let (status, _, _) = call(&app, "POST", &path, Some(&ada), None).await;
             assert_eq!(status, StatusCode::FORBIDDEN);
-            let before = services.mails.sent.lock().unwrap().len();
+            let before = services.mails.sent().len();
             let (status, _, body) = call(&app, "POST", &path, Some(&admin), None).await;
             assert_eq!(status, StatusCode::ACCEPTED, "{body}");
-            let sent = services.mails.sent.lock().unwrap().clone();
+            let sent = services.mails.sent().clone();
             assert_eq!(sent.len(), before + 1);
             assert_eq!(sent.last().unwrap().to, "ada@example.com");
 

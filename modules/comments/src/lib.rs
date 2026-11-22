@@ -302,8 +302,11 @@ impl Module for CommentsModule {
 pub(crate) mod testing {
     //! Đồ dùng chung cho test trong crate này.
 
+    /// Bên gửi mail giả dùng chung (testkit).
+    pub use autoxide_testkit::FakeMailer;
+
     use autoxide_kernel::tenancy::{DatabaseRegistry, TenantContext, TenantSettings};
-    use std::sync::{Arc, Mutex};
+    use std::sync::Arc;
     use std::time::Duration;
 
     use autoxide_kernel::access::{PostingVerification, Principal};
@@ -313,7 +316,7 @@ pub(crate) mod testing {
     use autoxide_kernel::error::Error;
     use autoxide_kernel::event::Outbox;
     use autoxide_kernel::i18n::Translations;
-    use autoxide_kernel::mail::{Mail, Mailer};
+
     use autoxide_kernel::migration::{Migrator, ModuleMigrations};
     use autoxide_kernel::resource::{Resource, ResourceDirectory, ResourceResolver};
     use autoxide_kernel::secret::SecretKey;
@@ -322,29 +325,6 @@ pub(crate) mod testing {
 
     use crate::config::CommentsConfig;
     use crate::service::{CommentsService, Parts};
-
-    /// Bên gửi mail giả: giữ lại mọi mail, bỏ mail trùng `dedupe_key` như module `mail` thật.
-    #[derive(Default)]
-    pub struct FakeMailer(pub Mutex<Vec<Mail>>);
-
-    impl FakeMailer {
-        pub fn sent(&self) -> Vec<Mail> {
-            self.0.lock().unwrap().clone()
-        }
-    }
-
-    #[async_trait::async_trait]
-    impl Mailer for FakeMailer {
-        async fn send(&self, _tenant: &TenantContext, mail: Mail) -> Result<(), Error> {
-            let mut mails = self.0.lock().unwrap();
-            if mail.dedupe_key.is_none()
-                || mails.iter().all(|sent| sent.dedupe_key != mail.dedupe_key)
-            {
-                mails.push(mail);
-            }
-            Ok(())
-        }
-    }
 
     /// Bộ tra giả cho loại `content.entry`: đích `public-…` công khai, `draft-…` chưa công khai,
     /// còn lại không có.

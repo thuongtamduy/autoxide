@@ -13,52 +13,6 @@ use serde_json::json;
 
 use super::lifecycle::{Outbox, call, ok, priced, sql, tick};
 
-/// Danh mục hành chính giả: tỉnh 01 có xã 00004.
-struct FakeUnits;
-
-#[async_trait::async_trait]
-impl autoxide_address::api::AdministrativeUnits for FakeUnits {
-    async fn provinces(
-        &self,
-        _: &str,
-        _: Option<&str>,
-    ) -> Result<Vec<autoxide_address::api::AdministrativeUnit>, autoxide_kernel::error::Error> {
-        Ok(Vec::new())
-    }
-
-    async fn communes(
-        &self,
-        _: &str,
-        _: &str,
-        _: Option<&str>,
-    ) -> Result<Vec<autoxide_address::api::AdministrativeUnit>, autoxide_kernel::error::Error> {
-        Ok(Vec::new())
-    }
-
-    async fn validate(
-        &self,
-        input: autoxide_address::api::AddressInput,
-        field: &str,
-    ) -> Result<autoxide_address::api::Address, Vec<autoxide_kernel::error::FieldError>> {
-        if input.province_code != "01" || input.commune_code != "00004" {
-            return Err(vec![autoxide_kernel::error::FieldError::new(
-                format!("{field}commune_code"),
-                "address.commune_not_in_province",
-                "commune `{commune}` is not in province `{province}`",
-            )]);
-        }
-        Ok(serde_json::from_value(json!({
-            "country": input.country,
-            "province_code": "01",
-            "province_name": "Thanh pho Ha Noi",
-            "commune_code": "00004",
-            "commune_name": "Phuong Ba Dinh",
-            "line": input.line,
-        }))
-        .unwrap())
-    }
-}
-
 const OPS: [&str; 5] = [
     "plans.plans.read",
     "plans.plans.manage",
@@ -72,7 +26,9 @@ async fn app(test: &TestDatabase, mails: &Arc<Outbox>) -> TestApp {
     TestApp::builder(test)
         .setting("AUTOXIDE_PLANS_CACHE_SECONDS", "0")
         .provide::<dyn Mailer>(mailer)
-        .provide::<dyn autoxide_address::api::AdministrativeUnits>(Arc::new(FakeUnits))
+        .provide::<dyn autoxide_address::api::AdministrativeUnits>(Arc::new(
+            autoxide_address::api::testing::FakeAdministrativeUnits::sample(),
+        ))
         .module(crate::module())
         .tenant("acme")
         .tenant("beta")
@@ -165,7 +121,7 @@ async fn mail_nhac_ve_email_cua_ho_so_khi_thue_bao_khong_dat_rieng() {
         .await;
         tick(&app).await;
         tick(&app).await;
-        let sent = mails.0.lock().unwrap().clone();
+        let sent = mails.sent();
         assert_eq!(sent.len(), 1, "{sent:?}");
         assert_eq!(sent[0].to, "invoices@acme.example");
     })

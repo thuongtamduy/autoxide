@@ -1,6 +1,7 @@
 //! Báo yêu thích có hàng lại / giảm giá (D-233): tự bật kèm đồng ý, chỉ giảm thật so với mốc, bỏ người
 //! đã đăng ký ở `inventory`, gom lô tối đa 10, trần mỗi ngày, chỉ trong khung giờ, rút đồng ý thì dừng.
 
+use super::fake_shop::CatalogExt as _;
 use autoxide_testkit::TestDatabase;
 use axum::http::StatusCode;
 use serde_json::{Value, json};
@@ -36,7 +37,7 @@ fn alerts(shop: &Shop) -> Vec<Value> {
 }
 
 async fn reprice(shop: &Shop, product: Uuid, variant: Uuid, price: i64) {
-    shop.catalog.set_price(product, variant, price);
+    shop.catalog.reprice(variant, price);
     shop.price_changed(product).await;
     drain(shop).await;
 }

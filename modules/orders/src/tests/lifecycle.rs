@@ -2,6 +2,7 @@
 //! khi huỷ đơn đã thu, yêu cầu vận đơn, event của `shipping`, bút toán doanh thu cân, hoàn tất khi
 //! hết hạn đổi trả (trừ khi bị hoãn), huỷ đơn cửa hàng không nhận kịp.
 
+use super::CatalogExt as _;
 use autoxide_kernel::tenancy::ScopeExt;
 use autoxide_kernel::time::Timestamp;
 use autoxide_ledger::api::Side;

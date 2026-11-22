@@ -6,6 +6,7 @@
 mod http;
 mod service;
 
+pub(crate) use autoxide_media::api::testing::FakeMedia;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -18,7 +19,6 @@ use autoxide_kernel::event::Outbox;
 use autoxide_kernel::migration::{Migrator, ModuleMigrations};
 use autoxide_kernel::resource::{Resource, ResourceDirectory, ResourceRef, ResourceResolver};
 use autoxide_kernel::tenancy::TenantContext;
-use autoxide_media::api::{Media, MediaRef, MediaVisibility};
 use autoxide_testkit::TestDatabase;
 use uuid::Uuid;
 
@@ -115,6 +115,20 @@ impl ResourceResolver for Anything {
     }
 }
 
+/// Thư viện media giả: một ảnh công khai, một ảnh riêng tư (WebP 640×480); `alt` theo ngôn ngữ là
+/// `[<ngôn ngữ>]`.
+pub(crate) fn fake_media() -> FakeMedia {
+    let media = FakeMedia::new().tagging_locale();
+    for (id, public) in [(PUBLIC_IMAGE, true), (PRIVATE_IMAGE, false)] {
+        let mut item = autoxide_media::api::testing::image(id, public);
+        item.content_type = "image/webp".to_owned();
+        item.width = Some(640);
+        item.height = Some(480);
+        media.insert(item);
+    }
+    media
+}
+
 pub(crate) fn directory() -> ResourceDirectory {
     let directory = ResourceDirectory::default();
     directory.register("shop", "shop.item", Arc::new(Items)).unwrap();
@@ -122,52 +136,6 @@ pub(crate) fn directory() -> ResourceDirectory {
     directory.register("content", "content.entry", Arc::new(Anything)).unwrap();
     directory.register("content", "content.term", Arc::new(Anything)).unwrap();
     directory
-}
-
-/// Thư viện media giả: một ảnh công khai, một ảnh riêng tư.
-#[derive(Default)]
-pub(crate) struct FakeMedia;
-
-#[async_trait::async_trait]
-impl Media for FakeMedia {
-    async fn find_many(
-        &self,
-        _tenant: &TenantContext,
-        ids: &[Uuid],
-    ) -> Result<Vec<MediaRef>, Error> {
-        Ok(ids
-            .iter()
-            .filter(|id| [PUBLIC_IMAGE, PRIVATE_IMAGE].contains(id))
-            .map(|id| MediaRef {
-                id: *id,
-                visibility: if *id == PUBLIC_IMAGE {
-                    MediaVisibility::Public
-                } else {
-                    MediaVisibility::Private
-                },
-                content_type: "image/webp".to_owned(),
-                width: Some(640),
-                height: Some(480),
-                alt: String::new(),
-                alt_ai_assisted: false,
-                url: format!("/api/v1/media/{id}/content?v=1"),
-                variants: Vec::new(),
-            })
-            .collect())
-    }
-
-    async fn find_many_in(
-        &self,
-        tenant: &TenantContext,
-        ids: &[Uuid],
-        locale: &str,
-    ) -> Result<Vec<MediaRef>, Error> {
-        let mut found = self.find_many(tenant, ids).await?;
-        for media in &mut found {
-            media.alt = format!("[{locale}]");
-        }
-        Ok(found)
-    }
 }
 
 /// Menu cũ của `content` giả.
@@ -212,7 +180,7 @@ pub(crate) async fn harness(test: &TestDatabase) -> Harness {
     let legacy = Arc::new(FakeLegacy::default());
     let dependencies = Dependencies {
         resources: directory(),
-        media: Arc::new(FakeMedia),
+        media: Arc::new(fake_media()),
         legacy: Some(legacy.clone()),
         orgs: None,
     };

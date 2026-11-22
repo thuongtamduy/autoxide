@@ -1,6 +1,7 @@
 //! Nhận tại cửa hàng: sẵn sàng → mã nhận chỉ người mua thấy, giao bằng mã hay người nhận hộ, nhắc
 //! trước hạn một lần, hết hạn thì huỷ (mặc định) hay chờ tiếp theo chính sách.
 
+use super::CatalogExt as _;
 use autoxide_kernel::tenancy::ScopeExt;
 use autoxide_kernel::time::Timestamp;
 use autoxide_testkit::TestDatabase;

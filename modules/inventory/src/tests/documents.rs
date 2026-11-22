@@ -1,6 +1,7 @@
 //! Chuyển kho (đang đi đường, nhận một phần, giá vốn theo kho gửi) và kiểm kê (chênh lệch thành
 //! dòng sổ có lý do, kiểm kê khi đang bán, nhập CSV).
 
+use super::CatalogExt as _;
 use autoxide_kernel::time::Timestamp;
 use autoxide_testkit::{TestDatabase, tool};
 use axum::http::StatusCode;

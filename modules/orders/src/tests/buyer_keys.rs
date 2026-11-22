@@ -1,6 +1,7 @@
 //! Khoá người mua cho hạn mức khuyến mãi và cờ `first_order` (đặc tả 43 "Chống lạm dụng", 45 "Giỏ:
 //! coupon, voucher"): vãng lai và người đăng nhập đều có khoá số điện thoại + địa chỉ giao.
 
+use super::CatalogExt as _;
 use autoxide_testkit::TestDatabase;
 use axum::http::StatusCode;
 use serde_json::json;

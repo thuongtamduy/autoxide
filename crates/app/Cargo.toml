@@ -78,6 +78,8 @@ tracing.workspace = true
 uuid.workspace = true
 
 [dev-dependencies]
+# Danh mục hành chính giả dùng chung (`autoxide_address::api::testing`).
+autoxide-address = { workspace = true, features = ["testing"] }
 async-trait.workspace = true
 autoxide-testkit.workspace = true
 # Module mẫu, không đăng ký trong binary: test migration chạy cả migration của nó.

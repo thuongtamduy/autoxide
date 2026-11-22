@@ -21,7 +21,7 @@ const ALL: [&str; 5] =
     ["content.read", "content.write", "content.publish", "content.delete", "content.manage"];
 
 async fn app(test: &TestDatabase) -> TestApp {
-    let media: Arc<dyn Media> = Arc::new(FakeMedia::default());
+    let media: Arc<dyn Media> = Arc::new(FakeMedia::new().tagging_locale());
     let text: Arc<dyn TextModel> = Arc::new(FakeTextModel::disabled());
     let embedder: Arc<dyn Embedder> = Arc::new(FakeEmbedder::disabled());
     TestApp::builder(test)

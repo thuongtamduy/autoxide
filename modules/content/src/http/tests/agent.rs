@@ -8,7 +8,7 @@ use super::*;
 #[tokio::test]
 async fn agent_goi_lenh_rui_ro_nhan_202_approval_required() {
     TestDatabase::run(async |test| {
-        let media: Arc<dyn Media> = Arc::new(FakeMedia::default());
+        let media: Arc<dyn Media> = Arc::new(FakeMedia::new().tagging_locale());
         let text: Arc<dyn TextModel> = Arc::new(FakeTextModel::disabled());
         let embedder: Arc<dyn Embedder> = Arc::new(FakeEmbedder::disabled());
         let perms = ["content.read", "content.write", "content.delete"].map(str::to_owned);
@@ -147,7 +147,7 @@ async fn agent_goi_lenh_rui_ro_nhan_202_approval_required() {
 #[tokio::test]
 async fn nhan_noi_bo_tren_bai_viet() {
     TestDatabase::run(async |test| {
-        let media: Arc<dyn Media> = Arc::new(FakeMedia::default());
+        let media: Arc<dyn Media> = Arc::new(FakeMedia::new().tagging_locale());
         let text: Arc<dyn TextModel> = Arc::new(FakeTextModel::disabled());
         let embedder: Arc<dyn Embedder> = Arc::new(FakeEmbedder::disabled());
         let app = TestApp::builder(test)
@@ -269,7 +269,7 @@ async fn nhan_noi_bo_tren_bai_viet() {
 #[tokio::test]
 async fn truong_tu_dinh_nghia_tren_bai_viet() {
     TestDatabase::run(async |test| {
-        let media: Arc<dyn Media> = Arc::new(FakeMedia::default());
+        let media: Arc<dyn Media> = Arc::new(FakeMedia::new().tagging_locale());
         let text: Arc<dyn TextModel> = Arc::new(FakeTextModel::disabled());
         let embedder: Arc<dyn Embedder> = Arc::new(FakeEmbedder::disabled());
         let app = TestApp::builder(test)
@@ -344,7 +344,7 @@ async fn viec_va_tim_khong_lo_sang_nhanh_anh_em() {
             ("content.write", Scope::Subtree),
             ("content.publish", Scope::Subtree),
         ];
-        let media: Arc<dyn Media> = Arc::new(FakeMedia::default());
+        let media: Arc<dyn Media> = Arc::new(FakeMedia::new().tagging_locale());
         let text: Arc<dyn TextModel> = Arc::new(FakeTextModel::disabled());
         let embedder: Arc<dyn Embedder> = Arc::new(FakeEmbedder::disabled());
         let app = TestApp::builder(test)

@@ -1,5 +1,6 @@
 //! Người bán tham gia flash sale của sàn: đăng ký, duyệt, thành suất, người bán trả phần giảm.
 
+use super::CatalogExt as _;
 use autoxide_kernel::time::Timestamp;
 use autoxide_testkit::TestDatabase;
 use axum::http::StatusCode;

@@ -83,8 +83,7 @@ async fn dang_ky_tra_loi_nhu_nhau() {
         }
         let tenant = &services.tenant;
         assert!(services.users.find_by_email(tenant, "bob@example.com").await.unwrap().is_some());
-        let sent =
-            services.mails.sent.lock().unwrap().iter().map(|m| m.to.clone()).collect::<Vec<_>>();
+        let sent = services.mails.sent().iter().map(|m| m.to.clone()).collect::<Vec<_>>();
         assert!(sent.contains(&"ada@example.com".to_owned()), "chủ email đã có nhận thư báo");
         // Mật khẩu của Ada không đổi.
         let body = json!({"email": "ada@example.com", "password": PASSWORD});

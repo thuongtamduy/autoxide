@@ -363,77 +363,26 @@ impl Module for ContentModule {
 pub(crate) mod testing {
     //! Đồ dùng chung cho test trong crate này.
 
-    use autoxide_kernel::tenancy::{DatabaseRegistry, TenantContext};
-    use std::collections::HashMap;
-    use std::sync::{Arc, Mutex};
+    use autoxide_kernel::tenancy::DatabaseRegistry;
+
+    use std::sync::Arc;
 
     use autoxide_kernel::access::Principal;
     use autoxide_kernel::config::{Config, ConfigReader, ConfigSource};
     use autoxide_kernel::database::Database;
-    use autoxide_kernel::error::Error;
+
     use autoxide_kernel::event::Outbox;
     use autoxide_kernel::migration::{Migrator, ModuleMigrations};
-    use autoxide_media::api::{Media, MediaRef, MediaVisibility};
+
     use autoxide_testkit::TestDatabase;
     use uuid::Uuid;
 
     use crate::config::ContentConfig;
     use crate::service::ContentService;
 
-    /// Thư viện media giả: ID → công khai hay không.
-    #[derive(Default)]
-    pub struct FakeMedia(pub Mutex<HashMap<Uuid, MediaVisibility>>);
-
-    impl FakeMedia {
-        pub fn add(&self, public: bool) -> Uuid {
-            let id = Uuid::now_v7();
-            let visibility =
-                if public { MediaVisibility::Public } else { MediaVisibility::Private };
-            self.0.lock().unwrap().insert(id, visibility);
-            id
-        }
-    }
-
-    #[async_trait::async_trait]
-    impl Media for FakeMedia {
-        async fn find_many(
-            &self,
-            _tenant: &TenantContext,
-            ids: &[Uuid],
-        ) -> Result<Vec<MediaRef>, Error> {
-            let known = self.0.lock().unwrap();
-            Ok(ids
-                .iter()
-                .filter_map(|id| {
-                    known.get(id).map(|visibility| MediaRef {
-                        id: *id,
-                        visibility: *visibility,
-                        content_type: "image/png".to_owned(),
-                        width: Some(10),
-                        height: Some(10),
-                        alt: String::new(),
-                        alt_ai_assisted: false,
-                        url: format!("/api/v1/media/{id}/content?v=1"),
-                        variants: Vec::new(),
-                    })
-                })
-                .collect())
-        }
-
-        /// `alt` theo ngôn ngữ: `[<ngôn ngữ>]`, để test thấy ảnh được tra theo ngôn ngữ nào.
-        async fn find_many_in(
-            &self,
-            tenant: &TenantContext,
-            ids: &[Uuid],
-            locale: &str,
-        ) -> Result<Vec<MediaRef>, Error> {
-            let mut found = self.find_many(tenant, ids).await?;
-            for item in &mut found {
-                item.alt = format!("[{locale}]");
-            }
-            Ok(found)
-        }
-    }
+    /// Thư viện media giả dùng chung; dựng bằng `FakeMedia::new().tagging_locale()` (`alt` theo
+    /// ngôn ngữ là `[<ngôn ngữ>]`).
+    pub use autoxide_media::api::testing::FakeMedia;
 
     pub fn config(pairs: &[(&str, &str)]) -> ContentConfig {
         let source = ConfigSource::from_pairs(pairs.iter().copied());
@@ -503,7 +452,7 @@ pub(crate) mod testing {
             .up(&database)
             .await
             .unwrap();
-        let media = Arc::new(FakeMedia::default());
+        let media = Arc::new(FakeMedia::new().tagging_locale());
         let dependencies =
             crate::service::Dependencies { media: media.clone(), ai, embedder, settings };
         let service = ContentService::new(

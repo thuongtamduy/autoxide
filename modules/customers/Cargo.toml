@@ -34,6 +34,8 @@ uuid.workspace = true
 validator.workspace = true
 
 [dev-dependencies]
+# Catalog giả dùng chung (`autoxide_catalog::api::testing`).
+autoxide-catalog = { workspace = true, features = ["testing"] }
 # Sổ đồng ý giả dùng chung (`autoxide_compliance::api::testing`).
 autoxide-compliance = { workspace = true, features = ["testing"] }
 # Bộ gửi thông báo giả dùng chung (`autoxide_notifications::api::testing`).

@@ -605,7 +605,10 @@ fn random_secret() -> Result<Vec<u8>, Error> {
 #[cfg(test)]
 pub(crate) mod testing {
     //! Đồ dùng chung cho test trong crate này.
+
     use autoxide_kernel::time::Timestamp;
+    /// Bên gửi mail giả dùng chung (testkit).
+    pub use autoxide_testkit::FakeMailer;
     use jiff::SignedDuration;
 
     use std::sync::Arc;
@@ -872,7 +875,7 @@ pub(crate) mod testing {
     }
 
     pub fn last_token(services: &Services) -> String {
-        let sent = services.mails.sent.lock().unwrap();
+        let sent = services.mails.sent();
         let text = &sent.last().unwrap().text;
         text.split_whitespace()
             .find(|word| {
@@ -881,24 +884,6 @@ pub(crate) mod testing {
             })
             .unwrap()
             .to_owned()
-    }
-
-    /// `Mailer` giả: giữ lại mọi mail để test đọc.
-    #[derive(Default)]
-    pub struct FakeMailer {
-        pub sent: std::sync::Mutex<Vec<autoxide_kernel::mail::Mail>>,
-    }
-
-    #[async_trait::async_trait]
-    impl autoxide_kernel::mail::Mailer for FakeMailer {
-        async fn send(
-            &self,
-            _tenant: &autoxide_kernel::tenancy::TenantContext,
-            mail: autoxide_kernel::mail::Mail,
-        ) -> Result<(), autoxide_kernel::error::Error> {
-            self.sent.lock().unwrap().push(mail);
-            Ok(())
-        }
     }
 
     /// Service phiên đăng nhập kèm service người dùng dùng chung database.
