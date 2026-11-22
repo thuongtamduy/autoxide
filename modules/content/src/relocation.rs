@@ -13,6 +13,7 @@ pub(crate) fn relocation() -> Relocation {
             "content_shared_sections",
             "content_page_templates",
             "content_theme_variants",
+            "content_site_regions",
         ])
         .follow("content_published", "entry_id", "content_entries")
         .follow("content_revisions", "entry_id", "content_entries")

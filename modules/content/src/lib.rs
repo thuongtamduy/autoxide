@@ -37,6 +37,7 @@ mod sandbox;
 mod service;
 mod setup;
 mod shared;
+mod site;
 mod suggest;
 mod taxonomy;
 mod templates;
@@ -262,6 +263,8 @@ impl Module for ContentModule {
             blocks::PLACEMENT.name,
             Arc::new(blocks::data::ContentBlocks(service.clone())),
         )?;
+        // Phần của module khác trong khung website (`GET /public/site`, bước 67).
+        context.provide::<dyn api::SiteExtensions>(service.site_extensions.clone())?;
         self.service = Some(service);
         Ok(())
     }

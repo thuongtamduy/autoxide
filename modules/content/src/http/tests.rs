@@ -25,6 +25,7 @@ mod layout;
 mod layout_public;
 mod ops;
 mod page_templates;
+mod public_site;
 mod shared_sections;
 mod theme_variants;
 mod themes;
