@@ -23,7 +23,10 @@ use super::session::{MfaChallengeResponse, TokenResponse};
 use crate::session::LoginOutcome;
 
 pub(super) fn routes() -> OpenApiRouter<Arc<HttpState>> {
-    OpenApiRouter::new().routes(routes!(send_phone_code)).routes(routes!(phone_login))
+    OpenApiRouter::new()
+        .routes(routes!(send_phone_code))
+        .routes(routes!(phone_login))
+        .routes(routes!(phone_signup))
 }
 
 /// A phone number to send a sign-in code to.
@@ -122,6 +125,63 @@ async fn phone_login(
             let status = if login.created { StatusCode::CREATED } else { StatusCode::OK };
             (status, Data { data: TokenResponse::from(tokens) }).into_response()
         }
+        LoginOutcome::MfaRequired { mfa_token, expires_in } => {
+            let data = MfaChallengeResponse::new(mfa_token, expires_in);
+            (StatusCode::ACCEPTED, Data { data }).into_response()
+        }
+    })
+}
+
+/// A verified phone token to create an account from.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct PhoneSignupRequest {
+    /// The order lookup token from `POST /api/v1/orders/public/orders/lookup/{id}/confirm` (the buyer
+    /// already proved the number with a one-time code).
+    #[validate(length(min = 1, max = 256))]
+    lookup_token: String,
+    /// Display name for the new account (1 to 100 characters). Without it the account is named after
+    /// the masked number.
+    name: Option<String>,
+}
+
+/// Create a buyer account from a verified order lookup.
+///
+/// Public, for guest buyers who looked an order up with a code sent by SMS. Creates a buyer account
+/// for that phone number, with no email and no password, and signs in. Later sign-ins use a code
+/// sent by SMS (`POST /api/v1/auth/phone/codes`) or a passkey added to the account. Next, call
+/// `POST /api/v1/orders/me/orders/claim` with the same token to move the guest orders to the
+/// account. Limited per address per hour.
+#[utoipa::path(
+    post, path = "/phone-signups", extensions(("x-public" = json!(true))),
+    operation_id = "phone_signup", request_body = PhoneSignupRequest,
+    responses(
+        (status = 201, description = "A new buyer account was created and signed in.", body = Data<TokenResponse>),
+        (status = 403, description = "The shop does not let buyers create accounts; code `auth.customer_registration_closed`.", body = Problem),
+        (status = 409, description = "This number already has an account; sign in with a code instead. Code `auth.phone_taken`.", body = Problem),
+        (status = 422, description = "The lookup token is not valid or has expired (field `lookup_token`), or a value is invalid.", body = Problem),
+        (status = 429, description = "Too many accounts created from this address; code `auth.phone_signup_throttled`, see `Retry-After`.", body = Problem),
+        (status = 503, description = "No module issues verified phone tokens on this server; code `auth.phone_signup_unavailable`.", body = Problem),
+    )
+)]
+async fn phone_signup(
+    State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
+    client: ClientInfo,
+    headers: HeaderMap,
+    ValidJson(input): ValidJson<PhoneSignupRequest>,
+) -> Result<Response, Error> {
+    let user_agent = super::user_agent(&headers);
+    let outcome = state
+        .phone
+        .sign_up(&tenant, &input.lookup_token, input.name.as_deref(), client.ip, user_agent)
+        .await?;
+    Ok(match outcome {
+        LoginOutcome::Tokens(tokens) => {
+            super::note_country(&state, &tenant, &headers, tokens.session_id).await;
+            (StatusCode::CREATED, Data { data: TokenResponse::from(tokens) }).into_response()
+        }
+        // Tài khoản vừa tạo chưa bật hai bước; nhánh này để khớp kiểu.
         LoginOutcome::MfaRequired { mfa_token, expires_in } => {
             let data = MfaChallengeResponse::new(mfa_token, expires_in);
             (StatusCode::ACCEPTED, Data { data }).into_response()

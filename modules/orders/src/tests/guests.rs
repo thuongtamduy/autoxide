@@ -474,6 +474,11 @@ async fn mo_ho_tro_va_gan_don_vao_tai_khoan() {
         let lookups = guests.shop.api::<dyn crate::api::OrderLookups>().unwrap();
         assert_eq!(lookups.verified_phone(&tenant, &token).await.unwrap(), Some(PHONE.to_owned()));
         assert_eq!(lookups.verified_phone(&tenant, "nope").await.unwrap(), None);
+        // Bản trung lập của kernel mà `auth` dùng (D-20261122-late-apis): cùng câu trả lời.
+        let tokens = guests.shop.api::<dyn autoxide_kernel::sms::VerifiedPhoneTokens>().unwrap();
+        let phone = tokens.verified_phone(&tenant, &token).await.unwrap().unwrap();
+        assert_eq!(phone.as_str(), PHONE);
+        assert!(tokens.verified_phone(&tenant, "nope").await.unwrap().is_none());
 
         // Gắn đơn: cả hai đơn vãng lai cùng số về tài khoản `buyer1`.
         let buyer = Call::as_user(&guests.shop, "buyer1");

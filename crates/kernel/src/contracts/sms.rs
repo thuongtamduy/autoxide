@@ -129,6 +129,21 @@ pub trait SmsSender: Send + Sync {
     async fn send(&self, message: SmsMessage) -> Result<SmsReceipt, Error>;
 }
 
+/// Token do một module cấp sau khi người dùng đã qua mã một lần gửi tới số điện thoại (vd token xem
+/// đơn vãng lai của `orders`). `auth` hỏi qua trait này để tạo tài khoản từ số đã xác thực
+/// (`POST /api/v1/auth/phone-signups`, D-202) mà không phụ thuộc module cấp token. Module cấp token
+/// công bố bằng `context.provide::<dyn VerifiedPhoneTokens>(…)`; `auth` (đăng ký trước) lấy bằng
+/// `StartContext::later`.
+#[async_trait::async_trait]
+pub trait VerifiedPhoneTokens: Send + Sync {
+    /// Số đã qua mã một lần của `token`, khi token còn hạn và thuộc khách `tenant`; không thì `None`.
+    async fn verified_phone(
+        &self,
+        tenant: &crate::tenancy::TenantContext,
+        token: &str,
+    ) -> Result<Option<PhoneNumber>, Error>;
+}
+
 /// `sms_disabled` (503): chưa cấu hình gửi SMS.
 pub fn sms_disabled() -> Error {
     Error::unavailable("sms_disabled", "Sending SMS is not set up on this server.")

@@ -12,7 +12,7 @@ use autoxide_kernel::access::Permission;
 use autoxide_kernel::config::{ConfigReader, ConfigSource, DatabaseConfig};
 use autoxide_kernel::database::Database;
 use autoxide_kernel::error::Error;
-use autoxide_kernel::module::{Module, Modules, StartContext};
+use autoxide_kernel::module::{Later, Module, Modules, StartContext};
 use autoxide_testkit::TestDatabase;
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
@@ -133,6 +133,44 @@ async fn module_lay_duoc_trait_cua_module_dang_ky_truoc() {
         // Sau khởi động, binary lấy được trait module đã công bố.
         let users = modules.api::<dyn UserDirectory>().unwrap();
         assert_eq!(users.display_name(1), "user-1");
+    })
+    .await
+    .unwrap();
+}
+
+/// Module giữ tay cầm `Later` tới trait của module đăng ký SAU nó.
+struct LateReader(Arc<Mutex<Option<Later<dyn UserDirectory>>>>);
+
+impl Module for LateReader {
+    fn name(&self) -> &'static str {
+        "late_reader"
+    }
+
+    fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
+        let later = context.later::<dyn UserDirectory>();
+        // Trong `start` chưa điền: đọc lúc phục vụ.
+        assert!(later.get().is_none());
+        *self.0.lock().unwrap() = Some(later);
+        Ok(())
+    }
+}
+
+#[tokio::test]
+async fn later_lay_trait_cua_module_dang_ky_sau() {
+    TestDatabase::run(async |database| {
+        let db = connect(database).await;
+        let held = Arc::new(Mutex::new(None));
+        let mut modules =
+            Modules::new(vec![Box::new(LateReader(held.clone())), Box::new(Users)]).unwrap();
+        modules.start(&db).unwrap();
+        let later = held.lock().unwrap().clone().unwrap();
+        assert_eq!(later.get().unwrap().display_name(3), "user-3");
+
+        // Không module nào công bố: tay cầm trả `None`, khởi động vẫn được.
+        let alone = Arc::new(Mutex::new(None));
+        let mut modules = Modules::new(vec![Box::new(LateReader(alone.clone()))]).unwrap();
+        modules.start(&db).unwrap();
+        assert!(alone.lock().unwrap().clone().unwrap().get().is_none());
     })
     .await
     .unwrap();

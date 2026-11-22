@@ -413,6 +413,7 @@ impl Modules {
                 ModuleError(format!("module `{name}` failed to start: {error}"))
             })?;
         }
+        apis.fill_later();
         self.dns.fill(apis.get::<dyn crate::tenancy::DnsTxtLookup>());
         partners.fill(apis.get::<dyn crate::tenancy::sandbox::SandboxRecipients>());
         self.orgs.fill(apis.get::<dyn crate::tenancy::OrgNodes>());

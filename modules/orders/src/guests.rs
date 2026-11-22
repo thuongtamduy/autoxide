@@ -882,14 +882,15 @@ fn subject(order_id: Uuid) -> Option<String> {
     Some(format!("orders.order:{order_id}"))
 }
 
-// `auth` (bước 34) hỏi số điện thoại đã qua OTP của một token xem đơn để tạo tài khoản (D-202).
+// `auth` (bước 34) hỏi số điện thoại đã qua OTP của một token xem đơn để tạo tài khoản (D-202):
+// qua trait của kernel, vì `auth` không phụ thuộc `orders` (D-20261122-late-apis).
 #[async_trait::async_trait]
-impl crate::api::OrderLookups for OrdersService {
+impl autoxide_kernel::sms::VerifiedPhoneTokens for OrdersService {
     async fn verified_phone(
         &self,
         tenant: &TenantContext,
         token: &str,
-    ) -> Result<Option<String>, Error> {
+    ) -> Result<Option<PhoneNumber>, Error> {
         let access = match self.guest_access(tenant, Some(token)).await {
             Ok(access) => access,
             Err(error) if error.code() == "orders.lookup_token_invalid" => return Ok(None),
@@ -902,7 +903,20 @@ impl crate::api::OrderLookups for OrdersService {
         };
         // Số trong đơn phải đúng số đã qua OTP lúc cấp token.
         let key = self.secret.phone_key(tenant.id(), &phone).await?;
-        Ok((key == access.phone_hash).then(|| phone.as_str().to_owned()))
+        Ok((key == access.phone_hash).then_some(phone))
+    }
+}
+
+#[async_trait::async_trait]
+impl crate::api::OrderLookups for OrdersService {
+    async fn verified_phone(
+        &self,
+        tenant: &TenantContext,
+        token: &str,
+    ) -> Result<Option<String>, Error> {
+        let phone =
+            autoxide_kernel::sms::VerifiedPhoneTokens::verified_phone(self, tenant, token).await?;
+        Ok(phone.map(|phone| phone.as_str().to_owned()))
     }
 }
 

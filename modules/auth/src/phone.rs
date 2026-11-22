@@ -13,9 +13,11 @@ use std::sync::{Arc, OnceLock};
 use autoxide_kernel::access::Realm;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::{Actor, Outbox};
+use autoxide_kernel::module::Later;
 use autoxide_kernel::secret::SecretKey;
-use autoxide_kernel::sms::PhoneNumber;
+use autoxide_kernel::sms::{PhoneNumber, VerifiedPhoneTokens};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
+use autoxide_kernel::throttle::{Outcome, Throttle};
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set, SqlErr};
 use serde_json::json;
 use uuid::Uuid;
@@ -42,6 +44,58 @@ fn registration_closed() -> Error {
     )
 }
 
+/// Cách đăng nhập ghi trên phiên của tài khoản tạo từ token đã xác thực số.
+const SIGNUP_METHOD: &str = "phone_token";
+
+/// Số lần tạo tài khoản từ token mỗi giờ theo một địa chỉ IP.
+const SIGNUPS_PER_IP_PER_HOUR: u32 = 10;
+
+fn signup_unavailable() -> Error {
+    Error::unavailable(
+        "auth.phone_signup_unavailable",
+        "This server has no module that issues verified phone tokens, such as order lookups.",
+    )
+}
+
+fn phone_taken() -> Error {
+    Error::conflict(
+        "auth.phone_taken",
+        "This phone number already has an account. Sign in with a code sent to it instead.",
+    )
+}
+
+fn lookup_token_invalid() -> Error {
+    Error::validation(vec![FieldError::new(
+        "lookup_token",
+        "invalid",
+        "is not valid or has expired; look the order up again",
+    )])
+}
+
+fn signups_throttled(retry_after: u64) -> Error {
+    Error::too_many_requests(
+        "auth.phone_signup_throttled",
+        "Too many accounts created from this address. Try again in {retry_after} seconds.",
+    )
+    .with_param("retry_after", retry_after)
+    .with_retry_after(retry_after)
+}
+
+fn check_name(name: Option<&str>) -> Result<Option<&str>, Error> {
+    let name = name.map(str::trim).filter(|name| !name.is_empty());
+    if name.is_some_and(|name| name.chars().count() > 100) {
+        return Err(Error::validation(vec![
+            FieldError::new(
+                "name",
+                "length",
+                "must be between 1 and {name_max_length} characters long",
+            )
+            .with_param("name_max_length", 100),
+        ]));
+    }
+    Ok(name)
+}
+
 /// Kết quả của một lần đăng nhập bằng số.
 pub(crate) struct PhoneLogin {
     pub outcome: LoginOutcome,
@@ -51,6 +105,9 @@ pub(crate) struct PhoneLogin {
 
 pub(crate) struct PhoneSignIn {
     codes: OnceLock<Arc<dyn PhoneCodes>>,
+    /// Token đã qua mã một lần do module khác cấp (token xem đơn của `orders`), cho
+    /// `POST /phone-signups`. Module đó đăng ký sau `auth` nên lấy bằng chỗ nối muộn của kernel.
+    tokens: Later<dyn VerifiedPhoneTokens>,
     sessions: Arc<SessionService>,
     secret: SecretKey,
     outbox: Outbox,
@@ -63,8 +120,9 @@ impl PhoneSignIn {
         secret: SecretKey,
         outbox: Outbox,
         orgs: Option<Arc<dyn autoxide_organizations::api::OrgDirectory>>,
+        tokens: Later<dyn VerifiedPhoneTokens>,
     ) -> Self {
-        PhoneSignIn { codes: OnceLock::new(), sessions, secret, outbox, orgs }
+        PhoneSignIn { codes: OnceLock::new(), tokens, sessions, secret, outbox, orgs }
     }
 
     fn codes(&self) -> Result<&Arc<dyn PhoneCodes>, Error> {
@@ -91,17 +149,7 @@ impl PhoneSignIn {
         name: Option<&str>,
         user_agent: Option<&str>,
     ) -> Result<PhoneLogin, Error> {
-        let name = name.map(str::trim).filter(|name| !name.is_empty());
-        if name.is_some_and(|name| name.chars().count() > 100) {
-            return Err(Error::validation(vec![
-                FieldError::new(
-                    "name",
-                    "length",
-                    "must be between 1 and {name_max_length} characters long",
-                )
-                .with_param("name_max_length", 100),
-            ]));
-        }
+        let name = check_name(name)?;
         let codes = self.codes()?;
         let phone = codes.verify(tenant, challenge, code).await?;
         let key = self.secret.phone_key(tenant.id(), &phone).await?;
@@ -117,13 +165,62 @@ impl PhoneSignIn {
                 if !open {
                     return Err(registration_closed());
                 }
-                self.create(tenant, &phone, &key, name).await?
+                self.create(tenant, &phone, &key, name, METHOD).await?
             }
         };
         // Số này giờ là số đã xác thực của tài khoản (module khác thấy qua `compliance`).
         codes.record(tenant, user, &phone).await?;
         let outcome = self.sessions.login_verified(tenant, user, METHOD, user_agent).await?;
         Ok(PhoneLogin { outcome, created })
+    }
+
+    /// Tạo tài khoản người mua từ số đã qua mã một lần ở module khác (token xem đơn vãng lai của
+    /// `orders`, D-202), rồi đăng nhập. Không mật khẩu, không email: lần sau đăng nhập bằng mã SMS hay
+    /// passkey thêm sau. Số đã có tài khoản → 409 `auth.phone_taken` (không đăng nhập hộ: token xem đơn
+    /// không phải bằng chứng đủ để vào tài khoản sẵn có).
+    pub(crate) async fn sign_up(
+        &self,
+        tenant: &TenantContext,
+        token: &str,
+        name: Option<&str>,
+        ip: Option<std::net::IpAddr>,
+        user_agent: Option<&str>,
+    ) -> Result<LoginOutcome, Error> {
+        let name = check_name(name)?;
+        let tokens = self.tokens.get().ok_or_else(signup_unavailable)?;
+        // Đếm TRƯỚC khi hỏi token: dò token cũng bị giới hạn.
+        if let Some(ip) = ip {
+            let hour = std::time::Duration::from_secs(3600);
+            let throttle = Throttle::new("auth", SIGNUPS_PER_IP_PER_HOUR, hour)?;
+            let key = format!("phone-signup-ip:{}", autoxide_kernel::ip_hash::prefix(ip));
+            if let Outcome::Limited { retry_after } = throttle.hit(tenant, &key).await? {
+                return Err(signups_throttled(retry_after));
+            }
+        }
+        let phone = tokens.verified_phone(tenant, token).await?.ok_or_else(lookup_token_invalid)?;
+        let key = self.secret.phone_key(tenant.id(), &phone).await?;
+        if self.find(tenant, &key).await?.is_some() {
+            return Err(phone_taken());
+        }
+        let open = crate::settings::enabled(
+            self.orgs.as_ref(),
+            tenant,
+            &crate::settings::CUSTOMER_REGISTRATION,
+        )
+        .await?;
+        if !open {
+            return Err(registration_closed());
+        }
+        let (user, created) = self.create(tenant, &phone, &key, name, SIGNUP_METHOD).await?;
+        if !created {
+            // Một request khác vừa tạo tài khoản cho cùng số.
+            return Err(phone_taken());
+        }
+        // Ghi số đã xác thực ở `compliance` khi có (module khác thấy qua `AccountVerification`).
+        if let Some(codes) = self.codes.get() {
+            codes.record(tenant, user, &phone).await?;
+        }
+        self.sessions.login_verified(tenant, user, SIGNUP_METHOD, user_agent).await
     }
 
     /// Xác nhận lại (D-308) bằng mã gửi tới số đăng nhập của chính tài khoản `user_id`. Số khác: lỗi
@@ -170,6 +267,7 @@ impl PhoneSignIn {
         phone: &PhoneNumber,
         key: &str,
         name: Option<&str>,
+        method: &str,
     ) -> Result<(Uuid, bool), Error> {
         let name = name.map_or_else(|| phone.masked(), str::to_owned);
         // Lưu tới micro giây như mọi mốc thời gian của module.
@@ -208,7 +306,7 @@ impl PhoneSignIn {
         };
         let event = events::UserCreated {
             before: None,
-            after: Some(json!({"email": "", "name": row.name, "admin": false, "sign_in": METHOD})),
+            after: Some(json!({"email": "", "name": row.name, "admin": false, "sign_in": method})),
         };
         self.outbox
             .record(&transaction, tenant, Actor::system(), events::user_subject(row.id), &event)

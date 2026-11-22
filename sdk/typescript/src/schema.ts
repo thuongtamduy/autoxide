@@ -25665,6 +25665,20 @@ export type PhoneLoginRequest = {
   name?: string | null;
 };
 
+/** A verified phone token to create an account from. */
+export type PhoneSignupRequest = {
+  /**
+   * The order lookup token from `POST /api/v1/orders/public/orders/lookup/{id}/confirm` (the buyer
+   * already proved the number with a one-time code).
+   */
+  lookup_token: string;
+  /**
+   * Display name for the new account (1 to 100 characters). Without it the account is named after
+   * the masked number.
+   */
+  name?: string | null;
+};
+
 /** A shortcut the signed-in user pinned: a screen of the navigation or a record. */
 export type Pin = {
   created_at: string;
@@ -33436,6 +33450,22 @@ export interface paths {
         200: Data_Vec_PermissionResponse;
         401: Problem;
         403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/phone-signups": {
+    /** Create a buyer account from a verified order lookup. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      requestBody: PhoneSignupRequest;
+      responses: {
+        201: Data_TokenResponse;
+        403: Problem;
+        409: Problem;
+        422: Problem;
+        429: Problem;
+        503: Problem;
         default: Problem;
       };
     };
