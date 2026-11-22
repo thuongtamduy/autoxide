@@ -3,7 +3,6 @@
 //! nút (module khác chỉ dùng qua `api`).
 
 mod bookings;
-mod fakes;
 mod guests;
 mod setup;
 

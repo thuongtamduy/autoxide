@@ -533,12 +533,12 @@ async fn nhac_khi_flash_sale_bat_dau_gui_mot_lan_kem_dong_y_rieng() {
         let (status, _) = call(&setup.app, "POST", &uri, "buyer1", None).await;
         assert_eq!(status, StatusCode::CREATED);
         // Đồng ý riêng cho lời nhắc, không phải quảng cáo.
-        let consents = setup.consents.0.lock().unwrap().clone();
-        assert!(consents.iter().all(|row| row.0.purpose == "promotions.flash_sale_reminder"));
+        let consents = setup.consents.records();
+        assert!(consents.iter().all(|row| row.consent.purpose == "promotions.flash_sale_reminder"));
         // buyer1 đổi ý: bỏ lời nhắc, rút đồng ý.
         let (status, _) = call(&setup.app, "DELETE", &uri, "buyer1", None).await;
         assert_eq!(status, StatusCode::NO_CONTENT);
-        assert!(setup.consents.0.lock().unwrap().iter().any(|row| !row.2));
+        assert!(setup.consents.records().iter().any(|row| row.consent.state == "withdrawn"));
 
         // Tới hạn: job gửi đúng một lần, chạy lại không gửi thêm.
         {
@@ -564,7 +564,7 @@ async fn nhac_khi_flash_sale_bat_dau_gui_mot_lan_kem_dong_y_rieng() {
                 .unwrap();
             super::drain(&setup.app).await;
         }
-        let sent = setup.notifier.0.lock().unwrap().clone();
+        let sent = setup.notifier.sent();
         assert_eq!(sent.len(), 1, "{sent:?}");
         assert_eq!(sent[0].kind, "promotions.flash_sale_starting");
         assert_eq!(sent[0].params["title"], "Giảm giá");

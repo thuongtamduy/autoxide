@@ -5,16 +5,15 @@
 //! đồng ý và quy tắc là bản giả (test của module không dựng module khác); đi qua module thật ở
 //! `crates/app/src/e2e/notifications.rs`.
 
+use autoxide_compliance::api::testing::FakeConsentLedger;
 use autoxide_kernel::time::Timestamp;
 use jiff::SignedDuration;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use autoxide_auth::api::{TenantAdmins, User, Users};
-use autoxide_compliance::api::{
-    ComplianceRules, Consent, ConsentEvidence, ConsentKey, ConsentLedger, ConsentSubject, Rule,
-};
+use autoxide_compliance::api::{ComplianceRules, ConsentKey, ConsentLedger, ConsentSubject, Rule};
 use autoxide_kernel::access::Realm;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::mail::{Mail, Mailer};
@@ -143,91 +142,6 @@ impl Mailer for Outbox {
     }
 }
 
-/// Sổ đồng ý giả: (đối tượng, mục đích, kênh); kênh rỗng bao mọi kênh.
-#[derive(Default)]
-struct Ledger(Mutex<HashSet<(ConsentSubject, String, String)>>);
-
-impl Ledger {
-    fn allow(&self, subject: ConsentSubject, channel: &str) {
-        self.0.lock().unwrap().insert((subject, "marketing".to_owned(), channel.to_owned()));
-    }
-
-    fn deny(&self, subject: &ConsentSubject) {
-        self.0.lock().unwrap().retain(|(who, _, _)| who != subject);
-    }
-}
-
-fn consent(key: &ConsentKey, state: &str) -> Consent {
-    Consent {
-        id: Uuid::now_v7(),
-        purpose: key.purpose.clone(),
-        scope: key.scope.clone(),
-        channel: key.channel.clone(),
-        state: state.to_owned(),
-        granted_at: None,
-        withdrawn_at: None,
-        subject_value: None,
-    }
-}
-
-#[async_trait::async_trait]
-impl ConsentLedger for Ledger {
-    async fn grant(
-        &self,
-        _tenant: TenantId,
-        subject: ConsentSubject,
-        key: ConsentKey,
-        _evidence: ConsentEvidence,
-        _source_ref: &str,
-    ) -> Result<Consent, Error> {
-        self.0.lock().unwrap().insert((subject, key.purpose.clone(), key.channel.clone()));
-        Ok(consent(&key, "granted"))
-    }
-
-    async fn withdraw(
-        &self,
-        _tenant: TenantId,
-        subject: ConsentSubject,
-        key: ConsentKey,
-        _source: &str,
-        _source_ref: &str,
-    ) -> Result<Consent, Error> {
-        self.0
-            .lock()
-            .unwrap()
-            .retain(|(who, purpose, _)| !(*who == subject && *purpose == key.purpose));
-        Ok(consent(&key, "withdrawn"))
-    }
-
-    async fn is_granted(
-        &self,
-        _tenant: TenantId,
-        subject: &ConsentSubject,
-        key: &ConsentKey,
-    ) -> Result<bool, Error> {
-        let granted = self.0.lock().unwrap();
-        Ok(granted.contains(&(subject.clone(), key.purpose.clone(), key.channel.clone()))
-            || granted.contains(&(subject.clone(), key.purpose.clone(), String::new())))
-    }
-
-    async fn granted_many(
-        &self,
-        tenant: TenantId,
-        subjects: &[ConsentSubject],
-        key: &ConsentKey,
-    ) -> Result<Vec<bool>, Error> {
-        let mut found = Vec::new();
-        for subject in subjects {
-            found.push(self.is_granted(tenant, subject, key).await?);
-        }
-        Ok(found)
-    }
-
-    async fn get(&self, _tenant: TenantId, _consent_id: Uuid) -> Result<Option<Consent>, Error> {
-        Ok(None)
-    }
-}
-
 /// Quy tắc giả: thân quy tắc theo khoá.
 struct Rules(Mutex<HashMap<String, Value>>);
 
@@ -256,7 +170,7 @@ struct Fixture {
     app: TestApp,
     notifier: Arc<dyn Notifier>,
     mails: Arc<Outbox>,
-    ledger: Arc<Ledger>,
+    ledger: Arc<FakeConsentLedger>,
     rules: Arc<Rules>,
     sms: Arc<FakeSmsSender>,
     web_push: Arc<FakeWebPushSender>,
@@ -269,7 +183,7 @@ async fn fixture_with(test: &TestDatabase, per_hour: &str) -> Fixture {
         (Uuid::from_u128(2), user(2, "alice@example.com")),
     ])));
     let mails = Arc::new(Outbox::default());
-    let ledger = Arc::new(Ledger::default());
+    let ledger = Arc::new(FakeConsentLedger::new());
     let rules = Arc::new(Rules(Mutex::new(HashMap::from([
         (
             "notifications.marketing_labels".to_owned(),
@@ -496,17 +410,17 @@ async fn quang_cao_can_dong_y_kiem_lai_truoc_khi_gui_va_link_huy_nhan() {
         assert!(outcome.skipped.iter().any(|skip| skip.channel == Channel::Sms && skip.reason == SkipReason::NoAddress));
 
         let subject = ConsentSubject::Email("bob@example.com".to_owned());
-        fx.ledger.allow(subject.clone(), "email");
+        fx.ledger.allow(subject.clone(), ConsentKey::new("marketing", "", "email"));
         let mut second = bob();
         second.dedupe_key = "promo-2".to_owned();
         assert_eq!(fx.notifier.notify(DEFAULT_TENANT, second).await.unwrap().message_ids.len(), 1);
         // Rút đồng ý trước khi job chạy: không gửi.
-        fx.ledger.deny(&subject);
+        fx.ledger.forget(&subject);
         run_jobs(&fx.app).await;
         assert!(fx.mails.all().is_empty());
         assert_eq!(statuses(&fx.app, "promo-2").await["email"], ("skipped".to_owned(), "consent_withdrawn".to_owned()));
 
-        fx.ledger.allow(subject.clone(), "");
+        fx.ledger.allow(subject.clone(), ConsentKey::new("marketing", "", ""));
         let mut third = bob();
         third.dedupe_key = "promo-3".to_owned();
         fx.notifier.notify(DEFAULT_TENANT, third).await.unwrap();
@@ -570,7 +484,10 @@ async fn ngoai_khung_gio_thi_hoan_qua_24_gio_thi_bo() {
             "notifications.send_windows".to_owned(),
             json!({"utc_offset_minutes": 0, "marketing": {"sms": window, "email": null}}),
         );
-        fx.ledger.allow(ConsentSubject::Phone("+84912345678".to_owned()), "sms");
+        fx.ledger.allow(
+            ConsentSubject::Phone("+84912345678".to_owned()),
+            ConsentKey::new("marketing", "", "sms"),
+        );
         let promo = |key: &str| {
             Notification::new(
                 PROMO.key(),
@@ -616,7 +533,10 @@ async fn ngoai_khung_gio_thi_hoan_qua_24_gio_thi_bo() {
 async fn tin_moi_dang_ky_chi_gui_mot_lan() {
     TestDatabase::run(async |test| {
         let fx = fixture(test).await;
-        fx.ledger.allow(ConsentSubject::Phone("+84912000111".to_owned()), "");
+        fx.ledger.allow(
+            ConsentSubject::Phone("+84912000111".to_owned()),
+            ConsentKey::new("marketing", "", ""),
+        );
         let invite = |key: &str| {
             Notification::new(
                 INVITE.key(),

@@ -149,7 +149,8 @@ async fn xuat_ban_va_quay_lai_phien_ban_mail_html_trong_khung() {
 async fn mau_quang_cao_luon_co_chan_thu_huy_nhan_va_mau_hong_dung_mac_dinh() {
     TestDatabase::run(async |test| {
         let fx = templates_fixture(test).await;
-        fx.ledger.allow(ConsentSubject::User(Uuid::from_u128(2)), "");
+        fx.ledger
+            .allow(ConsentSubject::User(Uuid::from_u128(2)), ConsentKey::new("marketing", "", ""));
         let promo =
             json!({"subject": "Giảm {{ percent }}%", "body_text": "Mọi thứ giảm {{ percent }}%."});
         call(&fx.app, "PUT", "/templates/shop.promo/email/en/draft", "admin", Some(promo)).await;

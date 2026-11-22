@@ -3,6 +3,7 @@
 //! chênh lệch, duyệt).
 
 use autoxide_kernel::time::Timestamp;
+use autoxide_notifications::api::testing::FakeNotifier;
 use std::sync::{Arc, Mutex};
 
 use autoxide_invoices::api::{
@@ -12,9 +13,9 @@ use autoxide_kernel::access::{Principal, Scope};
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::reference::Submitted;
-use autoxide_kernel::tenancy::{TenantContext, TenantId};
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_ledger::api::AccountKey;
-use autoxide_notifications::api::{Notification, NotificationKind, Notifier, Outcome, Recipient};
+use autoxide_notifications::api::{Notifier, Recipient};
 use autoxide_testkit::TestDatabase;
 use axum::http::StatusCode;
 use futures_util::future::join_all;
@@ -176,29 +177,6 @@ impl Invoices for FakeInvoices {
     }
 }
 
-/// `notifications` giả: giữ loại đã khai và tin đã gửi (cùng `dedupe_key` → không thêm).
-#[derive(Default)]
-struct FakeNotifier {
-    kinds: Mutex<Vec<&'static str>>,
-    sent: Mutex<Vec<Notification>>,
-}
-
-#[async_trait::async_trait]
-impl Notifier for FakeNotifier {
-    fn declare(&self, kind: NotificationKind) -> Result<(), Error> {
-        self.kinds.lock().unwrap().push(kind.key());
-        Ok(())
-    }
-
-    async fn notify(&self, _: TenantId, notification: Notification) -> Result<Outcome, Error> {
-        let mut sent = self.sent.lock().unwrap();
-        if !sent.iter().any(|old| old.dedupe_key == notification.dedupe_key) {
-            sent.push(notification);
-        }
-        Ok(Outcome::default())
-    }
-}
-
 struct World {
     shop: Shop,
     invoices: Arc<FakeInvoices>,
@@ -354,11 +332,11 @@ async fn thu_xac_nhan_va_trang_thai_gui_mot_lan() {
     TestDatabase::run(async |test| {
         let world = world(test).await;
         let shop = &world.shop;
-        assert!(world.notifier.kinds.lock().unwrap().contains(&"orders.order_placed"));
+        assert!(world.notifier.kinds().contains(&"orders.order_placed".to_owned()));
         let (id, _) = delivered_order(shop).await;
         drain(shop).await;
         drain(shop).await;
-        let sent = world.notifier.sent.lock().unwrap().clone();
+        let sent = world.notifier.sent();
         let kinds: Vec<&str> = sent.iter().map(|notification| notification.kind.as_str()).collect();
         assert!(kinds.contains(&"orders.order_placed"), "{kinds:?}");
         assert!(kinds.contains(&"orders.order_delivered"), "{kinds:?}");
@@ -371,7 +349,7 @@ async fn thu_xac_nhan_va_trang_thai_gui_mot_lan() {
         // Mỗi event một tin: chạy lại không gửi thêm.
         let before = sent.len();
         drain(shop).await;
-        assert_eq!(world.notifier.sent.lock().unwrap().len(), before);
+        assert_eq!(world.notifier.sent().len(), before);
     })
     .await
     .unwrap();

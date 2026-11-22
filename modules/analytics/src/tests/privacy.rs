@@ -26,7 +26,7 @@ async fn theo_doi_theo_nguoi_chi_khi_dong_y() {
         h.send(None, &client, Some(buyer), vec![product.clone()], at(10, 9)).await;
         assert_eq!(h.raw().await[0].user_id, None);
         // Đồng ý `analytics.personal`: gắn người, "vừa xem" có dữ liệu.
-        h.ledger.grant(buyer);
+        super::grant_personal(&h.ledger, buyer);
         h.send(None, &client, Some(buyer), vec![product.clone()], at(10, 10)).await;
         let other =
             json!({"type": "shop.product_viewed", "path": "/p/2", "object": "shop.product:p-2"});
@@ -63,8 +63,8 @@ async fn rut_dong_y_xoa_phan_gan_nguoi() {
     TestDatabase::run(async |test| {
         let h = harness(test).await;
         let (buyer, other) = (user_id(9), user_id(10));
-        h.ledger.grant(buyer);
-        h.ledger.grant(other);
+        super::grant_personal(&h.ledger, buyer);
+        super::grant_personal(&h.ledger, other);
         let client = browser("203.0.113.1", CHROME);
         h.send(None, &client, Some(buyer), vec![page("/a"), page("/b")], at(10, 9)).await;
         h.send(None, &client, Some(other), vec![page("/c")], at(10, 9)).await;
@@ -72,7 +72,7 @@ async fn rut_dong_y_xoa_phan_gan_nguoi() {
         let before = daily::Entity::find().all(h.app.database().read()).await.unwrap();
 
         // Rút đồng ý: ngừng ngay (đọc sổ đồng ý ở mỗi lần), rồi bên nhận event gỡ phần gắn người.
-        h.ledger.withdraw(buyer);
+        super::withdraw_personal(&h.ledger, buyer);
         let recent = h.service.recently_viewed(&h.tenant, buyer, "shop.product", 10).await;
         assert!(recent.unwrap().is_empty());
         h.send(None, &client, Some(buyer), vec![page("/d")], at(10, 11)).await;
