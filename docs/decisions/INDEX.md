@@ -125,6 +125,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261121-external-modules](D-20261121-external-modules.md)** Module ở repo riêng: crate `autoxide` là thư viện, ví dụ chạy thật, cam kết tương thích — 2026-11-21
 - **[D-20261121-module-selection](D-20261121-module-selection.md)** Bật / tắt module bằng `AUTOXIDE_MODULES`, ba hạng module — 2026-11-21
 - **[D-20261121-provider-accounts](D-20261121-provider-accounts.md)** Một cách cho mọi bộ nối nhà cung cấp: tài khoản theo khách, webhook theo khách — 2026-11-21
+- **[D-20261122-provider-environments](D-20261122-provider-environments.md)** Bộ nối: URL webhook đầy đủ theo khách, môi trường thử theo khách, xác thực lại khi đổi tài khoản — 2026-11-22
 
 ## Database, dữ liệu, job, event
 
@@ -568,6 +569,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261121-buyer-keys](D-20261121-buyer-keys.md)** Khoá người mua cho hạn mức khuyến mãi và cờ đơn đầu — 2026-11-21
 - **[D-20261121-catalog-digital-downloads](D-20261121-catalog-digital-downloads.md)** Hàng số của `catalog`: file chép từ `files`, quyền tải phát theo event của `orders`, địa chỉ ký theo khách — 2026-11-21
 - **[D-20261121-catalog-draft-from-images](D-20261121-catalog-draft-from-images.md)** Tạo sản phẩm nháp từ ảnh: ảnh qua `Media::ai_image`, job, kết quả luôn là nháp — 2026-11-21
+- **[D-20261121-esms-adapter](D-20261121-esms-adapter.md)** Bộ nối eSMS: chỉ gửi mã một lần và tin chăm sóc khách hàng, từ chối tin quảng cáo, chưa nhận callback — 2026-11-21
 - **[D-20261121-money-low-fixes](D-20261121-money-low-fixes.md)** Thu hồi thưởng giới thiệu khi hoàn tiền; thẻ quà tặng đã gắn chỉ chủ dùng; khớp biến động số dư theo lượt nhận — 2026-11-21
 - **[D-20261121-payment-amount-check](D-20261121-payment-amount-check.md)** `plans` và `bookings` so số thực thu của `ledger.payment_succeeded` với số phải trả — 2026-11-21
 - **[D-20261121-vn-providers](D-20261121-vn-providers.md)** Bộ nối nhà cung cấp đầu tiên: SePay, MoMo, Giao Hàng Nhanh, eSMS, SePay eInvoice; tài khoản do từng khách tự cấu hình — 2026-11-21 · **chủ dự án quyết**
