@@ -116,12 +116,13 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-038** Hình dạng của hợp đồng module — 2026-11-11
 - **D-069** Module mẫu `notes` không đăng ký sẵn trong binary — 2026-11-11
 - **D-124** `AUTOXIDE_HTTP_PUBLIC_URL`, công bố bởi module nội bộ `kernel` — 2026-11-12
-- **D-167** Hợp đồng module: liệt kê thư viện công khai, `#[non_exhaustive]`, chính sách deprecate — 2026-11-13
+- **D-167** Hợp đồng module: liệt kê thư viện công khai, `#[non_exhaustive]`, chính sách deprecate — 2026-11-13 · *thay một phần bởi D-20261121-external-modules*
 - **D-170** Hàm tạo cho các kiểu module dựng bằng literal, rồi `#[non_exhaustive]` — 2026-11-13
 - **D-351** Bộ dựng mẫu của kernel `autoxide_kernel::template` dùng `minijinja` (bước 37 mục 2, phần kernel) — 2026-11-17
 - **D-365** Loại bên làm (`ActorKind`) và lệnh cần duyệt khi agent gọi (bước 51 P12, D-224) — 2026-11-17
 - **[D-20261118-step41-kernel-prep](D-20261118-step41-kernel-prep.md)** Ba API kernel cho module thương mại: `Subscription::optional`, `csv::read`, `slug` — 2026-11-18
 - **[D-20261119-step61-stream-audience](D-20261119-step61-stream-audience.md)** Stream SSE của kernel đưa event tới "người được nêu tên" — 2026-11-19
+- **[D-20261121-external-modules](D-20261121-external-modules.md)** Module ở repo riêng: crate `autoxide` là thư viện, ví dụ chạy thật, cam kết tương thích — 2026-11-21
 - **[D-20261121-module-selection](D-20261121-module-selection.md)** Bật / tắt module bằng `AUTOXIDE_MODULES`, ba hạng module — 2026-11-21
 - **[D-20261121-provider-accounts](D-20261121-provider-accounts.md)** Một cách cho mọi bộ nối nhà cung cấp: tài khoản theo khách, webhook theo khách — 2026-11-21
 
