@@ -74,6 +74,8 @@ pub(crate) struct ModuleCatalog {
     setup: crate::ops::setup::SetupSteps,
     /// Danh sách lý do (bước 51 P18).
     reasons: crate::ops::reasons::ReasonCodes,
+    /// Sổ khối của trang dựng từ khối (bước 67).
+    blocks: crate::blocks::Blocks,
     /// Cách thử kết nối ra ngoài (bước 51).
     probes: crate::ops::connections::ConnectionProbes,
     /// Loại bản ghi gắn nhãn được (bước 51 P20).
@@ -186,6 +188,10 @@ impl ModuleCatalog {
 
     pub(crate) fn reason_codes(&self) -> crate::ops::reasons::ReasonCodes {
         self.reasons.clone()
+    }
+
+    pub(crate) fn blocks(&self) -> crate::blocks::Blocks {
+        self.blocks.clone()
     }
 
     pub(crate) fn connection_probes(&self) -> crate::ops::connections::ConnectionProbes {

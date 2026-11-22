@@ -516,6 +516,10 @@ impl Module for KernelModule {
             overrides: self.catalog.text_overrides(),
             translations: self.translations.clone(),
         }));
+        routes = routes.merge(crate::blocks::routes(crate::blocks::BlocksState {
+            blocks: self.catalog.blocks(),
+            translations: self.translations.clone(),
+        }));
         routes = routes.merge(crate::ops::connections::routes(
             crate::ops::connections::ConnectionsState { probes: self.catalog.connection_probes() },
         ));

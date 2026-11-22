@@ -451,7 +451,7 @@ MCP đã có, chạy với quyền của người tạo luật.
 Bắt đầu SAU bước 51 và 37. Kéo thả là giao diện ở repo riêng; core cho dữ liệu trang và API. AI chỉ ghép khối có
 sẵn, không sinh code; kết quả luôn là bản nháp.
 
-- [ ] Sổ khối của kernel: `Module::blocks()` (tên, nhóm, schema props, gợi ý cho AI, tính năng của gói),
+- [x] Sổ khối của kernel: `Module::blocks()` (tên, nhóm, schema props, gợi ý cho AI, tính năng của gói),
       `BlockData` trả dữ liệu theo lô; `GET /kernel/blocks` chỉ khối của module đang bật
 - [ ] Trang có thân `layout` (cây khối JSON) cạnh thân `rich`: kiểm từ chối mặc định, theo cỡ màn hình, theo ngôn
       ngữ; sửa từng phần bằng JSON Patch + `If-Match`; khoá sửa; nháp, lịch sử, xem trước, hẹn giờ dùng lại `content`

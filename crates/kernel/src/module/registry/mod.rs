@@ -249,6 +249,15 @@ impl Modules {
             crate::entitlement::EntitlementCatalog::build(declared);
         problems.extend(entitlement_problems);
         let entitlements = crate::entitlement::EntitlementsHandle::new(entitlement_catalog);
+        // Sổ khối (bước 67): tên, schema props, tính năng của chính module.
+        catalog.blocks().fill(
+            modules
+                .iter()
+                .map(|module| (module.name(), module.features(), module.blocks()))
+                .collect(),
+            entitlements.clone(),
+            &mut problems,
+        );
         for module in &modules {
             for deprecation in module.deprecations() {
                 problems.extend(deprecation.problems(module.name()));
@@ -351,6 +360,7 @@ impl Modules {
         let resolvers = self.catalog.code_resolvers();
         let setup = self.catalog.setup_steps();
         let reasons = self.catalog.reason_codes();
+        let blocks = self.catalog.blocks();
         let probes = self.catalog.connection_probes();
         let taggables = self.catalog.taggables();
         let texts = self.catalog.text_overrides();
@@ -404,6 +414,7 @@ impl Modules {
                 counters: &mut counters,
                 facts: &self.facts,
                 analytics: &self.analytics,
+                blocks: &blocks,
                 automations: &self.automations,
                 sync_keep: self.sync_keep,
                 partners: &partners,
@@ -412,6 +423,13 @@ impl Modules {
             module.start(&mut context).map_err(|error| {
                 ModuleError(format!("module `{name}` failed to start: {error}"))
             })?;
+        }
+        let missing = blocks.missing_sources();
+        if !missing.is_empty() {
+            return Err(ModuleError(format!(
+                "blocks {missing:?} are declared `with_data` but their module never registers \
+                 block data (`StartContext::block_data`)"
+            )));
         }
         apis.fill_later();
         self.dns.fill(apis.get::<dyn crate::tenancy::DnsTxtLookup>());

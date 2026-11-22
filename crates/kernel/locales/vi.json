@@ -428,5 +428,16 @@
   "kernel.ws_unknown_topic": "Không module nào mở tín hiệu cho `{topic}`. Chủ đề có dạng `<loại>:<id>`.",
   "kernel.ws_topic_denied": "Bạn không được vào `{topic}`.",
   "kernel.ws_not_joined": "Hãy vào `{topic}` (thông điệp `join`) trước khi gửi tín hiệu ở đó.",
-  "kernel.ws_too_many_topics": "Một kết nối vào tối đa {max} chủ đề. Hãy rời một chủ đề trước."
+  "kernel.ws_too_many_topics": "Một kết nối vào tối đa {max} chủ đề. Hãy rời một chủ đề trước.",
+  "field:is not a screen size; use `base`, `md` or `lg`": "không phải cỡ màn hình; dùng `base`, `md` hoặc `lg`",
+  "field:must be of type {expected}": "phải có kiểu {expected}",
+  "field:must be {allowed}": "phải là {allowed}",
+  "field:must have {min} to {max} items": "phải có từ {min} đến {max} phần tử",
+  "field:is not a property of this block": "không phải thuộc tính của khối này",
+  "field:must be {min} to {max} characters long": "phải dài {min} đến {max} ký tự",
+  "field:must be plain text, without HTML tags": "phải là chữ thuần, không có thẻ HTML",
+  "field:must be an id (UUID)": "phải là một ID (UUID)",
+  "field:must be a time in RFC 3339 form, e.g. 2026-12-31T17:00:00Z": "phải là thời điểm dạng RFC 3339, vd 2026-12-31T17:00:00Z",
+  "field:must be an http(s), mailto: or tel: link, or a path on the site starting with /": "phải là link http(s), mailto: hay tel:, hoặc đường dẫn trong site bắt đầu bằng /",
+  "field:block `{block}` is not available": "khối `{block}` không dùng được"
 }
