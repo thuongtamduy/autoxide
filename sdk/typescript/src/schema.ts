@@ -10524,6 +10524,7 @@ export type Data_OrdersPaymentAction = {
   /** What the buyer does next to pay one amount. */
   data: {
     amount: Money;
+    error?: OrdersPaymentStartError | null;
     expires_at?: string | null;
     /**
      * `redirect` (go to `redirect_url`), `qr` (show `qr_payload`), `cod` (pay on delivery) or
@@ -14951,6 +14952,7 @@ export type Data_Vec_OrdersDocument = {
 export type Data_Vec_OrdersPaymentAction = {
   data: {
     amount: Money;
+    error?: OrdersPaymentStartError | null;
     expires_at?: string | null;
     /**
      * `redirect` (go to `redirect_url`), `qr` (show `qr_payload`), `cod` (pay on delivery) or
@@ -21240,6 +21242,7 @@ export type OrdersOrderTotals = {
 /** What the buyer does next to pay one amount. */
 export type OrdersPaymentAction = {
   amount: Money;
+  error?: OrdersPaymentStartError | null;
   expires_at?: string | null;
   /**
    * `redirect` (go to `redirect_url`), `qr` (show `qr_payload`), `cod` (pay on delivery) or
@@ -21257,6 +21260,23 @@ export type OrdersPaymentAction = {
   status_token: string;
   /** Transfer content the bank transfer must carry. */
   transfer_code?: string | null;
+};
+
+/** Where to send the buyer back after paying. */
+export type OrdersPaymentLinkRequest = {
+  /**
+   * Where the payment partner sends the buyer back (some partners need it, e.g. MoMo); omitted:
+   * the shop's default.
+   */
+  return_url?: string | null;
+};
+
+/** Why a payment could not be started. */
+export type OrdersPaymentStartError = {
+  /** Stable error code, as in a `Problem` (e.g. `momo.return_url_required`). */
+  code: string;
+  /** What to fix, in the language of `Accept-Language`. */
+  message: string;
 };
 
 /** An order waiting in store. */
@@ -46333,6 +46353,23 @@ export interface paths {
       };
     };
   };
+  "/api/v1/orders/me/orders/{id}/payment-link": {
+    /** Start the payment of your order again. */
+    post: {
+      parameters: { header: { "Idempotency-Key"?: string | null; "Accept-Language"?: string }; path: { id: string }; };
+      requestBody: OrdersPaymentLinkRequest;
+      responses: {
+        200: Data_Vec_OrdersPaymentAction;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        429: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/orders/me/orders/{id}/payments": {
     /** Pay the balance of your order. */
     post: {
@@ -46639,6 +46676,23 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/public/orders/{id}/payment-link": {
+    /** Start the payment of a guest order again. */
+    post: {
+      parameters: { header: { "Order-Token": string; "Idempotency-Key"?: string | null; "Accept-Language"?: string }; path: { id: string }; };
+      requestBody: OrdersPaymentLinkRequest;
+      responses: {
+        200: Data_Vec_OrdersPaymentAction;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        429: Problem;
         default: Problem;
       };
     };

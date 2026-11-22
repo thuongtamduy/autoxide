@@ -117,6 +117,7 @@
   "orders.order_shipped.title": "Đơn {number} đang trên đường giao",
   "orders.out_of_stock": "Sản phẩm {sku} không đủ hàng (còn {available}).",
   "orders.payment_expired": "Đơn đã quá hạn thanh toán.",
+  "orders.payment_retry_too_many": "Đơn đã được mở lại thanh toán quá nhiều lần. Hãy thử lại sau {retry_after} giây.",
   "orders.payment_method_unavailable": "Phương thức thanh toán {method} không dùng được cho đơn này.",
   "orders.payment_token_invalid": "Không có thanh toán với mã này, hoặc đã quá hạn thanh toán.",
   "orders.payments_mismatch": "Tổng các khoản thanh toán ({paid}) khác tổng đơn ({total}).",

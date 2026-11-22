@@ -448,7 +448,7 @@ impl OrdersService {
 
     /// Đã làm thao tác `action` với khoá `reference` chưa: cùng nội dung → `true` (gọi lại), khác
     /// nội dung → 422.
-    async fn guest_replayed(
+    pub(crate) async fn guest_replayed(
         &self,
         tenant: &TenantContext,
         order_id: Uuid,
@@ -471,7 +471,7 @@ impl OrdersService {
     }
 
     /// Ghi thao tác đã làm (bỏ qua nếu một request song song đã ghi).
-    async fn remember_guest_request(
+    pub(crate) async fn remember_guest_request(
         connection: &impl ConnectionTrait,
         tenant: &TenantContext,
         order_id: Uuid,

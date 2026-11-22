@@ -197,6 +197,7 @@ impl OrdersService {
         &self,
         tenant: &TenantContext,
         order_id: Uuid,
+        return_url: Option<String>,
     ) -> Result<payment::Model, Error> {
         let database = tenant.database();
         let plan = self
@@ -251,7 +252,7 @@ impl OrdersService {
                 })
                 .await?;
         }
-        self.start_payment(tenant, order_id, None).await?;
+        self.start_payment(tenant, order_id, return_url).await?;
         self.latest_balance(database.read(), tenant, order_id)
             .await?
             .ok_or_else(errors::balance_not_requested)
@@ -283,7 +284,7 @@ impl OrdersService {
         if row.buyer_user_id != Some(buyer) {
             return Err(errors::order_not_found());
         }
-        self.reopen_balance(tenant, order_id).await
+        self.reopen_balance(tenant, order_id, None).await
     }
 }
 

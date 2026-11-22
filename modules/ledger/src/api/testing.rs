@@ -92,6 +92,10 @@ struct State {
     refunds: Vec<Refund>,
     /// Số lần `post` kế tiếp trả `ledger.period_closed`.
     fail_posts: usize,
+    /// Số lần `create_payment` kế tiếp trả `ledger.gateway_not_configured`.
+    fail_payments: usize,
+    /// `return_url` người gọi gửi cho từng lượt thu qua cổng, theo thứ tự.
+    return_urls: Vec<Option<String>>,
 }
 
 /// Sổ cái giả, giữ mọi thứ trong bộ nhớ. Công bố vào app bằng
@@ -151,6 +155,17 @@ impl FakeLedger {
     /// `count` lần `post` kế tiếp lỗi `ledger.period_closed` (thử đường ghi lại khi sổ từ chối).
     pub fn fail_next_posts(&self, count: usize) {
         lock(&self.state).fail_posts = count;
+    }
+
+    /// `count` lần `create_payment` kế tiếp lỗi `ledger.gateway_not_configured` (thử đường đối tác
+    /// từ chối khởi tạo lượt thu).
+    pub fn fail_next_payments(&self, count: usize) {
+        lock(&self.state).fail_payments = count;
+    }
+
+    /// `return_url` của từng lần gọi `create_payment` thành công (`None`: không gửi), theo thứ tự.
+    pub fn return_urls(&self) -> Vec<Option<String>> {
+        lock(&self.state).return_urls.clone()
     }
 
     /// Bút toán đã ghi, theo thứ tự (lần gửi lại không thêm dòng).
@@ -480,6 +495,22 @@ impl Ledger for FakeLedger {
         _: Actor,
         payment: NewPayment,
     ) -> Result<Submitted<Payment>, Error> {
+        {
+            let mut state = lock(&self.state);
+            if state.fail_payments > 0 {
+                state.fail_payments -= 1;
+                return Err(Error::new(
+                    autoxide_kernel::error::ErrorKind::Validation,
+                    "ledger.gateway_not_configured",
+                    "The payment partner `{provider}` is not set up on this server.",
+                )
+                .with_param(
+                    "provider",
+                    payment.provider.as_deref().unwrap_or(FAKE_LEDGER_PROVIDER),
+                ));
+            }
+            state.return_urls.push(payment.return_url.clone());
+        }
         let org = payment.org;
         let request = PaymentRequest {
             provider: payment.provider,

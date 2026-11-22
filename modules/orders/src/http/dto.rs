@@ -665,19 +665,51 @@ pub(crate) struct PaymentActionResponse {
     expires_at: Option<Timestamp>,
     /// For `GET /public/payments/{token}`.
     status_token: String,
+    /// Only with `kind = none`, when starting the payment failed: why (e.g. the payment partner
+    /// refused). Fix the cause, then start the payment again from the order.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error: Option<PaymentStartError>,
+}
+
+/// Why a payment could not be started.
+#[derive(Debug, Serialize, ToSchema)]
+#[schema(as = OrdersPaymentStartError)]
+pub(crate) struct PaymentStartError {
+    /// Stable error code, as in a `Problem` (e.g. `momo.return_url_required`).
+    code: String,
+    /// What to fix, in the language of `Accept-Language`.
+    message: String,
 }
 
 impl PaymentActionResponse {
+    /// Việc của khoản `row`; lý do khởi tạo hỏng (nếu có) bằng `language` (bản dịch theo `code`,
+    /// như `detail` của `Problem`).
     pub(crate) fn new(
         row: &crate::entity::payment::Model,
         status_token: String,
+        translations: &autoxide_kernel::i18n::Translations,
+        language: autoxide_kernel::i18n::Language,
     ) -> Result<Self, autoxide_kernel::error::Error> {
         let action = crate::payments::action_of(row);
         let text = |key: &str| action[key].as_str().map(str::to_owned);
+        let kind = text("kind").unwrap_or_else(|| "none".to_owned());
+        let error = action
+            .get("error")
+            .filter(|_| kind == "none")
+            .and_then(|raw| {
+                serde_json::from_value::<crate::payments::StartFailure>(raw.clone()).ok()
+            })
+            .map(|failure| {
+                let error = failure.to_error();
+                PaymentStartError {
+                    code: failure.code,
+                    message: translations.message(&error, language),
+                }
+            });
         Ok(PaymentActionResponse {
             order_id: row.order_id,
             payment_id: row.id,
-            kind: text("kind").unwrap_or_else(|| "none".to_owned()),
+            kind,
             amount: Money::from_columns(row.amount_minor, &row.currency)?,
             status: row.status.clone(),
             redirect_url: text("redirect_url"),
@@ -685,6 +717,7 @@ impl PaymentActionResponse {
             transfer_code: text("transfer_code"),
             expires_at: row.expires_at,
             status_token,
+            error,
         })
     }
 }

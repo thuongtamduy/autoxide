@@ -27,6 +27,7 @@ use crate::checkout::{CheckoutInput, Contact};
 use crate::errors;
 use crate::orders_read::OrderFilter;
 use crate::service::OrdersService;
+use autoxide_kernel::i18n::Language;
 
 /// Contact for the order.
 #[derive(Debug, Deserialize, Validate, ToSchema)]
@@ -140,6 +141,7 @@ pub(crate) async fn checkout(
     State(service): State<Arc<OrdersService>>,
     tenant: TenantContext,
     principal: Option<Principal>,
+    language: Language,
     headers: HeaderMap,
     ValidJson(input): ValidJson<CheckoutRequest>,
 ) -> Result<Response, Error> {
@@ -190,7 +192,12 @@ pub(crate) async fn checkout(
         let view = service.order_view(&tenant, service.order(&tenant, *id).await?).await?;
         for payment in &view.payments {
             let status_token = service.status_token(&tenant, payment.id).await?;
-            actions.push(PaymentActionResponse::new(payment, status_token)?);
+            actions.push(PaymentActionResponse::new(
+                payment,
+                status_token,
+                &service.translations,
+                language,
+            )?);
         }
         orders.push(OrderResponse::new(view)?);
     }

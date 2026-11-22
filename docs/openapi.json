@@ -31884,6 +31884,17 @@
               "amount": {
                 "$ref": "#/components/schemas/Money"
               },
+              "error": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/OrdersPaymentStartError",
+                    "description": "Only with `kind = none`, when starting the payment failed: why (e.g. the payment partner\nrefused). Fix the cause, then start the payment again from the order."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
               "expires_at": {
                 "format": "date-time",
                 "type": [
@@ -45926,6 +45937,17 @@
               "properties": {
                 "amount": {
                   "$ref": "#/components/schemas/Money"
+                },
+                "error": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/OrdersPaymentStartError",
+                      "description": "Only with `kind = none`, when starting the payment failed: why (e.g. the payment partner\nrefused). Fix the cause, then start the payment again from the order."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
                 },
                 "expires_at": {
                   "format": "date-time",
@@ -64892,6 +64914,17 @@
           "amount": {
             "$ref": "#/components/schemas/Money"
           },
+          "error": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/OrdersPaymentStartError",
+                "description": "Only with `kind = none`, when starting the payment failed: why (e.g. the payment partner\nrefused). Fix the cause, then start the payment again from the order."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "expires_at": {
             "format": "date-time",
             "type": [
@@ -64947,6 +64980,38 @@
           "amount",
           "status",
           "status_token"
+        ],
+        "type": "object"
+      },
+      "OrdersPaymentLinkRequest": {
+        "additionalProperties": false,
+        "description": "Where to send the buyer back after paying.",
+        "properties": {
+          "return_url": {
+            "description": "Where the payment partner sends the buyer back (some partners need it, e.g. MoMo); omitted:\nthe shop's default.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "OrdersPaymentStartError": {
+        "description": "Why a payment could not be started.",
+        "properties": {
+          "code": {
+            "description": "Stable error code, as in a `Problem` (e.g. `momo.return_url_required`).",
+            "type": "string"
+          },
+          "message": {
+            "description": "What to fix, in the language of `Accept-Language`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
         ],
         "type": "object"
       },
@@ -222085,6 +222150,145 @@
         "x-permissions": []
       }
     },
+    "/api/v1/orders/me/orders/{id}/payment-link": {
+      "post": {
+        "description": "Signed in: an order you placed. Same as `POST /public/orders/{id}/payment-link` for a guest\norder: when the payment could not be started at checkout or its link expired, starts it again\nand returns the payment actions. Sending the same `Idempotency-Key` again returns the payment\nactions without starting anything. At most 10 times an hour per order.",
+        "operationId": "orders_restart_my_order_payment",
+        "parameters": [
+          {
+            "description": "Id of the order.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Key of this attempt; resend the same key when retrying.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrdersPaymentLinkRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_OrdersPaymentAction"
+                }
+              }
+            },
+            "description": "The payment actions of the order."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; code `unauthenticated`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such order of yours; code `orders.order_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The order is not waiting for payment (`orders.invalid_transition`), its deadline passed (`orders.payment_expired`) or the time to pay the balance passed (`orders.balance_overdue`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The payment partner refused the payment (its code, e.g. `momo.return_url_required`), the payment method is not usable (`orders.payment_method_unavailable`), the same `Idempotency-Key` with another body (`orders.idempotency_key_reused`), or invalid values (see `errors`)."
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Started again too many times; code `orders.payment_retry_too_many`, see `Retry-After`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Start the payment of your order again.",
+        "tags": [
+          "orders"
+        ],
+        "x-permissions": []
+      }
+    },
     "/api/v1/orders/me/orders/{id}/payments": {
       "post": {
         "description": "Signed in: for your order with pre-ordered items paid in part, once the balance is asked (the\nitems are ready). Returns the balance payment to follow; a link that expired is opened again\nwhile the time to pay lasts. Calling again returns the same payment.",
@@ -224456,6 +224660,157 @@
           {}
         ],
         "summary": "Print a document of a guest order.",
+        "tags": [
+          "orders"
+        ],
+        "x-public": true
+      }
+    },
+    "/api/v1/orders/public/orders/{id}/payment-link": {
+      "post": {
+        "description": "Public with the `Order-Token` header. When the payment could not be started at checkout\n(`payment_actions[].kind = none`, see its `error`) or its link expired: for an order waiting for\npayment before its deadline, starts it again and returns the payment actions; for an order with\npre-ordered items whose balance was asked, opens the balance payment again. A payment still\nvalid is returned as is. Sending the same `Idempotency-Key` again returns the payment actions\nwithout starting anything. At most 10 times an hour per order.",
+        "operationId": "orders_restart_guest_order_payment",
+        "parameters": [
+          {
+            "description": "Id of the order.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Access token of the order.",
+            "in": "header",
+            "name": "Order-Token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Key of this attempt; resend the same key when retrying.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrdersPaymentLinkRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_OrdersPaymentAction"
+                }
+              }
+            },
+            "description": "The payment actions of the order."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing, wrong or expired token; code `orders.lookup_token_invalid`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The token opens another order; code `orders.order_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The order is not waiting for payment (`orders.invalid_transition`), its deadline passed (`orders.payment_expired`) or the time to pay the balance passed (`orders.balance_overdue`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The payment partner refused the payment (its code, e.g. `momo.return_url_required`), the payment method is not usable (`orders.payment_method_unavailable`), the same `Idempotency-Key` with another body (`orders.idempotency_key_reused`), or invalid values (see `errors`)."
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Started again too many times; code `orders.payment_retry_too_many`, see `Retry-After`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {}
+        ],
+        "summary": "Start the payment of a guest order again.",
         "tags": [
           "orders"
         ],

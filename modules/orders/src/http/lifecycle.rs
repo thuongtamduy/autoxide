@@ -10,6 +10,7 @@ use autoxide_kernel::response::{Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, Tagged};
 use axum::extract::{Path, State};
+use axum::http::HeaderMap;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -18,6 +19,7 @@ use validator::Validate;
 use super::dto::{OrderResponse, PaymentActionResponse};
 use crate::api::OrderStatus;
 use crate::service::OrdersService;
+use autoxide_kernel::i18n::Language;
 
 /// A status change of an order.
 #[derive(Debug, Deserialize, Validate, ToSchema)]
@@ -195,14 +197,121 @@ pub(crate) async fn payment_link(
     State(service): State<Arc<OrdersService>>,
     tenant: TenantContext,
     principal: Principal,
+    language: Language,
     Path(id): Path<Uuid>,
 ) -> Result<Data<Vec<PaymentActionResponse>>, Error> {
+    let payments = service.payment_link(&tenant, &principal, id).await?;
+    payment_actions(&service, &tenant, language, payments).await
+}
+
+/// Where to send the buyer back after paying.
+#[derive(Debug, Default, Deserialize, Validate, ToSchema)]
+#[schema(as = OrdersPaymentLinkRequest)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct PaymentLinkRequest {
+    /// Where the payment partner sends the buyer back (some partners need it, e.g. MoMo); omitted:
+    /// the shop's default.
+    #[validate(length(min = 1, max = 2000))]
+    return_url: Option<String>,
+}
+
+async fn payment_actions(
+    service: &OrdersService,
+    tenant: &TenantContext,
+    language: Language,
+    payments: Vec<crate::entity::payment::Model>,
+) -> Result<Data<Vec<PaymentActionResponse>>, Error> {
     let mut actions = Vec::new();
-    for payment in service.payment_link(&tenant, &principal, id).await? {
-        let token = service.status_token(&tenant, payment.id).await?;
-        actions.push(PaymentActionResponse::new(&payment, token)?);
+    for payment in payments {
+        let token = service.status_token(tenant, payment.id).await?;
+        actions.push(PaymentActionResponse::new(&payment, token, &service.translations, language)?);
     }
     Ok(Data { data: actions })
+}
+
+/// Start the payment of a guest order again.
+///
+/// Public with the `Order-Token` header. When the payment could not be started at checkout
+/// (`payment_actions[].kind = none`, see its `error`) or its link expired: for an order waiting for
+/// payment before its deadline, starts it again and returns the payment actions; for an order with
+/// pre-ordered items whose balance was asked, opens the balance payment again. A payment still
+/// valid is returned as is. Sending the same `Idempotency-Key` again returns the payment actions
+/// without starting anything. At most 10 times an hour per order.
+#[utoipa::path(
+    post,
+    path = "/public/orders/{id}/payment-link",
+    extensions(("x-public" = json!(true))),
+    operation_id = "restart_guest_order_payment",
+    security(()),
+    params(
+        ("id" = Uuid, Path, description = "Id of the order."),
+        ("Order-Token" = String, Header, description = "Access token of the order."),
+        ("Idempotency-Key" = Option<String>, Header, description = "Key of this attempt; resend the same key when retrying."),
+    ),
+    request_body = PaymentLinkRequest,
+    responses(
+        (status = 200, description = "The payment actions of the order.", body = Data<Vec<PaymentActionResponse>>),
+        (status = 401, description = "Missing, wrong or expired token; code `orders.lookup_token_invalid`.", body = Problem),
+        (status = 404, description = "The token opens another order; code `orders.order_not_found`.", body = Problem),
+        (status = 409, description = "The order is not waiting for payment (`orders.invalid_transition`), its deadline passed (`orders.payment_expired`) or the time to pay the balance passed (`orders.balance_overdue`).", body = Problem),
+        (status = 422, description = "The payment partner refused the payment (its code, e.g. `momo.return_url_required`), the payment method is not usable (`orders.payment_method_unavailable`), the same `Idempotency-Key` with another body (`orders.idempotency_key_reused`), or invalid values (see `errors`).", body = Problem),
+        (status = 429, description = "Started again too many times; code `orders.payment_retry_too_many`, see `Retry-After`.", body = Problem),
+    )
+)]
+pub(crate) async fn guest_payment_link(
+    State(service): State<Arc<OrdersService>>,
+    tenant: TenantContext,
+    language: Language,
+    headers: HeaderMap,
+    Path(id): Path<Uuid>,
+    ValidJson(input): ValidJson<PaymentLinkRequest>,
+) -> Result<Data<Vec<PaymentActionResponse>>, Error> {
+    let access = super::guests::access(&service, &tenant, &headers).await?;
+    let key =
+        super::guests::idempotency_key(&headers).unwrap_or_else(|| Uuid::now_v7().to_string());
+    let payments = service.guest_payment_link(&tenant, &access, id, input.return_url, &key).await?;
+    payment_actions(&service, &tenant, language, payments).await
+}
+
+/// Start the payment of your order again.
+///
+/// Signed in: an order you placed. Same as `POST /public/orders/{id}/payment-link` for a guest
+/// order: when the payment could not be started at checkout or its link expired, starts it again
+/// and returns the payment actions. Sending the same `Idempotency-Key` again returns the payment
+/// actions without starting anything. At most 10 times an hour per order.
+#[utoipa::path(
+    post,
+    path = "/me/orders/{id}/payment-link",
+    extensions(("x-permissions" = json!([]))),
+    operation_id = "restart_my_order_payment",
+    params(
+        ("id" = Uuid, Path, description = "Id of the order."),
+        ("Idempotency-Key" = Option<String>, Header, description = "Key of this attempt; resend the same key when retrying."),
+    ),
+    request_body = PaymentLinkRequest,
+    responses(
+        (status = 200, description = "The payment actions of the order.", body = Data<Vec<PaymentActionResponse>>),
+        (status = 401, description = "Not signed in; code `unauthenticated`.", body = Problem),
+        (status = 404, description = "No such order of yours; code `orders.order_not_found`.", body = Problem),
+        (status = 409, description = "The order is not waiting for payment (`orders.invalid_transition`), its deadline passed (`orders.payment_expired`) or the time to pay the balance passed (`orders.balance_overdue`).", body = Problem),
+        (status = 422, description = "The payment partner refused the payment (its code, e.g. `momo.return_url_required`), the payment method is not usable (`orders.payment_method_unavailable`), the same `Idempotency-Key` with another body (`orders.idempotency_key_reused`), or invalid values (see `errors`).", body = Problem),
+        (status = 429, description = "Started again too many times; code `orders.payment_retry_too_many`, see `Retry-After`.", body = Problem),
+    )
+)]
+pub(crate) async fn my_payment_link(
+    State(service): State<Arc<OrdersService>>,
+    tenant: TenantContext,
+    principal: Principal,
+    language: Language,
+    headers: HeaderMap,
+    Path(id): Path<Uuid>,
+    ValidJson(input): ValidJson<PaymentLinkRequest>,
+) -> Result<Data<Vec<PaymentActionResponse>>, Error> {
+    let key =
+        super::guests::idempotency_key(&headers).unwrap_or_else(|| Uuid::now_v7().to_string());
+    let payments =
+        service.my_payment_link(&tenant, principal.user_id(), id, input.return_url, &key).await?;
+    payment_actions(&service, &tenant, language, payments).await
 }
 
 /// Pay the balance of your order.
@@ -227,9 +336,10 @@ pub(crate) async fn pay_balance(
     State(service): State<Arc<OrdersService>>,
     tenant: TenantContext,
     principal: Principal,
+    language: Language,
     Path(id): Path<Uuid>,
 ) -> Result<Data<PaymentActionResponse>, Error> {
     let payment = service.buyer_reopen_balance(&tenant, principal.user_id(), id).await?;
     let token = service.status_token(&tenant, payment.id).await?;
-    Ok(Data { data: PaymentActionResponse::new(&payment, token)? })
+    Ok(Data { data: PaymentActionResponse::new(&payment, token, &service.translations, language)? })
 }
