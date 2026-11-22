@@ -19,6 +19,7 @@ use crate::testing::FakeMedia;
 mod agent;
 mod bulk;
 mod embed;
+mod layout;
 mod ops;
 mod versions;
 

@@ -658,13 +658,7 @@ impl ContentService {
     ) -> Result<(), Error> {
         let body: Value = serde_json::from_str(&entry.body).unwrap_or_else(|_| body::empty());
         let mut problems = Vec::new();
-        let info = match body::check(&body, self.config.max_body_bytes, &self.config.embed_hosts) {
-            Ok(info) => info,
-            Err(errors) => {
-                problems.extend(errors);
-                body::BodyInfo::default()
-            }
-        };
+        let info = self.check_body(tenant, &entry.kind, &body, &mut problems).await?;
         self.check_media(tenant, entry, &info.media_ids, true, &mut problems).await?;
         self.check_records(tenant, &info.records, &mut problems).await?;
         if problems.is_empty() { Ok(()) } else { Err(invalid(problems)) }
