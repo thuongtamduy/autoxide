@@ -268,6 +268,25 @@ impl FormsService {
         Form::parse(row)
     }
 
+    /// Các form có khoá trong `keys` (khối `forms.embed` của một trang), một câu truy vấn.
+    pub(crate) async fn find_by_keys(
+        &self,
+        tenant: &TenantContext,
+        keys: &[String],
+    ) -> Result<Vec<Form>, Error> {
+        if keys.is_empty() {
+            return Ok(Vec::new());
+        }
+        form::Entity::find()
+            .scoped(tenant)
+            .filter(form::Column::Key.is_in(keys.iter().cloned()))
+            .all(tenant.database().read())
+            .await?
+            .into_iter()
+            .map(Form::parse)
+            .collect()
+    }
+
     /// Form có `key` (cho endpoint công khai).
     pub(crate) async fn find_by_key(
         &self,

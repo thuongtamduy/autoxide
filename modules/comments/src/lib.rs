@@ -9,6 +9,7 @@
 
 #[cfg(any(test, feature = "bench-seed"))]
 mod bench_seed;
+mod blocks;
 mod bulk;
 mod config;
 mod entity;
@@ -124,6 +125,10 @@ impl Module for CommentsModule {
 
     fn permissions(&self) -> Vec<Permission> {
         permissions::all()
+    }
+
+    fn blocks(&self) -> Vec<autoxide_kernel::blocks::BlockType> {
+        blocks::all()
     }
 
     fn events(&self) -> Vec<EventInfo> {

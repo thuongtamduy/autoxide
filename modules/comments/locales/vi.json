@@ -75,5 +75,6 @@
   "text:Marketing": "Tiếp thị",
   "text:Read every comment in any status, with author emails, network fingerprints and reports.": "Xem mọi bình luận ở mọi trạng thái, kèm email người viết, dấu vết mạng và báo cáo.",
   "text:The daily job deleted comments that waited for approval or were spam for too long.": "Việc chạy hằng ngày đã xoá các bình luận chờ duyệt hay là spam quá lâu.",
-  "text:{actor} moderated a comment": "{actor} duyệt một bình luận"
+  "text:{actor} moderated a comment": "{actor} duyệt một bình luận",
+  "text:Use to let visitors read and write comments under the page; leave the target out to use the page itself.": "Dùng để người xem đọc và viết bình luận dưới trang; bỏ trống đích thì dùng chính trang này."
 }

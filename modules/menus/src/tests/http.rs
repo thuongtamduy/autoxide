@@ -114,6 +114,15 @@ async fn vong_doi_qua_rest() {
         let tag = public.header(header::ETAG).to_owned();
         let cached = send(&app, "GET", "/public/main?locale=vi", None, &[("if-none-match", &tag)], None).await;
         assert_eq!(cached.status(), StatusCode::NOT_MODIFIED);
+        // Khối `menus.menu` (bước 67) trả đúng menu công khai; khoá không có → `null`.
+        let tenant = app.default_tenant();
+        let site = autoxide_kernel::tenancy::Site::whole(&tenant);
+        let request = autoxide_kernel::blocks::BlockRequest::new(&tenant, &site, "vi");
+        let block = |id: &str, key: &str| ("menus.menu", autoxide_kernel::blocks::BlockRef::new(id, json!({"key": key})));
+        let data = app.blocks().resolve(&request, &[block("a", "main"), block("b", "main"), block("c", "nope")]).await;
+        assert_eq!(data["a"], shown["data"], "{data:?}");
+        assert_eq!(data["b"], data["a"]);
+        assert_eq!(data["c"], serde_json::Value::Null);
 
         let items = json!({"items": [{"label": "Trang chủ", "url": "/"}]});
         let missing = send(&app, "PUT", &format!("/{id}"), Some("admin"), &[], Some(items.clone())).await;

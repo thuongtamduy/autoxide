@@ -22,6 +22,7 @@ use crate::service::FormsService;
 
 pub(crate) use admin::{FormResponse, counted as counted_forms};
 pub(crate) use inbox::SubmissionResponse;
+pub(crate) use public::PublicFormResponse;
 
 pub(crate) fn routes(service: Arc<FormsService>) -> OpenApiRouter {
     OpenApiRouter::new()
