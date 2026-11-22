@@ -488,6 +488,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-354** Xuất dữ liệu kế toán: ba hồ sơ, CSV tự viết + `rust_xlsxwriter`, chưa có hồ sơ riêng của hãng (bước 36 mục 12) — 2026-11-17
 - **[D-20261119-step69-store](D-20261119-step69-store.md)** Mua trong ứng dụng: trait `StorePurchases` của kernel, `plans` nối giao dịch của cửa hàng vào thuê bao, cửa hàng thu tiền — 2026-11-19
 - **[D-20261121-reconcile-accept](D-20261121-reconcile-accept.md)** Đối soát: `match` chỉ khi đúng số, số lệch cần `accept_received`; event mang số thực thu — 2026-11-21
+- **[D-20261122-einvoice-provider-number](D-20261122-einvoice-provider-number.md)** Trạng thái "đã chấp nhận" của hoá đơn điện tử mang số do nhà cung cấp cấp — 2026-11-22
 
 ## Pháp luật và tuân thủ
 
@@ -503,6 +504,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-363** Vụ việc: báo vi phạm sở hữu trí tuệ / hàng giả, ẩn đích qua hợp đồng kernel, cung cấp thông tin cho cơ quan (bước 37) — 2026-11-17
 - **D-364** Bảo vệ người tiêu dùng: lý do được ẩn đánh giá, kênh khiếu nại, điều kiện giao dịch chung (bước 37) — 2026-11-17
 - **[D-20261118-step43-legal-data](D-20261118-step43-legal-data.md)** Khuyến mại: hạn mức pháp luật là dữ liệu, chặn khi chưa thông báo — 2026-11-18
+- **[D-20261121-sepay-einvoice](D-20261121-sepay-einvoice.md)** Bộ nối SePay eInvoice sau `EInvoiceProvider`: gửi và phát hành ngay, hỏi trạng thái theo mã tracking — 2026-11-21
 
 ## Thương mại
 
@@ -574,6 +576,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261121-esms-adapter](D-20261121-esms-adapter.md)** Bộ nối eSMS: chỉ gửi mã một lần và tin chăm sóc khách hàng, từ chối tin quảng cáo, chưa nhận callback — 2026-11-21
 - **[D-20261121-money-low-fixes](D-20261121-money-low-fixes.md)** Thu hồi thưởng giới thiệu khi hoàn tiền; thẻ quà tặng đã gắn chỉ chủ dùng; khớp biến động số dư theo lượt nhận — 2026-11-21
 - **[D-20261121-payment-amount-check](D-20261121-payment-amount-check.md)** `plans` và `bookings` so số thực thu của `ledger.payment_succeeded` với số phải trả — 2026-11-21
+- **[D-20261121-sepay-bank-feed](D-20261121-sepay-bank-feed.md)** Bộ nối SePay là nguồn biến động số dư (`BankFeed`), không phải cổng giữ tiền — 2026-11-21
 - **[D-20261121-vn-providers](D-20261121-vn-providers.md)** Bộ nối nhà cung cấp đầu tiên: SePay, MoMo, Giao Hàng Nhanh, eSMS, SePay eInvoice; tài khoản do từng khách tự cấu hình — 2026-11-21 · **chủ dự án quyết**
 
 ## Vận hành và hiệu năng
