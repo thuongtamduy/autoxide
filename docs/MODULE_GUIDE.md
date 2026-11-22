@@ -723,6 +723,13 @@ once, next to its code (step 51). Every one of these is optional (default: nothi
   same transaction as the record.
 - **Connections to partners**: settings named `<module>.connection.<kind>.<field>`;
   `context.connection_probe(…)` to test one, `ConnectionStatus::record` after each use.
+- **Page blocks** (step 67): `Module::blocks` declares the blocks the module offers to pages built
+  from blocks — `BlockType::new("<module>.<block>", category, label, ai_hint, props_schema)`, with
+  `.with_data()`, `.with_children()`, `.requires(feature)`. The props schema is the JSON Schema
+  subset of `autoxide_kernel::blocks::schema` (every object closed; `x-responsive`, `x-media`,
+  `x-link`); a wrong schema stops the server at start. A block `with_data` registers a `BlockData`
+  in `start` with `context.block_data(name, …)`: it answers all blocks of that kind on a page in one
+  call, only with public data, `None` for a reference that is no longer public.
 
 ### 10. Translations
 

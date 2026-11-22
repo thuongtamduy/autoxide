@@ -5,6 +5,7 @@
 
 pub mod ai;
 pub mod analytics;
+pub mod blocks;
 pub mod einvoice;
 pub mod identity;
 pub mod mail;

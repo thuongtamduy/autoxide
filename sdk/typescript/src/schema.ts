@@ -685,10 +685,37 @@ export type BillingProfileResponse = {
   updated_by?: string | null;
 };
 
+/** Group of a block in the block picker. */
+export type BlockCategory = "layout" | "text" | "media" | "lead" | "embed" | "commerce" | "social" | "navigation" | "legal";
+
 /** Why a customer is blocked. */
 export type BlockConversationCustomerRequest = {
   /** Up to 500 characters, kept for colleagues (never shown to the customer). */
   reason?: string;
+};
+
+/** A block type that pages can use. */
+export type BlockTypeView = {
+  /** One sentence on when to use the block, for people and AI page builders. */
+  ai_hint: string;
+  category: BlockCategory;
+  children: Children;
+  /** Plan feature the block needs; only blocks the tenant's plan includes are listed. */
+  feature?: string | null;
+  /** The public page carries data for this block in `blocks_data`. */
+  has_data: boolean;
+  /** Name of the block in the language of `Accept-Language`. */
+  label: string;
+  /** The module that provides the block. */
+  module: string;
+  /** `<module>.<block>`, e.g. `catalog.product_grid`. */
+  name: string;
+  /**
+   * JSON Schema (draft 2020-12 subset) of the block's `props`. Extra keywords: `x-responsive`
+   * (the value may be `{base, md?, lg?}` per screen size), `x-media` (an id from `media`),
+   * `x-link` (an http(s), mailto:, tel: link or a path on the site).
+   */
+  props_schema: Record<string, unknown>;
 };
 
 /**
@@ -2631,6 +2658,9 @@ export type ChildTenantResponse = {
   /** `provisioning`, `active`, `suspended`, `maintenance` or `moving`. */
   status: string;
 };
+
+/** Whether a block holds other blocks. */
+export type Children = "none" | "blocks";
 
 /** A purchase made in an app store. */
 export type ClaimRequest = {
@@ -13572,6 +13602,32 @@ export type Data_Vec_BillingPeriodResponse = {
     /** `open`, `paid` or `void`. */
     status: string;
     tenant_id: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_BlockTypeView = {
+  data: {
+    /** One sentence on when to use the block, for people and AI page builders. */
+    ai_hint: string;
+    category: BlockCategory;
+    children: Children;
+    /** Plan feature the block needs; only blocks the tenant's plan includes are listed. */
+    feature?: string | null;
+    /** The public page carries data for this block in `blocks_data`. */
+    has_data: boolean;
+    /** Name of the block in the language of `Accept-Language`. */
+    label: string;
+    /** The module that provides the block. */
+    module: string;
+    /** `<module>.<block>`, e.g. `catalog.product_grid`. */
+    name: string;
+    /**
+     * JSON Schema (draft 2020-12 subset) of the block's `props`. Extra keywords: `x-responsive`
+     * (the value may be `{base, md?, lg?}` per screen size), `x-media` (an id from `media`),
+     * `x-link` (an http(s), mailto:, tel: link or a path on the site).
+     */
+    props_schema: Record<string, unknown>;
   }[];
 };
 
@@ -41542,6 +41598,17 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/blocks": {
+    /** List the block types this tenant can use. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_BlockTypeView;
+        401: Problem;
         default: Problem;
       };
     };

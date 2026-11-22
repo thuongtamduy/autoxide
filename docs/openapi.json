@@ -1876,6 +1876,21 @@
         ],
         "type": "object"
       },
+      "BlockCategory": {
+        "description": "Group of a block in the block picker.",
+        "enum": [
+          "layout",
+          "text",
+          "media",
+          "lead",
+          "embed",
+          "commerce",
+          "social",
+          "navigation",
+          "legal"
+        ],
+        "type": "string"
+      },
       "BlockConversationCustomerRequest": {
         "additionalProperties": false,
         "description": "Why a customer is blocked.",
@@ -1885,6 +1900,59 @@
             "type": "string"
           }
         },
+        "type": "object"
+      },
+      "BlockTypeView": {
+        "description": "A block type that pages can use.",
+        "properties": {
+          "ai_hint": {
+            "description": "One sentence on when to use the block, for people and AI page builders.",
+            "type": "string"
+          },
+          "category": {
+            "$ref": "#/components/schemas/BlockCategory"
+          },
+          "children": {
+            "$ref": "#/components/schemas/Children"
+          },
+          "feature": {
+            "description": "Plan feature the block needs; only blocks the tenant's plan includes are listed.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "has_data": {
+            "description": "The public page carries data for this block in `blocks_data`.",
+            "type": "boolean"
+          },
+          "label": {
+            "description": "Name of the block in the language of `Accept-Language`.",
+            "type": "string"
+          },
+          "module": {
+            "description": "The module that provides the block.",
+            "type": "string"
+          },
+          "name": {
+            "description": "`<module>.<block>`, e.g. `catalog.product_grid`.",
+            "type": "string"
+          },
+          "props_schema": {
+            "description": "JSON Schema (draft 2020-12 subset) of the block's `props`. Extra keywords: `x-responsive`\n(the value may be `{base, md?, lg?}` per screen size), `x-media` (an id from `media`),\n`x-link` (an http(s), mailto:, tel: link or a path on the site).",
+            "type": "object"
+          }
+        },
+        "required": [
+          "name",
+          "module",
+          "category",
+          "label",
+          "ai_hint",
+          "props_schema",
+          "has_data",
+          "children"
+        ],
         "type": "object"
       },
       "BodyMark": {
@@ -7826,6 +7894,14 @@
           "status"
         ],
         "type": "object"
+      },
+      "Children": {
+        "description": "Whether a block holds other blocks.",
+        "enum": [
+          "none",
+          "blocks"
+        ],
+        "type": "string"
       },
       "ClaimRequest": {
         "additionalProperties": false,
@@ -41398,6 +41474,71 @@
                 "status",
                 "due_at",
                 "created_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_Vec_BlockTypeView": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "A block type that pages can use.",
+              "properties": {
+                "ai_hint": {
+                  "description": "One sentence on when to use the block, for people and AI page builders.",
+                  "type": "string"
+                },
+                "category": {
+                  "$ref": "#/components/schemas/BlockCategory"
+                },
+                "children": {
+                  "$ref": "#/components/schemas/Children"
+                },
+                "feature": {
+                  "description": "Plan feature the block needs; only blocks the tenant's plan includes are listed.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "has_data": {
+                  "description": "The public page carries data for this block in `blocks_data`.",
+                  "type": "boolean"
+                },
+                "label": {
+                  "description": "Name of the block in the language of `Accept-Language`.",
+                  "type": "string"
+                },
+                "module": {
+                  "description": "The module that provides the block.",
+                  "type": "string"
+                },
+                "name": {
+                  "description": "`<module>.<block>`, e.g. `catalog.product_grid`.",
+                  "type": "string"
+                },
+                "props_schema": {
+                  "description": "JSON Schema (draft 2020-12 subset) of the block's `props`. Extra keywords: `x-responsive`\n(the value may be `{base, md?, lg?}` per screen size), `x-media` (an id from `media`),\n`x-link` (an http(s), mailto:, tel: link or a path on the site).",
+                  "type": "object"
+                }
+              },
+              "required": [
+                "name",
+                "module",
+                "category",
+                "label",
+                "ai_hint",
+                "props_schema",
+                "has_data",
+                "children"
               ],
               "type": "object"
             },
@@ -183355,6 +183496,68 @@
           }
         ],
         "summary": "Reject an agent's command.",
+        "tags": [
+          "kernel"
+        ],
+        "x-permissions": []
+      }
+    },
+    "/api/v1/kernel/blocks": {
+      "get": {
+        "description": "Any signed-in user. Blocks of modules that run on this server and are in the tenant's plan,\nwith their props schema; labels in the language of `Accept-Language`. Ordered by name.",
+        "operationId": "kernel_list_blocks",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_BlockTypeView"
+                }
+              }
+            },
+            "description": "The block types."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the block types this tenant can use.",
         "tags": [
           "kernel"
         ],

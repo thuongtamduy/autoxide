@@ -705,6 +705,13 @@ của nó (bước 51). Mọi mục dưới đây đều tuỳ chọn (mặc đ�
   `CustomFields::write_index` trong cùng transaction với bản ghi.
 - **Kết nối đối tác**: cấu hình tên `<module>.connection.<loại>.<trường>`;
   `context.connection_probe(…)` để thử, `ConnectionStatus::record` sau mỗi lần dùng.
+- **Khối của trang** (bước 67): `Module::blocks` khai khối module cung cấp cho trang dựng từ khối —
+  `BlockType::new("<module>.<khối>", nhóm, nhãn, gợi_ý_cho_AI, schema_props)`, kèm `.with_data()`,
+  `.with_children()`, `.requires(tính_năng)`. Schema props là phần con JSON Schema của
+  `autoxide_kernel::blocks::schema` (object nào cũng đóng; `x-responsive`, `x-media`, `x-link`);
+  schema sai thì máy chủ không khởi động. Khối `with_data` gắn một `BlockData` trong `start` bằng
+  `context.block_data(tên, …)`: trả lời mọi khối loại đó của một trang trong một lần gọi, chỉ dữ
+  liệu công khai, `None` cho tham chiếu không còn công khai.
 
 ### 10. Bản dịch
 

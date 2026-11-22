@@ -407,6 +407,13 @@ pub trait Module: Send + Sync {
     fn sync_resources(&self) -> Vec<crate::sync::SyncResource> {
         Vec::new()
     }
+
+    /// Khối module cung cấp cho trang dựng từ khối (bước 67, [`crate::blocks`]). Khối cần dữ liệu
+    /// gắn [`BlockData`](crate::blocks::BlockData) lúc `start` bằng
+    /// [`StartContext::block_data`]. Mặc định: không có.
+    fn blocks(&self) -> Vec<crate::blocks::BlockType> {
+        Vec::new()
+    }
 }
 
 /// Những gì một module nhận được lúc khởi động.
@@ -444,6 +451,7 @@ pub struct StartContext<'a> {
         &'a mut std::collections::BTreeMap<&'static str, Arc<dyn crate::entitlement::UsageCounter>>,
     facts: &'a crate::report::FactCatalog,
     analytics: &'a crate::analytics::AnalyticsCatalog,
+    blocks: &'a crate::blocks::Blocks,
     automations: &'a crate::automation::AutomationDirectory,
     sync_keep: SignedDuration,
     /// Bọc hợp đồng đối tác để sandbox luôn dùng bộ giả (bước 38, D-232).
@@ -723,6 +731,22 @@ impl StartContext<'_> {
         resolver: Arc<dyn crate::resource::BadgeResolver>,
     ) -> Result<(), Error> {
         self.resources.register_badges(self.module, kind, codes, resolver)
+    }
+
+    /// Sổ khối của mọi module (bước 67): kiểm props, đọc dữ liệu khối theo lô. Sổ có cả khối của
+    /// module khởi động sau.
+    pub fn blocks(&self) -> crate::blocks::Blocks {
+        self.blocks.clone()
+    }
+
+    /// Gắn bộ trả dữ liệu `source` cho khối `name` mà module này khai bằng
+    /// [`BlockType::with_data`](crate::blocks::BlockType::with_data).
+    pub fn block_data(
+        &mut self,
+        name: &'static str,
+        source: Arc<dyn crate::blocks::BlockData>,
+    ) -> Result<(), Error> {
+        self.blocks.register(self.module, name, source)
     }
 
     /// Event vòng đời mọi module đã khai qua [`Module::resource_events`] — có đủ ngay từ module
