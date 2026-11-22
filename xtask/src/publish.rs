@@ -110,6 +110,7 @@ pub fn run(root: &Path, verify: bool) -> Result<(), String> {
     std::fs::write(&manifest, allowed)
         .map_err(|error| format!("cannot write {}: {error}", manifest.display()))?;
 
+    forget_local_registries();
     let cargo = std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_owned());
     let mut command = Command::new(&cargo);
     // `--exclude-lockfile`: gói thư viện trên crates.io không dùng lock file của mình; bỏ nó thì bản
@@ -130,6 +131,32 @@ pub fn run(root: &Path, verify: bool) -> Result<(), String> {
         Ok(())
     } else {
         Err("`cargo package` failed: the crates are not ready for crates.io (see above)".to_owned())
+    }
+}
+
+/// Xoá bản giải nén cũ của các gói từ registry TẠM mà `cargo package` dựng (`target/…/tmp-registry`).
+///
+/// Cargo giữ bản giải nén của mỗi gói theo tên và phiên bản ở `$CARGO_HOME/registry/{src,cache,index}`;
+/// registry tạm là thư mục trên đĩa nên thư mục của nó ở đó không có tên máy chủ (`-<băm>`). Lần chạy sau
+/// đóng gói lại `autoxide-kernel` CÙNG phiên bản với mã nguồn đã khác, nhưng cargo dùng lại bản giải nén cũ —
+/// các crate phụ thuộc bị build với kernel cũ và báo lỗi không có thật (đã gặp). Lỗi xoá thì bỏ qua: thư mục
+/// không có là bình thường.
+fn forget_local_registries() {
+    let home = std::env::var_os("CARGO_HOME")
+        .map(std::path::PathBuf::from)
+        .or_else(|| std::env::var_os("HOME").map(|home| Path::new(&home).join(".cargo")));
+    let Some(home) = home else {
+        return;
+    };
+    for part in ["src", "cache", "index"] {
+        let Ok(entries) = std::fs::read_dir(home.join("registry").join(part)) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            if entry.file_name().to_string_lossy().starts_with('-') {
+                let _ = std::fs::remove_dir_all(entry.path());
+            }
+        }
     }
 }
 
