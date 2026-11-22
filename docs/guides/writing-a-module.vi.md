@@ -13,13 +13,17 @@ Hướng dẫn này đi từ một thư mục trống tới một module chạy 
 
 ## 1. Workspace
 
-Một repo, hai crate: module và máy chủ. Muốn sinh sẵn cả bố cục này — một bản sao của ví dụ với tên của bạn — chạy `cargo xtask new-module --external <dir> <module> <entity>` trong một bản checkout của Autoxide (ví dụ `cargo xtask new-module --external ../acme bookmarks bookmark`), rồi đọc tiếp để biết từng phần làm gì.
+Một repo, hai crate: module và máy chủ. Muốn sinh sẵn cả bố cục này — một bản sao của ví dụ với tên của bạn — chạy `cargo xtask new-module --external <dir> <module> <entity>` trong một bản checkout của Autoxide (ví dụ `cargo xtask new-module --external ../acme bookmarks bookmark`), rồi đọc tiếp để biết từng phần làm gì. Thư mục mới build và qua test ngay; nó còn có `README.md` + `README.vi.md`, `AGENTS.md` ghi luật cho AI agent làm việc trong đó (`CLAUDE.md` liên kết tới nó), và `.github/workflows/ci.yml` chạy `check.sh` trên SQLite và PostgreSQL khi bạn push. Thêm `--core-path <checkout>` để phụ thuộc vào một bản checkout Autoxide trên máy thay cho tag phát hành (để thử một thay đổi của core).
 
 ```text
 acme/
 ├── Cargo.toml          the workspace
 ├── rust-toolchain.toml
 ├── clippy.toml
+├── check.sh            định dạng, lint, test trên cả hai database
+├── README.md, README.vi.md
+├── AGENTS.md           luật cho AI agent (CLAUDE.md liên kết tới nó)
+├── .github/workflows/ci.yml
 ├── bookmarks/          your module: crate `acme-bookmarks`
 │   ├── Cargo.toml
 │   ├── locales/vi.json
