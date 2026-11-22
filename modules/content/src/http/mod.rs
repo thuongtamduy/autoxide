@@ -7,6 +7,7 @@ mod assist;
 mod banners;
 pub(crate) mod entries;
 mod history;
+mod layout;
 mod library;
 mod links;
 mod menus;
@@ -50,6 +51,7 @@ pub(crate) fn routes(service: Arc<ContentService>) -> OpenApiRouter {
     OpenApiRouter::new()
         .routes(routes!(entries::list_entries, entries::create_entry))
         .routes(routes!(entries::get_entry, entries::update_entry, actions::delete_entry))
+        .routes(routes!(layout::put_layout, layout::patch_layout))
         .routes(routes!(actions::publish_entry))
         .routes(routes!(actions::unpublish_entry))
         .routes(routes!(actions::archive_entry))

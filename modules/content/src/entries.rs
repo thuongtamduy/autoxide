@@ -2,6 +2,8 @@
 //! (D-102). Đăng, gỡ, chuyển, xoá ở `publishing.rs`.
 
 pub(crate) mod body;
+pub(crate) mod layout;
+pub(crate) mod patch;
 pub(crate) mod review;
 pub(crate) mod revisions;
 

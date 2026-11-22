@@ -52,6 +52,8 @@ pub(crate) struct ContentService {
     /// Hồ sơ pháp lý (module `compliance`) làm biến của mẫu trang bắt buộc; `None` khi app không
     /// đăng ký `compliance` (test của riêng module): người gọi tự gửi mọi biến.
     pub(crate) legal: Option<Arc<dyn autoxide_compliance::api::LegalProfiles>>,
+    /// Sổ khối của kernel (bước 67): kiểm thân `layout`, đọc dữ liệu khối khi đọc công khai.
+    pub(crate) blocks: autoxide_kernel::blocks::Blocks,
 }
 
 /// Tính năng theo gói (bước 35): gợi ý và bản nháp do AI soạn (SEO, dịch).
@@ -99,6 +101,7 @@ impl ContentService {
             custom_fields: Default::default(),
             templates: Default::default(),
             legal: None,
+            blocks: Default::default(),
         }
     }
 
@@ -109,6 +112,11 @@ impl ContentService {
     ) -> Self {
         self.templates = templates;
         self.legal = legal;
+        self
+    }
+
+    pub(crate) fn with_blocks(mut self, blocks: autoxide_kernel::blocks::Blocks) -> Self {
+        self.blocks = blocks;
         self
     }
 
