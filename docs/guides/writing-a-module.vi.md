@@ -20,9 +20,9 @@ acme/
 ├── Cargo.toml          the workspace
 ├── rust-toolchain.toml
 ├── clippy.toml
-├── check.sh            định dạng, lint, test trên cả hai database
+├── check.sh            format, lints, tests on both databases
 ├── README.md, README.vi.md
-├── AGENTS.md           luật cho AI agent (CLAUDE.md liên kết tới nó)
+├── AGENTS.md           rules for AI agents (CLAUDE.md links to it)
 ├── .github/workflows/ci.yml
 ├── bookmarks/          your module: crate `acme-bookmarks`
 │   ├── Cargo.toml
