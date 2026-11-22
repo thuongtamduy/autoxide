@@ -200,5 +200,6 @@
   "text:The notification / registration status of a website with the Ministry of Industry and Trade changed (`website_id`, `domain`, `kind`, `status`, `previous_status`).": "Trạng thái thông báo / đăng ký của website với Bộ Công Thương vừa đổi (`website_id`, `domain`, `kind`, `status`, `previous_status`).",
   "text:The target of a case may be shown again (`case_id`, `target`, `case_kind`; contract `autoxide_kernel::moderation`).": "Đối tượng của một vụ việc được hiện lại (`case_id`, `target`, `case_kind`; hợp đồng `autoxide_kernel::moderation`).",
   "text:The target of a case must be hidden by the module that owns it (`case_id`, `target`, `case_kind`; contract `autoxide_kernel::moderation`).": "Module sở hữu phải ẩn đối tượng của một vụ việc (`case_id`, `target`, `case_kind`; hợp đồng `autoxide_kernel::moderation`).",
-  "text:Where the tenant must keep its data changed (`data_residency`, `previous`).": "Nơi khách buộc lưu dữ liệu vừa thay đổi (`data_residency`, `previous`)."
+  "text:Where the tenant must keep its data changed (`data_residency`, `previous`).": "Nơi khách buộc lưu dữ liệu vừa thay đổi (`data_residency`, `previous`).",
+  "compliance.otp_daily_limit": "Số điện thoại này đã nhập sai mã quá nhiều lần hôm nay. Hãy chờ {seconds} giây rồi thử lại."
 }
