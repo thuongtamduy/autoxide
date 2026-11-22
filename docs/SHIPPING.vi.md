@@ -97,7 +97,10 @@ của nó; hãng không trả lời trong `AUTOXIDE_SHIPPING_CARRIER_TIMEOUT_SEC
 
 ## Webhook của hãng
 
-`POST /api/v1/shipping/webhooks/{carrier_code}/{token}` là công khai. Bộ nối kiểm chữ ký trên thân thô; sai chữ ký trả
+`POST /api/v1/shipping/webhooks/{carrier_code}/{hook}/{token}` là công khai: `hook` chỉ khách, `token` chỉ tài khoản
+hãng, nên hãng không cần gửi header khách. Đây là `webhook_path` của tài khoản hãng mới. Địa chỉ cũ
+`…/webhooks/{carrier_code}/{token}` vẫn chạy; ở đó khách lấy từ header `autoxide-tenant` hoặc tên miền. Bộ nối kiểm
+chữ ký trên thân thô; sai chữ ký trả
 401 và không lưu gì. Thân hợp lệ được lưu nguyên văn (bỏ header bí mật) rồi trả 202; một job áp nó. Cập nhật lặp lại
 chỉ áp một lần (`event_key`); thân lớn hơn `AUTOXIDE_SHIPPING_WEBHOOK_MAX_BYTES` trả 413. Hãng không có webhook được hỏi
 mỗi 30 phút.

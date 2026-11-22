@@ -256,6 +256,7 @@ dependencies = [
  "autoxide-esms",
  "autoxide-files",
  "autoxide-forms",
+ "autoxide-ghn",
  "autoxide-idempotency",
  "autoxide-inventory",
  "autoxide-invoices",
@@ -702,6 +703,20 @@ dependencies = [
  "utoipa-axum",
  "uuid",
  "validator",
+]
+
+[[package]]
+name = "autoxide-ghn"
+version = "0.17.0"
+dependencies = [
+ "async-trait",
+ "autoxide-kernel",
+ "autoxide-shipping",
+ "axum",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tracing",
 ]
 
 [[package]]

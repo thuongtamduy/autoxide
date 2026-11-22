@@ -21,6 +21,7 @@ pub(crate) struct Parts {
     pub entitlements: autoxide_kernel::entitlement::EntitlementsHandle,
     pub databases: autoxide_kernel::tenancy::DatabaseRegistry,
     pub secret: autoxide_kernel::secret::SecretKey,
+    pub providers: autoxide_kernel::provider::ProviderAccounts,
     pub carriers: Arc<crate::registry::Registry>,
     pub ledger: Option<Arc<dyn autoxide_ledger::api::Ledger>>,
     pub reasons: autoxide_kernel::reasons::ReasonCodes,
@@ -63,6 +64,8 @@ pub(crate) struct ShippingService {
     pub(crate) databases: autoxide_kernel::tenancy::DatabaseRegistry,
     /// Khoá gốc: mã hoá thông tin đăng nhập hãng.
     pub(crate) secret: autoxide_kernel::secret::SecretKey,
+    /// Định tuyến webhook về đúng khách từ định danh trong URL (D-20261121-provider-accounts).
+    pub(crate) providers: autoxide_kernel::provider::ProviderAccounts,
     /// Sổ hãng vận chuyển (bộ nối đăng ký sau `shipping`).
     pub(crate) carriers: Arc<crate::registry::Registry>,
     /// `dyn Ledger` khi module `ledger` đã cài: ghi nghĩa vụ COD.
@@ -86,6 +89,7 @@ impl ShippingService {
             entitlements: parts.entitlements,
             databases: parts.databases,
             secret: parts.secret,
+            providers: parts.providers,
             carriers: parts.carriers,
             ledger: parts.ledger,
             reasons: parts.reasons,

@@ -55,6 +55,7 @@ autoxide-notifications.workspace = true
 autoxide-catalog.workspace = true
 autoxide-inventory.workspace = true
 autoxide-shipping.workspace = true
+autoxide-ghn.workspace = true
 autoxide-promotions.workspace = true
 autoxide-orders.workspace = true
 autoxide-customers.workspace = true

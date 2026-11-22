@@ -78,6 +78,7 @@ autoxide-analytics = { path = "modules/analytics", version = "=0.17.0" }
 autoxide-catalog = { path = "modules/catalog", version = "=0.17.0" }
 autoxide-inventory = { path = "modules/inventory", version = "=0.17.0" }
 autoxide-shipping = { path = "modules/shipping", version = "=0.17.0" }
+autoxide-ghn = { path = "modules/ghn", version = "=0.17.0" }
 autoxide-support = { path = "modules/support", version = "=0.17.0" }
 autoxide-bookings = { path = "modules/bookings", version = "=0.17.0" }
 autoxide-conversations = { path = "modules/conversations", version = "=0.17.0" }

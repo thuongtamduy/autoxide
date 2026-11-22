@@ -1,8 +1,10 @@
 //! Webhook trạng thái của hãng (bước 44 mục 3): kiểm chữ ký trên thân thô → ghi nguyên văn vào
 //! `shipping_webhook_inbox` (chỉ trả 2xx sau khi đã ghi) → job `shipping.process_webhook` áp từng
 //! cập nhật (chống trùng theo `event_key`, trạng thái theo bảng chuyển). Chữ ký sai → 401, không
-//! lưu thân. Khách xác định bởi token trong đường dẫn: token của khách A gửi vào khách B không khớp
-//! tài khoản nào → 404.
+//! lưu thân. Hai đường vào: `/webhooks/{carrier_code}/{hook}/{token}` tìm khách từ `{hook}` (định danh
+//! của nền `autoxide_kernel::provider`, hãng không cần gửi header hay gọi đúng tên miền của khách)
+//! rồi tìm tài khoản từ `{token}`; đường cũ `/webhooks/{carrier_code}/{token}` lấy khách của request
+//! (header / tên miền). Token của khách A gửi vào khách B không khớp tài khoản nào → 404.
 
 use std::collections::BTreeMap;
 
@@ -97,6 +99,23 @@ impl ShippingService {
             .await?;
         transaction.commit().await?;
         Ok(id)
+    }
+
+    /// Nhận webhook mà khách nằm trong đường dẫn: `hook` → khách (sai → `provider.webhook_unknown`,
+    /// 404), rồi như [`receive_webhook`](Self::receive_webhook) với khách đó.
+    pub(crate) async fn receive_webhook_by_hook(
+        &self,
+        carrier_code: &str,
+        hook: &str,
+        token: &str,
+        headers: &HeaderMap,
+        body: &[u8],
+    ) -> Result<Uuid, Error> {
+        let tenant = self
+            .providers
+            .resolve_webhook(&crate::carriers::webhook_base(carrier_code), hook)
+            .await?;
+        self.receive_webhook(&tenant, carrier_code, token, headers, body).await
     }
 
     /// Job: áp các cập nhật của một webhook đã lưu. Chạy lại không sao (chống trùng `event_key`).

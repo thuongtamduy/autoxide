@@ -108,6 +108,8 @@ pub fn all() -> Vec<Box<dyn Module>> {
         // Vận chuyển (bước 44): cần `dyn AdministrativeUnits` (kiểm địa chỉ), đứng sau `catalog`
         // (cạnh `inventory`, `promotions`) và trước `orders`. Bộ nối hãng đăng ký SAU nó.
         Box::new(autoxide_shipping::module()),
+        // Bộ nối hãng Giao Hàng Nhanh (bước 70 P7): ghi tên vào sổ hãng của `shipping`, nên đứng SAU nó.
+        Box::new(autoxide_ghn::module()),
         // Khuyến mại (bước 43): cần `dyn Catalog` (biến thể, giá ngay trước khuyến mại, sàn giá),
         // nên đứng sau `catalog`; đọc cài đặt kế thừa qua `dyn OrgDirectory` nếu có. `orders`
         // (bước 45) đăng ký SAU nó để gọi `dyn Promotions`.
