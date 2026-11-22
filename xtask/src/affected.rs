@@ -36,10 +36,17 @@ const GLOBAL_FILES: &[&str] =
     &["Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "clippy.toml", "rustfmt.toml"];
 const GLOBAL_DIRS: &[&str] = &[".cargo/"];
 
-/// File nằm ngoài thư mục crate nhưng có test của một crate đọc (bản sinh từ code phải khớp
-/// bản đã commit): đổi file thì chạy test của crate đó.
+/// File nằm ngoài thư mục crate nhưng có test của một crate đọc lúc chạy (bản sinh từ code phải
+/// khớp bản đã commit): đổi file thì chạy test của crate đó.
 const CHECKED_FILES: &[(&str, &str)] =
     &[("docs/openapi.json", "autoxide"), (".env.example", "autoxide")];
+
+/// Thư mục ngoài crate có test đọc lúc chạy (`read_dir`, `read_to_string`), như trên. File nhúng lúc
+/// biên dịch (`include_str!` / `include_bytes!`) thì không cần ghi ở đây: [`included_files`] tự dò.
+/// - `docs/guides/`: `e2e::guides` của `autoxide` chạy mọi ví dụ của hướng dẫn và so khối code
+///   bản tiếng Việt với bản tiếng Anh;
+/// - `examples/`: test của `xtask` sinh khung module ngoài từ `examples/external-module`.
+const CHECKED_DIRS: &[(&str, &str)] = &[("docs/guides/", "autoxide"), ("examples/", "xtask")];
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Affected {
@@ -51,6 +58,7 @@ pub enum Affected {
 
 /// Crate bị ảnh hưởng bởi các file `changed` (đường dẫn tương đối so với gốc repo, dùng `/`).
 pub fn affected(workspace: &Workspace, changed: &[String]) -> Affected {
+    let included = included_files(workspace);
     let mut crates = BTreeSet::new();
     for file in changed {
         if GLOBAL_FILES.contains(&file.as_str())
@@ -58,10 +66,19 @@ pub fn affected(workspace: &Workspace, changed: &[String]) -> Affected {
         {
             return Affected::All;
         }
-        if let Some((_, package)) = CHECKED_FILES.iter().find(|(path, _)| path == file) {
-            crates.insert((*package).to_owned());
-            continue;
-        }
+        // Crate có test đọc hay nhúng file này dù file nằm ngoài thư mục của nó.
+        let readers = CHECKED_FILES
+            .iter()
+            .filter(|(path, _)| path == file)
+            .chain(CHECKED_DIRS.iter().filter(|(dir, _)| file.starts_with(dir)))
+            .map(|(_, package)| (*package).to_owned())
+            .chain(
+                included
+                    .iter()
+                    .filter(|(path, _)| path == file)
+                    .map(|(_, package)| package.clone()),
+            );
+        crates.extend(readers);
         // Crate có thư mục dài nhất chứa file; file ngoài mọi crate (tài liệu…) không kéo
         // theo test nào.
         let owner = workspace
@@ -90,6 +107,70 @@ pub fn affected(workspace: &Workspace, changed: &[String]) -> Affected {
             return Affected::Crates(crates);
         }
     }
+}
+
+/// File nằm NGOÀI thư mục crate mà mã nguồn của crate nhúng lúc biên dịch (`include_str!("…")`,
+/// `include_bytes!("…")` với đường dẫn tương đối): (đường dẫn so với gốc repo, tên crate). Đổi file
+/// đó là đổi crate — vd `docs/MODULES.md` mà `e2e::module_selection` của `autoxide` so với code.
+/// Không đọc được repo (test với workspace giả) thì rỗng.
+fn included_files(workspace: &Workspace) -> Vec<(String, String)> {
+    let Ok(files) = crate::lengths::rust_files(&workspace.root) else {
+        return Vec::new();
+    };
+    let mut found = Vec::new();
+    for file in files {
+        let owner = workspace
+            .packages
+            .iter()
+            .filter(|package| {
+                !package.dir.is_empty() && file.starts_with(&format!("{}/", package.dir))
+            })
+            .max_by_key(|package| package.dir.len());
+        let Some(owner) = owner else { continue };
+        let Ok(text) = std::fs::read_to_string(workspace.root.join(&file)) else { continue };
+        let dir = Path::new(&file).parent().unwrap_or(Path::new(""));
+        for literal in included_paths(&text) {
+            if let Some(path) = normalize(&dir.join(literal))
+                && !path.starts_with(&format!("{}/", owner.dir))
+            {
+                found.push((path, owner.name.clone()));
+            }
+        }
+    }
+    found
+}
+
+/// Đường dẫn trong `include_str!("…")` / `include_bytes!("…")` của một file nguồn.
+fn included_paths(text: &str) -> Vec<&str> {
+    let mut paths = Vec::new();
+    for marker in ["include_str!(\"", "include_bytes!(\""] {
+        let mut rest = text;
+        while let Some(start) = rest.find(marker) {
+            rest = &rest[start + marker.len()..];
+            if let Some(end) = rest.find('"') {
+                paths.push(&rest[..end]);
+            }
+        }
+    }
+    paths
+}
+
+/// Bỏ `.` và `..` của một đường dẫn tương đối so với gốc repo, viết bằng `/`; `None` khi nó ra
+/// ngoài gốc.
+fn normalize(path: &Path) -> Option<String> {
+    use std::path::Component;
+    let mut parts: Vec<String> = Vec::new();
+    for component in path.components() {
+        match component {
+            Component::Normal(part) => parts.push(part.to_string_lossy().into_owned()),
+            Component::ParentDir => {
+                parts.pop()?;
+            }
+            Component::CurDir => {}
+            Component::RootDir | Component::Prefix(_) => return None,
+        }
+    }
+    Some(parts.join("/"))
 }
 
 /// `cargo xtask test-filter --base <ref>`: filterset của nextest chọn đúng các crate mà
@@ -811,6 +892,54 @@ mod tests {
         }
         // Manifest của một crate không phải file dùng chung.
         assert_eq!(changed(&["xtask/Cargo.toml"]), crates(&["xtask"]));
+    }
+
+    #[test]
+    fn huong_dan_va_vi_du_chay_test_doc_chung() {
+        // Lô #394: sửa bản tiếng Việt của một hướng dẫn mà không chạy `e2e::guides`, main đỏ ngầm.
+        assert_eq!(changed(&["docs/guides/writing-a-module.vi.md"]), crates(&["autoxide"]));
+        assert_eq!(changed(&["docs/guides/files/photo.png"]), crates(&["autoxide"]));
+        assert_eq!(changed(&["examples/external-module/AGENTS.md"]), crates(&["xtask"]));
+    }
+
+    #[test]
+    fn duong_dan_nhung_va_chuan_hoa() {
+        let text = r#"const A: &str = include_str!("../../../../docs/MODULES.md");
+            const B: &[u8] = include_bytes!("../locales/x.bin"); fn c() { include_str!("y.txt"); }"#;
+        let mut paths = included_paths(text);
+        paths.sort();
+        assert_eq!(paths, ["../../../../docs/MODULES.md", "../locales/x.bin", "y.txt"]);
+        let dir = Path::new("crates/app/src/e2e");
+        assert_eq!(
+            normalize(&dir.join("../../../../docs/MODULES.md")).as_deref(),
+            Some("docs/MODULES.md")
+        );
+        assert_eq!(normalize(&dir.join("./a/../b.rs")).as_deref(), Some("crates/app/src/e2e/b.rs"));
+        assert_eq!(normalize(Path::new("../outside")), None);
+    }
+
+    /// Dò trên một repo thật: file nhúng ngoài crate kéo crate đó, file nhúng trong crate thì không
+    /// cần (đã thuộc crate).
+    #[test]
+    fn file_nhung_ngoai_crate_keo_crate_nhung_no() {
+        let repo = TempRepo::new("include");
+        repo.write(
+            "crates/app/src/e2e/modules.rs",
+            "const M: &str = include_str!(\"../../../../docs/MODULES.md\");\n",
+        );
+        repo.write(
+            "crates/app/src/lib.rs",
+            "const V: &str = include_str!(\"../locales/vi.json\");\n",
+        );
+        repo.write("docs/MODULES.md", "x");
+        let mut workspace = workspace();
+        workspace.root = repo.0.clone();
+        assert_eq!(
+            included_files(&workspace),
+            vec![("docs/MODULES.md".to_owned(), "autoxide".to_owned())]
+        );
+        let files = vec!["docs/MODULES.md".to_owned()];
+        assert_eq!(affected(&workspace, &files), crates(&["autoxide"]));
     }
 
     #[test]
