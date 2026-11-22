@@ -65,6 +65,7 @@ autoxide-analytics = { path = "modules/analytics" }
 autoxide-catalog = { path = "modules/catalog" }
 autoxide-inventory = { path = "modules/inventory" }
 autoxide-shipping = { path = "modules/shipping" }
+autoxide-ghn = { path = "modules/ghn" }
 autoxide-support = { path = "modules/support" }
 autoxide-bookings = { path = "modules/bookings" }
 autoxide-conversations = { path = "modules/conversations" }

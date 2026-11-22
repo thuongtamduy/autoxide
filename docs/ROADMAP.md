@@ -114,7 +114,7 @@ thật (P7).
         webhook tìm đúng khách rồi kiểm chữ ký; hướng dẫn viết bộ nối khác
   - [ ] Thanh toán: SePay
   - [ ] Thanh toán: MoMo
-  - [ ] Vận chuyển: Giao Hàng Nhanh
+  - [x] Vận chuyển: Giao Hàng Nhanh
   - [ ] SMS: eSMS
   - [ ] Hoá đơn điện tử: SePay eInvoice
 - [ ] P8 — Luồng bán hàng mẫu chạy trọn (D-20261121-shop-first-order): một bài test đi từ sản phẩm → giỏ → đơn →

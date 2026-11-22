@@ -312,6 +312,7 @@ fn service_with_ledger(app: &TestApp) -> Arc<crate::service::ShippingService> {
         entitlements: base.entitlements.clone(),
         databases: base.databases.clone(),
         secret: base.secret.clone(),
+        providers: base.providers.clone(),
         carriers: base.carriers.clone(),
         ledger: None,
         reasons: base.reasons.clone(),

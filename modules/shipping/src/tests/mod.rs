@@ -108,6 +108,7 @@ pub(crate) fn service_of(app: &TestApp) -> Arc<crate::service::ShippingService> 
         entitlements: Default::default(),
         databases: app.registry().clone(),
         secret: (*app.api::<autoxide_kernel::secret::SecretKey>().unwrap()).clone(),
+        providers: (*app.api::<autoxide_kernel::provider::ProviderAccounts>().unwrap()).clone(),
         carriers,
         ledger: None,
         reasons: Default::default(),

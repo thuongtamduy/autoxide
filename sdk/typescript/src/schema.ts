@@ -12174,8 +12174,9 @@ export type Data_ShippingCarrierAccount = {
     settings: unknown;
     updated_at: string;
     /**
-     * Only in the answer of the create call: the address the carrier posts status updates to.
-     * Keep it; it cannot be shown again.
+     * Only in the answer of the create call: the address the carrier posts status updates to
+     * (`/api/v1/shipping/webhooks/{carrier_code}/{hook}/{token}`; it names the tenant, so the
+     * carrier needs no header). Keep it; it cannot be shown again.
      */
     webhook_path?: string | null;
   };
@@ -24895,8 +24896,9 @@ export type Page_ShippingCarrierAccount = {
     settings: unknown;
     updated_at: string;
     /**
-     * Only in the answer of the create call: the address the carrier posts status updates to.
-     * Keep it; it cannot be shown again.
+     * Only in the answer of the create call: the address the carrier posts status updates to
+     * (`/api/v1/shipping/webhooks/{carrier_code}/{hook}/{token}`; it names the tenant, so the
+     * carrier needs no header). Keep it; it cannot be shown again.
      */
     webhook_path?: string | null;
   }[];
@@ -29335,8 +29337,9 @@ export type ShippingCarrierAccount = {
   settings: unknown;
   updated_at: string;
   /**
-   * Only in the answer of the create call: the address the carrier posts status updates to.
-   * Keep it; it cannot be shown again.
+   * Only in the answer of the create call: the address the carrier posts status updates to
+   * (`/api/v1/shipping/webhooks/{carrier_code}/{hook}/{token}`; it names the tenant, so the
+   * carrier needs no header). Keep it; it cannot be shown again.
    */
   webhook_path?: string | null;
 };
@@ -48245,6 +48248,21 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/webhooks/{carrier_code}/{hook}/{token}": {
+    /** Receive a status webhook from a carrier at the address that names the tenant. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { carrier_code: string; hook: string; token: string }; };
+      requestBody: string;
+      responses: {
+        202: Data_ShippingWebhookReceipt;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        413: Problem;
         default: Problem;
       };
     };
