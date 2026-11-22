@@ -55,6 +55,10 @@ chmod 600 .env
 docker compose up -d --build
 ```
 
+The first build compiles everything from source: count on roughly 20 minutes to well over an hour,
+and at least 4 GB of memory for Docker. Behind a company proxy, give Docker the proxy first (see
+[Requirements in the README](../README.md#requirements)).
+
 Or skip building and use a released image (see the project's GitHub releases):
 
 ```bash
@@ -790,6 +794,33 @@ up to N times its limit. To share the limit per API key between servers, set
 in small lots (a quarter of `AUTOXIDE_HTTP_RATE_LIMIT_API_KEY_BURST`), so a key gets at most one
 lot per server more than its limit each minute. The limit per address stays per process.
 
+## Kubernetes
+
+[`deploy/kubernetes/autoxide.yaml`](../deploy/kubernetes/autoxide.yaml) is a minimal, commented
+example: a migration `Job`, a `Deployment` of two pods, a `Service` and an `Ingress` with HTTPS. It
+follows the rules of [Running several servers](#running-several-servers):
+
+- PostgreSQL runs outside the cluster file (a managed database or your own operator); SQLite allows
+  one process and does not fit here.
+- Files go to S3 (`AUTOXIDE_FILES_S3_BUCKET`) and mail to SMTP (`AUTOXIDE_MAIL_SMTP_URL`): pods keep
+  nothing on disk, so any pod can be replaced.
+- Secrets (`DATABASE_URL`, `AUTOXIDE_AUTH_TOKEN_SECRET`, `AUTOXIDE_SECRET_KEY`, the S3 keys, the SMTP
+  URL) live in a Kubernetes `Secret` you create with `kubectl create secret`, never in the file.
+- Migrations run once per release in the `Job`; pods refuse to start while one is pending, so the
+  old pods keep serving until the `Job` has finished.
+- `readinessProbe` on `/health/ready`, `livenessProbe` on `/health/live`, a drain of 15 seconds and
+  `terminationGracePeriodSeconds: 50` give rolling updates without dropped requests (see
+  [Updating without dropping requests](#updating-without-dropping-requests)).
+- `AUTOXIDE_HTTP_RATE_LIMIT_STORE=database` shares the per-key limit between pods, and
+  `AUTOXIDE_HTTP_CLIENT_IP_HEADER` with one trusted proxy reads the client's address that the
+  ingress controller passes on.
+- The pods run as the image's non-root user (`10001`) without extra privileges.
+
+The commands to create the secret, apply the file and update are at the top of the file. To split
+the API from the background work, copy the `Deployment` into a second one with
+`AUTOXIDE_PROCESS_ROLE=worker` (no `Service`, at least one pod) and set `AUTOXIDE_PROCESS_ROLE=api`
+on the first.
+
 ## Uploads straight to S3
 
 With files on S3, clients can upload large files straight to the bucket
@@ -888,6 +919,95 @@ every gate run.
    way. To get back the data of a single tenant, restore the backup into a temporary installation
    and read or export that tenant's data from there; there is no command that restores one tenant
    into a live database.
+
+## Encrypted off-site backups and point-in-time recovery
+
+`autoxide backup` and the scheduled backups are consistent snapshots: restoring one brings the data
+back as it was when it was taken, and what happened after is lost. Two additions cover the rest.
+
+### Encrypting a backup before it leaves the machine
+
+A backup holds every module's data, personal data included. Encrypt it before copying it to another
+machine or a bucket, for example with [age](https://age-encryption.org) and a key pair whose private
+half is kept offline:
+
+```bash
+age-keygen -o backup-key.txt            # once; keep backup-key.txt offline, apart from the backups
+age-keygen -y backup-key.txt            # prints the public key, age1…, used below
+
+autoxide backup "backups/$(date +%F)"
+tar -C backups -c "$(date +%F)" | age -r age1… > "autoxide-$(date +%F).tar.age"
+# copy autoxide-<date>.tar.age off-site, then delete the clear directory
+
+# to restore: decrypt, then restore the directory as in "Restoring, step by step"
+age -d -i backup-key.txt autoxide-2026-11-21.tar.age | tar -x -C restore/
+```
+
+Keep `AUTOXIDE_SECRET_KEY` apart from the backups as well: without it the encrypted secrets inside a
+backup cannot be read, which is the point.
+
+### Point-in-time recovery on PostgreSQL
+
+To get the database back as it was at any second — just before a wrong bulk change, for example —
+PostgreSQL must keep its write-ahead log (WAL) next to regular base backups. Autoxide needs nothing
+special for this: it is the standard PostgreSQL setup.
+
+- **Managed PostgreSQL** (Amazon RDS, Google Cloud SQL, Azure, …): turn on automated backups with
+  point-in-time recovery and storage encryption in the provider's console; restoring creates a new
+  database at the time you choose. Point `DATABASE_URL` at it.
+- **Your own server**: [pgBackRest](https://pgbackrest.org) keeps base backups and WAL in a bucket,
+  encrypted on the database server before they are sent. A sketch (check the pgBackRest user guide
+  of your version; on Debian or Ubuntu, `apt install pgbackrest`; with the `compose.yml` PostgreSQL
+  container, use an image that adds it):
+
+  ```ini
+  # /etc/pgbackrest/pgbackrest.conf
+  [global]
+  repo1-type=s3
+  repo1-s3-bucket=<bucket>
+  repo1-s3-endpoint=s3.<region>.amazonaws.com
+  repo1-s3-region=<region>
+  repo1-path=/pgbackrest
+  # client-side encryption: a long random value, kept apart from the bucket
+  repo1-cipher-type=aes-256-cbc
+  repo1-cipher-pass=<openssl rand -base64 48>
+  repo1-retention-full=2
+
+  [autoxide]
+  pg1-path=/var/lib/postgresql/16/main
+  ```
+
+  ```ini
+  # postgresql.conf
+  wal_level = replica
+  archive_mode = on
+  archive_command = 'pgbackrest --stanza=autoxide archive-push %p'
+  ```
+
+  The S3 keys go in `PGBACKREST_REPO1_S3_KEY` and `PGBACKREST_REPO1_S3_KEY_SECRET` (or
+  `repo1-s3-key`, `repo1-s3-key-secret` in a file only `postgres` reads). Then, as the `postgres`
+  user:
+
+  ```bash
+  pgbackrest --stanza=autoxide stanza-create
+  pgbackrest --stanza=autoxide check
+  pgbackrest --stanza=autoxide --type=full backup   # weekly, from cron
+  pgbackrest --stanza=autoxide --type=diff backup   # daily, from cron
+  ```
+
+  To go back to a point in time: stop the Autoxide servers and PostgreSQL, then
+
+  ```bash
+  pgbackrest --stanza=autoxide --delta --type=time --target-action=promote \
+    "--target=2026-11-21 09:59:00+00" restore
+  ```
+
+  start PostgreSQL, run `autoxide doctor`, then start the servers.
+
+Point-in-time recovery covers the database only. Files in S3 are not rolled back with it: turn on
+versioning of the bucket to get deleted or overwritten files back. In multi-tenant mode each
+placement is its own database and needs its own setup. Practise a restore before you need one, as
+for snapshots.
 
 ## Monitoring
 

@@ -43,6 +43,45 @@ curl -sS "$API/api/v1/content/entries/0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11" -H "
 # expect: 404
 ```
 
+## Changing a record: `If-Match`, `428` and `412`
+
+Reading one record returns its version in the `ETag` header. Endpoints that change a record take it back in `If-Match`, so two people never overwrite each other. Endpoints whose description says `If-Match` is required answer `428` (code `precondition_required`) without it; a version that is no longer current gets `412` (code `precondition_failed`): read the record again, apply your change to what you read, and send the new `ETag`.
+
+<!-- example: create-entry -->
+```bash
+curl -sS "$API/api/v1/content/entries" -H "Authorization: Bearer $TOKEN" \
+  --json '{"kind":"post","title":"First title"}'
+# expect: 201
+# save: ENTRY=.data.id
+```
+
+<!-- example: read-entry -->
+```bash
+curl -sS "$API/api/v1/content/entries/$ENTRY" -H "Authorization: Bearer $TOKEN"
+# save: ENTRY_ETAG=header:etag
+```
+
+<!-- example: change-without-version -->
+```bash
+curl -sS -X PATCH "$API/api/v1/content/entries/$ENTRY" -H "Authorization: Bearer $TOKEN" \
+  --json '{"title":"Second title"}'
+# expect: 428
+```
+
+<!-- example: change-with-version -->
+```bash
+curl -sS -X PATCH "$API/api/v1/content/entries/$ENTRY" -H "Authorization: Bearer $TOKEN" \
+  -H "If-Match: $ENTRY_ETAG" --json '{"title":"Second title"}'
+# expect: 200
+```
+
+<!-- example: change-with-old-version -->
+```bash
+curl -sS -X PATCH "$API/api/v1/content/entries/$ENTRY" -H "Authorization: Bearer $TOKEN" \
+  -H "If-Match: $ENTRY_ETAG" --json '{"title":"Third title"}'
+# expect: 412
+```
+
 ## With the SDK
 
 Errors throw an `AutoxideError`:

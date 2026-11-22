@@ -52,6 +52,8 @@ pub(crate) struct KernelModule {
     settings: Option<Arc<crate::tenancy::settings::SettingsService>>,
     /// Sổ database; có sau `start` (nhân sự nền tảng đặt cấu hình của khách khác).
     registry: Option<crate::tenancy::DatabaseRegistry>,
+    /// Tài khoản nhà cung cấp theo khách (bước 70 P7): đọc cấu hình kết nối, định tuyến webhook.
+    accounts: Option<crate::provider::ProviderAccounts>,
     /// Bộ gieo dữ liệu cho khách mới của mọi module.
     seeds: crate::tenancy::admin::Seeds,
     /// Service quản lý khách; có sau `start`.
@@ -142,6 +144,7 @@ impl KernelModule {
             tenant_settings,
             settings: None,
             registry: None,
+            accounts: None,
             seeds,
             admin: None,
             public_url: PublicUrl::default(),
@@ -600,6 +603,9 @@ impl Module for KernelModule {
             routes =
                 routes.merge(crate::tenancy::settings::routes(settings.clone(), registry.clone()));
         }
+        if let Some(accounts) = &self.accounts {
+            routes = routes.merge(crate::provider::routes(accounts.clone()));
+        }
         if let Some(admin) = &self.admin {
             routes = routes.merge(crate::tenancy::admin::routes(admin.clone()));
         }
@@ -654,6 +660,10 @@ impl Module for KernelModule {
         }
         if let Some(settings) = &self.settings {
             tools.extend(crate::tenancy::settings::tools(settings.clone()));
+            tools.extend(crate::ops::connections::tools(self.catalog.connection_probes()));
+        }
+        if let Some(accounts) = &self.accounts {
+            tools.extend(crate::provider::tools(accounts.clone()));
         }
         if let Some(admin) = &self.admin {
             tools.extend(crate::tenancy::admin::tools(admin.clone()));
@@ -826,6 +836,14 @@ impl Module for KernelModule {
         ));
         self.registry = Some(context.tenancy().clone());
         self.settings = Some(settings.clone());
+        let accounts = crate::provider::ProviderAccounts::new(
+            settings.clone(),
+            context.tenancy().clone(),
+            key.clone(),
+            self.public_url.clone(),
+        );
+        self.accounts = Some(accounts.clone());
+        context.provide::<crate::provider::ProviderAccounts>(Arc::new(accounts))?;
         let admin = Arc::new(
             crate::tenancy::TenantAdmin::new(
                 context.tenancy().clone(),

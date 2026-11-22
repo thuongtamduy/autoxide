@@ -156,6 +156,7 @@ impl UsageBook {
             .format("%Y-%m-%d")
             .to_string();
         let result =
+            // tenant-scope: job hạn lưu, xoá usage cũ của mọi khách trên database này.
             Entity::delete_many().filter(Column::Day.lt(cutoff)).exec(database.write()).await?;
         Ok(result.rows_affected)
     }

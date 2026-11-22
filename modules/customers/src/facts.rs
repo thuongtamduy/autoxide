@@ -297,6 +297,7 @@ impl CustomersService {
             profile::Entity::update_many()
                 .col_expr(profile::Column::TotalSpentMinor, Expr::value(0_i64))
                 .filter(same_currency)
+                .scoped(tenant)
                 .exec(connection)
                 .await?;
         } else if changed == 0 {

@@ -14,9 +14,20 @@ thuộc đã xong. **Bước ghi "tạm dừng tới sau 1.0" không bao giờ l
 
 ## Thứ tự làm (D-228, D-20261121-community-first)
 
-**Từ ngày 21/11/2026:** bước 70 (P1–P3) làm trước mọi bước còn mở; sau đó tới phần còn dở của các module đã có (đuôi
-của 51, 68, 41, 43, 45, 55), rồi 54, 52, 67. Không dựng module mới trước bản 1.0: các bước 46, 48, 49, 56, 59, 62, 63,
-64, 65 tạm dừng. Bảng dưới là thứ tự gốc của D-228, giữ để tra phụ thuộc.
+**Từ ngày 21/11/2026:** bước 70 (P1–P3) làm trước mọi bước còn mở. Sau đó xếp theo kịch bản "một cửa hàng bán online
+chạy thật" (D-20261121-shop-first-order):
+
+1. Bán được hàng thật: bước 70 P7 (bộ nối nhà cung cấp) → hai mục còn mở của 45 không chờ 67 → bước 70 P8 (luồng bán
+   hàng mẫu chạy trọn).
+2. Mặt tiền cửa hàng: 67, phần sổ khối và khối của `catalog` / `promotions` / `orders` trước (đuôi 41, 43, 45), rồi
+   phần còn lại của 67.
+3. Phân quyền 54: xác thực lại cho việc nhạy cảm và quyền theo trường dữ liệu trước, rồi các mục còn lại.
+4. Quản trị nâng cao 52.
+5. Bản 1.0: bước 70 P6 rồi P4.
+
+Không dựng module mới trước bản 1.0: các bước 46, 48, 49, 56, 59, 62, 63, 64, 65 tạm dừng. Mục còn mở mà chờ bước tạm
+dừng hay mốc thời gian (P17 của 51, banner người bán của 55, gỡ menu cũ của 68, cache quyền của 54) không chặn 1.0.
+Bảng dưới là thứ tự gốc của D-228, giữ để tra phụ thuộc.
 
 | Giai đoạn | Bước, theo thứ tự | Vì sao ở đây |
 |---|---|---|
@@ -99,13 +110,17 @@ thật (P7).
       của bên thứ ba
 - [ ] P7 — Bộ nối nhà cung cấp thật ở Việt Nam (D-20261121-vn-providers), mỗi bộ nối một module nhỏ sau trait của core,
       viết theo tài liệu công khai trước, hạng thử nghiệm cho tới khi chạy thử bằng tài khoản thật:
-  - [ ] Nền chung: tài khoản nhà cung cấp theo từng khách, khách tự cấu hình qua API (mã hoá, không trả lại secret),
+  - [x] Nền chung: tài khoản nhà cung cấp theo từng khách, khách tự cấu hình qua API (mã hoá, không trả lại secret),
         webhook tìm đúng khách rồi kiểm chữ ký; hướng dẫn viết bộ nối khác
   - [ ] Thanh toán: SePay
   - [ ] Thanh toán: MoMo
   - [ ] Vận chuyển: Giao Hàng Nhanh
   - [ ] SMS: eSMS
   - [ ] Hoá đơn điện tử: SePay eInvoice
+- [ ] P8 — Luồng bán hàng mẫu chạy trọn (D-20261121-shop-first-order): một bài test đi từ sản phẩm → giỏ → đơn →
+      thanh toán → vận chuyển → hoá đơn điện tử → tin nhắn, qua máy chủ giả của các nhà cung cấp ở P7, trên cả hai
+      database; hướng dẫn "mở một cửa hàng" `docs/guides/shop.md` + `.vi.md` làm theo được từ quickstart; chỗ vướng tìm
+      ra thì sửa hoặc ghi thành mục
 
 ## Giai đoạn B — Lớp cho giao diện và phân quyền
 

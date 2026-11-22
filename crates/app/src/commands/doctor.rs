@@ -130,6 +130,9 @@ async fn diagnose(settings: Settings) -> Vec<Line> {
     let migrations = if usable { Some(probe_migrations(&modules, &database).await) } else { None };
     let migrated = migrations.as_ref().is_some_and(passes);
     lines.push(line("migrations", migrations));
+    if usable && let Some(finding) = probe_dormant(&modules, &database).await {
+        lines.push(line("modules_turned_off", Some(finding)));
+    }
     // Module chạy trên bảng chưa có thì mọi bước sau chỉ báo lỗi kéo theo.
     if migrated && let Err(error) = modules.start(&database) {
         lines.push(line(

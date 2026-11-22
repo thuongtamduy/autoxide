@@ -43,6 +43,7 @@ pub(crate) fn routes(service: Arc<LedgerService>) -> OpenApiRouter {
         .routes(routes!(preview_vietqr))
         .routes(routes!(create_vietqr_payment))
         .routes(routes!(receive_bank_feed))
+        .routes(routes!(receive_tenant_bank_feed))
         .routes(routes!(seal_status))
         .routes(routes!(verify_book))
         .with_state(service)
@@ -683,6 +684,46 @@ async fn receive_bank_feed(
 ) -> Result<Data<BankFeedReceipt>, Error> {
     let stored = service.receive_bank_feed(&tenant, &provider, &headers, &body).await?;
     Ok(Data { data: BankFeedReceipt { stored } })
+}
+
+/// Receive bank account transactions from a bank feed at a tenant's own address.
+///
+/// No sign-in. The last part of the address identifies the tenant (copy the address from
+/// `GET /api/v1/kernel/connections/webhooks`); the notification is then checked with that tenant's
+/// secret at the bank feed before anything is stored. A transaction sent again is stored once;
+/// matching runs in the background. The answer is the one the bank feed expects (its documented
+/// acknowledgement), or the standard envelope when it expects nothing special.
+#[utoipa::path(
+    post,
+    path = "/bank-feeds/{provider}/{hook}",
+    extensions(("x-public" = json!(true))),
+    operation_id = "receive_ledger_tenant_bank_feed",
+    params(
+        ("provider" = String, Path, description = "Bank feed name, e.g. `sepay`."),
+        ("hook" = String, Path, description = "The tenant's webhook identifier."),
+    ),
+    request_body(content = String, description = "The bank feed's notification, as it sends it.", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Stored (or stored before). The body is the bank feed's expected acknowledgement when it has one.", body = Data<BankFeedReceipt>),
+        (status = 204, description = "Stored (or stored before), for bank feeds that expect an empty answer."),
+        (status = 401, description = "The signature is not valid; code `payment.signature_invalid`.", body = Problem),
+        (status = 404, description = "The address is not known; code `provider.webhook_unknown`.", body = Problem),
+        (status = 413, description = "The body is larger than `AUTOXIDE_LEDGER_WEBHOOK_MAX_BYTES`.", body = Problem),
+        (status = 422, description = "The bank feed is not installed on this server (`ledger.bank_feed_not_configured`) or the tenant has not set its account (`provider.not_configured`).", body = Problem),
+    )
+)]
+async fn receive_tenant_bank_feed(
+    State(service): State<Arc<LedgerService>>,
+    Path((provider, hook)): Path<(String, String)>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<Response, Error> {
+    let tenant = service.webhook_tenant("bank-feeds", &provider, &hook).await?;
+    let stored = service.receive_bank_feed(&tenant, &provider, &headers, &body).await?;
+    Ok(match service.bank_feed(&provider)?.webhook_ack() {
+        Some(ack) => ack.into_response(),
+        None => Data { data: BankFeedReceipt { stored } }.into_response(),
+    })
 }
 
 // ---- Niêm phong ----------------------------------------------------------------------------------

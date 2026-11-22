@@ -20,7 +20,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-175** Công khai repo; bật lại CI và phát hành tự động trên GitHub — 2026-11-13 · **chủ dự án quyết** · *thay một phần bởi D-199*
 - **D-185** Nền cho kinh doanh đa mô hình: khách hàng, tổ chức, gói, tiền, tuân thủ — 2026-11-13 · **chủ dự án quyết**
 - **D-199** Repo tạm giữ riêng tư; phần cần repo công khai tách thành bước 50 — 2026-11-13 · **chủ dự án quyết**
-- **[D-20261121-community-first](D-20261121-community-first.md)** Core cho cộng đồng trước: tạm dừng module mới, bật/tắt module, module viết ngoài repo, hai hạng module — 2026-11-21 · **chủ dự án quyết** · *thay một phần bởi D-20261121-vn-providers*
+- **[D-20261121-community-first](D-20261121-community-first.md)** Core cho cộng đồng trước: tạm dừng module mới, bật/tắt module, module viết ngoài repo, hai hạng module — 2026-11-21 · **chủ dự án quyết** · *thay một phần bởi D-20261121-shop-first-order, D-20261121-vn-providers*
 
 ## Quy trình, gate, lộ trình
 
@@ -105,6 +105,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261121-mobile-sdk-on-demand](D-20261121-mobile-sdk-on-demand.md)** Build SDK di động (Swift, Kotlin, Dart) chỉ khi chạy tay, trước mỗi lần phát hành — 2026-11-21 · **chủ dự án quyết** · *thay một phần bởi D-20261121-drop-mobile-sdk*
 - **[D-20261121-pin-ci-deps](D-20261121-pin-ci-deps.md)** Ghim action, công cụ CI và image nền theo SHA / digest, Dependabot nâng — 2026-11-21
 - **[D-20261121-security-lints](D-20261121-security-lints.md)** Hai luật gate chặn lỗi phân quyền tái phát: `tenant-scope` và `mcp-principal`, kèm danh sách chỗ cũ chờ sửa — 2026-11-21
+- **[D-20261121-shop-first-order](D-20261121-shop-first-order.md)** Thứ tự sau bước 70 P1–P3 xếp theo kịch bản "cửa hàng bán online chạy thật" — 2026-11-21
 - **[D-20261121-sqlx-091](D-20261121-sqlx-091.md)** Nâng sqlx 0.9.1, gỡ ngoại lệ RUSTSEC-2026-0459 — 2026-11-21
 
 ## Kiến trúc module và kernel
@@ -122,6 +123,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261118-step41-kernel-prep](D-20261118-step41-kernel-prep.md)** Ba API kernel cho module thương mại: `Subscription::optional`, `csv::read`, `slug` — 2026-11-18
 - **[D-20261119-step61-stream-audience](D-20261119-step61-stream-audience.md)** Stream SSE của kernel đưa event tới "người được nêu tên" — 2026-11-19
 - **[D-20261121-module-selection](D-20261121-module-selection.md)** Bật / tắt module bằng `AUTOXIDE_MODULES`, ba hạng module — 2026-11-21
+- **[D-20261121-provider-accounts](D-20261121-provider-accounts.md)** Một cách cho mọi bộ nối nhà cung cấp: tài khoản theo khách, webhook theo khách — 2026-11-21
 
 ## Database, dữ liệu, job, event
 
@@ -290,7 +292,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-254** Bảng phụ trợ theo khách, worker và bộ phát trên nhiều database (bước 33 A4) — 2026-11-15
 - **D-255** Trait của kernel và `api` của module nhận khách (bước 33 A4b) — 2026-11-15
 - **D-256** Lọc theo khách và kiểm schema theo khách (bước 33 A5) — 2026-11-15
-- **D-258** Cấu hình và secret theo khách (bước 33 A7, D-190) — 2026-11-15
+- **D-258** Cấu hình và secret theo khách (bước 33 A7, D-190) — 2026-11-15 · *thay một phần bởi D-20261121-provider-accounts*
 - **D-259** Thứ ngoài bảng theo khách ở kernel (bước 33 A8, D-190) — 2026-11-15
 - **D-261** Placement: URL mã hoá, `schema_state`, `migrate --all` (bước 33 A9b) — 2026-11-15
 - **D-276** `audit` theo khách: mỗi khách một chuỗi băm (bước 33 B5) — 2026-11-15
