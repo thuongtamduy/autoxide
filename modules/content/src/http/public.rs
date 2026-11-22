@@ -177,6 +177,12 @@ pub(crate) struct PublicEntryResponse {
     /// were when the entry was published.
     #[schema(value_type = Object)]
     custom_fields: serde_json::Map<String, Value>,
+    /// For a page with a block layout (`body.type` is `layout`), only in `GET /public/resolve`:
+    /// data of the blocks that carry data (`has_data` in `GET /api/v1/kernel/blocks`), by block
+    /// `id`. `null` for a block whose data could not be read or whose record is no longer public:
+    /// hide that block. Blocks of modules the site no longer has are left out of `body`.
+    #[schema(value_type = Object)]
+    blocks_data: std::collections::BTreeMap<String, Value>,
 }
 
 /// A record of another module embedded in an entry.
@@ -206,6 +212,7 @@ pub(crate) fn public_entry(view: PublicView) -> PublicEntryResponse {
         custom_fields,
     } = view;
     PublicEntryResponse {
+        blocks_data: std::collections::BTreeMap::new(),
         custom_fields,
         embeds: embeds
             .into_iter()
@@ -322,10 +329,16 @@ pub(crate) async fn resolution(
     Ok(match service.resolve(tenant, site, locale, path).await? {
         Resolved::Entry(row) => {
             let version = row.updated_at;
+            let layout = service.public_layout(tenant, site, &row.locale, &row.body).await?;
             let view = service.public_views(tenant, vec![*row]).await?.into_iter().next();
             let view =
                 view.ok_or_else(|| Error::internal("public view of a published entry is missing"))?;
-            (Resolution::Entry { entry: Box::new(public_entry(view)) }, Some(version))
+            let mut entry = public_entry(view);
+            if let Some(layout) = layout {
+                entry.body = layout.body;
+                entry.blocks_data = layout.data;
+            }
+            (Resolution::Entry { entry: Box::new(entry) }, Some(version))
         }
         Resolved::Redirect { status, location } => {
             (Resolution::Redirect { status, location }, None)
@@ -925,6 +938,10 @@ pub(crate) struct PreviewEntryResponse {
     /// The public images used in `body`, in order of appearance (find one by the `mediaId` of
     /// its node). Images that are not public yet are left out.
     body_media: Vec<PublicMedia>,
+    /// For a page with a block layout: data of the blocks that carry data, by block `id`, as on
+    /// `GET /public/resolve`.
+    #[schema(value_type = Object)]
+    blocks_data: std::collections::BTreeMap<String, Value>,
 }
 
 /// Bản nháp như link xem trước trả: chỉ nội dung, không ID người dùng hay trường nội bộ (ai tạo,
@@ -938,7 +955,7 @@ async fn preview_entry(
     let term_ids = service.term_ids(tenant, &ids).await?.remove(&entry.id);
     let author_ids = service.author_ids(tenant, &ids).await?.remove(&entry.id);
     // Địa chỉ ảnh như bài công khai (đề bài giao diện B4): chỉ ảnh đã công khai.
-    let body_ids = crate::entries::body::stored_image_ids(&entry.body);
+    let body_ids = service.body_media_ids(&entry.body);
     let mut wanted: Vec<Uuid> =
         entry.featured_media_id.into_iter().chain(body_ids.clone()).collect();
     wanted.sort_unstable();
@@ -957,12 +974,19 @@ async fn preview_entry(
         &entry.featured_media_alt,
     );
     let body_media = body_ids.iter().filter_map(|id| media(found.get(id).cloned(), "")).collect();
+    let site = service.site_of(tenant, entry.org_id).await;
+    let layout = service.public_layout(tenant, &site, &entry.locale, &entry.body).await?;
+    let (body, blocks_data) = match layout {
+        Some(layout) => (layout.body, layout.data),
+        None => (serde_json::from_str(&entry.body).unwrap_or(Value::Null), Default::default()),
+    };
     Ok(PreviewEntryResponse {
+        blocks_data,
+        body,
         featured_media,
         body_media,
         kind: Kind::parse(&entry.kind).unwrap_or(Kind::Post),
         status: crate::entries::Status::of(&entry),
-        body: serde_json::from_str(&entry.body).unwrap_or(Value::Null),
         term_ids: term_ids.unwrap_or_default(),
         author_ids: author_ids.unwrap_or_default(),
         id: entry.id,

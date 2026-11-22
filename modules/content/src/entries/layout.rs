@@ -291,3 +291,61 @@ fn collect(schema: &Value, value: &Value, info: &mut BodyInfo) {
         _ => {}
     }
 }
+
+/// Mọi khối của bố cục đã lưu `body`, theo thứ tự xuất hiện: (tên khối, `id`, props).
+pub(crate) fn blocks_of(body: &Value) -> Vec<(&str, &str, &Value)> {
+    let mut found = Vec::new();
+    let mut pending: Vec<&Value> = body
+        .get("sections")
+        .and_then(Value::as_array)
+        .map(|s| s.iter().rev().collect())
+        .unwrap_or_default();
+    let empty = &Value::Null;
+    while let Some(node) = pending.pop() {
+        let block = node.get("block").and_then(Value::as_str).unwrap_or_default();
+        let id = node.get("id").and_then(Value::as_str).unwrap_or_default();
+        found.push((block, id, node.get("props").unwrap_or(empty)));
+        if let Some(children) = node.get("children").and_then(Value::as_array) {
+            pending.extend(children.iter().rev());
+        }
+    }
+    found
+}
+
+/// Bố cục công khai: bỏ khối khách không còn dùng được (module đã tắt, gói không còn tính năng) —
+/// giao diện không phải đoán khối lạ; bản nháp giữ nguyên để quản trị thấy và sửa.
+pub(crate) fn public(body: &Value, usable: &Usable) -> Value {
+    fn keep(nodes: &[Value], usable: &Usable) -> Vec<Value> {
+        nodes
+            .iter()
+            .filter(|node| {
+                node.get("block")
+                    .and_then(Value::as_str)
+                    .is_some_and(|name| usable.contains_key(name))
+            })
+            .map(|node| {
+                let mut node = node.clone();
+                if let Some(Value::Array(children)) = node.get_mut("children") {
+                    *children = keep(children, usable);
+                }
+                node
+            })
+            .collect()
+    }
+    let mut body = body.clone();
+    if let Some(Value::Array(sections)) = body.get_mut("sections") {
+        *sections = keep(sections, usable);
+    }
+    body
+}
+
+/// ID `media` mà bố cục đã lưu `body` tham chiếu (props `x-media`), theo schema trong sổ khối.
+pub(crate) fn media_ids(body: &Value, blocks: &Blocks) -> Vec<Uuid> {
+    let mut info = BodyInfo::default();
+    for (name, _, props) in blocks_of(body) {
+        if let Some(block) = blocks.get(name) {
+            collect(&block.schema, props, &mut info);
+        }
+    }
+    info.media_ids.into_iter().collect()
+}

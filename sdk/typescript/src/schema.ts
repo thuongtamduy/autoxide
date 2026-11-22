@@ -11105,6 +11105,11 @@ export type Data_PreviewEntryResponse = {
     ai_generated: boolean;
     /** Authors, in order (the first is the main one). */
     author_ids: string[];
+    /**
+     * For a page with a block layout: data of the blocks that carry data, by block `id`, as on
+     * `GET /public/resolve`.
+     */
+    blocks_data: Record<string, unknown>;
     body: BodyNode;
     /**
      * The public images used in `body`, in order of appearance (find one by the `mediaId` of
@@ -15244,6 +15249,13 @@ export type Data_Vec_PublicEntryResponse = {
     ai_reviewed: boolean;
     /** Authors; the first is the main one. */
     authors: PublicAuthor[];
+    /**
+     * For a page with a block layout (`body.type` is `layout`), only in `GET /public/resolve`:
+     * data of the blocks that carry data (`has_data` in `GET /api/v1/kernel/blocks`), by block
+     * `id`. `null` for a block whose data could not be read or whose record is no longer public:
+     * hide that block. Blocks of modules the site no longer has are left out of `body`.
+     */
+    blocks_data: Record<string, unknown>;
     body: BodyNode;
     /**
      * The images used in `body` (nodes of type `image`), in order of appearance: find one by
@@ -24548,6 +24560,13 @@ export type Page_PublicEntryResponse = {
     ai_reviewed: boolean;
     /** Authors; the first is the main one. */
     authors: PublicAuthor[];
+    /**
+     * For a page with a block layout (`body.type` is `layout`), only in `GET /public/resolve`:
+     * data of the blocks that carry data (`has_data` in `GET /api/v1/kernel/blocks`), by block
+     * `id`. `null` for a block whose data could not be read or whose record is no longer public:
+     * hide that block. Blocks of modules the site no longer has are left out of `body`.
+     */
+    blocks_data: Record<string, unknown>;
     body: BodyNode;
     /**
      * The images used in `body` (nodes of type `image`), in order of appearance: find one by
@@ -26188,6 +26207,11 @@ export type PreviewEntryResponse = {
   ai_generated: boolean;
   /** Authors, in order (the first is the main one). */
   author_ids: string[];
+  /**
+   * For a page with a block layout: data of the blocks that carry data, by block `id`, as on
+   * `GET /public/resolve`.
+   */
+  blocks_data: Record<string, unknown>;
   body: BodyNode;
   /**
    * The public images used in `body`, in order of appearance (find one by the `mediaId` of
@@ -27550,6 +27574,13 @@ export type PublicEntryResponse = {
   ai_reviewed: boolean;
   /** Authors; the first is the main one. */
   authors: PublicAuthor[];
+  /**
+   * For a page with a block layout (`body.type` is `layout`), only in `GET /public/resolve`:
+   * data of the blocks that carry data (`has_data` in `GET /api/v1/kernel/blocks`), by block
+   * `id`. `null` for a block whose data could not be read or whose record is no longer public:
+   * hide that block. Blocks of modules the site no longer has are left out of `body`.
+   */
+  blocks_data: Record<string, unknown>;
   body: BodyNode;
   /**
    * The images used in `body` (nodes of type `image`), in order of appearance: find one by
