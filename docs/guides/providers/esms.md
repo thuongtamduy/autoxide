@@ -74,7 +74,7 @@ curl -X PUT https://your-server/api/v1/kernel/settings/esms.connection.sms.api_k
 | `esms.connection.sms.api_key` | yes | ApiKey |
 | `esms.connection.sms.secret_key` | yes | SecretKey |
 | `esms.connection.sms.brandname` | no | your registered brandname |
-| `esms.connection.sms.sandbox` | no | `true` to use the eSMS test environment: nothing is delivered or charged. Unset or `false`: real messages. |
+| `esms.connection.sms.environment` | no | `sandbox` to use the eSMS test environment: nothing is delivered or charged. Unset or `production`: real messages. |
 
 `GET /api/v1/kernel/settings?group=connection` shows which fields are set, when the connection was
 last used and its last error.
@@ -88,7 +88,11 @@ curl -X POST https://your-server/api/v1/kernel/settings/esms.connection.sms.api_
 
 This asks eSMS for the account balance (the balance itself is not returned). `"ok": true` means the
 ApiKey and SecretKey are accepted. It does not check the brandname or the templates: for that, set
-`esms.connection.sms.sandbox` to `true`, trigger a code, and read the connection's last error.
+`esms.connection.sms.environment` to `sandbox`, trigger a code, and read the connection's last error.
+
+eSMS has no separate sandbox address or sandbox account: the test environment is the same API and
+the same ApiKey / SecretKey, with a `Sandbox` flag the adapter adds to each request. Set the
+setting back to `production` (or remove it) to send real messages.
 
 ## Webhook
 
