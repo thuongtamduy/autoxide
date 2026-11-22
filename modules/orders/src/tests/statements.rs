@@ -2,6 +2,7 @@
 //! giỏ (không N+1). Module khác là bộ giả; chỉ đếm câu chạm bảng `orders_` — câu của kernel
 //! (cache cấu hình, khoá gốc) chạy hay không tuỳ cache còn hạn, làm số lệch ±1 giữa các lượt.
 
+use super::CatalogExt as _;
 use autoxide_testkit::TestDatabase;
 use serde_json::json;
 

@@ -1,6 +1,7 @@
 //! Giữ chỗ: không bán quá tồn khi nhiều request cùng lúc, xác nhận / trả / xuất / hết hạn, chọn
 //! kho, combo, bán khi hết hàng, nhập lại hàng trả về.
 
+use super::CatalogExt as _;
 use autoxide_kernel::time::Timestamp;
 use jiff::SignedDuration;
 use std::sync::Arc;

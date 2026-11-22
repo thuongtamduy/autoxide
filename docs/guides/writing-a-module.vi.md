@@ -300,6 +300,8 @@ Các trait module hay gọi khác cũng có bản giả như vậy: `autoxide_no
 
 `autoxide_media::api::testing::FakeMedia` là thư viện media trong bộ nhớ: thêm item bằng `add(public)` / `add_with` / `insert`, `upload(user)` cho item do một người tải lên, `set_alt(id, locale, alt)`, `set_ai_image`, `remove`; ID nó không giữ thì không trả, như module `media` thật.
 
+`autoxide_catalog::api::testing::FakeCatalog` giữ biến thể (dựng bằng `variant(id, org)`, sửa phần test của bạn cần, rồi `insert_variant`), lịch sử giá theo biến thể (`set_price`, `push_price`, `set_price_history`; giá hiện tại và giá tham chiếu theo lịch sử đó như catalog thật), giá sàn, combo và giá hiển thị, và nhận nguồn giá giảm (`CatalogExtensions`).
+
 ## 6. Luật của core, kiểm trên crate của bạn
 
 Trong repo Autoxide, `cargo xtask check` giữ các luật của module. Với một crate ở nơi khác, chạy đúng các luật đọc mã nguồn đó từ một bản checkout của Autoxide ở tag bạn dựa vào:

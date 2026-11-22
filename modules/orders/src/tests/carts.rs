@@ -1,5 +1,7 @@
 //! Giỏ hàng: giá tính lại ở máy chủ, vãng lai và gộp giỏ, tồn, mã giảm giá, phí giao, giỏ bỏ dở.
 
+use super::CatalogExt as _;
+use super::money;
 use autoxide_kernel::tenancy::{OrgId, ScopeExt};
 use autoxide_kernel::time::Timestamp;
 use autoxide_testkit::{TestApp, TestDatabase};
@@ -47,7 +49,7 @@ async fn cart_prices_are_recomputed_ignoring_client_numbers() {
         assert_eq!(minor(&cart["data"]["totals"]["total"]), 300_000);
         // Giá đổi ở `catalog`: đọc lại giỏ thấy giá mới, `quote_token` đổi.
         let before = cart["data"]["quote_token"].as_str().unwrap().to_owned();
-        shop.catalog.set_price(shirt, 140_000);
+        shop.catalog.set_price(shirt, money(140_000));
         let (_, cart) = guest.send("GET", &format!("/carts/{id}"), None).await;
         assert_eq!(minor(&cart["data"]["totals"]["total"]), 280_000);
         assert_ne!(cart["data"]["quote_token"].as_str().unwrap(), before);
@@ -202,7 +204,7 @@ async fn het_hang_va_so_luong_sai_bi_tu_choi() {
         let (_, cart) = buyer.send("PUT", &line(backorder), Some(json!({"quantity": 0}))).await;
         assert_eq!(cart["data"]["lines"].as_array().unwrap().len(), 1);
         // Hết hàng sau khi đã bỏ vào giỏ: dòng báo vấn đề, không tính tiền.
-        shop.catalog.variants.lock().unwrap().get_mut(&shirt).unwrap().variant_active = false;
+        shop.catalog.edit_variant(shirt, |variant| variant.variant_active = false);
         let (_, cart) = buyer.send("GET", &format!("/carts/{id}"), None).await;
         assert_eq!(cart["data"]["lines"][0]["problem"]["code"], "orders.variant_unavailable");
         assert_eq!(minor(&cart["data"]["totals"]["total"]), 0);

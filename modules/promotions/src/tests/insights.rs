@@ -1,5 +1,6 @@
 //! Chạy thử, xung đột, lịch, số liệu (D-222).
 
+use super::CatalogExt as _;
 use autoxide_kernel::time::{Date, Timestamp};
 use autoxide_testkit::TestDatabase;
 use axum::http::StatusCode;

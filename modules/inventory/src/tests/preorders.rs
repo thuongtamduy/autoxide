@@ -1,6 +1,7 @@
 //! Hàng đặt trước (D-204): không vượt suất khi đặt đồng thời, hàng về chia theo thứ tự đặt, huỷ
 //! trả lại suất.
 
+use super::CatalogExt as _;
 use autoxide_kernel::time::Timestamp;
 use jiff::SignedDuration;
 use std::sync::Arc;

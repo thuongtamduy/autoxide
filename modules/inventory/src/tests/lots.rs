@@ -1,6 +1,7 @@
 //! Lô và hạn dùng (hết hạn trước xuất trước, job trừ lô quá hạn, `expiry_state`), serial (không
 //! bán hai lần dù xuất cùng lúc), chuyển kho giữ lô và serial.
 
+use super::CatalogExt as _;
 use autoxide_kernel::time::Timestamp;
 use jiff::SignedDuration;
 use std::sync::Arc;
