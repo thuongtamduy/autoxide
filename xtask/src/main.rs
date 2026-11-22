@@ -16,6 +16,11 @@
 //!   dạng thống nhất của API trên `docs/openapi.json` (`api_shape.rs`: thân request đóng, lỗi
 //!   `Problem`, danh sách `Page<T>`).
 //!   `./gate.sh` gọi lệnh này; vi phạm thì gate đỏ.
+//! - `check-module <thư mục>` — các luật của `check` áp cho một module, chạy trên crate nằm ngoài
+//!   repo này (module ở repo riêng; xem `external.rs`).
+//! - `publish-check [--no-verify]` — đóng gói mọi crate như `cargo publish` rồi build thử
+//!   từng gói; chạy lúc phát hành, không đăng gì (xem `publish.rs`). Luật `publish-ready` của `check`
+//!   giữ metadata và phiên bản phụ thuộc nội bộ.
 //! - `changelog` — gộp các mảnh trong `changelog.d/` vào `## [Unreleased]` của `CHANGELOG.md` rồi
 //!   xoá chúng; chạy lúc phát hành (xem `changelog.rs`, D-20261119-changelog-fragments).
 //! - `decisions` — sinh lại mục lục `docs/decisions/INDEX.md` từ nhật ký quyết định (xem
@@ -43,10 +48,12 @@ mod changelog;
 mod decisions;
 mod deploy_metrics;
 mod docs;
+mod external;
 mod i18n;
 mod lengths;
 mod mcp_principal;
 mod metric_labels;
+mod publish;
 mod scaffold;
 mod sdk;
 mod semver;
@@ -59,10 +66,12 @@ mod workspace;
 use std::process::ExitCode;
 
 const USAGE: &str = "usage: cargo xtask check
+       cargo xtask check-module <dir>            the module rules of `check`, on a crate outside this repository
        cargo xtask decisions                     regenerate docs/decisions/INDEX.md
        cargo xtask changelog                     fold changelog.d/ fragments into CHANGELOG.md (at release)
        cargo xtask api-diff [--base <ref>]       default base: the last release tag before HEAD
        cargo xtask semver [--base <tag>] [--deny] [--markdown]
+       cargo xtask publish-check [--no-verify]   package every crate as for crates.io (publishes nothing)
        cargo xtask sdk [--check | --extract-examples <dir>]
        cargo xtask upgrade-test [--from <tag>] [--image <image>] [--database sqlite|postgres|both]
        cargo xtask new-module <module> <entity>   e.g. new-module bookmarks bookmark
@@ -95,11 +104,13 @@ fn main() -> ExitCode {
     // số mà không phải tự kiểm độ dài.
     match args.iter().map(String::as_str).collect::<Vec<_>>().as_slice() {
         ["check"] => check(),
+        ["check-module", dir] => check_module(dir),
         ["decisions"] => decisions(),
         ["changelog"] => changelog(),
         ["api-diff"] => api_diff(None),
         ["api-diff", "--base", base] => api_diff(Some(base)),
         ["semver", rest @ ..] => semver(rest),
+        ["publish-check", rest @ ..] => publish_check(rest),
         ["sdk"] => sdk(false),
         ["sdk", "--check"] => sdk(true),
         ["sdk", "--extract-examples", dir] => sdk_examples(dir),
@@ -169,6 +180,29 @@ fn semver(args: &[&str]) -> ExitCode {
     }
 }
 
+fn publish_check(args: &[&str]) -> ExitCode {
+    let verify = match args {
+        [] => true,
+        ["--no-verify"] => false,
+        _ => {
+            eprintln!("{USAGE}");
+            return ExitCode::FAILURE;
+        }
+    };
+    match workspace::load().and_then(|workspace| publish::run(&workspace.root, verify)) {
+        Ok(()) => {
+            println!(
+                "xtask publish-check: every crate packages for crates.io (nothing was published)"
+            );
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            eprintln!("xtask publish-check: {error}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
 fn sdk(check: bool) -> ExitCode {
     let result = workspace::load().map_err(|error| error.to_string()).and_then(|workspace| {
         let version = semver::workspace_version(&workspace.root)?;
@@ -214,6 +248,26 @@ fn sdk_examples(dir: &str) -> ExitCode {
     }
 }
 
+fn check_module(dir: &str) -> ExitCode {
+    match external::check(std::path::Path::new(dir)) {
+        Ok((module, violations)) if violations.is_empty() => {
+            println!("xtask check-module: module `{module}`, no violations");
+            ExitCode::SUCCESS
+        }
+        Ok((_, violations)) => {
+            for violation in &violations {
+                eprintln!("{violation}");
+            }
+            eprintln!("xtask check-module: {} violation(s)", violations.len());
+            ExitCode::FAILURE
+        }
+        Err(error) => {
+            eprintln!("xtask check-module: {error}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
 fn check() -> ExitCode {
     let workspace = match workspace::load() {
         Ok(workspace) => workspace,
@@ -225,6 +279,7 @@ fn check() -> ExitCode {
     let violations = match boundaries::check_workspace(&workspace).and_then(|mut violations| {
         violations.extend(i18n::check_translations(&workspace)?);
         violations.extend(docs::check_docs(&workspace.root)?);
+        violations.extend(publish::check(&workspace)?);
         violations.extend(tenancy::check_entities(&workspace)?);
         // Hai luật bảo mật có danh sách chỗ cũ chờ sửa (D-20261121-security-lints).
         let mut security = tenant_scope::check(&workspace)?;
@@ -328,7 +383,7 @@ fn new_module(module: &str, entity: &str) -> ExitCode {
             );
             println!("  3. Register it (docs/MODULE_GUIDE.md, step 1):");
             println!(
-                "       Cargo.toml:            autoxide-{module} = {{ path = \"modules/{module}\" }}"
+                "       Cargo.toml:            autoxide-{module} = {{ path = \"modules/{module}\", version = \"=<workspace version>\" }}"
             );
             println!("       crates/app/Cargo.toml: autoxide-{module}.workspace = true");
             println!("       crates/app/src/modules.rs: Box::new(autoxide_{module}::module()),");

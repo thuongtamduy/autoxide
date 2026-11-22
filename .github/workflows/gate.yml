@@ -90,6 +90,40 @@ jobs:
       - run: ./gate.sh --only avif
         if: steps.changed.outputs.run == 'true'
 
+  # Module ở repo riêng (D-20261121-external-modules): `examples/external-module` là workspace Cargo riêng —
+  # một module và binary ghép nó với module chính thức — build lại cả core như người ngoài build. Job riêng,
+  # song song với `build tests` (đường dài nhất của gate), nên không kéo dài gate. Test trên SQLite rồi Postgres.
+  example:
+    name: external module example
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 2s --health-timeout 5s --health-retries 30
+    env:
+      CARGO_INCREMENTAL: "0"
+      CARGO_TERM_COLOR: always
+      # Database dùng xong bỏ của CI: mật khẩu này không bảo vệ gì.
+      GATE_POSTGRES_URL: postgres://postgres:postgres@127.0.0.1:5432/postgres
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: rustup toolchain install
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: example
+          # Hai thư mục build: xtask ở workspace gốc, ví dụ ở workspace riêng của nó.
+          workspaces: |
+            . -> target
+            examples/external-module -> target
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - run: ./gate.sh --only example
+
   # Build mọi chương trình test MỘT lần thành archive của nextest (`./gate.sh --only build`); các job
   # `tests` tải archive về và chạy, không biên dịch lại (D-20261120-ci-nextest-archive). Gate đầy đủ
   # (push lên main) chạy doc-test ở đây.

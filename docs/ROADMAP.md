@@ -93,10 +93,14 @@ thật (P7).
       MCP, không job, không nhận event, không chạy migration trên database mới; database đã có bảng của module tắt thì
       giữ nguyên dữ liệu; bật thiếu phụ thuộc thì báo rõ phải bật thêm gì; `doctor` liệt kê module bật / tắt;
       `docs/openapi.json` trong repo vẫn sinh với mọi module; test tập tối thiểu trên cả hai database
-- [ ] P2 — Module viết ngoài repo, không fork: crate `autoxide` dùng được như thư viện (binary của người ngoài = module
+- [x] P2 — Module viết ngoài repo, không fork: crate `autoxide` dùng được như thư viện (binary của người ngoài = module
       chính thức + module của họ, đủ lệnh CLI); `examples/external-module/` là workspace riêng, CI build và test trên
       cả hai database; hướng dẫn `docs/guides/writing-a-module.md` + `.vi.md`; phụ thuộc bằng git tag dùng được ngay;
-      `cargo publish --dry-run` qua cho kernel và testkit (đăng thật ở P5)
+      `cargo publish --dry-run` qua cho kernel và testkit (đăng thật ở P5) — D-20261121-external-modules:
+      `autoxide::Autoxide`, `cargo xtask check-module` (luật của gate trên crate ngoài repo), `cargo xtask
+      publish-check` (đóng gói + build thử mọi crate sẽ đăng; `publish = false` giữ tới khi chủ dự án bảo đăng), job
+      `semver` ở PR phát hành. Còn lại cho P4 / P5: rustdoc của kernel và testkit đang viết tiếng Việt (docs.rs cần
+      tiếng Anh); một hàm gộp chuỗi migration bảng phụ trợ (outbox, job) cho module mới
 - [x] P3 — Hai hạng module: chính thức (giữ ổn định) và thử nghiệm (ghi rõ "có thể đổi", không bật khi không đặt cấu
       hình); danh sách và phụ thuộc ở `docs/MODULES.md` + `.vi.md`; người nâng cấp có dữ liệu của module đang tắt được
       cảnh báo rõ ở log khởi động và `doctor`, kèm đúng dòng cấu hình cần thêm

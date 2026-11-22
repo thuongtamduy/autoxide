@@ -10,7 +10,7 @@ use autoxide_kernel::config::{
 };
 use autoxide_kernel::module::{MODULES, Module, Modules, Selection, SelectionError};
 
-use crate::modules;
+use crate::registry;
 use crate::startup::StartupConfig;
 
 /// Tên file cấu hình cục bộ, tìm trong thư mục đang đứng.
@@ -111,19 +111,19 @@ pub fn read_with(
 /// MỌI module chạy (kể cả thử nghiệm), để bài test không phải nêu biến.
 #[cfg(test)]
 pub fn read(source: &ConfigSource) -> Result<Settings, ConfigErrors> {
-    settings(source, modules::all(), Choice::AllUnlessConfigured)
+    settings(source, registry::all(), Choice::AllUnlessConfigured)
 }
 
 /// Đọc cấu hình từ môi trường của tiến trình và file `.env` trong thư mục hiện tại.
 pub fn load() -> Result<Settings, ConfigErrors> {
-    read_with(&ConfigSource::load(Path::new(DOTENV_FILE))?, modules::all())
+    read_with(&ConfigSource::load(Path::new(DOTENV_FILE))?, registry::all())
 }
 
 /// Như [`load`] nhưng với MỌI module, bỏ qua `AUTOXIDE_MODULES`: cho lệnh in hợp đồng đầy đủ
 /// (`autoxide openapi`, `autoxide mcp-manifest`).
 pub fn load_everything() -> Result<Settings, ConfigErrors> {
     let source = ConfigSource::load(Path::new(DOTENV_FILE))?;
-    settings(&source, modules::all(), Choice::Everything)
+    settings(&source, registry::all(), Choice::Everything)
 }
 
 /// Danh sách mọi biến chương trình đọc (kernel và mọi module), với giá trị mặc định
@@ -133,7 +133,7 @@ pub fn describe() -> Vec<SettingValue> {
     let source = ConfigSource::default();
     let mut reader = ConfigReader::new(&source);
     // Bỏ qua kết quả: biến bắt buộc đương nhiên "thiếu" ở đây; chỉ cần danh sách.
-    let _ = read_selected(&mut reader, &source, modules::all(), Choice::Everything);
+    let _ = read_selected(&mut reader, &source, registry::all(), Choice::Everything);
     reader.values().to_vec()
 }
 
