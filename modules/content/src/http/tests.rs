@@ -24,6 +24,7 @@ mod embed;
 mod layout;
 mod layout_public;
 mod ops;
+mod page_templates;
 mod shared_sections;
 mod themes;
 mod versions;

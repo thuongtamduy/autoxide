@@ -1,0 +1,186 @@
+{
+  "key": "fnb_menu",
+  "industry": "fnb",
+  "name": {
+    "en": "Restaurant or café",
+    "vi": "Nhà hàng, quán cà phê"
+  },
+  "description": {
+    "en": "Introduce the place, opening hours, booking button and questions.",
+    "vi": "Giới thiệu quán, giờ mở cửa, nút đặt bàn và hỏi đáp."
+  },
+  "layout": {
+    "en": {
+      "type": "layout",
+      "schema": 1,
+      "sections": [
+        {
+          "id": "hero",
+          "block": "content.hero",
+          "props": {
+            "heading": "Welcome",
+            "text": "Home-style dishes, made fresh every day.",
+            "button_label": "Book a table",
+            "button_link": "/booking",
+            "height": {
+              "base": "medium",
+              "lg": "large"
+            },
+            "overlay": "dark"
+          }
+        },
+        {
+          "id": "about",
+          "block": "content.section",
+          "props": {
+            "background": "none",
+            "padding": {
+              "base": "medium",
+              "lg": "large"
+            }
+          },
+          "children": [
+            {
+              "id": "about_cols",
+              "block": "content.columns",
+              "props": {
+                "widths": "equal"
+              },
+              "children": [
+                {
+                  "id": "a1",
+                  "block": "content.text",
+                  "props": {
+                    "text": "Our kitchen uses fresh local ingredients."
+                  }
+                },
+                {
+                  "id": "a2",
+                  "block": "content.text",
+                  "props": {
+                    "text": "Open every day from 7:00 to 22:00."
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "faq_s",
+          "block": "content.section",
+          "props": {
+            "background": "surface",
+            "padding": {
+              "base": "medium",
+              "lg": "large"
+            }
+          },
+          "children": [
+            {
+              "id": "faq",
+              "block": "content.faq",
+              "props": {
+                "items": [
+                  {
+                    "question": "Do you take large groups?",
+                    "answer": "Yes, please book ahead."
+                  },
+                  {
+                    "question": "Is there parking?",
+                    "answer": "Motorbike parking is free."
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "vi": {
+      "type": "layout",
+      "schema": 1,
+      "sections": [
+        {
+          "id": "hero",
+          "block": "content.hero",
+          "props": {
+            "heading": "Chào mừng",
+            "text": "Món ăn nhà làm, nấu mới mỗi ngày.",
+            "button_label": "Đặt bàn",
+            "button_link": "/booking",
+            "height": {
+              "base": "medium",
+              "lg": "large"
+            },
+            "overlay": "dark"
+          }
+        },
+        {
+          "id": "about",
+          "block": "content.section",
+          "props": {
+            "background": "none",
+            "padding": {
+              "base": "medium",
+              "lg": "large"
+            }
+          },
+          "children": [
+            {
+              "id": "about_cols",
+              "block": "content.columns",
+              "props": {
+                "widths": "equal"
+              },
+              "children": [
+                {
+                  "id": "a1",
+                  "block": "content.text",
+                  "props": {
+                    "text": "Bếp dùng nguyên liệu tươi tại địa phương."
+                  }
+                },
+                {
+                  "id": "a2",
+                  "block": "content.text",
+                  "props": {
+                    "text": "Mở cửa mỗi ngày từ 7:00 đến 22:00."
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "faq_s",
+          "block": "content.section",
+          "props": {
+            "background": "surface",
+            "padding": {
+              "base": "medium",
+              "lg": "large"
+            }
+          },
+          "children": [
+            {
+              "id": "faq",
+              "block": "content.faq",
+              "props": {
+                "items": [
+                  {
+                    "question": "Quán có nhận nhóm đông không?",
+                    "answer": "Có, vui lòng đặt trước."
+                  },
+                  {
+                    "question": "Có chỗ để xe không?",
+                    "answer": "Gửi xe máy miễn phí."
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

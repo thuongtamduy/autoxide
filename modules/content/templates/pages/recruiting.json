@@ -1,0 +1,278 @@
+{
+  "key": "recruiting_jobs",
+  "industry": "recruiting",
+  "name": {
+    "en": "Recruiting: we are hiring",
+    "vi": "Tuyển dụng: chúng tôi đang tuyển"
+  },
+  "description": {
+    "en": "Why join, open roles, questions and an application form.",
+    "vi": "Vì sao gia nhập, vị trí đang tuyển, hỏi đáp và form ứng tuyển."
+  },
+  "layout": {
+    "en": {
+      "type": "layout",
+      "schema": 1,
+      "sections": [
+        {
+          "id": "hero",
+          "block": "content.hero",
+          "props": {
+            "heading": "Join our team",
+            "text": "We are looking for people who care about their work.",
+            "button_label": "See open roles",
+            "button_link": "/careers",
+            "height": {
+              "base": "medium",
+              "lg": "large"
+            },
+            "overlay": "dark"
+          }
+        },
+        {
+          "id": "why",
+          "block": "content.section",
+          "props": {
+            "background": "none",
+            "padding": {
+              "base": "medium",
+              "lg": "large"
+            }
+          },
+          "children": [
+            {
+              "id": "why_h",
+              "block": "content.heading",
+              "props": {
+                "text": "Why work with us",
+                "level": 2
+              }
+            },
+            {
+              "id": "why_cols",
+              "block": "content.columns",
+              "props": {
+                "widths": "equal"
+              },
+              "children": [
+                {
+                  "id": "w1",
+                  "block": "content.text",
+                  "props": {
+                    "text": "Fair pay, paid on time."
+                  }
+                },
+                {
+                  "id": "w2",
+                  "block": "content.text",
+                  "props": {
+                    "text": "Training and room to grow."
+                  }
+                },
+                {
+                  "id": "w3",
+                  "block": "content.text",
+                  "props": {
+                    "text": "A friendly team."
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "roles",
+          "block": "content.section",
+          "props": {
+            "background": "none",
+            "padding": {
+              "base": "medium",
+              "lg": "large"
+            }
+          },
+          "children": [
+            {
+              "id": "roles_h",
+              "block": "content.heading",
+              "props": {
+                "text": "Open roles",
+                "level": 2
+              }
+            },
+            {
+              "id": "r1",
+              "block": "content.text",
+              "props": {
+                "text": "Write the roles you are hiring for here."
+              }
+            }
+          ]
+        },
+        {
+          "id": "apply",
+          "block": "content.section",
+          "props": {
+            "background": "surface",
+            "padding": {
+              "base": "medium",
+              "lg": "large"
+            }
+          },
+          "children": [
+            {
+              "id": "faq",
+              "block": "content.faq",
+              "props": {
+                "items": [
+                  {
+                    "question": "How do I apply?",
+                    "answer": "Send the form below; we answer within a week."
+                  }
+                ]
+              }
+            },
+            {
+              "id": "form",
+              "block": "forms.embed",
+              "props": {
+                "key": "contact"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "vi": {
+      "type": "layout",
+      "schema": 1,
+      "sections": [
+        {
+          "id": "hero",
+          "block": "content.hero",
+          "props": {
+            "heading": "Gia nhập đội ngũ",
+            "text": "Chúng tôi tìm người tận tâm với công việc.",
+            "button_label": "Xem vị trí đang tuyển",
+            "button_link": "/careers",
+            "height": {
+              "base": "medium",
+              "lg": "large"
+            },
+            "overlay": "dark"
+          }
+        },
+        {
+          "id": "why",
+          "block": "content.section",
+          "props": {
+            "background": "none",
+            "padding": {
+              "base": "medium",
+              "lg": "large"
+            }
+          },
+          "children": [
+            {
+              "id": "why_h",
+              "block": "content.heading",
+              "props": {
+                "text": "Vì sao làm cùng chúng tôi",
+                "level": 2
+              }
+            },
+            {
+              "id": "why_cols",
+              "block": "content.columns",
+              "props": {
+                "widths": "equal"
+              },
+              "children": [
+                {
+                  "id": "w1",
+                  "block": "content.text",
+                  "props": {
+                    "text": "Lương xứng đáng, trả đúng hạn."
+                  }
+                },
+                {
+                  "id": "w2",
+                  "block": "content.text",
+                  "props": {
+                    "text": "Được đào tạo và có lộ trình phát triển."
+                  }
+                },
+                {
+                  "id": "w3",
+                  "block": "content.text",
+                  "props": {
+                    "text": "Đồng nghiệp thân thiện."
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "roles",
+          "block": "content.section",
+          "props": {
+            "background": "none",
+            "padding": {
+              "base": "medium",
+              "lg": "large"
+            }
+          },
+          "children": [
+            {
+              "id": "roles_h",
+              "block": "content.heading",
+              "props": {
+                "text": "Vị trí đang tuyển",
+                "level": 2
+              }
+            },
+            {
+              "id": "r1",
+              "block": "content.text",
+              "props": {
+                "text": "Ghi các vị trí đang tuyển ở đây."
+              }
+            }
+          ]
+        },
+        {
+          "id": "apply",
+          "block": "content.section",
+          "props": {
+            "background": "surface",
+            "padding": {
+              "base": "medium",
+              "lg": "large"
+            }
+          },
+          "children": [
+            {
+              "id": "faq",
+              "block": "content.faq",
+              "props": {
+                "items": [
+                  {
+                    "question": "Ứng tuyển thế nào?",
+                    "answer": "Gửi form bên dưới; chúng tôi trả lời trong một tuần."
+                  }
+                ]
+              }
+            },
+            {
+              "id": "form",
+              "block": "forms.embed",
+              "props": {
+                "key": "contact"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

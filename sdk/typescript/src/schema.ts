@@ -8548,6 +8548,19 @@ export type Data_FormTokenResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_FromTemplateResponse = {
+  /** The draft made from a template. */
+  data: {
+    /**
+     * Blocks of the template left out because the tenant cannot use them (module off, or a plan
+     * without the feature), by name.
+     */
+    dropped_blocks: string[];
+    entry: EntryResponse;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_FunnelReport = {
   /** A funnel over a range of days. */
   data: {
@@ -10858,6 +10871,30 @@ export type Data_Overview = {
     views: number;
     /** Sum of the daily unique visitors (no cookies: one person on two days counts twice). */
     visitors: number;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_PageTemplateResponse = {
+  /** A page template: a block layout to start a page from. */
+  data: {
+    created_at: string;
+    created_by?: string | null;
+    description: string;
+    id: string;
+    /** `retail`, `fnb`, `services`, `events`, `recruiting` or `other`. */
+    industry: string;
+    /** The block layout copied into a new page. */
+    layout: Record<string, unknown>;
+    /** Language of the template's text. */
+    locale: string;
+    name: string;
+    org_id: string;
+    /**
+     * Key in the templates shipped with the server, when installed from them; `null`: saved by
+     * someone of the tenant.
+     */
+    preset_key?: string | null;
   };
 };
 
@@ -14958,6 +14995,29 @@ export type Data_Vec_OverrideResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_PageTemplateResponse = {
+  data: {
+    created_at: string;
+    created_by?: string | null;
+    description: string;
+    id: string;
+    /** `retail`, `fnb`, `services`, `events`, `recruiting` or `other`. */
+    industry: string;
+    /** The block layout copied into a new page. */
+    layout: Record<string, unknown>;
+    /** Language of the template's text. */
+    locale: string;
+    name: string;
+    org_id: string;
+    /**
+     * Key in the templates shipped with the server, when installed from them; `null`: saved by
+     * someone of the tenant.
+     */
+    preset_key?: string | null;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_PermissionResponse = {
   data: {
     /** What the permission allows, in the language of `Accept-Language`. */
@@ -16938,6 +16998,27 @@ export type FoundView = {
   screen: string;
   subtitle?: string | null;
   title: string;
+};
+
+/** A new page from a template. */
+export type FromTemplateRequest = {
+  /** Owning organization unit; left out: your only unit, or the whole tenant. */
+  org_id?: string | null;
+  /** Parent page, in the template's language. */
+  parent_id?: string | null;
+  template_id: string;
+  /** Title of the new page. */
+  title: string;
+};
+
+/** The draft made from a template. */
+export type FromTemplateResponse = {
+  /**
+   * Blocks of the template left out because the tenant cannot use them (module off, or a plan
+   * without the feature), by name.
+   */
+  dropped_blocks: string[];
+  entry: EntryResponse;
 };
 
 /** A funnel a module declares. */
@@ -21717,6 +21798,27 @@ export type Overview = {
   visitors: number;
 };
 
+/** A page template: a block layout to start a page from. */
+export type PageTemplateResponse = {
+  created_at: string;
+  created_by?: string | null;
+  description: string;
+  id: string;
+  /** `retail`, `fnb`, `services`, `events`, `recruiting` or `other`. */
+  industry: string;
+  /** The block layout copied into a new page. */
+  layout: Record<string, unknown>;
+  /** Language of the template's text. */
+  locale: string;
+  name: string;
+  org_id: string;
+  /**
+   * Key in the templates shipped with the server, when installed from them; `null`: saved by
+   * someone of the tenant.
+   */
+  preset_key?: string | null;
+};
+
 /** One page of a list. */
 export type Page_AdministrativeUnit = {
   /** The items of this page, in the requested order. */
@@ -24311,6 +24413,31 @@ export type Page_OverrideResponse = {
     reason: string;
     /** The tenant it applies to. */
     tenant_id: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_PageTemplateResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    created_at: string;
+    created_by?: string | null;
+    description: string;
+    id: string;
+    /** `retail`, `fnb`, `services`, `events`, `recruiting` or `other`. */
+    industry: string;
+    /** The block layout copied into a new page. */
+    layout: Record<string, unknown>;
+    /** Language of the template's text. */
+    locale: string;
+    name: string;
+    org_id: string;
+    /**
+     * Key in the templates shipped with the server, when installed from them; `null`: saved by
+     * someone of the tenant.
+     */
+    preset_key?: string | null;
   }[];
   pagination: Pagination;
 };
@@ -29107,6 +29234,18 @@ export type SaveSupportMacroRequest = {
   /** 1 to 100 characters. */
   name: string;
   org_id: string;
+};
+
+/** A page to keep as a template. */
+export type SaveTemplateRequest = {
+  /** At most 500 characters. */
+  description?: string | null;
+  /** A page with a block layout; its current draft is copied. */
+  entry_id: string;
+  /** `retail`, `fnb`, `services`, `events`, `recruiting` or `other`. */
+  industry: string;
+  /** 1 to 120 characters. */
+  name: string;
 };
 
 /** The object a saved item links to. With `include=targets`, also how it stands now. */
@@ -38253,6 +38392,22 @@ export interface paths {
       };
     };
   };
+  "/api/v1/content/entries/from-template": {
+    /** Create a page from a template. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: FromTemplateRequest;
+      responses: {
+        201: Data_FromTemplateResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/content/entries/{id}": {
     /** Get a post or page (its draft). */
     get: {
@@ -38704,6 +38859,57 @@ export interface paths {
         412: Problem;
         422: Problem;
         428: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/content/page-templates": {
+    /** List page templates. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { industry?: string; locale?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_PageTemplateResponse;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Save a page as a template. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: SaveTemplateRequest;
+      responses: {
+        201: Data_PageTemplateResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/content/page-templates/presets": {
+    /** Install the page templates shipped with the server. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      responses: {
+        200: Data_Vec_PageTemplateResponse;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/content/page-templates/{id}": {
+    /** Delete a page template. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
         default: Problem;
       };
     };

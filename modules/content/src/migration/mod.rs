@@ -18,6 +18,7 @@ mod m0021_banners;
 mod m0022_edit_locks;
 mod m0023_themes;
 mod m0024_shared_sections;
+mod m0025_page_templates;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 use autoxide_kernel::tenancy::migration::TenantTable;
@@ -167,5 +168,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(m0023_themes::Migration),
         // Khu dùng chung nhiều trang (bước 67).
         Box::new(m0024_shared_sections::Migration),
+        // Trang mẫu theo ngành và trang khách lưu thành mẫu (bước 67).
+        Box::new(m0025_page_templates::Migration),
     ]
 }
