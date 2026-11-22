@@ -96,7 +96,7 @@ async fn tender_pays_part_or_all_of_the_order() {
         let order = &placed["data"]["orders"][0];
         assert_eq!(order["status"], "pending_payment");
         let id = order["id"].as_str().unwrap().to_owned();
-        let payment = shop.ledger.payments.lock().unwrap()[0].clone();
+        let payment = shop.ledger.payments()[0].clone();
         assert_eq!(payment.amount.minor(), 80_000);
         assert_eq!(tender.held.lock().unwrap()[0], (format!("orders:{id}"), 50_000));
         let (_, mine) = buyer.send("GET", &format!("/me/orders/{id}"), None).await;
@@ -109,7 +109,7 @@ async fn tender_pays_part_or_all_of_the_order() {
         let (status, placed) = checkout(&buyer, Some("t-2"), request).await;
         assert_eq!(status, StatusCode::CREATED, "{placed}");
         assert_eq!(placed["data"]["orders"][0]["status"], "confirmed");
-        assert_eq!(shop.ledger.payments.lock().unwrap().len(), 1);
+        assert_eq!(shop.ledger.payments().len(), 1);
         assert_eq!(tender.held.lock().unwrap()[1].1, 130_000);
     })
     .await

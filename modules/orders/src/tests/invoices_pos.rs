@@ -463,7 +463,7 @@ async fn ban_tai_quay_tru_kho_cua_hang_va_gui_lai_cung_ma() {
         assert_eq!(kinds_of(&world), vec!["cash_register_invoice".to_owned()]);
         // Sổ: tiền mặt vào két, thẻ vào tài khoản chờ của ngân hàng.
         let cash = AccountKey::new(shop.tree.a, "cash.on_hand", vnd());
-        assert_eq!(shop.ledger.balance_of(&cash), 60_000);
+        assert_eq!(shop.ledger.net_debit(&cash), 60_000);
         assert_eq!(status_of(shop, order.parse().unwrap()).await, "delivered");
     })
     .await
@@ -505,7 +505,7 @@ async fn dong_ca_co_chenh_lech_can_ly_do_ghi_so_va_duyet_khi_vuot_nguong() {
         assert_eq!(minor(&closed["data"]["expected_cash"]), 545_000);
         assert_eq!(minor(&closed["data"]["variance"]), -5_000);
         let shortage = AccountKey::new(shop.tree.a, "orders.cash_shortage", vnd());
-        assert_eq!(shop.ledger.balance_of(&shortage), 5_000);
+        assert_eq!(shop.ledger.net_debit(&shortage), 5_000);
         assert_eq!(count_events(shop, "orders.pos_shift_closed").await, 1);
         // Đã đóng: không đóng lại, không bán tiếp.
         let (status, _) = boss.send("POST", &close, Some(json!({"counted_cash": vnd_json(0)}))).await;
@@ -524,7 +524,7 @@ async fn dong_ca_co_chenh_lech_can_ly_do_ghi_so_va_duyet_khi_vuot_nguong() {
         assert_eq!(status, StatusCode::OK, "{pending}");
         assert_eq!(pending["data"]["status"], "pending_approval");
         let overage = AccountKey::new(shop.tree.a, "orders.cash_overage", vnd());
-        assert_eq!(shop.ledger.balance_of(&overage), 0, "chưa duyệt thì chưa ghi sổ");
+        assert_eq!(shop.ledger.net_debit(&overage), 0, "chưa duyệt thì chưa ghi sổ");
         let approve = format!("/pos/shifts/{shift}/approve");
         let (status, own) = boss.send("POST", &approve, None).await;
         assert_eq!(status, StatusCode::FORBIDDEN, "{own}");
@@ -532,7 +532,7 @@ async fn dong_ca_co_chenh_lech_can_ly_do_ghi_so_va_duyet_khi_vuot_nguong() {
         let (status, approved) = Call::as_user(shop, "boss2").send("POST", &approve, None).await;
         assert_eq!(status, StatusCode::OK, "{approved}");
         assert_eq!(approved["data"]["status"], "closed");
-        assert_eq!(shop.ledger.balance_of(&overage), -300_000);
+        assert_eq!(shop.ledger.net_debit(&overage), -300_000);
         // Thu ngân không có `orders.pos.shift`.
         let (status, _) = Call::as_user(shop, "cashier_a")
             .send(

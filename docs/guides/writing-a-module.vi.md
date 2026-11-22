@@ -265,6 +265,17 @@ TEST_DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/postgres \
 
 [`src/tests.rs`](../../examples/external-module/bookmarks/src/tests.rs) của ví dụ cho thấy những test một module nên có: REST và MCP cho cùng kết quả, permission được kiểm, ghi đồng thời (hai request lưu cùng một liên kết) chỉ một bên qua, hai khách không bao giờ thấy nhau (`leak_check`), bảng theo đúng luật (`schema_ownership_violations`, `schema_tenancy_violations`), job và cấu hình chạy đúng. [`server/tests/cli.rs`](../../examples/external-module/server/tests/cli.rs) chạy binary thật: `migrate up`, `openapi` và `mcp-manifest` có module. [`check.sh`](../../examples/external-module/check.sh) chạy định dạng, lint và cả hai lượt test; hãy giữ một script như vậy và chạy nó trong CI.
 
+### Bản giả của module khác
+
+Module của bạn gọi trait mà module khác công bố thì test với bản giả của module đó thay vì tự chép. Module để bản giả ở `api::testing`, sau feature `testing`; chỉ bật cho test:
+
+```toml
+[dev-dependencies]
+autoxide-ledger = { git = "https://github.com/thuongtamduy/autoxide", tag = "vX.Y.Z", features = ["testing"] }
+```
+
+`autoxide_ledger::api::testing::FakeLedger` giữ bút toán, lượt thu và lượt hoàn trong bộ nhớ, chống trùng như sổ cái thật. Đăng ký `ledger.module()` trước module của bạn, đọc những gì module đã làm (`entries()`, `payments()`, `refunds()`, `balance`), và báo một lượt thu đã thu bằng `ledger.succeed(&tenant, &payment)` — nó ghi `ledger.payment_succeeded` vào outbox như sổ cái thật, nên bộ nghe của bạn chạy khi bạn cho dispatcher giao hết event.
+
 ## 6. Luật của core, kiểm trên crate của bạn
 
 Trong repo Autoxide, `cargo xtask check` giữ các luật của module. Với một crate ở nơi khác, chạy đúng các luật đọc mã nguồn đó từ một bản checkout của Autoxide ở tag bạn dựa vào:

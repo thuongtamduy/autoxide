@@ -68,7 +68,7 @@ async fn place(shop: &Shop, items: &[(Uuid, i64)], method: &str) -> Uuid {
     assert_eq!(status, StatusCode::CREATED, "{placed}");
     let id = placed["data"]["orders"][0]["id"].as_str().unwrap().parse().unwrap();
     if method == "card" {
-        let payment = shop.ledger.payments.lock().unwrap().last().cloned().unwrap();
+        let payment = shop.ledger.last_payment().unwrap();
         emit(shop, &PaymentSucceeded(json!({"payment_id": payment.id, "source_module": "orders", "amount": payment.amount}))).await;
         drain(shop).await;
     }
@@ -205,7 +205,7 @@ async fn ngung_dat_truoc_huy_va_hoan_tien_tu_dong() {
         emit_from(&shop, &shop.catalog_outbox, &VariantUpdated(stopped)).await;
         drain(&shop).await;
         assert_eq!(status_of(&shop, only).await, "cancelled");
-        let refunds = shop.ledger.refunds.lock().unwrap().clone();
+        let refunds = super::refund_rows(&shop.ledger);
         let amounts: Vec<i64> = refunds.iter().map(|refund| refund.1).collect();
         assert!(amounts.contains(&200_000), "{refunds:?}");
         assert_eq!(count_events(&shop, "orders.preorder_cancelled").await, 1);

@@ -4,7 +4,6 @@
 //! `AccountVerification` giả trả số đã xác thực.
 
 mod engagement;
-mod fake_ledger;
 pub(crate) mod fake_shop;
 mod groups;
 mod loyalty;
@@ -229,7 +228,9 @@ pub(crate) async fn shop_with(test: &TestDatabase, settings: &[(&str, &str)]) ->
             events: vec![autoxide_compliance::api::CONSENT_WITHDRAWN],
             outbox: compliance.clone(),
         })
-        .provide::<dyn autoxide_ledger::api::Ledger>(Arc::new(fake_ledger::FakeLedger::default()))
+        .provide::<dyn autoxide_ledger::api::Ledger>(Arc::new(
+            autoxide_ledger::api::testing::FakeLedger::new(),
+        ))
         .module(Emitter {
             name: "orders",
             events: vec![

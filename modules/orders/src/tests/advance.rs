@@ -36,7 +36,7 @@ async fn place_paid(shop: &Shop, items: &[(Uuid, i64)]) -> (Uuid, i64) {
 
 /// Báo `ledger` đã thu khoản mới nhất; trả số tiền.
 async fn pay_last(shop: &Shop) -> i64 {
-    let payment = shop.ledger.payments.lock().unwrap().last().cloned().unwrap();
+    let payment = shop.ledger.last_payment().unwrap();
     emit(
         shop,
         &PaymentSucceeded(
@@ -118,7 +118,7 @@ async fn tra_truoc_mot_phan_tu_luc_dat_toi_tra_phan_con_lai() {
         allocate(&shop, id, phone).await;
         allocate(&shop, id, phone).await;
         assert_eq!(count_events(&shop, "orders.preorder_balance_requested").await, 1);
-        assert_eq!(shop.ledger.payments.lock().unwrap().len(), 2);
+        assert_eq!(shop.ledger.payments().len(), 2);
         let order = mine(&shop, id).await;
         assert_eq!(order["advance"]["status"], "balance_requested");
         assert!(order["advance"]["balance_due_at"].is_string());
@@ -126,7 +126,7 @@ async fn tra_truoc_mot_phan_tu_luc_dat_toi_tra_phan_con_lai() {
         assert_eq!(status, StatusCode::OK, "{link}");
         assert_eq!(minor(&link["data"]["amount"]), 225_750);
         assert_eq!(link["data"]["kind"], "redirect");
-        assert_eq!(shop.ledger.payments.lock().unwrap().len(), 2, "link còn hạn: dùng lại");
+        assert_eq!(shop.ledger.payments().len(), 2, "link còn hạn: dùng lại");
 
         // Trả xong → `paid`, hàng đặt trước giao được.
         assert_eq!(pay_last(&shop).await, 225_750);
@@ -181,12 +181,12 @@ async fn chua_tra_phan_con_lai_thi_chua_giao_qua_han_thi_huy_va_giu_lai() {
         let order = mine(&shop, id).await;
         assert_eq!(order["status"], "cancelled");
         assert_eq!(order["advance"]["status"], "cancelled");
-        let refunds = shop.ledger.refunds.lock().unwrap().clone();
+        let refunds = super::refund_rows(&shop.ledger);
         assert_eq!(refunds.len(), 1, "{refunds:?}");
         assert_eq!(refunds[0].1, 49_500, "hoàn phần trả trước trừ phần giữ lại");
         let income =
             AccountKey::new(shop.tree.a, crate::advance_cancel::CANCELLATION_INCOME, Currency::VND);
-        assert_eq!(shop.ledger.balance_of(&income), -49_500, "Có thu nhập huỷ đơn");
+        assert_eq!(shop.ledger.net_debit(&income), -49_500, "Có thu nhập huỷ đơn");
     })
     .await
     .unwrap();
@@ -210,7 +210,7 @@ async fn nguoi_mua_huy_truoc_moc_chot_duoc_hoan_du() {
             .await;
         assert_eq!(status, StatusCode::OK, "{cancelled}");
         drain(&shop).await;
-        let refunds = shop.ledger.refunds.lock().unwrap().clone();
+        let refunds = super::refund_rows(&shop.ledger);
         assert_eq!(refunds.iter().map(|refund| refund.1).sum::<i64>(), 99_000);
         // Trả bằng COD: không trả trước một phần.
         let (cart, quote) = cart_of(&shop, &[(phone, 1)]).await;

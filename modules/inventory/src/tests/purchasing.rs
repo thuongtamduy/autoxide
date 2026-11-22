@@ -1,209 +1,19 @@
 //! Nhập hàng: nhà cung cấp (công nợ qua `ledger`), đơn đặt hàng nhận một phần, phiếu nhập ghi sổ
 //! cái đúng một lần, ghi lại khi lỗi, trả hàng nhà cung cấp đảo bút toán.
 
-use autoxide_kernel::time::{Date, Timestamp};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
-use autoxide_kernel::error::Error;
-use autoxide_kernel::event::Actor;
-use autoxide_kernel::money::{Currency, Money};
-use autoxide_kernel::pagination::Page;
-use autoxide_kernel::reference::Submitted;
-use autoxide_kernel::tenancy::{OrgId, TenantContext};
-use autoxide_ledger::api::{
-    AccountKey, Entry, ExchangeRate, FlowSettings, Hold, JournalLine, JournalQuery, Ledger,
-    LineAccount, NewEntry, NewPayment, NewPayout, NewRefund, NewReversal, NewTransferPayment,
-    OpenAccount, Payment, Payout, Refund, Settled, Settlement, Side,
-};
+use autoxide_ledger::api::Ledger;
+use autoxide_ledger::api::Side;
+use autoxide_ledger::api::testing::FakeLedger;
 use autoxide_testkit::{TestApp, TestDatabase};
 use axum::http::StatusCode;
 use serde_json::{Value, json};
-use uuid::Uuid;
 
 use super::{Shop, assert_consistent, call, drain, level, shop_with};
 
-fn unused<T>() -> Result<T, Error> {
-    Err(Error::internal("not used by inventory"))
-}
-
-/// Một bút toán đã ghi: mã tham chiếu và các dòng (bên, tài khoản, số tiền).
-#[derive(Debug, Clone)]
-struct Posted {
-    reference: String,
-    lines: Vec<(Side, LineAccount, i64)>,
-}
-
-/// Sổ cái giả: nhớ bút toán (chống trùng theo mã tham chiếu), lỗi lần ghi kế khi được bảo.
-#[derive(Default)]
-struct FakeLedger {
-    posted: Mutex<Vec<Posted>>,
-    fail_next: Mutex<bool>,
-}
-
-impl FakeLedger {
-    fn references(&self) -> Vec<String> {
-        self.posted.lock().unwrap().iter().map(|post| post.reference.clone()).collect()
-    }
-}
-
-fn entry(reference: &str) -> Entry {
-    serde_json::from_value(json!({
-        "id": Uuid::now_v7(), "book_id": Uuid::now_v7(), "org_id": Uuid::now_v7(), "period_id": Uuid::now_v7(),
-        "effective_date": "2026-11-19", "posted_at": Timestamp::now(), "description": "", "source_module": "inventory",
-        "source_kind": "receipt", "source_id": null, "reference": reference, "reverses_entry_id": null,
-        "reversed_by_entry_id": null, "actor_user_id": null, "lines": [], "sequence": null, "sealed_at": null,
-    }))
-    .unwrap()
-}
-
-#[async_trait::async_trait]
-impl Ledger for FakeLedger {
-    async fn post(
-        &self,
-        _: &TenantContext,
-        _: Actor,
-        new: NewEntry,
-    ) -> Result<Submitted<Entry>, Error> {
-        if std::mem::take(&mut *self.fail_next.lock().unwrap()) {
-            // Mã của module `ledger` (không phải của module này): dựng lúc chạy.
-            let code = ["ledger", "period_closed"].join(".");
-            return Err(Error::conflict(code, "The period is closed."));
-        }
-        let mut posted = self.posted.lock().unwrap();
-        if posted.iter().any(|post| post.reference == new.reference) {
-            return Ok(Submitted::Replayed(entry(&new.reference)));
-        }
-        let lines = new
-            .lines
-            .iter()
-            .map(|line| (line.side, line.account.clone(), line.amount.minor()))
-            .collect();
-        posted.push(Posted { reference: new.reference.clone(), lines });
-        Ok(Submitted::Created(entry(&new.reference)))
-    }
-    async fn reverse(
-        &self,
-        _: &TenantContext,
-        _: Actor,
-        _: Uuid,
-        _: NewReversal,
-    ) -> Result<Submitted<Entry>, Error> {
-        unused()
-    }
-    async fn ensure_account(&self, _: &TenantContext, _: AccountKey) -> Result<Uuid, Error> {
-        unused()
-    }
-    async fn open_account(&self, _: &TenantContext, _: OpenAccount) -> Result<Uuid, Error> {
-        Ok(Uuid::from_u128(42))
-    }
-    async fn balance(
-        &self,
-        _: &TenantContext,
-        _: AccountKey,
-        _: Option<Date>,
-    ) -> Result<Money, Error> {
-        unused()
-    }
-    async fn entry(&self, _: &TenantContext, _: Uuid) -> Result<Option<Entry>, Error> {
-        unused()
-    }
-    async fn create_payment(
-        &self,
-        _: &TenantContext,
-        _: Actor,
-        _: NewPayment,
-    ) -> Result<Submitted<Payment>, Error> {
-        unused()
-    }
-    async fn refund(
-        &self,
-        _: &TenantContext,
-        _: Actor,
-        _: NewRefund,
-    ) -> Result<Submitted<Refund>, Error> {
-        unused()
-    }
-    async fn payment(&self, _: &TenantContext, _: Uuid) -> Result<Option<Payment>, Error> {
-        unused()
-    }
-    async fn balances(
-        &self,
-        _: &TenantContext,
-        keys: &[AccountKey],
-        _: Option<Date>,
-    ) -> Result<Vec<Money>, Error> {
-        let posted = self.posted.lock().unwrap();
-        Ok(keys
-            .iter()
-            .map(|key| {
-                let sum: i64 = posted
-                    .iter()
-                    .flat_map(|post| post.lines.iter())
-                    .filter(|(_, account, _)| *account == LineAccount::Key(key.clone()))
-                    .map(|(side, _, amount)| if *side == Side::Credit { *amount } else { -amount })
-                    .sum();
-                Money::new(sum, key.currency)
-            })
-            .collect())
-    }
-    async fn flow_settings(&self, _: &TenantContext, _: OrgId) -> Result<FlowSettings, Error> {
-        unused()
-    }
-    async fn settle(
-        &self,
-        _: &TenantContext,
-        _: Actor,
-        _: Settlement,
-    ) -> Result<Submitted<Settled>, Error> {
-        unused()
-    }
-    async fn hold_status(
-        &self,
-        _: &TenantContext,
-        _: &str,
-        _: &str,
-    ) -> Result<Option<Hold>, Error> {
-        unused()
-    }
-    async fn create_payout(
-        &self,
-        _: &TenantContext,
-        _: Actor,
-        _: NewPayout,
-    ) -> Result<Submitted<Payout>, Error> {
-        unused()
-    }
-    async fn create_transfer_payment(
-        &self,
-        _: &TenantContext,
-        _: Actor,
-        _: NewTransferPayment,
-    ) -> Result<Submitted<Payment>, Error> {
-        unused()
-    }
-    async fn exchange_rate(
-        &self,
-        _: &TenantContext,
-        _: Currency,
-        _: Currency,
-        _: Date,
-    ) -> Result<Option<ExchangeRate>, Error> {
-        unused()
-    }
-    async fn book_currency(&self, _: &TenantContext, _: OrgId) -> Result<Currency, Error> {
-        unused()
-    }
-    async fn journal(
-        &self,
-        _: &TenantContext,
-        _: JournalQuery,
-    ) -> Result<Page<JournalLine>, Error> {
-        unused()
-    }
-}
-
 async fn shop_with_ledger(test: &TestDatabase) -> (Shop, Arc<FakeLedger>) {
-    let ledger = Arc::new(FakeLedger::default());
+    let ledger = Arc::new(FakeLedger::new());
     let provided = ledger.clone();
     let shop = shop_with(test, move |builder, _| builder.provide::<dyn Ledger>(provided)).await;
     (shop, ledger)
@@ -292,7 +102,7 @@ async fn ghi_so_loi_thi_ghi_lai_va_tra_hang_dao_but_toan() {
         let tea = shop.catalog.item();
         let a = shop.tree.a.as_uuid();
         let supplier = supplier(&shop, "S-2").await;
-        *ledger.fail_next.lock().unwrap() = true;
+        ledger.fail_next_posts(1);
         let body = json!({"org_id": a, "supplier_id": supplier, "reference": "GRN-9",
                           "lines": [{"variant_id": tea, "quantity": 5, "unit_cost": vnd(10_000)}]});
         let (status, made) = call(&shop, "POST", "/receipts", "boss", Some(body)).await;
@@ -317,8 +127,8 @@ async fn ghi_so_loi_thi_ghi_lai_va_tra_hang_dao_but_toan() {
         assert!(returned["data"]["number"].as_str().unwrap().starts_with("TH-"));
         drain(&shop).await;
         assert_eq!(ledger.references().len(), 2);
-        let posted = ledger.posted.lock().unwrap().last().cloned().unwrap();
-        assert!(matches!(posted.lines[0], (Side::Debit, LineAccount::Key(_), 20_000)), "{posted:?}");
+        let posted = ledger.entries().last().cloned().unwrap();
+        assert_eq!((posted.lines[0].side, posted.lines[0].amount), (Side::Debit, 20_000), "{posted:?}");
         let (_, found) = call(&shop, "GET", &format!("/suppliers/{supplier}"), "boss", None).await;
         assert_eq!(found["data"]["payable"], vnd(30_000));
         assert_eq!(level(&shop, shop.tree.a, tea).await["on_hand"], 3);

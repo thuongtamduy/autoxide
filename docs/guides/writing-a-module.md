@@ -265,6 +265,17 @@ TEST_DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/postgres \
 
 [`src/tests.rs`](../../examples/external-module/bookmarks/src/tests.rs) of the example shows the tests a module should have: REST and MCP give the same result, permissions are checked, a concurrent write (two requests keeping the same link) lets one through, two tenants never see each other (`leak_check`), the tables follow the rules (`schema_ownership_violations`, `schema_tenancy_violations`), the job and the settings work. [`server/tests/cli.rs`](../../examples/external-module/server/tests/cli.rs) runs the real binary: `migrate up`, `openapi` and `mcp-manifest` include the module. [`check.sh`](../../examples/external-module/check.sh) runs format, lints and both test runs; keep a script like it and run it in CI.
 
+### Fakes of other modules
+
+When your module calls a trait another module publishes, test it against that module's fake instead of copying one. A module ships its fakes in `api::testing` behind the `testing` feature; enable it only for tests:
+
+```toml
+[dev-dependencies]
+autoxide-ledger = { git = "https://github.com/thuongtamduy/autoxide", tag = "vX.Y.Z", features = ["testing"] }
+```
+
+`autoxide_ledger::api::testing::FakeLedger` keeps entries, payments and refunds in memory with the same replay rules as the real ledger. Register `ledger.module()` before your module, read what your module did (`entries()`, `payments()`, `refunds()`, `balance`), and report a payment as collected with `ledger.succeed(&tenant, &payment)` — it writes `ledger.payment_succeeded` to the outbox like the real ledger, so your listener runs once you drain the dispatcher.
+
 ## 6. The rules of the core, checked on your crate
 
 Inside the Autoxide repository, `cargo xtask check` enforces the module rules. For a crate anywhere else, run the same source rules from a checkout of Autoxide at the tag you build on:

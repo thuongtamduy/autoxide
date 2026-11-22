@@ -129,7 +129,7 @@ async fn tra_gop_qua_doi_tac_va_cach_tra_cua_gio() {
         let (status, placed) = checkout(&buyer, Some("i-4"), request).await;
         assert_eq!(status, StatusCode::CREATED, "{placed}");
         assert_eq!(placed["data"]["orders"][0]["status"], "pending_payment");
-        assert_eq!(*shop.ledger.providers.lock().unwrap(), vec![Some("fe_credit".to_owned())]);
+        assert_eq!(shop.ledger.providers(), vec![Some("fe_credit".to_owned())]);
 
         // Cửa hàng tắt COD: giỏ không còn đưa COD.
         shop.orgs.set(shop.tree.a, "orders.cod_enabled", json!(false));
