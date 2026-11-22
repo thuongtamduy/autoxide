@@ -579,10 +579,12 @@ impl InvoicesService {
         };
         let Some(name) = found.einvoice_provider else { return Ok(()) };
         let status = self.provider(&name)?.status(tenant.id(), &provider_ref).await?;
-        let (next, authority, reason) = match status {
+        let (next, authority, reason, number) = match status {
             EInvoiceStatus::Pending => return Ok(()),
-            EInvoiceStatus::Accepted { authority_code } => ("accepted", authority_code, None),
-            EInvoiceStatus::Rejected { reason } => ("rejected", None, Some(reason)),
+            EInvoiceStatus::Accepted { authority_code, number } => {
+                ("accepted", authority_code, None, number)
+            }
+            EInvoiceStatus::Rejected { reason } => ("rejected", None, Some(reason), None),
         };
         let outbox = &self.outbox;
         let (authority, reason) = (&authority, &reason);
@@ -602,6 +604,11 @@ impl InvoicesService {
                 active.status = Set(next.to_owned());
                 if authority.is_some() {
                     active.authority_code = Set(authority.clone());
+                }
+                // Số do nhà cung cấp cấp lúc chấp nhận (số hợp lệ về thuế) — giữ số đã có nếu nhà
+                // cung cấp không trả.
+                if number.is_some() {
+                    active.provider_number = Set(number);
                 }
                 active.rejection_reason = Set(reason.clone());
                 active.updated_at = Set(now());

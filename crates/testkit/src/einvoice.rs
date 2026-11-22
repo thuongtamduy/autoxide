@@ -98,6 +98,7 @@ impl EInvoiceProvider for FakeEInvoiceProvider {
             Some(reason) => EInvoiceStatus::Rejected { reason },
             None => EInvoiceStatus::Accepted {
                 authority_code: Some(format!("CQT-{}", provider_ref.len())),
+                number: None,
             },
         })
     }

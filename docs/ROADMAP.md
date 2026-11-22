@@ -116,11 +116,11 @@ thật (P7).
       viết theo tài liệu công khai trước, hạng thử nghiệm cho tới khi chạy thử bằng tài khoản thật:
   - [x] Nền chung: tài khoản nhà cung cấp theo từng khách, khách tự cấu hình qua API (mã hoá, không trả lại secret),
         webhook tìm đúng khách rồi kiểm chữ ký; hướng dẫn viết bộ nối khác
-  - [ ] Thanh toán: SePay
+  - [x] Thanh toán: SePay
   - [ ] Thanh toán: MoMo
   - [ ] Vận chuyển: Giao Hàng Nhanh
   - [x] SMS: eSMS
-  - [ ] Hoá đơn điện tử: SePay eInvoice
+  - [x] Hoá đơn điện tử: SePay eInvoice
 - [ ] P8 — Luồng bán hàng mẫu chạy trọn (D-20261121-shop-first-order): một bài test đi từ sản phẩm → giỏ → đơn →
       thanh toán → vận chuyển → hoá đơn điện tử → tin nhắn, qua máy chủ giả của các nhà cung cấp ở P7, trên cả hai
       database; hướng dẫn "mở một cửa hàng" `docs/guides/shop.md` + `.vi.md` làm theo được từ quickstart; chỗ vướng tìm
