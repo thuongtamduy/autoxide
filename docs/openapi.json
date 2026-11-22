@@ -31098,6 +31098,13 @@
                 "description": "`active`, `abandoned`, `merged` or `converted`.",
                 "type": "string"
               },
+              "tender_limits": {
+                "description": "The most each other way to pay can cover for this cart, before checkout (e.g. the most loyalty\npoints usable). Only ways the shop offers and that can tell without more input appear (a gift\ncard needs its code). Pay with them through `tenders` at checkout.",
+                "items": {
+                  "$ref": "#/components/schemas/OrdersCartTenderLimit"
+                },
+                "type": "array"
+              },
               "totals": {
                 "$ref": "#/components/schemas/OrdersCartTotals"
               },
@@ -31126,6 +31133,7 @@
               "rejected_codes",
               "shipping",
               "payment_methods",
+              "tender_limits",
               "totals",
               "quote_token",
               "quote_expires_at",
@@ -62498,6 +62506,13 @@
             "description": "`active`, `abandoned`, `merged` or `converted`.",
             "type": "string"
           },
+          "tender_limits": {
+            "description": "The most each other way to pay can cover for this cart, before checkout (e.g. the most loyalty\npoints usable). Only ways the shop offers and that can tell without more input appear (a gift\ncard needs its code). Pay with them through `tenders` at checkout.",
+            "items": {
+              "$ref": "#/components/schemas/OrdersCartTenderLimit"
+            },
+            "type": "array"
+          },
           "totals": {
             "$ref": "#/components/schemas/OrdersCartTotals"
           },
@@ -62526,6 +62541,7 @@
           "rejected_codes",
           "shipping",
           "payment_methods",
+          "tender_limits",
           "totals",
           "quote_token",
           "quote_expires_at",
@@ -62853,6 +62869,33 @@
           "currency",
           "created_at",
           "updated_at"
+        ],
+        "type": "object"
+      },
+      "OrdersCartTenderLimit": {
+        "description": "The most a way to pay can cover for a cart.",
+        "properties": {
+          "kind": {
+            "description": "The tender, as sent in `tenders[].kind` at checkout: `points`, `store_credit`…",
+            "example": "points",
+            "type": "string"
+          },
+          "max_amount": {
+            "$ref": "#/components/schemas/Money",
+            "description": "The most it can take off what is left to pay."
+          },
+          "max_units": {
+            "description": "The same limit in the tender's own units, when it has them: for `points`, the most points\nusable (send that number or less as `{\"points\": n}`).",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "max_amount"
         ],
         "type": "object"
       },

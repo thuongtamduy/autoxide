@@ -39,6 +39,11 @@ impl Extensions {
         tenders.iter().find(|tender| tender.kind() == kind).cloned()
     }
 
+    /// Mọi tender đã cắm, theo thứ tự cắm.
+    pub(crate) fn tenders(&self) -> Vec<Arc<dyn Tender>> {
+        self.tenders.lock().map(|tenders| tenders.clone()).unwrap_or_default()
+    }
+
     /// Loại của mọi tender đã cắm.
     pub(crate) fn tender_kinds(&self) -> Vec<&'static str> {
         self.tenders

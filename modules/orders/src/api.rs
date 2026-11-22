@@ -506,6 +506,36 @@ pub trait Tender: Send + Sync {
 
     /// Trả chỗ giữ của `reference` (không có thì không làm gì).
     async fn release(&self, tenant: &TenantContext, reference: &str) -> Result<(), Error>;
+
+    /// Tối đa người mua `buyer` trả được bằng tender này cho một giỏ còn phải trả `max` — báo giá giỏ
+    /// hiện trước khi đặt (vd số điểm tối đa dùng được). Không ghi gì. `None`: không báo trước được
+    /// (cần mã như thẻ quà tặng, chưa đăng nhập, không có chương trình). Mặc định `None` để bên cài
+    /// cũ không phải sửa (D-038).
+    async fn limit(
+        &self,
+        tenant: &TenantContext,
+        buyer: Option<Uuid>,
+        max: Money,
+    ) -> Result<Option<TenderLimit>, Error> {
+        let _ = (tenant, buyer, max);
+        Ok(None)
+    }
+}
+
+/// Tối đa dùng được của một tender cho một giỏ ([`Tender::limit`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct TenderLimit {
+    /// Số tiền tối đa trừ được (không quá phần còn phải trả).
+    pub amount: Money,
+    /// Số đơn vị riêng của tender tương ứng (vd số điểm), khi có.
+    pub units: Option<i64>,
+}
+
+impl TenderLimit {
+    pub fn new(amount: Money, units: Option<i64>) -> Self {
+        TenderLimit { amount, units }
+    }
 }
 
 /// Điểm cắm cho module đăng ký SAU `orders` (bước 46–49): gọi trong `Module::start` của họ. Mỗi

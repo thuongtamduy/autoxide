@@ -581,6 +581,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261121-payment-amount-check](D-20261121-payment-amount-check.md)** `plans` và `bookings` so số thực thu của `ledger.payment_succeeded` với số phải trả — 2026-11-21
 - **[D-20261121-sepay-bank-feed](D-20261121-sepay-bank-feed.md)** Bộ nối SePay là nguồn biến động số dư (`BankFeed`), không phải cổng giữ tiền — 2026-11-21
 - **[D-20261121-vn-providers](D-20261121-vn-providers.md)** Bộ nối nhà cung cấp đầu tiên: SePay, MoMo, Giao Hàng Nhanh, eSMS, SePay eInvoice; tài khoản do từng khách tự cấu hình — 2026-11-21 · **chủ dự án quyết**
+- **[D-20261122-cart-tender-limits](D-20261122-cart-tender-limits.md)** Báo giá giỏ trả tối đa dùng được của từng tender (`tender_limits`, số điểm tối đa) — 2026-11-22
 - **[D-20261122-esms-environment](D-20261122-esms-environment.md)** Bộ nối eSMS: môi trường thử theo quy ước chung `environment`, vẫn là cờ `Sandbox` trong request — 2026-11-22
 
 ## Vận hành và hiệu năng
