@@ -139,6 +139,7 @@ pub struct GiftSelection {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[non_exhaustive]
 #[schema(as = PromotionsCart)]
+#[serde(deny_unknown_fields)]
 pub struct Cart {
     // Cửa hàng bán.
     #[schema(value_type = Uuid)]

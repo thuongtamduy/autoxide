@@ -35,6 +35,7 @@ pub(super) fn routes() -> OpenApiRouter<Arc<HttpState>> {
 
 /// The current password and the new one.
 #[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct ChangePasswordRequest {
     current_password: String,
     /// 12 to 128 characters.
@@ -43,6 +44,7 @@ pub(crate) struct ChangePasswordRequest {
 
 /// Email and password of an account.
 #[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct LoginRequest {
     /// Email of the account. Case and surrounding spaces do not matter.
     #[validate(length(min = 1, max = 254))]
@@ -80,6 +82,7 @@ impl MfaChallengeResponse {
 
 /// The second step of signing in.
 #[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct LoginMfaRequest {
     /// The `mfa_token` returned by `POST /api/v1/auth/login`.
     #[validate(length(min = 1, max = 256))]
@@ -92,6 +95,7 @@ pub(crate) struct LoginMfaRequest {
 
 /// A refresh token, as returned by sign-in or by the previous refresh.
 #[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct RefreshRequest {
     #[validate(length(min = 1, max = 256))]
     refresh_token: String,
@@ -388,7 +392,7 @@ async fn logout(
     security(("bearer" = [])),
     responses(
         (status = 200, description = "The user the access token belongs to, with the permissions of their roles in the tenant of the request — also in a tenant entered through a delegation or a support grant (`access`, `home_tenant_id`).", body = Data<MeResponse>),
-        (status = 401, description = "The access token is missing (code `auth.missing_token`), invalid (`auth.invalid_token`) or expired (`auth.token_expired`; get a new one with `POST /api/v1/auth/refresh`). Without a usable refresh token, sign in with `POST /api/v1/auth/login`.", body = Problem),
+        (status = 401, description = "The access token is missing (code `auth.missing_token`), invalid (`auth.invalid_token`) or expired (`auth.token_expired`; get a new one with `POST /api/v1/auth/refresh`), or its session was signed out or revoked (`auth.session_ended`). Without a usable refresh token, sign in with `POST /api/v1/auth/login`.", body = Problem),
         (status = 403, description = "The account is disabled; code `auth.user_disabled`.", body = Problem),
     )
 )]

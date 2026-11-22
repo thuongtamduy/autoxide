@@ -36,13 +36,19 @@ pub async fn serve<F>(settings: Settings, shutdown: F) -> Result<(), String>
 where
     F: Future<Output = ()> + Send + 'static,
 {
-    let (runtime, listener) = prepare(settings).await?;
-    run_server(runtime, listener, shutdown).await
+    let (runtime, listeners) = prepare(settings).await?;
+    run_server(runtime, listeners, shutdown).await
+}
+
+/// Các port đã mở: port của API, và port riêng của `/metrics` khi có.
+struct Listeners {
+    api: TcpListener,
+    metrics: Option<TcpListener>,
 }
 
 /// Khởi động mọi thứ và mở port, nhưng chưa nhận request. Tách riêng để test biết
 /// port thật (khi cấu hình port `0`, hệ điều hành chọn một port trống).
-async fn prepare(settings: Settings) -> Result<(Runtime, TcpListener), String> {
+async fn prepare(settings: Settings) -> Result<(Runtime, Listeners), String> {
     let startup = settings.startup.clone();
     let prepared = startup::before_start(&settings).await?;
     let runtime = match runtime::start(settings, Migrations::RequireApplied).await {
@@ -58,26 +64,40 @@ async fn prepare(settings: Settings) -> Result<(Runtime, TcpListener), String> {
         return Err(error);
     }
     let address = runtime.config.http.address;
-    match TcpListener::bind(address).await {
-        Ok(listener) => Ok((runtime, listener)),
+    let api = match TcpListener::bind(address).await {
+        Ok(listener) => listener,
         Err(error) => {
             let _ = runtime.database.close().await;
-            Err(format!("http: cannot listen on `{address}`: {error}"))
+            return Err(format!("http: cannot listen on `{address}`: {error}"));
         }
-    }
+    };
+    let metrics = match runtime.config.http.metrics_address {
+        Some(address) if runtime.metrics.is_some() => match TcpListener::bind(address).await {
+            Ok(listener) => Some(listener),
+            Err(error) => {
+                let _ = runtime.database.close().await;
+                return Err(format!(
+                    "http: cannot listen on `{address}` (AUTOXIDE_HTTP_METRICS_ADDRESS): {error}"
+                ));
+            }
+        },
+        _ => None,
+    };
+    Ok((runtime, Listeners { api, metrics }))
 }
 
 /// Khoảng giữa hai lần kiểm migration của các placement.
 const PLACEMENT_CHECK_EVERY: std::time::Duration = std::time::Duration::from_secs(60);
 
 /// Phục vụ tới khi `shutdown` hoàn thành, rồi đóng kết nối database.
-async fn run_server<F>(runtime: Runtime, listener: TcpListener, shutdown: F) -> Result<(), String>
+async fn run_server<F>(runtime: Runtime, listeners: Listeners, shutdown: F) -> Result<(), String>
 where
     F: Future<Output = ()> + Send + 'static,
 {
+    let Listeners { api: listener, metrics: metrics_listener } = listeners;
     // Tách `runtime` thành từng phần: router được chuyển hẳn (move) cho máy chủ,
     // còn database phải giữ lại để đóng sau khi máy chủ dừng.
-    let Runtime { config, database, modules, api, dispatcher, worker, draining } = runtime;
+    let Runtime { config, database, modules, api, dispatcher, worker, draining, metrics } = runtime;
     let address = listener.local_addr().map_err(|error| format!("http: {error}"))?;
     let role = config.process.role;
     tracing::info!(%address, modules = ?modules.names(), ?role, "listening");
@@ -87,6 +107,23 @@ where
     // chạy sau làm tiếp — không mất.
     let (stop_background, background_stopped) = tokio::sync::watch::channel(false);
     let mut background = tokio::task::JoinSet::new();
+    // `/metrics` trên port riêng: phục vụ tới khi việc nền dừng (sau máy chủ API), để máy thu số
+    // đo vẫn đọc được trong lúc rút.
+    if let (Some(listener), Some(router)) = (metrics_listener, metrics) {
+        if let Ok(address) = listener.local_addr() {
+            tracing::info!(%address, "serving /metrics");
+        }
+        let mut stopped = background_stopped.clone();
+        let grace = config.http.shutdown_grace;
+        background.spawn(async move {
+            let stop = async move {
+                let _ = stopped.wait_for(|stop| *stop).await;
+            };
+            if let Err(error) = http::serve(listener, router, stop, grace).await {
+                tracing::error!(error = %error, "the /metrics listener stopped");
+            }
+        });
+    }
     if role.runs_background_work() {
         let mut stopped = background_stopped.clone();
         background.spawn(dispatcher.run(async move {
@@ -295,11 +332,11 @@ mod tests {
             settings.modules.migrator().unwrap().up(&db).await.unwrap();
             db.close().await.unwrap();
 
-            let (runtime, listener) = prepare(settings).await.unwrap();
-            let address = listener.local_addr().unwrap();
+            let (runtime, listeners) = prepare(settings).await.unwrap();
+            let address = listeners.api.local_addr().unwrap();
             // `oneshot`: kênh gửi đúng một lần, đóng vai tín hiệu dừng.
             let (stop, stopped) = tokio::sync::oneshot::channel::<()>();
-            let server = tokio::spawn(run_server(runtime, listener, async {
+            let server = tokio::spawn(run_server(runtime, listeners, async {
                 let _ = stopped.await;
             }));
 
@@ -334,10 +371,10 @@ mod tests {
             settings.modules.migrator().unwrap().up(&db).await.unwrap();
             db.close().await.unwrap();
 
-            let (runtime, listener) = prepare(settings).await.unwrap();
-            let address = listener.local_addr().unwrap();
+            let (runtime, listeners) = prepare(settings).await.unwrap();
+            let address = listeners.api.local_addr().unwrap();
             let (stop, stopped) = tokio::sync::oneshot::channel::<()>();
-            let server = tokio::spawn(run_server(runtime, listener, async {
+            let server = tokio::spawn(run_server(runtime, listeners, async {
                 let _ = stopped.await;
             }));
 
@@ -347,6 +384,52 @@ mod tests {
 
             assert!(live.starts_with("HTTP/1.1 200 OK\r\n"), "{live}");
             assert!(!docs.contains("/api/v1/notes"), "{docs}");
+            assert_eq!(server.await.unwrap(), Ok(()));
+        })
+        .await
+        .unwrap();
+    }
+
+    /// `AUTOXIDE_HTTP_METRICS_ADDRESS`: `/metrics` chỉ có ở port riêng, không có ở port của API
+    /// (số đo không có xác thực). Test duy nhất của chương trình bật bộ thu số đo toàn tiến trình.
+    #[tokio::test]
+    async fn so_do_o_port_rieng_khong_o_port_api() {
+        TestDatabase::run(async |database| {
+            let source = ConfigSource::from_pairs([
+                ("DATABASE_URL", database.url()),
+                ("AUTOXIDE_HTTP_ADDRESS", "127.0.0.1:0"),
+                ("AUTOXIDE_HTTP_METRICS", "true"),
+                ("AUTOXIDE_HTTP_METRICS_ADDRESS", "127.0.0.1:0"),
+            ]);
+            let settings = settings::read_with(&source, vec![Box::new(Notes)]).unwrap();
+            autoxide_testkit::prepare_from_template(
+                &settings.config.database,
+                &settings.modules.migrator().unwrap(),
+            )
+            .await;
+            let db = Database::connect(&settings.config.database).await.unwrap();
+            settings.modules.migrator().unwrap().up(&db).await.unwrap();
+            db.close().await.unwrap();
+
+            let (runtime, listeners) = prepare(settings).await.unwrap();
+            let address = listeners.api.local_addr().unwrap();
+            let metrics_address = listeners.metrics.as_ref().unwrap().local_addr().unwrap();
+            let (stop, stopped) = tokio::sync::oneshot::channel::<()>();
+            let server = tokio::spawn(run_server(runtime, listeners, async {
+                let _ = stopped.await;
+            }));
+
+            let on_api = get(address, "/metrics").await;
+            let docs = get(address, "/api/v1/openapi.json").await;
+            let scraped = get(metrics_address, "/metrics").await;
+            let other = get(metrics_address, "/health/live").await;
+            stop.send(()).unwrap();
+
+            assert!(on_api.starts_with("HTTP/1.1 404"), "{on_api}");
+            assert!(!docs.contains("\"/metrics\""), "{docs}");
+            assert!(scraped.starts_with("HTTP/1.1 200 OK\r\n"), "{scraped}");
+            assert!(scraped.contains("text/plain"), "{scraped}");
+            assert!(other.starts_with("HTTP/1.1 404"), "{other}");
             assert_eq!(server.await.unwrap(), Ok(()));
         })
         .await
@@ -373,10 +456,10 @@ mod tests {
             settings.modules.migrator().unwrap().up(&db).await.unwrap();
             db.close().await.unwrap();
 
-            let (runtime, listener) = prepare(settings).await.unwrap();
-            let address = listener.local_addr().unwrap();
+            let (runtime, listeners) = prepare(settings).await.unwrap();
+            let address = listeners.api.local_addr().unwrap();
             let (stop, stopped) = tokio::sync::oneshot::channel::<()>();
-            let server = tokio::spawn(run_server(runtime, listener, async {
+            let server = tokio::spawn(run_server(runtime, listeners, async {
                 let _ = stopped.await;
             }));
             assert!(get(address, "/health/ready").await.starts_with("HTTP/1.1 200 OK\r\n"));

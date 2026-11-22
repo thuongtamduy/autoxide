@@ -179,6 +179,7 @@ async fn get_import(
 /// What to export.
 #[derive(Debug, Default, Deserialize, Validate, ToSchema)]
 #[schema(as = CatalogExportRequest)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct ExportRequest {
     /// Only products of this unit and the units below it; leave out for everything you can read.
     pub org_id: Option<Uuid>,

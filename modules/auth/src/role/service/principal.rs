@@ -51,8 +51,31 @@ impl RoleService {
         tenant: &TenantContext,
         user_id: Uuid,
     ) -> Result<Option<(User, Principal)>, Error> {
+        let found = self.user_principal_in(tenant, user_id, None).await?;
+        Ok(found.map(|(user, principal, _)| (user, principal)))
+    }
+
+    /// Như [`Self::user_principal`], kèm phiên `session` (họ refresh token cấp access token) còn
+    /// sống không — vẫn MỘT câu: đăng xuất, thu hồi phiên, đổi mật khẩu có hiệu lực ngay với access
+    /// token đã cấp, không chờ token hết hạn (D-20261121-access-token-revocation).
+    pub(crate) async fn session_principal(
+        &self,
+        tenant: &TenantContext,
+        user_id: Uuid,
+        session: Uuid,
+    ) -> Result<Option<(User, Principal, bool)>, Error> {
+        self.user_principal_in(tenant, user_id, Some(session)).await
+    }
+
+    async fn user_principal_in(
+        &self,
+        tenant: &TenantContext,
+        user_id: Uuid,
+        session: Option<Uuid>,
+    ) -> Result<Option<(User, Principal, bool)>, Error> {
+        use crate::session::entity as refresh;
         use sea_orm::FromQueryResult as _;
-        use sea_orm::sea_query::{Asterisk, ExprTrait as _};
+        use sea_orm::sea_query::{Alias, Asterisk, ExprTrait as _};
         let tenant_id = tenant.id().as_uuid();
         // Mỗi dòng: cả dòng người dùng, kèm một role và một permission của role đó. Người dùng
         // không có role nào vẫn ra một dòng (LEFT JOIN), cột role là NULL.
@@ -84,13 +107,30 @@ impl RoleService {
             )
             .and_where(Expr::col((user::Entity, user::Column::Id)).eq(user_id))
             .and_where(Expr::col((user::Entity, user::Column::TenantId)).eq(tenant_id));
+        if let Some(session) = session {
+            // Phiên còn sống = họ còn refresh token chưa dùng, chưa thu hồi. Đăng xuất thu hồi cả
+            // họ; đổi mật khẩu, khoá tài khoản thu hồi token chưa dùng của mọi họ. Index
+            // `auth_refresh_token_family_idx` (tenant_id, family_id).
+            let mut live = Query::select();
+            live.expr(Expr::val(1))
+                .from(refresh::Entity)
+                .and_where(Expr::col((refresh::Entity, refresh::Column::TenantId)).eq(tenant_id))
+                .and_where(Expr::col((refresh::Entity, refresh::Column::FamilyId)).eq(session))
+                .and_where(Expr::col((refresh::Entity, refresh::Column::UsedAt)).is_null())
+                .and_where(Expr::col((refresh::Entity, refresh::Column::RevokedAt)).is_null());
+            select.expr_as(Expr::exists(live), Alias::new(SESSION_LIVE));
+        }
         let rows = tenant.database().read().query_all(&select).await?;
         let Some(first) = rows.first() else {
             return Ok(None);
         };
         let user = User::from(user::Model::from_query_result(first, "")?);
+        let live = match session {
+            Some(_) => first.try_get::<bool>("", SESSION_LIVE)?,
+            None => true,
+        };
         let principal = principal_from_rows(tenant, user_id, &rows, &self.catalog).await?;
-        Ok(Some((user, principal)))
+        Ok(Some((user, principal, live)))
     }
 
     /// `Ok` nếu `actor` có mọi permission người dùng `target` có. Dùng trước khi một
@@ -128,6 +168,9 @@ impl RoleService {
         ))
     }
 }
+
+/// Tên cột "phiên còn sống" trong câu của [`RoleService::session_principal`].
+const SESSION_LIVE: &str = "session_live";
 
 /// Giá trị cột `effect` của `auth_role_permission`.
 pub(super) const ALLOW: &str = "allow";

@@ -7,7 +7,8 @@
 //!   kỳ vẫn trả được.
 //! - `POST /billing-periods/{id}/pay` → lượt thu ở cổng của khách vận hành, trả `checkout_url`.
 //! - Event `ledger.payment_succeeded` (`source_module = plans`, `source_id` = ID kỳ) → `mark_paid`.
-//!   Event đến lại vô hại (kỳ đã trả thì bỏ qua).
+//!   Event đến lại vô hại (kỳ đã trả thì bỏ qua). Số thực thu (`amount`) nhỏ hơn số của kỳ (hay
+//!   khác loại tiền) thì kỳ vẫn mở.
 //!
 //! Giá của gói là số khách trả (đã gồm thuế). `plans` không tự đánh số, không tự tính thuế, không tự
 //! ghi sổ.
@@ -321,8 +322,21 @@ impl EventHandler for PaymentListener {
             .or_else(|| event.payload["payment_id"].as_str())
             .unwrap_or("payment")
             .to_owned();
-        match self.0.mark_paid(Actor::system(), period, reference, None).await {
+        // Số thực thu (`ledger` ghi cả khoản thiếu khi đối soát `accept_received`). Event không
+        // mang số (bản cũ) thì coi như thu đủ — như trước.
+        let received = match event.payload.get("amount") {
+            Some(amount) if !amount.is_null() => {
+                Some(serde_json::from_value::<Money>(amount.clone()).map_err(Error::internal)?)
+            }
+            _ => None,
+        };
+        match self.0.mark_paid(Actor::system(), period, reference, None, received).await {
             Ok(_) => Ok(()),
+            // Thu thiếu: kỳ vẫn mở (khách trả nốt hay nhà vận hành thu tay); ghi lại để đối soát.
+            Err(error) if error.code() == "plans.billing_period_underpaid" => {
+                tracing::warn!(billing_period_id = %period, "payment does not cover the billing period");
+                Ok(())
+            }
             // Đã trả / đã huỷ (event đến lại): không làm gì.
             Err(error) if error.code() == "plans.billing_period_not_payable" => Ok(()),
             Err(error) if error.code() == "plans.billing_period_not_found" => Ok(()),

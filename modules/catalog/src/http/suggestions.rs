@@ -32,6 +32,7 @@ pub(crate) fn routes(service: Arc<CatalogService>) -> OpenApiRouter {
 /// Which language to draft.
 #[derive(Debug, Deserialize, Validate, ToSchema)]
 #[schema(as = CatalogSuggestionRequest)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct SuggestionRequest {
     /// Language of the draft (one of the configured product languages).
     #[schema(example = "vi")]
