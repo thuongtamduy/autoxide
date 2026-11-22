@@ -556,6 +556,11 @@ impl Modules {
         self.personal_data.clone()
     }
 
+    /// Sổ khối của mọi module (bước 67): test và công cụ đọc dữ liệu khối như `content` đọc.
+    pub fn blocks(&self) -> crate::blocks::Blocks {
+        self.catalog.blocks()
+    }
+
     /// Sổ đối tượng các module đã đăng ký (gọi sau [`start`](Self::start)).
     pub fn resources(&self) -> crate::resource::ResourceDirectory {
         self.resources.clone()

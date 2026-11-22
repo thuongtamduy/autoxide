@@ -5,6 +5,7 @@
 
 pub mod api;
 mod attributes;
+mod blocks;
 mod bulk;
 mod card;
 mod categories;
@@ -110,6 +111,10 @@ impl Module for CatalogModule {
         vec![("vi", include_str!("../locales/vi.json"))]
     }
 
+    fn blocks(&self) -> Vec<autoxide_kernel::blocks::BlockType> {
+        blocks::all()
+    }
+
     fn features(&self) -> Vec<Feature> {
         service::features()
     }
@@ -146,6 +151,11 @@ impl Module for CatalogModule {
             files: context.require::<dyn autoxide_files::api::Files>().ok(),
             secrets: context.require::<autoxide_kernel::secret::SecretKey>()?,
         });
+        // Khối bán hàng cho trang dựng từ khối (bước 67): một bộ trả dữ liệu cho cả ba khối.
+        let block_data = Arc::new(blocks::CatalogBlocks(service.clone()));
+        for block in blocks::all() {
+            context.block_data(block.name, block_data.clone())?;
+        }
         // Bộ sưu tập trong sổ đối tượng: banner, menu trỏ tới (bước 55).
         context.resource_type(
             collections::resource::COLLECTION,

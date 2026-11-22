@@ -12,6 +12,7 @@ mod advance;
 mod advance_cancel;
 mod advance_flow;
 pub mod api;
+mod blocks;
 mod buyer_identity;
 mod carts;
 mod checkout;
@@ -109,6 +110,10 @@ impl Module for OrdersModule {
         permissions::all()
     }
 
+    fn blocks(&self) -> Vec<autoxide_kernel::blocks::BlockType> {
+        blocks::all()
+    }
+
     fn events(&self) -> Vec<autoxide_kernel::event::EventInfo> {
         events::all()
     }
@@ -194,6 +199,9 @@ impl Module for OrdersModule {
         context.provide::<dyn api::OrderRefunds>(service.clone())?;
         context.provide::<dyn api::OrderLookups>(service.clone())?;
         context.provide::<dyn autoxide_kernel::sms::VerifiedPhoneTokens>(service.clone())?;
+        // Khối đánh giá cho trang dựng từ khối (bước 67); ba khối nút chỉ có props.
+        context
+            .block_data(blocks::REVIEWS.name, Arc::new(blocks::ReviewBlocks(service.clone())))?;
         // Trả lời tự động về trạng thái đơn cho `support` (D-230), khi có `support`.
         if let Ok(facts) = context.require::<dyn autoxide_support::api::SupportFacts>() {
             facts.attach(Arc::new(facts::OrderFacts::new(context.translations().clone())))?;
