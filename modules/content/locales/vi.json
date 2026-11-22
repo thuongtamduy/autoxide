@@ -353,5 +353,7 @@
   "field:the page has no block layout yet; compose one first": "trang chưa có bố cục khối; hãy tạo bố cục trước",
   "field:must name at most {max} blocks": "chỉ được nêu tối đa {max} khối",
   "field:is not a JSON Patch: {error}": "không phải JSON Patch: {error}",
-  "field:is not JSON: {error}": "không phải JSON: {error}"
+  "field:is not JSON: {error}": "không phải JSON: {error}",
+  "content.site_health_too_soon": "Website vừa được kiểm chưa tới một giờ; xem kết quả bằng GET /api/v1/content/site-health.",
+  "text:Fix {count} problems found on the website": "Sửa {count} vấn đề tìm thấy trên website"
 }

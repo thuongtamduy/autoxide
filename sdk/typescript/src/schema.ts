@@ -8800,6 +8800,18 @@ export type Data_Health = {
 };
 
 /** Envelope of a single result. */
+export type Data_HealthResponse = {
+  /** The last check of a website. */
+  data: {
+    checked_at: string;
+    /** Problems found, by kind, at most 200 of each kind; each says how to fix it. */
+    findings: Finding[];
+    /** The website (organization unit). */
+    org_id: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_Home = {
   /** What this server is and where to go next. */
   data: {
@@ -10434,6 +10446,17 @@ export type Data_Option_EditLock = {
     mine: boolean;
     /** The user holding the lock. */
     user_id: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_Option_HealthResponse = {
+  data: null | {
+    checked_at: string;
+    /** Problems found, by kind, at most 200 of each kind; each says how to fix it. */
+    findings: Finding[];
+    /** The website (organization unit). */
+    org_id: string;
   };
 };
 
@@ -17190,6 +17213,24 @@ export type FindView = {
   incomplete: string[];
 };
 
+/** One problem found on the website. */
+export type Finding = {
+  /** What is wrong: the broken link, the hidden record (`kind:id`), the image id… */
+  detail: string;
+  /** The published entry it is on. */
+  entry_id: string;
+  /** How to fix it with the API, e.g. `PATCH /api/v1/content/entries/{id}`. */
+  fix: string;
+  /**
+   * `seo_description_missing`, `title_duplicate`, `image_alt_missing`, `link_broken`,
+   * `record_not_public` or `countdown_over`.
+   */
+  kind: string;
+  locale: string;
+  /** Public address of the entry. */
+  path: string;
+};
+
 /** How serious a finding is. */
 export type FindingLevel = "error" | "warning";
 
@@ -17425,6 +17466,15 @@ export type GuestCancelRequest = {
 export type Health = {
   /** Always `ok`; a service that is not healthy answers with an error instead. */
   status: string;
+};
+
+/** The last check of a website. */
+export type HealthResponse = {
+  checked_at: string;
+  /** Problems found, by kind, at most 200 of each kind; each says how to fix it. */
+  findings: Finding[];
+  /** The website (organization unit). */
+  org_id: string;
 };
 
 /** Why a message is hidden. */
@@ -39972,6 +40022,33 @@ export interface paths {
         409: Problem;
         412: Problem;
         428: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/content/site-health": {
+    /** Get the last health check of a website. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { org_id: string }; };
+      responses: {
+        200: Data_Option_HealthResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/content/site-health/{org_id}/run": {
+    /** Check the health of a website now. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { org_id: string }; };
+      responses: {
+        200: Data_HealthResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
