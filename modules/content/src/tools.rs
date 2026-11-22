@@ -406,6 +406,7 @@ fn entry_tools(service: &Arc<ContentService>) -> Vec<Tool> {
                     };
                     let new = NewEntry {
                         kind,
+                        type_id: None,
                         locale: input.locale,
                         parent_id: input.parent_id,
                         org_id: input.org_id,

@@ -474,8 +474,11 @@ sẵn, không sinh code; kết quả luôn là bản nháp.
 - [ ] Đầu trang và chân trang của cả website (D-234): bố cục khối có nháp / đăng, theo ngôn ngữ, kế thừa theo nút,
       bản chủ đề kèm được bản riêng; `GET /public/site` một lời gọi cho khung website, cache tới đúng mốc đổi chủ
       đề, không query khi cache nóng; đo p99 trên cả hai database
-- [ ] Loại nội dung tự định nghĩa (D-235): khách tạo loại (đội ngũ, dự án, chi nhánh…) với trường riêng của bước
-      51, mục dùng lại nháp / lịch sử / bản dịch / SEO, trang chi tiết dựng sẵn, khối danh sách, API công khai có lọc
+- [x] Loại nội dung tự định nghĩa (D-235), phần chính: khách tạo loại (đội ngũ, dự án, chi nhánh…) với trường riêng
+      của bước 51 (đích `content.type.<key>`), mục `kind = custom` dùng lại nháp / lịch sử / bản dịch / SEO, đường dẫn
+      theo tiền tố, API công khai của loại (D-20261122-content-types)
+- [ ] Loại nội dung tự định nghĩa, phần sau: trang chi tiết dựng sẵn (`detail_layout`, khối `content.entry_field`),
+      khối `content.type_list`, lọc `cf.<key>` ở danh sách công khai, AI gợi ý bộ trường (bản nháp), hạn mức theo gói
 - [ ] AI tạo trang và sửa tiếp bằng trò chuyện (job, kết quả qua bộ kiểm, thử lại có giới hạn, bản nháp
       `ai_assisted`, lịch sử trò chuyện để hoàn tác); bộ nháp chiến dịch từ một chương trình khuyến mại
 - [ ] Kiểm tra sức khoẻ website vào hộp việc: thiếu SEO / alt, link gãy, khối tham chiếu bản ghi đã ẩn, đường dẫn

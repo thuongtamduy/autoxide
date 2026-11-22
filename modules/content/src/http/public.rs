@@ -414,7 +414,7 @@ use crate::publishing::reading::PostFilter;
 use crate::taxonomy::terms::Taxonomy;
 
 /// Ghép thông tin cho một trang bản công khai.
-async fn views(
+pub(crate) async fn views(
     service: &ContentService,
     tenant: &TenantContext,
     page: Page<crate::publishing::Published>,

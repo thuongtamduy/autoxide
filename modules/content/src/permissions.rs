@@ -50,6 +50,12 @@ pub(crate) const CONTENT_BANNERS: Permission = Permission::new(
 )
 .scoped();
 
+pub(crate) const CONTENT_TYPES: Permission = Permission::new(
+    "content.types.manage",
+    "Create, change and delete the tenant's own content types (team, projects, branches…).",
+)
+.scoped();
+
 // Theo nút (bước 34, D-208): đọc, viết, đăng, xoá áp theo độ sâu — người của một cửa hàng chỉ làm
 // trên bài của cửa hàng mình. `content.manage` (danh mục, thẻ, tác giả, chuyển hướng) giữ cấp khách.
 
@@ -63,6 +69,7 @@ pub(crate) fn all() -> Vec<Permission> {
         CONTENT_DELETE,
         CONTENT_MANAGE,
         CONTENT_BANNERS,
+        CONTENT_TYPES,
     ]
 }
 

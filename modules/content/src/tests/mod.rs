@@ -18,6 +18,7 @@ pub(crate) fn fields(title: &str) -> EntryFields {
 pub(crate) fn post(title: &str) -> NewEntry {
     NewEntry {
         kind: Kind::Post,
+        type_id: None,
         locale: None,
         parent_id: None,
         org_id: None,
@@ -28,6 +29,7 @@ pub(crate) fn post(title: &str) -> NewEntry {
 pub(crate) fn page(title: &str, parent: Option<Uuid>) -> NewEntry {
     NewEntry {
         kind: Kind::Page,
+        type_id: None,
         locale: None,
         parent_id: parent,
         org_id: None,

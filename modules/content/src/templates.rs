@@ -259,6 +259,7 @@ impl ContentService {
         self.fill(&mut body, &file.locale, &context)?;
         let new = NewEntry {
             kind: Kind::Page,
+            type_id: None,
             locale: Some(file.locale.clone()),
             parent_id: input.parent_id,
             org_id: input.org_id,

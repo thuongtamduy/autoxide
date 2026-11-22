@@ -15,6 +15,7 @@ mod m0017_restriction;
 mod m0018_custom_fields;
 mod m0020_published_custom_fields;
 mod m0021_banners;
+mod m0028_content_types;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 use autoxide_kernel::tenancy::migration::TenantTable;
@@ -158,5 +159,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(m0020_published_custom_fields::Migration),
         // Vị trí hiển thị và banner (bước 55, D-236).
         Box::new(m0021_banners::Migration),
+        // Loại nội dung tự định nghĩa và cột `type_id` của mục (bước 67, D-235).
+        Box::new(m0028_content_types::Migration),
     ]
 }

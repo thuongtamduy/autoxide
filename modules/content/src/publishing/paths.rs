@@ -18,7 +18,7 @@ use sea_orm::sea_query::{Expr, OnConflict};
 use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, Set};
 use uuid::Uuid;
 
-use crate::entity::{published, redirect, tree_lock};
+use crate::entity::{content_type, published, redirect, tree_lock};
 use crate::entries::{Entry, Kind};
 
 /// Khoá cây của ngôn ngữ `locale` tới hết `transaction`.
@@ -58,6 +58,22 @@ pub(crate) async fn path_of<C: ConnectionTrait>(
 ) -> Result<Result<String, ()>, Error> {
     if entry.kind == Kind::Post.as_str() {
         return Ok(Ok(format!("/{post_prefix}/{}", entry.slug)));
+    }
+    if entry.kind == Kind::Custom.as_str() {
+        // Mục của loại tự định nghĩa (D-235): loại có trang → `/<tiền tố>/<slug>`; loại không có
+        // trang → đường dẫn nội bộ không bắt đầu bằng `/`, nên `GET /public/resolve` (luôn nhận
+        // đường dẫn `/…`) không bao giờ trả nó, mà khoá duy nhất của đường dẫn vẫn đúng.
+        let found = match entry.type_id {
+            Some(id) => content_type::Entity::find_by_id(id).scoped(tenant).one(connection).await?,
+            None => None,
+        };
+        return Ok(match found {
+            Some(row) if row.routable => {
+                Ok(format!("/{}/{}", row.path_prefix.unwrap_or_default(), entry.slug))
+            }
+            Some(row) => Ok(format!("~{}/{}", row.key, entry.slug)),
+            None => Err(()),
+        });
     }
     let Some(parent) = entry.parent_id else {
         return Ok(Ok(format!("/{}", entry.slug)));

@@ -49,6 +49,24 @@ impl ContentService {
         } else {
             BTreeSet::new()
         };
+        // Mục của loại tự định nghĩa (D-235): trường công khai của chính loại, một lần mỗi loại.
+        let mut type_keys: std::collections::HashMap<Uuid, BTreeSet<String>> = Default::default();
+        let typed: BTreeSet<Uuid> = rows
+            .iter()
+            .filter(|row| row.custom_fields.is_some())
+            .filter_map(|row| row.type_id)
+            .collect();
+        if !typed.is_empty() {
+            let types = crate::entity::content_type::Entity::find()
+                .scoped(tenant)
+                .filter(crate::entity::content_type::Column::Id.is_in(typed))
+                .all(tenant.database().read())
+                .await?;
+            for row in types {
+                let target = crate::types::field_target(&row.key);
+                type_keys.insert(row.id, self.custom_fields.public_keys(tenant, &target).await?);
+            }
+        }
         let mut authors =
             crate::taxonomy::authors::authors_of(tenant.database().read(), tenant, &ids).await?;
         // Ảnh đại diện của tác giả cũng tra qua `media`: ảnh riêng tư thì không lộ cả ID.
@@ -159,7 +177,7 @@ impl ContentService {
                 PublicView {
                     custom_fields: autoxide_kernel::custom_fields::CustomFields::pick_public(
                         row.custom_fields.as_deref(),
-                        &public_keys,
+                        row.type_id.and_then(|id| type_keys.get(&id)).unwrap_or(&public_keys),
                     ),
                     featured: row.featured_media_id.and_then(image),
                     og: row.og_media_id.and_then(image),
@@ -270,7 +288,10 @@ impl ContentService {
         let mut select = published::Entity::find()
             .scoped(tenant)
             .filter(published::Column::RestrictedAt.is_null())
-            .filter(on_site(&site.lineage_ids()));
+            .filter(on_site(&site.lineage_ids()))
+            // Mục của loại không có trang (đường dẫn nội bộ `~…`) hay loại đã tắt không vào sitemap.
+            .filter(published::Column::Path.starts_with("/"))
+            .filter(crate::types::public::type_is_active(tenant));
         // Sandbox (D-232): sitemap rỗng — bản thử không được máy tìm kiếm thu thập.
         if tenant.is_sandbox() {
             select = select.filter(published::Column::EntryId.is_null());

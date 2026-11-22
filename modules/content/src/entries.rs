@@ -63,6 +63,9 @@ pub(crate) enum Kind {
     Post,
     /// A page, at `/<parent slugs>/<slug>`; pages nest.
     Page,
+    /// An entry of a custom content type (`type_id`), at `/<type path prefix>/<slug>` when the type
+    /// has pages.
+    Custom,
 }
 
 impl Kind {
@@ -70,6 +73,7 @@ impl Kind {
         match self {
             Kind::Post => "post",
             Kind::Page => "page",
+            Kind::Custom => "custom",
         }
     }
 
@@ -77,6 +81,7 @@ impl Kind {
         match raw {
             "post" => Some(Kind::Post),
             "page" => Some(Kind::Page),
+            "custom" => Some(Kind::Custom),
             _ => None,
         }
     }
@@ -142,6 +147,8 @@ pub(crate) struct EntryFields {
 #[derive(Debug, Clone)]
 pub(crate) struct NewEntry {
     pub kind: Kind,
+    /// Loại nội dung tự định nghĩa (bắt buộc khi `kind = custom`).
+    pub type_id: Option<Uuid>,
     /// `None`: ngôn ngữ mặc định.
     pub locale: Option<String>,
     /// Trang cha (chỉ trang).
@@ -187,6 +194,8 @@ pub(crate) enum EntrySort {
 #[derive(Debug, Clone, Default)]
 pub(crate) struct EntryFilter {
     pub kind: Option<Kind>,
+    /// Chỉ mục của loại tự định nghĩa này.
+    pub type_id: Option<Uuid>,
     pub locale: Option<String>,
     pub status: Option<Status>,
     pub parent: ParentFilter,
@@ -247,6 +256,7 @@ pub(crate) fn blank(
         tenant_id: tenant.id().as_uuid(),
         org_id: Some(autoxide_kernel::tenancy::root_of(tenant.id()).as_uuid()),
         kind: kind.as_str().to_owned(),
+        type_id: None,
         locale: locale.to_owned(),
         translation_group_id: id,
         parent_id: parent,

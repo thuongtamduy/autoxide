@@ -26,6 +26,7 @@ mod tests_compliance;
 mod tests_tenancy;
 #[cfg(test)]
 mod tests_web;
+mod types;
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -98,6 +99,9 @@ pub(crate) fn routes(service: Arc<ContentService>) -> OpenApiRouter {
             redirects::update_redirect,
             redirects::delete_redirect
         ))
+        .routes(routes!(types::list_types, types::create_type))
+        .routes(routes!(types::get_type, types::update_type, types::delete_type))
+        .routes(routes!(types::public_type_entries))
         .routes(routes!(templates::list_templates))
         .routes(routes!(templates::draft_from_template))
         .routes(routes!(public::preview_token))

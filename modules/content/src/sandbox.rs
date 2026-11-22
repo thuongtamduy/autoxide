@@ -90,6 +90,7 @@ impl Pages {
     ) -> Result<Uuid, Error> {
         let new = NewEntry {
             kind: Kind::Page,
+            type_id: None,
             locale: Some(row.locale.clone()),
             parent_id: parent,
             org_id: None,
@@ -195,6 +196,7 @@ impl PromoteApply for Pages {
             None => {
                 let new = NewEntry {
                     kind: Kind::Page,
+                    type_id: None,
                     locale: Some(row.locale.clone()),
                     parent_id: parent,
                     org_id: None,

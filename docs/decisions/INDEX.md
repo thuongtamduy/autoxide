@@ -473,6 +473,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261119-step55-banners](D-20261119-step55-banners.md)** Bước 55: banner trỏ tới đối tượng qua sổ đối tượng, permission `content.banners`, phiên bản bằng `updated_at` — 2026-11-19
 - **[D-20261121-avif-feature](D-20261121-avif-feature.md)** AVIF thành feature cargo `avif`, không bật mặc định — 2026-11-21
 - **[D-20261121-s3-client](D-20261121-s3-client.md)** Lưu file: `rusty-s3` + `reqwest` cho S3, ổ đĩa tự viết, thay `object_store` — 2026-11-21
+- **[D-20261122-content-types](D-20261122-content-types.md)** Loại nội dung tự định nghĩa: mục `kind = custom` trên bảng mục sẵn có, trường qua đích con `content.type.<key>` của kernel — 2026-11-22
 - **[D-20261122-layout-public](D-20261122-layout-public.md)** Đọc công khai trang dựng từ khối: dữ liệu khối trong `blocks_data`, ETag theo cả câu trả lời; số đo p99 — 2026-11-22
 - **[D-20261122-page-layout](D-20261122-page-layout.md)** Thân `layout` của trang: cùng cột `body`, sửa từng phần bằng JSON Patch tự viết, khoá sửa tách mục riêng — 2026-11-22
 

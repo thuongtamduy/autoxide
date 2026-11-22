@@ -39,6 +39,7 @@ mod suggest;
 mod taxonomy;
 mod templates;
 mod tools;
+mod types;
 mod usages;
 mod work;
 
@@ -91,6 +92,14 @@ impl Module for ContentModule {
                 permissions::CONTENT_WRITE,
             )
             .visibilities(&["internal", "public"]),
+            // Loại nội dung tự định nghĩa (bước 67, D-235): mỗi loại một bộ trường `content.type.<key>`.
+            autoxide_kernel::custom_fields::CustomFieldTarget::new(
+                types::TARGET,
+                permissions::CONTENT_READ,
+                permissions::CONTENT_WRITE,
+            )
+            .visibilities(&["internal", "public"])
+            .with_subtypes(),
         ]
     }
 
