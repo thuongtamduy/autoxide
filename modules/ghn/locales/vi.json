@@ -1,0 +1,15 @@
+{
+  "ghn.account_incomplete": "Tài khoản GHN thiếu `{field}`. Hãy thêm vào tài khoản hãng (token trong `credentials`, `shop_id` trong `settings`).",
+  "ghn.setting_invalid": "Cài đặt `{field}` của tài khoản GHN không hợp lệ: {problem}.",
+  "ghn.shop_not_found": "Token GHN này không quản lý cửa hàng `{shop_id}`, hoặc cửa hàng đang bị khoá. Hãy kiểm tra ShopId trong trang quản trị GHN.",
+  "ghn.permission_missing": "Tài khoản GHN không có quyền cho việc này. Hãy liên hệ GHN để được cấp quyền.",
+  "ghn.currency_unsupported": "GHN chỉ nhận tiền VND; yêu cầu này dùng {currency}.",
+  "ghn.country_unsupported": "GHN chỉ giao trong Việt Nam; địa chỉ này ở {country}.",
+  "ghn.service_unknown": "GHN không có dịch vụ `{service}`. Dùng `2` (hàng nhẹ, dưới 20 kg) hoặc `5` (hàng nặng hoặc nhiều kiện).",
+  "ghn.direction_unsupported": "Bộ nối GHN chưa tạo được vận đơn lấy hàng trả từ người mua. Hãy tạo đơn trả trong trang quản trị GHN.",
+  "ghn.phone_invalid": "GHN từ chối số điện thoại của người gửi hoặc người nhận. Hãy sửa số rồi thử lại.",
+  "ghn.address_not_recognized": "GHN không nhận ra địa chỉ (tên tỉnh / phường xã). Hãy kiểm tra địa chỉ rồi thử lại.",
+  "ghn.route_not_supported": "GHN không phục vụ tuyến này với dịch vụ đã chọn. Hãy chọn dịch vụ hoặc hãng khác.",
+  "ghn.order_not_found": "GHN không tìm thấy đơn này trong tài khoản.",
+  "ghn.webhook_body": "Thân webhook không phải JSON như tài liệu của GHN mô tả."
+}

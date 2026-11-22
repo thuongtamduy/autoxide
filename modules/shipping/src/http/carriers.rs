@@ -74,8 +74,9 @@ pub(crate) struct AccountResponse {
     check_status: String,
     checked_at: Option<Timestamp>,
     check_error_code: Option<String>,
-    /// Only in the answer of the create call: the address the carrier posts status updates to.
-    /// Keep it; it cannot be shown again.
+    /// Only in the answer of the create call: the address the carrier posts status updates to
+    /// (`/api/v1/shipping/webhooks/{carrier_code}/{hook}/{token}`; it names the tenant, so the
+    /// carrier needs no header). Keep it; it cannot be shown again.
     webhook_path: Option<String>,
     updated_at: Timestamp,
 }
@@ -84,9 +85,12 @@ impl From<AccountView> for AccountResponse {
     fn from(view: AccountView) -> Self {
         let row = view.row;
         AccountResponse {
-            webhook_path: view
-                .webhook_token
-                .map(|token| format!("/api/v1/shipping/webhooks/{}/{token}", row.carrier_code)),
+            webhook_path: view.webhook_token.map(|token| match &view.webhook_hook {
+                Some(hook) => {
+                    format!("{}/{hook}/{token}", crate::carriers::webhook_base(&row.carrier_code))
+                }
+                None => format!("{}/{token}", crate::carriers::webhook_base(&row.carrier_code)),
+            }),
             id: row.id,
             org_id: row.org_id,
             carrier_code: row.carrier_code,
@@ -240,11 +244,48 @@ pub(crate) struct WebhookReceipt {
     id: Uuid,
 }
 
+/// Receive a status webhook from a carrier at the address that names the tenant.
+///
+/// Public: the carrier calls the `webhook_path` given when the account was connected. `hook`
+/// finds the tenant and `token` the carrier account, so the carrier sends no tenant header. The
+/// connector then checks the request (signature, or what the carrier offers) on the raw body; the
+/// body is stored as received and applied in the background. Repeated or late updates are applied
+/// once, in order.
+#[utoipa::path(
+    post,
+    path = "/webhooks/{carrier_code}/{hook}/{token}",
+    operation_id = "receive_shipping_webhook_for_tenant",
+    extensions(("x-public" = json!(true))),
+    security(()),
+    params(
+        ("carrier_code" = String, Path, description = "Code of the carrier."),
+        ("hook" = String, Path, description = "Identifier of the tenant for this carrier (from `webhook_path`)."),
+        ("token" = String, Path, description = "Token of the carrier account (from `webhook_path`)."),
+    ),
+    request_body(content = String, description = "Body as the carrier sends it.", content_type = "application/json"),
+    responses(
+        (status = 202, description = "Stored; it will be applied shortly.", body = Data<WebhookReceipt>),
+        (status = 401, description = "The request is not from the carrier account (signature or shop does not match); nothing was stored. Code `shipping.webhook_signature`.", body = Problem),
+        (status = 404, description = "`hook` names no tenant (code `provider.webhook_unknown`), or no active account of this carrier has this token (code `shipping.webhook_unknown`).", body = Problem),
+        (status = 413, description = "The body is larger than `AUTOXIDE_SHIPPING_WEBHOOK_MAX_BYTES`; code `shipping.webhook_too_large`.", body = Problem),
+    )
+)]
+pub(crate) async fn receive_webhook_for_tenant(
+    State(service): State<Arc<ShippingService>>,
+    Path((carrier_code, hook, token)): Path<(String, String, String)>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<(StatusCode, Data<WebhookReceipt>), Error> {
+    let id = service.receive_webhook_by_hook(&carrier_code, &hook, &token, &headers, &body).await?;
+    Ok((StatusCode::ACCEPTED, Data { data: WebhookReceipt { id } }))
+}
+
 /// Receive a status webhook from a carrier.
 ///
-/// Public: the carrier calls the `webhook_path` given when the account was connected. The
-/// signature is checked on the raw body; the body is stored as received and applied in the
-/// background. Repeated or late updates are applied once, in order.
+/// Public: for an address without the tenant identifier (accounts connected before the
+/// `webhook_path` named the tenant); the tenant comes from the `autoxide-tenant` header or the
+/// domain. The signature is checked on the raw body; the body is stored as received and applied
+/// in the background. Repeated or late updates are applied once, in order.
 #[utoipa::path(
     post,
     path = "/webhooks/{carrier_code}/{token}",

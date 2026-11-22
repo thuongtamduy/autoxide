@@ -435,15 +435,35 @@ async fn token_cua_khach_a_o_khach_b() {
         let path = account["data"]["webhook_path"].as_str().unwrap().to_owned();
         let body = "[]";
         let signature = sign("s", body.as_bytes());
-        let to = |tenant: &'static str| {
-            app.post(&path)
-                .header("Autoxide-Tenant", tenant)
+        // Địa chỉ mới mang định danh của khách: hãng gọi không cần header, và header của khách khác
+        // không đổi được khách nhận.
+        let token = path.rsplit('/').next().unwrap().to_owned();
+        assert_eq!(path.split('/').count(), 8, "the address names the tenant: {path}");
+        let send = |path: String, tenant: Option<&'static str>| {
+            let mut request = app
+                .post(&path)
                 .header(SIGNATURE_HEADER, &signature)
                 .bytes(body.as_bytes().to_vec())
-                .unchecked()
+                .unchecked();
+            if let Some(tenant) = tenant {
+                request = request.header("Autoxide-Tenant", tenant);
+            }
+            async move { request.send().await.unwrap() }
         };
-        assert_eq!(to("a").send().await.unwrap().status(), StatusCode::ACCEPTED);
-        assert_eq!(to("b").send().await.unwrap().status(), StatusCode::NOT_FOUND);
+        assert_eq!(send(path.clone(), None).await.status(), StatusCode::ACCEPTED);
+        assert_eq!(send(path.clone(), Some("b")).await.status(), StatusCode::ACCEPTED);
+        // Định danh khách sai (kể cả của khách khác): không tìm ra khách.
+        let forged = format!("/api/v1/shipping/webhooks/fake/not-a-tenant/{token}");
+        let answer = send(forged, Some("a")).await;
+        assert_eq!(answer.status(), StatusCode::NOT_FOUND);
+        assert_eq!(answer.json()["code"], "provider.webhook_unknown");
+        // Địa chỉ cũ (không có định danh khách) vẫn chạy: khách lấy từ header / tên miền, token của
+        // khách A gửi vào khách B không khớp tài khoản nào.
+        let old = format!("/api/v1/shipping/webhooks/fake/{token}");
+        assert_eq!(send(old.clone(), Some("a")).await.status(), StatusCode::ACCEPTED);
+        let answer = send(old, Some("b")).await;
+        assert_eq!(answer.status(), StatusCode::NOT_FOUND);
+        assert_eq!(answer.json()["code"], "shipping.webhook_unknown");
         let _ = ShipmentStatus::Pending;
     })
     .await

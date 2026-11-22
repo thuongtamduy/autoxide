@@ -14,6 +14,7 @@ pub(crate) mod child_context;
 pub(crate) mod connections;
 pub(crate) mod conversations;
 pub(crate) mod einvoice_sepay;
+pub(crate) mod ghn;
 pub(crate) mod guides;
 pub(crate) mod inventory;
 pub(crate) mod invoices;

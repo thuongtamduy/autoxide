@@ -38,6 +38,7 @@ pub(crate) fn routes(service: Arc<ShippingService>) -> OpenApiRouter {
         .routes(routes!(carriers::update_account))
         .routes(routes!(carriers::test_account))
         .routes(routes!(carriers::receive_webhook))
+        .routes(routes!(carriers::receive_webhook_for_tenant))
         .routes(routes!(shipments::list_shipments, shipments::create_shipment))
         .routes(routes!(shipments::get_shipment))
         .routes(routes!(shipments::book_shipment))

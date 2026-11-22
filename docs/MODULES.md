@@ -63,6 +63,7 @@ and stock holds from `inventory`), and simply offers less when they are off.
 | `sepay` | experimental | — | Confirms VietQR bank transfers from SePay's bank transaction notifications, with one SePay account per tenant (experimental: written from the provider's public documentation; not yet verified against the live service). |
 | `einvoice_sepay` | experimental | — | Sends e-invoices to the Vietnamese tax authority through SePay eInvoice, with one SePay eInvoice account per tenant (experimental: written from the provider's public documentation; not yet verified against the live service). |
 | `esms` | experimental | — | SMS through eSMS (Vietnam): one-time codes and customer-care messages under each tenant's own eSMS account and brandname. Written from the provider's public documentation; not yet verified against the live service. |
+| `ghn` | experimental | `shipping` | Giao Hang Nhanh (GHN) carrier connector for shipping: quotes, shipments, labels, cancellation, tracking and status webhooks, with each tenant's own GHN account. Written from the provider's public documentation; not yet verified against the live service. |
 | `bookings` | experimental | — | Bookable services with staff, rooms and equipment, weekly schedules, public availability, bookings that never overlap, deposits through a licensed partner, cancellation policies and reminders. |
 | `newsletter` | experimental | `mail` | Newsletter lists, double opt-in subscribers, one-click unsubscribe and campaigns sent in rate-limited batches. |
 | `comments` | experimental | `mail` | Comments and questions on any record (posts, products…), with threads, moderation, reports, bans and answers. |
@@ -117,6 +118,9 @@ Mistakes are reported at startup, by every command, with what to write instead:
 
 `autoxide doctor` prints the modules that run and those that are turned off (the first line of
 `autoxide serve`'s log says the same), and `autoxide config` shows the value in use.
+`autoxide modules` lists every module of the program — also modules a binary of your own added —
+with its tier, whether it is on, what it depends on and, for a module that is off, whether the
+database still holds its data; `autoxide modules --json` prints the same for programs and agents.
 
 Settings of a module that is turned off are not read: a leftover `AUTOXIDE_NEWSLETTER_…` line in
 `.env` is ignored. A task in `AUTOXIDE_STARTUP_TASKS` whose module is off is skipped with a warning

@@ -35,6 +35,10 @@ mod tests;
 use std::fmt;
 
 pub use date::Date;
+/// Một khoảng thời gian có dấu (`jiff::SignedDuration`), re-export để module cộng trừ [`Timestamp`]
+/// (`Timestamp::now() - SignedDuration::from_hours(24)`) mà không phải tự khai `jiff`
+/// (D-20261122-module-helpers).
+pub use jiff::SignedDuration;
 pub use timestamp::Timestamp;
 
 /// Múi giờ IANA theo tên (`Asia/Ho_Chi_Minh`, `UTC`), lấy từ bộ dữ liệu múi giờ đóng gói trong binary (không phụ

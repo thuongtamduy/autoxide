@@ -26,7 +26,8 @@
 //! - `decisions` — sinh lại mục lục `docs/decisions/INDEX.md` từ nhật ký quyết định (xem
 //!   `decisions.rs`).
 //! - `new-module <module> <entity>` — sinh module mới từ khuôn `modules/notes` (xem
-//!   `scaffold.rs`).
+//!   `scaffold.rs`). `new-module --external <dir> <module> <entity>` — sinh một workspace Cargo riêng
+//!   ngoài repo (module + binary) từ `examples/external-module`.
 //! - `test-all [--doc]` — mọi test của workspace, các file test chạy song song, trên database của
 //!   `TEST_DATABASE_URL`; phần test của `./gate.sh` đầy đủ (xem `affected.rs`).
 //! - `test-affected [--base <ref>]` — chạy test của crate bị sửa kể từ lần chạy xanh gần nhất
@@ -75,6 +76,7 @@ const USAGE: &str = "usage: cargo xtask check
        cargo xtask sdk [--check | --extract-examples <dir>]
        cargo xtask upgrade-test [--from <tag>] [--image <image>] [--database sqlite|postgres|both]
        cargo xtask new-module <module> <entity>   e.g. new-module bookmarks bookmark
+       cargo xtask new-module --external <dir> <module> <entity>   a workspace of your own, outside this repository
        cargo xtask test-affected [--base <ref>]   default base: the last green run, else origin/main
        cargo xtask test-affected --base <ref> --keep-env   on TEST_DATABASE_URL instead of SQLite
        cargo xtask test-all [--doc]               every test, on TEST_DATABASE_URL (default SQLite)
@@ -116,6 +118,7 @@ fn main() -> ExitCode {
         ["sdk", "--extract-examples", dir] => sdk_examples(dir),
         ["upgrade-test", rest @ ..] => upgrade_test(rest),
         ["new-module", module, entity] => new_module(module, entity),
+        ["new-module", "--external", dir, module, entity] => new_external(dir, module, entity),
         ["test-all"] => test_all(false, shard),
         ["test-all", "--doc"] => test_all(true, shard),
         ["test-affected"] => test_affected(None, false, shard),
@@ -354,6 +357,47 @@ fn changelog() -> ExitCode {
         }
         Err(error) => {
             eprintln!("xtask changelog: {error}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+fn new_external(dir: &str, module: &str, entity: &str) -> ExitCode {
+    let result = workspace::load().and_then(|workspace| {
+        let version = semver::workspace_version(&workspace.root)?;
+        let written = scaffold::new_external(
+            &workspace.root,
+            std::path::Path::new(dir),
+            module,
+            entity,
+            &version,
+        )?;
+        Ok((written.len(), version))
+    });
+    match result {
+        Ok((files, version)) => {
+            println!(
+                "Created {dir} ({files} files): module `{module}` and the server `acme`, from \
+                 examples/external-module."
+            );
+            println!("It depends on Autoxide by the git tag v{version}.");
+            println!();
+            println!("Next (docs/guides/writing-a-module.md):");
+            println!(
+                "  1. cd {dir} && git init && ./check.sh      (format, lints, tests on SQLite)"
+            );
+            println!(
+                "  2. cargo run -p acme-server -- migrate up && cargo run -p acme-server -- serve"
+            );
+            println!(
+                "  3. Rewrite the tables, service, descriptions and locales/vi.json for your feature;"
+            );
+            println!("     rename `acme` to your own name.");
+            println!("  4. cargo xtask check-module {dir}/{module}   (from this repository)");
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            eprintln!("xtask new-module: {error}");
             ExitCode::FAILURE
         }
     }

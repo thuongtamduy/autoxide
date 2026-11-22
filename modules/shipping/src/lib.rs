@@ -142,6 +142,7 @@ impl Module for ShippingModule {
             entitlements: context.entitlements(),
             databases: context.tenancy(),
             secret: (*context.require::<autoxide_kernel::secret::SecretKey>()?).clone(),
+            providers: (*context.require::<autoxide_kernel::provider::ProviderAccounts>()?).clone(),
             carriers: registry.clone(),
             // `ledger` đăng ký trước `shipping`; chưa cài thì không ghi sổ COD.
             ledger: context.require::<dyn autoxide_ledger::api::Ledger>().ok(),

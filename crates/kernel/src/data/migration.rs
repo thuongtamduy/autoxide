@@ -32,9 +32,11 @@ use crate::error::Error;
 use crate::module::{is_identifier, module_name_problems};
 use crate::secret::{KeyConfig, SecretKey};
 
+mod helpers;
 mod lock;
 mod manager;
 pub mod schema;
+pub use helpers::{HelperTable, helper_tables};
 pub use lock::MigrationLock;
 pub(crate) use manager::has_table as table_exists;
 

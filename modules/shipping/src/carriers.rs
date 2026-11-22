@@ -53,6 +53,15 @@ pub(crate) struct AccountView {
     pub credential_fields: Vec<String>,
     /// Chỉ có ngay sau khi tạo: token trong đường dẫn webhook (lưu băm, không lấy lại được).
     pub webhook_token: Option<String>,
+    /// Đi cùng `webhook_token`: định danh của khách cho đường webhook của hãng này
+    /// (`ProviderAccounts::webhook_token`) — hãng gọi về không cần header hay tên miền của khách.
+    pub webhook_hook: Option<String>,
+}
+
+/// Đường nhận webhook của hãng `carrier_code`, chưa có định danh khách và token tài khoản. Cùng
+/// một chuỗi lúc cấp định danh (tạo tài khoản) và lúc tìm khách (nhận webhook).
+pub(crate) fn webhook_base(carrier_code: &str) -> String {
+    format!("/api/v1/shipping/webhooks/{carrier_code}")
 }
 
 /// Gọi `future` tối đa `seconds` giây; quá giờ → `shipping.carrier_unavailable`.
@@ -125,7 +134,7 @@ impl ShippingService {
         fields: Vec<String>,
         token: Option<String>,
     ) -> AccountView {
-        AccountView { row, credential_fields: fields, webhook_token: token }
+        AccountView { row, credential_fields: fields, webhook_token: token, webhook_hook: None }
     }
 
     async fn credential_fields(
@@ -191,7 +200,8 @@ impl ShippingService {
     }
 
     /// Thêm tài khoản hãng. Trả token webhook một lần (đường dẫn
-    /// `/api/v1/shipping/webhooks/{carrier_code}/{token}`).
+    /// `/api/v1/shipping/webhooks/{carrier_code}/{hook}/{token}`: `{hook}` tìm khách, `{token}` tìm
+    /// tài khoản).
     pub(crate) async fn create_account(
         &self,
         tenant: &TenantContext,
@@ -268,7 +278,10 @@ impl ShippingService {
             )
             .await?;
         transaction.commit().await?;
-        Ok(Self::view(row, credentials.into_keys().collect(), Some(token)))
+        let hook = self.providers.webhook_token(tenant, &webhook_base(&row.carrier_code)).await?;
+        let mut view = Self::view(row, credentials.into_keys().collect(), Some(token));
+        view.webhook_hook = Some(hook);
+        Ok(view)
     }
 
     pub(crate) async fn update_account(

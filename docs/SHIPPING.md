@@ -101,7 +101,10 @@ is listed in `unavailable` (`shipping.carrier_unavailable`) without breaking the
 
 ## Carrier webhooks
 
-`POST /api/v1/shipping/webhooks/{carrier_code}/{token}` is public. The connector checks the signature on the raw
+`POST /api/v1/shipping/webhooks/{carrier_code}/{hook}/{token}` is public: `hook` names the tenant and `token` the
+carrier account, so the carrier sends no tenant header. This is the `webhook_path` of a new carrier account. The older
+address `…/webhooks/{carrier_code}/{token}` still works; there the tenant comes from the `autoxide-tenant` header or the
+domain. The connector checks the signature on the raw
 body; a wrong signature answers 401 and nothing is stored. A valid body is stored as received (secret headers
 removed) and answered 202; a job applies it. Repeated updates are applied once (`event_key`); bodies above
 `AUTOXIDE_SHIPPING_WEBHOOK_MAX_BYTES` answer 413. Carriers without webhooks are polled every 30 minutes.

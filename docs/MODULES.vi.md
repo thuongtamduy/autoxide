@@ -63,6 +63,7 @@ và giữ kho qua `inventory`), và chỉ làm được ít hơn khi module đó
 | `sepay` | experimental | — | Xác nhận chuyển khoản VietQR từ thông báo biến động số dư của SePay, mỗi khách một tài khoản SePay (thử nghiệm: viết theo tài liệu công khai của nhà cung cấp, chưa kiểm với dịch vụ thật). |
 | `einvoice_sepay` | experimental | — | Gửi hoá đơn điện tử tới cơ quan thuế Việt Nam qua SePay eInvoice, mỗi khách một tài khoản SePay eInvoice (thử nghiệm: viết theo tài liệu công khai của nhà cung cấp, chưa kiểm với dịch vụ thật). |
 | `esms` | experimental | — | SMS qua eSMS (Việt Nam): mã một lần và tin chăm sóc khách hàng bằng tài khoản eSMS và brandname riêng của từng khách. Viết theo tài liệu công khai của nhà cung cấp; chưa kiểm với dịch vụ thật. |
+| `ghn` | experimental | `shipping` | Bộ nối hãng Giao Hàng Nhanh (GHN) cho vận chuyển: báo giá, vận đơn, in vận đơn, huỷ, tra trạng thái và webhook trạng thái, bằng tài khoản GHN của từng khách. Viết theo tài liệu công khai của nhà cung cấp; chưa kiểm với dịch vụ thật. |
 | `bookings` | experimental | — | Dịch vụ đặt lịch với nhân viên, phòng và thiết bị, lịch tuần, lịch trống công khai, lịch hẹn không chồng nhau, đặt cọc qua đối tác có giấy phép, chính sách huỷ và nhắc lịch. |
 | `newsletter` | experimental | `mail` | Danh sách bản tin, người đăng ký double opt-in, huỷ đăng ký một chạm và chiến dịch gửi theo lô có giới hạn tốc độ. |
 | `comments` | experimental | `mail` | Bình luận và câu hỏi trên mọi bản ghi (bài viết, sản phẩm…), có luồng trả lời, kiểm duyệt, báo cáo, cấm và trả lời. |
@@ -116,6 +117,9 @@ Viết sai thì mọi lệnh báo ngay lúc khởi động, kèm cách viết đ
 
 `autoxide doctor` in module nào đang chạy và module nào tắt (dòng đầu của log `autoxide serve`
 cũng nói vậy), và `autoxide config` cho thấy giá trị đang dùng.
+`autoxide modules` liệt kê mọi module của chương trình — kể cả module mà binary của bạn thêm —
+kèm hạng, đang bật hay tắt, phụ thuộc và, với module đang tắt, database còn dữ liệu của nó không;
+`autoxide modules --json` in đúng những thứ đó cho chương trình và agent.
 
 Cấu hình của module đang tắt không được đọc: dòng `AUTOXIDE_NEWSLETTER_…` còn sót trong `.env` bị
 bỏ qua. Task trong `AUTOXIDE_STARTUP_TASKS` mà module của nó đang tắt thì được bỏ qua kèm một cảnh
