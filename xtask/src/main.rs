@@ -12,7 +12,9 @@
 //!   (`i18n.rs`), tài liệu EN / VI (`docs.rs`), mục lục quyết định (`decisions.rs`), mảnh thay đổi
 //!   (`changelog.rs`), lọc theo khách (`tenant_scope.rs`), tool MCP theo phạm vi
 //!   (`mcp_principal.rs`; chỗ cũ chờ sửa ở `baseline.rs`) và độ dài
-//!   file `.rs` (`lengths.rs`: quá 800 dòng thì cảnh báo, quá 1200 thì chặn trừ file miễn).
+//!   file `.rs` (`lengths.rs`: quá 800 dòng thì cảnh báo, quá 1200 thì chặn trừ file miễn), hình
+//!   dạng thống nhất của API trên `docs/openapi.json` (`api_shape.rs`: thân request đóng, lỗi
+//!   `Problem`, danh sách `Page<T>`).
 //!   `./gate.sh` gọi lệnh này; vi phạm thì gate đỏ.
 //! - `changelog` — gộp các mảnh trong `changelog.d/` vào `## [Unreleased]` của `CHANGELOG.md` rồi
 //!   xoá chúng; chạy lúc phát hành (xem `changelog.rs`, D-20261119-changelog-fragments).
@@ -34,6 +36,7 @@
 
 mod affected;
 mod api_diff;
+mod api_shape;
 mod baseline;
 mod boundaries;
 mod changelog;
@@ -235,6 +238,12 @@ fn check() -> ExitCode {
         violations.extend(changelog::check(&workspace.root)?);
         violations.extend(metric_labels::check(&workspace.root)?);
         violations.extend(deploy_metrics::check(&workspace.root)?);
+        // Hình dạng thống nhất của API trên docs/openapi.json (D-20261121-api-shape).
+        let shape = api_shape::check(&workspace.root)?;
+        for warning in &shape.warnings {
+            eprintln!("{warning}");
+        }
+        violations.extend(shape.violations);
         let lengths = lengths::check(&workspace.root)?;
         if let Some(warning) = lengths.warning {
             eprintln!("{warning}");

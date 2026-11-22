@@ -143,6 +143,7 @@ async fn remove(tenant: &TenantContext, key: &str, user_id: Uuid) -> Result<(), 
 /// When to show the work again.
 #[derive(Debug, Clone, Deserialize, ToSchema, validator::Validate)]
 #[schema(as = WorkSnoozeRequest)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct SnoozeRequest {
     /// A time in the future, at most a year away.
     pub until: Timestamp,
@@ -151,6 +152,7 @@ pub(crate) struct SnoozeRequest {
 /// Who should do the work.
 #[derive(Debug, Clone, Deserialize, ToSchema, validator::Validate)]
 #[schema(as = WorkAssignRequest)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct AssignRequest {
     /// A user who may see the work's source; `null` removes the assignment.
     pub user_id: Option<Uuid>,

@@ -596,6 +596,7 @@ impl PlansService {
         id: Uuid,
         provider_reference: String,
         paid_at: Option<Timestamp>,
+        received: Option<Money>,
     ) -> Result<billing_period::Model, Error> {
         let at = now();
         let transaction = self.databases.control().begin_write().await?;
@@ -604,6 +605,14 @@ impl PlansService {
             .ok_or_else(|| billing_period_not_found(id))?;
         if period.status != "open" {
             return Err(billing_period_not_payable());
+        }
+        // Tiền về qua cổng thanh toán: `ledger` ghi nhận cả khoản thu thiếu (đối soát
+        // `accept_received`), nên chỉ coi là đã trả khi số thực thu đủ số của kỳ, cùng loại tiền.
+        if let Some(received) = received {
+            let due = Money::from_columns(period.amount_minor, &period.amount_currency)?;
+            if !covers(received, due) {
+                return Err(billing_period_underpaid(received, due));
+            }
         }
         let tenant = period.tenant_id;
         let window = (period.period_start, period.period_end);
@@ -999,6 +1008,23 @@ struct NewPeriod<'a> {
 pub(crate) fn billing_period_not_found(id: Uuid) -> Error {
     Error::not_found("plans.billing_period_not_found", "There is no billing period `{id}`.")
         .with_param("id", id)
+}
+
+/// `received` đủ trả `due`: cùng loại tiền và không nhỏ hơn.
+pub(crate) fn covers(received: Money, due: Money) -> bool {
+    received.compare(due).is_ok_and(|order| order != std::cmp::Ordering::Less)
+}
+
+pub(crate) fn billing_period_underpaid(received: Money, due: Money) -> Error {
+    Error::conflict(
+        "plans.billing_period_underpaid",
+        "The payment of {received} {received_currency} does not cover the {due} {due_currency} due; \
+         the billing period stays open.",
+    )
+    .with_param("received", received.minor())
+    .with_param("received_currency", received.currency().code())
+    .with_param("due", due.minor())
+    .with_param("due_currency", due.currency().code())
 }
 
 pub(crate) fn billing_period_not_payable() -> Error {

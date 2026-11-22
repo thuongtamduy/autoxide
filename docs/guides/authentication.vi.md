@@ -68,7 +68,7 @@ curl -sS "$API/api/v1/auth/refresh" --json '{"refresh_token":"'"$NEW_REFRESH"'"}
 
 ## Đăng xuất
 
-Kết thúc một phiên bằng refresh token của nó; access token thôi dùng được khi hết hạn.
+Kết thúc một phiên bằng refresh token của nó. Access token của phiên thôi dùng được ngay (mã `auth.session_ended`), không chờ hết hạn; cũng vậy khi bạn kết thúc một phiên trong danh sách bên dưới, đổi mật khẩu, hay quản trị viên đăng xuất hoặc khoá tài khoản của bạn.
 
 <!-- example: sign-in-again -->
 ```bash
@@ -82,6 +82,12 @@ curl -sS "$API/api/v1/auth/login" \
 ```bash
 curl -sS "$API/api/v1/auth/logout" --json '{"refresh_token":"'"$REFRESH"'"}'
 # expect: 204
+```
+
+<!-- example: signed-out-token -->
+```bash
+curl -sS "$API/api/v1/auth/me" -H "Authorization: Bearer $TOKEN"
+# expect: 401
 ```
 
 ## Các phiên của bạn

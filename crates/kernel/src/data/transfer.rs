@@ -91,8 +91,8 @@ enum Kind {
 }
 
 #[derive(Debug, Clone)]
-struct Column {
-    name: String,
+pub(crate) struct Column {
+    pub(crate) name: String,
     kind: Kind,
 }
 
@@ -185,7 +185,7 @@ pub(crate) async fn module_tables<C: ConnectionTrait>(
 }
 
 /// Cột của `table` và kiểu của chúng.
-async fn columns<C: ConnectionTrait>(
+pub(crate) async fn columns<C: ConnectionTrait>(
     connection: &C,
     table: &str,
 ) -> Result<Vec<Column>, TransferError> {

@@ -28,6 +28,9 @@ pub struct Runtime {
     pub worker: Worker,
     /// Cờ "đang tắt" mà `/health/ready` đọc; `serve` bật nó khi nhận tín hiệu dừng.
     pub draining: http::Draining,
+    /// Router chỉ có `/metrics`, khi số đo có port riêng (`AUTOXIDE_HTTP_METRICS_ADDRESS`):
+    /// `serve` mở port đó; `/metrics` khi ấy không có trên port của API.
+    pub metrics: Option<axum::Router>,
 }
 
 /// Có đòi database đã áp dụng đủ migration trước khi khởi động không.
@@ -88,12 +91,19 @@ pub async fn start(settings: Settings, migrations: Migrations) -> Result<Runtime
     };
     let draining = http::Draining::default();
     let mut root = http::health_routes(database.clone(), draining.clone());
+    let mut metrics_router = None;
     if config.http.metrics {
         // Bộ thu số đo là toàn tiến trình: bật một lần, ở đây.
         match Metrics::install() {
             Ok(metrics) => {
                 metrics.spawn_upkeep();
-                root = root.merge(http::metrics_routes(metrics));
+                if config.http.metrics_address.is_some() {
+                    // Port riêng: số đo không có xác thực, nên không để chung port công khai.
+                    let (router, _) = http::metrics_routes(metrics).split_for_parts();
+                    metrics_router = Some(router);
+                } else {
+                    root = root.merge(http::metrics_routes(metrics));
+                }
             }
             Err(error) => {
                 let _ = database.close().await;
@@ -128,6 +138,7 @@ pub async fn start(settings: Settings, migrations: Migrations) -> Result<Runtime
         .idempotency(modules.api::<dyn IdempotencyStore>())
         .translations(modules.translations().clone())
         .deprecations(modules.deprecations())
+        .experimental(modules.experimental())
         .body_limits(modules.body_limits())
         .entitlements(modules.entitlements())
         .sync(modules.sync_resources())
@@ -140,7 +151,16 @@ pub async fn start(settings: Settings, migrations: Migrations) -> Result<Runtime
         extras = extras.tenancy(registry);
     }
     let api = http::build(&config.http, root, routes, extras);
-    Ok(Runtime { config, database, modules, api, dispatcher, worker, draining })
+    Ok(Runtime {
+        config,
+        database,
+        modules,
+        api,
+        dispatcher,
+        worker,
+        draining,
+        metrics: metrics_router,
+    })
 }
 
 /// Lỗi nếu database còn migration chưa áp dụng; thông báo nêu số lượng, vài tên đầu và

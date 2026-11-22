@@ -270,10 +270,21 @@ impl FakeLedger {
         tenant: &TenantContext,
         payment: &Payment,
     ) {
+        Self::succeed_with(outbox, tenant, payment, payment.amount).await;
+    }
+
+    /// Như [`succeed`](Self::succeed), với số thực thu `amount` (`ledger` ghi cả khoản thu thiếu khi
+    /// đối soát `accept_received`).
+    pub(crate) async fn succeed_with(
+        outbox: &Mutex<Option<autoxide_kernel::event::Outbox>>,
+        tenant: &TenantContext,
+        payment: &Payment,
+        amount: autoxide_kernel::money::Money,
+    ) {
         let outbox = outbox.lock().unwrap().clone().unwrap();
         let payload = serde_json::json!({
             "payment_id": payment.id, "source_module": payment.source_module,
-            "source_id": payment.source_id, "reference": payment.reference,
+            "source_id": payment.source_id, "reference": payment.reference, "amount": amount,
         });
         let transaction = tenant.database().begin_write().await.unwrap();
         outbox
