@@ -288,20 +288,23 @@ impl Module for NewsletterModule {
 pub(crate) mod testing {
     //! Đồ dùng chung cho test trong crate này.
 
+    /// Bên gửi mail giả dùng chung (testkit).
+    pub use autoxide_testkit::FakeMailer;
+
     use autoxide_kernel::tenancy::{DatabaseRegistry, TenantContext};
-    use std::sync::atomic::{AtomicUsize, Ordering};
-    use std::sync::{Arc, Mutex};
+
+    use std::sync::Arc;
     use std::time::Duration;
 
     use autoxide_kernel::access::Principal;
     use autoxide_kernel::antispam::{AntispamConfig, SpamGuard};
     use autoxide_kernel::config::{Config, ConfigReader, ConfigSource};
     use autoxide_kernel::database::Database;
-    use autoxide_kernel::error::Error;
+
     use autoxide_kernel::event::Outbox;
     use autoxide_kernel::i18n::Translations;
     use autoxide_kernel::job::JobQueue;
-    use autoxide_kernel::mail::{Mail, Mailer};
+
     use autoxide_kernel::migration::{Migrator, ModuleMigrations};
     use autoxide_kernel::public_url::PublicUrl;
     use autoxide_kernel::resource::ResourceDirectory;
@@ -311,42 +314,6 @@ pub(crate) mod testing {
 
     use crate::config::NewsletterConfig;
     use crate::service::{NewsletterService, Parts};
-
-    /// Bên gửi mail giả: giữ lại mọi mail, bỏ mail trùng `dedupe_key` như module `mail` thật.
-    #[derive(Default)]
-    pub struct FakeMailer {
-        pub mails: Mutex<Vec<Mail>>,
-        /// Số lần `send` được gọi (kể cả mail trùng khoá bị bỏ).
-        pub calls: AtomicUsize,
-    }
-
-    impl FakeMailer {
-        pub fn sent(&self) -> Vec<Mail> {
-            self.mails.lock().unwrap().clone()
-        }
-
-        pub fn to(&self, address: &str) -> Vec<Mail> {
-            self.sent().into_iter().filter(|mail| mail.to == address).collect()
-        }
-
-        pub fn calls(&self) -> usize {
-            self.calls.load(Ordering::SeqCst)
-        }
-    }
-
-    #[async_trait::async_trait]
-    impl Mailer for FakeMailer {
-        async fn send(&self, _tenant: &TenantContext, mail: Mail) -> Result<(), Error> {
-            self.calls.fetch_add(1, Ordering::SeqCst);
-            let mut mails = self.mails.lock().unwrap();
-            let duplicate = mail.dedupe_key.is_some()
-                && mails.iter().any(|sent| sent.dedupe_key == mail.dedupe_key);
-            if !duplicate {
-                mails.push(mail);
-            }
-            Ok(())
-        }
-    }
 
     /// Cấu hình đủ để gửi: trang xác nhận, trang lựa chọn, website, địa chỉ người gửi.
     pub fn config() -> NewsletterConfig {

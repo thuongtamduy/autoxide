@@ -296,6 +296,8 @@ autoxide-ledger = { git = "https://github.com/thuongtamduy/autoxide", tag = "vX.
 
 Các trait module hay gọi khác cũng có bản giả như vậy: `autoxide_notifications::api::testing::FakeNotifier` (nhớ những gì module của bạn đã gửi — `sent()` theo đúng luật `dedupe_key`, `calls()` mọi lời gọi, `kinds()` các loại đã khai) và `autoxide_compliance::api::testing::FakeConsentLedger` (đồng ý trong bộ nhớ, đúng luật "khoá rộng hơn" của sổ thật; dựng bằng `allow` / `deny`, đọc lại bằng `state_of` / `records`, giả sổ lỗi bằng `set_failing`).
 
+`autoxide_testkit::FakeMailer` giữ các mail module của bạn gửi (`sent()`, `to(address)`, `calls()`), đúng luật `dedupe_key` của module thật; `autoxide_address::api::testing::FakeAdministrativeUnits` giữ vài tỉnh và xã (`sample()`, hay tự dựng bằng `province` / `commune` / `expired_commune`) để địa chỉ được kiểm như module `address` thật.
+
 ## 6. Luật của core, kiểm trên crate của bạn
 
 Trong repo Autoxide, `cargo xtask check` giữ các luật của module. Với một crate ở nơi khác, chạy đúng các luật đọc mã nguồn đó từ một bản checkout của Autoxide ở tag bạn dựa vào:

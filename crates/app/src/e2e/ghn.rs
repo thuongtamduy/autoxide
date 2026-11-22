@@ -6,8 +6,7 @@
 
 use std::sync::Arc;
 
-use autoxide_address::api::{Address, AddressInput, AdministrativeUnit, AdministrativeUnits};
-use autoxide_kernel::error::{Error, FieldError};
+use autoxide_address::api::AdministrativeUnits;
 use autoxide_kernel::tenancy::{OrgTree, root_of};
 use autoxide_kernel::time::Timestamp;
 use autoxide_testkit::{FakeProviderServer, TestApp, TestDatabase};
@@ -32,44 +31,6 @@ const BY_CLIENT_CODE: &str = "/shiip/public-api/v2/shipping-order/detail-by-clie
 const CANCEL: &str = "/shiip/public-api/v2/switch-status/cancel";
 const PRINT_TOKEN: &str = "/shiip/public-api/v2/a5/gen-token";
 
-/// Danh mục hành chính giả (mô hình hai cấp): tỉnh 79 có phường 26734.
-struct FakeUnits;
-
-#[async_trait::async_trait]
-impl AdministrativeUnits for FakeUnits {
-    async fn provinces(&self, _: &str, _: Option<&str>) -> Result<Vec<AdministrativeUnit>, Error> {
-        Ok(Vec::new())
-    }
-
-    async fn communes(
-        &self,
-        _: &str,
-        _: &str,
-        _: Option<&str>,
-    ) -> Result<Vec<AdministrativeUnit>, Error> {
-        Ok(Vec::new())
-    }
-
-    async fn validate(&self, input: AddressInput, field: &str) -> Result<Address, Vec<FieldError>> {
-        if (input.province_code.as_str(), input.commune_code.as_str()) != ("79", "26734") {
-            return Err(vec![FieldError::new(
-                format!("{field}commune_code"),
-                "address.commune_not_in_province",
-                "is not in the province",
-            )]);
-        }
-        Ok(serde_json::from_value(json!({
-            "country": "VN",
-            "province_code": "79",
-            "province_name": "Thành phố Hồ Chí Minh",
-            "commune_code": "26734",
-            "commune_name": "Phường Sài Gòn",
-            "line": input.line,
-        }))
-        .unwrap())
-    }
-}
-
 /// App có `shipping` + `ghn`, hai khách `one` và `two` (mỗi khách một quản lý), GHN trỏ về máy chủ
 /// giả: tài khoản thường về `server`, tài khoản `sandbox` về `staging`.
 async fn app(test: &TestDatabase) -> (TestApp, FakeProviderServer, FakeProviderServer) {
@@ -82,7 +43,11 @@ async fn app(test: &TestDatabase) -> (TestApp, FakeProviderServer, FakeProviderS
         .tenant("two")
         .user_in("one", "boss-one", 1, &STAFF)
         .user_in("two", "boss-two", 2, &STAFF)
-        .provide::<dyn AdministrativeUnits>(Arc::new(FakeUnits))
+        .provide::<dyn AdministrativeUnits>(Arc::new(
+            autoxide_address::api::testing::FakeAdministrativeUnits::new()
+                .province("79", "Thành phố Hồ Chí Minh")
+                .commune("26734", "Phường Sài Gòn", "79"),
+        ))
         .module(autoxide_shipping::module())
         .module(autoxide_ghn::module())
         .build()

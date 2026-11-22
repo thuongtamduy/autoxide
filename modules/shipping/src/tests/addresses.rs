@@ -156,7 +156,7 @@ async fn gioi_han_so_dia_chi_va_sua() {
         let app = TestApp::builder(test)
             .setting("AUTOXIDE_SHIPPING_MAX_ADDRESSES_PER_BUYER", "2")
             .principal("x", Principal::customer(Uuid::from_u128(BUYER_X)))
-            .provide::<dyn AdministrativeUnits>(Arc::new(FakeUnits))
+            .provide::<dyn AdministrativeUnits>(Arc::new(FakeAdministrativeUnits::sample()))
             .module(crate::module())
             .build()
             .await

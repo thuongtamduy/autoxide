@@ -36,7 +36,7 @@ pub(crate) async fn shop(test: &TestDatabase) -> (TestApp, Tree) {
         .member("boss", 1, root_of(DEFAULT_TENANT), &scoped(Scope::Tenant))
         .member("store_a", 2, tree.a, &scoped(Scope::Unit))
         .member("store_b", 3, tree.b, &scoped(Scope::Unit))
-        .provide::<dyn AdministrativeUnits>(Arc::new(FakeUnits))
+        .provide::<dyn AdministrativeUnits>(Arc::new(FakeAdministrativeUnits::sample()))
         .module(crate::module())
         .build()
         .await

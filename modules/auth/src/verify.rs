@@ -405,7 +405,7 @@ mod tests {
 
     /// Người nhận và token của mail cuối cùng.
     fn last_mail(services: &Services) -> (String, String) {
-        let sent = services.mails.sent.lock().unwrap();
+        let sent = services.mails.sent();
         let mail = sent.last().unwrap();
         let token = mail
             .text
@@ -420,7 +420,7 @@ mod tests {
     }
 
     fn sent(services: &Services) -> usize {
-        services.mails.sent.lock().unwrap().len()
+        services.mails.sent().len()
     }
 
     /// Cho thời gian trôi qua: lượt chặn gửi dồn hết, token gần hết hạn hơn.
@@ -446,7 +446,7 @@ mod tests {
             verifications.after_signup(&tenant, Actor::system(), &ada, Language::Vi).await;
             let (to, token) = last_mail(&services);
             assert_eq!(to, "ada@example.com");
-            assert_eq!(services.mails.sent.lock().unwrap()[0].subject, "Xác nhận địa chỉ email");
+            assert_eq!(services.mails.sent()[0].subject, "Xác nhận địa chỉ email");
             // Xin gửi lại ngay: không thêm mail.
             verifications.send_current(&tenant, ada.id, Language::En).await.unwrap();
             assert_eq!(sent(&services), 1);

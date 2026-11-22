@@ -127,9 +127,9 @@ mod tests {
             // (D-162): mail đi khi worker chạy.
             assert_eq!(status_known, StatusCode::ACCEPTED);
             assert_eq!(status_unknown, StatusCode::ACCEPTED);
-            assert!(services.mails.sent.lock().unwrap().is_empty());
+            assert!(services.mails.sent().is_empty());
             crate::testing::send_resets(&services).await;
-            assert_eq!(services.mails.sent.lock().unwrap().len(), 1);
+            assert_eq!(services.mails.sent().len(), 1);
 
             let body = json!({"token": "nope", "password": "a brand new passphrase"});
             let (status, _, problem) =

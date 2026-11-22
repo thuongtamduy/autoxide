@@ -7,6 +7,7 @@
 
 use autoxide_compliance::api::testing::FakeConsentLedger;
 use autoxide_kernel::time::Timestamp;
+use autoxide_testkit::FakeMailer;
 use jiff::SignedDuration;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -16,7 +17,7 @@ use autoxide_auth::api::{TenantAdmins, User, Users};
 use autoxide_compliance::api::{ComplianceRules, ConsentKey, ConsentLedger, ConsentSubject, Rule};
 use autoxide_kernel::access::Realm;
 use autoxide_kernel::error::Error;
-use autoxide_kernel::mail::{Mail, Mailer};
+use autoxide_kernel::mail::Mailer;
 use autoxide_kernel::push::{MobilePushSender, WebPushSender};
 use autoxide_kernel::sms::SmsSender;
 use autoxide_kernel::tenancy::{DEFAULT_TENANT, TenantContext, TenantId};
@@ -124,24 +125,6 @@ impl TenantAdmins for People {
     }
 }
 
-/// Hộp thư đi giả.
-#[derive(Default)]
-struct Outbox(Mutex<Vec<Mail>>);
-
-impl Outbox {
-    fn all(&self) -> Vec<Mail> {
-        self.0.lock().unwrap().clone()
-    }
-}
-
-#[async_trait::async_trait]
-impl Mailer for Outbox {
-    async fn send(&self, _tenant: &TenantContext, mail: Mail) -> Result<(), Error> {
-        self.0.lock().unwrap().push(mail);
-        Ok(())
-    }
-}
-
 /// Quy tắc giả: thân quy tắc theo khoá.
 struct Rules(Mutex<HashMap<String, Value>>);
 
@@ -169,7 +152,7 @@ impl ComplianceRules for Rules {
 struct Fixture {
     app: TestApp,
     notifier: Arc<dyn Notifier>,
-    mails: Arc<Outbox>,
+    mails: Arc<FakeMailer>,
     ledger: Arc<FakeConsentLedger>,
     rules: Arc<Rules>,
     sms: Arc<FakeSmsSender>,
@@ -182,7 +165,7 @@ async fn fixture_with(test: &TestDatabase, per_hour: &str) -> Fixture {
         (Uuid::from_u128(1), user(1, "admin@example.com")),
         (Uuid::from_u128(2), user(2, "alice@example.com")),
     ])));
-    let mails = Arc::new(Outbox::default());
+    let mails = Arc::new(FakeMailer::new());
     let ledger = Arc::new(FakeConsentLedger::new());
     let rules = Arc::new(Rules(Mutex::new(HashMap::from([
         (
@@ -304,7 +287,7 @@ async fn email_va_hop_thu_khong_gui_trung() {
         run_jobs(&fx.app).await;
         run_jobs(&fx.app).await;
 
-        let mails = fx.mails.all();
+        let mails = fx.mails.sent();
         assert_eq!(mails.len(), 1);
         assert_eq!(mails[0].to, "alice@example.com");
         assert_eq!(mails[0].subject, "Order DH001 shipped");
@@ -384,7 +367,7 @@ async fn tuy_chon_tat_bo_qua_nhung_bao_mat_khong_tat_duoc() {
         // Tin bảo mật bỏ qua tuỳ chọn: vẫn gửi email.
         fx.notifier.notify(DEFAULT_TENANT, to_alice(&SIGN_IN, "signin-1")).await.unwrap();
         run_jobs(&fx.app).await;
-        let mails = fx.mails.all();
+        let mails = fx.mails.sent();
         assert_eq!(mails.len(), 1);
         assert_eq!(mails[0].subject, "New sign-in");
         let (_, mine) = call(&fx.app, "GET", "/me/preferences", "alice", None).await;
@@ -417,7 +400,7 @@ async fn quang_cao_can_dong_y_kiem_lai_truoc_khi_gui_va_link_huy_nhan() {
         // Rút đồng ý trước khi job chạy: không gửi.
         fx.ledger.forget(&subject);
         run_jobs(&fx.app).await;
-        assert!(fx.mails.all().is_empty());
+        assert!(fx.mails.sent().is_empty());
         assert_eq!(statuses(&fx.app, "promo-2").await["email"], ("skipped".to_owned(), "consent_withdrawn".to_owned()));
 
         fx.ledger.allow(subject.clone(), ConsentKey::new("marketing", "", ""));
@@ -425,7 +408,7 @@ async fn quang_cao_can_dong_y_kiem_lai_truoc_khi_gui_va_link_huy_nhan() {
         third.dedupe_key = "promo-3".to_owned();
         fx.notifier.notify(DEFAULT_TENANT, third).await.unwrap();
         run_jobs(&fx.app).await;
-        let mails = fx.mails.all();
+        let mails = fx.mails.sent();
         assert_eq!(mails.len(), 1);
         assert_eq!(mails[0].subject, "[QC] Sale 30%");
         let (name, value) = &mails[0].headers[0];
@@ -641,7 +624,7 @@ async fn thong_bao_nen_tang_toi_quan_tri_vien() {
         assert!(alice["data"].as_array().unwrap().is_empty());
         assert!(
             fx.mails
-                .all()
+                .sent()
                 .iter()
                 .any(|mail| mail.to == "admin@example.com" && mail.subject == "Maintenance")
         );
@@ -709,7 +692,7 @@ async fn permission_kiem_truoc_khi_tra_va_mau_thay_the() {
 
         fx.notifier.notify(DEFAULT_TENANT, to_alice(&SHIPPED, "custom-1").locale("vi")).await.unwrap();
         run_jobs(&fx.app).await;
-        assert_eq!(fx.mails.all()[0].subject, "Đơn DH001 đã gửi");
+        assert_eq!(fx.mails.sent()[0].subject, "Đơn DH001 đã gửi");
         let (status, _) = call(&fx.app, "DELETE", "/templates/shop.order_shipped/email/vi", "admin", None).await;
         assert_eq!(status, StatusCode::NO_CONTENT);
         let (status, problem) = call(&fx.app, "DELETE", "/templates/shop.order_shipped/email/vi", "admin", None).await;
@@ -815,7 +798,7 @@ async fn job_xong_va_nhac_ten_thanh_tin_trong_ung_dung() {
         assert!(titles.contains(&"You were mentioned in a note"), "{titles:?}");
         let (_, admin) = call(&fx.app, "GET", "/me/inbox", "admin", None).await;
         assert_eq!(admin["data"], json!([]), "tin chỉ tới đúng người");
-        assert!(fx.mails.all().is_empty(), "chỉ tin trong ứng dụng");
+        assert!(fx.mails.sent().is_empty(), "chỉ tin trong ứng dụng");
     })
     .await
     .unwrap();

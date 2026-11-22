@@ -40,7 +40,7 @@ async fn cod_shop(
     let mut builder = TestApp::builder(test)
         .member("boss", 1, root_of(DEFAULT_TENANT), &ALL.map(|name| (name, Scope::Tenant)))
         .member("auditor", 2, root_of(DEFAULT_TENANT), &[("shipping.cod.read", Scope::Tenant)])
-        .provide::<dyn AdministrativeUnits>(Arc::new(FakeUnits))
+        .provide::<dyn AdministrativeUnits>(Arc::new(FakeAdministrativeUnits::sample()))
         .provide::<dyn Ledger>(Arc::new(FakeLedger::default()))
         .module(crate::module());
     for (name, value) in settings {

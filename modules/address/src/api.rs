@@ -6,6 +6,10 @@ use autoxide_kernel::error::{Error, FieldError};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+/// Danh mục hành chính giả cho test của module khác (feature `testing`).
+#[cfg(feature = "testing")]
+pub mod testing;
+
 /// A postal address in an administrative unit (Vietnam: province and commune, since 2025-07-01).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[non_exhaustive]

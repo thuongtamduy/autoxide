@@ -71,7 +71,6 @@
   "field:a `{kind}` website ends with `{expected}`, not this status": "website loại `{kind}` kết thúc bằng `{expected}`, không phải trạng thái này",
   "field:a consumer complaint comes from a consumer, not an authority": "khiếu nại của người tiêu dùng phải do người tiêu dùng gửi, không phải cơ quan",
   "field:addresses cannot be checked on this server": "máy chủ này không kiểm được địa chỉ",
-  "field:commune `{commune}` is not in province `{province}`": "xã / phường `{commune}` không thuộc tỉnh / thành `{province}`",
   "field:give an email address or a phone number to be told the outcome": "hãy để lại email hoặc số điện thoại để nhận kết quả",
   "field:is not a method of the identity provider": "không phải cách xác thực của nhà cung cấp định danh",
   "field:is not a page or post of this tenant": "không phải trang hay bài viết của khách này",

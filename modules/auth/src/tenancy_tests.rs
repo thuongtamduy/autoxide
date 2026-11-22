@@ -463,7 +463,7 @@ async fn api_key_dinh_tuyen_dung_database() {
 
 /// Token mang khách trong mail cuối cùng: `t<ID khách>.<43 ký tự>`.
 fn tenant_token_in_mail(services: &crate::testing::Services) -> String {
-    let sent = services.mails.sent.lock().unwrap();
+    let sent = services.mails.sent();
     let text = &sent.last().unwrap().text;
     text.split_whitespace()
         .find(|word| {

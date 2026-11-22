@@ -4,25 +4,14 @@
 
 use autoxide_kernel::time::Timestamp;
 use jiff::SignedDuration;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
-use autoxide_kernel::error::Error;
-use autoxide_kernel::mail::{Mail, Mailer};
-use autoxide_kernel::tenancy::{TenantContext, TenantId};
+use autoxide_kernel::mail::Mailer;
+use autoxide_kernel::tenancy::TenantId;
+pub(super) use autoxide_testkit::FakeMailer as Outbox;
 use autoxide_testkit::{TestApp, TestDatabase};
 use axum::http::{Method, StatusCode};
 use serde_json::{Value, json};
-
-#[derive(Default)]
-pub(super) struct Outbox(pub(super) Mutex<Vec<Mail>>);
-
-#[async_trait::async_trait]
-impl Mailer for Outbox {
-    async fn send(&self, _tenant: &TenantContext, mail: Mail) -> Result<(), Error> {
-        self.0.lock().unwrap().push(mail);
-        Ok(())
-    }
-}
 
 const OPS: [&str; 4] = [
     "plans.plans.manage",
@@ -338,7 +327,7 @@ async fn mail_nhac_khong_gui_trung() {
         sql(&app, &format!("UPDATE plans_subscription SET current_period_end = '{}'", soon.to_rfc3339())).await;
         tick(&app).await;
         tick(&app).await;
-        let sent = mails.0.lock().unwrap().clone();
+        let sent = mails.sent();
         assert_eq!(sent.len(), 1, "{sent:?}");
         assert_eq!(sent[0].to, "billing@acme.example");
     })
