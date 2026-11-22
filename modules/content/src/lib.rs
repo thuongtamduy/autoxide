@@ -15,6 +15,7 @@ pub mod api;
 mod banners;
 #[cfg(any(test, feature = "bench-seed"))]
 mod bench_seed;
+mod blocks;
 mod client_config;
 mod config;
 mod entity;
@@ -194,6 +195,10 @@ impl Module for ContentModule {
         vec![("vi", include_str!("../locales/vi.json"))]
     }
 
+    fn blocks(&self) -> Vec<autoxide_kernel::blocks::BlockType> {
+        blocks::all()
+    }
+
     fn features(&self) -> Vec<autoxide_kernel::entitlement::Feature> {
         vec![service::AI_SUGGESTIONS]
     }
@@ -223,6 +228,7 @@ impl Module for ContentModule {
             .with_entitlements(context.entitlements())
             .with_resources(context.resources())
             .with_custom_fields(context.custom_fields())
+            .with_blocks(context.blocks())
             // Mẫu trang bắt buộc (D-359): biến từ hồ sơ pháp lý của `compliance` khi app có module đó.
             .with_templates(
                 (*context.require::<autoxide_kernel::template::TemplateEngine>()?).clone(),

@@ -353,7 +353,8 @@ pub(crate) struct EntryFieldsInput {
     pub slug: Option<String>,
     /// Up to 1000 characters.
     pub excerpt: Option<String>,
-    /// A ProseMirror / Tiptap JSON document (see `BodyNode`); checked by the server.
+    /// A ProseMirror / Tiptap JSON document (see `BodyNode`); checked by the server. A page may
+    /// instead have a block layout (`{"type": "layout", …}`, see `PUT /entries/{id}/layout`).
     #[schema(value_type = Option<BodyNode>)]
     pub body: Option<Value>,
     /// Main image: a media item id; `null` removes it.

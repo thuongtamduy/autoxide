@@ -18142,6 +18142,24 @@ export type LastDelivery = {
   status: string;
 };
 
+/** A JSON Patch (RFC 6902): a list of operations applied in order, all or nothing. */
+export type LayoutPatch = Operation[];
+
+/** A whole block layout for a page. */
+export type LayoutRequest = {
+  /**
+   * `{"type": "layout", "schema": 1, "sections": [block…]}`. A block is
+   * `{"id", "block", "props"?, "visibility"?, "children"?}`: `id` is 1 to 64 letters, digits, `-`
+   * or `_`, unique in the page; `block` is a name from `GET /api/v1/kernel/blocks`; `props`
+   * follows that block's `props_schema`; `visibility` maps screen sizes `base` / `md` / `lg` to
+   * `true` / `false`; only blocks with `children: "blocks"` hold `children`. At most 500 blocks,
+   * 6 levels deep, 256 KB of JSON.
+   */
+  layout: Record<string, unknown>;
+  /** Keep this version in the history now, whatever the time since the last one. */
+  save_revision?: boolean;
+};
+
 /** Changes to an account. Omitted fields stay; `null` clears. */
 export type LedgerAccountChange = {
   /** Account number in the accounting software, up to 32 characters. */
@@ -20391,6 +20409,18 @@ export type OpenSupportTicketRequest = {
   subject: string;
   /** Guests: the hidden trap field of the form; leave it empty. */
   trap?: string | null;
+};
+
+/** One JSON Patch operation (RFC 6902). */
+export type Operation = {
+  /** Source pointer of `move` and `copy`. */
+  from?: string | null;
+  /** `add`, `remove`, `replace`, `move`, `copy` or `test`. */
+  op: string;
+  /** JSON Pointer (RFC 6901) of the target, e.g. `/sections/0/props/text`; `-` appends to a list. */
+  path: string;
+  /** Value of `add`, `replace` and `test`. */
+  value?: Record<string, unknown> | null;
 };
 
 /** Backlogs of every database this server handles. */
@@ -38065,6 +38095,39 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/content/entries/{id}/layout": {
+    /** Replace the block layout of a page. */
+    put: {
+      parameters: { header: { "If-Match": string; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: LayoutRequest;
+      responses: {
+        200: Data_EntryResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        412: Problem;
+        422: Problem;
+        428: Problem;
+        default: Problem;
+      };
+    };
+    /** Change part of the block layout of a page with JSON Patch. */
+    patch: {
+      parameters: { header: { "If-Match": string; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: LayoutPatch;
+      responses: {
+        200: Data_EntryResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        412: Problem;
+        422: Problem;
+        428: Problem;
         default: Problem;
       };
     };

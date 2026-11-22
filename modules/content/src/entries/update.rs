@@ -159,6 +159,41 @@ impl ContentService {
         }
     }
 
+    /// Kiểm thân bài theo loại của nó: thân `rich` (ProseMirror, D-102) hay thân `layout` (cây
+    /// khối, bước 67 — chỉ trang). Lỗi vào `problems`; trả chữ và ID `media` trích được.
+    pub(crate) async fn check_body(
+        &self,
+        tenant: &TenantContext,
+        kind: &str,
+        body: &Value,
+        problems: &mut Vec<FieldError>,
+    ) -> Result<body::BodyInfo, Error> {
+        let checked = if layout::is_layout(body) {
+            if kind != "page" {
+                problems.push(FieldError::new(
+                    "body.type",
+                    "invalid",
+                    "only pages can have a `layout` body; posts use a `doc` body",
+                ));
+                return Ok(body::BodyInfo::default());
+            }
+            let usable: layout::Usable = self
+                .blocks
+                .usable(tenant)
+                .await?
+                .into_iter()
+                .map(|info| (info.block.name, info))
+                .collect();
+            layout::check(body, &self.blocks, &usable)
+        } else {
+            body::check(body, self.config.max_body_bytes, &self.config.embed_hosts)
+        };
+        Ok(checked.unwrap_or_else(|errors| {
+            problems.extend(errors);
+            body::BodyInfo::default()
+        }))
+    }
+
     /// Áp `fields` lên `candidate` rồi kiểm toàn bộ (mọi lỗi vào `problems`); tính văn bản
     /// thuần, số chữ, thời gian đọc, khoá tìm; kiểm ảnh có tồn tại (qua `media`).
     pub(crate) async fn apply(
@@ -246,13 +281,7 @@ impl ContentService {
             Some(body) => body,
             None => serde_json::from_str(&candidate.body).unwrap_or_else(|_| body::empty()),
         };
-        let info = match body::check(&body, self.config.max_body_bytes, &self.config.embed_hosts) {
-            Ok(info) => info,
-            Err(errors) => {
-                problems.extend(errors);
-                body::BodyInfo::default()
-            }
-        };
+        let info = self.check_body(tenant, &candidate.kind, &body, problems).await?;
         candidate.body = serde_json::to_string(&body).map_err(Error::internal)?;
         candidate.body_schema_version = body::SCHEMA_VERSION;
         candidate.word_count = info.word_count;
@@ -265,5 +294,61 @@ impl ContentService {
         candidate.plain_text = info.plain_text;
         self.check_media(tenant, candidate, &info.media_ids, false, problems).await?;
         self.check_records(tenant, &info.records, problems).await
+    }
+}
+
+impl ContentService {
+    /// Thay cả bố cục của trang `id` (bước 67): như sửa thân bài, nhưng thân phải là `layout`.
+    pub(crate) async fn replace_layout(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+        id: Uuid,
+        layout: Value,
+        save_revision: bool,
+        expected: Option<Timestamp>,
+    ) -> Result<Entry, Error> {
+        // Quyền trước, dữ liệu sau: người không có quyền luôn nhận 403, không biết thân sai ở đâu.
+        permissions::require_create(principal)?;
+        if !layout::is_layout(&layout) {
+            return Err(invalid(vec![FieldError::new(
+                "layout.type",
+                "invalid",
+                "must be `layout`",
+            )]));
+        }
+        let fields = EntryFields { body: Some(layout), ..EntryFields::default() };
+        self.update(tenant, principal, id, fields, save_revision, expected).await
+    }
+
+    /// Sửa từng phần bố cục của trang `id` bằng JSON Patch (RFC 6902): áp lên bản nháp hiện tại
+    /// rồi kiểm lại cả trang. Trang còn thân `rich` trống được coi như bố cục trống; thân `rich`
+    /// có nội dung thì 409 `content.not_layout` (thay bằng `PUT …/layout` trước).
+    pub(crate) async fn patch_layout(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+        id: Uuid,
+        operations: &[patch::Operation],
+        expected: Option<Timestamp>,
+    ) -> Result<Entry, Error> {
+        permissions::require_create(principal)?;
+        let current = self.load_checked(tenant, id, expected).await?;
+        let body: Value = serde_json::from_str(&current.body).unwrap_or_else(|_| body::empty());
+        let body = if layout::is_layout(&body) {
+            body
+        } else if body == body::empty() {
+            layout::empty()
+        } else {
+            return Err(Error::conflict(
+                "content.not_layout",
+                "Entry {id} has a rich text body, not a layout; replace it with `PUT /api/v1/content/entries/{id}/layout` first.",
+            )
+            .with_param("id", id));
+        };
+        let patched = patch::apply(&body, operations).map_err(|error| invalid(vec![error]))?;
+        let fields = EntryFields { body: Some(patched), ..EntryFields::default() };
+        // Phiên bản đã đọc ở trên: không ai sửa xen giữa lúc áp patch và lúc ghi.
+        self.update(tenant, principal, id, fields, false, Some(current.updated_at)).await
     }
 }
