@@ -109,6 +109,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261121-shop-first-order](D-20261121-shop-first-order.md)** Thứ tự sau bước 70 P1–P3 xếp theo kịch bản "cửa hàng bán online chạy thật" — 2026-11-21
 - **[D-20261121-sqlx-091](D-20261121-sqlx-091.md)** Nâng sqlx 0.9.1, gỡ ngoại lệ RUSTSEC-2026-0459 — 2026-11-21
 - **[D-20261122-gitleaks-8-30-1](D-20261122-gitleaks-8-30-1.md)** Ghim gitleaks 8.30.1, image lấy từ `ghcr.io/gitleaks/gitleaks` ở cả gate và CI — 2026-11-22
+- **[D-20261122-step67-after-1-0](D-20261122-step67-after-1-0.md)** Ba mục cuối của bước 67 làm sau bản 1.0 — 2026-11-22 · **chủ dự án quyết**
 
 ## Kiến trúc module và kernel
 
@@ -585,6 +586,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261121-vn-providers](D-20261121-vn-providers.md)** Bộ nối nhà cung cấp đầu tiên: SePay, MoMo, Giao Hàng Nhanh, eSMS, SePay eInvoice; tài khoản do từng khách tự cấu hình — 2026-11-21 · **chủ dự án quyết**
 - **[D-20261122-cart-tender-limits](D-20261122-cart-tender-limits.md)** Báo giá giỏ trả tối đa dùng được của từng tender (`tender_limits`, số điểm tối đa) — 2026-11-22
 - **[D-20261122-esms-environment](D-20261122-esms-environment.md)** Bộ nối eSMS: môi trường thử theo quy ước chung `environment`, vẫn là cờ `Sandbox` trong request — 2026-11-22
+- **[D-20261122-shop-flow-fixes](D-20261122-shop-flow-fixes.md)** Luồng bán hàng mẫu (bước 70 P8): người nhận và kích thước kiện khi báo phí, cổng thanh toán mặc định theo khách, "kênh chưa bật" khi khách chưa đặt tài khoản — 2026-11-22
 
 ## Vận hành và hiệu năng
 

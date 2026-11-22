@@ -50,6 +50,9 @@ pub(crate) const UNSUBSCRIBE_FOOTER: MailTemplate = MailTemplate::new(
 const MAX_DEVICE_FAILURES: i32 = 10;
 
 /// Lỗi vĩnh viễn của nhà cung cấp (địa chỉ / token sai, bị chặn): không thử lại.
+/// Mã lỗi của bộ nối khi khách chưa nhập tài khoản nhà cung cấp (`autoxide_kernel::provider`).
+const NOT_CONFIGURED: &str = "provider.not_configured";
+
 fn is_permanent(error: &Error) -> bool {
     matches!(
         error.kind(),
@@ -236,6 +239,11 @@ impl NotificationsService {
         };
         match result {
             Ok(sent) => self.finish(tenant, &row, sent).await,
+            // Khách chưa cấu hình tài khoản nhà cung cấp của kênh (bước 70 P8): như kênh chưa bật,
+            // không phải lỗi và không thử lại.
+            Err(error) if error.code() == NOT_CONFIGURED => {
+                self.finish(tenant, &row, Sent::Skipped(SkipReason::ChannelDisabled)).await
+            }
             // Lỗi vĩnh viễn (địa chỉ sai, bị chặn, mẫu chưa duyệt): không thử lại.
             Err(error) if is_permanent(&error) => {
                 self.finish(tenant, &row, Sent::Failed(error.code().to_owned())).await

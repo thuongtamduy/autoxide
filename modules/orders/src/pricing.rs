@@ -59,6 +59,8 @@ pub(crate) struct PriceInput {
     pub buyer_keys: Vec<String>,
     pub profile: BuyerProfile,
     pub destination: Option<Address>,
+    /// Người nhận (tên, số điện thoại) khi đã biết: chuyển cho hãng vận chuyển lúc báo phí.
+    pub recipient: Option<(String, String)>,
     pub shipping_option: Option<String>,
     pub payment_method: Option<String>,
     /// `web` / `app` / `pos`.
@@ -201,6 +203,9 @@ pub(crate) async fn quote(
             QuoteRequest::new(input.org_id, items, subtotal, input.at).locale(input.locale.clone());
         if let Some(destination) = &input.destination {
             request = request.destination(destination.clone());
+        }
+        if let Some((name, phone)) = &input.recipient {
+            request = request.recipient(name.clone(), phone.clone());
         }
         let quoted = rates.quote(tenant, &request).await?;
         shipping_options = quoted.options;

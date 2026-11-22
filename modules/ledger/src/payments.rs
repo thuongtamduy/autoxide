@@ -214,10 +214,31 @@ impl LedgerService {
                 _ => Err(Error::validation(vec![FieldError::new(
                     "provider",
                     "required",
-                    "is required: this server has several payment partners",
+                    "is required: this server has several payment partners and this shop has no \
+                     default one (ledger.payments.default_provider)",
                 )])),
             },
         }
+    }
+
+    /// Như [`gateway`](Self::gateway), nhưng khi không nêu `provider` mà có nhiều cổng thì dùng cổng
+    /// mặc định của khách (`ledger.payments.default_provider`).
+    pub(crate) async fn gateway_for(
+        &self,
+        tenant: &TenantContext,
+        provider: Option<&str>,
+    ) -> Result<Arc<dyn PaymentGateway>, Error> {
+        if provider.is_none()
+            && self.gateways.len() > 1
+            && let Some(settings) = &self.settings
+            && let Some(chosen) = settings.get(tenant, &crate::service::DEFAULT_PROVIDER).await?
+        {
+            let chosen = chosen.as_str().trim();
+            if !chosen.is_empty() {
+                return self.gateway(Some(chosen));
+            }
+        }
+        self.gateway(provider)
     }
 
     // ---- Tạo thanh toán ------------------------------------------------------------------------
@@ -261,7 +282,7 @@ impl LedgerService {
                 "must be an http(s) URL of at most 2000 characters",
             ));
         }
-        let gateway = match self.gateway(input.provider.as_deref()) {
+        let gateway = match self.gateway_for(tenant, input.provider.as_deref()).await {
             Ok(gateway) => Some(gateway),
             Err(error) if error.code() == "validation_failed" => {
                 problems.extend(error.fields().iter().cloned());

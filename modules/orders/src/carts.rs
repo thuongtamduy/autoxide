@@ -326,18 +326,24 @@ impl OrdersService {
             row.ship_to.as_deref().and_then(|raw| serde_json::from_str(raw).ok());
         // Số nhận hàng: số ghi ở giỏ, không có thì số của địa chỉ trong sổ.
         let chosen_phone = ship_to.as_ref().and_then(|ship_to| ship_to.phone.clone());
+        let mut name = ship_to.as_ref().and_then(|ship_to| ship_to.recipient_name.clone());
         let (destination, phone) = match (&ship_to, buyer, &self.address_book) {
             (Some(ShipTo { address: Some(address), .. }), _, _) => {
                 (Some(address.clone()), chosen_phone)
             }
             (Some(ShipTo { address_id: Some(id), .. }), Some(buyer), Some(book)) => {
                 match book.get(tenant, buyer, *id).await.ok() {
-                    Some(found) => (Some(found.address), chosen_phone.or(Some(found.phone))),
+                    Some(found) => {
+                        name = name.or(Some(found.recipient_name));
+                        (Some(found.address), chosen_phone.or(Some(found.phone)))
+                    }
                     None => (None, chosen_phone),
                 }
             }
             _ => (None, chosen_phone),
         };
+        // Người nhận cho hãng vận chuyển lúc báo phí (khi đủ tên và số).
+        let recipient = name.zip(phone.clone());
         let identity =
             self.buyer_identity(tenant, buyer, phone.as_deref(), destination.as_ref()).await?;
         Ok(PriceInput {
@@ -352,6 +358,7 @@ impl OrdersService {
             buyer_keys: identity.keys,
             profile,
             destination,
+            recipient,
             shipping_option: row.shipping_option.clone(),
             payment_method: row.payment_method.clone(),
             client: Some("web".to_owned()),

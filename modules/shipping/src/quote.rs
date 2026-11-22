@@ -58,6 +58,26 @@ pub(crate) fn volumetric_grams(item: &QuoteItem, divisor: i64) -> i64 {
     }
 }
 
+/// Kích thước (mm) của một kiện gom mọi món cần giao: dài và rộng lớn nhất, cao cộng dồn (xếp chồng).
+/// Một món cần giao thiếu kích thước → không biết (`None` cả ba): hãng dùng mặc định của nó.
+pub(crate) fn parcel_sides(items: &[QuoteItem]) -> (Option<i64>, Option<i64>, Option<i64>) {
+    let (mut length, mut width, mut height) = (0i64, 0i64, 0i64);
+    let mut any = false;
+    for item in items.iter().filter(|item| item.requires_shipping && item.quantity > 0) {
+        let (Some(l), Some(w), Some(h)) = (item.length_mm, item.width_mm, item.height_mm) else {
+            return (None, None, None);
+        };
+        if l <= 0 || w <= 0 || h <= 0 {
+            return (None, None, None);
+        }
+        length = length.max(l);
+        width = width.max(w);
+        height = height.saturating_add(h.saturating_mul(item.quantity));
+        any = true;
+    }
+    if any { (Some(length), Some(width), Some(height)) } else { (None, None, None) }
+}
+
 /// Cân tính phí và cạnh dài nhất của giỏ. Món cần giao thiếu cân nặng dùng `default_weight`;
 /// không có thì trả SKU của món thiếu.
 pub(crate) fn load_of(
@@ -463,10 +483,13 @@ impl ShippingService {
             return Err(errors::no_carrier());
         }
         let Some(destination) = request.destination.clone() else { return Ok(Vec::new()) };
-        let parcel = crate::api::CarrierParcel::new(load.chargeable_grams.max(1));
+        let (length, width, height) = parcel_sides(&request.items);
+        let parcel = crate::api::CarrierParcel::new(load.chargeable_grams.max(1))
+            .dimensions(length, width, height);
         let ask =
             crate::api::CarrierQuoteRequest::new(destination, vec![parcel], request.order_value)
-                .service(method.service_code.clone());
+                .service(method.service_code.clone())
+                .recipient(request.recipient.clone());
         let rates = match crate::carriers::within(
             self.config.carrier_timeout_seconds,
             carrier.quote(&account, &ask),
@@ -543,5 +566,28 @@ impl ShippingService {
         };
         let hours = crate::eta::Hours::from_ranges(ranges);
         Ok(crate::eta::ready_at(calendar, &hours, request.at, prep))
+    }
+}
+
+#[cfg(test)]
+mod parcel_tests {
+    use super::*;
+
+    fn item(quantity: i64, sides: Option<(i64, i64, i64)>) -> QuoteItem {
+        let item = QuoteItem::new(Uuid::now_v7(), quantity).weight(Some(100));
+        match sides {
+            Some((l, w, h)) => item.dimensions(Some(l), Some(w), Some(h)),
+            None => item,
+        }
+    }
+
+    #[test]
+    fn kien_gom_dai_rong_lon_nhat_cao_cong_don() {
+        let items = [item(2, Some((300, 200, 50))), item(1, Some((250, 250, 100)))];
+        assert_eq!(parcel_sides(&items), (Some(300), Some(250), Some(200)));
+        // Một món thiếu kích thước: không đoán.
+        let items = [item(1, Some((300, 200, 50))), item(1, None)];
+        assert_eq!(parcel_sides(&items), (None, None, None));
+        assert_eq!(parcel_sides(&[]), (None, None, None));
     }
 }

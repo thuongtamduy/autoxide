@@ -9,6 +9,7 @@ Ví dụ `curl` gửi JSON bằng `--json '…'`, cần curl 7.82 trở lên (`c
 `--json '…'` bằng `-H 'Content-Type: application/json' -H 'Accept: application/json' -d '…'`.
 
 - [Hiện bài viết và ảnh trên website](website.vi.md): endpoint công khai, `srcset` và WebP, ETag và 304
+- [Mở một cửa hàng: đơn đầu tiên từ sản phẩm tới hoá đơn điện tử](shop.vi.md): bật bộ nối, tài khoản nhà cung cấp, sản phẩm, giỏ vãng lai, MoMo, GHN, eSMS, SePay eInvoice
 - [Dựng trang chủ của cửa hàng từ API](storefront.vi.md): vị trí và banner, bộ sưu tập, thương hiệu và liên hệ, cache
 - [Đăng nhập và giữ phiên đăng nhập](authentication.vi.md): access token và refresh token, đăng xuất
 - [Đăng nhập bằng Google, Microsoft, GitHub hay OpenID Connect](oidc.vi.md): nhà cung cấp theo khách, liên kết tài khoản an toàn
