@@ -46,7 +46,9 @@ bước 7.**
 
 1. Đưa nhánh lên `main` mới nhất: `git fetch origin`, rồi `git rebase origin/main`. Phiên
    khác có thể đã merge trong lúc mình làm — xem "Khi hai phiên đụng nhau" bên dưới.
-2. Đổi `version` trong `Cargo.toml` gốc; chạy `cargo check` để cập nhật `Cargo.lock`. Đổi
+2. Đổi `version` trong `Cargo.toml` gốc — cả dòng `version` của `[workspace.package]` lẫn `version = "=X.Y.Z"`
+   của từng crate nội bộ ở `[workspace.dependencies]` (một lệnh: `sed -i 's/version = "=A.B.C"/version = "=X.Y.Z"/'
+   Cargo.toml`; quên thì luật `publish-ready` của `cargo xtask check` đỏ); chạy `cargo check` để cập nhật `Cargo.lock`. Đổi
    theo: `"version"` trong `docs/openapi.json`, `"version"` trong `sdk/typescript/package.json` và
    `sdk/typescript/package-lock.json`, image mặc định trong `compose.quickstart.yml` — `cargo xtask sdk --check`
    của gate kiểm mấy chỗ này; bản phát hành mới
@@ -59,7 +61,8 @@ bước 7.**
    mất vài phút và vài GB đĩa — `rm -rf target/semver-checks` sau đó): nó in mục `### Breaking (Rust)`
    gồm thay đổi phá vỡ của `autoxide-kernel` và `autoxide-testkit` so với tag trước; chép vào mục
    `## [X.Y.Z]`. Không in gì thì không thêm mục. Còn `0.x` thì chỉ báo cáo, không chặn (D-167, D-242).
-4. Commit `release: vX.Y.Z`, chạy gate (`./gate.sh`, cả SQLite lẫn Postgres) trên bản này. Rồi
+4. Commit `release: vX.Y.Z`, chạy gate (`./gate.sh`, cả SQLite lẫn Postgres) trên bản này, rồi
+   `cargo xtask publish-check` (các crate vẫn đóng gói và build được như trên crates.io, xem "Đăng lên crates.io"). Rồi
    chạy test nâng cấp: `cargo xtask upgrade-test` — bản phát hành trước (image Docker của nó; tải
    không được thì build từ tag, lâu) ghi dữ liệu, bản này đọc lại trên cùng database, cả SQLite lẫn
    Postgres (D-246). Cần Docker; đỏ thì không phát hành. Job `upgrade` của CI chạy cùng lệnh.
@@ -104,6 +107,45 @@ bước 7.**
    chọn tag); không xoá tag đã đẩy. Lỗi nằm ở code thì phát hành bản vá `X.Y.Z+1`.
 8. `cargo clean`: mỗi lần đổi phiên bản, cargo build lại cả workspace thành một bộ file mới
    mà không xoá bộ cũ, `target/` phình thêm hàng chục GB.
+
+## Đăng lên crates.io (chưa bật — chờ chủ dự án)
+
+Mọi crate trừ `xtask` và module mẫu `notes` đã **sẵn sàng** cho crates.io nhưng **chưa đăng**
+(D-20261121-external-modules): đăng là việc không hoàn tác được (một phiên bản đã đăng chỉ "yank" được, tên crate
+giữ vĩnh viễn) và cần tài khoản của chủ dự án. Agent không tự đăng, không đổi `publish = false`.
+
+Giữ cho sẵn sàng (đã chạy mỗi lần gate và mỗi lần phát hành):
+
+- `cargo xtask check` — luật `publish-ready`: metadata đủ, phụ thuộc nội bộ ghim `version = "=X.Y.Z"`.
+- `cargo xtask publish-check` (lúc phát hành, bước 4; lâu như một lần build sạch, ghi vào `target/package`) —
+  `cargo package` cho từng crate rồi build từ gói đã đóng, với phiên bản thư viện mới nhất hợp lệ: đúng thứ người
+  dùng crates.io nhận. Đỏ thì sửa trước khi phát hành.
+
+Khi chủ dự án bảo đăng, lần đầu (làm tay, một lần):
+
+1. Chủ dự án tạo tài khoản crates.io (đăng nhập bằng GitHub), xác nhận email, tạo một API token có quyền
+   `publish-new` và `publish-update` (https://crates.io/settings/tokens). Token là secret: không vào git, không dán
+   vào trò chuyện.
+2. Kiểm lại tên còn trống: 36 tên `autoxide`, `autoxide-kernel`, `autoxide-testkit`, `autoxide-<module>` (ngày
+   2026-11-21 đều trống). Tên đã bị người khác lấy thì dừng lại hỏi chủ dự án.
+3. Đổi `publish = false` ở `[workspace.package]` của `Cargo.toml` gốc thành `publish = true` (`xtask` tự khai `publish = false`;
+   module mẫu `notes` luôn bị loại bằng `--exclude autoxide-notes`), commit.
+4. Trên đúng commit của tag phát hành, gate xanh: `cargo publish --workspace --exclude xtask --exclude
+   autoxide-notes --dry-run`, rồi bỏ `--dry-run`. Cargo tự xếp thứ tự theo phụ thuộc: `autoxide-kernel` →
+   `autoxide-testkit` → các module (module nền trước module dùng nó) → `autoxide`. crates.io giới hạn số crate MỚI
+   mỗi tài khoản (một đợt vài crate, sau đó chậm lại): lệnh dừng giữa chừng vì giới hạn thì chờ rồi chạy lại — crate
+   đã đăng được bỏ qua; có thể xin nâng giới hạn qua help@crates.io trước.
+5. Với từng crate, trên crates.io: Settings → Trusted Publishing → thêm repo GitHub này, workflow `release.yml`
+   (Trusted Publishing chỉ cấu hình được sau khi crate đã có, nên lần đầu phải dùng token). Xong thì thu hồi token.
+
+Từ lần sau (tự động, không secret lâu dài): thêm vào `release.yml` một job `crates` chạy sau `publish`, quyền
+`id-token: write`, dùng action `rust-lang/crates-io-auth-action` lấy token ngắn hạn qua OIDC rồi chạy
+`cargo publish --workspace --exclude xtask --exclude autoxide-notes`. Job này CHƯA có trong workflow: thêm nó cùng
+lúc với bước 3, ghim action theo SHA như mọi action khác (D-20261121-pin-ci-deps). Cách cấu hình Trusted Publishing
+và tên action nên đối chiếu lại tài liệu crates.io lúc làm (https://crates.io/docs/trusted-publishing).
+
+Sau khi đăng: sửa `docs/guides/writing-a-module.md` (+ bản `.vi.md`) và `examples/external-module/Cargo.toml` để
+hướng dẫn phụ thuộc bằng phiên bản crates.io thay cho git tag.
 
 ## Khi repo còn riêng tư
 

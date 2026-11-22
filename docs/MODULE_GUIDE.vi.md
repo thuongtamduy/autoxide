@@ -41,7 +41,7 @@ kiểu viết hoa: tên crate, `Module::name`, bảng, permission, event, mã l�
 file). Kết quả qua được gate ngay; sau đó viết lại bảng, service, mô tả và
 `locales/vi.json` cho đúng tính năng. Để đăng ký:
 
-1. thêm `autoxide-<tên> = { path = "modules/<tên>" }` vào `[workspace.dependencies]`
+1. thêm `autoxide-<tên> = { path = "modules/<tên>", version = "=<phiên bản workspace>" }` vào `[workspace.dependencies]`
    của `Cargo.toml` gốc;
 2. thêm `autoxide-<tên>.workspace = true` vào `crates/app/Cargo.toml`;
 3. thêm một dòng vào `all()` trong `crates/app/src/modules.rs`:
@@ -748,31 +748,39 @@ dùng một lần, bộ đếm) cần một test đồng thời.
 
 ## Module ở repo riêng
 
-Module không nhất thiết nằm trong repo này. Để nó trong crate riêng và phụ thuộc vào
-core theo tag phát hành:
+Module không nhất thiết nằm trong repo này, và chạy nó không cần fork. Để module trong crate
+của bạn, viết một binary nhỏ thêm nó vào các module chính thức
+(`autoxide::Autoxide::new().module(your_crate::module).run()`), và phụ thuộc vào core theo tag
+phát hành:
 
 ```toml
 [dependencies]
-autoxide-kernel = { git = "https://github.com/<owner>/autoxide", tag = "vX.Y.Z" }
+autoxide-kernel = { git = "https://github.com/thuongtamduy/autoxide", tag = "vX.Y.Z" }
 
 [dev-dependencies]
-autoxide-testkit = { git = "https://github.com/<owner>/autoxide", tag = "vX.Y.Z" }
+autoxide-testkit = { git = "https://github.com/thuongtamduy/autoxide", tag = "vX.Y.Z" }
 ```
+
+[`docs/guides/writing-a-module.vi.md`](guides/writing-a-module.vi.md) đi từng bước từ repo trống
+tới module chạy được, có test; [`examples/external-module`](../examples/external-module) chính là
+module đó và máy chủ của nó, được CI build và test trên cả hai database.
 
 Dùng phiên bản Rust của bản phát hành đó (`rust-toolchain.toml`) hoặc mới hơn, và cùng
 phiên bản lớn của các thư viện công khai (bảng bên dưới), nếu không trình biên dịch báo
-hai bản của cùng một kiểu. Để chạy, thêm crate vào một bản
-checkout của Autoxide (`crates/app/Cargo.toml` và `crates/app/src/modules.rs`, bước 1).
+hai bản của cùng một kiểu.
 
-`cargo xtask check` chỉ chạy trong repo này, nên module để ở nơi khác tự giữ luật của
-nó: hai thứ công khai, tiền tố bảng, không foreign key sang module khác, mọi route qua
-`routes!`, mã lỗi có bản dịch. Giữ test sở hữu bảng
-(`autoxide_testkit::schema_ownership_violations`) và test `TestApp` trên cả hai database.
+`cargo xtask check-module <thư mục>` (chạy từ một bản checkout của repo này) áp các luật đọc mã
+nguồn module của `cargo xtask check` cho một crate ở bất cứ đâu: hai thứ công khai, mọi route
+qua `routes!`, handler và tool không chạm database, mã lỗi có bản dịch, entity có `tenant_id`,
+truy vấn lọc theo khách. Thứ nằm trong database — tiền tố bảng, không foreign key sang module
+khác, `tenant_id` đứng đầu mọi index — do test của testkit kiểm (`schema_ownership_violations`,
+`schema_tenancy_violations`, `leak_check`): hãy giữ chúng, và chạy test trên cả hai database.
 
 ## Độ ổn định của hợp đồng module
 
 Thứ module dựa vào là **hợp đồng module**: các thứ công khai của `autoxide-kernel` và
-`autoxide-testkit`, cùng các thư viện có kiểu xuất hiện trong đó.
+`autoxide-testkit`, điểm vào `autoxide::Autoxide`, `api` của các module chính thức
+(`autoxide_<tên>::api`), cùng các thư viện có kiểu xuất hiện trong đó.
 
 | Thư viện | Phiên bản | Gặp ở |
 | --- | --- | --- |
@@ -783,15 +791,19 @@ Thứ module dựa vào là **hợp đồng module**: các thứ công khai củ
 | `tokio` | 1 | runtime async |
 | `serde`, `serde_json` | 1 | thân request, event, tham số tool |
 | `uuid` | 1 (v7) | ID |
-| `chrono` | 0.4 | thời gian |
+| `jiff` | 1 | khoảng thời gian và múi giờ (thời điểm là `autoxide_kernel::time::Timestamp`) |
 | `async-trait` | 0.1 | trait gọi qua `dyn` |
 | `validator` | 0.21 | `ValidJson<T>` |
 
 Luật core tự giữ:
 
 - Khi phiên bản còn `0.x`, thay đổi phá vỡ hợp đồng chỉ đến ở bản minor (`0.7` → `0.8`)
-  và được ghi ở mục **Changed** hoặc **Removed** của `CHANGELOG.md`. Một thư viện trong
-  bảng lên phiên bản lớn mới là một thay đổi như vậy.
+  và được ghi ở mục **Changed** hoặc **Removed** của `CHANGELOG.md`, phần Rust ở mục
+  `### Breaking (Rust)`. Bản patch (`0.8.0` → `0.8.1`) không bao giờ phá vỡ hợp đồng. Một thư
+  viện trong bảng lên phiên bản lớn mới, hay phiên bản Rust tối thiểu mới hơn, là một thay đổi
+  như vậy.
+- Từ `1.0` hợp đồng theo Semantic Versioning: thay đổi phá vỡ chỉ đến ở bản major, và
+  `cargo semver-checks` chặn bản phát hành lỡ phá vỡ nó.
 - `Module` chỉ lớn thêm bằng hàm có thân mặc định: module viết cho bản cũ vẫn biên dịch.
 - Kiểu công khai sẽ còn lớn thêm được đánh dấu `#[non_exhaustive]`: dựng chúng bằng hàm
   tạo, không bằng struct literal, và `match` enum của chúng có nhánh `_`.

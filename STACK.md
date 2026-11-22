@@ -188,6 +188,7 @@ repo này; giao diện là dự án riêng dùng API.
 | Cache lớp Docker      | `cargo-chef` 0.1.78 (cài trong Dockerfile bằng `cargo install --locked`, không cần cài ở máy dev) — tách build thư viện ngoài khỏi build code của mình để cache gha giữ được lớp thư viện (D-20261120-docker-chef) |
 | Database cho test   | `autoxide-testkit` — mỗi test một database trống (D-033)        |
 | Kiểm ranh giới      | `cargo xtask check` — bố cục, license, lint, chiều phụ thuộc, bề mặt module (D-031) |
+| Module ở repo riêng | `cargo xtask check-module <thư mục>` — các luật đọc mã nguồn module của `check`, trên crate ngoài repo; ví dụ chạy thật ở `examples/external-module` (workspace Cargo riêng, `./gate.sh --only example`); `cargo xtask publish-check` — đóng gói và build thử mọi crate như trên crates.io, lúc phát hành (D-20261121-external-modules) |
 | Kiểm phụ thuộc      | `cargo-deny` (license, lỗ hổng đã công bố, nguồn) — cấu hình `deny.toml`, chạy trong gate |
 | Postgres cho test   | Docker — `gate.sh` tự dựng một container dùng xong bỏ           |
 | Hợp đồng Rust       | `cargo-semver-checks` 0.51.0 (`cargo install cargo-semver-checks --version 0.51.0 --locked`) — `cargo xtask semver` báo thay đổi phá vỡ của kernel, testkit lúc phát hành, không trong gate (D-242) |

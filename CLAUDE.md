@@ -225,6 +225,12 @@ sẵn lệnh.
   Mọi thứ khác là `mod` riêng tư hoặc `pub(crate)`. Module khác chỉ được viết
   `autoxide_<tên>::api::…`; `api` không tham chiếu phần bên trong (`crate::…`).
 - Các luật trên do `cargo xtask check` kiểm trong gate; lý do ở D-031.
+- Crate `autoxide` còn là thư viện, phần công khai chỉ có `autoxide::Autoxide` (binary chính thức là
+  `Autoxide::new().run()`): module ở repo riêng của người khác ghép vào bằng `.module(…)`, không fork. Phần công
+  khai của kernel, testkit, `Autoxide` và `api` của module là hợp đồng với họ — đổi phá vỡ chỉ ở bản minor, có
+  `#[deprecated]` trước. `examples/external-module/` là workspace Cargo RIÊNG (ví dụ chạy thật, `./gate.sh --only
+  example`); phụ thuộc nội bộ ở `[workspace.dependencies]` ghim `version = "=<phiên bản workspace>"`
+  (D-20261121-external-modules).
 - Module cài trait `Module` của `autoxide_kernel::module` (tên, migration, cấu
   hình…) và được đăng ký ở đúng một chỗ: `crates/app/src/modules.rs`. Phần mới của
   core cần module khai thêm gì thì thêm một hàm vào `Module` **kèm cài đặt mặc
