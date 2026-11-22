@@ -583,6 +583,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261121-sepay-bank-feed](D-20261121-sepay-bank-feed.md)** Bộ nối SePay là nguồn biến động số dư (`BankFeed`), không phải cổng giữ tiền — 2026-11-21
 - **[D-20261121-vn-providers](D-20261121-vn-providers.md)** Bộ nối nhà cung cấp đầu tiên: SePay, MoMo, Giao Hàng Nhanh, eSMS, SePay eInvoice; tài khoản do từng khách tự cấu hình — 2026-11-21 · **chủ dự án quyết**
 - **[D-20261122-esms-environment](D-20261122-esms-environment.md)** Bộ nối eSMS: môi trường thử theo quy ước chung `environment`, vẫn là cờ `Sandbox` trong request — 2026-11-22
+- **[D-20261122-shop-flow-fixes](D-20261122-shop-flow-fixes.md)** Luồng bán hàng mẫu (bước 70 P8): người nhận và kích thước kiện khi báo phí, cổng thanh toán mặc định theo khách, "kênh chưa bật" khi khách chưa đặt tài khoản — 2026-11-22
 
 ## Vận hành và hiệu năng
 

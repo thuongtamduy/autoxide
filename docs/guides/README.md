@@ -9,6 +9,7 @@ The `curl` examples send JSON with `--json '…'`, which needs curl 7.82 or newe
 older curl, replace `--json '…'` with `-H 'Content-Type: application/json' -H 'Accept: application/json' -d '…'`.
 
 - [Showing posts and pictures on a website](website.md): public endpoints, `srcset` and WebP, ETag and 304
+- [Opening a shop: your first order from product to e-invoice](shop.md): connectors on, provider accounts, product, guest cart, MoMo, GHN, eSMS, SePay eInvoice
 - [Building a shop's home page from the API](storefront.md): placements and banners, collections, brand and contact details, cache
 - [Signing in and staying signed in](authentication.md): access and refresh tokens, signing out
 - [Signing in with Google, Microsoft, GitHub or OpenID Connect](oidc.md): providers per tenant, linking accounts safely

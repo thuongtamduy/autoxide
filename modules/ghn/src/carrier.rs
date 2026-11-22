@@ -214,9 +214,14 @@ impl ShippingCarrier for GhnCarrier {
         let account = account::read(account)?;
         let service = service_of(request.service_code.as_deref(), &request.parcels)?;
         let mut body = Map::new();
-        // `preview` buộc có người nhận như `create`; lúc báo giá chưa có nên gửi giá trị giữ chỗ.
-        body.insert("to_name".to_owned(), json!("Quote"));
-        body.insert("to_phone".to_owned(), json!("0900000000"));
+        // `preview` buộc có người nhận như `create`: dùng người nhận của giỏ khi đã có, chưa có (trang
+        // sản phẩm, giỏ chưa nhập địa chỉ) thì gửi giá trị giữ chỗ.
+        let (name, phone) = request
+            .recipient
+            .clone()
+            .unwrap_or_else(|| ("Quote".to_owned(), "0900000000".to_owned()));
+        body.insert("to_name".to_owned(), json!(name));
+        body.insert("to_phone".to_owned(), json!(phone));
         put_address(&mut body, "to", &request.destination)?;
         if let Some(origin) = &request.origin {
             put_address(&mut body, "from", origin)?;

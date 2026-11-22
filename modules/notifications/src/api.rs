@@ -280,7 +280,8 @@ pub enum SkipReason {
     PreferenceOff,
     /// No address on this channel (no email, phone number, push subscription…).
     NoAddress,
-    /// The server has no provider for this channel.
+    /// The server has no provider for this channel, or the shop has not set up its account at the
+    /// provider (`provider.not_configured`).
     ChannelDisabled,
     /// Advertising that could not go out within 24 hours of the allowed hours.
     QuietHoursExpired,

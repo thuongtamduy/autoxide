@@ -1,6 +1,6 @@
 //! Đặt hàng trên chương trình thật (cả SQLite và Postgres, bước 45): sản phẩm và giá của `catalog`
-//! thật, giỏ vãng lai, đặt hàng trả qua `ledger` thật với cổng thanh toán giả (webhook ký đúng) →
-//! đơn `confirmed`; gửi lại cùng `Idempotency-Key` trả đơn cũ.
+//! thật, giỏ vãng lai, đặt hàng trả qua `ledger` thật với cổng thanh toán giả (webhook ký đúng; có
+//! cả MoMo nên đơn đi qua cổng mặc định của khách) → đơn `confirmed`; gửi lại cùng `Idempotency-Key` trả đơn cũ.
 
 use std::sync::Arc;
 
@@ -50,13 +50,16 @@ async fn gio_vang_lai_dat_hang_tra_qua_cong_thi_don_xac_nhan() {
         let mut builder = TestApp::builder(test)
             .principal("boss", Principal::with_all_permissions(Uuid::from_u128(1)))
             .contribute::<dyn PaymentGateway>(gateway.clone());
-        // Bài này thu qua cổng giả; bộ nối thật `momo` cũng góp `dyn PaymentGateway`, mà có hai cổng thì
-        // mỗi thanh toán phải nêu đối tác, nên không nạp nó ở đây.
-        for module in crate::modules::all().into_iter().filter(|module| module.name() != "momo") {
+        // Bài này thu qua cổng giả; bộ nối thật `momo` cũng góp `dyn PaymentGateway`. Có hai cổng mà đơn
+        // không nêu đối tác: khách chọn cổng mặc định (bước 70 P8).
+        for module in crate::modules::all() {
             builder = builder.boxed_module(module);
         }
         let app = builder.build().await.unwrap();
         let boss = [("authorization", "Bearer boss")];
+        let setting = "/kernel/settings/ledger.payments.default_provider";
+        let (status, set) = call(&app, "PUT", setting, &boss, Some(json!({"value": "fake"}))).await;
+        assert_eq!(status, StatusCode::OK, "{set}");
 
         // Sản phẩm số (không giao, không tồn kho) đang bán, giá 150.000 gồm thuế.
         let product = json!({"kind": "digital", "tax_category": "vat.standard", "locale": "vi",
@@ -103,7 +106,7 @@ async fn gio_vang_lai_dat_hang_tra_qua_cong_thi_don_xac_nhan() {
         assert_eq!(cart["data"]["shipping"]["required"], false);
         let quote = cart["data"]["quote_token"].as_str().unwrap().to_owned();
 
-        // Đặt hàng, trả bằng thẻ qua cổng.
+        // Đặt hàng, trả bằng thẻ qua cổng mặc định của khách.
         let body = json!({"cart_id": cart_id, "quote_token": quote, "payment_method": "card",
             "contact": {"name": "An", "phone": "0901234567"}});
         let headers = [guest[0], ("idempotency-key", "e2e-1")];

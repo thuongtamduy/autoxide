@@ -118,6 +118,9 @@ pub struct QuoteRequest {
     pub at: Timestamp,
     /// Ngôn ngữ của tên phương thức.
     pub locale: String,
+    /// Người nhận (tên, số điện thoại) khi đã biết, chuyển cho hãng lúc báo phí.
+    #[serde(default)]
+    pub recipient: Option<(String, String)>,
 }
 
 impl QuoteRequest {
@@ -130,7 +133,14 @@ impl QuoteRequest {
             order_value,
             at,
             locale: "en".to_owned(),
+            recipient: None,
         }
+    }
+
+    /// Người nhận (tên, số điện thoại), nếu đã biết.
+    pub fn recipient(mut self, name: impl Into<String>, phone: impl Into<String>) -> Self {
+        self.recipient = Some((name.into(), phone.into()));
+        self
     }
 
     pub fn destination(mut self, address: Address) -> Self {

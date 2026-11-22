@@ -220,6 +220,10 @@ impl Module for LedgerModule {
         vec![("vi", include_str!("../locales/vi.json"))]
     }
 
+    fn tenant_settings(&self) -> Vec<autoxide_kernel::tenancy::TenantSetting> {
+        vec![service::DEFAULT_PROVIDER]
+    }
+
     fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
         let service = Arc::new(LedgerService {
             databases: context.tenancy(),
@@ -237,6 +241,7 @@ impl Module for LedgerModule {
                 .require::<autoxide_kernel::provider::ProviderAccounts>()
                 .ok()
                 .map(|accounts| (*accounts).clone()),
+            settings: context.require::<dyn autoxide_kernel::tenancy::TenantSettings>().ok(),
         });
         self.service = Some(service.clone());
         context.provide::<dyn api::Ledger>(Arc::new(provider::Provider(service)))

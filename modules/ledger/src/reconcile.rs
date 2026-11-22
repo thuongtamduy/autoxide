@@ -305,7 +305,7 @@ impl LedgerService {
         on: Date,
     ) -> Result<reconciliation::Model, Error> {
         principal.require(&RECONCILE)?;
-        let gateway = self.gateway(provider.as_deref())?;
+        let gateway = self.gateway_for(tenant, provider.as_deref()).await?;
         self.reconcile(tenant, gateway.provider(), on, Some(principal.user_id())).await
     }
 
