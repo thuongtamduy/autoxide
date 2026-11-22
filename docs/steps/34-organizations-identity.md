@@ -359,7 +359,7 @@ trên bảng của chính mình.
 | `GET /support-access` | `auth.support_access.read` (ở khách) | quản trị của khách xem mọi lần cấp và lần vào |
 | `DELETE /support-access/{id}` | `auth.support_access.revoke` (ở khách) | khách tự thu hồi một lần cấp còn hạn; lần cấp `legal_request` không thu hồi được từ phía khách (D-211) |
 | `POST /support-grants` `{tenant_id, staff_user_id, role_id, basis, reason, legal_reference?, hours}` · `DELETE /support-grants/{id}` · `GET /support-grants?tenant_id=` | `auth.support.grant` (ở khách vận hành) | khách tắt `auth.support_access` (từ bước 54: chế độ `disabled`; `per_request` thì mỗi lần cấp cần khách duyệt — D-232) → chỉ `legal_request` được; trần giờ `AUTOXIDE_AUTH_SUPPORT_ACCESS_MAX_HOURS` (D-211 giữ như cũ) |
-| `POST /phone-signups` `{lookup_token, display_name?}` | công khai, rate limit theo IP | làm ở bước 45 — mục "Tạo tài khoản từ số đã xác thực" dưới (D-202) |
+| `POST /phone-signups` `{lookup_token, name?}` | công khai, rate limit theo IP | làm ở bước 45 — mục "Tạo tài khoản từ số đã xác thực" dưới (D-202) |
 
 **Tính `Principal`** (đường nóng, mặt điều khiển): một câu `auth_user_role ⋈ auth_role ⟕
 auth_role_permission` lọc `user_id`, `tenant_id` (như D-076), cộng một câu cho uỷ quyền (role R
@@ -411,7 +411,7 @@ giờ mở cửa theo thứ trong tuần và ngày nghỉ đặc biệt, `pickup
 
 ### Tạo tài khoản từ số đã xác thực (D-202 — làm ở bước 45)
 
-`auth` thêm `POST /api/v1/auth/phone-signups {lookup_token, display_name?}` (công khai, rate limit theo IP):
+`auth` thêm `POST /api/v1/auth/phone-signups {lookup_token, name?}` (D-20261122-late-apis) (công khai, rate limit theo IP):
 lấy số điện thoại đã qua OTP từ token xem đơn của `orders` (trait `OrderLookups` do `orders` công bố ở bước
 45 — `auth` đăng ký trước nên lấy qua chỗ giữ của kernel hay `Subscription::optional`, agent bước 45 chọn),
 tạo tài khoản trong khách với số đó đã xác thực, đăng nhập bằng passkey (bước 12) hay OTP; không bắt buộc mật

@@ -370,6 +370,8 @@ impl Module for AuthModule {
             secrets.as_ref().clone(),
             outbox.clone(),
             context.require::<dyn autoxide_organizations::api::OrgDirectory>().ok(),
+            // Tạo tài khoản từ token xem đơn: `orders` đăng ký sau nên nối muộn.
+            context.later::<dyn autoxide_kernel::sms::VerifiedPhoneTokens>(),
         ));
         context.provide::<dyn api::AuthExtensions>(phone.clone())?;
         let reauth = Arc::new(reauth::Reauthentication {
@@ -775,6 +777,7 @@ pub(crate) mod testing {
             autoxide_kernel::secret::SecretKey::new(database.clone(), None),
             autoxide_kernel::event::Outbox::standalone("auth"),
             None,
+            autoxide_kernel::module::Later::ready(None),
         ));
         let reauth = Arc::new(crate::reauth::Reauthentication {
             sessions: sessions.clone(),

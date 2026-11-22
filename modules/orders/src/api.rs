@@ -399,7 +399,8 @@ pub trait OrderHolds: Send + Sync {
     ) -> Result<(), Error>;
 }
 
-/// Tra cứu cho `auth` (tạo tài khoản từ số đã xác thực qua tra đơn vãng lai, D-202).
+/// Tra số đã xác thực của token xem đơn (D-202). `auth` dùng bản trung lập của kernel
+/// (`autoxide_kernel::sms::VerifiedPhoneTokens`, cùng bộ cài đặt) để không phụ thuộc `orders`.
 #[async_trait::async_trait]
 pub trait OrderLookups: Send + Sync {
     /// Số điện thoại (E.164) đã qua OTP của token xem đơn `token`, khi token còn hạn.

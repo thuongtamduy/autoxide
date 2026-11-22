@@ -189,7 +189,7 @@ pub(crate) mod test_support {
     use autoxide_kernel::event::Actor;
     use autoxide_kernel::mail::Mailer;
     use autoxide_kernel::module::Module;
-    use autoxide_testkit::{TestApp, TestDatabase};
+    use autoxide_testkit::{TestApp, TestAppBuilder, TestDatabase};
     use axum::http::{Method, StatusCode, header};
     use serde_json::Value;
 
@@ -223,10 +223,19 @@ pub(crate) mod test_support {
     /// cùng cấu hình với module trong app, và dùng chung bên gửi mail giả: thứ một bên ghi,
     /// bên kia đọc được.
     pub async fn app_with(test: &TestDatabase, self_registration: bool) -> (TestApp, Services) {
+        app_built(test, self_registration, |builder| builder).await
+    }
+
+    /// Như [`app_with`], `extra` thêm vào bộ dựng (vd công bố trait mà module khác thường cung cấp).
+    pub async fn app_built(
+        test: &TestDatabase,
+        self_registration: bool,
+        extra: impl FnOnce(TestAppBuilder<'_>) -> TestAppBuilder<'_>,
+    ) -> (TestApp, Services) {
         let services = crate::testing::services(test).await;
         let tenant = services.tenant.clone();
         let mailer: std::sync::Arc<dyn Mailer> = services.mails.clone();
-        let app = TestApp::builder(test)
+        let builder = TestApp::builder(test)
             .setting("AUTOXIDE_AUTH_TOKEN_SECRET", crate::testing::TOKEN_SECRET)
             .setting("AUTOXIDE_AUTH_SELF_REGISTRATION", &self_registration.to_string())
             .setting("AUTOXIDE_AUTH_PASSKEY_RP_ID", crate::testing::PASSKEY_RP_ID)
@@ -234,10 +243,8 @@ pub(crate) mod test_support {
             .setting("AUTOXIDE_AUTH_COUNTRY_HEADER", "CF-IPCountry")
             .provide::<dyn Mailer>(mailer)
             .module(crate::module())
-            .module(NotesPermissions)
-            .build()
-            .await
-            .unwrap();
+            .module(NotesPermissions);
+        let app = extra(builder).build().await.unwrap();
         services
             .users
             .create(
