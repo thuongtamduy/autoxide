@@ -54,6 +54,27 @@ fn settings_of_the_module_are_listed_with_those_of_the_core() {
     assert!(message.contains("ACME_BOOKMARKS_RETENTION_DAYS"), "{message}");
 }
 
+/// `AUTOXIDE_MODULES` chooses the modules that run; a module added by the binary goes through the
+/// same choice as the official ones, and is on when the setting is not given.
+#[test]
+fn the_module_can_be_turned_off_and_on_by_configuration() {
+    let listed = |value: &str| {
+        let output = acme("modules", &["migrate", "status"], &[("AUTOXIDE_MODULES", value)]);
+        stdout(&output).contains("m0001_create_bookmark")
+    };
+    assert!(listed("official"));
+    assert!(!listed("official,-bookmarks"));
+    // Named on its own: it comes with the modules it depends on.
+    assert!(listed("core,bookmarks"));
+
+    // A misspelt name is refused, and the message names the modules that exist — this one too.
+    let wrong = acme("typo", &["config"], &[("AUTOXIDE_MODULES", "official,bookmark")]);
+    assert_eq!(wrong.status.code(), Some(2));
+    let message = String::from_utf8_lossy(&wrong.stderr).into_owned();
+    assert!(message.contains("AUTOXIDE_MODULES"), "{message}");
+    assert!(message.contains("bookmarks"), "{message}");
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn migrations_openapi_and_mcp_include_the_module() {
     TestDatabase::run(async |test| {

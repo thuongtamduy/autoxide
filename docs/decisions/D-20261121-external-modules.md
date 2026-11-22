@@ -9,6 +9,9 @@ Quyết định (bước 70 P2, theo hướng "core cho cộng đồng trước"
   thêm; binary chính thức là `Autoxide::new().run()`. Module thêm đăng ký SAU mọi module chính thức, theo thứ tự
   thêm. `.module` nhận hàm tạo (`fn() -> impl Module`), không nhận giá trị: `Module` không `Clone` mà chương trình
   dựng danh sách module nhiều lần. Mọi thứ khác của crate (lệnh, cấu hình, khởi động) là riêng tư.
+- **Module thêm đi qua đúng bộ lọc `AUTOXIDE_MODULES`** của module chính thức (`Modules::select`): mặc định hạng
+  `Official` nên **bật khi không đặt biến** — người ghép binary đã chủ động thêm nó; `official,-<tên>` tắt nó, tên gõ
+  sai được báo kèm tên hợp lệ kể cả module thêm, `depends_on()` của nó kéo module chính thức cần thiết.
 - **Ví dụ chạy thật** ở `examples/external-module/`: một workspace Cargo riêng (không thuộc workspace gốc) gồm module
   `bookmarks` và binary `acme`; test trên cả SQLite và Postgres. CI chạy nó ở một job song song của gate
   (`./gate.sh --only example`); gate đầy đủ trên máy cũng chạy, gate nhanh chỉ chạy khi `examples/` đổi. Ví dụ phụ
