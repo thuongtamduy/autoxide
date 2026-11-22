@@ -17,7 +17,6 @@ edition = "2024"
 rust-version = "1.99"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/thuongtamduy/autoxide"
-homepage = "https://github.com/thuongtamduy/autoxide"
 readme = "README.md"
 keywords = ["backend", "rest", "openapi", "mcp", "multi-tenant"]
 categories = ["web-programming::http-server"]
