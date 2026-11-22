@@ -50,7 +50,9 @@ async fn gio_vang_lai_dat_hang_tra_qua_cong_thi_don_xac_nhan() {
         let mut builder = TestApp::builder(test)
             .principal("boss", Principal::with_all_permissions(Uuid::from_u128(1)))
             .contribute::<dyn PaymentGateway>(gateway.clone());
-        for module in crate::modules::all() {
+        // Bài này thu qua cổng giả; bộ nối thật `momo` cũng góp `dyn PaymentGateway`, mà có hai cổng thì
+        // mỗi thanh toán phải nêu đối tác, nên không nạp nó ở đây.
+        for module in crate::modules::all().into_iter().filter(|module| module.name() != "momo") {
             builder = builder.boxed_module(module);
         }
         let app = builder.build().await.unwrap();

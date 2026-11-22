@@ -263,6 +263,7 @@ dependencies = [
  "autoxide-mail",
  "autoxide-media",
  "autoxide-menus",
+ "autoxide-momo",
  "autoxide-newsletter",
  "autoxide-notes",
  "autoxide-notifications",
@@ -901,6 +902,20 @@ dependencies = [
  "utoipa-axum",
  "uuid",
  "validator",
+]
+
+[[package]]
+name = "autoxide-momo"
+version = "0.17.0"
+dependencies = [
+ "async-trait",
+ "autoxide-kernel",
+ "autoxide-testkit",
+ "axum",
+ "reqwest",
+ "serde_json",
+ "tokio",
+ "uuid",
 ]
 
 [[package]]

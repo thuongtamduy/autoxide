@@ -70,7 +70,9 @@ async fn coc_qua_ledger_huy_muon_hoan_theo_chinh_sach() {
             )
             .user("ann", 0xa1, &[])
             .contribute::<dyn PaymentGateway>(gateway.clone());
-        for module in crate::modules::all() {
+        // Bài này thu qua cổng giả; bộ nối thật `momo` cũng góp `dyn PaymentGateway`, mà có hai cổng thì
+        // mỗi thanh toán phải nêu đối tác, nên không nạp nó ở đây.
+        for module in crate::modules::all().into_iter().filter(|module| module.name() != "momo") {
             builder = builder.boxed_module(module);
         }
         let app = builder.build().await.unwrap();

@@ -35,7 +35,9 @@ async fn app(test: &TestDatabase, gateway: Arc<FakePaymentGateway>) -> TestApp {
         .domain("default", "pay.operator.example")
         .user("ops", 1, &OPS)
         .user_in("acme", "owner", 2, &["plans.billing.read", "plans.billing.manage"]);
-    for module in crate::modules::all() {
+    // Bài này thu qua cổng giả; bộ nối thật `momo` cũng góp `dyn PaymentGateway`, mà có hai cổng thì
+    // mỗi thanh toán phải nêu đối tác, nên không nạp nó ở đây.
+    for module in crate::modules::all().into_iter().filter(|module| module.name() != "momo") {
         builder = builder.boxed_module(module);
     }
     builder.build().await.unwrap()

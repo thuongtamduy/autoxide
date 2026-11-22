@@ -25,6 +25,7 @@ older curl, replace `--json '…'` with `-H 'Content-Type: application/json' -H 
 - [Building a mobile or desktop app](mobile.md): SDKs, tokens and PKCE, push, offline sync, WebSocket, in-app purchases
 - [Writing a provider adapter](provider-adapters.md): per-tenant accounts, secrets, webhooks, testing without the network (for developers)
 - [Sending SMS through eSMS](providers/esms.md): what to get from eSMS, the tenant's account settings, testing, errors (experimental)
+- [Taking payments with MoMo](providers/momo.md): your own MoMo business account per tenant, payment links, notifications, refunds (experimental)
 
 For developers who extend the core:
 

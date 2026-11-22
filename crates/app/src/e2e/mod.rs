@@ -22,6 +22,7 @@ pub(crate) mod media;
 pub(crate) mod migrations;
 pub(crate) mod module_selection;
 pub(crate) mod moit;
+pub(crate) mod momo;
 pub(crate) mod notifications;
 pub(crate) mod orders;
 pub(crate) mod plans;

@@ -25,6 +25,7 @@ Ví dụ `curl` gửi JSON bằng `--json '…'`, cần curl 7.82 trở lên (`c
 - [Làm app điện thoại hay app máy tính](mobile.vi.md): SDK, token và PKCE, thông báo đẩy, đồng bộ khi mất mạng, WebSocket, mua trong ứng dụng
 - [Viết một bộ nối nhà cung cấp](provider-adapters.vi.md): tài khoản theo khách, secret, webhook, test không ra mạng (cho người phát triển)
 - [Gửi SMS qua eSMS](providers/esms.vi.md): lấy gì ở eSMS, cấu hình tài khoản của khách, thử kết nối, lỗi (thử nghiệm)
+- [Nhận thanh toán qua MoMo](providers/momo.vi.md): mỗi khách một tài khoản MoMo doanh nghiệp riêng, link thanh toán, thông báo kết quả, hoàn tiền (thử nghiệm)
 
 Cho lập trình viên mở rộng core:
 
