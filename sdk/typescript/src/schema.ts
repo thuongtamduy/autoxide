@@ -10295,6 +10295,25 @@ export type Data_Option_PromotionsEligibility = {
 };
 
 /** Envelope of a single result. */
+export type Data_Option_SiteRegionResponse = {
+  data: null | {
+    /** The draft being edited; publish it with `POST /site-regions/{id}/publish`. */
+    draft_layout?: Record<string, unknown> | null;
+    id: string;
+    /** The published layout, shown on the website; `null`: never published. */
+    layout?: Record<string, unknown> | null;
+    locale: string;
+    org_id: string;
+    published_at?: string | null;
+    /** `header` or `footer`. */
+    region: string;
+    updated_at: string;
+    /** The theme variant it belongs to; `null`: the base theme. */
+    variant_id?: string | null;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_Option_StoreCredit = {
   data: null | {
     balance: Money;
@@ -11696,6 +11715,40 @@ export type Data_PublicSiteMenu = {
 };
 
 /** Envelope of a single result. */
+export type Data_PublicSiteResponse = {
+  /** The frame of every page of the website. */
+  data: {
+    /**
+     * Decoration of the running variant (`snow`, `petals`, `lanterns`, `fireworks`, `confetti`,
+     * `hearts`) or `null`. Load it after the page shows; never on cart, checkout, account or
+     * sign-in pages; off when the visitor asks for reduced motion (`docs/PAGES.md`).
+     */
+    effect?: string | null;
+    effect_intensity?: string | null;
+    /** Parts of other modules, by module name (e.g. cookie consent settings). */
+    extensions: Record<string, unknown>;
+    footer?: Record<string, unknown> | null;
+    /** `{"layout", "blocks_data"}` like a page (`blocks_data` by block id), or `null`. */
+    header?: Record<string, unknown> | null;
+    /**
+     * Owner information and ministry logo, drawn below the footer on every page; `null` when the
+     * website has no legal profile or the `compliance` module is off.
+     */
+    legal_footer?: Record<string, unknown> | null;
+    locale: string;
+    /** When the look changes next (a variant starts or ends), within 7 days. */
+    next_change_at?: string | null;
+    /**
+     * Every theme token, flat (`color.primary` → set it as the CSS variable `--color-primary`): the
+     * website's theme with the running theme variant's overrides.
+     */
+    tokens: Record<string, unknown>;
+    /** The running theme variant (`id`, `name`), or `null`. */
+    variant?: Record<string, unknown> | null;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_PublicTermPage = {
   /** A category or tag as readers see it. */
   data: PublicTerm & {
@@ -12526,6 +12579,26 @@ export type Data_SiteMenu = {
     /** The website (organization unit) of the menu; the id of the tenant for the whole tenant. */
     org_id: string;
     updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_SiteRegionResponse = {
+  /** A website header or footer. */
+  data: {
+    /** The draft being edited; publish it with `POST /site-regions/{id}/publish`. */
+    draft_layout?: Record<string, unknown> | null;
+    id: string;
+    /** The published layout, shown on the website; `null`: never published. */
+    layout?: Record<string, unknown> | null;
+    locale: string;
+    org_id: string;
+    published_at?: string | null;
+    /** `header` or `footer`. */
+    region: string;
+    updated_at: string;
+    /** The theme variant it belongs to; `null`: the base theme. */
+    variant_id?: string | null;
   };
 };
 
@@ -28300,6 +28373,37 @@ export type PublicSiteMenuItem = {
   ref?: PublicMenuTarget | null;
 };
 
+/** The frame of every page of the website. */
+export type PublicSiteResponse = {
+  /**
+   * Decoration of the running variant (`snow`, `petals`, `lanterns`, `fireworks`, `confetti`,
+   * `hearts`) or `null`. Load it after the page shows; never on cart, checkout, account or
+   * sign-in pages; off when the visitor asks for reduced motion (`docs/PAGES.md`).
+   */
+  effect?: string | null;
+  effect_intensity?: string | null;
+  /** Parts of other modules, by module name (e.g. cookie consent settings). */
+  extensions: Record<string, unknown>;
+  footer?: Record<string, unknown> | null;
+  /** `{"layout", "blocks_data"}` like a page (`blocks_data` by block id), or `null`. */
+  header?: Record<string, unknown> | null;
+  /**
+   * Owner information and ministry logo, drawn below the footer on every page; `null` when the
+   * website has no legal profile or the `compliance` module is off.
+   */
+  legal_footer?: Record<string, unknown> | null;
+  locale: string;
+  /** When the look changes next (a variant starts or ends), within 7 days. */
+  next_change_at?: string | null;
+  /**
+   * Every theme token, flat (`color.primary` → set it as the CSS variable `--color-primary`): the
+   * website's theme with the running theme variant's overrides.
+   */
+  tokens: Record<string, unknown>;
+  /** The running theme variant (`id`, `name`), or `null`. */
+  variant?: Record<string, unknown> | null;
+};
+
 /** A message from a guest. */
 export type PublicSupportMessageRequest = {
   /** Plain text. */
@@ -30568,6 +30672,33 @@ export type SiteMenuSummary = {
    * before this field existed, or changed by the system).
    */
   updated_by?: string | null;
+};
+
+/** A new draft for a header or footer. */
+export type SiteRegionRequest = {
+  /**
+   * A block layout, checked like a page layout (`content.logo`, `menus.menu`,
+   * `content.search_box`, `content.announcement_bar`, `content.placement`, `newsletter.signup` suit
+   * headers and footers). The legal footer is added below the footer by itself.
+   */
+  layout: Record<string, unknown>;
+};
+
+/** A website header or footer. */
+export type SiteRegionResponse = {
+  /** The draft being edited; publish it with `POST /site-regions/{id}/publish`. */
+  draft_layout?: Record<string, unknown> | null;
+  id: string;
+  /** The published layout, shown on the website; `null`: never published. */
+  layout?: Record<string, unknown> | null;
+  locale: string;
+  org_id: string;
+  published_at?: string | null;
+  /** `header` or `footer`. */
+  region: string;
+  updated_at: string;
+  /** The theme variant it belongs to; `null`: the base theme. */
+  variant_id?: string | null;
 };
 
 /** The look of a website at a moment. */
@@ -39325,6 +39456,19 @@ export interface paths {
       };
     };
   };
+  "/api/v1/content/public/site": {
+    /** Get the frame of the website (public). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { locale?: string; site?: string }; };
+      responses: {
+        200: Data_PublicSiteResponse;
+        304: void;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/content/public/sitemap": {
     /** List every published address, for a sitemap (public). */
     get: {
@@ -39525,6 +39669,51 @@ export interface paths {
       parameters: { header: { "If-Match": string; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
       responses: {
         204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        412: Problem;
+        428: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/content/site-regions": {
+    /** Get a website header or footer. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { org_id: string; region: string; locale: string; variant_id?: string }; };
+      responses: {
+        200: Data_Option_SiteRegionResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Save a draft of a website header or footer. */
+    put: {
+      parameters: { header: { "If-Match": string; "Accept-Language"?: string; "Idempotency-Key"?: string }; query: { org_id: string; region: string; locale: string; variant_id?: string }; };
+      requestBody: SiteRegionRequest;
+      responses: {
+        200: Data_SiteRegionResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        412: Problem;
+        422: Problem;
+        428: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/content/site-regions/{id}/publish": {
+    /** Publish the draft of a website header or footer. */
+    post: {
+      parameters: { header: { "If-Match": string; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_SiteRegionResponse;
         401: Problem;
         403: Problem;
         404: Problem;
