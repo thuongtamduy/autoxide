@@ -125,6 +125,13 @@ thật (P7).
       thanh toán → vận chuyển → hoá đơn điện tử → tin nhắn, qua máy chủ giả của các nhà cung cấp ở P7, trên cả hai
       database; hướng dẫn "mở một cửa hàng" `docs/guides/shop.md` + `.vi.md` làm theo được từ quickstart; chỗ vướng tìm
       ra thì sửa hoặc ghi thành mục
+- [ ] P9 — **Ghi nợ, chủ dự án hoãn ngày 22/11/2026** (không chặn 1.0 khi chưa mở lại):
+  - [ ] Chế độ "nghỉ": module tắt vẫn tham gia dữ liệu cá nhân và vòng đời khách (xuất, xoá, dời khách)
+  - [ ] Mẫu câu OTP khách tự sửa cho khớp template đã đăng ký với nhà mạng (đang viết cứng ở `compliance`, `orders`,
+        `bookings`)
+  - [ ] 139 endpoint GET trả `Data<Vec<T>>` không phân trang: endpoint mới trả `Page<T>`, khai deprecation cho cái cũ
+  - [ ] Rustdoc tiếng Anh cho phần công khai của kernel, testkit và `autoxide` (docs.rs)
+  - [ ] Chạy thử năm bộ nối của P7 bằng tài khoản thử thật; đối chiếu các điểm "(?)" của MoMo với trang tài liệu gốc
 
 ## Giai đoạn B — Lớp cho giao diện và phân quyền
 
