@@ -10273,6 +10273,12 @@ export type Data_OrdersCart = {
     shipping: OrdersCartShipping;
     /** `active`, `abandoned`, `merged` or `converted`. */
     status: string;
+    /**
+     * The most each other way to pay can cover for this cart, before checkout (e.g. the most loyalty
+     * points usable). Only ways the shop offers and that can tell without more input appear (a gift
+     * card needs its code). Pay with them through `tenders` at checkout.
+     */
+    tender_limits: OrdersCartTenderLimit[];
     totals: OrdersCartTotals;
     updated_at: string;
     /** Vouchers of your wallet used for this cart. */
@@ -20412,6 +20418,12 @@ export type OrdersCart = {
   shipping: OrdersCartShipping;
   /** `active`, `abandoned`, `merged` or `converted`. */
   status: string;
+  /**
+   * The most each other way to pay can cover for this cart, before checkout (e.g. the most loyalty
+   * points usable). Only ways the shop offers and that can tell without more input appear (a gift
+   * card needs its code). Pay with them through `tenders` at checkout.
+   */
+  tender_limits: OrdersCartTenderLimit[];
   totals: OrdersCartTotals;
   updated_at: string;
   /** Vouchers of your wallet used for this cart. */
@@ -20505,6 +20517,19 @@ export type OrdersCartSummary = {
   org_id: string;
   status: string;
   updated_at: string;
+};
+
+/** The most a way to pay can cover for a cart. */
+export type OrdersCartTenderLimit = {
+  /** The tender, as sent in `tenders[].kind` at checkout: `points`, `store_credit`… */
+  kind: string;
+  /** The most it can take off what is left to pay. */
+  max_amount: Money;
+  /**
+   * The same limit in the tender's own units, when it has them: for `points`, the most points
+   * usable (send that number or less as `{"points": n}`).
+   */
+  max_units?: number | null;
 };
 
 /** Money totals of a cart. */

@@ -6,7 +6,7 @@
 use autoxide_address::api::AddressInput;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
-use autoxide_kernel::money::Currency;
+use autoxide_kernel::money::{Currency, Money};
 use autoxide_kernel::reference::Submitted;
 use autoxide_kernel::secret::{random_token, sha256};
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext, root_of};
@@ -84,6 +84,8 @@ pub(crate) struct CartView {
     pub payment_methods: Vec<String>,
     /// Trả trước một phần cho hàng đặt trước (khi trả online, D-232): công bố trước khi đặt.
     pub advance: Option<crate::advance_flow::Planned>,
+    /// Tối đa trả được bằng từng tender đã cắm (vd số điểm), theo thứ tự cắm.
+    pub tender_limits: Vec<(&'static str, crate::api::TenderLimit)>,
 }
 
 /// Giỏ vừa tạo; `token` chỉ có với giỏ vãng lai mới.
@@ -248,9 +250,11 @@ impl OrdersService {
         let payment_methods = self.payment_methods(tenant, &row, &quote).await?;
         let org = autoxide_kernel::tenancy::OrgId::from_uuid(row.org_id);
         let advance = self.plan_for(tenant, org, &quote).await?;
+        let tender_limits = self.tender_limits(tenant, owner.buyer(), &quote).await?;
         Ok(CartView {
             payment_methods,
             advance,
+            tender_limits,
             codes: json_list(&row.codes),
             voucher_ids: json_list(&row.voucher_ids),
             ship_to: row.ship_to.as_deref().and_then(|raw| serde_json::from_str(raw).ok()),
@@ -281,6 +285,28 @@ impl OrdersService {
             methods.extend(["bank_transfer", "gateway", "installment"].map(str::to_owned));
         }
         Ok(methods)
+    }
+
+    /// Tối đa trả được bằng từng tender cho tổng của giỏ (cùng trần checkout dùng: phần còn phải trả).
+    /// Giỏ chưa có tiền phải trả thì không hỏi.
+    async fn tender_limits(
+        &self,
+        tenant: &TenantContext,
+        buyer: Option<Uuid>,
+        quote: &Quote,
+    ) -> Result<Vec<(&'static str, crate::api::TenderLimit)>, Error> {
+        let mut limits = Vec::new();
+        if !quote.total.is_positive() {
+            return Ok(limits);
+        }
+        for tender in self.extensions.tenders() {
+            if let Some(limit) = tender.limit(tenant, buyer, quote.total).await? {
+                let amount = limit.amount.minor().clamp(0, quote.total.minor());
+                let amount = Money::new(amount, quote.total.currency());
+                limits.push((tender.kind(), crate::api::TenderLimit::new(amount, limit.units)));
+            }
+        }
+        Ok(limits)
     }
 
     /// Đầu vào báo giá của giỏ: dòng, lựa chọn của người mua, hồ sơ nhóm khách (bước 47 cắm vào).
