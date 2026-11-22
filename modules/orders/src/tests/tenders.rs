@@ -15,7 +15,7 @@ use uuid::Uuid;
 
 use super::checkout::{body, checkout, ready_cart};
 use super::{Call, shop};
-use crate::api::{OrderExtensions, Tender};
+use crate::api::{OrderExtensions, Tender, TenderLimit};
 
 /// Tender giả: giữ `input.amount` (tối đa trần), hay báo lỗi khi `input.fail`.
 #[derive(Default)]
@@ -56,6 +56,17 @@ impl Tender for FakeTender {
         self.released.lock().unwrap().push(reference.to_owned());
         Ok(())
     }
+
+    /// Báo giá giỏ: tối đa nửa phần phải trả, 1 điểm = 1.000 đ; khách vãng lai không báo.
+    async fn limit(
+        &self,
+        _tenant: &TenantContext,
+        buyer: Option<Uuid>,
+        max: Money,
+    ) -> Result<Option<TenderLimit>, Error> {
+        let amount = max.minor() / 2;
+        Ok(buyer.map(|_| TenderLimit::new(Money::new(amount, max.currency()), Some(amount / 1000))))
+    }
 }
 
 #[tokio::test]
@@ -70,6 +81,14 @@ async fn tender_pays_part_or_all_of_the_order() {
 
         // Một phần: 50.000 bằng điểm, phần còn lại (130.000 − 50.000) qua đối tác.
         let (cart, _, quote) = ready_cart(&buyer, shop.tree.a, shirt, 1).await;
+        // Báo giá giỏ cho biết tối đa trả được bằng điểm (nửa của 130.000).
+        let (_, read) = buyer.send("GET", &format!("/carts/{cart}"), None).await;
+        assert_eq!(
+            read["data"]["tender_limits"],
+            json!([{"kind": "points", "max_amount": {"amount": "65000", "currency": "VND"},
+                "max_units": 65}]),
+            "{read}"
+        );
         let mut request = body(&cart, &quote, "card");
         request["tenders"] = json!([{"kind": "points", "input": {"amount": 50000}}]);
         let (status, placed) = checkout(&buyer, Some("t-1"), request).await;

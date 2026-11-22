@@ -17,7 +17,7 @@ use autoxide_kernel::event::{Actor, Delivered, EventHandler};
 use autoxide_kernel::money::Money;
 use autoxide_kernel::rows;
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use autoxide_orders::api::{Tender, events as orders};
+use autoxide_orders::api::{Tender, TenderLimit, events as orders};
 use sea_orm::sea_query::{Expr, ExprTrait as _};
 use sea_orm::{ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, Set};
 use serde_json::{Value, json};
@@ -102,9 +102,56 @@ impl Tender for PointsTender {
     async fn release(&self, tenant: &TenantContext, reference: &str) -> Result<(), Error> {
         self.0.release_hold(tenant, reference).await
     }
+
+    /// Số điểm tối đa dùng được cho giỏ (báo giá giỏ, website hiện trước khi đặt). Khách chưa đăng
+    /// nhập hay không có chương trình đúng tiền tệ của giỏ: không báo.
+    async fn limit(
+        &self,
+        tenant: &TenantContext,
+        buyer: Option<Uuid>,
+        max: Money,
+    ) -> Result<Option<TenderLimit>, Error> {
+        match buyer {
+            Some(buyer) => self.0.points_limit(tenant, buyer, max).await,
+            None => Ok(None),
+        }
+    }
 }
 
 impl CustomersService {
+    /// Tối đa điểm `buyer` dùng được cho một đơn còn phải trả `max`, cùng luật `hold_points` kiểm:
+    /// số dư dùng được, trần % đơn, giá trị điểm hiện hành; dưới mức đổi tối thiểu thì 0. Chỉ đọc.
+    pub(crate) async fn points_limit(
+        &self,
+        tenant: &TenantContext,
+        buyer: Uuid,
+        max: Money,
+    ) -> Result<Option<TenderLimit>, Error> {
+        let read = tenant.database().read();
+        let Some(rule) = current_rule(read, tenant, now()).await? else {
+            return Ok(None);
+        };
+        if rule.currency != max.currency().code() || rule.point_value_minor <= 0 {
+            return Ok(None);
+        }
+        let profile = profile::Entity::find()
+            .filter(profile::Column::UserId.eq(buyer))
+            .scoped(tenant)
+            .one(read)
+            .await?;
+        let balance = match profile {
+            Some(profile) => self.balance_of(read, tenant, profile.id).await?.0,
+            None => 0,
+        };
+        let cap = super::mul_div(max.minor(), i64::from(rule.max_redeem_ratio_bp), 10_000);
+        let mut points = Ord::max(Ord::min(balance, cap / rule.point_value_minor), 0);
+        if points < rule.min_redeem_points {
+            points = 0;
+        }
+        let amount = Money::new(points.saturating_mul(rule.point_value_minor), max.currency());
+        Ok(Some(TenderLimit::new(amount, Some(points))))
+    }
+
     pub(crate) async fn hold_points(
         &self,
         tenant: &TenantContext,

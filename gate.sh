@@ -152,7 +152,7 @@ renice -n 10 -p $$ >/dev/null 2>&1 || true
 
 POSTGRES_IMAGE="${GATE_POSTGRES_IMAGE:-postgres:16-alpine}"
 S3_IMAGE="${GATE_S3_IMAGE:-motoserver/moto:5.2.5}"
-GITLEAKS_IMAGE="${GATE_GITLEAKS_IMAGE:-zricethezav/gitleaks:v8.30.0}"
+GITLEAKS_IMAGE="${GATE_GITLEAKS_IMAGE:-ghcr.io/gitleaks/gitleaks:v8.30.1}"
 CONTAINER=""
 S3_CONTAINER=""
 

@@ -497,3 +497,45 @@ async fn cap_voucher_loi_hoan_diem() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn bao_gia_gio_biet_so_diem_toi_da_dung_duoc() {
+    TestDatabase::run(async |test| {
+        let shop = shop(test).await;
+        let tenant = shop.default_tenant();
+        let tender = shop.points_tender();
+        let buyer = Some(Uuid::from_u128(BUYER));
+        // Chưa có chương trình: không báo.
+        assert!(tender.limit(&tenant, buyer, vnd(200_000)).await.unwrap().is_none());
+        with_rule(&shop).await;
+        completed_order(&shop, 1_000_000).await; // 100 điểm
+        // Khách vãng lai: không báo.
+        assert!(tender.limit(&tenant, None, vnd(200_000)).await.unwrap().is_none());
+        // Trần 50% của 200.000 đ = 100 điểm; có đủ 100.
+        let limit = tender.limit(&tenant, buyer, vnd(200_000)).await.unwrap().unwrap();
+        assert_eq!((limit.amount, limit.units), (vnd(100_000), Some(100)));
+        // Trần 50% của 30.000 đ = 15 điểm.
+        let limit = tender.limit(&tenant, buyer, vnd(30_000)).await.unwrap().unwrap();
+        assert_eq!((limit.amount, limit.units), (vnd(15_000), Some(15)));
+        // Dưới mức đổi tối thiểu (10 điểm): 0.
+        let limit = tender.limit(&tenant, buyer, vnd(18_000)).await.unwrap().unwrap();
+        assert_eq!((limit.amount, limit.units), (vnd(0), Some(0)));
+        // Số dư là trần khi đơn lớn; dùng được đúng số đó.
+        let limit = tender.limit(&tenant, buyer, vnd(1_000_000)).await.unwrap().unwrap();
+        assert_eq!(limit.units, Some(100));
+        let until = Timestamp::now() + SignedDuration::from_mins(30);
+        let held = tender
+            .hold(&tenant, "orders:max", buyer, &json!({"points": 100}), vnd(1_000_000), until)
+            .await
+            .unwrap();
+        assert_eq!(held, limit.amount);
+        // Đang giữ thì không tính.
+        let limit = tender.limit(&tenant, buyer, vnd(1_000_000)).await.unwrap().unwrap();
+        assert_eq!(limit.units, Some(0));
+        // Tiền tệ khác chương trình: không báo.
+        let usd = Money::new(10_000, Currency::parse("USD").unwrap());
+        assert!(tender.limit(&tenant, buyer, usd).await.unwrap().is_none());
+    })
+    .await
+    .unwrap();
+}

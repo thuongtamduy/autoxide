@@ -221,6 +221,10 @@ pub(crate) struct CartResponse {
     /// paid now and what is asked once the items are ready. Show it, then send
     /// `accept_preorder_terms: true` at checkout. This is an advance payment, not a deposit.
     advance: Option<CartAdvanceResponse>,
+    /// The most each other way to pay can cover for this cart, before checkout (e.g. the most loyalty
+    /// points usable). Only ways the shop offers and that can tell without more input appear (a gift
+    /// card needs its code). Pay with them through `tenders` at checkout.
+    tender_limits: Vec<CartTenderLimitResponse>,
     attribution: Option<AttributionResponse>,
     totals: TotalsResponse,
     /// How much more to spend for free shipping (`0`: already free), when the option has a
@@ -234,6 +238,20 @@ pub(crate) struct CartResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     cart_token: Option<String>,
     updated_at: Timestamp,
+}
+
+/// The most a way to pay can cover for a cart.
+#[derive(Debug, Serialize, ToSchema)]
+#[schema(as = OrdersCartTenderLimit)]
+pub(crate) struct CartTenderLimitResponse {
+    /// The tender, as sent in `tenders[].kind` at checkout: `points`, `store_credit`…
+    #[schema(example = "points")]
+    kind: String,
+    /// The most it can take off what is left to pay.
+    max_amount: Money,
+    /// The same limit in the tender's own units, when it has them: for `points`, the most points
+    /// usable (send that number or less as `{"points": n}`).
+    max_units: Option<i64>,
 }
 
 /// Advance payment terms of a cart with pre-ordered items.
@@ -335,6 +353,15 @@ impl CartResponse {
             payment_method: view.cart.payment_method.clone(),
             payment_methods: view.payment_methods,
             advance: view.advance.as_ref().map(|planned| CartAdvanceResponse::new(planned, quote)),
+            tender_limits: view
+                .tender_limits
+                .iter()
+                .map(|(kind, limit)| CartTenderLimitResponse {
+                    kind: (*kind).to_owned(),
+                    max_amount: limit.amount,
+                    max_units: limit.units,
+                })
+                .collect(),
             attribution: view.attribution.map(|attribution| AttributionResponse {
                 click_id: attribution.click_id,
                 code: attribution.code,
