@@ -89,6 +89,7 @@ impl From<CreatedScimToken> for CreatedScimTokenResponse {
 
 /// A new SCIM token.
 #[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct CreateScimTokenRequest {
     /// 1–100 characters, e.g. the identity provider it is for.
     #[schema(example = "Microsoft Entra ID")]
@@ -235,6 +236,7 @@ impl From<GroupMapping> for ScimGroupMappingResponse {
 
 /// A new mapping rule.
 #[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct CreateScimGroupMappingRequest {
     /// A SCIM group of the tenant (`GET /api/v1/auth/scim/groups`).
     group_id: Uuid,

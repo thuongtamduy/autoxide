@@ -441,7 +441,7 @@ async fn mark_paid(
 ) -> Result<Data<BillingPeriodResponse>, Error> {
     operator(&principal, &SUBSCRIPTIONS_MANAGE)?;
     let row = service
-        .mark_paid(Actor::from(&principal), id, input.provider_reference, input.paid_at)
+        .mark_paid(Actor::from(&principal), id, input.provider_reference, input.paid_at, None)
         .await?;
     Ok(Data { data: row.into() })
 }

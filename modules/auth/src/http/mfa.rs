@@ -74,6 +74,7 @@ pub(crate) struct TotpSetupResponse {
 
 /// Confirms starting two-step sign-in.
 #[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct StartTotpRequest {
     /// Your current password.
     #[serde(default)]
@@ -86,6 +87,7 @@ pub(crate) struct StartTotpRequest {
 
 /// A code from the authenticator app, or (where stated) a recovery code.
 #[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct CodeRequest {
     /// The 6-digit code currently shown by the app, or a recovery code where the
     /// endpoint accepts one.

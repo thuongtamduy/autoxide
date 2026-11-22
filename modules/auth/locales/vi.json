@@ -26,6 +26,7 @@
   "auth.invalid_refresh_token": "Phiên đăng nhập đã kết thúc. Hãy đăng nhập lại.",
   "auth.invalid_reset_token": "Link đặt lại mật khẩu này không đúng, đã hết hạn hoặc đã được dùng. Hãy xin link mới.",
   "auth.invalid_token": "Thông tin đăng nhập không hợp lệ. Hãy đăng nhập lại.",
+  "auth.session_ended": "Phiên đăng nhập này đã kết thúc (đã đăng xuất, bị thu hồi hoặc mật khẩu đã đổi). Hãy đăng nhập lại.",
   "auth.invalid_verification_token": "Link xác minh email này không đúng, đã hết hạn hoặc đã được dùng. Hãy xin thư xác minh mới.",
   "auth.invitation_email_mismatch": "Lời mời gửi cho email khác với tài khoản bạn đang dùng.",
   "auth.invitation_invalid": "Lời mời sai, đã dùng, đã bị thu hồi hoặc đã hết hạn. Hãy xin lời mời mới.",

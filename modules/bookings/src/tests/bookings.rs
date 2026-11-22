@@ -329,6 +329,39 @@ async fn giu_tam_het_han_tra_cho() {
     .unwrap();
 }
 
+/// Thu thiếu cọc (đối soát chấp nhận số thực nhận ở `ledger`): lịch không được xác nhận, số đã thu
+/// được hoàn lại; lịch vẫn giữ tới khi hết hạn rồi trả chỗ.
+#[tokio::test]
+async fn thu_thieu_coc_khong_xac_nhan_va_hoan_so_da_thu() {
+    TestDatabase::run(async |test| {
+        let (shop, ledger) = shop(test).await;
+        let lan = staff(&shop, "Lan").await;
+        let deposit = json!({"deposit": {"kind": "percent", "value": 50}});
+        let haircut = service(&shop, 60, 0, deposit, &[&lan]).await;
+        let (status, body) = book(&shop, "ann", &haircut, at(next_monday(), 9, 0), json!({})).await;
+        assert_eq!(status, StatusCode::CREATED, "{body}");
+        let id = body["data"]["booking"]["id"].as_str().unwrap().to_owned();
+        let payment = ledger.last_payment();
+        let short = autoxide_kernel::money::Money::parse("40000", "VND").unwrap();
+        // Event đến hai lần: chỉ hoàn một lần.
+        for _ in 0..2 {
+            FakeLedger::succeed_with(&ledger.outbox, &shop.default_tenant(), &payment, short).await;
+            drain(&shop).await;
+        }
+        drain(&shop).await;
+        assert_eq!(ledger.refunded(payment.id), 40_000, "hoàn đúng số đã thu");
+        let (_, got) =
+            call(&shop, "GET", &format!("/bookings/bookings/{id}"), Some("ann"), None).await;
+        assert_eq!(
+            (got["data"]["status"].as_str(), got["data"]["deposit"]["status"].as_str()),
+            (Some("held"), Some("refunded")),
+            "{got}"
+        );
+    })
+    .await
+    .unwrap();
+}
+
 #[tokio::test]
 async fn huy_muon_giu_coc_theo_chinh_sach() {
     TestDatabase::run(async |test| {

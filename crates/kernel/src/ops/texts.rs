@@ -224,6 +224,7 @@ pub(crate) struct TextsQuery {
 
 /// The tenant's wording.
 #[derive(Debug, Clone, Deserialize, ToSchema, validator::Validate)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct TextInput {
     /// Plain text (no HTML), 1 to 500 characters, with exactly the `{placeholders}` of the default.
     pub text: String,

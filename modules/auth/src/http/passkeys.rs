@@ -101,6 +101,7 @@ impl From<Passkey> for PasskeyResponse {
 
 /// Proof that you are the account owner.
 #[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct StartPasskeyRegistrationRequest {
     /// Your current password: a stolen access token alone must not add a passkey.
     #[serde(default)]
@@ -113,6 +114,7 @@ pub(crate) struct StartPasskeyRegistrationRequest {
 
 /// The authenticator's answer to an add-passkey ceremony.
 #[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct AddPasskeyRequest {
     /// The `ceremony_id` from `POST /api/v1/auth/me/passkeys/registration`.
     ceremony_id: Uuid,
@@ -126,6 +128,7 @@ pub(crate) struct AddPasskeyRequest {
 
 /// The authenticator's answer to a sign-in ceremony.
 #[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct PasskeyLoginRequest {
     /// The `ceremony_id` from `POST /api/v1/auth/login/passkey/options`.
     ceremony_id: Uuid,

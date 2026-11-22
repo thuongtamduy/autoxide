@@ -83,6 +83,7 @@ pub(crate) struct RecordNote {
 
 /// A note to write.
 #[derive(Debug, Clone, Deserialize, ToSchema, validator::Validate)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct NewRecordNote {
     /// 1 to 5000 characters.
     pub body: String,

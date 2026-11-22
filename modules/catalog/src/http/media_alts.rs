@@ -27,6 +27,7 @@ pub(crate) fn routes(service: Arc<CatalogService>) -> OpenApiRouter {
 /// The alternative text of an image in one language.
 #[derive(Debug, Deserialize, Validate, ToSchema)]
 #[schema(as = CatalogMediaAltRequest)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct MediaAltRequest {
     /// What the image shows, for people who cannot see it; 1 to 500 characters.
     pub alt: String,

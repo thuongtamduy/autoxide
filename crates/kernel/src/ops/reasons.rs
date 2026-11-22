@@ -245,6 +245,7 @@ pub(crate) struct ReasonsQuery {
 
 /// Changes to a reason; omitted fields stay. A code the list does not have yet is added.
 #[derive(Debug, Clone, Deserialize, ToSchema, validator::Validate)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct ReasonChange {
     /// The tenant's labels by language (`vi`, `en`…), up to 200 characters each; an empty label
     /// goes back to the default. A new code needs at least one.

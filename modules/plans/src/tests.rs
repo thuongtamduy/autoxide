@@ -4,8 +4,10 @@
 
 mod billing;
 mod enforcement;
+mod fake_ledger;
 mod invoicing;
 mod lifecycle;
+mod payments;
 mod provisioning;
 mod signup;
 mod store;
