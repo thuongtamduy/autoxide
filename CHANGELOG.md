@@ -11,6 +11,11 @@ endpoints are marked deprecated with a sunset date first.
 
 ## [0.18.0] - 2026-11-22
 
+### Breaking (Rust)
+
+- `autoxide-kernel` — pub enum struct variant field added (`enum_struct_variant_field_added`)
+- `autoxide-kernel` — pub method parameter count changed (`method_parameter_count_changed`)
+
 ### Added
 
 - `cargo xtask check` checks the shape of every `/api/v1` endpoint in `docs/openapi.json`: request
