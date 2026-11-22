@@ -473,7 +473,7 @@ sẵn, không sinh code; kết quả luôn là bản nháp.
 - [x] Bộ giao diện của website (token màu, chữ, khoảng cách, kế thừa theo nút, kiểm tương phản) — D-20261122-theme-tokens
 - [x] Khu dùng chung nhiều trang (D-20261122-shared-sections)
 - [x] Thư viện trang mẫu theo ngành (D-20261122-page-templates)
-- [ ] Chủ đề theo mùa, ngày lễ, khung giờ (D-234): bản chủ đề ghi đè một phần theme gốc theo lịch (một lần, hằng
+- [x] Chủ đề theo mùa, ngày lễ, khung giờ (D-234, D-20261122-theme-variants): bản chủ đề ghi đè một phần theme gốc theo lịch (một lần, hằng
       ngày, hằng tuần, theo múi giờ của website), ưu tiên khi trùng, thư viện chủ đề mẫu, chép sang năm sau, xem
       trước ở một thời điểm; hiệu ứng trang trí chỉ trong danh sách cho phép, không chạy ở trang thanh toán
 - [ ] Đầu trang và chân trang của cả website (D-234): bố cục khối có nháp / đăng, theo ngôn ngữ, kế thừa theo nút,

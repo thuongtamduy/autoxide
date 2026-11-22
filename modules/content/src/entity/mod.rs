@@ -20,6 +20,7 @@ pub(crate) mod shared_section;
 pub(crate) mod term;
 pub(crate) mod term_translation;
 pub(crate) mod theme;
+pub(crate) mod theme_variant;
 pub(crate) mod translation_request;
 pub(crate) mod tree_lock;
 

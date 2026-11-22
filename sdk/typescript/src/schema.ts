@@ -4705,6 +4705,12 @@ export type ConversationVoiceWebhookReceipt = {
   stored: number;
 };
 
+/** A copy with a new schedule. */
+export type CopyVariantRequest = {
+  /** The copy's schedule (see `ThemeVariantResponse.schedule`). */
+  schedule: Record<string, unknown>;
+};
+
 /** A key to create. */
 export type CreateApiKeyRequest = {
   /**
@@ -12524,6 +12530,22 @@ export type Data_SiteMenu = {
 };
 
 /** Envelope of a single result. */
+export type Data_SiteThemeResponse = {
+  /** The look of a website at a moment. */
+  data: {
+    effect?: string | null;
+    effect_intensity?: string | null;
+    /** Next start or end of a variant within 7 days; `null`: none. */
+    next_change_at?: string | null;
+    /** Every token the website uses at that moment: its theme, then the running variant's overrides. */
+    tokens: Record<string, unknown>;
+    /** The running variant (`id`, `name`); `null`: the base theme. */
+    variant?: Record<string, unknown> | null;
+    warnings: ContrastWarning[];
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_StartResponse = {
   /** Where to send the browser. */
   data: {
@@ -13383,6 +13405,40 @@ export type Data_ThemeResponse = {
      * the theme is saved anyway.
      */
     warnings: ContrastWarning[];
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ThemeVariantResponse = {
+  /** A theme variant: part of a website's theme swapped in on a schedule (a holiday, a season, an hour). */
+  data: {
+    /**
+     * Decoration the website may draw: `snow`, `petals`, `lanterns`, `fireworks`, `confetti`,
+     * `hearts`; `null`: none. Never on cart, checkout, account or sign-in pages, and off when the
+     * visitor asks for reduced motion (`docs/PAGES.md`).
+     */
+    effect?: string | null;
+    /** `low` or `medium`. */
+    effect_intensity?: string | null;
+    id: string;
+    name: string;
+    /** The website (organization unit). Variants of a unit also apply to the websites below it. */
+    org_id: string;
+    /** Theme tokens this variant overrides (same names and rules as `PUT /themes/{org_id}`). */
+    overrides: Record<string, unknown>;
+    /** The preset it came from, if any. */
+    preset_key?: string | null;
+    /** When several variants run at once, the highest wins (then the one that started later). */
+    priority: number;
+    /**
+     * `{"kind": "once", "starts_at", "ends_at"}` (UTC), `{"kind": "daily", "start": "HH:MM", "end":
+     * "HH:MM", "from"?, "until"?}` or `{"kind": "weekly", …, "days": ["sat", "sun"]}`; times are local
+     * to the website (`organizations.timezone`), an `end` before `start` runs past midnight.
+     */
+    schedule: Record<string, unknown>;
+    /** `draft`, `active` or `paused`. Only `active` variants are shown. */
+    status: string;
+    updated_at: string;
   };
 };
 
@@ -25776,6 +25832,65 @@ export type Page_TermResponse = {
 };
 
 /** One page of a list. */
+export type Page_ThemePresetResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /**
+     * Suggested local dates by year (`{"2027": ["2027-01-27", "2027-02-14"]}`); holidays on a fixed
+     * day give the same month and day every year. Empty for an every-day preset.
+     */
+    dates: Record<string, unknown>;
+    effect?: string | null;
+    effect_intensity?: string | null;
+    /** Stable id of the preset in this list (for paging). */
+    id: string;
+    /** Give it as `preset_key` to `POST /theme-variants`. */
+    key: string;
+    /** Name by language (`en`, `vi`). */
+    name: Record<string, unknown>;
+    overrides: Record<string, unknown>;
+    /** Schedule of an every-day or every-week preset (e.g. golden hour); `null` otherwise. */
+    schedule?: Record<string, unknown> | null;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_ThemeVariantResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /**
+     * Decoration the website may draw: `snow`, `petals`, `lanterns`, `fireworks`, `confetti`,
+     * `hearts`; `null`: none. Never on cart, checkout, account or sign-in pages, and off when the
+     * visitor asks for reduced motion (`docs/PAGES.md`).
+     */
+    effect?: string | null;
+    /** `low` or `medium`. */
+    effect_intensity?: string | null;
+    id: string;
+    name: string;
+    /** The website (organization unit). Variants of a unit also apply to the websites below it. */
+    org_id: string;
+    /** Theme tokens this variant overrides (same names and rules as `PUT /themes/{org_id}`). */
+    overrides: Record<string, unknown>;
+    /** The preset it came from, if any. */
+    preset_key?: string | null;
+    /** When several variants run at once, the highest wins (then the one that started later). */
+    priority: number;
+    /**
+     * `{"kind": "once", "starts_at", "ends_at"}` (UTC), `{"kind": "daily", "start": "HH:MM", "end":
+     * "HH:MM", "from"?, "until"?}` or `{"kind": "weekly", …, "days": ["sat", "sun"]}`; times are local
+     * to the website (`organizations.timezone`), an `end` before `start` runs past midnight.
+     */
+    schedule: Record<string, unknown>;
+    /** `draft`, `active` or `paused`. Only `active` variants are shown. */
+    status: string;
+    updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_ThreadComment = {
   /** The items of this page, in the requested order. */
   data: (PublicComment & {
@@ -30455,6 +30570,19 @@ export type SiteMenuSummary = {
   updated_by?: string | null;
 };
 
+/** The look of a website at a moment. */
+export type SiteThemeResponse = {
+  effect?: string | null;
+  effect_intensity?: string | null;
+  /** Next start or end of a variant within 7 days; `null`: none. */
+  next_change_at?: string | null;
+  /** Every token the website uses at that moment: its theme, then the running variant's overrides. */
+  tokens: Record<string, unknown>;
+  /** The running variant (`id`, `name`); `null`: the base theme. */
+  variant?: Record<string, unknown> | null;
+  warnings: ContrastWarning[];
+};
+
 /** One address of the sitemap. */
 export type SitemapItem = {
   /** For `lastmod`. */
@@ -31948,6 +32076,26 @@ export type TextView = {
   text?: string | null;
 };
 
+/** A ready-made theme variant shipped with the server. */
+export type ThemePresetResponse = {
+  /**
+   * Suggested local dates by year (`{"2027": ["2027-01-27", "2027-02-14"]}`); holidays on a fixed
+   * day give the same month and day every year. Empty for an every-day preset.
+   */
+  dates: Record<string, unknown>;
+  effect?: string | null;
+  effect_intensity?: string | null;
+  /** Stable id of the preset in this list (for paging). */
+  id: string;
+  /** Give it as `preset_key` to `POST /theme-variants`. */
+  key: string;
+  /** Name by language (`en`, `vi`). */
+  name: Record<string, unknown>;
+  overrides: Record<string, unknown>;
+  /** Schedule of an every-day or every-week preset (e.g. golden hour); `null` otherwise. */
+  schedule?: Record<string, unknown> | null;
+};
+
 /** The tokens a unit sets. */
 export type ThemeRequest = {
   /**
@@ -31980,6 +32128,59 @@ export type ThemeResponse = {
    * the theme is saved anyway.
    */
   warnings: ContrastWarning[];
+};
+
+/** A theme variant to create or replace. */
+export type ThemeVariantRequest = {
+  /** One of `snow`, `petals`, `lanterns`, `fireworks`, `confetti`, `hearts`. */
+  effect?: string | null;
+  /** `low` (default) or `medium`. */
+  effect_intensity?: string | null;
+  /** 1 to 120 characters; left out with `preset_key`: the preset's name. */
+  name?: string | null;
+  /** The website (create only); left out: the whole tenant. */
+  org_id?: string | null;
+  /** Tokens to override; left out with `preset_key`: the preset's. */
+  overrides?: Record<string, unknown> | null;
+  /** Start from a preset of `GET /theme-presets` (create only). */
+  preset_key?: string | null;
+  /** 0 to 1000, default 0. */
+  priority?: number | null;
+  /** See `ThemeVariantResponse.schedule`; left out with `preset_key`: the preset's dates for `year`. */
+  schedule?: Record<string, unknown> | null;
+  /** Year of the preset's dates; default: this year in the website's time zone. */
+  year?: number | null;
+};
+
+/** A theme variant: part of a website's theme swapped in on a schedule (a holiday, a season, an hour). */
+export type ThemeVariantResponse = {
+  /**
+   * Decoration the website may draw: `snow`, `petals`, `lanterns`, `fireworks`, `confetti`,
+   * `hearts`; `null`: none. Never on cart, checkout, account or sign-in pages, and off when the
+   * visitor asks for reduced motion (`docs/PAGES.md`).
+   */
+  effect?: string | null;
+  /** `low` or `medium`. */
+  effect_intensity?: string | null;
+  id: string;
+  name: string;
+  /** The website (organization unit). Variants of a unit also apply to the websites below it. */
+  org_id: string;
+  /** Theme tokens this variant overrides (same names and rules as `PUT /themes/{org_id}`). */
+  overrides: Record<string, unknown>;
+  /** The preset it came from, if any. */
+  preset_key?: string | null;
+  /** When several variants run at once, the highest wins (then the one that started later). */
+  priority: number;
+  /**
+   * `{"kind": "once", "starts_at", "ends_at"}` (UTC), `{"kind": "daily", "start": "HH:MM", "end":
+   * "HH:MM", "from"?, "until"?}` or `{"kind": "weekly", …, "days": ["sat", "sun"]}`; times are local
+   * to the website (`organizations.timezone`), an `end` before `start` runs past midnight.
+   */
+  schedule: Record<string, unknown>;
+  /** `draft`, `active` or `paused`. Only `active` variants are shown. */
+  status: string;
+  updated_at: string;
 };
 
 /** A top-level comment with its first replies. */
@@ -39334,6 +39535,19 @@ export interface paths {
       };
     };
   };
+  "/api/v1/content/site/{org_id}/preview": {
+    /** Preview the look of a website at a moment. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { org_id: string }; query: { at?: string; variant_id?: string }; };
+      responses: {
+        200: Data_SiteThemeResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/content/templates": {
     /** List the mandatory page templates (Vietnam). */
     get: {
@@ -39425,6 +39639,135 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/content/theme-presets": {
+    /** List the theme presets shipped with the server. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_ThemePresetResponse;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/content/theme-variants": {
+    /** List the theme variants of a website. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_ThemeVariantResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a theme variant (as a draft). */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: ThemeVariantRequest;
+      responses: {
+        201: Data_ThemeVariantResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/content/theme-variants/{id}": {
+    /** Get a theme variant. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ThemeVariantResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Replace a theme variant. */
+    put: {
+      parameters: { header: { "If-Match": string; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ThemeVariantRequest;
+      responses: {
+        200: Data_ThemeVariantResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        412: Problem;
+        422: Problem;
+        428: Problem;
+        default: Problem;
+      };
+    };
+    /** Delete a theme variant. */
+    delete: {
+      parameters: { header: { "If-Match": string; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        412: Problem;
+        428: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/content/theme-variants/{id}/activate": {
+    /** Turn a theme variant on: it shows whenever its schedule runs. */
+    post: {
+      parameters: { header: { "If-Match": string; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ThemeVariantResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        412: Problem;
+        428: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/content/theme-variants/{id}/copy": {
+    /** Copy a theme variant with a new schedule (e.g. to next year). */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: CopyVariantRequest;
+      responses: {
+        201: Data_ThemeVariantResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/content/theme-variants/{id}/pause": {
+    /** Pause a theme variant: it no longer shows until turned on again. */
+    post: {
+      parameters: { header: { "If-Match": string; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ThemeVariantResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        412: Problem;
+        428: Problem;
         default: Problem;
       };
     };

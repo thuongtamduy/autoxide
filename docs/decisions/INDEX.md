@@ -479,6 +479,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261122-page-templates](D-20261122-page-templates.md)** Trang mẫu theo ngành: bộ mẫu nhúng vào binary, khách cài vào bảng của mình, tạo trang bỏ khối không dùng được — 2026-11-22
 - **[D-20261122-shared-sections](D-20261122-shared-sections.md)** Khu dùng chung: mở rộng lúc đọc công khai, đếm trang dùng bằng quét chữ khi sửa / xoá, không lồng — 2026-11-22
 - **[D-20261122-theme-tokens](D-20261122-theme-tokens.md)** Bộ giao diện website: token phẳng theo nút, ghi đè kế thừa, danh sách font cho phép, tương phản chỉ cảnh báo — 2026-11-22
+- **[D-20261122-theme-variants](D-20261122-theme-variants.md)** Chủ đề theo lịch: lịch JSON ba loại theo múi IANA của website, chọn đúng một bản, mẫu nhúng binary — 2026-11-22
 
 ## Tiền, thuế, chứng từ
 

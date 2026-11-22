@@ -2,7 +2,10 @@
 //! theo nút của cây tổ chức, kế thừa (chuỗi đặt, cửa hàng ghi đè), kiểm tương phản WCAG AA (cảnh
 //! báo, không chặn). Đọc / ghi cần `content.themes.manage` ở nút đó.
 
+pub(crate) mod presets;
+pub(crate) mod schedule;
 pub(crate) mod tokens;
+pub(crate) mod variants;
 
 use std::collections::BTreeMap;
 
@@ -39,7 +42,49 @@ fn stored(row: &theme::Model) -> BTreeMap<String, Value> {
     serde_json::from_str(&row.tokens).unwrap_or_default()
 }
 
+/// Giao diện của một website ở một thời điểm: theme gốc ghép bản chủ đề đang chạy.
+#[derive(Debug, Clone)]
+pub(crate) struct SiteTheme {
+    pub tokens: BTreeMap<String, Value>,
+    pub effect: Option<String>,
+    pub effect_intensity: Option<String>,
+    pub variant: Option<variants::Variant>,
+    pub next_change_at: Option<Timestamp>,
+    pub warnings: Vec<ContrastWarning>,
+}
+
 impl ContentService {
+    /// Giao diện hiệu lực của website `site` lúc `now`. `preview`: một bản chủ đề (kể cả nháp) được
+    /// coi như đang bật — xem trước trước khi bật. Ba câu truy vấn, không quét lịch ngoài 7 ngày tới.
+    pub(crate) async fn site_theme(
+        &self,
+        tenant: &TenantContext,
+        site: &Site,
+        now: Timestamp,
+        preview: Option<&variants::Variant>,
+    ) -> Result<SiteTheme, Error> {
+        let (base, _) = self.effective_theme(tenant, site).await?;
+        let mut candidates = self.active_variants(tenant, site, now).await?;
+        if let Some(preview) = preview {
+            candidates.retain(|row| row.id != preview.id);
+            candidates.push(preview.clone());
+        }
+        let zone = self.site_zone(tenant, site.org()).await;
+        let applied = variants::select(&candidates, now, &zone);
+        let mut tokens = base;
+        if let Some(variant) = &applied.variant {
+            tokens.extend(variants::overrides_of(variant));
+        }
+        Ok(SiteTheme {
+            warnings: tokens::contrast_warnings(&tokens),
+            tokens,
+            effect: applied.variant.as_ref().and_then(|row| row.effect.clone()),
+            effect_intensity: applied.variant.as_ref().and_then(|row| row.effect_intensity.clone()),
+            variant: applied.variant,
+            next_change_at: applied.next_change_at,
+        })
+    }
+
     /// Token hiệu lực của website `site` (theo chuỗi nút của nó) và các dòng đã dùng. Một câu truy
     /// vấn.
     pub(crate) async fn effective_theme(
