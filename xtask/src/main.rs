@@ -26,8 +26,9 @@
 //! - `decisions` — sinh lại mục lục `docs/decisions/INDEX.md` từ nhật ký quyết định (xem
 //!   `decisions.rs`).
 //! - `new-module <module> <entity>` — sinh module mới từ khuôn `modules/notes` (xem
-//!   `scaffold.rs`). `new-module --external <dir> <module> <entity>` — sinh một workspace Cargo riêng
-//!   ngoài repo (module + binary) từ `examples/external-module`.
+//!   `scaffold.rs`). `new-module --external <dir> <module> <entity>
+//!   [--core-path <dir>]` — sinh một workspace Cargo riêng ngoài repo (module, binary, README, AGENTS.md,
+//!   CI mẫu) từ `examples/external-module`; `--core-path` trỏ core vào một bản checkout thay git tag.
 //! - `test-all [--doc]` — mọi test của workspace, các file test chạy song song, trên database của
 //!   `TEST_DATABASE_URL`; phần test của `./gate.sh` đầy đủ (xem `affected.rs`).
 //! - `test-affected [--base <ref>]` — chạy test của crate bị sửa kể từ lần chạy xanh gần nhất
@@ -76,7 +77,8 @@ const USAGE: &str = "usage: cargo xtask check
        cargo xtask sdk [--check | --extract-examples <dir>]
        cargo xtask upgrade-test [--from <tag>] [--image <image>] [--database sqlite|postgres|both]
        cargo xtask new-module <module> <entity>   e.g. new-module bookmarks bookmark
-       cargo xtask new-module --external <dir> <module> <entity>   a workspace of your own, outside this repository
+       cargo xtask new-module --external <dir> <module> <entity> [--core-path <autoxide checkout>]
+                                                   a workspace of your own, outside this repository
        cargo xtask test-affected [--base <ref>]   default base: the last green run, else origin/main
        cargo xtask test-affected --base <ref> --keep-env   on TEST_DATABASE_URL instead of SQLite
        cargo xtask test-all [--doc]               every test, on TEST_DATABASE_URL (default SQLite)
@@ -118,7 +120,12 @@ fn main() -> ExitCode {
         ["sdk", "--extract-examples", dir] => sdk_examples(dir),
         ["upgrade-test", rest @ ..] => upgrade_test(rest),
         ["new-module", module, entity] => new_module(module, entity),
-        ["new-module", "--external", dir, module, entity] => new_external(dir, module, entity),
+        ["new-module", "--external", dir, module, entity] => {
+            new_external(dir, module, entity, None)
+        }
+        ["new-module", "--external", dir, module, entity, "--core-path", core] => {
+            new_external(dir, module, entity, Some(core))
+        }
         ["test-all"] => test_all(false, shard),
         ["test-all", "--doc"] => test_all(true, shard),
         ["test-affected"] => test_affected(None, false, shard),
@@ -362,27 +369,52 @@ fn changelog() -> ExitCode {
     }
 }
 
-fn new_external(dir: &str, module: &str, entity: &str) -> ExitCode {
+fn new_external(dir: &str, module: &str, entity: &str, core_path: Option<&str>) -> ExitCode {
     let result = workspace::load().and_then(|workspace| {
         let version = semver::workspace_version(&workspace.root)?;
+        let core_dir = match core_path {
+            Some(path) => Some(
+                std::fs::canonicalize(path)
+                    .map_err(|error| format!("--core-path {path}: {error}"))?,
+            ),
+            None => None,
+        };
+        let core = match &core_dir {
+            Some(path) => scaffold::CoreSource::Path(path),
+            None => scaffold::CoreSource::Tag(&version),
+        };
         let written = scaffold::new_external(
             &workspace.root,
             std::path::Path::new(dir),
             module,
             entity,
-            &version,
+            &core,
         )?;
-        Ok((written.len(), version))
+        // Tên mới dài / ngắn hơn tên khuôn làm lệch định dạng (thứ tự import, độ dài dòng): định dạng
+        // lại để khung sinh ra qua `cargo fmt --check` của `check.sh` ngay. Không có rustfmt thì chỉ báo.
+        let formatted = std::process::Command::new("cargo")
+            .args(["fmt", "--all"])
+            .current_dir(dir)
+            .status()
+            .is_ok_and(|status| status.success());
+        if !formatted {
+            eprintln!("xtask new-module: `cargo fmt --all` failed in {dir}; run it there yourself");
+        }
+        let source = match &core_dir {
+            Some(path) => format!("the Autoxide checkout at {}", path.display()),
+            None => format!("Autoxide by the git tag v{version}"),
+        };
+        Ok((written.len(), source))
     });
     match result {
-        Ok((files, version)) => {
+        Ok((files, source)) => {
             println!(
                 "Created {dir} ({files} files): module `{module}` and the server `acme`, from \
                  examples/external-module."
             );
-            println!("It depends on Autoxide by the git tag v{version}.");
+            println!("It depends on {source}.");
             println!();
-            println!("Next (docs/guides/writing-a-module.md):");
+            println!("Next (README.md of the new folder, docs/guides/writing-a-module.md):");
             println!(
                 "  1. cd {dir} && git init && ./check.sh      (format, lints, tests on SQLite)"
             );
@@ -392,8 +424,11 @@ fn new_external(dir: &str, module: &str, entity: &str) -> ExitCode {
             println!(
                 "  3. Rewrite the tables, service, descriptions and locales/vi.json for your feature;"
             );
-            println!("     rename `acme` to your own name.");
+            println!(
+                "     rename `acme` to your own name. AGENTS.md holds the rules for AI agents."
+            );
             println!("  4. cargo xtask check-module {dir}/{module}   (from this repository)");
+            println!("  5. Push: .github/workflows/ci.yml runs check.sh on SQLite and PostgreSQL.");
             ExitCode::SUCCESS
         }
         Err(error) => {

@@ -22,8 +22,10 @@
 #   --only example      module ở repo riêng (D-20261121-external-modules): `examples/external-module/check.sh` — workspace
 #                       Cargo riêng gồm một module và binary ghép nó với module chính thức; fmt, clippy, test trên
 #                       SQLite và (khi có GATE_POSTGRES_URL) Postgres — cộng `cargo xtask check-module` trên module
-#                       đó. CI chạy job riêng song song. Gate đầy đủ không có `--only` cũng chạy phần này; gate
-#                       nhanh chỉ chạy khi `examples/` đổi so với origin/main (nó build lại cả core ở workspace riêng).
+#                       đó; rồi sinh khung `cargo xtask new-module --external` vào thư mục tạm và lint + test nó trên
+#                       SQLite. CI chạy job riêng song song. Gate đầy đủ không có `--only` cũng chạy phần này; gate
+#                       nhanh chỉ chạy khi `examples/` hay `xtask/src/scaffold.rs` đổi so với origin/main (nó build
+#                       lại cả core ở workspace riêng).
 #   --only build        đi kèm gate đầy đủ hoặc `--pr`: build mọi chương trình test MỘT lần thành archive
 #                       của nextest ở GATE_ARCHIVE_DIR (D-20261120-ci-nextest-archive), kèm file `filter`
 #                       (filterset chọn test: `all()` ở gate đầy đủ, crate bị ảnh hưởng ở `--pr`). Gate đầy
@@ -243,13 +245,34 @@ fi
 example_needed() {
   [ "$QUICK" = 1 ] || return 0
   git rev-parse --verify --quiet "${GATE_BASE:-origin/main}" >/dev/null || return 0
-  git diff --name-only "$(git merge-base "${GATE_BASE:-origin/main}" HEAD)" -- examples | grep -q .
+  git diff --name-only "$(git merge-base "${GATE_BASE:-origin/main}" HEAD)" -- examples xtask/src/scaffold.rs | grep -q .
 }
 if runs example && example_needed; then
   step "module outside the repository: rules (cargo xtask check-module)"
   cargo xtask check-module examples/external-module/bookmarks
   step "module outside the repository: examples/external-module/check.sh"
   POSTGRES_URL="${GATE_POSTGRES_URL:-}" ./examples/external-module/check.sh
+  # Khung `cargo xtask new-module --external` sinh ra (D-20261122-external-template): sinh vào thư mục tạm, trỏ
+  # core vào bản checkout này, rồi định dạng, lint và test trên SQLite. Dùng chung thư mục build với ví dụ nên chỉ
+  # biên dịch lại module đổi tên và binary; Postgres đã chạy ở ví dụ cùng mã nguồn ngay trên.
+  step "module outside the repository: generated workspace (cargo xtask new-module --external)"
+  scaffold_dir="$(mktemp -d)"
+  example_target="${CARGO_TARGET_DIR:-$PWD/examples/external-module/target}"
+  # Cùng hồ sơ build với `check.sh` của ví dụ (trên CI: thư viện không tối ưu), để dùng lại bản đã biên dịch.
+  EXAMPLE_PROFILE=()
+  if [ -n "${GITHUB_ACTIONS:-}" ]; then
+    EXAMPLE_PROFILE=(--config 'profile.dev.package."*".opt-level=0')
+  fi
+  cargo xtask new-module --external "$scaffold_dir/acme" reading_lists reading_list --core-path . >/dev/null
+  cp Cargo.lock "$scaffold_dir/acme/Cargo.lock"
+  (
+    cd "$scaffold_dir/acme"
+    export CARGO_TARGET_DIR="$example_target"
+    cargo fmt --check -p acme-reading_lists -p acme-server
+    cargo clippy --workspace --all-targets ${EXAMPLE_PROFILE[@]+"${EXAMPLE_PROFILE[@]}"} -- -D warnings
+    env -u TEST_DATABASE_URL cargo test --workspace ${EXAMPLE_PROFILE[@]+"${EXAMPLE_PROFILE[@]}"}
+  )
+  rm -rf "$scaffold_dir"
 fi
 if [ "$ONLY" = example ]; then
   printf '\n\033[32mgate --only example: green — module outside the repository\033[0m\n'
