@@ -1,0 +1,214 @@
+{
+  "key": "services_lead",
+  "industry": "services",
+  "name": {
+    "en": "Services: request a quote",
+    "vi": "Dịch vụ: nhận báo giá"
+  },
+  "description": {
+    "en": "Present a service, how it works, and a contact form.",
+    "vi": "Giới thiệu dịch vụ, cách làm việc và form liên hệ."
+  },
+  "layout": {
+    "en": {
+      "type": "layout",
+      "schema": 1,
+      "sections": [
+        {
+          "id": "hero",
+          "block": "content.hero",
+          "props": {
+            "heading": "Work done right, on time",
+            "text": "Tell us what you need and get a quote within a day.",
+            "button_label": "Get a quote",
+            "button_link": "/contact",
+            "height": {
+              "base": "medium",
+              "lg": "large"
+            },
+            "overlay": "dark"
+          }
+        },
+        {
+          "id": "steps",
+          "block": "content.section",
+          "props": {
+            "background": "none",
+            "padding": {
+              "base": "medium",
+              "lg": "large"
+            }
+          },
+          "children": [
+            {
+              "id": "steps_h",
+              "block": "content.heading",
+              "props": {
+                "text": "How it works",
+                "level": 2
+              }
+            },
+            {
+              "id": "steps_cols",
+              "block": "content.columns",
+              "props": {
+                "widths": "equal"
+              },
+              "children": [
+                {
+                  "id": "s1",
+                  "block": "content.text",
+                  "props": {
+                    "text": "1. Send your request."
+                  }
+                },
+                {
+                  "id": "s2",
+                  "block": "content.text",
+                  "props": {
+                    "text": "2. We call you back with a quote."
+                  }
+                },
+                {
+                  "id": "s3",
+                  "block": "content.text",
+                  "props": {
+                    "text": "3. We do the work and you check it."
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "contact",
+          "block": "content.section",
+          "props": {
+            "background": "surface",
+            "padding": {
+              "base": "medium",
+              "lg": "large"
+            }
+          },
+          "children": [
+            {
+              "id": "contact_h",
+              "block": "content.heading",
+              "props": {
+                "text": "Request a quote",
+                "level": 2
+              }
+            },
+            {
+              "id": "form",
+              "block": "forms.embed",
+              "props": {
+                "key": "contact"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "vi": {
+      "type": "layout",
+      "schema": 1,
+      "sections": [
+        {
+          "id": "hero",
+          "block": "content.hero",
+          "props": {
+            "heading": "Làm đúng, làm đúng hẹn",
+            "text": "Cho chúng tôi biết bạn cần gì, nhận báo giá trong một ngày.",
+            "button_label": "Nhận báo giá",
+            "button_link": "/contact",
+            "height": {
+              "base": "medium",
+              "lg": "large"
+            },
+            "overlay": "dark"
+          }
+        },
+        {
+          "id": "steps",
+          "block": "content.section",
+          "props": {
+            "background": "none",
+            "padding": {
+              "base": "medium",
+              "lg": "large"
+            }
+          },
+          "children": [
+            {
+              "id": "steps_h",
+              "block": "content.heading",
+              "props": {
+                "text": "Cách làm việc",
+                "level": 2
+              }
+            },
+            {
+              "id": "steps_cols",
+              "block": "content.columns",
+              "props": {
+                "widths": "equal"
+              },
+              "children": [
+                {
+                  "id": "s1",
+                  "block": "content.text",
+                  "props": {
+                    "text": "1. Gửi yêu cầu."
+                  }
+                },
+                {
+                  "id": "s2",
+                  "block": "content.text",
+                  "props": {
+                    "text": "2. Chúng tôi gọi lại kèm báo giá."
+                  }
+                },
+                {
+                  "id": "s3",
+                  "block": "content.text",
+                  "props": {
+                    "text": "3. Chúng tôi làm và bạn nghiệm thu."
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "contact",
+          "block": "content.section",
+          "props": {
+            "background": "surface",
+            "padding": {
+              "base": "medium",
+              "lg": "large"
+            }
+          },
+          "children": [
+            {
+              "id": "contact_h",
+              "block": "content.heading",
+              "props": {
+                "text": "Yêu cầu báo giá",
+                "level": 2
+              }
+            },
+            {
+              "id": "form",
+              "block": "forms.embed",
+              "props": {
+                "key": "contact"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

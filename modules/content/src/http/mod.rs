@@ -12,6 +12,7 @@ mod layout;
 mod library;
 mod links;
 mod menus;
+mod page_templates;
 mod placements;
 mod public;
 mod public_banners;
@@ -117,6 +118,10 @@ pub(crate) fn routes(service: Arc<ContentService>) -> OpenApiRouter {
             shared_sections::put_shared_section,
             shared_sections::delete_shared_section
         ))
+        .routes(routes!(page_templates::list_page_templates, page_templates::save_page_template))
+        .routes(routes!(page_templates::install_page_templates))
+        .routes(routes!(page_templates::delete_page_template))
+        .routes(routes!(page_templates::page_from_template))
         .routes(routes!(templates::list_templates))
         .routes(routes!(templates::draft_from_template))
         .routes(routes!(public::preview_token))

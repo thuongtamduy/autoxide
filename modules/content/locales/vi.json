@@ -310,5 +310,8 @@
   "field:must be 1 to {max} characters": "phải dài 1 đến {max} ký tự",
   "text:Shared section": "Khu dùng chung",
   "text:Use to place a shared section (the same blocks on many pages, edited in one place) by its id.": "Dùng để đặt một khu dùng chung (cùng các khối trên nhiều trang, sửa ở một chỗ) theo ID.",
-  "text:A shared section was created, changed (every page using it changes too; `pages` counts them) or deleted.": "Một khu dùng chung được tạo, sửa (mọi trang dùng nó đổi theo; `pages` là số trang) hay bị xoá."
+  "text:A shared section was created, changed (every page using it changes too; `pages` counts them) or deleted.": "Một khu dùng chung được tạo, sửa (mọi trang dùng nó đổi theo; `pages` là số trang) hay bị xoá.",
+  "content.page_template_not_found": "Không có trang mẫu {id}.",
+  "field:the page has a rich text body; only block layouts can become templates": "trang có thân chữ (rich); chỉ bố cục khối mới lưu thành mẫu được",
+  "field:must be 1 to {max} characters": "phải dài 1 đến {max} ký tự"
 }

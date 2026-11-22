@@ -26,6 +26,7 @@ mod find;
 mod http;
 mod mcp;
 mod migration;
+mod page_templates;
 mod permissions;
 mod privacy;
 mod publishing;

@@ -1,0 +1,258 @@
+{
+  "key": "retail_launch",
+  "industry": "retail",
+  "name": {
+    "en": "Shop: new collection",
+    "vi": "Cửa hàng: bộ sưu tập mới"
+  },
+  "description": {
+    "en": "Launch a collection: hero, three reasons to buy, products, FAQ, newsletter.",
+    "vi": "Ra mắt bộ sưu tập: ảnh bìa, ba lý do mua, sản phẩm, hỏi đáp, đăng ký nhận tin."
+  },
+  "layout": {
+    "en": {
+      "type": "layout",
+      "schema": 1,
+      "sections": [
+        {
+          "id": "hero",
+          "block": "content.hero",
+          "props": {
+            "heading": "The new collection",
+            "text": "Fresh pieces for the season.",
+            "button_label": "Shop now",
+            "button_link": "/collections/new",
+            "height": {
+              "base": "medium",
+              "lg": "large"
+            },
+            "overlay": "dark"
+          }
+        },
+        {
+          "id": "why",
+          "block": "content.section",
+          "props": {
+            "background": "none",
+            "padding": {
+              "base": "medium",
+              "lg": "large"
+            }
+          },
+          "children": [
+            {
+              "id": "why_h",
+              "block": "content.heading",
+              "props": {
+                "text": "Why shop with us",
+                "level": 2
+              }
+            },
+            {
+              "id": "why_cols",
+              "block": "content.columns",
+              "props": {
+                "widths": "equal"
+              },
+              "children": [
+                {
+                  "id": "w1",
+                  "block": "content.text",
+                  "props": {
+                    "text": "Free returns within 7 days."
+                  }
+                },
+                {
+                  "id": "w2",
+                  "block": "content.text",
+                  "props": {
+                    "text": "Fast delivery across the country."
+                  }
+                },
+                {
+                  "id": "w3",
+                  "block": "content.text",
+                  "props": {
+                    "text": "Pay on delivery or by bank transfer."
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "faq_s",
+          "block": "content.section",
+          "props": {
+            "background": "surface",
+            "padding": {
+              "base": "medium",
+              "lg": "large"
+            }
+          },
+          "children": [
+            {
+              "id": "faq",
+              "block": "content.faq",
+              "props": {
+                "items": [
+                  {
+                    "question": "How long does delivery take?",
+                    "answer": "Usually 2 to 4 days."
+                  },
+                  {
+                    "question": "Can I return an item?",
+                    "answer": "Yes, within 7 days of delivery."
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "news",
+          "block": "content.section",
+          "props": {
+            "background": "none",
+            "padding": {
+              "base": "medium",
+              "lg": "large"
+            }
+          },
+          "children": [
+            {
+              "id": "signup",
+              "block": "newsletter.signup",
+              "props": {
+                "consent_text": "I agree to receive emails about new products and offers.",
+                "policy_link": "/privacy"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "vi": {
+      "type": "layout",
+      "schema": 1,
+      "sections": [
+        {
+          "id": "hero",
+          "block": "content.hero",
+          "props": {
+            "heading": "Bộ sưu tập mới",
+            "text": "Những thiết kế mới cho mùa này.",
+            "button_label": "Mua ngay",
+            "button_link": "/collections/new",
+            "height": {
+              "base": "medium",
+              "lg": "large"
+            },
+            "overlay": "dark"
+          }
+        },
+        {
+          "id": "why",
+          "block": "content.section",
+          "props": {
+            "background": "none",
+            "padding": {
+              "base": "medium",
+              "lg": "large"
+            }
+          },
+          "children": [
+            {
+              "id": "why_h",
+              "block": "content.heading",
+              "props": {
+                "text": "Vì sao mua ở đây",
+                "level": 2
+              }
+            },
+            {
+              "id": "why_cols",
+              "block": "content.columns",
+              "props": {
+                "widths": "equal"
+              },
+              "children": [
+                {
+                  "id": "w1",
+                  "block": "content.text",
+                  "props": {
+                    "text": "Đổi trả miễn phí trong 7 ngày."
+                  }
+                },
+                {
+                  "id": "w2",
+                  "block": "content.text",
+                  "props": {
+                    "text": "Giao nhanh toàn quốc."
+                  }
+                },
+                {
+                  "id": "w3",
+                  "block": "content.text",
+                  "props": {
+                    "text": "Thanh toán khi nhận hàng hoặc chuyển khoản."
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "faq_s",
+          "block": "content.section",
+          "props": {
+            "background": "surface",
+            "padding": {
+              "base": "medium",
+              "lg": "large"
+            }
+          },
+          "children": [
+            {
+              "id": "faq",
+              "block": "content.faq",
+              "props": {
+                "items": [
+                  {
+                    "question": "Giao hàng mất bao lâu?",
+                    "answer": "Thường từ 2 đến 4 ngày."
+                  },
+                  {
+                    "question": "Tôi có đổi trả được không?",
+                    "answer": "Được, trong 7 ngày kể từ khi nhận hàng."
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "news",
+          "block": "content.section",
+          "props": {
+            "background": "none",
+            "padding": {
+              "base": "medium",
+              "lg": "large"
+            }
+          },
+          "children": [
+            {
+              "id": "signup",
+              "block": "newsletter.signup",
+              "props": {
+                "consent_text": "Tôi đồng ý nhận email về sản phẩm mới và ưu đãi.",
+                "policy_link": "/privacy"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
