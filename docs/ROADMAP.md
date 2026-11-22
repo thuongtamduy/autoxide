@@ -25,7 +25,8 @@ chạy thật" (D-20261121-shop-first-order):
 4. Quản trị nâng cao 52.
 5. Bản 1.0: bước 70 P6 rồi P4.
 
-Không dựng module mới trước bản 1.0: các bước 46, 48, 49, 56, 59, 62, 63, 64, 65 tạm dừng. Mục còn mở mà chờ bước tạm
+Không dựng module mới trước bản 1.0: các bước 46, 48, 49, 56, 59, 62, 63, 64, 65 tạm dừng. Ba mục cuối của 67 (thử
+A/B, AI tạo ảnh, khối mã tự viết) cũng để sau 1.0 (D-20261122-step67-after-1-0). Mục còn mở mà chờ bước tạm
 dừng hay mốc thời gian (P17 của 51, banner người bán của 55, gỡ menu cũ của 68, cache quyền của 54) không chặn 1.0.
 Bảng dưới là thứ tự gốc của D-228, giữ để tra phụ thuộc.
 
@@ -459,11 +460,11 @@ sẵn, không sinh code; kết quả luôn là bản nháp.
       `ai_assisted`, lịch sử trò chuyện để hoàn tác); bộ nháp chiến dịch từ một chương trình khuyến mại
 - [ ] Kiểm tra sức khoẻ website vào hộp việc: thiếu SEO / alt, link gãy, khối tham chiếu bản ghi đã ẩn, đường dẫn
       404 nhiều → gợi ý chuyển hướng; tool MCP như REST; hướng dẫn EN + VI cho người viết module khai khối
-- [ ] Thử A/B hai phiên bản trang (D-231, sau bước 57): chia cố định theo người xem (F5 không đổi), bot thấy bản
+- [ ] Thử A/B hai phiên bản trang (D-231, sau bước 57), **sau 1.0** — D-20261122-step67-after-1-0): chia cố định theo người xem (F5 không đổi), bot thấy bản
       gốc, chỉ thử bố cục và nội dung (không thử giá), số liệu và độ tin cậy, người chọn bản thắng
-- [ ] AI tạo ảnh (D-231): `ImageModel` mặc định tắt, chỉ banner / ảnh nền / minh hoạ, cờ `ai_generated` và nhãn,
+- [ ] AI tạo ảnh (D-231), **sau 1.0** — D-20261122-step67-after-1-0): `ImageModel` mặc định tắt, chỉ banner / ảnh nền / minh hoạ, cờ `ai_generated` và nhãn,
       `catalog` chặn làm ảnh sản phẩm
-- [ ] Khối mã tự viết (D-231): mặc định tắt; mức cách ly (iframe `sandbox`, CSP theo host) chủ cửa hàng bật; mức
+- [ ] Khối mã tự viết (D-231), **sau 1.0** — D-20261122-step67-after-1-0): mặc định tắt; mức cách ly (iframe `sandbox`, CSP theo host) chủ cửa hàng bật; mức
       không cách ly cần cả máy chủ và chủ cửa hàng bật, không trên trang thanh toán / tài khoản; audit, sổ script
 
 ## 66. Đồng bộ nhân viên qua SCIM 2.0 (chủ dự án giao ngày 14/11/2026, D-221)
