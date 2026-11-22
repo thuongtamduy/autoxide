@@ -568,12 +568,68 @@ async fn tai_khoan_nha_cung_cap_theo_tung_khach() {
             );
         }
 
+        // Chưa đặt URL công khai: không đoán từ `Host`, báo rõ phải đặt gì.
+        let missing_url = accounts.webhook_url(&one, HOOK).await.unwrap_err();
+        assert_eq!(missing_url.code(), "public_url_missing");
+
         let listed =
             app.get("/api/v1/kernel/connections/webhooks").token("one").send().await.unwrap();
         assert_eq!(listed.status(), StatusCode::OK, "{}", listed.json());
         let listed = listed.json();
         assert_eq!(listed["data"][0]["path"], format!("{HOOK}/{token_one}"));
         assert_eq!(listed["data"][0]["connection"], "demo.connection.partner");
+    })
+    .await
+    .unwrap();
+}
+
+/// Đặt / bỏ cài đặt nhóm `connection` (tài khoản nhà cung cấp) đòi lần xác thực gần đây; cài đặt
+/// thường thì không (D-20261122-provider-environments). URL webhook đầy đủ ghép từ URL công khai.
+#[tokio::test]
+async fn tai_khoan_nha_cung_cap_doi_xac_thuc_lai_gan_day() {
+    use autoxide_kernel::access::StepUp;
+    use autoxide_kernel::provider::ProviderAccounts;
+    use autoxide_kernel::time::Timestamp;
+
+    TestDatabase::run(async |test| {
+        let window = jiff::SignedDuration::from_mins(15);
+        let manage = |user: u128, authenticated_at| {
+            Principal::new(Uuid::from_u128(user), ["kernel.settings.manage".to_owned()])
+                .with_step_up(StepUp { authenticated_at, window })
+        };
+        let stale_at = Timestamp::now() - jiff::SignedDuration::from_mins(16);
+        let app = TestApp::builder(test)
+            .setting("AUTOXIDE_HTTP_PUBLIC_URL", "https://api.example.com")
+            .principal("fresh", manage(1, Some(Timestamp::now())))
+            .principal("stale", manage(2, Some(stale_at)))
+            .user("key", 3, &["kernel.settings.manage"])
+            .module(Renamed)
+            .build()
+            .await
+            .unwrap();
+        let account = "/api/v1/kernel/settings/demo.connection.partner.account";
+        let put = async |token: &str, uri: &str| {
+            app.put(uri).token(token).json(json!({"value": "v-1"})).send().await.unwrap()
+        };
+        let refused = put("stale", account).await;
+        assert_eq!(refused.status(), StatusCode::UNAUTHORIZED, "{}", refused.text());
+        assert_eq!(refused.json()["code"], "step_up_required");
+        // Cài đặt thường không đòi; phiên vừa xác thực và người gọi không gắn step-up (API key) được.
+        assert_eq!(
+            put("stale", "/api/v1/kernel/settings/demo.color").await.status(),
+            StatusCode::OK
+        );
+        assert_eq!(put("fresh", account).await.status(), StatusCode::OK);
+        assert_eq!(put("key", account).await.status(), StatusCode::OK);
+        let removed = app.delete(account).token("stale").send().await.unwrap();
+        assert_eq!(removed.status(), StatusCode::UNAUTHORIZED);
+        assert_eq!(app.delete(account).token("fresh").send().await.unwrap().status(), 204);
+
+        let accounts = app.api::<ProviderAccounts>().unwrap();
+        let tenant = app.default_tenant();
+        let url = accounts.webhook_url(&tenant, "/api/v1/demo/hooks/partner").await.unwrap();
+        let token = accounts.webhook_token(&tenant, "/api/v1/demo/hooks/partner").await.unwrap();
+        assert_eq!(url, format!("https://api.example.com/api/v1/demo/hooks/partner/{token}"));
     })
     .await
     .unwrap();
