@@ -779,8 +779,8 @@ impl TestRequest<'_> {
             .builder
             .body(self.body.unwrap_or_else(Body::empty))
             .map_err(|e| fail("request", e))?;
-        let response =
-            self.app.router.clone().oneshot(request).await.map_err(|e| fail("send", e))?;
+        // Lỗi của `Router` là `Infallible` (không bao giờ xảy ra): `let Ok(…) = …` không cần nhánh lỗi.
+        let Ok(response) = self.app.router.clone().oneshot(request).await;
         let status = response.status();
         let headers = response.headers().clone();
         let body = axum::body::to_bytes(response.into_body(), usize::MAX)

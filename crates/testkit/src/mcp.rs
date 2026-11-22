@@ -206,12 +206,8 @@ impl McpClient {
         let request = builder
             .body(Body::from(body.to_string()))
             .map_err(|error| broken(StatusCode::BAD_REQUEST, error.to_string()))?;
-        let response = self
-            .router
-            .clone()
-            .oneshot(request)
-            .await
-            .map_err(|error| broken(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?;
+        // Lỗi của `Router` là `Infallible` (không bao giờ xảy ra): `let Ok(…) = …` không cần nhánh lỗi.
+        let Ok(response) = self.router.clone().oneshot(request).await;
         let status = response.status();
         let bytes = response
             .into_body()
