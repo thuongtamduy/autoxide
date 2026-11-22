@@ -462,8 +462,8 @@ sẵn, không sinh code; kết quả luôn là bản nháp.
       `forms`, `newsletter`, `comments`, `media`, `menus` (`menus.menu`, D-238), `content` (`content.placement`:
       vị trí banner trong trang và đầu trang, D-20261120-step55-close); chân trang pháp lý tự gắn cho
       website bán hàng
-- [ ] Đọc công khai trả bố cục kèm dữ liệu khối, một lần gọi mỗi loại khối, khối lỗi không hỏng trang, ETag;
-      đo p99 trang 50 khối trên cả hai database
+- [x] Đọc công khai trả bố cục kèm dữ liệu khối, một lần gọi mỗi loại khối, khối lỗi không hỏng trang, ETag;
+      đo p99 trang 50 khối trên cả hai database (D-20261122-layout-public)
 - [ ] Bộ giao diện của website (token màu, chữ, khoảng cách, kế thừa theo nút, kiểm tương phản), khu dùng chung
       nhiều trang, thư viện trang mẫu theo ngành
 - [ ] Chủ đề theo mùa, ngày lễ, khung giờ (D-234): bản chủ đề ghi đè một phần theme gốc theo lịch (một lần, hằng

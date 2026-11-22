@@ -2,6 +2,7 @@
 //! bằng khoá cây của ngôn ngữ (`paths::lock_tree`), và kiểm phiên bản (`If-Match`) ngay trong
 //! câu `UPDATE` của mục: hai lệnh cùng phiên bản thì một bên nhận 412.
 
+pub(crate) mod blocks;
 pub(crate) mod paths;
 pub(crate) mod preview;
 pub(crate) mod reading;
