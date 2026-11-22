@@ -50,48 +50,6 @@ impl Module for FakeContent {
     }
 }
 
-/// Danh mục hành chính giả: tỉnh 01 có xã 00004.
-struct FakeUnits;
-
-#[async_trait::async_trait]
-impl autoxide_address::api::AdministrativeUnits for FakeUnits {
-    async fn provinces(
-        &self,
-        _: &str,
-        _: Option<&str>,
-    ) -> Result<Vec<autoxide_address::api::AdministrativeUnit>, Error> {
-        Ok(Vec::new())
-    }
-
-    async fn communes(
-        &self,
-        _: &str,
-        _: &str,
-        _: Option<&str>,
-    ) -> Result<Vec<autoxide_address::api::AdministrativeUnit>, Error> {
-        Ok(Vec::new())
-    }
-
-    async fn validate(
-        &self,
-        input: autoxide_address::api::AddressInput,
-        field: &str,
-    ) -> Result<autoxide_address::api::Address, Vec<autoxide_kernel::error::FieldError>> {
-        if input.province_code != "01" || input.commune_code != "00004" {
-            return Err(vec![autoxide_kernel::error::FieldError::new(
-                format!("{field}commune_code"),
-                "address.commune_not_in_province",
-                "commune `{commune}` is not in province `{province}`",
-            )]);
-        }
-        Ok(serde_json::from_value(json!({
-            "country": input.country, "province_code": "01", "province_name": "Thanh pho Ha Noi",
-            "commune_code": "00004", "commune_name": "Phuong Ba Dinh", "line": input.line,
-        }))
-        .unwrap())
-    }
-}
-
 const LEGAL: &[&str] = &[
     "compliance.legal.read",
     "compliance.legal.manage",
@@ -105,7 +63,9 @@ async fn app(test: &TestDatabase) -> TestApp {
         .user("admin", 1, LEGAL)
         .user("nobody", 2, &[])
         .user("staff", 5, &["compliance.rules.read", "compliance.rules.manage"])
-        .provide::<dyn autoxide_address::api::AdministrativeUnits>(Arc::new(FakeUnits))
+        .provide::<dyn autoxide_address::api::AdministrativeUnits>(Arc::new(
+            autoxide_address::api::testing::FakeAdministrativeUnits::sample(),
+        ))
         .module(FakeContent)
         .module(crate::module())
         .build()
@@ -552,7 +512,9 @@ async fn ho_so_cua_nguoi_ban_chi_trong_pham_vi_nut() {
         let app = TestApp::builder(test)
             .user("admin", 1, LEGAL)
             .principal("seller_a", Principal::with_grants(Uuid::from_u128(10), grants(seller_a)))
-            .provide::<dyn autoxide_address::api::AdministrativeUnits>(Arc::new(FakeUnits))
+            .provide::<dyn autoxide_address::api::AdministrativeUnits>(Arc::new(
+                autoxide_address::api::testing::FakeAdministrativeUnits::sample(),
+            ))
             .module(FakeContent)
             .module(crate::module())
             .build()

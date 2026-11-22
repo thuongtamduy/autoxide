@@ -238,7 +238,7 @@ mod tests {
 
     /// Token trong mail cuối cùng: chuỗi base64url 43 ký tự.
     fn last_token(services: &Services) -> String {
-        let sent = services.mails.sent.lock().unwrap();
+        let sent = services.mails.sent();
         let text = &sent.last().unwrap().text;
         text.split_whitespace()
             .find(|word| {
@@ -250,7 +250,7 @@ mod tests {
     }
 
     fn sent(services: &Services) -> usize {
-        services.mails.sent.lock().unwrap().len()
+        services.mails.sent().len()
     }
 
     /// Cho thời gian trôi qua: token và lượt chặn gửi dồn coi như đã cũ.
@@ -296,7 +296,7 @@ mod tests {
             crate::testing::request_reset(&services, " ADA@example.com", Language::Vi).await;
             assert_eq!(sent(&services), 1);
             {
-                let mails = services.mails.sent.lock().unwrap();
+                let mails = services.mails.sent();
                 assert_eq!(mails[0].to, "ada@example.com");
                 assert_eq!(mails[0].subject, "Đặt lại mật khẩu");
                 assert!(mails[0].text.contains("trong 30 phút"), "{}", mails[0].text);
@@ -307,7 +307,7 @@ mod tests {
             time_passes(&services, 2).await;
             crate::testing::request_reset(&services, "ada@example.com", Language::En).await;
             assert_eq!(sent(&services), 2);
-            assert_eq!(services.mails.sent.lock().unwrap()[1].subject, "Reset your password");
+            assert_eq!(services.mails.sent()[1].subject, "Reset your password");
 
             // Tài khoản bị khoá: không gửi.
             let ada =
@@ -456,13 +456,13 @@ mod tests {
                 language: "en".to_owned(),
             };
             resets.send(&tenant, &job("ada@example.com")).await.unwrap();
-            let text = services.mails.sent.lock().unwrap().last().unwrap().text.clone();
+            let text = services.mails.sent().last().unwrap().text.clone();
             assert!(text.contains("https://www.example.com/reset?token="), "{text}");
 
             settings.set(tenant.id(), "kernel.public_url", "https://shop.acme.vn");
             time_passes(&services, 2).await;
             resets.send(&tenant, &job("ada@example.com")).await.unwrap();
-            let text = services.mails.sent.lock().unwrap().last().unwrap().text.clone();
+            let text = services.mails.sent().last().unwrap().text.clone();
             assert!(text.contains("https://shop.acme.vn/reset?token="), "{text}");
         })
         .await

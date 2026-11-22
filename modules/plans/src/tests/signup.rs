@@ -4,12 +4,11 @@
 //! slug; danh sách cho nhân sự nền tảng. Cả SQLite và Postgres. Luồng có định danh nằm ở
 //! `crates/app/src/e2e/signup.rs` (cần module `compliance` thật).
 
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use autoxide_auth::api::Invitations;
-use autoxide_kernel::error::Error;
-use autoxide_kernel::mail::{Mail, Mailer};
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::mail::Mailer;
+use autoxide_testkit::FakeMailer;
 use autoxide_testkit::{TestApp, TestDatabase};
 use axum::http::{Method, StatusCode};
 use serde_json::{Value, json};
@@ -19,18 +18,6 @@ use super::provisioning::FakeInvitations;
 
 /// Đăng ký thuộc khách nền tảng: request công khai nêu khách (hay gọi tới tên miền của nó).
 const TENANT: &str = "autoxide-tenant";
-
-/// Bên gửi mail giả: giữ mọi mail.
-#[derive(Default)]
-struct FakeMailer(Mutex<Vec<Mail>>);
-
-#[async_trait::async_trait]
-impl Mailer for FakeMailer {
-    async fn send(&self, _tenant: &TenantContext, mail: Mail) -> Result<(), Error> {
-        self.0.lock().unwrap().push(mail);
-        Ok(())
-    }
-}
 
 struct Setup {
     app: TestApp,
@@ -131,14 +118,14 @@ async fn drain(app: &TestApp) {
 
 /// Token trong mail cuối gửi tới `email`.
 fn token_for(setup: &Setup, email: &str) -> String {
-    let mails = setup.mailer.0.lock().unwrap();
+    let mails = setup.mailer.sent();
     let mail = mails.iter().rev().find(|mail| mail.to == email).expect("no mail");
     let start = mail.text.find("token=").expect("no link") + "token=".len();
     mail.text[start..].split_whitespace().next().unwrap().to_owned()
 }
 
 fn mails_to(setup: &Setup, email: &str) -> usize {
-    setup.mailer.0.lock().unwrap().iter().filter(|mail| mail.to == email).count()
+    setup.mailer.sent().iter().filter(|mail| mail.to == email).count()
 }
 
 #[tokio::test]
@@ -236,7 +223,7 @@ async fn tu_dang_ky_kiem_dau_vao_gom_loi_mot_lan() {
         assert_eq!(kyc["errors"][0]["code"], "unavailable");
         // Không ghi gì, không gửi mail.
         drain(app).await;
-        assert!(setup.mailer.0.lock().unwrap().is_empty());
+        assert!(setup.mailer.sent().is_empty());
     })
     .await
     .unwrap();

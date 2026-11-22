@@ -88,9 +88,9 @@ async fn xuat_ban_va_quay_lai_phien_ban_mail_html_trong_khung() {
         // Chưa xuất bản: mẫu mặc định vẫn dùng.
         fx.notifier.notify(DEFAULT_TENANT, to_alice(&SHIPPED, "t-0").locale("vi")).await.unwrap();
         run_jobs(&fx.app).await;
-        assert_eq!(fx.mails.all()[0].subject, "Order DH001 shipped");
+        assert_eq!(fx.mails.sent()[0].subject, "Order DH001 shipped");
         // Mail mặc định cũng có HTML trong khung có thương hiệu.
-        assert!(fx.mails.all()[0].html.as_deref().unwrap().contains("Shop A, 1 Street"));
+        assert!(fx.mails.sent()[0].html.as_deref().unwrap().contains("Shop A, 1 Street"));
 
         let (status, published) = call(&fx.app, "POST", &format!("{EMAIL_VI}/publish"), "admin", None).await;
         assert_eq!(status, StatusCode::OK, "{published}");
@@ -106,7 +106,7 @@ async fn xuat_ban_va_quay_lai_phien_ban_mail_html_trong_khung() {
             .link("https://shop.example/o/1");
         fx.notifier.notify(DEFAULT_TENANT, hostile).await.unwrap();
         run_jobs(&fx.app).await;
-        let mail = fx.mails.all().pop().unwrap();
+        let mail = fx.mails.sent().pop().unwrap();
         assert_eq!(mail.subject, "Đơn <script>x</script> v1");
         assert!(mail.text.contains("Đơn <script>x</script> đang đi."), "{}", mail.text);
         let html = mail.html.unwrap();
@@ -131,7 +131,7 @@ async fn xuat_ban_va_quay_lai_phien_ban_mail_html_trong_khung() {
         assert_eq!(status, StatusCode::NOT_FOUND);
         fx.notifier.notify(DEFAULT_TENANT, to_alice(&SHIPPED, "t-2").locale("vi")).await.unwrap();
         run_jobs(&fx.app).await;
-        assert_eq!(fx.mails.all().pop().unwrap().subject, "Đơn DH001 v1");
+        assert_eq!(fx.mails.sent().pop().unwrap().subject, "Đơn DH001 v1");
         // Thôi dùng: mẫu mặc định áp lại; các bản vẫn còn.
         let (status, _) = call(&fx.app, "DELETE", &format!("{EMAIL_VI}/published"), "admin", None).await;
         assert_eq!(status, StatusCode::NO_CONTENT);
@@ -139,7 +139,7 @@ async fn xuat_ban_va_quay_lai_phien_ban_mail_html_trong_khung() {
         assert_eq!(status, StatusCode::NOT_FOUND);
         fx.notifier.notify(DEFAULT_TENANT, to_alice(&SHIPPED, "t-3").locale("vi")).await.unwrap();
         run_jobs(&fx.app).await;
-        assert_eq!(fx.mails.all().pop().unwrap().subject, "Order DH001 shipped");
+        assert_eq!(fx.mails.sent().pop().unwrap().subject, "Order DH001 shipped");
     })
     .await
     .unwrap();
@@ -159,7 +159,7 @@ async fn mau_quang_cao_luon_co_chan_thu_huy_nhan_va_mau_hong_dung_mac_dinh() {
         assert_eq!(status, StatusCode::OK);
         fx.notifier.notify(DEFAULT_TENANT, to_alice(&PROMO, "p-1")).await.unwrap();
         run_jobs(&fx.app).await;
-        let mail = fx.mails.all().pop().unwrap();
+        let mail = fx.mails.sent().pop().unwrap();
         assert_eq!(mail.subject, "[QC] Giảm 30%");
         assert!(mail.text.contains("https://shop.example/unsubscribe?token="), "{}", mail.text);
         assert!(mail.html.as_deref().unwrap().contains("https://shop.example/unsubscribe?token="));
@@ -173,7 +173,7 @@ async fn mau_quang_cao_luon_co_chan_thu_huy_nhan_va_mau_hong_dung_mac_dinh() {
         call(&fx.app, "POST", &format!("{EMAIL_VI}/publish"), "admin", None).await;
         fx.notifier.notify(DEFAULT_TENANT, to_alice(&SHIPPED, "b-1").locale("vi")).await.unwrap();
         run_jobs(&fx.app).await;
-        assert_eq!(fx.mails.all().pop().unwrap().subject, "Order DH001 shipped");
+        assert_eq!(fx.mails.sent().pop().unwrap().subject, "Order DH001 shipped");
         let (_, page) = call(&fx.app, "GET", "/messages?limit=200", "admin", None).await;
         let row = page["data"]
             .as_array()
@@ -220,7 +220,7 @@ async fn xem_truoc_gui_thu_chi_toi_nguoi_goi_va_gioi_han_chay() {
         assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
         let (status, sent) = call(&fx.app, "POST", &format!("{path}/test-send"), "admin", Some(json!({}))).await;
         assert_eq!(status, StatusCode::OK, "{sent}");
-        let mail = fx.mails.all().pop().unwrap();
+        let mail = fx.mails.sent().pop().unwrap();
         assert_eq!(mail.to, "admin@example.com");
         assert_eq!(mail.subject, "[Test] Hi An");
         assert!(mail.html.is_some());

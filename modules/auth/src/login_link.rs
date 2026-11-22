@@ -345,7 +345,7 @@ mod tests {
     }
 
     fn sent(services: &Services) -> usize {
-        services.mails.sent.lock().unwrap().len()
+        services.mails.sent().len()
     }
 
     #[tokio::test]

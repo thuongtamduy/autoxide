@@ -117,7 +117,7 @@ async fn dated_shop(test: &TestDatabase) -> (TestApp, Tree, String, String) {
             autoxide_kernel::tenancy::root_of(autoxide_kernel::tenancy::DEFAULT_TENANT),
             &staff,
         )
-        .provide::<dyn AdministrativeUnits>(Arc::new(FakeUnits))
+        .provide::<dyn AdministrativeUnits>(Arc::new(FakeAdministrativeUnits::sample()))
         .provide::<dyn Catalog>(Arc::new(FakeCatalog::new(tree.a)))
         .module(crate::module())
         .build()
