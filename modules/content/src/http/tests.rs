@@ -22,6 +22,7 @@ mod blocks_base;
 mod bulk;
 mod edit_lock;
 mod embed;
+mod health;
 mod layout;
 mod layout_public;
 mod ops;

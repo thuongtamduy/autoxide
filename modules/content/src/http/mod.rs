@@ -8,6 +8,7 @@ mod assist;
 mod banners;
 mod edit_lock;
 pub(crate) mod entries;
+mod health;
 mod history;
 mod layout;
 mod library;
@@ -146,6 +147,8 @@ pub(crate) fn routes(service: Arc<ContentService>) -> OpenApiRouter {
         .routes(routes!(types::list_types, types::create_type))
         .routes(routes!(types::get_type, types::update_type, types::delete_type))
         .routes(routes!(types::public_type_entries))
+        .routes(routes!(health::get_site_health))
+        .routes(routes!(health::run_site_health))
         .routes(routes!(templates::list_templates))
         .routes(routes!(templates::draft_from_template))
         .routes(routes!(public::preview_token))

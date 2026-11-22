@@ -23,6 +23,7 @@ mod m0026_theme_variants;
 mod m0027_site_regions;
 mod m0028_content_types;
 mod m0029_ai_turns;
+mod m0030_site_health;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 use autoxide_kernel::tenancy::migration::TenantTable;
@@ -182,5 +183,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(m0028_content_types::Migration),
         // AI tạo và sửa trang: lịch sử trò chuyện của trang (bước 67).
         Box::new(m0029_ai_turns::Migration),
+        // Kiểm tra sức khoẻ website: lần kiểm gần nhất (bước 67).
+        Box::new(m0030_site_health::Migration),
     ]
 }
