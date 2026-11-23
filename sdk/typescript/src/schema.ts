@@ -4619,6 +4619,12 @@ export type ContentTypeRequest = {
   active?: boolean | null;
   /** `none`, `rich` (default) or `layout`. */
   body?: string | null;
+  /**
+   * Only with `routable`: the block layout (`{"type": "layout", "schema": 1, "sections": […]}`)
+   * of every entry page of the type, checked like a page layout; blocks
+   * `content.entry_field {"field": …}` show a field of the entry being viewed. `null` removes it.
+   */
+  detail_layout?: Record<string, unknown> | null;
   has_seo?: boolean | null;
   /**
    * `people`, `briefcase`, `map_pin`, `star`, `question`, `calendar`, `image`, `document`, `tag`,
@@ -4643,6 +4649,12 @@ export type ContentTypeResponse = {
   active: boolean;
   /** Body of the entries: `none`, `rich` or `layout`. */
   body: string;
+  /**
+   * Only for a type with pages: the block layout every entry page of the type uses (blocks
+   * `content.entry_field` show the entry's own fields). `null`: none; the website draws entries
+   * from their own body.
+   */
+  detail_layout?: Record<string, unknown> | null;
   has_seo: boolean;
   icon: string;
   id: string;
@@ -7947,6 +7959,12 @@ export type Data_ContentTypeResponse = {
     active: boolean;
     /** Body of the entries: `none`, `rich` or `layout`. */
     body: string;
+    /**
+     * Only for a type with pages: the block layout every entry page of the type uses (blocks
+     * `content.entry_field` show the entry's own fields). `null`: none; the website draws entries
+     * from their own body.
+     */
+    detail_layout?: Record<string, unknown> | null;
     has_seo: boolean;
     icon: string;
     id: string;
@@ -13866,6 +13884,24 @@ export type Data_TranslationRequestResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_TypeSuggestionResponse = {
+  /** A draft definition of a content type. Nothing is saved: review it, then create it. */
+  data: {
+    /** Body for `POST /types`. */
+    content_type: Record<string, unknown>;
+    /** Always `true`: a person reviews the draft before creating anything. */
+    draft: boolean;
+    /**
+     * Bodies for `POST /api/v1/kernel/custom-fields`, one per field (target
+     * `content.type.<key>`), after the type is created.
+     */
+    fields: Record<string, unknown>[];
+    /** The model that wrote the draft. */
+    model: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_UnitResponse = {
   /** A unit of the organization tree of the tenant (head office, region, store, warehouse…). */
   data: {
@@ -15827,6 +15863,7 @@ export type Data_Vec_PublicEntryResponse = {
      * were when the entry was published.
      */
     custom_fields: Record<string, unknown>;
+    detail?: PublicDetail | null;
     /**
      * Records of other modules embedded in `body` (nodes `embed` with `kind` and `id`, e.g. a
      * product), keyed by `<kind>:<id>`, in the entry's language. A record that is not public
@@ -23283,6 +23320,12 @@ export type Page_ContentTypeResponse = {
     active: boolean;
     /** Body of the entries: `none`, `rich` or `layout`. */
     body: string;
+    /**
+     * Only for a type with pages: the block layout every entry page of the type uses (blocks
+     * `content.entry_field` show the entry's own fields). `null`: none; the website draws entries
+     * from their own body.
+     */
+    detail_layout?: Record<string, unknown> | null;
     has_seo: boolean;
     icon: string;
     id: string;
@@ -25338,6 +25381,7 @@ export type Page_PublicEntryResponse = {
      * were when the entry was published.
      */
     custom_fields: Record<string, unknown>;
+    detail?: PublicDetail | null;
     /**
      * Records of other modules embedded in `body` (nodes `embed` with `kind` and `id`, e.g. a
      * product), keyed by `<kind>:<id>`, in the entry's language. A record that is not public
@@ -28381,6 +28425,17 @@ export type PublicComment = {
   target_type: string;
 };
 
+/** The detail layout of a custom content type, filled for one entry. */
+export type PublicDetail = {
+  /**
+   * Data of the blocks that carry data, by block `id`. A block `content.entry_field` gets
+   * `{"field": …, "value": …}`: the entry's value of that field (`null`: empty).
+   */
+  blocks_data: Record<string, unknown>;
+  /** The layout (`{"type": "layout", …}`), blocks of switched-off modules left out. */
+  layout: Record<string, unknown>;
+};
+
 /** A record of another module embedded in an entry. */
 export type PublicEmbed = {
   id: string;
@@ -28435,6 +28490,7 @@ export type PublicEntryResponse = {
    * were when the entry was published.
    */
   custom_fields: Record<string, unknown>;
+  detail?: PublicDetail | null;
   /**
    * Records of other modules embedded in `body` (nodes `embed` with `kind` and `id`, e.g. a
    * product), keyed by `<kind>:<id>`, in the entry's language. A record that is not public
@@ -31484,6 +31540,17 @@ export type SubscriptionResponse = {
 /** Where a subscriber stands on one list. */
 export type SubscriptionStatus = "unconfirmed" | "confirmed" | "unsubscribed";
 
+/** What the new content type is for. */
+export type SuggestTypeRequest = {
+  /**
+   * Required: in the owner's words, 1 to 2000 characters, e.g. "a page introducing our team,
+   * one card per person".
+   */
+  description?: string;
+  /** Required: language of the labels, e.g. `vi`. */
+  locale?: string;
+};
+
 /** One group of the summary. */
 export type SummaryGroupResponse = {
   /** Sums per original currency; money of two currencies is never added together. */
@@ -32789,6 +32856,21 @@ export type TranslationRequestResponse = {
 
 /** Where an AI translation is. */
 export type TranslationStatus = "queued" | "running" | "succeeded" | "failed";
+
+/** A draft definition of a content type. Nothing is saved: review it, then create it. */
+export type TypeSuggestionResponse = {
+  /** Body for `POST /types`. */
+  content_type: Record<string, unknown>;
+  /** Always `true`: a person reviews the draft before creating anything. */
+  draft: boolean;
+  /**
+   * Bodies for `POST /api/v1/kernel/custom-fields`, one per field (target
+   * `content.type.<key>`), after the type is created.
+   */
+  fields: Record<string, unknown>[];
+  /** The model that wrote the draft. */
+  model: string;
+};
 
 /** A unit of the organization tree of the tenant (head office, region, store, warehouse…). */
 export type UnitResponse = {
@@ -40532,6 +40614,21 @@ export interface paths {
         403: Problem;
         409: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/content/types/ai/suggest": {
+    /** Suggest a content type with AI. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: SuggestTypeRequest;
+      responses: {
+        200: Data_TypeSuggestionResponse;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        503: Problem;
         default: Problem;
       };
     };

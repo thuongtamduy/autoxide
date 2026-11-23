@@ -215,11 +215,11 @@ impl Module for ContentModule {
     }
 
     fn features(&self) -> Vec<autoxide_kernel::entitlement::Feature> {
-        vec![service::AI_SUGGESTIONS]
+        vec![service::AI_SUGGESTIONS, types::CUSTOM_TYPES]
     }
 
     fn limits(&self) -> Vec<autoxide_kernel::entitlement::Limit> {
-        vec![crate::ai::campaign::AI_PAGE_GENERATIONS]
+        vec![types::CUSTOM_TYPES_LIMIT, crate::ai::campaign::AI_PAGE_GENERATIONS]
     }
 
     fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
@@ -281,6 +281,12 @@ impl Module for ContentModule {
             blocks::PLACEMENT.name,
             Arc::new(blocks::data::ContentBlocks(service.clone())),
         )?;
+        // Danh sách mục của loại nội dung tự định nghĩa (D-235).
+        context.block_data(
+            blocks::TYPE_LIST.name,
+            Arc::new(blocks::data::ContentBlocks(service.clone())),
+        )?;
+        context.usage_counter(&types::CUSTOM_TYPES_LIMIT, Arc::new(types::TypeCounter))?;
         // Phần của module khác trong khung website (`GET /public/site`, bước 67).
         context.provide::<dyn api::SiteExtensions>(service.site_extensions.clone())?;
         self.service = Some(service);

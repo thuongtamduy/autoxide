@@ -840,7 +840,10 @@ Rules the core follows:
   `0.8.1`) never breaks the contract. A new major version of a library in the table, or a newer
   minimum Rust version, is such a change.
 - From `1.0` the contract follows Semantic Versioning: a breaking change comes only in a major
-  release, and `cargo semver-checks` stops a release that breaks it by accident.
+  release, and `cargo semver-checks` stops a release that breaks it by accident. A new major
+  version of a library in the table then waits for a major release of Autoxide; a newer minimum
+  Rust version comes only in a minor release, never in a patch release. The whole policy, for the
+  HTTP API too, is in [`docs/COMPATIBILITY.md`](COMPATIBILITY.md).
 - `Module` only grows by functions with a default body: a module written for an older
   release keeps compiling.
 - Public types that will grow are `#[non_exhaustive]`: build them with their

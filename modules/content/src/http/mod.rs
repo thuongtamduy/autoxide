@@ -150,6 +150,7 @@ pub(crate) fn routes(service: Arc<ContentService>) -> OpenApiRouter {
         .routes(routes!(types::list_types, types::create_type))
         .routes(routes!(types::get_type, types::update_type, types::delete_type))
         .routes(routes!(types::public_type_entries))
+        .routes(routes!(types::suggest_type))
         .routes(routes!(health::get_site_health))
         .routes(routes!(health::run_site_health))
         .routes(routes!(templates::list_templates))

@@ -358,5 +358,14 @@
   "field:is not a JSON Patch: {error}": "không phải JSON Patch: {error}",
   "field:is not JSON: {error}": "không phải JSON: {error}",
   "content.site_health_too_soon": "Website vừa được kiểm chưa tới một giờ; xem kết quả bằng GET /api/v1/content/site-health.",
-  "text:Fix {count} problems found on the website": "Sửa {count} vấn đề tìm thấy trên website"
+  "text:Fix {count} problems found on the website": "Sửa {count} vấn đề tìm thấy trên website",
+  "field:only a content type with pages (`routable`) has a detail layout": "chỉ loại nội dung có trang (`routable`) mới có bố cục trang chi tiết",
+  "field:block `{id}` shows `{field}`, which is neither {builtin} nor an active custom field of this type": "khối `{id}` hiện `{field}`, không phải {builtin} cũng không phải trường tự định nghĩa đang bật của loại này",
+  "field:block `{id}`: `content.entry_field` is only for the detail layout of a content type (`detail_layout` of `PATCH /types/<key>`)": "khối `{id}`: `content.entry_field` chỉ dùng trong bố cục trang chi tiết của loại nội dung (`detail_layout` của `PATCH /types/<key>`)",
+  "field:is not a public field of this content type": "không phải trường công khai của loại nội dung này",
+  "text:Content type list": "Danh sách loại nội dung",
+  "text:Entry field": "Trường của mục",
+  "text:Only in the detail layout of a custom content type: shows one field of the entry being viewed.": "Chỉ trong bố cục trang chi tiết của loại nội dung tự định nghĩa: hiện một trường của mục đang xem.",
+  "text:Use to show the published entries of a custom content type (team, projects, branches…) as cards; filter on its filterable public fields.": "Dùng để hiện các mục đã đăng của một loại nội dung tự định nghĩa (đội ngũ, dự án, chi nhánh…) thành thẻ; lọc theo trường công khai lọc được.",
+  "field:must be a BCP 47 language code such as `vi`": "phải là mã ngôn ngữ BCP 47, vd `vi`"
 }
