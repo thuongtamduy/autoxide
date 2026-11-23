@@ -101,9 +101,16 @@ pub(crate) struct Applied {
     pub reason: ReasonDraft,
 }
 
+/// Tổng các số tiền / số lượng, bão hoà ở giới hạn của `i64` thay vì tràn: tiền một dòng đã bão hoà
+/// (`giá × số lượng`), cộng nhiều dòng như thế không được panic (D-20261123-property-fuzzing). Ở mức
+/// đó mọi ngưỡng đều đã đạt và mọi mức giảm đều bị cắt theo tiền của dòng, nên kết quả vẫn đúng.
+pub(crate) fn saturating_sum(values: impl IntoIterator<Item = i64>) -> i64 {
+    values.into_iter().fold(0, i64::saturating_add)
+}
+
 impl Applied {
     pub(crate) fn total(&self) -> i64 {
-        self.lines.iter().map(|part| part.amount).sum::<i64>() + self.shipping
+        saturating_sum(self.lines.iter().map(|part| part.amount)).saturating_add(self.shipping)
     }
 
     fn is_empty(&self) -> bool {
@@ -368,7 +375,7 @@ fn best_for_buyer<'p>(
         }
     }
     let score = |option: &Vec<(&Program, Applied)>| -> i64 {
-        option.iter().map(|(_, applied)| applied.total()).sum()
+        saturating_sum(option.iter().map(|(_, applied)| applied.total()))
     };
     let mut best: Option<Vec<(&'p Program, Applied)>> = None;
     for option in options {
@@ -441,7 +448,7 @@ pub(crate) fn cart_conditions(program: &Program, cart: &Cart) -> Result<(), Reas
                 continue;
             }
             ConditionKind::MinItems => {
-                let items: i64 = cart.lines.iter().map(|line| line.quantity).sum();
+                let items: i64 = saturating_sum(cart.lines.iter().map(|line| line.quantity));
                 let wanted = condition.values.first().and_then(|value| value.parse::<i64>().ok());
                 let ok = match (condition.operator, wanted) {
                     (Operator::Gte, Some(wanted)) => items >= wanted,

@@ -43,6 +43,7 @@ uuid.workspace = true
 validator.workspace = true
 
 [dev-dependencies]
+proptest.workspace = true
 # Thư viện media giả dùng chung (`autoxide_media::api::testing`).
 autoxide-media = { workspace = true, features = ["testing"] }
 # Catalog giả dùng chung (`autoxide_catalog::api::testing`).

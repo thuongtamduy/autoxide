@@ -41,7 +41,7 @@ pub(crate) fn apply(
                 .flat_map(|applied| applied.lines.iter())
                 .filter(|part| part.line == line)
                 .map(|part| part.amount)
-                .sum();
+                .fold(0, i64::saturating_add);
             let mut excess = total - limit.max(0);
             // Khoản áp sau (lớp sau, ưu tiên thấp hơn) bị cắt trước.
             for applied in draft.applied.iter_mut().rev() {
