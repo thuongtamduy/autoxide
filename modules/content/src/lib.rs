@@ -336,6 +336,8 @@ impl Module for ContentModule {
                 JobRegistration::new(
                     crate::ai::campaign::CAMPAIGN_DRAFTS,
                     Arc::new(crate::ai::campaign::CampaignDrafts(service.clone())),
+                ),
+                JobRegistration::new(
                     not_found::SITE_HEALTH_DAILY,
                     Arc::new(not_found::DailyHealth(service.clone())),
                 ),
