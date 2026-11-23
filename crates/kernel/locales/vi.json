@@ -249,6 +249,7 @@
   "kernel.tag_name_taken": "Đã có nhãn tên `{name}`.",
   "kernel.tag_not_found": "Không có nhãn `{id}`.",
   "kernel.tags_restricted": "Ở khách hàng này chỉ người có `kernel.tags.manage` mới tạo nhãn; hãy chọn nhãn có sẵn.",
+  "kernel.tags_staff_only": "Nhãn chỉ dành cho tài khoản nhân sự; tài khoản người mua không xem được.",
   "kernel.text_limit_reached": "Khách hàng này đã đổi {max} câu của giao diện.",
   "kernel.text_not_overridable": "Không đổi được `{key}`: chỉ đổi được câu module cho đổi và khoá `ui.*`.",
   "kernel.text_placeholders_mismatch": "Câu phải dùng đúng các chỗ điền của câu mặc định: {wanted} (câu gửi có: {got}).",

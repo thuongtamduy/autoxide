@@ -199302,7 +199302,7 @@
     },
     "/api/v1/kernel/tags": {
       "get": {
-        "description": "Any signed-in user. Every tag of the tenant, by name, with how many records carry it.",
+        "description": "Any signed-in staff account; customer accounts get 403 `kernel.tags_staff_only`. Every tag of\nthe tenant, by name, with how many records carry it.",
         "operationId": "kernel_list_tags",
         "parameters": [
           {
@@ -199338,6 +199338,16 @@
               }
             },
             "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A customer account; code `kernel.tags_staff_only`."
           },
           "default": {
             "content": {
