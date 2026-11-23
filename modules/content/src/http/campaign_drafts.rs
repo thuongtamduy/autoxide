@@ -174,20 +174,20 @@ pub(crate) async fn create_campaign_drafts(
 
 /// Get a set of campaign drafts.
 ///
-/// Requires `content.write` (or `content.write_own` for your own requests). Shows the status and,
-/// once finished, the draft made for each channel.
+/// Requires `content.read`; someone else's request also needs `content.write`. Shows the status
+/// and, once finished, the draft made for each channel.
 #[utoipa::path(
     get,
     path = "/campaign-drafts/{id}",
-    extensions(("x-permissions" = json!(["content.write", "content.write_own"]))),
+    extensions(("x-permissions" = json!(["content.read"]))),
     operation_id = "get_content_campaign_drafts",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the request.")),
     responses(
         (status = 200, description = "The request and its results.", body = Data<CampaignDraftsResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "Missing permission; code `permission_denied`.", body = Problem),
-        (status = 404, description = "No request has this id, or it is someone else's and you only have `content.write_own`; code `content.campaign_draft_not_found`.", body = Problem),
+        (status = 403, description = "Missing permission `content.read`; code `permission_denied`.", body = Problem),
+        (status = 404, description = "No request has this id, or it is someone else's and you lack `content.write`; code `content.campaign_draft_not_found`.", body = Problem),
     )
 )]
 pub(crate) async fn get_campaign_drafts(

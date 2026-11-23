@@ -199,7 +199,7 @@ async fn tool_mcp_voi_version() {
         let reader = client("reader").await;
         let mut names: Vec<String> = reader.list_all_tools().await.unwrap().into_iter().map(|tool| tool.name.to_string()).collect();
         names.sort();
-        assert_eq!(names, ["content.get", "content.get_translation_request", "content.legal_templates", "content.list", "content.list_banners", "content.list_revisions", "content.resolve", "content.search", "content.seo_check", "kernel.current_tenant", "kernel.decide_approval", "kernel.list_approvals", "kernel.list_custom_fields", "kernel.navigation"]);
+        assert_eq!(names, ["content.get", "content.get_campaign_drafts", "content.get_translation_request", "content.legal_templates", "content.list", "content.list_banners", "content.list_revisions", "content.resolve", "content.search", "content.seo_check", "kernel.current_tenant", "kernel.decide_approval", "kernel.list_approvals", "kernel.list_custom_fields", "kernel.navigation"]);
         reader.cancel().await.unwrap();
 
         // Agent chỉ có `content.write_own`: thấy tool viết, không thấy tool đăng.

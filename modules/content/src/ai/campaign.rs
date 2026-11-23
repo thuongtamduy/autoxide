@@ -302,14 +302,15 @@ impl ContentService {
         Ok(row)
     }
 
-    /// Một yêu cầu bộ nháp chiến dịch. Người yêu cầu xem được; người khác cần quyền sửa bài.
+    /// Một yêu cầu bộ nháp chiến dịch. Cần `content.read`; người yêu cầu xem được, người khác cần
+    /// `content.write`.
     pub(crate) async fn campaign_drafts(
         &self,
         tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
     ) -> Result<CampaignDraft, Error> {
-        permissions::require_create(principal)?;
+        principal.require(&permissions::CONTENT_READ)?;
         let row = campaign_draft::Entity::find_by_id(id)
             .scoped(tenant)
             .one(tenant.database().read())

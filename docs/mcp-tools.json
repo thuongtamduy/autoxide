@@ -5372,8 +5372,7 @@
       "name": "content.get_campaign_drafts",
       "output_schema": null,
       "permissions": [
-        "content.write",
-        "content.write_own"
+        "content.read"
       ],
       "stability": "official"
     },

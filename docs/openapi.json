@@ -152980,7 +152980,7 @@
     },
     "/api/v1/content/campaign-drafts/{id}": {
       "get": {
-        "description": "Requires `content.write` (or `content.write_own` for your own requests). Shows the status and,\nonce finished, the draft made for each channel.",
+        "description": "Requires `content.read`; someone else's request also needs `content.write`. Shows the status\nand, once finished, the draft made for each channel.",
         "operationId": "content_get_content_campaign_drafts",
         "parameters": [
           {
@@ -153035,7 +153035,7 @@
                 }
               }
             },
-            "description": "Missing permission; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+            "description": "Missing permission `content.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "404": {
             "content": {
@@ -153045,7 +153045,7 @@
                 }
               }
             },
-            "description": "No request has this id, or it is someone else's and you only have `content.write_own`; code `content.campaign_draft_not_found`."
+            "description": "No request has this id, or it is someone else's and you lack `content.write`; code `content.campaign_draft_not_found`."
           },
           "default": {
             "content": {
@@ -153068,8 +153068,7 @@
           "content"
         ],
         "x-permissions": [
-          "content.write",
-          "content.write_own"
+          "content.read"
         ]
       }
     },

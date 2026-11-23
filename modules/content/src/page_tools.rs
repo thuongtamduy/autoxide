@@ -14,7 +14,7 @@ use validator::Validate;
 
 use crate::ai::campaign::CampaignRequest;
 use crate::http::campaign_drafts::{CampaignDraftsResponse, response};
-use crate::permissions::{CONTENT_WRITE, CONTENT_WRITE_OWN};
+use crate::permissions::{CONTENT_READ, CONTENT_WRITE, CONTENT_WRITE_OWN};
 use crate::service::ContentService;
 
 /// A request for campaign drafts made from one promotion.
@@ -86,8 +86,7 @@ pub(crate) fn all(service: &Arc<ContentService>) -> Vec<Tool> {
                 }
             },
         )
-        .requires(CONTENT_WRITE)
-        .or_requires(CONTENT_WRITE_OWN)
+        .requires(CONTENT_READ)
         .read_only(),
     ]
 }
