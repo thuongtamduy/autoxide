@@ -209,7 +209,7 @@ impl UserService {
 impl UserService {
     /// Gỡ mọi liên kết OIDC của tài khoản `id` trong `transaction`, mỗi liên kết một event
     /// `auth.identity_unlinked`.
-    async fn forget_identities(
+    pub(super) async fn forget_identities(
         &self,
         transaction: &sea_orm::DatabaseTransaction,
         tenant: &TenantContext,

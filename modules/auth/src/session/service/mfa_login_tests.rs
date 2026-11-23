@@ -149,3 +149,69 @@ async fn hoan_tat_dong_thoi_chi_mot_ben_nhan_token() {
     .await
     .unwrap();
 }
+
+/// Rà soát bảo mật 2026-11 (M-8): tài khoản giữ role đòi MFA mà yếu tố thứ hai duy nhất là passkey
+/// không mở được phiên chỉ bằng mật khẩu (hay link / nhà cung cấp ngoài) — trước đây phiên đó mang
+/// đủ quyền của role. Bật TOTP thì đăng nhập mật khẩu hỏi mã như thường.
+#[tokio::test]
+async fn role_doi_mfa_chi_co_passkey_thi_khong_dang_nhap_bang_mat_khau() {
+    TestDatabase::run(async |test| {
+        let services = crate::testing::services(test).await;
+        let tenant = services.tenant.clone();
+        let input = NewUser {
+            email: "bob@example.com".to_owned(),
+            name: "Bob".to_owned(),
+            password: Some(PASSWORD.to_owned()),
+        };
+        let bob = services.users.create(&tenant, Actor::system(), input).await.unwrap();
+        let role = crate::role::RoleInput {
+            denies: Vec::new(),
+            requires_mfa: true,
+            name: "treasurer".to_owned(),
+            description: String::new(),
+            permissions: vec!["auth.users.read".to_owned()],
+            grants: Vec::new(),
+        };
+        let role = services.roles.create(&tenant, Actor::system(), role).await.unwrap();
+        services
+            .roles
+            .set_user_roles(&tenant, Actor::system(), bob.id, vec![role.id])
+            .await
+            .unwrap();
+        // Chưa có yếu tố thứ hai: đăng nhập được (quyền của role bị giữ, như trước).
+        assert!(services.sessions.login(&tenant, "bob@example.com", PASSWORD, None).await.is_ok());
+
+        let mut device = crate::passkey::testing::SoftAuthenticator::new(9);
+        let ceremony =
+            services.passkeys.start_registration(&tenant, bob.id, PASSWORD).await.unwrap();
+        let credential = device.register(&ceremony.options);
+        services
+            .passkeys
+            .finish_registration(&tenant, bob.id, ceremony.id, "Laptop", &credential)
+            .await
+            .unwrap();
+        let refused =
+            services.sessions.login(&tenant, "bob@example.com", PASSWORD, None).await.unwrap_err();
+        assert_eq!(refused.code(), "auth.passkey_required");
+        assert_eq!(refused.kind(), ErrorKind::Forbidden);
+        let refused = services
+            .sessions
+            .login_verified(&tenant, bob.id, "login_link", None)
+            .await
+            .unwrap_err();
+        assert_eq!(refused.code(), "auth.passkey_required");
+
+        // Bật TOTP: mật khẩu rồi mã, như mọi tài khoản có MFA.
+        let setup = services.mfa.start_totp(&tenant, bob.id, &bob.email).await.unwrap();
+        services
+            .mfa
+            .confirm_totp(&tenant, bob.id, &code_at(&setup.secret, unix_now()))
+            .await
+            .unwrap();
+        let outcome =
+            services.sessions.login(&tenant, "bob@example.com", PASSWORD, None).await.unwrap();
+        assert!(matches!(outcome, LoginOutcome::MfaRequired { .. }));
+    })
+    .await
+    .unwrap();
+}

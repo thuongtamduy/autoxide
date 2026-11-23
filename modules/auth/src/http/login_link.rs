@@ -103,7 +103,7 @@ async fn request_link(
         (status = 200, description = "Signed in.", body = Data<TokenResponse>),
         (status = 202, description = "A code is needed; continue with `POST /api/v1/auth/login/mfa`.", body = Data<MfaChallengeResponse>),
         (status = 401, description = "The token is wrong, used or expired, or the device secret does not match; code `auth.login_link_invalid`.", body = Problem),
-        (status = 403, description = "The account is disabled; code `auth.user_disabled`.", body = Problem),
+        (status = 403, description = "The account is disabled (code `auth.user_disabled`), or it must sign in with its passkey (code `auth.passkey_required`, see `POST /api/v1/auth/login`).", body = Problem),
         (status = 404, description = "Sign-in links are off on this server; code `auth.login_link_disabled`.", body = Problem),
         (status = 422, description = "The body is missing a field or a value is invalid.", body = Problem),
     )

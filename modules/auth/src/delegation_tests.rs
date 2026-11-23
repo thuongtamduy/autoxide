@@ -228,3 +228,32 @@ async fn khach_cha_xem_danh_sach_khach_con() {
     .await
     .unwrap();
 }
+
+/// Rà soát bảo mật 2026-11: role đòi MFA không cấp quyền ở khách con cho người chưa bật MFA, như ở
+/// khách nhà — uỷ quyền không phải đường vòng qua yêu cầu MFA.
+#[tokio::test]
+async fn uy_quyen_role_doi_mfa_can_mfa() {
+    TestDatabase::run(async |test| {
+        let (chain, _) = chain(test).await;
+        let body = json!({"child_tenant_id": chain.child.id().as_uuid(), "role_id": chain.role_id, "reason": "Care"});
+        let (status, granted) = call(&chain, "POST", "/delegations", &chain.admin, None, Some(body)).await;
+        assert_eq!(status, StatusCode::CREATED, "{granted}");
+        let (status, _) = call(&chain, "GET", "/customers", &chain.agent, Some("child"), None).await;
+        assert_eq!(status, StatusCode::OK);
+
+        let write = chain.parent.database().write();
+        write
+            .execute_raw(autoxide_kernel::database::statement(
+                write.get_database_backend(),
+                "UPDATE auth_role SET requires_mfa = $1 WHERE id = $2",
+                [true.into(), uuid::Uuid::parse_str(&chain.role_id).unwrap().into()],
+            ))
+            .await
+            .unwrap();
+        // Ở khách nhà role không còn hiệu lực; ở khách con cũng vậy.
+        let (status, _) = call(&chain, "GET", "/customers", &chain.agent, Some("child"), None).await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+    })
+    .await
+    .unwrap();
+}

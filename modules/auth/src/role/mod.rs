@@ -9,5 +9,6 @@ pub(crate) use service::{
     MembershipRow, Role, RoleInput, RoleService, active_admin_ids, add_roles, count_active_admins,
     count_active_admins_unlocked, forget_scim_grants, grant_admin, grant_problems, has_membership,
     has_second_factor_condition, holds_any_role, holds_mfa_role, last_admin, member_reference,
-    role_by_name, role_grants, root_roles,
+    passkey_required, passkey_required_error, role_by_name, role_grants, roles_blocked_by_mfa,
+    root_roles,
 };

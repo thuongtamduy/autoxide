@@ -294,6 +294,74 @@ pub(super) async fn principal_from_rows(
     Ok(principal.in_tenant(tenant.id()).without(denied, catalog))
 }
 
+/// Role trong `ids` (của khách `tenant`) bắt buộc MFA (D-308) mà người dùng `user_id` của khách đó
+/// chưa bật MFA. Quyền dựng ở khách khác (uỷ quyền xuống khách con, quyền hỗ trợ) bỏ các role này
+/// như [`principal_from_rows`] bỏ ở khách nhà — trước đây đi đường vòng qua khách khác thì vẫn dùng
+/// được quyền của role đòi MFA (rà soát bảo mật 2026-11).
+pub(crate) async fn roles_blocked_by_mfa(
+    tenant: &TenantContext,
+    user_id: Uuid,
+    ids: &[Uuid],
+) -> Result<std::collections::HashSet<Uuid>, Error> {
+    if ids.is_empty() {
+        return Ok(std::collections::HashSet::new());
+    }
+    let strict: std::collections::HashSet<Uuid> = role::Entity::find()
+        .filter(role::Column::Id.is_in(ids.iter().copied()))
+        .filter(role::Column::RequiresMfa.eq(true))
+        .scoped(tenant)
+        .all(tenant.database().read())
+        .await?
+        .into_iter()
+        .map(|row| row.id)
+        .collect();
+    if strict.is_empty() || has_second_factor(tenant, user_id).await? {
+        return Ok(std::collections::HashSet::new());
+    }
+    Ok(strict)
+}
+
+/// Người dùng `user_id` giữ role đòi MFA (D-308) mà yếu tố thứ hai duy nhất là passkey (chưa bật
+/// TOTP). Role đòi MFA được tính theo tài khoản *đã bật* yếu tố thứ hai; đăng nhập bằng mật khẩu chỉ hỏi
+/// mã TOTP, nên tài khoản như vậy mở được phiên mang quyền của role chỉ bằng mật khẩu. Các cách đăng
+/// nhập không qua yếu tố thứ hai từ chối tài khoản này (`auth.passkey_required`): chỉ passkey mở phiên
+/// (rà soát bảo mật 2026-11, M-8 của `docs/security/review-2026-11.md`).
+pub(crate) async fn passkey_required(tenant: &TenantContext, user_id: Uuid) -> Result<bool, Error> {
+    let read = tenant.database().read();
+    let holder = user::Entity::find_by_id(user_id)
+        .filter(holds_mfa_role(tenant))
+        .scoped(tenant)
+        .one(read)
+        .await?;
+    if holder.is_none() {
+        return Ok(false);
+    }
+    let totp = crate::mfa::entity::totp::Entity::find()
+        .filter(crate::mfa::entity::totp::Column::UserId.eq(user_id))
+        .filter(crate::mfa::entity::totp::Column::ConfirmedAt.is_not_null())
+        .scoped(tenant)
+        .one(read)
+        .await?;
+    if totp.is_some() {
+        return Ok(false);
+    }
+    let passkey = crate::passkey::entity::passkey::Entity::find()
+        .filter(crate::passkey::entity::passkey::Column::UserId.eq(user_id))
+        .scoped(tenant)
+        .one(read)
+        .await?;
+    Ok(passkey.is_some())
+}
+
+/// Lỗi khi đăng nhập không qua yếu tố thứ hai mà tài khoản phải dùng passkey ([`passkey_required`]).
+pub(crate) fn passkey_required_error() -> Error {
+    Error::forbidden(
+        "auth.passkey_required",
+        "This account must sign in with its passkey: one of its roles requires two-step sign-in, \
+         and a passkey is its only second step.",
+    )
+}
+
 /// Tài khoản `user_id` đã bật MFA: TOTP đã xác nhận, hay có ít nhất một passkey.
 pub(crate) async fn has_second_factor(
     tenant: &TenantContext,

@@ -593,7 +593,8 @@ impl UserService {
     /// đổi email (`email_report.rs`): kẻ chiếm đã biết mật khẩu (đổi email cần nó) và có thể đã
     /// gắn MFA hay passkey của nó. Bỏ mật khẩu (không đăng nhập bằng mật khẩu được nữa; chủ
     /// tài khoản đặt lại qua mail), thu hồi mọi phiên, refresh token, API key, passkey, mọi
-    /// token xác minh email / đặt lại mật khẩu, và tắt TOTP kèm recovery code.
+    /// token xác minh email / đặt lại mật khẩu / link đăng nhập / xác nhận lại, liên kết nhà
+    /// cung cấp ngoài, và tắt TOTP kèm recovery code.
     pub(crate) async fn lock_out_in(
         &self,
         tenant: &TenantContext,
@@ -615,9 +616,13 @@ impl UserService {
         crate::api_key::revoke_all_in(transaction, tenant, &self.outbox, actor, id).await?;
         crate::mfa::service::remove_in(transaction, tenant, &self.outbox, actor, id, false).await?;
         let subject = id.to_string();
-        for purpose in ["email_verification", "password_reset"] {
+        // Link đăng nhập và token xác nhận lại đang chờ cũng là cửa vào của kẻ chiếm (link gửi tới
+        // email của nó trước khi bị khoá); liên kết nhà cung cấp ngoài nó đã gắn cũng vậy — gỡ như
+        // đặt lại mật khẩu kiểu `Recovery` (rà soát bảo mật 2026-11).
+        for purpose in ["email_verification", "password_reset", "login_link", "reauth"] {
             OneTimeTokens::new("auth").revoke(transaction, tenant, purpose, &subject).await?;
         }
+        self.forget_identities(transaction, tenant, actor, id).await?;
         Ok(())
     }
 }

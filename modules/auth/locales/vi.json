@@ -100,6 +100,7 @@
   "auth.support_platform_only": "Chỉ nhân sự nền tảng, trong khách nền tảng, mới cấp được quyền vào hỗ trợ.",
   "auth.target_has_more_permissions": "Người dùng này có permission mà bạn không có, nên bạn không thay đổi tài khoản của họ theo cách này được. Hãy nhờ người có đủ mọi permission của họ.",
   "auth.token_expired": "Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại.",
+  "auth.passkey_required": "Tài khoản này phải đăng nhập bằng passkey: một role của nó bắt buộc xác thực hai bước, và passkey là bước thứ hai duy nhất của nó.",
   "auth.user_disabled": "Tài khoản này đã bị khoá. Hãy nhờ quản trị viên mở khoá.",
   "auth.user_not_found": "Không có người dùng `{id}`.",
   "auth.wrong_password": "Mật khẩu hiện tại không đúng. Nếu bạn quên, có thể đặt lại qua email.",

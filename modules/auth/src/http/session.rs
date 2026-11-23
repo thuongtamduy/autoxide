@@ -254,7 +254,7 @@ impl MeResponse {
         (status = 200, description = "Signed in.", body = Data<TokenResponse>),
         (status = 202, description = "Password accepted; a code is needed. Continue with `POST /api/v1/auth/login/mfa`.", body = Data<MfaChallengeResponse>),
         (status = 401, description = "Wrong email or password; code `auth.invalid_credentials`.", body = Problem),
-        (status = 403, description = "The account is disabled; code `auth.user_disabled`.", body = Problem),
+        (status = 403, description = "The account is disabled (code `auth.user_disabled`), or it holds a role that requires two-step sign-in and its only second step is a passkey, so it must sign in with the passkey (code `auth.passkey_required`).", body = Problem),
         (status = 422, description = "The body is missing a field or a value is invalid.", body = Problem),
         (status = 429, description = "Too many failed sign-ins for this email from this address, or for this email overall; code `auth.login_throttled`. Wait the number of seconds in the `Retry-After` header.", body = Problem),
     )
