@@ -200,6 +200,15 @@ thật (P7).
       cho cargo, npm, github-actions, docker có nhóm và `cooldown`; giai đoạn bản thử `X.0.0-rc.N` (pre-release, image
       không `latest` / `X.Y`, bản vá dòng cũ không giành `latest`) và tiêu chí từ RC lên 1.0 ở `docs/RELEASING.md`;
       `SECURITY.md` + `.vi.md` thêm chính sách công bố phối hợp
+- [x] P14 — Pentest hộp đen có uỷ quyền trên bản chạy thật (release, SQLite và PostgreSQL, nhiều khách, mọi module):
+      IDOR và vượt khách, leo thang quyền, xác thực, injection, XSS, SSRF, race, DoS rẻ, lộ thông tin; báo cáo phần
+      "Black-box test" của `docs/security/review-2026-11.md`. Không lỗ vượt khách hay mất tiền; đã sửa: API key tạo
+      token SCIM / nhà cung cấp đăng nhập (#483), mã SMS đặt lịch không giới hạn theo địa chỉ (#487), người mua đọc
+      được nhãn nội bộ (#489). Nợ mức thấp:
+  - [ ] P-4: tên miền khách khai mà không xác minh chặn khách khác 7 ngày — cho nhiều khách cùng chờ, ai xác minh
+        trước được (đổi unique index), hoặc endpoint cho nhân sự nền tảng thu hồi
+  - [ ] P-5: `return_url` của thanh toán nhận mọi địa chỉ http(s) — chỉ nhận tên miền đã xác minh của khách (cần
+        quyết danh sách địa chỉ hợp lệ)
 
 ## Giai đoạn B — Lớp cho giao diện và phân quyền
 
