@@ -216,6 +216,12 @@ async fn tool_mcp_chi_doc_va_theo_quyen() {
             .unwrap();
         let text = format!("{:?}", result.content);
         assert!(text.contains("/p/1") || text.contains("\\\"/\\\""), "{text}");
+        // Phễu khai bởi module (ở đây: phễu `shop.checkout` của test) đọc được qua tool.
+        let funnel = mine.iter().find(|tool| tool.name.ends_with("funnel")).unwrap().name.clone();
+        let input = json!({"key": "shop.checkout", "from": "2026-11-01", "to": "2026-11-30"});
+        let result = client.call_tool(tool(&funnel, input)).await.unwrap();
+        assert_ne!(result.is_error, Some(true), "{:?}", result.content);
+        assert!(format!("{:?}", result.content).contains("steps"), "{:?}", result.content);
     })
     .await
     .unwrap();
