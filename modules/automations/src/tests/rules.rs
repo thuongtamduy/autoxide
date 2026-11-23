@@ -209,11 +209,12 @@ async fn luat_tao_bang_api_key_mang_quyen_cua_key() {
     TestDatabase::run(async |test| {
         let harness = Harness::new(test).await;
         let key = Uuid::now_v7();
-        // Key chỉ có một phần quyền của chủ: không có `shop.read`.
+        // Key chỉ có một phần quyền của chủ: không có `automations.run` (`shop.read` thì cần: luật
+        // theo event `shop.order_placed` đòi quyền xem event đó).
         let by_key = harness
             .owner
             .clone()
-            .only(["automations.read", "automations.manage", "shop.write"])
+            .only(["automations.read", "automations.manage", "shop.write", "shop.read"])
             .via_api_key(key);
         let actions =
             json!([{"tool": "shop.tag_order", "arguments": {"order_id": "1", "tag": "x"}}]);
@@ -223,13 +224,13 @@ async fn luat_tao_bang_api_key_mang_quyen_cua_key() {
         assert_eq!(rule.run_as_api_key, Some(key));
         let runner = harness.service.rule_principal(&harness.tenant, &rule).await.unwrap().unwrap();
         assert!(runner.allows("shop.write"));
-        assert!(!runner.allows("shop.read"), "the rule never gets more than the key had");
+        assert!(!runner.allows("automations.run"), "the rule never gets more than the key had");
         assert_eq!(runner.api_key_id(), Some(key));
         // Luật của người đăng nhập: quyền hiện tại của người đó, không gắn key.
         let own = harness.rule(on_order(), json!(null), actions).await;
         assert_eq!(own.run_as_api_key, None);
         let runner = harness.service.rule_principal(&harness.tenant, &own).await.unwrap().unwrap();
-        assert!(runner.allows("shop.read"));
+        assert!(runner.allows("automations.run"));
 
         // Key bị thu hồi: luật của key tạm dừng (nhận lại event không đổi gì), luật kia vẫn chạy.
         for _ in 0..2 {
@@ -239,6 +240,58 @@ async fn luat_tao_bang_api_key_mang_quyen_cua_key() {
         assert_eq!(paused.status, crate::service::rules::PAUSED);
         assert_eq!(paused.status_reason.as_deref(), Some("credential_revoked"));
         assert_eq!(harness.reload(own.id).await.status, ACTIVE);
+    })
+    .await
+    .unwrap();
+}
+
+/// Rà soát bảo mật 2026-11: lưu luật gọi tool có permission `money` cần phiên vừa xác nhận lại như
+/// gọi REST — token cũ không lưu được luật để làm hộ việc REST đòi xác nhận.
+#[tokio::test]
+async fn luu_luat_tool_nhay_cam_doi_xac_nhan_lai() {
+    use autoxide_kernel::access::StepUp;
+    use autoxide_kernel::time::Timestamp;
+    use jiff::SignedDuration;
+
+    TestDatabase::run(async |test| {
+        let harness = Harness::new(test).await;
+        let mut permissions = super::OWNER.to_vec();
+        permissions.push("shop.refund");
+        let window = SignedDuration::from_mins(15);
+        let stale = person(4, &permissions).with_step_up(StepUp {
+            authenticated_at: Some(Timestamp::now() - SignedDuration::from_mins(60)),
+            window,
+        });
+        let actions = json!([{"tool": "shop.refund"}]);
+        let error =
+            harness.rule_by(&stale, on_order(), json!(null), actions.clone()).await.unwrap_err();
+        assert_eq!(error.code(), "step_up_required");
+        let fresh = person(4, &permissions)
+            .with_step_up(StepUp { authenticated_at: Some(Timestamp::now()), window });
+        let rule = harness.rule_by(&fresh, on_order(), json!(null), actions).await.unwrap();
+        assert_eq!(rule.status, ACTIVE);
+    })
+    .await
+    .unwrap();
+}
+
+/// Rà soát bảo mật 2026-11: luật kích hoạt bằng event đòi quyền xem event đó qua luồng event (như
+/// webhook) — không thì đọc được event qua ngữ cảnh của lần chạy.
+#[tokio::test]
+async fn luat_theo_event_doi_quyen_xem_event() {
+    TestDatabase::run(async |test| {
+        let harness = Harness::new(test).await;
+        let blind = person(5, &["automations.read", "automations.manage", "shop.write"]);
+        let error = harness
+            .rule_by(
+                &blind,
+                on_order(),
+                json!(null),
+                json!([{"tool": "shop.tag_order", "arguments": {"order_id": "x", "tag": "vip"}}]),
+            )
+            .await
+            .unwrap_err();
+        assert_eq!(error.code(), "permission_denied", "{error:?}");
     })
     .await
     .unwrap();
