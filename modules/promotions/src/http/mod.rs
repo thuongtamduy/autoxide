@@ -7,6 +7,18 @@ use utoipa_axum::router::OpenApiRouter;
 
 use crate::service::PromotionsService;
 
+/// Endpoint của người mua (ví voucher, nhập mã, lưu voucher, nhắc flash sale). Tài khoản người mua
+/// không có permission nào (D-309) nên chỉ cần là người mua; tài khoản nhân sự (vd thử trên giao diện
+/// quản trị) cần `promotions.use` như trước.
+pub(crate) fn require_use(
+    principal: &autoxide_kernel::access::Principal,
+) -> Result<(), autoxide_kernel::error::Error> {
+    if principal.realm() == autoxide_kernel::access::Realm::Customer {
+        return Ok(());
+    }
+    principal.require(&crate::permissions::USE)
+}
+
 pub(crate) mod admin;
 pub(crate) mod buyer;
 pub(crate) mod dto;

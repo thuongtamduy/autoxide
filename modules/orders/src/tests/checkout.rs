@@ -456,3 +456,32 @@ async fn orders_api_finds_order_and_delivered_lines() {
     .await
     .unwrap();
 }
+
+/// Rà soát bảo mật 2026-11: đơn đặt bằng tài khoản có trong bản xuất dữ liệu cá nhân của người mua
+/// (liên hệ, địa chỉ nhận), không có trong bản xuất của người khác.
+#[tokio::test]
+async fn don_hang_trong_ban_xuat_du_lieu_ca_nhan() {
+    TestDatabase::run(async |test| {
+        let shop = shop(test).await;
+        let shirt = shop.catalog.add(shop.tree.a, 200_000);
+        shop.inventory.stock(shop.tree.a, shirt, 5);
+        let buyer = Call::as_user(&shop, "buyer1");
+        let (cart, _, quote) = ready_cart(&buyer, shop.tree.a, shirt, 1).await;
+        let (status, placed) = checkout(&buyer, Some("k-x"), body(&cart, &quote, "cod")).await;
+        assert_eq!(status, StatusCode::CREATED, "{placed}");
+        let number = placed["data"]["orders"][0]["number"].clone();
+        let tenant = shop.default_tenant();
+        let exported =
+            shop.modules().personal_data().export(&tenant, Uuid::from_u128(101)).await.unwrap();
+        let orders = exported["orders"]["orders"].as_array().unwrap();
+        assert_eq!(orders.len(), 1, "{exported:?}");
+        assert_eq!(orders[0]["number"], number);
+        assert_eq!(orders[0]["contact"]["phone"], "0901234567", "{exported:?}");
+        assert!(orders[0]["ship_to"].is_object(), "{exported:?}");
+        let other =
+            shop.modules().personal_data().export(&tenant, Uuid::from_u128(102)).await.unwrap();
+        assert_eq!(other["orders"]["orders"], json!([]));
+    })
+    .await
+    .unwrap();
+}

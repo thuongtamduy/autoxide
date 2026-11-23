@@ -171,6 +171,26 @@ async fn bao_co_hang_lai_mot_lan_moi_dot() {
         let back = notifier.sent_of("inventory.back_in_stock");
         assert_eq!(back.len(), 5);
         assert_eq!(back[4].recipient, Recipient::User(Uuid::from_u128(BUYER)));
+
+        // Dữ liệu cá nhân (rà soát bảo mật 2026-11): bản xuất của người mua có đăng ký của họ; tài
+        // khoản bị xoá thì đăng ký bị xoá (nhận lại event cũng không sao).
+        let buyer = Uuid::from_u128(BUYER);
+        let exported = shop.modules().personal_data().export(&tenant, buyer).await.unwrap();
+        let alerts = exported["inventory"]["restock_alerts"].as_array().unwrap();
+        assert_eq!(alerts.len(), 1, "{exported:?}");
+        assert_eq!(alerts[0]["variant_id"], json!(item));
+        let deleted = autoxide_kernel::event::Delivered::new(
+            tenant.clone(),
+            "auth",
+            autoxide_kernel::privacy::USER_DELETED.to_owned(),
+            json!({"before": {"id": buyer}}),
+        );
+        use autoxide_kernel::event::EventHandler as _;
+        crate::alerts::AlertPrivacy.handle(&deleted).await.unwrap();
+        crate::alerts::AlertPrivacy.handle(&deleted).await.unwrap();
+        let exported = shop.modules().personal_data().export(&tenant, buyer).await.unwrap();
+        assert_eq!(exported["inventory"]["restock_alerts"], json!([]));
+        assert!(api.restock_alerts_of(&tenant, buyer, &[item]).await.unwrap().is_empty());
     })
     .await
     .unwrap();

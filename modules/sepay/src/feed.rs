@@ -81,8 +81,12 @@ impl Cursor {
 
     fn next_page(&self) -> Self {
         match self {
-            Cursor::From { from, page } => Cursor::From { from: from.clone(), page: page + 1 },
-            Cursor::Since { since, page } => Cursor::Since { since: since.clone(), page: page + 1 },
+            Cursor::From { from, page } => {
+                Cursor::From { from: from.clone(), page: page.saturating_add(1) }
+            }
+            Cursor::Since { since, page } => {
+                Cursor::Since { since: since.clone(), page: page.saturating_add(1) }
+            }
         }
     }
 
@@ -92,6 +96,39 @@ impl Cursor {
             .checked_sub(jiff::SignedDuration::from_hours(FIRST_PULL_DAYS * 24 - 7))
             .unwrap_or(now);
         Cursor::From { from: shifted.format("%Y-%m-%d %H:%M:%S"), page: 1 }
+    }
+}
+
+/// Kiểm chữ ký HMAC của một webhook: `signature` phải là `sha256={hex}` của `"{timestamp}.{thân thô}"`
+/// và `timestamp` (giây Unix) cách `now` không quá `MAX_SKEW_SECONDS`. Hàm thuần để thử phá bằng property
+/// test (D-20261123-property-fuzzing): header do bất kỳ ai gửi tới, kể cả số biên.
+fn check_signature(
+    secret: &[u8],
+    timestamp: Option<&str>,
+    signature: Option<&str>,
+    body: &[u8],
+    now: i64,
+) -> Result<(), Error> {
+    let (Some(signature), Some(timestamp)) = (signature, timestamp) else {
+        return Err(signature_invalid());
+    };
+    let signed_at: i64 = timestamp.trim().parse().map_err(|_| signature_invalid())?;
+    // `checked_sub`: timestamp là số người gửi chọn; `now - i64::MIN` tràn `i64` (bản release vẫn kiểm
+    // tràn, D-179) — trước đây thành panic, giờ là chữ ký sai như mọi timestamp ngoài cửa sổ.
+    let skew = now.checked_sub(signed_at).and_then(i64::checked_abs);
+    if skew.is_none_or(|skew| skew > MAX_SKEW_SECONDS) {
+        return Err(signature_invalid());
+    }
+    // Ký trên byte gốc của thân: `"{timestamp}.{raw_body}"`.
+    let mut signed = Vec::with_capacity(timestamp.len() + 1 + body.len());
+    signed.extend_from_slice(timestamp.as_bytes());
+    signed.push(b'.');
+    signed.extend_from_slice(body);
+    let expected = format!("sha256={}", hex(&hmac_sha256(secret, &signed)));
+    if constant_time_eq(expected.as_bytes(), signature.trim().as_bytes()) {
+        Ok(())
+    } else {
+        Err(signature_invalid())
     }
 }
 
@@ -116,25 +153,13 @@ impl SepayFeed {
     ) -> Result<(), Error> {
         let header = |name: &str| headers.get(name).and_then(|value| value.to_str().ok());
         if let Some(secret) = self.accounts.get(tenant, &WEBHOOK_SECRET).await? {
-            let (Some(signature), Some(timestamp)) = (header(SIGNATURE), header(TIMESTAMP)) else {
-                return Err(signature_invalid());
-            };
-            let signed_at: i64 = timestamp.trim().parse().map_err(|_| signature_invalid())?;
-            if (Timestamp::now().as_unix_seconds() - signed_at).abs() > MAX_SKEW_SECONDS {
-                return Err(signature_invalid());
-            }
-            // Ký trên byte gốc của thân: `"{timestamp}.{raw_body}"`.
-            let mut signed = Vec::with_capacity(timestamp.len() + 1 + body.len());
-            signed.extend_from_slice(timestamp.as_bytes());
-            signed.push(b'.');
-            signed.extend_from_slice(body);
-            let expected =
-                format!("sha256={}", hex(&hmac_sha256(secret.as_str().as_bytes(), &signed)));
-            return if constant_time_eq(expected.as_bytes(), signature.trim().as_bytes()) {
-                Ok(())
-            } else {
-                Err(signature_invalid())
-            };
+            return check_signature(
+                secret.as_str().as_bytes(),
+                header(TIMESTAMP),
+                header(SIGNATURE),
+                body,
+                Timestamp::now().as_unix_seconds(),
+            );
         }
         if let Some(key) = self.accounts.get(tenant, &WEBHOOK_API_KEY).await? {
             let given = header("authorization").and_then(|value| value.strip_prefix("Apikey "));
@@ -320,5 +345,114 @@ mod tests {
             Cursor::first(now),
             Cursor::From { from: "2026-11-19 03:00:00".to_owned(), page: 1 }
         );
+    }
+
+    /// Thử phá chữ ký webhook (D-20261123-property-fuzzing). Secret sinh ngẫu nhiên lúc chạy.
+    mod properties {
+        use super::*;
+        use proptest::prelude::*;
+
+        const NOW: i64 = 1_790_000_000;
+
+        fn signed(secret: &[u8], timestamp: &str, body: &[u8]) -> String {
+            let mut raw = timestamp.as_bytes().to_vec();
+            raw.push(b'.');
+            raw.extend_from_slice(body);
+            format!("sha256={}", hex(&hmac_sha256(secret, &raw)))
+        }
+
+        proptest! {
+            #[test]
+            fn chu_ky_dung_trong_cua_so_thi_nhan(
+                secret in proptest::collection::vec(any::<u8>(), 1..64),
+                body in proptest::collection::vec(any::<u8>(), 0..512),
+                skew in -MAX_SKEW_SECONDS..=MAX_SKEW_SECONDS,
+            ) {
+                let timestamp = (NOW + skew).to_string();
+                let signature = signed(&secret, &timestamp, &body);
+                prop_assert!(
+                    check_signature(&secret, Some(&timestamp), Some(&signature), &body, NOW).is_ok()
+                );
+            }
+
+            #[test]
+            fn sua_mot_byte_cua_than_thi_tu_choi(
+                secret in proptest::collection::vec(any::<u8>(), 1..64),
+                body in proptest::collection::vec(any::<u8>(), 1..512),
+                index in any::<proptest::sample::Index>(),
+                flip in 1u8..=255,
+            ) {
+                let timestamp = NOW.to_string();
+                let signature = signed(&secret, &timestamp, &body);
+                let mut tampered = body.clone();
+                let at = index.index(tampered.len());
+                tampered[at] ^= flip;
+                prop_assert!(
+                    check_signature(&secret, Some(&timestamp), Some(&signature), &tampered, NOW)
+                        .is_err()
+                );
+            }
+
+            #[test]
+            fn ngoai_cua_so_thi_tu_choi_ke_ca_so_bien(
+                secret in proptest::collection::vec(any::<u8>(), 1..64),
+                signed_at in prop_oneof![
+                    Just(i64::MIN),
+                    Just(i64::MAX),
+                    any::<i64>(),
+                    (NOW + MAX_SKEW_SECONDS + 1)..i64::MAX,
+                ],
+            ) {
+                prop_assume!(NOW.abs_diff(signed_at) > MAX_SKEW_SECONDS.unsigned_abs());
+                let timestamp = signed_at.to_string();
+                let body = br#"{"id":1}"#;
+                let signature = signed(&secret, &timestamp, body);
+                let checked = check_signature(&secret, Some(&timestamp), Some(&signature), body, NOW);
+                prop_assert!(checked.is_err());
+            }
+
+            #[test]
+            fn header_bat_ky_khong_panic(
+                timestamp in proptest::option::of("\\PC{0,30}"),
+                signature in proptest::option::of("\\PC{0,80}"),
+                body in proptest::collection::vec(any::<u8>(), 0..256),
+                now in any::<i64>(),
+            ) {
+                let _ = check_signature(b"k", timestamp.as_deref(), signature.as_deref(), &body, now);
+            }
+
+            #[test]
+            fn than_webhook_bat_ky_khong_panic(body in proptest::collection::vec(any::<u8>(), 0..512)) {
+                if let Ok(parsed) = serde_json::from_slice::<WebhookBody>(&body) {
+                    let _ = parsed.into_transaction();
+                }
+            }
+
+            #[test]
+            fn con_tro_bat_ky_khong_panic_va_doc_lai_nguyen_ven(
+                raw in "\\PC{0,60}",
+                mark in "\\PC{0,40}",
+                page in 1u32..,
+            ) {
+                if let Some(cursor) = Cursor::parse(&raw) {
+                    let _ = cursor.next_page();
+                }
+                for cursor in [
+                    Cursor::From { from: mark.clone(), page },
+                    Cursor::Since { since: mark.clone(), page },
+                ] {
+                    prop_assert_eq!(Cursor::parse(&cursor.encode()), Some(cursor));
+                }
+            }
+        }
+
+        #[test]
+        fn timestamp_am_cuc_bien_khong_panic() {
+            // Ca tái hiện: `now - i64::MIN` tràn số và panic trước khi sửa.
+            let timestamp = i64::MIN.to_string();
+            assert!(
+                check_signature(b"k", Some(&timestamp), Some("sha256=00"), b"{}", NOW).is_err()
+            );
+        }
     }
 }

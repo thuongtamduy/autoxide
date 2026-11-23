@@ -134,11 +134,11 @@ pub(crate) async fn call_tool(app: &TestApp, who: &str, name: &str, arguments: V
     }
 }
 
-/// Nạp dữ liệu tham chiếu đi kèm bản cài (đơn vị hành chính, biểu thuế) như người vận hành chạy
-/// `autoxide task address.import` và `autoxide task tax.import_pack`.
+/// Nạp dữ liệu tham chiếu đi kèm bản cài (đơn vị hành chính, biểu thuế, giới hạn khuyến mại theo luật)
+/// như người vận hành chạy `autoxide task address.import`, `tax.import_pack`, `promotions.load_legal_data`.
 pub(crate) async fn import_reference_data(app: &TestApp) {
     let tasks = app.modules().tasks().unwrap();
-    for name in ["address.import", "tax.import_pack"] {
+    for name in ["address.import", "tax.import_pack", "promotions.load_legal_data"] {
         let (_, task) = tasks.iter().find(|(full, _)| full == name).unwrap();
         task.run(&task.parse(&[]).unwrap()).await.unwrap();
     }
@@ -281,4 +281,12 @@ pub(crate) fn mail_param(mail: &str, name: &str) -> String {
         .chars()
         .take_while(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '~'))
         .collect()
+}
+
+/// Khung thời gian của một chương trình khuyến mại đang chạy, trong giới hạn số ngày của luật:
+/// từ một giờ trước tới 30 ngày sau (RFC 3339).
+pub(crate) fn promotion_window() -> (String, String) {
+    let now = autoxide_kernel::time::Timestamp::now();
+    let hour = jiff::SignedDuration::from_hours(1);
+    ((now - hour).to_rfc3339(), (now + hour * 24 * 30).to_rfc3339())
 }

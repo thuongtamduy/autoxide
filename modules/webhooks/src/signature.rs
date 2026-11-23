@@ -65,3 +65,37 @@ mod tests {
         assert_ne!(first, new_secret().unwrap());
     }
 }
+
+/// Thử phá chữ ký Standard Webhooks (D-20261123-property-fuzzing). Secret sinh lúc chạy.
+#[cfg(test)]
+mod properties {
+    use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn chu_ky_xac_dinh_va_doi_khi_noi_dung_doi(
+            key in proptest::collection::vec(any::<u8>(), 24..=64),
+            id in "[a-zA-Z0-9_]{1,40}",
+            timestamp in any::<i64>(),
+            body in "\\PC{0,200}",
+            other in "\\PC{0,200}",
+        ) {
+            let secret = format!("{SECRET_PREFIX}{}", STANDARD.encode(&key));
+            let signature = sign(&secret, &id, timestamp, &body).unwrap();
+            prop_assert!(signature.starts_with("v1,"));
+            prop_assert_eq!(&signature, &sign(&secret, &id, timestamp, &body).unwrap());
+            // Không tiền tố `whsec_` thì vẫn là cùng khoá (chuẩn cho phép cả hai).
+            prop_assert_eq!(&signature, &sign(&STANDARD.encode(&key), &id, timestamp, &body).unwrap());
+            if other != body {
+                prop_assert_ne!(&signature, &sign(&secret, &id, timestamp, &other).unwrap());
+            }
+            prop_assert_ne!(&signature, &sign(&secret, &id, timestamp.wrapping_add(1), &body).unwrap());
+        }
+
+        #[test]
+        fn secret_bat_ky_khong_panic(secret in "\\PC{0,80}") {
+            let _ = sign(&secret, "msg_1", 0, "{}");
+        }
+    }
+}
