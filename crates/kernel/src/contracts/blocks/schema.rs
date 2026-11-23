@@ -479,3 +479,57 @@ mod tests {
         }
     }
 }
+
+// Thử phá luật link an toàn (D-20261123-property-fuzzing): so với bộ phân tích URL chuẩn WHATWG (cách trình
+// duyệt hiểu link) — link được nhận thì trình duyệt mở đúng giao thức cho phép, và link "trong site" thì
+// không bao giờ ra host khác.
+#[cfg(test)]
+mod properties {
+    use super::*;
+    use crate::net::Url;
+    use proptest::prelude::*;
+
+    fn href() -> impl Strategy<Value = String> {
+        let prefix = prop_oneof![
+            Just(""),
+            Just("/"),
+            Just("//"),
+            Just("/\\"),
+            Just("\\/"),
+            Just("/%2f"),
+            Just("http:"),
+            Just("https://"),
+            Just("HTTPS://"),
+            Just("javascript:"),
+            Just("data:"),
+            Just("mailto:"),
+            Just("tel:"),
+            Just(" "),
+            Just("\u{3000}"),
+            Just("\t"),
+        ];
+        (prefix.clone(), prefix, "\\PC{0,30}|[a-z./:@\\\\%]{0,20}")
+            .prop_map(|(first, second, rest)| format!("{first}{second}{rest}"))
+    }
+
+    proptest! {
+        #[test]
+        fn link_duoc_nhan_trinh_duyet_mo_dung_cho(href in href()) {
+            if !safe_link(&href) {
+                return Ok(());
+            }
+            let site = Url::parse("https://site.example/blog/post").unwrap();
+            // Link sai dạng thì trình duyệt không mở gì cả: an toàn.
+            let Ok(target) = site.join(&href) else {
+                return Ok(());
+            };
+            prop_assert!(
+                matches!(target.scheme(), "http" | "https" | "mailto" | "tel"),
+                "{href:?} → {target}"
+            );
+            if href.trim().starts_with('/') {
+                prop_assert_eq!(target.host_str(), Some("site.example"), "{:?} → {}", href, target);
+            }
+        }
+    }
+}

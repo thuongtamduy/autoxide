@@ -203,3 +203,34 @@ mod tests {
         assert_eq!(response.headers()[header::ETAG], "\"1700000000123456\"");
     }
 }
+
+// Thử phá header `If-None-Match` (D-20261123-property-fuzzing).
+#[cfg(test)]
+mod properties {
+    use super::*;
+    use axum::http::HeaderMap;
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn header_bat_ky_khong_panic_va_etag_cua_minh_luon_khop(
+            raw in "\\PC{0,80}|(W/)?\"[a-z0-9]{0,8}\"(, ?(W/)?\"[a-z0-9]{0,8}\"){0,4}",
+            tag in "[a-z0-9]{1,8}",
+            weak in any::<bool>(),
+        ) {
+            let etag = format!("\"{tag}\"");
+            let mut headers = HeaderMap::new();
+            if let Ok(value) = HeaderValue::from_str(&raw) {
+                headers.insert(header::IF_NONE_MATCH, value);
+                let _ = if_none_match(&headers, &etag);
+            }
+            // Client gửi lại đúng ETag (yếu hay mạnh) trong một danh sách thì luôn khớp.
+            let sent = format!("{raw_list}, {prefix}{etag}", raw_list = "\"other\"", prefix = if weak { "W/" } else { "" });
+            headers.insert(header::IF_NONE_MATCH, HeaderValue::from_str(&sent).unwrap());
+            prop_assert!(if_none_match(&headers, &etag));
+            // ETag khác hẳn thì không khớp.
+            headers.insert(header::IF_NONE_MATCH, HeaderValue::from_static("\"zzzzzzzzzz\""));
+            prop_assert!(!if_none_match(&headers, &etag));
+        }
+    }
+}
