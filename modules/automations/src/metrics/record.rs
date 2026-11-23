@@ -168,10 +168,12 @@ impl Automations {
     /// Dọn số liệu theo giờ và dấu event đã cộng quá hạn của `database`.
     pub(crate) async fn prune_metrics(&self, database: &Database) -> Result<(), Error> {
         let now = now();
+        // tenant-scope: việc nền / kiểm tra quét mọi khách của database, chủ ý không lọc khách (rà soát bảo mật 2026-11)
         metric_hour::Entity::delete_many()
             .filter(metric_hour::Column::Hour.lt(now - SignedDuration::from_hours(24 * KEEP_DAYS)))
             .exec(database.write())
             .await?;
+        // tenant-scope: việc nền / kiểm tra quét mọi khách của database, chủ ý không lọc khách (rà soát bảo mật 2026-11)
         metric_seen::Entity::delete_many()
             .filter(
                 metric_seen::Column::CreatedAt.lt(now - SignedDuration::from_hours(24 * SEEN_DAYS)),

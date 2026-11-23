@@ -129,6 +129,7 @@ impl Reporting {
     /// Xoá số liệu cục bộ đã đẩy quá hạn giữ; trả số dòng đã xoá.
     pub(crate) async fn prune_local(&self, database: &Database) -> Result<u64, Error> {
         let cutoff = now() - SignedDuration::from_hours(24 * self.config.local_retention_days);
+        // tenant-scope: việc nền / kiểm tra quét mọi khách của database, chủ ý không lọc khách (rà soát bảo mật 2026-11)
         let result = local_fact::Entity::delete_many()
             .filter(local_fact::Column::ForwardedAt.lt(cutoff))
             .exec(database.write())

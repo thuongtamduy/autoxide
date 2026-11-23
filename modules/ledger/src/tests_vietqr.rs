@@ -234,6 +234,7 @@ async fn tien_den_muon_va_keo_bien_dong_theo_con_tro() {
             created["transfer_code"].as_str().unwrap().to_owned(),
         );
         // Hết hạn (cùng hạn thanh toán với mọi thanh toán).
+        // tenant-scope: việc nền / kiểm tra quét mọi khách của database, chủ ý không lọc khách (rà soát bảo mật 2026-11)
         payment::Entity::update_many()
             .col_expr(payment::Column::Status, "expired".into())
             .filter(payment::Column::Id.eq(id.parse::<uuid::Uuid>().unwrap()))

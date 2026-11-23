@@ -497,8 +497,11 @@ impl InvoicesService {
                 )
                 .await?;
         }
-        let saved =
-            export::Entity::find_by_id(id).one(&transaction).await?.ok_or_else(export_not_found)?;
+        let saved = export::Entity::find_by_id(id)
+            .scoped(tenant)
+            .one(&transaction)
+            .await?
+            .ok_or_else(export_not_found)?;
         transaction.commit().await?;
         Ok(saved)
     }

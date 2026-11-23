@@ -411,6 +411,7 @@ impl LedgerService {
                 } else {
                     // Chưa xong: dời mốc để lượt sau hỏi lại, không quét mãi một dòng.
                     payout::Entity::update_many()
+                        .scoped(tenant)
                         .col_expr(payout::Column::UpdatedAt, now().into())
                         .filter(payout::Column::Id.eq(id))
                         .filter(payout::Column::Status.eq("sent"))

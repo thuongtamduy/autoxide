@@ -12,7 +12,7 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::job::{EnqueueOptions, Job, JobQueue};
 use autoxide_kernel::module::{Module, StartContext};
 use autoxide_kernel::resource::{Resource, ResourceResolver};
-use autoxide_kernel::tenancy::{DEFAULT_TENANT, TenantContext};
+use autoxide_kernel::tenancy::{DEFAULT_TENANT, ScopeExt, TenantContext};
 use autoxide_testkit::{TestApp, TestDatabase};
 use axum::http::StatusCode;
 use sea_orm::sea_query::Expr;
@@ -94,6 +94,7 @@ async fn events(database: &Database, name: &str) -> Vec<Value> {
 /// Dời một mốc của vụ `id` (thời gian giả).
 async fn set_time(app: &TestApp, id: &str, column: case::Column, at: &str) {
     let at: Timestamp = at.parse().unwrap();
+    // tenant-scope: việc nền / kiểm tra quét mọi khách của database, chủ ý không lọc khách (rà soát bảo mật 2026-11)
     case::Entity::update_many()
         .col_expr(column, Expr::value(at))
         .filter(case::Column::Id.eq(id.parse::<Uuid>().unwrap()))
@@ -474,7 +475,11 @@ async fn khieu_nai_tu_phieu_goi_lai_khong_tao_hai_vu_viec() {
         assert!(first.created);
         let again = intake.open(&tenant, complaint()).await.unwrap();
         assert_eq!((again.id, again.created), (first.id, false));
-        let row = case::Entity::find_by_id(first.id).one(app.database().read()).await.unwrap();
+        let row = case::Entity::find_by_id(first.id)
+            .scoped(&tenant)
+            .one(app.database().read())
+            .await
+            .unwrap();
         let row = row.unwrap();
         assert_eq!((row.kind.as_str(), row.channel.as_str()), ("consumer_complaint", "support"));
         let short = crate::api::ComplaintFromTicket {

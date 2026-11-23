@@ -187,6 +187,7 @@ impl LedgerService {
             ));
         }
         let saved = bank_account::Entity::find_by_id(id)
+            .scoped(tenant)
             .one(&transaction)
             .await?
             .ok_or_else(|| Error::internal("a bank account vanished after it was written"))?;
@@ -266,6 +267,7 @@ impl LedgerService {
         }
         update.exec(&transaction).await?;
         let saved = bank_account::Entity::find_by_id(found.id)
+            .scoped(tenant)
             .one(&transaction)
             .await?
             .ok_or_else(bank_account_not_found)?;
@@ -587,6 +589,7 @@ impl LedgerService {
                 }
                 if let Some(account) = account {
                     bank_account::Entity::update_many()
+                        .scoped(tenant)
                         .col_expr(bank_account::Column::FeedCursor, cursor.clone().into())
                         .col_expr(bank_account::Column::UpdatedAt, now().into())
                         .filter(bank_account::Column::Id.eq(account))
@@ -605,6 +608,7 @@ impl LedgerService {
         &self,
         database: &autoxide_kernel::database::Database,
     ) -> Result<u64, Error> {
+        // tenant-scope: việc nền / kiểm tra quét mọi khách của database, chủ ý không lọc khách (rà soát bảo mật 2026-11)
         let accounts = bank_account::Entity::find()
             .filter(bank_account::Column::FeedProvider.is_not_null())
             .filter(bank_account::Column::Status.eq("active"))
@@ -727,6 +731,7 @@ impl LedgerService {
             }
         };
         bank_transaction::Entity::update_many()
+            .scoped(tenant)
             .col_expr(bank_transaction::Column::MatchStatus, status.into())
             .col_expr(bank_transaction::Column::PaymentId, payment_id.into())
             .filter(bank_transaction::Column::Id.eq(id))

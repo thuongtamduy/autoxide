@@ -334,6 +334,7 @@ impl NotificationsService {
             )
             .await?;
         let saved = template::Entity::find_by_id(key)
+            .scoped(tenant)
             .one(&transaction)
             .await?
             .ok_or_else(|| Error::internal("a notification template vanished"))?;

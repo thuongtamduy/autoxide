@@ -211,6 +211,7 @@ async fn bang_chung_dong_y_khong_luu_ip_tho_va_nguoi_dang_nhap_ghi_so_chung() {
             StatusCode::NO_CONTENT
         );
 
+        // tenant-scope: việc nền / kiểm tra quét mọi khách của database, chủ ý không lọc khách (rà soát bảo mật 2026-11)
         let rows = cookie_consent::Entity::find().all(app.database().read()).await.unwrap();
         assert_eq!(rows.len(), 2);
         for row in &rows {

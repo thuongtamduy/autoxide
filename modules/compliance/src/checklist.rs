@@ -612,6 +612,7 @@ impl Probe for ReadinessProbe {
         };
         let (mut total, mut lacking) = (0usize, Vec::new());
         for (_, name, database) in databases {
+            // tenant-scope: việc nền / kiểm tra quét mọi khách của database, chủ ý không lọc khách (rà soát bảo mật 2026-11)
             let rows = match website::Entity::find()
                 .order_by_asc(website::Column::Id)
                 .all(database.read())
