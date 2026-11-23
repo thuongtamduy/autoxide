@@ -32,6 +32,13 @@ Bản vá ra dưới dạng bản patch (`1.5.2` → `1.5.3`), không đổi gì
 bản mới nhất của dòng bạn dùng trước khi báo, và ghi trong báo cáo bạn đã thử trên phiên bản nào.
 `CHANGELOG.md` liệt kê mọi bản phát hành.
 
+## Rà soát bảo mật
+
+Trước bản 1.0, nhóm duy trì đã rà soát bảo mật toàn bộ mã nguồn vào tháng 11/2026. Đây là **rà soát
+nội bộ có AI hỗ trợ, không phải kiểm toán của một bên thứ ba độc lập**. Phạm vi, cách làm, từng phát
+hiện kèm mức độ và cách sửa, cùng phần chưa rà được ghi ở
+[`docs/security/review-2026-11.md`](docs/security/review-2026-11.md) (tiếng Anh).
+
 ## Báo lỗ hổng
 
 **Đừng mở issue, pull request hay discussion công khai cho một vấn đề bảo mật.**
