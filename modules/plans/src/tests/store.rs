@@ -189,6 +189,18 @@ async fn thong_bao_gia_han_gui_lai_khong_cap_trung_het_han_thi_huy() {
             (status, body["code"].as_str()),
             (StatusCode::CONFLICT, Some("plans.store_billed"))
         );
+        // Tool MCP cùng permission cũng không đổi được (luật kiến trúc 8; rà soát bảo mật 2026-11).
+        let client = app.mcp("owner").await.unwrap();
+        let answer = client
+            .call_tool(autoxide_testkit::tool(
+                "plans.change_subscription",
+                json!({"plan_id": uuid::Uuid::now_v7(), "reference": "r-1"}),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(answer.is_error, Some(true));
+        let text = serde_json::to_string(&answer.structured_content).unwrap();
+        assert!(text.contains("plans.store_billed"), "{text}");
 
         // Hết hạn, không gia hạn: vòng đời huỷ khi hết kỳ (không thành gói miễn phí).
         let gone = StorePurchase::new(
