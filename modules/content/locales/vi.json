@@ -375,5 +375,7 @@
   "field:name at least one channel": "hãy chọn ít nhất một kênh",
   "field:the `banner` channel needs the key of a banner placement": "kênh `banner` cần mã của một vị trí banner",
   "field:the `newsletter` channel needs the list to write the campaign for": "kênh `newsletter` cần danh sách nhận tin của chiến dịch",
-  "field:the number {number} is not in the promotion facts": "số {number} không có trong dữ liệu của chương trình"
+  "field:the number {number} is not in the promotion facts": "số {number} không có trong dữ liệu của chương trình",
+  "field:send exactly one of `layout` and `operations`": "gửi đúng một trong hai: `layout` hoặc `operations`",
+  "field:is not valid: {error}": "chưa hợp lệ: {error}"
 }

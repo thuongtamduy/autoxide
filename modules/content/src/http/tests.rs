@@ -19,6 +19,7 @@ use crate::testing::FakeMedia;
 mod agent;
 mod ai_pages;
 mod blocks_base;
+mod builder_tools;
 mod bulk;
 mod campaign_drafts;
 mod edit_lock;
@@ -199,19 +200,19 @@ async fn tool_mcp_voi_version() {
         let reader = client("reader").await;
         let mut names: Vec<String> = reader.list_all_tools().await.unwrap().into_iter().map(|tool| tool.name.to_string()).collect();
         names.sort();
-        assert_eq!(names, ["content.get", "content.get_campaign_drafts", "content.get_translation_request", "content.legal_templates", "content.list", "content.list_banners", "content.list_revisions", "content.resolve", "content.search", "content.seo_check", "kernel.current_tenant", "kernel.decide_approval", "kernel.list_approvals", "kernel.list_custom_fields", "kernel.navigation"]);
+        assert_eq!(names, ["content.get", "content.get_campaign_drafts", "content.get_page_layout", "content.get_translation_request", "content.legal_templates", "content.list", "content.list_banners", "content.list_blocks", "content.list_revisions", "content.list_types", "content.resolve", "content.search", "content.seo_check", "content.site_health", "kernel.current_tenant", "kernel.decide_approval", "kernel.list_approvals", "kernel.list_custom_fields", "kernel.navigation"]);
         reader.cancel().await.unwrap();
 
         // Agent chỉ có `content.write_own`: thấy tool viết, không thấy tool đăng.
         let agent = client("agent").await;
         let mut names: Vec<String> = agent.list_all_tools().await.unwrap().into_iter().map(|tool| tool.name.to_string()).collect();
         names.sort();
-        assert_eq!(names, ["content.create_campaign_drafts", "content.create_draft", "content.draft_from_template", "content.get", "content.get_campaign_drafts", "content.get_translation_request", "content.legal_templates", "content.list", "content.list_banners", "content.list_revisions", "content.request_review", "content.resolve", "content.restore_revision", "content.search", "content.seo_check", "content.suggest_seo", "content.translate", "content.update", "kernel.current_tenant", "kernel.decide_approval", "kernel.list_approvals", "kernel.list_custom_fields", "kernel.navigation"]);
+        assert_eq!(names, ["content.compose_page", "content.create_campaign_drafts", "content.create_draft", "content.draft_from_template", "content.edit_page", "content.get", "content.get_campaign_drafts", "content.get_page_layout", "content.get_translation_request", "content.legal_templates", "content.list", "content.list_banners", "content.list_blocks", "content.list_revisions", "content.list_types", "content.request_review", "content.resolve", "content.restore_revision", "content.search", "content.seo_check", "content.site_health", "content.suggest_seo", "content.translate", "content.update", "content.update_page_layout", "kernel.current_tenant", "kernel.decide_approval", "kernel.list_approvals", "kernel.list_custom_fields", "kernel.navigation"]);
         agent.cancel().await.unwrap();
 
         let admin = client("admin").await;
         let tools = admin.list_all_tools().await.unwrap();
-        assert_eq!(tools.len(), 25, "with `kernel.current_tenant` and `kernel.navigation` (admin reads banners, `content.read`)");
+        assert_eq!(tools.len(), 32, "with `kernel.current_tenant` and `kernel.navigation` (admin reads banners, `content.read`)");
         let publish = tools.iter().find(|tool| tool.name == "content.publish").unwrap();
         assert!(publish.description.as_deref().unwrap_or_default().contains("Requires permission `content.publish` or `content.publish_own`."));
         for tool in &tools {

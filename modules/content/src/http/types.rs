@@ -56,7 +56,7 @@ pub(crate) struct ContentTypeResponse {
     updated_at: Timestamp,
 }
 
-fn response(row: ContentType) -> ContentTypeResponse {
+pub(crate) fn response(row: ContentType) -> ContentTypeResponse {
     ContentTypeResponse {
         labels: serde_json::from_str(&row.labels).unwrap_or(Value::Null),
         detail_layout: row

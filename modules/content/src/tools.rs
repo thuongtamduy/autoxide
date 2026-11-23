@@ -320,6 +320,7 @@ pub(crate) fn all(service: &Arc<ContentService>) -> Vec<Tool> {
     tools.extend(template_tools(service));
     tools.extend(crate::banners::tools::all(service));
     tools.extend(crate::page_tools::all(service));
+    tools.extend(crate::builder_tools::all(service));
     tools
 }
 

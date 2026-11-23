@@ -164,28 +164,38 @@ Tool của phiên bản này, theo module (`docs/mcp-tools.json` có đủ schem
 | `compliance.website_checklist` | `compliance.legal.read` | read-only |
 | `compliance.website_dossier` | `compliance.legal.read` | read-only |
 | `compliance.websites` | `compliance.legal.read` | read-only |
+| `content.compose_page` | `content.write` or `content.write_own` | writes |
 | `content.create_campaign_drafts` | `content.write` or `content.write_own` | writes |
 | `content.create_draft` | `content.write` or `content.write_own` | writes |
 | `content.draft_from_template` | `content.write` or `content.write_own` | writes |
+| `content.edit_page` | `content.write` or `content.write_own` | writes |
 | `content.get` | `content.read` | read-only |
 | `content.get_campaign_drafts` | `content.read` | read-only |
+| `content.get_page_layout` | `content.read` | read-only |
 | `content.get_translation_request` | `content.read` or `content.write_own` | read-only |
 | `content.legal_templates` | `content.read` | read-only |
 | `content.list` | `content.read` | read-only |
 | `content.list_banners` | `content.banners` or `content.read` | read-only |
+| `content.list_blocks` | `content.read` | read-only |
 | `content.list_revisions` | `content.read` | read-only |
+| `content.list_theme_variants` | `content.themes.manage` | read-only |
+| `content.list_types` | `content.read` | read-only |
 | `content.order_placement` | `content.banners` | writes |
 | `content.publish` | `content.publish` or `content.publish_own` | writes |
 | `content.request_review` | `content.write` or `content.write_own` | writes |
 | `content.resolve` | `content.read` | read-only |
 | `content.restore_revision` | `content.write` or `content.write_own` | writes |
 | `content.save_banner` | `content.banners` | writes |
+| `content.save_theme_variant` | `content.themes.manage` | writes |
+| `content.save_type` | `content.types.manage` | writes |
 | `content.search` | `content.read` | read-only |
 | `content.seo_check` | `content.read` | read-only |
+| `content.site_health` | `content.read` | read-only |
 | `content.suggest_seo` | `content.write` or `content.write_own` | writes |
 | `content.translate` | `content.write` or `content.write_own` | writes |
 | `content.unpublish` | `content.publish` or `content.publish_own` | destructive |
 | `content.update` | `content.write` or `content.write_own` | writes |
+| `content.update_page_layout` | `content.write` or `content.write_own` | writes |
 | `conversations.get_thread` | `conversations.read` | read-only |
 | `conversations.list_callbacks` | `conversations.call` | read-only |
 | `conversations.list_calls` | `conversations.call` | read-only |

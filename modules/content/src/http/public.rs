@@ -418,7 +418,16 @@ pub(crate) async fn resolve(
     Query(query): Query<ResolveQuery>,
 ) -> Result<Response, Error> {
     let (resolution, version) =
-        resolution(&service, &tenant, &site, &query.locale, &query.path).await?;
+        match resolution(&service, &tenant, &site, &query.locale, &query.path).await {
+            Ok(found) => found,
+            Err(error) => {
+                // Đường dẫn không có: đếm cho kiểm tra sức khoẻ website (gợi ý chuyển hướng).
+                if error.code() == "content.not_found" {
+                    service.record_not_found(&tenant, &site, &query.locale, &query.path).await;
+                }
+                return Err(error);
+            }
+        };
     let data = Data { data: resolution };
     // ETag là dấu vân tay của CẢ câu trả lời, không phải `updated_at` của bản công khai: câu
     // trả lời còn gộp danh mục, thẻ, tác giả, bản dịch, ảnh — đổi những thứ đó không chạm
