@@ -79,22 +79,27 @@ jobs:
         working-directory: sdk/typescript
         run: npm ci && npx tsc --noEmit
 
-  # Hợp đồng Rust cho module ở repo riêng (D-20261121-external-modules): ở pull request PHÁT HÀNH (PR đổi
-  # `version` của Cargo.toml gốc), `cargo semver-checks` so kernel và testkit với tag trước và ghi mục
-  # `### Breaking (Rust)` vào tóm tắt của job, để chép vào CHANGELOG.md trước khi merge. Còn `0.x` thì chỉ báo
-  # cáo; từ 1.0 `cargo xtask semver` tự thất bại khi có phá vỡ (D-242). PR khác: bỏ qua, job vẫn báo xong.
+  # Hợp đồng Rust (bước 70 P4, docs/COMPATIBILITY.md): `cargo semver-checks` so phần công khai của
+  # autoxide-kernel, autoxide-testkit, `autoxide` (thư viện) và crate của module core / official.
+  # - PR PHÁT HÀNH (đổi `version` của Cargo.toml gốc): mọi crate hợp đồng so với tag phát hành trước; mục
+  #   `### Breaking (Rust)` ghi vào tóm tắt của job để chép vào CHANGELOG.md trước khi merge.
+  # - PR khác chạm phần công khai (crates/kernel, crates/testkit, crates/app/src/lib.rs, modules/*/src/lib.rs,
+  #   modules/*/src/api*): chỉ crate bị chạm, so với nhánh gốc của PR — báo sớm cho người sửa.
+  # - Còn lại: bỏ qua, job vẫn báo xong. Job riêng, không nằm trên đường của gate.
+  # Còn `0.x` thì chỉ cảnh báo; từ 1.0 `cargo xtask semver` tự thất bại khi có phá vỡ (D-242) — cách bật chặn ở
+  # docs/RELEASING.md, mục "Kiểm hợp đồng Rust".
   semver:
-    name: Rust API of kernel and testkit (release pull requests)
+    name: Rust API compatibility (cargo-semver-checks)
     if: ${{ github.event_name == 'pull_request' && !github.event.repository.private }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 90
     env:
       CARGO_INCREMENTAL: "0"
       CARGO_TERM_COLOR: always
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # Cả lịch sử và tag: so với tag phát hành trước.
+          # Cả lịch sử và tag: so với tag phát hành trước hay nhánh gốc của PR.
           fetch-depth: 0
       - name: changed
         id: changed
@@ -104,34 +109,57 @@ jobs:
           version() { sed -n '/^\[workspace.package\]/,/^\[/s/^version = "\(.*\)"/\1/p' | head -n 1; }
           before="$(git show "$BASE_SHA:Cargo.toml" | version)"
           after="$(version < Cargo.toml)"
+          public='^(crates/kernel/|crates/testkit/|crates/app/src/lib\.rs$|modules/[^/]+/src/(lib\.rs$|api\.rs$|api/))'
           if [ "$before" != "$after" ]; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "mode=release" >> "$GITHUB_OUTPUT"
+          elif git diff --name-only "$BASE_SHA...HEAD" | grep -Eq "$public"; then
+            echo "mode=pull-request" >> "$GITHUB_OUTPUT"
           else
-            echo "run=false" >> "$GITHUB_OUTPUT"
-            echo "The workspace version is unchanged ($after): not a release pull request, semver check skipped."
+            echo "mode=skip" >> "$GITHUB_OUTPUT"
+            echo "No public Rust API changed and the version is unchanged ($after): semver check skipped."
           fi
       - run: rustup toolchain install
-        if: steps.changed.outputs.run == 'true'
+        if: steps.changed.outputs.mode != 'skip'
       - uses: taiki-e/install-action@25f51f6b1bf4e18876107cece836f4f77ac17c8c # v2.90.7
-        if: steps.changed.outputs.run == 'true'
+        if: steps.changed.outputs.mode != 'skip'
         with:
           tool: cargo-semver-checks@0.51.0
       - name: cargo xtask semver
-        if: steps.changed.outputs.run == 'true'
+        if: steps.changed.outputs.mode != 'skip'
+        env:
+          MODE: ${{ steps.changed.outputs.mode }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           set -o pipefail
-          cargo xtask semver --markdown | tee semver.md
+          if [ "$MODE" = release ]; then
+            args=()
+            title="since the last release"
+          else
+            args=(--base "$BASE_SHA" --changed "$BASE_SHA")
+            title="in this pull request"
+          fi
+          # Từ 1.0 lệnh thoát 1 khi có phá vỡ: vẫn ghi tóm tắt rồi mới báo đỏ.
+          status=0
+          cargo xtask semver --markdown "${args[@]}" | tee semver.md || status=$?
           {
-            echo "## Breaking changes to the Rust API of autoxide-kernel and autoxide-testkit"
+            echo "## Breaking changes to the public Rust API $title"
             echo
             if [ -s semver.md ]; then
-              echo "Copy this section into the release's section of \`CHANGELOG.md\`:"
+              if [ "$MODE" = release ]; then
+                echo "Copy this section into the release's section of \`CHANGELOG.md\`:"
+              else
+                echo "Before 1.0 this is a warning. From 1.0 a breaking change needs a new major version (docs/COMPATIBILITY.md)."
+              fi
               echo
               cat semver.md
             else
               echo "None found."
             fi
           } >> "$GITHUB_STEP_SUMMARY"
+          if [ -s semver.md ]; then
+            echo "::warning title=Breaking Rust API change::cargo-semver-checks found breaking changes $title; see the job summary."
+          fi
+          exit "$status"
 
   upgrade:
     # Bản phát hành trước ghi dữ liệu, bản này đọc lại trên cùng database (đặc tả 31 B1, D-246).

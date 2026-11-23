@@ -2,8 +2,9 @@
 //!
 //! - `api-diff [--base <ref>]` — chặn thay đổi phá vỡ của `/api/v1` so với bản phát hành gần
 //!   nhất (xem `api_diff.rs`). `./gate.sh` gọi lệnh này ở cả hai mức.
-//! - `semver [--base <tag>] [--deny] [--markdown]` — báo thay đổi phá vỡ của hợp đồng Rust
-//!   (kernel, testkit) bằng `cargo semver-checks`; chạy lúc phát hành (xem `semver.rs`).
+//! - `semver [--base <rev>] [--changed <rev>] [--deny] [--markdown]` — báo thay đổi phá vỡ của hợp
+//!   đồng Rust (kernel, testkit, `autoxide`, module chính thức) bằng `cargo semver-checks`; chạy ở job
+//!   CI `semver` và lúc phát hành (xem `semver.rs`).
 //! - `sdk [--check | --extract-examples <dir>]` — sinh kiểu TypeScript của SDK từ
 //!   `docs/openapi.json`; `--check` (trong gate) báo khi file đã commit lệch (xem `sdk.rs`).
 //! - `upgrade-test [--from <tag>] [--image <image>] [--database …]` — test nâng cấp từ bản phát
@@ -75,7 +76,7 @@ const USAGE: &str = "usage: cargo xtask check
        cargo xtask decisions                     regenerate docs/decisions/INDEX.md
        cargo xtask changelog                     fold changelog.d/ fragments into CHANGELOG.md (at release)
        cargo xtask api-diff [--base <ref>]       default base: the last release tag before HEAD
-       cargo xtask semver [--base <tag>] [--deny] [--markdown]
+       cargo xtask semver [--base <rev>] [--changed <rev>] [--deny] [--markdown]
        cargo xtask publish-check [--no-verify]   package every crate as for crates.io (publishes nothing)
        cargo xtask sdk [--check | --extract-examples <dir>]
        cargo xtask upgrade-test [--from <tag>] [--image <image>] [--database sqlite|postgres|both]
@@ -162,7 +163,7 @@ fn api_diff(base: Option<&str>) -> ExitCode {
 }
 
 fn semver(args: &[&str]) -> ExitCode {
-    let mut base = None;
+    let (mut base, mut changed) = (None, None);
     let (mut deny, mut markdown) = (false, false);
     let mut args = args.iter();
     while let Some(arg) = args.next() {
@@ -170,6 +171,7 @@ fn semver(args: &[&str]) -> ExitCode {
             "--deny" => deny = true,
             "--markdown" => markdown = true,
             "--base" => base = args.next().copied(),
+            "--changed" => changed = args.next().copied(),
             _ => {
                 eprintln!("{USAGE}");
                 return ExitCode::FAILURE;
@@ -183,7 +185,7 @@ fn semver(args: &[&str]) -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    match semver::run(&root, base, deny, markdown) {
+    match semver::run(&root, base, changed, deny, markdown) {
         Ok(true) => ExitCode::SUCCESS,
         Ok(false) => ExitCode::FAILURE,
         Err(error) => {

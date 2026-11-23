@@ -23,6 +23,50 @@ Theo Semantic Versioning, một số cho cả workspace (`[workspace.package] ve
 - Thêm tính năng, hoặc (khi còn `0.x`) thay đổi phá vỡ ở cấu hình, CLI hay hợp đồng
   module: tăng `x` (`0.1.1` → `0.2.0`) và ghi rõ ở mục **Changed** / **Removed**.
 - API HTTP `/api/v1` không bao giờ phá vỡ: endpoint thay thế đi qua deprecation (D-059).
+- **Từ `1.0.0`** theo [`docs/COMPATIBILITY.md`](COMPATIBILITY.md) (+ `.vi.md`, D-20261123-compatibility-policy):
+  patch chỉ sửa lỗi; minor thêm, không phá vỡ; phá vỡ hợp đồng (REST, mã lỗi, cấu hình, migration, tool MCP,
+  event, CLI, Rust API của kernel / testkit / `autoxide::Autoxide` / `api` của module core và official) chỉ ở
+  bản major. Bản minor chạm hợp đồng thì kiểm theo bảng của trang đó trước khi merge.
+
+## Kiểm hợp đồng Rust (`cargo-semver-checks`)
+
+`cargo xtask semver` chạy `cargo semver-checks` (phiên bản ghim ở `STACK.md`) trên mọi crate thuộc hợp đồng:
+`autoxide-kernel`, `autoxide-testkit`, `autoxide` (thư viện) và crate của module hạng core / official — danh sách
+đọc từ bảng sinh tự động của `docs/MODULES.md`, module đổi hạng thì danh sách tự đổi. Baseline là tag git (chưa
+đăng crates.io). Job `semver` của CI (`.github/workflows/ci.yml`, job riêng, không làm chậm gate):
+
+- **PR phát hành** (đổi `version` của workspace): mọi crate hợp đồng so với tag phát hành trước; mục `### Breaking
+  (Rust)` nằm ở tóm tắt của job để chép vào `CHANGELOG.md` (bước 3).
+- **PR khác** chạm phần công khai (`crates/kernel/`, `crates/testkit/`, `crates/app/src/lib.rs`,
+  `modules/*/src/lib.rs`, `modules/*/src/api.rs`, `modules/*/src/api/`): chỉ crate bị chạm, so với nhánh gốc
+  của PR (`--base <sha> --changed <sha>`). PR không chạm thì job bỏ qua.
+
+Chặn hay chỉ cảnh báo do `version` của workspace quyết, không cần sửa workflow:
+
+- **Còn `0.x`**: chỉ cảnh báo (dòng `::warning` và tóm tắt của job), job vẫn xanh; so như bản patch để mọi phá vỡ đều hiện.
+- **Từ `1.0.0`**: có phá vỡ thì `cargo xtask semver` thoát 1, job đỏ; so như bản minor (thêm mới và
+  `#[deprecated]` là hợp lệ). Ngoại lệ duy nhất: PR phát hành tăng major (`2.0.0` so với tag `v1.x`) chỉ báo cáo.
+- Khi phát hành `1.0.0`, chủ dự án thêm check **"Rust API compatibility (cargo-semver-checks)"** vào danh sách
+  check bắt buộc của nhánh `main` (Settings → Branches → branch protection; agent không có quyền đổi). Thiếu bước
+  này thì job đỏ vẫn hiện trên PR nhưng không ngăn được merge.
+- Chạy tay trên máy: `cargo xtask semver` (so với tag trước), `--changed origin/main` (chỉ crate bị chạm),
+  `--deny` (chặn cả khi còn `0.x`). Mất vài phút tới gần một giờ và vài GB đĩa — `rm -rf target/semver-checks`
+  sau đó.
+
+## Dòng hỗ trợ dài hạn
+
+Ghi cho người ngoài ở [`SECURITY.md`](../SECURITY.md#supported-versions) (+ `.vi.md`); dự án cộng đồng, không SLA.
+
+- Trước `1.0`: chỉ bản minor mới nhất được vá.
+- Từ `1.0`: bản minor mới nhất nhận mọi bản sửa; bản minor trước nhận vá bảo mật **3 tháng** sau khi minor mới
+  ra; khi có major mới, bản minor cuối của major trước nhận vá bảo mật **6 tháng**.
+- Vá cho dòng cũ: nhánh `release/X.Y` cắt từ tag `vX.Y.Z` mới nhất của dòng đó, cherry-pick bản sửa đã vào
+  `main`, đổi `version` thành `X.Y.Z+1`, gom mảnh changelog của bản sửa vào mục `## [X.Y.Z+1]`, chạy gate đầy đủ,
+  rồi đẩy tag `vX.Y.Z+1` tay lên commit của nhánh đó (workflow `Release` chạy theo push tag). `Auto release` chỉ
+  nhìn `main`, không gắn tag cho nhánh `release/*`. Bản sửa trên `main` cũng ra trong bản phát hành kế tiếp của
+  `main`. Chưa làm bản vá dòng cũ nào: lần đầu làm thì kiểm `release.yml` không gắn image `latest` và không đánh
+  dấu "Latest release" của GitHub cho bản của dòng cũ (hiện workflow chưa phân biệt), sửa trong cùng PR.
+- Hết hạn hỗ trợ của một dòng thì xoá nó khỏi bảng trong `SECURITY.md`.
 
 ## Khi làm việc hằng ngày
 
@@ -59,8 +103,10 @@ bước 7.**
    có mục `## [X.Y.Z]` và tag khớp `version`, sai thì không phát hành.
    Rồi chạy `cargo xtask semver --markdown` (cần `cargo-semver-checks`, phiên bản ghim ở `STACK.md`;
    mất vài phút và vài GB đĩa — `rm -rf target/semver-checks` sau đó): nó in mục `### Breaking (Rust)`
-   gồm thay đổi phá vỡ của `autoxide-kernel` và `autoxide-testkit` so với tag trước; chép vào mục
-   `## [X.Y.Z]`. Không in gì thì không thêm mục. Còn `0.x` thì chỉ báo cáo, không chặn (D-167, D-242).
+   gồm thay đổi phá vỡ của mọi crate hợp đồng (xem "Kiểm hợp đồng Rust") so với tag trước — job `semver`
+   của PR phát hành in sẵn mục này ở tóm tắt; chép vào mục `## [X.Y.Z]`. Không in gì thì không thêm mục. Còn
+   `0.x` thì chỉ báo cáo, không chặn (D-167, D-242); từ `1.0` có phá vỡ ở bản không tăng major thì không
+   phát hành.
 4. Commit `release: vX.Y.Z`, chạy gate (`./gate.sh`, cả SQLite lẫn Postgres) trên bản này, rồi
    `cargo xtask publish-check` (các crate vẫn đóng gói và build được như trên crates.io, xem "Đăng lên crates.io"). Rồi
    chạy test nâng cấp: `cargo xtask upgrade-test` — bản phát hành trước (image Docker của nó; tải

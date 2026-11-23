@@ -4,15 +4,33 @@
 
 ## Supported versions
 
-Autoxide is in its `0.x` series. Security fixes go into the **latest minor release** only
-(for example `0.11.x` while `0.11` is the newest); older minor releases are not patched.
-Update to the latest release before reporting, and say in your report which version you
-tested. The `CHANGELOG.md` lists every release.
+Autoxide is a community project maintained by a small team. The periods below are what we aim
+for, **not a service-level agreement**: there is no paid support and no guaranteed response time.
 
-| Version              | Security fixes |
-| -------------------- | -------------- |
-| Latest `0.x` release | Yes            |
-| Older releases       | No             |
+**From 1.0** (long-term support of each major version):
+
+- The **latest minor release** of the current major version (for example `1.5.x` while `1.5` is the
+  newest) gets every bug fix and security fix.
+- The **previous minor release** gets security fixes for **3 months** after the next minor release
+  comes out (for example `1.4.x` until three months after `1.5.0`), so you have time to upgrade.
+- When a new major version comes out, the last minor release of the previous major version gets
+  security fixes for **6 months** after the new major release.
+- Older releases are not patched.
+
+| Version                                        | Security fixes                          |
+| ---------------------------------------------- | --------------------------------------- |
+| Latest `1.x` minor                             | Yes                                     |
+| Previous `1.x` minor                           | For 3 months after the next minor       |
+| Last minor of the previous major (after `2.0`) | For 6 months after the new major        |
+| Older releases (and `0.x` once 1.0 is out)    | No                                      |
+
+**Before 1.0**, while Autoxide is in its `0.x` series, security fixes go into the latest minor
+release only; older `0.x` releases are not patched.
+
+Fixes ship as patch releases (`1.5.2` → `1.5.3`), which change nothing else, so they are safe to
+install right away ([`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md) says what a patch release may
+contain). Update to the latest release of your line before reporting, and say in your report which
+version you tested. The `CHANGELOG.md` lists every release.
 
 ## Reporting a vulnerability
 

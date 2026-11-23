@@ -105,9 +105,12 @@ thật (P7).
 - [x] P3 — Hai hạng module: chính thức (giữ ổn định) và thử nghiệm (ghi rõ "có thể đổi", không bật khi không đặt cấu
       hình); danh sách và phụ thuộc ở `docs/MODULES.md` + `.vi.md`; người nâng cấp có dữ liệu của module đang tắt được
       cảnh báo rõ ở log khởi động và `doctor`, kèm đúng dòng cấu hình cần thêm
-- [ ] P4 — Bản 1.0 có cam kết: chính sách tương thích cho API, mã lỗi, cấu hình, migration và phần kernel mở cho module
+- [x] P4 — Bản 1.0 có cam kết: chính sách tương thích cho API, mã lỗi, cấu hình, migration và phần kernel mở cho module
       ngoài; `cargo-semver-checks` trong bước phát hành; dòng hỗ trợ dài hạn (vá bảo mật bao lâu) ghi ở
-      `docs/RELEASING.md` và `SECURITY.md`
+      `docs/RELEASING.md` và `SECURITY.md` — D-20261123-compatibility-policy: `docs/COMPATIBILITY.md` + `.vi.md`;
+      `cargo xtask semver` kiểm cả `autoxide` và module core / official, `--changed`; job CI `semver` ở PR chạm phần
+      công khai và PR phát hành (cảnh báo trước 1.0, chặn từ 1.0 — chủ dự án thêm check bắt buộc lúc phát hành 1.0);
+      LTS: minor trước vá bảo mật 3 tháng, major trước 6 tháng
 - [ ] P5 — Đăng gói: SDK TypeScript lên npm, kernel và testkit lên crates.io, tự động lúc phát hành — **ghi nợ, làm
       sau** (D-20261121-vn-providers); cần tài khoản npm và crates.io của chủ dự án
 - [ ] P6 — Rà soát bảo mật toàn bộ trước 1.0 bằng một phiên AI độc lập (chưa thuê bên ngoài, D-20261121-vn-providers);
@@ -1044,7 +1047,7 @@ Thứ tự ưu tiên chủ dự án đồng ý; mỗi mục khi làm thì ghi qu
 - [ ] `/kernel/find`, `/kernel/work` bỏ nguồn chậm khi máy bận: đo lại hạn mỗi nguồn và để client hiện rõ phần thiếu
 - [ ] Tách kernel (nút thắt build: sửa kernel phải build lại gần hết, xem D-20261120-build-faster)
 - [ ] Phát hành thường hơn (1–2 tuần) cho CHANGELOG mỗi bản gọn (phát hành nay tự chạy khi merge PR phát hành,
-      D-20261121-auto-release); cài `cargo-semver-checks` cho bước phát hành — **chuyển thành P4 của bước 70**
+      D-20261121-auto-release); cài `cargo-semver-checks` cho bước phát hành — **chuyển thành P4 của bước 70** (xong)
 - [ ] Đăng SDK TypeScript lên npm (chờ tài khoản của chủ dự án) — **chuyển thành P5 của bước 70**
 - [ ] Nợ nhỏ: tách các file `.rs` trên 800 dòng (đang làm); ~~`chrono` không còn bảo trì~~ — đã thay bằng `jiff`
       (D-20261121-time-library)

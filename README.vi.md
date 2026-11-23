@@ -537,6 +537,8 @@ dùng foreign key xuyên module. Gate tự động kiểm các luật này.
 - [`CLAUDE.md`](CLAUDE.md) — luật cho người đóng góp, là người hay AI agent
 - [`CHANGELOG.md`](CHANGELOG.md) — thay đổi của từng bản phát hành (tiếng Anh); image
   Docker đã phát hành ở `ghcr.io/<owner>/autoxide`
+- [`docs/COMPATIBILITY.vi.md`](docs/COMPATIBILITY.vi.md) — thứ giữ ổn định từ 1.0 (API, mã lỗi, cấu hình,
+  migration, Rust API cho module) và thứ có thể đổi
 - [`docs/guides/`](docs/guides/README.vi.md) — hướng dẫn API theo tình huống, có ví dụ `curl` và
   TypeScript chạy như test: website, đăng nhập, API key, gọi lại an toàn, pagination, lỗi,
   nối AI agent qua MCP
