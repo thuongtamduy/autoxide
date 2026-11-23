@@ -5,7 +5,9 @@
 pub(crate) mod ai_assist;
 pub(crate) mod auth;
 pub(crate) mod catalog_inventory;
+pub(crate) mod checkout_more;
 pub(crate) mod community;
+pub(crate) mod compliance;
 pub(crate) mod content;
 pub(crate) mod customers;
 pub(crate) mod foundation;
