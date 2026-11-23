@@ -60,7 +60,7 @@ mod tenancy;
 mod voice;
 
 pub use app::{TestApp, TestAppBuilder, TestAppError, TestRequest, TestResponse, tool};
-pub use coverage::TEST_API_COVERAGE;
+pub use coverage::{TEST_API_COVERAGE, record_response};
 pub use dns::FakeDns;
 pub use einvoice::{FAKE_EINVOICE_PROVIDER, FakeEInvoiceProvider};
 pub use identity::{FAKE_IDENTITY_PROVIDER, FakeIdentityVerifier, FakeSmsSender};

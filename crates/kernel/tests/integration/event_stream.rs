@@ -165,6 +165,13 @@ impl Server {
         let response = self.app.router().oneshot(request.body(Body::empty()).unwrap()).await;
         let response = response.unwrap();
         let status = response.status();
+        // Stream không đọc hết được bằng `TestRequest::send`: ghi độ phủ tay (D-20261123-api-coverage).
+        autoxide_testkit::record_response(
+            self.app.openapi(),
+            "GET",
+            "/api/v1/kernel/events/stream",
+            status.as_u16(),
+        );
         if status == StatusCode::OK {
             assert_eq!(response.headers()["content-type"], "text/event-stream");
             assert_eq!(response.headers()["x-accel-buffering"], "no");

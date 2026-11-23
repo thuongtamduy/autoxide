@@ -102,6 +102,7 @@ pub(crate) async fn raw(
     let response =
         runtime.api.router.clone().oneshot(request.body(Body::from(body)).unwrap()).await.unwrap();
     let (parts, body) = response.into_parts();
+    autoxide_testkit::record_response(&runtime.api.openapi, method, uri, parts.status.as_u16());
     let bytes = axum::body::to_bytes(body, usize::MAX).await.unwrap().to_vec();
     (parts.status, parts.headers, bytes)
 }

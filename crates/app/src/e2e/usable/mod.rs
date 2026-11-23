@@ -15,4 +15,5 @@ pub(crate) mod ledger_invoices;
 pub(crate) mod orders;
 pub(crate) mod platform;
 pub(crate) mod promotions;
+pub(crate) mod service_desk;
 pub(crate) mod shipping_carrier;
