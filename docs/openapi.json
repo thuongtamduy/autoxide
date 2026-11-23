@@ -254896,7 +254896,7 @@
             }
           },
           {
-            "description": "Id of the automatic answer.",
+            "description": "Id of the automatic answer, or of the ticket message it sent (`auto_reply: true`).",
             "in": "path",
             "name": "reply_id",
             "required": true,
@@ -255940,7 +255940,7 @@
             }
           },
           {
-            "description": "Id of the automatic answer.",
+            "description": "Id of the automatic answer, or of the ticket message it sent (`auto_reply: true`).",
             "in": "path",
             "name": "reply_id",
             "required": true,

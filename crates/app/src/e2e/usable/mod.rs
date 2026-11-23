@@ -3,6 +3,7 @@
 //! người dùng thật (tạo dữ liệu qua API), trên cả SQLite và Postgres. Đo bằng `cargo xtask coverage-api --run`.
 
 pub(crate) mod ai_assist;
+pub(crate) mod ai_drafts;
 pub(crate) mod auth;
 pub(crate) mod catalog_inventory;
 pub(crate) mod checkout_more;
