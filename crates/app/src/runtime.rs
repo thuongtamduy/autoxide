@@ -102,6 +102,11 @@ pub async fn start(settings: Settings, migrations: Migrations) -> Result<Runtime
                     let (router, _) = http::metrics_routes(metrics).split_for_parts();
                     metrics_router = Some(router);
                 } else {
+                    tracing::warn!(
+                        "AUTOXIDE_HTTP_METRICS is on without AUTOXIDE_HTTP_METRICS_ADDRESS: /metrics \
+                         is served on the public port without authentication. Set a separate \
+                         address, or block /metrics at your proxy."
+                    );
                     root = root.merge(http::metrics_routes(metrics));
                 }
             }

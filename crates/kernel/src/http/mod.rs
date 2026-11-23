@@ -443,6 +443,20 @@ pub fn build(
         idempotency.clone(),
     ));
     let limiter = rate_limit::RateLimiter::new(config.rate_limit).map(Arc::new);
+    // SECURITY.md hứa: các cấu hình mở rộng tay này đều có cảnh báo lúc khởi động (rà soát bảo mật
+    // 2026-11 thấy chỉ có cảnh báo cho header IP).
+    if limiter.is_none() {
+        tracing::warn!(
+            "AUTOXIDE_HTTP_RATE_LIMIT_PER_MINUTE is 0: rate limiting is off. Turn it back on unless \
+             a proxy in front of this server limits requests."
+        );
+    }
+    if matches!(config.cors_origins, CorsOrigins::Any) {
+        tracing::warn!(
+            "AUTOXIDE_HTTP_CORS_ORIGINS is `*`: any website can call this API from a browser. List \
+             the origins of your own front ends instead."
+        );
+    }
     if let Some(header) = &config.client_ip_header
         && config.trusted_proxies.is_empty()
     {

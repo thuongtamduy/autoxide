@@ -24,6 +24,7 @@ mod event;
 mod event_stream;
 mod event_ws;
 mod filter_parse;
+mod find_limits;
 mod health;
 mod http;
 mod job;
