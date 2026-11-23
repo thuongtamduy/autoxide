@@ -222,6 +222,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261119-step53-auto-reply](D-20261119-step53-auto-reply.md)** `support`: trả lời tự động — mô hình chỉ phân loại, luật quyết trong Rust, duyệt bằng chính lệnh bật — 2026-11-19
 - **[D-20261121-mcp-server](D-20261121-mcp-server.md)** MCP server tự viết trong kernel thay `rmcp`, phục vụ cả bản `2026-07-28` lẫn bản cũ — 2026-11-21
 - **[D-20261122-ai-pages](D-20261122-ai-pages.md)** AI tạo và sửa trang: job theo lượt, bố cục trả dưới dạng chuỗi JSON, kiểm như người, ghi nháp bằng quyền đã chụp — 2026-11-22
+- **[D-20261123-campaign-drafts](D-20261123-campaign-drafts.md)** Bộ nháp chiến dịch gọi `promotions` / `newsletter` qua sổ tool MCP; hạn mức AI trang theo gói — 2026-11-23
 
 ## Xác thực, phân quyền, bảo mật
 
