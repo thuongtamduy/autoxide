@@ -116,9 +116,13 @@ pub(crate) async fn setup(test: &TestDatabase, legal: bool) -> Setup {
         .provide::<dyn autoxide_catalog::api::CatalogExtensions>(catalog.clone())
         .provide::<dyn autoxide_notifications::api::Notifier>(notifier.clone())
         .provide::<dyn autoxide_compliance::api::ConsentLedger>(consents.clone());
+    // Người mua thật: tài khoản `customer`, không permission nào (D-309).
     for buyer in 0..4u128 {
-        builder = builder.user(&format!("buyer{buyer}"), 100 + buyer, &["promotions.use"]);
+        let principal = autoxide_kernel::access::Principal::customer(Uuid::from_u128(100 + buyer));
+        builder = builder.principal(&format!("buyer{buyer}"), principal);
     }
+    // Nhân sự không có `promotions.use`: không dùng được ví voucher.
+    builder = builder.user("clerk", 99, &[]);
     let app = builder.module(crate::module()).build().await.unwrap();
     let write = app.database().begin_write().await.unwrap();
     let root = OrgTree::insert_root(&write, DEFAULT_TENANT).await.unwrap();

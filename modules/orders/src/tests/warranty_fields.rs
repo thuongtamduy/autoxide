@@ -206,6 +206,19 @@ async fn bao_hanh_theo_serial_va_theo_dong_phieu_bao_hanh() {
         deliver(&shop, other).await;
         let (none, _) = order_of(&shop, plain, 1, "w-3").await;
         deliver(&shop, none).await;
+        // Giao lại (event giao ít nhất một lần): `orders.order_delivered` chạy lại không lỗi, không mở thêm.
+        {
+            use sea_orm::ConnectionTrait as _;
+            let write = shop.database().write();
+            let backend = write.get_database_backend();
+            let sql = "UPDATE orders_events SET delivered_at = NULL WHERE name = 'orders.order_delivered'";
+            write.execute_raw(autoxide_kernel::database::statement(backend, sql, [])).await.unwrap();
+            drain(&shop).await;
+            let sql = "SELECT COUNT(*) AS n FROM orders_events WHERE delivered_at IS NULL";
+            let row = write.query_one_raw(autoxide_kernel::database::statement(backend, sql, [])).await.unwrap().unwrap();
+            let pending: i64 = row.try_get("", "n").unwrap();
+            assert_eq!(pending, 0, "every redelivered event is handled");
+        }
         let tech = Call::as_user(&shop, "tech_a");
         let (status, found) = tech.send("GET", "/warranties?serial=SN-002", None).await;
         assert_eq!(status, StatusCode::OK, "{found}");
