@@ -43,6 +43,7 @@ uuid.workspace = true
 validator.workspace = true
 
 [dev-dependencies]
+proptest.workspace = true
 autoxide-testkit.workspace = true
 
 [lints]

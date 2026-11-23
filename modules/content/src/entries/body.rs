@@ -803,3 +803,73 @@ mod tests {
         }
     }
 }
+
+/// Thử phá link và địa chỉ nhúng của thân bài (D-20261123-property-fuzzing): so với bộ phân tích URL chuẩn
+/// WHATWG — cách trình duyệt hiểu địa chỉ.
+#[cfg(test)]
+mod link_properties {
+    use super::*;
+    use autoxide_kernel::net::Url;
+    use proptest::prelude::*;
+
+    fn piece() -> impl Strategy<Value = &'static str> {
+        prop_oneof![
+            Just(""),
+            Just("/"),
+            Just("//"),
+            Just("\\"),
+            Just("@"),
+            Just(":443"),
+            Just("%2e"),
+            Just("."),
+            Just("#"),
+            Just("?"),
+            Just("https://"),
+            Just("javascript:"),
+            Just("www."),
+            Just("youtube.com"),
+            Just("evil.com"),
+            Just("\u{3000}"),
+            Just(" "),
+        ]
+    }
+
+    fn address() -> impl Strategy<Value = String> {
+        (proptest::collection::vec(piece(), 0..7), "[a-z0-9.]{0,6}")
+            .prop_map(|(pieces, tail)| format!("{}{tail}", pieces.concat()))
+    }
+
+    proptest! {
+        #[test]
+        fn link_duoc_nhan_trinh_duyet_mo_dung_cho(href in prop_oneof![address(), "\\PC{0,40}"]) {
+            if !safe_link(&href) {
+                return Ok(());
+            }
+            let site = Url::parse("https://site.example/blog/post").unwrap();
+            let Ok(target) = site.join(&href) else {
+                return Ok(());
+            };
+            prop_assert!(matches!(target.scheme(), "http" | "https" | "mailto"), "{href:?} → {target}");
+            if href.trim().starts_with('/') {
+                prop_assert_eq!(target.host_str(), Some("site.example"), "{:?} → {}", href, target);
+            }
+        }
+
+        #[test]
+        fn dia_chi_nhung_duoc_nhan_mo_dung_host(url in prop_oneof![
+            address().prop_map(|rest| format!("https://{rest}")),
+            address(),
+        ]) {
+            let hosts = vec!["youtube.com".to_owned()];
+            if !embed_host_allowed(&url, &hosts) {
+                return Ok(());
+            }
+            let parsed = Url::parse(&url);
+            prop_assert!(parsed.is_ok(), "{url:?}");
+            let parsed = parsed.unwrap();
+            prop_assert_eq!(parsed.scheme(), "https");
+            let host = parsed.host_str().unwrap_or_default();
+            prop_assert!(host == "youtube.com" || host.ends_with(".youtube.com"), "{url:?} → {host}");
+        }
+    }
+}

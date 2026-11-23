@@ -32,6 +32,13 @@ install right away ([`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md) says what a
 contain). Update to the latest release of your line before reporting, and say in your report which
 version you tested. The `CHANGELOG.md` lists every release.
 
+## Security reviews
+
+Before 1.0, the maintainers reviewed the whole code base for security problems in November 2026.
+It was an **internal review carried out with AI assistance, not an audit by an independent third
+party**. The scope, the method, every finding with its severity and fix, and the parts not yet
+covered are in [`docs/security/review-2026-11.md`](docs/security/review-2026-11.md).
+
 ## Reporting a vulnerability
 
 **Do not open a public issue, pull request or discussion for a security problem.**

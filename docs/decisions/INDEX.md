@@ -303,6 +303,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261121-scim-groups](D-20261121-scim-groups.md)** Bước 66: nhóm SCIM → role ở nút qua luật ánh xạ; chỉ membership do SCIM tạo bị SCIM gỡ; đồng bộ từng người sau khi ghi nhóm — 2026-11-21
 - **[D-20261121-scim](D-20261121-scim.md)** Bước 66: SCIM 2.0 trong `auth` — token riêng của khách, endpoint theo chuẩn SCIM thay cho envelope chung, mức lọc và PATCH, không Bulk — 2026-11-21 · *thay một phần bởi D-20261121-scim-claim-covers*
 - **[D-20261121-ssrf-targets](D-20261121-ssrf-targets.md)** Địa chỉ máy chủ do khách chọn: kiểm lúc lưu, lọc IP lúc kết nối, lỗi chung — 2026-11-21
+- **[D-20261123-security-review-2026-11](D-20261123-security-review-2026-11.md)** Rà soát bảo mật trước 1.0: báo cáo công khai, sửa hết mức cao/trung bình, role đòi MFA chặn ở cửa đăng nhập — 2026-11-23
 
 ## Đa khách, tổ chức, gói
 
