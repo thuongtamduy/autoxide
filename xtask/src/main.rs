@@ -9,7 +9,8 @@
 //! - `upgrade-test [--from <tag>] [--image <image>] [--database …]` — test nâng cấp từ bản phát
 //!   hành trước bằng image Docker của nó; chạy trong CI và lúc phát hành (xem `upgrade.rs`).
 //! - `check` — kiểm luật ranh giới của workspace (xem `boundaries.rs`), bản dịch i18n
-//!   (`i18n.rs`), tài liệu EN / VI (`docs.rs`), mục lục quyết định (`decisions.rs`), mảnh thay đổi
+//!   (`i18n.rs`), tài liệu EN / VI (`docs.rs`), doc comment tiếng Anh của phần công khai
+//!   (`doc_language.rs`), mục lục quyết định (`decisions.rs`), mảnh thay đổi
 //!   (`changelog.rs`), lọc theo khách (`tenant_scope.rs`), tool MCP theo phạm vi
 //!   (`mcp_principal.rs`; chỗ cũ chờ sửa ở `baseline.rs`) và độ dài
 //!   file `.rs` (`lengths.rs`: quá 800 dòng thì cảnh báo, quá 1200 thì chặn trừ file miễn), hình
@@ -49,6 +50,7 @@ mod boundaries;
 mod changelog;
 mod decisions;
 mod deploy_metrics;
+mod doc_language;
 mod docs;
 mod external;
 mod i18n;
@@ -290,6 +292,8 @@ fn check() -> ExitCode {
     let violations = match boundaries::check_workspace(&workspace).and_then(|mut violations| {
         violations.extend(i18n::check_translations(&workspace)?);
         violations.extend(docs::check_docs(&workspace.root)?);
+        // Doc comment của phần công khai viết tiếng Anh (D-20261123-english-rustdoc).
+        violations.extend(doc_language::check(&workspace.root)?);
         violations.extend(publish::check(&workspace)?);
         violations.extend(tenancy::check_entities(&workspace)?);
         // Hai luật bảo mật có danh sách chỗ cũ chờ sửa (D-20261121-security-lints).

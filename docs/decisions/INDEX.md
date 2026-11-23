@@ -26,7 +26,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 
 - **D-004** GraphQL để sau, OpenAPI từ đầu — 2026-11-11 · **chủ dự án quyết**
 - **D-012** Rust edition 2024, toolchain ghim — 2026-11-11
-- **D-013** Tài liệu tiếng Việt, thuật ngữ kỹ thuật tiếng Anh — 2026-11-11 · **chủ dự án quyết** · *thay một phần bởi D-023*
+- **D-013** Tài liệu tiếng Việt, thuật ngữ kỹ thuật tiếng Anh — 2026-11-11 · **chủ dự án quyết** · *thay một phần bởi D-023, D-20261123-english-rustdoc*
 - **D-018** Được chia agent và subagent — 2026-11-11 · **chủ dự án quyết**
 - **D-021** License: MIT hoặc Apache-2.0 — 2026-11-11 · **chủ dự án quyết**
 - **D-023** Ngôn ngữ tài liệu: tách cho người ngoài và nội bộ — 2026-11-11 · **chủ dự án quyết**
@@ -111,6 +111,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261122-gitleaks-8-30-1](D-20261122-gitleaks-8-30-1.md)** Ghim gitleaks 8.30.1, image lấy từ `ghcr.io/gitleaks/gitleaks` ở cả gate và CI — 2026-11-22
 - **[D-20261122-step67-after-1-0](D-20261122-step67-after-1-0.md)** Ba mục cuối của bước 67 làm sau bản 1.0 — 2026-11-22 · **chủ dự án quyết**
 - **[D-20261122-toolchain-sync](D-20261122-toolchain-sync.md)** Ví dụ module ngoài dùng đúng toolchain của core; `cargo xtask check` chặn khi lệch — 2026-11-22
+- **[D-20261123-english-rustdoc](D-20261123-english-rustdoc.md)** Doc comment của phần công khai viết tiếng Anh, gate `doc-language` — 2026-11-23 · **chủ dự án quyết**
 
 ## Kiến trúc module và kernel
 
