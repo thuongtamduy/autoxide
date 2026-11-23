@@ -176,6 +176,11 @@ thật (P7).
       `docs/guides/` làm theo được đúng như viết; chỗ hỏng tìm ra thì sửa tận gốc kèm test (D-20261123-api-coverage)
   - [x] Công cụ đo: testkit ghi endpoint / tool gọi thành công khi đặt `TEST_API_COVERAGE`; `cargo xtask coverage-api
         --run` báo phần chưa phủ theo module
+  - [x] Hướng dẫn: mọi lệnh `curl` trong `docs/guides/` (cả khối không chạy thật) gọi endpoint có trong hợp đồng, đúng
+        method, thân JSON chỉ dùng trường có thật — `e2e/guides_endpoints.rs`
+  - [ ] Luồng e2e theo nhóm (`crates/app/src/e2e/usable/`): nền, auth, kernel, gói, thông báo, webhook, file; thương
+        mại; nội dung và AI; chăm sóc khách, đặt lịch, tự động hoá, phân tích; tuân thủ — còn: bản nháp AI của support /
+        conversations / catalog / đánh giá, gọi điện (voice), chứng từ của đơn vãng lai, phiên KYC với nhà cung cấp
 - [x] P12 — Thử phá có chủ đích: fuzz / property test cho chỗ nhận dữ liệu từ ngoài, tiền và trạng thái
       (D-20261123-property-fuzzing): `proptest` trên stable trong gate (256 ca), workflow `property.yml` chạy hằng đêm
       20 000 ca, không chặn PR; lỗi tìm ra sửa tận gốc kèm ca tái hiện
