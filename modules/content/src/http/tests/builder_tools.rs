@@ -72,7 +72,7 @@ async fn tool_dung_trang_tu_khoi_nhu_rest() {
         let labels = json!({"one": {"vi": "Dự án"}, "many": {"vi": "Dự án"}});
         let (failed, kind) = call("content.save_type", json!({"fields": {"key": "du_an", "labels": labels}})).await;
         assert!(!failed, "{kind}");
-        let version = kind["data"]["version"].as_str().expect(&kind.to_string()).to_owned();
+        let version = kind["data"]["version"].as_str().unwrap().to_owned();
         let (failed, changed) = call("content.save_type", json!({"key": "du_an", "version": version, "fields": {"icon": "star"}})).await;
         assert!(!failed, "{changed}");
         assert_eq!(changed["data"]["icon"], "star");
