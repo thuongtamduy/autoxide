@@ -531,6 +531,7 @@ impl InvoicesService {
         let invoice = self.einvoice_of(tenant, &row, &found.symbol).await?;
         let answer = provider.issue(tenant.id(), &invoice).await?;
         document::Entity::update_many()
+            .scoped(tenant)
             .col_expr(document::Column::Status, "submitting".into())
             .col_expr(document::Column::ProviderRef, Some(answer.provider_ref.clone()).into())
             .col_expr(document::Column::ProviderNumber, answer.number.into())

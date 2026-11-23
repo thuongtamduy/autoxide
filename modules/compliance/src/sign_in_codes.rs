@@ -121,7 +121,10 @@ impl ComplianceService {
             )),
         };
         if let Err(error) = outcome {
-            phone_challenge::Entity::delete_by_id(id).exec(tenant.database().write()).await?;
+            phone_challenge::Entity::delete_by_id(id)
+                .scoped(tenant)
+                .exec(tenant.database().write())
+                .await?;
             tracing::warn!(phone = %phone.masked(), code = error.code(), "sign-in code sms failed");
             return Err(error);
         }
@@ -169,6 +172,7 @@ impl ComplianceService {
         let digits: String = code.chars().filter(|c| !c.is_whitespace()).collect();
         if !same(&code_hash(&pepper, id, &digits), &row.code_hash) {
             phone_challenge::Entity::update_many()
+                .scoped(tenant)
                 .col_expr(
                     phone_challenge::Column::Attempts,
                     Expr::col(phone_challenge::Column::Attempts).add(1),
@@ -184,6 +188,7 @@ impl ComplianceService {
             });
         }
         let consumed = phone_challenge::Entity::update_many()
+            .scoped(tenant)
             .col_expr(phone_challenge::Column::ConsumedAt, Expr::value(at))
             .filter(phone_challenge::Column::Id.eq(id))
             .filter(phone_challenge::Column::ConsumedAt.is_null())

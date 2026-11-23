@@ -500,6 +500,7 @@ impl NotificationsService {
         let key = key_of(tenant, &kind, channel, locale);
         let transaction = tenant.database().begin_write().await?;
         let draft = template_draft::Entity::find_by_id(key.clone())
+            .scoped(tenant)
             .one(&transaction)
             .await?
             .ok_or_else(draft_not_found)?;
@@ -534,7 +535,7 @@ impl NotificationsService {
             .exec_without_returning(&transaction)
             .await?;
         self.set_live(&transaction, tenant, principal, &key, version.version).await?;
-        template_draft::Entity::delete_by_id(key.clone()).exec(&transaction).await?;
+        template_draft::Entity::delete_by_id(key.clone()).scoped(tenant).exec(&transaction).await?;
         template_version::Entity::delete_many()
             .filter(template_version::Column::Kind.eq(kind.key()))
             .filter(template_version::Column::Channel.eq(channel.as_str()))

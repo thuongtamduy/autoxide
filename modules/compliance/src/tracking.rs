@@ -297,7 +297,8 @@ impl ComplianceService {
         // lần và người dùng không bị hỏi đồng ý lại cho nhà cung cấp mới.
         let key = (tenant.id().as_uuid(), org);
         let mut current =
-            rows::lock_one(transaction, cookie_setting::Entity::find_by_id(key)).await?;
+            rows::lock_one(transaction, cookie_setting::Entity::find_by_id(key).scoped(tenant))
+                .await?;
         let at = now();
         if current.is_none() {
             // Chưa có banner: tạo. Hai bên cùng tạo thì bên sau không chèn được (khoá chính), khoá
@@ -331,7 +332,9 @@ impl ComplianceService {
             if inserted > 0 {
                 return Ok(());
             }
-            current = rows::lock_one(transaction, cookie_setting::Entity::find_by_id(key)).await?;
+            current =
+                rows::lock_one(transaction, cookie_setting::Entity::find_by_id(key).scoped(tenant))
+                    .await?;
         }
         let row = current.ok_or_else(|| Error::internal("cookie banner row vanished"))?;
         let tags = Self::active_tags(transaction, tenant, org).await?;
@@ -584,7 +587,7 @@ impl ComplianceService {
     ) -> Result<(), Error> {
         let row = self.tag_in_scope(tenant, principal, id).await?;
         let transaction = tenant.database().begin_write().await?;
-        tracking_tag::Entity::delete_by_id(row.id).exec(&transaction).await?;
+        tracking_tag::Entity::delete_by_id(row.id).scoped(tenant).exec(&transaction).await?;
         Self::refresh_banner(
             &transaction,
             tenant,
