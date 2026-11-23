@@ -130,7 +130,7 @@
   "field:must be another tag": "phải là nhãn khác",
   "field:must be at least {min}": "phải ít nhất là {min}",
   "field:must be at least {min} characters": "phải có ít nhất {min} ký tự",
-  "field:must be at most {max} characters": "chỉ được tối đa {max} ký tự",
+  "field:must be at most {max} characters": "phải dài tối đa {max} ký tự",
   "field:must be at least {min} characters long": "phải dài ít nhất {min} ký tự",
   "field:must be at most 200 options of 1 to 100 characters": "phải có tối đa 200 lựa chọn, mỗi lựa chọn dài 1 đến 100 ký tự",
   "field:must be at most 50 names of 1 to 64 lower-case letters, digits, `_` and `.`": "phải có tối đa 50 tên, mỗi tên dài 1 đến 64 ký tự gồm chữ thường, số, `_` và `.`",
