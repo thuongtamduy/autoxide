@@ -3,6 +3,7 @@
 pub(crate) mod ai_turn;
 pub(crate) mod author;
 pub(crate) mod banner;
+pub(crate) mod campaign_draft;
 pub(crate) mod content_type;
 pub(crate) mod edit_lock;
 pub(crate) mod embedding;

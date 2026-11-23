@@ -5098,6 +5098,83 @@
         "returns_secret": false
       },
       "deprecation": null,
+      "description": "Draft a campaign from a promotion: a landing page (`page`), a text banner (`banner`, needs `banner_placement`) and a newsletter campaign (`newsletter`, needs `newsletter_list_id`). Everything is a draft in its own module — nothing is published or sent; a person reviews each one. Runs in the background: read the outcome with `get_campaign_drafts`. Counts once toward the plan's monthly AI page builds.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A request for campaign drafts made from one promotion.",
+        "properties": {
+          "banner_placement": {
+            "description": "`banner` channel: key of the banner placement.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "channels": {
+            "description": "What to draft: any of `page`, `banner`, `newsletter`.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "instruction": {
+            "description": "Extra wishes in plain words, at most 2000 characters.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "locale": {
+            "description": "Language of the drafts; omit for the default language.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "newsletter_list_id": {
+            "description": "`newsletter` channel: the list the campaign is written for.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "org_id": {
+            "description": "Website (organization node) of the landing page and the banner. Omit for your own node.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "promotion_id": {
+            "description": "The promotion (module `promotions`) to draft the campaign for.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "promotion_id",
+          "channels"
+        ],
+        "type": "object"
+      },
+      "name": "content.create_campaign_drafts",
+      "output_schema": null,
+      "permissions": [
+        "content.write",
+        "content.write_own"
+      ],
+      "stability": "official"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
       "description": "Create a post or page as a draft (not visible to readers until published). The slug is made from the title unless given.",
       "input_schema": {
         "additionalProperties": false,
@@ -5262,6 +5339,37 @@
         "type": "object"
       },
       "name": "content.get",
+      "output_schema": null,
+      "permissions": [
+        "content.read"
+      ],
+      "stability": "official"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Get a campaign draft request: its status and, once finished, the draft made for each channel (`kind` and `id`) or why that channel failed (`error_code`).",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A request to read.",
+        "properties": {
+          "id": {
+            "description": "Id of the request (from `create_campaign_drafts`).",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "content.get_campaign_drafts",
       "output_schema": null,
       "permissions": [
         "content.read"

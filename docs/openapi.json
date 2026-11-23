@@ -2968,6 +2968,165 @@
         ],
         "type": "object"
       },
+      "CampaignDraftsRequest": {
+        "additionalProperties": false,
+        "description": "A request for campaign drafts.",
+        "properties": {
+          "banner_placement": {
+            "description": "`banner` channel: key of the banner placement (`GET /placements`).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "channels": {
+            "description": "What to draft: `page` (a landing page built from blocks), `banner` (a text banner linking to\nthe promotion), `newsletter` (a campaign of the `newsletter` module).",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "instruction": {
+            "description": "Extra wishes in plain words (at most 2000 characters), e.g. \"playful tone, mention free\nshipping\".",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "locale": {
+            "description": "Language of the drafts; one of the site's languages. Omit for the default language.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "newsletter_list_id": {
+            "description": "`newsletter` channel: the list the campaign is written for.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "org_id": {
+            "description": "Website (organization node) of the landing page and the banner. Omit for your own node.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "promotion_id": {
+            "description": "The promotion (module `promotions`) to draft the campaign for.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "promotion_id",
+          "channels"
+        ],
+        "type": "object"
+      },
+      "CampaignDraftsResponse": {
+        "description": "A set of campaign drafts made from one promotion, and the outcome of each channel.",
+        "properties": {
+          "banner_placement": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "channels": {
+            "description": "The channels asked for: `page`, `banner`, `newsletter`.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "error_code": {
+            "description": "Why the whole set failed, e.g. `promotions.not_found` when the promotion is gone.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "finished_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "instruction": {
+            "description": "Extra wishes of the requester (may be empty).",
+            "type": "string"
+          },
+          "locale": {
+            "type": "string"
+          },
+          "newsletter_list_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "org_id": {
+            "description": "Website of the landing page and the banner; `null`: the requester's own node.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "promotion_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "requested_by": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "results": {
+            "description": "One result per channel once finished.",
+            "items": {
+              "$ref": "#/components/schemas/ChannelResultResponse"
+            },
+            "type": "array"
+          },
+          "status": {
+            "description": "`queued`, `succeeded` (every channel has a draft), `partial` or `failed`.",
+            "type": "string"
+          },
+          "tries": {
+            "description": "Calls made to the model for the banner and mail copy (a refused answer is retried at most\ntwice).",
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "promotion_id",
+          "locale",
+          "channels",
+          "instruction",
+          "status",
+          "tries",
+          "results",
+          "requested_by",
+          "created_at"
+        ],
+        "type": "object"
+      },
       "CampaignPreviewResponse": {
         "description": "A campaign mail exactly as subscribers get it.",
         "properties": {
@@ -7971,6 +8130,54 @@
         "required": [
           "plan_id",
           "reference"
+        ],
+        "type": "object"
+      },
+      "ChannelResultResponse": {
+        "description": "The draft made for one channel. Nothing is published or sent: review each draft in its module.",
+        "properties": {
+          "channel": {
+            "description": "`page`, `banner` or `newsletter`.",
+            "type": "string"
+          },
+          "error_code": {
+            "description": "Why this channel failed, e.g. `content.campaign_copy_invalid`, `permission_denied`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "description": "Id of the draft.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "description": "`content.entry` (a draft page), `content.banner` (a draft banner) or `newsletter.campaign` (a\ndraft campaign).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "`created` or `failed`.",
+            "type": "string"
+          },
+          "turn_id": {
+            "description": "`page` only: the AI turn building the layout; follow it with `GET /entries/{id}/ai/thread`.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "channel",
+          "status"
         ],
         "type": "object"
       },
@@ -18329,6 +18536,114 @@
             "required": [
               "count",
               "ids"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_CampaignDraftsResponse": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A set of campaign drafts made from one promotion, and the outcome of each channel.",
+            "properties": {
+              "banner_placement": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "channels": {
+                "description": "The channels asked for: `page`, `banner`, `newsletter`.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "error_code": {
+                "description": "Why the whole set failed, e.g. `promotions.not_found` when the promotion is gone.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "finished_at": {
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "instruction": {
+                "description": "Extra wishes of the requester (may be empty).",
+                "type": "string"
+              },
+              "locale": {
+                "type": "string"
+              },
+              "newsletter_list_id": {
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "org_id": {
+                "description": "Website of the landing page and the banner; `null`: the requester's own node.",
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "promotion_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "requested_by": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "results": {
+                "description": "One result per channel once finished.",
+                "items": {
+                  "$ref": "#/components/schemas/ChannelResultResponse"
+                },
+                "type": "array"
+              },
+              "status": {
+                "description": "`queued`, `succeeded` (every channel has a draft), `partial` or `failed`.",
+                "type": "string"
+              },
+              "tries": {
+                "description": "Calls made to the model for the banner and mail copy (a refused answer is retried at most\ntwice).",
+                "format": "int32",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "id",
+              "promotion_id",
+              "locale",
+              "channels",
+              "instruction",
+              "status",
+              "tries",
+              "results",
+              "requested_by",
+              "created_at"
             ],
             "type": "object"
           }
@@ -152522,6 +152837,238 @@
         ],
         "x-permissions": [
           "content.banners"
+        ]
+      }
+    },
+    "/api/v1/content/campaign-drafts": {
+      "post": {
+        "description": "Requires `content.write` (or `content.write_own`), the plan feature `content.ai_suggestions`, and\nreading the promotion (`promotions.read`); the `banner` channel also needs `content.banners`, the\n`newsletter` channel `newsletter.manage`. Runs in the background: follow it with\n`GET /campaign-drafts/{id}`. From the promotion's real data the AI drafts, per channel: a landing page\n(blocks `promotions.flash_sale` / `promotions.voucher_claim`), a text banner linking to the\npromotion, and an advertising newsletter campaign. Every result is a **draft** in its own module —\nnothing is published or sent; numbers in the copy must come from the promotion. Counts once toward\nthe plan limit `content.ai_page_generations`.",
+        "operationId": "content_create_content_campaign_drafts",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CampaignDraftsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CampaignDraftsResponse"
+                }
+              }
+            },
+            "description": "Queued."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission (`permission_denied`), or the plan lacks `content.ai_suggestions`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No promotion has this id in your scope; code `promotions.not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A channel is unknown or misses its `banner_placement` / `newsletter_list_id`, the language or the instruction is invalid; see `errors`."
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The plan's monthly AI page builds are used up; code `quota_exhausted`."
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "AI is off on this server (`ai.disabled`), or the `promotions` / `newsletter` module is not installed (`content.campaign_module_unavailable`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Draft a campaign from a promotion.",
+        "tags": [
+          "content"
+        ],
+        "x-permissions": [
+          "content.write",
+          "content.write_own"
+        ]
+      }
+    },
+    "/api/v1/content/campaign-drafts/{id}": {
+      "get": {
+        "description": "Requires `content.read`; someone else's request also needs `content.write`. Shows the status\nand, once finished, the draft made for each channel.",
+        "operationId": "content_get_content_campaign_drafts",
+        "parameters": [
+          {
+            "description": "Id of the request.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CampaignDraftsResponse"
+                }
+              }
+            },
+            "description": "The request and its results."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `content.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No request has this id, or it is someone else's and you lack `content.write`; code `content.campaign_draft_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a set of campaign drafts.",
+        "tags": [
+          "content"
+        ],
+        "x-permissions": [
+          "content.read"
         ]
       }
     },

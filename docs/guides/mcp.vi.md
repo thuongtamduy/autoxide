@@ -164,9 +164,11 @@ Tool của phiên bản này, theo module (`docs/mcp-tools.json` có đủ schem
 | `compliance.website_checklist` | `compliance.legal.read` | read-only |
 | `compliance.website_dossier` | `compliance.legal.read` | read-only |
 | `compliance.websites` | `compliance.legal.read` | read-only |
+| `content.create_campaign_drafts` | `content.write` or `content.write_own` | writes |
 | `content.create_draft` | `content.write` or `content.write_own` | writes |
 | `content.draft_from_template` | `content.write` or `content.write_own` | writes |
 | `content.get` | `content.read` | read-only |
+| `content.get_campaign_drafts` | `content.read` | read-only |
 | `content.get_translation_request` | `content.read` or `content.write_own` | read-only |
 | `content.legal_templates` | `content.read` | read-only |
 | `content.list` | `content.read` | read-only |

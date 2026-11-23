@@ -1059,6 +1059,59 @@ export type CallbackRequest = {
   state: string;
 };
 
+/** A request for campaign drafts. */
+export type CampaignDraftsRequest = {
+  /** `banner` channel: key of the banner placement (`GET /placements`). */
+  banner_placement?: string | null;
+  /**
+   * What to draft: `page` (a landing page built from blocks), `banner` (a text banner linking to
+   * the promotion), `newsletter` (a campaign of the `newsletter` module).
+   */
+  channels: string[];
+  /**
+   * Extra wishes in plain words (at most 2000 characters), e.g. "playful tone, mention free
+   * shipping".
+   */
+  instruction?: string | null;
+  /** Language of the drafts; one of the site's languages. Omit for the default language. */
+  locale?: string | null;
+  /** `newsletter` channel: the list the campaign is written for. */
+  newsletter_list_id?: string | null;
+  /** Website (organization node) of the landing page and the banner. Omit for your own node. */
+  org_id?: string | null;
+  /** The promotion (module `promotions`) to draft the campaign for. */
+  promotion_id: string;
+};
+
+/** A set of campaign drafts made from one promotion, and the outcome of each channel. */
+export type CampaignDraftsResponse = {
+  banner_placement?: string | null;
+  /** The channels asked for: `page`, `banner`, `newsletter`. */
+  channels: string[];
+  created_at: string;
+  /** Why the whole set failed, e.g. `promotions.not_found` when the promotion is gone. */
+  error_code?: string | null;
+  finished_at?: string | null;
+  id: string;
+  /** Extra wishes of the requester (may be empty). */
+  instruction: string;
+  locale: string;
+  newsletter_list_id?: string | null;
+  /** Website of the landing page and the banner; `null`: the requester's own node. */
+  org_id?: string | null;
+  promotion_id: string;
+  requested_by: string;
+  /** One result per channel once finished. */
+  results: ChannelResultResponse[];
+  /** `queued`, `succeeded` (every channel has a draft), `partial` or `failed`. */
+  status: string;
+  /**
+   * Calls made to the model for the banner and mail copy (a refused answer is retried at most
+   * twice).
+   */
+  tries: number;
+};
+
 /** A campaign mail exactly as subscribers get it. */
 export type CampaignPreviewResponse = {
   /**
@@ -2685,6 +2738,25 @@ export type ChangeRequest = {
    * same change again changes nothing more.
    */
   reference: string;
+};
+
+/** The draft made for one channel. Nothing is published or sent: review each draft in its module. */
+export type ChannelResultResponse = {
+  /** `page`, `banner` or `newsletter`. */
+  channel: string;
+  /** Why this channel failed, e.g. `content.campaign_copy_invalid`, `permission_denied`. */
+  error_code?: string | null;
+  /** Id of the draft. */
+  id?: string | null;
+  /**
+   * `content.entry` (a draft page), `content.banner` (a draft banner) or `newsletter.campaign` (a
+   * draft campaign).
+   */
+  kind?: string | null;
+  /** `created` or `failed`. */
+  status: string;
+  /** `page` only: the AI turn building the layout; follow it with `GET /entries/{id}/ai/thread`. */
+  turn_id?: string | null;
 };
 
 /** A tenant below this one (a child, or a child of a child…). */
@@ -6199,6 +6271,38 @@ export type Data_BulkPreview = {
   data: {
     count: number;
     ids: string[];
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_CampaignDraftsResponse = {
+  /** A set of campaign drafts made from one promotion, and the outcome of each channel. */
+  data: {
+    banner_placement?: string | null;
+    /** The channels asked for: `page`, `banner`, `newsletter`. */
+    channels: string[];
+    created_at: string;
+    /** Why the whole set failed, e.g. `promotions.not_found` when the promotion is gone. */
+    error_code?: string | null;
+    finished_at?: string | null;
+    id: string;
+    /** Extra wishes of the requester (may be empty). */
+    instruction: string;
+    locale: string;
+    newsletter_list_id?: string | null;
+    /** Website of the landing page and the banner; `null`: the requester's own node. */
+    org_id?: string | null;
+    promotion_id: string;
+    requested_by: string;
+    /** One result per channel once finished. */
+    results: ChannelResultResponse[];
+    /** `queued`, `succeeded` (every channel has a draft), `partial` or `failed`. */
+    status: string;
+    /**
+     * Calls made to the model for the banner and mail copy (a refused answer is retried at most
+     * twice).
+     */
+    tries: number;
   };
 };
 
@@ -39061,6 +39165,36 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
       responses: {
         204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/content/campaign-drafts": {
+    /** Draft a campaign from a promotion. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CampaignDraftsRequest;
+      responses: {
+        202: Data_CampaignDraftsResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        429: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/content/campaign-drafts/{id}": {
+    /** Get a set of campaign drafts. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_CampaignDraftsResponse;
         401: Problem;
         403: Problem;
         404: Problem;

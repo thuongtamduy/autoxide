@@ -6,6 +6,7 @@ mod actions;
 mod ai_pages;
 mod assist;
 mod banners;
+pub(crate) mod campaign_drafts;
 mod edit_lock;
 pub(crate) mod entries;
 mod health;
@@ -70,6 +71,8 @@ pub(crate) fn routes(service: Arc<ContentService>) -> OpenApiRouter {
         .routes(routes!(ai_pages::compose_page))
         .routes(routes!(ai_pages::edit_page))
         .routes(routes!(ai_pages::ai_thread))
+        .routes(routes!(campaign_drafts::create_campaign_drafts))
+        .routes(routes!(campaign_drafts::get_campaign_drafts))
         .routes(routes!(actions::publish_entry))
         .routes(routes!(actions::unpublish_entry))
         .routes(routes!(actions::archive_entry))
