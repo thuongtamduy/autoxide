@@ -173,6 +173,39 @@ async fn goi_lai_tao_dung_mot_muc_hop_viec() {
 }
 
 #[tokio::test]
+async fn nguoi_mua_huy_nhan_vien_dong_va_lay_phien_nghe_may() {
+    TestDatabase::run(async |test| {
+        let v = voice(test, true, false).await;
+        let id = start(&v.h.app, "buyer", "Gọi lại giúp mình").await;
+        // Người mua đổi ý: huỷ yêu cầu của mình.
+        let (_, made) = request(&v.h.app, "buyer", &id, "cb-1", false).await;
+        let cb = made["data"]["id"].as_str().unwrap().to_owned();
+        let (status, cancelled) =
+            call(&v.h.app, "DELETE", &format!("/me/threads/{id}/callbacks/{cb}"), "buyer", None)
+                .await;
+        assert_eq!(status, StatusCode::OK, "{cancelled}");
+        assert_eq!(cancelled["data"]["status"], "cancelled");
+        // Yêu cầu mới; nhân viên đã liên lạc được bằng cách khác nên đóng.
+        let (status, made) = request(&v.h.app, "buyer", &id, "cb-2", false).await;
+        assert_eq!(status, StatusCode::CREATED, "{made}");
+        let cb = made["data"]["id"].as_str().unwrap().to_owned();
+        let (status, closed) =
+            call(&v.h.app, "POST", &format!("/callbacks/{cb}/close"), "agent", None).await;
+        assert_eq!(status, StatusCode::OK, "{closed}");
+        assert_eq!(closed["data"]["status"], "done");
+        // Nhân viên lấy phiên WebRTC để nghe máy ở đường dây của cửa hàng.
+        let (status, session) = call(&v.h.app, "GET", "/voice/agent-session", "agent", None).await;
+        assert_eq!(status, StatusCode::OK, "{session}");
+        assert!(
+            session["data"]["token"].as_str().is_some_and(|token| !token.is_empty()),
+            "{session}"
+        );
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
 async fn hai_nhan_vien_bam_goi_cung_luc_chi_mot_cuoc_goi() {
     TestDatabase::run(async |test| {
         let v = voice(test, true, false).await;

@@ -172,6 +172,36 @@ async fn dinh_danh_qua_nha_cung_cap_roi_cong_kyc_mo() {
 }
 
 #[tokio::test]
+async fn nhan_vien_dinh_danh_to_chuc_qua_dang_ky_kinh_doanh() {
+    TestDatabase::run(async |test| {
+        let (app, verifier) = app(test).await;
+        // Hồ sơ của người bán là tổ chức (nút gốc), nhân viên có `compliance.kyc.submit` mở và nộp.
+        let body = json!({"party_type": "organization"});
+        let (status, opened) = call(&app, "POST", "/kyc/profiles", "admin", Some(body)).await;
+        assert!(status.is_success(), "{opened}");
+        let profile = opened["data"]["id"].as_str().unwrap().to_owned();
+        let body = json!({"method": "business_registry", "return_url": "https://shop.example/kyc"});
+        let uri = format!("/kyc/profiles/{profile}/sessions");
+        let (status, session) = call(&app, "POST", &uri, "admin", Some(body)).await;
+        assert_eq!(status, StatusCode::OK, "{session}");
+        assert_eq!(session["data"]["profile_id"], profile.as_str());
+        let attempt: Uuid = session["data"]["attempt_id"].as_str().unwrap().parse().unwrap();
+        // Người không có quyền nộp: 403.
+        let (status, _) = call(&app, "POST", &uri, "alice", Some(json!({}))).await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+
+        let reference = FakeIdentityVerifier::reference(attempt);
+        verifier.complete(&reference, true, "CONG TY TNHH AN", "0101234567");
+        assert_eq!(callback(&app, &reference).await, StatusCode::NO_CONTENT);
+        run_jobs(&app).await;
+        let (_, read) = call(&app, "GET", &format!("/kyc/profiles/{profile}"), "admin", None).await;
+        assert_eq!(read["data"]["verified_name"], "CONG TY TNHH AN", "{read}");
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
 async fn quy_tac_theo_ngay_hieu_luc_va_nhap_chi_them() {
     TestDatabase::run(async |test| {
         let (app, _) = app(test).await;
