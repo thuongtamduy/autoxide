@@ -320,3 +320,71 @@ mod tests {
         assert!(error.contains("decimal number"), "{error}");
     }
 }
+
+// Thử phá số thập phân và quy đổi tiền (D-20261123-property-fuzzing).
+#[cfg(test)]
+mod properties {
+    use super::*;
+    use proptest::prelude::*;
+
+    fn rounding() -> impl Strategy<Value = Rounding> {
+        prop_oneof![
+            Just(Rounding::HalfUp),
+            Just(Rounding::HalfEven),
+            Just(Rounding::Down),
+            Just(Rounding::Up),
+            Just(Rounding::Floor),
+            Just(Rounding::Ceiling),
+        ]
+    }
+
+    proptest! {
+        #[test]
+        fn doc_chuoi_bat_ky_khong_panic_va_cot_doc_lai_nguyen_ven(
+            raw in "-?[0-9]{0,30}(\\.[0-9]{0,30})?|\\PC{0,40}",
+        ) {
+            if let Ok(value) = parse(&raw) {
+                prop_assert_eq!(from_column(&to_column(value)).unwrap(), value);
+            }
+        }
+
+        #[test]
+        fn tien_doi_ra_thap_phan_roi_doi_lai_nguyen_ven(
+            minor in any::<i64>(),
+            currency in prop_oneof![Just(Currency::VND), Just(Currency::USD), Just(Currency::parse("KWD").unwrap())],
+            rounding in rounding(),
+        ) {
+            let money = Money::new(minor, currency);
+            prop_assert_eq!(Money::from_decimal(money.to_decimal(), currency, rounding).unwrap(), money);
+        }
+
+        #[test]
+        fn nhan_ti_le_tu_0_toi_1_khong_vuot_so_goc_va_cung_dau(
+            minor in any::<i64>(),
+            basis_points in 0i64..=10_000,
+            rounding in rounding(),
+        ) {
+            let money = Money::new(minor, Currency::VND);
+            let rate = Decimal::new(basis_points, 4);
+            let applied = money.apply_rate(rate, rounding).unwrap();
+            prop_assert!(applied.minor().unsigned_abs() <= minor.unsigned_abs());
+            prop_assert!(applied.minor() == 0 || (applied.minor() < 0) == (minor < 0));
+            // Sai khác so với giá trị đúng dưới một đơn vị nhỏ nhất.
+            let exact = Decimal::from(minor) * rate;
+            prop_assert!((Decimal::from(applied.minor()) - exact).abs() < Decimal::ONE);
+        }
+
+        #[test]
+        fn quy_doi_ti_gia_bat_ky_khong_panic(
+            minor in any::<i64>(),
+            mantissa in any::<i64>(),
+            scale in 0u32..=28,
+            rounding in rounding(),
+        ) {
+            let rate = Decimal::new(mantissa, scale);
+            if let Err(error) = Money::new(minor, Currency::USD).convert(rate, Currency::VND, rounding) {
+                prop_assert_eq!(error.code(), "money.overflow");
+            }
+        }
+    }
+}

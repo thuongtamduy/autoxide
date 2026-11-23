@@ -119,6 +119,16 @@ pub(crate) fn compute(
                 "must not be negative",
             ));
         }
+        if line
+            .quantity
+            .is_some_and(|quantity| quantity.0.is_sign_negative() && !quantity.0.is_zero())
+        {
+            problems.push(FieldError::new(
+                format!("lines[{index}].quantity"),
+                "range",
+                "must not be negative",
+            ));
+        }
         if chain.iter().any(|rate| rate.basis == Basis::PerUnit) && line.quantity.is_none() {
             problems.push(FieldError::new(
                 format!("lines[{index}].quantity"),
@@ -140,11 +150,17 @@ pub(crate) fn compute(
     let mut totals: BTreeMap<(String, String, bool), (Money, Money)> = BTreeMap::new();
     for indexes in groups.values() {
         let chain = &lines[indexes[0]].1;
+        // Giá đã gồm thuế: phần dư làm tròn dồn vào tầng CHỊU thuế cuối cùng. Tầng "không chịu thuế"
+        // luôn có số thuế 0 — dồn vào nó thì hoá đơn ghi số thuế khác 0 cho dòng không chịu thuế.
+        let last_taxable = chain.iter().rposition(|rate| rate.basis != Basis::Exempt);
         let amounts: Vec<Money> = indexes.iter().map(|index| lines[*index].0.amount).collect();
-        let quantity: Decimal = indexes
+        // Số lượng do người gọi gửi (tới 28 chữ số): cộng / nhân `Decimal` bằng phép có kiểm tràn —
+        // phép `+` / `*` thường của `rust_decimal` panic khi tràn (D-20261123-property-fuzzing).
+        let quantity = indexes
             .iter()
             .filter_map(|index| lines[*index].0.quantity.map(|quantity| quantity.0))
-            .sum();
+            .try_fold(Decimal::ZERO, Decimal::checked_add)
+            .ok_or_else(too_large)?;
         let group_total = sum(&amounts, currency)?;
         let shares = ratios(&amounts);
         // Giá chưa thuế của nhóm, và thuế từng tầng (tổng nhóm), cùng cơ sở của từng tầng.
@@ -170,17 +186,28 @@ pub(crate) fn compute(
                         Basis::Percent => base / (Decimal::ONE + rate.rate_percent / hundred()),
                         Basis::PerUnit => {
                             let unit = rate.per_unit.map_or(Decimal::ZERO, Money::to_decimal);
-                            base - unit * quantity
+                            unit.checked_mul(quantity)
+                                .and_then(|tax| base.checked_sub(tax))
+                                .ok_or_else(too_large)?
                         }
                     };
                 }
                 let net = Money::from_decimal(base, currency, Rounding::HalfUp)?;
+                // Giá đã gồm thuế thấp hơn thuế theo đơn vị nằm trong nó: giá chưa thuế âm là dữ liệu
+                // sai (hoá đơn không ghi được), báo cho người gọi thay vì tính tiếp.
+                if net.is_negative() {
+                    return Err(Error::validation(vec![FieldError::new(
+                        format!("lines[{}].amount", indexes[0]),
+                        "range",
+                        "is lower than the per-unit taxes it includes",
+                    )]));
+                }
                 let mut running = net;
                 let mut taxes = Vec::with_capacity(chain.len());
                 let mut bases = Vec::with_capacity(chain.len());
                 for (position, rate) in chain.iter().enumerate() {
                     bases.push(running);
-                    let tax = if position + 1 == chain.len() {
+                    let tax = if Some(position) == last_taxable {
                         // Tầng cuối nhận phần dư: tổng luôn khớp giá đã gồm thuế.
                         group_total.checked_sub(running)?
                     } else {
@@ -206,7 +233,7 @@ pub(crate) fn compute(
         };
         let mut line_taxes: Vec<Vec<Money>> = Vec::with_capacity(chain.len());
         for (position, tax) in taxes.iter().enumerate() {
-            let last_inclusive = mode == PriceMode::Inclusive && position + 1 == chain.len();
+            let last_inclusive = mode == PriceMode::Inclusive && Some(position) == last_taxable;
             if last_inclusive {
                 // Thuế tầng cuối của dòng = tổng dòng − giá chưa thuế − các thuế trước của dòng.
                 let mut column = Vec::with_capacity(indexes.len());
@@ -254,6 +281,15 @@ pub(crate) fn compute(
         })
         .collect();
     Ok(Computed { lines, totals })
+}
+
+/// Số lượng hay số tiền vượt giới hạn tính được (28 chữ số của `Decimal`).
+fn too_large() -> Error {
+    Error::validation(vec![FieldError::new(
+        "lines",
+        "range",
+        "the quantities or amounts are too large to compute",
+    )])
 }
 
 #[cfg(test)]
@@ -349,6 +385,217 @@ mod tests {
             PriceMode::Exclusive,
             Currency::VND,
             &[(line("a", -1), vec![percent(2, "vat", 10)])],
+        )
+        .unwrap_err();
+        assert_eq!(error.code(), "validation_failed");
+    }
+}
+
+/// Thử phá bộ tính thuế (D-20261123-property-fuzzing): tổng luôn khớp, không âm, không tràn thành panic.
+#[cfg(test)]
+mod properties {
+    use super::*;
+    use proptest::prelude::*;
+
+    /// Một thuế suất; `per_unit = false` thì không sinh thuế theo đơn vị.
+    fn rate(per_unit: bool) -> impl Strategy<Value = (Basis, i64, i64)> {
+        prop_oneof![
+            4 => (0i64..=10_000).prop_map(|bp| (Basis::Percent, bp, 0)),
+            u32::from(per_unit) => (0i64..=5_000).prop_map(|unit| (Basis::PerUnit, 0, unit)),
+            1 => Just((Basis::Exempt, 0, 0)),
+        ]
+    }
+
+    /// Chuỗi thuế suất: mỗi tầng một ID riêng.
+    fn chain() -> impl Strategy<Value = Vec<ResolvedRate>> {
+        chain_of(true)
+    }
+
+    fn chain_of(per_unit: bool) -> impl Strategy<Value = Vec<ResolvedRate>> {
+        proptest::collection::vec(rate(per_unit), 0..3).prop_map(|rates| {
+            rates
+                .into_iter()
+                .enumerate()
+                .map(|(stage, (basis, bp, unit))| ResolvedRate {
+                    id: Uuid::from_u128(
+                        u128::from(stage as u64) << 64
+                            | u128::from(bp.unsigned_abs()) << 32
+                            | u128::from(unit.unsigned_abs()),
+                    ),
+                    tax_kind: format!("kind{stage}"),
+                    basis,
+                    rate_percent: Decimal::new(bp, 2),
+                    per_unit: (basis == Basis::PerUnit).then(|| Money::new(unit, Currency::VND)),
+                    stage: i32::try_from(stage).unwrap(),
+                })
+                .collect()
+        })
+    }
+
+    fn document() -> impl Strategy<Value = (PriceMode, Vec<(TaxableLine, Vec<ResolvedRate>)>)> {
+        document_of(true)
+    }
+
+    fn document_of(
+        per_unit: bool,
+    ) -> impl Strategy<Value = (PriceMode, Vec<(TaxableLine, Vec<ResolvedRate>)>)> {
+        let mode = prop_oneof![Just(PriceMode::Inclusive), Just(PriceMode::Exclusive)];
+        let lines = (chain_of(per_unit), chain_of(per_unit)).prop_flat_map(|(first, second)| {
+            proptest::collection::vec((0i64..=1_000_000_000_000, 0i64..=1_000, any::<bool>()), 1..8)
+                .prop_map(move |lines| {
+                    lines
+                        .into_iter()
+                        .enumerate()
+                        .map(|(index, (amount, quantity, pick))| {
+                            let line = TaxableLine::new(
+                                format!("l{index}"),
+                                "c",
+                                Money::new(amount, Currency::VND),
+                            )
+                            .with_quantity(Decimal::from(quantity));
+                            (line, if pick { first.clone() } else { second.clone() })
+                        })
+                        .collect::<Vec<_>>()
+                })
+        });
+        (mode, lines)
+    }
+
+    proptest! {
+        #[test]
+        fn tong_dong_khop_va_tong_chung_tu_khop(document in document()) {
+            let (mode, lines) = document;
+            let computed = match compute(mode, Currency::VND, &lines) {
+                Ok(computed) => computed,
+                // Chỉ một lỗi được phép: giá đã gồm thuế thấp hơn thuế theo đơn vị.
+                Err(error) => {
+                    prop_assert!(mode == PriceMode::Inclusive && lines.iter().any(|(_, chain)| chain.iter().any(|rate| rate.basis == Basis::PerUnit)));
+                    prop_assert_eq!(error.fields()[0].code.as_str(), "range");
+                    return Ok(());
+                }
+            };
+            prop_assert_eq!(computed.lines.len(), lines.len());
+            for taxed in &computed.lines {
+                prop_assert!(!taxed.net.is_negative(), "{:?}", taxed);
+            }
+            let mut by_kind: BTreeMap<(String, bool), i128> = BTreeMap::new();
+            for (taxed, (line, chain)) in computed.lines.iter().zip(&lines) {
+                prop_assert_eq!(&taxed.line_id, &line.line_id);
+                let taxes: i128 = taxed.taxes.iter().map(|tax| i128::from(tax.amount.minor())).sum();
+                prop_assert_eq!(i128::from(taxed.gross.minor()), i128::from(taxed.net.minor()) + taxes);
+                match mode {
+                    PriceMode::Exclusive => prop_assert_eq!(taxed.net, line.amount),
+                    PriceMode::Inclusive => prop_assert_eq!(taxed.gross, line.amount),
+                }
+                prop_assert_eq!(taxed.taxes.len(), chain.len());
+                for tax in &taxed.taxes {
+                    if tax.exempt {
+                        prop_assert!(tax.amount.is_zero(), "thuế của dòng không chịu thuế: {:?}", taxed);
+                    }
+                    *by_kind.entry((tax.tax_kind.clone(), tax.exempt)).or_default() += i128::from(tax.amount.minor());
+                }
+            }
+            let mut totals: BTreeMap<(String, bool), i128> = BTreeMap::new();
+            for total in &computed.totals {
+                *totals.entry((total.tax_kind.clone(), total.exempt)).or_default() += i128::from(total.amount.minor());
+            }
+            prop_assert_eq!(by_kind, totals);
+        }
+
+        #[test]
+        fn gia_chua_thue_phan_tram_khong_am_va_thue_khong_am(
+            // Chỉ thuế theo phần trăm: thuế theo đơn vị lớn hơn giá thì giá chưa thuế âm là đúng số học.
+            document in document_of(false),
+        ) {
+            let (mode, lines) = document;
+            let computed = compute(mode, Currency::VND, &lines).unwrap();
+            for taxed in &computed.lines {
+                prop_assert!(!taxed.net.is_negative(), "{:?}", taxed);
+                for tax in &taxed.taxes {
+                    prop_assert!(!tax.amount.is_negative(), "{:?}", taxed);
+                }
+            }
+        }
+
+        #[test]
+        fn so_tien_bien_khong_panic(
+            amount in any::<i64>(),
+            chain in chain(),
+            mode in prop_oneof![Just(PriceMode::Inclusive), Just(PriceMode::Exclusive)],
+            quantity in any::<i64>(),
+        ) {
+            let line = TaxableLine::new("l", "c", Money::new(amount, Currency::VND))
+                .with_quantity(Decimal::from(quantity));
+            let _ = compute(mode, Currency::VND, &[(line, chain)]);
+        }
+
+        #[test]
+        fn so_luong_cuc_lon_khong_panic(
+            lo in any::<u32>(),
+            mid in any::<u32>(),
+            hi in any::<u32>(),
+            negative in any::<bool>(),
+            scale in 0u32..=28,
+            lines in 1usize..4,
+            chain in chain(),
+            mode in prop_oneof![Just(PriceMode::Inclusive), Just(PriceMode::Exclusive)],
+        ) {
+            // Số lượng do người gọi gửi (`DecimalString`, tới 28 chữ số): cộng hay nhân có thể vượt
+            // giới hạn của `Decimal` — phải là lỗi, không phải panic.
+            let quantity = Decimal::from_parts(lo, mid, hi, negative, scale);
+            let document: Vec<_> = (0..lines)
+                .map(|index| {
+                    let line = TaxableLine::new(format!("l{index}"), "c", Money::new(1_000, Currency::VND))
+                        .with_quantity(quantity);
+                    (line, chain.clone())
+                })
+                .collect();
+            let _ = compute(mode, Currency::VND, &document);
+        }
+    }
+    fn rate_of(stage: i32, basis: Basis, percent: i64) -> ResolvedRate {
+        ResolvedRate {
+            id: Uuid::from_u128(u128::try_from(stage).unwrap() + 1),
+            tax_kind: format!("kind{stage}"),
+            basis,
+            rate_percent: Decimal::new(percent, 2),
+            per_unit: (basis == Basis::PerUnit).then(|| Money::new(49, Currency::VND)),
+            stage,
+        }
+    }
+
+    #[test]
+    fn tang_khong_chiu_thue_cuoi_chuoi_khong_nhan_phan_du_lam_tron() {
+        // Ca tái hiện: giá đã gồm thuế, chuỗi [10.31%, không chịu thuế] — trước khi sửa, phần dư làm
+        // tròn (-1 đồng) rơi vào tầng không chịu thuế.
+        let chain = vec![rate_of(0, Basis::Percent, 1031), rate_of(1, Basis::Exempt, 0)];
+        let lines: Vec<_> = [261_698_875_581, 340_453_309_228, 478_001_272_827]
+            .into_iter()
+            .enumerate()
+            .map(|(index, amount)| {
+                (
+                    TaxableLine::new(format!("l{index}"), "c", Money::new(amount, Currency::VND)),
+                    chain.clone(),
+                )
+            })
+            .collect();
+        let computed = compute(PriceMode::Inclusive, Currency::VND, &lines).unwrap();
+        for (taxed, (line, _)) in computed.lines.iter().zip(&lines) {
+            assert_eq!(taxed.gross, line.amount);
+            assert!(taxed.taxes[1].exempt && taxed.taxes[1].amount.is_zero(), "{taxed:?}");
+        }
+    }
+
+    #[test]
+    fn so_luong_qua_lon_la_loi_kiem_dau_vao_khong_panic() {
+        // Ca tái hiện: số lượng 28 chữ số làm phép nhân `Decimal` tràn và panic trước khi sửa.
+        let quantity = Decimal::from_parts(0, 0, 88_446_609, false, 0);
+        let line =
+            TaxableLine::new("l0", "c", Money::new(1_000, Currency::VND)).with_quantity(quantity);
+        let error = compute(
+            PriceMode::Inclusive,
+            Currency::VND,
+            &[(line, vec![rate_of(0, Basis::PerUnit, 0)])],
         )
         .unwrap_err();
         assert_eq!(error.code(), "validation_failed");
