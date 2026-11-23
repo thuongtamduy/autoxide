@@ -40,6 +40,7 @@ mod policy;
 mod pos;
 mod preorders;
 mod pricing;
+mod privacy;
 mod reasons;
 mod refunds;
 mod relocation;
@@ -195,6 +196,8 @@ impl Module for OrdersModule {
         }
         let service = Arc::new(OrdersService::new(parts, config));
         // `Arc<OrdersService>` tự đổi thành `Arc<dyn Orders>`: module khác chỉ thấy trait.
+        // Đơn đặt bằng tài khoản: vào bản xuất dữ liệu cá nhân (rà soát bảo mật 2026-11).
+        context.personal_data(Arc::new(privacy::OrderPrivacy))?;
         context.provide::<dyn api::Orders>(service.clone())?;
         context.provide::<dyn api::OrderHolds>(service.clone())?;
         context.provide::<dyn api::OrderRefunds>(service.clone())?;

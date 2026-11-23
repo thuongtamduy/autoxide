@@ -14,6 +14,7 @@
 
 pub(crate) mod migration;
 mod notify;
+mod privacy;
 
 use std::time::Duration;
 
@@ -32,6 +33,7 @@ use serde_json::json;
 use uuid::Uuid;
 
 pub(crate) use notify::{declare, subscriptions};
+pub(crate) use privacy::AlertPrivacy;
 
 use crate::entity::restock_alert;
 use crate::service::{InventoryService, now};
