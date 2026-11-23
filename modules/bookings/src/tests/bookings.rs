@@ -670,3 +670,49 @@ async fn hai_lan_doi_gio_cung_luc_khong_ro_cho() {
     .await
     .unwrap();
 }
+
+/// Rà soát bảo mật 2026-11: lịch đặt bằng tài khoản có trong bản xuất dữ liệu cá nhân; tài khoản bị
+/// xoá thì lịch còn (chứng từ cọc) nhưng không còn tên, số, email và mối nối tới tài khoản.
+#[tokio::test]
+async fn du_lieu_ca_nhan_xuat_va_xoa_theo_tai_khoan() {
+    use autoxide_kernel::event::{Delivered, EventHandler as _};
+    use sea_orm::EntityTrait as _;
+
+    TestDatabase::run(async |test| {
+        let (shop, _) = shop(test).await;
+        let lan = staff(&shop, "Lan").await;
+        let haircut = service(&shop, 60, 15, json!({}), &[&lan]).await;
+        let (status, body) = book(&shop, "ben", &haircut, at(next_monday(), 9, 0), json!({})).await;
+        assert_eq!(status, StatusCode::CREATED, "{body}");
+        let id = body["data"]["booking"]["id"].as_str().unwrap().to_owned();
+        let tenant = shop.default_tenant();
+        let ben = uuid::Uuid::from_u128(0xb1);
+        let exported = shop.modules().personal_data().export(&tenant, ben).await.unwrap();
+        let mine = exported["bookings"]["bookings"].as_array().unwrap();
+        assert_eq!(mine.len(), 1, "{exported:?}");
+        assert_eq!(mine[0]["phone"], "+84912345678", "{exported:?}");
+        let ann = uuid::Uuid::from_u128(0xa1);
+        let other = shop.modules().personal_data().export(&tenant, ann).await.unwrap();
+        assert_eq!(other["bookings"]["bookings"], json!([]));
+
+        let deleted = Delivered::new(
+            tenant.clone(),
+            "auth",
+            autoxide_kernel::privacy::USER_DELETED.to_owned(),
+            json!({"before": {"id": ben}}),
+        );
+        crate::privacy::BookingPrivacy.handle(&deleted).await.unwrap();
+        crate::privacy::BookingPrivacy.handle(&deleted).await.unwrap();
+        let exported = shop.modules().personal_data().export(&tenant, ben).await.unwrap();
+        assert_eq!(exported["bookings"]["bookings"], json!([]));
+        let row = crate::entity::booking::Entity::find_by_id(uuid::Uuid::parse_str(&id).unwrap())
+            .one(tenant.database().read())
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!((row.customer_name.as_str(), row.customer_phone), ("", None));
+        assert_eq!(row.customer_user_id, None);
+    })
+    .await
+    .unwrap();
+}

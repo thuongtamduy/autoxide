@@ -148,6 +148,8 @@ impl Module for InventoryModule {
         let service = Arc::new(InventoryService::new(parts, config));
         self.service = Some(service.clone());
         self.databases = Some(databases);
+        // Đăng ký báo có hàng gắn tài khoản: vào bản xuất dữ liệu cá nhân (rà soát bảo mật 2026-11).
+        context.personal_data(Arc::new(alerts::AlertPrivacy))?;
         // `Arc<InventoryService>` tự đổi thành `Arc<dyn Inventory>`: module khác chỉ thấy trait.
         context.provide::<dyn api::Inventory>(service)
     }
@@ -157,6 +159,11 @@ impl Module for InventoryModule {
         let mut subscriptions = contract::subscriptions(service);
         subscriptions.extend(orders_events::subscriptions(service));
         subscriptions.extend(alerts::subscriptions(service));
+        // Tài khoản bị xoá: xoá đăng ký báo có hàng gắn tài khoản đó.
+        subscriptions.push(Subscription::new(
+            autoxide_kernel::privacy::USER_DELETED,
+            Arc::new(alerts::AlertPrivacy),
+        ));
         subscriptions
     }
 
