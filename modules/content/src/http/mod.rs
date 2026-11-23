@@ -3,14 +3,14 @@
 //! đăng ký qua `routes!` để có tài liệu OpenAPI (luật kiến trúc 6).
 
 mod actions;
-mod ai_pages;
+pub(crate) mod ai_pages;
 mod assist;
 mod banners;
 mod edit_lock;
 pub(crate) mod entries;
-mod health;
+pub(crate) mod health;
 mod history;
-mod layout;
+pub(crate) mod layout;
 mod library;
 mod links;
 mod menus;
@@ -32,9 +32,9 @@ mod tests_compliance;
 mod tests_tenancy;
 #[cfg(test)]
 mod tests_web;
-mod theme_variants;
+pub(crate) mod theme_variants;
 mod themes;
-mod types;
+pub(crate) mod types;
 
 use std::collections::HashMap;
 use std::sync::Arc;

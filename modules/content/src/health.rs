@@ -5,10 +5,12 @@
 //! - ảnh thiếu `alt` (ảnh trong thân `rich`, khối ảnh / ảnh bìa / bộ ảnh của bố cục);
 //! - link nội bộ gãy (đường dẫn `/…` không còn công khai và không có chuyển hướng);
 //! - khối hay node nhúng bản ghi không còn công khai (sổ đối tượng);
-//! - trang còn công khai mà khối đếm ngược đã qua mốc (chiến dịch đã hết).
+//! - trang còn công khai mà khối đếm ngược đã qua mốc (chiến dịch đã hết);
+//! - đường dẫn 404 hỏi nhiều lần → gợi ý chuyển hướng (`not_found.rs`).
 //!
-//! Chạy theo yêu cầu (`POST /site-health/{org_id}/run`, tối đa một lần mỗi giờ mỗi website); kết quả lần
-//! gần nhất lưu một dòng mỗi website. Không gọi AI, không ghi gì vào bài.
+//! Chạy theo yêu cầu (`POST /site-health/{org_id}/run`, tối đa một lần mỗi giờ mỗi website) và mỗi ngày
+//! bằng job `content.site_health_daily`; kết quả lần gần nhất lưu một dòng mỗi website. Không gọi AI,
+//! không ghi gì vào bài.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
@@ -44,7 +46,8 @@ pub(crate) type HealthReport = site_health::Model;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 pub(crate) struct Finding {
     /// `seo_description_missing`, `title_duplicate`, `image_alt_missing`, `link_broken`,
-    /// `record_not_public` or `countdown_over`.
+    /// `record_not_public`, `countdown_over` or `not_found_path` (a missing address asked for often:
+    /// `path` is that address, `entry_id` the suggested redirect target).
     pub kind: String,
     /// The published entry it is on.
     pub entry_id: Uuid,
@@ -117,7 +120,21 @@ impl ContentService {
                 "This website was checked less than an hour ago; read the result with GET /api/v1/content/site-health.",
             ));
         }
-        let findings = self.check_site(tenant, &site, now).await?;
+        self.save_site_health(tenant, &site, before, Some(principal.user_id()), now).await
+    }
+
+    /// Kiểm website `site` và ghi kết quả (dòng cũ `before` nếu có). `checked_by`: `None` khi job hằng
+    /// ngày kiểm.
+    pub(crate) async fn save_site_health(
+        &self,
+        tenant: &TenantContext,
+        site: &Site,
+        before: Option<HealthReport>,
+        checked_by: Option<Uuid>,
+        now: Timestamp,
+    ) -> Result<HealthReport, Error> {
+        let org = site.org().as_uuid();
+        let findings = self.check_site(tenant, site, now).await?;
         let text = serde_json::to_string(&findings).map_err(Error::internal)?;
         let count = i32::try_from(findings.len()).unwrap_or(i32::MAX);
         let transaction = tenant.database().begin_write().await?;
@@ -126,7 +143,7 @@ impl ContentService {
                 let mut active: site_health::ActiveModel = row.into();
                 active.findings = Set(text);
                 active.findings_count = Set(count);
-                active.checked_by = Set(Some(principal.user_id()));
+                active.checked_by = Set(checked_by);
                 active.checked_at = Set(now);
                 active.update(&transaction).await?
             }
@@ -137,7 +154,7 @@ impl ContentService {
                     org_id: Set(org),
                     findings: Set(text),
                     findings_count: Set(count),
-                    checked_by: Set(Some(principal.user_id())),
+                    checked_by: Set(checked_by),
                     checked_at: Set(now),
                 }
                 .insert(&transaction)
@@ -255,6 +272,10 @@ impl ContentService {
                     push(finding("record_not_public", row, format!("{kind}:{id}"), patch_fix(row)));
                 }
             }
+        }
+        // Đường dẫn 404 nhiều lần trong 7 ngày → gợi ý chuyển hướng tới trang gần nhất.
+        for item in self.not_found_findings(tenant, site, &rows, &redirects, now).await? {
+            push(item);
         }
         Ok(by_kind.into_values().flatten().collect())
     }

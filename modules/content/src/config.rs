@@ -93,6 +93,13 @@ pub(crate) const PUBLIC_SEARCH_PER_MINUTE: Setting = Setting::new(
 )
 .with_default("30");
 
+pub(crate) const SITE_HEALTH_NOT_FOUND_MIN_HITS: Setting = Setting::new(
+    "AUTOXIDE_CONTENT_SITE_HEALTH_NOT_FOUND_MIN_HITS",
+    "Requests in the last 7 days (1 to 100000) after which a missing address of a website is listed \
+     by the website health check, with a suggested redirect.",
+)
+.with_default("5");
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ContentConfig {
     pub locales: Vec<String>,
@@ -108,6 +115,7 @@ pub(crate) struct ContentConfig {
     pub public_semantic_search: bool,
     pub public_search_per_minute: u32,
     pub theme_variants_max: u32,
+    pub not_found_min_hits: i64,
 }
 
 impl ContentConfig {
@@ -172,6 +180,8 @@ impl ContentConfig {
             reader.get_with(&PUBLIC_SEARCH_PER_MINUTE, |raw| parse_in_range(raw, 1u32, 10_000));
         let theme_variants_max =
             reader.get_with(&THEME_VARIANTS_MAX, |raw| parse_in_range(raw, 1u32, 500));
+        let not_found_min_hits =
+            reader.get_with(&SITE_HEALTH_NOT_FOUND_MIN_HITS, |raw| parse_in_range(raw, 1i64, 100_000));
         let (locales, default_locale) = (locales?, default_locale?);
         if !locales.contains(&default_locale) {
             return reader.reject(
@@ -193,6 +203,7 @@ impl ContentConfig {
             public_semantic_search: public_semantic_search?,
             public_search_per_minute: public_search_per_minute?,
             theme_variants_max: theme_variants_max?,
+            not_found_min_hits: not_found_min_hits?,
         })
     }
 }

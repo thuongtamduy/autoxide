@@ -49,7 +49,7 @@ pub(crate) struct AiTurnResponse {
     finished_at: Option<Timestamp>,
 }
 
-fn response(turn: AiTurn) -> AiTurnResponse {
+pub(crate) fn response(turn: AiTurn) -> AiTurnResponse {
     AiTurnResponse {
         selection: turn.selection.as_deref().and_then(|text| serde_json::from_str(text).ok()),
         id: turn.id,

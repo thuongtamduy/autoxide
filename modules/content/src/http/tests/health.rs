@@ -1,6 +1,7 @@
 //! Kiểm tra sức khoẻ website (bước 67): tìm thiếu mô tả SEO, tiêu đề trùng, ảnh thiếu `alt`, link nội bộ
 //! gãy, bản ghi nhúng không còn công khai, đếm ngược đã qua; vào hộp việc; tối đa một lần mỗi giờ; quyền
-//! theo nút. Gate chạy trên cả SQLite và Postgres.
+//! theo nút; phần sau: đếm đường dẫn 404 (không lưu gì về người xem) → gợi ý chuyển hướng, job hằng ngày,
+//! tool MCP. Gate chạy trên cả SQLite và Postgres.
 
 use super::*;
 
@@ -80,6 +81,51 @@ async fn suc_khoe_tim_link_gay_anh_thieu_alt_va_dem_nguoc_da_qua() {
         let inbox = app.get("/api/v1/kernel/work").token("admin").send().await.unwrap();
         assert_eq!(inbox.status(), StatusCode::OK, "{}", inbox.text());
         assert!(inbox.text().contains("content.site_health"), "{}", inbox.text());
+    })
+    .await
+    .unwrap();
+}
+
+/// Đường dẫn 404 hỏi đủ số lần → job hằng ngày gợi ý chuyển hướng tới trang có slug gần nhất; đường dẫn
+/// không giống trang nào, hay đã có chuyển hướng, thì không gợi ý. Tool MCP đọc cùng kết quả.
+#[tokio::test]
+async fn duong_dan_404_goi_y_chuyen_huong_qua_job_hang_ngay() {
+    TestDatabase::run(async |test| {
+        let app = app(test).await;
+        let root = autoxide_kernel::tenancy::root_of(app.default_tenant().id()).as_uuid();
+        let page = publish(&app, json!({"kind": "page", "title": "Ao thun", "slug": "ao-thun", "meta_description": "x"}), None).await;
+        for path in ["/ao-thunn", "/ao-thunn/", "/zzzzzzzzzzzz", "/ao-thun-cu"] {
+            let hits = match path { "/ao-thun-cu" => 2, "/zzzzzzzzzzzz" => 6, _ => 3 };
+            for _ in 0..hits {
+                let missing = send(&app, "GET", &format!("/public/resolve?locale=en&path={path}"), None, &[], None).await;
+                assert_eq!(missing.status(), StatusCode::NOT_FOUND);
+            }
+        }
+        // Trang có thật không bị đếm.
+        let found = send(&app, "GET", "/public/resolve?locale=en&path=/ao-thun", None, &[], None).await;
+        assert_eq!(found.status(), StatusCode::OK);
+
+        let worker = app.modules().worker(4).unwrap();
+        while worker.run_once().await.unwrap() > 0 {}
+        let report = send(&app, "GET", &format!("/site-health?org_id={root}"), Some("reader"), &[], None).await;
+        assert_eq!(report.status(), StatusCode::OK, "{}", report.json());
+        let findings: Vec<Value> = report.json()["data"]["findings"].as_array().unwrap().iter()
+            .filter(|item| item["kind"] == "not_found_path").cloned().collect();
+        // `/ao-thunn` và `/ao-thunn/` là một đường dẫn: 6 lượt ≥ 5; `/ao-thun-cu` 2 lượt (chưa đủ);
+        // `/zzz…` không giống trang nào.
+        assert_eq!(findings.len(), 1, "{findings:#?}");
+        assert_eq!(findings[0]["path"], "/ao-thunn");
+        assert_eq!(findings[0]["entry_id"], page.as_str());
+        assert!(findings[0]["detail"].as_str().unwrap().starts_with("6 requests"), "{findings:#?}");
+        assert!(findings[0]["fix"].as_str().unwrap().contains("/api/v1/content/redirects"));
+
+        // Tool MCP: cùng kết quả, cùng quyền như REST.
+        let reader = app.mcp("reader").await.unwrap();
+        let result = reader.call_tool(tool("content.site_health", json!({"org_id": root}))).await.unwrap();
+        assert_ne!(result.is_error, Some(true), "{result:?}");
+        let data = result.structured_content.unwrap();
+        assert!(data.to_string().contains("not_found_path"), "{data}");
+        reader.cancel().await.unwrap();
     })
     .await
     .unwrap();
