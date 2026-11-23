@@ -8,7 +8,7 @@ The SCIM endpoint is `/api/v1/auth/scim/v2` (`Users`, `Groups`, `ServiceProvider
 
 ## 1. Create a SCIM token
 
-Needs the permission `auth.scim.manage` and a plan with the feature `auth.scim`. The token belongs to the tenant (not to a person), works only on the SCIM endpoint, and is shown once.
+Needs the permission `auth.scim.manage`, a plan with the feature `auth.scim`, and a signed-in session: an API key cannot create one (`auth.session_required`). The token belongs to the tenant (not to a person), works only on the SCIM endpoint, and is shown once.
 
 <!-- example: sign-in -->
 ```bash

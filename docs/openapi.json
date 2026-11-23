@@ -112188,7 +112188,7 @@
         ]
       },
       "post": {
-        "description": "Requires `auth.oidc.manage`. Register the application at the provider first and list the\ninterface's callback pages in `redirect_uris`. The client secret is stored encrypted and never\nshown again.",
+        "description": "Requires `auth.oidc.manage` and a signed-in session (not an API key). Register the application at the provider first and list the\ninterface's callback pages in `redirect_uris`. The client secret is stored encrypted and never\nshown again.",
         "operationId": "auth_create_oidc_provider",
         "parameters": [
           {
@@ -112264,7 +112264,7 @@
                 }
               }
             },
-            "description": "Missing permission `auth.oidc.manage`; code `permission_denied`."
+            "description": "Missing permission `auth.oidc.manage` (code `permission_denied`), or the request used an API key (code `auth.session_required`)."
           },
           "409": {
             "content": {
@@ -112503,7 +112503,7 @@
         ]
       },
       "patch": {
-        "description": "Requires `auth.oidc.manage`. Fields left out stay as they are; `null` clears `issuer`,\n`allowed_email_domains`, `default_org_id` or `default_role_id`. `slug`, `kind` and `realm`\ncannot change.",
+        "description": "Requires `auth.oidc.manage` and a signed-in session (not an API key). Fields left out stay as they are; `null` clears `issuer`,\n`allowed_email_domains`, `default_org_id` or `default_role_id`. `slug`, `kind` and `realm`\ncannot change.",
         "operationId": "auth_update_oidc_provider",
         "parameters": [
           {
@@ -112581,7 +112581,7 @@
                 }
               }
             },
-            "description": "Missing permission `auth.oidc.manage`; code `permission_denied`."
+            "description": "Missing permission `auth.oidc.manage` (code `permission_denied`), or the request used an API key (code `auth.session_required`)."
           },
           "404": {
             "content": {
@@ -114960,7 +114960,7 @@
         ]
       },
       "post": {
-        "description": "Requires `auth.scim.manage` and the plan feature `auth.scim`. The identity provider (Entra ID,\nOkta, Google Workspace) calls the SCIM endpoint (`scim_base_path`) with it to create, change\nand disable staff accounts and groups. The secret is in the response only. Rotate by creating a\nnew token, switching the provider to it, then revoking the old one; a tenant has at most 5.",
+        "description": "Requires `auth.scim.manage`, the plan feature `auth.scim` and a signed-in session (not an API key). The identity provider (Entra ID,\nOkta, Google Workspace) calls the SCIM endpoint (`scim_base_path`) with it to create, change\nand disable staff accounts and groups. The secret is in the response only. Rotate by creating a\nnew token, switching the provider to it, then revoking the old one; a tenant has at most 5.",
         "operationId": "auth_create_scim_token",
         "parameters": [
           {
@@ -115036,7 +115036,7 @@
                 }
               }
             },
-            "description": "Missing permission `auth.scim.manage` (code `permission_denied`), or the plan does not include `auth.scim` (code `feature_not_enabled`)."
+            "description": "Missing permission `auth.scim.manage` (code `permission_denied`), the plan does not include `auth.scim` (code `feature_not_enabled`), or the request used an API key (code `auth.session_required`)."
           },
           "409": {
             "content": {

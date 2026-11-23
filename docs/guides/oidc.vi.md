@@ -17,7 +17,7 @@ Tính năng **tắt mặc định**. Người vận hành máy chủ bật bằn
 
 ## 2. Thêm nhà cung cấp cho khách
 
-Cần permission `auth.oidc.manage` (`auth.oidc.read` nếu chỉ xem danh sách). Client secret lưu mã hoá và không bao giờ hiện lại (`has_secret` cho biết đã lưu chưa).
+Cần permission `auth.oidc.manage` (`auth.oidc.read` nếu chỉ xem danh sách) và, để thêm hay sửa nhà cung cấp, một phiên đăng nhập: API key không làm được (`auth.session_required`). Client secret lưu mã hoá và không bao giờ hiện lại (`has_secret` cho biết đã lưu chưa).
 
 <!-- example: sign-in -->
 ```bash

@@ -66,6 +66,9 @@ impl ScimService {
         principal: &Principal,
         name: &str,
     ) -> Result<CreatedScimToken, Error> {
+        // Token SCIM tạo và đổi email được mọi tài khoản mà người tạo bao trùm: một API key (dù chỉ
+        // mang `auth.scim.manage`) không được tạo nó, như key không tạo được key (pentest 2026-11).
+        crate::access::require_session(principal)?;
         let name = name.trim().to_owned();
         if !(1..=NAME_MAX_LENGTH).contains(&name.chars().count()) {
             return Err(Error::validation(vec![

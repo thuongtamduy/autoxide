@@ -123,7 +123,7 @@ async fn list_scim_tokens(
 
 /// Create a SCIM token for the tenant's identity provider.
 ///
-/// Requires `auth.scim.manage` and the plan feature `auth.scim`. The identity provider (Entra ID,
+/// Requires `auth.scim.manage`, the plan feature `auth.scim` and a signed-in session (not an API key). The identity provider (Entra ID,
 /// Okta, Google Workspace) calls the SCIM endpoint (`scim_base_path`) with it to create, change
 /// and disable staff accounts and groups. The secret is in the response only. Rotate by creating a
 /// new token, switching the provider to it, then revoking the old one; a tenant has at most 5.
@@ -137,7 +137,7 @@ async fn list_scim_tokens(
     responses(
         (status = 201, description = "The token was created; `token_secret` holds it.", body = Data<CreatedScimTokenResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "Missing permission `auth.scim.manage` (code `permission_denied`), or the plan does not include `auth.scim` (code `feature_not_enabled`).", body = Problem),
+        (status = 403, description = "Missing permission `auth.scim.manage` (code `permission_denied`), the plan does not include `auth.scim` (code `feature_not_enabled`), or the request used an API key (code `auth.session_required`).", body = Problem),
         (status = 409, description = "The tenant already has 5 SCIM tokens; code `auth.scim_token_limit`.", body = Problem),
         (status = 422, description = "`name` is empty or longer than 100 characters; code `validation_failed`.", body = Problem),
     )
