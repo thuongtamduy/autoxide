@@ -298,15 +298,16 @@ async fn bootstrap_admin(runtime: &Runtime, admin: &AdminBootstrap) -> Result<()
                 path.display()
             )
         })?;
+        // ID chứ không phải email: log không mang dữ liệu cá nhân (rà soát bảo mật 2026-11).
         tracing::warn!(
-            email = %user.email,
+            user_id = %user.id,
             file = %path.display(),
             "created the first administrator with a generated password, written to the file \
              (readable only by this server's user): sign in, change the password, then delete \
              the file"
         );
     } else {
-        tracing::info!(email = %user.email, "created the first administrator");
+        tracing::info!(user_id = %user.id, "created the first administrator");
     }
     Ok(())
 }

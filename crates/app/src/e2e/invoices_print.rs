@@ -40,6 +40,10 @@ const PERMISSIONS: [&str; 14] = [
 ];
 
 async fn app(test: &TestDatabase) -> TestApp {
+    app_with(test, &[]).await
+}
+
+async fn app_with(test: &TestDatabase, settings: &[(&str, &str)]) -> TestApp {
     let dir = std::env::temp_dir().join(format!("autoxide-invoices-{}", uuid::Uuid::now_v7()));
     let mut builder = TestApp::builder(test)
         .setting("AUTOXIDE_FILES_DIR", &dir.display().to_string())
@@ -48,6 +52,9 @@ async fn app(test: &TestDatabase) -> TestApp {
         .tenant("acme")
         .user_in("acme", "acme", 3, &PERMISSIONS)
         .contribute::<dyn EInvoiceProvider>(Arc::new(FakeEInvoiceProvider::new()));
+    for (name, value) in settings {
+        builder = builder.setting(name, value);
+    }
     for module in crate::modules::all() {
         builder = builder.boxed_module(module);
     }
@@ -588,6 +595,26 @@ async fn lap_lai_ban_xuat_bi_loi() {
         let (status, problem) = call(&app, "clerk", "POST", &missing, None).await;
         assert_eq!(status, StatusCode::NOT_FOUND);
         assert_eq!(problem["code"], "invoices.export_not_found");
+    })
+    .await
+    .unwrap();
+}
+
+/// Rà soát bảo mật 2026-11 (I-3): bản in HTML (chứa chữ của mẫu do khách viết) tự mang CSP `sandbox`,
+/// kể cả khi người vận hành tắt lớp header bảo mật chung.
+#[tokio::test]
+async fn ban_in_html_tu_mang_csp_sandbox() {
+    TestDatabase::run(async |test| {
+        let app = app_with(test, &[("AUTOXIDE_HTTP_SECURITY_HEADERS", "false")]).await;
+        let tenant = app.default_tenant();
+        series(&app, "clerk", "vat_invoice").await;
+        let buyer = Buyer::business("Cong ty A", "0101234567").address("Ha Noi");
+        let document =
+            issued(&app, &tenant, sale(&tenant, Currency::VND, 1_000_000, buyer, "P-9")).await;
+        let render = format!("/api/v1/invoices/documents/{}/render", document.id);
+        let answer = app.get(&render).token("reader").send().await.unwrap();
+        assert_eq!(answer.status(), StatusCode::OK);
+        assert!(answer.header("content-security-policy").contains("sandbox"));
     })
     .await
     .unwrap();

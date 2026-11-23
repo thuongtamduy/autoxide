@@ -399,6 +399,12 @@ fn file_response(rendered: Rendered, disposition: Disposition) -> Response {
     let headers = response.headers_mut();
     headers.insert(header::CONTENT_TYPE, HeaderValue::from_static(rendered.content_type));
     headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    // Bản in HTML chứa chữ của mẫu do khách viết: tự gắn CSP `sandbox`, không dựa vào lớp header bảo
+    // mật chung (người vận hành tắt được) — rà soát bảo mật 2026-11.
+    headers.insert(
+        header::CONTENT_SECURITY_POLICY,
+        HeaderValue::from_static(autoxide_kernel::http::API_CSP),
+    );
     if let Ok(value) = HeaderValue::from_str(&content_disposition(disposition, &rendered.file_name))
     {
         headers.insert(header::CONTENT_DISPOSITION, value);
