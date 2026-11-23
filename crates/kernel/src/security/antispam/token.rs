@@ -93,3 +93,55 @@ mod tests {
         assert!(open(&key, "a.b").is_none());
     }
 }
+
+// Thử phá token của form (D-20261123-property-fuzzing): token do bất kỳ ai gửi tới.
+#[cfg(test)]
+mod properties {
+    use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn ky_roi_doc_lai_nguyen_ven(
+            key in any::<[u8; 32]>(),
+            scope in "\\PC{0,60}",
+            seconds in 0i64..4_102_444_800,
+            nonce in any::<[u8; 16]>(),
+        ) {
+            prop_assume!(scope.len() <= usize::from(u8::MAX));
+            let issued_at = Timestamp::from_unix_seconds(seconds).unwrap();
+            let token = sign(&key, &scope, issued_at, &nonce).unwrap();
+            let opened = open(&key, &token).unwrap();
+            prop_assert_eq!(opened, FormToken { scope, issued_at, nonce: encode_nonce(&nonce) });
+        }
+
+        #[test]
+        fn khoa_khac_hay_sua_mot_ky_tu_thi_tu_choi(
+            key in any::<[u8; 32]>(),
+            other in any::<[u8; 32]>(),
+            nonce in any::<[u8; 16]>(),
+            index in any::<proptest::sample::Index>(),
+            replacement in proptest::char::range('-', 'z'),
+        ) {
+            let token = sign(&key, "contact", Timestamp::from_unix_seconds(1_790_000_000).unwrap(), &nonce).unwrap();
+            if other != key {
+                prop_assert!(open(&other, &token).is_none());
+            }
+            let mut chars: Vec<char> = token.chars().collect();
+            let at = index.index(chars.len());
+            prop_assume!(chars[at] != replacement);
+            chars[at] = replacement;
+            let tampered: String = chars.into_iter().collect();
+            // Base64 không đệm có bit thừa ở ký tự cuối: đổi nó có khi vẫn ra cùng byte — khi đó token
+            // đọc ra phải giống hệt bản gốc, không bao giờ là nội dung khác.
+            if let Some(opened) = open(&key, &tampered) {
+                prop_assert_eq!(Some(opened), open(&key, &token));
+            }
+        }
+
+        #[test]
+        fn chuoi_bat_ky_khong_panic(token in "\\PC{0,200}", key in any::<[u8; 32]>()) {
+            prop_assert!(open(&key, &token).is_none() || token.contains('.'));
+        }
+    }
+}

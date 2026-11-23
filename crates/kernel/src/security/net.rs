@@ -302,3 +302,76 @@ mod tests {
         }
     }
 }
+
+// Thử phá bộ lọc SSRF (D-20261123-property-fuzzing): mọi cách viết một IPv4 nội bộ đều bị chặn.
+#[cfg(test)]
+mod properties {
+    use super::*;
+    use proptest::prelude::*;
+
+    // IPv4 không public: lấy ngẫu nhiên trong các dải nội bộ hay gặp nhất.
+    fn internal_v4() -> impl Strategy<Value = Ipv4Addr> {
+        prop_oneof![
+            any::<[u8; 3]>().prop_map(|[b, c, d]| Ipv4Addr::new(127, b, c, d)),
+            any::<[u8; 3]>().prop_map(|[b, c, d]| Ipv4Addr::new(10, b, c, d)),
+            (16u8..32, any::<[u8; 2]>()).prop_map(|(b, [c, d])| Ipv4Addr::new(172, b, c, d)),
+            any::<[u8; 2]>().prop_map(|[c, d]| Ipv4Addr::new(192, 168, c, d)),
+            any::<[u8; 2]>().prop_map(|[c, d]| Ipv4Addr::new(169, 254, c, d)),
+            (64u8..128, any::<[u8; 2]>()).prop_map(|(b, [c, d])| Ipv4Addr::new(100, b, c, d)),
+            any::<[u8; 3]>().prop_map(|[b, c, d]| Ipv4Addr::new(0, b, c, d)),
+        ]
+    }
+
+    // Mọi cách nhúng một IPv4 vào IPv6 mà máy chủ Linux định tuyến tới chính IPv4 đó.
+    fn embeddings(v4: Ipv4Addr) -> Vec<Ipv6Addr> {
+        let [a, b, c, d] = v4.octets();
+        let high = u16::from_be_bytes([a, b]);
+        let low = u16::from_be_bytes([c, d]);
+        vec![
+            v4.to_ipv6_mapped(),
+            Ipv6Addr::new(0, 0, 0, 0, 0, 0, high, low),
+            Ipv6Addr::new(0x64, 0xff9b, 0, 0, 0, 0, high, low),
+            Ipv6Addr::new(0x2002, high, low, 0, 0, 0, 0, 1),
+        ]
+    }
+
+    proptest! {
+        #[test]
+        fn ipv4_noi_bo_bi_chan_o_moi_cach_viet(v4 in internal_v4()) {
+            prop_assert!(!is_public(IpAddr::V4(v4)));
+            for v6 in embeddings(v4) {
+                prop_assert!(!is_public(IpAddr::V6(v6)), "{v6}");
+                let url = format!("https://[{v6}]/hook");
+                prop_assert!(check_target_url(&url, &["https"], false).is_err(), "{url}");
+            }
+            // Dạng số thập phân, bát phân, thập lục phân mà trình phân tích URL chuẩn hoá về IPv4.
+            let number = u32::from(v4);
+            let [a, b, c, d] = v4.octets();
+            for host in [
+                v4.to_string(),
+                number.to_string(),
+                format!("{number:#x}"),
+                format!("0{a:o}.0{b:o}.0{c:o}.0{d:o}"),
+                format!("{a}.{}", u32::from_be_bytes([0, b, c, d])),
+            ] {
+                let url = format!("http://{host}/hook");
+                prop_assert!(check_target_url(&url, &["http"], false).is_err(), "{url}");
+            }
+        }
+
+        #[test]
+        fn ipv4_public_giu_nguyen_khi_nhung_vao_ipv6(raw in any::<u32>()) {
+            let v4 = Ipv4Addr::from(raw);
+            let public = is_public(IpAddr::V4(v4));
+            prop_assert_eq!(is_public(IpAddr::V6(v4.to_ipv6_mapped())), public);
+            prop_assert_eq!(is_public(IpAddr::V6(embeddings(v4)[3])), public);
+        }
+
+        #[test]
+        fn url_bat_ky_khong_panic(raw in "\\PC{0,120}", allow in any::<bool>()) {
+            if let Ok(url) = check_target_url(&raw, &["http", "https"], allow) {
+                prop_assert!(allow || is_public_host(&url));
+            }
+        }
+    }
+}

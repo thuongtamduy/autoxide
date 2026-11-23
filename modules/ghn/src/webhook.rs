@@ -73,3 +73,64 @@ pub(crate) fn parse(account: &CarrierAccount, body: &[u8]) -> Result<Vec<Carrier
             .note(note),
     ])
 }
+
+/// Thử phá webhook của GHN (D-20261123-property-fuzzing): thân do bất kỳ ai biết địa chỉ webhook gửi.
+#[cfg(test)]
+mod properties {
+    use super::*;
+    use autoxide_shipping::api::CarrierCredentials;
+    use proptest::prelude::*;
+    use serde_json::json;
+
+    fn account(shop_id: i64) -> CarrierAccount {
+        CarrierAccount::new(
+            Default::default(),
+            "ghn",
+            true,
+            json!({ "shop_id": shop_id }),
+            CarrierCredentials::default(),
+        )
+    }
+
+    proptest! {
+        #[test]
+        fn than_bat_ky_khong_panic(body in proptest::collection::vec(any::<u8>(), 0..512)) {
+            let _ = parse(&account(885), &body);
+        }
+
+        #[test]
+        fn cua_hang_khac_luon_bi_tu_choi(
+            shop in 1i64..,
+            other in any::<i64>(),
+            status in "[a-z_]{0,20}",
+            fee in any::<i64>(),
+        ) {
+            prop_assume!(shop != other);
+            let body = json!({
+                "ShopID": other, "OrderCode": "GHN1", "Type": "switch_status",
+                "Status": status, "TotalFee": fee, "Time": "2026-11-23T08:00:00Z",
+            });
+            prop_assert!(parse(&account(shop), body.to_string().as_bytes()).is_err());
+        }
+
+        #[test]
+        fn cap_nhat_dung_cua_hang_khong_co_phi_am(
+            shop in 1i64..,
+            status in prop_oneof![Just("delivered".to_owned()), Just("picking".to_owned()), "[a-z_]{0,20}"],
+            fee in any::<i64>(),
+            time in "\\PC{0,40}",
+            code in "\\PC{0,40}",
+        ) {
+            let body = json!({
+                "ShopID": shop, "OrderCode": code, "Type": "switch_status",
+                "Status": status, "TotalFee": fee, "Time": time,
+            });
+            let updates = parse(&account(shop), body.to_string().as_bytes())
+                .map_err(|error| TestCaseError::fail(error.message()))?;
+            for update in updates {
+                prop_assert!(update.fee.is_none_or(Money::is_positive));
+                prop_assert_eq!(update.tracking_number, code.clone());
+            }
+        }
+    }
+}
