@@ -2,6 +2,10 @@
 # lại gate (chia nhiều máy, dùng chung gate.yml với ci.yml), build image Docker cho `linux/amd64` và `linux/arm64` trên máy build gốc của GitHub
 # (không giả lập), đăng lên GitHub Container Registry bằng `GITHUB_TOKEN`, đính kèm chứng thực
 # nguồn gốc build và SBOM đã ký, rồi tạo bản phát hành GitHub với ghi chú lấy từ CHANGELOG.md.
+# Ký không cần khoá giữ tay (D-20261123-supply-chain): image và mọi file đính kèm (binary Linux, gói SDK, SBOM) có
+# chứng thực nguồn gốc build (SLSA) ký bằng Sigstore qua OIDC của GitHub Actions; image còn có chữ ký cosign, file
+# có `SHA256SUMS` ký bằng cosign. Cách kiểm: docs/VERIFYING.md. Bản thử `X.Y.Z-rc.N` là pre-release:
+# không gắn image `latest` / `X.Y`, không thành "Latest release" trên GitHub (docs/RELEASING.md, "Bản thử").
 # Quy trình: docs/RELEASING.md. Chỉ chạy khi repo công khai (D-197). Tag đã có mà thiếu image: workflow
 # release-image.yml (D-20261120-upgrade-image); tên và thẻ image ở hai file phải giống nhau (test của xtask kiểm).
 name: Release
@@ -22,8 +26,13 @@ jobs:
     if: ${{ !github.event.repository.private }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
+    outputs:
+      prerelease: ${{ steps.kind.outputs.prerelease }}
+      latest: ${{ steps.kind.outputs.latest }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Tag matches the version in Cargo.toml
         env:
           TAG: ${{ github.ref_name }}
@@ -34,6 +43,37 @@ jobs:
             exit 1
           fi
           grep -q "^## \[$version\]" CHANGELOG.md || { echo "CHANGELOG.md has no section [$version]" >&2; exit 1; }
+      # Bản thử (`X.Y.Z-rc.N`) là pre-release: không bao giờ là `latest`. Bản chính thức chỉ là `latest` khi nó là bản
+      # chính thức cao nhất đã có (bản vá của dòng cũ, nhánh `release/X.Y`, không giành `latest` của dòng mới).
+      - id: kind
+        name: Pre-release or stable, and whether it becomes latest
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          version="${TAG#v}"
+          if [[ "$version" == *-* ]]; then
+            if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$ ]]; then
+              echo "Pre-release $version must look like X.Y.Z-rc.N (docs/RELEASING.md)" >&2
+              exit 1
+            fi
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+            echo "latest=false" >> "$GITHUB_OUTPUT"
+            echo "$version is a release candidate: pre-release, not latest."
+            exit 0
+          fi
+          # Repo công khai (workflow chỉ chạy khi đó) nên đọc tag không cần token.
+          highest="$(
+            { git ls-remote --tags --refs origin 'v*' | sed 's#.*refs/tags/v##'; echo "$version"; } \
+              | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1
+          )"
+          echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          if [ "$highest" = "$version" ]; then
+            echo "latest=true" >> "$GITHUB_OUTPUT"
+            echo "$version is the highest stable release: latest."
+          else
+            echo "latest=false" >> "$GITHUB_OUTPUT"
+            echo "$version is older than $highest (a patch for an older line): not latest."
+          fi
 
   # Dùng lại kết quả CI của đúng commit (D-20261121-ci-batch-release-faster): nếu workflow CI trên `main` của
   # ĐÚNG SHA của tag đã `success` (gate SQLite + PostgreSQL 16 và 18, upgrade-test, quét secret — đúng thứ D-300
@@ -91,9 +131,11 @@ jobs:
         include:
           - platform: linux/amd64
             runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
           # Máy build ARM của GitHub: miễn phí cho repo công khai (D-078 để sau vì giả lập quá lâu).
           - platform: linux/arm64
             runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
     permissions:
@@ -101,6 +143,8 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       # Tên image trên ghcr.io phải viết thường; tên chủ repo có thể có chữ hoa.
       - name: Image name
         run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
@@ -138,9 +182,33 @@ jobs:
           path: digests/*
           if-no-files-found: error
           retention-days: 1
+      # Binary Linux đính kèm bản phát hành: lấy đúng file trong image vừa build (cùng mã, cùng lần build), không build
+      # lại. Build trên Debian 13 nên cần glibc đủ mới (docs/VERIFYING.md); không chạy thử ở đây vì máy
+      # build (Ubuntu 24.04) có thể có glibc cũ hơn.
+      - name: Binary from the image
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+          PLATFORM: ${{ matrix.platform }}
+          TARGET: ${{ matrix.target }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          name="autoxide-${TAG#v}-$TARGET"
+          mkdir -p "dist/$name"
+          container="$(docker create --platform "$PLATFORM" "$IMAGE@$DIGEST")"
+          docker cp "$container:/usr/local/bin/autoxide" "dist/$name/autoxide"
+          docker rm "$container" >/dev/null
+          cp LICENSE-MIT LICENSE-APACHE README.md "dist/$name/"
+          file "dist/$name/autoxide"
+          tar -C dist --owner=0 --group=0 -czf "dist/$name.tar.gz" "$name"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: binary-${{ strategy.job-index }}
+          path: dist/*.tar.gz
+          if-no-files-found: error
+          retention-days: 1
 
   publish:
-    needs: image
+    needs: [verify, image]
     # Điều kiện mặc định (`success()`) bỏ qua job khi BẤT KỲ job nào phía trên trong chuỗi `needs` bị bỏ qua — kể cả
     # `gate` bị bỏ qua có chủ đích khi dùng lại CI xanh (D-20261121-ci-batch-release-faster). v0.17.0 dính lỗi này:
     # image build xong nhưng không gắn thẻ, không cập nhật trang Release. Chỉ cần `image` xanh.
@@ -156,6 +224,8 @@ jobs:
       artifact-metadata: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Image name
         run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -163,25 +233,36 @@ jobs:
           pattern: digests-*
           merge-multiple: true
           path: digests
+      # Binary của hai kiến trúc vào `dist/`: mọi file đính kèm bản phát hành nằm ở đó để băm, ký và chứng thực chung.
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: binary-*
+          merge-multiple: true
+          path: dist
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      # `{{major}}.{{minor}}` không áp cho bản thử (`docker/metadata-action` chỉ gắn `{{version}}` cho pre-release);
+      # `latest` do job `verify` quyết (không bao giờ cho bản thử, không cho bản vá dòng cũ).
       - id: meta
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           images: ${{ env.IMAGE }}
+          flavor: |
+            latest=${{ needs.verify.outputs.latest }}
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
       - name: Create the multi-platform image with its tags
         working-directory: digests
         run: |
-          docker buildx imagetools create \
-            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-            $(printf "$IMAGE@sha256:%s " *)
+          mapfile -t tags < <(jq -r '.tags[] | "-t", .' <<< "$DOCKER_METADATA_OUTPUT_JSON")
+          sources=()
+          for digest in *; do sources+=("$IMAGE@sha256:$digest"); done
+          docker buildx imagetools create "${tags[@]}" "${sources[@]}"
       - id: index
         name: Digest of the multi-platform image
         env:
@@ -196,6 +277,15 @@ jobs:
           subject-name: ${{ env.IMAGE }}
           subject-digest: ${{ steps.index.outputs.digest }}
           push-to-registry: true
+      # Chữ ký cosign không khoá (keyless) cho image, cho người dùng `cosign verify` thay vì `gh attestation verify`:
+      # chứng chỉ ngắn hạn của Sigstore cấp theo danh tính OIDC của đúng workflow này, không có khoá nào phải giữ.
+      - uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
+        with:
+          cosign-release: v3.1.4
+      - name: Sign the image with cosign (keyless)
+        env:
+          DIGEST: ${{ steps.index.outputs.digest }}
+        run: cosign sign --yes "$IMAGE@$DIGEST"
       # Danh sách thành phần (SPDX) của image, cũng ký thành chứng thực và đính vào bản phát hành.
       - uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
         with:
@@ -203,25 +293,33 @@ jobs:
           registry-username: ${{ github.actor }}
           registry-password: ${{ secrets.GITHUB_TOKEN }}
           format: spdx-json
-          output-file: sbom.spdx.json
+          output-file: dist/sbom.spdx.json
           upload-artifact: false
           upload-release-assets: false
       - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-name: ${{ env.IMAGE }}
           subject-digest: ${{ steps.index.outputs.digest }}
-          sbom-path: sbom.spdx.json
+          sbom-path: dist/sbom.spdx.json
           push-to-registry: true
       - name: Release notes from CHANGELOG.md
         env:
           TAG: ${{ github.ref_name }}
+          PRERELEASE: ${{ needs.verify.outputs.prerelease }}
         run: |
           version="${TAG#v}"
-          awk -v section="## [$version]" '
-            index($0, section) == 1 { found = 1; next }
-            found && /^## \[/ { exit }
-            found { print }
-          ' CHANGELOG.md > notes.md
+          {
+            if [ "$PRERELEASE" = true ]; then
+              echo "> **Release candidate** of ${version%%-*}, for testing before the final release: do not use it in"
+              echo "> production. Report problems as issues (security problems: SECURITY.md)."
+              echo
+            fi
+            awk -v section="## [$version]" '
+              index($0, section) == 1 { found = 1; next }
+              found && /^## \[/ { exit }
+              found { print }
+            ' CHANGELOG.md
+          } > notes.md
           # GitHub giới hạn ghi chú một bản phát hành ở 125 000 ký tự (v0.15.0 vượt). Dài hơn thì thay
           # bằng đoạn ngắn dẫn tới mục của bản này trong CHANGELOG.md của tag.
           if [ "$(wc -c < notes.md)" -gt 120000 ]; then
@@ -239,22 +337,49 @@ jobs:
         working-directory: sdk/typescript
         run: |
           npm pack
-          mv autoxide-sdk-*.tgz ../../
+          mv autoxide-sdk-*.tgz ../../dist/
+      # Mọi file đính kèm: một `SHA256SUMS` ký bằng cosign (bundle Sigstore), và chứng thực nguồn gốc build (SLSA) cho
+      # từng file, lưu ở GitHub: `gh attestation verify <file> --repo <owner>/autoxide`.
+      - name: Checksums of the release files
+        working-directory: dist
+        run: |
+          sha256sum -- *.tar.gz *.tgz sbom.spdx.json > SHA256SUMS
+          cat SHA256SUMS
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: |
+            dist/*.tar.gz
+            dist/*.tgz
+            dist/sbom.spdx.json
+      - name: Sign the checksums with cosign (keyless)
+        working-directory: dist
+        run: cosign sign-blob --yes --bundle SHA256SUMS.sigstore.json SHA256SUMS
       - name: Create the GitHub release
+        working-directory: dist
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.ref_name }}
+          PRERELEASE: ${{ needs.verify.outputs.prerelease }}
+          LATEST: ${{ needs.verify.outputs.latest }}
         run: |
           sdk="$(ls autoxide-sdk-*.tgz)"
+          files=(
+            "sbom.spdx.json#SBOM (SPDX JSON) of the Docker image"
+            "$sdk#TypeScript SDK (npm install <URL of this file>)"
+            "SHA256SUMS#SHA-256 checksums of the release files"
+            "SHA256SUMS.sigstore.json#Sigstore bundle: cosign signature of SHA256SUMS"
+          )
+          for target in x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu; do
+            files+=("autoxide-${TAG#v}-$target.tar.gz#Linux binary ($target)")
+          done
+          # Bản thử là pre-release và không bao giờ là "Latest release"; bản vá dòng cũ cũng không (job `verify`).
+          flags=("--prerelease=$PRERELEASE" "--latest=$LATEST")
           # Chủ dự án có thể đã tạo trang Release để có tag (agent không đẩy được tag): khi đó cập nhật
           # trang đó và đính kèm file, thay vì báo "already exists".
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release edit "$TAG" --title "Autoxide $TAG" --notes-file notes.md
-            gh release upload "$TAG" --clobber \
-              "sbom.spdx.json#SBOM (SPDX JSON) of the Docker image" \
-              "$sdk#TypeScript SDK (npm install <URL of this file>)"
+            gh release edit "$TAG" --title "Autoxide $TAG" --notes-file ../notes.md "${flags[@]}"
+            gh release upload "$TAG" --clobber "${files[@]}"
           else
-            gh release create "$TAG" --title "Autoxide $TAG" --notes-file notes.md --verify-tag \
-              "sbom.spdx.json#SBOM (SPDX JSON) of the Docker image" \
-              "$sdk#TypeScript SDK (npm install <URL of this file>)"
+            gh release create "$TAG" --title "Autoxide $TAG" --notes-file ../notes.md --verify-tag "${flags[@]}" \
+              "${files[@]}"
           fi

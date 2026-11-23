@@ -19,6 +19,8 @@ Theo Semantic Versioning, một số cho cả workspace (`[workspace.package] ve
 `Cargo.toml`, mọi crate dùng chung):
 
 - `0.x.y` cho tới khi chủ dự án tuyên bố API ổn định (`1.0.0`).
+- Bản thử trước một bản major: `X.0.0-rc.N` (N từ 1), xem "Bản thử trước bản major" bên dưới. Không dùng dạng
+  pre-release khác (`-beta`, `-alpha.1`…): workflow `Release` từ chối.
 - Sửa lỗi, không đổi hành vi: tăng `y` (`0.1.0` → `0.1.1`).
 - Thêm tính năng, hoặc (khi còn `0.x`) thay đổi phá vỡ ở cấu hình, CLI hay hợp đồng
   module: tăng `x` (`0.1.1` → `0.2.0`) và ghi rõ ở mục **Changed** / **Removed**.
@@ -64,8 +66,9 @@ Ghi cho người ngoài ở [`SECURITY.md`](../SECURITY.md#supported-versions) (
   `main`, đổi `version` thành `X.Y.Z+1`, gom mảnh changelog của bản sửa vào mục `## [X.Y.Z+1]`, chạy gate đầy đủ,
   rồi đẩy tag `vX.Y.Z+1` tay lên commit của nhánh đó (workflow `Release` chạy theo push tag). `Auto release` chỉ
   nhìn `main`, không gắn tag cho nhánh `release/*`. Bản sửa trên `main` cũng ra trong bản phát hành kế tiếp của
-  `main`. Chưa làm bản vá dòng cũ nào: lần đầu làm thì kiểm `release.yml` không gắn image `latest` và không đánh
-  dấu "Latest release" của GitHub cho bản của dòng cũ (hiện workflow chưa phân biệt), sửa trong cùng PR.
+  `main`. Job `verify` của `Release` thấy phiên bản thấp hơn bản chính thức cao nhất đã có nên không gắn image
+  `latest` và không đánh dấu "Latest release" của GitHub (D-20261123-supply-chain); thẻ `X.Y` của dòng cũ vẫn được
+  cập nhật.
 - Hết hạn hỗ trợ của một dòng thì xoá nó khỏi bảng trong `SECURITY.md`.
 
 ## Khi làm việc hằng ngày
@@ -142,17 +145,71 @@ bước 7.**
    Workflow `Release` thấy trang Release đã có thì cập nhật ghi chú và đính kèm file chứ không báo lỗi. Ghi chú quá
    giới hạn của GitHub (125 000 ký tự) thì workflow thay bằng đoạn ngắn dẫn tới `CHANGELOG.md`.
 
-7. Theo dõi workflow `Auto release` rồi `Release` của tag (Actions) tới khi xanh, rồi kiểm image đã đăng:
+7. Theo dõi workflow `Auto release` rồi `Release` của tag (Actions) tới khi xanh, rồi kiểm image và file đã đăng
+   đúng như người dùng kiểm ([`docs/VERIFYING.md`](VERIFYING.md)):
 
    ```bash
    gh attestation verify oci://ghcr.io/<owner>/autoxide:X.Y.Z --owner <owner>
    docker run --rm ghcr.io/<owner>/autoxide:X.Y.Z --version
+   gh release download vX.Y.Z --dir /tmp/autoxide-vX.Y.Z
+   gh attestation verify /tmp/autoxide-vX.Y.Z/autoxide-X.Y.Z-x86_64-unknown-linux-gnu.tar.gz --owner <owner>
    ```
+
+   Workflow ký không cần khoá nào (D-20261123-supply-chain): image có chứng thực nguồn gốc build, chứng thực SBOM và
+   chữ ký cosign; binary Linux (amd64, arm64 — chép từ image), gói SDK và SBOM có chứng thực cho từng file, cộng
+   `SHA256SUMS` ký bằng cosign (`SHA256SUMS.sigstore.json`).
 
    Workflow đỏ thì sửa nguyên nhân rồi chạy lại trên cùng tag (Actions → Release → Run workflow,
    chọn tag); không xoá tag đã đẩy. Lỗi nằm ở code thì phát hành bản vá `X.Y.Z+1`.
 8. `cargo clean`: mỗi lần đổi phiên bản, cargo build lại cả workspace thành một bộ file mới
    mà không xoá bộ cũ, `target/` phình thêm hàng chục GB.
+
+## Bản thử trước bản major (release candidate)
+
+Bản major là cam kết dài hạn ([`docs/COMPATIBILITY.md`](COMPATIBILITY.md)), nên ra qua một hay nhiều bản thử
+`X.0.0-rc.N` trước — lần đầu là `1.0.0-rc.1` (D-20261123-supply-chain). Mở `rc.1` và lên bản chính thức đều do **chủ
+dự án quyết** (`1.0` là lúc chủ dự án tuyên bố API ổn định); agent kiểm tiêu chí bên dưới và báo khi đạt.
+
+**Phát hành một bản thử** — đúng các bước 1–8 ở trên, với phiên bản `X.0.0-rc.N`:
+
+- `version` của workspace, ghim `=X.0.0-rc.N` của crate nội bộ, `docs/openapi.json`, `sdk/typescript/package.json`
+  (+ lock), image của `compose.quickstart.yml`: đều `X.0.0-rc.N`.
+- `CHANGELOG.md`: gộp mảnh như mọi lần, mục mang tên `## [X.0.0-rc.N] - YYYY-MM-DD`.
+- Workflow tự nhận ra bản thử (có `-`): trang Release là **pre-release**, ghi chú mở đầu bằng dòng cảnh báo "Release
+  candidate…"; image chỉ có thẻ `X.0.0-rc.N` — không `X.0`, không `latest` (người đang dùng `latest` hay `0.x` không bị
+  kéo lên bản thử). `Auto release` gắn tag `vX.0.0-rc.N` như mọi bản.
+- `rc.1` so với bản `0.x` cuối: job `semver` chỉ báo cáo (tăng major). Từ `rc.2`: so với bản thử trước và **chặn** mọi
+  phá vỡ hợp đồng Rust — giữa các bản thử chỉ sửa lỗi. Phá vỡ là bắt buộc thì đó là lỗi nghiêm trọng của bản thử: dừng
+  lại hỏi chủ dự án.
+
+**Trong giai đoạn bản thử** (từ `rc.1` tới bản chính thức), `main` đóng băng tính năng: chỉ merge sửa lỗi, tài liệu,
+test, và nâng thư viện bản vá. Mảnh changelog chỉ thuộc mục `fixed`, `security`, hay `changed` khi là sửa lỗi. Tính
+năng mới nằm chờ ở nhánh của nó, merge sau khi bản chính thức ra.
+
+**Lỗi nghiêm trọng** (chặn bản chính thức): lỗ hổng bảo mật mức cao hay nghiêm trọng; mất hay hỏng dữ liệu; migration
+hay nâng cấp hỏng trên SQLite hoặc PostgreSQL; máy chủ không khởi động với cấu hình mặc định; phá vỡ một hợp đồng của
+`docs/COMPATIBILITY.md`. Ghi chúng thành issue có nhãn `release-blocker`.
+
+**Tiêu chí từ bản thử lên bản chính thức** — tất cả phải đạt:
+
+1. Bản thử mới nhất đã ra ít nhất **14 ngày**, và trong 14 ngày đó không có lỗi nghiêm trọng nào mở. Có lỗi nghiêm
+   trọng thì sửa, ra `rc.N+1`, đếm lại từ đầu.
+2. Gate đầy đủ (`./gate.sh`, SQLite và PostgreSQL) xanh trên commit sẽ phát hành, và CI trên `main` của commit đó xanh
+   — kể cả test nâng cấp từ bản thử trước (job `upgrade`). Đã chạy `cargo xtask upgrade-test --from <tag 0.x cuối>`
+   trên cả hai database: người dùng `0.x` nâng thẳng lên bản chính thức được.
+3. Độ phủ end-to-end đạt mục tiêu của P11 bước 70: mọi endpoint trong `docs/openapi.json` và mọi tool trong
+   `docs/mcp-tools.json` được gọi thành công ít nhất một lần (`cargo xtask coverage-api --run` không còn mục chưa phủ),
+   trên cả hai database.
+4. Báo cáo rà soát bảo mật của P6 bước 70 đã đăng, và không còn phát hiện mức cao hay nghiêm trọng nào chưa sửa.
+5. `cargo xtask semver` không thấy phá vỡ nào so với bản thử cuối; `cargo deny check` xanh; không có cảnh báo
+   Dependabot mức cao trở lên đang mở.
+6. Chữ ký và chứng thực của bản thử cuối kiểm được bằng đúng các lệnh của [`docs/VERIFYING.md`](VERIFYING.md).
+7. Chủ dự án đồng ý.
+
+**Phát hành bản chính thức**: bước 1–8 với `X.0.0`. Mục `## [X.0.0]` của `CHANGELOG.md` gồm thay đổi sau bản thử cuối,
+kèm dòng đầu `Includes every change of X.0.0-rc.1 to X.0.0-rc.N, listed below.`; các mục bản thử giữ nguyên bên dưới.
+Khi ra `1.0.0`, chủ dự án thêm check **"Rust API compatibility (cargo-semver-checks)"** vào danh sách check bắt buộc
+(mục "Kiểm hợp đồng Rust").
 
 ## Đăng lên crates.io (chưa bật — chờ chủ dự án)
 
@@ -249,7 +306,8 @@ Nhiều phiên agent có thể làm song song trên các nhánh khác nhau. Lúc
 ## Nâng cấp thư viện
 
 Dependabot (`.github/dependabot.yml`) mở pull request mỗi tuần, gom bản minor/patch của
-thư viện Rust thành một PR. CI chạy gate trên PR (khi repo công khai); người duyệt hoặc agent
+thư viện Rust thành một PR; npm của `sdk/typescript`, image Docker và action của GitHub mỗi loại một PR. Chỉ đề xuất
+bản đã ra ít nhất 7 ngày (`cooldown`, D-20261123-supply-chain); bản vá lỗ hổng thì không chờ. CI chạy gate trên PR (khi repo công khai); người duyệt hoặc agent
 vẫn chạy `./gate.sh` trên máy, xanh mới merge. Bản lớn (major) đến từng PR riêng: đọc
 CHANGELOG của thư viện (skill `check-library-api`) trước khi merge. Lỗ hổng thư viện được
 `cargo deny check` trong gate bắt; đỏ thì nâng thư viện hoặc ghi ngoại lệ có lý do trong

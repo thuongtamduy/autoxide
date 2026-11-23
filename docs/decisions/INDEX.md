@@ -114,6 +114,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261123-api-coverage](D-20261123-api-coverage.md)** Đo độ phủ endpoint và tool MCP bằng test, mục tiêu 100% trước 1.0 — 2026-11-23
 - **[D-20261123-compatibility-policy](D-20261123-compatibility-policy.md)** Bản 1.0 có cam kết: chính sách tương thích, `cargo-semver-checks` trên PR, dòng hỗ trợ dài hạn — 2026-11-23
 - **[D-20261123-english-rustdoc](D-20261123-english-rustdoc.md)** Doc comment của phần công khai viết tiếng Anh, gate `doc-language` — 2026-11-23 · **chủ dự án quyết**
+- **[D-20261123-supply-chain](D-20261123-supply-chain.md)** Chuỗi cung ứng và phát hành: ký không khoá, provenance cho mọi file, Actions tối thiểu quyền, Dependabot có cooldown, bản thử `X.Y.Z-rc.N` — 2026-11-23
 
 ## Kiến trúc module và kernel
 

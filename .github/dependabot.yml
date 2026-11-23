@@ -1,4 +1,7 @@
-# Dependabot đề xuất nâng cấp bằng pull request; CI chạy trên PR như mọi PR khác. Gom theo nhóm để mỗi tuần một PR mỗi loại.
+# Dependabot đề xuất nâng cấp bằng pull request; CI chạy trên PR như mọi PR khác. Gom theo nhóm để mỗi tuần một PR mỗi
+# loại (D-20261123-supply-chain). `cooldown`: chỉ đề xuất bản đã ra ít nhất vài ngày — bản bị chiếm quyền thường bị
+# phát hiện và gỡ trong vài ngày đầu. Bản vá lỗ hổng (Dependabot security updates, chủ dự án bật trong Settings) không
+# chịu `cooldown`.
 version: 2
 updates:
   - package-ecosystem: cargo
@@ -6,6 +9,8 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    cooldown:
+      default-days: 7
     groups:
       rust-minor-and-patch:
         update-types: [minor, patch]
@@ -14,20 +19,43 @@ updates:
       # Bỏ dòng này khi nâng `webauthn_rp` lên bản dùng `p256` 0.14 (D-092).
       - dependency-name: p256
         versions: [">= 0.14"]
+  # SDK TypeScript: chỉ có phụ thuộc lúc phát triển (TypeScript để kiểm kiểu). Một PR mỗi tuần cho mọi bản.
+  - package-ecosystem: npm
+    directory: /sdk/typescript
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      npm:
+        patterns: ["*"]
+  # Image nền của Dockerfile (ghim theo digest).
   - package-ecosystem: docker
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      docker:
+        patterns: ["*"]
   # Image nền trong compose.yml (Postgres) cũng ghim theo digest.
   - package-ecosystem: docker-compose
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      docker-compose:
+        patterns: ["*"]
   # Action của GitHub ghim theo SHA đầy đủ (kèm comment phiên bản): Dependabot nâng cả SHA và comment.
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
     groups:
       github-actions:
         patterns: ["*"]
