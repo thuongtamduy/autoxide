@@ -1129,3 +1129,31 @@ mod tests {
         .unwrap();
     }
 }
+
+/// Thử phá cách đọc khách từ API key (D-20261123-property-fuzzing): chuỗi do bất kỳ ai gửi tới.
+#[cfg(test)]
+mod properties {
+    use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn key_dung_dang_doc_lai_dung_khach(id in any::<u128>(), random in "[A-Za-z0-9_-]{1,60}") {
+            let tenant = TenantId::from_uuid(Uuid::from_u128(id));
+            let key = format!("{API_KEY_PREFIX}{}_{random}", tenant_hex(tenant));
+            prop_assert_eq!(tenant_of(&key).unwrap(), Some(tenant));
+        }
+
+        #[test]
+        fn chuoi_bat_ky_khong_panic_va_sai_dang_bi_tu_choi(raw in "\\PC{0,100}", rest in "\\PC{0,60}") {
+            let _ = tenant_of(&raw);
+            let key = format!("{API_KEY_PREFIX}{rest}");
+            if let Ok(found) = tenant_of(&key) {
+                // Nhận thì phải đúng dạng: 32 chữ hex thường, `_`, phần ngẫu nhiên không rỗng.
+                let tenant = found.unwrap();
+                let expected = format!("{}_", tenant_hex(tenant));
+                prop_assert!(rest.starts_with(&expected) && rest.len() > expected.len());
+            }
+        }
+    }
+}

@@ -450,3 +450,83 @@ mod tests {
         assert!(!format!("{:?}", tokens()).contains("0123456789"));
     }
 }
+
+/// Thử phá access token (D-20261123-property-fuzzing): khoá sinh ngẫu nhiên lúc chạy.
+#[cfg(test)]
+mod properties {
+    use super::*;
+    use proptest::prelude::*;
+
+    fn tenant() -> impl Strategy<Value = TenantId> {
+        prop_oneof![
+            Just(DEFAULT_TENANT),
+            any::<u128>().prop_map(|id| TenantId::from_uuid(Uuid::from_u128(id)))
+        ]
+    }
+
+    fn at(seconds: i64) -> Timestamp {
+        Timestamp::from_unix_seconds(seconds).unwrap()
+    }
+
+    proptest! {
+        #[test]
+        fn cap_roi_kiem_lai_ra_dung_khach_va_nguoi_dung(
+            key in proptest::collection::vec(any::<u8>(), 32..64),
+            tenant in tenant(),
+            user in any::<u128>(),
+            session in any::<u128>(),
+            now in 1_000_000_000i64..4_000_000_000,
+        ) {
+            let tokens = AccessTokens::new(key, Duration::from_secs(900));
+            let (user, session) = (Uuid::from_u128(user), Uuid::from_u128(session));
+            let token = tokens.issue(tenant, user, at(now), session, at(now)).unwrap();
+            let verified = tokens.verify(&token, at(now + 899)).unwrap();
+            prop_assert_eq!((verified.tenant, verified.user, verified.session), (tenant, user, Some(session)));
+            // Hết hạn đúng lúc `exp`.
+            let expired = tokens.verify(&token, at(now + 900)).unwrap_err();
+            prop_assert_eq!(expired.code(), "auth.token_expired");
+        }
+
+        #[test]
+        fn sua_mot_ky_tu_hay_khoa_khac_thi_tu_choi(
+            key in proptest::collection::vec(any::<u8>(), 32..64),
+            other in proptest::collection::vec(any::<u8>(), 32..64),
+            tenant in tenant(),
+            index in any::<proptest::sample::Index>(),
+            replacement in proptest::char::range('-', 'z'),
+        ) {
+            let tokens = AccessTokens::new(key.clone(), Duration::from_secs(900));
+            let now = at(1_800_000_000);
+            let token = tokens.issue(tenant, Uuid::nil(), now, Uuid::nil(), now).unwrap();
+            if other != key {
+                prop_assert!(AccessTokens::new(other, Duration::from_secs(900)).verify(&token, now).is_err());
+            }
+            let mut chars: Vec<char> = token.chars().collect();
+            let at_index = index.index(chars.len());
+            prop_assume!(chars[at_index] != replacement);
+            chars[at_index] = replacement;
+            let tampered: String = chars.into_iter().collect();
+            prop_assert!(tokens.verify(&tampered, now).is_err(), "{tampered}");
+        }
+
+        #[test]
+        fn chuoi_bat_ky_khong_panic(token in "\\PC{0,300}|[A-Za-z0-9_-]{0,40}\\.[A-Za-z0-9_-]{0,80}\\.[A-Za-z0-9_-]{0,50}") {
+            let tokens = AccessTokens::new(vec![7; 32], Duration::from_secs(900));
+            prop_assert!(tokens.verify(&token, at(1_800_000_000)).is_err());
+        }
+
+        #[test]
+        fn khoa_cu_van_kiem_duoc_trong_luc_doi_khoa(
+            old in proptest::collection::vec(any::<u8>(), 32..64),
+            new in proptest::collection::vec(any::<u8>(), 32..64),
+            tenant in tenant(),
+        ) {
+            let now = at(1_800_000_000);
+            let token = AccessTokens::new(old.clone(), Duration::from_secs(900))
+                .issue(tenant, Uuid::nil(), now, Uuid::nil(), now)
+                .unwrap();
+            let rotated = AccessTokens::new(new, Duration::from_secs(900)).with_previous(vec![old]);
+            prop_assert_eq!(rotated.verify(&token, now).unwrap().tenant, tenant);
+        }
+    }
+}

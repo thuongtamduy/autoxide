@@ -728,3 +728,28 @@ mod mfa_login_tests;
 
 #[cfg(test)]
 mod change_password_tests;
+
+/// Thử phá header `Authorization` (D-20261123-property-fuzzing).
+#[cfg(test)]
+mod properties {
+    use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn header_bat_ky_khong_panic(raw in proptest::option::of("\\PC{0,120}")) {
+            if let Ok(token) = bearer_token(raw.as_deref()) {
+                prop_assert!(!token.is_empty() && token == token.trim());
+            }
+        }
+
+        #[test]
+        fn bearer_khong_phan_biet_hoa_thuong(
+            scheme in "[bB][eE][aA][rR][eE][rR]",
+            token in "[A-Za-z0-9._~+/=-]{1,80}",
+        ) {
+            let header = format!("{scheme} {token}");
+            prop_assert_eq!(bearer_token(Some(&header)).unwrap(), token.as_str());
+        }
+    }
+}
