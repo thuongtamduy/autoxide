@@ -25,6 +25,8 @@
 //!   giữ metadata và phiên bản phụ thuộc nội bộ.
 //! - `changelog` — gộp các mảnh trong `changelog.d/` vào `## [Unreleased]` của `CHANGELOG.md` rồi
 //!   xoá chúng; chạy lúc phát hành (xem `changelog.rs`, D-20261119-changelog-fragments).
+//! - `coverage-api [--run]` — endpoint trong `docs/openapi.json` và tool trong `docs/mcp-tools.json` chưa
+//!   được test nào gọi thành công; `--run` chạy `test-all` để đo trước (xem `coverage.rs`).
 //! - `decisions` — sinh lại mục lục `docs/decisions/INDEX.md` từ nhật ký quyết định (xem
 //!   `decisions.rs`).
 //! - `new-module <module> <entity>` — sinh module mới từ khuôn `modules/notes` (xem
@@ -49,6 +51,7 @@ mod api_shape;
 mod baseline;
 mod boundaries;
 mod changelog;
+mod coverage;
 mod decisions;
 mod deploy_metrics;
 mod doc_language;
@@ -73,6 +76,7 @@ use std::process::ExitCode;
 
 const USAGE: &str = "usage: cargo xtask check
        cargo xtask check-module <dir>            the module rules of `check`, on a crate outside this repository
+       cargo xtask coverage-api [--run]          endpoints and MCP tools no test calls successfully
        cargo xtask decisions                     regenerate docs/decisions/INDEX.md
        cargo xtask changelog                     fold changelog.d/ fragments into CHANGELOG.md (at release)
        cargo xtask api-diff [--base <ref>]       default base: the last release tag before HEAD
@@ -113,6 +117,8 @@ fn main() -> ExitCode {
     match args.iter().map(String::as_str).collect::<Vec<_>>().as_slice() {
         ["check"] => check(),
         ["check-module", dir] => check_module(dir),
+        ["coverage-api"] => coverage_api(false),
+        ["coverage-api", "--run"] => coverage_api(true),
         ["decisions"] => decisions(),
         ["changelog"] => changelog(),
         ["api-diff"] => api_diff(None),
@@ -479,6 +485,22 @@ fn new_module(module: &str, entity: &str) -> ExitCode {
         }
         Err(error) => {
             eprintln!("xtask new-module: {error}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+fn coverage_api(run_tests: bool) -> ExitCode {
+    let result = workspace::load()
+        .map_err(|error| error.to_string())
+        .and_then(|workspace| coverage::run(&workspace.root, run_tests));
+    match result {
+        Ok(report) => {
+            coverage::print(&report);
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            eprintln!("xtask coverage-api: {error}");
             ExitCode::FAILURE
         }
     }

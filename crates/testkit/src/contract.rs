@@ -45,6 +45,11 @@ fn operation<'a>(document: &'a Value, method: &str, path: &str) -> Option<(&'a s
     best.map(|(_, template, operation)| (template, operation))
 }
 
+/// The documented path template `path` resolves to (`/api/v1/notes/{id}` for `/api/v1/notes/0193…`), if any.
+pub(crate) fn template<'a>(document: &'a Value, method: &str, path: &str) -> Option<&'a str> {
+    operation(document, method, path).map(|(template, _)| template)
+}
+
 /// Checks one response. Returns `Ok(())` even when the path is not in the document (unknown route → the
 /// router's 404): there is no contract to compare against.
 pub fn check(

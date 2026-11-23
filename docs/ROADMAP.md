@@ -159,6 +159,11 @@ thật (P7).
         được ngay (module, migration, route có OpenAPI, test `TestApp::builder` trên cả hai database, `check.sh`, CI
         mẫu, README EN + VI, `AGENTS.md`); `./gate.sh --only example` sinh khung rồi lint và test nó
         (D-20261122-external-template)
+- [ ] P11 — Dùng được mọi thứ đã dựng: mọi endpoint trong `docs/openapi.json` và mọi tool trong `docs/mcp-tools.json`
+      được test end-to-end gọi thành công ít nhất một lần (chạy trên cả hai database); mọi hướng dẫn trong
+      `docs/guides/` làm theo được đúng như viết; chỗ hỏng tìm ra thì sửa tận gốc kèm test (D-20261123-api-coverage)
+  - [x] Công cụ đo: testkit ghi endpoint / tool gọi thành công khi đặt `TEST_API_COVERAGE`; `cargo xtask coverage-api
+        --run` báo phần chưa phủ theo module
 
 ## Giai đoạn B — Lớp cho giao diện và phân quyền
 
