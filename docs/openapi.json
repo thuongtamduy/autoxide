@@ -195401,7 +195401,7 @@
                 }
               }
             },
-            "description": "`q` is shorter than 2 characters, or `limit` is not between 1 and 20; see `errors`."
+            "description": "`q` is shorter than 2 or longer than 200 characters, or `limit` is not between 1 and 20; see `errors`."
           },
           "default": {
             "content": {
