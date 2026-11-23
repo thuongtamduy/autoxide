@@ -23,6 +23,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(CreateExchangeRates),
         Box::new(AddListIndexes),
         Box::new(AddBankPaymentIndex),
+        Box::new(AddCapturedAmount),
     ]
 }
 
@@ -1052,6 +1053,38 @@ impl MigrationTrait for AddBankPaymentIndex {
                     .name("ledger_bank_transactions_payment_idx")
                     .table(Alias::new("ledger_bank_transactions"))
                     .to_owned(),
+            )
+            .await
+    }
+}
+
+/// Số thực thu của thanh toán (rà soát bảo mật 2026-11): trần hoàn tiền là số đã thu, không phải số
+/// phải thu. Thanh toán có sẵn: `NULL` (đọc như số phải thu).
+struct AddCapturedAmount;
+
+impl MigrationName for AddCapturedAmount {
+    fn name(&self) -> &str {
+        "m0012_add_captured_amount"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for AddCapturedAmount {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .alter_table(
+                Table::alter()
+                    .table("ledger_payments")
+                    .add_column(schema::big_integer_null("captured_minor"))
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .alter_table(
+                Table::alter().table("ledger_payments").drop_column("captured_minor").to_owned(),
             )
             .await
     }

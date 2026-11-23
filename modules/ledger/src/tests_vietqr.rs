@@ -499,3 +499,67 @@ async fn hai_lan_chuyen_cung_ma_khop_dong_thoi_khong_mat_khoan_thua() {
     .await
     .unwrap();
 }
+
+/// Rà soát bảo mật 2026-11: tiền vào một tài khoản khác (của người bán khác) mang mã của thanh toán
+/// không làm thanh toán đó thành đã nhận — tiền không nằm ở tài khoản nó chờ; khoản đó vào hàng chờ.
+#[tokio::test]
+async fn ma_dung_nhung_sai_tai_khoan_nhan_vao_hang_cho() {
+    TestDatabase::run(async |test| {
+        let (app, _feed, account) = setup(test).await;
+        let created = pay(&app, 150_000, "P-9").await;
+        let id = created["id"].as_str().unwrap().to_owned();
+        let code = created["transfer_code"].as_str().unwrap().to_owned();
+        const OTHER: &str = "0022002345678";
+        let (status_code, other) = call(
+            &app,
+            "POST",
+            "/bank-accounts",
+            Some(json!({"bank_bin": "970436", "account_number": OTHER,
+                        "account_name": "CUA HANG B", "feed_provider": "fake"})),
+        )
+        .await;
+        assert_eq!(status_code, StatusCode::CREATED, "{other}");
+        let other_id = other["data"]["id"].as_str().unwrap().to_owned();
+        let txn = FakeBankFeed::credit("T-9", OTHER, vnd(150_000), &code);
+        let (answer, stored) = push(&app, &[txn]).await;
+        assert_eq!(answer, StatusCode::OK, "{stored}");
+        drain(&app).await;
+        assert_eq!(status(&app, &id).await, "pending");
+        assert_eq!(bank_balance(&app, &account).await, 0);
+        let open = exceptions(&app).await;
+        assert_eq!(open.len(), 1, "{open:?}");
+        assert_eq!(open[0]["kind"], "unmatched_credit");
+        assert_ne!(other_id, account);
+    })
+    .await
+    .unwrap();
+}
+
+/// Rà soát bảo mật 2026-11: hai lệnh khớp cùng một khoản không mã vào hai thanh toán khác nhau, gửi
+/// cùng lúc: chỉ một thanh toán được ghi thu — một khoản tiền không trả cho hai đơn.
+#[tokio::test]
+async fn hai_lenh_khop_cung_luc_mot_khoan_chi_ghi_thu_mot_lan() {
+    TestDatabase::run(async |test| {
+        let (app, _feed, account) = setup(test).await;
+        let first = pay(&app, 50_000, "P-A").await["id"].as_str().unwrap().to_owned();
+        let second = pay(&app, 50_000, "P-B").await["id"].as_str().unwrap().to_owned();
+        push(&app, &[FakeBankFeed::credit("T-1", ACCOUNT, vnd(50_000), "chuyen tien")]).await;
+        drain(&app).await;
+        let open = exceptions(&app).await;
+        assert_eq!(open.len(), 1, "{open:?}");
+        let uri = format!("/exceptions/{}/resolve", open[0]["id"].as_str().unwrap());
+        let (one, two) = tokio::join!(
+            call(&app, "POST", &uri, Some(json!({"action": "match", "payment_id": first}))),
+            call(&app, "POST", &uri, Some(json!({"action": "match", "payment_id": second}))),
+        );
+        assert!(one.0.is_success() || two.0.is_success(), "{one:?} {two:?}");
+        let succeeded = [status(&app, &first).await, status(&app, &second).await]
+            .iter()
+            .filter(|status| *status == "succeeded")
+            .count();
+        assert_eq!(succeeded, 1, "one credit pays one payment");
+        assert_eq!(bank_balance(&app, &account).await, 50_000);
+    })
+    .await
+    .unwrap();
+}

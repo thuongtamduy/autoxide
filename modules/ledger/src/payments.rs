@@ -361,6 +361,7 @@ impl LedgerService {
                 updated_at: Set(at),
                 transfer_code: Set(None),
                 bank_account_id: Set(None),
+                captured_minor: Set(None),
             };
             let saved = payment::Entity::insert(row).exec_with_returning(&transaction).await?;
             let event = events::PaymentCreated(payment_payload(&saved)?);
@@ -607,12 +608,25 @@ impl LedgerService {
                 "processed"
             }
             "refund_succeeded" | "refund_failed" => {
+                // Chỉ lượt hoàn của thanh toán qua đúng đối tác gửi thông báo, và thông báo phải nêu
+                // mã: mã rỗng / mã của đối tác khác không khớp lượt hoàn nào (rà soát bảo mật 2026-11).
                 let reference = notice.refund_provider_ref.clone().unwrap_or_default();
-                let found = refund::Entity::find()
-                    .scoped(tenant)
-                    .filter(refund::Column::ProviderRef.eq(reference))
-                    .one(database.write())
-                    .await?;
+                let found = if reference.is_empty() {
+                    None
+                } else {
+                    refund::Entity::find()
+                        .scoped(tenant)
+                        .filter(refund::Column::ProviderRef.eq(reference))
+                        .one(database.write())
+                        .await?
+                };
+                let found = match found {
+                    Some(found) => Self::find_payment(database.write(), tenant, found.payment_id)
+                        .await?
+                        .filter(|payment| payment.provider == stored.provider)
+                        .map(|_| found),
+                    None => None,
+                };
                 if let Some(found) = found {
                     if notice.kind == "refund_succeeded" {
                         self.complete_refund(tenant, found.id).await?;
@@ -723,6 +737,8 @@ impl LedgerService {
                 let mut active: payment::ActiveModel = row.into();
                 active.status = Set("succeeded".to_owned());
                 active.captured_at = Set(Some(at));
+                // Số thực thu (có thể nhỏ hơn số phải thu khi người duyệt nhận số đã nhận): trần hoàn.
+                active.captured_minor = Set(Some(received.minor()));
                 active.updated_at = Set(at);
                 let saved = payment::Entity::update(active).exec(&transaction).await?;
                 // Số thực thu, không phải số phải thu: bên nghe cộng đúng tiền đã vào.
@@ -919,11 +935,11 @@ impl LedgerService {
                 payment::Column::RefundedMinor,
                 payment::Column::Id.eq(row.id),
                 input.amount.minor(),
-                Bounds { floor: 0, ceiling: row.amount_minor },
+                Bounds { floor: 0, ceiling: collected(&row) },
             )
             .await?;
             if changed == 0 {
-                let remaining = row.amount_minor.saturating_sub(row.refunded_minor);
+                let remaining = collected(&row).saturating_sub(row.refunded_minor);
                 return Err(refund_exceeds(money(remaining, &row.amount_currency)?));
             }
             let at = now();
@@ -1114,4 +1130,11 @@ impl JobHandler for ExpirePaymentsJob {
     async fn run(&self, job: &JobContext) -> Result<(), Error> {
         self.0.expire_payments(&job.database).await.map(|_| ())
     }
+}
+
+/// Số đã thu của thanh toán: số thực thu lúc ghi thu, thanh toán ghi thu trước m0012 thì số phải thu.
+/// Trần của tổng số hoàn — nhận thiếu rồi hoàn theo số phải thu là trả ra nhiều hơn đã vào (rà soát
+/// bảo mật 2026-11).
+fn collected(row: &payment::Model) -> i64 {
+    row.captured_minor.unwrap_or(row.amount_minor)
 }
