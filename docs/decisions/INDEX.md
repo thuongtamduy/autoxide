@@ -61,7 +61,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-233** Viết đặc tả cho 6 việc "để sau" còn rải trong đặc tả; dọn câu "để sau" đã cũ — 2026-11-14 · **chủ dự án quyết**
 - **D-237** Rà lộ trình lần hai trước bước 31: tỉ giá về `ledger`, một chỗ cho thông tin cửa hàng, nhãn và ghi chú của `customers`, báo có hàng lại không trùng, sửa bảng phụ thuộc — 2026-11-14
 - **D-239** `cargo xtask api-diff`: luật phá vỡ của `/api/v1`, chỉ `x-sunset` trong tài liệu (bước 31 A1) — 2026-11-15
-- **D-242** `cargo xtask semver`: chỉ kernel và testkit, ép so như bản patch, báo cáo khi còn `0.x` (bước 31 A7) — 2026-11-15
+- **D-242** `cargo xtask semver`: chỉ kernel và testkit, ép so như bản patch, báo cáo khi còn `0.x` (bước 31 A7) — 2026-11-15 · *thay một phần bởi D-20261123-compatibility-policy*
 - **D-243** SDK TypeScript: bộ sinh viết bằng Rust trong `xtask`, gate kiểm khớp không cần Node, `tsc` trong CI (bước 31 A2) — 2026-11-15
 - **D-244** Hướng dẫn theo tình huống: dạng `curl` hẹp chạy như test, bảng tool kiểm theo code (bước 31 A3–A5) — 2026-11-15
 - **D-245** Hợp đồng quyền đọc được bằng máy và test độ phủ phân quyền (bước 31, đặc tả 54 P1) — 2026-11-15
@@ -111,6 +111,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261122-gitleaks-8-30-1](D-20261122-gitleaks-8-30-1.md)** Ghim gitleaks 8.30.1, image lấy từ `ghcr.io/gitleaks/gitleaks` ở cả gate và CI — 2026-11-22
 - **[D-20261122-step67-after-1-0](D-20261122-step67-after-1-0.md)** Ba mục cuối của bước 67 làm sau bản 1.0 — 2026-11-22 · **chủ dự án quyết**
 - **[D-20261122-toolchain-sync](D-20261122-toolchain-sync.md)** Ví dụ module ngoài dùng đúng toolchain của core; `cargo xtask check` chặn khi lệch — 2026-11-22
+- **[D-20261123-compatibility-policy](D-20261123-compatibility-policy.md)** Bản 1.0 có cam kết: chính sách tương thích, `cargo-semver-checks` trên PR, dòng hỗ trợ dài hạn — 2026-11-23
 - **[D-20261123-english-rustdoc](D-20261123-english-rustdoc.md)** Doc comment của phần công khai viết tiếng Anh, gate `doc-language` — 2026-11-23 · **chủ dự án quyết**
 
 ## Kiến trúc module và kernel
