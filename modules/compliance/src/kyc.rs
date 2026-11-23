@@ -230,13 +230,11 @@ impl ComplianceService {
         let session = verifier.start(request).await?;
         let reference = session.provider_reference().to_owned();
         kyc_attempt::Entity::update_many()
-            .scoped(tenant)
             .col_expr(kyc_attempt::Column::ProviderReference, reference.clone().into())
             .filter(kyc_attempt::Column::Id.eq(attempt_id))
             .exec(database.write())
             .await?;
         kyc_profile::Entity::update_many()
-            .scoped(tenant)
             .col_expr(kyc_profile::Column::ProviderReference, Some(reference).into())
             .filter(kyc_profile::Column::Id.eq(profile.id))
             .exec(database.write())
@@ -320,7 +318,6 @@ impl ComplianceService {
         let outcome = verifier.fetch(&callback.provider_reference).await?;
         self.apply_outcome(tenant, &callback.provider, outcome).await?;
         kyc_callback::Entity::update_many()
-            .scoped(tenant)
             .col_expr(kyc_callback::Column::ProcessedAt, Some(now()).into())
             .filter(kyc_callback::Column::Id.eq(callback_id))
             .exec(database.write())
@@ -423,7 +420,6 @@ impl ComplianceService {
                         _ => None,
                     };
                     kyc_attempt::Entity::update_many()
-                        .scoped(tenant)
                         .col_expr(kyc_attempt::Column::Status, "superseded".into())
                         .col_expr(kyc_attempt::Column::ResultCode, result_code.into())
                         .col_expr(kyc_attempt::Column::CompletedAt, Some(at).into())
@@ -493,7 +489,6 @@ impl ComplianceService {
                     Err(error) => return Err(error.into()),
                 };
                 kyc_attempt::Entity::update_many()
-                    .scoped(tenant)
                     .col_expr(kyc_attempt::Column::Status, attempt_status.into())
                     .col_expr(kyc_attempt::Column::ResultCode, result_code.into())
                     .col_expr(kyc_attempt::Column::CompletedAt, Some(at).into())
@@ -942,7 +937,6 @@ impl ComplianceService {
         // Callback cũ quá hạn lưu: xoá.
         let before: Timestamp =
             Timestamp::now() - SignedDuration::from_hours(24 * self.callback_retention_days);
-        // tenant-scope: việc nền / kiểm tra quét mọi khách của database, chủ ý không lọc khách (rà soát bảo mật 2026-11)
         kyc_callback::Entity::delete_many()
             .filter(kyc_callback::Column::ReceivedAt.lt(before))
             .filter(kyc_callback::Column::ProcessedAt.is_not_null())

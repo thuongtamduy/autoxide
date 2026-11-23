@@ -190,7 +190,6 @@ impl InvoicesService {
     ) -> Result<Purged, Error> {
         let mut report = Purged::default();
         // 1. Ẩn danh người mua cá nhân của chứng từ quá hạn lưu (index `…_retention_sweep_idx`).
-        // tenant-scope: việc nền / kiểm tra quét mọi khách của database, chủ ý không lọc khách (rà soát bảo mật 2026-11)
         let expired: Vec<document::Model> = document::Entity::find()
             .filter(document::Column::RetentionUntil.lt(today))
             .filter(document::Column::BuyerPurgedAt.is_null())

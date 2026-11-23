@@ -359,10 +359,7 @@ impl ComplianceService {
             )),
         };
         if let Err(error) = outcome {
-            phone_challenge::Entity::delete_by_id(id)
-                .scoped(tenant)
-                .exec(tenant.database().write())
-                .await?;
+            phone_challenge::Entity::delete_by_id(id).exec(tenant.database().write()).await?;
             tracing::warn!(phone = %phone.masked(), code = error.code(), "phone verification sms failed");
             return Err(error);
         }
@@ -424,7 +421,6 @@ impl ComplianceService {
         let digits: String = code.chars().filter(|c| !c.is_whitespace()).collect();
         if !same(&code_hash(&pepper, id, &digits), &row.code_hash) {
             phone_challenge::Entity::update_many()
-                .scoped(tenant)
                 .col_expr(
                     phone_challenge::Column::Attempts,
                     Expr::col(phone_challenge::Column::Attempts).add(1),
@@ -444,7 +440,6 @@ impl ComplianceService {
         }
         // Dùng một lần: chỉ đổi dòng còn chưa dùng.
         let consumed = phone_challenge::Entity::update_many()
-            .scoped(tenant)
             .col_expr(phone_challenge::Column::ConsumedAt, Expr::value(at))
             .filter(phone_challenge::Column::Id.eq(id))
             .filter(phone_challenge::Column::ConsumedAt.is_null())
@@ -534,7 +529,6 @@ impl ComplianceService {
         database: &autoxide_kernel::database::Database,
     ) -> Result<u64, Error> {
         let before = Timestamp::now() - SignedDuration::from_hours(CHALLENGE_KEEP_HOURS);
-        // tenant-scope: việc nền / kiểm tra quét mọi khách của database, chủ ý không lọc khách (rà soát bảo mật 2026-11)
         Ok(phone_challenge::Entity::delete_many()
             .filter(phone_challenge::Column::CreatedAt.lt(before))
             .exec(database.write())

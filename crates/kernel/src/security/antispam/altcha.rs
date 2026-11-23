@@ -270,3 +270,25 @@ mod tests {
         assert_eq!(found, Some(40));
     }
 }
+
+// Thử phá lời giải ALTCHA (D-20261123-property-fuzzing): thân do bất kỳ ai gửi tới form công khai.
+#[cfg(test)]
+mod properties {
+    use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn loi_giai_bat_ky_khong_qua(raw in "\\PC{0,300}", bytes in proptest::collection::vec(any::<u8>(), 0..300)) {
+            let expected = Expected { scope: "contact", binding: "b", cost: 1, now: 1_800_000_000 };
+            prop_assert!(!check(&raw, "server-key", &expected));
+            prop_assert!(!check(&STANDARD.encode(&bytes), "server-key", &expected));
+        }
+
+        #[test]
+        fn hex_doc_lai_nguyen_ven(bytes in proptest::collection::vec(any::<u8>(), 0..64), raw in "\\PC{0,20}") {
+            prop_assert_eq!(unhex(&hex(&bytes)), Some(bytes));
+            let _ = unhex(&raw);
+        }
+    }
+}

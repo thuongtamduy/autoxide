@@ -450,14 +450,12 @@ impl LedgerService {
             .into_tuple()
             .all(&snapshot)
             .await?;
-        // tenant-scope: việc nền / kiểm tra quét mọi khách của database, chủ ý không lọc khách (rà soát bảo mật 2026-11)
         let stored: HashMap<Uuid, i64> = balance::Entity::find()
             .all(&snapshot)
             .await?
             .into_iter()
             .map(|row| (row.account_id, row.balance_minor))
             .collect();
-        // tenant-scope: việc nền / kiểm tra quét mọi khách của database, chủ ý không lọc khách (rà soát bảo mật 2026-11)
         let sums: Vec<(Uuid, Option<i64>)> = line::Entity::find()
             .select_only()
             .column(line::Column::AccountId)

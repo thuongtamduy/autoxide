@@ -991,7 +991,6 @@ async fn settle_in(
             return Err(insufficient_balance());
         }
         hold::Entity::update_many()
-            .scoped(tenant)
             .col_expr(hold::Column::UpdatedAt, now().into())
             .filter(hold::Column::Id.eq(hold_id))
             .exec(transaction)
@@ -1036,13 +1035,9 @@ async fn debtor(
         return Ok(Debtor::Split);
     }
     let Some(found) = found else { return Ok(Debtor::Receivable) };
-    // Lọc theo khách của dòng vừa đọc (hàm không nhận `TenantContext`).
-    let locked = rows::lock_one(
-        transaction,
-        hold::Entity::find_by_id(found.id).filter(hold::Column::TenantId.eq(found.tenant_id)),
-    )
-    .await?
-    .ok_or_else(hold_not_found)?;
+    let locked = rows::lock_one(transaction, hold::Entity::find_by_id(found.id))
+        .await?
+        .ok_or_else(hold_not_found)?;
     if locked.status != "held" {
         return Ok(Debtor::Available);
     }

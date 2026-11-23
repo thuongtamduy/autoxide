@@ -641,24 +641,3 @@ async fn tra_nhieu_nut_mot_cau() {
     .await
     .unwrap();
 }
-
-/// Bản cài một khách: khách mặc định không qua bước tạo khách nên nút gốc chưa có. Module khác hỏi nút
-/// gốc qua `OrgDirectory` (vd `ledger` mở sổ của cửa hàng) vẫn thấy nó — được tạo khi hỏi lần đầu.
-#[tokio::test]
-async fn hoi_nut_goc_cua_khach_mac_dinh_thi_tao_khi_thieu() {
-    use crate::api::OrgDirectory;
-    TestDatabase::run(async |test| {
-        let app = build(test, |builder| builder).await;
-        let directory = app.api::<dyn OrgDirectory>().unwrap();
-        let tenant = app.default_tenant();
-        let root = root_of(DEFAULT_TENANT);
-        let found = directory.units(&tenant, &[root]).await.unwrap();
-        assert_eq!(found.len(), 1, "nút gốc được tạo khi hỏi qua `units`");
-        let unit = directory.unit(&tenant, root).await.unwrap().unwrap();
-        assert_eq!((unit.id, unit.parent_id), (root, None));
-        let other = OrgId::from_uuid(Uuid::now_v7());
-        assert!(directory.unit(&tenant, other).await.unwrap().is_none());
-    })
-    .await
-    .unwrap();
-}

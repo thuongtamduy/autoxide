@@ -678,7 +678,7 @@ impl InvoicesService {
             .filter(line::Column::DocumentId.eq(id))
             .exec(&transaction)
             .await?;
-        document::Entity::delete_by_id(id).scoped(tenant).exec(&transaction).await?;
+        document::Entity::delete_by_id(id).exec(&transaction).await?;
         transaction.commit().await?;
         Ok(())
     }

@@ -744,7 +744,6 @@ async fn write(
         }
     }
     let saved = entry::Entity::find_by_id(entry_id)
-        .scoped(tenant)
         .one(transaction)
         .await?
         .ok_or_else(|| Error::internal("a ledger entry vanished after it was written"))?;

@@ -26,7 +26,6 @@ mod listing;
 mod migration;
 mod openings;
 mod permissions;
-mod privacy;
 mod reminders;
 mod service;
 mod settings;
@@ -132,8 +131,6 @@ impl Module for BookingsModule {
             reminders::declare(notifier.as_ref())?;
         }
         self.service = Some(service);
-        // Lịch đặt bằng tài khoản: vào bản xuất dữ liệu cá nhân (rà soát bảo mật 2026-11).
-        context.personal_data(Arc::new(privacy::BookingPrivacy))?;
         Ok(())
     }
 
@@ -154,17 +151,10 @@ impl Module for BookingsModule {
     fn subscriptions(&self) -> Vec<autoxide_kernel::event::Subscription> {
         // Cọc đã thu; `ledger` có thể không được cài (`optional`).
         self.service.clone().map_or_else(Vec::new, |service| {
-            vec![
-                autoxide_kernel::event::Subscription::optional(
-                    "ledger.payment_succeeded",
-                    Arc::new(jobs::PaymentListener(service)),
-                ),
-                // Tài khoản bị xoá: bỏ thông tin cá nhân khỏi lịch của người đó.
-                autoxide_kernel::event::Subscription::new(
-                    autoxide_kernel::privacy::USER_DELETED,
-                    Arc::new(privacy::BookingPrivacy),
-                ),
-            ]
+            vec![autoxide_kernel::event::Subscription::optional(
+                "ledger.payment_succeeded",
+                Arc::new(jobs::PaymentListener(service)),
+            )]
         })
     }
 

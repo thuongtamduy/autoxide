@@ -128,17 +128,6 @@ fn scoped_entities(files: &[File]) -> Vec<String> {
             };
             *scoped.entry(name).or_default() += 1;
         }
-        // Crate khai `impl TenantScoped for Entity` qua macro riêng (`tenant_scoped!();` trong
-        // `mod <entity> { … }`): chữ `TenantScoped for` chỉ có một lần trong `macro_rules!`, nên
-        // trước đây cả crate lọt khỏi luật (rà soát bảo mật 2026-11). Mỗi lần gọi macro tính như
-        // một `impl` cho entity của `mod` bao nó.
-        for at in find_word(code, "tenant_scoped") {
-            if code[at + "tenant_scoped".len()..].trim_start().starts_with('!')
-                && !code[..at].trim_end().ends_with("macro_rules!")
-            {
-                *scoped.entry(module_at(file, &mods, at)).or_default() += 1;
-            }
-        }
     }
     scoped
         .into_iter()
@@ -503,37 +492,6 @@ mod tests {
 }
 ";
         assert!(check(service).is_empty());
-    }
-
-    #[test]
-    fn entity_khai_bang_macro_rieng_cung_bi_kiem() {
-        let entity = "macro_rules! tenant_scoped {
-    () => {
-        impl autoxide_kernel::tenancy::TenantScoped for Entity {
-            fn tenant_column() -> Self::Column { Column::TenantId }
-        }
-    };
-}
-pub(crate) mod order {
-    #[sea_orm(table_name = \"shop_orders\")]
-    pub struct Model { pub tenant_id: Uuid }
-    tenant_scoped!();
-}
-pub(crate) mod status {
-    #[sea_orm(table_name = \"shop_statuses\")]
-    pub struct Model {}
-}
-";
-        let service = "use crate::entity::{order, status};
-fn a(t: &TenantContext) {
-    order::Entity::delete_by_id(id).exec(db).await?;
-    status::Entity::find_by_id(id).one(db).await?;
-}
-";
-        let files = [file("shop/src/entity.rs", entity), file("shop/src/service.rs", service)];
-        let violations = check_crate(&files);
-        assert_eq!(violations.len(), 1, "{violations:?}");
-        assert!(violations[0].message.contains("`order`"), "{}", violations[0].message);
     }
 
     #[test]

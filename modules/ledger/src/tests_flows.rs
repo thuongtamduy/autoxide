@@ -386,7 +386,6 @@ async fn flow_partner_collect_hold_release_payout() {
             .await;
         assert_eq!(early.unwrap_err().code(), "ledger.insufficient_balance");
         // Hết hạn đổi trả: job nhả phần còn giữ.
-        // tenant-scope: việc nền / kiểm tra quét mọi khách của database, chủ ý không lọc khách (rà soát bảo mật 2026-11)
         hold::Entity::update_many()
             .col_expr(
                 hold::Column::ReleaseAt,
@@ -714,7 +713,6 @@ async fn nha_dong_thoi_mot_but_toan_va_chi_tra_cho_ket_qua() {
             .into_inner();
         assert_eq!(sent.status, "sent");
         setup.payouts.settle(sent.id, false);
-        // tenant-scope: việc nền / kiểm tra quét mọi khách của database, chủ ý không lọc khách (rà soát bảo mật 2026-11)
         payout::Entity::update_many()
             .col_expr(
                 payout::Column::UpdatedAt,

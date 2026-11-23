@@ -269,15 +269,17 @@ pub(crate) fn check_claims(claims: &Value, expected: &Expected<'_>) -> Result<Cl
     {
         return Err(Rejection::Audience);
     }
+    // Cộng / trừ bão hoà: claim là số nhà cung cấp gửi (khách tự cấu hình nhà cung cấp OIDC), `exp`
+    // gần `i64::MAX` không được làm tràn số thành panic (D-20261123-property-fuzzing).
     let exp = number("exp").ok_or(Rejection::Expired)?;
-    if exp + LEEWAY_SECONDS < expected.now {
+    if exp.saturating_add(LEEWAY_SECONDS) < expected.now {
         return Err(Rejection::Expired);
     }
     let iat = number("iat").ok_or(Rejection::Malformed)?;
-    if iat - LEEWAY_SECONDS > expected.now {
+    if iat.saturating_sub(LEEWAY_SECONDS) > expected.now {
         return Err(Rejection::NotYetValid);
     }
-    if number("nbf").is_some_and(|nbf| nbf - LEEWAY_SECONDS > expected.now) {
+    if number("nbf").is_some_and(|nbf| nbf.saturating_sub(LEEWAY_SECONDS) > expected.now) {
         return Err(Rejection::NotYetValid);
     }
     // `nonce` so bằng thời gian hằng: nó là bí mật của lượt đăng nhập này.
@@ -439,5 +441,87 @@ mod tests {
         let mut forged = claims.clone();
         forged["tid"] = json!("evil/../x");
         assert_eq!(check_claims(&forged, &wanted), Err(Rejection::Issuer));
+    }
+}
+
+/// Thử phá `id_token` của nhà cung cấp OIDC (D-20261123-property-fuzzing): token và claim do bên ngoài gửi.
+#[cfg(test)]
+mod properties {
+    use super::*;
+    use proptest::prelude::*;
+    use serde_json::json;
+
+    fn expected(now: i64) -> Expected<'static> {
+        Expected {
+            issuer: "https://idp.example",
+            alternative_issuer: None,
+            client_id: "client",
+            nonce: "n0nce",
+            now,
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn chuoi_bat_ky_khong_panic(token in "\\PC{0,300}|[A-Za-z0-9_-]{0,60}\\.[A-Za-z0-9_-]{0,60}\\.[A-Za-z0-9_-]{0,60}") {
+            if let Ok(parsed) = parse(&token) {
+                // Chỉ RS256 / ES256 qua được bước đọc header.
+                prop_assert!(matches!(parsed.algorithm, Algorithm::Rs256 | Algorithm::Es256));
+            }
+        }
+
+        #[test]
+        fn thuat_toan_khac_luon_bi_tu_choi(alg in "[A-Za-z0-9]{0,10}") {
+            prop_assume!(alg != "RS256" && alg != "ES256");
+            let header = URL_SAFE_NO_PAD.encode(json!({ "alg": alg }).to_string());
+            let payload = URL_SAFE_NO_PAD.encode(r#"{"sub":"x"}"#);
+            let token = format!("{header}.{payload}.");
+            prop_assert!(matches!(parse(&token), Err(Rejection::Algorithm)));
+        }
+
+        #[test]
+        fn claim_thoi_gian_bien_khong_panic(
+            exp in any::<i64>(),
+            iat in any::<i64>(),
+            nbf in proptest::option::of(any::<i64>()),
+            now in any::<i64>(),
+        ) {
+            let mut claims = json!({
+                "iss": "https://idp.example", "aud": "client", "nonce": "n0nce", "sub": "u1",
+                "exp": exp, "iat": iat,
+            });
+            if let Some(nbf) = nbf {
+                claims["nbf"] = json!(nbf);
+            }
+            let checked = check_claims(&claims, &expected(now));
+            // Còn hạn và đã tới lúc dùng (tính cả độ lệch cho phép) thì nhận, ngược lại từ chối.
+            let fresh = i128::from(exp) + i128::from(LEEWAY_SECONDS) >= i128::from(now)
+                && i128::from(iat) - i128::from(LEEWAY_SECONDS) <= i128::from(now)
+                && nbf.is_none_or(|nbf| i128::from(nbf) - i128::from(LEEWAY_SECONDS) <= i128::from(now));
+            prop_assert_eq!(checked.is_ok(), fresh);
+        }
+
+        #[test]
+        fn sai_nonce_hay_aud_hay_iss_thi_tu_choi(
+            nonce in "[a-z0-9]{0,10}",
+            aud in "[a-z]{0,8}",
+            iss in "[a-z:/.]{0,20}",
+        ) {
+            let claims = json!({
+                "iss": iss, "aud": aud, "nonce": nonce, "sub": "u1", "exp": 2_000, "iat": 1_000,
+            });
+            let accepted = check_claims(&claims, &expected(1_500)).is_ok();
+            prop_assert_eq!(accepted, nonce == "n0nce" && aud == "client" && iss == "https://idp.example");
+        }
+    }
+
+    #[test]
+    fn exp_cuc_lon_khong_panic() {
+        // Ca tái hiện: `exp + LEEWAY_SECONDS` tràn `i64` và panic trước khi sửa.
+        let claims = json!({
+            "iss": "https://idp.example", "aud": "client", "nonce": "n0nce", "sub": "u1",
+            "exp": i64::MAX, "iat": i64::MIN, "nbf": i64::MIN,
+        });
+        assert!(check_claims(&claims, &expected(1_000)).is_ok());
     }
 }

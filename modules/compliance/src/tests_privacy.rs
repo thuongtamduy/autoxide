@@ -245,7 +245,6 @@ async fn nhac_han_dung_moc_khong_nhac_trung() {
         run_jobs(&app).await;
         assert_eq!(events(app.database(), "compliance.incident_deadline_near").await, 1);
         let row =
-            // tenant-scope: việc nền / kiểm tra quét mọi khách của database, chủ ý không lọc khách (rà soát bảo mật 2026-11)
             incident::Entity::find_by_id(id).one(app.database().read()).await.unwrap().unwrap();
         assert_eq!(row.reminded_hours, 48);
         // Chạy lại cùng mốc: không nhắc lần hai.
@@ -253,7 +252,6 @@ async fn nhac_han_dung_moc_khong_nhac_trung() {
         run_jobs(&app).await;
         assert_eq!(events(app.database(), "compliance.incident_deadline_near").await, 1);
         // Qua mốc 60 giờ: nhắc một lần nữa.
-        // tenant-scope: việc nền / kiểm tra quét mọi khách của database, chủ ý không lọc khách (rà soát bảo mật 2026-11)
         incident::Entity::update_many()
             .col_expr(
                 incident::Column::DetectedAt,
@@ -311,7 +309,6 @@ async fn so_yeu_cau_chu_the_han_la_du_lieu_va_xoa_gia_tri() {
         assert_eq!(status, StatusCode::OK, "{done}");
         assert_eq!(done["data"]["request"]["status"], "fulfilled");
         assert_eq!(done["data"]["erased"], 1);
-        // tenant-scope: việc nền / kiểm tra quét mọi khách của database, chủ ý không lọc khách (rà soát bảo mật 2026-11)
         let rows = consent::Entity::find().all(app.database().read()).await.unwrap();
         assert!(rows.iter().all(|row| row.subject_value.is_none()), "{rows:?}");
         let (status, problem) =

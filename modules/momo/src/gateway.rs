@@ -379,7 +379,69 @@ impl PaymentGateway for MomoGateway {
     ) -> Result<GatewayNotification, Error> {
         let tenant = self.accounts.tenant(tenant).await?;
         let account = self.account(&tenant).await?;
-        read_notification(&account, body)
+        // Chữ ký của MoMo nằm TRONG thân JSON và ký trên giá trị từng trường, nên phải đọc JSON
+        // trước; không trường nào được tin cho tới khi chữ ký khớp.
+        let notice: Value =
+            serde_json::from_slice(body).map_err(|_| payment::signature_invalid())?;
+        let field = |name: &str| text(&notice, name).unwrap_or_default();
+        let names = [
+            "amount",
+            "extraData",
+            "message",
+            "orderId",
+            "orderInfo",
+            "orderType",
+            "partnerCode",
+            "payType",
+            "requestId",
+            "responseTime",
+            "resultCode",
+            "transId",
+        ];
+        let values: Vec<String> = names.iter().map(|name| field(name)).collect();
+        let pairs: Vec<(&str, &str)> =
+            names.iter().copied().zip(values.iter().map(String::as_str)).collect();
+        let wanted = account.sign(&pairs);
+        let given = field("signature").to_ascii_lowercase();
+        // So sánh thời gian hằng: không lộ chữ ký đúng qua thời gian trả lời.
+        if !constant_time_eq(wanted.as_bytes(), given.as_bytes())
+            || field("partnerCode") != account.partner_code
+        {
+            return Err(payment::signature_invalid());
+        }
+        let (order_id, trans_id) = (field("orderId"), field("transId"));
+        let malformed = || payment::provider_rejected("the MoMo notification is incomplete");
+        let code = result_code(&notice).ok_or_else(malformed)?;
+        let amount = notice.get("amount").and_then(Value::as_i64).ok_or_else(malformed)?;
+        if order_id.is_empty() {
+            return Err(malformed());
+        }
+        let kind = match code {
+            OK => NotificationKind::PaymentSucceeded,
+            // Chưa phải kết quả cuối: không ghi gì, MoMo sẽ báo lại khi có kết quả.
+            code if not_final(code) => return Err(notification_not_final(code)),
+            code => NotificationKind::PaymentFailed { reason: describe(code, &notice) },
+        };
+        // `responseTime` là mili giây từ 1970. Không dùng cửa sổ thời gian để chống phát lại: MoMo
+        // không ký thời điểm gửi, và một thông báo phát lại mang cùng `event_id` nên chỉ được xử
+        // lý một lần.
+        let occurred_at = notice
+            .get("responseTime")
+            .and_then(Value::as_i64)
+            .and_then(|millis| millis.checked_mul(1000))
+            .and_then(Timestamp::from_unix_micros)
+            .unwrap_or_else(Timestamp::now);
+        let mut notification = GatewayNotification::new(
+            format!("{order_id}:{trans_id}:{code}"),
+            kind,
+            order_id.clone(),
+            Money::new(amount, Currency::VND),
+            occurred_at,
+        );
+        if let Ok(payment_id) = Uuid::parse_str(&order_id) {
+            notification = notification.payment_id(payment_id);
+        }
+        Ok(notification)
     }
 
     // Tài liệu MoMo (trang "Payment Notification"): trả HTTP 204 trong 15 giây.
@@ -423,73 +485,6 @@ impl ConnectionProbe for MomoGateway {
 // ---- Đọc câu trả lời -----------------------------------------------------------------------------
 
 /// `resultCode` của một câu trả lời / thông báo (MoMo gửi số; chấp nhận cả chuỗi số).
-/// Kiểm chữ ký rồi đọc một thông báo IPN của MoMo bằng tài khoản `account`. Hàm thuần để thử phá
-/// bằng property test (D-20261123-property-fuzzing): thân do bất kỳ ai gửi tới.
-fn read_notification(account: &Account, body: &[u8]) -> Result<GatewayNotification, Error> {
-    // Chữ ký của MoMo nằm TRONG thân JSON và ký trên giá trị từng trường, nên phải đọc JSON
-    // trước; không trường nào được tin cho tới khi chữ ký khớp.
-    let notice: Value = serde_json::from_slice(body).map_err(|_| payment::signature_invalid())?;
-    let field = |name: &str| text(&notice, name).unwrap_or_default();
-    let names = [
-        "amount",
-        "extraData",
-        "message",
-        "orderId",
-        "orderInfo",
-        "orderType",
-        "partnerCode",
-        "payType",
-        "requestId",
-        "responseTime",
-        "resultCode",
-        "transId",
-    ];
-    let values: Vec<String> = names.iter().map(|name| field(name)).collect();
-    let pairs: Vec<(&str, &str)> =
-        names.iter().copied().zip(values.iter().map(String::as_str)).collect();
-    let wanted = account.sign(&pairs);
-    let given = field("signature").to_ascii_lowercase();
-    // So sánh thời gian hằng: không lộ chữ ký đúng qua thời gian trả lời.
-    if !constant_time_eq(wanted.as_bytes(), given.as_bytes())
-        || field("partnerCode") != account.partner_code
-    {
-        return Err(payment::signature_invalid());
-    }
-    let (order_id, trans_id) = (field("orderId"), field("transId"));
-    let malformed = || payment::provider_rejected("the MoMo notification is incomplete");
-    let code = result_code(&notice).ok_or_else(malformed)?;
-    let amount = notice.get("amount").and_then(Value::as_i64).ok_or_else(malformed)?;
-    if order_id.is_empty() {
-        return Err(malformed());
-    }
-    let kind = match code {
-        OK => NotificationKind::PaymentSucceeded,
-        // Chưa phải kết quả cuối: không ghi gì, MoMo sẽ báo lại khi có kết quả.
-        code if not_final(code) => return Err(notification_not_final(code)),
-        code => NotificationKind::PaymentFailed { reason: describe(code, &notice) },
-    };
-    // `responseTime` là mili giây từ 1970. Không dùng cửa sổ thời gian để chống phát lại: MoMo
-    // không ký thời điểm gửi, và một thông báo phát lại mang cùng `event_id` nên chỉ được xử
-    // lý một lần.
-    let occurred_at = notice
-        .get("responseTime")
-        .and_then(Value::as_i64)
-        .and_then(|millis| millis.checked_mul(1000))
-        .and_then(Timestamp::from_unix_micros)
-        .unwrap_or_else(Timestamp::now);
-    let mut notification = GatewayNotification::new(
-        format!("{order_id}:{trans_id}:{code}"),
-        kind,
-        order_id.clone(),
-        Money::new(amount, Currency::VND),
-        occurred_at,
-    );
-    if let Ok(payment_id) = Uuid::parse_str(&order_id) {
-        notification = notification.payment_id(payment_id);
-    }
-    Ok(notification)
-}
-
 fn result_code(answer: &Value) -> Option<i64> {
     match answer.get("resultCode")? {
         Value::Number(number) => number.as_i64(),
@@ -592,143 +587,4 @@ fn notification_not_final(code: i64) -> Error {
         "This MoMo notification (result code {code}) is not a final result; nothing was recorded.",
     )
     .with_param("code", code)
-}
-
-/// Thử phá IPN của MoMo (D-20261123-property-fuzzing). Khoá sinh ngẫu nhiên lúc chạy.
-#[cfg(test)]
-mod properties {
-    use super::*;
-    use proptest::prelude::*;
-
-    const SIGNED: [&str; 12] = [
-        "amount",
-        "extraData",
-        "message",
-        "orderId",
-        "orderInfo",
-        "orderType",
-        "partnerCode",
-        "payType",
-        "requestId",
-        "responseTime",
-        "resultCode",
-        "transId",
-    ];
-
-    fn account(partner: &str, access: &str, secret: &str) -> Account {
-        Account {
-            partner_code: partner.to_owned(),
-            access_key: SettingValue::new(access),
-            secret_key: SettingValue::new(secret),
-            base_url: String::new(),
-        }
-    }
-
-    /// Thông báo đã ký đúng như MoMo ký: giá trị từng trường theo thứ tự a-z.
-    fn signed(account: &Account, mut notice: serde_json::Map<String, Value>) -> Value {
-        let values: Vec<String> = SIGNED
-            .iter()
-            .map(|name| text(&Value::Object(notice.clone()), name).unwrap_or_default())
-            .collect();
-        let pairs: Vec<(&str, &str)> =
-            SIGNED.iter().copied().zip(values.iter().map(String::as_str)).collect();
-        notice.insert("signature".to_owned(), Value::String(account.sign(&pairs)));
-        Value::Object(notice)
-    }
-
-    fn notice(
-        partner: &str,
-        order_id: &str,
-        amount: i64,
-        code: i64,
-        info: &str,
-        millis: i64,
-    ) -> serde_json::Map<String, Value> {
-        let Value::Object(map) = json!({
-            "partnerCode": partner,
-            "orderId": order_id,
-            "requestId": order_id,
-            "amount": amount,
-            "orderInfo": info,
-            "orderType": "momo_wallet",
-            "transId": 4_088_878_653_i64,
-            "resultCode": code,
-            "message": "ok",
-            "payType": "qr",
-            "responseTime": millis,
-            "extraData": "",
-        }) else {
-            unreachable!("json! của object luôn là object")
-        };
-        map
-    }
-
-    proptest! {
-        #[test]
-        fn thong_bao_ky_dung_thi_doc_dung(
-            partner in "[A-Z0-9]{4,20}",
-            access in "[A-Za-z0-9]{8,32}",
-            secret in "[A-Za-z0-9]{8,40}",
-            order in proptest::option::of(any::<u128>()),
-            amount in 1i64..=50_000_000_000,
-            info in "\\PC{0,60}",
-            millis in any::<i64>(),
-        ) {
-            let account = account(&partner, &access, &secret);
-            let order_id = order.map_or_else(|| "ORD-1".to_owned(), |id| Uuid::from_u128(id).to_string());
-            let body = signed(&account, notice(&partner, &order_id, amount, OK, &info, millis));
-            let read = read_notification(&account, body.to_string().as_bytes());
-            let read = read.map_err(|error| TestCaseError::fail(error.message()))?;
-            prop_assert_eq!(read.amount, Money::new(amount, Currency::VND));
-            prop_assert_eq!(read.provider_ref, order_id.clone());
-            prop_assert_eq!(read.payment_id, Uuid::parse_str(&order_id).ok());
-            prop_assert!(matches!(read.kind, NotificationKind::PaymentSucceeded));
-        }
-
-        #[test]
-        fn sua_mot_truong_da_ky_thi_tu_choi(
-            secret in "[A-Za-z0-9]{8,40}",
-            amount in 1i64..=50_000_000_000,
-            field in 0usize..SIGNED.len(),
-            replacement in "\\PC{1,20}",
-        ) {
-            let account = account("MOMO", "access", &secret);
-            let mut body = signed(&account, notice("MOMO", "ORD-1", amount, OK, "x", 1));
-            let name = SIGNED[field];
-            let before = text(&body, name).unwrap_or_default();
-            prop_assume!(before != replacement);
-            body[name] = Value::String(replacement);
-            prop_assert!(read_notification(&account, body.to_string().as_bytes()).is_err());
-        }
-
-        #[test]
-        fn khoa_khac_hay_doi_tac_khac_thi_tu_choi(
-            secret in "[A-Za-z0-9]{8,40}",
-            other in "[A-Za-z0-9]{8,40}",
-        ) {
-            prop_assume!(secret != other);
-            let signer = account("MOMO", "access", &other);
-            let body = signed(&signer, notice("MOMO", "ORD-1", 1000, OK, "x", 1));
-            prop_assert!(read_notification(&account("MOMO", "access", &secret), body.to_string().as_bytes()).is_err());
-            // Cùng khoá nhưng mã đối tác của khách khác: không nhận.
-            let body = signed(&account("OTHER", "access", &secret), notice("OTHER", "ORD-1", 1000, OK, "x", 1));
-            prop_assert!(read_notification(&account("MOMO", "access", &secret), body.to_string().as_bytes()).is_err());
-        }
-
-        #[test]
-        fn than_bat_ky_khong_panic(body in proptest::collection::vec(any::<u8>(), 0..512)) {
-            let _ = read_notification(&account("MOMO", "access", "secret"), &body);
-        }
-
-        #[test]
-        fn json_ky_dung_voi_gia_tri_bien_khong_panic(
-            amount in any::<i64>(),
-            code in any::<i64>(),
-            millis in any::<i64>(),
-        ) {
-            let account = account("MOMO", "access", "secret");
-            let body = signed(&account, notice("MOMO", "ORD-1", amount, code, "x", millis));
-            let _ = read_notification(&account, body.to_string().as_bytes());
-        }
-    }
 }

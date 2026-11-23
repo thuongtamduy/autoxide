@@ -699,7 +699,6 @@ impl NotificationsService {
         at: Timestamp,
     ) -> Result<(u64, u64), Error> {
         let write = database.write();
-        // tenant-scope: việc nền / kiểm tra quét mọi khách của database, chủ ý không lọc khách (rà soát bảo mật 2026-11)
         let blanked = message::Entity::update_many()
             .col_expr(message::Column::Address, Expr::value(Option::<String>::None))
             .col_expr(message::Column::Params, Expr::value("{}"))
@@ -712,7 +711,6 @@ impl NotificationsService {
             .exec(write)
             .await?
             .rows_affected;
-        // tenant-scope: việc nền / kiểm tra quét mọi khách của database, chủ ý không lọc khách (rà soát bảo mật 2026-11)
         let deleted = inbox::Entity::delete_many()
             .filter(
                 inbox::Column::CreatedAt

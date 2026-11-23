@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex};
 use autoxide_auth::api::{AuthExtensions, PhoneCodes};
 use autoxide_kernel::error::Error;
 use autoxide_kernel::sms::SmsSender;
-use autoxide_kernel::tenancy::{DEFAULT_TENANT, ScopeExt};
+use autoxide_kernel::tenancy::DEFAULT_TENANT;
 use autoxide_testkit::{FakeSmsSender, TestApp, TestDatabase};
 use uuid::Uuid;
 
@@ -154,7 +154,6 @@ async fn sai_qua_han_muc_moi_ngay_thi_khoa_so() {
             let past =
                 autoxide_kernel::time::Timestamp::now() - jiff::SignedDuration::from_hours(25);
             crate::entity::phone_challenge::Entity::update_many()
-                .scoped(&tenant)
                 .col_expr(crate::entity::phone_challenge::Column::CreatedAt, Expr::value(past))
                 .filter(crate::entity::phone_challenge::Column::Phone.eq("+84912000111"))
                 .exec(app.database().write())

@@ -85,7 +85,6 @@ pub(crate) async fn take<C: ConnectionTrait>(
     .exec_without_returning(transaction)
     .await?;
     preorder_counter::Entity::update_many()
-        .scoped(tenant)
         .col_expr(preorder_counter::Column::PreorderLimit, Expr::value(limit))
         .col_expr(preorder_counter::Column::UpdatedAt, Expr::value(now()))
         .filter(counter_filter(tenant, variant))

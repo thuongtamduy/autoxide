@@ -78,7 +78,6 @@ async fn xac_thuc_so_dien_thoai_bang_ma_mot_lan() {
         let id = ask(&app, "alice", "0912 345 678").await;
         let code = code_in(&sms, ALICE_PHONE);
         // Mã không bao giờ nằm trong bảng nguyên văn.
-        // tenant-scope: việc nền / kiểm tra quét mọi khách của database, chủ ý không lọc khách (rà soát bảo mật 2026-11)
         let row = phone_challenge::Entity::find_by_id(id.parse::<Uuid>().unwrap())
             .one(app.database().read())
             .await
@@ -198,7 +197,6 @@ async fn gui_sms_loi_thi_xoa_ma() {
         )
         .await;
         assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE, "{problem}");
-        // tenant-scope: việc nền / kiểm tra quét mọi khách của database, chủ ý không lọc khách (rà soát bảo mật 2026-11)
         let left = phone_challenge::Entity::find().count(app.database().read()).await.unwrap();
         assert_eq!(left, 0);
     })
@@ -271,7 +269,6 @@ async fn sai_qua_so_lan_het_han_va_gioi_han_so_ma() {
         // Hết hạn.
         let id = ask(&app, "alice", ALICE_PHONE).await;
         let code = code_in(&sms, ALICE_PHONE);
-        // tenant-scope: việc nền / kiểm tra quét mọi khách của database, chủ ý không lọc khách (rà soát bảo mật 2026-11)
         phone_challenge::Entity::update_many()
             .col_expr(
                 phone_challenge::Column::ExpiresAt,

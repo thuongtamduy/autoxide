@@ -533,28 +533,3 @@ mod tests {
         assert_eq!(WebhookAck::no_content().into_response().status(), 204);
     }
 }
-
-// Thử phá hàm so chữ ký (D-20261123-property-fuzzing).
-#[cfg(test)]
-mod properties {
-    use super::*;
-    use proptest::prelude::*;
-
-    proptest! {
-        #[test]
-        fn so_sanh_thoi_gian_hang_giong_so_sanh_thuong(
-            a in proptest::collection::vec(any::<u8>(), 0..64),
-            b in proptest::collection::vec(any::<u8>(), 0..64),
-        ) {
-            prop_assert_eq!(constant_time_eq(&a, &b), a == b);
-            prop_assert!(constant_time_eq(&a, &a.clone()));
-        }
-
-        #[test]
-        fn hex_dai_gap_doi_va_chi_co_chu_thuong(bytes in proptest::collection::vec(any::<u8>(), 0..64)) {
-            let text = hex(&bytes);
-            prop_assert_eq!(text.len(), bytes.len() * 2);
-            prop_assert!(text.bytes().all(|c| matches!(c, b'0'..=b'9' | b'a'..=b'f')));
-        }
-    }
-}

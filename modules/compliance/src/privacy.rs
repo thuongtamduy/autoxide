@@ -974,14 +974,12 @@ impl Probe for DeadlinesProbe {
         let at = Timestamp::now();
         let (mut incidents, mut requests) = (0usize, 0usize);
         for (_, name, database) in databases {
-            // tenant-scope: việc nền / kiểm tra quét mọi khách của database, chủ ý không lọc khách (rà soát bảo mật 2026-11)
             let late = crate::entity::incident::Entity::find()
                 .filter(crate::entity::incident::Column::Status.is_in(["open", "contained"]))
                 .filter(crate::entity::incident::Column::AuthorityNotifiedAt.is_null())
                 .filter(crate::entity::incident::Column::ReportDueAt.lt(at))
                 .all(database.read())
                 .await;
-            // tenant-scope: việc nền / kiểm tra quét mọi khách của database, chủ ý không lọc khách (rà soát bảo mật 2026-11)
             let overdue = subject_request::Entity::find()
                 .filter(subject_request::Column::Status.is_in(["received", "in_progress"]))
                 .filter(subject_request::Column::DueAt.lt(at))

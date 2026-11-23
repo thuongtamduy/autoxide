@@ -129,14 +129,8 @@ impl OrdersService {
                     status: Set(ACTIVE.to_owned()),
                     created_at: Set(now()),
                 };
-                // Event giao lại: bảo hành của (dòng, serial) đã có thì thôi. Phải nêu cột của khoá
-                // unique — `on_conflict_do_nothing()` chỉ bỏ qua trùng khoá chính (ID mới, không bao giờ trùng).
                 warranty::Entity::insert(record)
-                    .on_conflict_do_nothing_on([
-                        warranty::Column::TenantId,
-                        warranty::Column::OrderLineId,
-                        warranty::Column::SerialKey,
-                    ])
+                    .on_conflict_do_nothing()
                     .exec_without_returning(&transaction)
                     .await?;
             }

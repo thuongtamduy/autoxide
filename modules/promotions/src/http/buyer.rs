@@ -21,7 +21,7 @@ use validator::Validate;
 
 use crate::api::{Cart, Evaluation, Redemption, Voucher, VoucherStatus};
 use crate::http::dto::{LegalLimitDto, NoticeRuleDto};
-use crate::permissions::{PUBLISH, READ};
+use crate::permissions::{PUBLISH, READ, USE};
 use crate::service::PromotionsService;
 
 pub(crate) fn routes(service: Arc<PromotionsService>) -> OpenApiRouter {
@@ -234,7 +234,7 @@ pub(crate) struct WalletQuery {
 
 /// List the vouchers in your wallet, soonest to expire first.
 ///
-/// For buyer accounts; a staff account needs `promotions.use`.
+/// Requires `promotions.use` (buyers have it).
 #[utoipa::path(
     get,
     path = "/me/vouchers",
@@ -245,7 +245,7 @@ pub(crate) struct WalletQuery {
     responses(
         (status = 200, description = "One page of your vouchers.", body = Page<Voucher>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "A staff account without `promotions.use`; code `permission_denied`.", body = Problem),
+        (status = 403, description = "Missing `promotions.use`; code `permission_denied`.", body = Problem),
         (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
@@ -256,7 +256,7 @@ async fn my_vouchers(
     Query(query): Query<WalletQuery>,
     Query(page): Query<PageQuery>,
 ) -> Result<Page<Voucher>, Error> {
-    super::require_use(&principal)?;
+    principal.require(&USE)?;
     let page = PageRequest::try_from(page)?;
     service.wallet(&tenant, principal.user_id(), query.status, &page).await
 }
@@ -279,8 +279,7 @@ fn voucher_response(submitted: Submitted<Voucher>, location: String) -> Response
 
 /// Enter a claim code to put its voucher into your wallet.
 ///
-/// For buyer accounts; a staff account needs `promotions.use`. Tries are limited
-/// (`promotions.too_many_attempts`). Entering the
+/// Requires `promotions.use`. Tries are limited (`promotions.too_many_attempts`). Entering the
 /// same code again returns the voucher you already have (200).
 #[utoipa::path(
     post,
@@ -293,7 +292,7 @@ fn voucher_response(submitted: Submitted<Voucher>, location: String) -> Response
         (status = 201, description = "The voucher is in your wallet.", body = Data<Voucher>, headers(("Location" = String, description = "Path of your wallet."))),
         (status = 200, description = "You already had this voucher.", body = Data<Voucher>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "A staff account without `promotions.use`; code `permission_denied`.", body = Problem),
+        (status = 403, description = "Missing `promotions.use`; code `permission_denied`.", body = Problem),
         (status = 409, description = "No vouchers left (`promotions.voucher_quota_exhausted`), you received all allowed (`promotions.claim_limit_reached`), or the promotion is not running (`promotions.invalid_transition`).", body = Problem),
         (status = 422, description = "The code does not exist; code `promotions.code_invalid`.", body = Problem),
         (status = 429, description = "Too many codes tried; code `promotions.too_many_attempts`.", body = Problem),
@@ -305,15 +304,14 @@ async fn claim_code(
     principal: Principal,
     ValidJson(body): ValidJson<ClaimCodeRequest>,
 ) -> Result<Response, Error> {
-    super::require_use(&principal)?;
+    principal.require(&USE)?;
     let submitted = service.claim_code(&tenant, &principal, &body.code).await?;
     Ok(voucher_response(submitted, "/promotions/me/vouchers".to_owned()))
 }
 
 /// Save the voucher of a public promotion into your wallet ("Save" button).
 ///
-/// For buyer accounts; a staff account needs `promotions.use`. Only promotions with `claimable`.
-/// Vouchers left are a real count.
+/// Requires `promotions.use`. Only promotions with `claimable`. Vouchers left are a real count.
 #[utoipa::path(
     post,
     path = "/public/promotions/{id}/claim",
@@ -325,7 +323,7 @@ async fn claim_code(
         (status = 201, description = "The voucher is in your wallet.", body = Data<Voucher>, headers(("Location" = String, description = "Path of your wallet."))),
         (status = 200, description = "You already saved it.", body = Data<Voucher>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "A staff account without `promotions.use` (`permission_denied`) or a verified phone number is needed (`promotions.claim_requires_verified_phone`).", body = Problem),
+        (status = 403, description = "Missing `promotions.use` (`permission_denied`) or a verified phone number is needed (`promotions.claim_requires_verified_phone`).", body = Problem),
         (status = 404, description = "No such public promotion to save; code `promotions.not_found`.", body = Problem),
         (status = 409, description = "No vouchers left (`promotions.voucher_quota_exhausted`), you saved all allowed (`promotions.claim_limit_reached`), or the promotion is not running (`promotions.invalid_transition`).", body = Problem),
     )
@@ -336,7 +334,7 @@ async fn claim(
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<Response, Error> {
-    super::require_use(&principal)?;
+    principal.require(&USE)?;
     let submitted = service.claim(&tenant, &principal, id).await?;
     Ok(voucher_response(submitted, "/promotions/me/vouchers".to_owned()))
 }

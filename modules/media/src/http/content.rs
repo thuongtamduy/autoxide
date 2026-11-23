@@ -402,3 +402,27 @@ mod tests {
         assert_eq!(requested_range(&headers, "\"e\"", 10), Requested::Whole);
     }
 }
+
+/// Thử phá header `Range` (D-20261123-property-fuzzing): khoảng trả về luôn nằm trong nội dung.
+#[cfg(test)]
+mod properties {
+    use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn khoang_tra_ve_luon_nam_trong_noi_dung(
+            value in "bytes=[0-9 ]{0,22}-[0-9 ]{0,22}|bytes=\\PC{0,30}|\\PC{0,30}",
+            size in prop_oneof![Just(0u64), 1u64..1_000, any::<u64>()],
+        ) {
+            let Ok(value) = HeaderValue::from_str(&value) else {
+                return Ok(());
+            };
+            let mut headers = HeaderMap::new();
+            headers.insert(header::RANGE, value);
+            if let Requested::Part(range) = requested_range(&headers, "\"e\"", size) {
+                prop_assert!(range.start < range.end && range.end <= size, "{range:?} / {size}");
+            }
+        }
+    }
+}

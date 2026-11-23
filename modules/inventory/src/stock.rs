@@ -175,7 +175,6 @@ pub(crate) async fn record<C: ConnectionTrait>(
             || row.average_cost_currency.as_deref() != Some(cost.currency().code())
         {
             level::Entity::update_many()
-                .scoped(tenant)
                 .col_expr(level::Column::AverageCostMinor, Expr::value(average))
                 .col_expr(
                     level::Column::AverageCostCurrency,
@@ -361,7 +360,6 @@ pub(crate) async fn publish<C: ConnectionTrait>(
     let stamp = now();
     for (id, delta) in &touched.levels {
         level::Entity::update_many()
-            .scoped(tenant)
             .col_expr(level::Column::UpdatedAt, Expr::value(stamp))
             .filter(by_id(tenant, *id))
             .exec(transaction)

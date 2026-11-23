@@ -344,7 +344,6 @@ pub(crate) async fn check_database(
             }
         }
     }
-    // tenant-scope: việc nền / kiểm tra quét mọi khách của database, chủ ý không lọc khách (rà soát bảo mật 2026-11)
     let stale = entry::Entity::find()
         .filter(entry::Column::Id.not_in_subquery(sealed_ids()))
         .filter(entry::Column::PostedAt.lt(Timestamp::now() - UNSEALED_WARNING))

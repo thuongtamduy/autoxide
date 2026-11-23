@@ -93,31 +93,9 @@ impl EventHandler for OnStage {
         let row = self.service.order(&event.tenant, id).await?;
         let timing = self.service.invoice_timing(&event.tenant, &row).await?;
         if timing == self.stage.timing() {
-            let issued = self.service.issue_invoice(&event.tenant, id).await;
-            return skip_unfixable(issued.map(|_| ()), id);
+            self.service.issue_invoice(&event.tenant, id).await?;
         }
         Ok(())
-    }
-}
-
-/// Lỗi khi tự xuất hoá đơn mà thử lại không hết (chưa có dãy số, thiếu thông tin người mua…): ghi log
-/// và coi như đã xử lý event. Không thì event của đơn kẹt, mọi bên nghe sau (bảo hành, điểm của khách,
-/// nhắc đánh giá…) chờ tới khi hết lượt thử. Chứng từ nháp (nếu đã lập) nằm ở `invoices`; người bán sửa
-/// cấu hình rồi xin lại bằng `POST /api/v1/orders/{id}/invoice`. Lỗi thoáng qua (database, nhà cung
-/// cấp không trả lời) vẫn trả lỗi để thử lại.
-fn skip_unfixable(outcome: Result<(), Error>, order_id: Uuid) -> Result<(), Error> {
-    use autoxide_kernel::error::ErrorKind;
-    match outcome {
-        Err(error)
-            if matches!(
-                error.kind(),
-                ErrorKind::NotFound | ErrorKind::Validation | ErrorKind::Conflict
-            ) =>
-        {
-            tracing::warn!(%order_id, code = error.code(), "order invoice not issued automatically");
-            Ok(())
-        }
-        other => other,
     }
 }
 
@@ -132,7 +110,7 @@ impl EventHandler for OnRefund {
         ) else {
             return Ok(());
         };
-        skip_unfixable(self.0.adjust_invoice(&event.tenant, id, return_id).await, id)
+        self.0.adjust_invoice(&event.tenant, id, return_id).await
     }
 }
 
@@ -306,13 +284,8 @@ impl OrdersService {
             created_at: Set(at),
             updated_at: Set(at),
         };
-        // Lập lại (xin lại sau khi phát hành chưa được): dòng của tham chiếu đã có thì thôi. Nêu cột của
-        // khoá unique — `on_conflict_do_nothing()` chỉ bỏ qua trùng khoá chính (ID mới, không bao giờ trùng).
         invoice_link::Entity::insert(row)
-            .on_conflict_do_nothing_on([
-                invoice_link::Column::TenantId,
-                invoice_link::Column::Reference,
-            ])
+            .on_conflict_do_nothing()
             .exec_without_returning(tenant.database().write())
             .await?;
         Ok(())
@@ -483,8 +456,7 @@ impl OrdersService {
             return Err(Error::validation(problems));
         }
         let reference = format!("orders:{}:invoice", row.id);
-        // Chứng từ còn nháp (tự xuất chưa được, vd lúc đó chưa có dãy số): xin lại thì phát hành tiếp.
-        if self.invoice_link(tenant, &reference).await?.is_some_and(|link| link.status != "draft") {
+        if self.invoice_link(tenant, &reference).await?.is_some() {
             return Err(errors::invoice_already_issued());
         }
         let raw = serde_json::to_string(&request).map_err(Error::internal)?;

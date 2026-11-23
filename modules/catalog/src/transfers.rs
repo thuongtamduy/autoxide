@@ -747,7 +747,6 @@ impl JobHandler for Cleanup {
     async fn run(&self, job: &JobContext) -> Result<(), Error> {
         let Some(storage) = self.0.storage.clone() else { return Ok(()) };
         let before = now() - SignedDuration::from_hours(24 * KEEP_DAYS);
-        // tenant-scope: việc nền / kiểm tra quét mọi khách của database, chủ ý không lọc khách (rà soát bảo mật 2026-11)
         let rows = transfer::Entity::find()
             .filter(transfer::Column::CreatedAt.lt(before))
             .filter(transfer::Column::FileKey.is_not_null())
