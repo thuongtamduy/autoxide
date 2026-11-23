@@ -162,6 +162,10 @@ impl McpClient {
         } else if let Some(version) = legacy_header {
             builder = builder.header("mcp-protocol-version", version);
         }
+        // Tên tool lấy trước khi `params` bị chuyển (move) vào thân request.
+        let tool = (method == "tools/call")
+            .then(|| params.get("name").and_then(Value::as_str).map(str::to_owned))
+            .flatten();
         let id = self.next_id.fetch_add(1, Ordering::Relaxed);
         let body = json!({"jsonrpc": "2.0", "id": id, "method": method, "params": params});
         let (status, text) = self.exchange(builder, body).await?;
@@ -175,6 +179,11 @@ impl McpClient {
         }
         let mut result = message["result"].clone();
         check_shape(method, &mut result, modern).map_err(|problem| broken(status, problem))?;
+        if let Some(tool) = tool
+            && result.get("isError") != Some(&Value::Bool(true))
+        {
+            crate::coverage::tool(&tool);
+        }
         Ok(result)
     }
 

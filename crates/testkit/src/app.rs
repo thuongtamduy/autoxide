@@ -795,6 +795,12 @@ impl TestRequest<'_> {
         let body = axum::body::to_bytes(response.into_body(), usize::MAX)
             .await
             .map_err(|e| fail("body", e))?;
+        if status.as_u16() < 400
+            && let Some(template) =
+                crate::contract::template(&self.app.contract, &self.method, &self.path)
+        {
+            crate::coverage::http(&self.method, template);
+        }
         if self.checked {
             let content_type =
                 headers.get(header::CONTENT_TYPE).and_then(|value| value.to_str().ok());
