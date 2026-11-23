@@ -1,5 +1,5 @@
-//! Tool MCP của cấu hình theo khách: liệt kê, đặt cấu hình KHÔNG bí mật, bỏ cấu hình. Dùng chung
-//! service với REST.
+//! MCP tools of per-tenant settings: list, set NON-secret settings, remove a setting. They share the service
+//! with REST.
 
 use std::sync::Arc;
 

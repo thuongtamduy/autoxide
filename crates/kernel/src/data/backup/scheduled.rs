@@ -1,13 +1,14 @@
-//! Backup theo lịch (bước 39, A1): job `kernel.backup` của module `kernel` tạo một bản backup cho
-//! MỖI database máy chủ này chạy job (database chính và database riêng của placement), bằng đúng
-//! đường của `autoxide backup` ([`write_backup`]), ghi vào nơi lưu file chung dưới
-//! `kernel/backups/<database>/<id>/`, rồi chỉ giữ `AUTOXIDE_BACKUP_KEEP` bản tốt mới nhất mỗi
+//! Scheduled backups (step 39, A1): the `kernel.backup` job of the `kernel` module creates a backup for
+//! EVERY database this server runs the job for (the main database and each placement's own database), through
+//! the same path as `autoxide backup` ([`write_backup`]), writes it to the shared file store under
+//! `kernel/backups/<database>/<id>/`, then keeps only the newest `AUTOXIDE_BACKUP_KEEP` good backups per
 //! database.
 //!
-//! Sổ các lượt backup là bảng mặt điều khiển `kernel_backups` (database chính). Cột `active_key`
-//! = tên database khi đang chạy, `NULL` khi xong; unique index trên nó chặn hai lượt cùng lúc cho
-//! một database dù nhiều worker (nhiều `NULL` được trên cả SQLite lẫn Postgres). Lượt `running` mà
-//! `heartbeat_at` cũ hơn [`STALE_AFTER`] (tiến trình chết) bị đánh `failed` trước khi mở lượt mới.
+//! The ledger of backup runs is the control-plane table `kernel_backups` (main database). The `active_key`
+//! column holds the database name while a run is in progress and `NULL` when done; a unique index on it
+//! prevents two concurrent runs for one database even with many workers (multiple `NULL`s are allowed on both
+//! SQLite and Postgres). A `running` run whose `heartbeat_at` is older than [`STALE_AFTER`] (the process
+//! died) is marked `failed` before a new run is opened.
 
 use crate::time::Timestamp;
 use jiff::SignedDuration;
@@ -31,15 +32,15 @@ use crate::job::{JobContext, JobHandler, Schedule};
 use crate::storage::{ByteStream, Storage};
 use crate::tenancy::DatabaseRegistry;
 
-/// Loại job (và tên lịch).
+/// Job kind (and schedule name).
 pub const BACKUP_JOB: &str = "kernel.backup";
-/// Thời gian chạy tối đa của một lượt (mọi database).
+/// Maximum run time of one run (any database).
 pub const BACKUP_TIMEOUT: Duration = Duration::from_secs(6 * 3600);
-/// Lượt `running` không nhịp quá chừng này: tiến trình đã chết.
+/// A `running` run with no heartbeat for this long: the process has died.
 pub const STALE_AFTER: SignedDuration = SignedDuration::from_mins(15);
-/// Nhịp cập nhật `heartbeat_at` trong lúc chạy.
+/// Interval between `heartbeat_at` updates while running.
 const HEARTBEAT_EVERY: Duration = Duration::from_secs(60);
-/// Độ dài tối đa của lỗi lưu lại (như `last_error` của job).
+/// Maximum length of the stored error (like a job's `last_error`).
 const MAX_ERROR_LENGTH: usize = 2000;
 const TABLE: &str = "kernel_backups";
 
@@ -66,11 +67,11 @@ pub const INCLUDE_FILES: Setting = Setting::new(
 )
 .with_default("false");
 
-/// Cấu hình backup theo lịch.
+/// Scheduled backup configuration.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct BackupConfig {
-    /// Giờ giữa hai lượt; 0: tắt.
+    /// Hours between two runs; 0: disabled.
     pub interval_hours: u64,
     pub keep: u64,
     pub include_files: bool,
@@ -97,7 +98,7 @@ impl BackupConfig {
         Ok(BackupConfig { interval_hours: interval?, keep: keep?, include_files: include_files? })
     }
 
-    /// Lịch của job, khi bật.
+    /// Schedule of the job, when enabled.
     pub fn schedule(&self) -> Option<Schedule> {
         (self.interval_hours > 0).then(|| {
             Schedule::new(BACKUP_JOB, BACKUP_JOB, Duration::from_secs(self.interval_hours * 3600))
@@ -106,7 +107,7 @@ impl BackupConfig {
     }
 }
 
-/// Bảng `kernel_backups` (mặt điều khiển).
+/// The `kernel_backups` table (control plane).
 pub(crate) struct CreateBackups;
 
 impl MigrationName for CreateBackups {
@@ -166,7 +167,7 @@ impl MigrationTrait for CreateBackups {
     }
 }
 
-/// Kết quả một lượt cho một database.
+/// Result of one run for one database.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BackupOutcome {
     Succeeded {
@@ -177,14 +178,14 @@ pub enum BackupOutcome {
         id: Uuid,
         error: String,
     },
-    /// Một lượt khác đang chạy cho database này.
+    /// Another run is already in progress for this database.
     AlreadyRunning,
 }
 
-/// Backup theo lịch của mọi database.
+/// Scheduled backups of all databases.
 pub struct ScheduledBackups {
     registry: DatabaseRegistry,
-    /// Tên mọi module và migrator, có sau khi mọi module khởi động.
+    /// Names of all modules and migrators, available once every module has started.
     setup: crate::tenancy::moves::MoveSetup,
     config: BackupConfig,
 }
@@ -204,8 +205,8 @@ impl ScheduledBackups {
         ScheduledBackups { registry, setup, config }
     }
 
-    /// Một lượt: backup mọi database, mỗi database một dòng của sổ. Trả kết quả theo tên database.
-    /// Lỗi chung (không có nơi lưu, module chưa khởi động) là `Err`.
+    /// One round: backs up every database, one ledger row per database. Returns the result by database name.
+    /// A general failure (no file store, module not started) is an `Err`.
     pub async fn run(&self) -> Result<Vec<(String, BackupOutcome)>, Error> {
         let storage = self.registry.shared_storage().ok_or_else(|| {
             Error::internal(
@@ -293,8 +294,9 @@ impl ScheduledBackups {
         }
     }
 
-    /// Chỉ giữ `keep` bản `succeeded` mới nhất của `name`; xoá file và dòng của bản cũ hơn, cùng
-    /// mọi bản `failed` cũ hơn bản giữ lại cũ nhất. Luôn giữ bản tốt mới nhất.
+    /// Keeps only the newest `keep` `succeeded` backups of `name`; deletes the files and rows of older
+    /// ones, plus every `failed` run older than the oldest retained one. Always keeps the newest good
+    /// backup.
     async fn prune(
         &self,
         control: &Database,
@@ -334,13 +336,13 @@ impl ScheduledBackups {
     }
 }
 
-/// Tiền tố nơi lưu của một bản.
+/// Storage prefix of one backup.
 pub fn prefix_of(database: &str, id: Uuid) -> String {
     format!("{BACKUP_PREFIX}{database}/{id}/")
 }
 
-/// Mở một lượt `running` cho `name`; `None` khi đang có lượt khác chạy. Lượt chết (nhịp quá cũ)
-/// được đánh `failed` trước.
+/// Opens a `running` run for `name`; `None` when another run is in progress. A dead run (heartbeat too old)
+/// is marked `failed` first.
 async fn open(control: &Database, name: &str) -> Result<Option<Uuid>, Error> {
     let now = Timestamp::now();
     let stale = Query::update()
@@ -391,8 +393,8 @@ async fn open(control: &Database, name: &str) -> Result<Option<Uuid>, Error> {
     }
 }
 
-/// Cập nhật `heartbeat_at` mỗi [`HEARTBEAT_EVERY`]; chỉ trả về khi dòng không còn `running` (ai đó
-/// đã đánh nó hỏng) — khi đó lượt này phải dừng.
+/// Updates `heartbeat_at` every [`HEARTBEAT_EVERY`]; returns only when the row is no longer `running` (someone
+/// marked it failed), in which case this run must stop.
 async fn heartbeat(control: &Database, id: Uuid) {
     loop {
         tokio::time::sleep(HEARTBEAT_EVERY).await;
@@ -426,7 +428,7 @@ async fn fail(control: &Database, id: Uuid, message: &str) -> Result<(), Error> 
     Ok(())
 }
 
-/// Xoá mọi file dưới `prefix`; lỗi chỉ ghi log (lần dọn sau thử lại).
+/// Deletes every file under `prefix`; failures are only logged (the next cleanup retries).
 async fn remove_files(storage: &dyn Storage, prefix: &str) {
     let keys = match storage.keys_with_prefix(prefix).await {
         Ok(keys) => keys,
@@ -467,7 +469,7 @@ fn describe(error: &Error) -> String {
     }
 }
 
-/// Bọc một [`BackupSink`] để đếm số byte đã ghi (cỡ bản backup).
+/// Wraps a [`BackupSink`] to count the bytes written (backup size).
 struct CountingSink<S> {
     inner: S,
     bytes: AtomicU64,
@@ -482,7 +484,7 @@ impl<S: BackupSink> BackupSink for CountingSink<S> {
     }
 }
 
-/// Bộ chạy job `kernel.backup`.
+/// Runner of the `kernel.backup` job.
 pub(crate) struct BackupRunner(pub Arc<ScheduledBackups>);
 
 #[async_trait::async_trait]
@@ -503,7 +505,7 @@ impl JobHandler for BackupRunner {
     }
 }
 
-/// Bản backup tốt mới nhất trên mọi database: `(tên database, lúc xong)`, cũ nhất trước — cho
+/// Newest good backup on every database: `(database name, finish time)`, oldest first, for
 /// `autoxide doctor`.
 pub async fn latest_successes(control: &Database) -> Result<Vec<(String, Timestamp)>, Error> {
     let select = Query::select()
@@ -524,7 +526,7 @@ pub async fn latest_successes(control: &Database) -> Result<Vec<(String, Timesta
     Ok(newest)
 }
 
-/// Bước kiểm `kernel.backup_age` của `autoxide doctor`.
+/// The `kernel.backup_age` check step of `autoxide doctor`.
 pub(crate) struct BackupAge {
     pub registry: DatabaseRegistry,
     pub config: BackupConfig,

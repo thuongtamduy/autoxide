@@ -1,29 +1,32 @@
-//! Tên miền riêng của khách (đặc tả 33 "API REST", D-190): khách gắn tên miền của mình (vd
-//! `shop.example`), chứng minh sở hữu bằng một bản ghi TXT, rồi request tới tên miền đó vào thẳng
-//! khách (`request.rs`, bước 4).
+//! A tenant's own domains (spec 33 "REST API", D-190): a tenant attaches its own domain (e.g.
+//! `shop.example`), proves ownership with a TXT record, and then requests to that domain go straight to the
+//! tenant (`request.rs`, step 4).
 //!
-//! - Bảng `kernel_tenant_domains` thuộc mặt điều khiển (chỉ database điều khiển có dữ liệu); một tên
-//!   miền thuộc đúng một khách trên cả nền tảng (unique index).
-//! - Trạng thái: `pending` (chờ bản ghi TXT) → `verified`; `pending` quá 7 ngày → `failed`; xoá →
-//!   `revoked`. Tên miền `verified` được kiểm lại mỗi ngày: 3 lần liên tiếp không thấy bản ghi đúng
-//!   (`check_failures`) → `failed`, request tới nó không còn vào khách; một lần thấy thì đếm lại từ 0.
-//!   DNS không trả lời (lỗi, quá giờ) không tính là "không thấy" — sự cố của DNS không lấy mất tên
-//!   miền của khách. `failed` xác minh lại được (`POST /domains/{id}/verify`). Tên miền `failed` /
-//!   `revoked` của khách khác thì khách mới nhận lại được — người chưa chứng minh sở hữu không giữ
-//!   chỗ mãi (chỉ `pending` và `verified` chặn khách khác).
-//! - Bản ghi phải đặt: TXT `_autoxide-challenge.<domain>` = `autoxide-verify=<verification_token>`;
-//!   tra qua trait [`DnsTxtLookup`] (bản thật dùng `hickory-resolver`, `dns.rs`; test dùng bản giả).
-//! - `updated_at` là lúc trạng thái đổi lần cuối: tên miền `pending` hỏng sau 7 ngày tính từ đó.
+//! - The `kernel_tenant_domains` table belongs to the control plane (only the control database holds data); a
+//!   domain belongs to exactly one tenant across the whole platform (unique index).
+//! - Status: `pending` (waiting for the TXT record) → `verified`; `pending` for more than 7 days →
+//!   `failed`; deleted → `revoked`. A `verified` domain is rechecked daily: 3 consecutive checks that do
+//!   not find the right record (`check_failures`) → `failed`, and requests to it no longer reach the
+//!   tenant; one successful check resets the count to 0. A DNS that does not answer (error, timeout) does
+//!   not count as "not found": a DNS outage does not take away a tenant's domain. A `failed` domain can be
+//!   verified again (`POST /domains/{id}/verify`). A `failed` / `revoked` domain of one tenant can be
+//!   claimed by another tenant: someone who has not proved ownership does not hold a domain forever (only
+//!   `pending` and `verified` block other tenants).
+//! - The record to set: TXT `_autoxide-challenge.<domain>` = `autoxide-verify=<verification_token>`;
+//!   looked up through the trait [`DnsTxtLookup`] (the real one uses `hickory-resolver`, `dns.rs`; tests use
+//!   a fake).
+//! - `updated_at` is when the status last changed: a `pending` domain fails 7 days after it.
 //! - Event `kernel.domain_added` / `kernel.domain_verified` / `kernel.domain_revoked` /
-//!   `kernel.domain_failed` / `kernel.domain_updated` ghi vào outbox của `kernel` trong database
-//!   của khách (như event của `TenantAdmin`).
-//! - Tên miền gắn được với một nút trong cây tổ chức của khách (`org_id`, đối chiếu thiết kế đợt
-//!   2): nút phải thuộc khách, hỏi qua trait [`OrgNodes`] (module cây tổ chức của bước 34 công
-//!   bố); chưa ai công bố thì chỉ gỡ được (`null`). Gắn / gỡ không đổi trạng thái hay hạn 7 ngày.
-//! - Job `kernel.verify_domains` (mỗi 10 phút) tra lại tên miền `pending`, và tên miền `verified`
-//!   đã quá một ngày từ lần kiểm trước.
-//! - Xác minh / thu hồi xong thì bỏ tên miền khỏi cache của sổ database ngay; máy chủ khác thấy sau
-//!   tối đa `AUTOXIDE_TENANCY_CACHE_SECONDS`.
+//!   `kernel.domain_failed` / `kernel.domain_updated` are written to the `kernel` outbox in the tenant's
+//!   database (like the events of `TenantAdmin`).
+//! - A domain can be attached to a node of the tenant's organization tree (`org_id`, see the wave 2
+//!   design): the node must belong to the tenant, asked through the trait [`OrgNodes`] (published by the
+//!   step 34 organization-tree module); if nobody publishes it, the domain can only be detached (`null`).
+//!   Attaching / detaching does not change the status or the 7-day deadline.
+//! - The job `kernel.verify_domains` (every 10 minutes) rechecks `pending` domains, and `verified` domains
+//!   more than a day past their last check.
+//! - After verification / revocation the domain is removed from the database registry's cache at once;
+//!   other servers see it after at most `AUTOXIDE_TENANCY_CACHE_SECONDS`.
 
 mod dns;
 mod http;
@@ -59,7 +62,7 @@ use crate::pagination::{Page, PageRequest, fetch_page};
 
 pub(crate) use http::{routes, tools};
 
-/// Quản lý tên miền riêng của khách mình.
+/// Manages the caller's own tenant's domains.
 pub const DOMAINS_MANAGE: Permission = Permission::new(
     "kernel.domains.manage",
     "Add the tenant's own domains, verify them with a DNS record and remove them.",
@@ -87,40 +90,40 @@ pub(crate) const DOMAIN_UPDATED: EventInfo = EventInfo::new(
      detached from it.",
 );
 
-/// Loại job (cũng là tên lịch) tra lại tên miền đang chờ.
+/// Job kind (also the schedule name) that rechecks pending domains.
 pub(crate) const VERIFY_DOMAINS: &str = "kernel.verify_domains";
 
-/// Tên bản ghi TXT đứng trước tên miền.
+/// Name of the TXT record placed before the domain.
 pub const CHALLENGE_PREFIX: &str = "_autoxide-challenge";
-/// Giá trị bản ghi TXT đứng trước token.
+/// Value of the TXT record placed before the token.
 pub const CHALLENGE_VALUE_PREFIX: &str = "autoxide-verify=";
 
-/// Tên miền `pending` quá lâu chừng này thì `failed`.
+/// A `pending` domain this old becomes `failed`.
 const PENDING_DAYS: i64 = 7;
-/// Chờ DNS trả lời tối đa chừng này (job và request đều không treo lâu hơn).
+/// Waits at most this long for DNS to answer (neither the job nor a request hangs longer).
 const LOOKUP_TIMEOUT: Duration = Duration::from_secs(10);
-/// Số tên miền một lần job tra (lần sau tra tiếp phần còn lại).
+/// Number of domains the job checks per run (the next run checks the rest).
 const SWEEP_BATCH: u64 = 200;
-/// Độ dài tối đa của `check_error` (cột `varchar(200)`).
+/// Maximum length of `check_error` (the `varchar(200)` column).
 const CHECK_ERROR_MAX: usize = 200;
-/// Tên miền `verified` được kiểm lại sau chừng này giờ từ lần kiểm trước.
+/// A `verified` domain is rechecked this many hours after its previous check.
 const RECHECK_HOURS: i64 = 24;
-/// Số lần kiểm lại liên tiếp không thấy bản ghi thì tên miền `verified` thành `failed`.
+/// Number of consecutive rechecks that do not find the record before a `verified` domain becomes `failed`.
 const MAX_CHECK_FAILURES: i32 = 3;
 
-/// Tra bản ghi TXT của một tên. Kernel dùng bộ tra DNS của hệ điều hành; module (hay testkit) công
-/// bố `dyn DnsTxtLookup` để thay (`context.provide::<dyn DnsTxtLookup>(…)`).
+/// Looks up the TXT records of a name. The kernel uses the operating system's DNS resolver; a module (or
+/// testkit) publishes `dyn DnsTxtLookup` to replace it (`context.provide::<dyn DnsTxtLookup>(…)`).
 //
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
 #[async_trait::async_trait]
 pub trait DnsTxtLookup: Send + Sync {
-    /// Mọi giá trị TXT của `name` (tên đầy đủ, vd `_autoxide-challenge.shop.example`); rỗng khi
-    /// tên không có bản ghi TXT hay không tồn tại. Lỗi khi không hỏi được DNS.
+    /// Every TXT value of `name` (the full name, e.g. `_autoxide-challenge.shop.example`); empty when
+    /// the name has no TXT record or does not exist. An error when DNS cannot be queried.
     async fn txt(&self, name: &str) -> Result<Vec<String>, Error>;
 }
 
-/// Bộ tra DNS dùng cho tên miền: bản module / testkit công bố, hoặc bộ tra của hệ điều hành. Điền
-/// một lần sau khi mọi module khởi động (`Modules::start_in`). Clone rẻ.
+/// The DNS resolver used for domains: the one a module / testkit publishes, or the operating system's. Filled
+/// once after every module has started (`Modules::start_in`). Cheap to clone.
 #[derive(Clone, Default)]
 pub(crate) struct DnsSlot(Arc<OnceLock<Arc<dyn DnsTxtLookup>>>);
 
@@ -136,8 +139,8 @@ impl DnsSlot {
     }
 }
 
-/// Cây tổ chức một module công bố (bước 34), hoặc không có. Điền một lần sau khi mọi module khởi
-/// động (`Modules::start_in`). Clone rẻ.
+/// The organization tree a module publishes (step 34), or none. Filled once after every module has
+/// started (`Modules::start_in`). Cheap to clone.
 #[derive(Clone, Default)]
 pub(crate) struct OrgSlot(Arc<OnceLock<Arc<dyn OrgNodes>>>);
 
@@ -153,10 +156,10 @@ impl OrgSlot {
     }
 }
 
-/// Tên miền đã chuẩn hoá (chữ thường, không cổng, không dấu chấm cuối), hoặc `None` khi không
-/// phải tên miền dùng được: chỉ nhãn ASCII chữ / số / `-` (tên quốc tế viết dạng punycode
-/// `xn--…`), mỗi nhãn 1–63 ký tự, cả tên tối đa 253, ít nhất hai nhãn; không IP, không
-/// `localhost` hay `*.localhost`.
+/// The normalized domain (lowercase, no port, no trailing dot), or `None` when it is not
+/// a usable domain: only ASCII labels of letters / digits / `-` (international names in punycode form
+/// `xn--…`), each label 1 to 63 characters, the whole name at most 253, at least two labels; no IP, no
+/// `localhost` or `*.localhost`.
 pub fn normalize_domain(raw: &str) -> Option<String> {
     let mut name = raw.trim().to_ascii_lowercase();
     if let Some((host, port)) = name.rsplit_once(':')
@@ -182,7 +185,7 @@ pub fn normalize_domain(raw: &str) -> Option<String> {
     (labels_ok && tld_ok && !local).then(|| name.to_owned())
 }
 
-/// Tên máy của `AUTOXIDE_HTTP_PUBLIC_URL` (`https://API.example.com:8443/x` → `api.example.com`).
+/// Host name of `AUTOXIDE_HTTP_PUBLIC_URL` (`https://API.example.com:8443/x` → `api.example.com`).
 pub(crate) fn host_of_url(url: &str) -> Option<String> {
     let rest = url.split_once("://").map_or(url, |(_, rest)| rest);
     let authority = rest.split(['/', '?', '#']).next().unwrap_or_default();
@@ -191,7 +194,7 @@ pub(crate) fn host_of_url(url: &str) -> Option<String> {
 }
 
 pub(super) mod entity {
-    //! Bảng `kernel_tenant_domains` (mặt điều khiển).
+    //! The `kernel_tenant_domains` table (control plane).
     use crate::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
@@ -209,7 +212,7 @@ pub(super) mod entity {
         pub verified_at: Option<Timestamp>,
         pub last_checked_at: Option<Timestamp>,
         pub check_error: Option<String>,
-        /// Số lần kiểm lại liên tiếp không thấy bản ghi (tên miền `verified`).
+        /// Number of consecutive rechecks that did not find the record (`verified` domain).
         pub check_failures: i32,
         pub created_at: Timestamp,
         pub updated_at: Timestamp,
@@ -352,22 +355,23 @@ fn describe(row: Model) -> TenantDomain {
     }
 }
 
-/// Kết quả một lần tra bản ghi TXT.
+/// Result of one TXT lookup.
 enum Probe {
     Found,
-    /// DNS trả lời nhưng không có bản ghi đúng: lý do (tiếng Anh, cho người quản trị).
+    /// DNS answered but without the right record: the reason (English, for the administrator).
     Missing(String),
-    /// Không hỏi được DNS (lỗi, quá giờ): không biết bản ghi còn hay không.
+    /// DNS could not be queried (error, timeout): unknown whether the record still exists.
     Unreachable(String),
 }
 
-/// Dịch vụ tên miền riêng của khách. Module `kernel` công bố (`context.require::<TenantDomains>()`).
+/// The service for tenants' own domains. Published by the `kernel` module
+/// (`context.require::<TenantDomains>()`).
 pub struct TenantDomains {
     registry: DatabaseRegistry,
     outbox: Outbox,
     dns: DnsSlot,
     orgs: OrgSlot,
-    /// Tên máy của `AUTOXIDE_HTTP_PUBLIC_URL`: khách không được nhận.
+    /// Host name of `AUTOXIDE_HTTP_PUBLIC_URL`: a tenant may not claim it.
     platform_host: Option<String>,
 }
 
@@ -388,7 +392,7 @@ impl TenantDomains {
         TenantDomains { registry, outbox, dns, orgs, platform_host }
     }
 
-    /// Bản cài chạy chế độ nhiều khách (chỉ khi đó tên miền riêng có tác dụng).
+    /// The installation runs in multi-tenant mode (the only case where own domains take effect).
     pub(crate) fn multi_tenant(&self) -> bool {
         self.registry.mode() == TenancyMode::Multi
     }
@@ -397,7 +401,7 @@ impl TenantDomains {
         self.registry.control()
     }
 
-    /// Tên miền khách gửi, đã chuẩn hoá; không dùng được: `tenant_domain_invalid`.
+    /// The domain the tenant submitted, normalized; if not usable: `tenant_domain_invalid`.
     fn checked(&self, raw: &str) -> Result<String, Error> {
         let domain = normalize_domain(raw).ok_or_else(|| tenant_domain_invalid(raw))?;
         if self.platform_host.as_deref() == Some(domain.as_str()) {
@@ -406,7 +410,7 @@ impl TenantDomains {
         Ok(domain)
     }
 
-    /// Một trang tên miền của khách `tenant` (trừ tên miền đã thu hồi), mới nhất trước trừ khi
+    /// One page of the domains of tenant `tenant` (excluding revoked domains), newest first unless
     /// `order=asc`.
     pub async fn list(
         &self,
@@ -421,8 +425,8 @@ impl TenantDomains {
         Ok(rows.map(describe))
     }
 
-    /// Thêm tên miền `raw` cho khách `tenant` (trạng thái `pending`, token xác minh mới). Gửi lại
-    /// tên miền khách đang có (`pending` / `verified`) trả về chính nó, không đổi gì.
+    /// Adds domain `raw` for tenant `tenant` (status `pending`, new verification token). Resubmitting
+    /// a domain the tenant already has (`pending` / `verified`) returns it unchanged.
     pub async fn add(
         &self,
         actor: Actor,
@@ -506,9 +510,10 @@ impl TenantDomains {
         Ok(describe(row))
     }
 
-    /// Tra bản ghi TXT của tên miền `id` của khách `tenant` ngay, trả trạng thái mới. Tên miền
-    /// `failed` xác minh lại được; tên miền đã xác minh trả về như cũ — trừ khi lần kiểm lại hằng
-    /// ngày gần nhất không thấy bản ghi: khi đó kiểm lại ngay (sửa bản ghi xong thì đếm lại từ 0).
+    /// Looks up the TXT record of domain `id` of tenant `tenant` right now and returns the new status. A
+    /// `failed` domain can be verified again; an already verified domain is returned as it was, unless the
+    /// most recent daily recheck did not find the record: then it is rechecked at once (after fixing the
+    /// record, the count restarts from 0).
     pub async fn verify(
         &self,
         actor: Actor,
@@ -527,8 +532,8 @@ impl TenantDomains {
         Ok(describe(row))
     }
 
-    /// Thu hồi tên miền `id` của khách `tenant` (`revoked`): request tới tên miền đó không còn vào
-    /// khách. Thu hồi lại tên miền đã thu hồi không đổi gì.
+    /// Revokes domain `id` of tenant `tenant` (`revoked`): requests to that domain no longer reach
+    /// the tenant. Revoking an already revoked domain changes nothing.
     pub async fn revoke(
         &self,
         actor: Actor,
@@ -558,11 +563,12 @@ impl TenantDomains {
         Ok(())
     }
 
-    /// Gắn tên miền `id` của khách `tenant` với nút `org` của cây tổ chức của khách (`None`: gỡ,
-    /// tên miền thuộc cả khách). Nút phải thuộc khách — hỏi [`OrgNodes`]; chưa module nào công
-    /// bố cây tổ chức thì chỉ nhận `None`. Tên miền đã thu hồi: `tenant_domain_revoked`. Gắn lại
-    /// đúng nút đang gắn không đổi gì, không ghi event. Không đổi trạng thái hay `updated_at` (hạn 7
-    /// ngày của tên miền `pending` tính từ đó). Hai lệnh gắn cùng lúc: lệnh ghi sau thắng.
+    /// Attaches domain `id` of tenant `tenant` to node `org` of the tenant's organization tree (`None`:
+    /// detach, the domain belongs to the whole tenant). The node must belong to the tenant, asked of
+    /// [`OrgNodes`]; if no module publishes an organization tree, only `None` is accepted. A revoked
+    /// domain: `tenant_domain_revoked`. Attaching again to the node it is already attached to changes
+    /// nothing and writes no event. Does not change the status or `updated_at` (the 7-day deadline of a
+    /// `pending` domain counts from it). Two concurrent attach commands: the later write wins.
     pub async fn assign_org(
         &self,
         actor: Actor,
@@ -631,8 +637,8 @@ impl TenantDomains {
         Ok(describe(after))
     }
 
-    /// Tên miền `raw` đã xác minh và khách của nó đang hoạt động — cho câu hỏi `ask` của Caddy
-    /// (cấp chứng chỉ TLS theo yêu cầu). Đi qua cache của sổ database.
+    /// Whether domain `raw` is verified and its tenant is active: for Caddy's `ask` query
+    /// (on-demand TLS certificate issuance). Goes through the database registry's cache.
     pub async fn allowed(&self, raw: &str) -> Result<bool, Error> {
         let Some(domain) = normalize_domain(raw) else {
             return Ok(false);
@@ -646,8 +652,8 @@ impl TenantDomains {
         }
     }
 
-    /// Tra lại các tên miền `pending` trên `database` (job `kernel.verify_domains`): bản ghi đúng
-    /// → `verified`; chờ quá 7 ngày → `failed`. Trả số tên miền đã xét.
+    /// Rechecks the `pending` domains on `database` (job `kernel.verify_domains`): the right record
+    /// → `verified`; waiting more than 7 days → `failed`. Returns the number of domains examined.
     pub async fn check_pending(&self, database: &Database) -> Result<usize, Error> {
         let rows = Entity::find()
             .filter(Column::Status.eq(PENDING))
@@ -668,7 +674,7 @@ impl TenantDomains {
         Ok(count)
     }
 
-    /// `pending` quá hạn → `failed`.
+    /// `pending` past its deadline → `failed`.
     async fn expire(&self, database: &Database, row: Model) -> Result<(), Error> {
         let now = now();
         let reason = format!(
@@ -695,9 +701,9 @@ impl TenantDomains {
         Ok(())
     }
 
-    /// Kiểm lại các tên miền `verified` trên `database` đã quá [`RECHECK_HOURS`] giờ từ lần kiểm
-    /// trước (job `kernel.verify_domains`): thấy bản ghi → đếm lại từ 0; không thấy lần thứ
-    /// [`MAX_CHECK_FAILURES`] liên tiếp → `failed`. Trả số tên miền đã xét.
+    /// Rechecks the `verified` domains on `database` more than [`RECHECK_HOURS`] hours past their previous
+    /// check (job `kernel.verify_domains`): record found → count restarts from 0; not found for the
+    /// [`MAX_CHECK_FAILURES`]-th consecutive time → `failed`. Returns the number of domains examined.
     pub async fn recheck_verified(&self, database: &Database) -> Result<usize, Error> {
         let due = Timestamp::now() - SignedDuration::from_hours(RECHECK_HOURS);
         let rows = Entity::find()
@@ -719,9 +725,9 @@ impl TenantDomains {
         Ok(count)
     }
 
-    /// Tra DNS cho tên miền `verified` `row` rồi ghi kết quả; trả dòng sau khi ghi. Mọi lệnh ghi
-    /// chỉ ghi khi số lần trượt chưa bị bên khác đổi: hai lượt kiểm cùng lúc chỉ đếm một lần, chỉ
-    /// một bên ghi event.
+    /// Looks up DNS for the `verified` domain `row` then writes the result; returns the row after writing.
+    /// Every write only writes while the failure count has not been changed by another party: two
+    /// concurrent checks count only once and only one writes the event.
     async fn recheck(&self, database: &Database, row: Model) -> Result<Model, Error> {
         // Tra DNS NGOÀI mọi transaction: gọi mạng có thể chậm.
         let probe = self.probe(&row.domain, &row.verification_token).await;
@@ -781,7 +787,8 @@ impl TenantDomains {
         self.find_in(database, row.id).await
     }
 
-    /// Ghi `kernel.domain_failed` cho tên miền vừa thành `failed` (khách không còn thì bỏ qua).
+    /// Writes `kernel.domain_failed` for a domain that has just become `failed` (skipped if the tenant no
+    /// longer exists).
     async fn record_failed(&self, row: &Model) -> Result<(), Error> {
         match self.registry.tenant(TenantId::from_uuid(row.tenant_id)).await {
             Ok(tenant) => {
@@ -793,14 +800,15 @@ impl TenantDomains {
         }
     }
 
-    /// Tra DNS cho `row` (trên database điều khiển) và ghi kết quả.
+    /// Looks up DNS for `row` (on the control database) and writes the result.
     async fn check(&self, actor: Actor, row: Model) -> Result<Model, Error> {
         let database = self.control().clone();
         self.check_on(&database, actor, row).await
     }
 
-    /// Tra DNS cho `row` (dòng của `database`) rồi ghi kết quả; trả dòng sau khi ghi. Chỉ một bên
-    /// (request hay job chạy cùng lúc) chuyển được `pending` / `failed` → `verified` và ghi event.
+    /// Looks up DNS for `row` (a row of `database`) then writes the result; returns the row after writing.
+    /// Only one party (a request or a job running at the same time) can move `pending` / `failed` →
+    /// `verified` and write the event.
     async fn check_on(
         &self,
         database: &Database,
@@ -859,7 +867,7 @@ impl TenantDomains {
         }
     }
 
-    /// Tra bản ghi TXT của `domain`, so với `token`.
+    /// Looks up the TXT record of `domain`, compared with `token`.
     async fn probe(&self, domain: &str, token: &str) -> Probe {
         let name = format!("{CHALLENGE_PREFIX}.{domain}");
         let expected = format!("{CHALLENGE_VALUE_PREFIX}{token}");
@@ -896,7 +904,7 @@ impl TenantDomains {
         Entity::find_by_id(id).one(database.write()).await?.ok_or_else(tenant_domain_not_found)
     }
 
-    /// Dòng `id` của khách `tenant` (kể cả đã thu hồi); dòng của khách khác là "không có".
+    /// Row `id` of tenant `tenant` (including revoked ones); a row of another tenant counts as "not found".
     async fn find_owned(&self, tenant: &TenantContext, id: Uuid) -> Result<Model, Error> {
         Entity::find_by_id(id)
             .filter(Column::TenantId.eq(tenant.id().as_uuid()))
@@ -905,13 +913,13 @@ impl TenantDomains {
             .ok_or_else(tenant_domain_not_found)
     }
 
-    /// Như [`find_owned`](Self::find_owned), không tính tên miền đã thu hồi.
+    /// Like [`find_owned`](Self::find_owned), not counting revoked domains.
     async fn owned(&self, tenant: &TenantContext, id: Uuid) -> Result<Model, Error> {
         let row = self.find_owned(tenant, id).await?;
         if row.status == REVOKED { Err(tenant_domain_not_found()) } else { Ok(row) }
     }
 
-    /// Ghi `event` của tên miền `row` vào outbox của `kernel` trong database của khách.
+    /// Writes `event` of domain `row` to the `kernel` outbox in the tenant's database.
     async fn record<E: Event>(
         &self,
         tenant: &TenantContext,
@@ -928,13 +936,13 @@ fn changed(row: &Model) -> DomainChanged {
     DomainChanged { id: row.id, domain: row.domain.clone(), status: row.status.clone() }
 }
 
-/// Lịch của job `kernel.verify_domains`: mỗi 10 phút, chỉ trên database điều khiển (nơi duy nhất
-/// có tên miền).
+/// Schedule of the job `kernel.verify_domains`: every 10 minutes, only on the control database (the only place
+/// that has domains).
 pub(crate) fn schedule() -> Schedule {
     Schedule::new(VERIFY_DOMAINS, VERIFY_DOMAINS, Duration::from_secs(600)).on_control_only()
 }
 
-/// Bộ chạy job `kernel.verify_domains` (job của cả database điều khiển).
+/// Runner of the job `kernel.verify_domains` (a job of the whole control database).
 pub(crate) struct VerifyDomains(pub(crate) Arc<TenantDomains>);
 
 #[async_trait::async_trait]
@@ -952,8 +960,8 @@ impl JobHandler for VerifyDomains {
     }
 }
 
-/// Cột `check_failures` của `kernel_tenant_domains`: số lần kiểm lại hằng ngày liên tiếp không thấy
-/// bản ghi TXT của tên miền đã xác minh.
+/// The `check_failures` column of `kernel_tenant_domains`: the number of consecutive daily rechecks that
+/// did not find the TXT record of a verified domain.
 pub(crate) struct AddCheckFailures;
 
 impl MigrationName for AddCheckFailures {

@@ -1,22 +1,23 @@
-//! Tìm theo chữ trong danh sách: "chứa chuỗi này", không phân biệt hoa thường, không phân
-//! biệt dấu ("da lat" ra "Đà Lạt"), cho cùng kết quả trên SQLite và Postgres.
+//! Text search in lists: "contains this string", case-insensitive and diacritic-insensitive ("da lat"
+//! finds `Đà Lạt`), with the same results on SQLite and Postgres.
 //!
-//! Cách làm chung cho mọi module:
+//! The shared approach for every module:
 //!
-//! 1. Lưu sẵn một cột "khoá tìm" là chữ đã qua [`fold`] (vd `search_key`), cập nhật cùng
-//!    lúc với cột gốc. Làm trong Rust chứ không bằng `LOWER()` / `unaccent()` của database:
-//!    `LOWER()` của SQLite chỉ biết chữ ASCII, của Postgres theo locale; `unaccent` chỉ
-//!    Postgres có — hai database sẽ cho hai kết quả.
-//! 2. Lọc bằng [`contains`] trên cột đó: `LIKE '%…%' ESCAPE '\'`, nên `%` hay `_` người
-//!    dùng gõ là chữ thường, không phải ký tự đại diện.
+//! 1. Store a "search key" column holding text passed through [`fold`] (e.g. `search_key`), updated at the
+//!    same time as the source column. This is done in Rust rather than with the database `LOWER()` /
+//!    `unaccent()`: SQLite's `LOWER()` only knows ASCII, Postgres's follows the locale; `unaccent` exists
+//!    only on Postgres, so the two databases would give two different results.
+//! 2. Filter with [`contains`] on that column: `LIKE '%…%' ESCAPE '\'`, so a `%` or `_` typed by the user is
+//!    an ordinary character, not a wildcard.
 //!
-//! [`normalize`] (chỉ viết thường) là khoá để chặn trùng tên và để sắp: "Anh" và "Ảnh" là
-//! hai từ khác nhau nên không được coi là trùng. Đổi cách [`fold`] làm thì phải thêm
-//! migration tính lại mọi cột khoá tìm đã lưu.
+//! [`normalize`] (lowercase only) is the key for name uniqueness and sorting: `Anh` and `Ảnh` are two
+//! different words so they must not count as duplicates. If [`fold`] changes, add a migration that
+//! recomputes every stored search key column.
 //!
-//! "Chứa" không dùng được index: database quét các dòng còn lại sau những bộ lọc khác.
-//! Đủ cho bảng vài trăm nghìn dòng; lớn hơn thì dùng chỉ mục tìm kiếm thay được ([`SearchIndex`],
-//! bước 40 P7): module khai loại tài liệu, bộ máy mặc định [`DatabaseSearch`] hay bộ máy ngoài.
+//! "Contains" cannot use an index: the database scans the rows left after the other filters. That suffices
+//! for tables of a few hundred thousand rows; for larger ones, a search index can replace it
+//! ([`SearchIndex`], step 40 P7): the module declares document kinds, and the engine is the default
+//! [`DatabaseSearch`] or an external one.
 
 mod backend;
 pub(crate) mod database;
@@ -35,13 +36,13 @@ use sea_orm::sea_query::{Expr, LikeExpr};
 use unicode_normalization::UnicodeNormalization as _;
 use unicode_normalization::char::is_combining_mark;
 
-/// Khoá để chặn trùng và để sắp theo chữ: bỏ khoảng trắng hai đầu, viết thường.
+/// Key for uniqueness and text sorting: trims surrounding whitespace and lowercases.
 pub fn normalize(text: &str) -> String {
     text.trim().to_lowercase()
 }
 
-/// Dạng đem so khi tìm: như [`normalize`], rồi bỏ dấu — tách chữ khỏi dấu (Unicode NFD), bỏ
-/// dấu, `đ` → `d`. "Đường đến Đà Lạt" → "duong den da lat".
+/// The form compared when searching: like [`normalize`], then strips diacritics: separates letters from
+/// marks (Unicode NFD), drops the marks, `đ` → `d`. `Đường đến Đà Lạt` → `duong den da lat`.
 pub fn fold(text: &str) -> String {
     normalize(text)
         .nfd()
@@ -50,36 +51,36 @@ pub fn fold(text: &str) -> String {
         .collect()
 }
 
-/// Dạng đem so khi tìm "khớp đúng dấu": như [`normalize`], rồi gộp chữ và dấu về một dạng
-/// (Unicode NFC) — "Ảnh" gõ trên máy này và máy kia ra cùng chuỗi, còn "anh" thì khác. Dùng làm
-/// tầng xếp trước khi tìm (D-202): tiếng Việt "dấu / dầu / dâu" khác nghĩa.
+/// The form compared in "exact diacritic" matching: like [`normalize`], then merges letters and marks into
+/// one form (Unicode NFC), so `Ảnh` typed on one machine or another gives the same string, while "anh" differs.
+/// Used as the ranking tier before searching (D-202): in Vietnamese, `dấu / dầu / dâu` mean different things.
 pub fn exact_key(text: &str) -> String {
     normalize(text).nfc().collect()
 }
 
-/// Điều kiện "cột `column` (đã lưu dạng [`exact_key`]) chứa `text` đúng dấu".
+/// Condition "column `column` (stored in [`exact_key`] form) contains `text` with exact diacritics".
 pub fn contains_exact<C: ColumnTrait>(column: C, text: &str) -> Expr {
     let pattern = format!("%{}%", escape_like(&exact_key(text)));
     column.like(LikeExpr::new(pattern).escape('\\'))
 }
 
-/// Điều kiện "cột `column` (đã lưu dạng [`fold`]) chứa `text`" — `text` có dấu hay không
-/// đều được.
+/// Condition "column `column` (stored in [`fold`] form) contains `text`"; `text` may have diacritics or
+/// not.
 pub fn contains<C: ColumnTrait>(column: C, text: &str) -> Expr {
     let pattern = format!("%{}%", escape_like(&fold(text)));
     column.like(LikeExpr::new(pattern).escape('\\'))
 }
 
-/// Điều kiện "cột `column` bắt đầu bằng đúng chuỗi `prefix`" (so nguyên văn, không gấp dấu). Thay
-/// `ColumnTrait::starts_with` của SeaORM — hàm đó không thoát `%` / `_`, nên `prefix` do người dùng
-/// đặt (slug, mã tham chiếu) thành ký tự đại diện. Chạy như nhau trên SQLite và Postgres.
+/// Condition "column `column` starts with exactly the string `prefix`" (compared verbatim, no diacritic
+/// folding). Replaces SeaORM's `ColumnTrait::starts_with`, which does not escape `%` / `_`, so a user-chosen
+/// `prefix` (slug, reference code) would become a wildcard. Behaves the same on SQLite and Postgres.
 pub fn starts_with<C: ColumnTrait>(column: C, prefix: &str) -> Expr {
     let pattern = format!("{}%", escape_like(prefix));
     column.like(LikeExpr::new(pattern).escape('\\'))
 }
 
-/// Thoát `\`, `%` và `_` để dùng trong mẫu `LIKE … ESCAPE '\'`. Mọi mẫu `LIKE` dựng từ dữ liệu
-/// người dùng đi qua đây (hay qua [`contains`], [`starts_with`]).
+/// Escapes `\`, `%` and `_` for use in a `LIKE … ESCAPE '\'` pattern. Every `LIKE` pattern built from user
+/// data goes through here (or through [`contains`], [`starts_with`]).
 pub fn escape_like(text: &str) -> String {
     let mut escaped = String::with_capacity(text.len());
     for character in text.chars() {

@@ -1,5 +1,5 @@
-//! Bảng `kernel_relocations` (mặt điều khiển): mỗi lượt tách / gộp — hay yêu cầu của khách — một
-//! dòng, đi qua các trạng thái của [`super::run`].
+//! The `kernel_relocations` table (control plane): each split / merge run, or tenant request, is one row that
+//! goes through the states of [`super::run`].
 
 use crate::time::Timestamp;
 use serde::{Deserialize, Serialize};
@@ -19,11 +19,11 @@ pub(crate) const SWITCHED: &str = "switched";
 pub(crate) const CLEANED: &str = "cleaned";
 pub(crate) const DONE: &str = "done";
 pub(crate) const FAILED: &str = "failed";
-/// Trạng thái của lượt đang chạy dở: khách nguồn (và khách nhận khi gộp) không phục vụ.
+/// States of a run in progress: the source tenant (and the receiving tenant on a merge) is not served.
 pub(crate) const UNFINISHED: [&str; 6] = [PLANNED, FROZEN, COPIED, VERIFIED, SWITCHED, CLEANED];
 
 pub(crate) mod entity {
-    //! Bảng `kernel_relocations` (mặt điều khiển).
+    //! The `kernel_relocations` table (control plane).
     use crate::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
@@ -37,22 +37,22 @@ pub(crate) mod entity {
         pub kind: String,
         pub state: String,
         pub source_tenant_id: Uuid,
-        /// Tách: ID khách mới (= nút gốc nhánh). Gộp: khách nhận.
+        /// Split: ID of the new tenant (= branch root node). Merge: the receiving tenant.
         pub target_tenant_id: Option<Uuid>,
-        /// Tách: nút gốc nhánh. Gộp: nút nhận của khách nhận.
+        /// Split: the branch root node. Merge: the receiving node of the receiving tenant.
         pub org_id: Option<Uuid>,
-        /// Tách: placement của khách mới.
+        /// Split: placement of the new tenant.
         pub placement_id: Option<Uuid>,
         /// JSON [`super::Options`].
         pub options: String,
-        /// JSON kế hoạch lúc bắt đầu (hay lúc khách gửi yêu cầu).
+        /// Plan JSON at start (or when the tenant sent the request).
         pub plan: Option<String>,
-        /// JSON `[{"table": …, "rows": …}]`: dòng đã ghi ở đích mỗi bảng.
+        /// JSON `[{"table": …, "rows": …}]`: rows written at the target for each table.
         pub tables: String,
         pub error: Option<String>,
         pub runner: Option<String>,
         pub runner_until: Option<Timestamp>,
-        /// Người của khách gửi yêu cầu (`requested`).
+        /// The tenant's person who sent the request (`requested`).
         pub requested_by: Option<Uuid>,
         pub created_by: Option<Uuid>,
         pub created_at: Timestamp,
@@ -65,32 +65,32 @@ pub(crate) mod entity {
 
 pub(crate) use entity::{Column, Entity, Model};
 
-/// Tuỳ chọn của một lượt, lưu ở cột `options`.
+/// Options of a run, stored in the `options` column.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) struct Options {
-    /// Tách: slug và tên của khách mới.
+    /// Split: slug and name of the new tenant.
     #[serde(default)]
     pub(crate) slug: Option<String>,
     #[serde(default)]
     pub(crate) name: Option<String>,
-    /// Tách: khách mới là con của khách nguồn.
+    /// Split: the new tenant is a child of the source tenant.
     #[serde(default)]
     pub(crate) keep_parent: bool,
-    /// Lý do (bắt buộc: chuyển dữ liệu giữa hai khách — căn cứ pháp lý, D-20261118-step38-relocation).
+    /// Reason (required: transferring data between two tenants; legal basis, D-20261118-step38-relocation).
     #[serde(default)]
     pub(crate) reason: String,
-    /// Yêu cầu: tên placement khách mong muốn (nhân sự nền tảng quyết).
+    /// Request: the placement name the tenant wants (platform staff decide).
     #[serde(default)]
     pub(crate) placement: Option<String>,
-    /// Gộp: khách nhận (ID hay slug) — yêu cầu chưa có `target_tenant_id`.
+    /// Merge: the receiving tenant (ID or slug); a request has no `target_tenant_id` yet.
     #[serde(default)]
     pub(crate) into: Option<String>,
-    /// Khách gốc của cây trước và sau (cho `kernel.relocation_finished`, dời kho báo cáo).
+    /// Root tenant of the tree before and after (for `kernel.relocation_finished`, moving the reporting store).
     #[serde(default)]
     pub(crate) from_root: Option<Uuid>,
     #[serde(default)]
     pub(crate) to_root: Option<Uuid>,
-    /// Lúc khách bắt đầu bảo trì (chờ hàng đợi rỗng tính từ đây).
+    /// When the tenant began maintenance (waiting for empty queues counts from here).
     #[serde(default)]
     pub(crate) frozen_at: Option<Timestamp>,
 }
@@ -105,7 +105,7 @@ impl Options {
     }
 }
 
-/// Lượt đã lưu, cho người gọi.
+/// A saved run, for callers.
 pub(crate) fn describe(row: Model, placement: Option<String>) -> Result<TenantRelocation, Error> {
     let options = Options::parse(&row.options)?;
     let plan: Option<RelocationPlan> = match &row.plan {
@@ -134,7 +134,7 @@ pub(crate) fn describe(row: Model, placement: Option<String>) -> Result<TenantRe
     })
 }
 
-/// Bảng `kernel_relocations` (mặt điều khiển, chỉ database điều khiển có dữ liệu).
+/// The `kernel_relocations` table (control plane; only the control database holds data).
 pub(crate) struct CreateRelocations;
 
 impl MigrationName for CreateRelocations {
@@ -191,7 +191,7 @@ impl MigrationTrait for CreateRelocations {
     }
 }
 
-/// ID mới cho một lượt.
+/// New ID for a run.
 pub(crate) fn new_id() -> Uuid {
     Uuid::now_v7()
 }

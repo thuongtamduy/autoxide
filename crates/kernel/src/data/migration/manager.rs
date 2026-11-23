@@ -1,10 +1,11 @@
-//! Phần nền của migration mà kernel tự giữ (D-20261121-own-migrations): trait module cài ([`MigrationTrait`],
-//! [`MigrationName`]), [`SchemaManager`] (chạy câu DDL trên kết nối hay transaction), và bảng lịch sử
-//! `<m>_migrations`. Thay `sea-orm-migration`, vốn bật bộ feature mặc định của SeaORM (kéo `chrono`).
+//! The migration foundation that the kernel owns itself (D-20261121-own-migrations): the traits modules
+//! implement ([`MigrationTrait`], [`MigrationName`]), [`SchemaManager`] (runs DDL statements on a
+//! connection or transaction), and the history table `<m>_migrations`. It replaces `sea-orm-migration`,
+//! which enables SeaORM's default feature set (pulling in `chrono`).
 //!
-//! Cùng tên, cùng chữ ký với `sea-orm-migration` 2.0 mà module đã viết theo, nên migration của module không phải
-//! sửa. Bảng lịch sử dựng từ cùng một entity (`version` chuỗi làm khoá chính, `applied_at` giây Unix) như trước:
-//! database cũ đọc tiếp được, không migration dữ liệu.
+//! Same names and signatures as `sea-orm-migration` 2.0, which modules were written against, so module
+//! migrations need no edits. The history table is built from the same entity (`version` string as primary key,
+//! `applied_at` in Unix seconds) as before: existing databases keep working, with no data migration.
 
 use sea_orm::sea_query::{
     Alias, ColumnDef, Expr, ExprTrait as _, ForeignKeyCreateStatement, ForeignKeyDropStatement,
@@ -16,13 +17,13 @@ use sea_orm::{
     StatementBuilder,
 };
 
-/// Tên của một migration (`m0001_create_note`): ghi vào bảng lịch sử.
+/// Name of a migration (`m0001_create_note`): recorded in the history table.
 pub trait MigrationName {
     fn name(&self) -> &str;
 }
 
-/// Một migration của module: `up` áp dụng, `down` gỡ. Kernel chạy mỗi migration trong một transaction trên cả
-/// hai database (hỏng giữa chừng thì không để lại gì).
+/// A module migration: `up` applies it, `down` reverts it. The kernel runs each migration in a transaction on
+/// both databases (a failure midway leaves nothing behind).
 //
 // `#[async_trait]`: hàm `async` gọi qua `dyn MigrationTrait` (Rust chưa hỗ trợ trực tiếp).
 #[async_trait::async_trait]
@@ -35,7 +36,7 @@ pub trait MigrationTrait: MigrationName + Send + Sync {
     }
 }
 
-/// Chạy câu lệnh dựng schema trên một kết nối hay transaction.
+/// Runs schema-building statements on a connection or a transaction.
 pub struct SchemaManager<'c> {
     connection: DatabaseExecutor<'c>,
 }
@@ -48,12 +49,12 @@ impl<'c> SchemaManager<'c> {
         SchemaManager { connection: connection.into_database_executor() }
     }
 
-    /// Chạy một câu lệnh dựng sẵn.
+    /// Runs one prepared statement.
     pub async fn execute<S: StatementBuilder>(&self, statement: S) -> Result<(), DbErr> {
         self.connection.execute(&statement).await.map(drop)
     }
 
-    /// Như [`execute`](Self::execute) (tên cũ của `sea-orm-migration`).
+    /// Same as [`execute`](Self::execute) (the old name from `sea-orm-migration`).
     pub async fn exec_stmt<S: StatementBuilder>(&self, statement: S) -> Result<(), DbErr> {
         self.execute(statement).await
     }
@@ -62,7 +63,7 @@ impl<'c> SchemaManager<'c> {
         self.connection.get_database_backend()
     }
 
-    /// Kết nối (hay transaction) bên dưới, cho câu lệnh dữ liệu trong migration.
+    /// The underlying connection (or transaction), for data statements inside a migration.
     pub fn get_connection(&self) -> &DatabaseExecutor<'c> {
         &self.connection
     }
@@ -106,13 +107,14 @@ impl<'c> SchemaManager<'c> {
         self.execute(statement).await
     }
 
-    /// Bảng `table` có trong schema hiện tại không.
+    /// Whether table `table` exists in the current schema.
     pub async fn has_table<T: AsRef<str>>(&self, table: T) -> Result<bool, DbErr> {
         has_table(&self.connection, table.as_ref()).await
     }
 }
 
-/// Bảng `table` có không — chỉ đọc catalog (chạy được với người dùng không có quyền DDL), như `sea-schema`.
+/// Whether table `table` exists, reading only the catalog (works for users without DDL permission), like
+/// `sea-schema`.
 pub(crate) async fn has_table<C: ConnectionTrait>(
     connection: &C,
     table: &str,
@@ -146,8 +148,8 @@ pub(crate) async fn has_table<C: ConnectionTrait>(
     row.try_get("", "has_table")
 }
 
-/// Cột của bảng lịch sử `<m>_migrations` (như `seaql_migrations` của `sea-orm-migration`): `version` — tên
-/// migration, khoá chính; `applied_at` — giây Unix lúc áp dụng.
+/// Columns of the history table `<m>_migrations` (like `seaql_migrations` of `sea-orm-migration`): `version` is
+/// the migration name, primary key; `applied_at` is the Unix seconds when it was applied.
 const VERSION: &str = "version";
 const APPLIED_AT: &str = "applied_at";
 
@@ -155,8 +157,8 @@ fn table_iden(table: &str) -> DynIden {
     Alias::new(table).into_iden()
 }
 
-/// Tạo bảng lịch sử nếu chưa có — cùng cột, cùng kiểu như `sea-orm-migration` dựng từ entity của nó (`version`
-/// chuỗi không null làm khoá chính, `applied_at` số nguyên 64 bit không null).
+/// Creates the history table if missing, with the same columns and types as `sea-orm-migration` builds from its
+/// entity (`version` non-null string as primary key, `applied_at` non-null 64-bit integer).
 pub(super) async fn install<C: ConnectionTrait>(connection: &C, table: &str) -> Result<(), DbErr> {
     let statement = Table::create()
         .table(table_iden(table))
@@ -167,7 +169,8 @@ pub(super) async fn install<C: ConnectionTrait>(connection: &C, table: &str) -> 
     connection.execute(&statement).await.map(drop)
 }
 
-/// Tên các migration đã ghi trong bảng lịch sử, theo tên. Bảng chưa có thì rỗng (không tạo gì: chỉ đọc).
+/// Names of the migrations recorded in the history table, by name. Empty when the table does not exist
+/// (creates nothing: read only).
 pub(super) async fn applied<C: ConnectionTrait>(
     connection: &C,
     table: &str,
@@ -188,7 +191,7 @@ pub(super) async fn applied<C: ConnectionTrait>(
         .collect()
 }
 
-/// Ghi `name` là đã áp dụng (giây Unix hiện tại).
+/// Records `name` as applied (current Unix seconds).
 pub(super) async fn record<C: ConnectionTrait>(
     connection: &C,
     table: &str,
@@ -204,7 +207,7 @@ pub(super) async fn record<C: ConnectionTrait>(
     connection.execute(&statement).await.map(drop)
 }
 
-/// Xoá dòng của `name` (migration vừa gỡ).
+/// Deletes the row of `name` (the migration just reverted).
 pub(super) async fn forget<C: ConnectionTrait>(
     connection: &C,
     table: &str,

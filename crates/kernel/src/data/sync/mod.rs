@@ -1,24 +1,26 @@
-//! Đồng bộ khi mất mạng (bước 69 P2, D-20261119-step69-sync): app trên điện thoại, máy tính, máy
-//! bán hàng giữ bản sao dữ liệu, ghi tạm khi mất mạng, có mạng lại thì gửi lên và tải phần đã đổi.
+//! Offline sync (step 69 P2, D-20261119-step69-sync): apps on phones, computers and point-of-sale machines keep
+//! a local copy of the data, write while offline, and on reconnecting upload their changes and download what
+//! changed.
 //!
-//! Cách làm chuẩn của các hệ đồng bộ: **luồng thay đổi theo con trỏ** + **ghi có điều kiện**.
+//! The standard approach of sync systems: a **change feed with a cursor** plus **conditional writes**.
 //!
-//! - Module khai loại bản ghi đồng bộ được qua `Module::sync_resources` ([`SyncResource`]) và thêm
-//!   [`changes_migration`] vào migration của mình: bảng `<module>_changes`.
-//! - Mỗi lệnh ghi bản ghi đồng bộ được ghi thêm một dòng thay đổi bằng [`SyncLog::changed`] /
-//!   [`SyncLog::deleted`] trong CÙNG transaction (như `Outbox::record`): thay đổi và dòng của nó
-//!   cùng có hoặc cùng không.
-//! - Endpoint `GET /api/v1/<module>/<resource>/changes?cursor=…` của module gọi
-//!   [`SyncLog::changes`]: trả bản HIỆN TẠI của mỗi bản ghi đã đổi sau con trỏ, hay dấu xoá
-//!   (tombstone), lọc theo khách, theo nút và theo permission đọc như danh sách thường.
-//! - Ghi lại khi có mạng: `Idempotency-Key` (gửi lại không trùng) và `If-Match` (phát hiện xung
-//!   đột → `412` kèm bản hiện tại, [`crate::version::changed_with`]); nhiều lệnh một lần qua
-//!   `POST /api/v1/kernel/sync/batch` (lớp HTTP của kernel chạy từng lệnh như một request REST).
-//! - Dòng thay đổi giữ [`RETENTION_DAYS`] ngày (worker xoá dòng cũ); con trỏ cũ hơn thế trả
-//!   `410 sync_cursor_expired`: app tải lại từ đầu.
+//! - A module declares its syncable record kinds through `Module::sync_resources` ([`SyncResource`]) and adds
+//!   [`changes_migration`] to its migrations: the `<module>_changes` table.
+//! - Every write of a syncable record also writes a change row with [`SyncLog::changed`] /
+//!   [`SyncLog::deleted`] in the SAME transaction (like `Outbox::record`): the change and its row
+//!   either both exist or neither does.
+//! - The module's endpoint `GET /api/v1/<module>/<resource>/changes?cursor=…` calls
+//!   [`SyncLog::changes`]: it returns the CURRENT version of each record changed after the cursor, or a
+//!   deletion mark (tombstone), filtered by tenant, by node and by read permission like a normal list.
+//! - Writing back once online: `Idempotency-Key` (a resend creates no duplicate) and `If-Match` (conflict
+//!   detection → `412` with the current version, [`crate::version::changed_with`]); several commands at
+//!   once through `POST /api/v1/kernel/sync/batch` (the kernel's HTTP layer runs each command like a REST
+//!   request).
+//! - Change rows are kept [`RETENTION_DAYS`] days (a worker deletes old rows); a cursor older than that returns
+//!   `410 sync_cursor_expired`: the app reloads from the start.
 //!
-//! Con trỏ là UUIDv7 của dòng thay đổi — sinh trong ứng dụng, tăng theo thời gian, so sánh giống
-//! nhau trên SQLite và Postgres.
+//! The cursor is the UUIDv7 of the change row: generated in the application, increasing with time, and
+//! compared the same way on SQLite and Postgres.
 
 mod migration;
 
@@ -42,7 +44,7 @@ use crate::tenancy::TenantContext;
 
 pub use migration::changes_migration;
 
-/// Số ngày giữ luồng thay đổi.
+/// Number of days the change feed is kept.
 pub const RETENTION_DAYS: Setting = Setting::new(
     "AUTOXIDE_SYNC_RETENTION_DAYS",
     "Days the server keeps the change feed of offline sync (1 to 365). A device that has not \
@@ -50,38 +52,39 @@ pub const RETENTION_DAYS: Setting = Setting::new(
 )
 .with_default("30");
 
-/// Đọc [`RETENTION_DAYS`].
+/// Reads [`RETENTION_DAYS`].
 pub(crate) fn read_retention(reader: &mut ConfigReader<'_>) -> Result<SignedDuration, Invalid> {
     reader
         .get_with(&RETENTION_DAYS, |raw| crate::config::parse_in_range(raw, 1i64, 365))
         .map(|days| SignedDuration::from_hours(24 * days))
 }
 
-/// Mặc định của [`RETENTION_DAYS`], cho [`SyncLog::standalone`].
+/// Default of [`RETENTION_DAYS`], for [`SyncLog::standalone`].
 const DEFAULT_RETENTION_DAYS: i64 = 30;
 
-/// Dòng thay đổi mới hơn chừng này có thể còn transaction ghi chậm hơn chưa commit (Postgres cho
-/// nhiều transaction ghi cùng lúc, ID sinh trước khi commit): con trỏ trả cho client không vượt quá
-/// mốc này, để lần hỏi sau đọc lại khúc cuối — không bỏ sót dòng commit muộn. Đọc lại một bản ghi
-/// không sao: mỗi mục là bản hiện tại, áp lại cho cùng kết quả.
+/// Change rows newer than this may still have slower write transactions that have not committed (Postgres
+/// allows many concurrent write transactions, and the ID is generated before commit): the cursor returned
+/// to the client does not pass this mark, so the next call rereads the tail and misses no late-committing
+/// row. Rereading a record is harmless: each entry is the current version, and reapplying gives the same
+/// result.
 const SETTLE: SignedDuration = SignedDuration::from_secs(10);
 
-/// Số mục mặc định và tối đa của một trang thay đổi.
+/// Default and maximum number of entries in a change page.
 const DEFAULT_LIMIT: u32 = 100;
 const MAX_LIMIT: u32 = 500;
 
-/// Một loại bản ghi đồng bộ được, module khai qua `Module::sync_resources`.
+/// A syncable record kind, declared by a module through `Module::sync_resources`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct SyncResource {
-    /// Tên trong module (chữ thường, `_`), vd `notes`; tên đầy đủ là `<module>.<name>`.
+    /// Name within the module (lowercase, `_`), e.g. `notes`; the full name is `<module>.<name>`.
     pub name: &'static str,
-    /// Đường dẫn của danh sách dưới `/api/v1/<module>`: `""` khi chính là `/api/v1/<module>`, hay
-    /// `/items`. Endpoint thay đổi là `<đường dẫn>/changes`; lô ghi nhận lệnh dưới đường dẫn này.
+    /// Path of the list under `/api/v1/<module>`: `""` when it is `/api/v1/<module>` itself, or
+    /// `/items`. The changes endpoint is `<path>/changes`; the batch accepts commands under this path.
     pub path: &'static str,
-    /// Permission đọc, có phạm vi theo nút: lọc luồng thay đổi như danh sách thường.
+    /// Read permission, scoped by node: filters the change feed like a normal list.
     pub read: Permission,
-    /// Một câu tiếng Anh cho người làm app.
+    /// One English sentence for the app developer.
     pub description: &'static str,
 }
 
@@ -96,7 +99,7 @@ impl SyncResource {
     }
 }
 
-/// Vấn đề trong khai báo `sync_resources` của module `module` (kernel báo lúc khởi động).
+/// A problem in the `sync_resources` declaration of module `module` (the kernel reports it at startup).
 pub(crate) fn declaration_problems(module: &str, resources: &[SyncResource]) -> Vec<String> {
     let mut problems = Vec::new();
     let mut names = HashSet::new();
@@ -133,7 +136,7 @@ pub(crate) fn declaration_problems(module: &str, resources: &[SyncResource]) -> 
     problems
 }
 
-/// Vấn đề trong khai báo `sync_resources` của mọi module, kể cả permission đọc không ai khai.
+/// Problems in the `sync_resources` declarations of every module, including a read permission nobody declares.
 pub(crate) fn module_problems(
     modules: &[Box<dyn crate::module::Module>],
     permissions: &crate::access::PermissionCatalog,
@@ -156,7 +159,7 @@ pub(crate) fn module_problems(
     problems
 }
 
-/// `(tên module, khai báo)` của mọi module, theo thứ tự đăng ký.
+/// `(module name, declaration)` of every module, in registration order.
 pub(crate) fn declared(
     modules: &[Box<dyn crate::module::Module>],
 ) -> Vec<(&'static str, SyncResource)> {
@@ -169,7 +172,7 @@ pub(crate) fn declared(
         .collect()
 }
 
-/// Luồng thay đổi của các module có khai `sync_resources`, để worker dọn dòng quá hạn.
+/// The change feeds of the modules that declare `sync_resources`, so a worker can clean up expired rows.
 pub(crate) fn logs(
     modules: &[Box<dyn crate::module::Module>],
     keep: SignedDuration,
@@ -217,7 +220,7 @@ pub struct SyncChange<T> {
 }
 
 impl<T> SyncChange<T> {
-    /// Đổi dạng của bản ghi (vd từ model của database sang dạng trả cho client).
+    /// Converts the record's shape (e.g. from the database model to the shape returned to the client).
     pub fn map<U>(self, convert: impl FnOnce(T) -> U) -> SyncChange<U> {
         SyncChange {
             id: self.id,
@@ -229,11 +232,12 @@ impl<T> SyncChange<T> {
     }
 }
 
-/// Bản ghi module tải lại cho luồng thay đổi: ID, phiên bản (`updated_at`) và dạng trả cho client.
+/// The record a module reloads for the change feed: ID, version (`updated_at`) and the shape returned to the
+/// client.
 pub type Loaded<T> = Vec<(Uuid, Timestamp, T)>;
 
-/// Nơi một module ghi và đọc luồng thay đổi của mình. Lấy bằng `StartContext::sync_log` lúc khởi
-/// động; clone rẻ.
+/// Where a module writes and reads its own change feed. Obtained with `StartContext::sync_log` at
+/// startup; cheap to clone.
 #[derive(Debug, Clone)]
 pub struct SyncLog {
     table: Arc<str>,
@@ -245,13 +249,13 @@ impl SyncLog {
         SyncLog { table: table_name(module).into(), keep }
     }
 
-    /// `SyncLog` đứng riêng (giữ mặc định 30 ngày) — cho test của module.
+    /// A standalone `SyncLog` (keeps the default 30 days), for module tests.
     pub fn standalone(module: &str) -> Self {
         SyncLog::new(module, SignedDuration::from_hours(24 * DEFAULT_RETENTION_DAYS))
     }
 
-    /// Bản ghi `id` (loại `resource`, ở nút / người sở hữu `target`) vừa được tạo hay sửa. Gọi với
-    /// transaction đang ghi thay đổi.
+    /// Record `id` (kind `resource`, at node / owner `target`) has just been created or edited. Call it
+    /// with the transaction that is writing the change.
     pub async fn changed<C: ConnectionTrait>(
         &self,
         connection: &C,
@@ -263,7 +267,8 @@ impl SyncLog {
         self.insert(connection, tenant, resource, id, target, false).await
     }
 
-    /// Bản ghi `id` vừa bị xoá: client nhận dấu xoá. `target` là nút / người sở hữu lúc xoá.
+    /// Record `id` has just been deleted: the client receives a deletion mark. `target` is the node / owner
+    /// at deletion time.
     pub async fn deleted<C: ConnectionTrait>(
         &self,
         connection: &C,
@@ -315,9 +320,10 @@ impl SyncLog {
         Ok(())
     }
 
-    /// Một trang thay đổi của loại `resource` sau con trỏ của `query`, trong phạm vi permission
-    /// đọc của `principal`. `load` nhận ID các bản ghi còn (chưa xoá) và trả bản hiện tại của
-    /// những bản module còn cho người gọi đọc (lọc theo khách); bản không trả về thành dấu xoá.
+    /// One page of changes of kind `resource` after the cursor of `query`, within the read permission scope
+    /// of `principal`. `load` receives the IDs of the records that still exist (not deleted) and returns
+    /// the current version of those the module still lets the caller read (filtered by tenant); a record
+    /// not returned becomes a deletion mark.
     pub async fn changes<T, F, Fut>(
         &self,
         tenant: &TenantContext,
@@ -409,7 +415,7 @@ impl SyncLog {
         Ok(Page { data: items, pagination: Pagination::new(limit, next) })
     }
 
-    /// Con trỏ (đã kiểm còn trong thời hạn giữ) và số mục của trang.
+    /// The cursor (checked to be within the retention period) and the number of entries of the page.
     fn check(&self, query: &ChangesQuery) -> Result<(Option<Uuid>, u32), Error> {
         let mut problems = Vec::new();
         let limit = query.limit.unwrap_or(DEFAULT_LIMIT);
@@ -447,7 +453,8 @@ impl SyncLog {
         Ok((cursor, limit))
     }
 
-    /// Xoá dòng thay đổi (mọi khách) cũ hơn thời hạn giữ trên `database`. Worker gọi định kỳ.
+    /// Deletes change rows (all tenants) older than the retention period on `database`. Called periodically
+    /// by a worker.
     pub(crate) async fn purge(&self, database: &Database) -> Result<u64, Error> {
         let before = Timestamp::now() - self.keep;
         let mut delete = Query::delete();
@@ -458,12 +465,12 @@ impl SyncLog {
     }
 }
 
-/// Bảng thay đổi của module `module`.
+/// Change table of module `module`.
 pub(crate) fn table_name(module: &str) -> String {
     format!("{module}_changes")
 }
 
-/// Lỗi 410: con trỏ cũ hơn thời hạn giữ — tải lại từ đầu.
+/// Error 410: the cursor is older than the retention period; reload from the start.
 fn expired() -> Error {
     Error::new(
         ErrorKind::Gone,
@@ -473,7 +480,7 @@ fn expired() -> Error {
     )
 }
 
-/// Thời điểm của con trỏ (UUIDv7); `None` khi không phải UUIDv7.
+/// The time of the cursor (UUIDv7); `None` when it is not a UUIDv7.
 fn cursor_time(id: Uuid) -> Option<Timestamp> {
     if id.get_version_num() != 7 {
         return None;
@@ -482,7 +489,7 @@ fn cursor_time(id: Uuid) -> Option<Timestamp> {
     Timestamp::from_unix(i64::try_from(seconds).ok()?, nanos)
 }
 
-/// UUIDv7 nhỏ nhất của mili giây `at`: mọi dòng từ mili giây đó trở đi lớn hơn nó.
+/// The smallest UUIDv7 of millisecond `at`: every row from that millisecond on is greater than it.
 fn settled_cursor(at: Timestamp) -> Uuid {
     let millis = u64::try_from(at.as_unix_millis()).unwrap_or_default();
     let mut bytes = [0u8; 16];
@@ -492,9 +499,9 @@ fn settled_cursor(at: Timestamp) -> Uuid {
     Uuid::from_bytes(bytes)
 }
 
-/// Entity "ảo" để dựng điều kiện phạm vi (`Principal::scope_condition` cần cột của một entity):
-/// câu đọc gọi bảng `<module>_changes` bằng bí danh [`ALIAS`], nên cột `sync_change.org_id` trỏ
-/// đúng bảng. Không có bảng nào tên này.
+/// A "virtual" entity for building the scope condition (`Principal::scope_condition` needs the columns of
+/// an entity): the read query names the `<module>_changes` table with the alias [`ALIAS`], so the column
+/// `sync_change.org_id` points to the right table. No table has this name.
 mod change {
     use sea_orm::entity::prelude::*;
 

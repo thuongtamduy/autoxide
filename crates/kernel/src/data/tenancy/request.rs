@@ -1,22 +1,22 @@
-//! Khách của một request (đặc tả 33 "Ngữ cảnh khách cho request").
+//! The tenant of a request (spec 33 "Tenant context for requests").
 //!
-//! 1. Chế độ `single`: luôn khách mặc định; bỏ qua tên miền và header; không truy vấn gì thêm.
-//! 2. Có credential (`Authorization`): khách lấy **từ chính credential** (bộ xác thực của `auth`
-//!    đặt [`Principal::in_tenant`]).
-//! 3. Header `Autoxide-Tenant: <slug | id>`: nhân sự của khách nền tảng có permission
-//!    `kernel.tenants.operate` vào được khách đó ([`Principal::operator_from`]); credential của
-//!    khách khác trỏ khách khác → `tenant_mismatch`; không credential → chọn khách cho route công
-//!    khai.
-//! 4. Tên miền (`Host`) đã xác minh của một khách → khách đó; khác khách của credential →
+//! 1. `single` mode: always the default tenant; ignores the domain and header; runs no extra query.
+//! 2. With a credential (`Authorization`): the tenant is taken **from the credential itself** (the `auth`
+//!    authenticator sets [`Principal::in_tenant`]).
+//! 3. Header `Autoxide-Tenant: <slug | id>`: platform-tenant staff with the permission
+//!    `kernel.tenants.operate` can enter that tenant ([`Principal::operator_from`]); a credential of one
+//!    tenant that points at another tenant → `tenant_mismatch`; with no credential → selects the tenant for
+//!    public routes.
+//! 4. A verified domain (`Host`) of a tenant → that tenant; different from the credential's tenant →
 //!    `tenant_mismatch`.
-//! 5. Không xác định được → handler cần [`TenantContext`] nhận `tenant_required`.
+//! 5. Cannot be determined → a handler that needs [`TenantContext`] gets `tenant_required`.
 //!
-//! Khách đã giải: tạm khoá / bảo trì → lỗi ([`ensure_serving`]); chỉ đọc mà request ghi (không phải
-//! `GET` / `HEAD` / `OPTIONS`, route không đánh dấu `AllowedWhileReadOnly`) → `tenant_read_only`
-//! ([`ensure_writable`]). Một chỗ kiểm cả hai cờ cho mọi handler chạm dữ liệu của khách.
+//! The resolved tenant: suspended / maintenance → error ([`ensure_serving`]); read-only while the request
+//! writes (not `GET` / `HEAD` / `OPTIONS`, route not marked `AllowedWhileReadOnly`) → `tenant_read_only`
+//! ([`ensure_writable`]). One place checks both flags for every handler that touches tenant data.
 //!
-//! Kết quả xác thực giữ trong extensions của request: handler nhận cả `Principal` lẫn
-//! `TenantContext` chỉ xác thực một lần.
+//! The authentication result is kept in the request's extensions: a handler that takes both `Principal` and
+//! `TenantContext` authenticates only once.
 
 use std::sync::Arc;
 
@@ -31,13 +31,13 @@ use super::{
 use crate::access::{Authenticator, Principal};
 use crate::error::Error;
 
-/// Header chọn khách: `Autoxide-Tenant: <slug | id>`.
+/// Header that selects the tenant: `Autoxide-Tenant: <slug | id>`.
 pub const TENANT_HEADER: HeaderName = HeaderName::from_static("autoxide-tenant");
 
-/// Permission cho nhân sự nền tảng vào khách khác bằng header (khai ở module `kernel`).
+/// Permission for platform staff to enter another tenant with the header (declared in the `kernel` module).
 pub(crate) const OPERATE: &str = "kernel.tenants.operate";
 
-/// Khách mà request nhắm tới, đọc từ tên miền và header — chưa kiểm gì.
+/// The tenant the request targets, read from the domain and header, with nothing checked yet.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct TenantHint {
     host: Option<String>,
@@ -45,12 +45,12 @@ pub struct TenantHint {
 }
 
 impl TenantHint {
-    /// Không gợi ý gì (lệnh CLI, job, test).
+    /// No hint (CLI command, job, test).
     pub fn none() -> Self {
         TenantHint::default()
     }
 
-    /// Gợi ý từ tên miền `host` (không cổng) và giá trị header `Autoxide-Tenant`.
+    /// A hint from the domain `host` (no port) and the value of the `Autoxide-Tenant` header.
     pub fn new(host: Option<String>, tenant: Option<String>) -> Self {
         TenantHint {
             host: host.map(|host| normalize_host(&host)).filter(|host| !host.is_empty()),
@@ -60,7 +60,7 @@ impl TenantHint {
         }
     }
 
-    /// Gợi ý từ header `Host` và `Autoxide-Tenant` của request.
+    /// A hint from the request's `Host` and `Autoxide-Tenant` headers.
     pub fn from_headers(headers: &HeaderMap) -> Self {
         let text = |name: &HeaderName| {
             headers.get(name).and_then(|value| value.to_str().ok()).map(str::to_owned)
@@ -68,8 +68,8 @@ impl TenantHint {
         TenantHint::new(text(&header::HOST), text(&TENANT_HEADER))
     }
 
-    /// Gợi ý của request: tên miền proxy tin cậy chuyển tới (`X-Forwarded-Host`, lớp
-    /// `client::attach`) hay header `Host`, và header `Autoxide-Tenant`.
+    /// The request's hint: the domain a trusted proxy forwards (`X-Forwarded-Host`, layer
+    /// `client::attach`) or the `Host` header, and the `Autoxide-Tenant` header.
     pub(crate) fn of_request(headers: &HeaderMap, extensions: &Extensions) -> Self {
         match extensions.get::<crate::http::ForwardedHost>() {
             Some(forwarded) => {
@@ -80,12 +80,12 @@ impl TenantHint {
         }
     }
 
-    /// Tên miền (chữ thường, không cổng, không dấu chấm cuối).
+    /// Domain (lowercase, no port, no trailing dot).
     pub fn host(&self) -> Option<&str> {
         self.host.as_deref()
     }
 
-    /// Giá trị header `Autoxide-Tenant`: slug hay ID của khách.
+    /// Value of the `Autoxide-Tenant` header: the tenant's slug or ID.
     pub fn tenant(&self) -> Option<&str> {
         self.tenant.as_deref()
     }
@@ -105,12 +105,12 @@ fn normalize_host(host: &str) -> String {
     without_port.trim_end_matches('.').to_ascii_lowercase()
 }
 
-/// Bên gọi đã xác thực, giữ trong extensions để không xác thực hai lần.
+/// The authenticated caller, kept in extensions so authentication does not run twice.
 #[derive(Clone)]
 pub(crate) struct Authenticated(pub(crate) Principal);
 
-/// Xác thực request bằng `authenticator` rồi kiểm khách (chế độ `multi`). Kết quả giữ trong
-/// extensions của request.
+/// Authenticates the request with `authenticator` then checks the tenant (`multi` mode). The result is kept
+/// in the request's extensions.
 pub(crate) async fn authenticate(
     authenticator: &Arc<dyn Authenticator>,
     parts: &mut Parts,
@@ -139,7 +139,7 @@ pub(crate) async fn authenticate(
     Ok(principal)
 }
 
-/// Khách của credential khớp với tên miền / header; nhân sự nền tảng vào khách khác.
+/// The credential's tenant matching the domain / header; platform staff entering another tenant.
 async fn check(
     registry: &DatabaseRegistry,
     authenticator: &dyn Authenticator,
@@ -181,7 +181,7 @@ async fn check(
     Ok(principal)
 }
 
-/// Khách theo giá trị header: ID (UUID) hay slug.
+/// The tenant by header value: ID (UUID) or slug.
 async fn lookup(registry: &DatabaseRegistry, raw: &str) -> Result<TenantContext, Error> {
     match raw.parse::<Uuid>() {
         Ok(id) => registry.tenant(super::TenantId::from_uuid(id)).await,
@@ -189,7 +189,7 @@ async fn lookup(registry: &DatabaseRegistry, raw: &str) -> Result<TenantContext,
     }
 }
 
-/// Khách của request (xem đầu file). Chế độ `single`: khách mặc định, không truy vấn gì.
+/// The request's tenant (see the top of the file). `single` mode: the default tenant, no query.
 pub(crate) async fn tenant(parts: &mut Parts) -> Result<TenantContext, Error> {
     if let Some(tenant) = parts.extensions.get::<TenantContext>() {
         return Ok(tenant.clone());
@@ -235,7 +235,8 @@ async fn resolve_tenant(parts: &mut Parts) -> Result<TenantContext, Error> {
     Ok(tenant)
 }
 
-/// Khách theo header `autoxide-tenant` / tên miền, bỏ qua credential (request không đăng nhập).
+/// The tenant by the `autoxide-tenant` header / domain, ignoring the credential (a request that is not signed
+/// in).
 async fn by_hint(registry: &DatabaseRegistry, parts: &Parts) -> Result<TenantContext, Error> {
     let hint = TenantHint::of_request(&parts.headers, &parts.extensions);
     match (hint.tenant(), hint.host()) {
@@ -247,10 +248,10 @@ async fn by_hint(registry: &DatabaseRegistry, parts: &Parts) -> Result<TenantCon
     }
 }
 
-/// Khách của request cho endpoint nhận token tự mang khách (`OptionalTenant`): như [`tenant`],
-/// nhưng credential trong `Authorization` không hợp lệ (vd access token đã hết hạn mà client vẫn
-/// gửi kèm khi gọi `/refresh`) thì bỏ qua nó và chọn khách theo header / tên miền. Không xác định
-/// được khách: `tenant_required`.
+/// The request's tenant for an endpoint that accepts a token that carries the tenant itself
+/// (`OptionalTenant`): like [`tenant`], but an invalid credential in `Authorization` (e.g. an expired
+/// access token that the client still sends along when calling `/refresh`) is ignored and the tenant is
+/// chosen by header / domain. If the tenant cannot be determined: `tenant_required`.
 pub(crate) async fn tenant_ignoring_bad_credential(
     parts: &mut Parts,
 ) -> Result<TenantContext, Error> {

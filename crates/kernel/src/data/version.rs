@@ -1,19 +1,19 @@
-//! Chống ghi đè khi hai người cùng sửa một bản ghi (optimistic concurrency), theo HTTP
-//! chuẩn (RFC 9110): `ETag` khi đọc, `If-Match` khi sửa.
+//! Preventing overwrites when two people edit the same record (optimistic concurrency), using standard HTTP
+//! (RFC 9110): `ETag` when reading, `If-Match` when editing.
 //!
-//! Phiên bản của một bản ghi là cột `updated_at` của nó (đã cắt tới micro giây nên hai
-//! database lưu cùng một giá trị). `ETag` là số micro giây đó trong ngoặc kép.
+//! The version of a record is its `updated_at` column (truncated to microseconds so both databases store
+//! the same value). The `ETag` is that microsecond number in double quotes.
 //!
-//! - Handler đọc / sửa trả [`Tagged`] thay cho `Data`: thân như `Data`, kèm `ETag`.
-//! - Handler sửa nhận [`IfMatch`] và đưa [`IfMatch::expected`] cho service. Service sửa
-//!   bằng một câu `UPDATE … WHERE updated_at = <phiên bản mong đợi>`: 0 dòng nghĩa là bản
-//!   ghi vừa bị người khác sửa → [`changed`] (412). Kiểm trong chính câu `UPDATE` nên hai
-//!   request đồng thời không đè nhau được, trên cả hai database.
-//! - Không gửi `If-Match` thì sửa như cũ (ghi đè), để client cũ vẫn chạy — trừ endpoint
-//!   gọi [`IfMatch::required`]: không gửi là 428 `precondition_required` (RFC 6585).
-//! - Đọc: client gửi lại `ETag` trong `If-None-Match`; còn khớp thì lớp HTTP của kernel
-//!   trả `304 Not Modified` không kèm thân (xem [`if_none_match`]) — mọi `GET` có `ETag`
-//!   đều được, không phải viết gì thêm.
+//! - Read / edit handlers return [`Tagged`] instead of `Data`: the body is like `Data`, with an `ETag`.
+//! - An edit handler takes [`IfMatch`] and passes [`IfMatch::expected`] to the service. The service edits with
+//!   one statement `UPDATE … WHERE updated_at = <expected version>`: 0 rows means the record was just edited by
+//!   someone else → [`changed`] (412). The check is inside the `UPDATE` itself, so two concurrent requests
+//!   cannot overwrite each other, on both databases.
+//! - Without `If-Match`, the edit works as before (overwrites), so old clients keep working, except endpoints
+//!   that call [`IfMatch::required`]: omitting it is 428 `precondition_required` (RFC 6585).
+//! - Reading: the client sends the `ETag` back in `If-None-Match`; if it still matches, the kernel's HTTP layer
+//!   returns `304 Not Modified` with no body (see [`if_none_match`]); every `GET` with an `ETag` qualifies,
+//!   with nothing more to write.
 
 use crate::time::Timestamp;
 use axum::extract::FromRequestParts;
@@ -25,12 +25,12 @@ use serde::Serialize;
 use crate::error::{Error, ErrorKind};
 use crate::response::Data;
 
-/// Giá trị `ETag` của phiên bản `version`: `"<số micro giây Unix>"`.
+/// The `ETag` value of version `version`: `"<Unix microsecond number>"`.
 pub fn etag(version: Timestamp) -> String {
     format!("\"{}\"", version.as_unix_micros())
 }
 
-/// Kết quả `{"data": …}` kèm header `ETag` của bản ghi.
+/// A `{"data": …}` result with the record's `ETag` header.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Tagged<T> {
     pub version: Timestamp,
@@ -47,23 +47,23 @@ impl<T: Serialize> IntoResponse for Tagged<T> {
     }
 }
 
-/// Header `If-Match` của request.
+/// The `If-Match` header of the request.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum IfMatch {
-    /// Không gửi header.
+    /// The header was not sent.
     Missing,
-    /// Gửi `*`: sửa không cần kiểm phiên bản.
+    /// `*` was sent: edit without a version check.
     Any,
-    /// Chỉ sửa khi bản ghi còn đúng phiên bản này.
+    /// Edit only if the record is still at exactly this version.
     Version(Timestamp),
-    /// Giá trị không phải `ETag` máy chủ này cấp (sai dạng, `ETag` yếu `W/…`, nhiều giá trị):
-    /// không bao giờ khớp.
+    /// A value that is not an `ETag` this server issued (malformed, weak `ETag` `W/…`, several values):
+    /// never matches.
     Never,
 }
 
 impl IfMatch {
-    /// Phiên bản service phải khớp (`None`: không kiểm); lỗi 412 nếu không thể khớp.
+    /// The version the service must match (`None`: no check); a 412 error if it cannot match.
     pub fn expected(self) -> Result<Option<Timestamp>, Error> {
         match self {
             IfMatch::Missing | IfMatch::Any => Ok(None),
@@ -72,8 +72,8 @@ impl IfMatch {
         }
     }
 
-    /// Như [`expected`](Self::expected), nhưng bắt buộc gửi header: thiếu thì 428.
-    /// `*` vẫn được nhận — người gọi nói rõ là muốn ghi đè.
+    /// Like [`expected`](Self::expected), but the header is required: missing gives 428.
+    /// `*` is still accepted; the caller states explicitly that they want to overwrite.
     pub fn required(self) -> Result<Option<Timestamp>, Error> {
         match self {
             IfMatch::Missing => Err(Error::new(
@@ -86,8 +86,8 @@ impl IfMatch {
         }
     }
 
-    /// Đọc một giá trị `ETag` (hoặc `*`) nhận qua kênh khác header — vd tham số `version` của
-    /// tool MCP — y như header `If-Match`.
+    /// Reads an `ETag` value (or `*`) received through a channel other than a header (e.g. the `version`
+    /// parameter of an MCP tool), exactly like the `If-Match` header.
     pub fn from_value(value: &str) -> IfMatch {
         IfMatch::parse(Some(value))
     }
@@ -125,9 +125,9 @@ impl<S: Send + Sync> FromRequestParts<S> for IfMatch {
     }
 }
 
-/// Header `If-None-Match` của request có khớp `etag` (một giá trị `ETag` đầy đủ, kể cả
-/// ngoặc kép) không: so sánh "yếu" của RFC 9110 (bỏ qua tiền tố `W/`), nhận danh sách
-/// nhiều giá trị và `*`. Khớp nghĩa là client đã có đúng bản này: trả 304.
+/// Whether the request's `If-None-Match` header matches `etag` (a full `ETag` value, double quotes included):
+/// the "weak" comparison of RFC 9110 (ignores the `W/` prefix), accepting a list of several values and `*`.
+/// A match means the client already has exactly this version: return 304.
 pub fn if_none_match(headers: &axum::http::HeaderMap, etag: &str) -> bool {
     let wanted = etag.trim_start_matches("W/");
     headers.get_all(header::IF_NONE_MATCH).iter().filter_map(|value| value.to_str().ok()).any(
@@ -140,7 +140,7 @@ pub fn if_none_match(headers: &axum::http::HeaderMap, etag: &str) -> bool {
     )
 }
 
-/// Lỗi 412: bản ghi đã bị sửa từ lúc người gọi đọc nó.
+/// 412 error: the record was edited since the caller read it.
 pub fn changed() -> Error {
     Error::new(
         ErrorKind::PreconditionFailed,
@@ -150,10 +150,10 @@ pub fn changed() -> Error {
     )
 }
 
-/// Lỗi 412 như [`changed`], kèm bản ghi hiện tại `current` (dạng như khi đọc nó) và phiên bản
-/// `version` của nó (bước 69 P2): app ngoại tuyến tự gộp thay đổi của mình vào bản trên máy chủ
-/// rồi gửi lại với `ETag` mới, không phải đọc lại. Không đổi được `current` thành JSON thì vẫn trả
-/// 412, không kèm bản.
+/// A 412 error like [`changed`], with the current record `current` (in the form it is read) and its version
+/// `version` (step 69 P2): an offline app merges its own changes into the server version itself and resends
+/// with the new `ETag`, without re-reading. If `current` cannot be turned into JSON, it still returns 412,
+/// without the record.
 pub fn changed_with<T: Serialize>(current: &T, version: Timestamp) -> Error {
     match serde_json::to_value(current) {
         Ok(record) => changed().with_current(record, version),

@@ -1,24 +1,24 @@
-//! Tách / gộp khách (bước 38 mục 3, D-20261118-step38-relocation): tách một nhánh tổ chức của khách
-//! T thành khách riêng T' ở database khác, hay gộp khách T' vào khách T dưới một nút — **giữ nguyên
-//! khoá chính và lịch sử**.
+//! Splitting / merging tenants (step 38 item 3, D-20261118-step38-relocation): split an organization branch of
+//! tenant T into a separate tenant T' in another database, or merge tenant T' into tenant T under a node,
+//! **keeping primary keys and history unchanged**.
 //!
-//! - Mỗi module khai cách từng bảng cấp khách của mình đi theo ([`Module::relocation`]): theo nút
-//!   ([`TablePolicy::ByOrg`]), theo dòng cha ([`TablePolicy::FollowParent`]), chép theo dòng trỏ tới
-//!   ([`TablePolicy::Referenced`]), cả khách ([`TablePolicy::TenantWide`]), phải rỗng
-//!   ([`TablePolicy::MustBeEmpty`]) hay tự làm ([`TablePolicy::Custom`]). Bảng không khai thì suy
-//!   từ cột (có `org_id` → theo nút; hàng đợi job / outbox → phải rỗng; còn lại → ở lại) kèm cảnh
-//!   báo trong kế hoạch; test của binary chặn bảng không khai.
-//! - Một lượt là một dòng `kernel_relocations` (mặt điều khiển) đi qua `planned` → `frozen` →
-//!   `copied` → `verified` → `switched` → `cleaned` → `done` (hay `failed`); mỗi bước chạy lại được
-//!   (`autoxide tenant split --resume <id>`, job `kernel.relocate`). Không có transaction xuyên hai
-//!   database: chép là MỘT transaction ở đích, chuyển là một transaction ở database điều khiển,
-//!   dọn chỉ xoá ở nguồn dòng đã có ở đích.
-//! - Nguồn và đích phải là hai database khác nhau (dời trong cùng database: dùng
-//!   `autoxide tenant move` trước). Khách mới khi tách có ID = ID nút gốc nhánh (nút gốc của khách
-//!   có ID bằng ID khách, D-198), nên gộp ngược lại trả mọi dòng về đúng chỗ cũ.
-//! - Chỉ nhân sự nền tảng chạy được (CLI, hay REST với `dry_run` mặc định, D-210); khách chỉ gửi
-//!   yêu cầu (`POST /api/v1/kernel/tenant/relocation-requests`), yêu cầu vào hộp việc của nhân sự
-//!   nền tảng.
+//! - Each module declares how each of its tenant-level tables travels ([`Module::relocation`]): by node
+//!   ([`TablePolicy::ByOrg`]), by parent row ([`TablePolicy::FollowParent`]), copied by the rows that point to
+//!   them ([`TablePolicy::Referenced`]), whole tenant ([`TablePolicy::TenantWide`]), must be empty
+//!   ([`TablePolicy::MustBeEmpty`]) or handled by the module ([`TablePolicy::Custom`]). An undeclared table is
+//!   inferred from its columns (has `org_id` → by node; job queue / outbox → must be empty; otherwise →
+//!   stays), with a warning in the plan; the binary's test rejects undeclared tables.
+//! - One run is one `kernel_relocations` row (control plane) that goes through `planned` → `frozen` →
+//!   `copied` → `verified` → `switched` → `cleaned` → `done` (or `failed`); each step is re-runnable
+//!   (`autoxide tenant split --resume <id>`, job `kernel.relocate`). There is no transaction across the two
+//!   databases: copying is ONE transaction at the target, switching is one transaction at the control
+//!   database, and cleaning deletes at the source only rows that already exist at the target.
+//! - Source and target must be two different databases (to move within the same database, use
+//!   `autoxide tenant move` first). On a split, the new tenant has an ID equal to the ID of the branch root
+//!   node (a tenant's root node has an ID equal to the tenant ID, D-198), so merging back returns every row
+//!   to its old place.
+//! - Only platform staff can run it (CLI, or REST with `dry_run` by default, D-210); a tenant only sends a
+//!   request (`POST /api/v1/kernel/tenant/relocation-requests`), which goes into the platform staff's inbox.
 //!
 //! [`Module::relocation`]: crate::module::Module::relocation
 
@@ -54,7 +54,7 @@ pub(crate) use run::Wiring;
 pub use run::{RelocationInput, TenantRelocations};
 pub(crate) use store::CreateRelocations;
 
-/// Tách / gộp khách (chỉ nhân sự nền tảng).
+/// Splits / merges tenants (platform staff only).
 pub const TENANTS_RELOCATE: Permission = Permission::new(
     "kernel.tenants.relocate",
     "Split a branch of a tenant into a tenant of its own, or merge a tenant into another (platform \
@@ -62,7 +62,7 @@ pub const TENANTS_RELOCATE: Permission = Permission::new(
 )
 .with_risk(Risk::Destructive);
 
-/// Quản trị viên của khách gửi yêu cầu tách / gộp cho nhân sự nền tảng.
+/// A tenant administrator sends a split / merge request to platform staff.
 pub const RELOCATIONS_REQUEST: Permission = Permission::new(
     "kernel.relocations.request",
     "Ask the platform staff to split a branch of your tenant into a tenant of its own, or to merge \
@@ -82,7 +82,7 @@ pub(crate) const RELOCATION_FAILED: EventInfo = EventInfo::new(
     "A split or merge of tenants stopped before changing anything; the tenant works again.",
 );
 
-/// Chờ outbox / job đến hạn của khách rỗng trước khi chép.
+/// Waits until the tenant's due outbox / jobs are empty before copying.
 pub const DRAIN_SECONDS: Setting = Setting::new(
     "AUTOXIDE_RELOCATION_DRAIN_SECONDS",
     "Seconds a split or merge of tenants waits for the tenant's queued events and due jobs to run \
@@ -90,7 +90,7 @@ pub const DRAIN_SECONDS: Setting = Setting::new(
 )
 .with_default("300");
 
-/// Loại job chạy một lượt tách / gộp bắt đầu qua REST.
+/// Job kind that runs a split / merge started through REST.
 pub(crate) const RELOCATE: &str = "kernel.relocate";
 
 // Tách hay gộp.
@@ -121,52 +121,54 @@ impl RelocationKind {
     }
 }
 
-/// Dòng `TenantWide` khi tách.
+/// A `TenantWide` row on a split.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Split {
-    /// Ở lại khách nguồn; khách mới không có.
+    /// Stays with the source tenant; the new tenant has none.
     Stay,
-    /// Chép sang khách mới, khách nguồn vẫn giữ (cấu hình dùng chung: role…).
+    /// Copied to the new tenant while the source tenant keeps it (shared configuration: roles…).
     Copy,
 }
 
-/// Dòng `TenantWide` khi gộp.
+/// A `TenantWide` row on a merge.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Merge {
-    /// Chuyển sang khách nhận (dòng mà khoá chính đã có ở khách nhận — bản đã chép khi tách — bỏ
-    /// qua: cùng một dòng).
+    /// Moves to the receiving tenant (a row whose primary key already exists at the receiving tenant, the copy
+    /// made at split time, is skipped: it is the same row).
     Import,
-    /// Không chuyển: ở lại với khách đã gộp (thuê bao, phiên, bộ đếm…).
+    /// Not moved: stays with the merged tenant (subscriptions, sessions, counters…).
     Skip,
 }
 
-/// Cách một bảng cấp khách đi theo khi tách / gộp.
+/// How a tenant-level table travels on a split / merge.
 #[derive(Clone)]
 #[non_exhaustive]
 pub enum TablePolicy {
-    /// Dòng có nút `column` thuộc nhánh tách thì đi theo nhánh; `NULL` hay nút ngoài nhánh ở lại.
+    /// A row whose node `column` belongs to the split branch goes with the branch; `NULL` or a node outside the branch stays.
     ByOrg { column: &'static str },
-    /// Bảng soi cây tổ chức (một dòng mỗi nút, `id` là ID nút, `parent` là nút cha): như `ByOrg`
-    /// theo `id`, kèm nút cha của gốc nhánh thành `NULL` khi tách và thành nút nhận khi gộp.
+    /// A table that mirrors the organization tree (one row per node, `id` is the node ID, `parent` is the
+    /// parent node): like `ByOrg` on `id`, and the parent node of the branch root becomes `NULL` on a split and
+    /// becomes the receiving node on a merge.
     OrgTree { id: &'static str, parent: &'static str },
-    /// Dòng theo dòng cha ở `parent_table` (`column` trỏ `parent_column`): cha đi thì con đi, cha
-    /// được chép thì con được chép.
+    /// A row follows its parent row in `parent_table` (`column` points to `parent_column`): when the parent
+    /// goes, the child goes; when the parent is copied, the child is copied.
     FollowParent { parent_table: &'static str, column: &'static str, parent_column: &'static str },
-    /// Dòng mà dòng của `by_table` (đi hay được chép) trỏ tới qua `by_column` → `column`: được CHÉP
-    /// sang khách mới, khách nguồn vẫn giữ (vd tài khoản của người có role ở nút trong nhánh).
+    /// A row that a row of `by_table` (moved or copied) points to through `by_column` → `column`: it is COPIED
+    /// to the new tenant while the source tenant keeps it (e.g. the account of a person with a role at a node
+    /// in the branch).
     Referenced { by_table: &'static str, by_column: &'static str, column: &'static str },
-    /// Cả khách, không theo nút.
+    /// Whole tenant, not by node.
     TenantWide { on_split: Split, on_merge: Merge },
-    /// Hàng đợi (outbox, job): phần đến hạn của khách phải chạy hết trước khi chép; không chép.
+    /// A queue (outbox, job): the tenant's due part must finish running before copying; not copied.
     MustBeEmpty,
-    /// Bảng do bảng `by` của cùng module xử lý cùng lúc (vd đầu chuỗi băm của audit).
+    /// A table handled at the same time by table `by` of the same module (e.g. the head of the audit hash chain).
     HandledBy { by: &'static str },
-    /// Module tự làm (audit, cây tổ chức, dãy số).
+    /// The module handles it itself (audit, organization tree, number sequences).
     Custom(Arc<dyn RelocateTable>),
 }
 
 impl TablePolicy {
-    /// Tên chính sách trong kế hoạch.
+    /// Policy name in the plan.
     pub fn name(&self) -> &'static str {
         match self {
             TablePolicy::ByOrg { .. } => "by_org",
@@ -187,19 +189,19 @@ impl std::fmt::Debug for TablePolicy {
     }
 }
 
-/// Cột chứa secret đã mã hoá theo khách (`Sealer`, AAD gồm khách): khi đổi khách, giá trị được mã
-/// hoá lại cho khách mới — không thì khách mới không mở được.
+/// A column that holds a secret encrypted per tenant (`Sealer`, AAD includes the tenant): when the tenant
+/// changes, the value is re-encrypted for the new tenant; otherwise the new tenant could not open it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SealedColumn {
     pub table: &'static str,
     pub column: &'static str,
-    /// Mục đích đã dùng khi mã hoá (vd `webhooks.endpoint_secret`).
+    /// The purpose used when encrypting (e.g. `webhooks.endpoint_secret`).
     pub purpose: &'static str,
-    /// Cột định danh dòng đã dùng khi mã hoá (thường `id`).
+    /// The row-identifying column used when encrypting (usually `id`).
     pub row_column: &'static str,
 }
 
-/// Chính sách tách / gộp của một module ([`Module::relocation`](crate::module::Module::relocation)).
+/// Split / merge policy of a module ([`Module::relocation`](crate::module::Module::relocation)).
 #[derive(Clone, Default)]
 pub struct Relocation {
     tables: Vec<(&'static str, TablePolicy)>,
@@ -217,22 +219,23 @@ impl std::fmt::Debug for Relocation {
     }
 }
 
-/// Lượt tách / gộp đang chuyển (bước `switch`).
+/// A split / merge run that is switching (the `switch` step).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct RelocationSwitch {
     pub kind: RelocationKind,
-    /// Khách có dữ liệu đi (khách bị tách nhánh; khách bị gộp).
+    /// The tenant whose data leaves (the tenant a branch is split from; the tenant being merged).
     pub source: TenantId,
-    /// Khách nhận (khách mới khi tách; khách nhận khi gộp).
+    /// The receiving tenant (the new tenant on a split; the receiving tenant on a merge).
     pub target: TenantId,
 }
 
-/// Việc module phải làm ĐỒNG BỘ khi một lượt tách / gộp chuyển (D-20261119-relocation-switch-hook):
-/// chạy trong transaction của bước `switch` ở database điều khiển, TRƯỚC khi khách mới hoạt động.
-/// Lỗi thì cả transaction bỏ: khách mới không mở, lượt dừng ở bước trước và chạy lại được. Dùng cho
-/// chính sách bảo mật đặt theo ID khách ở database điều khiển (vd rào quyền của `auth`), thứ phải
-/// có hiệu lực ngay từ request đầu tiên tới khách mới. Phải chạy lại được.
+/// Work a module must do SYNCHRONOUSLY when a split / merge run switches (D-20261119-relocation-switch-hook):
+/// it runs inside the transaction of the `switch` step at the control database, BEFORE the new tenant becomes
+/// active. On error the whole transaction is dropped: the new tenant does not open, and the run stops at the
+/// previous step and can be re-run. Used for security policy keyed by tenant ID at the control database (e.g.
+/// the permission fence of `auth`), which must take effect from the very first request to the new tenant.
+/// Must be re-runnable.
 //
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
 #[async_trait::async_trait]
@@ -245,19 +248,19 @@ pub trait SwitchHook: Send + Sync {
 }
 
 impl Relocation {
-    /// Chạy `hook` trong bước chuyển của mọi lượt tách / gộp ([`SwitchHook`]).
+    /// Runs `hook` in the switch step of every split / merge run ([`SwitchHook`]).
     pub fn on_switch(mut self, hook: Arc<dyn SwitchHook>) -> Self {
         self.switch_hooks.push(hook);
         self
     }
 
-    /// Hook của bước chuyển đã khai.
+    /// The declared switch-step hooks.
     pub fn switch_hooks(&self) -> &[Arc<dyn SwitchHook>] {
         &self.switch_hooks
     }
 
-    /// Không khai gì: mọi bảng suy từ cột (cảnh báo trong kế hoạch). Cài đặt mặc định của
-    /// `Module::relocation`.
+    /// Declares nothing: every table is inferred from its columns (with warnings in the plan). The default
+    /// implementation of `Module::relocation`.
     pub fn inferred() -> Self {
         Relocation::default()
     }
@@ -266,20 +269,20 @@ impl Relocation {
         Relocation::default()
     }
 
-    /// Bảng `table` theo `policy`.
+    /// Table `table` follows `policy`.
     pub fn table(mut self, table: &'static str, policy: TablePolicy) -> Self {
         self.tables.push((table, policy));
         self
     }
 
-    /// Các bảng theo nút ở cột `org_id`.
+    /// Tables by node in the column `org_id`.
     pub fn by_org(self, tables: &[&'static str]) -> Self {
         tables
             .iter()
             .fold(self, |this, table| this.table(table, TablePolicy::ByOrg { column: "org_id" }))
     }
 
-    /// Bảng `table` theo dòng cha ở `parent_table` (`column` trỏ `parent_table.id`).
+    /// Table `table` follows its parent row in `parent_table` (`column` points to `parent_table.id`).
     pub fn follow(
         self,
         table: &'static str,
@@ -289,7 +292,7 @@ impl Relocation {
         self.table(table, TablePolicy::FollowParent { parent_table, column, parent_column: "id" })
     }
 
-    /// Bảng `table` được chép theo dòng của `by_table` trỏ tới (`by_table.by_column` → `id`).
+    /// Table `table` is copied by the rows of `by_table` that point to it (`by_table.by_column` → `id`).
     pub fn referenced(
         self,
         table: &'static str,
@@ -299,17 +302,17 @@ impl Relocation {
         self.table(table, TablePolicy::Referenced { by_table, by_column, column: "id" })
     }
 
-    /// Cấu hình cả khách: chép sang khách mới khi tách, chuyển khi gộp.
+    /// Whole-tenant configuration: copied to the new tenant on a split, moved on a merge.
     pub fn copy_on_split(self, tables: &[&'static str]) -> Self {
         self.tenant_wide(tables, Split::Copy, Merge::Import)
     }
 
-    /// Dữ liệu cả khách ở lại khách nguồn khi tách, chuyển khi gộp (vd người mua, người đăng ký).
+    /// Whole-tenant data stays with the source tenant on a split and moves on a merge (e.g. buyers, subscribers).
     pub fn stay(self, tables: &[&'static str]) -> Self {
         self.tenant_wide(tables, Split::Stay, Merge::Import)
     }
 
-    /// Dữ liệu tạm hay riêng của khách (phiên, bộ đếm, token, thuê bao): không đi đâu cả.
+    /// Temporary or tenant-private data (sessions, counters, tokens, subscriptions): goes nowhere.
     pub fn ephemeral(self, tables: &[&'static str]) -> Self {
         self.tenant_wide(tables, Split::Stay, Merge::Skip)
     }
@@ -320,22 +323,22 @@ impl Relocation {
         })
     }
 
-    /// Hàng đợi phải rỗng (outbox, job — nhận ra theo cột nên thường không cần khai).
+    /// A queue that must be empty (outbox, job; recognized by columns so it usually needs no declaration).
     pub fn must_be_empty(self, tables: &[&'static str]) -> Self {
         tables.iter().fold(self, |this, table| this.table(table, TablePolicy::MustBeEmpty))
     }
 
-    /// Bảng `table` do bảng `by` xử lý cùng lúc.
+    /// Table `table` is handled at the same time by table `by`.
     pub fn handled_by(self, table: &'static str, by: &'static str) -> Self {
         self.table(table, TablePolicy::HandledBy { by })
     }
 
-    /// Bảng `table` do module tự làm.
+    /// Table `table` is handled by the module itself.
     pub fn custom(self, table: &'static str, handler: Arc<dyn RelocateTable>) -> Self {
         self.table(table, TablePolicy::Custom(handler))
     }
 
-    /// Cột `table.column` chứa secret mã hoá theo khách với `purpose`, dòng định danh bằng
+    /// Column `table.column` holds a secret encrypted per tenant with `purpose`, rows identified by
     /// `row_column`.
     pub fn sealed(
         mut self,
@@ -348,33 +351,33 @@ impl Relocation {
         self
     }
 
-    /// Các bảng đã khai.
+    /// The declared tables.
     pub fn tables(&self) -> &[(&'static str, TablePolicy)] {
         &self.tables
     }
 
-    /// Các cột secret đã khai.
+    /// The declared secret columns.
     pub fn sealed_columns(&self) -> &[SealedColumn] {
         &self.sealed
     }
 }
 
-/// Phần module tự làm cho một bảng ([`TablePolicy::Custom`]). Mọi hàm chạy lại được: `copy` chạy
-/// trong transaction ở đích (hỏng thì đích như chưa chép), `clean` trong transaction ở nguồn và chỉ
-/// xoá dòng đã có ở đích.
+/// What a module does itself for one table ([`TablePolicy::Custom`]). Every function is re-runnable: `copy`
+/// runs in a transaction at the target (on failure the target is as if not copied), `clean` in a transaction
+/// at the source and deletes only rows that already exist at the target.
 //
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
 #[async_trait::async_trait]
 pub trait RelocateTable: Send + Sync {
-    /// Số dòng sẽ đi, xung đột, cảnh báo — không đổi gì.
+    /// Number of rows that will go, conflicts, warnings; changes nothing.
     async fn plan(&self, context: &RelocationContext) -> Result<TableReport, Error>;
-    /// Ghi phần của bảng vào đích (qua `target`); trả số dòng đã ghi.
+    /// Writes the table's part to the target (through `target`); returns the number of rows written.
     async fn copy(
         &self,
         context: &RelocationContext,
         target: &DatabaseTransaction,
     ) -> Result<u64, Error>;
-    /// Xoá ở nguồn (qua `source`) phần đã chuyển; trả số dòng đã xoá.
+    /// Deletes at the source (through `source`) the part that has moved; returns the number of rows deleted.
     async fn clean(
         &self,
         context: &RelocationContext,
@@ -382,7 +385,7 @@ pub trait RelocateTable: Send + Sync {
     ) -> Result<u64, Error>;
 }
 
-/// Kế hoạch của một bảng `Custom`.
+/// Plan of one `Custom` table.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct TableReport {
@@ -397,7 +400,7 @@ impl TableReport {
     }
 }
 
-/// Thứ một bảng `Custom` cần biết về lượt tách / gộp.
+/// What a `Custom` table needs to know about the split / merge run.
 #[derive(Clone)]
 pub struct RelocationContext {
     id: Uuid,
@@ -437,12 +440,12 @@ impl RelocationContext {
         }
     }
 
-    /// Bảng cấp khách của hai database (đọc / ghi dòng theo kiểu cột).
+    /// Tenant-level tables of the two databases (read / write rows by column type).
     pub(crate) fn tables(&self) -> &crate::transfer::TenantTables {
         &self.tables
     }
 
-    /// ID của lượt tách / gộp.
+    /// ID of the split / merge run.
     pub fn id(&self) -> Uuid {
         self.id
     }
@@ -451,40 +454,40 @@ impl RelocationContext {
         self.kind
     }
 
-    /// Khách có dữ liệu đi (T khi tách, T' khi gộp).
+    /// The tenant whose data leaves (T on a split, T' on a merge).
     pub fn source_tenant(&self) -> TenantId {
         self.source_tenant
     }
 
-    /// Khách nhận dữ liệu (T' khi tách, T khi gộp).
+    /// The tenant that receives the data (T' on a split, T on a merge).
     pub fn target_tenant(&self) -> TenantId {
         self.target_tenant
     }
 
-    /// Database của khách nguồn.
+    /// Database of the source tenant.
     pub fn source(&self) -> &Database {
         &self.source
     }
 
-    /// Database của khách đích.
+    /// Database of the target tenant.
     pub fn target(&self) -> &Database {
         &self.target
     }
 
-    /// Tách: nút gốc của nhánh (= ID khách mới). Gộp: nút của khách nhận mà gốc của khách bị gộp
-    /// thành con.
+    /// Split: the branch root node (= the new tenant's ID). Merge: the node of the receiving tenant under which
+    /// the root of the merged tenant becomes a child.
     pub fn org(&self) -> OrgId {
         self.org
     }
 
-    /// Tách: `id` là một nút của nhánh, hay khoá chính của một dòng đi / được chép theo chính sách
-    /// chung. Gộp: luôn `true` (mọi thứ của khách bị gộp đi).
+    /// Split: `id` is a node of the branch, or the primary key of a row that goes / is copied under the general
+    /// policy. Merge: always `true` (everything of the merged tenant goes).
     pub fn moved(&self, id: Uuid) -> bool {
         self.kind == RelocationKind::Merge || self.moved.contains(&id)
     }
 
-    /// Điều kiện "dòng của khách nguồn có `column` là một nút của nhánh" (tách), hay "dòng của
-    /// khách nguồn" (gộp). Đọc ở database nguồn.
+    /// Condition "a source tenant row whose `column` is a node of the branch" (split), or "a source tenant row"
+    /// (merge). Read at the source database.
     pub fn branch_condition(&self, column: &str) -> Condition {
         let mine = Condition::all()
             .add(Expr::col(Alias::new("tenant_id")).eq(self.source_tenant.as_uuid()));
@@ -634,7 +637,7 @@ pub struct TenantRelocation {
     pub finished_at: Option<Timestamp>,
 }
 
-/// Lỗi của phần tách / gộp (mã ổn định, bản dịch ở `crates/kernel/locales/vi.json`).
+/// Error of the split / merge part (stable code, translation in `crates/kernel/locales/vi.json`).
 pub(crate) mod errors {
     use crate::error::Error;
 

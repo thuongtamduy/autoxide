@@ -1,10 +1,10 @@
-//! Migration tạo bảng luồng thay đổi `<module>_changes` của một module.
+//! Migration that creates a module's change-feed table `<module>_changes`.
 
 use crate::migration::prelude::*;
 use crate::migration::schema;
 
-/// Migration tạo bảng `<module>_changes` (bước 69 P2). Module khai `sync_resources` thêm nó vào
-/// CUỐI danh sách migration của mình:
+/// Migration that creates the `<module>_changes` table (step 69 P2). A module that declares
+/// `sync_resources` adds it to the END of its migration list:
 ///
 /// ```ignore
 /// autoxide_kernel::sync::changes_migration("m0007_create_changes", "notes"),

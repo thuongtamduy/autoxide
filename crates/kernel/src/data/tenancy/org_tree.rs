@@ -1,25 +1,25 @@
-//! Cây tổ chức trong một khách (bước 34, D-185): trụ sở → vùng → cửa hàng / kho / người bán…
+//! The organization tree within a tenant (step 34, D-185): head office → region → store / warehouse / seller…
 //!
-//! Kernel giữ **cấu trúc** của cây — hai bảng cấp khách hàng, có ở mọi database của đội:
+//! The kernel keeps the **structure** of the tree: two tenant-level tables, present in every database of the fleet:
 //!
-//! - `kernel_org_units`: mỗi nút một dòng — nút cha, độ sâu (gốc = 0), cờ `writable` (`false` khi
-//!   nút không còn hoạt động: chờ duyệt, tạm khoá, lưu trữ).
-//! - `kernel_org_closure`: bảng tổ tiên – con cháu (closure table): mỗi cặp (tổ tiên, con cháu) một
-//!   dòng, kèm khoảng cách; mỗi nút có một dòng tự trỏ khoảng cách 0. Câu "nút X có thuộc nhánh N
-//!   không" hay "mọi bản ghi trong nhánh N" là một câu có index, không đệ quy — chạy như nhau trên
-//!   SQLite và Postgres (không `ltree`, không `WITH RECURSIVE`).
+//! - `kernel_org_units`: one row per node: parent node, depth (root = 0), and the `writable` flag (`false`
+//!   when the node is no longer active: pending approval, suspended, archived).
+//! - `kernel_org_closure`: the ancestor-descendant table (closure table): one row per (ancestor, descendant)
+//!   pair, with the distance; each node has one self-pointing row with distance 0. "Does node X belong to
+//!   branch N" or "every record in branch N" is one indexed statement, with no recursion, behaving the same
+//!   on SQLite and Postgres (no `ltree`, no `WITH RECURSIVE`).
 //!
-//! Phần **nghĩa** của nút (tên, loại, trạng thái, địa chỉ, cài đặt) là của module `organizations`.
-//! Cấu trúc ở kernel vì module khác lọc dữ liệu của mình theo nhánh bằng một subquery trên
-//! `kernel_org_closure` ([`OrgTree::subtree_condition`]) — module không được đọc bảng của module
-//! khác (luật kiến trúc 1), còn kernel thì được.
+//! The **meaning** of a node (name, kind, status, address, settings) belongs to the `organizations` module.
+//! The structure lives in the kernel because other modules filter their data by branch with one subquery on
+//! `kernel_org_closure` ([`OrgTree::subtree_condition`]); a module must not read another module's tables
+//! (architecture rule 1), but the kernel may.
 //!
-//! Nút gốc của khách có ID = ID của khách: dữ liệu cấp khách mang `org_id = tenant_id`, và nâng cấp
-//! dữ liệu cũ chỉ cần gán như vậy.
+//! The root node of a tenant has an ID equal to the tenant's ID: tenant-level data carries
+//! `org_id = tenant_id`, and upgrading old data only needs that assignment.
 //!
-//! Mọi hàm đổi cây gọi [`OrgTree::lock`] (khoá dòng gốc của khách) TRƯỚC mọi dòng khác: dời nút và
-//! đổi trạng thái của cùng khách nối đuôi nhau, không deadlock, không tạo vòng khi hai lệnh dời
-//! chéo nhau chạy cùng lúc.
+//! Every function that changes the tree calls [`OrgTree::lock`] (locks the tenant's root row) BEFORE any
+//! other row: moving a node and changing the status of the same tenant queue up, with no deadlock and no
+//! cycle when two crossing move commands run at once.
 use crate::time::Timestamp;
 use sea_orm::sea_query::{Alias, Condition, Expr, ExprTrait as _, JoinType, Query};
 use sea_orm::{
@@ -33,7 +33,7 @@ use crate::error::{Error, ErrorKind};
 use crate::rows;
 
 pub(crate) mod unit {
-    //! Bảng `kernel_org_units`.
+    //! The `kernel_org_units` table.
     use crate::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
@@ -45,11 +45,11 @@ pub(crate) mod unit {
         pub tenant_id: Uuid,
         #[sea_orm(primary_key, auto_increment = false)]
         pub id: Uuid,
-        /// `None` chỉ ở nút gốc.
+        /// `None` only at the root node.
         pub parent_id: Option<Uuid>,
-        /// Khoảng cách tới gốc (gốc = 0).
+        /// Distance to the root (root = 0).
         pub depth: i32,
-        /// `false` khi nút không hoạt động: nút và cả nhánh dưới nó không ghi được.
+        /// `false` when the node is inactive: neither the node nor its whole branch can be written.
         pub writable: bool,
         pub updated_at: Timestamp,
     }
@@ -58,7 +58,7 @@ pub(crate) mod unit {
 }
 
 pub(crate) mod closure {
-    //! Bảng `kernel_org_closure`.
+    //! The `kernel_org_closure` table.
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -71,32 +71,33 @@ pub(crate) mod closure {
         pub ancestor_id: Uuid,
         #[sea_orm(primary_key, auto_increment = false)]
         pub descendant_id: Uuid,
-        /// Khoảng cách từ tổ tiên tới con cháu (dòng tự trỏ: 0).
+        /// Distance from ancestor to descendant (self-pointing row: 0).
         pub depth: i32,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
 }
 
-/// ID của nút gốc của khách `tenant` (bằng ID của khách).
+/// ID of the root node of tenant `tenant` (equal to the tenant's ID).
 pub const fn root_of(tenant: TenantId) -> OrgId {
     OrgId::from_uuid(tenant.as_uuid())
 }
 
-/// Công cụ cho cấu trúc cây tổ chức. Mọi hàm nhận kết nối của database chứa dữ liệu của khách
-/// (`tenant.database()`); hàm đổi cây nhận transaction GHI (`Database::begin_write`).
+/// Tool for the organization tree structure. Every function takes a connection to the database that holds the
+/// tenant's data (`tenant.database()`); functions that change the tree take a WRITE transaction
+/// (`Database::begin_write`).
 pub struct OrgTree;
 
 impl OrgTree {
-    /// Khoá dòng gốc của khách tới hết `transaction`: mọi lệnh đổi cây của cùng khách nối đuôi
-    /// nhau. Gọi trước mọi dòng khác. Khách chưa có gốc thì không khoá gì (trên SQLite quyền ghi
-    /// cả database đã giữ từ đầu transaction).
+    /// Locks the tenant's root row until the end of `transaction`: every tree-changing command of the same
+    /// tenant queues up. Call before any other row. A tenant with no root yet locks nothing (on SQLite the
+    /// write permission on the whole database is held from the start of the transaction).
     pub async fn lock<C: ConnectionTrait>(transaction: &C, tenant: TenantId) -> Result<(), Error> {
         rows::lock_one(transaction, unit_by_id(tenant, root_of(tenant))).await?;
         Ok(())
     }
 
-    /// Tạo nút gốc của khách (ID = ID của khách) nếu chưa có; chạy lại được.
+    /// Creates the tenant's root node (ID = the tenant's ID) if missing; re-runnable.
     pub async fn insert_root<C: ConnectionTrait>(
         transaction: &C,
         tenant: TenantId,
@@ -110,9 +111,9 @@ impl OrgTree {
         Ok(root)
     }
 
-    /// Thêm nút `id` dưới `parent`; cây sâu quá `max_depth` cấp (gốc = 0) thì
-    /// `org_depth_exceeded`. Nút mới ghi được; nút chưa hoạt động thì gọi thêm
-    /// [`set_writable`](Self::set_writable) trong cùng transaction.
+    /// Adds node `id` under `parent`; a tree deeper than `max_depth` levels (root = 0) gives
+    /// `org_depth_exceeded`. A new node is writable; for an inactive node, also call
+    /// [`set_writable`](Self::set_writable) in the same transaction.
     pub async fn insert<C: ConnectionTrait>(
         transaction: &C,
         tenant: TenantId,
@@ -143,8 +144,8 @@ impl OrgTree {
         Ok(())
     }
 
-    /// Dời nút `id` (cùng cả nhánh dưới nó) sang dưới `new_parent`. Gốc không dời được
-    /// (`org_root_immutable`); dời vào chính nó hay nhánh của nó → `org_cycle`; cây sâu quá
+    /// Moves node `id` (with its whole branch) under `new_parent`. The root cannot be moved
+    /// (`org_root_immutable`); moving into itself or its own branch → `org_cycle`; a tree deeper than
     /// `max_depth` → `org_depth_exceeded`.
     pub async fn move_subtree<C: ConnectionTrait>(
         transaction: &C,
@@ -263,7 +264,7 @@ impl OrgTree {
         Ok(())
     }
 
-    /// Đặt cờ ghi được của nút `id` (module `organizations` gọi khi trạng thái nút đổi).
+    /// Sets the writable flag of node `id` (the `organizations` module calls it when the node status changes).
     pub async fn set_writable<C: ConnectionTrait>(
         transaction: &C,
         tenant: TenantId,
@@ -278,8 +279,8 @@ impl OrgTree {
         Ok(())
     }
 
-    /// Chuỗi tổ tiên của nút `id`, **gồm chính nó**, gần nhất trước, gốc cuối cùng. Rỗng khi nút
-    /// không có trong cây.
+    /// The ancestor chain of node `id`, **including itself**, nearest first, root last. Empty when the node
+    /// is not in the tree.
     pub async fn ancestors<C: ConnectionTrait>(
         connection: &C,
         tenant: TenantId,
@@ -294,7 +295,7 @@ impl OrgTree {
         Ok(rows.into_iter().map(|row| OrgId::from_uuid(row.ancestor_id)).collect())
     }
 
-    /// Nút `id` có thuộc nhánh của một trong `roots` (gồm chính các nút đó) không.
+    /// Whether node `id` belongs to the branch of one of `roots` (including those nodes themselves).
     pub async fn is_within<C: ConnectionTrait>(
         connection: &C,
         tenant: TenantId,
@@ -313,14 +314,14 @@ impl OrgTree {
         Ok(count > 0)
     }
 
-    /// `Ok` khi nút `id` và mọi tổ tiên của nó ghi được; không thì `org_frozen`. Nút không có
-    /// trong cây (khách chưa dựng cây) coi như ghi được. Gọi TRONG transaction ghi của module —
-    /// kiểm trước rồi mới mở transaction thì có khe giữa hai lúc.
+    /// `Ok` when node `id` and all its ancestors are writable; otherwise `org_frozen`. A node not in the tree
+    /// (the tenant has not built a tree) counts as writable. Call INSIDE the module's write transaction:
+    /// checking first and then opening the transaction leaves a gap between the two moments.
     ///
-    /// Postgres: các dòng của chuỗi tổ tiên được khoá chia sẻ (`FOR SHARE`) tới hết transaction,
-    /// nên lệnh khoá nút ([`set_writable`](Self::set_writable)) chờ mọi lệnh ghi đang dở xong; lệnh
-    /// ghi bắt đầu sau khi lệnh khoá commit thì thấy cờ mới. SQLite: transaction ghi đã giữ quyền
-    /// ghi cả database.
+    /// Postgres: the rows of the ancestor chain are share-locked (`FOR SHARE`) until the transaction ends, so
+    /// a node-locking command ([`set_writable`](Self::set_writable)) waits for every write in progress to
+    /// finish; a write that starts after the locking command commits sees the new flag. SQLite: the write
+    /// transaction already holds the write permission on the whole database.
     pub async fn ensure_writable<C: ConnectionTrait>(
         connection: &C,
         tenant: TenantId,
@@ -348,9 +349,10 @@ impl OrgTree {
         Ok(())
     }
 
-    /// Như [`ensure_writable`](Self::ensure_writable) nhưng chỉ đọc, không khoá — cho chỗ không có
-    /// transaction ghi (kiểm sớm trước khi mở transaction, kết nối đọc). Không chặn được lệnh khoá
-    /// nút xen giữa: lệnh ghi thật vẫn nên kiểm lại bằng `ensure_writable` trong transaction.
+    /// Like [`ensure_writable`](Self::ensure_writable) but read-only, no lock: for places with no write
+    /// transaction (an early check before opening a transaction, read connections). It cannot block a
+    /// node-locking command in between: the actual write should still re-check with `ensure_writable` inside
+    /// the transaction.
     pub async fn ensure_writable_unlocked<C: ConnectionTrait>(
         connection: &C,
         tenant: TenantId,
@@ -374,9 +376,9 @@ impl OrgTree {
         Ok(())
     }
 
-    /// Mọi cặp (tổ tiên, con cháu) của cây của khách, kể cả cặp tự trỏ của mỗi nút — cho phép tính
-    /// gộp theo cây trong bộ nhớ bằng một câu (vd số người làm được ở mỗi nút). Số dòng = số nút ×
-    /// độ sâu trung bình.
+    /// Every (ancestor, descendant) pair of the tenant's tree, including each node's self-pointing pair; lets
+    /// in-memory tree aggregation be computed with one statement (e.g. the number of staff at each node).
+    /// Row count = nodes × average depth.
     pub async fn pairs<C: ConnectionTrait>(
         connection: &C,
         tenant: TenantId,
@@ -397,10 +399,10 @@ impl OrgTree {
             .collect())
     }
 
-    /// Mọi nút trong nhánh của một trong `roots` (gồm chính các nút đó), không trùng — cho chỗ phải
-    /// lọc theo nhánh ở một database KHÁC database chứa cây (vd kho báo cáo gộp ở database của
-    /// khách gốc, bước 38), nơi subquery của [`subtree_condition`](Self::subtree_condition) không
-    /// chạy được.
+    /// Every node in the branch of one of `roots` (including those nodes themselves), without duplicates; for
+    /// places that must filter by branch in a database OTHER than the one holding the tree (e.g. a combined
+    /// reporting store in the root tenant's database, step 38), where the subquery of
+    /// [`subtree_condition`](Self::subtree_condition) cannot run.
     pub async fn descendants<C: ConnectionTrait>(
         connection: &C,
         tenant: TenantId,
@@ -421,9 +423,9 @@ impl OrgTree {
         Ok(rows.into_iter().map(OrgId::from_uuid).collect())
     }
 
-    /// Điều kiện SeaORM "cột `column` là một nút trong nhánh của một trong `roots`": `column IN
+    /// SeaORM condition "column `column` is a node in the branch of one of `roots`": `column IN
     /// (SELECT descendant_id FROM kernel_org_closure WHERE tenant_id = … AND ancestor_id IN …)`.
-    /// Một subquery có index, không đổ danh sách ID ra bộ nhớ.
+    /// One indexed subquery, without pouring the ID list into memory.
     pub fn subtree_condition<Col: ColumnTrait>(
         tenant: TenantId,
         roots: &[OrgId],
@@ -439,9 +441,9 @@ impl OrgTree {
     }
 }
 
-/// Khuôn "giá trị kế thừa theo cây": giá trị của nút gần nhất có giá trị. `ancestors` gần nhất
-/// trước (như [`OrgTree::ancestors`]), `values` là các cặp (nút, giá trị) đã đặt. Trả nút nguồn
-/// kèm giá trị.
+/// Template for "tree-inherited value": the value of the nearest node that has a value. `ancestors` nearest
+/// first (as [`OrgTree::ancestors`]), `values` are the (node, value) pairs already set. Returns the source
+/// node together with the value.
 pub fn nearest<T>(
     ancestors: &[OrgId],
     values: impl IntoIterator<Item = (OrgId, T)>,
@@ -547,8 +549,8 @@ fn cycle() -> Error {
     )
 }
 
-/// Lỗi `org_root_immutable` (409): nút gốc không dời, khoá hay lưu trữ được. Module quản lý cây
-/// dùng chung mã này.
+/// Error `org_root_immutable` (409): the root node cannot be moved, locked or archived. Modules that manage
+/// the tree share this code.
 pub fn root_immutable() -> Error {
     Error::conflict(
         "org_root_immutable",
@@ -556,7 +558,7 @@ pub fn root_immutable() -> Error {
     )
 }
 
-/// Migration tạo hai bảng của cây (module nội bộ `kernel`, cấp khách hàng).
+/// Migration that creates the two tree tables (internal `kernel` module, tenant level).
 pub(crate) struct CreateOrgTree;
 
 mod migration {

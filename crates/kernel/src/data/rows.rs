@@ -1,26 +1,26 @@
-//! Khoá dòng và cập nhật có điều kiện — một cách cho mọi module khi nhiều request cùng sửa một
-//! dòng (D-181).
+//! Row locks and conditional updates: one way for every module when several requests edit the same row
+//! (D-181).
 //!
-//! Hai công cụ, chạy như nhau trên SQLite và Postgres:
+//! Two tools, behaving the same on SQLite and Postgres:
 //!
-//! - [`lock`] / [`lock_one`]: đọc các dòng và **khoá chúng tới hết transaction ghi**. Postgres:
-//!   `SELECT … FOR UPDATE` — transaction khác muốn khoá hay sửa cùng dòng phải chờ transaction
-//!   này xong, rồi thấy giá trị mới. SQLite: câu `SELECT` thường là đủ, vì mọi transaction ghi
-//!   mở bằng [`Database::begin_write`](crate::database::Database::begin_write) (`BEGIN
-//!   IMMEDIATE`) giữ quyền ghi cả database từ đầu tới cuối — không ai chen vào được.
-//!   Dùng khi phải đọc, xét rồi mới ghi (kiểm vòng lặp trong cây, kiểm quyền còn hiệu lực…).
-//! - [`adjust`]: **cộng / trừ có điều kiện trong một câu** — `UPDATE … SET c = c + Δ WHERE …`
-//!   kèm điều kiện kết quả nằm trong giới hạn — rồi đếm số dòng bị đổi. Đây là cách chuẩn để trừ số dư: không đọc
-//!   trước, nên không có khoảng hở giữa lúc đọc và lúc ghi; số dư không bao giờ xuống dưới mức
-//!   sàn, và không bao giờ tràn `i64` (SQLite đổi số nguyên tràn thành số thực một cách âm thầm;
-//!   Postgres báo lỗi — chặn trước bằng điều kiện thì hai bên như nhau).
+//! - [`lock`] / [`lock_one`]: read rows and **lock them until the write transaction ends**. Postgres:
+//!   `SELECT … FOR UPDATE`; another transaction that wants to lock or edit the same row waits for this one
+//!   to finish, then sees the new value. SQLite: a plain `SELECT` is enough, because every write transaction
+//!   opened with [`Database::begin_write`](crate::database::Database::begin_write) (`BEGIN
+//!   IMMEDIATE`) holds the write permission on the whole database from start to end, so nobody can interleave.
+//!   Use it when you must read, check, then write (loop check in a tree, check a permission is still valid…).
+//! - [`adjust`]: **conditional add / subtract in a single statement**: `UPDATE … SET c = c + Δ WHERE …`
+//!   with a condition that the result stays within bounds, then count the rows changed. This is the standard
+//!   way to deduct a balance: no prior read, so no gap between read and write; the balance never drops below
+//!   the floor and never overflows `i64` (SQLite silently turns an overflowing integer into a float;
+//!   Postgres raises an error; guarding with the condition makes both behave the same).
 //!
-//! - [`lock_key`]: khoá theo tên tới hết transaction ghi, khi không có dòng ổn định để khoá.
+//! - [`lock_key`]: lock by name until the write transaction ends, when there is no stable row to lock.
 //!
-//! Thứ tự khoá chống deadlock: khi một transaction khoá nhiều dòng, luôn khoá theo cùng một thứ
-//! tự (vd ID tăng dần — [`lock`] làm vậy khi được giao cột sắp xếp), và khoá trước khi ghi.
-//! Hai transaction khoá A rồi B và B rồi A sẽ chờ nhau mãi; Postgres phát hiện và huỷ một bên
-//! với lỗi `40P01` (xem [`Database::write_with_retry`](crate::database::Database::write_with_retry)).
+//! Lock order against deadlock: when a transaction locks several rows, always lock in the same order (e.g.
+//! ascending ID; [`lock`] does so when given an order column), and lock before writing. Two transactions that
+//! lock A then B and B then A would wait for each other forever; Postgres detects it and cancels one side
+//! with error `40P01` (see [`Database::write_with_retry`](crate::database::Database::write_with_retry)).
 
 use sea_orm::sea_query::{Expr, ExprTrait as _, IntoCondition};
 use sea_orm::{
@@ -29,12 +29,12 @@ use sea_orm::{
 };
 use sha2::{Digest as _, Sha256};
 
-/// Đọc và khoá mọi dòng `select` chọn, tới hết `transaction`. `order` là cột sắp xếp khi khoá
-/// (thường là khoá chính): nhiều transaction khoá cùng nhóm dòng theo cùng thứ tự thì không
-/// deadlock. `transaction` phải là transaction GHI (`Database::begin_write`): trên Postgres
-/// transaction chỉ đọc từ chối `FOR UPDATE`, và ngoài transaction thì khoá nhả ngay sau câu lệnh
-/// (nhận kiểu `ConnectionTrait` chung để hàm dùng chung được cả `&DatabaseTransaction` lẫn
-/// `&C` của hàm gọi nó).
+/// Reads and locks every row that `select` picks, until the end of `transaction`. `order` is the sort column
+/// used while locking (usually the primary key): several transactions that lock the same group of rows in
+/// the same order do not deadlock. `transaction` must be a WRITE transaction (`Database::begin_write`): on
+/// Postgres a read-only transaction rejects `FOR UPDATE`, and outside a transaction the lock is released
+/// right after the statement (it takes the generic `ConnectionTrait` type so the function works with both
+/// `&DatabaseTransaction` and the `&C` of its caller).
 pub async fn lock<E: EntityTrait, C: ConnectionTrait>(
     transaction: &C,
     select: Select<E>,
@@ -45,9 +45,10 @@ pub async fn lock<E: EntityTrait, C: ConnectionTrait>(
     select.order_by_asc(order).lock_exclusive().all(transaction).await
 }
 
-/// Đọc và khoá dòng `select` chọn (tối đa một dòng, vd `Entity::find_by_id(id)` kèm điều kiện),
-/// tới hết `transaction`. `None`: không có dòng nào khớp — kể cả khi dòng vừa bị transaction
-/// khác đổi để không còn khớp (Postgres chờ transaction đó xong rồi xét lại điều kiện).
+/// Reads and locks the row that `select` picks (at most one row, e.g. `Entity::find_by_id(id)` with a
+/// condition), until the end of `transaction`. `None`: no row matches, including when the row was just
+/// changed by another transaction so it no longer matches (Postgres waits for that transaction to finish,
+/// then re-evaluates the condition).
 pub async fn lock_one<E: EntityTrait, C: ConnectionTrait>(
     transaction: &C,
     select: Select<E>,
@@ -55,12 +56,13 @@ pub async fn lock_one<E: EntityTrait, C: ConnectionTrait>(
     select.lock_exclusive().one(transaction).await
 }
 
-/// Đọc dòng `select` chọn (tối đa một dòng) và giữ **khoá chia sẻ** tới hết `transaction` (bước 36):
-/// nhiều transaction cùng giữ khoá chia sẻ trên một dòng được, nhưng bên muốn [`lock_one`] (khoá độc
-/// quyền) hay sửa dòng đó phải chờ chúng xong. Vd mọi bút toán giữ khoá chia sẻ trên dòng kỳ kế toán,
-/// còn khoá sổ khoá độc quyền: khoá sổ chờ các bút toán đang ghi, bút toán mới chờ khoá sổ xong rồi
-/// thấy kỳ đã khoá. Postgres: `SELECT … FOR SHARE`. SQLite: câu `SELECT` thường (mọi transaction ghi
-/// đã giữ quyền ghi cả database — xem đầu file).
+/// Reads the row that `select` picks (at most one) and holds a **shared lock** until the end of `transaction`
+/// (step 36): several transactions can hold a shared lock on one row, but a party that wants [`lock_one`]
+/// (exclusive lock) or to edit that row waits for them to finish. For example every journal entry holds a
+/// shared lock on the accounting period row while closing the books takes an exclusive lock: closing waits
+/// for entries being written, and a new entry waits for the close to finish, then sees the period locked.
+/// Postgres: `SELECT … FOR SHARE`. SQLite: a plain `SELECT` (every write transaction already holds the write
+/// permission on the whole database; see the top of the file).
 pub async fn lock_one_shared<E: EntityTrait, C: ConnectionTrait>(
     transaction: &C,
     select: Select<E>,
@@ -68,18 +70,19 @@ pub async fn lock_one_shared<E: EntityTrait, C: ConnectionTrait>(
     select.lock_shared().one(transaction).await
 }
 
-/// Khoá **theo tên** tới hết `transaction` ghi: hai transaction khoá cùng `key` thì bên sau chờ bên
-/// trước commit / rollback. Dùng khi việc cần tuần tự hoá không gắn với một dòng có sẵn — vd "mọi
-/// lần tính lại của (khách, ngôn ngữ)" khi chưa có dòng nào, hay khi các dòng bị xoá / chèn lại
-/// (đổi ID) giữa chừng nên khoá dòng không còn chắc trúng. Sau khi có khoá, đọc lại mọi thứ cần
-/// xét: câu đọc mới thấy những gì transaction trước đã commit.
+/// Locks **by name** until the end of the write `transaction`: when two transactions lock the same `key`,
+/// the later one waits for the earlier one to commit / roll back. Use it when the work to serialize is not
+/// tied to an existing row, e.g. "every recompute of (tenant, language)" when no row exists yet, or when rows
+/// are deleted / re-inserted (ID changes) midway so a row lock no longer reliably hits. After taking the
+/// lock, re-read everything you need to check: a fresh read sees what earlier transactions committed.
 ///
-/// Postgres: `pg_advisory_xact_lock` với số 64 bit lấy từ SHA-256 của `key` (trùng số giữa hai tên
-/// khác nhau chỉ làm chờ thừa, không sai). SQLite: không làm gì — transaction ghi mở bằng
-/// [`Database::begin_write`](crate::database::Database::begin_write) (`BEGIN IMMEDIATE`) đã giữ
-/// quyền ghi cả database. `transaction` phải là transaction GHI (ngoài transaction, khoá Postgres
-/// nhả ngay sau câu lệnh). Một transaction giữ nhiều khoá thì luôn lấy theo cùng thứ tự (vd tên
-/// tăng dần) để không deadlock. Đặt tên có tiền tố module (`catalog.similar:<…>`).
+/// Postgres: `pg_advisory_xact_lock` with a 64-bit number taken from the SHA-256 of `key` (a collision
+/// between two different names only causes an unneeded wait, not a wrong result). SQLite: does nothing; the
+/// write transaction opened with [`Database::begin_write`](crate::database::Database::begin_write)
+/// (`BEGIN IMMEDIATE`) already holds the write permission on the whole database. `transaction` must be a
+/// WRITE transaction (outside a transaction, the Postgres lock is released right after the statement). A
+/// transaction that holds several locks always takes them in the same order (e.g. ascending name) to avoid
+/// deadlock. Prefix the name with the module (`catalog.similar:<…>`).
 pub async fn lock_key<C: ConnectionTrait>(transaction: &C, key: &str) -> Result<(), DbErr> {
     let backend = transaction.get_database_backend();
     if backend != DbBackend::Postgres {
@@ -95,7 +98,7 @@ pub async fn lock_key<C: ConnectionTrait>(transaction: &C, key: &str) -> Result<
     Ok(())
 }
 
-/// Số khoá advisory của `key`: 8 byte đầu của SHA-256 — như nhau trên mọi máy và mọi phiên bản.
+/// Advisory lock number of `key`: the first 8 bytes of its SHA-256, identical on every machine and version.
 fn key_number(key: &str) -> i64 {
     let digest = Sha256::digest(key.as_bytes());
     let mut bytes = [0u8; 8];
@@ -103,7 +106,7 @@ fn key_number(key: &str) -> i64 {
     i64::from_be_bytes(bytes)
 }
 
-/// Giới hạn cho [`adjust`]: giá trị của cột SAU khi cộng phải nằm trong `[floor, ceiling]`.
+/// Bounds for [`adjust`]: the column value AFTER the addition must be within `[floor, ceiling]`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Bounds {
     pub floor: i64,
@@ -111,22 +114,23 @@ pub struct Bounds {
 }
 
 impl Bounds {
-    /// Không âm: `[0, i64::MAX]` — số dư không được xuống dưới 0.
+    /// Non-negative: `[0, i64::MAX]`; the balance must not drop below 0.
     pub const NON_NEGATIVE: Bounds = Bounds { floor: 0, ceiling: i64::MAX };
-    /// Chỉ chặn tràn: `[i64::MIN, i64::MAX]` (vd số dư được phép âm tới hạn mức riêng — khi đó
-    /// đặt `floor` là hạn mức).
+    /// Overflow guard only: `[i64::MIN, i64::MAX]` (e.g. a balance allowed to go negative down to its own
+    /// limit; then set `floor` to that limit).
     pub const ANY: Bounds = Bounds { floor: i64::MIN, ceiling: i64::MAX };
 }
 
-/// Cộng `delta` (âm là trừ) vào cột số nguyên `column` của các dòng khớp `filter`, chỉ ở dòng
-/// mà kết quả nằm trong `bounds`. Trả số dòng đã đổi — với một dòng theo ID: `1` là đã trừ /
-/// cộng, `0` là không có dòng đó hoặc không đủ (service tự phân biệt nếu cần, vd đọc lại).
+/// Adds `delta` (negative to subtract) to the integer column `column` of the rows matching `filter`, only on
+/// rows where the result stays within `bounds`. Returns the number of rows changed; for one row by ID, `1`
+/// means deducted / added and `0` means the row does not exist or the amount is insufficient (the service
+/// tells them apart if needed, e.g. by re-reading).
 ///
-/// Một câu `UPDATE`, không đọc trước: hai request trừ cùng lúc trên Postgres nối đuôi nhau ở
-/// dòng đó (request sau xét lại điều kiện trên giá trị mới), trên SQLite vốn một bên ghi.
+/// A single `UPDATE` statement, no prior read: on Postgres two concurrent deductions on that row queue up
+/// (the later request re-evaluates the condition on the new value); on SQLite there is only one writer anyway.
 ///
 /// ```ignore
-/// // Trừ 500 khỏi số dư của ví `id`, không cho âm.
+/// // Deduct 500 from the balance of wallet `id`, not allowing negative.
 /// let changed = rows::adjust::<wallet::Entity, _>(
 ///     &transaction, wallet::Column::BalanceMinor, wallet::Column::Id.eq(id), -500,
 ///     Bounds::NON_NEGATIVE,

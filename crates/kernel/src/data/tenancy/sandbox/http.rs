@@ -1,5 +1,5 @@
-//! REST của sandbox (D-232), dưới `/api/v1/kernel`. Handler chỉ: lấy dữ liệu vào → gọi service →
-//! trả envelope; quyền và phạm vi do service kiểm.
+//! REST of the sandbox (D-232), under `/api/v1/kernel`. A handler only: takes input → calls the service →
+//! returns the envelope; the service checks permission and scope.
 
 use std::sync::Arc;
 

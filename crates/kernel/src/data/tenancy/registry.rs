@@ -1,22 +1,23 @@
-//! Sổ database (đặc tả 33 "Sổ kết nối"): database điều khiển (`DATABASE_URL`, placement `main`) và
-//! các placement khác, mở lười, tối đa `AUTOXIDE_TENANCY_MAX_OPEN_DATABASES` pool cùng lúc.
+//! Database registry (spec 33 "Connection registry"): the control database (`DATABASE_URL`, placement `main`)
+//! and the other placements, opened lazily, at most `AUTOXIDE_TENANCY_MAX_OPEN_DATABASES` pools at once.
 //!
-//! - Chế độ `single`: mọi thứ là khách mặc định trên database điều khiển; không truy vấn gì thêm —
-//!   đường nóng như trước bước 33.
-//! - Chế độ `multi`: tra khách theo ID / slug / tên miền qua bảng mặt điều khiển, kết quả giữ trong
-//!   cache có TTL (`AUTOXIDE_TENANCY_CACHE_SECONDS`); sửa khách trên máy chủ này thì
-//!   [`DatabaseRegistry::invalidate`] ngay, máy chủ khác thấy sau tối đa TTL.
-//! - URL kết nối của placement lưu mã hoá (`Sealer`, mục đích [`PLACEMENT_URL`], gắn với ID
-//!   placement); sổ mở bằng khoá gốc của chương trình — module `kernel` đưa khoá vào lúc khởi
-//!   động ([`DatabaseRegistry::use_secret_key`]).
-//! - Khách trên placement có `schema_state` khác `ready` mang `schema_ready = false` → nhận
-//!   `tenant_maintenance` (đặc tả 33); khách nơi khác chạy bình thường.
-//! - Placement có nơi lưu file riêng (`storage_sealed`, mã hoá, mục đích [`PLACEMENT_STORAGE`]):
-//!   ngữ cảnh khách mang nơi lưu đó ([`TenantContext::own_storage`]); client nơi lưu giữ trong cache
-//!   theo placement, dựng lại khi giá trị đã lưu đổi. Bộ mở nơi lưu (`dyn StorageOpener`) và nơi lưu
-//!   chung do module `files` công bố ([`DatabaseRegistry::use_storage`]).
-//! - Pool ít dùng nhất bị bỏ khỏi sổ khi cần chỗ; request đang giữ bản clone của nó vẫn chạy tới
-//!   xong (pool tự đóng khi không còn bản clone nào) — không bao giờ gọi `close()` ở đây.
+//! - `single` mode: everything is the default tenant on the control database; no extra queries, so the hot
+//!   path is as before step 33.
+//! - `multi` mode: looks up a tenant by ID / slug / domain through control-plane tables, keeping results in a
+//!   cache with a TTL (`AUTOXIDE_TENANCY_CACHE_SECONDS`); when a tenant is edited on this server,
+//!   [`DatabaseRegistry::invalidate`] runs at once, and other servers see it after at most the TTL.
+//! - The connection URL of a placement is stored encrypted (`Sealer`, purpose [`PLACEMENT_URL`], bound to the
+//!   placement ID); the registry opens with the program root key, which the `kernel` module supplies at
+//!   startup ([`DatabaseRegistry::use_secret_key`]).
+//! - A tenant on a placement whose `schema_state` is not `ready` carries `schema_ready = false` and receives
+//!   `tenant_maintenance` (spec 33); tenants elsewhere run normally.
+//! - A placement with its own file storage (`storage_sealed`, encrypted, purpose [`PLACEMENT_STORAGE`]): the
+//!   tenant context carries that storage ([`TenantContext::own_storage`]); the storage client is cached per
+//!   placement and rebuilt when the stored value changes. The storage opener (`dyn StorageOpener`) and the
+//!   shared storage are published by the `files` module ([`DatabaseRegistry::use_storage`]).
+//! - The least recently used pool is dropped from the registry when room is needed; a request holding a clone
+//!   of it keeps running to completion (the pool closes itself when no clone remains); never call `close()`
+//!   here.
 
 use crate::time::Timestamp;
 use std::collections::HashMap;
@@ -37,15 +38,15 @@ use crate::error::Error;
 use crate::secret::SecretKey;
 use crate::storage::{Storage, StorageLocation, StorageOpener, UnavailableStorage};
 
-/// Mục đích (AAD của `Sealer`) của URL kết nối placement; dòng là ID placement.
+/// Purpose (AAD of `Sealer`) of the placement connection URL; the row is the placement ID.
 pub const PLACEMENT_URL: &str = "kernel.placement_url";
-/// Mục đích của URL đọc (read replica) của placement.
+/// Purpose of the read URL (read replica) of a placement.
 pub const PLACEMENT_READ_URL: &str = "kernel.placement_read_url";
-/// Mục đích của nơi lưu file riêng của placement (JSON của [`StorageLocation`]); dòng là ID placement.
+/// Purpose of the placement's own file storage (JSON of [`StorageLocation`]); the row is the placement ID.
 pub const PLACEMENT_STORAGE: &str = "kernel.placement_storage";
 
-/// Một nơi lưu file và khách dùng nó (job dọn file mồ côi quét từng nơi): nơi lưu chung
-/// (`placement = None`) hay nơi lưu riêng của một placement.
+/// A file storage and the tenants that use it (the orphan-file cleanup job scans each storage): the shared
+/// storage (`placement = None`) or a placement's own storage.
 #[derive(Clone)]
 pub struct FileStore {
     pub placement: Option<PlacementId>,
@@ -53,24 +54,24 @@ pub struct FileStore {
 }
 
 impl FileStore {
-    /// Khách `tenant` lưu file ở đây (khoá của khách khác tìm thấy ở đây — vd bản sao còn sót sau
-    /// khi dời — không phải việc của lần quét này).
+    /// Tenant `tenant` stores files here (keys of other tenants found here, e.g. copies left over after a
+    /// move, are not the concern of this scan).
     pub fn serves(&self, tenant: &TenantContext) -> bool {
         tenant.storage_placement() == self.placement
     }
 }
 
-/// Nơi lưu riêng đã mở và giá trị đã lưu (mã hoá) dùng để dựng nó: giá trị trong bảng đổi (máy chủ
-/// khác đổi nơi lưu) thì dựng lại.
+/// An opened own storage and the stored (encrypted) value used to build it: when the value in the table
+/// changes (another server changed the storage), it is rebuilt.
 type OpenStore = (String, Arc<dyn Storage>);
 
-/// Nơi lưu chung và bộ mở nơi lưu riêng (module `files` công bố; điền sau khi mọi module khởi động).
+/// The shared storage and the opener for own storage (published by the `files` module; filled after every module starts).
 struct StorageSlot {
     shared: Option<Arc<dyn Storage>>,
     opener: Option<Arc<dyn StorageOpener>>,
 }
 
-/// Một khách cấp dưới (xem [`DatabaseRegistry::tenant_descendants`]).
+/// A descendant tenant (see [`DatabaseRegistry::tenant_descendants`]).
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct ChildTenant {
@@ -82,7 +83,7 @@ pub struct ChildTenant {
     pub status: String,
 }
 
-/// Sổ database của bản cài. Clone rẻ (bên trong là `Arc`).
+/// Database registry of the installation. Cheap to clone (it holds an `Arc` inside).
 #[derive(Clone)]
 pub struct DatabaseRegistry(Arc<Inner>);
 
@@ -90,22 +91,22 @@ struct Inner {
     mode: TenancyMode,
     config: TenancyConfig,
     control: Database,
-    /// Cấu hình của database điều khiển: mẫu khi mở placement khác (thời gian chờ…).
+    /// Configuration of the control database: the template used when opening other placements (timeouts…).
     base: Option<DatabaseConfig>,
     default: TenantContext,
     tenants: Mutex<HashMap<TenantId, (Instant, TenantContext)>>,
     slugs: Mutex<HashMap<String, (Instant, TenantId)>>,
-    /// Tên miền → (khách, nút gắn với tên miền) đã xác minh; `None`: không có.
+    /// Domain → (tenant, node bound to the domain) verified; `None`: none.
     domains: Mutex<HashMap<String, (Instant, Option<DomainSite>)>>,
     pools: Mutex<Pools>,
-    /// Khoá gốc để mở URL placement đã mã hoá; module `kernel` đặt lúc khởi động.
+    /// Root key used to open encrypted placement URLs; the `kernel` module sets it at startup.
     secret: OnceLock<SecretKey>,
-    /// Nơi lưu chung và bộ mở nơi lưu riêng; điền sau khi mọi module khởi động.
+    /// Shared storage and the opener for own storage; filled after every module starts.
     storage: OnceLock<StorageSlot>,
-    /// Nơi lưu riêng đã mở, theo placement, kèm giá trị đã lưu (mã hoá) dùng để dựng nó.
+    /// Own storages already opened, by placement, with the stored (encrypted) value used to build each.
     stores: Mutex<HashMap<PlacementId, OpenStore>>,
-    /// Chỉ một bên mở pool của placement cùng lúc (hai request cùng cần một placement chưa mở
-    /// thì bên sau dùng pool bên trước vừa mở).
+    /// Only one party opens a placement pool at a time (if two requests need the same unopened placement,
+    /// the later one uses the pool the earlier one just opened).
     opening: tokio::sync::Mutex<()>,
 }
 
@@ -121,22 +122,22 @@ impl std::fmt::Debug for DatabaseRegistry {
     }
 }
 
-/// Khách và nút (website) của một tên miền đã xác minh.
+/// Tenant and node (website) of a verified domain.
 type DomainSite = (TenantId, Option<OrgId>);
 
-/// Khoá `mutex` dù một thread khác đã panic lúc giữ nó: dữ liệu bên trong chỉ là cache.
+/// Locks `mutex` even if another thread panicked while holding it: the data inside is only a cache.
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
 impl DatabaseRegistry {
-    /// Sổ của chế độ `single`: mọi request là khách mặc định trên `control`.
+    /// Registry of `single` mode: every request is the default tenant on `control`.
     pub fn single(control: Database) -> Self {
         Self::build(control, None, TenancyConfig::default())
     }
 
-    /// Sổ theo `config`: `base` là cấu hình của database điều khiển (`DATABASE_URL`), dùng làm mẫu
-    /// khi mở placement khác.
+    /// Registry according to `config`: `base` is the configuration of the control database
+    /// (`DATABASE_URL`), used as the template when opening other placements.
     pub fn new(control: Database, base: DatabaseConfig, config: TenancyConfig) -> Self {
         Self::build(control, Some(base), config)
     }
@@ -167,14 +168,15 @@ impl DatabaseRegistry {
         &self.0.config
     }
 
-    /// Database điều khiển (placement `main`): bảng mặt điều khiển và dữ liệu của khách mặc định.
+    /// The control database (placement `main`): the control-plane tables and the default tenant's data.
     pub fn control(&self) -> &Database {
         &self.0.control
     }
 
-    /// Các khách cấp trên của khách `id` (chuỗi khách cha – con, bước 34): khách cha trước, tới
-    /// khách gốc của chuỗi. Rỗng khi không có cha hay không có khách này. Đọc ở database điều
-    /// khiển, mỗi cấp một câu (chuỗi ngắn); dừng ở 16 cấp để dữ liệu hỏng không lặp mãi.
+    /// The ancestor tenants of tenant `id` (the parent-child tenant chain, step 34): the parent first, up to
+    /// the root tenant of the chain. Empty when there is no parent or no such tenant. Read at the control
+    /// database, one statement per level (short chains); stops at 16 levels so corrupt data cannot loop
+    /// forever.
     pub async fn tenant_ancestors(&self, id: TenantId) -> Result<Vec<TenantId>, Error> {
         use sea_orm::EntityTrait;
         let mut found = Vec::new();
@@ -193,8 +195,9 @@ impl DatabaseRegistry {
         Ok(found)
     }
 
-    /// Mọi khách cấp dưới của khách `id` (con, cháu…), theo từng tầng, mỗi tầng một câu; dừng ở 16
-    /// tầng như [`tenant_ancestors`](Self::tenant_ancestors). Trả `(id, khách cha, slug, tên, trạng thái)`.
+    /// Every descendant tenant of tenant `id` (child, grandchild…), level by level, one statement per level;
+    /// stops at 16 levels like [`tenant_ancestors`](Self::tenant_ancestors). Returns `(id, parent tenant,
+    /// slug, name, status)`.
     pub async fn tenant_descendants(&self, id: TenantId) -> Result<Vec<ChildTenant>, Error> {
         use super::admin::tenant;
         use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
@@ -229,7 +232,7 @@ impl DatabaseRegistry {
         Ok(found)
     }
 
-    /// Khách mặc định (khách nền tảng) trên database điều khiển.
+    /// The default tenant (the platform tenant) on the control database.
     pub fn default_tenant(&self) -> TenantContext {
         self.0.default.clone()
     }
@@ -238,7 +241,7 @@ impl DatabaseRegistry {
         Duration::from_secs(self.0.config.cache_seconds)
     }
 
-    /// Ngữ cảnh của khách `id`. Không có: `tenant_not_found`.
+    /// The context of tenant `id`. Missing: `tenant_not_found`.
     pub async fn tenant(&self, id: TenantId) -> Result<TenantContext, Error> {
         if self.0.mode == TenancyMode::Single {
             return if id == DEFAULT_TENANT {
@@ -260,8 +263,9 @@ impl DatabaseRegistry {
         self.context_of(&row).await
     }
 
-    /// Mọi khách còn dữ liệu (chế độ một khách: khách mặc định), cho lệnh duyệt mọi khách (vd dựng
-    /// lại chỉ mục tìm kiếm). Khách không mở được (placement hỏng…) bị bỏ qua, có ghi log.
+    /// Every tenant that still has data (in single-tenant mode: the default tenant), for commands that walk
+    /// every tenant (e.g. rebuilding the search index). A tenant that cannot be opened (a broken placement…)
+    /// is skipped, with a log entry.
     pub async fn all_tenants(&self) -> Result<Vec<TenantContext>, Error> {
         if self.0.mode == TenancyMode::Single {
             return Ok(vec![self.default_tenant()]);
@@ -280,7 +284,7 @@ impl DatabaseRegistry {
         Ok(found)
     }
 
-    /// Ngữ cảnh của khách có tên rút gọn `slug`.
+    /// The context of the tenant with short name `slug`.
     pub async fn tenant_by_slug(&self, slug: &str) -> Result<TenantContext, Error> {
         if self.0.mode == TenancyMode::Single {
             return if slug == self.0.default.slug() {
@@ -301,8 +305,8 @@ impl DatabaseRegistry {
         self.context_of(&row).await
     }
 
-    /// Khách sở hữu tên miền `host` (đã xác minh), nếu có. Chế độ `single`: luôn `None` (không đọc
-    /// tên miền).
+    /// The tenant that owns the verified domain `host`, if any. `single` mode: always `None` (does not read
+    /// domains).
     pub async fn tenant_by_domain(&self, host: &str) -> Result<Option<TenantContext>, Error> {
         match self.domain_site(host).await? {
             Some((id, _)) => self.tenant(id).await.map(Some),
@@ -310,9 +314,8 @@ impl DatabaseRegistry {
         }
     }
 
-    /// Khách và nút (website) của tên miền đã xác minh `host` (bước 34): tên miền gắn với một
-    /// nút thì là website của nút đó; không gắn → `None` (website của cả khách). Chế độ `single`:
-    /// luôn `None`.
+    /// The tenant and node (website) of the verified domain `host` (step 34): a domain bound to a node is the
+    /// website of that node; unbound → `None` (the website of the whole tenant). `single` mode: always `None`.
     pub async fn domain_site(
         &self,
         host: &str,
@@ -345,14 +348,14 @@ impl DatabaseRegistry {
         Ok(found)
     }
 
-    /// Khoá gốc dùng mở URL placement đã mã hoá. Đặt một lần (module `kernel` đặt lúc khởi động);
-    /// lần sau bị bỏ qua.
+    /// The root key used to open encrypted placement URLs. Set once (the `kernel` module sets it at startup);
+    /// later calls are ignored.
     pub fn use_secret_key(&self, key: SecretKey) {
         let _ = self.0.secret.set(key);
     }
 
-    /// Nơi lưu chung (`shared`, của module `files`) và bộ mở nơi lưu riêng của placement (`opener`).
-    /// Đặt một lần (`Modules::start_in` đặt sau khi mọi module khởi động); lần sau bị bỏ qua.
+    /// The shared storage (`shared`, of the `files` module) and the opener for a placement's own storage
+    /// (`opener`). Set once (`Modules::start_in` sets it after every module starts); later calls are ignored.
     pub fn use_storage(
         &self,
         shared: Option<Arc<dyn Storage>>,
@@ -361,12 +364,12 @@ impl DatabaseRegistry {
         let _ = self.0.storage.set(StorageSlot { shared, opener });
     }
 
-    /// Nơi lưu file chung (cấu hình của module `files`), nếu có module công bố.
+    /// The shared file storage (configuration of the `files` module), if a module publishes it.
     pub fn shared_storage(&self) -> Option<Arc<dyn Storage>> {
         self.0.storage.get().and_then(|slot| slot.shared.clone())
     }
 
-    /// Mở giá trị `sealed` (cột `storage_sealed` của placement `id`).
+    /// Opens the value `sealed` (the `storage_sealed` column of placement `id`).
     pub async fn storage_location(
         &self,
         id: PlacementId,
@@ -381,7 +384,7 @@ impl DatabaseRegistry {
         })
     }
 
-    /// Nơi lưu file riêng của placement `id` (đọc lại bảng); `None`: placement dùng nơi lưu chung.
+    /// The own file storage of placement `id` (re-reads the table); `None`: the placement uses the shared storage.
     pub async fn placement_storage(
         &self,
         id: PlacementId,
@@ -403,7 +406,7 @@ impl DatabaseRegistry {
         }
     }
 
-    /// Nơi lưu riêng dựng từ `sealed` của placement `id`, qua cache.
+    /// The own storage built from `sealed` of placement `id`, through the cache.
     async fn open_storage(&self, id: PlacementId, sealed: &str) -> Result<Arc<dyn Storage>, Error> {
         let cached = lock(&self.0.stores).get(&id).cloned();
         if let Some((known, store)) = cached
@@ -424,8 +427,8 @@ impl DatabaseRegistry {
         Ok(store)
     }
 
-    /// Mọi nơi lưu file: `shared` (nơi lưu chung) rồi nơi lưu riêng của từng placement, theo tên.
-    /// Nơi lưu riêng không mở được thì bỏ qua (ghi log) — lần sau thử lại.
+    /// Every file storage: `shared` (the shared storage), then each placement's own storage, by name.
+    /// An own storage that cannot be opened is skipped (logged); the next round retries.
     pub async fn file_stores(&self, shared: Arc<dyn Storage>) -> Result<Vec<FileStore>, Error> {
         let mut all = vec![FileStore { placement: None, storage: shared }];
         if self.0.mode == TenancyMode::Single {
@@ -451,8 +454,7 @@ impl DatabaseRegistry {
         Ok(all)
     }
 
-    /// Bỏ mọi khách trên placement `id` khỏi cache (sau khi `schema_state` hay nơi lưu file của nó
-    /// đổi).
+    /// Drops every tenant on placement `id` from the cache (after its `schema_state` or file storage changes).
     pub fn invalidate_placement(&self, id: PlacementId) {
         lock(&self.0.stores).remove(&id);
         let gone: Vec<TenantId> = lock(&self.0.tenants)
@@ -465,22 +467,22 @@ impl DatabaseRegistry {
         }
     }
 
-    /// Bỏ tên miền `domain` khỏi cache (sau khi xác minh, thu hồi hay đổi khách của nó trên máy chủ
-    /// này): request kế tiếp tra lại bảng.
+    /// Drops the domain `domain` from the cache (after verifying it, revoking it, or changing its tenant on
+    /// this server): the next request re-reads the table.
     pub fn invalidate_domain(&self, domain: &str) {
         let domain = domain.trim().trim_end_matches('.').to_ascii_lowercase();
         lock(&self.0.domains).remove(&domain);
     }
 
-    /// Bỏ khách `id` khỏi cache (sau khi sửa khách trên máy chủ này).
+    /// Drops tenant `id` from the cache (after editing the tenant on this server).
     pub fn invalidate(&self, id: TenantId) {
         lock(&self.0.tenants).remove(&id);
         lock(&self.0.slugs).retain(|_, (_, known)| *known != id);
         lock(&self.0.domains).retain(|_, (_, known)| known.map(|(tenant, _)| tenant) != Some(id));
     }
 
-    /// Mọi database máy chủ này chạy job và event cho: `(placement, tên, database)` — chỉ placement
-    /// đã đủ migration. Chế độ `single`: chỉ database điều khiển.
+    /// Every database this server runs jobs and events for: `(placement, name, database)`; only placements
+    /// with all migrations applied. `single` mode: only the control database.
     pub async fn databases(&self) -> Result<Vec<(PlacementId, String, Database)>, Error> {
         let mut all = Vec::new();
         if self.0.config.worker_placements.includes("main") {
@@ -509,7 +511,7 @@ impl DatabaseRegistry {
         Ok(all)
     }
 
-    /// Database của placement `id`; mở pool nếu chưa mở.
+    /// The database of placement `id`; opens the pool if not yet open.
     pub async fn placement_database(&self, id: PlacementId) -> Result<Database, Error> {
         if id == MAIN_PLACEMENT {
             return Ok(self.0.control.clone());
@@ -557,7 +559,7 @@ impl DatabaseRegistry {
         Ok(database)
     }
 
-    /// Số pool placement đang mở (không tính database điều khiển).
+    /// Number of placement pools currently open (the control database not counted).
     pub fn open_databases(&self) -> usize {
         lock(&self.0.pools).open.len()
     }
@@ -572,7 +574,7 @@ impl DatabaseRegistry {
         })
     }
 
-    /// Mở URL placement đã mã hoá. Giá trị chưa mã hoá (chép tay vào bảng) trả nguyên văn.
+    /// Opens an encrypted placement URL. An unencrypted value (copied into the table by hand) is returned verbatim.
     async fn unseal(&self, id: PlacementId, purpose: &str, sealed: &str) -> Result<String, Error> {
         if !crate::secret::is_sealed(sealed) {
             return Ok(sealed.to_owned());
@@ -582,7 +584,7 @@ impl DatabaseRegistry {
             .map_err(|_| Error::internal(format!("placement {id}: the stored URL is not text")))
     }
 
-    /// Bộ mã hoá của khoá gốc (mã hoá / mở URL placement).
+    /// The sealer of the root key (encrypts / opens placement URLs).
     pub(super) async fn sealer(&self) -> Result<crate::secret::Sealer, Error> {
         let key = self.0.secret.get().ok_or_else(|| {
             Error::internal("the database registry has no secret key to open placement URLs")
@@ -590,7 +592,7 @@ impl DatabaseRegistry {
         key.sealer().await
     }
 
-    /// Mở pool cho một placement (cỡ pool nhỏ của `AUTOXIDE_TENANCY_*_CONNECTIONS`).
+    /// Opens a pool for one placement (the small pool size of `AUTOXIDE_TENANCY_*_CONNECTIONS`).
     pub(super) async fn open(&self, url: &str, read_url: Option<&str>) -> Result<Database, Error> {
         let parse = |raw: &str| {
             raw.parse::<DatabaseUrl>()
@@ -652,12 +654,12 @@ impl DatabaseRegistry {
     }
 }
 
-/// Cột `column` của `kernel_tenants` (ghi rõ bảng: câu truy vấn nối thêm `kernel_placements`).
+/// Column `column` of `kernel_tenants` (the table is named explicitly: the query also joins `kernel_placements`).
 fn tenant_column(column: &'static str) -> Expr {
     Expr::col((Alias::new("kernel_tenants"), Alias::new(column)))
 }
 
-/// Khách kèm `schema_state` và nơi lưu file riêng của placement chứa nó.
+/// A tenant together with `schema_state` and the own file storage of the placement that holds it.
 fn tenant_select() -> SelectStatement {
     let tenants = Alias::new("kernel_tenants");
     let placements = Alias::new("kernel_placements");

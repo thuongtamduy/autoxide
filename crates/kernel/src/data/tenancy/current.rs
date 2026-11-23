@@ -1,4 +1,4 @@
-//! Khách của người gọi (`GET /api/v1/kernel/tenant`, tool `kernel.current_tenant`).
+//! The caller's tenant (`GET /api/v1/kernel/tenant`, tool `kernel.current_tenant`).
 use crate::time::Timestamp;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -41,7 +41,7 @@ fn production() -> String {
 }
 
 impl TenantAdmin {
-    /// Khách của người gọi.
+    /// The caller's tenant.
     pub fn current(&self, tenant: &TenantContext) -> CurrentTenant {
         CurrentTenant {
             id: tenant.id().as_uuid(),

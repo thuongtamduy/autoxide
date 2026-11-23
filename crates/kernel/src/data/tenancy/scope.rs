@@ -1,5 +1,5 @@
-//! Lọc theo khách cho SeaORM (đặc tả 33, D-253): entity cấp khách hàng cài [`TenantScoped`] (một
-//! dòng), service viết `.scoped(&tenant)` ở mọi truy vấn của nó.
+//! Tenant filtering for SeaORM (spec 33, D-253): a tenant-level entity implements [`TenantScoped`] (one
+//! line), and a service writes `.scoped(&tenant)` in every one of its queries.
 //!
 //! ```ignore
 //! impl TenantScoped for Entity {
@@ -12,8 +12,8 @@
 //! Entity::delete_many().filter(Column::OwnerId.eq(owner)).scoped(&tenant).exec(write).await?;
 //! ```
 //!
-//! `INSERT` không có bộ lọc: service đặt `tenant_id` khi dựng `ActiveModel` (cột NOT NULL không
-//! `DEFAULT` — quên là lỗi ngay, D-253 mục 5).
+//! `INSERT` has no filter: the service sets `tenant_id` when building the `ActiveModel` (a NOT NULL column
+//! with no `DEFAULT`, so forgetting it is an immediate error, D-253 item 5).
 
 use sea_orm::sea_query::IntoCondition;
 use sea_orm::{
@@ -23,15 +23,15 @@ use sea_orm::{
 
 use super::TenantContext;
 
-/// Entity cấp khách hàng: có cột `tenant_id`.
+/// A tenant-level entity: has a `tenant_id` column.
 pub trait TenantScoped: EntityTrait {
-    /// Cột `tenant_id` của entity.
+    /// The entity's `tenant_id` column.
     fn tenant_column() -> Self::Column;
 }
 
-/// Thêm `WHERE <bảng>.tenant_id = <khách>` vào một truy vấn của entity cấp khách hàng.
+/// Adds `WHERE <table>.tenant_id = <tenant>` to a query of a tenant-level entity.
 pub trait ScopeExt: Sized {
-    /// Chỉ các dòng của khách `tenant`.
+    /// Only the rows of tenant `tenant`.
     #[must_use]
     fn scoped(self, tenant: &TenantContext) -> Self;
 }

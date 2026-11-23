@@ -1,29 +1,32 @@
-//! Cấu hình và secret theo khách (đặc tả 33 "Cấu hình và secret theo khách", D-258).
+//! Per-tenant configuration and secrets (spec 33 "Per-tenant configuration and secrets", D-258).
 //!
-//! - Module khai cấu hình nó nhận theo khách qua `Module::tenant_settings` ([`TenantSetting`],
-//!   tên `<module>.<khoá>`, vd `comments.max_links`); kernel khai `kernel.public_url`.
-//! - Cấu hình xếp được vào một nhóm ([`TenantSetting::group`]). Nhóm [`CONNECTION_GROUP`] là kết
-//!   nối tới đối tác (máy chủ SMTP, nhà cung cấp AI, cổng thanh toán…): tên bắt buộc theo dạng
-//!   `<module>.connection.<loại>.<trường>` (vd `mail.connection.smtp.url`), trường bí mật khai
-//!   `.secret()`. `GET /api/v1/kernel/settings?group=connection` là nguồn của màn "Kết nối đối tác".
-//! - Đổi tên một cấu hình: khai tên cũ bằng [`TenantSetting::formerly`]. Giá trị khách đã đặt dưới
-//!   tên cũ vẫn được đọc (secret mở bằng đúng tên nó được mã hoá cùng), API vẫn nhận tên cũ; lần
-//!   đặt kế tiếp ghi dưới tên mới và bỏ dòng tên cũ. Không cần upgrade dữ liệu.
-//! - Module đọc bằng trait [`TenantSettings`] (`context.require::<dyn TenantSettings>()`). Khách
-//!   chưa đặt thì module dùng cấu hình chung (biến môi trường) như trước.
-//! - Lưu ở bảng `kernel_tenant_settings` (cấp khách hàng, database của khách); secret mã hoá bằng
-//!   [`Sealer`](crate::secret::Sealer) và **không bao giờ** trả ra API, log hay event: event
-//!   `kernel.setting_changed` chỉ mang tên.
-//! - Quản lý qua `GET /api/v1/kernel/settings`, `PUT` / `DELETE /api/v1/kernel/settings/{name}`
-//!   (permission `kernel.settings.manage`) và tool `kernel.list_settings`. Nhân sự nền tảng đặt
-//!   cho một khách bất kỳ qua `…/kernel/tenants/{id}/settings…` (D-210, đối chiếu thiết kế 2).
-//! - Cấu hình có thể khai bộ kiểm ([`TenantSetting::checked`]): giá trị sai bị từ chối lúc đặt
-//!   (422). Module đọc bằng [`parsed_setting`]: giá trị đã lưu mà nay không còn hợp lệ (bộ kiểm
-//!   chặt hơn ở bản mới) thì ghi cảnh báo và dùng cấu hình chung — không làm hỏng request.
-//! - Đọc qua cache theo khách (một câu truy vấn lấy mọi cấu hình của khách, giữ
-//!   `AUTOXIDE_TENANCY_CACHE_SECONDS`): module đọc ở đường nóng (ngôn ngữ của `content` mỗi
-//!   request) không thêm truy vấn. Đặt / bỏ trên máy chủ này xoá cache ngay; máy chủ khác thấy
-//!   trong TTL.
+//! - A module declares the per-tenant configuration it accepts through `Module::tenant_settings`
+//!   ([`TenantSetting`], name `<module>.<key>`, e.g. `comments.max_links`); the kernel declares
+//!   `kernel.public_url`.
+//! - A setting can be placed in a group ([`TenantSetting::group`]). The [`CONNECTION_GROUP`] group is
+//!   connections to partners (SMTP server, AI provider, payment gateway…): the name must have the form
+//!   `<module>.connection.<kind>.<field>` (e.g. `mail.connection.smtp.url`), and a secret field is declared
+//!   with `.secret()`. `GET /api/v1/kernel/settings?group=connection` is the source of the "Partner
+//!   connections" screen.
+//! - Renaming a setting: declare the old name with [`TenantSetting::formerly`]. A value the tenant set under
+//!   the old name is still read (a secret is opened with the exact name it was encrypted with), the API still
+//!   accepts the old name; the next set writes under the new name and removes the old-name row. No data
+//!   upgrade needed.
+//! - Modules read through the [`TenantSettings`] trait (`context.require::<dyn TenantSettings>()`). When a
+//!   tenant has not set a value, the module uses the shared configuration (environment variables) as before.
+//! - Stored in the table `kernel_tenant_settings` (tenant level, in the tenant's database); a secret is
+//!   encrypted with [`Sealer`](crate::secret::Sealer) and is **never** returned in the API, logs or events:
+//!   the event `kernel.setting_changed` carries only the name.
+//! - Managed through `GET /api/v1/kernel/settings`, `PUT` / `DELETE /api/v1/kernel/settings/{name}`
+//!   (permission `kernel.settings.manage`) and the tool `kernel.list_settings`. Platform staff set values for
+//!   any tenant through `…/kernel/tenants/{id}/settings…` (D-210, cross-check design 2).
+//! - A setting can declare a checker ([`TenantSetting::checked`]): an invalid value is rejected when set (422).
+//!   Modules read with [`parsed_setting`]: a stored value that is no longer valid (a stricter checker in a new
+//!   version) logs a warning and uses the shared configuration, without breaking the request.
+//! - Reads go through a per-tenant cache (one query fetches every setting of the tenant, kept for
+//!   `AUTOXIDE_TENANCY_CACHE_SECONDS`): a module that reads on a hot path (the `content` language on every
+//!   request) adds no query. A set / remove on this server clears the cache at once; other servers see it
+//!   within the TTL.
 
 use crate::time::Timestamp;
 use std::collections::HashMap;
@@ -49,7 +52,7 @@ use crate::migration::prelude::*;
 use crate::response::{Data, Problem};
 use crate::secret::SecretKey;
 
-/// Đọc / ghi cấu hình theo khách của khách mình.
+/// Reads / writes the per-tenant configuration of the caller's own tenant.
 pub const SETTINGS_MANAGE: Permission = Permission::new(
     "kernel.settings.manage",
     "Read and change the settings of this tenant (mail server, AI provider keys…); secret values \
@@ -57,7 +60,7 @@ pub const SETTINGS_MANAGE: Permission = Permission::new(
 )
 .with_risk(Risk::SensitiveData);
 
-/// URL công khai của khách (link trong email…); không đặt thì `AUTOXIDE_HTTP_PUBLIC_URL`.
+/// Public URL of the tenant (links in emails…); when unset, `AUTOXIDE_HTTP_PUBLIC_URL`.
 pub const PUBLIC_URL: TenantSetting = TenantSetting::new(
     "kernel.public_url",
     "Public address of this tenant's site, e.g. `https://shop.example` (scheme and host only). \
@@ -79,7 +82,7 @@ fn site_origin(raw: &str) -> Result<(), FieldError> {
     }
 }
 
-/// Phần đầu `scheme://host[:port]` của một địa chỉ http(s); `None` khi không phải.
+/// The `scheme://host[:port]` head of an http(s) address; `None` when it is not one.
 fn origin_of(url: &str) -> Option<&str> {
     let rest = url.strip_prefix("https://").or_else(|| url.strip_prefix("http://"))?;
     let host_len = rest.find(['/', '?', '#']).unwrap_or(rest.len());
@@ -89,9 +92,9 @@ fn origin_of(url: &str) -> Option<&str> {
     Some(&url[..url.len() - rest.len() + host_len])
 }
 
-/// Link trong thư theo khách (đề bài giao diện): khách đã đặt `kernel.public_url` thì link mở trên
-/// tên miền của khách — giữ đường dẫn của địa chỉ máy chủ, chỉ đổi phần đầu. Clone rẻ; mặc định
-/// (không có cấu hình theo khách, vd test dựng tay) trả nguyên địa chỉ.
+/// Per-tenant links in mail (UI brief): when a tenant has set `kernel.public_url`, the link opens on the
+/// tenant's domain, keeping the path of the server address and replacing only the head. Cheap to clone; the
+/// default (no per-tenant configuration, e.g. hand-built tests) returns the address unchanged.
 #[derive(Clone, Default)]
 pub struct SiteLinks(Option<Arc<dyn TenantSettings>>);
 
@@ -100,7 +103,7 @@ impl SiteLinks {
         SiteLinks(Some(settings))
     }
 
-    /// `template` (địa chỉ đã cấu hình của máy chủ, có thể chứa `{token}`) cho khách `tenant`.
+    /// `template` (the server's configured address, may contain `{token}`) for tenant `tenant`.
     pub async fn rewrite(&self, tenant: &TenantContext, template: &str) -> Result<String, Error> {
         let Some(settings) = &self.0 else { return Ok(template.to_owned()) };
         // Giá trị cũ đặt trước khi có bộ kiểm mà sai dạng: dùng địa chỉ của máy chủ.
@@ -112,7 +115,7 @@ impl SiteLinks {
     }
 }
 
-/// Đổi phần đầu của `template` thành `site`; `template` không phải địa chỉ http(s) thì giữ nguyên.
+/// Replaces the head of `template` with `site`; a `template` that is not an http(s) address stays unchanged.
 fn rebase(template: &str, site: &str) -> String {
     let site = site.trim().trim_end_matches('/');
     match (origin_of(template), origin_of(site)) {
@@ -121,8 +124,8 @@ fn rebase(template: &str, site: &str) -> String {
     }
 }
 
-/// Mô hình kinh doanh của khách (D-185): giao diện chọn các bước thiết lập, màn mặc định theo đó.
-/// Chỉ là thông tin; quyền dùng vẫn do gói (bước 35) quyết.
+/// Business model of a tenant (D-185): the UI picks the setup steps and default screen accordingly.
+/// Informational only; what may be used is still decided by the plan (step 35).
 pub const BUSINESS_MODEL: TenantSetting = TenantSetting::new(
     "kernel.business_model",
     "How this tenant does business, so interfaces show the right setup steps and screens: \
@@ -132,7 +135,7 @@ pub const BUSINESS_MODEL: TenantSetting = TenantSetting::new(
 )
 .checked(business_model);
 
-/// Giá trị `kernel.business_model` nhận.
+/// Values accepted by `kernel.business_model`.
 pub const BUSINESS_MODELS: [&str; 5] =
     ["independent", "multi_store", "chain", "marketplace", "saas"];
 
@@ -148,24 +151,24 @@ fn business_model(raw: &str) -> Result<(), FieldError> {
     }
 }
 
-/// Event: một cấu hình của khách vừa được đặt hay bỏ. Chỉ mang tên, không bao giờ mang giá trị.
+/// Event: a tenant setting was just set or removed. Carries only the name, never the value.
 pub(crate) const SETTING_CHANGED: EventInfo = EventInfo::new(
     "kernel.setting_changed",
     "A setting of the tenant was set or removed; carries only its name.",
 );
 
-/// Độ dài tối đa của một giá trị.
+/// Maximum length of one value.
 const VALUE_MAX: usize = 4000;
 
-/// Bộ kiểm giá trị của một cấu hình: `Err` với lỗi của ô `value` (câu mẫu có bản dịch như mọi
-/// `FieldError`).
+/// Value checker of a setting: `Err` with an error for the `value` field (the message template has a
+/// translation like every `FieldError`).
 pub type SettingCheck = fn(&str) -> Result<(), FieldError>;
 
-/// Nhóm của cấu hình kết nối tới đối tác (đối chiếu thiết kế đợt 2): tên phải theo dạng
-/// `<module>.connection.<loại>.<trường>`.
+/// Group of settings for connections to partners (cross-check design batch 2): the name must have the form
+/// `<module>.connection.<kind>.<field>`.
 pub const CONNECTION_GROUP: &str = "connection";
 
-/// Một cấu hình module nhận theo khách.
+/// A setting a module accepts per tenant.
 #[derive(Debug, Clone, Copy)]
 pub struct TenantSetting {
     name: &'static str,
@@ -186,8 +189,8 @@ impl PartialEq for TenantSetting {
 impl Eq for TenantSetting {}
 
 impl TenantSetting {
-    /// Cấu hình `name` (`<module>.<khoá>`; khoá là một hay nhiều đoạn chữ thường, số, `_` nối bằng
-    /// dấu chấm), mô tả tiếng Anh cho người quản trị.
+    /// Setting `name` (`<module>.<key>`; the key is one or more segments of lowercase letters, digits, `_`
+    /// joined by dots), with an English description for administrators.
     pub const fn new(name: &'static str, description: &'static str) -> Self {
         TenantSetting {
             name,
@@ -199,28 +202,29 @@ impl TenantSetting {
         }
     }
 
-    /// Giá trị là secret: lưu mã hoá, không bao giờ trả ra.
+    /// The value is a secret: stored encrypted, never returned.
     pub const fn secret(mut self) -> Self {
         self.secret = true;
         self
     }
 
-    /// Giá trị phải qua `check` khi đặt (422 `validation_failed`, lỗi ở ô `value`). Module dùng
-    /// cùng hàm dịch giá trị cho bộ kiểm và cho [`parsed_setting`].
+    /// The value must pass `check` when set (422 `validation_failed`, the error on the `value` field). A module
+    /// uses the same value-parsing function for the checker and for [`parsed_setting`].
     pub const fn checked(mut self, check: SettingCheck) -> Self {
         self.check = Some(check);
         self
     }
 
-    /// Xếp cấu hình vào nhóm `group` (chữ thường, số, `_`): danh sách lọc được theo nhóm
-    /// (`?group=`). Nhóm [`CONNECTION_GROUP`] buộc tên dạng `<module>.connection.<loại>.<trường>`.
+    /// Places the setting in group `group` (lowercase, digits, `_`): the list can be filtered by group
+    /// (`?group=`). The [`CONNECTION_GROUP`] group requires names of the form
+    /// `<module>.connection.<kind>.<field>`.
     pub const fn group(mut self, group: &'static str) -> Self {
         self.group = Some(group);
         self
     }
 
-    /// Cấu hình này trước đây tên là `name`: giá trị khách đã đặt dưới tên cũ vẫn được đọc, API vẫn
-    /// nhận tên cũ; lần đặt kế tiếp ghi dưới tên mới.
+    /// This setting used to be named `name`: a value the tenant set under the old name is still read, the API
+    /// still accepts the old name; the next set writes under the new name.
     pub const fn formerly(mut self, name: &'static str) -> Self {
         self.former_name = Some(name);
         self
@@ -230,22 +234,22 @@ impl TenantSetting {
         self.name
     }
 
-    /// Nhóm của cấu hình, nếu có.
+    /// The setting's group, if any.
     pub fn group_name(&self) -> Option<&'static str> {
         self.group
     }
 
-    /// Tên cũ của cấu hình, nếu nó từng đổi tên.
+    /// The setting's former name, if it was renamed.
     pub fn former_name(&self) -> Option<&'static str> {
         self.former_name
     }
 
-    /// `name` là tên (hiện tại hay cũ) của cấu hình này.
+    /// `name` is the name (current or former) of this setting.
     fn answers_to(&self, name: &str) -> bool {
         self.name == name || self.former_name == Some(name)
     }
 
-    /// Dòng đã lưu của cấu hình này trong `rows`: dòng tên hiện tại trước, không có thì dòng tên cũ.
+    /// The stored row of this setting in `rows`: the current-name row first, otherwise the former-name row.
     fn row_in<'a>(&self, rows: &'a [entity::Model]) -> Option<&'a entity::Model> {
         rows.iter()
             .find(|row| row.name == self.name)
@@ -261,7 +265,7 @@ impl TenantSetting {
     }
 }
 
-/// Giá trị một cấu hình của khách. `Debug` không in secret; bộ nhớ được xoá khi bỏ.
+/// The value of a tenant setting. `Debug` does not print the secret; memory is wiped on drop.
 #[derive(Clone)]
 pub struct SettingValue {
     value: Zeroizing<String>,
@@ -269,7 +273,7 @@ pub struct SettingValue {
 }
 
 impl SettingValue {
-    /// Giá trị không phải secret (cho bản giả trong test; module đọc qua [`TenantSettings`]).
+    /// A non-secret value (for fakes in tests; modules read through [`TenantSettings`]).
     pub fn new(value: impl Into<String>) -> Self {
         SettingValue { value: Zeroizing::new(value.into()), secret: false }
     }
@@ -285,9 +289,9 @@ impl std::fmt::Debug for SettingValue {
     }
 }
 
-/// Giá trị `setting` của `tenant`, dịch bằng `parse`; `None` khi khách chưa đặt. Giá trị đã lưu mà
-/// `parse` từ chối (vd bộ kiểm của bản mới chặt hơn) → cảnh báo trong log và `None`: module dùng
-/// cấu hình chung thay vì làm hỏng request của khách.
+/// The value of `setting` for `tenant`, parsed with `parse`; `None` when the tenant has not set it. A stored
+/// value that `parse` rejects (e.g. the checker of a newer version is stricter) → a warning in the log and
+/// `None`: the module uses the shared configuration instead of breaking the tenant's request.
 pub async fn parsed_setting<T>(
     settings: &dyn TenantSettings,
     tenant: &TenantContext,
@@ -311,12 +315,12 @@ pub async fn parsed_setting<T>(
     }
 }
 
-/// Đọc cấu hình của một khách. Module `kernel` công bố.
+/// Reads a tenant's settings. Published by the `kernel` module.
 //
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
 #[async_trait::async_trait]
 pub trait TenantSettings: Send + Sync {
-    /// Giá trị `setting` của khách `tenant`; `None` khi khách chưa đặt.
+    /// The value of `setting` for tenant `tenant`; `None` when the tenant has not set it.
     async fn get(
         &self,
         tenant: &TenantContext,
@@ -324,7 +328,7 @@ pub trait TenantSettings: Send + Sync {
     ) -> Result<Option<SettingValue>, Error>;
 }
 
-/// Sổ cấu hình đã khai của mọi module, điền một lần khi dựng `Modules`. Clone rẻ.
+/// Registry of the declared settings of every module, filled once when `Modules` is built. Cheap to clone.
 #[derive(Clone, Default)]
 pub(crate) struct Catalog(Arc<OnceLock<Vec<TenantSetting>>>);
 
@@ -337,7 +341,7 @@ impl Catalog {
         self.0.get().map_or(&[], Vec::as_slice)
     }
 
-    /// Cấu hình tên `name` — tên hiện tại hay tên cũ ([`TenantSetting::formerly`]).
+    /// The setting named `name`, current or former ([`TenantSetting::formerly`]).
     fn find(&self, name: &str) -> Result<TenantSetting, Error> {
         self.all()
             .iter()
@@ -347,7 +351,7 @@ impl Catalog {
     }
 }
 
-/// `name` có dạng `<module>.<khoá>`; khoá là một hay nhiều đoạn (chữ thường, số, `_`) nối bằng `.`.
+/// `name` has the form `<module>.<key>`; the key is one or more segments (lowercase, digits, `_`) joined by `.`.
 fn well_named(module: &str, name: &str) -> bool {
     name.len() <= 100
         && name
@@ -356,8 +360,8 @@ fn well_named(module: &str, name: &str) -> bool {
             .is_some_and(|key| key.split('.').all(crate::module::is_identifier))
 }
 
-/// Kiểm khai báo của module `module`: tên `<module>.<khoá>`, không trùng (kể cả với tên cũ); cấu
-/// hình nhóm `connection` — và chỉ chúng — mang tên `<module>.connection.<loại>.<trường>`.
+/// Checks the declarations of module `module`: name `<module>.<key>`, no duplicates (former names included);
+/// settings of the `connection` group, and only they, have the name `<module>.connection.<kind>.<field>`.
 pub(crate) fn declaration_problems(
     module: &str,
     settings: &[TenantSetting],
@@ -421,9 +425,9 @@ pub(crate) fn declaration_problems(
     problems
 }
 
-/// Sao mọi cài đặt KHÔNG bí mật của `source` sang `target` (sandbox, D-232): secret (thông tin kết
-/// nối đối tác) không bao giờ sang — sandbox dùng bộ giả. Cài đặt `target` đã có thì giữ. Trả số dòng
-/// mới.
+/// Copies every NON-secret setting from `source` to `target` (sandbox, D-232): a secret (partner connection
+/// information) never crosses; the sandbox uses fakes. A setting `target` already has is kept. Returns the
+/// number of new rows.
 pub(crate) async fn copy_plain(
     source: &TenantContext,
     target: &TenantContext,
@@ -461,7 +465,7 @@ pub(crate) async fn copy_plain(
 }
 
 mod entity {
-    //! Bảng `kernel_tenant_settings`.
+    //! The `kernel_tenant_settings` table.
     use crate::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
@@ -473,7 +477,7 @@ mod entity {
         pub tenant_id: Uuid,
         #[sea_orm(primary_key, auto_increment = false)]
         pub name: String,
-        /// Chữ thường với cấu hình thường, `sealed:…` với secret.
+        /// Plain text for ordinary settings, `sealed:…` for secrets.
         pub value: String,
         pub secret: bool,
         pub updated_by: Option<Uuid>,
@@ -533,27 +537,27 @@ impl Event for SettingChanged {
     const NAME: &'static str = "kernel.setting_changed";
 }
 
-/// Cấu hình đã lưu của một khách (giá trị secret vẫn mã hoá), giữ trong cache.
+/// The stored settings of one tenant (secret values still encrypted), kept in the cache.
 type Stored = Arc<Vec<entity::Model>>;
 
-/// Số khách trong cache quá mức này thì bỏ các mục đã hết hạn khi thêm mục mới.
+/// When the cache holds more tenants than this, expired entries are dropped when a new entry is added.
 const CACHE_PRUNE_AT: usize = 10_000;
 
-/// Dịch vụ cấu hình theo khách.
+/// Per-tenant settings service.
 pub(crate) struct SettingsService {
     catalog: Catalog,
     secret: SecretKey,
     outbox: Outbox,
-    /// Thời gian giữ cache (`AUTOXIDE_TENANCY_CACHE_SECONDS`).
+    /// How long the cache is kept (`AUTOXIDE_TENANCY_CACHE_SECONDS`).
     ttl: Duration,
     cache: Mutex<HashMap<TenantId, (Instant, Stored)>>,
 }
 
-/// Mục đích (AAD) khi mã hoá giá trị secret. Tên của dòng cũng nằm trong AAD: secret đặt dưới tên
-/// cũ của một cấu hình chỉ mở được bằng tên cũ đó — luôn mở bằng `row.name`.
+/// Purpose (AAD) when encrypting a secret value. The row name is also in the AAD: a secret set under the old
+/// name of a setting can only be opened with that old name, so always open with `row.name`.
 pub(crate) const PURPOSE: &str = "kernel.tenant_setting";
 
-/// Trạng thái của `setting` ở một khách, từ dòng đã lưu `row` (nếu khách đã đặt).
+/// State of `setting` at a tenant, from the stored row `row` (if the tenant has set it).
 fn state(setting: &TenantSetting, row: Option<&entity::Model>) -> SettingState {
     SettingState {
         name: setting.name.to_owned(),
@@ -573,8 +577,8 @@ impl SettingsService {
         SettingsService { catalog, secret, outbox, ttl, cache: Mutex::default() }
     }
 
-    /// Mọi cấu hình đã lưu của khách `tenant`, qua cache. Khoá `mutex` chỉ giữ trong từng câu,
-    /// không qua `await`.
+    /// Every stored setting of tenant `tenant`, through the cache. The `mutex` lock is held only within each
+    /// statement, never across an `await`.
     async fn stored(&self, tenant: &TenantContext) -> Result<Stored, Error> {
         let cached =
             self.cache.lock().unwrap_or_else(PoisonError::into_inner).get(&tenant.id()).cloned();
@@ -594,13 +598,13 @@ impl SettingsService {
         Ok(rows)
     }
 
-    /// Bỏ cấu hình của khách `tenant` khỏi cache (sau khi đặt / bỏ trên máy chủ này).
+    /// Drops tenant `tenant`'s settings from the cache (after a set / remove on this server).
     fn forget(&self, tenant: TenantId) {
         self.cache.lock().unwrap_or_else(PoisonError::into_inner).remove(&tenant);
     }
 
-    /// Mọi cấu hình đã khai, theo tên, với trạng thái ở khách `tenant`; `group`: chỉ cấu hình của
-    /// nhóm đó (nhóm không ai khai: danh sách rỗng).
+    /// Every declared setting, by name, with its state at tenant `tenant`; `group`: only the settings of that
+    /// group (a group nobody declares: an empty list).
     pub(crate) async fn list(
         &self,
         tenant: &TenantContext,
@@ -629,8 +633,8 @@ impl SettingsService {
         Ok(states)
     }
 
-    /// Đặt cấu hình `name` của khách `tenant` (ghi đè nếu có). `name` là tên cũ của một cấu hình
-    /// thì đặt chính cấu hình đó, dưới tên hiện tại.
+    /// Sets setting `name` of tenant `tenant` (overwriting if present). If `name` is the former name of a
+    /// setting, sets that setting itself, under the current name.
     pub(crate) async fn put(
         &self,
         tenant: &TenantContext,
@@ -712,9 +716,9 @@ impl SettingsService {
         })
     }
 
-    /// Bỏ cấu hình `name` của khách `tenant` (về cấu hình chung), kể cả giá trị đặt dưới tên cũ.
-    /// Không có thì không đổi gì.
-    /// Như [`put`](Self::put) nhưng từ chối cấu hình bí mật (tool MCP): secret chỉ đặt qua REST.
+    /// Removes setting `name` of tenant `tenant` (back to the shared configuration), including a value set
+    /// under a former name. Changes nothing if it is absent. Like [`put`](Self::put) but rejects secret
+    /// settings (MCP tool): a secret is set through REST only.
     pub(crate) async fn put_plain(
         &self,
         tenant: &TenantContext,
@@ -760,9 +764,10 @@ impl SettingsService {
     }
 }
 
-/// Đặt / bỏ một trường của kết nối đối tác (nhóm `connection`) đổi nơi tiền về hay nơi dữ liệu đi:
-/// đòi lần xác thực gần đây của phiên (step-up) như việc nhạy cảm, dù `kernel.settings.manage`
-/// không thuộc loại rủi ro cao (D-20261122-provider-environments). Cài đặt thường không bị đòi.
+/// Setting / removing a field of a partner connection (group `connection`) changes where money arrives or
+/// where data goes: it requires the session's recent authentication (step-up) like a sensitive action, even
+/// though `kernel.settings.manage` is not a high-risk kind (D-20261122-provider-environments). Ordinary
+/// settings are not required to.
 fn connection_step_up(setting: &TenantSetting, principal: &Principal) -> Result<(), Error> {
     if setting.group == Some(CONNECTION_GROUP) {
         principal.require_fresh(&SETTINGS_MANAGE)?;
@@ -911,7 +916,7 @@ async fn delete_setting(
 
 // --- REST cho nhân sự nền tảng: cấu hình của một khách bất kỳ ------------------------------
 
-/// Thứ handler của nhân sự nền tảng cần: service và sổ database (tìm khách theo ID / slug).
+/// What the platform staff handlers need: the service and the database registry (find a tenant by ID / slug).
 #[derive(Clone)]
 pub(crate) struct PlatformSettings {
     service: Arc<SettingsService>,
@@ -919,7 +924,7 @@ pub(crate) struct PlatformSettings {
 }
 
 impl PlatformSettings {
-    /// Khách `id_or_slug`. Đang dời: ghi lúc này sẽ vào database cũ → `tenant_moving`.
+    /// Tenant `id_or_slug`. Being moved: a write now would go to the old database → `tenant_moving`.
     async fn tenant(&self, id_or_slug: &str, writing: bool) -> Result<TenantContext, Error> {
         let tenant = match id_or_slug.parse::<uuid::Uuid>() {
             Ok(id) => self.registry.tenant(TenantId::from_uuid(id)).await?,
@@ -1038,7 +1043,7 @@ async fn delete_tenant_setting(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// Route dưới `/api/v1/kernel`.
+/// Routes under `/api/v1/kernel`.
 pub(crate) fn routes(service: Arc<SettingsService>, registry: DatabaseRegistry) -> OpenApiRouter {
     let platform = PlatformSettings { service: service.clone(), registry };
     OpenApiRouter::new()
@@ -1056,7 +1061,7 @@ pub(crate) fn routes(service: Arc<SettingsService>, registry: DatabaseRegistry) 
 mod tools;
 pub(crate) use tools::tools;
 
-/// Bảng `kernel_tenant_settings` (cấp khách hàng, có `tenant_id` từ đầu).
+/// The `kernel_tenant_settings` table (tenant level, has `tenant_id` from the start).
 pub(crate) struct CreateTenantSettings;
 
 impl MigrationName for CreateTenantSettings {

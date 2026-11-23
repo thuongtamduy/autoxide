@@ -1,6 +1,6 @@
-//! Từ chính sách của mọi module tới việc cụ thể của từng bảng trong một lượt tách / gộp: điều kiện
-//! SQL chọn dòng đi (đọc ở database nguồn), đi hẳn hay chỉ chép, bảng nào chờ rỗng, bảng nào module
-//! tự làm.
+//! From the policies of every module to the concrete work for each table in a split / merge run: the SQL
+//! condition that picks the rows that go (read at the source database), whether they move or are only copied,
+//! which tables wait to be empty, and which tables the module handles itself.
 
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -12,43 +12,43 @@ use crate::error::Error;
 use crate::tenancy::{OrgId, TenantId};
 use crate::transfer::{TableKind, TenantTables, tenant_is};
 
-/// Dòng đi hẳn (chép rồi xoá ở nguồn) hay chỉ được chép.
+/// Rows move (copied then deleted at the source) or are only copied.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Mode {
     Move,
     Copy,
 }
 
-/// Việc của một bảng.
+/// The work for one table.
 #[derive(Clone)]
 pub(crate) enum Treatment {
-    /// Dòng thoả `condition` (ở nguồn) được chép sang đích; `Move` thì sau đó xoá ở nguồn.
+    /// Rows satisfying `condition` (at the source) are copied to the target; with `Move`, they are then deleted at the source.
     Select {
         mode: Mode,
         condition: Condition,
     },
-    /// Không đổi gì.
+    /// Change nothing.
     Leave,
-    /// Hàng đợi: phần đến hạn của khách phải chạy hết trước khi chép.
+    /// A queue: the tenant's due part must finish running before copying.
     Drain,
-    /// Bảng do bảng khác của module xử lý.
+    /// A table handled by another table of the module.
     Handled,
     Custom(Arc<dyn RelocateTable>),
 }
 
-/// Việc của một bảng, kèm chính sách gốc.
+/// The work for one table, with its original policy.
 #[derive(Clone)]
 pub(crate) struct Resolved {
     pub(crate) table: String,
     pub(crate) policy: &'static str,
     pub(crate) treatment: Treatment,
-    /// Không module nào khai bảng này: chính sách suy từ cột.
+    /// No module declares this table: the policy is inferred from the columns.
     pub(crate) inferred: bool,
-    /// Bảng soi cây tổ chức: (cột ID nút, cột nút cha).
+    /// A table mirroring the organization tree: (node ID column, parent node column).
     pub(crate) org_tree: Option<(&'static str, &'static str)>,
 }
 
-/// Chính sách của mọi module, theo bảng.
+/// The policies of every module, by table.
 #[derive(Clone, Default)]
 pub(crate) struct Policies {
     tables: HashMap<&'static str, TablePolicy>,
@@ -57,7 +57,7 @@ pub(crate) struct Policies {
 }
 
 impl Policies {
-    /// Gom chính sách của các module; bảng phải thuộc chính module đó và không khai hai lần.
+    /// Collects the policies of the modules; a table must belong to that module and must not be declared twice.
     pub(crate) fn collect(declared: Vec<(&'static str, Relocation)>) -> Result<Self, Vec<String>> {
         let mut problems = Vec::new();
         let mut policies = Policies::default();
@@ -87,17 +87,17 @@ impl Policies {
         if problems.is_empty() { Ok(policies) } else { Err(problems) }
     }
 
-    /// Hook của bước chuyển, mọi module.
+    /// Switch-step hooks, every module.
     pub(crate) fn switch_hooks(&self) -> &[std::sync::Arc<dyn super::SwitchHook>] {
         &self.switch_hooks
     }
 
-    /// Cột secret của `table`.
+    /// Secret columns of `table`.
     pub(crate) fn sealed(&self, table: &str) -> Vec<SealedColumn> {
         self.sealed.iter().filter(|sealed| sealed.table == table).copied().collect()
     }
 
-    /// Bảng cấp khách (trừ hàng đợi) không module nào khai chính sách.
+    /// Tenant-level tables (except queues) for which no module declares a policy.
     pub(crate) fn uncovered(&self, tables: &TenantTables) -> Vec<String> {
         tables
             .names()
@@ -107,7 +107,7 @@ impl Policies {
             .collect()
     }
 
-    /// Chính sách của `table`: đã khai, hay suy từ cột.
+    /// Policy of `table`: declared, or inferred from the columns.
     fn policy(&self, tables: &TenantTables, table: &str) -> (TablePolicy, bool) {
         if let Some(policy) = self.tables.get(table) {
             return (policy.clone(), false);
@@ -122,8 +122,8 @@ impl Policies {
         (inferred, true)
     }
 
-    /// Việc của mọi bảng cấp khách trong `tables` (theo thứ tự tạo bảng) cho lượt `kind` từ khách
-    /// `source`; `org` là gốc nhánh khi tách.
+    /// The work for every tenant-level table in `tables` (in table creation order) for run `kind` from tenant
+    /// `source`; `org` is the branch root on a split.
     pub(crate) fn resolve(
         &self,
         tables: &TenantTables,
@@ -182,7 +182,7 @@ struct Resolver<'a> {
 }
 
 impl Resolver<'_> {
-    /// Dòng của khách nguồn có `column` là một nút của nhánh.
+    /// Rows of the source tenant whose `column` is a node of the branch.
     fn in_branch(&self, column: &str) -> Condition {
         tenant_is(self.source).add(
             Expr::col(Alias::new(column)).in_subquery(
@@ -271,7 +271,7 @@ impl Resolver<'_> {
     }
 }
 
-/// Dòng của khách `source` có `column` nằm trong `other_column` của các dòng `other` thoả
+/// Rows of tenant `source` whose `column` is in `other_column` of the `other` rows that satisfy
 /// `condition`.
 fn follow(
     source: TenantId,

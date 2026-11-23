@@ -1,5 +1,6 @@
-//! `kernel_tenants` nhìn từ phía sandbox: cột chung cùng bốn cột của sandbox (`m0037_tenant_sandbox`).
-//! Cột khác của bảng (`read_only`, `data_residency`) có mặc định / NULL nên không cần khai ở đây.
+//! `kernel_tenants` seen from the sandbox side: the shared columns plus the four sandbox columns
+//! (`m0037_tenant_sandbox`). The table's other columns (`read_only`, `data_residency`) have defaults / NULL so
+//! they need no declaration here.
 
 use crate::time::Timestamp;
 use sea_orm::entity::prelude::*;
@@ -20,7 +21,7 @@ pub struct Model {
     pub read_only: bool,
     /// `production` / `sandbox`.
     pub kind: String,
-    /// Khách gốc của sandbox; không foreign key.
+    /// The sandbox's source tenant; no foreign key.
     pub sandbox_of: Option<Uuid>,
     pub sandbox_expires_at: Option<Timestamp>,
     /// JSON `SandboxOptions` (`products`, `role_id`).

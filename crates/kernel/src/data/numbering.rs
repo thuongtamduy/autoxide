@@ -1,20 +1,22 @@
-//! Đánh số tuần tự không nhảy số (bước 36): số chứng từ, số hoá đơn, số phiếu… phải liên tục
-//! 1, 2, 3… theo từng dãy, không trùng và không bỏ số — kể cả khi nhiều request cấp số cùng lúc.
+//! Gap-free sequential numbering (step 36): document numbers, invoice numbers, voucher numbers and so on
+//! must be continuous 1, 2, 3... per sequence, never duplicated and never skipped, even when many requests
+//! take numbers at once.
 //!
-//! Một dãy là một dòng của bảng `kernel_sequences`, theo khách (`tenant_id`) và tên dãy (`scope`, do
-//! module tự đặt, vd `invoices:<org>:<loại>:<ký hiệu>:<năm>`). Bảng là bảng cấp khách hàng của module
-//! nội bộ `kernel`, nên có ở mọi database dữ liệu: số được cấp **trong cùng transaction** với bản ghi
-//! mang số đó.
+//! A sequence is one row of the `kernel_sequences` table, keyed by tenant (`tenant_id`) and sequence name
+//! (`scope`, chosen by the module, e.g. `invoices:<org>:<kind>:<symbol>:<year>`). The table is a
+//! tenant-level table of the internal `kernel` module, so it exists in every data database: a number is
+//! issued **in the same transaction** as the record that carries it.
 //!
-//! Vì sao không nhảy số: [`next`] là MỘT câu
-//! `INSERT … ON CONFLICT (tenant_id, scope) DO UPDATE SET last_value = last_value + 1 RETURNING last_value`
-//! chạy trong transaction ghi của bên gọi. Postgres khoá dòng của dãy tới hết transaction — bên cấp số
-//! thứ hai chờ bên đầu xong rồi mới cộng tiếp; SQLite vốn chỉ một bên ghi (`BEGIN IMMEDIATE`).
-//! Transaction rollback thì phép cộng cũng rollback: số không bị tiêu. (Khác `SEQUENCE` của Postgres —
-//! nhanh hơn nhưng nhảy số khi rollback, và SQLite không có.)
+//! Why there are no gaps: [`next`] is ONE statement,
+//! `INSERT … ON CONFLICT (tenant_id, scope) DO UPDATE SET last_value = last_value + 1 RETURNING last_value`,
+//! run inside the caller's write transaction. Postgres locks the sequence row until the transaction ends, so
+//! a second issuer waits for the first to finish before adding; SQLite has a single writer anyway
+//! (`BEGIN IMMEDIATE`). If the transaction rolls back, the increment rolls back too: the number is not
+//! consumed. (Unlike a Postgres `SEQUENCE`, which is faster but skips numbers on rollback, and SQLite has
+//! none.)
 //!
-//! Giá phải trả: các bên cấp số trong cùng một dãy nối đuôi nhau tới khi commit — giữ transaction
-//! ngắn, cấp số ở cuối, ngay trước khi ghi bản ghi.
+//! The price: issuers on the same sequence queue up until commit, so keep the transaction short and issue the
+//! number last, right before writing the record.
 use crate::time::Timestamp;
 use sea_orm::ConnectionTrait;
 use sea_orm::sea_query::{Alias, Expr, ExprTrait as _, OnConflict, Query};
@@ -22,15 +24,16 @@ use sea_orm::sea_query::{Alias, Expr, ExprTrait as _, OnConflict, Query};
 use crate::error::Error;
 use crate::tenancy::TenantId;
 
-/// Tên bảng (cấp khách hàng, module `kernel`).
+/// Table name (tenant-level, `kernel` module).
 pub(crate) const TABLE: &str = "kernel_sequences";
 
-/// Độ dài tối đa của tên dãy.
+/// Maximum length of a sequence name.
 pub const MAX_SCOPE_LEN: usize = 200;
 
-/// Cấp số kế tiếp của dãy `scope` của khách `tenant`: dãy mới bắt đầu từ 1. `transaction` phải là
-/// transaction GHI (`Database::begin_write`) trên database của khách, cùng transaction với bản ghi mang
-/// số — ngoài transaction thì số vẫn đúng thứ tự nhưng bản ghi hỏng sau đó sẽ để lại một số bị bỏ.
+/// Issues the next number of sequence `scope` of tenant `tenant`: a new sequence starts at 1. `transaction`
+/// must be the WRITE transaction (`Database::begin_write`) on the tenant's database, the same transaction
+/// as the record that carries the number; outside it the number is still in order, but a later failure of
+/// the record leaves a skipped number.
 pub async fn next<C: ConnectionTrait>(
     transaction: &C,
     tenant: TenantId,
@@ -62,8 +65,8 @@ pub async fn next<C: ConnectionTrait>(
     Ok(row.try_get::<i64>("", "last_value")?)
 }
 
-/// Số đã cấp cuối cùng của dãy (0 khi chưa cấp số nào). Chỉ để xem — muốn cấp số thì gọi [`next`],
-/// không đọc rồi cộng một.
+/// The last number issued in the sequence (0 when none has been issued). For viewing only: to issue a
+/// number call [`next`], do not read then add one.
 pub async fn current<C: ConnectionTrait>(
     connection: &C,
     tenant: TenantId,
@@ -93,7 +96,7 @@ fn check_scope(scope: &str) -> Result<(), Error> {
     Ok(())
 }
 
-/// Migration tạo bảng `kernel_sequences`.
+/// Migration that creates the `kernel_sequences` table.
 pub(crate) struct CreateSequences;
 
 mod migration {

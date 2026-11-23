@@ -1,11 +1,12 @@
-//! Website của một request công khai (bước 34, D-208): mỗi nút của cây tổ chức có thể có website
-//! riêng (cửa hàng, người bán trên sàn). Request tới tên miền đã xác minh gắn với nút N → website
-//! của N; không gắn nút → website của cả khách (nút gốc). Client không gọi qua tên miền riêng (vd
-//! giao diện dựng sẵn, máy chủ khác) nêu website bằng tham số `?site=<id của nút>`.
+//! The website of a public request (step 34, D-208): each node of the organization tree can have its own
+//! website (a store, a seller on a marketplace). A request to a verified domain attached to node N → N's
+//! website; not attached to a node → the whole tenant's website (the root node). A client that does not
+//! come through its own domain (e.g. a prebuilt UI, another server) names the website with the parameter
+//! `?site=<node id>`.
 //!
-//! Module đọc công khai lấy [`Site`] làm extractor rồi lọc theo [`Site::lineage`]: dữ liệu của
-//! chính nút và của mọi nút cấp trên hiện trên website đó (bài của trụ sở hiện ở mọi cửa hàng; bài
-//! của cửa hàng A không hiện ở cửa hàng B).
+//! A public-read module takes [`Site`] as an extractor then filters by [`Site::lineage`]: the data of the
+//! node itself and of every ancestor node shows on that website (a headquarters post shows in every store;
+//! a post of store A does not show in store B).
 
 use axum::extract::FromRequestParts;
 use axum::http::request::Parts;
@@ -14,7 +15,7 @@ use uuid::Uuid;
 use super::{OrgId, OrgTree, TenantContext, TenantHint, root_of};
 use crate::error::Error;
 
-/// Tên tham số query nêu website.
+/// Name of the query parameter that names the website.
 pub const SITE_PARAM: &str = "site";
 
 // Chỉ để mô tả tham số trong OpenAPI (`params(…, SiteQuery)`): giá trị do extractor `Site` đọc.
@@ -28,22 +29,22 @@ pub struct SiteQuery {
     pub site: Option<Uuid>,
 }
 
-/// Website của request: nút của cây tổ chức (gốc = cả khách).
+/// The request's website: a node of the organization tree (root = the whole tenant).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Site {
     org: OrgId,
-    /// Nút và mọi nút cấp trên, gần nhất trước (gồm gốc).
+    /// The node and all its ancestors, nearest first (including the root).
     lineage: Vec<OrgId>,
 }
 
 impl Site {
-    /// Website của cả khách `tenant`.
+    /// The website of the whole tenant `tenant`.
     pub fn whole(tenant: &TenantContext) -> Self {
         let root = root_of(tenant.id());
         Site { org: root, lineage: vec![root] }
     }
 
-    /// Website của nút `org` của khách `tenant`; nút không có trong cây → `site_not_found`.
+    /// The website of node `org` of tenant `tenant`; a node not in the tree → `site_not_found`.
     pub async fn of(tenant: &TenantContext, org: OrgId) -> Result<Self, Error> {
         let root = root_of(tenant.id());
         if org == root {
@@ -56,28 +57,29 @@ impl Site {
         Ok(Site { org, lineage })
     }
 
-    /// Nút của website.
+    /// The website's node.
     pub fn org(&self) -> OrgId {
         self.org
     }
 
-    /// Website của cả khách (nút gốc).
+    /// The website of the whole tenant (the root node).
     pub fn is_whole(&self) -> bool {
         self.lineage.len() <= 1
     }
 
-    /// Nút và mọi nút cấp trên, gần nhất trước: dữ liệu của các nút này hiện trên website.
+    /// The node and all its ancestors, nearest first: the data of these nodes shows on the website.
     pub fn lineage(&self) -> &[OrgId] {
         &self.lineage
     }
 
-    /// UUID của [`lineage`](Self::lineage), cho điều kiện `org_id IN (…)`.
+    /// The UUIDs of [`lineage`](Self::lineage), for the condition `org_id IN (…)`.
     pub fn lineage_ids(&self) -> Vec<Uuid> {
         self.lineage.iter().map(OrgId::as_uuid).collect()
     }
 }
 
-/// `site_not_found` (404): khách không có nút `org` (module trả cùng mã khi nút không dùng được).
+/// `site_not_found` (404): the tenant has no node `org` (modules return the same code when the node is
+/// unusable).
 pub fn site_not_found(org: OrgId) -> Error {
     Error::not_found(
         "site_not_found",
@@ -87,7 +89,7 @@ pub fn site_not_found(org: OrgId) -> Error {
     .with_param("site", org.as_uuid())
 }
 
-/// `site` trong query string, nếu có. Giá trị không phải UUID → 400.
+/// `site` in the query string, if present. A value that is not a UUID → 400.
 fn site_param(parts: &Parts) -> Result<Option<OrgId>, Error> {
     let Some(query) = parts.uri.query() else { return Ok(None) };
     for pair in query.split('&') {
