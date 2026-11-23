@@ -241067,7 +241067,7 @@
     },
     "/api/v1/promotions/me/vouchers": {
       "get": {
-        "description": "Requires `promotions.use` (buyers have it).",
+        "description": "For buyer accounts; a staff account needs `promotions.use`.",
         "operationId": "promotions_list_my_vouchers",
         "parameters": [
           {
@@ -241173,7 +241173,7 @@
                 }
               }
             },
-            "description": "Missing `promotions.use`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+            "description": "A staff account without `promotions.use`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "422": {
             "content": {
@@ -241233,7 +241233,7 @@
     },
     "/api/v1/promotions/me/vouchers/claim-code": {
       "post": {
-        "description": "Requires `promotions.use`. Tries are limited (`promotions.too_many_attempts`). Entering the\nsame code again returns the voucher you already have (200).",
+        "description": "For buyer accounts; a staff account needs `promotions.use`. Tries are limited\n(`promotions.too_many_attempts`). Entering the\nsame code again returns the voucher you already have (200).",
         "operationId": "promotions_claim_voucher_code",
         "parameters": [
           {
@@ -241319,7 +241319,7 @@
                 }
               }
             },
-            "description": "Missing `promotions.use`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+            "description": "A staff account without `promotions.use`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "409": {
             "content": {
@@ -245672,7 +245672,7 @@
     },
     "/api/v1/promotions/public/promotions/{id}/claim": {
       "post": {
-        "description": "Requires `promotions.use`. Only promotions with `claimable`. Vouchers left are a real count.",
+        "description": "For buyer accounts; a staff account needs `promotions.use`. Only promotions with `claimable`.\nVouchers left are a real count.",
         "operationId": "promotions_claim_promotion_voucher",
         "parameters": [
           {
@@ -245758,7 +245758,7 @@
                 }
               }
             },
-            "description": "Missing `promotions.use` (`permission_denied`) or a verified phone number is needed (`promotions.claim_requires_verified_phone`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+            "description": "A staff account without `promotions.use` (`permission_denied`) or a verified phone number is needed (`promotions.claim_requires_verified_phone`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -245807,7 +245807,7 @@
     },
     "/api/v1/promotions/public/promotions/{id}/reminders": {
       "delete": {
-        "description": "Requires `promotions.use`. Removes the reminder (if not sent yet) and withdraws the consent\ngiven for it. Nothing to remove is fine (204).",
+        "description": "For buyer accounts; a staff account needs `promotions.use`. Removes the reminder (if not sent\nyet) and withdraws the consent\ngiven for it. Nothing to remove is fine (204).",
         "operationId": "promotions_delete_flash_sale_reminder",
         "parameters": [
           {
@@ -245868,7 +245868,7 @@
                 }
               }
             },
-            "description": "Missing `promotions.use`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+            "description": "A staff account without `promotions.use`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "default": {
             "content": {
@@ -245895,7 +245895,7 @@
         ]
       },
       "post": {
-        "description": "Requires `promotions.use`. Only public flash sales that have not started. One reminder is sent\na few minutes before the start (in-app, push or email, as your notification settings allow).\nAsking is your consent to this one reminder only — not to advertising. Asking again returns the\nreminder you have (200).",
+        "description": "For buyer accounts; a staff account needs `promotions.use`. Only public flash sales that have\nnot started. One reminder is sent\na few minutes before the start (in-app, push or email, as your notification settings allow).\nAsking is your consent to this one reminder only — not to advertising. Asking again returns the\nreminder you have (200).",
         "operationId": "promotions_create_flash_sale_reminder",
         "parameters": [
           {
@@ -245981,7 +245981,7 @@
                 }
               }
             },
-            "description": "Missing `promotions.use`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+            "description": "A staff account without `promotions.use`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {

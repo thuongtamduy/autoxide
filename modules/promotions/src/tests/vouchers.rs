@@ -93,6 +93,9 @@ async fn chi_chu_vi_dung_duoc_va_luu_nhap_ma_qua_rest() {
         assert_eq!((status, wrong["code"].as_str()), (StatusCode::UNPROCESSABLE_ENTITY, Some("promotions.code_invalid")));
         let (_, wallet) = call(&setup.app, "GET", "/me/vouchers", "buyer0", None).await;
         assert_eq!(wallet["data"].as_array().unwrap().len(), 1);
+        // Nhân sự không có `promotions.use` thì không có ví; người mua không cần permission nào.
+        let (status, _) = call(&setup.app, "GET", "/me/vouchers", "clerk", None).await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
         // Voucher của buyer0 trong giỏ của buyer1: bị từ chối, giỏ vẫn tính được.
         let tenant = setup.tenant();
         let mut cart = setup.cart(&[(variant, 1)]);

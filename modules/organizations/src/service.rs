@@ -726,6 +726,11 @@ impl OrgDirectory for OrgService {
             .scoped(tenant)
             .one(tenant.database().read())
             .await?;
+        // Khách mặc định của bản cài một khách không qua bước tạo khách (seed) nên nút gốc có thể
+        // chưa có: module khác hỏi nút gốc (vd `ledger` mở sổ) thì tạo, như `root()`.
+        if row.is_none() && id == root_of(tenant.id()) {
+            return Ok(Some(to_unit(&self.ensure_root(tenant).await?)));
+        }
         Ok(row.map(|row| to_unit(&row)))
     }
 
@@ -738,7 +743,13 @@ impl OrgDirectory for OrgService {
             .scoped(tenant)
             .all(tenant.database().read())
             .await?;
-        Ok(rows.iter().map(to_unit).collect())
+        let mut found: Vec<Unit> = rows.iter().map(to_unit).collect();
+        // Như `unit`: nút gốc của khách mặc định tạo khi được hỏi tới lần đầu.
+        let root = root_of(tenant.id());
+        if ids.contains(&root) && !found.iter().any(|unit| unit.id == root) {
+            found.push(to_unit(&self.ensure_root(tenant).await?));
+        }
+        Ok(found)
     }
 
     async fn root(&self, tenant: &TenantContext) -> Result<Unit, Error> {
