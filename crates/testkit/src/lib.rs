@@ -36,6 +36,7 @@
 pub mod ai;
 mod app;
 mod contract;
+mod coverage;
 mod dns;
 mod einvoice;
 mod identity;
@@ -59,6 +60,7 @@ mod tenancy;
 mod voice;
 
 pub use app::{TestApp, TestAppBuilder, TestAppError, TestRequest, TestResponse, tool};
+pub use coverage::TEST_API_COVERAGE;
 pub use dns::FakeDns;
 pub use einvoice::{FAKE_EINVOICE_PROVIDER, FakeEInvoiceProvider};
 pub use identity::{FAKE_IDENTITY_PROVIDER, FakeIdentityVerifier, FakeSmsSender};
