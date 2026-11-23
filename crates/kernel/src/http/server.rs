@@ -52,7 +52,7 @@ where
     serve_with(listener, router, shutdown, grace, HEADER_READ_TIMEOUT).await
 }
 
-/// [`serve`] với timeout đọc header `header_timeout` (test dùng số nhỏ).
+// `serve` với timeout đọc header `header_timeout` (test dùng số nhỏ).
 async fn serve_with<F>(
     listener: TcpListener,
     router: Router,
@@ -149,7 +149,7 @@ where
     }
 }
 
-/// Lỗi chỉ của một kết nối (không phải của listener).
+// Lỗi chỉ của một kết nối (không phải của listener).
 fn is_connection_error(error: &std::io::Error) -> bool {
     use std::io::ErrorKind;
     matches!(
@@ -192,8 +192,8 @@ mod tests {
     use super::*;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-    /// Rà soát bảo mật 2026-11: client gửi header nhỏ giọt bị đóng kết nối sau timeout; request
-    /// bình thường vẫn được trả lời.
+    // Rà soát bảo mật 2026-11: client gửi header nhỏ giọt bị đóng kết nối sau timeout; request
+    // bình thường vẫn được trả lời.
     #[tokio::test]
     async fn client_gui_header_qua_cham_bi_dong_ket_noi() {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
