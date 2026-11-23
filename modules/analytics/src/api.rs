@@ -1,36 +1,37 @@
-//! Hợp đồng của module `analytics` cho module khác (đăng ký SAU `analytics`):
-//! `context.require::<dyn Analytics>()`. Ví dụ: `catalog` hỏi "thịnh hành" (đối tượng xem nhiều),
-//! `customers` hỏi "sản phẩm vừa xem" của một người (chỉ có khi người đó đồng ý theo dõi theo người).
+//! Contract of the `analytics` module for other modules (registered AFTER `analytics`):
+//! `context.require::<dyn Analytics>()`. Example: `catalog` asks for "trending" (most-viewed objects),
+//! `customers` asks for a person's "recently viewed products" (available only when that person consented to
+//! per-person tracking).
 
 use autoxide_kernel::error::Error;
 use autoxide_kernel::tenancy::{OrgId, TenantContext};
 use uuid::Uuid;
 
-/// Mục đích trong sổ đồng ý của `compliance` cho phép gắn sự kiện phân tích với người dùng.
+/// Purpose in the `compliance` consent ledger that allows linking analytics events to a user.
 pub const PERSONAL_PURPOSE: &str = "analytics.personal";
 
-/// Loại sự kiện "xem trang" (website gửi kèm `object` khi trang là một đối tượng).
+/// Event kind "page view" (the website also sends `object` when the page is an object).
 pub const PAGE_VIEW: &str = "analytics.page_view";
 
-/// Một đối tượng và số lần được xem.
+/// An object and the number of times it was viewed.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ObjectViews {
-    /// `<loại>:<id>`, vd `catalog.product:0190…`.
+    /// `<kind>:<id>`, vd `catalog.product:0190…`.
     pub object: String,
-    /// Phần `<id>`.
+    /// The `<id>` part.
     pub id: String,
-    /// Số sự kiện nói tới đối tượng.
+    /// Number of events that refer to the object.
     pub views: i64,
-    /// Tổng khách của từng ngày.
+    /// Total visitors per day.
     pub visitors: i64,
 }
 
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
 #[async_trait::async_trait]
 pub trait Analytics: Send + Sync {
-    /// Đối tượng loại `kind` (vd `catalog.product`) được xem nhiều nhất trên website `site` (`None`:
-    /// website của cả khách) trong `days` ngày gần nhất (1–400), nhiều nhất trước, tối đa `limit`
-    /// (1–100). Đọc số gộp, không quét sự kiện thô.
+    /// Objects of kind `kind` (e.g. `catalog.product`) most viewed on website `site` (`None`: the tenant's
+    /// websites as a whole) in the last `days` days (1–400), most first, at most `limit`
+    /// (1–100). Reads the aggregated counts, not raw events.
     async fn top_objects(
         &self,
         tenant: &TenantContext,
@@ -40,8 +41,8 @@ pub trait Analytics: Send + Sync {
         limit: u32,
     ) -> Result<Vec<ObjectViews>, Error>;
 
-    /// Đối tượng loại `kind` người dùng `user_id` vừa xem, mới nhất trước, không trùng, tối đa
-    /// `limit` (1–100). Rỗng khi người đó không đồng ý theo dõi theo người (hay đã rút).
+    /// Objects of kind `kind` that user `user_id` recently viewed, newest first, without duplicates, at most
+    /// `limit` (1–100). Empty when that person did not consent to per-person tracking (or withdrew).
     async fn recently_viewed(
         &self,
         tenant: &TenantContext,

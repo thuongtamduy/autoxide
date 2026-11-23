@@ -1,13 +1,13 @@
-//! Hợp đồng của module `catalog` cho module khác (`inventory`, `promotions`, `shipping`, `orders`,
-//! `channels`, `marketplace`…): chỉ những gì ở đây được dùng từ bên ngoài
-//! (`autoxide_catalog::api::…`). Module khác lấy trait lúc khởi động:
+//! Contract of the `catalog` module for other modules (`inventory`, `promotions`, `shipping`, `orders`,
+//! `channels`, `marketplace`…): only what is here may be used from outside
+//! (`autoxide_catalog::api::…`). Other modules obtain the trait at startup:
 //!
 //! ```text
 //! let catalog = context.require::<dyn autoxide_catalog::api::Catalog>()?;
 //! ```
 //!
-//! Module đó phải đăng ký SAU `catalog` trong `crates/app/src/modules.rs`. Không module nào đọc
-//! bảng `catalog_…` (luật kiến trúc 1). File này không tham chiếu phần bên trong module.
+//! That module must be registered AFTER `catalog` in `crates/app/src/modules.rs`. No module reads
+//! the `catalog_…` tables (architecture rule 1). This file does not reference the module's internals.
 
 use autoxide_kernel::time::{Date, Timestamp};
 use std::collections::HashMap;
@@ -18,92 +18,94 @@ use autoxide_kernel::tenancy::{OrgId, TenantContext};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-/// Catalog giả cho test của module khác (feature `testing`).
+/// Fake catalog for other modules' tests (feature `testing`).
 #[cfg(feature = "testing")]
 pub mod testing;
 
-/// Số ID tối đa mỗi lần gọi một hàm nhận danh sách ID.
+/// Maximum number of IDs per call to a function that takes a list of IDs.
 pub const MAX_IDS: usize = 500;
 
-/// Tên event `catalog` phát mà module khác hay nghe (payload `{"before": …, "after": …}`).
+/// Names of the events `catalog` emits that other modules often listen to (payload `{"before": …, "after": …}`).
 pub mod events {
-    /// Sản phẩm vừa tạo.
+    /// A product was just created.
     pub const PRODUCT_CREATED: &str = "catalog.product_created";
-    /// Sản phẩm đổi thông tin.
+    /// A product's information changed.
     pub const PRODUCT_UPDATED: &str = "catalog.product_updated";
-    /// Sản phẩm đổi trạng thái (`draft`, `active`, `inactive`, `archived`).
+    /// A product's status changed (`draft`, `active`, `inactive`, `archived`).
     pub const PRODUCT_STATUS_CHANGED: &str = "catalog.product_status_changed";
-    /// Sản phẩm được lưu trữ.
+    /// A product was archived.
     pub const PRODUCT_ARCHIVED: &str = "catalog.product_archived";
-    /// Sản phẩm bị xoá (chỉ sản phẩm chưa từng bán).
+    /// A product was deleted (only products that have never been sold).
     pub const PRODUCT_DELETED: &str = "catalog.product_deleted";
-    /// Biến thể vừa tạo.
+    /// A variant was just created.
     pub const VARIANT_CREATED: &str = "catalog.variant_created";
-    /// Biến thể đổi thông tin (SKU, cân nặng, chế độ bán…).
+    /// A variant's information changed (SKU, weight, sale mode…).
     pub const VARIANT_UPDATED: &str = "catalog.variant_updated";
-    /// Biến thể bị xoá.
+    /// A variant was deleted.
     pub const VARIANT_DELETED: &str = "catalog.variant_deleted";
-    /// Thêm dòng giá: bảng giá, biến thể, giá mới, `valid_from`.
+    /// A price row was added: price list, variant, new price, `valid_from`.
     pub const PRICE_CHANGED: &str = "catalog.price_changed";
-    /// Giá hẹn giờ vừa bắt đầu hay giá tạm thời vừa hết hạn (lịch mỗi phút): `after` có
-    /// `variant_ids` và khoảng `from` / `to` đã xét. Giá đang áp của các biến thể đó có thể đã đổi.
+    /// A scheduled price just started or a temporary price just expired (checked every minute): `after` has
+    /// `variant_ids` and the `from` / `to` range examined. The prices currently applied to those variants may
+    /// have changed.
     pub const PRICE_EFFECTIVE: &str = "catalog.price_effective";
-    /// Giá công khai của một sản phẩm ở một nút bán đổi (D-233): `before` / `after` đều là
-    /// `{"org_id", "product_id", "price": Money | null}` — giá sau giảm tự động nếu có, không thì giá
-    /// thấp nhất của các biến thể; `null` khi sản phẩm không hiện ở đó. Không dùng giá gạch. Event chỉ
-    /// là tín hiệu: bên nghe đọc lại giá hiện tại nếu cần.
+    /// The public price of a product at a selling branch changed (D-233): `before` / `after` are both
+    /// `{"org_id", "product_id", "price": Money | null}` — the automatic-discount price if any, otherwise the
+    /// lowest price among the variants; `null` when the product is not visible there. The strikethrough price
+    /// is not used. The event is only a signal: listeners re-read the current price if needed.
     pub const DISPLAY_PRICE_CHANGED: &str = "catalog.display_price_changed";
 
-    /// Event của module `inventory` (bước 42) mà `catalog` nghe để có giá vốn cho sàn giá
-    /// (D-222). `catalog` đọc payload `{"after": {"org_id": "<uuid>", "variant_id": "<uuid>",
-    /// "unit_cost": {"amount": "<số nguyên đơn vị nhỏ nhất>", "currency": "VND"}}}` (dạng JSON của
-    /// `Money`); thiếu trường thì bỏ qua event.
+    /// Event of the `inventory` module (step 42) that `catalog` listens to in order to get costs for the
+    /// price floor (D-222). `catalog` reads the payload
+    /// `{"after": {"org_id": "<uuid>", "variant_id": "<uuid>", "unit_cost": {"amount": "<integer in the smallest unit>", "currency": "VND"}}}`
+    /// (the JSON form of `Money`); if a field is missing, the event is ignored.
     pub const INVENTORY_COST_CHANGED: &str = "inventory.cost_changed";
 
-    /// Event của module `promotions` (bước 43): giá sau giảm tự động của các biến thể đổi.
-    /// `catalog` đọc `after.variant_ids` rồi dựng lại storefront, hỏi giá qua
-    /// [`SalePriceSource`](super::SalePriceSource) mà `promotions` cắm vào bằng
-    /// [`CatalogExtensions`](super::CatalogExtensions). Thiếu trường thì bỏ qua event.
+    /// Event of the `promotions` module (step 43): the automatic-discount prices of changed variants.
+    /// `catalog` reads `after.variant_ids`, rebuilds the storefront, and asks for prices through the
+    /// [`SalePriceSource`](super::SalePriceSource) that `promotions` plugs in with
+    /// [`CatalogExtensions`](super::CatalogExtensions). If a field is missing, the event is ignored.
     pub const PROMOTIONS_AUTOMATIC_PRICES_CHANGED: &str = "promotions.automatic_prices_changed";
 
-    /// Event của module `orders` (bước 45): đơn hoàn tất. `catalog` đọc `after.order_id` và
-    /// `after.lines[].{product_id, quantity}` để đếm bán chạy (sắp `best_selling`) và "thường mua
-    /// cùng"; nhận lại cùng đơn không đếm hai lần.
+    /// Event of the `orders` module (step 45): an order completed. `catalog` reads `after.order_id` and
+    /// `after.lines[].{product_id, quantity}` to count best sellers (sort `best_selling`) and "frequently
+    /// bought together"; receiving the same order again does not count it twice.
     pub const ORDERS_ORDER_COMPLETED: &str = "orders.order_completed";
 
-    /// Event đánh giá của module `orders` (bước 45): đăng, ẩn hay mở lại một đánh giá. `catalog`
-    /// đọc `after.product_id` và `after.product_rating = {"count": <số đánh giá đang hiện>, "sum":
-    /// <tổng số sao>}` — **tổng hiện tại** của sản phẩm (như `orders_review_stats`), không phải
-    /// phần thay đổi, để nhận lại hay nhận lệch thứ tự vẫn đúng. Thiếu trường thì bỏ qua event.
+    /// Review event of the `orders` module (step 45): a review was published, hidden or reopened. `catalog`
+    /// reads `after.product_id` and
+    /// `after.product_rating = {"count": <number of visible reviews>, "sum": <total stars>}` — the product's
+    /// **current total** (as in `orders_review_stats`), not the delta, so receiving it again or out of order
+    /// is still correct. If a field is missing, the event is ignored.
     pub const ORDERS_REVIEW_PUBLISHED: &str = "orders.review_published";
-    /// Như [`ORDERS_REVIEW_PUBLISHED`], khi đánh giá bị ẩn hay mở lại.
+    /// Like [`ORDERS_REVIEW_PUBLISHED`], when a review is hidden or reopened.
     pub const ORDERS_REVIEW_MODERATED: &str = "orders.review_moderated";
 
-    /// Event của module `orders` (bước 45): đơn được xác nhận. `catalog` phát quyền tải hàng số khi
-    /// `after.payment_status = "paid"`, đọc `after.order_id`, `after.buyer_user_id` (có thể `null`) và
-    /// `after.lines[].{line_id, variant_id}`. Nhận lại cùng đơn không phát thêm (khoá theo
-    /// `line_id` và file).
+    /// Event of the `orders` module (step 45): an order was confirmed. `catalog` grants digital-goods
+    /// download rights when `after.payment_status = "paid"`, reading `after.order_id`, `after.buyer_user_id`
+    /// (may be `null`) and `after.lines[].{line_id, variant_id}`. Receiving the same order again grants
+    /// nothing more (keyed by `line_id` and file).
     pub const ORDERS_ORDER_CONFIRMED: &str = "orders.order_confirmed";
-    /// Event của module `orders`: đơn bị huỷ — `catalog` thu hồi mọi quyền tải của `after.order_id`.
+    /// Event of the `orders` module: an order was cancelled — `catalog` revokes every download right of `after.order_id`.
     pub const ORDERS_ORDER_CANCELLED: &str = "orders.order_cancelled";
-    /// Event của module `orders`: một lần hoàn tiền xong. Hoàn tiền không gắn trả hàng
-    /// (`after.return_id = null`) là hoàn cả đơn hay một phần do người bán quyết — `catalog` thu hồi
-    /// quyền tải của `after.order_id`. Hoàn tiền của một lần trả hàng chỉ là hàng vật lý (hàng số
-    /// không trả được) nên không đụng tới quyền tải.
+    /// Event of the `orders` module: a refund completed. A refund not tied to a return
+    /// (`after.return_id = null`) is a whole-order or partial refund decided by the seller — `catalog`
+    /// revokes the download rights of `after.order_id`. A refund for a return concerns physical goods only
+    /// (digital goods cannot be returned), so it does not touch download rights.
     pub const ORDERS_REFUND_COMPLETED: &str = "orders.refund_completed";
 
     // Hai bộ đọc dưới đây là hợp đồng payload: `catalog` đọc event của `orders` bằng đúng chúng,
     // và test của `orders` dùng chúng để kiểm event mình phát khớp hợp đồng.
 
-    /// Một dòng của đơn hoàn tất: sản phẩm và số lượng.
+    /// A line of a completed order: product and quantity.
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub struct SoldLine {
         pub product_id: uuid::Uuid,
         pub quantity: i64,
     }
 
-    /// Đọc `after.order_id` và `after.lines[].{product_id, quantity}` của
-    /// [`ORDERS_ORDER_COMPLETED`]; dòng số lượng ≤ 0 bị bỏ. `None` khi thiếu trường.
+    /// Reads `after.order_id` and `after.lines[].{product_id, quantity}` of
+    /// [`ORDERS_ORDER_COMPLETED`]; lines with quantity ≤ 0 are dropped. `None` when a field is missing.
     pub fn completed_order(payload: &serde_json::Value) -> Option<(uuid::Uuid, Vec<SoldLine>)> {
         let after = &payload["after"];
         let order: uuid::Uuid = after.get("order_id")?.as_str()?.parse().ok()?;
@@ -120,9 +122,9 @@ pub mod events {
         Some((order, lines))
     }
 
-    /// Đọc `after.product_id` và `after.product_rating.{count, sum}` của event đánh giá:
-    /// `(sản phẩm, số đánh giá, tổng số sao)`. `None` khi thiếu trường hay tổng không thể có
-    /// (mỗi đánh giá 1–5 sao).
+    /// Reads `after.product_id` and `after.product_rating.{count, sum}` of the review event:
+    /// `(product, number of reviews, total stars)`. `None` when a field is missing or the total is impossible
+    /// (each review is 1–5 stars).
     pub fn product_rating(payload: &serde_json::Value) -> Option<(uuid::Uuid, i64, i64)> {
         let after = &payload["after"];
         let product: uuid::Uuid = after.get("product_id")?.as_str()?.parse().ok()?;
@@ -134,21 +136,21 @@ pub mod events {
     }
 }
 
-/// Loại sản phẩm.
+/// Product kind.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ProductKind {
-    /// Hàng vật lý: cần giao, có tồn kho.
+    /// Physical goods: need shipping, have stock.
     Physical,
-    /// Hàng số: tải về, không giao, không tồn kho.
+    /// Digital goods: downloaded, not shipped, no stock.
     Digital,
-    /// Dịch vụ: không giao, không tồn kho.
+    /// Service: not shipped, no stock.
     Service,
-    /// Combo / bộ sản phẩm: kho trừ từng thành phần.
+    /// Combo / product bundle: stock is deducted per component.
     Bundle,
 }
 
-/// Trạng thái của sản phẩm.
+/// Product status.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ProductStatus {
@@ -158,91 +160,91 @@ pub enum ProductStatus {
     Archived,
 }
 
-/// Chế độ bán của biến thể (D-204).
+/// Sale mode of a variant (D-204).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SaleMode {
-    /// Chỉ bán khi còn hàng.
+    /// Sold only when in stock.
     InStock,
-    /// Bán cả khi hết hàng (giao khi có).
+    /// Sold even when out of stock (shipped when available).
     Backorder,
-    /// Đặt trước hàng chưa về (`preorder_available_on`).
+    /// Pre-order of goods not yet arrived (`preorder_available_on`).
     Preorder,
 }
 
-/// Ảnh chụp một biến thể, đủ để chụp vào chứng từ và để module khác quyết định.
+/// Snapshot of a variant, enough to capture into a document and for other modules to decide.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct VariantSnapshot {
     pub variant_id: Uuid,
     pub product_id: Uuid,
-    /// Nút sở hữu sản phẩm (chuỗi, cửa hàng hay người bán).
+    /// Branch that owns the product (chain, store or seller).
     pub org_id: OrgId,
     pub kind: ProductKind,
-    /// Của sản phẩm; biến thể tắt thì `variant_active = false`.
+    /// The product's; a disabled variant has `variant_active = false`.
     pub status: ProductStatus,
     pub variant_active: bool,
     pub sku: String,
     pub barcode: Option<String>,
-    /// Tên sản phẩm theo `locale` xin, không có thì ngôn ngữ mặc định của sản phẩm.
+    /// Product name in the requested `locale`, otherwise in the product's default language.
     pub name: String,
-    /// Nhãn tổ hợp tuỳ chọn, vd "Đỏ / M"; rỗng khi sản phẩm không có tuỳ chọn.
+    /// Label of the option combination, e.g. "Red / M"; empty when the product has no options.
     pub variant_label: String,
-    /// Ngôn ngữ thật của `name` và `variant_label`.
+    /// Actual language of `name` and `variant_label`.
     pub locale: String,
-    /// Mã nhóm thuế của engine thuế (bước 36), vd `vat.standard`.
+    /// Tax group code of the tax engine (step 36), e.g. `vat.standard`.
     pub tax_category: String,
-    /// Mọi danh mục của sản phẩm KÈM tổ tiên của chúng.
+    /// Every category of the product PLUS their ancestors.
     pub category_ids: Vec<Uuid>,
     pub weight_grams: Option<i64>,
     pub length_mm: Option<i64>,
     pub width_mm: Option<i64>,
     pub height_mm: Option<i64>,
-    /// `false` với hàng số và dịch vụ.
+    /// `false` for digital goods and services.
     pub requires_shipping: bool,
-    /// `false` với hàng số, dịch vụ và combo (combo trừ kho từng thành phần).
+    /// `false` for digital goods, services and combos (a combo deducts stock per component).
     pub track_inventory: bool,
     pub sale_mode: SaleMode,
-    /// Ngày dự kiến có hàng khi `Preorder` (theo múi giờ của nút).
+    /// Expected availability date when `Preorder` (in the branch's time zone).
     pub preorder_available_on: Option<Date>,
-    /// Tổng suất đặt trước; `None` = không giới hạn.
+    /// Total pre-order slots; `None` = unlimited.
     pub preorder_limit: Option<i64>,
-    /// Hết nhận đặt trước.
+    /// Pre-orders no longer accepted.
     pub preorder_ends_at: Option<Timestamp>,
-    /// Cờ cũ, còn đọc được tới khi `inventory`, `orders` chuyển hết sang `sale_mode` (D-204):
-    /// `true` khi `sale_mode` là `Backorder`.
+    /// Legacy flag, still readable until `inventory` and `orders` have fully moved to `sale_mode` (D-204):
+    /// `true` when `sale_mode` is `Backorder`.
     pub allow_backorder: bool,
     pub lot_tracked: bool,
     pub serial_tracked: bool,
-    /// Số tháng bảo hành; `None` = không bảo hành.
+    /// Warranty months; `None` = no warranty.
     pub warranty_months: Option<i32>,
     pub image_media_id: Option<Uuid>,
-    /// Phiên bản của biến thể, để bên chụp ghi kèm.
+    /// Version of the variant, for the capturing side to record.
     pub updated_at: Timestamp,
 }
 
-/// Câu hỏi giá: giá của các biến thể ở cửa hàng `org_id` lúc `at`.
+/// Price query: prices of the variants at store `org_id` at `at`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct PriceQuery {
-    /// Cửa hàng bán.
+    /// Selling store.
     pub org_id: OrgId,
-    /// Công ty B2B (bước 59; giờ `None`) — D-222.
+    /// B2B company (step 59; currently `None`) — D-222.
     pub company_id: Option<Uuid>,
-    /// Mã nhóm khách (bước 47 cung cấp; giờ là chữ tự do).
+    /// Customer group code (provided by step 47; currently free text).
     pub customer_group: Option<String>,
-    /// Kênh bán (bước 48; giờ `None`) — D-222.
+    /// Sales channel (step 48; currently `None`) — D-222.
     pub channel: Option<String>,
-    /// Thị trường (bước 63; giờ `None`) — D-222.
+    /// Market (step 63; currently `None`) — D-222.
     pub market: Option<String>,
     pub currency: Currency,
     pub at: Timestamp,
-    /// Tối đa [`MAX_IDS`].
+    /// At most [`MAX_IDS`].
     pub variant_ids: Vec<Uuid>,
 }
 
 impl PriceQuery {
-    /// Câu hỏi giá chung (không nhóm khách, kênh, thị trường) ở cửa hàng `org_id` lúc `at`.
+    /// General price query (no customer group, channel or market) at store `org_id` at `at`.
     pub fn new(org_id: OrgId, currency: Currency, at: Timestamp, variant_ids: Vec<Uuid>) -> Self {
         PriceQuery {
             org_id,
@@ -256,97 +258,97 @@ impl PriceQuery {
         }
     }
 
-    /// Hỏi giá của nhóm khách `group`.
+    /// Queries the price of customer group `group`.
     pub fn for_customer_group(mut self, group: impl Into<String>) -> Self {
         self.customer_group = Some(group.into());
         self
     }
 
-    /// Hỏi giá của kênh bán `channel` (bước 48).
+    /// Queries the price of sales channel `channel` (step 48).
     pub fn for_channel(mut self, channel: impl Into<String>) -> Self {
         self.channel = Some(channel.into());
         self
     }
 
-    /// Hỏi giá của thị trường `market` (bước 63).
+    /// Queries the price of market `market` (step 63).
     pub fn for_market(mut self, market: impl Into<String>) -> Self {
         self.market = Some(market.into());
         self
     }
 
-    /// Hỏi giá của công ty B2B `company_id` (bước 59).
+    /// Queries the price of B2B company `company_id` (step 59).
     pub fn for_company(mut self, company_id: Uuid) -> Self {
         self.company_id = Some(company_id);
         self
     }
 }
 
-/// Giá của một biến thể, đủ để chụp vào chứng từ.
+/// Price of a variant, enough to capture into a document.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct PriceSnapshot {
     pub variant_id: Uuid,
-    /// Bảng giá thắng theo thứ tự chọn bảng giá (D-222).
+    /// The winning price list, in price-list selection order (D-222).
     pub price_list_id: Uuid,
-    /// Dòng giá cụ thể — chụp vào chứng từ.
+    /// The specific price row — captured into the document.
     pub price_id: Uuid,
-    /// Giá một đơn vị.
+    /// Price of one unit.
     pub amount: Money,
-    /// Giá đã gồm thuế.
+    /// Price includes tax.
     pub tax_inclusive: bool,
-    /// Giá gạch (chỉ để hiển thị).
+    /// Strikethrough price (for display only).
     pub compare_at: Option<Money>,
     pub valid_from: Timestamp,
-    /// Hết hiệu lực (giá tạm thời); `None` = tới khi có dòng mới.
+    /// Expiry (temporary price); `None` = until a new row exists.
     pub valid_to: Option<Timestamp>,
 }
 
-/// Khi giá dưới sàn thì làm gì (D-222).
+/// What to do when a price is below the floor (D-222).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum FloorAction {
-    /// Ghi được, kèm cảnh báo.
+    /// Can be saved, with a warning.
     Warn,
-    /// Không ghi được.
+    /// Cannot be saved.
     Block,
 }
 
-/// Sàn giá đang áp cho một biến thể ở một nút (D-222): quy tắc của nút gần nhất, danh mục gần
-/// nhất thắng. `promotions` kiểm lúc kích hoạt và cắt giá khi tính.
+/// The price floor in effect for a variant at a branch (D-222): the nearest branch's rule wins, the nearest
+/// category wins. `promotions` checks it at activation and clamps prices when computing.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct PriceFloor {
     pub variant_id: Uuid,
-    /// Quy tắc sàn giá thắng.
+    /// The winning price-floor rule.
     pub guard_id: Uuid,
-    /// Giá tối thiểu tuyệt đối, nếu quy tắc có.
+    /// Absolute minimum price, if the rule has one.
     pub min_price: Option<Money>,
-    /// Biên lợi nhuận tối thiểu trên giá vốn, theo phần vạn (`1500` = 15%), nếu quy tắc có.
+    /// Minimum profit margin over cost, in basis points (`1500` = 15%), if the rule has one.
     pub min_margin_bp: Option<i64>,
-    /// Giá vốn đơn vị đã biết (từ event `inventory.cost_changed`), nếu có.
+    /// Known unit cost (from the event `inventory.cost_changed`), if any.
     pub unit_cost: Option<Money>,
-    /// Giá thấp nhất được phép: lớn hơn của `min_price` và giá vốn × (1 + biên); `None` khi
-    /// quy tắc chỉ có biên mà chưa biết giá vốn.
+    /// Lowest allowed price: the larger of `min_price` and cost × (1 + margin); `None` when
+    /// the rule has only a margin and the cost is not known.
     pub floor: Option<Money>,
     pub action: FloorAction,
 }
 
-/// Một thành phần của combo.
+/// A component of a combo.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BundleComponent {
     pub variant_id: Uuid,
-    /// Số đơn vị của thành phần trong một combo; > 0.
+    /// Units of the component in one combo; > 0.
     pub quantity: i64,
 }
 
-/// Đọc sản phẩm, biến thể và giá cho module khác.
+/// Reads products, variants and prices for other modules.
 //
 // `#[async_trait]`: Rust chưa cho gọi hàm `async` của trait qua `dyn Trait`; macro này đổi hàm
 // `async` thành hàm trả về `Box<dyn Future>` để gọi được.
 #[async_trait::async_trait]
 pub trait Catalog: Send + Sync {
-    /// Biến thể theo ID, theo thứ tự `ids`, bỏ ID không có. Quá [`MAX_IDS`] thì lỗi
-    /// `catalog.too_many_ids`. Một lần gọi là vài câu query, không phụ thuộc số ID.
+    /// Variants by ID, in the order of `ids`, skipping IDs that do not exist. More than [`MAX_IDS`] is the
+    /// error `catalog.too_many_ids`. One call costs a few queries, independent of the number of IDs.
     async fn variants(
         &self,
         tenant: &TenantContext,
@@ -354,8 +356,8 @@ pub trait Catalog: Send + Sync {
         locale: Option<&str>,
     ) -> Result<Vec<VariantSnapshot>, Error>;
 
-    /// Một biến thể theo SKU (không phân biệt hoa thường, bỏ khoảng trắng) hoặc mã vạch — bán tại
-    /// quầy, đa kênh.
+    /// One variant by SKU (case-insensitive, whitespace trimmed) or barcode — for selling at the
+    /// counter, omnichannel.
     async fn variant_by_code(
         &self,
         tenant: &TenantContext,
@@ -363,24 +365,24 @@ pub trait Catalog: Send + Sync {
         locale: Option<&str>,
     ) -> Result<Option<VariantSnapshot>, Error>;
 
-    /// Giá đang hiệu lực lúc `query.at` (dòng có `valid_from <= at`, chưa hết hạn), theo thứ tự
-    /// chọn bảng giá (D-222). Biến thể không có giá thì vắng trong kết quả.
+    /// Prices in effect at `query.at` (rows with `valid_from <= at`, not expired), in price-list
+    /// selection order (D-222). A variant with no price is absent from the result.
     async fn prices(
         &self,
         tenant: &TenantContext,
         query: &PriceQuery,
     ) -> Result<Vec<PriceSnapshot>, Error>;
 
-    /// Giá hiệu lực NGAY TRƯỚC `query.at` (dòng có `valid_from < at`) — "giá ngay trước khuyến
-    /// mại" (bước 43). Cùng bảng giá như [`prices`](Self::prices).
+    /// Price in effect JUST BEFORE `query.at` (rows with `valid_from < at`) — the "price just before the
+    /// promotion" (step 43). Same price lists as [`prices`](Self::prices).
     async fn reference_prices(
         &self,
         tenant: &TenantContext,
         query: &PriceQuery,
     ) -> Result<Vec<PriceSnapshot>, Error>;
 
-    /// Sàn giá đang áp cho các biến thể ở nút `org_id`, tiền `currency` (D-222). Biến thể không
-    /// có quy tắc nào thì vắng.
+    /// Price floors in effect for the variants at branch `org_id`, in currency `currency` (D-222). A variant
+    /// with no rule is absent.
     async fn price_floors(
         &self,
         tenant: &TenantContext,
@@ -389,12 +391,13 @@ pub trait Catalog: Send + Sync {
         variant_ids: &[Uuid],
     ) -> Result<Vec<PriceFloor>, Error>;
 
-    /// Giá công khai lúc này (D-233, báo giảm giá cho danh sách yêu thích), ở nút sở hữu sản phẩm
-    /// (bảng giá chung gần nhất trong chuỗi của nó): theo biến thể là giá niêm yết hay giá sau giảm
-    /// tự động nếu thấp hơn; theo sản phẩm là giá thấp nhất của các biến thể đang bán. Không dùng giá gạch, giá theo nhóm khách hay
-    /// mã giảm giá. Không bán / không có giá thì vắng. Mỗi danh sách tối đa [`MAX_IDS`].
+    /// Current public prices (D-233, wishlist price-drop alerts), at the branch that owns the product
+    /// (nearest shared price list in its chain): per variant it is the list price or the automatic-discount
+    /// price if lower; per product it is the lowest price among the variants on sale. Does not use the
+    /// strikethrough price, customer-group prices or discount codes. Not for sale / no price: absent. Each
+    /// list holds at most [`MAX_IDS`].
     ///
-    /// Cài đặt mặc định trả rỗng, để bản giả trong test của module khác không phải sửa.
+    /// The default implementation returns empty, so fakes in other modules' tests need no changes.
     async fn display_prices(
         &self,
         tenant: &TenantContext,
@@ -405,7 +408,7 @@ pub trait Catalog: Send + Sync {
         Ok(DisplayPrices::default())
     }
 
-    /// Thành phần của các biến thể combo (biến thể không phải combo thì vắng).
+    /// Components of the combo variants (a variant that is not a combo is absent).
     async fn bundle_components(
         &self,
         tenant: &TenantContext,
@@ -413,7 +416,7 @@ pub trait Catalog: Send + Sync {
     ) -> Result<HashMap<Uuid, Vec<BundleComponent>>, Error>;
 }
 
-/// Giá công khai (D-233) theo sản phẩm và theo biến thể, xem [`Catalog::display_prices`].
+/// Public prices (D-233) per product and per variant, see [`Catalog::display_prices`].
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct DisplayPrices {
@@ -421,14 +424,14 @@ pub struct DisplayPrices {
     pub variants: HashMap<Uuid, Money>,
 }
 
-/// Giá sau giảm tự động của một biến thể (từ khuyến mại không cần mã, không điều kiện giỏ).
+/// Automatic-discount price of a variant (from promotions needing no code and no cart condition).
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct SalePrice {
     pub variant_id: Uuid,
-    /// Giá một đơn vị sau giảm, cùng tiền tệ với giá niêm yết đã gửi.
+    /// Price of one unit after the discount, in the same currency as the list price that was sent.
     pub sale_price: Money,
-    /// Lúc giá giảm hết.
+    /// When the discounted price ends.
     pub ends_at: Timestamp,
 }
 
@@ -438,13 +441,13 @@ impl SalePrice {
     }
 }
 
-/// Nguồn giá sau giảm tự động cho storefront công khai. `promotions` đăng ký SAU `catalog` và phụ
-/// thuộc vào `catalog`, nên `catalog` không gọi thẳng trait của nó được (vòng phụ thuộc): module
-/// khuyến mại cài trait này và cắm vào bằng [`CatalogExtensions::set_sale_price_source`].
+/// Source of automatic-discount prices for the public storefront. `promotions` registers AFTER `catalog` and
+/// depends on `catalog`, so `catalog` cannot call its trait directly (a dependency cycle): the promotions
+/// module implements this trait and plugs it in with [`CatalogExtensions::set_sale_price_source`].
 #[async_trait::async_trait]
 pub trait SalePriceSource: Send + Sync {
-    /// Giá sau giảm của các biến thể ở nút bán `org_id` lúc `at`, từ giá niêm yết `prices`
-    /// (biến thể, giá). Biến thể không được giảm thì vắng. Gọi ngoài transaction.
+    /// Discounted prices of the variants at selling branch `org_id` at `at`, from the list prices `prices`
+    /// (variant, price). A variant that gets no discount is absent. Call outside a transaction.
     async fn sale_prices(
         &self,
         tenant: &TenantContext,
@@ -454,14 +457,14 @@ pub trait SalePriceSource: Send + Sync {
     ) -> Result<Vec<SalePrice>, Error>;
 }
 
-/// Sản phẩm sắp mở bán, đưa cho [`ListingGate`] xét.
+/// A product about to go on sale, handed to [`ListingGate`] for review.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct ListingCandidate {
     pub product_id: Uuid,
-    /// Nút sở hữu sản phẩm (người bán khi là sàn).
+    /// Branch that owns the product (the seller when a marketplace).
     pub org_id: OrgId,
-    /// Danh mục của sản phẩm (không kèm tổ tiên).
+    /// Categories of the product (without ancestors).
     pub category_ids: Vec<Uuid>,
     pub kind: ProductKind,
 }
@@ -477,21 +480,21 @@ impl ListingCandidate {
     }
 }
 
-/// Kết quả xét mở bán.
+/// Result of the listing review.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ListingDecision {
     Allow,
-    /// Không cho mở bán. `code` là mã lỗi ổn định của module cắm vào (vd
-    /// `marketplace.seller_not_verified`, có bản dịch ở module đó), `message` nói rõ phải làm gì.
+    /// Listing is not allowed. `code` is the stable error code of the plugged-in module (e.g.
+    /// `marketplace.seller_not_verified`, translated in that module), `message` says clearly what to do.
     Deny {
         code: String,
         message: String,
     },
 }
 
-/// Điều kiện mở bán do module khác đặt (bước 46: người bán đã xác thực, sản phẩm đã duyệt, đủ giấy
-/// tờ ngành hàng). `catalog` hỏi trước khi chuyển sản phẩm sang `active`, ngoài transaction.
+/// Listing condition set by another module (step 46: seller verified, product approved, category
+/// paperwork complete). `catalog` asks before moving a product to `active`, outside a transaction.
 #[async_trait::async_trait]
 pub trait ListingGate: Send + Sync {
     async fn can_publish(
@@ -501,15 +504,15 @@ pub trait ListingGate: Send + Sync {
     ) -> Result<ListingDecision, Error>;
 }
 
-/// Điểm cắm của module đăng ký sau `catalog`: lấy bằng
-/// `context.require::<dyn CatalogExtensions>()` trong `Module::start`.
+/// Extension point for modules registered after `catalog`: obtain it with
+/// `context.require::<dyn CatalogExtensions>()` in `Module::start`.
 pub trait CatalogExtensions: Send + Sync {
-    /// Cắm nguồn giá sau giảm tự động (một nguồn; cắm lần hai thì giữ nguồn đầu và trả `false`).
+    /// Plugs in the automatic-discount price source (one source; plugging a second keeps the first and returns `false`).
     fn set_sale_price_source(&self, source: std::sync::Arc<dyn SalePriceSource>) -> bool;
 
-    /// Cắm điều kiện mở bán (một điều kiện; cắm lần hai thì giữ cái đầu và trả `false`). Có cài
-    /// đặt mặc định (không nhận, trả `false`) để bản cài đặt sẵn có — vd bản giả trong test của
-    /// module khác — không phải sửa khi trait có thêm hàm.
+    /// Plugs in the listing condition (one condition; plugging a second keeps the first and returns `false`).
+    /// Has a default implementation (accepts nothing, returns `false`) so existing implementations — e.g.
+    /// fakes in other modules' tests — need no changes when the trait gains a function.
     fn set_listing_gate(&self, gate: std::sync::Arc<dyn ListingGate>) -> bool {
         let _ = gate;
         false

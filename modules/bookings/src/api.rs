@@ -1,8 +1,8 @@
-//! Hợp đồng của module `bookings` cho module khác. Chưa module nào cần gọi vào `bookings`; event của
-//! module (`bookings.booking_created`, `…_confirmed`, `…_cancelled`, `…_rescheduled`, `…_no_show`,
-//! `…_completed`) là cách nghe thay đổi. Thêm trait vào đây khi có module cần.
+//! Contract of the `bookings` module for other modules. No module needs to call into `bookings` yet; the
+//! module's events (`bookings.booking_created`, `…_confirmed`, `…_cancelled`, `…_rescheduled`, `…_no_show`,
+//! `…_completed`) are the way to listen for changes. Add traits here when a module needs them.
 
-/// Tên các event lịch đặt, cho module nghe qua `Module::subscriptions`.
+/// Names of the booking events, for modules to listen to through `Module::subscriptions`.
 pub const BOOKING_EVENTS: [&str; 6] = [
     "bookings.booking_created",
     "bookings.booking_confirmed",

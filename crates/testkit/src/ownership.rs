@@ -1,19 +1,19 @@
-//! Kiểm luật "module sở hữu bảng của mình" trên một database đã migrate:
+//! Checks the rule "a module owns its own tables" on a migrated database:
 //!
-//! 1. mọi bảng mang tiền tố `<module>_` của đúng một module đã đăng ký;
-//! 2. không foreign key nào trỏ sang bảng của module khác.
+//! 1. every table carries the `<module>_` prefix of exactly one registered module;
+//! 2. no foreign key points to a table of another module.
 //!
-//! Hai luật này trình biên dịch không thấy được — chúng nằm trong cấu trúc
-//! database — nên phải hỏi chính database. Câu hỏi khác nhau giữa SQLite và
-//! Postgres (mỗi bên có bảng danh mục riêng); cả hai nhánh nằm ở file này và đều
-//! được gate chạy.
+//! The compiler cannot see these two rules — they live in the structure of the
+//! database — so the database itself must be asked. The question differs between SQLite and
+//! Postgres (each has its own catalog tables); both branches live in this file and are both
+//! run by the gate.
 
 use sea_orm::{ConnectionTrait, DatabaseConnection, DbBackend, DbErr, Statement};
 
 use crate::TestDatabaseError;
 
-/// Tìm các vi phạm luật sở hữu bảng. `modules` là tên các module đã đăng ký.
-/// Trả về danh sách câu mô tả vi phạm (đã sắp xếp); rỗng nghĩa là hợp lệ.
+/// Finds violations of the table ownership rule. `modules` is the names of the registered modules.
+/// Returns a sorted list of sentences describing the violations; empty means valid.
 pub async fn schema_ownership_violations(
     connection: &DatabaseConnection,
     modules: &[&str],
@@ -47,7 +47,7 @@ pub async fn schema_ownership_violations(
     Ok(violations)
 }
 
-/// Module sở hữu `table`: module có tiền tố `<module>_` khớp tên bảng.
+/// The module that owns `table`: the module whose `<module>_` prefix matches the table name.
 fn owner<'a>(table: &str, modules: &[&'a str]) -> Option<&'a str> {
     modules
         .iter()
@@ -59,7 +59,7 @@ fn owner<'a>(table: &str, modules: &[&'a str]) -> Option<&'a str> {
         .max_by_key(|module| module.len())
 }
 
-/// Câu lệnh liệt kê tên mọi bảng của ứng dụng.
+/// Statement listing the names of all tables of the application.
 fn tables_sql(backend: DbBackend) -> Result<&'static str, TestDatabaseError> {
     match backend {
         DbBackend::Sqlite => {
@@ -71,7 +71,7 @@ fn tables_sql(backend: DbBackend) -> Result<&'static str, TestDatabaseError> {
     }
 }
 
-/// Câu lệnh liệt kê mọi foreign key thành cặp (bảng chứa khoá, bảng được trỏ tới).
+/// Statement listing every foreign key as a pair (table holding the key, table pointed to).
 fn foreign_keys_sql(backend: DbBackend) -> Result<&'static str, TestDatabaseError> {
     match backend {
         DbBackend::Sqlite => Ok("SELECT m.name, f.\"table\" FROM sqlite_master m \

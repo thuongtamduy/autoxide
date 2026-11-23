@@ -1,12 +1,12 @@
-//! Hợp đồng của module `address` cho module khác: kiểu địa chỉ và trait tra đơn vị hành chính.
-//! Module khác lấy trait lúc khởi động: `context.require::<dyn AdministrativeUnits>()?` (đăng ký
-//! SAU `address`).
+//! Contract of the `address` module for other modules: the address types and the trait for looking up
+//! administrative units. Other modules get the trait at startup:
+//! `context.require::<dyn AdministrativeUnits>()?` (registered AFTER `address`).
 
 use autoxide_kernel::error::{Error, FieldError};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-/// Danh mục hành chính giả cho test của module khác (feature `testing`).
+/// A fake administrative catalog for other modules' tests (feature `testing`).
 #[cfg(feature = "testing")]
 pub mod testing;
 
@@ -85,24 +85,24 @@ pub struct AdministrativeUnit {
     pub valid_to: Option<String>,
 }
 
-/// Tra đơn vị hành chính (module `address` công bố).
+/// Lookup of administrative units (published by the `address` module).
 //
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
 #[async_trait::async_trait]
 pub trait AdministrativeUnits: Send + Sync {
-    /// Tỉnh của `country` còn hiệu lực ngày `as_of` (`YYYY-MM-DD`; `None`: hôm nay), theo mã.
+    /// Provinces of `country` in force on day `as_of` (`YYYY-MM-DD`; `None`: today), by code.
     async fn provinces(
         &self,
         country: &str,
         as_of: Option<&str>,
     ) -> Result<Vec<AdministrativeUnit>, Error>;
-    /// Xã của tỉnh `province` (mã), như trên. Tỉnh không có: `address.unit_not_found`.
+    /// Communes of province `province` (code), as above. A province that does not exist: `address.unit_not_found`.
     async fn communes(
         &self,
         country: &str,
         province: &str,
         as_of: Option<&str>,
     ) -> Result<Vec<AdministrativeUnit>, Error>;
-    /// Kiểm địa chỉ và điền tên; lỗi gắn tiền tố `field` (vd `address.` → `address.commune_code`).
+    /// Validates an address and fills in names; errors get the prefix `field` (e.g. `address.` → `address.commune_code`).
     async fn validate(&self, input: AddressInput, field: &str) -> Result<Address, Vec<FieldError>>;
 }

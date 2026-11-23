@@ -1,8 +1,8 @@
-//! Hợp đồng của module `inventory` cho module khác (`orders`, `catalog`, `channels`, báo
-//! cáo…): chỉ những gì ở đây được dùng từ bên ngoài (`autoxide_inventory::api::…`). Module khác
-//! lấy trait lúc khởi động bằng `context.require::<dyn …>()` và phải đăng ký SAU `inventory`
-//! trong `crates/app/src/modules.rs`. Không module nào đọc bảng `inventory_…` (luật kiến trúc 1).
-//! File này không tham chiếu phần bên trong module.
+//! Contract of the `inventory` module for other modules (`orders`, `catalog`, `channels`, reports…):
+//! only what is here may be used from outside (`autoxide_inventory::api::…`). Other modules
+//! obtain the traits at startup with `context.require::<dyn …>()` and must be registered AFTER `inventory`
+//! in `crates/app/src/modules.rs`. No module reads the `inventory_…` tables (architecture rule 1).
+//! This file does not reference the module's internals.
 
 use autoxide_kernel::error::Error;
 use autoxide_kernel::reference::Submitted;
@@ -11,46 +11,46 @@ use autoxide_kernel::time::Timestamp;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-/// Số ID tối đa mỗi lần gọi một hàm nhận danh sách ID.
+/// Maximum number of IDs per call to a function that takes a list of IDs.
 pub const MAX_IDS: usize = 500;
 
-/// Tên event `inventory` phát mà module khác hay nghe (payload `{"before": …, "after": …}`).
+/// Names of the events `inventory` emits that other modules often listen to (payload `{"before": …, "after": …}`).
 pub mod events {
-    /// Tồn của một dòng (biến thể × kho) đổi. `after`: `level_id`, `org_id`, `variant_id`,
-    /// `on_hand`, `available`, `reserved`; `before`: `on_hand`, `available`. Nhiều thay đổi của
-    /// một dòng trong một transaction gộp thành một event.
+    /// Stock of a row (variant × warehouse) changed. `after`: `level_id`, `org_id`, `variant_id`,
+    /// `on_hand`, `available`, `reserved`; `before`: `on_hand`, `available`. Several changes to
+    /// one row in one transaction are merged into one event.
     pub const LEVEL_CHANGED: &str = "inventory.level_changed";
-    /// Tồn bán được đi từ trên xuống ≤ điểm đặt hàng lại (`reorder_point`).
+    /// Sellable stock went from above to ≤ the reorder point (`reorder_point`).
     pub const LOW_STOCK: &str = "inventory.low_stock";
-    /// Tồn bán được đi từ trên 0 xuống ≤ 0.
+    /// Sellable stock went from above 0 down to ≤ 0.
     pub const OUT_OF_STOCK: &str = "inventory.out_of_stock";
-    /// Một dòng của sổ biến động được ghi.
+    /// A row of the movement ledger was recorded.
     pub const MOVEMENT_RECORDED: &str = "inventory.movement_recorded";
-    /// Giá vốn bình quân của biến thể ở một kho đổi. `after`: `org_id`, `variant_id`,
-    /// `unit_cost` (dạng JSON của `Money`) — `catalog` nghe để có giá vốn cho sàn giá (D-222).
+    /// The average cost of a variant at a warehouse changed. `after`: `org_id`, `variant_id`,
+    /// `unit_cost` (the JSON form of `Money`) — `catalog` listens to get costs for the price floor (D-222).
     pub const COST_CHANGED: &str = "inventory.cost_changed";
-    /// Hàng được giữ cho một đơn (`after`: chỗ giữ).
+    /// Goods were held for an order (`after`: the hold).
     pub const RESERVATION_HELD: &str = "inventory.reservation_held";
-    /// Chỗ giữ được xác nhận (đơn đã đặt).
+    /// A hold was confirmed (the order was placed).
     pub const RESERVATION_CONFIRMED: &str = "inventory.reservation_confirmed";
-    /// Chỗ giữ được trả (`after.reason`: `cancelled`, `payment_failed`, `checkout_aborted`, `manual`).
+    /// A hold was released (`after.reason`: `cancelled`, `payment_failed`, `checkout_aborted`, `manual`).
     pub const RESERVATION_RELEASED: &str = "inventory.reservation_released";
-    /// Chỗ giữ hết hạn khi chưa xác nhận.
+    /// A hold expired before being confirmed.
     pub const RESERVATION_EXPIRED: &str = "inventory.reservation_expired";
-    /// Hàng về được chia cho một dòng đặt trước (D-204). `after`: `reservation_id`, `order_id`,
-    /// `line_key`, `variant_id`, `warehouse_org_id`, `quantity` (lần này), `allocated_quantity`
-    /// (cộng dồn) — `orders` chuyển đơn sang chuẩn bị hàng khi đủ.
+    /// Incoming stock was allocated to a pre-order line (D-204). `after`: `reservation_id`, `order_id`,
+    /// `line_key`, `variant_id`, `warehouse_org_id`, `quantity` (this time), `allocated_quantity`
+    /// (cumulative) — `orders` moves the order to preparation once fully allocated.
     pub const PREORDER_ALLOCATED: &str = "inventory.preorder_allocated";
 }
 
-/// Một dòng của đơn cần giữ hàng.
+/// A line of an order that needs goods held.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct ReserveLine {
-    /// Mã dòng của đơn (duy nhất trong đơn, 1–100 ký tự): xuất kho và trả lời lỗi theo mã này.
+    /// Order line code (unique within the order, 1–100 characters): issuing stock and error replies use this code.
     pub line_key: String,
     pub variant_id: Uuid,
-    /// 1…1 000 000 đơn vị (combo: số combo).
+    /// 1…1 000 000 units (combo: number of combos).
     pub quantity: i64,
 }
 
@@ -60,19 +60,19 @@ impl ReserveLine {
     }
 }
 
-/// Lệnh giữ hàng cho cả một đơn.
+/// Command to hold goods for a whole order.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct ReserveRequest {
-    /// Mã tham chiếu: một đơn giữ một lần.
+    /// Reference code: an order holds goods once.
     pub order_id: Uuid,
-    /// Cửa hàng / kênh bán: kho phục vụ nó là ứng viên.
+    /// Store / sales channel: the warehouses serving it are candidates.
     pub selling_org_id: OrgId,
-    /// Nhận tại cửa hàng, bán tại quầy: chỉ lấy từ kho này.
+    /// Pick up at the store, sold at the counter: take only from this warehouse.
     pub fixed_org_id: Option<OrgId>,
-    /// Mã tỉnh (module `address`) của nơi giao, để ưu tiên kho cùng tỉnh.
+    /// Province code (`address` module) of the delivery place, to prefer warehouses in the same province.
     pub ship_to_province: Option<String>,
-    /// Hạn thanh toán do `orders` đặt (≤ `AUTOXIDE_INVENTORY_MAX_HOLD_HOURS` từ bây giờ).
+    /// Payment deadline set by `orders` (≤ `AUTOXIDE_INVENTORY_MAX_HOLD_HOURS` from now).
     pub expires_at: Timestamp,
     pub lines: Vec<ReserveLine>,
 }
@@ -94,37 +94,37 @@ impl ReserveRequest {
         }
     }
 
-    /// Chỉ lấy hàng từ kho `org` (nhận tại cửa hàng, bán tại quầy).
+    /// Take goods only from warehouse `org` (pick up at the store, sold at the counter).
     pub fn from_warehouse(mut self, org: OrgId) -> Self {
         self.fixed_org_id = Some(org);
         self
     }
 
-    /// Giao tới tỉnh `province` (mã của `address`): kho cùng tỉnh trước khi cửa hàng bật ưu tiên.
+    /// Deliver to province `province` (`address` code): warehouses in the same province first, before the store's priority setting is applied.
     pub fn ship_to(mut self, province: impl Into<String>) -> Self {
         self.ship_to_province = Some(province.into());
         self
     }
 }
 
-/// Trạng thái của chỗ giữ hàng.
+/// State of a stock hold.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ReservationStatus {
-    /// Đang giữ, có hạn (`expires_at`).
+    /// Held, with a deadline (`expires_at`).
     Held,
-    /// Đơn đã đặt: giữ tới khi xuất hay huỷ, không hạn.
+    /// Order placed: held until issued or cancelled, no deadline.
     Confirmed,
-    /// Mọi dòng đã xuất (hay phần còn lại đã trả sau khi xuất một phần).
+    /// Every line issued (or the remainder released after a partial issue).
     Fulfilled,
-    /// Đã trả lại (huỷ, thanh toán lỗi…) trước khi xuất gì.
+    /// Released (cancelled, payment failed…) before anything was issued.
     Released,
-    /// Hết hạn khi còn `Held`: hàng đã về tồn bán được.
+    /// Expired while still `Held`: the goods went back to sellable stock.
     Expired,
 }
 
 impl ReservationStatus {
-    /// Tên ổn định: `held`, `confirmed`, `fulfilled`, `released`, `expired`.
+    /// Stable names: `held`, `confirmed`, `fulfilled`, `released`, `expired`.
     pub const fn as_str(self) -> &'static str {
         match self {
             ReservationStatus::Held => "held",
@@ -148,30 +148,30 @@ impl ReservationStatus {
     }
 }
 
-/// Một phần của dòng đơn đã giữ ở một kho. Một dòng đơn có nhiều phần khi là combo (mỗi thành
-/// phần một phần) hay khi cửa hàng cho chia kho.
+/// A part of an order line held at one warehouse. An order line has several parts when it is a combo (one
+/// part per component) or when the store allows splitting across warehouses.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct ReservedLine {
     pub line_key: String,
-    /// Biến thể thật bị trừ (thành phần, khi dòng là combo).
+    /// The real variant deducted (component, when the line is a combo).
     pub variant_id: Uuid,
-    /// Biến thể combo của dòng đơn, khi dòng là combo.
+    /// The combo variant of the order line, when the line is a combo.
     pub bundle_variant_id: Option<Uuid>,
     pub warehouse_org_id: OrgId,
-    /// Đơn vị của biến thể này đã giữ.
+    /// Units of this variant held.
     pub quantity: i64,
     pub fulfilled_quantity: i64,
     pub released_quantity: i64,
-    /// Giữ khi tồn bán được không đủ (sản phẩm cho bán khi hết hàng).
+    /// Held when sellable stock is not enough (a product that may be sold when out of stock).
     pub backordered: bool,
-    /// Dòng đặt trước (D-204).
+    /// Pre-order line (D-204).
     pub preordered: bool,
-    /// Dòng đặt trước: số đơn vị hàng về đã chia cho dòng này (cộng dồn, gồm phần đã xuất).
+    /// Pre-order line: units of incoming stock allocated to this line (cumulative, including those already issued).
     pub allocated_quantity: i64,
 }
 
-/// Chỗ giữ hàng của một đơn.
+/// Stock hold of an order.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct Reservation {
@@ -179,22 +179,22 @@ pub struct Reservation {
     pub order_id: Uuid,
     pub selling_org_id: OrgId,
     pub status: ReservationStatus,
-    /// `None` khi đã xác nhận (hay đã kết thúc).
+    /// `None` once confirmed (or finished).
     pub expires_at: Option<Timestamp>,
-    /// Dòng không theo dõi tồn (hàng số, dịch vụ) không có phần nào ở đây.
+    /// A line that does not track stock (digital goods, services) has no part here.
     pub lines: Vec<ReservedLine>,
 }
 
-/// Một dòng của lần xuất kho.
+/// A line of a stock issue.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct FulfilLine {
     pub line_key: String,
-    /// Số đơn vị của dòng đơn (combo: số combo) xuất lần này.
+    /// Units of the order line (combo: number of combos) issued this time.
     pub quantity: i64,
-    /// Lô xuất; trống khi biến thể theo dõi lô thì tự chọn lô hết hạn trước.
+    /// Issued lot; when empty and the variant tracks lots, the lot expiring first is chosen automatically.
     pub lot_code: Option<String>,
-    /// Bắt buộc, đủ `quantity` số, khi biến thể theo dõi serial.
+    /// Required, `quantity` numbers in total, when the variant tracks serials.
     pub serials: Vec<String>,
 }
 
@@ -214,14 +214,14 @@ impl FulfilLine {
     }
 }
 
-/// Lệnh xuất kho theo chỗ đã giữ của một đơn.
+/// Command to issue stock against the hold of an order.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct FulfilRequest {
     pub order_id: Uuid,
-    /// Mã của lần xuất (vd mã vận đơn): gửi lại cùng mã không xuất lần hai.
+    /// Code of the issue (e.g. a waybill code): sending the same code again does not issue a second time.
     pub fulfilment_key: String,
-    /// Trống: xuất hết phần còn lại.
+    /// Empty: issue the whole remainder.
     pub lines: Vec<FulfilLine>,
 }
 
@@ -231,13 +231,13 @@ impl FulfilRequest {
     }
 }
 
-/// Một dòng hàng trả về nhập lại kho.
+/// A line of returned goods to restock.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct RestockLine {
     pub variant_id: Uuid,
     pub quantity: i64,
-    /// `false`: chỉ ghi nhận (hàng hỏng), không cộng vào tồn.
+    /// `false`: only record it (damaged goods), do not add to stock.
     pub sellable: bool,
     pub lot_code: Option<String>,
     pub serials: Vec<String>,
@@ -249,11 +249,11 @@ impl RestockLine {
     }
 }
 
-/// Lệnh nhập lại hàng trả về.
+/// Command to restock returned goods.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct RestockRequest {
-    /// Vd `return:<return_id>`; chống trùng vĩnh viễn.
+    /// E.g. `return:<return_id>`; permanent deduplication.
     pub reference: String,
     pub order_id: Option<Uuid>,
     pub warehouse_org_id: OrgId,
@@ -271,7 +271,7 @@ impl RestockRequest {
     }
 }
 
-/// Tồn của một biến thể ở một kho phục vụ cửa hàng.
+/// Stock of a variant at a warehouse serving a store.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct Availability {
@@ -282,7 +282,7 @@ pub struct Availability {
     pub incoming: i64,
 }
 
-/// Vì sao trả chỗ giữ.
+/// Why the hold was released.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ReleaseReason {
@@ -290,7 +290,7 @@ pub enum ReleaseReason {
     PaymentFailed,
     Expired,
     CheckoutAborted,
-    /// Nhân viên gỡ chỗ giữ bị kẹt bằng tay.
+    /// Staff manually clear a stuck hold.
     Manual,
 }
 
@@ -306,15 +306,15 @@ impl ReleaseReason {
     }
 }
 
-/// Tồn kho cho module khác: giữ chỗ → xác nhận → xuất / trả lại theo `order_id` (`orders`, bước
-/// 45), nhập lại hàng trả về, đọc tồn bán được.
+/// Stock for other modules: hold → confirm → issue / release by `order_id` (`orders`, step
+/// 45), restock returned goods, read sellable stock.
 //
 // `#[async_trait]`: Rust chưa cho gọi hàm `async` của trait qua `dyn Trait`; macro này đổi hàm
 // `async` thành hàm trả về `Box<dyn Future>` để gọi được.
 #[async_trait::async_trait]
 pub trait Inventory: Send + Sync {
-    /// Tồn của các biến thể ở từng kho phục vụ `selling_org_id` (theo thứ tự chọn kho), tối đa
-    /// [`MAX_IDS`] biến thể. Biến thể chưa có tồn ở kho nào thì vắng.
+    /// Stock of the variants at each warehouse serving `selling_org_id` (in warehouse-selection order), at most
+    /// [`MAX_IDS`] variants. A variant with no stock at any warehouse is absent.
     async fn availability(
         &self,
         tenant: &TenantContext,
@@ -322,9 +322,9 @@ pub trait Inventory: Send + Sync {
         variant_ids: &[Uuid],
     ) -> Result<Vec<Availability>, Error>;
 
-    /// Giữ hàng cho cả đơn: tất cả hoặc không gì. Gọi lại cùng `order_id` + cùng nội dung →
-    /// `Submitted::Replayed`; khác nội dung → `reference_reused`. Combo được tách thành thành phần;
-    /// biến thể không theo dõi tồn được bỏ qua. Lỗi: `inventory.insufficient_stock`,
+    /// Holds goods for a whole order: all or nothing. Calling again with the same `order_id` + same content →
+    /// `Submitted::Replayed`; different content → `reference_reused`. Combos are split into components;
+    /// variants that do not track stock are skipped. Errors: `inventory.insufficient_stock`,
     /// `inventory.no_source`, `inventory.hold_too_long`, `inventory.preorder_sold_out`.
     async fn reserve(
         &self,
@@ -332,12 +332,12 @@ pub trait Inventory: Send + Sync {
         request: &ReserveRequest,
     ) -> Result<Submitted<Reservation>, Error>;
 
-    /// Giữ → xác nhận (bỏ hạn). Đã xác nhận / đã xuất: trả như cũ. Đã hết hạn / đã trả:
-    /// `inventory.reservation_expired`; không có: `inventory.reservation_not_found`.
+    /// Held → confirmed (deadline removed). Already confirmed / issued: returns as before. Expired / released:
+    /// `inventory.reservation_expired`; none: `inventory.reservation_not_found`.
     async fn confirm(&self, tenant: &TenantContext, order_id: Uuid) -> Result<Reservation, Error>;
 
-    /// Trả phần chưa xuất về tồn bán được. Không có chỗ giữ: `Ok(None)`; đã trả / đã kết thúc:
-    /// trả như cũ (gọi lại an toàn).
+    /// Returns the un-issued part to sellable stock. No hold: `Ok(None)`; already released / finished:
+    /// returns as before (safe to call again).
     async fn release(
         &self,
         tenant: &TenantContext,
@@ -345,19 +345,20 @@ pub trait Inventory: Send + Sync {
         reason: ReleaseReason,
     ) -> Result<Option<Reservation>, Error>;
 
-    /// Xuất kho theo chỗ đã giữ (một phần được; chỗ còn giữ thì được xác nhận luôn). Gọi lại cùng
-    /// `fulfilment_key` + cùng nội dung: trả như cũ, không xuất lần hai.
+    /// Issues stock against a hold (a partial issue is allowed; a still-held hold is confirmed at the same
+    /// time). Calling again with the same `fulfilment_key` + same content: returns as before, does not issue
+    /// a second time.
     async fn fulfil(
         &self,
         tenant: &TenantContext,
         request: &FulfilRequest,
     ) -> Result<Reservation, Error>;
 
-    /// Nhập lại hàng trả về. Gọi lại cùng `reference` + cùng nội dung: không cộng lần hai.
+    /// Restocks returned goods. Calling again with the same `reference` + same content: does not add a second time.
     async fn restock(&self, tenant: &TenantContext, request: &RestockRequest) -> Result<(), Error>;
 
-    /// Các biến thể (trong `variant_ids`, tối đa [`MAX_IDS`]) còn hàng bán được ngay ở cửa hàng
-    /// `store_org_id` — bộ lọc "chỉ hàng có sẵn ở cửa hàng X" của `catalog` (D-200).
+    /// The variants (among `variant_ids`, at most [`MAX_IDS`]) that are sellable right now at store
+    /// `store_org_id` — the "only goods available at store X" filter of `catalog` (D-200).
     async fn in_stock_at(
         &self,
         tenant: &TenantContext,
@@ -365,8 +366,9 @@ pub trait Inventory: Send + Sync {
         variant_ids: &[Uuid],
     ) -> Result<Vec<Uuid>, Error>;
 
-    /// Biến thể (trong `variant_ids`) mà tài khoản `user_id` đang có đăng ký báo có hàng lại đã
-    /// xác nhận — để `customers` (bước 47) không gửi trùng tin cho cùng một lần có hàng (D-237).
+    /// The variants (among `variant_ids`) for which account `user_id` has a confirmed back-in-stock
+    /// subscription — so `customers` (step 47) does not send a duplicate message for the same restock
+    /// (D-237).
     async fn restock_alerts_of(
         &self,
         tenant: &TenantContext,

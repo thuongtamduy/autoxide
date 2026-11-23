@@ -1,12 +1,13 @@
-//! Hợp đồng của module `notifications` cho module khác (bước 37, D-348). Module khác lấy lúc khởi động
-//! `context.require::<dyn Notifier>()` (đăng ký SAU `notifications`), khai loại thông báo của mình bằng
-//! [`Notifier::declare`] ngay trong `Module::start`, rồi gửi bằng [`Notifier::notify`] từ handler event
-//! hay job — KHÔNG trong transaction ghi của mình.
+//! Contract of the `notifications` module for other modules (step 37, D-348). Other modules obtain
+//! `context.require::<dyn Notifier>()` at startup (registered AFTER `notifications`), declare their
+//! notification kinds with [`Notifier::declare`] right in `Module::start`, then send with
+//! [`Notifier::notify`] from an event handler or job — NOT inside their own write transaction.
 //!
-//! Tách tin giao dịch và tin quảng cáo (NĐ 91/2020/NĐ-CP về chống tin nhắn, thư điện tử rác; Luật Bảo
-//! vệ dữ liệu cá nhân 91/2025/QH15 — cần đối chiếu văn bản gốc): mỗi loại thuộc đúng một nhóm
-//! [`Category`]; tin quảng cáo chỉ gửi khi sổ đồng ý của `compliance` có đồng ý còn hiệu lực, trong
-//! khung giờ quy tắc `notifications.send_windows` cho phép, kèm nhãn quảng cáo và link huỷ nhận.
+//! Transactional and marketing messages are kept apart (Decree 91/2020/ND-CP on anti-spam messages and email;
+//! Personal Data Protection Law 91/2025/QH15 — verify against the original texts): each kind belongs to
+//! exactly one [`Category`] group; marketing messages are sent only when the `compliance` consent ledger
+//! holds a consent still in effect, within the time windows allowed by the rule `notifications.send_windows`,
+//! with an advertising label and an unsubscribe link.
 
 use autoxide_kernel::error::Error;
 pub use autoxide_kernel::template::Variable;
@@ -16,7 +17,7 @@ use serde_json::Value;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-/// Bộ gửi thông báo giả cho test của module khác (feature `testing`).
+/// Fake notification sender for other modules' tests (feature `testing`).
 #[cfg(feature = "testing")]
 pub mod testing;
 
@@ -95,7 +96,7 @@ impl Channel {
         Channel::ALL.into_iter().find(|channel| channel.as_str() == raw)
     }
 
-    /// Kênh trong sổ đồng ý của `compliance` (`email`, `sms`, `zns`, `push`, `in_app`).
+    /// Channel in the `compliance` consent ledger (`email`, `sms`, `zns`, `push`, `in_app`).
     pub fn consent_channel(self) -> &'static str {
         match self {
             Channel::Email => "email",
@@ -107,9 +108,10 @@ impl Channel {
     }
 }
 
-/// Mẫu mặc định của một loại thông báo: câu tiếng Anh trong code (chỗ điền `{tên}`), bản dịch ở
-/// `locales/<ngôn ngữ>.json` của crate khai báo với khoá `<key>.title`, `<key>.body`, `<key>.short`
-/// (`cargo xtask check` kiểm đủ). `short` cho SMS, ZNS và thông báo đẩy (không HTML).
+/// Default template of a notification kind: the English text in code (placeholders `{name}`); the translation
+/// lives in the declaring crate's `locales/<language>.json` under the keys `<key>.title`, `<key>.body`,
+/// `<key>.short` (`cargo xtask check` verifies completeness). `short` is for SMS, ZNS and push notifications
+/// (no HTML).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct NotificationTemplate {
     pub key: &'static str,
@@ -119,7 +121,7 @@ pub struct NotificationTemplate {
 }
 
 impl NotificationTemplate {
-    /// `key`: `<module>.<loại>`, cũng là khoá của loại thông báo.
+    /// `key`: `<module>.<kind>`, also the key of the notification kind.
     pub const fn new(
         key: &'static str,
         title: &'static str,
@@ -130,7 +132,7 @@ impl NotificationTemplate {
     }
 }
 
-/// Một loại thông báo do module khai.
+/// A notification kind declared by a module.
 ///
 /// ```
 /// use autoxide_notifications::api::{Category, Channel, NotificationKind, NotificationTemplate};
@@ -152,14 +154,15 @@ pub struct NotificationKind {
     pub category: Category,
     pub channels: &'static [Channel],
     pub template: NotificationTemplate,
-    /// Tin quảng cáo: khoá mục đích trong sổ đồng ý; `None` → `marketing`.
+    /// Marketing messages: the purpose key in the consent ledger; `None` → `marketing`.
     pub purpose: Option<&'static str>,
-    /// Tin mời đăng ký nhận quảng cáo: mỗi địa chỉ chỉ nhận một lần trên mỗi kênh.
+    /// A message inviting opt-in to marketing: each address receives it only once per channel.
     pub invitation: bool,
-    /// Schema biến cho mẫu khách tự soạn (D-206): biến mẫu được dùng (`{{ code }}`). Rỗng → suy ra từ
-    /// chỗ điền `{tên}` của mẫu mặc định (đều không bắt buộc), cộng `link`.
+    /// Variable schema for tenant-authored templates (D-206): the template variables that may be used
+    /// (`{{ code }}`). Empty → derived from the `{name}` placeholders of the default template (all optional),
+    /// plus `link`.
     pub variables: &'static [Variable],
-    /// Dữ liệu mẫu để xem trước (JSON object); `None` → sinh từ schema (`"[tên]"`).
+    /// Sample data for preview (JSON object); `None` → generated from the schema (`"[name]"`).
     pub sample: Option<&'static str>,
 }
 
@@ -180,25 +183,25 @@ impl NotificationKind {
         }
     }
 
-    /// Khai schema biến cho mẫu khách tự soạn (D-206), vd `Variable::required("link", "…")`.
+    /// Declares the variable schema for tenant-authored templates (D-206), e.g. `Variable::required("link", "…")`.
     pub const fn variables(mut self, variables: &'static [Variable]) -> Self {
         self.variables = variables;
         self
     }
 
-    /// Dữ liệu mẫu (JSON object) cho xem trước và gửi thử.
+    /// Sample data (JSON object) for preview and test sends.
     pub const fn sample(mut self, sample: &'static str) -> Self {
         self.sample = Some(sample);
         self
     }
 
-    /// Đặt khoá mục đích trong sổ đồng ý (tin quảng cáo).
+    /// Sets the purpose key in the consent ledger (marketing messages).
     pub const fn purpose(mut self, purpose: &'static str) -> Self {
         self.purpose = Some(purpose);
         self
     }
 
-    /// Đánh dấu tin mời đăng ký: gửi tối đa một lần cho mỗi (kênh, địa chỉ).
+    /// Marks an opt-in invitation: sent at most once per (channel, address).
     pub const fn invitation(mut self) -> Self {
         self.invitation = true;
         self
@@ -208,38 +211,38 @@ impl NotificationKind {
         self.template.key
     }
 
-    /// Mục đích đồng ý của tin quảng cáo.
+    /// Consent purpose of the marketing message.
     pub fn consent_purpose(&self) -> &'static str {
         self.purpose.unwrap_or("marketing")
     }
 }
 
-/// Người nhận.
+/// Recipient.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Recipient {
-    /// Một người dùng của khách: email từ tài khoản, in-app, push.
+    /// A tenant user: email from the account, in-app, push.
     User(Uuid),
-    /// Một địa chỉ email chưa (hay không) có tài khoản.
+    /// An email address that has no account (or none yet).
     Email(String),
-    /// Một số điện thoại E.164 (`+84912345678`).
+    /// A phone number in E.164 (`+84912345678`).
     Phone(String),
-    /// Mọi quản trị viên còn hoạt động của khách (thông báo của nền tảng tới khách).
+    /// Every active administrator of the tenant (platform notifications to the tenant).
     TenantAdmins,
 }
 
-/// Một thông báo cần gửi.
+/// A notification to send.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Notification {
-    /// Khoá của loại đã khai (`orders.order_shipped`).
+    /// Key of the declared kind (`orders.order_shipped`).
     pub kind: String,
     pub recipient: Recipient,
-    /// Giá trị điền vào mẫu (`{"code": "DH001"}`) — chỉ chữ hiển thị, không dữ liệu nhạy cảm.
+    /// Values to fill into the template (`{"code": "DH001"}`) — display text only, no sensitive data.
     pub params: Value,
-    /// Link mở khi bấm (trang của giao diện).
+    /// Link opened on click (a page of the UI).
     pub link: Option<String>,
-    /// Ngôn ngữ (`vi`, `en`); `None`: ngôn ngữ ưa thích của người dùng, không có thì tiếng Anh.
+    /// Language (`vi`, `en`); `None`: the user's preferred language, English if none.
     pub locale: Option<String>,
-    /// Bắt buộc: gọi lại cùng khoá thì không tạo tin thứ hai (vd ID của event gây ra tin).
+    /// Required: calling again with the same key does not create a second message (e.g. the ID of the event that caused it).
     pub dedupe_key: String,
 }
 
@@ -328,17 +331,17 @@ pub struct Outcome {
     pub skipped: Vec<Skipped>,
 }
 
-/// Gửi thông báo.
+/// Sends a notification.
 //
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
 #[async_trait::async_trait]
 pub trait Notifier: Send + Sync {
-    /// Khai một loại thông báo; gọi trong `Module::start`. Khai trùng khoá, khoá không mang tiền tố
-    /// module hay không có kênh nào → lỗi.
+    /// Declares a notification kind; call in `Module::start`. Error on a duplicate key, a key without the
+    /// module prefix, or no channels.
     fn declare(&self, kind: NotificationKind) -> Result<(), Error>;
 
-    /// Ghi tin (mỗi kênh một dòng) + job gửi trong transaction riêng của `notifications`. KHÔNG gọi
-    /// trong transaction ghi của module khác. Cùng `dedupe_key` → trả lại các tin đã có, không tạo
-    /// thêm. Loại chưa khai → `notifications.kind_unknown`.
+    /// Records the messages (one row per channel) + the send job in `notifications`' own transaction. Do NOT
+    /// call inside another module's write transaction. The same `dedupe_key` → returns the existing messages
+    /// and creates no more. A kind not declared → `notifications.kind_unknown`.
     async fn notify(&self, tenant: TenantId, notification: Notification) -> Result<Outcome, Error>;
 }

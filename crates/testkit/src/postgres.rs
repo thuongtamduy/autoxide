@@ -1,9 +1,9 @@
-//! Phần Postgres của [`TestDatabase`](crate::TestDatabase): mỗi database test là
-//! một database thật, tạo và xoá qua một kết nối "quản trị".
+//! The Postgres part of [`TestDatabase`](crate::TestDatabase): every test database is
+//! a real database, created and dropped over an "admin" connection.
 //!
-//! `CREATE DATABASE` / `DROP DATABASE` là lệnh quản trị chỉ Postgres có và
-//! không viết được bằng query builder của SeaORM, nên hai lệnh đó là SQL viết
-//! tay — chỉ trong đồ test, ghi ở docs/DECISIONS.md D-031.
+//! `CREATE DATABASE` / `DROP DATABASE` are admin commands that only Postgres has and
+//! that SeaORM's query builder cannot express, so those two commands are hand-written
+//! SQL — only in test helpers, recorded in docs/DECISIONS.md D-031.
 
 use std::time::SystemTime;
 
@@ -13,18 +13,18 @@ use uuid::Uuid;
 
 use crate::stale::is_stale;
 
-/// Tiền tố tên database của mỗi test.
+/// Database name prefix of every test.
 pub(crate) const DATABASE_PREFIX: &str = "autoxide_test_";
 
-/// Kết nối quản trị: chỉ cần một kết nối, dùng xong đóng ngay.
+/// Admin connection: only one connection is needed, closed right after use.
 pub(crate) async fn connect_admin(admin_url: &str) -> Result<DatabaseConnection, DbErr> {
     let mut options = ConnectOptions::new(admin_url.to_owned());
     options.max_connections(1).sqlx_logging(false);
     Database::connect(options).await
 }
 
-/// Tạo một database trống mang `id` trong tên, trả về tên của nó. `id` là
-/// UUIDv7: thời điểm tạo nằm sẵn trong tên (xem module `stale`).
+/// Creates an empty database with `id` in its name, returns its name. `id` is a
+/// UUIDv7: the creation time is already in the name (see module `stale`).
 pub(crate) async fn create_database(admin: &DatabaseConnection, id: Uuid) -> Result<String, DbErr> {
     // Tên chỉ gồm chữ thường, số và `_` nên an toàn khi ghép vào câu lệnh.
     let name = format!("{DATABASE_PREFIX}{}", id.simple());
@@ -32,14 +32,14 @@ pub(crate) async fn create_database(admin: &DatabaseConnection, id: Uuid) -> Res
     Ok(name)
 }
 
-/// `DROP DATABASE` kèm FORCE: ngắt các kết nối còn mở tới database đó (bài test
-/// có thể chưa đóng pool của nó).
+/// `DROP DATABASE` with FORCE: drops the connections still open to that database (the test
+/// may not have closed its pool).
 pub(crate) async fn drop_database(admin: &DatabaseConnection, name: &str) -> Result<(), DbErr> {
     admin.execute_unprepared(&format!("DROP DATABASE IF EXISTS \"{name}\" WITH (FORCE)")).await?;
     Ok(())
 }
 
-/// Xoá các database test đã quá cũ. Trả về số database đã xoá.
+/// Deletes test databases that are too old. Returns the number of databases deleted.
 pub(crate) async fn remove_stale_databases(
     admin: &DatabaseConnection,
     now: SystemTime,
@@ -63,8 +63,8 @@ pub(crate) async fn remove_stale_databases(
     Ok(removed)
 }
 
-/// Thay phần tên database trong một URL dạng `scheme://authority/database?query`.
-/// Trả `None` nếu URL không có `://` hoặc không có authority.
+/// Replaces the database name part of a URL of the form `scheme://authority/database?query`.
+/// Returns `None` if the URL has no `://` or no authority.
 pub(crate) fn with_database(url: &str, database: &str) -> Option<String> {
     let (base, query) = match url.split_once('?') {
         Some((base, query)) => (base, Some(query)),
@@ -84,7 +84,7 @@ pub(crate) fn with_database(url: &str, database: &str) -> Option<String> {
     Some(result)
 }
 
-/// Che mật khẩu trong URL trước khi đưa vào thông báo lỗi.
+/// Masks the password in a URL before putting it into an error message.
 pub(crate) fn redact_password(url: &str) -> String {
     let Some((scheme, rest)) = url.split_once("://") else {
         return url.to_owned();

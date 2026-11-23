@@ -1,14 +1,14 @@
-//! Catalog giả dùng chung cho test của module khác (feature `testing`, chỉ khai ở
-//! `[dev-dependencies]`; quy ước D-20261122-module-test-fakes).
+//! Shared fake catalog for other modules' tests (feature `testing`, declared only in
+//! `[dev-dependencies]`; convention D-20261122-module-test-fakes).
 //!
-//! Giữ biến thể, lịch sử giá, giá sàn và combo trong bộ nhớ. Giá theo lịch sử như `catalog` thật:
-//! `prices` lấy giá có hiệu lực gần nhất tới `at` (kể cả đúng lúc đó), `reference_prices` lấy giá
-//! có hiệu lực TRƯỚC `at` (giá tham chiếu của khuyến mại). `display_prices`: biến thể là giá hiện
-//! tại, sản phẩm là giá thấp nhất của các biến thể đang bán. Cắm được nguồn giá giảm
-//! (`CatalogExtensions`) để module khuyến mại thử đúng đường thật.
+//! Keeps variants, price history, price floors and combos in memory. Prices follow history like the real
+//! `catalog`: `prices` takes the most recent price in effect up to `at` (inclusive), `reference_prices` takes
+//! the price in effect BEFORE `at` (the reference price of a promotion). `display_prices`: for a variant it
+//! is the current price, for a product the lowest price among variants on sale. A discount price source can
+//! be plugged in (`CatalogExtensions`) so the promotions module exercises the real path.
 //!
-//! Mỗi module tự dựng biến thể của mình (cân nặng, SKU…) rồi `insert_variant`; [`variant`] cho bản
-//! mặc định.
+//! Each module builds its own variants (weight, SKU…) and then calls `insert_variant`; [`variant`] gives the
+//! default.
 //!
 //! ```ignore
 //! let catalog = Arc::new(FakeCatalog::new());
@@ -35,17 +35,17 @@ use super::{
 
 #[derive(Default)]
 struct State {
-    /// Theo thứ tự thêm.
+    /// In the order added.
     variants: Vec<VariantSnapshot>,
-    /// Lịch sử giá mỗi biến thể: (có hiệu lực từ, giá).
+    /// Price history of each variant: (effective from, price).
     prices: HashMap<Uuid, Vec<(Timestamp, Money)>>,
     floors: HashMap<Uuid, (Money, FloorAction)>,
     bundles: HashMap<Uuid, Vec<BundleComponent>>,
     sale_source: Option<Arc<dyn SalePriceSource>>,
 }
 
-/// Catalog giả. Công bố bằng `TestApp::builder(…).provide::<dyn Catalog>(catalog.clone())` (và
-/// `provide::<dyn CatalogExtensions>` khi module đang test cắm nguồn giá giảm).
+/// Fake catalog. Publish it with `TestApp::builder(…).provide::<dyn Catalog>(catalog.clone())` (and
+/// `provide::<dyn CatalogExtensions>` when the module under test plugs in a discount price source).
 #[derive(Default)]
 pub struct FakeCatalog {
     state: Mutex<State>,
@@ -56,8 +56,8 @@ fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
-/// Biến thể mặc định `id` của nút `org`: hàng vật lý đang bán của một sản phẩm mới, SKU là ID,
-/// tên "Item", thuế `vat.standard`, cần giao, theo dõi tồn, bán khi có hàng.
+/// Default variant `id` of branch `org`: a physical item on sale of a new product, SKU is the ID,
+/// name "Item", tax `vat.standard`, needs shipping, tracks stock, sold when in stock.
 pub fn variant(id: Uuid, org: OrgId) -> VariantSnapshot {
     VariantSnapshot {
         variant_id: id,
@@ -109,14 +109,14 @@ impl FakeCatalog {
         FakeCatalog::default()
     }
 
-    /// Thêm (hay thay) biến thể mang đúng `variant_id`.
+    /// Adds (or replaces) the variant carrying the exact `variant_id`.
     pub fn insert_variant(&self, variant: VariantSnapshot) {
         let mut state = lock(&self.state);
         state.variants.retain(|old| old.variant_id != variant.variant_id);
         state.variants.push(variant);
     }
 
-    /// Sửa biến thể `id` (vd ngừng bán) nếu có.
+    /// Edits variant `id` (e.g. stop selling) if it exists.
     pub fn edit_variant(&self, id: Uuid, edit: impl FnOnce(&mut VariantSnapshot)) {
         if let Some(found) =
             lock(&self.state).variants.iter_mut().find(|variant| variant.variant_id == id)
@@ -125,44 +125,44 @@ impl FakeCatalog {
         }
     }
 
-    /// Biến thể `id`, nếu có.
+    /// Variant `id`, if it exists.
     pub fn variant_of(&self, id: Uuid) -> Option<VariantSnapshot> {
         lock(&self.state).variants.iter().find(|variant| variant.variant_id == id).cloned()
     }
 
-    /// Giá của biến thể `id` là `price`, có hiệu lực từ 30 ngày trước (bỏ lịch sử cũ).
+    /// Price of variant `id` is `price`, in effect from 30 days ago (older history is dropped).
     pub fn set_price(&self, id: Uuid, price: Money) {
         let from = Timestamp::now() - SignedDuration::from_hours(24 * 30);
         lock(&self.state).prices.insert(id, vec![(from, price)]);
     }
 
-    /// Thay cả lịch sử giá của biến thể `id`: các mốc (có hiệu lực từ, giá).
+    /// Replaces the whole price history of variant `id`: the points (effective from, price).
     pub fn set_price_history(&self, id: Uuid, history: Vec<(Timestamp, Money)>) {
         lock(&self.state).prices.insert(id, history);
     }
 
-    /// Thêm một mốc giá: `price` có hiệu lực từ `from`.
+    /// Adds a price point: `price` in effect from `from`.
     pub fn push_price(&self, id: Uuid, price: Money, from: Timestamp) {
         lock(&self.state).prices.entry(id).or_default().push((from, price));
     }
 
-    /// Giá của biến thể `id` có hiệu lực lúc `at` (như `prices`), nếu có.
+    /// Price of variant `id` in effect at `at` (like `prices`), if any.
     pub fn price_of(&self, id: Uuid, at: Timestamp) -> Option<Money> {
         let state = lock(&self.state);
         price_at(state.prices.get(&id)?, at, false).map(|(_, price)| price)
     }
 
-    /// Giá sàn của biến thể `id`: dưới `floor` thì `action`.
+    /// Price floor of variant `id`: below `floor`, do `action`.
     pub fn set_floor(&self, id: Uuid, floor: Money, action: FloorAction) {
         lock(&self.state).floors.insert(id, (floor, action));
     }
 
-    /// Thành phần của combo `id`.
+    /// Components of combo `id`.
     pub fn set_bundle(&self, id: Uuid, components: Vec<BundleComponent>) {
         lock(&self.state).bundles.insert(id, components);
     }
 
-    /// Nguồn giá giảm module khác đã cắm (`CatalogExtensions::set_sale_price_source`).
+    /// The discount price source another module plugged in (`CatalogExtensions::set_sale_price_source`).
     pub fn sale_source(&self) -> Option<Arc<dyn SalePriceSource>> {
         lock(&self.state).sale_source.clone()
     }

@@ -1,5 +1,6 @@
-//! Hãng vận chuyển: bộ nối là module riêng (`shipping-<hãng>`) cài [`ShippingCarrier`] và đăng ký
-//! vào [`CarrierRegistry`]. Mở ra ngoài qua `autoxide_shipping::api::…` (`pub use` ở `api.rs`).
+//! Shipping carriers: a connector is its own module (`shipping-<carrier>`) that implements
+//! [`ShippingCarrier`] and registers into [`CarrierRegistry`]. Exposed through `autoxide_shipping::api::…`
+//! (`pub use` in `api.rs`).
 
 use autoxide_kernel::time::{Date, Timestamp};
 use std::collections::BTreeMap;
@@ -15,7 +16,7 @@ use super::{Address, Direction, ShipmentStatus};
 
 // ---- Hãng vận chuyển: bộ nối là module riêng ----------------------------------------------------
 
-/// Thông tin đăng nhập của tài khoản hãng (đã giải mã). Không in ra `Debug`, không serialize.
+/// Credentials of a carrier account (decrypted). Not printed by `Debug`, not serialized.
 #[derive(Clone, Default)]
 pub struct CarrierCredentials(BTreeMap<String, String>);
 
@@ -24,12 +25,12 @@ impl CarrierCredentials {
         CarrierCredentials(values)
     }
 
-    /// Giá trị của trường `name` (vd `token`, `shop_id`, `webhook_secret`).
+    /// Value of field `name` (e.g. `token`, `shop_id`, `webhook_secret`).
     pub fn get(&self, name: &str) -> Option<&str> {
         self.0.get(name).map(String::as_str)
     }
 
-    /// Tên các trường có giá trị (để báo "đã đặt", không bao giờ trả giá trị).
+    /// Names of the fields that have values (to report "set", never to return the value).
     pub fn names(&self) -> Vec<String> {
         self.0.keys().cloned().collect()
     }
@@ -41,14 +42,14 @@ impl fmt::Debug for CarrierCredentials {
     }
 }
 
-/// Một tài khoản của khách ở một hãng vận chuyển.
+/// A tenant's account with a shipping carrier.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct CarrierAccount {
     pub id: Uuid,
     pub carrier_code: String,
     pub sandbox: bool,
-    /// Cài đặt không bí mật (kho lấy hàng mặc định của hãng, dịch vụ…).
+    /// Non-secret settings (the carrier's default pickup warehouse, service…).
     pub settings: serde_json::Value,
     pub credentials: CarrierCredentials,
 }
@@ -65,26 +66,26 @@ impl CarrierAccount {
     }
 }
 
-/// Bộ nối làm được gì.
+/// What the connector can do.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct CarrierCapabilities {
-    /// Một vận đơn nhiều kiện.
+    /// A multi-package waybill.
     pub multi_parcel: bool,
-    /// Thu hộ khi giao.
+    /// Cash collection on delivery.
     pub cod: bool,
-    /// In nhãn.
+    /// Label printing.
     pub label: bool,
-    /// Huỷ qua API.
+    /// Cancel through the API.
     pub cancel: bool,
-    /// Bảng kê COD qua API.
+    /// COD statement through the API.
     pub statement_api: bool,
-    /// Gửi webhook trạng thái (không thì `shipping.poll_tracking` hỏi định kỳ).
+    /// Sends status webhooks (otherwise `shipping.poll_tracking` polls periodically).
     pub webhooks: bool,
 }
 
 impl CarrierCapabilities {
-    /// Mọi khả năng (bộ giả).
+    /// Every capability (the fake connector).
     pub fn all() -> Self {
         CarrierCapabilities {
             multi_parcel: true,
@@ -97,7 +98,7 @@ impl CarrierCapabilities {
     }
 }
 
-/// Một kiện gửi hãng.
+/// A package sent to the carrier.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct CarrierParcel {
@@ -125,20 +126,20 @@ impl CarrierParcel {
     }
 }
 
-/// Hỏi phí của hãng.
+/// Asks the carrier for a fee.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct CarrierQuoteRequest {
-    /// Nơi lấy hàng (địa chỉ của nút xuất), nếu biết.
+    /// Pickup location (the address of the shipping branch), if known.
     pub origin: Option<Address>,
     pub destination: Address,
     pub parcels: Vec<CarrierParcel>,
     pub declared_value: Money,
     pub cod_amount: Option<Money>,
-    /// Dịch vụ của hãng phương thức chọn; `None`: mọi dịch vụ.
+    /// Carrier service chosen by the method; `None`: every service.
     pub service_code: Option<String>,
-    /// Người nhận (tên, số điện thoại) khi giỏ đã có — hãng nào buộc có người nhận lúc báo giá thì
-    /// khỏi gửi giá trị giữ chỗ. `None`: chưa biết.
+    /// Recipient (name, phone number) when the cart already has one — a carrier that requires a recipient
+    /// when quoting need not be sent a placeholder value. `None`: not known.
     pub recipient: Option<(String, String)>,
 }
 
@@ -155,7 +156,7 @@ impl CarrierQuoteRequest {
         }
     }
 
-    /// Người nhận (tên, số điện thoại), nếu đã biết.
+    /// Recipient (name, phone number), if known.
     pub fn recipient(mut self, recipient: Option<(String, String)>) -> Self {
         self.recipient = recipient;
         self
@@ -177,7 +178,7 @@ impl CarrierQuoteRequest {
     }
 }
 
-/// Một mức phí hãng báo.
+/// A fee quoted by the carrier.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct CarrierRate {
@@ -197,12 +198,12 @@ impl CarrierRate {
     }
 }
 
-/// Tạo vận đơn ở hãng.
+/// Creates a waybill with the carrier.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct CarrierShipmentRequest {
-    /// ID vận đơn của Autoxide: hãng nhận lại cùng mã thì không tạo đơn thứ hai (hoặc bộ nối tự
-    /// tra [`ShippingCarrier::find_by_reference`] trước).
+    /// Autoxide's waybill ID: if the carrier receives the same code again it does not create a second order
+    /// (or the connector first looks up [`ShippingCarrier::find_by_reference`] itself).
     pub client_reference: String,
     pub service_code: Option<String>,
     pub direction: Direction,
@@ -265,16 +266,16 @@ impl CarrierShipmentRequest {
     }
 }
 
-/// Vận đơn hãng đã tạo.
+/// The waybill the carrier created.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct CarrierShipment {
     pub client_reference: String,
     pub tracking_number: String,
-    /// Mã vận đơn của từng kiện (theo thứ tự gửi), khi hãng cấp riêng.
+    /// Tracking code of each package (in send order), when the carrier issues them separately.
     pub parcel_tracking_numbers: Vec<String>,
     pub status: ShipmentStatus,
-    /// Phí hãng tính.
+    /// Fee the carrier charges.
     pub fee: Option<Money>,
 }
 
@@ -300,7 +301,7 @@ impl CarrierShipment {
     }
 }
 
-/// File nhãn.
+/// Label file.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct Label {
@@ -315,19 +316,19 @@ impl Label {
     }
 }
 
-/// Một cập nhật trạng thái từ hãng (webhook hay hỏi định kỳ).
+/// A status update from the carrier (webhook or periodic polling).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct CarrierUpdate {
-    /// Khoá chống trùng (hãng không có thì bộ nối băm thân + thời gian).
+    /// Dedupe key (if the carrier has none, the connector hashes the body + time).
     pub event_id: String,
     pub tracking_number: String,
     pub status: ShipmentStatus,
-    /// Nguyên văn trạng thái của hãng.
+    /// The carrier's verbatim status.
     pub carrier_status: String,
-    /// Đã đổi sang UTC (hãng Việt Nam hay gửi giờ địa phương không kèm múi giờ).
+    /// Converted to UTC (Vietnamese carriers often send local time without a time zone).
     pub occurred_at: Timestamp,
-    /// Hãng báo đã thu (chỉ để đối chiếu; số tiền COD thật lấy từ yêu cầu giao).
+    /// The carrier reports it collected (for reconciliation only; the real COD amount comes from the delivery request).
     pub cod_collected: Option<Money>,
     pub fee: Option<Money>,
     pub note: String,
@@ -373,11 +374,11 @@ impl CarrierUpdate {
     }
 }
 
-/// Bảng kê COD của hãng cho một kỳ.
+/// The carrier's COD statement for a period.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct CodStatement {
-    /// Mã bảng kê của hãng (chống nhập trùng).
+    /// The carrier's statement code (guards against duplicate imports).
     pub reference: String,
     pub period_from: Date,
     pub period_to: Date,
@@ -395,14 +396,14 @@ impl CodStatement {
     }
 }
 
-/// Một dòng của bảng kê COD.
+/// A line of a COD statement.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct CodStatementLine {
     pub tracking_number: String,
-    /// Tiền hãng đã thu.
+    /// Money the carrier collected.
     pub cod: Money,
-    /// Phí hãng trừ.
+    /// Fee the carrier deducted.
     pub fee: Money,
 }
 
@@ -412,17 +413,17 @@ impl CodStatementLine {
     }
 }
 
-/// Một hãng vận chuyển. Bộ nối thật (GHN, GHTK…) là module riêng `shipping-<hãng>`, đăng ký SAU
-/// `shipping` và gọi [`CarrierRegistry::register`] trong `Module::start`. Mọi hàm gọi mạng; module
-/// `shipping` không bao giờ gọi chúng trong transaction ghi.
+/// A shipping carrier. A real connector (GHN, GHTK…) is its own module `shipping-<carrier>`, registered AFTER
+/// `shipping` and calling [`CarrierRegistry::register`] in `Module::start`. Every function makes network
+/// calls; the `shipping` module never calls them inside a write transaction.
 #[async_trait::async_trait]
 pub trait ShippingCarrier: Send + Sync {
-    /// Mã ổn định (`ghn`, `ghtk`, `fake`…): nằm trong đường dẫn webhook và trên tài khoản hãng.
+    /// Stable code (`ghn`, `ghtk`, `fake`…): appears in the webhook path and on the carrier account.
     fn code(&self) -> &'static str;
 
     fn capabilities(&self) -> CarrierCapabilities;
 
-    /// Kiểm thông tin đăng nhập (nút "Kiểm tra kết nối"); sai → lỗi `Unauthenticated`.
+    /// Checks the credentials (the "Test connection" button); wrong → error `Unauthenticated`.
     async fn check(&self, account: &CarrierAccount) -> Result<(), Error>;
 
     async fn quote(
@@ -431,35 +432,35 @@ pub trait ShippingCarrier: Send + Sync {
         request: &CarrierQuoteRequest,
     ) -> Result<Vec<CarrierRate>, Error>;
 
-    /// Tạo vận đơn. `request.client_reference` = ID vận đơn của Autoxide: gọi lại cùng mã không
-    /// tạo đơn thứ hai.
+    /// Creates a waybill. `request.client_reference` = Autoxide's waybill ID: calling again with the same
+    /// code does not create a second order.
     async fn create_shipment(
         &self,
         account: &CarrierAccount,
         request: &CarrierShipmentRequest,
     ) -> Result<CarrierShipment, Error>;
 
-    /// Tìm vận đơn đã tạo theo `client_reference` (khi lần tạo trước mất kết nối giữa chừng).
+    /// Finds a waybill already created by `client_reference` (when the previous create lost its connection midway).
     async fn find_by_reference(
         &self,
         account: &CarrierAccount,
         client_reference: &str,
     ) -> Result<Option<CarrierShipment>, Error>;
 
-    /// Huỷ. Hãng đã lấy hàng → `shipping.cancel_too_late`.
+    /// Cancels. The carrier already picked up the goods → `shipping.cancel_too_late`.
     async fn cancel(&self, account: &CarrierAccount, tracking_number: &str) -> Result<(), Error>;
 
     async fn label(&self, account: &CarrierAccount, tracking_number: &str) -> Result<Label, Error>;
 
-    /// Hành trình đầy đủ, cũ trước.
+    /// Full journey, oldest first.
     async fn track(
         &self,
         account: &CarrierAccount,
         tracking_number: &str,
     ) -> Result<Vec<CarrierUpdate>, Error>;
 
-    /// Kiểm chữ ký webhook trên thân thô (so sánh thời gian hằng) rồi mới đọc thân thành các cập
-    /// nhật; chữ ký sai → `shipping.webhook_signature` (401), không đọc thân.
+    /// Verifies the webhook signature over the raw body (constant-time comparison) and only then parses the
+    /// body into updates; a wrong signature → `shipping.webhook_signature` (401), the body is not read.
     fn parse_webhook(
         &self,
         account: &CarrierAccount,
@@ -467,7 +468,7 @@ pub trait ShippingCarrier: Send + Sync {
         body: &[u8],
     ) -> Result<Vec<CarrierUpdate>, Error>;
 
-    /// Bảng kê COD các ngày `[from, to]`, khi hãng có API (không có thì nhập CSV).
+    /// COD statements for the days `[from, to]`, when the carrier has an API (otherwise import a CSV).
     async fn cod_statement(
         &self,
         _account: &CarrierAccount,
@@ -478,11 +479,11 @@ pub trait ShippingCarrier: Send + Sync {
     }
 }
 
-/// Sổ hãng vận chuyển (module `shipping` công bố): bộ nối gọi `register` trong `Module::start`.
+/// Registry of shipping carriers (published by the `shipping` module): a connector calls `register` in `Module::start`.
 pub trait CarrierRegistry: Send + Sync {
-    /// Đăng ký bộ nối; trùng `code` → lỗi.
+    /// Registers a connector; a duplicate `code` → error.
     fn register(&self, carrier: Arc<dyn ShippingCarrier>) -> Result<(), Error>;
     fn get(&self, code: &str) -> Option<Arc<dyn ShippingCarrier>>;
-    /// Mã các hãng đã đăng ký, theo thứ tự chữ cái.
+    /// Codes of the registered carriers, in alphabetical order.
     fn codes(&self) -> Vec<&'static str>;
 }

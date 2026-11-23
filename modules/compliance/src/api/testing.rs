@@ -1,14 +1,14 @@
-//! Sổ đồng ý giả dùng chung cho test của module khác (feature `testing`, chỉ khai ở
-//! `[dev-dependencies]`; quy ước D-20261122-module-test-fakes).
+//! A shared fake consent ledger for other modules' tests (feature `testing`, declared only in
+//! `[dev-dependencies]`; convention D-20261122-module-test-fakes).
 //!
-//! Giống `compliance` thật ở chỗ module khác dựa vào:
-//! - mỗi (người, khoá) một dòng, trạng thái `granted` / `withdrawn`; `grant` gọi lại cùng `source_ref`
-//!   không ghi thêm, trả trạng thái hiện tại;
-//! - `is_granted`: có đồng ý ở đúng khoá hay khoá rộng hơn (`scope` / `channel` rỗng bao các con), và
-//!   không có rút lại ở khoá đó hay khoá rộng hơn;
-//! - đồng ý phải có câu chữ và phiên bản câu chữ.
+//! Like the real `compliance` in the ways other modules rely on:
+//! - one row per (person, key), state `granted` / `withdrawn`; calling `grant` again with the same `source_ref`
+//!   records nothing more and returns the current state;
+//! - `is_granted`: whether a consent exists at exactly this key or a broader key (an empty `scope` /
+//!   `channel` covers the children), and there is no withdrawal at this key or a broader key;
+//! - a consent must have wording and a wording version.
 //!
-//! Không phân biệt khách (`TenantId`): mỗi test một sổ.
+//! Does not distinguish tenants (`TenantId`): one ledger per test.
 //!
 //! ```ignore
 //! let consents = Arc::new(FakeConsentLedger::new());
@@ -28,7 +28,7 @@ use super::{Consent, ConsentEvidence, ConsentKey, ConsentLedger, ConsentSubject}
 const GRANTED: &str = "granted";
 const WITHDRAWN: &str = "withdrawn";
 
-/// Một dòng của sổ giả.
+/// One row of the fake ledger.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConsentRecord {
     pub subject: ConsentSubject,
@@ -38,13 +38,13 @@ pub struct ConsentRecord {
 #[derive(Default)]
 struct State {
     records: Vec<ConsentRecord>,
-    /// `source_ref` đã gặp, theo thứ tự (gọi lại không thêm).
+    /// `source_ref` values seen, in order (a repeat call adds none).
     source_refs: Vec<String>,
-    /// Sổ "hỏng": mọi lời gọi trả lỗi.
+    /// A "broken" ledger: every call returns an error.
     failing: bool,
 }
 
-/// Sổ đồng ý giả, giữ mọi thứ trong bộ nhớ. Công bố vào app bằng
+/// A fake consent ledger that keeps everything in memory. Publish it into the app with
 /// `TestApp::builder(…).provide::<dyn ConsentLedger>(consents.clone())`.
 #[derive(Default)]
 pub struct FakeConsentLedger {
@@ -56,7 +56,7 @@ fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
-/// `broad` bao `key`: cùng mục đích, phạm vi và kênh rỗng hay bằng nhau.
+/// `broad` covers `key`: same purpose, and the scope and channel are empty or equal.
 fn covers(broad: &Consent, key: &ConsentKey) -> bool {
     broad.purpose == key.purpose
         && (broad.scope.is_empty() || broad.scope == key.scope)
@@ -146,37 +146,37 @@ impl FakeConsentLedger {
         FakeConsentLedger::default()
     }
 
-    /// Ghi đồng ý ngay (dựng dữ liệu cho test, không qua module); trả dòng sau khi ghi.
+    /// Records a consent immediately (builds test data, bypassing the module); returns the row after writing.
     pub fn allow(&self, subject: ConsentSubject, key: ConsentKey) -> Consent {
         lock(&self.state).set(&subject, &key, GRANTED)
     }
 
-    /// Ghi rút lại ngay ở khoá `key` (rút ở khoá rộng hơn chặn mọi khoá con); trả dòng sau khi ghi.
+    /// Records a withdrawal immediately at key `key` (a withdrawal at a broader key blocks every child key); returns the row after writing.
     pub fn deny(&self, subject: ConsentSubject, key: ConsentKey) -> Consent {
         lock(&self.state).set(&subject, &key, WITHDRAWN)
     }
 
-    /// Bỏ mọi dòng của người `subject` (như chưa từng đồng ý gì).
+    /// Removes every row of person `subject` (as if they never consented to anything).
     pub fn forget(&self, subject: &ConsentSubject) {
         lock(&self.state).records.retain(|record| record.subject != *subject);
     }
 
-    /// Trạng thái (`granted` / `withdrawn`) ở đúng khoá `key`, nếu có dòng.
+    /// State (`granted` / `withdrawn`) at exactly key `key`, if there is a row.
     pub fn state_of(&self, subject: &ConsentSubject, key: &ConsentKey) -> Option<String> {
         lock(&self.state).current(subject, key).map(|consent| consent.state)
     }
 
-    /// Mọi dòng của sổ, theo thứ tự tạo.
+    /// Every row of the ledger, in creation order.
     pub fn records(&self) -> Vec<ConsentRecord> {
         lock(&self.state).records.clone()
     }
 
-    /// Các `source_ref` của lời gọi `grant` đã ghi, theo thứ tự.
+    /// The `source_ref` values of `grant` calls recorded, in order.
     pub fn source_refs(&self) -> Vec<String> {
         lock(&self.state).source_refs.clone()
     }
 
-    /// Bật / tắt chế độ "sổ hỏng": mọi lời gọi trả `internal_error`.
+    /// Turns the "broken ledger" mode on / off: every call returns `internal_error`.
     pub fn set_failing(&self, failing: bool) {
         lock(&self.state).failing = failing;
     }

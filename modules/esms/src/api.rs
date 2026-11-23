@@ -1,5 +1,5 @@
-//! Hợp đồng của module `esms` cho module khác: chỉ có tên nhà cung cấp. Việc gửi tin đi qua trait
-//! `autoxide_kernel::sms::SmsSender` mà module này công bố.
+//! Contract of the `esms` module for other modules: only the provider name. Sending goes through the trait
+//! `autoxide_kernel::sms::SmsSender` that this module publishes.
 
-/// Tên nhà cung cấp, như `SmsSender::provider` trả về.
+/// Provider name, as `SmsSender::provider` returns it.
 pub const PROVIDER: &str = "esms";
