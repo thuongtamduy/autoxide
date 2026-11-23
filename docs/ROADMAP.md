@@ -489,8 +489,8 @@ sẵn, không sinh code; kết quả luôn là bản nháp.
       khối `content.type_list`, lọc `cf.<key>` ở danh sách công khai, AI gợi ý bộ trường (bản nháp), hạn mức theo gói
 - [x] AI tạo trang và sửa tiếp bằng trò chuyện (job, kết quả qua bộ kiểm, thử lại có giới hạn, bản nháp
       `ai_assisted`, lịch sử trò chuyện để hoàn tác) — D-20261122-ai-pages
-- [ ] Bộ nháp chiến dịch từ một chương trình khuyến mại (trang đích, banner, chiến dịch `newsletter`, mỗi thứ là bản
-      nháp ở module của nó); hạn mức `content.ai_page_generations` theo gói
+- [x] Bộ nháp chiến dịch từ một chương trình khuyến mại (trang đích, banner, chiến dịch `newsletter`, mỗi thứ là bản
+      nháp ở module của nó); hạn mức `content.ai_page_generations` theo gói — D-20261123-campaign-drafts
 - [x] Kiểm tra sức khoẻ website vào hộp việc, chạy theo yêu cầu: thiếu mô tả SEO / alt, tiêu đề trùng, link gãy,
       bản ghi nhúng đã ẩn, đếm ngược đã qua (D-20261122-site-health)
 - [ ] Kiểm tra sức khoẻ website, phần sau: job hằng ngày mọi website, đếm đường dẫn 404 (bảng

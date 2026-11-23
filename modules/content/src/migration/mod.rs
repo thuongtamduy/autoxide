@@ -24,6 +24,7 @@ mod m0027_site_regions;
 mod m0028_content_types;
 mod m0029_ai_turns;
 mod m0030_site_health;
+mod m0033_campaign_drafts;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 use autoxide_kernel::tenancy::migration::TenantTable;
@@ -185,5 +186,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(m0029_ai_turns::Migration),
         // Kiểm tra sức khoẻ website: lần kiểm gần nhất (bước 67).
         Box::new(m0030_site_health::Migration),
+        // Bộ nháp chiến dịch từ một chương trình khuyến mại (bước 67).
+        Box::new(m0033_campaign_drafts::Migration),
     ]
 }

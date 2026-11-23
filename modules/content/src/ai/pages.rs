@@ -88,6 +88,7 @@ fn result_invalid(tries: i32) -> Error {
 impl ContentService {
     /// Xin AI tạo (`compose`) hay sửa tiếp (`edit`) bố cục của trang `id`. Cần quyền sửa trang, tính
     /// năng `content.ai_suggestions` của gói và AI đã bật. Trả lượt đã xếp hàng (`202`).
+    /// Mỗi yêu cầu tính một lần vào hạn mức `content.ai_page_generations` của gói.
     pub(crate) async fn request_ai_page(
         &self,
         tenant: &TenantContext,
@@ -96,6 +97,22 @@ impl ContentService {
         kind: TurnKind,
         instruction: &str,
         selection: Option<Vec<String>>,
+    ) -> Result<AiTurn, Error> {
+        self.queue_ai_page(tenant, principal, id, kind, instruction, selection, true).await
+    }
+
+    /// Như [`request_ai_page`](Self::request_ai_page); `charge = false` khi lượt thuộc một yêu cầu đã
+    /// tính hạn mức (bộ nháp chiến dịch).
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) async fn queue_ai_page(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+        id: Uuid,
+        kind: TurnKind,
+        instruction: &str,
+        selection: Option<Vec<String>>,
+        charge: bool,
     ) -> Result<AiTurn, Error> {
         permissions::require_create(principal)?;
         let current = self.load_checked(tenant, id, None).await?;
@@ -131,11 +148,23 @@ impl ContentService {
         if !problems.is_empty() {
             return Err(invalid(problems));
         }
+        let turn_id = Uuid::now_v7();
+        if charge {
+            // Hạn mức theo gói, ngoài transaction ghi (D-20261123-campaign-drafts).
+            self.entitlements
+                .record_usage(
+                    tenant.id(),
+                    &crate::ai::campaign::AI_PAGE_GENERATIONS,
+                    1,
+                    &format!("content.ai_turn:{turn_id}"),
+                )
+                .await?;
+        }
         let snapshot = serde_json::to_string(&principal.snapshot()).map_err(Error::internal)?;
         let at = now();
         let transaction = tenant.database().begin_write().await?;
         let turn = ai_turn::ActiveModel {
-            id: Set(Uuid::now_v7()),
+            id: Set(turn_id),
             tenant_id: Set(tenant.id().as_uuid()),
             entry_id: Set(id),
             kind: Set(kind.as_str().to_owned()),

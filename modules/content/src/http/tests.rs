@@ -20,6 +20,7 @@ mod agent;
 mod ai_pages;
 mod blocks_base;
 mod bulk;
+mod campaign_drafts;
 mod edit_lock;
 mod embed;
 mod health;

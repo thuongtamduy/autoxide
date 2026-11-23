@@ -28,6 +28,7 @@ mod http;
 mod mcp;
 mod migration;
 mod page_templates;
+mod page_tools;
 mod permissions;
 mod privacy;
 mod publishing;
@@ -217,6 +218,10 @@ impl Module for ContentModule {
         vec![service::AI_SUGGESTIONS]
     }
 
+    fn limits(&self) -> Vec<autoxide_kernel::entitlement::Limit> {
+        vec![crate::ai::campaign::AI_PAGE_GENERATIONS]
+    }
+
     fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
         let config = self
             .config
@@ -243,6 +248,7 @@ impl Module for ContentModule {
             .with_resources(context.resources())
             .with_custom_fields(context.custom_fields())
             .with_blocks(context.blocks())
+            .with_tools(context.automation_directory())
             // Mẫu trang bắt buộc (D-359): biến từ hồ sơ pháp lý của `compliance` khi app có module đó.
             .with_templates(
                 (*context.require::<autoxide_kernel::template::TemplateEngine>()?).clone(),
@@ -318,6 +324,10 @@ impl Module for ContentModule {
                 JobRegistration::new(
                     crate::ai::pages::AI_PAGE,
                     Arc::new(crate::ai::pages::AiPages(service.clone())),
+                ),
+                JobRegistration::new(
+                    crate::ai::campaign::CAMPAIGN_DRAFTS,
+                    Arc::new(crate::ai::campaign::CampaignDrafts(service.clone())),
                 ),
                 JobRegistration::new(semantic::INDEX, Arc::new(semantic::Indexer(service.clone()))),
                 JobRegistration::new(semantic::CATCH_UP, Arc::new(semantic::CatchUp(service))),
