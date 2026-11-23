@@ -248,7 +248,7 @@ pub(crate) struct FeedbackRequest {
     extensions(("x-permissions" = json!([]))),
     operation_id = "feedback_my_support_auto_reply",
     security(("bearer" = [])),
-    params(("id" = Uuid, Path, description = "Id of the ticket."), ("reply_id" = Uuid, Path, description = "Id of the automatic answer.")),
+    params(("id" = Uuid, Path, description = "Id of the ticket."), ("reply_id" = Uuid, Path, description = "Id of the automatic answer, or of the ticket message it sent (`auto_reply: true`).")),
     request_body = FeedbackRequest,
     responses(
         (status = 200, description = "Recorded.", body = Data<AutoReplyResponse>),
@@ -277,7 +277,7 @@ pub(crate) async fn feedback_mine(
     extensions(("x-public" = json!(true))),
     operation_id = "feedback_public_support_auto_reply",
     security(()),
-    params(("id" = Uuid, Path, description = "Id of the ticket."), ("reply_id" = Uuid, Path, description = "Id of the automatic answer.")),
+    params(("id" = Uuid, Path, description = "Id of the ticket."), ("reply_id" = Uuid, Path, description = "Id of the automatic answer, or of the ticket message it sent (`auto_reply: true`).")),
     request_body = FeedbackRequest,
     responses(
         (status = 200, description = "Recorded.", body = Data<AutoReplyResponse>),
