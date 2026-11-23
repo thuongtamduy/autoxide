@@ -1,15 +1,17 @@
-//! `GET /api/v1/kernel/events/ws` (bước 69 P3, D-20261119-step69-ws): event thời gian thực qua
-//! WebSocket, cho app cần hai chiều (chat, vị trí người giao hàng). Dùng chung [`StreamHub`] và bộ
-//! lọc quyền của SSE (D-378): cùng event, cùng quyền, cùng cách nối lại (`last_event_id`), cùng
-//! giới hạn kết nối — một phiên WebSocket là một kết nối dù đổi đăng ký bao nhiêu lần.
+//! `GET /api/v1/kernel/events/ws` (step 69 P3, D-20261119-step69-ws): real-time events over WebSocket, for
+//! apps that need two-way communication (chat, delivery person location). Shares the [`StreamHub`] and the
+//! permission filter of SSE (D-378): the same events, the same permissions, the same reconnection
+//! (`last_event_id`), the same connection limit - one WebSocket session is one connection no matter how many
+//! times its subscriptions change.
 //!
-//! Máy khách chỉ gửi được LỆNH ĐIỀU KHIỂN: đăng ký / huỷ đăng ký event, báo đã nhận, vào / rời một
-//! chủ đề và báo "đang gõ" (tín hiệu tạm, không lưu — [`crate::event::signals`]). Ghi dữ liệu vẫn
-//! qua REST: mỗi việc một cách làm.
+//! The client can send only CONTROL COMMANDS: subscribe / unsubscribe to events, acknowledge receipt, join /
+//! leave a topic and report "typing" (ephemeral signals, not stored - [`crate::event::signals`]). Writing
+//! data still goes through REST: one way to do each thing.
 //!
-//! Xác thực như REST lúc bắt tay; sau đó cứ `AUTOXIDE_EVENTS_WS_RECHECK_SECONDS` giây xét lại —
-//! token hết hạn, tài khoản bị khoá thì máy chủ đóng với mã 4401. Mỗi 30 phút (hết đời kết nối
-//! của hub) quyền được xét lại như khi nối mới.
+//! Authentication is like REST at the handshake; after that, every `AUTOXIDE_EVENTS_WS_RECHECK_SECONDS`
+//! seconds it is re-checked - if the token has expired or the account is locked the server closes with code 4401.
+//! Every 30 minutes (the end of the hub's connection lifetime) permissions are re-evaluated as for a new
+//! connection.
 
 use std::collections::{BTreeSet, HashMap};
 use std::sync::{Arc, Mutex};
@@ -34,28 +36,30 @@ use crate::event::signals::SignalTopicsSlot;
 use crate::event::stream::{Frame, StreamedEvent, Ticket, disabled, parse_last_event_id};
 use crate::tenancy::TenantContext;
 
-/// Mã đóng: thông tin xác thực không còn dùng được (token hết hạn, tài khoản bị khoá…).
+/// Close code: the credentials are no longer usable (token expired, account locked...).
 const CLOSE_UNAUTHENTICATED: u16 = 4401;
-/// Mã đóng: không còn quyền xem event nào đã đăng ký.
+/// Close code: no permission remains to see any subscribed event.
 const CLOSE_FORBIDDEN: u16 = 4403;
-/// Mã đóng chuẩn (RFC 6455): máy chủ khởi động lại / đang tắt — nối lại, máy chủ khác trả lời.
+/// Standard close code (RFC 6455): the server is restarting / shutting down - reconnect, another server
+/// answers.
 const CLOSE_RESTART: u16 = 1012;
-/// Thân một thông điệp của máy khách tối đa chừng này byte.
+/// A client message body is at most this many bytes.
 const MAX_MESSAGE_BYTES: usize = 16 * 1024;
-/// Một kết nối báo "đang gõ" ở một chủ đề tối đa một lần trong khoảng này; lần dày hơn bị bỏ.
+/// A connection may report "typing" on a topic at most once in this interval; more frequent reports are
+/// dropped.
 const TYPING_EVERY: Duration = Duration::from_secs(2);
-/// Nhớ event đã gửi chừng này để không gửi lại khi đổi đăng ký.
+/// Sent events are remembered this long so they are not resent when subscriptions change.
 const REMEMBER_SENT: Duration = Duration::from_secs(60);
-/// Một kết nối vào tối đa chừng này chủ đề.
+/// A connection may join at most this many topics.
 const MAX_TOPICS: usize = 20;
 
-/// Trạng thái chung của endpoint.
+/// Shared state of the endpoint.
 pub(crate) struct WsState {
     hub: StreamHub,
     topics: SignalTopicsSlot,
-    /// Tín hiệu tạm giữa các kết nối của tiến trình này.
+    /// Ephemeral signals between connections of this process.
     signals: broadcast::Sender<Arc<Signal>>,
-    /// Ai đang ở chủ đề nào: (khách, chủ đề) → kết nối → người dùng.
+    /// Who is on which topic: (tenant, topic) -> connection -> user.
     present: Mutex<HashMap<(Uuid, String), HashMap<Uuid, Uuid>>>,
 }
 
@@ -164,7 +168,7 @@ async fn events_ws(
     Ok(upgrade.max_message_size(MAX_MESSAGE_BYTES).on_upgrade(move |socket| session.run(socket)))
 }
 
-/// Tên event từ chuỗi `a,b,c`, bỏ trống và trùng.
+/// Event names from the string `a,b,c`, ignoring blanks and duplicates.
 fn patterns(names: &str) -> BTreeSet<String> {
     names.split(',').map(str::trim).filter(|name| !name.is_empty()).map(str::to_owned).collect()
 }
@@ -173,12 +177,12 @@ fn join(names: &BTreeSet<String>) -> String {
     names.iter().map(String::as_str).collect::<Vec<_>>().join(",")
 }
 
-/// Một tín hiệu tạm.
+/// An ephemeral signal.
 #[derive(Debug, Clone, Serialize)]
 struct Signal {
     #[serde(skip)]
     tenant: Uuid,
-    /// Kết nối gửi (không gửi lại cho chính nó).
+    /// The sending connection (not sent back to itself).
     #[serde(skip)]
     from: Uuid,
     topic: String,
@@ -186,7 +190,7 @@ struct Signal {
     signal: &'static str,
 }
 
-/// Thông điệp máy khách gửi.
+/// A message the client sends.
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 enum Command {
@@ -199,7 +203,7 @@ enum Command {
     Ping,
 }
 
-/// Thông điệp máy chủ gửi.
+/// A message the server sends.
 #[derive(Debug, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 enum Reply<'a> {
@@ -213,33 +217,33 @@ enum Reply<'a> {
     Error { code: &'a str, message: String },
 }
 
-/// Một phiên WebSocket.
+/// A WebSocket session.
 struct Session {
     id: Uuid,
     state: Arc<WsState>,
     tenant: TenantContext,
     principal: Principal,
-    /// Phần request bắt tay: xét lại thông tin xác thực bằng đúng đường của REST.
+    /// The handshake part of the request: re-checks credentials through the same path as REST.
     parts: Parts,
     names: BTreeSet<String>,
-    /// Luồng khung từ hub; `None` khi không đăng ký event nào.
+    /// The frame stream from the hub; `None` when no event is subscribed.
     receiver: Option<mpsc::Receiver<Frame>>,
-    /// Event cuối đã gửi (hay máy khách báo đã nhận): nối lại từ đây khi đổi đăng ký.
+    /// The last event sent (or acknowledged by the client): reconnects from here when subscriptions change.
     last: Option<Uuid>,
     signals: broadcast::Receiver<Arc<Signal>>,
-    /// Event đã gửi gần đây → lúc gửi: luồng mới sau khi đổi đăng ký đọc bù lùi lại vài giây, không
-    /// gửi lại event phiên đã gửi.
+    /// Events sent recently -> time sent: a new stream after a subscription change backfills a few seconds
+    /// back, without resending events the session already sent.
     sent: HashMap<Uuid, Instant>,
-    /// Chủ đề đã vào → lần báo "đang gõ" gần nhất.
+    /// Topics joined -> time of the most recent "typing" report.
     topics: HashMap<String, Option<Instant>>,
     _ticket: Ticket,
 }
 
-/// Phiên kết thúc thế nào.
+/// How the session ended.
 enum End {
-    /// Máy khách đóng hay mất kết nối.
+    /// The client closed or lost the connection.
     Gone,
-    /// Máy chủ đóng với mã và lý do.
+    /// The server closes with a code and reason.
     Close(u16, String),
 }
 
@@ -318,7 +322,8 @@ impl Session {
         }
     }
 
-    /// `id` chưa gửi trong phiên (ghi nhận là đã gửi). Chỉ nhớ một phút: đủ cho khoảng đọc bù.
+    /// `id` has not been sent in the session (it is recorded as sent). Remembered for only a minute: enough
+    /// for the backfill interval.
     fn fresh(&mut self, id: Uuid) -> bool {
         if self.sent.len() > 1000 {
             self.sent.retain(|_, at| at.elapsed() < REMEMBER_SENT);
@@ -326,7 +331,7 @@ impl Session {
         self.sent.insert(id, Instant::now()).is_none()
     }
 
-    /// Xét lại thông tin xác thực của lần bắt tay (token còn hạn, tài khoản còn dùng được).
+    /// Re-checks the credentials of the handshake (token still valid, account still usable).
     async fn authenticate(&mut self) -> Result<(), Error> {
         let mut parts = self.parts.clone();
         parts.extensions.remove::<crate::tenancy::request::Authenticated>();
@@ -334,7 +339,7 @@ impl Session {
         Ok(())
     }
 
-    /// Nối lại luồng của hub sau khi nó đóng, với quyền xét lại.
+    /// Reconnects the hub stream after it closed, re-evaluating permissions.
     async fn reconnect(&mut self) -> Result<(), End> {
         self.receiver = None;
         if self.state.hub.is_closed() {
@@ -352,7 +357,7 @@ impl Session {
         }
     }
 
-    /// Làm một lệnh của máy khách; trả các thông điệp cần gửi lại.
+    /// Handles one client command; returns the messages that need to be sent back.
     async fn command(&mut self, body: &str) -> Vec<Message> {
         let command = match serde_json::from_str::<Command>(body) {
             Ok(command) => command,
@@ -409,8 +414,9 @@ impl Session {
         }
     }
 
-    /// Đổi tập event đăng ký: kiểm quyền với tập mới (sai thì giữ tập cũ), rồi nối lại luồng từ
-    /// event cuối đã gửi — không lọt event nào giữa hai luồng.
+    /// Changes the set of subscribed events: checks permissions against the new set (if wrong, keeps the old
+    /// set), then reconnects the stream from the last event sent - no event slips through between the two
+    /// streams.
     fn resubscribe(&mut self, wanted: BTreeSet<String>) -> Vec<Message> {
         if wanted.is_empty() {
             self.names = wanted;
@@ -429,7 +435,7 @@ impl Session {
         vec![text(&Reply::Subscribed { names })]
     }
 
-    /// Vào chủ đề `topic` (`<loại>:<id>`) nếu module của loại đó cho phép.
+    /// Joins topic `topic` (`<kind>:<id>`) if the module of that kind allows it.
     async fn join(&mut self, topic: String) -> Vec<Message> {
         if self.topics.contains_key(&topic) {
             return vec![self.joined(&topic)];
@@ -465,7 +471,7 @@ impl Session {
         text(&Reply::Joined { topic, online })
     }
 
-    /// Gửi tín hiệu `signal` của người dùng này ở `topic` cho các kết nối khác; cập nhật sổ có mặt.
+    /// Sends this user's signal `signal` on `topic` to the other connections; updates the presence ledger.
     fn announce(&self, topic: &str, signal: &'static str) {
         let key = (self.tenant.id().as_uuid(), topic.to_owned());
         {
@@ -496,7 +502,7 @@ impl Session {
         let _ = self.state.signals.send(Arc::new(signal));
     }
 
-    /// Rời mọi chủ đề khi phiên kết thúc.
+    /// Leaves every topic when the session ends.
     fn leave_all(&mut self) {
         let topics: Vec<String> = self.topics.drain().map(|(topic, _)| topic).collect();
         for topic in topics {
@@ -505,7 +511,7 @@ impl Session {
     }
 }
 
-/// Khung kế tiếp của luồng hub; không có luồng thì chờ mãi (nhánh khác của `select!` chạy).
+/// The next frame of the hub stream; with no stream, waits forever (another `select!` branch runs).
 async fn next_frame(receiver: &mut Option<mpsc::Receiver<Frame>>) -> Option<Frame> {
     match receiver {
         Some(receiver) => receiver.recv().await,
@@ -517,7 +523,7 @@ fn text(reply: &Reply<'_>) -> Message {
     Message::text(serde_json::to_string(reply).unwrap_or_else(|_| "{}".to_owned()))
 }
 
-/// Thông điệp lỗi: mã ổn định và câu tiếng Anh đã điền giá trị.
+/// An error message: the stable code and the English sentence with values filled in.
 fn error(problem: &Error) -> Message {
     let mut message = problem.message();
     for field in problem.fields() {
@@ -567,7 +573,7 @@ fn too_many_topics() -> Error {
     .with_param("max", MAX_TOPICS)
 }
 
-/// Mutex bị "đầu độc" vẫn dùng tiếp: bên trong chỉ là sổ ai đang có mặt.
+/// A "poisoned" mutex is still used: inside it is only the ledger of who is present.
 fn lock<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
 }

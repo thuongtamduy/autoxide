@@ -1,14 +1,14 @@
-//! Claim job: nhiều worker cùng lấy job mà không ai lấy trùng.
+//! Job claiming: several workers take jobs at once without anyone taking the same one.
 //!
-//! Hai database làm việc này khác nhau (D-009), nên giấu sau trait [`Claim`]:
+//! The two databases do this differently (D-009), so it is hidden behind the [`Claim`] trait:
 //!
-//! - **Postgres** cho nhiều kết nối ghi cùng lúc: chọn job bằng
-//!   `SELECT … FOR UPDATE SKIP LOCKED` (bỏ qua dòng worker khác đang khoá) trong câu
-//!   `UPDATE … RETURNING`. Các worker lấy những job khác nhau, không ai phải chờ ai.
-//! - **SQLite** chỉ có một bên ghi tại một thời điểm: một câu
-//!   `UPDATE … WHERE id IN (SELECT … LIMIT n) RETURNING` đã là nguyên tử.
+//! - **Postgres** allows many write connections at once: it picks jobs with
+//!   `SELECT … FOR UPDATE SKIP LOCKED` (skipping rows locked by other workers) inside an
+//!   `UPDATE … RETURNING` statement. Workers take different jobs and nobody waits for anyone.
+//! - **SQLite** has only one writer at a time: a single `UPDATE … WHERE id IN (SELECT … LIMIT n) RETURNING`
+//!   statement is already atomic.
 //!
-//! Gate chạy test claim đồng thời trên cả hai database, nên cả hai nhánh đều được test.
+//! The gate runs the concurrent claim test on both databases, so both branches are tested.
 use crate::time::Timestamp;
 use sea_orm::sea_query::{
     Alias, Condition, Expr, ExprTrait as _, LockBehavior, LockType, Order, Query, SelectStatement,
@@ -20,22 +20,22 @@ use uuid::Uuid;
 use crate::error::Error;
 use crate::tenancy::TenantId;
 
-/// Một job vừa được claim.
+/// A job that was just claimed.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct ClaimedJob {
-    /// Khách của job ([`NO_TENANT`](crate::tenancy::NO_TENANT): job của cả database).
+    /// The job's tenant ([`NO_TENANT`](crate::tenancy::NO_TENANT): a job of the whole database).
     pub tenant: TenantId,
     pub id: Uuid,
     pub kind: String,
     pub payload: String,
-    /// Đã tính cả lần này.
+    /// Including this attempt.
     pub attempts: i32,
     pub max_attempts: i32,
 }
 
-/// Một lần claim: tối đa `limit` job đang chờ của bảng `table` (chỉ của khách `tenant` nếu có)
-/// cho worker `worker`, giữ tới `until`.
+/// One claim: at most `limit` pending jobs from table `table` (only of tenant `tenant` if given) for worker
+/// `worker`, held until `until`.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct ClaimRequest<'a> {
@@ -66,10 +66,10 @@ impl<'a> ClaimRequest<'a> {
     }
 }
 
-/// Cách claim job của một database.
+/// How to claim jobs for one database.
 #[async_trait::async_trait]
 pub trait Claim: Send + Sync {
-    /// Claim theo `request`. Mỗi job claim được tăng `attempts` thêm một.
+    /// Claims per `request`. Each claimed job has `attempts` increased by one.
     async fn claim(
         &self,
         connection: &DatabaseConnection,
@@ -77,13 +77,13 @@ pub trait Claim: Send + Sync {
     ) -> Result<Vec<ClaimedJob>, Error>;
 }
 
-/// Claim của Postgres: `FOR UPDATE SKIP LOCKED`.
+/// The Postgres claim: `FOR UPDATE SKIP LOCKED`.
 pub struct PostgresClaim;
 
-/// Claim của SQLite: một câu `UPDATE … RETURNING` (SQLite chỉ có một bên ghi).
+/// The SQLite claim: a single `UPDATE … RETURNING` statement (SQLite has only one writer).
 pub struct SqliteClaim;
 
-/// Cách claim đúng cho `backend`.
+/// The correct claim method for `backend`.
 pub fn claim_for(backend: DatabaseBackend) -> Box<dyn Claim> {
     match backend {
         DatabaseBackend::Postgres => Box::new(PostgresClaim),
@@ -115,7 +115,7 @@ impl Claim for SqliteClaim {
     }
 }
 
-/// Điều kiện "đang chờ chạy": chưa xong, chưa hỏng hẳn, tới giờ, không ai đang giữ.
+/// The "pending run" condition: not finished, not permanently failed, due, and not held by anyone.
 pub(crate) fn pending(now: Timestamp) -> Condition {
     Condition::all()
         .add(Expr::col(Alias::new("completed_at")).is_null())

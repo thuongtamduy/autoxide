@@ -1,9 +1,10 @@
-//! Endpoint deprecated: module khai, kernel đánh dấu trong OpenAPI và gắn header chuẩn
-//! vào mỗi response — `Deprecation` (RFC 9745), `Sunset` (RFC 8594), `Link` tới endpoint
-//! thay thế (`rel="successor-version"`). Client (và AI agent) biết sớm để chuyển.
+//! Deprecated endpoints: declared by modules, marked by the kernel in OpenAPI, with standard headers attached
+//! to every response - `Deprecation` (RFC 9745), `Sunset` (RFC 8594), `Link` to the replacement
+//! endpoint (`rel="successor-version"`). Clients (and AI agents) learn early so they can migrate.
 //!
-//! Tool MCP deprecated khai cùng chỗ, bằng [`Deprecation::tool`] (D-240): lớp HTTP bỏ qua chúng;
-//! `Modules::tools` gắn chúng vào tool, `tools/list` và kết quả của tool báo cho agent.
+//! Deprecated MCP tools are declared in the same place, with [`Deprecation::tool`] (D-240): the HTTP layer
+//! ignores them; `Modules::tools` attaches them to the tool, and `tools/list` and the tool's result tell the
+//! agent.
 
 use crate::time::Date;
 use std::collections::HashMap;
@@ -18,7 +19,7 @@ use utoipa::openapi::path::Operation;
 
 use super::API_PREFIX;
 
-/// Một endpoint sắp bỏ, do module khai (`Module::deprecations`).
+/// An endpoint about to be removed, declared by a module (`Module::deprecations`).
 ///
 /// ```
 /// use autoxide_kernel::http::Deprecation;
@@ -32,16 +33,16 @@ use super::API_PREFIX;
 #[non_exhaustive]
 pub struct Deprecation {
     pub method: Method,
-    /// Đường dẫn trong module, như khi khai route (`/`, `/{id}`).
+    /// Path within the module, as when declaring the route (`/`, `/{id}`).
     pub path: &'static str,
-    /// Ngày bắt đầu deprecated, `YYYY-MM-DD` (UTC).
+    /// Date the deprecation started, `YYYY-MM-DD` (UTC).
     pub since: &'static str,
-    /// Ngày endpoint bị bỏ hẳn, `YYYY-MM-DD` (UTC), nếu đã định.
+    /// Date the endpoint is removed for good, `YYYY-MM-DD` (UTC), if decided.
     pub sunset: Option<&'static str>,
-    /// Endpoint dùng thay, nếu có (đường dẫn hoặc URL). Với tool: tên ngắn của tool dùng thay.
+    /// The replacement endpoint, if any (a path or URL). For a tool: the short name of the replacement tool.
     pub successor: Option<&'static str>,
-    /// Tên ngắn của tool MCP bị deprecated (khai bằng [`Deprecation::tool`]); khi có thì `method`
-    /// và `path` không dùng.
+    /// Short name of the deprecated MCP tool (declared with [`Deprecation::tool`]); when set, `method`
+    /// and `path` are unused.
     pub tool: Option<&'static str>,
 }
 
@@ -50,9 +51,9 @@ impl Deprecation {
         Deprecation { method, path, since, sunset: None, successor: None, tool: None }
     }
 
-    /// Tool MCP `name` (tên ngắn, như trong `Module::tools`) deprecated từ ngày `since`. Thay đổi
-    /// phá vỡ của tool thì làm tool mới (vd `create_draft_v2`), tool cũ chạy như cũ tới ngày
-    /// sunset:
+    /// MCP tool `name` (short name, as in `Module::tools`) deprecated since date `since`. A breaking change
+    /// to a tool means creating a new tool (e.g. `create_draft_v2`); the old tool keeps working as before
+    /// until the sunset date:
     ///
     /// ```
     /// use autoxide_kernel::http::Deprecation;
@@ -72,7 +73,7 @@ impl Deprecation {
         }
     }
 
-    /// Khai báo này cho một tool MCP (không phải endpoint).
+    /// Whether this declaration is for an MCP tool (not an endpoint).
     pub const fn is_tool(&self) -> bool {
         self.tool.is_some()
     }
@@ -87,7 +88,7 @@ impl Deprecation {
         self
     }
 
-    /// Các vấn đề của khai báo này (ngày sai dạng, sunset trước since…).
+    /// The problems of this declaration (wrongly formatted date, sunset before since...).
     pub fn problems(&self, module: &str) -> Vec<String> {
         let mut problems = Vec::new();
         let endpoint = match self.tool {
@@ -118,18 +119,18 @@ fn parse_date(text: &str) -> Option<Date> {
     Date::parse_from_str(text, "%Y-%m-%d").ok()
 }
 
-/// Header của một endpoint deprecated, dựng sẵn một lần.
+/// The headers of a deprecated endpoint, built once in advance.
 struct Headers {
     deprecation: HeaderValue,
     sunset: Option<HeaderValue>,
     link: Option<HeaderValue>,
 }
 
-/// Bảng tra (method, mẫu đường dẫn đầy đủ) → header.
+/// Lookup table (method, full path pattern) -> headers.
 pub(super) struct Table(HashMap<(Method, String), Headers>);
 
-/// Đánh dấu `deprecated` trong tài liệu và dựng bảng tra header. Khai báo không khớp
-/// endpoint nào thì ghi log lỗi (test của module nên bắt được trước).
+/// Marks `deprecated` in the documentation and builds the header lookup table. A declaration that matches
+/// no endpoint is logged as an error (the module's tests should catch it first).
 pub(super) fn apply(openapi: &mut OpenApi, deprecations: &[(&'static str, Deprecation)]) -> Table {
     let mut table = HashMap::new();
     for (module, deprecation) in
@@ -190,13 +191,14 @@ fn header(text: &str) -> HeaderValue {
     HeaderValue::from_str(text).unwrap_or_else(|_| HeaderValue::from_static(""))
 }
 
-/// Câu gắn vào mô tả của mọi operation và tool MCP thuộc module thử nghiệm.
+/// The sentence attached to the description of every operation and MCP tool belonging to an experimental
+/// module.
 pub(crate) const EXPERIMENTAL_NOTE: &str = "**Experimental**: this belongs to an experimental \
      module; it may change between releases, breaking changes included (see the changelog).";
 
-/// Đánh dấu mọi operation của các module thử nghiệm `modules` (bước 70 P3): extension
-/// `x-stability: experimental` cho máy, một câu trong mô tả cho người. Operation không có
-/// `x-stability` thuộc module chính thức.
+/// Marks every operation of the experimental modules `modules` (step 70 P3): the extension
+/// `x-stability: experimental` for machines, one sentence in the description for people. An operation without
+/// `x-stability` belongs to an official module.
 pub(super) fn mark_experimental(openapi: &mut OpenApi, modules: &[&'static str]) {
     for (path, item) in &mut openapi.paths.paths {
         let owner = path
@@ -239,7 +241,7 @@ fn operation_mut<'a>(
     }
 }
 
-/// Lớp HTTP: gắn header vào response của endpoint deprecated, và đếm số lần gọi.
+/// HTTP layer: attaches headers to the response of a deprecated endpoint, and counts the calls.
 pub(super) async fn mark(table: Arc<Table>, request: Request, next: Next) -> Response {
     let key = request
         .extensions()

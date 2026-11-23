@@ -1,10 +1,10 @@
-//! Migration tạo bảng event của một module.
+//! Migration that creates the event table of a module.
 
 use crate::migration::prelude::*;
 use crate::migration::schema;
 
-/// Migration tạo bảng `<module>_events`. Module phát event thêm nó vào danh sách
-/// migration của mình, ở vị trí cố định như mọi migration khác:
+/// Migration that creates the `<module>_events` table. A module that emits events adds it to its own list
+/// of migrations, at a fixed position like every other migration:
 ///
 /// ```ignore
 /// fn migrations(&self) -> Vec<Box<dyn MigrationTrait>> {
@@ -75,11 +75,11 @@ impl MigrationTrait for OutboxMigration {
     }
 }
 
-/// Migration thêm cột `actor_kind` (`system` / `user` / `public`) vào bảng `<module>_events`, để
-/// event do người lạ gây ra (gửi form, đăng ký bản tin…) phân biệt được với event của hệ thống
-/// (D-122). Module phát event thêm nó NGAY SAU [`outbox_migration`] (module mới) hoặc như
-/// migration kế tiếp (module có sẵn). Dòng cũ không có giá trị: đọc ra là `system` / `user`
-/// theo `actor_user_id`.
+/// Migration that adds the `actor_kind` column (`system` / `user` / `public`) to the `<module>_events`
+/// table, so events caused by strangers (form submissions, newsletter signups...) can be told apart from
+/// system events (D-122). A module that emits events adds it RIGHT AFTER [`outbox_migration`] (new module)
+/// or as the next migration (existing module). An old row has no value: it reads as `system` / `user` by
+/// `actor_user_id`.
 pub fn outbox_actor_migration(name: &'static str, module: &'static str) -> Box<dyn MigrationTrait> {
     Box::new(ActorKindMigration { name, module })
 }
@@ -119,8 +119,9 @@ impl MigrationTrait for ActorKindMigration {
     }
 }
 
-/// Bảng `<module>_events` sau khi nâng theo khách (bước 33 A4): `tenant_id` đứng đầu; index quét
-/// của bộ phát (mọi khách) đổi tên `…_pending_sweep_idx`. Module thêm vào migration của mình:
+/// The `<module>_events` table after the tenant upgrade (step 33 A4): `tenant_id` comes first; the
+/// dispatcher's sweep index (all tenants) is renamed `…_pending_sweep_idx`. A module adds this to its own
+/// migrations:
 ///
 /// ```ignore
 /// autoxide_kernel::tenancy::migration::adopt(
@@ -138,9 +139,10 @@ pub fn tenant_table(module: &str) -> crate::tenancy::migration::TenantTable {
         .drop_index(format!("{table}_pending_idx"))
 }
 
-/// Migration thêm `actor_access` (`direct` / `delegation` / `support`) và `actor_access_id` vào
-/// bảng `<module>_events` (bước 34, D-310): đường người làm vào khách. Mọi module phát event thêm
-/// nó vào CUỐI danh sách migration của mình. Dòng cũ không có giá trị: đọc ra là `direct`.
+/// Migration that adds `actor_access` (`direct` / `delegation` / `support`) and `actor_access_id` to the
+/// `<module>_events` table (step 34, D-310): the path by which the actor entered the tenant. Every module
+/// that emits events adds it at the END of its own migration list. An old row has no value: it reads as
+/// `direct`.
 pub fn outbox_access_migration(
     name: &'static str,
     module: &'static str,

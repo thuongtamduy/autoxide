@@ -1,23 +1,22 @@
-//! Nơi lấy giá trị cấu hình: biến môi trường của tiến trình và file `.env`.
+//! Where configuration values come from: the process environment variables and the `.env` file.
 
 use std::collections::BTreeMap;
 use std::path::Path;
 
 use super::{ConfigError, ConfigErrors};
 
-/// Tập giá trị cấu hình thô (tên → chuỗi), đã gộp từ mọi nguồn.
+/// The set of raw configuration values (name to string), merged from every source.
 ///
-/// Code đọc cấu hình không gọi `std::env::var` trực tiếp mà đi qua kiểu này, để
-/// test truyền giá trị vào bằng [`from_pairs`](Self::from_pairs) — không phải sửa
-/// môi trường của tiến trình (việc đó `unsafe` từ Rust 2024 vì các thread khác có
-/// thể đang đọc).
+/// Configuration-reading code does not call `std::env::var` directly but goes through this type, so tests
+/// can pass values in with [`from_pairs`](Self::from_pairs) without modifying the process environment
+/// (which is `unsafe` since Rust 2024 because other threads may be reading it).
 #[derive(Debug, Clone, Default)]
 pub struct ConfigSource {
     values: BTreeMap<String, String>,
 }
 
 impl ConfigSource {
-    /// Dựng từ các cặp (tên, giá trị) cho trước.
+    /// Builds from the given (name, value) pairs.
     pub fn from_pairs<I, K, V>(pairs: I) -> Self
     where
         I: IntoIterator<Item = (K, V)>,
@@ -29,9 +28,9 @@ impl ConfigSource {
         }
     }
 
-    /// Biến môi trường của tiến trình, cộng với file `.env` tại `dotenv_path` nếu
-    /// file tồn tại. Biến môi trường thật THẮNG file `.env` — để Docker, systemd
-    /// hay CI ghi đè được mà không phải sửa file.
+    /// The process environment variables, plus the `.env` file at `dotenv_path` if the file exists. Real
+    /// environment variables WIN over the `.env` file, so Docker, systemd or CI can override without
+    /// editing the file.
     pub fn load(dotenv_path: &Path) -> Result<Self, ConfigErrors> {
         let mut values = BTreeMap::new();
 
@@ -58,8 +57,8 @@ impl ConfigSource {
         Ok(ConfigSource { values })
     }
 
-    /// Giá trị của `name`, đã bỏ khoảng trắng hai đầu. Chuỗi rỗng coi như không
-    /// đặt: `VAR=` trong file `.env` hay compose nghĩa là "dùng mặc định".
+    /// The value of `name`, trimmed of surrounding whitespace. An empty string counts as unset: `VAR=` in a
+    /// `.env` file or compose means "use the default".
     pub fn get(&self, name: &str) -> Option<&str> {
         self.values.get(name).map(|value| value.trim()).filter(|value| !value.is_empty())
     }
@@ -78,7 +77,7 @@ mod tests {
         assert_eq!(source.get("MISSING"), None);
     }
 
-    /// Thư mục tạm riêng cho một bài test, tự xoá khi xong.
+    /// A temporary directory private to one test, removed automatically when done.
     struct TempDir(std::path::PathBuf);
 
     impl TempDir {

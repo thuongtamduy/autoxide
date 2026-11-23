@@ -1,4 +1,4 @@
-//! Chạy máy chủ và tắt cho êm (graceful shutdown).
+//! Runs the server and shuts down gracefully.
 
 use std::future::{Future, IntoFuture};
 use std::net::SocketAddr;
@@ -10,20 +10,20 @@ use axum::serve::ListenerExt as _;
 use tokio::net::TcpListener;
 use tokio::sync::Notify;
 
-/// Máy chủ đã dừng như thế nào.
+/// How the server stopped.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Shutdown {
-    /// Mọi request đang chạy đã xong trước khi dừng.
+    /// Every in-flight request finished before stopping.
     Graceful,
-    /// Hết thời gian chờ: các request còn dở bị cắt.
+    /// The wait timed out: the unfinished requests were cut off.
     TimedOut,
 }
 
-/// Phục vụ `router` trên `listener` cho tới khi `shutdown` hoàn thành.
+/// Serves `router` on `listener` until `shutdown` completes.
 ///
-/// Khi `shutdown` hoàn thành: ngừng nhận kết nối mới, chờ các request đang chạy
-/// xong — nhưng không quá `grace`. Nhờ vậy lúc deploy bản mới, request đang dở
-/// không bị đứt giữa chừng, mà tiến trình cũng không treo mãi vì một request kẹt.
+/// When `shutdown` completes: stops accepting new connections and waits for in-flight requests
+/// to finish - but no longer than `grace`. This way, when deploying a new version, in-flight requests
+/// are not cut off midway, and the process also does not hang forever because of one stuck request.
 pub async fn serve<F>(
     listener: TcpListener,
     router: Router,
@@ -63,8 +63,8 @@ where
     }
 }
 
-/// Hoàn thành khi tiến trình nhận tín hiệu dừng: Ctrl-C, hoặc SIGTERM (tín hiệu
-/// Docker và systemd gửi khi dừng dịch vụ).
+/// Completes when the process receives a stop signal: Ctrl-C, or SIGTERM (the signal
+/// Docker and systemd send when stopping a service).
 pub async fn shutdown_signal() {
     let interrupt = async {
         // Không đăng ký được tín hiệu thì coi như không bao giờ nhận: chờ mãi.

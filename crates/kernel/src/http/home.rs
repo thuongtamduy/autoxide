@@ -1,6 +1,6 @@
-//! `GET /`: trang chủ dạng JSON — người hay agent mở địa chỉ máy chủ lần đầu thấy ngay đây là gì
-//! và đi đâu tiếp (tài liệu OpenAPI, trang xem API nếu bật, MCP, health check). Core chỉ có API
-//! (luật kiến trúc 9), nên đây không phải trang HTML.
+//! `GET /`: a JSON home page - a person or agent opening the server address for the first time sees at once
+//! what this is and where to go next (the OpenAPI document, the API viewer if enabled, MCP, health checks).
+//! The core has only an API (architecture rule 9), so this is not an HTML page.
 
 use std::sync::Arc;
 
@@ -41,7 +41,7 @@ pub struct Home {
     pub health: String,
 }
 
-/// Route `GET /`. `docs`: trang xem API có bật không; `mcp`: endpoint MCP có được gắn không.
+/// The `GET /` route. `docs`: whether the API viewer is enabled; `mcp`: whether the MCP endpoint is mounted.
 pub(super) fn routes(docs: bool, mcp: bool) -> OpenApiRouter {
     let info = Home {
         name: "Autoxide".to_owned(),

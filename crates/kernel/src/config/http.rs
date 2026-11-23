@@ -1,4 +1,4 @@
-//! Cấu hình máy chủ HTTP.
+//! HTTP server configuration.
 
 use std::net::{IpAddr, SocketAddr};
 use std::time::Duration;
@@ -202,7 +202,7 @@ pub const HSTS_INCLUDE_SUBDOMAINS: Setting = Setting::new(
 )
 .with_default("false");
 
-/// Giá trị `Referrer-Policy` chuẩn (W3C Referrer Policy).
+/// Standard `Referrer-Policy` values (W3C Referrer Policy).
 const REFERRER_POLICIES: [&str; 8] = [
     "no-referrer",
     "no-referrer-when-downgrade",
@@ -214,14 +214,14 @@ const REFERRER_POLICIES: [&str; 8] = [
     "unsafe-url",
 ];
 
-/// Header bảo mật gắn vào mọi response (bước 40 P1).
+/// Security headers attached to every response (step 40 P1).
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct SecurityHeaders {
-    /// `false`: không gắn header nào.
+    /// `false`: no header is attached.
     pub enabled: bool,
     pub referrer_policy: String,
-    /// `max-age` của HSTS; 0 = không gửi.
+    /// HSTS `max-age`; 0 = not sent.
     pub hsts_seconds: u64,
     pub hsts_include_subdomains: bool,
 }
@@ -237,8 +237,8 @@ impl Default for SecurityHeaders {
     }
 }
 
-/// Một địa chỉ hoặc dải địa chỉ (CIDR) của proxy tin cậy: `10.0.0.0/8`, `2001:db8::/32`,
-/// `192.0.2.7` (= `/32`). Tự viết vài chục dòng thay vì thêm thư viện CIDR.
+/// An address or address range (CIDR) of a trusted proxy: `10.0.0.0/8`, `2001:db8::/32`,
+/// `192.0.2.7` (= `/32`). Hand-written in a few dozen lines instead of adding a CIDR library.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct IpRange {
     network: IpAddr,
@@ -246,8 +246,8 @@ pub struct IpRange {
 }
 
 impl IpRange {
-    /// `address` có nằm trong dải không. Địa chỉ IPv4 viết dạng IPv6 (`::ffff:a.b.c.d`) tính
-    /// như IPv4 (proxy nghe trên socket hai giao thức thấy địa chỉ dạng này).
+    /// Whether `address` falls inside the range. An IPv4 address written in IPv6 form (`::ffff:a.b.c.d`)
+    /// counts as IPv4 (a proxy listening on a dual-stack socket sees addresses in this form).
     pub fn contains(&self, address: IpAddr) -> bool {
         let address = match address {
             IpAddr::V6(v6) => v6.to_ipv4_mapped().map_or(address, IpAddr::V4),
@@ -267,8 +267,8 @@ impl IpRange {
         }
     }
 
-    /// Đọc `10.0.0.0/8`, `2001:db8::/32` hay một địa chỉ (= dải chỉ có nó). Lỗi là câu tiếng Anh
-    /// nói rõ phải viết thế nào.
+    /// Parses `10.0.0.0/8`, `2001:db8::/32` or a single address (= a range containing only it). The error
+    /// is an English sentence stating how to write it.
     pub fn parse(text: &str) -> Result<Self, String> {
         let text = text.trim();
         let (address, prefix) = match text.split_once('/') {
@@ -302,7 +302,7 @@ impl std::fmt::Display for IpRange {
     }
 }
 
-/// Hai số `width` bit có cùng `prefix` bit đầu không.
+/// Whether two `width`-bit numbers share the same first `prefix` bits.
 fn same_prefix(network: u128, address: u128, width: u8, prefix: u8) -> bool {
     if prefix == 0 {
         return true;
@@ -324,16 +324,16 @@ fn parse_ranges(raw: &str) -> Result<Vec<IpRange>, String> {
     Ok(ranges)
 }
 
-/// Những origin (nguồn trang web) được trình duyệt cho gọi API.
+/// Origins (web page sources) the browser is allowed to call the API from.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 #[non_exhaustive]
 pub enum CorsOrigins {
-    /// Không origin nào: chỉ trang cùng origin với API gọi được từ trình duyệt.
+    /// No origin: only pages on the same origin as the API can call it from a browser.
     #[default]
     None,
-    /// Mọi origin (`*`).
+    /// Any origin (`*`).
     Any,
-    /// Đúng các origin này, dạng `https://host[:port]`.
+    /// Exactly these origins, in the form `https://host[:port]`.
     List(Vec<String>),
 }
 
@@ -378,52 +378,53 @@ pub struct HttpConfig {
     pub body_limit: usize,
     pub cors_origins: CorsOrigins,
     pub shutdown_grace: Duration,
-    /// Khoảng rút trước khi ngừng nhận kết nối: `/health/ready` trả 503, request vẫn được phục vụ.
+    /// Drain period before connections stop being accepted: `/health/ready` returns 503, requests are
+    /// still served.
     pub drain: Duration,
     pub api_docs: bool,
     pub metrics: bool,
-    /// Port riêng cho `/metrics`; `None`: phục vụ trên port của API.
+    /// Dedicated port for `/metrics`; `None`: served on the API port.
     pub metrics_address: Option<SocketAddr>,
-    /// Nén response chữ (gzip, brotli) — bước 39, D-20261119-step39-compression.
+    /// Compresses text responses (gzip, brotli) - step 39, D-20261119-step39-compression.
     pub compression: bool,
-    /// `s-maxage` của đọc công khai — bước 39, D-20261119-step39-cdn-cache.
+    /// `s-maxage` for public reads - step 39, D-20261119-step39-cdn-cache.
     pub public_cache_seconds: u32,
     pub rate_limit: RateLimit,
-    /// Số proxy tin cậy đứng trước API (đọc địa chỉ thứ chừng này từ cuối header). Bỏ qua khi
-    /// có `trusted_proxies`.
+    /// Number of trusted proxies in front of the API (reads the address that many positions from the end of
+    /// the header). Ignored when `trusted_proxies` is set.
     pub trusted_proxy_count: usize,
-    /// Địa chỉ / dải địa chỉ của proxy tin cậy (D-152); rỗng: đếm theo `trusted_proxy_count`.
+    /// Addresses / address ranges of trusted proxies (D-152); empty: count by `trusted_proxy_count`.
     pub trusted_proxies: Vec<IpRange>,
-    /// Giới hạn số request của một API key (D-109).
+    /// Request limit per API key (D-109).
     pub api_key_rate_limit: RateLimit,
-    /// Nơi đếm giới hạn theo API key (bước 40 P6, D-375).
+    /// Where per-API-key rate limit counts are kept (step 40 P6, D-375).
     pub rate_limit_store: RateLimitStore,
-    /// Header chứa địa chỉ client do reverse proxy đặt; `None`: dùng địa chỉ kết nối.
+    /// Header carrying the client address set by the reverse proxy; `None`: use the connection address.
     pub client_ip_header: Option<HeaderName>,
-    /// Header bảo mật cho mọi response.
+    /// Security headers for every response.
     pub security_headers: SecurityHeaders,
-    /// Số ngày giữ nhật ký request theo khách (bước 52); `0`: không ghi.
+    /// Number of days to keep the per-tenant request log (step 52); `0`: nothing is recorded.
     pub request_log_days: u16,
 }
 
-/// Nơi đếm giới hạn theo API key.
+/// Where per-API-key rate limit counts are kept.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[non_exhaustive]
 pub enum RateLimitStore {
-    /// Mỗi tiến trình đếm riêng (GCRA trong bộ nhớ).
+    /// Each process counts on its own (in-memory GCRA).
     #[default]
     Memory,
-    /// Đếm chung qua bảng `kernel_throttle`, lấy theo lô.
+    /// Shared counting through the `kernel_throttle` table, fetched in batches.
     Database,
 }
 
-/// Giới hạn số request của một địa chỉ client.
+/// Request limit for one client address.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct RateLimit {
-    /// Số request trung bình mỗi phút; `0` là tắt.
+    /// Average number of requests per minute; `0` disables it.
     pub per_minute: u32,
-    /// Số request được gửi dồn một lúc.
+    /// Number of requests that may be sent in a single burst.
     pub burst: u32,
 }
 

@@ -1,4 +1,4 @@
-//! Cấu hình xuất trace (tracing phân tán) theo OpenTelemetry.
+//! Trace export configuration (distributed tracing) via OpenTelemetry.
 
 use super::{ConfigReader, Invalid, Setting};
 
@@ -18,7 +18,7 @@ pub const SERVICE_NAME: Setting =
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct TraceConfig {
-    /// Địa chỉ gốc của collector (không kèm `/v1/traces`); `None` thì không xuất trace.
+    /// The collector base address (without `/v1/traces`); with `None`, traces are not exported.
     pub otlp_endpoint: Option<String>,
     pub service_name: String,
 }

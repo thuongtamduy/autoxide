@@ -1,16 +1,15 @@
-//! Rate limiting: giới hạn số request của mỗi địa chỉ client.
+//! Rate limiting: limits the number of requests from each client address.
 //!
-//! Thuật toán GCRA (Generic Cell Rate Algorithm — cách tính của "token bucket"
-//! nhưng chỉ cần nhớ MỘT mốc thời gian cho mỗi client): mỗi request đẩy mốc
-//! "thời điểm lý thuyết của request kế" (`tat`) đi thêm một khoảng `interval`
-//! (= 1 phút / số request mỗi phút). Request bị từ chối khi mốc đó đã vượt quá hiện
-//! tại hơn `tolerance` (= `interval` × (burst − 1)) — tức client đã dùng hết phần gửi
-//! dồn và đang gửi nhanh hơn tốc độ cho phép.
+//! The GCRA algorithm (Generic Cell Rate Algorithm - a "token bucket" style calculation that needs to
+//! remember only ONE timestamp per client): each request pushes the "theoretical arrival time of the next
+//! request" (`tat`) forward by an `interval` (= 1 minute / requests per minute). A request is rejected when
+//! that timestamp is more than `tolerance` (= `interval` × (burst − 1)) ahead of the present - meaning the
+//! client has used up its burst allowance and is sending faster than the permitted rate.
 //!
-//! Đếm trong bộ nhớ của từng tiến trình: chạy nhiều máy chủ thì mỗi máy đếm riêng.
-//! Đủ để chặn một client gửi dồn; chặn đoán mật khẩu thì nằm ở login throttling
-//! (đếm trong database, dùng chung mọi máy chủ). Giới hạn theo API key đếm chung qua database
-//! được khi `AUTOXIDE_HTTP_RATE_LIMIT_STORE=database` (bước 40 P6, `rate_limit_store`).
+//! Counting is in each process's memory: with several servers, each server counts separately. That is
+//! enough to stop one client from bursting; stopping password guessing is the job of login throttling
+//! (counted in the database, shared by all servers). The per-API-key limit can be counted jointly through
+//! the database when `AUTOXIDE_HTTP_RATE_LIMIT_STORE=database` (step 40 P6, `rate_limit_store`).
 
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv6Addr};
@@ -30,14 +29,14 @@ use crate::access::{Authenticator, Principal};
 use crate::config::RateLimit;
 use crate::error::Error;
 
-/// Dọn các client đã "nguội" sau mỗi chừng này request.
+/// Cleans up clients that have gone "cold" after this many requests.
 const PRUNE_EVERY: u64 = 1024;
 
 pub(super) struct RateLimiter {
     cells: Gcra<IpAddr>,
 }
 
-/// Bộ đếm GCRA cho mọi loại khoá (`K`: địa chỉ client, ID của API key…).
+/// The GCRA counter for any kind of key (`K`: client address, API key ID...).
 //
 // `K: Eq + Hash + Copy`: khoá làm chìa của `HashMap` và chép được rẻ (như `IpAddr`, `Uuid`).
 struct Gcra<K> {
@@ -50,7 +49,7 @@ struct Gcra<K> {
 }
 
 impl<K: Eq + std::hash::Hash + Copy> Gcra<K> {
-    /// `None` khi tắt (`per_minute = 0`).
+    /// `None` when disabled (`per_minute = 0`).
     fn new(limit: RateLimit) -> Option<Self> {
         if limit.per_minute == 0 {
             return None;
@@ -84,30 +83,30 @@ impl<K: Eq + std::hash::Hash + Copy> Gcra<K> {
     }
 }
 
-/// Kết quả xét một request.
+/// The outcome of evaluating a request.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Decision {
     Allow,
-    /// Từ chối; client nên chờ chừng này.
+    /// Rejected; the client should wait this long.
     Deny(Duration),
 }
 
 impl RateLimiter {
-    /// `None` khi rate limiting bị tắt (`per_minute = 0`).
+    /// `None` when rate limiting is disabled (`per_minute = 0`).
     pub(super) fn new(limit: RateLimit) -> Option<Self> {
         Gcra::new(limit).map(|cells| RateLimiter { cells })
     }
 
-    /// Xét một request của `client` tại thời điểm `now`.
+    /// Evaluates one request from `client` at time `now`.
     pub(super) fn check(&self, client: IpAddr, now: Instant) -> Decision {
         self.cells.check(client, now)
     }
 }
 
-/// Gom địa chỉ IPv6 theo khối /64: một máy thường có cả khối, đổi địa chỉ trong khối
-/// không được tính là client mới. Địa chỉ IPv4 viết dạng IPv6 (`::ffff:a.b.c.d`, khi máy chủ
-/// nghe trên `[::]`) tính như IPv4 — không thì mọi client IPv4 rơi vào cùng khối `::/64` và một
-/// client làm cả nhóm bị chặn (D-157).
+/// Groups IPv6 addresses by /64 block: a machine usually owns the whole block, and changing address within
+/// the block does not count as a new client. An IPv4 address written as IPv6 (`::ffff:a.b.c.d`, when the
+/// server listens on `[::]`) is treated as IPv4 - otherwise every IPv4 client would fall into the same
+/// `::/64` block and one client would get the whole group blocked (D-157).
 fn group(address: IpAddr) -> IpAddr {
     match address.to_canonical() {
         IpAddr::V6(v6) => {
@@ -127,32 +126,33 @@ fn group(address: IpAddr) -> IpAddr {
     }
 }
 
-/// Giới hạn theo API key (D-109): bọc bộ xác thực, đếm mỗi lần một request bằng API key
-/// được xác thực (extractor `Principal` của REST, lớp xác thực của MCP — mỗi request một lần).
-/// Request bằng phiên đăng nhập không bị đếm ở đây (đã có giới hạn theo địa chỉ).
+/// The per-API-key limit (D-109): wraps the authenticator, counting one request each time an API key is
+/// authenticated (REST's `Principal` extractor, MCP's authentication layer - once per request). A request
+/// using a login session is not counted here (the per-address limit already applies).
 pub(super) struct ApiKeyLimited {
     inner: Arc<dyn Authenticator>,
     counter: KeyCounter,
 }
 
-/// Nơi đếm của giới hạn theo API key.
+/// Where the per-API-key limit is counted.
 enum KeyCounter {
-    /// Mỗi tiến trình đếm riêng.
+    /// Each process counts separately.
     Memory(Gcra<Uuid>),
-    /// Đếm chung qua database, theo lô (D-375).
+    /// Counted jointly through the database, in batches (D-375).
     Database(super::rate_limit_store::SharedCounter),
 }
 
 impl ApiKeyLimited {
-    /// `inner` bọc thêm giới hạn `limit`, đếm trong bộ nhớ; tắt (`per_minute = 0`) thì trả nguyên
-    /// `inner`.
+    /// Wraps `inner` with the limit `limit`, counted in memory; when disabled (`per_minute = 0`) it returns
+    /// `inner` unchanged.
     #[cfg(test)]
     fn wrap(inner: Arc<dyn Authenticator>, limit: RateLimit) -> Arc<dyn Authenticator> {
         Self::wrap_in(inner, limit, None)
     }
 
-    /// Bọc `inner` thêm giới hạn `limit`; có `registry` thì đếm chung qua database của khách mặc
-    /// định, không thì trong bộ nhớ. Tắt (`per_minute = 0`) thì trả nguyên `inner`.
+    /// Wraps `inner` with the limit `limit`; with a `registry` it counts jointly through the default
+    /// tenant's database, otherwise in memory. When disabled (`per_minute = 0`) it returns `inner`
+    /// unchanged.
     pub(super) fn wrap_in(
         inner: Arc<dyn Authenticator>,
         limit: RateLimit,
@@ -218,7 +218,7 @@ impl Authenticator for ApiKeyLimited {
     }
 }
 
-/// Lớp HTTP: từ chối bằng 429 `rate_limited` kèm `Retry-After`.
+/// The HTTP layer: rejects with 429 `rate_limited` and `Retry-After`.
 pub(super) async fn limit(
     limiter: Option<Arc<RateLimiter>>,
     request: Request,
@@ -266,7 +266,7 @@ mod tests {
         text.parse().unwrap()
     }
 
-    /// Bộ xác thực giả: token là ID của API key (hay `session` cho phiên đăng nhập).
+    /// A fake authenticator: the token is the API key's ID (or `session` for a login session).
     struct Keys;
 
     #[async_trait::async_trait]

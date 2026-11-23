@@ -1,6 +1,6 @@
-//! Bộ đăng ký module: nhận danh sách module của binary, kiểm tên, gom permission, event,
-//! bản dịch, cấu hình, migration, rồi khởi động từng module theo thứ tự đăng ký. Hợp đồng
-//! với module (trait `Module`, `StartContext`) ở `module.rs`.
+//! The module registry: takes the binary's module list, checks names, collects permissions, events,
+//! translations, configuration and migrations, then starts each module in registration order. The contract
+//! with modules (the `Module` trait, `StartContext`) is in `module.rs`.
 
 mod sandbox;
 
@@ -19,7 +19,7 @@ use super::{Apis, Module, StartContext, module_name_problems};
 
 mod runtime;
 
-/// Lỗi trong việc đăng ký module.
+/// An error while registering modules.
 #[derive(Debug)]
 pub struct ModuleError(String);
 
@@ -28,7 +28,7 @@ impl ModuleError {
         ModuleError(message)
     }
 
-    /// Nội dung lỗi, không kèm tiền tố `modules:`.
+    /// The error content, without the `modules:` prefix.
     pub fn message(&self) -> &str {
         &self.0
     }
@@ -42,7 +42,7 @@ impl fmt::Display for ModuleError {
 
 impl std::error::Error for ModuleError {}
 
-/// Tập module đã đăng ký, theo thứ tự đăng ký.
+/// The set of registered modules, in registration order.
 pub struct Modules {
     // `Box<dyn Module>`: mỗi module là một kiểu khác nhau; `dyn` cho phép để chung
     // một danh sách và gọi qua trait.
@@ -50,70 +50,74 @@ pub struct Modules {
     permissions: PermissionCatalog,
     events: EventCatalog,
     translations: Translations,
-    /// Chuông đánh thức bộ phát event, dùng chung cho mọi `Outbox`.
+    /// The bell that wakes the event dispatcher, shared by every `Outbox`.
     wake: Arc<tokio::sync::Notify>,
-    /// Các trait module đã công bố; có sau [`start`](Self::start).
+    /// The traits modules have published; available after [`start`](Self::start).
     apis: Apis,
-    /// Phần dữ liệu cá nhân các module đăng ký lúc khởi động.
+    /// The personal-data parts modules register at startup.
     personal_data: PersonalDataExport,
     retention: crate::privacy::RetentionCatalog,
-    /// Loại đối tượng các module đăng ký lúc khởi động.
+    /// The object kinds modules register at startup.
     resources: crate::resource::ResourceDirectory,
-    /// Event vòng đời các module khai (`Module::resource_events`), đã kiểm.
+    /// Lifecycle events modules declare (`Module::resource_events`), already checked.
     resource_events: Vec<crate::resource::ResourceEvent>,
-    /// Bộ hỏi tài khoản đã xác thực (một module đăng ký lúc khởi động, D-202).
+    /// The verified-account checker (one module registers it at startup, D-202).
     verification: crate::access::PostingVerification,
-    /// Sổ module đã cài (module `kernel` phục vụ); điền ở cuối [`start`](Self::start).
+    /// The registry of installed modules (served by the `kernel` module); filled in at the end of
+    /// [`start`](Self::start).
     catalog: crate::module_catalog::ModuleCatalog,
-    /// Cấu hình cho giao diện của mọi module (D-271), điền sau `start`.
+    /// Configuration for the UI of every module (D-271), filled in after `start`.
     client_configs: crate::ops::client_config::ClientConfigs,
-    /// Cờ theo người dùng của module `kernel`, phục vụ dưới `/api/v1/me` (D-207).
+    /// Per-user flags of the `kernel` module, served under `/api/v1/me` (D-207).
     user_flags: crate::user_flags::Handle,
-    /// Cấu hình khoá gốc (module `kernel` điền lúc `configure`), cho upgrade dữ liệu.
+    /// The root key configuration (filled by the `kernel` module at `configure`), for data upgrades.
     keys: crate::secret::KeyConfig,
-    /// Bộ gieo dữ liệu cho khách mới của mọi module; điền sau khi mọi module khởi động.
+    /// The seeder of initial data for new tenants of every module; filled in after every module has
+    /// started.
     seeds: crate::tenancy::admin::Seeds,
-    /// Cài đặt theo nút của mọi module (bước 34).
+    /// The per-node settings of every module (step 34).
     org_settings: crate::tenancy::OrgSettingCatalog,
-    /// Quyền dùng theo khách (bước 35): sổ tính năng / hạn mức và tay cầm tới bên cung cấp.
+    /// Per-tenant entitlements (step 35): the feature / quota registry and the handle to the provider.
     entitlements: crate::entitlement::EntitlementsHandle,
-    /// Bộ tra DNS cho tên miền riêng của khách: bản một module công bố (`dyn DnsTxtLookup`), không
-    /// thì bộ tra của hệ điều hành; điền sau khi mọi module khởi động.
+    /// The DNS lookup for a tenant's custom domains: the one a module publishes (`dyn DnsTxtLookup`),
+    /// otherwise the operating system's resolver; filled in after every module has started.
     dns: crate::tenancy::domains::DnsSlot,
-    /// Cây tổ chức một module công bố (bước 34), điền sau khi mọi module khởi động.
+    /// The organization tree a module publishes (step 34), filled in after every module has started.
     orgs: crate::tenancy::domains::OrgSlot,
-    /// Thứ việc dời khách cần (module, bảng mặt điều khiển, migration); điền sau khi mọi module
-    /// khởi động.
+    /// What moving a tenant needs (modules, control-plane tables, migrations); filled in after every module
+    /// has started.
     moves: crate::tenancy::moves::MoveSetup,
-    /// Module có bảng job / event, cho số đo tồn đọng qua REST (bước 39); điền sau khi khởi động.
+    /// Modules that have job / event tables, for the backlog metrics over REST (step 39); filled in after
+    /// startup.
     backlog: crate::job::backlog::BacklogModules,
-    /// Sổ database (bước 33); có sau [`start`](Self::start).
+    /// The database registry (step 33); available after [`start`](Self::start).
     tenancy: Option<crate::tenancy::DatabaseRegistry>,
-    /// Nguồn số liệu báo cáo của mọi module (bước 38), đã kiểm.
+    /// The report fact sources of every module (step 38), already checked.
     facts: crate::report::FactCatalog,
-    /// Loại sự kiện phân tích và phễu của mọi module (bước 57), đã kiểm.
+    /// The analytics event kinds and funnels of every module (step 57), already checked.
     analytics: crate::analytics::AnalyticsCatalog,
-    /// Sổ tool và mẫu luật cho tự động hoá (bước 58); điền sau khi mọi module khởi động.
+    /// The registry of tools and rule templates for automations (step 58); filled in after every module has
+    /// started.
     automations: crate::automation::AutomationDirectory,
-    /// Sổ sao / đẩy sandbox (bước 38, D-232).
+    /// The sandbox copy / push registry (step 38, D-232).
     sandbox: crate::tenancy::sandbox::SandboxCatalog,
-    /// Thời hạn giữ luồng thay đổi đồng bộ (`AUTOXIDE_SYNC_RETENTION_DAYS`, bước 69 P2).
+    /// The retention period of the sync change stream (`AUTOXIDE_SYNC_RETENTION_DAYS`, step 69 P2).
     sync_keep: SignedDuration,
-    /// Module có trong binary nhưng `AUTOXIDE_MODULES` không bật (`Modules::select`).
+    /// Modules present in the binary but not enabled by `AUTOXIDE_MODULES` (`Modules::select`).
     pub(super) inactive: Vec<super::InactiveModule>,
-    /// `(module được bật kèm, module cần nó)` (`Modules::select`).
+    /// `(module enabled along, module that needs it)` (`Modules::select`).
     pub(super) implied: Vec<(&'static str, &'static str)>,
-    /// Nguyên văn `AUTOXIDE_MODULES` người cài viết, nếu có.
+    /// The verbatim `AUTOXIDE_MODULES` the installer wrote, if any.
     pub(super) selection_text: Option<String>,
 }
 
 impl Modules {
-    /// Kiểm tên rồi nhận các module. Tên sai là lỗi của người viết module, báo
-    /// ngay lúc khởi động.
+    /// Checks names then accepts the modules. A bad name is the module author's error, reported immediately
+    /// at startup.
     ///
-    /// Hai module nội bộ luôn được thêm vào đầu danh sách: `kernel` (bảng dùng chung của
-    /// chương trình, vd khoá ký) và `antispam` (chống spam, D-119). Module nào cũng `require`
-    /// được thứ chúng công bố.
+    /// Two internal modules are always added at the head of the list: `kernel` (the program's shared
+    /// tables, e.g. signing keys) and `antispam` (spam protection, D-119). Any module can `require` what
+    /// they publish.
     pub fn new(modules: Vec<Box<dyn Module>>) -> Result<Self, ModuleError> {
         let mut problems = Vec::new();
         // `me`: tiền tố `/api/v1/me` của các endpoint "của tôi" do kernel phục vụ.
@@ -310,13 +314,14 @@ impl Modules {
         }
     }
 
-    /// Tên các module, theo thứ tự đăng ký.
+    /// The names of the modules, in registration order.
     pub fn names(&self) -> Vec<&'static str> {
         self.modules.iter().map(|module| module.name()).collect()
     }
 
-    /// Số lịch định kỳ (`Module::schedules`) của từng module, theo thứ tự đăng ký — cho test và công
-    /// cụ so với số lịch thật sự khai thay vì một con số viết tay.
+    /// The number of periodic schedules (`Module::schedules`) of each module, in registration order - for
+    /// tests and tools to compare against the number of schedules actually declared instead of a
+    /// hand-written constant.
     pub fn schedule_counts(&self) -> Vec<(&'static str, usize)> {
         self.modules.iter().map(|module| (module.name(), module.schedules().len())).collect()
     }
@@ -326,8 +331,8 @@ impl Modules {
         self.modules.len() <= 2
     }
 
-    /// Cho từng module đọc cấu hình của nó. Module nào sai cũng không chặn module
-    /// khác đọc — để mọi lỗi được báo cùng lúc.
+    /// Lets each module read its configuration. A failing module does not stop other modules from reading -
+    /// so every error is reported at once.
     pub fn configure(&mut self, reader: &mut ConfigReader<'_>) -> Result<(), Invalid> {
         let mut result = crate::sync::read_retention(reader).map(|keep| self.sync_keep = keep);
         for module in &mut self.modules {
@@ -338,14 +343,14 @@ impl Modules {
         result
     }
 
-    /// Khởi động từng module theo thứ tự đăng ký, chế độ một khách trên `database`. Module nào
-    /// hỏng thì dừng và báo tên module đó.
+    /// Starts each module in registration order, in single-tenant mode on `database`. If a module fails, it
+    /// stops and reports that module's name.
     pub fn start(&mut self, database: &Database) -> Result<(), ModuleError> {
         self.start_in(&crate::tenancy::DatabaseRegistry::single(database.clone()))
     }
 
-    /// Như [`start`](Self::start), với sổ database `registry` (chế độ của bản cài, các
-    /// placement): database của chương trình là database điều khiển của nó.
+    /// Like [`start`](Self::start), with the database registry `registry` (the installation's mode, the
+    /// placements): the program's database is its control database.
     pub fn start_in(
         &mut self,
         registry: &crate::tenancy::DatabaseRegistry,
@@ -513,32 +518,33 @@ impl Modules {
         Ok(())
     }
 
-    /// Dùng `lookup` thay bộ tra DNS của hệ điều hành khi xác minh tên miền riêng của khách. Gọi
-    /// trước [`start`](Self::start) (testkit dùng bộ giả, không hỏi DNS thật); lần gọi sau và bản
-    /// một module công bố sau đó bị bỏ qua.
+    /// Uses `lookup` instead of the operating system's DNS resolver when verifying a tenant's custom
+    /// domains. Call before [`start`](Self::start) (the testkit uses a fake, with no real DNS queries);
+    /// later calls and any one a module publishes afterwards are ignored.
     pub fn use_dns(&self, lookup: Arc<dyn crate::tenancy::DnsTxtLookup>) {
         self.dns.fill(Some(lookup));
     }
 
-    /// Quyền dùng theo khách (bước 35): lớp cưỡng chế của HTTP, MCP, worker, bộ phát event dùng.
+    /// Per-tenant entitlements (step 35): the enforcement layer used by HTTP, MCP, the worker and the event
+    /// dispatcher.
     pub fn entitlements(&self) -> crate::entitlement::EntitlementsHandle {
         self.entitlements.clone()
     }
 
-    /// Sổ database đã dùng lúc khởi động; `None` trước [`start`](Self::start).
+    /// The database registry used at startup; `None` before [`start`](Self::start).
     pub fn tenancy(&self) -> Option<crate::tenancy::DatabaseRegistry> {
         self.tenancy.clone()
     }
 
-    /// Sổ database, có sau [`start`](Self::start).
+    /// The database registry, available after [`start`](Self::start).
     fn started(&self) -> Result<crate::tenancy::DatabaseRegistry, ModuleError> {
         self.tenancy.clone().ok_or_else(|| {
             ModuleError("start the modules (`Modules::start`) before building the worker".into())
         })
     }
 
-    /// Trait `T` mà một module đã công bố lúc khởi động, nếu có. Dùng ở binary để
-    /// lấy những trait core cần (vd `dyn Authenticator`). Gọi sau [`start`](Self::start).
+    /// The trait `T` a module published at startup, if any. Used in the binary to fetch the traits the core
+    /// needs (e.g. `dyn Authenticator`). Call after [`start`](Self::start).
     pub fn api<T>(&self) -> Option<Arc<T>>
     where
         T: ?Sized + Send + Sync + 'static,
@@ -546,34 +552,36 @@ impl Modules {
         self.apis.get()
     }
 
-    /// Sổ thời hạn lưu của mọi module (đủ sau `start`).
+    /// The retention registry of every module (complete after `start`).
     pub fn retention(&self) -> crate::privacy::RetentionCatalog {
         self.retention.clone()
     }
 
-    /// Sổ dữ liệu cá nhân các module đã đăng ký lúc [`start`](Self::start).
+    /// The registry of personal data the modules registered at [`start`](Self::start).
     pub fn personal_data(&self) -> PersonalDataExport {
         self.personal_data.clone()
     }
 
-    /// Sổ khối của mọi module (bước 67): test và công cụ đọc dữ liệu khối như `content` đọc.
+    /// The block registry of every module (step 67): tests and tools read block data the way `content`
+    /// does.
     pub fn blocks(&self) -> crate::blocks::Blocks {
         self.catalog.blocks()
     }
 
-    /// Sổ đối tượng các module đã đăng ký (gọi sau [`start`](Self::start)).
+    /// The object registry the modules registered (call after [`start`](Self::start)).
     pub fn resources(&self) -> crate::resource::ResourceDirectory {
         self.resources.clone()
     }
 
-    /// Mọi permission của các module đã đăng ký.
+    /// Every permission of the registered modules.
     pub fn permissions(&self) -> &PermissionCatalog {
         &self.permissions
     }
 }
 
-/// Event vòng đời mọi module khai, sau khi kiểm: event phải do chính module đó khai, loại phải
-/// thuộc module đó, một event chỉ khai một lần. Lỗi thêm vào `problems`.
+/// Lifecycle events of every module declared, after validation: the event must be declared by that module
+/// itself, the kind must belong to that module, and an event is declared only once. Errors are added to
+/// `problems`.
 fn checked_resource_events(
     modules: &[Box<dyn Module>],
     events: &EventCatalog,
@@ -628,7 +636,7 @@ mod tests {
     const LIMIT: Setting = Setting::new("AUTOXIDE_NOTES_LIMIT", "Limit.").with_default("10");
     const KEY: Setting = Setting::new("AUTOXIDE_TAGS_KEY", "Key.");
 
-    /// Module không khai gì ngoài tên: dùng mọi cài đặt mặc định của hợp đồng.
+    /// A module that declares nothing but its name: uses every default implementation of the contract.
     struct Bare(&'static str);
 
     impl Module for Bare {
@@ -637,7 +645,7 @@ mod tests {
         }
     }
 
-    /// Module đọc một biến có mặc định.
+    /// A module that reads a variable that has a default.
     #[derive(Default)]
     struct Notes {
         limit: u32,
@@ -654,7 +662,7 @@ mod tests {
         }
     }
 
-    /// Module sở hữu đối tượng `shop.item`, khai event vòng đời.
+    /// A module that owns object `shop.item` and declares a lifecycle event.
     struct Shop(Vec<crate::resource::ResourceEvent>);
 
     impl Module for Shop {
@@ -688,7 +696,7 @@ mod tests {
         assert!(error.to_string().contains("declared twice"), "{error}");
     }
 
-    /// Module đọc một biến bắt buộc.
+    /// A module that reads a required variable.
     struct Tags;
 
     impl Module for Tags {
@@ -783,8 +791,8 @@ mod tests {
         assert!(message.contains("AUTOXIDE_TAGS_KEY: is required but not set"), "{message}");
     }
 
-    /// Chế độ `multi` mà không đặt `AUTOXIDE_SECRET_KEY`: lỗi cấu hình nói rõ phải làm gì;
-    /// `single` thì không bắt buộc.
+    /// `multi` mode without `AUTOXIDE_SECRET_KEY` set: a configuration error that says plainly what to do;
+    /// `single` does not require it.
     #[test]
     fn che_do_multi_bat_buoc_khoa_goc() {
         let check = |pairs: &[(&str, &str)]| {

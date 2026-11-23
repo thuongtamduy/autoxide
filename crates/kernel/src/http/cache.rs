@@ -1,24 +1,27 @@
-//! `Cache-Control`, `ETag`, `Vary` cho cache dùng chung (CDN, reverse proxy) — bước 39 B5,
+//! `Cache-Control`, `ETag` and `Vary` for shared caches (CDN, reverse proxy) - step 39 B5,
 //! D-20261119-step39-cdn-cache.
 //!
-//! Handler vẫn quyết `Cache-Control` của mình; lớp này chỉ chốt ba luật để không response nào bị
-//! cache sai chỗ:
+//! Handlers still decide their own `Cache-Control`; this layer only enforces three rules so that no
+//! response is cached in the wrong place:
 //!
-//! 1. Lệnh ghi (không phải `GET` / `HEAD`): không đổi gì. Cache dùng chung vốn không giữ response
-//!    của lệnh ghi (RFC 9111 §9); và `no-store` trên lệnh ghi có nghĩa riêng ở lớp idempotency
-//!    ("response chứa secret, không lưu để trả lại") nên lớp này không được tự đặt.
-//! 2. Request mang `Authorization` hay cookie (người đã đăng nhập, hay trình duyệt có phiên): response
-//!    **không bao giờ** `public` — chưa đặt gì thì `private, no-store`; handler đặt `public` thì đổi
-//!    thành `private` và bỏ `s-maxage` / `stale-while-revalidate` (chỉ dành cho cache dùng chung).
-//! 3. Đọc công khai không đăng nhập mà handler đánh dấu `public, no-cache` (quy ước của endpoint
-//!    công khai: nội dung đổi được bất cứ lúc nào): thành
-//!    `public, max-age=0, s-maxage=<AUTOXIDE_HTTP_PUBLIC_CACHE_SECONDS>, stale-while-revalidate=300`
-//!    — trình duyệt luôn hỏi lại (rẻ nhờ `ETag` / `304`), CDN giữ tối đa chừng đó giây; thêm
-//!    `Vary: Accept-Language, Accept-Encoding` (thông báo lỗi theo ngôn ngữ, bản nén); thiếu `ETag` thì thêm ETag yếu là
-//!    dấu vân tay của thân (JSON tới 4 MiB), để lớp `304` ngoài cùng trả được `304`.
+//! 1. Write requests (not `GET` / `HEAD`): nothing changes. Shared caches do not keep responses to write
+//!    requests anyway (RFC 9111 §9); and `no-store` on a write request has its own meaning in the
+//!    idempotency layer ("the response contains a secret, do not store it for replay"), so this layer must
+//!    not set it itself.
+//! 2. A request carrying `Authorization` or a cookie (a signed-in user, or a browser with a session): the
+//!    response is **never** `public` - if nothing is set it becomes `private, no-store`; if the handler
+//!    sets `public` it is changed to `private` and `s-maxage` / `stale-while-revalidate` are dropped (they
+//!    only apply to shared caches).
+//! 3. An anonymous public read that the handler marks `public, no-cache` (the convention for public
+//!    endpoints: the content can change at any time): becomes
+//!    `public, max-age=0, s-maxage=<AUTOXIDE_HTTP_PUBLIC_CACHE_SECONDS>, stale-while-revalidate=300` Browsers
+//!    always revalidate (cheap thanks to `ETag` / `304`), the CDN keeps it for at most that many seconds; it
+//!    also adds `Vary: Accept-Language, Accept-Encoding` (error messages depend on language, and the body may
+//!    be compressed); if there is no `ETag`, it adds a weak ETag that is a fingerprint of the body (JSON up
+//!    to 4 MiB), so that the outermost `304` layer can return a `304`.
 //!
-//! Những gì handler đặt chặt hơn giữ nguyên: `no-store` của bản xem trước, file media có `?v=` đúng
-//! phiên bản (`public, max-age=31536000, immutable`), `private` của file riêng tư.
+//! Anything the handler sets more strictly is kept: `no-store` for previews, media files with a `?v=`
+//! matching the version (`public, max-age=31536000, immutable`), `private` for private files.
 
 use std::sync::Arc;
 
@@ -30,17 +33,18 @@ use axum::middleware::Next;
 use axum::response::Response;
 use sha2::{Digest, Sha256};
 
-/// Thân lớn hơn chừng này không đọc vào bộ nhớ để làm ETag.
+/// A body larger than this is not read into memory to compute an ETag.
 const ETAG_MAX_BYTES: u64 = 4 * 1024 * 1024;
 
-/// `stale-while-revalidate` của endpoint công khai: CDN trả bản cũ trong lúc hỏi lại máy chủ.
+/// `stale-while-revalidate` for public endpoints: the CDN serves the stale copy while revalidating with the
+/// server.
 const STALE_SECONDS: u32 = 300;
 
-/// Cấu hình đã dựng sẵn.
+/// The pre-built configuration.
 #[derive(Debug, Clone)]
 pub(crate) struct Policy {
-    /// `Cache-Control` của đọc công khai; `None` khi `AUTOXIDE_HTTP_PUBLIC_CACHE_SECONDS=0` (giữ
-    /// `public, no-cache` của handler).
+    /// The `Cache-Control` for public reads; `None` when `AUTOXIDE_HTTP_PUBLIC_CACHE_SECONDS=0` (keeping
+    /// the handler's `public, no-cache`).
     public: Option<HeaderValue>,
 }
 
@@ -107,7 +111,8 @@ async fn finish(
     response
 }
 
-/// Thêm ETag yếu là dấu vân tay của thân (khi thân biết trước cỡ và không quá lớn).
+/// Adds a weak ETag that is a fingerprint of the body (when the body's size is known up front and not too
+/// large).
 async fn with_fingerprint(response: Response) -> Response {
     let small = response.body().size_hint().exact().is_some_and(|size| size <= ETAG_MAX_BYTES);
     if !small {
@@ -154,7 +159,7 @@ fn has(value: &str, name: &str) -> bool {
     directives(value).iter().any(|directive| directive.split('=').next() == Some(name))
 }
 
-/// `public` → `private`; bỏ chỉ thị chỉ dành cho cache dùng chung.
+/// `public` becomes `private`; drops directives that only apply to shared caches.
 fn privatize(value: &str) -> String {
     directives(value)
         .into_iter()

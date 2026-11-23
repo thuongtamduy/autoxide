@@ -1,17 +1,18 @@
-//! Event: việc phụ của một thay đổi (audit, thông báo…) đi qua event, theo mẫu
-//! "transactional outbox".
+//! Events: side effects of a change (audit, notifications...) travel through events, following the
+//! "transactional outbox" pattern.
 //!
-//! 1. Module khai các event nó phát qua `Module::events` và thêm
-//!    [`outbox_migration`] vào migration của mình: bảng `<module>_events`.
-//! 2. Trong CÙNG transaction với thay đổi dữ liệu, module ghi event bằng
-//!    [`Outbox::record`]. Transaction hỏng thì event cũng không có; commit thì chắc chắn
-//!    có — không bao giờ "đổi dữ liệu mà quên báo", hay "báo mà dữ liệu không đổi".
-//! 3. Sau khi commit, [`Dispatcher`] của kernel đọc các bảng event và giao cho những
-//!    module đăng ký nhận (`Module::subscriptions`). Bên nhận lỗi thì thử lại với
-//!    backoff; quá [`MAX_ATTEMPTS`] lần thì đánh dấu hỏng và ghi log.
+//! 1. A module declares the events it emits through `Module::events` and adds
+//!    [`outbox_migration`] to its migrations: the `<module>_events` table.
+//! 2. In the SAME transaction as the data change, the module records the event with
+//!    [`Outbox::record`]. If the transaction fails the event does not exist either; once committed it
+//!    certainly exists - never "changed the data but forgot to notify", nor "notified but the data
+//!    did not change".
+//! 3. After the commit, the kernel's [`Dispatcher`] reads the event tables and delivers them to the
+//!    modules that subscribed (`Module::subscriptions`). When a receiver fails it is retried with
+//!    backoff; after [`MAX_ATTEMPTS`] attempts the event is marked failed and logged.
 //!
-//! Giao **ít nhất một lần** (at-least-once): bên nhận phải chịu được việc nhận lại
-//! cùng một event (so theo `id`), vì máy chủ có thể tắt giữa lúc giao.
+//! Delivery is **at-least-once**: a receiver must tolerate receiving the same event again
+//! (compared by `id`), because the server may shut down in the middle of delivery.
 
 mod dispatcher;
 mod migration;
@@ -37,7 +38,7 @@ pub use outbox::Outbox;
 pub use signals::SignalTopics;
 pub use stream::StreamHub;
 
-/// Một loại event, khai bởi module phát nó.
+/// A kind of event, declared by the module that emits it.
 ///
 /// ```
 /// use autoxide_kernel::event::EventInfo;
@@ -48,25 +49,25 @@ pub use stream::StreamHub;
 pub struct EventInfo {
     name: &'static str,
     description: &'static str,
-    /// Câu hoạt động (bước 51 P5) và permission cần để thấy nó.
+    /// Activity sentence (step 51 P5) and the permission needed to see it.
     activity: Option<(&'static str, crate::access::Permission)>,
-    /// Permission cần để nhận event này qua stream SSE (bước 40 P5); `None`: không stream.
+    /// Permission needed to receive this event through the SSE stream (step 40 P5); `None`: not streamed.
     stream: Option<crate::access::Permission>,
-    /// Event còn tới người có tên trong trường `audience` của payload (bước 61,
+    /// The event also reaches the people named in the payload's `audience` field (step 61,
     /// D-20261119-step61-stream-audience).
     audience: bool,
 }
 
 impl EventInfo {
-    /// `name`: `<module>.<việc>` (chữ thường, số, `_`). `description`: câu tiếng Anh.
+    /// `name`: `<module>.<action>` (lowercase, digits, `_`). `description`: an English sentence.
     pub const fn new(name: &'static str, description: &'static str) -> Self {
         EventInfo { name, description, activity: None, stream: None, audience: false }
     }
 
-    /// Event này hiện trong "hoạt động gần đây" (bước 51 P5, `GET /api/v1/audit/activity`) với câu
-    /// tiếng Anh `sentence` (dịch qua `text:` của module): `{actor}` là tên người làm, `{tên}` khác
-    /// lấy từ trường cùng tên của dữ liệu `after` (hay `before`) của event. Chỉ người có
-    /// `reader` mới thấy dòng này.
+    /// This event appears in "recent activity" (step 51 P5, `GET /api/v1/audit/activity`) with the English
+    /// sentence `sentence` (translated through the module's `text:`): `{actor}` is the name of the person who
+    /// acted, other `{name}` placeholders take the same-named field of the event's `after` (or `before`)
+    /// data. Only people with `reader` see this line.
     pub const fn activity(
         mut self,
         sentence: &'static str,
@@ -76,20 +77,20 @@ impl EventInfo {
         self
     }
 
-    /// Event này được đẩy qua stream thời gian thực (`GET /api/v1/kernel/events/stream`, bước 40
-    /// P5) tới người có `reader` — cùng permission đọc bản ghi qua REST, vì payload chứa dữ liệu của
-    /// bản ghi. Mặc định không stream: chỉ event module chủ động khai mới ra ngoài (không có
-    /// "realtime theo bảng", D-378).
+    /// This event is pushed through the real-time stream (`GET /api/v1/kernel/events/stream`, step 40 P5) to
+    /// people with `reader` - the same permission as reading the record through REST, because the payload
+    /// contains the record's data. Not streamed by default: only events a module explicitly declares go out
+    /// (there is no "per-table realtime", D-378).
     pub const fn streamable(mut self, reader: crate::access::Permission) -> Self {
         self.stream = Some(reader);
         self
     }
 
-    /// Event này còn tới người được nêu tên trong payload: trường `audience` (mảng user id) của
-    /// payload liệt kê những người được nhận event qua stream dù không có permission `reader` của
-    /// [`streamable`](Self::streamable) ở độ sâu cả khách — vd người mua và nhân viên được giao của
-    /// một cuộc trò chuyện (bước 61). Trường `audience` bị bỏ khỏi payload gửi ra client. Chỉ có tác
-    /// dụng cùng `streamable`.
+    /// This event also reaches people named in the payload: the payload's `audience` field (an array of user
+    /// ids) lists the people who receive the event through the stream even without the `reader` permission of
+    /// [`streamable`](Self::streamable) at tenant-wide depth - e.g. the buyer and the assigned staff of a
+    /// conversation (step 61). The `audience` field is removed from the payload sent to the client. Only
+    /// effective together with `streamable`.
     pub const fn to_audience(mut self) -> Self {
         self.audience = true;
         self
@@ -100,12 +101,13 @@ impl EventInfo {
         self.audience
     }
 
-    /// Permission để nhận event qua stream, khi event khai [`streamable`](Self::streamable).
+    /// Permission to receive the event through the stream, when the event declares
+    /// [`streamable`](Self::streamable).
     pub fn stream_permission(&self) -> Option<crate::access::Permission> {
         self.stream
     }
 
-    /// Câu hoạt động và permission để thấy nó, khi event khai.
+    /// The activity sentence and the permission to see it, when the event declares them.
     pub fn activity_line(&self) -> Option<(&'static str, crate::access::Permission)> {
         self.activity
     }
@@ -119,7 +121,7 @@ impl EventInfo {
     }
 }
 
-/// Nội dung của một event: kiểu dữ liệu đổi được sang JSON, gắn với tên event.
+/// The content of an event: a type convertible to JSON, tied to the event name.
 ///
 /// ```
 /// use autoxide_kernel::event::Event;
@@ -138,33 +140,33 @@ pub trait Event: Serialize {
     const NAME: &'static str;
 }
 
-/// Ai gây ra một thay đổi. Ghi kèm mọi event (để audit biết "ai"). Dựng bằng
-/// [`Actor::system`], [`Actor::user`], [`Actor::api_key`], [`Actor::public`] hay từ
+/// Who caused a change. Recorded with every event (so audit knows "who"). Built with
+/// [`Actor::system`], [`Actor::user`], [`Actor::api_key`], [`Actor::public`] or from
 /// `&Principal`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[non_exhaustive]
 pub struct Actor {
-    /// Người dùng; `None` khi là hệ thống (lệnh CLI, job…).
+    /// The user; `None` when it is the system (CLI command, job...).
     pub user_id: Option<Uuid>,
-    /// API key, khi người dùng hành động qua key.
+    /// The API key, when the user acts through a key.
     pub api_key_id: Option<Uuid>,
-    /// Người lạ chưa đăng nhập (gửi form, đăng ký bản tin, bình luận của khách) — khác hệ
-    /// thống, dù cả hai đều không có `user_id`.
+    /// An anonymous stranger who is not logged in (form submission, newsletter signup, a visitor's comment)
+    /// — different from the system, even though neither has a `user_id`.
     pub public: bool,
-    /// Đường người làm vào khách (bước 34): trực tiếp, uỷ quyền từ khách cha, hay quyền vào hỗ
-    /// trợ của nhân sự nền tảng — audit của khách thấy ai vào bằng đường nào.
+    /// The path through which the actor entered the tenant (step 34): directly, delegated from a parent
+    /// tenant, or the platform staff's support access - the tenant's audit shows who came in by which path.
     pub access: crate::access::AccessPath,
-    /// Loại bên làm (bước 51 P12); `None`: suy từ `user_id` / `public` như trước.
+    /// Kind of actor (step 51 P12); `None`: inferred from `user_id` / `public` as before.
     pub kind: Option<crate::access::ActorKind>,
 }
 
 impl Actor {
-    /// Hệ thống: lệnh CLI chạy bởi người vận hành, job chạy nền.
+    /// The system: CLI commands run by an operator, background jobs.
     pub fn system() -> Self {
         Actor::default()
     }
 
-    /// Người dùng `user_id` (không qua API key).
+    /// The user `user_id` (not through an API key).
     pub fn user(user_id: Uuid) -> Self {
         Actor { user_id: Some(user_id), ..Actor::default() }
     }
@@ -180,12 +182,13 @@ impl Actor {
         }
     }
 
-    /// Người lạ chưa đăng nhập.
+    /// An anonymous stranger who is not logged in.
     pub fn public() -> Self {
         Actor { public: true, ..Actor::default() }
     }
 
-    /// `public`, `system`, `user` (người), `agent`, `service`, `support`… — giá trị cột `actor_kind`.
+    /// `public`, `system`, `user` (a person), `agent`, `service`, `support`... - the value of the
+    /// `actor_kind` column.
     pub fn kind(&self) -> &'static str {
         if self.public {
             "public"
@@ -213,19 +216,19 @@ impl From<&crate::access::Principal> for Actor {
     }
 }
 
-/// Một event đang được giao cho bên nhận. Bên nhận đọc; test dựng bằng [`Delivered::new`].
+/// An event being delivered to a receiver. The receiver reads it; tests build it with [`Delivered::new`].
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct Delivered {
     pub id: Uuid,
-    /// Khách của event: bên nhận đọc / ghi dữ liệu của đúng khách này (database:
+    /// The event's tenant: the receiver reads / writes data of exactly this tenant (database:
     /// `tenant.database()`).
     pub tenant: TenantContext,
-    /// Module phát event.
+    /// The module that emitted the event.
     pub module: &'static str,
     pub name: String,
     pub actor: Actor,
-    /// Bản ghi bị thay đổi, dạng `<loại>:<id>` (vd `auth.user:0190…`), nếu có.
+    /// The record that was changed, in the form `<kind>:<id>` (e.g. `auth.user:0190...`), if any.
     pub subject: Option<String>,
     pub payload: serde_json::Value,
     pub occurred_at: Timestamp,
@@ -277,7 +280,7 @@ impl Delivered {
     }
 }
 
-/// Bên nhận event. Trả lỗi thì event được giao lại sau.
+/// An event receiver. When it returns an error the event is delivered again later.
 //
 // `#[async_trait]`: Rust chưa cho gọi hàm `async` của trait qua `dyn Trait`.
 #[async_trait::async_trait]
@@ -285,7 +288,7 @@ pub trait EventHandler: Send + Sync {
     async fn handle(&self, event: &Delivered) -> Result<(), Error>;
 }
 
-/// Đăng ký nhận event tên `event` (hoặc mọi event, với [`Subscription::ALL`]).
+/// Subscribes to events named `event` (or to every event, with [`Subscription::ALL`]).
 #[derive(Clone)]
 pub struct Subscription {
     event: &'static str,
@@ -294,16 +297,17 @@ pub struct Subscription {
 }
 
 impl Subscription {
-    /// Dùng làm `event` để nhận mọi event của mọi module (vd audit log).
+    /// Use as `event` to receive every event of every module (e.g. the audit log).
     pub const ALL: &'static str = "*";
 
     pub fn new(event: &'static str, handler: Arc<dyn EventHandler>) -> Self {
         Subscription { event, handler, optional: false }
     }
 
-    /// Như [`new`](Self::new), nhưng nhận event của module CÓ THỂ chưa cài (D-20261118-step41-kernel-prep):
-    /// chưa module nào khai `event` thì registry chỉ ghi log `info` thay vì báo lỗi khởi động. Dùng
-    /// khi module đăng ký trước nghe module đăng ký sau (vd `catalog` nghe `inventory.cost_changed`).
+    /// Like [`new`](Self::new), but for events of a module that MAY NOT be installed
+    /// (D-20261118-step41-kernel-prep): when no module declares `event` the registry only logs at `info`
+    /// level instead of failing startup. Used when a module registered earlier listens to a module registered
+    /// later (e.g. `catalog` listens to `inventory.cost_changed`).
     pub fn optional(event: &'static str, handler: Arc<dyn EventHandler>) -> Self {
         Subscription { event, handler, optional: true }
     }
@@ -312,7 +316,7 @@ impl Subscription {
         self.event
     }
 
-    /// `true` khi tạo bằng [`optional`](Self::optional).
+    /// `true` when created with [`optional`](Self::optional).
     pub fn is_optional(&self) -> bool {
         self.optional
     }
@@ -331,14 +335,14 @@ impl std::fmt::Debug for Subscription {
     }
 }
 
-/// Mọi loại event của chương trình, theo thứ tự tên.
+/// Every kind of event in the program, in name order.
 #[derive(Debug, Clone, Default)]
 pub struct EventCatalog {
     events: Arc<Vec<(&'static str, EventInfo)>>,
 }
 
 impl EventCatalog {
-    /// Kiểm và gom event của các module (`(tên module, event của nó)`).
+    /// Validates and collects the modules' events (`(module name, its events)`).
     pub fn new(modules: Vec<(&'static str, Vec<EventInfo>)>) -> Result<Self, Vec<String>> {
         let mut problems = Vec::new();
         let mut seen = BTreeSet::new();
@@ -372,17 +376,17 @@ impl EventCatalog {
         self.events.iter().any(|(_, event)| event.name == name)
     }
 
-    /// Mọi loại event, theo thứ tự tên.
+    /// Every kind of event, in name order.
     pub fn iter(&self) -> impl Iterator<Item = &EventInfo> {
         self.events.iter().map(|(_, event)| event)
     }
 
-    /// Event stream được (bước 40 P5): (module phát, event), theo thứ tự tên.
+    /// Streamable events (step 40 P5): (emitting module, event), in name order.
     pub fn streamable(&self) -> Vec<(&'static str, EventInfo)> {
         self.events.iter().filter(|(_, event)| event.stream.is_some()).copied().collect()
     }
 
-    /// Các module có phát ít nhất một event (tức có bảng `<module>_events`).
+    /// Modules that emit at least one event (i.e. that have a `<module>_events` table).
     pub fn modules(&self) -> Vec<&'static str> {
         let modules: BTreeSet<&'static str> =
             self.events.iter().map(|(module, _)| *module).collect();
@@ -390,12 +394,12 @@ impl EventCatalog {
     }
 }
 
-/// `name` có dạng `<module>.<đoạn>` không.
+/// Whether `name` has the form `<module>.<segment>`.
 fn has_module_prefix(module: &str, name: &str) -> bool {
     name.split_once('.').is_some_and(|(prefix, rest)| prefix == module && is_identifier(rest))
 }
 
-/// Tên bảng event của module `module`.
+/// The event table name of module `module`.
 pub(crate) fn table_name(module: &str) -> String {
     format!("{module}_events")
 }

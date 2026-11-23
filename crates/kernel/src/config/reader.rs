@@ -1,7 +1,7 @@
-//! Đọc và kiểm giá trị cấu hình, gom MỌI lỗi rồi mới báo.
+//! Reads and validates configuration values, collecting EVERY error before reporting.
 //!
-//! Người cài đặt sửa cấu hình một lần là xong, thay vì sửa một lỗi, chạy lại,
-//! gặp lỗi kế, sửa tiếp.
+//! The installer fixes the configuration once, instead of fixing one error, rerunning,
+//! hitting the next error, and fixing again.
 
 use std::fmt;
 use std::path::Path;
@@ -9,11 +9,11 @@ use std::str::FromStr;
 
 use super::{ConfigSource, Setting};
 
-/// Dấu hiệu "giá trị này không hợp lệ, và lỗi ĐÃ được ghi vào [`ConfigReader`]".
+/// Marker meaning "this value is invalid, and the error HAS been recorded in the [`ConfigReader`]".
 ///
-/// Hàm đọc một nhóm cấu hình trả `Result<Nhóm, Invalid>`. Cách viết: đọc hết các
-/// biến vào biến cục bộ trước, rồi mới dùng `?` khi dựng struct — để một biến
-/// sai không chặn việc kiểm các biến còn lại:
+/// A function that reads a configuration group returns `Result<Group, Invalid>`. Recommended style: read all
+/// variables into local variables first, then use `?` when building the struct, so that one
+/// wrong variable does not stop the remaining variables from being checked:
 ///
 /// ```
 /// # use autoxide_kernel::config::{ConfigReader, Invalid, Setting};
@@ -29,13 +29,13 @@ use super::{ConfigSource, Setting};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Invalid;
 
-/// Một vấn đề trong cấu hình.
+/// One problem in the configuration.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct ConfigError {
-    /// Tên biến, hoặc đường dẫn file `.env`.
+    /// Variable name, or the path of the `.env` file.
     pub subject: String,
-    /// Sai gì và phải sửa thế nào.
+    /// What is wrong and how to fix it.
     pub problem: String,
 }
 
@@ -56,7 +56,7 @@ impl fmt::Display for ConfigError {
     }
 }
 
-/// Mọi vấn đề tìm thấy trong một lần đọc cấu hình (ít nhất một).
+/// All problems found in one configuration read (at least one).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConfigErrors(Vec<ConfigError>);
 
@@ -92,31 +92,31 @@ impl fmt::Display for ConfigErrors {
 
 impl std::error::Error for ConfigErrors {}
 
-/// Giá trị đang có hiệu lực của một biến lấy từ đâu.
+/// Where the effective value of a variable comes from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Origin {
-    /// Người cài đặt đã đặt (biến môi trường hoặc `.env`).
+    /// Set by the installer (environment variable or `.env`).
     Configured,
-    /// Không đặt; dùng giá trị mặc định khai trong code.
+    /// Not set; the default value declared in code is used.
     Default,
-    /// Không đặt và không có mặc định.
+    /// Not set and there is no default.
     Unset,
 }
 
-/// Một biến đã được đọc: mô tả của nó và giá trị đang có hiệu lực.
+/// A variable that has been read: its description and its effective value.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SettingValue {
     pub setting: Setting,
     pub origin: Origin,
-    /// Biến tuỳ chọn: được phép không đặt dù không có mặc định.
+    /// Optional variable: may be left unset even without a default.
     pub optional: bool,
-    /// Giá trị thô đang có hiệu lực. Truy cập qua [`display_value`](Self::display_value)
-    /// để không lộ secret.
+    /// The raw effective value. Access it through [`display_value`](Self::display_value)
+    /// so that secrets are not exposed.
     raw: Option<String>,
 }
 
 impl SettingValue {
-    /// Giá trị để in cho người đọc: secret do người cài đặt đặt thì bị che.
+    /// The value to print for readers: a secret set by the installer is masked.
     pub fn display_value(&self) -> &str {
         match (&self.raw, self.origin, self.setting.secret) {
             (None, _, _) => "(not set)",
@@ -126,7 +126,7 @@ impl SettingValue {
     }
 }
 
-/// Đọc từng biến từ một [`ConfigSource`], ghi lại lỗi và danh sách biến đã đọc.
+/// Reads variables one by one from a [`ConfigSource`], recording errors and the list of variables read.
 #[derive(Debug)]
 pub struct ConfigReader<'a> {
     source: &'a ConfigSource,
@@ -141,8 +141,8 @@ impl<'a> ConfigReader<'a> {
         ConfigReader { source, errors: Vec::new(), values: Vec::new() }
     }
 
-    /// Đọc một biến có mặc định hoặc bắt buộc, đổi sang kiểu `T` bằng `FromStr`
-    /// (số, `bool`, `SocketAddr`, hoặc kiểu tự định nghĩa).
+    /// Reads a variable that has a default or is required, converting it to type `T` with `FromStr`
+    /// (a number, `bool`, `SocketAddr`, or a custom type).
     pub fn get<T>(&mut self, setting: &Setting) -> Result<T, Invalid>
     where
         T: FromStr,
@@ -151,8 +151,8 @@ impl<'a> ConfigReader<'a> {
         self.get_with(setting, |raw| raw.parse::<T>().map_err(|error| error.to_string()))
     }
 
-    /// Như [`get`](Self::get) nhưng tự viết hàm đổi kiểu và kiểm giá trị. `parse`
-    /// trả `Err(câu nói rõ giá trị phải như thế nào)` khi giá trị sai.
+    /// Like [`get`](Self::get) but with a custom conversion and validation function. `parse`
+    /// returns `Err(a sentence saying what the value must look like)` when the value is wrong.
     pub fn get_with<T>(
         &mut self,
         setting: &Setting,
@@ -167,7 +167,7 @@ impl<'a> ConfigReader<'a> {
         }
     }
 
-    /// Đọc một biến tuỳ chọn: không đặt (và không có mặc định) thì trả `Ok(None)`.
+    /// Reads an optional variable: when unset (and without a default) it returns `Ok(None)`.
     pub fn optional<T>(&mut self, setting: &Setting) -> Result<Option<T>, Invalid>
     where
         T: FromStr,
@@ -176,7 +176,7 @@ impl<'a> ConfigReader<'a> {
         self.optional_with(setting, |raw| raw.parse::<T>().map_err(|error| error.to_string()))
     }
 
-    /// Như [`optional`](Self::optional) nhưng tự viết hàm đổi kiểu.
+    /// Like [`optional`](Self::optional) but with a custom conversion function.
     pub fn optional_with<T>(
         &mut self,
         setting: &Setting,
@@ -188,8 +188,8 @@ impl<'a> ConfigReader<'a> {
         }
     }
 
-    /// Ghi một lỗi cho `setting` khi giá trị đúng kiểu nhưng không hợp với biến
-    /// khác (vd hai biến mâu thuẫn nhau). `problem` nói rõ phải sửa gì.
+    /// Records an error for `setting` when the value has the right type but does not fit with another
+    /// variable (e.g. two variables contradict each other). `problem` states what to fix.
     pub fn reject<T>(
         &mut self,
         setting: &Setting,
@@ -198,8 +198,8 @@ impl<'a> ConfigReader<'a> {
         self.fail(setting, problem.into())
     }
 
-    /// Kết thúc việc đọc. Có lỗi nào thì trả toàn bộ lỗi; không thì trả giá trị đã
-    /// dựng kèm danh sách biến đã đọc (để in ra hoặc sinh `.env.example`).
+    /// Finishes reading. If there are any errors, returns all of them; otherwise returns the built value
+    /// together with the list of variables read (to print or to generate `.env.example`).
     pub fn finish<T>(
         self,
         value: Result<T, Invalid>,
@@ -217,12 +217,12 @@ impl<'a> ConfigReader<'a> {
         }
     }
 
-    /// Danh sách biến đã đọc tới lúc này, kể cả khi có lỗi.
+    /// The list of variables read so far, including when there are errors.
     pub fn values(&self) -> &[SettingValue] {
         &self.values
     }
 
-    /// Lấy giá trị thô (đã đặt, hoặc mặc định) và ghi biến vào danh sách đã đọc.
+    /// Gets the raw value (set, or default) and records the variable in the list of variables read.
     fn read(&mut self, setting: &Setting, optional: bool) -> Option<String> {
         let (raw, origin) = match (self.source.get(setting.name), setting.default) {
             (Some(configured), _) => (Some(configured.to_owned()), Origin::Configured),
@@ -254,8 +254,8 @@ impl<'a> ConfigReader<'a> {
     }
 }
 
-/// Đổi `raw` thành số nguyên nằm trong `[min, max]`; dùng với
-/// [`ConfigReader::get_with`]. Thông báo lỗi nói rõ khoảng hợp lệ.
+/// Converts `raw` to an integer within `[min, max]`; use it with
+/// [`ConfigReader::get_with`]. The error message states the valid range.
 pub fn parse_in_range<T>(raw: &str, min: T, max: T) -> Result<T, String>
 where
     T: FromStr + PartialOrd + fmt::Display,

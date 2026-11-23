@@ -1,10 +1,10 @@
-//! Mô tả một biến cấu hình.
+//! Describes a configuration variable.
 
-/// Một biến cấu hình, khai bằng `const` ở cạnh code dùng nó.
+/// A configuration variable, declared with `const` next to the code that uses it.
 ///
-/// Khai MỘT lần, dùng cho bốn việc: đọc giá trị, báo lỗi, in ra ở lệnh
-/// `autoxide config`, và sinh file `.env.example`. Nhờ vậy tài liệu cấu hình
-/// không thể lệch với code.
+/// Declare it ONCE and it serves four purposes: reading the value, reporting errors, printing it in the
+/// `autoxide config` command, and generating the `.env.example` file. This way the configuration
+/// documentation cannot drift from the code.
 ///
 /// ```
 /// use autoxide_kernel::config::Setting;
@@ -17,18 +17,18 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct Setting {
-    /// Tên biến môi trường. Tên chuẩn ngành nếu có (`DATABASE_URL`), còn lại
-    /// mang tiền tố `AUTOXIDE_`.
+    /// Environment variable name. The industry-standard name if there is one (`DATABASE_URL`), otherwise
+    /// prefixed with `AUTOXIDE_`.
     pub name: &'static str,
-    /// Mô tả cho người cài đặt, tiếng Anh, một hai câu.
+    /// Description for the installer, in English, one or two sentences.
     pub description: &'static str,
-    /// Giá trị dùng khi biến không được đặt. `None` nghĩa là bắt buộc phải đặt
-    /// (hoặc là biến tuỳ chọn — xem [`ConfigReader::optional`](super::ConfigReader::optional)).
+    /// Value used when the variable is not set. `None` means it must be set
+    /// (or it is an optional variable - see [`ConfigReader::optional`](super::ConfigReader::optional)).
     pub default: Option<&'static str>,
-    /// Giá trị là secret: không bao giờ in ra trong thông báo lỗi hay ở lệnh
-    /// `autoxide config`.
+    /// The value is a secret: never printed in error messages or by the
+    /// `autoxide config` command.
     pub secret: bool,
-    /// Giá trị minh hoạ cho `.env.example` khi không có giá trị mặc định.
+    /// Illustrative value for `.env.example` when there is no default.
     pub example: Option<&'static str>,
 }
 

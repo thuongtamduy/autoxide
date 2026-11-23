@@ -1,14 +1,14 @@
-//! Header `Content-Disposition` của response tải file (RFC 6266).
+//! The `Content-Disposition` header of file download responses (RFC 6266).
 
-/// Trình duyệt mở file ngay trong trang (`Inline`) hay tải về (`Attachment`).
+/// Whether the browser opens the file in the page (`Inline`) or downloads it (`Attachment`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Disposition {
     Inline,
     Attachment,
 }
 
-/// Giá trị `Content-Disposition` kèm tên file: `filename` chỉ chữ ASCII an toàn (cho
-/// client cũ), `filename*` là tên đầy đủ mã hoá UTF-8 (RFC 8187).
+/// The `Content-Disposition` value with a file name: `filename` holds only safe ASCII (for old clients),
+/// `filename*` is the full name encoded as UTF-8 (RFC 8187).
 pub fn content_disposition(disposition: Disposition, name: &str) -> String {
     let kind = match disposition {
         Disposition::Inline => "inline",

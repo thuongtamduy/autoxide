@@ -1,7 +1,8 @@
-//! Lớp HTTP của endpoint MCP (Streamable HTTP, đặc tả 2026-07-28 và các bản cũ còn `initialize`): kiểm
-//! `Origin`, phương thức, `Accept`, `Content-Type`, đọc một tin nhắn JSON-RPC, kiểm header theo thế hệ giao
-//! thức, gọi [`McpServer::dispatch`], rồi đặt mã HTTP. Luôn trả JSON (không SSE): không tool nào gửi tin
-//! nhắn giữa chừng, và máy chủ không giữ phiên (như cấu hình `rmcp` trước đây).
+//! HTTP layer of the MCP endpoint (Streamable HTTP, spec 2026-07-28 and older versions that still have
+//! `initialize`): checks `Origin`, method, `Accept`, `Content-Type`, reads one JSON-RPC message, checks
+//! headers per protocol generation, calls [`McpServer::dispatch`], then sets the HTTP status. Always returns
+//! JSON (no SSE): no tool sends intermediate messages, and the server keeps no session (like the earlier
+//! `rmcp` configuration).
 
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
@@ -19,28 +20,29 @@ use crate::config::CorsOrigins;
 use crate::i18n::Language;
 use crate::tenancy::TenantContext;
 
-/// Thân POST lớn nhất (4 MiB, như mặc định của `rmcp`): lệnh MCP là JSON nhỏ; file đi qua REST.
+/// Largest POST body (4 MiB, like the `rmcp` default): MCP commands are small JSON; files go through REST.
 const MAX_BODY_BYTES: usize = 4 * 1024 * 1024;
 
 const PROTOCOL_VERSION_HEADER: &str = "mcp-protocol-version";
 const METHOD_HEADER: &str = "mcp-method";
 const NAME_HEADER: &str = "mcp-name";
 
-/// Ai gọi và bằng gì: thứ [`McpServer::dispatch`] cần của request HTTP.
+/// Who calls and with what: what [`McpServer::dispatch`] needs from the HTTP request.
 pub(super) struct Caller {
     pub(super) tenant: TenantContext,
     pub(super) principal: Principal,
     pub(super) language: Language,
     pub(super) request_id: Option<String>,
-    /// Request thuộc thế hệ mới (`2026-07-28`): không có `ping`, kết quả mang `resultType`.
+    /// The request belongs to the new generation (`2026-07-28`): there is no `ping`, and results carry
+    /// `resultType`.
     pub(super) modern: bool,
-    /// Request đã gọi một tool trả secret: response mang `Cache-Control: no-store` (D-149).
+    /// The request called a tool that returns a secret: the response carries `Cache-Control: no-store` (D-149).
     // `AtomicBool` thay vì `Cell<bool>`: tham chiếu tới nó sống qua `await`, nên phải dùng chung được giữa
     // các thread (`Sync`) — future của handler axum phải `Send`.
     pub(super) secret: AtomicBool,
 }
 
-/// Phục vụ một request HTTP tới `/mcp` hay `/mcp/<module>` (đã qua lớp xác thực).
+/// Serves one HTTP request to `/mcp` or `/mcp/<module>` (already past the authentication layer).
 pub(super) async fn handle(
     server: McpServer,
     origins: Arc<CorsOrigins>,
@@ -136,16 +138,18 @@ pub(super) async fn handle(
     response
 }
 
-/// Lý do từ chối trước khi chạy: chữ trần (như `rmcp` với header phiên bản sai) hay lỗi JSON-RPC.
+/// Reason for rejecting before running: bare text (like `rmcp` with a wrong version header) or a JSON-RPC
+/// error.
 enum Rejection {
     Text(String),
     Rpc(RpcError),
 }
 
-/// Thế hệ của request (`true`: mới) sau khi kiểm header của thế hệ đó.
+/// The request's generation (`true`: new) after checking the headers of that generation.
 ///
-/// Mới: `params._meta` mang `io.modelcontextprotocol/protocolVersion`, hay method là `server/discover`.
-/// Còn lại: bản cũ, phiên bản lấy từ header `MCP-Protocol-Version` (thiếu thì `2025-03-26`).
+/// New: `params._meta` carries `io.modelcontextprotocol/protocolVersion`, or the method is `server/discover`.
+/// Otherwise: the old version, the version taken from the `MCP-Protocol-Version` header (`2025-03-26` if
+/// missing).
 fn era(headers: &HeaderMap, method: &str, params: &Map<String, Value>) -> Result<bool, Rejection> {
     let meta = protocol::meta(params);
     let meta_version = meta.and_then(|meta| meta.get(protocol::META_PROTOCOL_VERSION));
@@ -255,8 +259,8 @@ fn era(headers: &HeaderMap, method: &str, params: &Map<String, Value>) -> Result
     Ok(true)
 }
 
-/// Kết quả của bản mới: `resultType`, thông tin máy chủ trong `_meta`, và gợi ý cache cho danh sách / nội
-/// dung resource (kết quả phụ thuộc quyền người gọi: `private`, không giữ lâu: `0`).
+/// The result of the new version: `resultType`, server information in `_meta`, and cache hints for lists /
+/// resource content (results depend on the caller's permissions: `private`, not kept long: `0`).
 fn decorate(method: &str, result: &mut Map<String, Value>) {
     result.insert("resultType".to_owned(), Value::from("complete"));
     let meta = result.entry("_meta").or_insert_with(|| Value::Object(Map::new()));
@@ -277,8 +281,8 @@ fn decorate(method: &str, result: &mut Map<String, Value>) {
     }
 }
 
-/// Mã HTTP của một lỗi JSON-RPC: bản cũ luôn 200; bản mới 400 cho lỗi phiên bản / header, 404 cho method
-/// không có (đặc tả 2026-07-28, "Protocol Version Header").
+/// The HTTP status of a JSON-RPC error: the old version is always 200; the new version 400 for version /
+/// header errors, 404 for a nonexistent method (spec 2026-07-28, "Protocol Version Header").
 fn error_status(error: &RpcError, modern: bool) -> StatusCode {
     if !modern {
         return StatusCode::OK;
@@ -300,7 +304,7 @@ fn origin_allowed(origins: &CorsOrigins, origin: &HeaderValue) -> bool {
     }
 }
 
-/// `Accept` có cả `application/json` và `text/event-stream` (hay `*/*`, `application/*`, `text/*`).
+/// `Accept` contains both `application/json` and `text/event-stream` (or `*/*`, `application/*`, `text/*`).
 fn accepts_json_and_sse(headers: &HeaderMap) -> bool {
     let mut json = false;
     let mut sse = false;

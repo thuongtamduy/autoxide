@@ -1,4 +1,4 @@
-//! Lấy dữ liệu vào của handler.
+//! Extracts a handler's input.
 
 use axum::Json;
 use axum::extract::rejection::JsonRejection;
@@ -8,15 +8,15 @@ use validator::Validate;
 
 use crate::error::{Error, ErrorKind};
 
-/// Thân JSON của request, đã đọc thành `T` VÀ đã qua `T::validate()`.
+/// The JSON body of the request, read as `T` AND having passed `T::validate()`.
 ///
-/// Handler nhận `ValidJson(input): ValidJson<CreateNote>` thì `input` chắc chắn
-/// hợp lệ; request sai bị trả lỗi trước khi handler chạy:
+/// When a handler takes `ValidJson(input): ValidJson<CreateNote>`, `input` is guaranteed valid; a bad
+/// request gets an error before the handler runs:
 ///
-/// - không phải JSON, hoặc JSON hỏng → 400 `invalid_json`;
-/// - thiếu `content-type: application/json` → 415 `unsupported_media_type`;
-/// - thiếu trường, sai kiểu → 422 `invalid_body`;
-/// - giá trị không qua kiểm tra → 422 `validation_failed` kèm lỗi từng trường.
+/// - not JSON, or malformed JSON: 400 `invalid_json`;
+/// - missing `content-type: application/json`: 415 `unsupported_media_type`;
+/// - missing field, wrong type: 422 `invalid_body`;
+/// - a value that fails validation: 422 `validation_failed` with the error for each field.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ValidJson<T>(pub T);
 
@@ -53,8 +53,8 @@ where
     }
 }
 
-/// Đổi lỗi đọc JSON của axum thành lỗi chung, giữ câu mô tả của nó (vd "missing
-/// field `name` at line 1 column 2") để client biết sửa gì.
+/// Turns axum's JSON read error into the common error, keeping its description (e.g. "missing field `name`
+/// at line 1 column 2") so the client knows what to fix.
 fn from_rejection(rejection: JsonRejection) -> Error {
     let detail = rejection.body_text();
     let (kind, code) = match rejection {
@@ -72,9 +72,9 @@ fn from_rejection(rejection: JsonRejection) -> Error {
     Error::new(kind, code, "{detail}").with_param("detail", detail)
 }
 
-/// Ký tự NUL (U+0000): Postgres không lưu được trong cột chữ (lỗi 500), SQLite thì lưu — hai
-/// database khác nhau. Kernel từ chối nó ở mọi cửa vào (thân JSON, tham số tool MCP, query,
-/// đường dẫn, con trỏ trang) bằng cùng một lỗi (D-157).
+/// The NUL character (U+0000): Postgres cannot store it in a text column (a 500 error), SQLite can - the
+/// two databases differ. The kernel rejects it at every entry point (JSON body, MCP tool arguments, query,
+/// path, page cursor) with the same error (D-157).
 pub(crate) fn nul_refused() -> Error {
     Error::bad_request(
         "invalid_character",
@@ -83,8 +83,8 @@ pub(crate) fn nul_refused() -> Error {
     )
 }
 
-/// Thân JSON `bytes` có chuỗi thoát `\u0000` không (byte 0 trần thì JSON vốn không nhận). Bỏ
-/// qua `\\u0000` (dấu `\` đã được thoát: chữ thường, không phải NUL).
+/// Whether the JSON body `bytes` has a `\u0000` escape sequence (a bare byte 0 is not accepted by JSON
+/// anyway). Skips `\\u0000` (the `\` is already escaped: plain text, not NUL).
 pub(crate) fn contains_nul_escape(bytes: &[u8]) -> bool {
     let mut index = 0;
     while let Some(found) = find(&bytes[index..], b"u0000") {
@@ -102,7 +102,7 @@ fn find(haystack: &[u8], needle: &[u8]) -> Option<usize> {
     haystack.windows(needle.len()).position(|window| window == needle)
 }
 
-/// Giá trị JSON `value` có chuỗi (khoá hay giá trị) chứa NUL không.
+/// Whether the JSON `value` has a string (key or value) containing NUL.
 pub(crate) fn value_contains_nul(value: &serde_json::Value) -> bool {
     match value {
         serde_json::Value::String(text) => text.contains('\0'),

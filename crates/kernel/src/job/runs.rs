@@ -1,12 +1,12 @@
-//! Job người dùng theo dõi được (bước 51 P15, D-213): xuất file, thao tác hàng loạt… Module ghi một
-//! dòng `kernel_job_runs` (cấp khách hàng, có ở mọi database dữ liệu) khi xếp job người dùng cần
-//! thấy tiến độ; worker tự đánh dấu xong / hỏng khi job của module chạy xong. Job nội bộ (gửi mail,
-//! lịch định kỳ) không có dòng nào nên không hiện.
+//! User-trackable jobs (step 51 P15, D-213): file exports, bulk operations... A module writes a
+//! `kernel_job_runs` row (tenant-level, present in every data database) when it queues a job whose progress
+//! the user needs to see; the worker marks it done / failed itself when the module's job finishes. Internal
+//! jobs (sending mail, periodic schedules) have no row so they do not show up.
 //!
-//! - `GET /api/v1/kernel/jobs` — job của chính người gọi, hay mọi job của khách với
-//!   `kernel.jobs.read`; `GET /api/v1/kernel/jobs/{id}` — trạng thái, tiến độ, kết quả.
-//! - `POST /api/v1/kernel/jobs/{id}/retry` (`kernel.jobs.manage`) — đưa job hỏng hẳn về hàng đợi, có
-//!   event `kernel.job_retried` (audit).
+//! - `GET /api/v1/kernel/jobs` - the caller's own jobs, or every job of the tenant with `kernel.jobs.read`;
+//!   `GET /api/v1/kernel/jobs/{id}` - status, progress, result.
+//! - `POST /api/v1/kernel/jobs/{id}/retry` (`kernel.jobs.manage`) - puts a permanently failed job back on
+//!   the queue, with event `kernel.job_retried` (audit).
 
 use crate::time::Timestamp;
 use std::sync::Arc;
@@ -30,14 +30,14 @@ use crate::tenancy::TenantContext;
 
 pub(crate) const TABLE: &str = "kernel_job_runs";
 
-/// Xem mọi job theo dõi được của khách (không chỉ job của mình).
+/// View every trackable job of the tenant (not only one's own jobs).
 pub const JOBS_READ: Permission =
     Permission::new("kernel.jobs.read", "See every tracked background job of the tenant.");
-/// Chạy lại job hỏng.
+/// Re-run a failed job.
 pub const JOBS_MANAGE: Permission =
     Permission::new("kernel.jobs.manage", "Run a failed background job of the tenant again.");
 
-/// Event: nhân viên chạy lại một job hỏng.
+/// Event: a staff member re-runs a failed job.
 pub(crate) const JOB_RETRIED: EventInfo =
     EventInfo::new("kernel.job_retried", "A failed background job was put back in the queue.");
 
@@ -51,8 +51,9 @@ impl crate::event::Event for JobRetried {
     const NAME: &'static str = "kernel.job_retried";
 }
 
-/// Ghi dòng theo dõi cho job `id` của module `module` vừa xếp (cùng transaction với `enqueue`).
-/// `label`: câu tiếng Anh cho người xem (vd "Export of the submissions of “Contact”").
+/// Records the tracking row for job `id` of module `module` that was just queued (in the same transaction
+/// as `enqueue`). `label`: an English sentence for the viewer (e.g. "Export of the submissions of
+/// “Contact”").
 #[allow(clippy::too_many_arguments)]
 pub async fn track<C: ConnectionTrait>(
     connection: &C,
@@ -96,7 +97,7 @@ pub async fn track<C: ConnectionTrait>(
     Ok(())
 }
 
-/// Tiến độ của job `id` (bộ chạy job gọi): `done` trên `total`.
+/// The progress of job `id` (called by the job runner): `done` out of `total`.
 pub async fn progress<C: ConnectionTrait>(
     connection: &C,
     id: Uuid,
@@ -121,7 +122,7 @@ pub async fn progress<C: ConnectionTrait>(
     Ok(())
 }
 
-/// Kết quả của job `id` (JSON, vd số dòng, mã tệp, kết quả từng bản ghi của thao tác hàng loạt).
+/// The result of job `id` (JSON, e.g. row count, file code, per-record results of a bulk operation).
 pub async fn set_result<C: ConnectionTrait>(
     connection: &C,
     id: Uuid,
@@ -137,7 +138,7 @@ pub async fn set_result<C: ConnectionTrait>(
     Ok(())
 }
 
-/// File job vừa ghi (bản xuất danh sách, P16).
+/// The file the job just wrote (the list export, P16).
 pub(crate) async fn set_file<C: ConnectionTrait>(
     connection: &C,
     id: Uuid,
@@ -155,7 +156,7 @@ pub(crate) async fn set_file<C: ConnectionTrait>(
     Ok(())
 }
 
-/// Bỏ file đã xoá khỏi dòng của job `id`.
+/// Drops a deleted file from the row of job `id`.
 pub(crate) async fn clear_file<C: ConnectionTrait>(connection: &C, id: Uuid) -> Result<(), Error> {
     let update = SqlQuery::update()
         .table(Alias::new(TABLE))
@@ -168,7 +169,7 @@ pub(crate) async fn clear_file<C: ConnectionTrait>(connection: &C, id: Uuid) -> 
     Ok(())
 }
 
-/// (khách, job) có file hết hạn trước `at` trong database này, tối đa 500 mỗi lượt.
+/// (tenant, job) pairs with a file expiring before `at` in this database, at most 500 per pass.
 pub(crate) async fn expired_files(
     database: &crate::database::Database,
     at: Timestamp,
@@ -183,8 +184,8 @@ pub(crate) async fn expired_files(
     rows.iter().map(|row| Ok((row.try_get("", "tenant_id")?, row.try_get("", "id")?))).collect()
 }
 
-/// Event: job người dùng theo dõi chạy xong hay hỏng hẳn (bước 51 P15/P16) — module thông báo báo
-/// cho người yêu cầu ("bản xuất đã xong").
+/// Event: a user-tracked job finished or failed permanently (step 51 P15/P16) - the notifications module
+/// notifies the requester ("the export is done").
 pub(crate) const JOB_FINISHED: EventInfo = EventInfo::new(
     "kernel.job_finished",
     "A background job someone asked for finished or failed for good.",
@@ -194,7 +195,7 @@ pub(crate) const JOB_FINISHED: EventInfo = EventInfo::new(
 struct JobFinished {
     job_id: Uuid,
     kind: String,
-    /// Câu tiếng Anh của job, vd "CSV export of content-entries".
+    /// The English sentence of the job, e.g. "CSV export of content-entries".
     label: String,
     /// `succeeded` hay `failed`.
     status: String,
@@ -205,7 +206,7 @@ impl crate::event::Event for JobFinished {
     const NAME: &'static str = "kernel.job_finished";
 }
 
-/// Phát `kernel.job_finished` cho job `id` của khách `tenant`, nếu đó là job có người yêu cầu.
+/// Emits `kernel.job_finished` for job `id` of tenant `tenant`, if it is a job someone requested.
 pub(crate) async fn announce(tenant: &TenantContext, id: Uuid, failed: bool) -> Result<(), Error> {
     let select = SqlQuery::select()
         .columns(["kind", "label", "requested_by"])
@@ -236,8 +237,8 @@ pub(crate) async fn announce(tenant: &TenantContext, id: Uuid, failed: bool) -> 
     Ok(())
 }
 
-/// Worker gọi khi job `id` chạy xong (`error` `None`) hay hỏng hẳn; job không theo dõi thì không
-/// có dòng nào và lệnh không đổi gì.
+/// Called by the worker when job `id` finishes (`error` is `None`) or fails permanently; a job that is not
+/// tracked has no row and the call changes nothing.
 pub(crate) async fn finish<C: ConnectionTrait>(
     connection: &C,
     id: Uuid,
@@ -551,7 +552,7 @@ async fn retry_job(
     Ok(Data { data: find(&tenant, &principal, id).await? })
 }
 
-/// Migration tạo bảng `kernel_job_runs` (cấp khách hàng, mọi database dữ liệu).
+/// Migration that creates the `kernel_job_runs` table (tenant-level, every data database).
 pub(crate) struct CreateJobRuns;
 
 impl MigrationName for CreateJobRuns {
@@ -604,8 +605,8 @@ impl MigrationTrait for CreateJobRuns {
     }
 }
 
-/// Migration thêm cột file của job (bước 51 P16): tên, kích thước, hạn giữ; index để job dọn tìm
-/// file hết hạn.
+/// Migration that adds the job's file columns (step 51 P16): name, size, retention deadline; an index so
+/// the cleanup job can find expired files.
 pub(crate) struct AddJobFiles;
 
 impl MigrationName for AddJobFiles {

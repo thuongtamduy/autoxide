@@ -1,15 +1,15 @@
-//! Nền của Autoxide: thứ mà mọi module dựa vào (cấu hình, database, kiểu lỗi,
-//! HTTP, hợp đồng module). Kernel không biết module nào — phụ thuộc chỉ đi một
-//! chiều từ module vào kernel (`cargo xtask check` kiểm điều này).
+//! The foundation of Autoxide: what every module builds on (configuration, database, error type, HTTP,
+//! module contract). The kernel knows no module - dependencies go in one direction, from module to kernel
+//! (`cargo xtask check` verifies this).
 //!
-//! Bố cục (D-247): file xếp theo nhóm riêng tư — `contracts/` (trait module cung cấp cho nhau),
-//! `data/` (database), `security/`, `ops/` (vận hành), `values/` (kiểu giá trị). Trên cùng là
-//! phần mọi module chạm tới: `error`, `response`, `i18n`, `module`, `config`, `http`, `event`,
-//! `job`, `mcp`. Đường dẫn công khai KHÔNG có tên nhóm: `pub use` dưới đây giữ
-//! `autoxide_kernel::ai::TextModel` cho module ở repo riêng (D-167), và `crate::ai::…` bên trong
-//! kernel — nhóm là riêng tư nên không có đường thứ hai (`autoxide_kernel::contracts::ai`). Module
-//! mới vào nhóm hợp với nó (mỗi file nhóm ghi module nào của bước 33+ thuộc về đó) rồi thêm vào
-//! `pub use`; test `tests/public_paths.rs` giữ mọi đường dẫn công khai.
+//! Layout (D-247): files are arranged in private groups - `contracts/` (traits modules provide to each
+//! other), `data/` (database), `security/`, `ops/` (operations), `values/` (value types). On top are the
+//! parts every module touches: `error`, `response`, `i18n`, `module`, `config`, `http`, `event`, `job`,
+//! `mcp`. Public paths do NOT carry the group name: the `pub use` below keeps
+//! `autoxide_kernel::ai::TextModel` for modules in separate repos (D-167), and `crate::ai::…` inside the
+//! kernel - the group is private so there is no second path (`autoxide_kernel::contracts::ai`). A new
+//! module goes into the group that fits it (each group file records which step 33+ modules belong there)
+//! and is then added to `pub use`; the test `tests/public_paths.rs` guards every public path.
 
 mod contracts;
 mod data;
