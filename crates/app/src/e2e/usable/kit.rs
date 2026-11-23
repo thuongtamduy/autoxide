@@ -281,6 +281,7 @@ pub(crate) fn mail_param(mail: &str, name: &str) -> String {
         .chars()
         .take_while(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '~'))
         .collect()
+}
 
 /// Khung thời gian của một chương trình khuyến mại đang chạy, trong giới hạn số ngày của luật:
 /// từ một giờ trước tới 30 ngày sau (RFC 3339).
