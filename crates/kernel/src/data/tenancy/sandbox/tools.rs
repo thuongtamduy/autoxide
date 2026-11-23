@@ -1,5 +1,5 @@
-//! Tool MCP của sandbox (D-232): agent thử cấu hình trong sandbox rồi đẩy sang. Không có tool xoá
-//! sandbox (chỉ REST, có người).
+//! MCP tools of the sandbox (D-232): an agent tries a configuration in a sandbox, then pushes it across.
+//! There is no tool to delete a sandbox (REST only, with a human).
 
 use std::sync::Arc;
 

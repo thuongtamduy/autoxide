@@ -1,10 +1,12 @@
-//! Chính sách tách / gộp của bảng cấp khách của module nội bộ `kernel`, và hai bảng kernel tự làm:
+//! Split / merge policy of the tenant-level tables of the internal `kernel` module, and the two tables the
+//! kernel handles itself:
 //!
-//! - Cây tổ chức (`kernel_org_units` + `kernel_org_closure`): tách → nút gốc nhánh thành gốc của
-//!   khách mới (độ sâu trừ đi, bảng tổ tiên – con cháu chỉ giữ cặp trong nhánh); gộp → gốc của khách
-//!   bị gộp thành con của nút nhận (độ sâu cộng thêm, thêm cặp với mọi tổ tiên của nút nhận).
-//! - Dãy số (`kernel_sequences`): dãy có tên chứa ID của thứ đi theo (nút, sổ, ký hiệu hoá đơn…)
-//!   đi cùng — số tiếp theo vẫn liên tục ở khách mới.
+//! - The organization tree (`kernel_org_units` + `kernel_org_closure`): split → the branch root node becomes
+//!   the root of the new tenant (depth reduced; the ancestor-descendant table keeps only the pairs inside the
+//!   branch); merge → the root of the merged tenant becomes a child of the receiving node (depth increased,
+//!   pairs added with every ancestor of the receiving node).
+//! - Number sequences (`kernel_sequences`): a sequence whose name contains the ID of the thing it numbers
+//!   (node, ledger, invoice series…) travels with it, so the next number stays continuous at the new tenant.
 
 use std::sync::Arc;
 
@@ -21,7 +23,7 @@ fn transfer(error: TransferError) -> Error {
     Error::internal(error.to_string())
 }
 
-/// Chính sách của các bảng cấp khách của `kernel`.
+/// Policy of the tenant-level tables of `kernel`.
 pub(crate) fn kernel_relocation() -> Relocation {
     Relocation::new()
         .custom("kernel_org_units", Arc::new(OrgTreeTables))
@@ -53,11 +55,11 @@ pub(crate) fn kernel_relocation() -> Relocation {
         ])
 }
 
-/// Cây tổ chức của kernel.
+/// The kernel's organization tree.
 struct OrgTreeTables;
 
 impl OrgTreeTables {
-    /// Dòng nút của khách nguồn sẽ đi.
+    /// The node rows of the source tenant that will go.
     async fn units(&self, context: &RelocationContext) -> Result<Vec<unit::Model>, Error> {
         let mut select = unit::Entity::find();
         select = match context.kind() {
@@ -217,12 +219,12 @@ impl RelocateTable for OrgTreeTables {
     }
 }
 
-/// Dãy số đi theo thứ nó đánh số.
+/// Number sequences travel with the thing they number.
 struct Sequences;
 
 const SEQUENCES: &str = crate::numbering::TABLE;
 
-/// Mọi UUID viết trong `text`.
+/// Every UUID written in `text`.
 fn uuids_in(text: &str) -> Vec<Uuid> {
     let bytes = text.as_bytes();
     let mut found = Vec::new();
@@ -240,7 +242,7 @@ fn uuids_in(text: &str) -> Vec<Uuid> {
 }
 
 impl Sequences {
-    /// Tên các dãy của khách nguồn sẽ đi.
+    /// Names of the source tenant's sequences that will go.
     async fn scopes<C: sea_orm::ConnectionTrait>(
         &self,
         context: &RelocationContext,

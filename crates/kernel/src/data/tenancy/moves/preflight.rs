@@ -1,11 +1,11 @@
-//! Kiểm trước khi dời và lập kế hoạch (dry-run).
+//! Pre-move checks and planning (dry run).
 
 use super::files::tenant_prefix;
 use super::*;
 
 impl TenantMoves {
-    /// Kiểm lượt dời khách `tenant` sang placement `to`: mọi lý do chặn (không dừng ở lý do đầu)
-    /// và số dòng sẽ chép. Khách hay placement không có: lỗi.
+    /// Checks moving tenant `tenant` to placement `to`: every blocking reason (it does not stop at the first)
+    /// and the number of rows that would be copied. A missing tenant or placement: an error.
     pub(super) async fn check(&self, tenant: &str, to: &str) -> Result<Checked, Error> {
         let row = self.tenant_row(tenant).await?;
         let placements = self.placements().await?;
@@ -120,8 +120,8 @@ impl TenantMoves {
         Ok(Checked { tenant: row, from: source, to: target, blockers, resume, tables, files })
     }
 
-    /// Nơi lưu file của placement `placement`: nơi lưu riêng của nó, hay nơi lưu chung. Kèm cấu hình
-    /// nơi lưu riêng (`None`: nơi lưu chung) để so hai placement.
+    /// The file store of placement `placement`: its own store, or the shared store. Comes with the
+    /// configuration of the own store (`None`: the shared store) so two placements can be compared.
     pub(super) async fn file_store(
         &self,
         placement: &placement::Model,
@@ -149,9 +149,9 @@ impl TenantMoves {
         }
     }
 
-    /// Nơi lưu file của `from` và của `to` khi hai placement dùng hai nơi lưu khác nhau; `None`: cùng
-    /// nơi lưu (cùng nơi lưu chung, hay nơi lưu riêng chỉ cùng một chỗ) — không có file nào phải
-    /// chép hay xoá.
+    /// The file stores of `from` and `to` when the two placements use two different stores; `None`: the same
+    /// store (the same shared store, or own stores that point to the same place), so no file needs to be
+    /// copied or deleted.
     pub(super) async fn file_stores(
         &self,
         from: &placement::Model,
@@ -173,7 +173,7 @@ impl TenantMoves {
         Ok(Some((from_store, to_store)))
     }
 
-    /// Lý do hai database chưa chép được cho nhau: cùng một database, hay thiếu migration.
+    /// The reason two databases cannot be copied to each other: the same database, or missing migrations.
     pub(super) async fn schema_problems(
         &self,
         source: &placement::Model,
@@ -197,8 +197,8 @@ impl TenantMoves {
         Ok(problems)
     }
 
-    /// Kế hoạch dời khách `tenant` (ID hay slug) sang placement `to`, không đổi gì: lý do chặn
-    /// (câu theo `language`) và số dòng sẽ chép.
+    /// The plan for moving tenant `tenant` (ID or slug) to placement `to`, changing nothing: the blocking
+    /// reasons (sentences in `language`) and the number of rows that would be copied.
     pub async fn plan(
         &self,
         tenant: &str,

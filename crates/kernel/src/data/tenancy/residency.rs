@@ -1,13 +1,15 @@
-//! Nơi lưu dữ liệu theo khách (bước 37, D-360): khách có thể buộc dữ liệu của mình nằm ở một nước
-//! (`kernel_tenants.data_residency`, vd `VN` — Luật An ninh mạng 116/2025/QH15, NĐ 53/2022/NĐ-CP; cần
-//! đối chiếu văn bản gốc); mỗi placement ghi nước đặt máy chủ (`kernel_placements.country_code`).
+//! Per-tenant data residency (step 37, D-360): a tenant can require its data to stay in one country
+//! (`kernel_tenants.data_residency`, e.g. `VN`; Law on Cybersecurity 116/2025/QH15, Decree 53/2022/ND-CP; to be
+//! checked against the original texts); each placement records the country where its server is
+//! (`kernel_placements.country_code`).
 //!
-//! - Đặt yêu cầu cho khách mà placement hiện tại không rõ nước hay ở nước khác → từ chối
-//!   (`tenant_residency_violation`), không ghi.
-//! - Dời khách sang placement không đáp ứng → lượt dời bị chặn với cùng mã lỗi (`moves.rs`).
-//! - Bỏ yêu cầu (`None`) luôn được.
+//! - Setting a requirement for a tenant whose current placement has an unknown or different country → rejected
+//!   (`tenant_residency_violation`), nothing is written.
+//! - Moving a tenant to a placement that does not meet it → the move is blocked with the same error code
+//!   (`moves.rs`).
+//! - Removing the requirement (`None`) is always allowed.
 //!
-//! Cả hai cột là mặt điều khiển; mã nước ISO 3166-1 alpha-2, chữ hoa.
+//! Both columns are control plane; country codes are ISO 3166-1 alpha-2, uppercase.
 
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set};
 
@@ -15,20 +17,20 @@ use super::admin::{placement, tenant};
 use super::{DatabaseRegistry, Placements, TenantId, errors};
 use crate::error::{Error, FieldError};
 
-/// Nơi lưu dữ liệu của một khách.
+/// Where a tenant's data is stored.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Residency {
     pub tenant: TenantId,
-    /// Nước khách buộc lưu dữ liệu (ISO 3166-1 alpha-2), `None` khi không buộc.
+    /// Country where the tenant requires its data to stay (ISO 3166-1 alpha-2), `None` when not required.
     pub required: Option<String>,
-    /// Tên placement đang giữ dữ liệu của khách.
+    /// Name of the placement that holds the tenant's data.
     pub placement: String,
-    /// Nước đặt placement đó; `None` khi chưa ai ghi.
+    /// Country of that placement; `None` when nobody has recorded it.
     pub placement_country: Option<String>,
 }
 
 impl Residency {
-    /// Đáp ứng yêu cầu: không buộc, hoặc placement ở đúng nước đó.
+    /// Meets the requirement: none is required, or the placement is in exactly that country.
     pub fn compliant(&self) -> bool {
         match &self.required {
             None => true,
@@ -37,7 +39,7 @@ impl Residency {
     }
 }
 
-/// Chuẩn hoá mã nước: hai chữ cái → chữ hoa; sai dạng → lỗi kiểm tra ở trường `field`.
+/// Normalizes a country code: two letters → uppercase; a wrong form → a validation error on field `field`.
 pub fn parse_country(raw: &str, field: &str) -> Result<String, Error> {
     let code = raw.trim().to_ascii_uppercase();
     if code.len() == 2 && code.bytes().all(|byte| byte.is_ascii_uppercase()) {
@@ -51,7 +53,7 @@ pub fn parse_country(raw: &str, field: &str) -> Result<String, Error> {
     }
 }
 
-/// Placement `target` có đáp ứng yêu cầu `required` của khách không; không → lỗi.
+/// Whether placement `target` meets the tenant's requirement `required`; if not → an error.
 pub(super) fn check_target(
     required: Option<&str>,
     target_country: Option<&str>,
@@ -78,7 +80,7 @@ impl DatabaseRegistry {
         })
     }
 
-    /// Nơi lưu dữ liệu của khách `tenant`.
+    /// Where the data of tenant `tenant` is stored.
     pub async fn residency(&self, tenant: TenantId) -> Result<Residency, Error> {
         let row = tenant::Entity::find_by_id(tenant.as_uuid())
             .one(self.control().read())
@@ -87,9 +89,9 @@ impl DatabaseRegistry {
         self.residency_of(row).await
     }
 
-    /// Đặt (`Some("VN")`) hay bỏ (`None`) yêu cầu nơi lưu của khách `tenant`. Placement hiện tại
-    /// không đáp ứng → `tenant_residency_violation` (409), không ghi. Người gọi kiểm quyền
-    /// (chỉ nhân sự nền tảng).
+    /// Sets (`Some("VN")`) or removes (`None`) the storage-location requirement of tenant `tenant`. If the
+    /// current placement does not meet it → `tenant_residency_violation` (409), nothing is written. The
+    /// caller checks permission (platform staff only).
     pub async fn set_residency(
         &self,
         tenant: TenantId,
@@ -106,7 +108,7 @@ impl DatabaseRegistry {
         Ok(Residency { required: country, ..current })
     }
 
-    /// Nơi lưu của mọi khách có yêu cầu (cho `autoxide doctor`), theo id.
+    /// The storage location of every tenant that has a requirement (for `autoxide doctor`), by id.
     pub async fn residencies(&self) -> Result<Vec<Residency>, Error> {
         let rows = tenant::Entity::find()
             .filter(tenant::Column::DataResidency.is_not_null())
@@ -123,8 +125,8 @@ impl DatabaseRegistry {
 }
 
 impl Placements {
-    /// Ghi nước đặt máy chủ của placement `name` (`None` = không rõ). Khách đang ở đó có yêu cầu nơi
-    /// lưu khác nước mới → `tenant_residency_violation`, không ghi.
+    /// Records the country of placement `name`'s server (`None` = unknown). If a tenant there has a storage
+    /// requirement different from the new country → `tenant_residency_violation`, nothing is written.
     pub async fn set_country(&self, name: &str, country: Option<&str>) -> Result<(), Error> {
         let country = country.map(|raw| parse_country(raw, "country")).transpose()?;
         let control = self.registry().control();
@@ -152,8 +154,8 @@ impl Placements {
 
 // --- Migration ------------------------------------------------------------------------------
 
-/// `kernel_placements.country_code`, `kernel_tenants.data_residency` (TEXT NULL). Không sửa migration
-/// của bước 33.
+/// `kernel_placements.country_code`, `kernel_tenants.data_residency` (TEXT NULL). Does not edit the migration
+/// of step 33.
 pub(crate) struct AddDataResidency;
 
 impl crate::migration::prelude::MigrationName for AddDataResidency {

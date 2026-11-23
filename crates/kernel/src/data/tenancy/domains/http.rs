@@ -1,4 +1,4 @@
-//! REST (`/api/v1/kernel/domains…`) và tool MCP của tên miền riêng — gọi đúng các hàm của
+//! REST (`/api/v1/kernel/domains…`) and MCP tools for custom domains; they call exactly the functions of
 //! [`TenantDomains`].
 
 use std::sync::Arc;
@@ -247,7 +247,7 @@ async fn domain_allowed(
     }
 }
 
-/// Route dưới `/api/v1/kernel`.
+/// Routes under `/api/v1/kernel`.
 pub(crate) fn routes(service: Arc<TenantDomains>) -> OpenApiRouter {
     OpenApiRouter::new()
         .routes(routes!(list_domains, add_domain))
@@ -279,7 +279,7 @@ pub(crate) struct DomainOrg {
     org_id: Option<Uuid>,
 }
 
-/// Tool MCP — gọi đúng các hàm REST dùng. Không có tool xoá tên miền (việc phá huỷ, làm qua REST).
+/// MCP tools; they call exactly the functions REST uses. There is no delete-domain tool (a destructive action, done through REST).
 pub(crate) fn tools(service: Arc<TenantDomains>) -> Vec<Tool> {
     let (list, add, verify, update) = (service.clone(), service.clone(), service.clone(), service);
     vec![

@@ -1,36 +1,40 @@
-//! Dời khách giữa các placement — `shared` ↔ `dedicated` (đặc tả 33 "Cấp phát và dời khách"):
-//! lệnh `autoxide tenant move` (chạy ngay trên máy chủ) và REST / MCP chỉ cho nhân sự nền tảng
-//! (dry-run mặc định; chạy thật thì một job nền làm).
+//! Moving a tenant between placements, `shared` ↔ `dedicated` (spec 33 "Provisioning and moving tenants"):
+//! the command `autoxide tenant move` (runs directly on the server) and REST / MCP for platform staff only
+//! (dry run by default; a real run is done by a background job).
 //!
-//! Một lượt dời là một dòng `kernel_tenant_moves` (mặt điều khiển) đi qua các trạng thái:
+//! A move is one `kernel_tenant_moves` row (control plane) that goes through these states:
 //!
-//! 1. Bắt đầu: trong MỘT transaction ở database điều khiển, khách `active` → `moving` (mọi request
-//!    tới khách nhận `503 tenant_maintenance`) và ghi lượt dời `copying`.
-//! 2. `copying` → `copied`: chờ máy chủ khác thấy `moving` (TTL cache khách) và request đang chạy
-//!    xong (`AUTOXIDE_HTTP_REQUEST_TIMEOUT_SECONDS`); chờ job / event của khách đang được chạy ở
-//!    nguồn hết giữ (`claimed_until`) — worker và bộ phát không nhận việc mới của khách `moving`;
-//!    hai database phải đủ migration và khác nhau; chép mọi dòng `tenant_id = X` của mọi bảng cấp
-//!    khách hàng (kể cả outbox và hàng đợi job — event chưa giao, job chưa chạy đi theo dữ liệu)
-//!    trong MỘT transaction ở đích, kèm event `kernel.tenant_moved`; so số dòng từng bảng.
-//! 3. `copied` → `switched`: so lại số dòng, rồi trong một transaction ở database điều khiển đổi
-//!    `placement_id` của khách sang đích và đặt lại `active` — khách phục vụ ngay từ database mới.
-//! 4. `switched` → `done`: xoá dòng của khách ở nguồn (`keep_source`: chỉ xoá hàng đợi job và
-//!    outbox, để không gì chạy hai lần; dữ liệu còn lại là bản sao dự phòng, xoá sau bằng
+//! 1. Start: in ONE transaction on the control database, the tenant goes `active` → `moving` (every request
+//!    to the tenant gets `503 tenant_maintenance`) and the move is recorded as `copying`.
+//! 2. `copying` → `copied`: waits for other servers to see `moving` (tenant cache TTL) and for running
+//!    requests to finish (`AUTOXIDE_HTTP_REQUEST_TIMEOUT_SECONDS`); waits for the tenant's jobs / events
+//!    being run at the source to release their hold (`claimed_until`): workers and the dispatcher take no
+//!    new work of a `moving` tenant; both databases must be fully migrated and different; copies every
+//!    `tenant_id = X` row of every tenant-level table (including outbox and job queue: undelivered events
+//!    and unrun jobs follow the data) in ONE transaction at the target, with the event
+//!    `kernel.tenant_moved`; compares the row count of each table.
+//! 3. `copied` → `switched`: recompares the row counts, then in one transaction on the control database
+//!    changes the tenant's `placement_id` to the target and sets it back to `active`: the tenant is served
+//!    from the new database immediately.
+//! 4. `switched` → `done`: deletes the tenant's rows at the source (`keep_source`: deletes only the job
+//!    queue and outbox so nothing runs twice; the remaining data is a backup copy, deleted later with
 //!    [`TenantMoves::purge`]).
 //!
-//! - **Chạy lại được**: mỗi bước một lease (`runner`, `runner_until`, gia hạn khi đang chạy) — hai
-//!   bên không cùng chạy một lượt. Tiến trình chết giữa chừng: khách giữ `moving` (hay đã `active`
-//!   ở đích nếu đã qua bước 3); dời lại sang cùng placement thì chạy tiếp từ trạng thái đã ghi
-//!   (bước 2 xoá dòng của khách ở đích rồi chép lại). Huỷ được trước bước 3 ([`TenantMoves::abort`]).
-//! - Không bao giờ có hai bản "đang sống": `placement_id` chỉ đổi sau khi số dòng khớp, nguồn chỉ bị
-//!   xoá sau khi đã đổi.
-//! - Không chép: bảng mặt điều khiển (`kernel_tenants`, `kernel_placements`, tên miền…).
-//! - File lưu trữ (khoá `tenants/<id>/…`): hai placement cùng nơi lưu (cùng nơi lưu chung, hay nơi
-//!   lưu riêng chỉ cùng một chỗ) thì không chép gì. Khác nơi lưu: bước 2 chép mọi file của khách sang
-//!   nơi lưu của đích (xoá file thừa của khách ở đó trước, so số file sau), bước 4 xoá file ở nguồn
-//!   (trừ `keep_source`; `purge` xoá sau). Trước khi chép hay xoá, ghi thử một file đánh dấu ở đích
-//!   rồi tìm ở nguồn: hai cấu hình khác nhau mà cùng một chỗ (vd nơi lưu riêng trỏ đúng thư mục của
-//!   nơi lưu chung) thì coi là cùng nơi lưu — không bao giờ xoá file đang dùng.
+//! - **Safe to rerun**: each step holds a lease (`runner`, `runner_until`, extended while running); two
+//!   parties never run the same move. If the process dies midway: the tenant stays `moving` (or is already
+//!   `active` at the target if past step 3); moving again to the same placement continues from the recorded
+//!   state (step 2 deletes the tenant's rows at the target and copies again). Can be aborted before step 3
+//!   ([`TenantMoves::abort`]).
+//! - There are never two "live" copies: `placement_id` changes only after the row counts match, and the
+//!   source is deleted only after the change.
+//! - Not copied: control-plane tables (`kernel_tenants`, `kernel_placements`, domains...).
+//! - Stored files (keys `tenants/<id>/…`): if two placements share a store (the same shared store, or own
+//!   stores that point to the same place) nothing is copied. With different stores: step 2 copies every
+//!   file of the tenant to the target's store (deleting the tenant's extra files there first, comparing
+//!   file counts afterwards), step 4 deletes the files at the source (except `keep_source`; `purge` deletes
+//!   them later). Before copying or deleting, a marker file is written at the target and looked for at the
+//!   source: two different configurations that are actually the same place (e.g. an own store pointing at
+//!   the very directory of the shared store) count as the same store, so a file in use is never deleted.
 
 mod claims;
 mod http;
@@ -72,7 +76,7 @@ mod phases;
 mod preflight;
 mod steps;
 
-/// Dời dữ liệu của khách sang placement khác.
+/// Moves a tenant's data to another placement.
 pub const TENANTS_MOVE: Permission = Permission::new(
     "kernel.tenants.move",
     "Move a tenant's data to another placement (database); the tenant is unavailable during the \
@@ -85,7 +89,7 @@ pub(crate) const TENANT_MOVED: EventInfo = EventInfo::new(
     "The tenant's data was moved to another placement (database).",
 );
 
-/// Loại job chạy một lượt dời bắt đầu qua REST / MCP.
+/// Kind of job that runs a move started through REST / MCP.
 pub(crate) const MOVE_TENANT: &str = "kernel.move_tenant";
 
 const COPYING: &str = "copying";
@@ -95,9 +99,9 @@ const DONE: &str = "done";
 const ABORTED: &str = "aborted";
 const UNFINISHED: [&str; 3] = [COPYING, COPIED, SWITCHED];
 
-/// Một bên giữ lượt dời tối đa chừng này mà không gia hạn; đang chạy thì gia hạn mỗi một phần ba.
+/// A party holds a move for at most this long without extending; while running it extends every third of that.
 const LEASE: Duration = Duration::from_secs(120);
-/// Bảng outbox của `kernel`: có thêm event `kernel.tenant_moved` ở đích.
+/// The `kernel` outbox table: gets the extra event `kernel.tenant_moved` at the target.
 const KERNEL_EVENTS: &str = "kernel_events";
 
 fn now() -> Timestamp {
@@ -105,7 +109,7 @@ fn now() -> Timestamp {
 }
 
 mod entity {
-    //! Bảng `kernel_tenant_moves` (mặt điều khiển).
+    //! The `kernel_tenant_moves` table (control plane).
     use crate::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
@@ -120,12 +124,12 @@ mod entity {
         pub to_placement_id: Uuid,
         pub keep_source: bool,
         pub state: String,
-        /// JSON `[{"table": …, "rows": …}]`: dòng đã chép mỗi bảng.
+        /// JSON `[{"table": …, "rows": …}]`: the rows copied per table.
         pub tables: String,
         pub error: Option<String>,
         pub runner: Option<String>,
         pub runner_until: Option<Timestamp>,
-        /// Lúc khách thành `moving`: chờ cache của máy chủ khác tính từ đây.
+        /// When the tenant became `moving`: other servers' caches wait from here.
         pub moving_since: Timestamp,
         pub requested_by: Option<Uuid>,
         pub created_at: Timestamp,
@@ -231,7 +235,7 @@ impl Event for TenantMoved {
     const NAME: &'static str = "kernel.tenant_moved";
 }
 
-/// Job chạy lượt dời `move_id` tới xong.
+/// Job that runs move `move_id` to completion.
 #[derive(Debug, Serialize, Deserialize)]
 struct MoveTenant {
     move_id: Uuid,
@@ -241,8 +245,8 @@ impl Job for MoveTenant {
     const KIND: &'static str = MOVE_TENANT;
 }
 
-/// Thứ lượt dời cần từ mọi module: tên module (chủ bảng), bảng mặt điều khiển, migration. Điền một
-/// lần sau khi mọi module khởi động (`Modules::start_in`). Clone rẻ.
+/// What a move needs from every module: the module name (table owner), control-plane tables, migrations. Filled
+/// once after every module has started (`Modules::start_in`). Cheap to clone.
 #[derive(Clone, Default)]
 pub(crate) struct MoveSetup(Arc<OnceLock<Setup>>);
 
@@ -250,13 +254,13 @@ pub(crate) struct Setup {
     pub(crate) modules: Vec<&'static str>,
     pub(crate) control_plane: Vec<&'static str>,
     pub(crate) migrator: Migrator,
-    /// Quản lý placement (migrate placement bằng API, D-334).
+    /// Placement management (migrating a placement through the API, D-334).
     pub(crate) placements: super::Placements,
-    /// Bảng giữ lại khi xoá hẳn khách (`Module::retained_tables`, D-337).
+    /// Tables kept when a tenant is deleted for good (`Module::retained_tables`, D-337).
     pub(crate) retained: Vec<&'static str>,
-    /// Chính sách tách / gộp của mọi module (`Module::relocation`, bước 38).
+    /// Split / merge policy of every module (`Module::relocation`, step 38).
     pub(crate) policies: super::relocate::Policies,
-    /// Module có trong binary nhưng đang tắt (`AUTOXIDE_MODULES`): lượt dời không chép bảng của chúng.
+    /// Modules present in the binary but turned off (`AUTOXIDE_MODULES`): a move does not copy their tables.
     pub(crate) inactive: Vec<&'static str>,
 }
 
@@ -265,8 +269,8 @@ impl MoveSetup {
         let _ = self.0.set(setup);
     }
 
-    /// Module đang tắt còn dữ liệu của khách `tenant` ở `database` (bước 70 P1): dời, tách hay gộp
-    /// khách lúc này sẽ để dữ liệu đó lại.
+    /// A turned-off module still has data of tenant `tenant` at `database` (step 70 P1): moving, splitting
+    /// or merging the tenant now would leave that data behind.
     pub(crate) async fn inactive_with_data(
         &self,
         database: &Database,
@@ -276,12 +280,12 @@ impl MoveSetup {
         Ok(crate::module::inactive_with_tenant_data(database.read(), inactive, tenant).await?)
     }
 
-    /// Chính sách tách / gộp của mọi module.
+    /// Split / merge policy of every module.
     pub(crate) fn policies(&self) -> Result<super::relocate::Policies, Error> {
         Ok(self.get()?.policies.clone())
     }
 
-    /// Migration còn thiếu ở `database`, theo mọi module đã đăng ký.
+    /// Migrations still missing at `database`, across every registered module.
     pub(crate) async fn pending(
         &self,
         database: &Database,
@@ -292,12 +296,12 @@ impl MoveSetup {
         }
     }
 
-    /// Bảng mọi module khai giữ lại khi xoá hẳn khách.
+    /// Tables that every module declares kept when a tenant is deleted for good.
     pub(crate) fn retained(&self) -> Result<Vec<&'static str>, Error> {
         Ok(self.get()?.retained.clone())
     }
 
-    /// Quản lý placement, sau khi mọi module đã khởi động.
+    /// Placement management, once every module has started.
     pub(crate) fn placements(&self) -> Result<super::Placements, Error> {
         Ok(self.get()?.placements.clone())
     }
@@ -306,14 +310,14 @@ impl MoveSetup {
         self.0.get().ok_or_else(|| Error::internal("tenant moves are used before modules started"))
     }
 
-    /// Tên mọi module và bảng mặt điều khiển của chúng (xuất dữ liệu khách dùng chung, D-328).
+    /// Names of every module and their control-plane tables (shared by tenant data export, D-328).
     pub(crate) fn tables(&self) -> Result<(Vec<&'static str>, Vec<&'static str>), Error> {
         let setup = self.get()?;
         Ok((setup.modules.clone(), setup.control_plane.clone()))
     }
 }
 
-/// Kết quả kiểm một lượt dời, trước khi chạy.
+/// Result of checking a move, before running it.
 struct Checked {
     tenant: tenant::Model,
     from: placement::Model,
@@ -324,13 +328,13 @@ struct Checked {
     files: u64,
 }
 
-/// Dời khách giữa các placement. Module `kernel` công bố (`context.require::<TenantMoves>()`).
+/// Moves tenants between placements. Published by the `kernel` module (`context.require::<TenantMoves>()`).
 pub struct TenantMoves {
     registry: DatabaseRegistry,
     setup: MoveSetup,
     outbox: Outbox,
     jobs: JobQueue,
-    /// Chờ chừng này sau khi đặt `moving` rồi mới chép (TTL cache khách + thời gian tối đa của một
+    /// Waits this long after setting `moving` before copying (tenant cache TTL + the maximum time of one
     /// request).
     settle: Duration,
     translations: Translations,
@@ -346,7 +350,7 @@ fn transfer(error: TransferError) -> Error {
     Error::internal(error.to_string())
 }
 
-/// Lỗi kèm nguyên nhân gốc, cho người vận hành đọc (cột `error`, log).
+/// An error with its root cause, for the operator to read (column `error`, log).
 pub(super) fn describe(error: &Error) -> String {
     match std::error::Error::source(error) {
         Some(source) => format!("{}: {source}", error.code()),
@@ -402,8 +406,8 @@ impl TenantMoves {
     }
 }
 
-/// Bộ chạy job `kernel.move_tenant` (job của database điều khiển, không thuộc khách nào): chạy lượt
-/// dời tới xong. Lần chạy lại của cùng job nhận lại lease của chính nó ngay.
+/// Runner of the job `kernel.move_tenant` (a control-database job, belonging to no tenant): runs the move
+/// to completion. A rerun of the same job takes back its own lease immediately.
 pub(crate) struct MoveTenantRunner(pub(crate) Arc<TenantMoves>);
 
 #[async_trait::async_trait]

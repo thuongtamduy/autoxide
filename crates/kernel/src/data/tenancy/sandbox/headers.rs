@@ -1,9 +1,9 @@
-//! Header của mọi response của sandbox (D-232): `Autoxide-Sandbox: true` cho máy biết đang ở bản
-//! thử, `X-Robots-Tag: noindex, nofollow` để máy tìm kiếm không đưa website thử vào kết quả.
+//! Headers of every sandbox response (D-232): `Autoxide-Sandbox: true` tells machines they are on a
+//! test copy, `X-Robots-Tag: noindex, nofollow` keeps search engines from listing a test website.
 //!
-//! Lớp HTTP đặt một ô vào extensions của request; chỗ giải khách của request (`request.rs`) đánh
-//! dấu ô khi khách là sandbox; lớp đọc ô khi response quay ra. Request không giải khách (trang tài
-//! liệu, health) không mang header.
+//! The HTTP layer puts a cell into the request's extensions; the place that resolves the request's tenant
+//! (`request.rs`) marks the cell when the tenant is a sandbox; the layer reads the cell when the response
+//! goes out. A request that resolves no tenant (docs page, health) carries no header.
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -15,10 +15,11 @@ use axum::response::Response;
 
 use crate::tenancy::TenantContext;
 
-/// Tên header đánh dấu response của sandbox.
+/// Name of the header that marks a sandbox response.
 pub const SANDBOX_HEADER: HeaderName = HeaderName::from_static("autoxide-sandbox");
 
-/// Ô "request này của sandbox" (clone rẻ, chung giữa lớp HTTP và extractor).
+/// The cell "this request belongs to a sandbox" (cheap to clone, shared between the HTTP layer and the
+/// extractor).
 #[derive(Clone, Default)]
 pub(crate) struct SandboxSlot(Arc<AtomicBool>);
 
@@ -30,7 +31,7 @@ impl SandboxSlot {
     }
 }
 
-/// Lớp HTTP: thêm hai header khi khách của request là sandbox.
+/// HTTP layer: adds the two headers when the request's tenant is a sandbox.
 pub(crate) async fn mark(mut request: Request, next: Next) -> Response {
     let slot = SandboxSlot::default();
     request.extensions_mut().insert(slot.clone());

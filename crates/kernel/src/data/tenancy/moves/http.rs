@@ -1,5 +1,5 @@
-//! REST (`/api/v1/kernel/tenants/{id}/move…`) và tool MCP của việc dời khách — gọi đúng các hàm
-//! của [`TenantMoves`]. Chỉ nhân sự khách nền tảng (`require_platform`).
+//! REST (`/api/v1/kernel/tenants/{id}/move…`) and MCP tools for moving a tenant; they call exactly the
+//! functions of [`TenantMoves`]. Platform-tenant staff only (`require_platform`).
 
 use std::sync::Arc;
 
@@ -122,7 +122,7 @@ async fn get_tenant_move(
     Ok(Data { data: moves.get(&id, move_id).await? })
 }
 
-/// Route dưới `/api/v1/kernel`.
+/// Routes under `/api/v1/kernel`.
 pub(crate) fn routes(moves: Arc<TenantMoves>) -> OpenApiRouter {
     OpenApiRouter::new()
         .routes(routes!(move_tenant))
@@ -162,7 +162,7 @@ pub(crate) struct TenantMoveRef {
     move_id: Uuid,
 }
 
-/// Kết quả của tool `move_tenant`: kế hoạch (dry run) hay lượt dời đã bắt đầu.
+/// Result of the `move_tenant` tool: the plan (dry run) or the move that has started.
 #[derive(Debug, Serialize)]
 #[serde(untagged)]
 enum MoveOutcome {
@@ -170,7 +170,7 @@ enum MoveOutcome {
     Started(TenantMove),
 }
 
-/// Tool MCP — gọi đúng các hàm REST dùng.
+/// MCP tools: call exactly the functions REST uses.
 pub(crate) fn tools(moves: Arc<TenantMoves>) -> Vec<Tool> {
     let (start, get) = (moves.clone(), moves);
     vec![

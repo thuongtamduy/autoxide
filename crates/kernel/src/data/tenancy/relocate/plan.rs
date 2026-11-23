@@ -1,6 +1,6 @@
-//! Kế hoạch của một lượt tách / gộp (dry-run): số dòng mỗi bảng, và **xung đột** tìm trước khi
-//! chép — tham chiếu vắt qua ranh giới (theo foreign key trong module) và giá trị unique đã có ở
-//! khách nhận. Không đổi gì.
+//! The plan of one split / merge run (dry run): the row count per table, and the **conflicts** found before
+//! copying: references that cross the boundary (by foreign key within a module) and unique values that
+//! already exist at the receiving tenant. Changes nothing.
 
 use crate::time::Timestamp;
 use sea_orm::sea_query::{Alias, Condition, Expr, ExprTrait as _, Query};
@@ -20,10 +20,10 @@ fn transfer(error: TransferError) -> Error {
     Error::internal(error.to_string())
 }
 
-/// Cột khách — không so trong khoá (đổi khách là chủ đích).
+/// The tenant column: not compared in keys (changing the tenant is intentional).
 const TENANT: &str = "tenant_id";
 
-/// Mọi nút của nhánh `org` trong cây của khách `tenant` (gồm chính nó).
+/// Every node of branch `org` in the tree of tenant `tenant` (including itself).
 pub(crate) async fn branch(
     database: &Database,
     tenant: TenantId,
@@ -33,8 +33,8 @@ pub(crate) async fn branch(
     Ok(nodes.into_iter().map(|node| node.as_uuid()).collect())
 }
 
-/// Khoá chính của các dòng đi / được chép (bảng có cột `id` kiểu UUID) cùng các nút của nhánh —
-/// cho bảng `Custom` biết thứ gì đi theo (audit, dãy số).
+/// Primary keys of the rows going / being copied (tables with a UUID `id` column) together with the
+/// branch's nodes, so a `Custom` table knows what goes along (audit, number sequences).
 pub(crate) async fn moved_ids(
     tables: &TenantTables,
     resolved: &[Resolved],
@@ -56,7 +56,7 @@ pub(crate) async fn moved_ids(
     Ok(moved)
 }
 
-/// Điều kiện "dòng đến hạn còn chờ" của một hàng đợi của khách `tenant`.
+/// The condition "due rows still waiting" of a job queue of tenant `tenant`.
 pub(crate) fn pending(kind: TableKind, tenant: TenantId) -> Condition {
     let condition = tenant_is(tenant).add(Expr::col(Alias::new("failed_at")).is_null());
     match kind {
@@ -67,14 +67,14 @@ pub(crate) fn pending(kind: TableKind, tenant: TenantId) -> Condition {
     }
 }
 
-/// Kết quả kế hoạch của mọi bảng.
+/// The plan result for every table.
 pub(crate) struct Report {
     pub(crate) tables: Vec<RelocationTable>,
     pub(crate) conflicts: Vec<RelocationConflict>,
     pub(crate) warnings: Vec<RelocationWarning>,
 }
 
-/// Lập kế hoạch cho các bảng `resolved` của lượt `context`.
+/// Builds the plan for the `resolved` tables of run `context`.
 pub(crate) async fn report(
     tables: &TenantTables,
     resolved: &[Resolved],
@@ -147,8 +147,8 @@ pub(crate) async fn report(
     Ok(report)
 }
 
-/// Tham chiếu vắt qua ranh giới theo foreign key của `child`: dòng đi mà dòng cha không có ở đích,
-/// hay dòng ở lại mà dòng cha bị xoá ở nguồn.
+/// References that cross the boundary by `child`'s foreign key: a row going whose parent is not at the target,
+/// or a row staying whose parent is deleted at the source.
 async fn reference_conflicts(
     tables: &TenantTables,
     child: &Resolved,
@@ -249,21 +249,22 @@ fn join(values: &[Option<String>]) -> String {
     values.iter().map(|value| value.as_deref().unwrap_or("null")).collect::<Vec<_>>().join(",")
 }
 
-/// Một unique index: cột (bỏ `tenant_id`), giá trị → khoá chính của dòng đi ở nguồn, giá trị → khoá
-/// chính của dòng đã có ở đích.
+/// A unique index: the columns (without `tenant_id`), value → primary key of the row going at the source,
+/// value → primary key of the row already at the target.
 type UniqueKeys = (
     Vec<String>,
     Vec<(Vec<String>, Vec<Option<String>>)>,
     HashMap<Vec<String>, Vec<Option<String>>>,
 );
 
-/// Khoá của các dòng đi ở nguồn và của khách nhận ở đích, để đếm dòng đã có và tìm unique trùng.
+/// The keys of the rows going at the source and of the receiving tenant at the target, to count existing rows
+/// and find duplicate uniques.
 struct Keys {
-    /// Khoá chính (bỏ `tenant_id`) của dòng đi.
+    /// Primary key (without `tenant_id`) of the row going.
     moving: HashSet<Vec<Option<String>>>,
-    /// Khoá chính của dòng đã có ở đích.
+    /// Primary key of the row already at the target.
     existing: HashSet<Vec<Option<String>>>,
-    /// Theo từng unique index: (cột, giá trị → khoá chính ở nguồn, giá trị → khoá chính ở đích).
+    /// Per unique index: (columns, value → primary key at the source, value → primary key at the target).
     unique: Vec<UniqueKeys>,
 }
 
@@ -337,7 +338,7 @@ impl Keys {
         Ok(Keys { moving, existing, unique })
     }
 
-    /// Dòng đi mà khoá chính đã có ở đích.
+    /// Rows going whose primary key already exists at the target.
     fn existing(&self) -> u64 {
         self.moving.intersection(&self.existing).count() as u64
     }

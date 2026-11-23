@@ -1,17 +1,17 @@
-//! Kết nối database: tách kết nối ĐỌC và kết nối GHI.
+//! Database connections: separate READ and WRITE connections.
 //!
-//! Vì sao tách (docs/DECISIONS.md D-009):
+//! Why they are separate (docs/DECISIONS.md D-009):
 //!
-//! - **SQLite là single-writer** — chỉ một lệnh ghi tại một thời điểm. Phía ghi
-//!   vì thế dùng đúng MỘT kết nối: các lệnh ghi xếp hàng trong ứng dụng thay vì
-//!   tranh lock và nhận lỗi "database is locked". Phía đọc dùng nhiều kết nối;
-//!   nhờ WAL, đọc không bị lệnh ghi chặn.
-//! - **Postgres** dùng cùng cách gọi: phía ghi là một pool tới database chính,
-//!   phía đọc là một pool khác, trỏ được sang read replica.
+//! - **SQLite is single-writer**: only one write statement at a time. The write side therefore uses exactly
+//!   ONE connection: writes queue up inside the application instead of fighting over the lock and getting
+//!   "database is locked" errors. The read side uses many connections; thanks to WAL, reads are not blocked
+//!   by writes.
+//! - **Postgres** uses the same calls: the write side is a pool to the main database, the read side is
+//!   another pool that can point at a read replica.
 //!
-//! Kết nối đọc bị cấm ghi trên CẢ HAI database (SQLite mở read-only; Postgres đặt
-//! `default_transaction_read_only`). Lỡ ghi qua [`Database::read`] thì hỏng ngay
-//! ở test, trên database nào cũng vậy — chứ không lặng lẽ chạy được ở một bên.
+//! Read connections are forbidden to write on BOTH databases (SQLite opens read-only; Postgres sets
+//! `default_transaction_read_only`). A write through [`Database::read`] fails immediately in tests, on either
+//! database, instead of silently working on one side.
 
 use std::fmt;
 use std::future::Future;
@@ -27,10 +27,10 @@ use sea_orm::{
 use crate::config::{DatabaseBackend, DatabaseConfig, DatabaseUrl};
 use crate::error::Error;
 
-/// Số lần chạy tối đa của [`Database::write_with_retry`] (lần đầu + 4 lần chạy lại).
+/// Maximum number of runs of [`Database::write_with_retry`] (the first run plus 4 reruns).
 pub const RETRY_ATTEMPTS: u32 = 5;
 
-/// Lỗi khi mở kết nối database.
+/// Error when opening a database connection.
 #[derive(Debug)]
 pub struct DatabaseError(String);
 
@@ -42,9 +42,9 @@ impl fmt::Display for DatabaseError {
 
 impl std::error::Error for DatabaseError {}
 
-/// Hai pool kết nối tới database: một để đọc, một để ghi.
+/// The two connection pools to the database: one for reading, one for writing.
 ///
-/// `Clone` rẻ: bên trong là con trỏ đếm tham chiếu tới pool, không mở thêm kết nối.
+/// `Clone` is cheap: inside is a reference-counted pointer to the pools, no new connection is opened.
 #[derive(Debug, Clone)]
 pub struct Database {
     read: DatabaseConnection,
@@ -53,8 +53,8 @@ pub struct Database {
 }
 
 impl Database {
-    /// Mở hai pool theo `config`. Với SQLite: tạo thư mục và file nếu chưa có, bật
-    /// WAL và foreign key.
+    /// Opens the two pools according to `config`. For SQLite: creates the directory and file if missing,
+    /// enables WAL and foreign keys.
     pub async fn connect(config: &DatabaseConfig) -> Result<Self, DatabaseError> {
         let backend = config.url.backend();
 
@@ -79,8 +79,8 @@ impl Database {
         Ok(Database { read, write, backend })
     }
 
-    /// Database không nối tới đâu: mọi truy vấn lỗi. Chỉ cho test đơn vị của kernel cần một
-    /// [`TenantContext`](crate::tenancy::TenantContext) mà không truy vấn gì.
+    /// A database that connects nowhere: every query fails. Only for kernel unit tests that need a
+    /// [`TenantContext`](crate::tenancy::TenantContext) without running any query.
     #[cfg(test)]
     pub(crate) fn detached() -> Self {
         Database {
@@ -90,11 +90,12 @@ impl Database {
         }
     }
 
-    /// Gọi `observer` với câu SQL của mọi lệnh chạy qua hai pool (kể cả trong transaction), sau
-    /// khi lệnh chạy xong. Dùng để đếm câu SQL mỗi request trong test và bài đo
-    /// (D-20261120-step39-hot-paths); không bật ở máy chủ thật.
+    /// Calls `observer` with the SQL of every statement run through the two pools (including inside a
+    /// transaction), after the statement has run. Used to count SQL statements per request in tests and
+    /// benchmarks (D-20261120-step39-hot-paths); do not enable it on a real server.
     ///
-    /// Phải gọi TRƯỚC khi clone `Database` cho ai khác: mỗi bản clone giữ observer của lúc clone.
+    /// Must be called BEFORE cloning `Database` for anyone else: each clone keeps the observer it had when
+    /// cloned.
     pub fn observe_statements(&mut self, observer: Arc<dyn Fn(&str) + Send + Sync>) {
         // `move` + clone `Arc`: mỗi pool giữ một con trỏ tới cùng một observer.
         let read = Arc::clone(&observer);
@@ -102,28 +103,27 @@ impl Database {
         self.write.set_metric_callback(move |info| observer(&info.statement.sql));
     }
 
-    /// Kết nối cho lệnh ĐỌC. Ghi qua kết nối này bị database từ chối.
+    /// Connection for READ statements. A write through this connection is rejected by the database.
     pub fn read(&self) -> &DatabaseConnection {
         &self.read
     }
 
-    /// Kết nối cho lệnh GHI. Một lệnh ghi đơn lẻ dùng thẳng kết nối này; nhiều
-    /// lệnh phải cùng thành công hoặc cùng thất bại thì dùng
-    /// [`begin_write`](Self::begin_write).
+    /// Connection for WRITE statements. A single write statement uses this connection directly; several
+    /// statements that must succeed or fail together use [`begin_write`](Self::begin_write).
     pub fn write(&self) -> &DatabaseConnection {
         &self.write
     }
 
-    /// Mở một transaction ghi. Gọi `.commit().await` để ghi nhận; transaction bị
-    /// drop mà chưa commit thì tự rollback.
+    /// Opens a write transaction. Call `.commit().await` to record it; a transaction that is
+    /// dropped without a commit rolls back automatically.
     ///
-    /// Giữ transaction NGẮN: không gọi mạng, không hash mật khẩu bên trong — trên
-    /// SQLite mọi lệnh ghi khác đang đứng chờ nó.
+    /// Keep the transaction SHORT: no network calls, no password hashing inside it, because on
+    /// SQLite every other write is waiting for it.
     ///
-    /// Trên SQLite transaction mở bằng `BEGIN IMMEDIATE`: lấy quyền ghi ngay từ
-    /// đầu. Kiểu mặc định (`DEFERRED`) chỉ xin quyền ghi khi gặp lệnh ghi đầu
-    /// tiên, và nếu lúc đó một tiến trình khác vừa ghi thì transaction hỏng giữa
-    /// chừng thay vì chờ.
+    /// On SQLite the transaction opens with `BEGIN IMMEDIATE`: it takes the write permission right
+    /// away. The default mode (`DEFERRED`) asks for write permission only at the first write
+    /// statement, and if another process has just written by then, the transaction fails midway
+    /// instead of waiting.
     pub async fn begin_write(&self) -> Result<DatabaseTransaction, DbErr> {
         let options = TransactionOptions {
             sqlite_transaction_mode: Some(SqliteTransactionMode::Immediate),
@@ -133,23 +133,23 @@ impl Database {
         self.write.begin_with_options(options).await
     }
 
-    /// Chạy lại thao tác ghi `work` khi gặp xung đột TẠM THỜI, tối đa [`RETRY_ATTEMPTS`] lần
-    /// (D-182). `work` tự mở transaction bằng [`begin_write`](Self::begin_write), làm việc và
-    /// commit; lỗi ở bất kỳ bước nào làm transaction tự rollback (bị drop chưa commit).
+    /// Reruns the write operation `work` on a TRANSIENT conflict, at most [`RETRY_ATTEMPTS`] times
+    /// (D-182). `work` opens a transaction itself with [`begin_write`](Self::begin_write), does its work and
+    /// commits; an error at any step makes the transaction roll back (dropped without a commit).
     ///
-    /// Xung đột tạm thời là lỗi mà chạy lại có thể thành công: Postgres `40001` (serialization
-    /// failure) và `40P01` (deadlock — Postgres huỷ một trong hai transaction chờ nhau); SQLite
-    /// bận (`SQLITE_BUSY`, `SQLITE_LOCKED`: tiến trình khác giữ quyền ghi quá
-    /// `AUTOXIDE_DATABASE_WAIT_SECONDS`). Mọi lỗi khác — kể cả lỗi nghiệp vụ `work` tự trả — trả
-    /// về ngay, không chạy lại.
+    /// A transient conflict is an error that a rerun may fix: Postgres `40001` (serialization
+    /// failure) and `40P01` (deadlock: Postgres cancels one of two transactions waiting on each other); SQLite
+    /// busy (`SQLITE_BUSY`, `SQLITE_LOCKED`: another process holds the write permission for longer than
+    /// `AUTOXIDE_DATABASE_WAIT_SECONDS`). Every other error, including a business error `work` returns itself,
+    /// is returned immediately without a rerun.
     ///
-    /// **`work` phải chịu được chạy lại**: mọi thay đổi database của lần trước đã bị rollback,
-    /// nhưng việc ngoài database thì không — đừng gửi mail, gọi mạng hay đổi biến bên ngoài
-    /// trong `work`; đọc lại mọi thứ trong transaction mới thay vì dùng giá trị đọc trước đó.
-    /// Giữa các lần chờ ngắn, tăng dần, có độ lệch ngẫu nhiên để hai bên không đụng nhau nữa.
+    /// **`work` must tolerate being rerun**: every database change of the previous run was rolled back,
+    /// but anything outside the database was not, so do not send mail, call the network or change outside
+    /// variables inside `work`; reread everything in the new transaction instead of using values read earlier.
+    /// The waits between runs are short, growing, and randomly jittered so the two sides stop colliding.
     ///
     /// ```ignore
-    /// // `move` + tham chiếu: mỗi lần gọi closure tạo một future mới mượn cùng dữ liệu.
+    /// // `move` + references: each call of the closure creates a new future borrowing the same data.
     /// let (database, order) = (&self.database, &order);
     /// let paid = database
     ///     .write_with_retry(move || async move {
@@ -183,10 +183,10 @@ impl Database {
         }
     }
 
-    /// Mở một transaction CHỈ ĐỌC thấy database như ở một thời điểm: mọi câu đọc bên
-    /// trong cho cùng một bức ảnh, dù lệnh ghi khác đang chạy (dùng cho backup, chép dữ
-    /// liệu). Postgres: `REPEATABLE READ READ ONLY`; SQLite (WAL): transaction đọc thường
-    /// đã cố định bức ảnh từ câu đọc đầu tiên.
+    /// Opens a READ-ONLY transaction that sees the database as of one point in time: every read inside
+    /// gives the same snapshot, even while other writes run (used for backup and data copy). Postgres:
+    /// `REPEATABLE READ READ ONLY`; SQLite (WAL): a plain read transaction
+    /// already fixes the snapshot from its first read.
     pub async fn begin_snapshot(&self) -> Result<DatabaseTransaction, DbErr> {
         match self.backend {
             DatabaseBackend::Postgres => {
@@ -201,18 +201,18 @@ impl Database {
         }
     }
 
-    /// Database đang dùng là SQLite hay Postgres.
+    /// Whether the database in use is SQLite or Postgres.
     pub fn backend(&self) -> DatabaseBackend {
         self.backend
     }
 
-    /// Kiểm cả hai phía còn trả lời. Dùng cho health check.
+    /// Checks that both sides still answer. Used for health checks.
     pub async fn ping(&self) -> Result<(), DbErr> {
         self.write.ping().await?;
         self.read.ping().await
     }
 
-    /// Đóng cả hai pool, chờ các kết nối đóng hẳn. Gọi khi graceful shutdown.
+    /// Closes both pools and waits for the connections to close fully. Call on graceful shutdown.
     pub async fn close(self) -> Result<(), DbErr> {
         // Đóng phía đọc trước: trên SQLite, kết nối ĐÓNG CUỐI CÙNG là kết nối gộp
         // file WAL vào file chính, và việc đó cần quyền ghi.
@@ -221,8 +221,8 @@ impl Database {
     }
 }
 
-/// Lỗi `error` có phải xung đột tạm thời, chạy lại transaction có thể thành công không (xem
-/// [`Database::write_with_retry`]). Đi dọc chuỗi nguyên nhân tìm lỗi của database.
+/// Whether `error` is a transient conflict where rerunning the transaction may succeed (see
+/// [`Database::write_with_retry`]). Walks the cause chain looking for the database's error.
 pub fn is_transient(error: &(dyn std::error::Error + 'static)) -> bool {
     let mut current = Some(error);
     while let Some(error) = current {
@@ -234,7 +234,7 @@ pub fn is_transient(error: &(dyn std::error::Error + 'static)) -> bool {
     false
 }
 
-/// Mã lỗi database (SQLSTATE của Postgres, mã kết quả của SQLite) trong `error`, nếu có.
+/// The database error code (Postgres SQLSTATE, SQLite result code) in `error`, if any.
 fn database_code(error: &DbErr) -> Option<String> {
     let runtime = match error {
         DbErr::Conn(runtime) | DbErr::Exec(runtime) | DbErr::Query(runtime) => runtime,
@@ -259,8 +259,8 @@ fn is_transient_code(code: &str) -> bool {
     }
 }
 
-/// Thời gian chờ trước lần chạy thứ `attempt + 1`: 10 ms, 20 ms, 40 ms, 80 ms… cộng một độ lệch
-/// ngẫu nhiên tới bằng chính nó, để hai transaction vừa đụng nhau không chạy lại cùng lúc.
+/// Wait before run number `attempt + 1`: 10 ms, 20 ms, 40 ms, 80 ms... plus a random jitter up to the same
+/// amount, so two transactions that just collided do not rerun at the same moment.
 fn retry_delay(attempt: u32) -> Duration {
     let base = 10u64 << attempt.saturating_sub(1).min(6);
     let mut byte = [0u8; 1];
@@ -281,9 +281,9 @@ async fn open(
     })
 }
 
-/// Một kết nối riêng tới database chính, ngoài hai pool: khoá migration trên Postgres
-/// ([`MigrationLock`](crate::migration::MigrationLock)) giữ transaction của nó suốt lúc migrate,
-/// không chiếm kết nối của pool ghi.
+/// A dedicated connection to the main database, outside the two pools: the migration lock on Postgres
+/// ([`MigrationLock`](crate::migration::MigrationLock)) keeps its transaction open for the whole migration
+/// without taking a connection from the write pool.
 pub(crate) async fn dedicated_connection(
     config: &DatabaseConfig,
 ) -> Result<DatabaseConnection, DatabaseError> {
@@ -292,7 +292,7 @@ pub(crate) async fn dedicated_connection(
     open(options, &config.url).await
 }
 
-/// Phần chung của hai phía.
+/// The part shared by both sides.
 fn base_options(config: &DatabaseConfig, url: &DatabaseUrl) -> ConnectOptions {
     let mut options = ConnectOptions::new(url.expose().to_owned());
     options
@@ -303,8 +303,8 @@ fn base_options(config: &DatabaseConfig, url: &DatabaseUrl) -> ConnectOptions {
     options
 }
 
-/// Số dòng mỗi index SQLite đọc khi lập thống kê (`PRAGMA analysis_limit`): mức SQLite khuyến
-/// nghị, đủ cho bộ lập kế hoạch, vài trăm mili giây cả khi bảng hàng triệu dòng.
+/// Number of rows each SQLite index reads when gathering statistics (`PRAGMA analysis_limit`): the level SQLite
+/// recommends, enough for the planner, a few hundred milliseconds even for tables with millions of rows.
 const ANALYSIS_LIMIT: u32 = 400;
 
 fn write_options(config: &DatabaseConfig) -> ConnectOptions {
@@ -400,17 +400,19 @@ mod tests {
     }
 }
 
-/// Câu SQL viết tay kèm tham số — dùng THAY `sea_orm::Statement::from_sql_and_values` (`cargo xtask check` chặn
-/// cách cũ, luật `raw-statement`).
+/// A hand-written SQL statement with parameters: use it INSTEAD OF `sea_orm::Statement::from_sql_and_values`
+/// (`cargo xtask check` rejects the old way, rule `raw-statement`).
 ///
-/// Vì sao: giá trị thời gian của kernel (`Timestamp`, `Date`) đi xuống driver dưới dạng chuỗi kèm tên kiểu
-/// (`timestamptz`, `date`) — SQLite cần đúng chuỗi ta viết. Builder của SeaORM / sea-query tự chèn tên kiểu vào
-/// câu lệnh Postgres (`$1::"timestamptz"`); câu viết tay thì không ai chèn, Postgres nhận chuỗi và từ chối (lỗi
-/// 42804). Hàm này chèn y như builder: mỗi tham số mang tên kiểu thì `$n` thành `$n::"<kiểu>"` (chỉ Postgres;
-/// SQLite giữ nguyên). Đừng tự viết `CAST(? AS timestamptz)`: SQLite đọc kiểu lạ thành số.
+/// Why: the kernel's time values (`Timestamp`, `Date`) reach the driver as a string with a type name
+/// (`timestamptz`, `date`); SQLite needs exactly the string we wrote. The SeaORM / sea-query builder
+/// inserts the type name into Postgres statements itself (`$1::"timestamptz"`); for a hand-written
+/// statement nobody does, and Postgres receives a string and rejects it (error 42804). This function
+/// inserts it exactly as the builder does: each parameter that carries a type name turns `$n` into
+/// `$n::"<type>"` (Postgres only; SQLite is left unchanged). Do not write `CAST(? AS timestamptz)`
+/// yourself: SQLite reads an unknown type as a number.
 ///
-/// Câu viết cho Postgres dùng `$1`, `$2`… như thường lệ; chuỗi `$n` nằm trong literal `'…'` cũng bị đổi, nên
-/// đừng viết `$` trong literal của câu có tham số thời gian.
+/// Write Postgres statements with `$1`, `$2`... as usual; a `$n` string inside a `'…'` literal is rewritten
+/// too, so do not write `$` in a literal of a statement that has time parameters.
 pub fn statement<I>(
     backend: sea_orm::DbBackend,
     sql: impl Into<String>,
@@ -438,7 +440,8 @@ where
     sea_orm::Statement::from_sql_and_values(backend, sql, values)
 }
 
-/// Thêm `::"<type_name>"` sau mỗi `$<number>` đứng riêng (không phải `$1` trong `$10`, chưa có `::` theo sau).
+/// Appends `::"<type_name>"` after each standalone `$<number>` (not the `$1` in `$10`, with no `::` already
+/// following).
 fn cast_placeholder(sql: &str, number: usize, type_name: &str) -> String {
     let placeholder = format!("${number}");
     let mut out = String::with_capacity(sql.len() + 16);

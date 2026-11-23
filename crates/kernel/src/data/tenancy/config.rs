@@ -1,5 +1,5 @@
-//! Cấu hình đa khách, tiền tố `AUTOXIDE_TENANCY_`. Mặc định là chế độ `single`: người cài một cửa
-//! hàng không phải đặt gì.
+//! Multi-tenant configuration, prefix `AUTOXIDE_TENANCY_`. The default is `single` mode: someone installing
+//! one store has nothing to set.
 
 use std::path::PathBuf;
 
@@ -55,17 +55,17 @@ const WORKER_PLACEMENTS: Setting = Setting::new(
 )
 .with_default("all");
 
-/// Placement nào máy chủ này chạy job và event cho.
+/// Which placements this server runs jobs and events for.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum WorkerPlacements {
     #[default]
     All,
-    /// Theo tên placement.
+    /// By placement name.
     Named(Vec<String>),
 }
 
 impl WorkerPlacements {
-    /// Máy chủ này chạy job của placement tên `name` không.
+    /// Whether this server runs the jobs of the placement named `name`.
     pub fn includes(&self, name: &str) -> bool {
         match self {
             WorkerPlacements::All => true,
@@ -74,7 +74,7 @@ impl WorkerPlacements {
     }
 }
 
-/// Cấu hình đa khách.
+/// Multi-tenant configuration.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct TenancyConfig {
@@ -83,7 +83,7 @@ pub struct TenancyConfig {
     pub max_open_databases: usize,
     pub write_connections: u32,
     pub read_connections: u32,
-    /// `None`: `tenants/` cạnh file của `DATABASE_URL`.
+    /// `None`: `tenants/` next to the `DATABASE_URL` file.
     pub sqlite_dir: Option<PathBuf>,
     pub worker_placements: WorkerPlacements,
 }
@@ -103,19 +103,19 @@ impl Default for TenancyConfig {
 }
 
 impl TenancyConfig {
-    /// Cấu hình mặc định ở chế độ `mode` (cho testkit và test, bỏ qua `MULTI_TENANT_READY`).
+    /// Default configuration in mode `mode` (for testkit and tests, ignoring `MULTI_TENANT_READY`).
     pub fn with_mode(mode: TenancyMode) -> Self {
         TenancyConfig { mode, ..TenancyConfig::default() }
     }
 
-    /// Đặt số pool placement tối đa mở cùng lúc.
+    /// Sets the maximum number of placement pools open at once.
     pub fn with_max_open_databases(mut self, max: usize) -> Self {
         self.max_open_databases = max;
         self
     }
 }
 
-/// Đọc cấu hình đa khách (chế độ `multi` cần thêm `AUTOXIDE_SECRET_KEY`, kiểm ở module `kernel`).
+/// Reads the multi-tenant configuration (`multi` mode additionally needs `AUTOXIDE_SECRET_KEY`, checked in the `kernel` module).
 pub(crate) fn read_setting(reader: &mut ConfigReader<'_>) -> Result<TenancyConfig, Invalid> {
     let mode = reader.get_with(&MODE, |raw| match raw.trim() {
         "single" => Ok(TenancyMode::Single),

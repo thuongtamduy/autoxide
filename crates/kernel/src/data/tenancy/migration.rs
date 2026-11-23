@@ -1,26 +1,26 @@
-//! Nâng bảng có sẵn thành bảng cấp khách hàng (đặc tả 33 "Helper nâng bảng", D-253 mục 5):
-//! thêm `tenant_id` NOT NULL **không DEFAULT**, gán dữ liệu cũ cho khách mặc định, đổi khoá unique
-//! / khoá chính cho bắt đầu bằng `tenant_id`.
+//! Upgrading an existing table to a tenant-level table (spec 33 "Table upgrade helper", D-253 item 5): adds
+//! `tenant_id` NOT NULL **with no DEFAULT**, assigns old data to the default tenant, and changes unique keys
+//! / the primary key to start with `tenant_id`.
 //!
-//! Cách làm — **dựng lại bảng**, một đường code cho cả hai database (SQLite không bỏ được
-//! `DEFAULT` hay đổi khoá chính bằng `ALTER TABLE`):
+//! Approach: **rebuild the table**, one code path for both databases (SQLite cannot drop a `DEFAULT` or change
+//! the primary key with `ALTER TABLE`):
 //!
-//! 1. đọc cột (tên, kiểu khai báo nguyên văn, NOT NULL, DEFAULT), khoá chính, khoá ngoại, index của
-//!    bảng cũ từ danh mục của database;
-//! 2. tạo `<bảng>__t` có `tenant_id` + mọi cột cũ, khoá chính mới; khoá ngoại trỏ tới `<cha>__t`
-//!    khi bảng cha cùng đợt;
-//! 3. chép dữ liệu (cha trước con), gán khách mặc định, so số dòng;
-//! 4. xoá bảng cũ (con trước cha);
-//! 5. đổi tên `<bảng>__t` → tên cũ (SQLite ≥ 3.26 tự sửa tham chiếu khoá ngoại; Postgres theo OID),
-//!    Postgres đổi lại tên ràng buộc khoá chính;
-//! 6. tạo các index đã khai.
+//! 1. read the columns (name, declared type verbatim, NOT NULL, DEFAULT), primary key, foreign keys and
+//!    indexes of the old table from the database catalog;
+//! 2. create `<table>__t` with `tenant_id` + every old column and the new primary key; foreign keys point to
+//!    `<parent>__t` when the parent table is in the same batch;
+//! 3. copy the data (parents before children), assign the default tenant, compare row counts;
+//! 4. drop the old tables (children before parents);
+//! 5. rename `<table>__t` → the old name (SQLite ≥ 3.26 fixes foreign key references itself; Postgres follows
+//!    the OID), and Postgres renames the primary key constraint back;
+//! 6. create the declared indexes.
 //!
-//! Helper **từ chối** chạy khi một index cũ không được khai lại (`unique` / `index` /
-//! `sweep_index` cùng tên) hay bỏ hẳn (`drop_index`) — không mất index âm thầm — và khi khoá chính
-//! mới không chứa `tenant_id` (trừ khoá `["id"]`, UUID duy nhất toàn cục). `down` dựng lại bảng
-//! không có `tenant_id` và **từ chối** khi còn dữ liệu của khách khác khách mặc định: down không
-//! được làm mất dữ liệu. Migrator chạy mỗi migration trong một transaction: hỏng giữa chừng thì
-//! không đổi gì.
+//! The helper **refuses** to run when an old index is neither re-declared (`unique` / `index` /
+//! `sweep_index` with the same name) nor explicitly dropped (`drop_index`), so no index is lost silently, and
+//! when the new primary key does not contain `tenant_id` (except the key `["id"]`, a globally unique UUID).
+//! `down` rebuilds the table without `tenant_id` and **refuses** when data of a tenant other than the default
+//! tenant remains: a down migration must not lose data. The migrator runs each migration in a transaction: a
+//! failure midway changes nothing.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -29,7 +29,7 @@ use sea_orm::{ConnectionTrait, DbBackend, QueryResult, Statement};
 use super::DEFAULT_TENANT;
 use crate::migration::prelude::*;
 
-/// Một bảng cần nâng, với khoá và index của nó sau khi nâng.
+/// One table to upgrade, with its keys and indexes after the upgrade.
 #[derive(Debug, Clone)]
 pub struct TenantTable {
     name: String,
@@ -50,7 +50,7 @@ impl TenantTable {
         TenantTable { name: name.into(), primary_key: None, indexes: Vec::new(), drops: Vec::new() }
     }
 
-    /// Index unique (cột đầu phải là `tenant_id`).
+    /// Unique index (the first column must be `tenant_id`).
     pub fn unique<const N: usize>(
         mut self,
         name: impl Into<String>,
@@ -60,7 +60,7 @@ impl TenantTable {
         self
     }
 
-    /// Index thường (cột đầu phải là `tenant_id`).
+    /// Ordinary index (the first column must be `tenant_id`).
     pub fn index<const N: usize>(
         mut self,
         name: impl Into<String>,
@@ -70,8 +70,8 @@ impl TenantTable {
         self
     }
 
-    /// Index phục vụ việc quét cả database (hết hạn, hàng đợi): không bắt đầu bằng `tenant_id`,
-    /// tên kết thúc `_sweep_idx`.
+    /// Index that serves whole-database scans (expiry, queues): does not start with `tenant_id`; the name
+    /// ends with `_sweep_idx`.
     pub fn sweep_index<const N: usize>(
         mut self,
         name: impl Into<String>,
@@ -81,19 +81,19 @@ impl TenantTable {
         self
     }
 
-    /// Khoá chính mới (chỉ khi đổi; phải chứa `tenant_id`).
+    /// New primary key (only when changing it; must contain `tenant_id`).
     pub fn primary_key<const N: usize>(mut self, columns: [&'static str; N]) -> Self {
         self.primary_key = Some(columns.to_vec());
         self
     }
 
-    /// Bỏ hẳn index cũ `name` (phải nói rõ).
+    /// Explicitly drops the old index `name` (must be stated).
     pub fn drop_index(mut self, name: impl Into<String>) -> Self {
         self.drops.push(name.into());
         self
     }
 
-    /// Kiểm khai báo: index thường / unique bắt đầu bằng `tenant_id`, index quét tên `_sweep_idx`.
+    /// Checks the declarations: ordinary / unique indexes start with `tenant_id`, sweep indexes are named `_sweep_idx`.
     fn check(&self) -> Result<(), DbErr> {
         for index in &self.indexes {
             let sweep = index.name.ends_with("_sweep_idx");
@@ -119,12 +119,12 @@ impl TenantTable {
     }
 }
 
-/// Migration `name` thêm index `<bảng>_tenant_list_idx (tenant_id, id)` cho mỗi bảng trong `tables`.
+/// Migration `name` that adds the index `<table>_tenant_list_idx (tenant_id, id)` for each table in `tables`.
 ///
-/// Danh sách của một khách sắp theo `id` (`fetch_page` với `.scoped(&tenant)`) cần index này: thiếu
-/// nó, SQLite đọc mọi dòng của khách rồi sắp xếp tạm, Postgres quét khoá chính bỏ qua dòng của khách
-/// khác — chậm dần theo cỡ bảng (đo ở bước 33 C, D-302). Bảng có danh sách như vậy mà chưa có index
-/// nào bắt đầu bằng `(tenant_id, id)` thì thêm bằng helper này.
+/// A tenant's list sorted by `id` (`fetch_page` with `.scoped(&tenant)`) needs this index: without it, SQLite
+/// reads every row of the tenant and sorts them in a temporary structure, and Postgres scans the primary key
+/// skipping other tenants' rows, getting slower as the table grows (measured in step 33 C, D-302). A table
+/// with such a list and no index starting with `(tenant_id, id)` yet gets it through this helper.
 pub fn list_index(name: &'static str, tables: Vec<&'static str>) -> Box<dyn MigrationTrait> {
     Box::new(ListIndex { name, tables })
 }
@@ -174,7 +174,7 @@ impl MigrationTrait for ListIndex {
     }
 }
 
-/// Migration `name` nâng các bảng `tables` (cha trước con khi có khoá ngoại giữa chúng).
+/// Migration `name` that upgrades the tables `tables` (parents before children when foreign keys link them).
 pub fn adopt(name: &'static str, tables: Vec<TenantTable>) -> Box<dyn MigrationTrait> {
     Box::new(Adopt { name, tables })
 }
@@ -331,7 +331,7 @@ fn custom(message: String) -> DbErr {
     DbErr::Custom(format!("tenancy: {message}"))
 }
 
-/// Kiểu cột UUID như `schema::uuid` tạo trên mỗi database.
+/// UUID column type as `schema::uuid` creates it on each database.
 fn uuid_type(backend: DbBackend) -> &'static str {
     match backend {
         DbBackend::Postgres => "uuid",
@@ -353,7 +353,7 @@ fn placeholder(backend: DbBackend, position: usize) -> String {
 #[derive(Debug, Clone)]
 struct Column {
     name: String,
-    /// Kiểu khai báo nguyên văn (vd `varchar(64)`, `timestamp with time zone`).
+    /// Declared type verbatim (e.g. `varchar(64)`, `timestamp with time zone`).
     kind: String,
     not_null: bool,
     default: Option<String>,
@@ -364,7 +364,7 @@ struct ForeignKey {
     columns: Vec<String>,
     table: String,
     referenced: Vec<String>,
-    /// `ON DELETE …` / `ON UPDATE …` (đã viết sẵn), có thể rỗng.
+    /// `ON DELETE …` / `ON UPDATE …` (already written out), may be empty.
     actions: String,
 }
 
@@ -373,7 +373,7 @@ struct Index {
     name: String,
     columns: Vec<String>,
     unique: bool,
-    /// Ràng buộc unique viết liền trong `CREATE TABLE` (không phải `CREATE INDEX`).
+    /// Unique constraint written inline in `CREATE TABLE` (not a `CREATE INDEX`).
     inline: bool,
 }
 
@@ -388,7 +388,7 @@ struct Described {
     columns: Vec<Column>,
     primary_key: Vec<String>,
     foreign_keys: Vec<ForeignKey>,
-    /// Index ngoài khoá chính.
+    /// Indexes other than the primary key.
     indexes: Vec<Index>,
 }
 
@@ -435,8 +435,8 @@ async fn count<C: ConnectionTrait>(
     row.ok_or_else(|| custom("COUNT returned no row".to_owned()))?.try_get_by_index::<i64>(0)
 }
 
-/// Tên bảng / index chỉ gồm chữ, số, `_` (luật đặt tên của module): đặt thẳng vào câu đọc danh
-/// mục an toàn.
+/// Table / index names contain only letters, digits and `_` (the module naming rule), so they can be placed
+/// directly into a catalog read statement safely.
 fn checked(name: &str) -> Result<&str, DbErr> {
     if !name.is_empty() && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
         Ok(name)
@@ -445,7 +445,7 @@ fn checked(name: &str) -> Result<&str, DbErr> {
     }
 }
 
-/// Đọc cột, khoá chính, khoá ngoại, index của `table` từ danh mục của database.
+/// Reads the columns, primary key, foreign keys and indexes of `table` from the database catalog.
 async fn describe<C: ConnectionTrait>(
     connection: &C,
     backend: DbBackend,
@@ -667,8 +667,9 @@ async fn describe_postgres<C: ConnectionTrait>(
     Ok(Described { columns, primary_key, foreign_keys, indexes })
 }
 
-/// Bảng ngoài đợt có khoá ngoại trỏ vào bảng trong đợt thì từ chối: xoá bảng cha cũ sẽ xoá dây
-/// chuyền (hay hỏng) dữ liệu của bảng con. Bảng cha và con phải nâng cùng một đợt.
+/// A table outside the batch with a foreign key pointing into a table in the batch is refused: dropping the
+/// old parent table would cascade-delete (or break) the child table's data. Parent and child must be upgraded
+/// in the same batch.
 async fn refuse_outside_references<C: ConnectionTrait>(
     connection: &C,
     backend: DbBackend,
@@ -705,7 +706,7 @@ async fn refuse_outside_references<C: ConnectionTrait>(
     }
 }
 
-/// Dựng lại các bảng theo `plans` (cha trước con trong danh sách).
+/// Rebuilds the tables according to `plans` (parents before children in the list).
 async fn rebuild<C: ConnectionTrait>(
     connection: &C,
     backend: DbBackend,

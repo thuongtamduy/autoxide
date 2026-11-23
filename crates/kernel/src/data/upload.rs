@@ -1,19 +1,20 @@
-//! Tải file lớn thẳng lên nơi lưu (bước 40 P4, D-379), dùng chung cho mọi module nhận file
+//! Uploading large files straight to the store (step 40 P4, D-379), shared by every module that accepts files
 //! (`files`, `media`).
 //!
-//! 1. Module ghi một **lượt tải lên** vào bảng `<module>_uploads` ([`uploads_migration`]) — cỡ, loại,
-//!    SHA-256 client khai, khoá lưu, hạn — rồi xin nơi lưu một link ký sẵn
-//!    ([`Storage::presign_upload`](crate::storage::Storage::presign_upload)); nơi lưu là ổ đĩa thì
-//!    không có link, client tải qua máy chủ như cũ.
-//! 2. Client gửi file thẳng tới link (không qua máy chủ).
-//! 3. Client gọi lệnh xác nhận: module đọc lại object ([`inspect`]: cỡ, SHA-256, phần đầu để nhận
-//!    loại thật), NGOÀI transaction; đạt thì trong một transaction khoá dòng lượt tải
-//!    ([`DirectUploads::lock`]), tạo bản ghi của mình và đánh dấu xong ([`DirectUploads::complete`]) —
-//!    hai lệnh xác nhận đồng thời chỉ tạo một bản ghi.
-//! 4. Lượt không bao giờ được xác nhận: job dọn của module xoá object và dòng
+//! 1. The module records an **upload attempt** in the `<module>_uploads` table ([`uploads_migration`]):
+//!    size, type, the SHA-256 the client declared, storage key, expiry; then asks the store for a presigned
+//!    link ([`Storage::presign_upload`](crate::storage::Storage::presign_upload)); if the store is a disk
+//!    there is no link, and the client uploads through the server as before.
+//! 2. The client sends the file straight to the link (not through the server).
+//! 3. The client calls the confirm command: the module rereads the object ([`inspect`]: size, SHA-256, the
+//!    first bytes to detect the real type), OUTSIDE a transaction; if it passes then, in one transaction,
+//!    it locks the upload row ([`DirectUploads::lock`]), creates its own record and marks it done
+//!    ([`DirectUploads::complete`]); two concurrent confirm commands create only one record.
+//! 4. An attempt that is never confirmed: the module's cleanup job deletes the object and the row
 //!    ([`DirectUploads::expired`]).
 //!
-//! ID của lượt cũng là ID của bản ghi sẽ tạo: khoá lưu đặt đúng chỗ cuối cùng, không phải chép.
+//! The attempt's ID is also the ID of the record to be created: the storage key is placed right at its final
+//! location, with no copying.
 
 use crate::time::Timestamp;
 use std::sync::Arc;
@@ -32,15 +33,15 @@ use crate::error::Error;
 use crate::storage::Storage;
 use crate::tenancy::{TenantContext, TenantId};
 
-/// Cỡ lớn nhất của một lần `PUT` lên S3 (5 GiB); lớn hơn cần upload nhiều phần (ngoài phạm vi).
+/// The largest size of one `PUT` to S3 (5 GiB); larger needs a multipart upload (out of scope).
 pub const MAX_SINGLE_PUT_BYTES: u64 = 5 * 1024 * 1024 * 1024;
 
-/// Trạng thái của một lượt tải lên.
+/// State of an upload attempt.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UploadStatus {
-    /// Đã cấp link, chưa xác nhận.
+    /// A link was issued, not yet confirmed.
     Pending,
-    /// Đã xác nhận: bản ghi mang cùng ID đã được tạo.
+    /// Confirmed: the record with the same ID has been created.
     Completed,
 }
 
@@ -53,7 +54,7 @@ impl UploadStatus {
     }
 }
 
-/// Một lượt tải lên đã ghi.
+/// An upload attempt that has been recorded.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct DirectUpload {
@@ -61,14 +62,14 @@ pub struct DirectUpload {
     pub tenant_id: TenantId,
     pub org_id: Option<Uuid>,
     pub owner_id: Uuid,
-    /// Khoá ở nơi lưu của khách (chưa có tiền tố khách).
+    /// Key in the tenant's store (without the tenant prefix yet).
     pub storage_key: String,
     pub name: String,
     pub content_type: String,
     pub size: u64,
-    /// SHA-256 khai, 64 chữ số hex thường.
+    /// Declared SHA-256, 64 lowercase hex digits.
     pub sha256: String,
-    /// Dữ liệu riêng của module (vd thư mục, nhãn), JSON.
+    /// The module's own data (e.g. folder, label), JSON.
     pub details: serde_json::Value,
     pub status: UploadStatus,
     pub created_at: Timestamp,
@@ -76,27 +77,27 @@ pub struct DirectUpload {
     pub completed_at: Option<Timestamp>,
 }
 
-/// Lượt tải lên mới.
+/// A new upload attempt.
 #[derive(Debug, Clone)]
 pub struct NewDirectUpload {
-    /// ID của lượt, cũng là ID của bản ghi sẽ tạo.
+    /// The attempt's ID, also the ID of the record to be created.
     pub id: Uuid,
     pub owner_id: Uuid,
-    /// Nút tổ chức sở hữu bản ghi sẽ tạo.
+    /// The organization node that owns the record to be created.
     pub org_id: Option<Uuid>,
-    /// Khoá ở nơi lưu của khách.
+    /// Key in the tenant's store.
     pub storage_key: String,
     pub name: String,
     pub content_type: String,
     pub size: u64,
-    /// SHA-256 khai, 64 chữ số hex thường.
+    /// Declared SHA-256, 64 lowercase hex digits.
     pub sha256: String,
-    /// Dữ liệu riêng của module, đọc lại lúc xác nhận.
+    /// The module's own data, reread at confirmation.
     pub details: serde_json::Value,
     pub expires_at: Timestamp,
 }
 
-/// Bảng lượt tải lên của một module. Lấy bằng [`DirectUploads::new`]; clone rẻ.
+/// The upload-attempts table of a module. Obtain it with [`DirectUploads::new`]; cheap to clone.
 #[derive(Debug, Clone)]
 pub struct DirectUploads {
     table: Arc<str>,
@@ -120,12 +121,12 @@ const COLUMNS: [&str; 14] = [
 ];
 
 impl DirectUploads {
-    /// Bảng `<module>_uploads` của module `module` (tạo bằng [`uploads_migration`]).
+    /// The `<module>_uploads` table of module `module` (created with [`uploads_migration`]).
     pub fn new(module: &str) -> Self {
         DirectUploads { table: table_name(module).into() }
     }
 
-    /// Ghi lượt mới cho khách `tenant`.
+    /// Records a new attempt for tenant `tenant`.
     pub async fn insert<C: ConnectionTrait>(
         &self,
         connection: &C,
@@ -176,7 +177,7 @@ impl DirectUploads {
         })
     }
 
-    /// Lượt `id` của khách `tenant`, nếu có.
+    /// Attempt `id` of tenant `tenant`, if it exists.
     pub async fn find<C: ConnectionTrait>(
         &self,
         connection: &C,
@@ -187,9 +188,9 @@ impl DirectUploads {
         connection.query_one(&select).await?.map(|row| parse(&row)).transpose()
     }
 
-    /// Như [`find`](Self::find), và khoá dòng tới hết `transaction` (`FOR UPDATE` trên Postgres;
-    /// SQLite vốn chỉ một transaction ghi một lúc): lệnh xác nhận thứ hai chờ lệnh đầu xong rồi thấy
-    /// lượt đã `completed`.
+    /// Like [`find`](Self::find), and locks the row until the end of `transaction` (`FOR UPDATE` on
+    /// Postgres; SQLite has only one write transaction at a time anyway): the second confirm command waits
+    /// for the first to finish and then sees the attempt as `completed`.
     pub async fn lock<C: ConnectionTrait>(
         &self,
         transaction: &C,
@@ -201,8 +202,8 @@ impl DirectUploads {
         transaction.query_one(&select).await?.map(|row| parse(&row)).transpose()
     }
 
-    /// Đánh dấu lượt `id` đã xác nhận (gọi trong transaction tạo bản ghi, sau [`lock`](Self::lock)).
-    /// `false`: lượt không còn ở trạng thái `pending`.
+    /// Marks attempt `id` as confirmed (call it in the transaction that creates the record, after
+    /// [`lock`](Self::lock)). `false`: the attempt is no longer in the `pending` state.
     pub async fn complete<C: ConnectionTrait>(
         &self,
         transaction: &C,
@@ -221,7 +222,7 @@ impl DirectUploads {
         Ok(transaction.execute(&update).await?.rows_affected() == 1)
     }
 
-    /// Xoá dòng của lượt `id` (khách `tenant_id`).
+    /// Deletes the row of attempt `id` (tenant `tenant_id`).
     pub async fn delete<C: ConnectionTrait>(
         &self,
         connection: &C,
@@ -237,8 +238,8 @@ impl DirectUploads {
         Ok(())
     }
 
-    /// Tối đa `limit` lượt (mọi khách trên database này) còn `pending` mà hết hạn trước `before`,
-    /// cũ trước — cho job dọn.
+    /// Up to `limit` attempts (of every tenant on this database) still `pending` that expired before `before`,
+    /// oldest first, for the cleanup job.
     pub async fn expired<C: ConnectionTrait>(
         &self,
         connection: &C,
@@ -257,8 +258,8 @@ impl DirectUploads {
         rows.iter().map(parse).collect()
     }
 
-    /// Xoá dòng của các lượt đã xác nhận trước `before` (bản ghi đã có, dòng chỉ còn để lệnh xác
-    /// nhận gọi lại trả cùng kết quả). Trả số dòng đã xoá.
+    /// Deletes the rows of attempts confirmed before `before` (the record exists; the row remained only so
+    /// a confirm command called again returns the same result). Returns the number of rows deleted.
     pub async fn forget_completed<C: ConnectionTrait>(
         &self,
         connection: &C,
@@ -330,7 +331,7 @@ pub struct UploadLink {
 }
 
 impl UploadLink {
-    /// Link của lượt `id`.
+    /// The link of attempt `id`.
     pub fn new(id: Uuid, link: crate::storage::PresignedUpload) -> Self {
         UploadLink {
             id,
@@ -342,21 +343,21 @@ impl UploadLink {
     }
 }
 
-/// Object đã đọc lại để kiểm.
+/// An object reread for checking.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct Inspected {
-    /// Số byte thật.
+    /// The real number of bytes.
     pub size: u64,
-    /// SHA-256 của nội dung, 64 chữ số hex thường.
+    /// SHA-256 of the content, 64 lowercase hex digits.
     pub sha256: String,
-    /// Tối đa `head_bytes` byte đầu (nhận loại thật bằng magic bytes).
+    /// Up to the first `head_bytes` bytes (to detect the real type by magic bytes).
     pub head: Vec<u8>,
 }
 
-/// Đọc hết object ở `key` để biết cỡ và SHA-256 thật (không tin nơi lưu: dịch vụ tương thích S3
-/// không phải cái nào cũng kiểm checksum đã ký), giữ `head_bytes` byte đầu. `None`: chưa có object.
-/// Không gọi trong transaction ghi (đây là gọi mạng).
+/// Reads the whole object at `key` to learn its real size and SHA-256 (the store is not trusted: not every
+/// S3-compatible service checks the signed checksum), keeping the first `head_bytes` bytes. `None`: no
+/// object yet. Do not call it inside a write transaction (this is a network call).
 pub async fn inspect(
     storage: &dyn Storage,
     key: &str,
@@ -379,7 +380,7 @@ pub async fn inspect(
     Ok(Some(Inspected { size, sha256: hex(&hasher.finalize()), head }))
 }
 
-/// 64 chữ số hex (hoa hay thường) thành 32 byte; sai dạng → `None`.
+/// 64 hex digits (upper or lower case) into 32 bytes; a wrong form → `None`.
 pub fn parse_sha256(text: &str) -> Option<[u8; 32]> {
     let text = text.trim();
     if text.len() != 64 {
@@ -393,18 +394,18 @@ pub fn parse_sha256(text: &str) -> Option<[u8; 32]> {
     Some(bytes)
 }
 
-/// Byte thành chữ số hex thường.
+/// Bytes to lowercase hex digits.
 pub fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
-/// Tên bảng lượt tải lên của module `module`.
+/// Name of the upload-attempts table of module `module`.
 fn table_name(module: &str) -> String {
     format!("{module}_uploads")
 }
 
-/// Migration tạo bảng `<module>_uploads`. Module nhận tải thẳng thêm nó vào danh sách migration của
-/// mình, như [`jobs_migration`](crate::job::jobs_migration).
+/// Migration that creates the `<module>_uploads` table. A module that accepts direct uploads adds it to its
+/// migration list, like [`jobs_migration`](crate::job::jobs_migration).
 pub fn uploads_migration(name: &'static str, module: &'static str) -> Box<dyn MigrationTrait> {
     Box::new(UploadsMigration { name, module })
 }

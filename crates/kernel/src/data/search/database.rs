@@ -1,15 +1,16 @@
-//! [`DatabaseSearch`]: bộ máy tìm mặc định, chỉ mục nằm trong chính database của khách (bước 40 P7).
+//! [`DatabaseSearch`]: the default search engine, with the index inside the tenant's own database (step 40 P7).
 //!
-//! - `kernel_search_docs`: một dòng mỗi tài liệu, khoá `(tenant_id, kind, id)`. Bốn cột khoá tìm như
-//!   ô tìm của module (D-202): `primary_*` là trường trọng số cao nhất ("tiêu đề"), `*_key` là mọi
-//!   trường có trọng số; `*_exact` / `exact_key` dạng [`exact_key`](crate::search::exact_key) (đúng
-//!   dấu), `*_fold` / `fold_key` dạng [`fold`](crate::search::fold) (không dấu).
-//! - `kernel_search_filters`: một dòng mỗi `(tài liệu, bộ lọc)`, index `(tenant_id, kind, name, value)`
-//!   — bộ lọc bất kỳ module khai đều là cột có index, không cần đổi schema theo module.
+//! - `kernel_search_docs`: one row per document, keyed `(tenant_id, kind, id)`. Four search key columns like
+//!   the module search box (D-202): `primary_*` is the highest-weight field (the "title"), `*_key` is every
+//!   weighted field; `*_exact` / `exact_key` use the [`exact_key`](crate::search::exact_key) form (exact
+//!   diacritics), `*_fold` / `fold_key` use the [`fold`](crate::search::fold) form (no diacritics).
+//! - `kernel_search_filters`: one row per `(document, filter)`, indexed `(tenant_id, kind, name, value)`;
+//!   any filter a module declares is an indexed column, with no per-module schema change.
 //!
-//! Xếp hạng bốn tầng (`fetch_page_tiers`): tiêu đề đúng dấu, nội dung đúng dấu, tiêu đề không dấu,
-//! nội dung không dấu; trong mỗi tầng theo ID. "Chứa" là `LIKE` như mọi ô tìm: chạy như nhau trên
-//! SQLite và Postgres, quét các dòng còn lại sau bộ lọc khách / loại / phạm vi.
+//! Four-tier ranking (`fetch_page_tiers`): title with exact diacritics, content with exact diacritics, title
+//! without diacritics, content without diacritics; within each tier by ID. "Contains" is `LIKE` as in every
+//! search box: it behaves the same on SQLite and Postgres and scans the rows left after the tenant / kind /
+//! scope filters.
 
 use crate::time::Timestamp;
 use sea_orm::sea_query::{Expr, ExprTrait as _, Query};
@@ -44,7 +45,7 @@ pub(crate) mod doc {
         pub primary_fold: String,
         pub exact_key: String,
         pub fold_key: String,
-        /// JSON: trường gốc (tên → giá trị), trả lại trong kết quả.
+        /// JSON: the source fields (name → value), returned in the result.
         pub fields: String,
         pub updated_at: Timestamp,
     }
@@ -85,10 +86,10 @@ pub(crate) mod filter {
     }
 }
 
-/// Giá trị lọc dài nhất (cột có index).
+/// Longest filter value (the column is indexed).
 const MAX_FILTER_VALUE: usize = 200;
 
-/// Bộ máy tìm trong database (mặc định, `AUTOXIDE_SEARCH_BACKEND=database`).
+/// Search engine in the database (default, `AUTOXIDE_SEARCH_BACKEND=database`).
 #[derive(Clone)]
 pub struct DatabaseSearch {
     kinds: Kinds,
@@ -100,7 +101,7 @@ impl DatabaseSearch {
     }
 }
 
-/// Giá trị lọc dạng chuỗi: chuỗi giữ nguyên, số / bool theo JSON.
+/// Filter value as a string: strings stay as is, numbers / bools follow JSON.
 pub(crate) fn filter_value(value: &serde_json::Value) -> Option<String> {
     let text = match value {
         serde_json::Value::String(text) => text.clone(),
@@ -292,7 +293,7 @@ impl SearchBackend for DatabaseSearch {
     }
 }
 
-/// Migration tạo `kernel_search_docs` và `kernel_search_filters` (cấp khách hàng, mọi database dữ liệu).
+/// Migration that creates `kernel_search_docs` and `kernel_search_filters` (tenant level, every data database).
 pub(crate) struct CreateSearchDocs;
 
 impl MigrationName for CreateSearchDocs {

@@ -1,21 +1,21 @@
-//! Migration của các bảng phụ trợ kernel định nghĩa mà module sở hữu, gộp thành MỘT lời gọi
+//! Migrations for the helper tables that the kernel defines and a module owns, bundled into ONE call
 //! (D-20261122-module-helpers).
 //!
-//! Bảng event (outbox) và bảng job lớn lên qua nhiều bước của lộ trình, nên một module có sẵn liệt
-//! kê từng bước: `outbox_migration`, `outbox_actor_migration`, `jobs_migration`,
-//! `tenancy::migration::adopt(…)`, `outbox_access_migration`. Module MỚI không có lịch sử đó; nó
-//! gọi [`helper_tables`] và nhận đúng chuỗi ấy với tên cố định. Module có sẵn giữ nguyên danh sách
-//! của mình — migration đã áp dụng thì không đổi tên.
+//! The event (outbox) table and the job table grew over several roadmap steps, so an existing module lists
+//! each step: `outbox_migration`, `outbox_actor_migration`, `jobs_migration`,
+//! `tenancy::migration::adopt(…)`, `outbox_access_migration`. A NEW module has no such history; it calls
+//! [`helper_tables`] and gets exactly that chain under fixed names. Existing modules keep their own list;
+//! an applied migration is never renamed.
 
 use super::MigrationTrait;
 
-/// Một bảng phụ trợ của kernel trong module.
+/// A kernel helper table inside a module.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum HelperTable {
     /// `<module>_events`: transactional outbox sau `Outbox::record` (`StartContext::outbox`).
     Events,
-    /// `<module>_jobs`: hàng đợi job sau `StartContext::jobs`, `Module::jobs` và
+    /// `<module>_jobs`: the job queue behind `StartContext::jobs`, `Module::jobs` and
     /// `Module::schedules`.
     Jobs,
 }

@@ -1,6 +1,6 @@
-//! Các bước của một lượt tách / gộp. Mỗi bước chạy lại được; không có transaction xuyên hai
-//! database — chép là MỘT transaction ở đích, chuyển là một transaction ở database điều khiển, dọn
-//! là một transaction ở nguồn và chỉ xoá dòng đã có ở đích.
+//! The steps of one split / merge run. Each step is re-runnable; there is no transaction across the two
+//! databases: copying is ONE transaction at the target, switching is one transaction at the control database,
+//! and cleaning is one transaction at the source and deletes only rows that already exist at the target.
 
 use std::collections::HashSet;
 
@@ -26,7 +26,7 @@ fn transfer(error: TransferError) -> Error {
     Error::internal(error.to_string())
 }
 
-/// Nội dung của event `kernel.relocation_*`.
+/// Content of the `kernel.relocation_*` events.
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct RelocationEvent {
     relocation_id: Uuid,
@@ -34,7 +34,7 @@ pub(crate) struct RelocationEvent {
     source_tenant_id: Uuid,
     target_tenant_id: Option<Uuid>,
     org_id: Option<Uuid>,
-    /// Khách gốc của cây chứa dữ liệu trước và sau (dời kho báo cáo gộp).
+    /// Root tenant of the tree that holds the data before and after (moving the combined reporting store).
     from_root: Option<Uuid>,
     to_root: Option<Uuid>,
 }
@@ -81,7 +81,7 @@ impl Event for Failed {
 }
 
 impl TenantRelocations {
-    /// Đặt `status` cho khách `ids` khi khách đang ở một trong `from`.
+    /// Sets `status` for tenants `ids` when the tenant is in one of `from`.
     async fn set_status<C: sea_orm::ConnectionTrait>(
         &self,
         connection: &C,
@@ -102,7 +102,7 @@ impl TenantRelocations {
         Ok(updated.rows_affected)
     }
 
-    /// Khách bị khoá trong lượt: khách nguồn, và khách nhận khi gộp.
+    /// Tenants locked during the run: the source tenant, and the receiving tenant on a merge.
     fn frozen_tenants(row: &Model, kind: RelocationKind) -> Vec<Uuid> {
         let mut ids = vec![row.source_tenant_id];
         if kind == RelocationKind::Merge {
@@ -111,7 +111,7 @@ impl TenantRelocations {
         ids
     }
 
-    /// Ghi event `event` cho khách `tenant` vào database của nó (ngoài transaction khác).
+    /// Records the event `event` for tenant `tenant` in its own database (outside other transactions).
     async fn record<E: Event>(
         &self,
         tenant: Uuid,
@@ -124,9 +124,9 @@ impl TenantRelocations {
         self.outbox.record(context.database().write(), &context, actor, subject, event).await
     }
 
-    /// `planned` → `frozen`: khách thành `maintenance` (request nhận 503, worker vẫn chạy), chờ
-    /// outbox / job đến hạn của khách chạy hết, rồi `moving` (worker và bộ phát dừng việc của khách),
-    /// chờ máy chủ khác thấy và việc đang chạy xong.
+    /// `planned` → `frozen`: the tenant becomes `maintenance` (requests get 503, workers keep running), waits
+    /// for the tenant's due outbox / jobs to finish, then `moving` (workers and the dispatcher stop the
+    /// tenant's work), then waits for other servers to notice and for work in progress to finish.
     pub(super) async fn freeze(&self, row: &Model, runner: &str) -> Result<(), Error> {
         let spec = Self::spec_of(row)?;
         let mut options = spec.options.clone();
@@ -191,7 +191,7 @@ impl TenantRelocations {
         self.set_state(self.control().write(), row, runner, store::FROZEN, Ok).await
     }
 
-    /// Dừng lượt trước khi đổi gì: khách phục vụ lại, lượt `failed`.
+    /// Stops the run before anything changes: the tenant is served again, the run is `failed`.
     async fn fail(
         &self,
         row: &Model,
@@ -222,7 +222,7 @@ impl TenantRelocations {
         Ok(())
     }
 
-    /// Kiểm lại, bảng và ngữ cảnh của một lượt đã lưu.
+    /// Re-checks, tables and context of a saved run.
     async fn reopen(
         &self,
         row: &Model,
@@ -235,8 +235,9 @@ impl TenantRelocations {
         Ok((prepared, tables, resolved, context))
     }
 
-    /// `frozen` → `copied`: (tách) tạo khách mới `provisioning`; chép trong MỘT transaction ở đích
-    /// mọi bảng theo chính sách, giữ khoá chính, đổi `tenant_id`; rồi bảng `Custom`.
+    /// `frozen` → `copied`: (split) creates the new tenant as `provisioning`; copies in ONE transaction at
+    /// the target every table according to policy, keeping primary keys and changing `tenant_id`; then the
+    /// `Custom` tables.
     pub(super) async fn copy(&self, row: &Model, runner: &str) -> Result<(), Error> {
         let (mut prepared, tables, resolved, context) = self.reopen(row).await?;
         if !prepared.blockers.is_empty() {
@@ -314,7 +315,7 @@ impl TenantRelocations {
         .await
     }
 
-    /// Khách mới khi tách (`provisioning`), nếu chưa có.
+    /// The new tenant on a split (`provisioning`), if not yet present.
     async fn create_target(&self, prepared: &Prepared, options: &Options) -> Result<(), Error> {
         if tenant::Entity::find_by_id(prepared.target_id)
             .one(self.control().write())
@@ -341,7 +342,7 @@ impl TenantRelocations {
         Ok(())
     }
 
-    /// `copied` → `verified`: mọi dòng đi / được chép (theo khoá chính) đã có ở đích.
+    /// `copied` → `verified`: every row that goes / is copied (by primary key) already exists at the target.
     pub(super) async fn verify(&self, row: &Model, runner: &str) -> Result<(), Error> {
         let (_, tables, resolved, context) = self.reopen(row).await?;
         for table in &resolved {
@@ -381,14 +382,15 @@ impl TenantRelocations {
         self.set_state(self.control().write(), row, runner, store::VERIFIED, Ok).await
     }
 
-    /// Khách gốc của cây chứa khách `tenant`.
+    /// The root tenant of the tree that contains tenant `tenant`.
     async fn root(&self, tenant: Uuid) -> Result<Uuid, Error> {
         let above = self.registry.tenant_ancestors(TenantId::from_uuid(tenant)).await?;
         Ok(above.last().map_or(tenant, TenantId::as_uuid))
     }
 
-    /// `verified` → `switched`: một transaction ở database điều khiển — khách mới hoạt động / khách
-    /// bị gộp thành `merged`, tên miền gắn nút trong nhánh và khách con đi theo; khách nguồn mở lại.
+    /// `verified` → `switched`: one transaction at the control database: the new tenant becomes active / the
+    /// merged tenant becomes `merged`, domains bound to a node in the branch and child tenants follow; the
+    /// source tenant reopens.
     pub(super) async fn switch(&self, row: &Model, runner: &str) -> Result<(), Error> {
         let (prepared, _, _, context) = self.reopen(row).await?;
         let mut options = Options::parse(&row.options)?;
@@ -471,7 +473,7 @@ impl TenantRelocations {
         Ok(())
     }
 
-    /// Tên miền của khách `from` (chỉ các tên miền gắn nút trong `branch`, nếu có) sang khách `to`.
+    /// Domains of tenant `from` (only the domains bound to a node in `branch`, if given) to tenant `to`.
     async fn move_domains<C: sea_orm::ConnectionTrait>(
         &self,
         connection: &C,
@@ -497,8 +499,9 @@ impl TenantRelocations {
         Ok(found.into_iter().map(|row| row.domain).collect())
     }
 
-    /// `switched` → `cleaned`: xoá ở nguồn dòng đã đi (bảng tham chiếu trước, bảng `Custom` sau
-    /// cùng), rồi báo `kernel.relocation_finished` ở khách nhận (dời kho báo cáo…).
+    /// `switched` → `cleaned`: deletes at the source the rows that have gone (referenced tables first,
+    /// `Custom` tables last), then announces `kernel.relocation_finished` at the receiving tenant (moving the
+    /// reporting store…).
     pub(super) async fn clean(&self, row: &Model, runner: &str) -> Result<(), Error> {
         let (prepared, tables, resolved, context) = self.reopen(row).await?;
         let transaction = context.source().begin_write().await?;
@@ -534,8 +537,8 @@ impl TenantRelocations {
 }
 
 impl TenantRelocations {
-    /// Nơi lưu file của placement `placement`: nơi lưu riêng của nó, hay nơi lưu chung; `None` khi
-    /// bản cài không có nơi lưu file (không module nào cung cấp).
+    /// File storage of placement `placement`: its own storage, or the shared storage; `None` when the
+    /// installation has no file storage (no module provides one).
     async fn store_of(
         &self,
         placement: Uuid,
@@ -544,8 +547,8 @@ impl TenantRelocations {
         Ok(own.or_else(|| self.registry.shared_storage()))
     }
 
-    /// File của thứ đi theo: khoá `tenants/<nguồn>/<module>/<id>/…` (D-259) mà `<id>` là một dòng
-    /// đi (tách) — hay mọi file của khách (gộp) — kèm khoá mới dưới `tenants/<đích>/`.
+    /// Files of what travels: keys `tenants/<source>/<module>/<id>/…` (D-259) where `<id>` is a row that goes
+    /// (split), or every file of the tenant (merge), together with the new key under `tenants/<target>/`.
     async fn blobs(
         &self,
         context: &RelocationContext,
@@ -565,7 +568,7 @@ impl TenantRelocations {
         Ok(found)
     }
 
-    /// Chép file của thứ đi theo sang nơi lưu của đích (đè file cùng khoá). Trả số file.
+    /// Copies the files of what travels to the target's storage (overwriting files with the same key). Returns the file count.
     async fn copy_blobs(
         &self,
         context: &RelocationContext,
@@ -587,7 +590,7 @@ impl TenantRelocations {
         Ok(blobs.len() as u64)
     }
 
-    /// Xoá ở nguồn file đã chép sang đích (chỉ file mà đích đã có).
+    /// Deletes at the source the files already copied to the target (only files the target already has).
     async fn clean_blobs(
         &self,
         context: &RelocationContext,
@@ -611,12 +614,12 @@ impl TenantRelocations {
     }
 }
 
-/// Placement của khách nhận (tách: placement đã chọn; gộp: placement của khách nhận).
+/// Placement of the receiving tenant (split: the chosen placement; merge: the receiving tenant's placement).
 fn prepared_target_placement(prepared: &Prepared) -> Uuid {
     prepared.placement.id
 }
 
-/// Database nguồn và đích của lượt (đã kiểm mở được, đủ migration, khác nhau).
+/// Source and target databases of the run (checked: openable, fully migrated, different).
 fn databases(
     prepared: &Prepared,
 ) -> Result<(crate::database::Database, crate::database::Database), Error> {
@@ -634,8 +637,8 @@ fn databases(
     )))
 }
 
-/// Ghi đè một dòng trước khi ghi vào đích: khách mới, nút cha của gốc (bảng soi cây tổ chức),
-/// secret mã hoá lại cho khách mới.
+/// Overrides a row before writing it to the target: the new tenant, the parent node of the root (tables that
+/// mirror the organization tree), and secrets re-encrypted for the new tenant.
 fn rewrite(
     row: &mut Row,
     context: &RelocationContext,
@@ -677,7 +680,7 @@ fn rewrite(
 struct Entity;
 
 impl Entity {
-    /// Ghi `options` của lượt `id`.
+    /// Writes `options` of run `id`.
     async fn update_options<C: sea_orm::ConnectionTrait>(
         connection: &C,
         id: Uuid,

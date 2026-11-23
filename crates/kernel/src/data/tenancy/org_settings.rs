@@ -1,31 +1,32 @@
-//! Cài đặt kế thừa theo cây tổ chức (bước 34 mục 4): múi giờ, tiền tệ, ngôn ngữ, hồ sơ thuế,
-//! chính sách… Module khai cài đặt của mình bằng [`OrgSetting`] (`Module::org_settings`); một nút
-//! đặt giá trị thì mọi nút dưới nó dùng giá trị đó, trừ khi tự đặt giá trị khác (chuỗi đặt, cửa
-//! hàng ghi đè). Không nút nào trên chuỗi đặt → giá trị mặc định của cài đặt.
+//! Settings inherited down the organization tree (step 34 item 4): time zone, currency, language, tax
+//! profile, policy... A module declares its settings with [`OrgSetting`] (`Module::org_settings`); when a
+//! node sets a value, every node below it uses that value unless it sets a different one itself (chain of
+//! settings, a store overrides). If no node on the chain sets it, the setting's default value applies.
 //!
-//! Kernel chỉ giữ **danh mục** (tên, mô tả, mặc định, bộ kiểm); giá trị do module `organizations`
-//! lưu và phục vụ. Module có dữ liệu kế thừa riêng (vd giá theo cửa hàng ở bảng của chính nó) dùng
-//! cùng khuôn: đọc chuỗi tổ tiên bằng [`OrgTree::ancestors`](super::OrgTree::ancestors) rồi lấy giá
-//! trị gần nhất bằng [`nearest`](super::nearest).
+//! The kernel holds only the **catalog** (name, description, default, validator); values are stored and
+//! served by the `organizations` module. A module with its own inherited data (e.g. per-store prices in its
+//! own table) uses the same pattern: read the ancestor chain with
+//! [`OrgTree::ancestors`](super::OrgTree::ancestors) then take the nearest value with
+//! [`nearest`](super::nearest).
 
 use std::sync::Arc;
 
 use serde_json::Value;
 
-/// Bộ kiểm giá trị: nhận giá trị JSON người gọi gửi, trả giá trị đã chuẩn hoá hay câu tiếng Anh nói
-/// rõ phải sửa gì.
+/// Value validator: takes the JSON value the caller sent, returns the normalized value or an English
+/// sentence saying clearly what to fix.
 pub type OrgSettingCheck = fn(&Value) -> Result<Value, String>;
 
-/// Một cài đặt theo nút do module khai.
+/// A per-node setting declared by a module.
 #[derive(Clone, Copy)]
 pub struct OrgSetting {
     key: &'static str,
     description: &'static str,
-    /// Giá trị mặc định, viết dạng JSON (vd `"\"UTC\""`).
+    /// Default value, written as JSON (e.g. `"\"UTC\""`).
     default: Option<&'static str>,
     check: Option<OrgSettingCheck>,
-    /// Dạng giá trị, viết dạng JSON Schema (vd `{"type":"boolean"}`): giao diện dựng ô nhập đúng
-    /// loại. Bộ kiểm vẫn là nơi quyết định giá trị hợp lệ.
+    /// Shape of the value, written as JSON Schema (e.g. `{"type":"boolean"}`): the UI builds the right kind of
+    /// input. The validator remains the place that decides which values are valid.
     schema: Option<&'static str>,
 }
 
@@ -36,31 +37,31 @@ impl std::fmt::Debug for OrgSetting {
 }
 
 impl OrgSetting {
-    /// Cài đặt `key` (`<module>.<tên>`), mô tả tiếng Anh cho người quản trị.
+    /// Setting `key` (`<module>.<name>`), with an English description for the administrator.
     pub const fn new(key: &'static str, description: &'static str) -> Self {
         OrgSetting { key, description, default: None, check: None, schema: None }
     }
 
-    /// Giá trị mặc định khi không nút nào đặt, viết dạng JSON: `.with_default("\"UTC\"")`.
+    /// Default value when no node sets it, written as JSON: `.with_default("\"UTC\"")`.
     pub const fn with_default(mut self, json: &'static str) -> Self {
         self.default = Some(json);
         self
     }
 
-    /// Bộ kiểm (và chuẩn hoá) giá trị.
+    /// Validator (and normalizer) of the value.
     pub const fn checked(mut self, check: OrgSettingCheck) -> Self {
         self.check = Some(check);
         self
     }
 
-    /// Dạng giá trị viết bằng JSON Schema, cho giao diện dựng ô nhập:
-    /// `.with_schema(r#"{"type":"boolean"}"#)`. Phải là object có `type`; mặc định phải khớp `type`.
+    /// Shape of the value written as JSON Schema, for the UI to build an input:
+    /// `.with_schema(r#"{"type":"boolean"}"#)`. Must be an object with a `type`; the default must match `type`.
     pub const fn with_schema(mut self, json: &'static str) -> Self {
         self.schema = Some(json);
         self
     }
 
-    /// JSON Schema của giá trị; `None` khi module không khai.
+    /// JSON Schema of the value; `None` when the module does not declare one.
     pub fn schema(&self) -> Option<Value> {
         self.schema.and_then(|json| serde_json::from_str(json).ok())
     }
@@ -73,12 +74,13 @@ impl OrgSetting {
         self.description
     }
 
-    /// Giá trị mặc định; `None` khi không có (hay JSON khai sai — `declaration_problems` báo).
+    /// Default value; `None` when there is none (or the JSON was declared wrongly, which
+    /// `declaration_problems` reports).
     pub fn default_value(&self) -> Option<Value> {
         self.default.and_then(|json| serde_json::from_str(json).ok())
     }
 
-    /// Kiểm `value`; trả giá trị đã chuẩn hoá. Không có bộ kiểm: nhận mọi giá trị trừ `null`.
+    /// Validates `value`; returns the normalized value. With no validator: accepts every value except `null`.
     pub fn check(&self, value: &Value) -> Result<Value, String> {
         if value.is_null() {
             return Err("must not be null; delete the setting to inherit it instead".to_owned());
@@ -90,7 +92,7 @@ impl OrgSetting {
     }
 }
 
-/// Mọi cài đặt theo nút của các module đã đăng ký, theo thứ tự tên. Clone rẻ.
+/// Every per-node setting of the registered modules, in name order. Cheap to clone.
 #[derive(Debug, Clone, Default)]
 pub struct OrgSettingCatalog(Arc<Vec<OrgSetting>>);
 
@@ -100,7 +102,7 @@ impl OrgSettingCatalog {
         OrgSettingCatalog(Arc::new(settings))
     }
 
-    /// Danh mục dựng sẵn (test, module dựng riêng).
+    /// A prebuilt catalog (tests, modules that build their own).
     pub fn of(settings: Vec<OrgSetting>) -> Self {
         OrgSettingCatalog::new(settings)
     }
@@ -114,8 +116,8 @@ impl OrgSettingCatalog {
     }
 }
 
-/// Vấn đề khai báo của module `module`: tên phải là `<module>.<tên>` (chữ thường, số, `_`), không
-/// trùng, có mô tả, mặc định là JSON hợp lệ và qua bộ kiểm.
+/// Declaration problem of module `module`: the name must be `<module>.<name>` (lowercase, digits, `_`), not
+/// duplicated, with a description, and the default must be valid JSON that passes the validator.
 pub(crate) fn declaration_problems(
     module: &str,
     declared: &[OrgSetting],
@@ -165,7 +167,8 @@ pub(crate) fn declaration_problems(
     problems
 }
 
-/// Schema phải là object JSON có `type` thuộc các kiểu JSON Schema; mặc định (nếu có) khớp `type`.
+/// The schema must be a JSON object with a `type` among the JSON Schema types; the default (if any) matches
+/// `type`.
 fn schema_problem(key: &str, json: &str, default: Option<Value>) -> Option<String> {
     let schema = serde_json::from_str::<Value>(json).ok();
     let kind = schema.as_ref().and_then(|schema| schema.get("type")).and_then(Value::as_str);

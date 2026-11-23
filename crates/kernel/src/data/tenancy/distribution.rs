@@ -1,22 +1,22 @@
-//! Phân phối dữ liệu khách cha → khách con (bước 38, D-20261118-step38-distribution): khách cha
-//! (chuỗi, trụ sở) đẩy một bản ghi của mình (danh mục, bảng giá…) xuống các khách con — kể cả khách
-//! con có database riêng.
+//! Distributing data from a parent tenant to child tenants (step 38, D-20261118-step38-distribution): a parent
+//! tenant (chain, head office) pushes one of its records (catalog, price list…) down to its child tenants,
+//! including child tenants that have their own database.
 //!
-//! 1. Module thêm [`distribution_migration`] vào migration của mình: bảng `<module>_distributions`
-//!    (bản phân phối: bản ghi nào, phiên bản mấy) và `<module>_distribution_targets` (mỗi khách
-//!    con một dòng: đã áp chưa, kết quả). Bảng nằm ở database của khách cha.
-//! 2. Trong transaction GHI bản ghi của khách cha, module gọi [`Distributor::publish`]: ghi bản phân
-//!    phối, một dòng đích cho mỗi khách con được chọn, và một job `<module>.distribute` cho mỗi
-//!    đích. Cùng (bản ghi, phiên bản) gửi lại → trả bản cũ, không thêm gì.
-//! 3. Module khai bộ chạy bằng [`Distributor::job`] với [`DistributionApply`] của mình. Job (chạy ở
-//!    database của khách cha) mở ngữ cảnh khách con qua sổ database, kiểm khách con còn là con
-//!    cháu và đã bật module, gọi `apply` (ghi database của con qua service của con), rồi cập nhật
-//!    dòng đích.
+//! 1. The module adds [`distribution_migration`] to its migrations: the table `<module>_distributions` (the
+//!    distribution: which record, which version) and `<module>_distribution_targets` (one row per child
+//!    tenant: applied yet, result). The tables live in the parent tenant's database.
+//! 2. Inside the WRITE transaction of the parent's record, the module calls [`Distributor::publish`]: it
+//!    records the distribution, one target row per chosen child tenant, and one `<module>.distribute` job per
+//!    target. Sending the same (record, version) again returns the old distribution and adds nothing.
+//! 3. The module declares the runner with [`Distributor::job`] using its own [`DistributionApply`]. The job
+//!    (running in the parent tenant's database) opens the child tenant's context through the database
+//!    registry, checks the child is still a descendant and has the module enabled, calls `apply` (writes the
+//!    child's database through the child's service), then updates the target row.
 //!
-//! Hai database không có transaction chung: `apply` PHẢI idempotent (tạo bằng
-//! [`reference`] — D-184; chỉ cập nhật khi phiên bản mới lớn hơn phiên bản đang lưu ở con). Chết
-//! sau khi con đã ghi mà trước khi cha cập nhật dòng đích thì lần chạy lại gặp bản đã có ở con →
-//! [`Applied::Unchanged`] → đích thành `applied`.
+//! The two databases share no transaction: `apply` MUST be idempotent (create with [`reference`], D-184;
+//! update only when the new version is greater than the version stored at the child). If the process dies
+//! after the child has written but before the parent updates the target row, the rerun finds the record
+//! already at the child, gets [`Applied::Unchanged`], and the target becomes `applied`.
 
 use crate::time::Timestamp;
 use std::sync::Arc;
@@ -35,19 +35,19 @@ use crate::error::{Error, ErrorKind};
 use crate::event::Actor;
 use crate::job::{EnqueueOptions, JobContext, JobHandler, JobQueue, JobRegistration};
 
-/// Một bản ghi của khách cha cần áp vào khách con.
+/// A parent tenant record to apply to a child tenant.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct DistributionItem {
-    /// Khách cha gửi.
+    /// The sending parent tenant.
     pub parent: TenantId,
-    /// Loại bản ghi của module, vd `catalog.category`.
+    /// Kind of the module record, e.g. `catalog.category`.
     pub record_kind: String,
-    /// ID bản ghi ở khách cha.
+    /// Record ID at the parent tenant.
     pub record_id: Uuid,
-    /// Phiên bản của bản ghi ở khách cha; tăng mỗi lần đổi.
+    /// Version of the record at the parent tenant; increases on every change.
     pub version: i64,
-    /// Nội dung để áp (JSON của module).
+    /// Content to apply (module JSON).
     pub payload: Value,
 }
 
@@ -62,34 +62,34 @@ impl DistributionItem {
         DistributionItem { parent, record_kind: record_kind.into(), record_id, version, payload }
     }
 
-    /// Mã tham chiếu (D-184) của bản ghi ở khách con: cùng bản ghi của cùng khách cha luôn ra cùng
-    /// mã, kể cả qua nhiều phiên bản — `apply` tìm bản đã nhận bằng mã này.
+    /// Reference code (D-184) of the record at the child tenant: the same record of the same parent always
+    /// yields the same code, across versions too; `apply` finds the already received record by this code.
     pub fn reference(&self) -> String {
         format!("dist:{}:{}:{}", self.parent, self.record_kind, self.record_id)
     }
 }
 
-/// Kết quả áp một bản ghi vào khách con.
+/// Result of applying a record to a child tenant.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Applied {
     Created(Uuid),
     Updated(Uuid),
-    /// Đã có bản bằng hay mới hơn (chạy lại, hay phiên bản đến muộn).
+    /// An equal or newer version already exists (a rerun, or a version that arrived late).
     Unchanged(Uuid),
-    /// Không áp, kèm lý do ngắn (vd khách con đã tự đặt giá trị riêng).
+    /// Not applied, with a short reason (e.g. the child tenant set its own value).
     Skipped {
         reason: String,
     },
 }
 
-/// Module cài để áp một bản ghi của khách cha vào khách con — gọi service của chính module, trong
-/// ngữ cảnh con (event, audit của con).
+/// Implemented by a module to apply a parent tenant record to a child tenant; calls the module's own
+/// service, in the child's context (the child's events, audit).
 //
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
 #[async_trait::async_trait]
 pub trait DistributionApply: Send + Sync {
-    /// Phải idempotent: tạo bằng `item.reference()`, cập nhật chỉ khi `item.version` lớn hơn phiên
-    /// bản nguồn đang lưu ở con (`UPDATE … WHERE source_version < ?`).
+    /// Must be idempotent: create with `item.reference()`, update only when `item.version` is greater than the
+    /// source version stored at the child (`UPDATE … WHERE source_version < ?`).
     async fn apply(
         &self,
         child: &TenantContext,
@@ -98,25 +98,25 @@ pub trait DistributionApply: Send + Sync {
     ) -> Result<Applied, Error>;
 }
 
-/// Khách con nhận một bản phân phối.
+/// Child tenants that receive a distribution.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Targets {
-    /// Con trực tiếp của khách cha.
+    /// Direct children of the parent tenant.
     AllChildren,
-    /// Mọi khách cấp dưới (con, cháu…).
+    /// Every descendant tenant (child, grandchild…).
     Descendants,
-    /// Đúng các khách này; khách nào không phải cấp dưới → `tenancy.distribution_target_invalid`.
+    /// Exactly these tenants; a tenant that is not a descendant → `tenancy.distribution_target_invalid`.
     Only(Vec<TenantId>),
 }
 
-/// Một khách con trong bản phân phối.
+/// One child tenant in a distribution.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[non_exhaustive]
 pub struct TargetStatus {
     pub tenant_id: TenantId,
     /// `pending`, `applied`, `skipped` hay `failed`.
     pub status: String,
-    /// `created`, `updated`, `unchanged` hay `skipped`; `None` khi chưa áp.
+    /// `created`, `updated`, `unchanged` or `skipped`; `None` when not yet applied.
     pub outcome: Option<String>,
     pub applied_record_id: Option<Uuid>,
     pub attempts: i32,
@@ -124,7 +124,7 @@ pub struct TargetStatus {
     pub applied_at: Option<Timestamp>,
 }
 
-/// Một bản phân phối và tình trạng ở từng khách con.
+/// A distribution and its state at each child tenant.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[non_exhaustive]
 pub struct DistributionStatus {
@@ -136,14 +136,14 @@ pub struct DistributionStatus {
     pub targets: Vec<TargetStatus>,
 }
 
-/// Payload của job `<module>.distribute`.
+/// Payload of the `<module>.distribute` job.
 #[derive(Debug, Serialize, Deserialize)]
 struct DistributeJob {
     distribution_id: Uuid,
     target_tenant_id: Uuid,
 }
 
-/// Bộ phân phối của một module. Lấy bằng `StartContext::distributor()`; clone rẻ.
+/// The distributor of a module. Obtained with `StartContext::distributor()`; cheap to clone.
 #[derive(Clone)]
 pub struct Distributor {
     module: &'static str,
@@ -166,7 +166,7 @@ fn col(name: &str) -> Alias {
 }
 
 impl Distributor {
-    /// Bộ phân phối của `module` (trong chương trình, lấy bằng `StartContext::distributor()`).
+    /// The distributor of `module` (inside the program, obtained with `StartContext::distributor()`).
     pub fn new(
         module: &'static str,
         registry: DatabaseRegistry,
@@ -183,14 +183,14 @@ impl Distributor {
         format!("{}_distribution_targets", self.module)
     }
 
-    /// Loại job áp bản phân phối: `<module>.distribute`.
+    /// Job kind that applies a distribution: `<module>.distribute`.
     pub fn job_kind(&self) -> String {
         format!("{}.distribute", self.module)
     }
 
-    /// Ghi bản phân phối `item` của khách cha `parent` tới `targets`, trong `connection` —
-    /// transaction GHI của khách cha (cùng transaction với thay đổi bản ghi). Trả ID bản phân
-    /// phối; cùng (loại, bản ghi, phiên bản) đã có thì trả ID cũ và không thêm đích hay job nào.
+    /// Records the distribution `item` of parent tenant `parent` to `targets`, on `connection`: the parent
+    /// tenant's WRITE transaction (the same transaction as the record change). Returns the distribution ID;
+    /// if the same (kind, record, version) already exists, returns the old ID and adds no target or job.
     pub async fn publish<C: ConnectionTrait>(
         &self,
         connection: &C,
@@ -312,7 +312,7 @@ impl Distributor {
         Ok(())
     }
 
-    /// Khách cấp dưới được chọn; khách lạ trong `Only` → `tenancy.distribution_target_invalid`.
+    /// Descendant tenants chosen; an unknown tenant in `Only` → `tenancy.distribution_target_invalid`.
     async fn resolve_targets(
         &self,
         parent: TenantId,
@@ -345,7 +345,7 @@ impl Distributor {
         })
     }
 
-    /// Bản phân phối `distribution` của khách cha `parent`; `None` khi khách không có bản này.
+    /// The distribution `distribution` of parent tenant `parent`; `None` when the tenant has no such distribution.
     pub async fn status(
         &self,
         parent: &TenantContext,
@@ -393,7 +393,7 @@ impl Distributor {
         }))
     }
 
-    /// Đưa các đích `failed` của bản phân phối về `pending` và chạy lại; trả số đích chạy lại.
+    /// Moves the `failed` targets of the distribution back to `pending` and reruns them; returns the number rerun.
     pub async fn retry_failed(
         &self,
         parent: &TenantContext,
@@ -427,8 +427,8 @@ impl Distributor {
         Ok(failed.len() as u64)
     }
 
-    /// Bộ chạy job `<module>.distribute` cho `Module::jobs`: `kind` phải là
-    /// [`job_kind`](Self::job_kind) (hằng `&'static str` của module, vd `"catalog.distribute"`).
+    /// Runner of the `<module>.distribute` job for `Module::jobs`: `kind` must be
+    /// [`job_kind`](Self::job_kind) (a `&'static str` constant of the module, e.g. `"catalog.distribute"`).
     pub fn job(&self, kind: &'static str, apply: Arc<dyn DistributionApply>) -> JobRegistration {
         JobRegistration::new(kind, Arc::new(DistributeRunner { distributor: self.clone(), apply }))
     }
@@ -474,7 +474,7 @@ impl Distributor {
         Ok(Some((item, row.try_get("", "created_by")?)))
     }
 
-    /// Ghi kết quả của một đích (ở database của khách cha).
+    /// Records the result of one target (in the parent tenant's database).
     async fn finish(
         &self,
         parent: &TenantContext,
@@ -560,7 +560,7 @@ impl Distributor {
     }
 }
 
-/// Chuỗi lỗi lưu vào cột: cắt 1000 ký tự.
+/// Error string stored in the column: truncated to 1000 characters.
 fn short(text: &str) -> String {
     text.chars().take(1000).collect()
 }
@@ -589,7 +589,7 @@ impl JobHandler for DistributeRunner {
     }
 }
 
-/// `tenancy.distribution_target_invalid` (422): khách đích không phải khách cấp dưới của khách gửi.
+/// `tenancy.distribution_target_invalid` (422): the target tenant is not a descendant of the sending tenant.
 pub fn target_invalid(tenant: TenantId) -> Error {
     Error::new(
         ErrorKind::Validation,
@@ -599,8 +599,8 @@ pub fn target_invalid(tenant: TenantId) -> Error {
     .with_param("tenant", tenant.to_string())
 }
 
-/// Migration tạo bảng phân phối `<module>_distributions` và `<module>_distribution_targets` của
-/// `module`, như [`outbox_migration`](crate::event::outbox_migration).
+/// Migration that creates the distribution tables `<module>_distributions` and `<module>_distribution_targets`
+/// of `module`, like [`outbox_migration`](crate::event::outbox_migration).
 pub fn distribution_migration(name: &'static str, module: &'static str) -> Box<dyn MigrationTrait> {
     Box::new(DistributionMigration { name, module })
 }
