@@ -164,14 +164,18 @@ thật (P7).
       `docs/guides/` làm theo được đúng như viết; chỗ hỏng tìm ra thì sửa tận gốc kèm test (D-20261123-api-coverage)
   - [x] Công cụ đo: testkit ghi endpoint / tool gọi thành công khi đặt `TEST_API_COVERAGE`; `cargo xtask coverage-api
         --run` báo phần chưa phủ theo module
-- [ ] P12 — Thử phá có chủ đích: fuzz / property test cho chỗ nhận dữ liệu từ ngoài, tiền và trạng thái
+- [x] P12 — Thử phá có chủ đích: fuzz / property test cho chỗ nhận dữ liệu từ ngoài, tiền và trạng thái
       (D-20261123-property-fuzzing): `proptest` trên stable trong gate (256 ca), workflow `property.yml` chạy hằng đêm
       20 000 ca, không chặn PR; lỗi tìm ra sửa tận gốc kèm ca tái hiện
   - [x] Webhook và chữ ký: SePay (sửa: timestamp `i64::MIN` làm tràn số → panic), MoMo, GHN, Standard Webhooks;
         token của form chống spam; bộ lọc SSRF (mọi cách viết IPv4 nội bộ)
-  - [ ] Tiền, thuế, khuyến mại, tổng đơn; state machine đơn hàng
-  - [ ] Token (access token, API key, bearer, JWT của OIDC), bộ lọc SCIM, header (Accept-Language, If-None-Match,
-        Range), idempotency key
+  - [x] Tiền, thuế, khuyến mại; state machine đơn hàng (sửa: `tax` dồn phần dư làm tròn vào tầng không chịu thuế,
+        số lượng 28 chữ số làm `Decimal` tràn → panic; `promotions` cộng tiền dòng bão hoà tràn `i64` → panic)
+  - [x] Token (access token, API key, bearer, `id_token` của OIDC), bộ lọc SCIM, ALTCHA, header (Accept-Language,
+        If-None-Match, Range) — sửa: claim thời gian cực biên của OIDC tràn `i64` → panic. Idempotency key không có
+        hàm thuần riêng (middleware chỉ kiểm độ dài và `HeaderValue`), đã có test tích hợp
+  - [x] Link an toàn của khối trang và thân bài, địa chỉ nhúng: so với bộ phân tích URL chuẩn WHATWG (cách trình
+        duyệt hiểu) — không tìm ra lỗi
 - [x] P13 — Chuỗi cung ứng và phát hành (D-20261123-supply-chain): ký không khoá (Sigstore qua OIDC của GitHub Actions)
       image và mọi file đính kèm — binary Linux amd64 / arm64 (chép từ image), gói SDK, SBOM — kèm chứng thực nguồn gốc
       build (SLSA) cho từng thứ, `SHA256SUMS` ký bằng cosign; hướng dẫn kiểm `docs/VERIFYING.md` + `.vi.md`; workflow
