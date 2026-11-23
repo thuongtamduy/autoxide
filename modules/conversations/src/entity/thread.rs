@@ -27,6 +27,9 @@ pub struct Model {
     pub locale: Option<String>,
     pub last_message_at: Timestamp,
     pub closed_at: Option<Timestamp>,
+    /// Đầu khung báo tin chưa đọc của người mua / nhân viên (tin chưa đọc đầu tiên); trống khi chưa có khung.
+    pub notify_customer_from: Option<Timestamp>,
+    pub notify_staff_from: Option<Timestamp>,
     pub created_at: Timestamp,
     pub updated_at: Timestamp,
 }

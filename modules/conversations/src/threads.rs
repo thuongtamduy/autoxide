@@ -7,6 +7,7 @@ use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Page, PageRequest, SortValue, fetch_page_by};
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext, root_of};
+use autoxide_kernel::time::Timestamp;
 use sea_orm::sea_query::{Condition, Expr};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter,
@@ -106,6 +107,8 @@ impl ConversationsService {
             open_key: Set(Some(open_key.clone())),
             unread_customer: Set(0),
             unread_staff: Set(0),
+            notify_customer_from: Set(None),
+            notify_staff_from: Set(None),
             auto_reply_paused: Set(false),
             auto_replies_in_row: Set(0),
             needs_agent: Set(false),
@@ -485,13 +488,15 @@ impl ConversationsService {
             .exec(&transaction)
             .await?;
         if upto >= latest.id {
-            let column = if viewer.is_staff() {
-                thread::Column::UnreadStaff
+            let (column, window) = if viewer.is_staff() {
+                (thread::Column::UnreadStaff, thread::Column::NotifyStaffFrom)
             } else {
-                thread::Column::UnreadCustomer
+                (thread::Column::UnreadCustomer, thread::Column::NotifyCustomerFrom)
             };
+            // Đọc hết thì đóng khung báo: tin sau đó mở khung mới (và một thông báo mới).
             thread::Entity::update_many()
                 .col_expr(column, Expr::value(0))
+                .col_expr(window, Expr::value(Option::<Timestamp>::None))
                 .filter(thread::Column::Id.eq(id))
                 .filter(message_newer_than(id, latest.id).not())
                 .scoped(tenant)

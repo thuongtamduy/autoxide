@@ -1,7 +1,8 @@
 //! Báo tin chưa đọc cho người không online (gom lô): mỗi tin mới hẹn một job
-//! `conversations.notify_unread` sau `AUTOXIDE_CONVERSATIONS_NOTIFY_AFTER_MINUTES` phút, khoá chống
-//! trùng theo (cuộc, phía nhận, khung thời gian) — mọi tin trong một khung chung một job, một thông
-//! báo. Tới giờ mà phía nhận đã đọc tới tin đó (con trỏ đọc) thì không báo. Thông báo là tin giao
+//! `conversations.notify_unread` sau `AUTOXIDE_CONVERSATIONS_NOTIFY_AFTER_MINUTES` phút. Khung bắt
+//! đầu từ tin chưa đọc đầu tiên (cột `notify_<phía>_from` của cuộc, đổi có điều kiện cùng transaction
+//! với tin): chỉ tin mở khung mới hẹn job, mọi tin trong khung chung một job, một thông báo; đọc hết
+//! thì khung đóng. Tới giờ mà phía nhận đã đọc tới tin đó (con trỏ đọc) thì không báo. Thông báo là tin giao
 //! dịch, gửi qua `dyn Notifier` của `notifications`; khoá chống trùng của thông báo là khoá của job,
 //! nên job chạy lại không báo hai lần. Không cài `notifications` thì không gửi gì.
 
