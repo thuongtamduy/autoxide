@@ -61,6 +61,7 @@ impl AnalyticsService {
         let write = database.write();
         let raw_before =
             now - SignedDuration::from_hours(24 * (i64::from(self.config.raw_retention_days)));
+        // tenant-scope: việc nền / kiểm tra quét mọi khách của database, chủ ý không lọc khách (rà soát bảo mật 2026-11)
         let events = event::Entity::delete_many()
             .filter(event::Column::OccurredAt.lt(raw_before))
             .exec(write)
@@ -68,22 +69,26 @@ impl AnalyticsService {
             .rows_affected;
         let kept_before =
             day_of(now - SignedDuration::from_hours(24 * (i64::from(self.config.retention_days))));
+        // tenant-scope: việc nền / kiểm tra quét mọi khách của database, chủ ý không lọc khách (rà soát bảo mật 2026-11)
         let daily = daily::Entity::delete_many()
             .filter(daily::Column::Day.lt(kept_before.as_str()))
             .exec(write)
             .await?
             .rows_affected;
+        // tenant-scope: việc nền / kiểm tra quét mọi khách của database, chủ ý không lọc khách (rà soát bảo mật 2026-11)
         funnel_daily::Entity::delete_many()
             .filter(funnel_daily::Column::Day.lt(kept_before.as_str()))
             .exec(write)
             .await?;
         let today = day_of(now);
+        // tenant-scope: việc nền / kiểm tra quét mọi khách của database, chủ ý không lọc khách (rà soát bảo mật 2026-11)
         let keys = day_key::Entity::delete_many()
             .filter(day_key::Column::Day.lt(today.as_str()))
             .exec(write)
             .await?
             .rows_affected;
         // Dấu "đã gộp" chỉ cần cho ngày còn sự kiện thô.
+        // tenant-scope: việc nền / kiểm tra quét mọi khách của database, chủ ý không lọc khách (rà soát bảo mật 2026-11)
         rollup::Entity::delete_many()
             .filter(rollup::Column::Day.lt(day_of(raw_before).as_str()))
             .exec(write)

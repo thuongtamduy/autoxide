@@ -55,6 +55,7 @@ impl Automations {
     /// Chạy các luật tới hạn của `database` (mọi khách ở database đó).
     pub(crate) async fn tick(&self, database: &Database) -> Result<(), Error> {
         let now = now();
+        // tenant-scope: việc nền / kiểm tra quét mọi khách của database, chủ ý không lọc khách (rà soát bảo mật 2026-11)
         let due = rule::Entity::find()
             .filter(rule::Column::Status.eq(ACTIVE))
             .filter(rule::Column::NextRunAt.lte(now))
@@ -125,11 +126,13 @@ impl Automations {
     /// Xoá nhật ký lần chạy đã xong quá hạn lưu của `database`.
     pub(crate) async fn prune(&self, database: &Database) -> Result<(), Error> {
         let before = now() - SignedDuration::from_hours(24 * self.config.run_retention_days);
+        // tenant-scope: việc nền / kiểm tra quét mọi khách của database, chủ ý không lọc khách (rà soát bảo mật 2026-11)
         let deleted = run::Entity::delete_many()
             .filter(run::Column::CreatedAt.lt(before))
             .filter(run::Column::Status.is_in([SUCCEEDED, FAILED, SKIPPED]))
             .exec(database.write())
             .await?;
+        // tenant-scope: việc nền / kiểm tra quét mọi khách của database, chủ ý không lọc khách (rà soát bảo mật 2026-11)
         run_key::Entity::delete_many()
             .filter(run_key::Column::CreatedAt.lt(before))
             .exec(database.write())

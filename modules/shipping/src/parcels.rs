@@ -181,7 +181,10 @@ impl ShippingService {
                 .insert(&transaction)
                 .await?;
             if take == item.quantity {
-                shipment_item::Entity::delete_by_id(item.id).exec(&transaction).await?;
+                shipment_item::Entity::delete_by_id(item.id)
+                    .scoped(tenant)
+                    .exec(&transaction)
+                    .await?;
             } else {
                 shipment_item::Entity::update_many()
                     .col_expr(shipment_item::Column::Quantity, Expr::value(item.quantity - take))

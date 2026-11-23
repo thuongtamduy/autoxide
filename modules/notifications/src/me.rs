@@ -356,6 +356,7 @@ impl NotificationsService {
             )
             .await?;
         let saved = push_subscription::Entity::find_by_id(id)
+            .scoped(tenant)
             .one(&transaction)
             .await?
             .ok_or_else(|| Error::internal("a push subscription vanished"))?;
@@ -514,6 +515,7 @@ impl NotificationsService {
             )
             .await?;
         let saved = device_token::Entity::find_by_id(id)
+            .scoped(tenant)
             .one(&transaction)
             .await?
             .ok_or_else(|| Error::internal("a device token vanished"))?;

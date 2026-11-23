@@ -639,6 +639,7 @@ impl LedgerService {
             _ => "ignored",
         };
         gateway_event::Entity::update_many()
+            .scoped(tenant)
             .col_expr(gateway_event::Column::Status, outcome.into())
             .col_expr(gateway_event::Column::ProcessedAt, Some(now()).into())
             .filter(gateway_event::Column::Id.eq(stored.id))
@@ -774,6 +775,7 @@ impl LedgerService {
         received: Money,
     ) -> Result<(), Error> {
         payment::Entity::update_many()
+            .scoped(tenant)
             .col_expr(payment::Column::Status, "needs_review".into())
             .col_expr(payment::Column::UpdatedAt, now().into())
             .filter(payment::Column::Id.eq(current.id))
@@ -971,6 +973,7 @@ impl LedgerService {
             let intent = RefundIntent::new(row.id, provider_ref, amount, &row.reason);
             let answer = gateway.refund(tenant.id(), &intent).await?;
             refund::Entity::update_many()
+                .scoped(tenant)
                 .col_expr(refund::Column::ProviderRef, Some(answer.provider_ref.clone()).into())
                 .col_expr(refund::Column::UpdatedAt, now().into())
                 .filter(refund::Column::Id.eq(row.id))
