@@ -164,6 +164,14 @@ thật (P7).
       `docs/guides/` làm theo được đúng như viết; chỗ hỏng tìm ra thì sửa tận gốc kèm test (D-20261123-api-coverage)
   - [x] Công cụ đo: testkit ghi endpoint / tool gọi thành công khi đặt `TEST_API_COVERAGE`; `cargo xtask coverage-api
         --run` báo phần chưa phủ theo module
+- [ ] P12 — Thử phá có chủ đích: fuzz / property test cho chỗ nhận dữ liệu từ ngoài, tiền và trạng thái
+      (D-20261123-property-fuzzing): `proptest` trên stable trong gate (256 ca), workflow `property.yml` chạy hằng đêm
+      20 000 ca, không chặn PR; lỗi tìm ra sửa tận gốc kèm ca tái hiện
+  - [x] Webhook và chữ ký: SePay (sửa: timestamp `i64::MIN` làm tràn số → panic), MoMo, GHN, Standard Webhooks;
+        token của form chống spam; bộ lọc SSRF (mọi cách viết IPv4 nội bộ)
+  - [ ] Tiền, thuế, khuyến mại, tổng đơn; state machine đơn hàng
+  - [ ] Token (access token, API key, bearer, JWT của OIDC), bộ lọc SCIM, header (Accept-Language, If-None-Match,
+        Range), idempotency key
 
 ## Giai đoạn B — Lớp cho giao diện và phân quyền
 
