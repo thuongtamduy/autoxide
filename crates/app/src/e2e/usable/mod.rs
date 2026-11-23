@@ -4,6 +4,8 @@
 
 pub(crate) mod auth;
 pub(crate) mod catalog_inventory;
+pub(crate) mod checkout_more;
+pub(crate) mod compliance;
 pub(crate) mod customers;
 pub(crate) mod foundation;
 pub(crate) mod kernel;

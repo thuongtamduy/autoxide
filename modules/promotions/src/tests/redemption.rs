@@ -327,3 +327,31 @@ async fn qua_het_suat() {
     .await
     .unwrap();
 }
+
+/// Nhân viên trả bằng tay lượt giữ của một đơn kẹt (`POST /redemptions/{id}/release`), trên cả hai
+/// database — trên Postgres lần kiểm quyền ghi từng chạy trên kết nối đọc và trả 500.
+#[tokio::test]
+async fn nhan_vien_tra_luot_giu_bang_tay() {
+    TestDatabase::run(async |test| {
+        let setup = setup(test, true).await;
+        let shirt = setup.catalog.add(setup.tree.a, 200_000, &[]);
+        let id = running(&setup, body(setup.tree.a, json!({}))).await;
+        let tenant = setup.tenant();
+        let held =
+            setup.promotions().reserve(&tenant, &hold(setup.cart(&[(shirt, 1)]))).await.unwrap();
+        let held = held.into_inner();
+        assert_eq!(held.status, RedemptionStatus::Held);
+        let (status, released) =
+            call(&setup.app, "POST", &format!("/redemptions/{}/release", held.id), "boss", None)
+                .await;
+        assert_eq!(status, axum::http::StatusCode::OK, "{released}");
+        assert_eq!(released["data"]["status"], "released");
+        let (status, _) =
+            call(&setup.app, "POST", &format!("/redemptions/{}/release", held.id), "store_b", None)
+                .await;
+        assert_eq!(status, axum::http::StatusCode::NOT_FOUND, "another store does not see it");
+        assert!(promotion(&setup, id).await["id"].is_string());
+    })
+    .await
+    .unwrap();
+}

@@ -1042,20 +1042,23 @@ impl PromotionsService {
         principal: &autoxide_kernel::access::Principal,
         id: Uuid,
     ) -> Result<Redemption, Error> {
-        let read = tenant.database().read();
+        // Kiểm quyền ghi trong transaction ghi: `writable` khoá nút tổ chức (`FOR SHARE`, nút không bị
+        // khoá trong lúc ghi), Postgres cấm khoá trên kết nối đọc. `release` mở transaction riêng của nó.
+        let check = tenant.database().begin_write().await?;
         let row = redemption::Entity::find_by_id(id)
             .scoped(tenant)
-            .one(read)
+            .one(&check)
             .await?
             .ok_or_else(redemption_not_found)?;
         crate::service::writable(
             principal,
-            read,
+            &check,
             &crate::permissions::PUBLISH,
             row.org_id,
             redemption_not_found,
         )
         .await?;
+        check.commit().await?;
         self.release(tenant, row.order_id, false).await?.ok_or_else(redemption_not_found)
     }
 }
