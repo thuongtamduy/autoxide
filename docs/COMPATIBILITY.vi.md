@@ -1,0 +1,157 @@
+# Chính sách tương thích
+
+[English](COMPATIBILITY.md) · **Tiếng Việt**
+
+Trang này nói bạn dựa vào được gì khi nâng cấp Autoxide, và cái gì có thể đổi. Áp dụng từ bản
+**1.0.0**. Trước 1.0 (`0.x`), một bản minor (`0.18` → `0.19`) được phép phá vỡ mọi hợp đồng dưới
+đây; mỗi chỗ phá vỡ được ghi ở mục **Changed** hay **Removed** của
+[`CHANGELOG.md`](../CHANGELOG.md), còn HTTP API thì đã theo luật REST bên dưới từ trước.
+
+Autoxide đánh số theo [Semantic Versioning](https://semver.org): một số phiên bản chung cho máy chủ,
+các crate Rust và SDK TypeScript.
+
+| Bản phát hành | Ví dụ           | Được phép chứa                                                        |
+| ------------- | --------------- | --------------------------------------------------------------------- |
+| Patch         | `1.4.0 → 1.4.1` | Sửa lỗi và vá bảo mật. Không tính năng mới, không biến cấu hình mới phải đặt. |
+| Minor         | `1.4.1 → 1.5.0` | Tính năng mới, endpoint mới, biến cấu hình mới, deprecation. Không phá vỡ. |
+| Major         | `1.9.3 → 2.0.0` | Thay đổi phá vỡ, mỗi cái ghi kèm cách làm thay thế.                    |
+
+"Phá vỡ" là mọi thay đổi khiến một client, một bản cài đặt hay một module làm đúng tài liệu không
+còn chạy được nếu không sửa.
+
+## Hợp đồng ổn định gồm những gì
+
+Mọi thứ trong mục này thuộc các module hạng **core** và **official**
+([`docs/MODULES.vi.md`](MODULES.vi.md)). Module thử nghiệm không nằm trong đó (xem
+[Phần không cam kết](#phần-không-cam-kết)).
+
+### REST API và OpenAPI
+
+Hợp đồng là `docs/openapi.json`, phục vụ ở `/api/v1/openapi.json`.
+
+- Trong `/api/v1` không có gì bị phá vỡ, ở bất kỳ bản nào: không bỏ hay đổi tên endpoint, không thêm
+  đầu vào bắt buộc, không bỏ hay đổi kiểu trường của response, không đổi nghĩa của status code.
+- Thay đổi sẽ làm vỡ client thì làm thành **endpoint mới**. Endpoint cũ chạy y như cũ và được khai
+  deprecated (`Module::deprecations`): tài liệu OpenAPI đánh dấu `deprecated`, response mang header
+  `Deprecation`, `Sunset` và `Link` (RFC 9745, RFC 8594) trỏ tới endpoint thay thế.
+- Endpoint deprecated chỉ bị bỏ sau **ngày sunset**, ít nhất **sáu tháng** sau bản phát hành khai
+  deprecated, và không bao giờ trong một bản patch.
+- Bản minor được **thêm**: endpoint, trường tuỳ chọn của request, tham số query, trường của response,
+  header, và giá trị mới trong enum của response. Client phải bỏ qua trường response không biết và
+  coi giá trị enum lạ là "khác".
+- `/api/v2` (nếu có) chỉ xuất hiện ở bản major, và `/api/v1` vẫn chạy song song ít nhất thêm một bản
+  major nữa.
+- `cargo xtask api-diff` trong gate so mọi thay đổi với bản phát hành trước và đỏ khi có phá vỡ.
+
+### Mã lỗi
+
+Trường `code` của lỗi (`notes.title_taken`, `validation_failed`…) là hợp đồng với chương trình.
+
+- Mã không bao giờ đổi tên, không bao giờ dùng lại với nghĩa khác.
+- Request hỏng với một mã thì sau bản minor vẫn hỏng với đúng mã đó.
+- Bản minor được thêm mã mới, cho lỗi mới. Client phải xử lý mã không biết theo HTTP status.
+- Câu `message`, bản dịch của nó và `errors[].detail` là cho người đọc, có thể đổi ở bất kỳ bản nào.
+
+### Cấu hình
+
+Các biến môi trường (`.env.example` liệt kê đủ), nghĩa và giá trị mặc định của chúng.
+
+- Không bỏ hay đổi tên biến trong bản minor. Khi buộc phải đổi tên, tên mới được thêm và **tên cũ
+  vẫn chạy**, kèm cảnh báo trong log khởi động nêu tên mới, ít nhất một bản minor và ít nhất sáu
+  tháng; tên cũ chỉ bị bỏ ở bản major.
+- Giá trị mặc định làm đổi hành vi (vd giới hạn chặt hơn) chỉ đổi ở bản major, trừ khi để vá lỗ hổng
+  bảo mật; khi đó changelog ghi ở mục **Security**.
+- Biến mới luôn có mặc định, nên file `.env` sẵn có vẫn chạy.
+- `AUTOXIDE_MODULES` theo cùng luật: trong một bản major, không module nào bị chuyển từ official sang
+  experimental (việc đó sẽ tắt nó theo mặc định).
+
+### Database và migration
+
+- Bản mới luôn đọc được dữ liệu của bản cũ: chạy binary mới (hay `autoxide migrate up`), migration
+  đưa database lên. Nâng từ **bất kỳ bản 1.x** lên bất kỳ bản 1.x mới hơn được ngay, không phải dừng
+  ở từng bản minor. CI thử việc nâng cấp từ bản phát hành trước trên cả SQLite và PostgreSQL.
+- Migration đã phát hành không bao giờ bị sửa; thay đổi đi bằng migration mới.
+- Mọi migration có bước `down`, nên quay về được bản trước: dùng binary **mới**, chạy
+  `autoxide migrate down <module> --steps <n>` cho các migration nó thêm (changelog và
+  `autoxide migrate status` cho biết là những cái nào), rồi chạy binary cũ. Backup trước; đi xuống có
+  thể bỏ dữ liệu mà chỉ bản mới lưu.
+- SQLite và PostgreSQL đều được hỗ trợ ở mọi bản. Một bản major của PostgreSQL mà dự án PostgreSQL đã
+  ngừng bảo trì có thể thôi được hỗ trợ ở một bản minor, báo trước trong changelog một bản minor.
+- Bản thân các bảng **không** là hợp đồng: chúng thuộc module của mình và có thể đổi hình dạng ở bất
+  kỳ bản nào. Đọc và ghi dữ liệu qua API, không bằng SQL.
+
+### Tool MCP
+
+Danh sách tool (`docs/mcp-tools.json`, do MCP endpoint phục vụ) theo luật của REST: tool giữ tên,
+nhận mọi đầu vào nó từng nhận và trả mọi trường nó từng trả. Tool phải đổi thì làm tool mới và khai
+tool cũ deprecated kèm ngày sunset (`Deprecation::tool`), ít nhất sáu tháng. Tool không bao giờ cần
+permission rộng hơn trước.
+
+### Event và webhook
+
+Tên event và các trường trong payload (thứ module nhận và webhook gửi đi) được thêm trường ở bản
+minor, nhưng không bao giờ mất hay đổi kiểu một trường. Event phải đổi hình dạng thì phát dưới tên
+mới, và event cũ vẫn được phát tới bản major kế tiếp.
+
+### Dòng lệnh
+
+Các lệnh và tuỳ chọn `autoxide` có trong tài liệu, mã thoát của chúng và đầu ra của tuỳ chọn `--json`
+theo luật như cấu hình: thêm ở bản minor, bỏ hay đổi chỉ ở bản major. Chữ in ra cho người đọc có thể
+đổi.
+
+### Rust API cho module
+
+Với người viết module ở repo riêng ([hướng dẫn](guides/writing-a-module.vi.md)), hợp đồng là phần
+Rust công khai của:
+
+- `autoxide-kernel` và `autoxide-testkit`;
+- `autoxide::Autoxide`, thứ công khai duy nhất của crate `autoxide`;
+- `pub mod api` và `pub fn module(…)` của mọi crate module hạng core và official.
+
+Luật, theo [hướng dẫn SemVer của Cargo](https://doc.rust-lang.org/cargo/reference/semver.html):
+
+- Thay đổi phá vỡ (bỏ hay đổi tên thứ công khai, đổi chữ ký hàm, thêm method bắt buộc vào trait mà
+  không có mặc định, …) chỉ có ở bản **major**.
+- Trước khi bị bỏ, một thứ được đánh dấu `#[deprecated]` kèm ghi chú nêu thứ thay thế, ít nhất một bản
+  minor.
+- Tính năng mới cho module đến dưới dạng method mới của trait **có cài đặt mặc định**, nên module sẵn
+  có biên dịch được mà không phải sửa.
+- `cargo-semver-checks` so các crate này với bản phát hành trước ở mọi pull request chạm vào chúng và
+  ở mọi pull request phát hành; từ 1.0, có phá vỡ thì kiểm tra đỏ.
+- Các thư viện có kiểu lộ ra trong API này (`axum`, `sea-orm`, `utoipa`, `tokio`, `serde`… — bảng ở
+  [`docs/MODULE_GUIDE.vi.md`](MODULE_GUIDE.vi.md#độ-ổn-định-của-hợp-đồng-module)) là một phần của
+  nó: đưa một thư viện trong đó lên phiên bản lớn mới là thay đổi phá vỡ, nên phải chờ bản major.
+- Phiên bản Rust tối thiểu theo bản Rust ổn định gần đây (`rust-toolchain.toml`). Nâng nó chỉ ở bản
+  minor, không bao giờ ở bản patch, và có ghi trong changelog.
+
+### SDK TypeScript
+
+SDK (`sdk/typescript`) sinh từ `docs/openapi.json` và mang cùng số phiên bản. Nó theo luật của REST:
+bản minor thêm method và trường tuỳ chọn; method hay kiểu chỉ biến mất ở bản major. Endpoint
+deprecated vẫn ở trong SDK tới ngày sunset.
+
+## Phần không cam kết
+
+Những thứ sau có thể đổi ở bất kỳ bản nào, kể cả bản patch khi đó là sửa lỗi:
+
+- **Module thử nghiệm** (hạng `experimental` trong [`docs/MODULES.vi.md`](MODULES.vi.md), tắt theo
+  mặc định): endpoint, tool, event, cấu hình và Rust API của chúng có thể đổi giữa các bản minor, kể cả
+  thay đổi phá vỡ. Mọi thay đổi đều có trong changelog, và việc chuyển dữ liệu của chúng sang bản mới
+  được mô tả trong ghi chú nâng cấp khi cần làm tay.
+- Thứ được đánh dấu **experimental** ở chỗ khác: operation OpenAPI có `"x-stability":
+  "experimental"`, tool MCP có `"stability": "experimental"`, và tính năng mà tài liệu ghi
+  "experimental".
+- Phần Rust không công khai: `pub(crate)` và thứ riêng tư, thứ có `#[doc(hidden)]`, và mọi thứ trong
+  crate module ngoài `api` và `module(…)`. Module mẫu `notes` và crate `xtask` hoàn toàn không thuộc
+  hợp đồng.
+- Dòng log: định dạng, câu và trường. Tên và nhãn của số đo (metric) được ghi trong changelog khi đổi
+  nhưng không bị đóng băng.
+- Chữ cho người đọc: `message` của lỗi, bản dịch, mô tả trong OpenAPI và MCP, đầu ra CLI không có
+  `--json`.
+- Bảng, cột và index của database (xem trên), thứ tự phần tử ở chỗ API không hứa thứ tự, và số đo
+  hiệu năng.
+
+## Hỗ trợ
+
+Bản nào được vá, và trong bao lâu, ghi ở [`SECURITY.vi.md`](../SECURITY.vi.md#phiên-bản-được-vá).
+Cách phát hành ghi ở [`docs/RELEASING.md`](RELEASING.md).

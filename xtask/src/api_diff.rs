@@ -424,7 +424,7 @@ fn read_allowlist(root: &Path) -> Result<Vec<Allowed>, String> {
         .map_err(|error| format!("{ALLOW_FILE} is not a list of entries: {error}"))
 }
 
-fn git(root: &Path, args: &[&str]) -> Result<String, String> {
+pub(crate) fn git(root: &Path, args: &[&str]) -> Result<String, String> {
     let output = Command::new("git")
         .args(args)
         .current_dir(root)

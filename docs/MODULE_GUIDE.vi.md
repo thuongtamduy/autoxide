@@ -819,7 +819,10 @@ Luật core tự giữ:
   viện trong bảng lên phiên bản lớn mới, hay phiên bản Rust tối thiểu mới hơn, là một thay đổi
   như vậy.
 - Từ `1.0` hợp đồng theo Semantic Versioning: thay đổi phá vỡ chỉ đến ở bản major, và
-  `cargo semver-checks` chặn bản phát hành lỡ phá vỡ nó.
+  `cargo semver-checks` chặn bản phát hành lỡ phá vỡ nó. Khi đó, thư viện trong bảng lên phiên
+  bản lớn mới phải chờ bản major của Autoxide; phiên bản Rust tối thiểu mới hơn chỉ đến ở bản
+  minor, không bao giờ ở bản patch. Toàn bộ chính sách, cả cho HTTP API, ở
+  [`docs/COMPATIBILITY.vi.md`](COMPATIBILITY.vi.md).
 - `Module` chỉ lớn thêm bằng hàm có thân mặc định: module viết cho bản cũ vẫn biên dịch.
 - Kiểu công khai sẽ còn lớn thêm được đánh dấu `#[non_exhaustive]`: dựng chúng bằng hàm
   tạo, không bằng struct literal, và `match` enum của chúng có nhánh `_`.

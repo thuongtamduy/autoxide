@@ -4,15 +4,33 @@
 
 ## Phiên bản được vá
 
-Autoxide đang ở loạt `0.x`. Bản vá bảo mật chỉ đi vào **bản phát hành minor mới nhất** (vd
-`0.11.x` khi `0.11` là bản mới nhất); các bản minor cũ hơn không được vá. Hãy cập nhật lên
-bản mới nhất trước khi báo, và ghi trong báo cáo bạn đã thử trên phiên bản nào.
-`CHANGELOG.md` liệt kê mọi bản phát hành.
+Autoxide là dự án cộng đồng do một nhóm nhỏ duy trì. Các thời hạn dưới đây là mục tiêu, **không
+phải cam kết dịch vụ (SLA)**: không có hỗ trợ trả phí, không có thời gian phản hồi bảo đảm.
 
-| Phiên bản               | Được vá bảo mật |
-| ----------------------- | --------------- |
-| Bản `0.x` mới nhất      | Có              |
-| Các bản cũ hơn          | Không           |
+**Từ 1.0** (hỗ trợ dài hạn cho mỗi bản major):
+
+- **Bản minor mới nhất** của bản major hiện tại (vd `1.5.x` khi `1.5` là bản mới nhất) nhận mọi bản
+  sửa lỗi và vá bảo mật.
+- **Bản minor trước đó** nhận vá bảo mật trong **3 tháng** sau khi bản minor kế tiếp ra (vd `1.4.x`
+  tới ba tháng sau `1.5.0`), để bạn có thời gian nâng cấp.
+- Khi một bản major mới ra, bản minor cuối của bản major trước nhận vá bảo mật trong **6 tháng** sau
+  bản major mới.
+- Các bản cũ hơn không được vá.
+
+| Phiên bản                                         | Được vá bảo mật                    |
+| ------------------------------------------------- | ---------------------------------- |
+| Bản minor `1.x` mới nhất                          | Có                                 |
+| Bản minor `1.x` trước đó                          | 3 tháng sau khi bản minor kế ra    |
+| Bản minor cuối của bản major trước (sau `2.0`)    | 6 tháng sau khi bản major mới ra   |
+| Các bản cũ hơn (và `0.x` khi đã có 1.0)           | Không                              |
+
+**Trước 1.0**, khi Autoxide còn ở loạt `0.x`, bản vá bảo mật chỉ đi vào bản minor mới nhất; các bản
+`0.x` cũ hơn không được vá.
+
+Bản vá ra dưới dạng bản patch (`1.5.2` → `1.5.3`), không đổi gì khác, nên cài ngay được
+([`docs/COMPATIBILITY.vi.md`](docs/COMPATIBILITY.vi.md) ghi bản patch được chứa gì). Hãy cập nhật lên
+bản mới nhất của dòng bạn dùng trước khi báo, và ghi trong báo cáo bạn đã thử trên phiên bản nào.
+`CHANGELOG.md` liệt kê mọi bản phát hành.
 
 ## Báo lỗ hổng
 
