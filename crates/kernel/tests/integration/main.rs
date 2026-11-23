@@ -59,6 +59,7 @@ mod secret;
 mod security_headers;
 mod stack;
 mod summary;
+mod tags_access;
 mod telemetry;
 mod tenancy;
 mod tenancy_adopt;

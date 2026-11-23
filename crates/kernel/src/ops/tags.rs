@@ -27,7 +27,7 @@ use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 use uuid::Uuid;
 
-use crate::access::{Permission, Principal};
+use crate::access::{Permission, Principal, Realm};
 use crate::error::{Error, FieldError};
 use crate::event::{Actor, EventInfo, Outbox};
 use crate::http::ValidJson;
@@ -395,7 +395,8 @@ async fn create<C: ConnectionTrait>(
 
 /// List the tags.
 ///
-/// Any signed-in user. Every tag of the tenant, by name, with how many records carry it.
+/// Any signed-in staff account; customer accounts get 403 `kernel.tags_staff_only`. Every tag of
+/// the tenant, by name, with how many records carry it.
 #[utoipa::path(
     get,
     path = "/tags",
@@ -405,12 +406,21 @@ async fn create<C: ConnectionTrait>(
     responses(
         (status = 200, description = "The tags.", body = Data<Vec<TagView>>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "A customer account; code `kernel.tags_staff_only`.", body = Problem),
     )
 )]
 async fn list_tags(
     tenant: TenantContext,
-    _principal: Principal,
+    principal: Principal,
 ) -> Result<Data<Vec<TagView>>, Error> {
+    // Nhãn là ghi chú nội bộ của nhân sự ("VIP", "nghi gian lận"…): tài khoản người mua của cửa hàng
+    // không được đọc (pentest 2026-11).
+    if principal.realm() == Realm::Customer {
+        return Err(Error::forbidden(
+            "kernel.tags_staff_only",
+            "Tags are for staff accounts; a customer account cannot list them.",
+        ));
+    }
     Ok(Data { data: list_views(&tenant).await? })
 }
 
