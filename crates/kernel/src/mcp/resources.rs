@@ -1,11 +1,11 @@
-//! Resource MCP: tài liệu chỉ đọc mà agent tự đọc khi cần (bước 40 P2) — hướng dẫn của module,
-//! JSON Schema của một loại bản ghi, sổ module…
+//! MCP resources: read-only documents the agent reads by itself when needed (step 40 P2) - a module's guide,
+//! the JSON Schema of a record kind, the module catalog...
 //!
-//! Tên `McpResource` để không lẫn với `autoxide_kernel::resource` (sổ loại bản ghi của D-123).
-//! Module khai qua `Module::mcp_resources` (gọi sau `start`); path ngắn (`guide`,
-//! `schema/entry`), kernel ghép URI `autoxide://<module>/<path>`. Như tool: mỗi resource hoặc
-//! cần một permission (`requires`), hoặc khai tường minh là ai đăng nhập cũng đọc được
-//! (`for_any_signed_in`) — thiếu cả hai là lỗi khởi động.
+//! The name `McpResource` avoids confusion with `autoxide_kernel::resource` (the record-kind catalog of
+//! D-123). A module declares them through `Module::mcp_resources` (called after `start`); with a short path
+//! (`guide`, `schema/entry`), and the kernel assembles the URI `autoxide://<module>/<path>`. Like tools: each
+//! resource either needs a permission (`requires`), or is explicitly declared readable by anyone signed in
+//! (`for_any_signed_in`) - missing both is a startup error.
 
 use std::future::Future;
 use std::pin::Pin;
@@ -20,10 +20,10 @@ use crate::access::{Permission, Principal};
 use crate::error::Error;
 use crate::tenancy::TenantContext;
 
-/// Tiền tố URI của mọi resource.
+/// URI prefix of every resource.
 pub const RESOURCE_SCHEME: &str = "autoxide://";
 
-/// Kiểu MIME của JSON Schema.
+/// MIME type of JSON Schema.
 pub const SCHEMA_MIME: &str = "application/schema+json";
 
 // `Pin<Box<dyn Future>>`: future của hàm đọc có kiểu khác nhau theo từng resource; đóng hộp để
@@ -31,10 +31,10 @@ pub const SCHEMA_MIME: &str = "application/schema+json";
 type ReadFuture = Pin<Box<dyn Future<Output = Result<String, Error>> + Send>>;
 type ReadFn = dyn Fn(TenantContext, Principal) -> ReadFuture + Send + Sync;
 
-/// Một resource MCP do module khai.
+/// An MCP resource declared by a module.
 #[derive(Clone)]
 pub struct McpResource {
-    /// Path ngắn lúc khai; URI đầy đủ sau khi kernel ghép tên module.
+    /// The short path at declaration; the full URI after the kernel prefixes the module name.
     uri: String,
     name: String,
     description: &'static str,
@@ -51,8 +51,9 @@ impl std::fmt::Debug for McpResource {
 }
 
 impl McpResource {
-    /// Resource ở `path` (chữ thường, số, `_`, `-`, `.`, `/`), tên `name`, mô tả tiếng Anh cho agent,
-    /// kiểu `mime_type`; nội dung do `read` dựng lúc được đọc (nhận khách và người gọi, như tool).
+    /// A resource at `path` (lowercase, digits, `_`, `-`, `.`, `/`), named `name`, with an English
+    /// description for the agent, of type `mime_type`; the content is built by `read` when it is read
+    /// (receives the tenant and the caller, like a tool).
     pub fn new<F, Fut>(
         path: &'static str,
         name: &'static str,
@@ -75,7 +76,7 @@ impl McpResource {
         }
     }
 
-    /// Tài liệu tĩnh, vd hướng dẫn viết trong file `.md` của crate (`include_str!`).
+    /// A static document, e.g. a guide written in a crate's `.md` file (`include_str!`).
     pub fn text(
         path: &'static str,
         name: &'static str,
@@ -88,9 +89,9 @@ impl McpResource {
         })
     }
 
-    /// JSON Schema của kiểu `T` — "schema một loại bản ghi", sinh từ cùng kiểu mà OpenAPI dùng nên
-    /// không lệch. Kiểu con được nhúng vào `$defs` (`$ref` trỏ `#/$defs/<tên>`), để agent đọc
-    /// riêng resource này là đủ.
+    /// The JSON Schema of type `T` - "the schema of a record kind", generated from the same type OpenAPI uses
+    /// so it cannot drift. Child types are embedded in `$defs` (`$ref` points to `#/$defs/<name>`), so an
+    /// agent reading just this resource has everything it needs.
     pub fn schema<T: ToSchema>(path: &'static str, description: &'static str) -> Self {
         let name = T::name().into_owned();
         let document = schema_document::<T>();
@@ -103,20 +104,20 @@ impl McpResource {
         resource
     }
 
-    /// Chỉ người có `permission` mới thấy và đọc được resource.
+    /// Only people with `permission` can see and read the resource.
     pub fn requires(mut self, permission: Permission) -> Self {
         self.permission = Some(permission);
         self
     }
 
-    /// Mọi người đã đăng nhập đọc được (tài liệu không có gì riêng tư). Phải khai tường minh, như
-    /// tool (D-245).
+    /// Readable by anyone signed in (a document with nothing private). Must be declared explicitly, like
+    /// a tool (D-245).
     pub fn for_any_signed_in(mut self) -> Self {
         self.any_signed_in = true;
         self
     }
 
-    /// URI: path ngắn trước khi kernel ghép, `autoxide://<module>/<path>` sau đó.
+    /// The URI: the short path before the kernel assembles it, `autoxide://<module>/<path>` afterwards.
     pub fn uri(&self) -> &str {
         &self.uri
     }
@@ -142,17 +143,17 @@ impl McpResource {
         self.any_signed_in
     }
 
-    /// Người gọi có được thấy và đọc resource không.
+    /// Whether the caller may see and read the resource.
     pub fn allows(&self, principal: &Principal) -> bool {
         self.permission.is_none_or(|permission| principal.has(&permission))
     }
 
-    /// Đọc nội dung (không kiểm permission — bên gọi kiểm bằng [`allows`](Self::allows)).
+    /// Reads the content (no permission check - the caller checks with [`allows`](Self::allows)).
     pub async fn read(&self, tenant: TenantContext, principal: Principal) -> Result<String, Error> {
         (self.read)(tenant, principal).await
     }
 
-    /// Module của resource (phần giữa `autoxide://` và `/` kế tiếp).
+    /// The resource's module (the part between `autoxide://` and the next `/`).
     pub fn module(&self) -> &str {
         self.uri
             .strip_prefix(RESOURCE_SCHEME)
@@ -160,13 +161,14 @@ impl McpResource {
             .unwrap_or_default()
     }
 
-    /// Ghép URI đầy đủ `autoxide://<module>/<path>`.
+    /// Assembles the full URI `autoxide://<module>/<path>`.
     pub(crate) fn qualify(mut self, module: &str) -> Self {
         self.uri = format!("{RESOURCE_SCHEME}{module}/{}", self.uri);
         self
     }
 
-    /// Các vấn đề của khai báo (path sai dạng, thiếu khai quyền, mô tả chưa dịch).
+    /// The problems of the declaration (badly formed path, missing permission declaration, untranslated
+    /// description).
     pub(crate) fn problems(&self, module: &str) -> Vec<String> {
         let mut problems = Vec::new();
         let path =
@@ -203,7 +205,7 @@ impl McpResource {
     }
 }
 
-/// JSON Schema đứng một mình của `T`: schema của `T`, thêm `title`, kiểu con trong `$defs`.
+/// A standalone JSON Schema of `T`: the schema of `T`, plus `title`, with child types in `$defs`.
 pub fn schema_document<T: ToSchema>() -> Value {
     let mut nested: Vec<(String, RefOr<Schema>)> = Vec::new();
     T::schemas(&mut nested);
@@ -226,7 +228,7 @@ pub fn schema_document<T: ToSchema>() -> Value {
     document
 }
 
-/// `#/components/schemas/X` (chỗ OpenAPI để kiểu con) thành `#/$defs/X`.
+/// `#/components/schemas/X` (where OpenAPI puts child types) becomes `#/$defs/X`.
 fn rewrite_refs(node: &mut Value) {
     match node {
         Value::Object(object) => {

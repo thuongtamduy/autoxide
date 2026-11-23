@@ -1,12 +1,12 @@
-//! [`SearchIndex`]: sổ loại tài liệu tìm được và bộ máy đang dùng (bước 40 P7). Kernel công bố nó lúc
-//! khởi động; module lấy bằng `context.require::<SearchIndex>()` hay khai qua
+//! [`SearchIndex`]: the registry of searchable document kinds and the engine in use (step 40 P7). The kernel
+//! publishes it at startup; modules get it with `context.require::<SearchIndex>()` or declare through
 //! `StartContext::search_documents`.
 //!
-//! Đồng bộ: module KHÔNG gọi bộ máy trong transaction ghi (bộ máy ngoài là gọi mạng). Trong
-//! transaction của thay đổi, module gọi [`SearchIndex::enqueue`] — xếp job `kernel.search_sync`
-//! mang loại và ID, cùng transaction (như outbox). Job đọc lại tài liệu hiện tại qua
-//! [`SearchSource::load`]: có thì `index`, không còn (đã xoá) thì `remove`. Chạy lại bao nhiêu lần
-//! cũng cùng kết quả — chịu được nhận lại (D-054).
+//! Sync: modules do NOT call the engine inside a write transaction (an external engine means a network call).
+//! Inside the transaction of the change, the module calls [`SearchIndex::enqueue`], which queues a
+//! `kernel.search_sync` job carrying the kind and IDs, in the same transaction (like the outbox). The job
+//! re-reads the current document through [`SearchSource::load`]: if present, `index`; if gone (deleted),
+//! `remove`. Running it any number of times gives the same result, so it tolerates redelivery (D-054).
 
 use std::collections::BTreeMap;
 use std::sync::{Arc, PoisonError, RwLock};
@@ -34,18 +34,18 @@ pub(crate) const SEARCH_BACKEND: Setting = Setting::new(
 )
 .with_default("database");
 
-/// Tên bộ máy mặc định.
+/// Name of the default engine.
 pub const DATABASE_BACKEND: &str = "database";
 
-/// Loại job đồng bộ.
+/// Job kind for sync.
 pub(crate) const SEARCH_SYNC: &str = "kernel.search_sync";
 
-/// Số tài liệu mỗi lượt khi dựng lại chỉ mục.
+/// Documents per batch when rebuilding the index.
 const BATCH: u64 = 200;
-/// Số ID tối đa một job đồng bộ.
+/// Maximum number of IDs in one sync job.
 const MAX_SYNC_IDS: usize = 500;
 
-/// Job [`SEARCH_SYNC`]: đồng bộ các bản ghi `ids` của loại `kind`.
+/// The [`SEARCH_SYNC`] job: syncs the records `ids` of kind `kind`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct SyncJob {
     pub kind: String,
@@ -56,10 +56,10 @@ impl Job for SyncJob {
     const KIND: &'static str = SEARCH_SYNC;
 }
 
-/// Một loại đã khai và nguồn tài liệu của nó.
+/// A declared kind and its document source.
 type Entry = (SearchKind, Arc<dyn SearchSource>);
 
-/// Sổ loại tài liệu (dùng chung giữa [`SearchIndex`] và [`DatabaseSearch`]).
+/// Registry of document kinds (shared between [`SearchIndex`] and [`DatabaseSearch`]).
 #[derive(Clone, Default)]
 pub(crate) struct Kinds {
     entries: Arc<RwLock<BTreeMap<String, Entry>>>,
@@ -89,7 +89,7 @@ fn unknown_kind(name: &str) -> Error {
     .with_param("kind", name)
 }
 
-/// Sổ loại tài liệu và bộ máy tìm. Clone rẻ.
+/// Registry of document kinds and the search engine. Cheap to clone.
 #[derive(Clone)]
 pub struct SearchIndex {
     kinds: Kinds,
@@ -100,7 +100,7 @@ pub struct SearchIndex {
 }
 
 impl SearchIndex {
-    /// Sổ trống dùng bộ máy `configured` (`database` hay tên một bộ máy module sẽ đăng ký).
+    /// An empty registry using the `configured` engine (`database` or the name of an engine a module will register).
     pub fn new(configured: &str) -> Self {
         let kinds = Kinds::default();
         SearchIndex {
@@ -112,7 +112,7 @@ impl SearchIndex {
         }
     }
 
-    /// Khai loại tài liệu `kind` của module `module` (`<module>.<loại>`) và nơi đọc tài liệu.
+    /// Declares the document kind `kind` of module `module` (`<module>.<kind>`) and where to read documents.
     pub fn register(
         &self,
         module: &str,
@@ -142,7 +142,7 @@ impl SearchIndex {
         Ok(())
     }
 
-    /// Đăng ký bộ máy tên `name` (module bộ máy ngoài). Dùng khi `AUTOXIDE_SEARCH_BACKEND = name`.
+    /// Registers the engine named `name` (an external engine module). Used when `AUTOXIDE_SEARCH_BACKEND = name`.
     pub fn add_backend(&self, name: &str, backend: Arc<dyn SearchBackend>) -> Result<(), Error> {
         if name == DATABASE_BACKEND {
             return Err(Error::internal("the search backend name `database` is the built-in one"));
@@ -154,7 +154,7 @@ impl SearchIndex {
         Ok(())
     }
 
-    /// Bộ máy đang dùng.
+    /// The engine in use.
     pub fn backend(&self) -> Result<Arc<dyn SearchBackend>, Error> {
         if self.configured == DATABASE_BACKEND {
             return Ok(self.database.clone());
@@ -168,13 +168,13 @@ impl SearchIndex {
         })
     }
 
-    /// Tên bộ máy đã cấu hình.
+    /// Name of the configured engine.
     pub fn configured(&self) -> &str {
         &self.configured
     }
 
-    /// Xếp việc đồng bộ các bản ghi `ids` của loại `kind`, trong `connection` của bên gọi
-    /// (transaction của thay đổi) — job chạy sau commit.
+    /// Queues the sync of records `ids` of kind `kind`, on the caller's `connection` (the transaction of the
+    /// change); the job runs after commit.
     pub async fn enqueue<C: ConnectionTrait>(
         &self,
         connection: &C,
@@ -190,8 +190,8 @@ impl SearchIndex {
         Ok(())
     }
 
-    /// Đồng bộ ngay các bản ghi `ids` của loại `kind` (việc của job): tài liệu còn thì đưa vào
-    /// chỉ mục, không còn thì bỏ.
+    /// Syncs the records `ids` of kind `kind` right away (the job's work): a document that still exists is
+    /// put into the index, one that no longer exists is removed.
     pub async fn sync(
         &self,
         tenant: &TenantContext,
@@ -208,7 +208,7 @@ impl SearchIndex {
         backend.remove(tenant, kind, &gone).await
     }
 
-    /// Dựng lại chỉ mục loại `kind` (mọi loại khi `None`) của khách `tenant`. Trả số tài liệu.
+    /// Rebuilds the index of kind `kind` (every kind when `None`) of tenant `tenant`. Returns the document count.
     pub async fn rebuild(
         &self,
         tenant: &TenantContext,
@@ -238,8 +238,8 @@ impl SearchIndex {
         Ok(count)
     }
 
-    /// Tìm trong loại `request.kind` cho người gọi `principal`: kiểm permission của loại và giới hạn
-    /// theo phạm vi nút của nó (lọc trong bộ máy). `principal = None`: chỉ loại công khai.
+    /// Searches kind `request.kind` for the caller `principal`: checks the kind's permission and limits to
+    /// its node scope (filtered inside the engine). `principal = None`: public kinds only.
     pub async fn search(
         &self,
         tenant: &TenantContext,
@@ -273,7 +273,7 @@ impl SearchIndex {
     }
 }
 
-/// Phạm vi nút của `permission` cho `principal`: `None` khi có độ sâu cả khách và không hàng rào.
+/// Node scope of `permission` for `principal`: `None` when it has whole-tenant depth and no fence.
 fn scope_of(
     principal: &Principal,
     permission: &crate::access::Permission,
@@ -298,7 +298,7 @@ fn scope_of(
     Ok(Some(scope))
 }
 
-/// Bộ chạy job [`SEARCH_SYNC`].
+/// Runner of the [`SEARCH_SYNC`] job.
 pub(crate) struct SyncRunner(pub SearchIndex);
 
 #[async_trait::async_trait]
@@ -314,7 +314,7 @@ impl JobHandler for SyncRunner {
     }
 }
 
-/// Lệnh `autoxide task kernel.reindex [kind=<loại>] [tenant=<slug>]`.
+/// The command `autoxide task kernel.reindex [kind=<kind>] [tenant=<slug>]`.
 pub(crate) fn reindex_task(index: SearchIndex, registry: DatabaseRegistry) -> crate::task::Task {
     crate::task::Task::new(
         "reindex",

@@ -1,19 +1,19 @@
-//! Giới hạn số lần theo khoá, đếm trong database (D-116): đúng khi chạy nhiều máy chủ và khi
-//! nhiều request cùng lúc, trên cả SQLite và Postgres.
+//! Per-key rate limiting, counted in the database (D-116): correct when running several servers and when
+//! many requests arrive at once, on both SQLite and Postgres.
 //!
-//! Dùng cho: khoá đăng nhập theo email (`auth`), giới hạn gửi form theo IP băm hay theo email
-//! (chống spam), giới hạn email xác nhận gửi tới một địa chỉ…
+//! Used for: login locks by email (`auth`), form submission limits by hashed IP or by email
+//! (anti-spam), limits on confirmation emails sent to one address…
 //!
-//! - Module thêm `throttle_migration("m00xx_create_throttle", "<module>")` vào migration của
-//!   mình (bảng `<module>_throttle`), như `jobs_migration`.
-//! - Mỗi khoá có một cửa sổ đếm dài `window`. Vượt `limit` lần trong cửa sổ thì khoá bị chặn
-//!   trong `lock` (mặc định bằng `window`), rồi đếm lại từ đầu.
-//! - Khoá đếm được băm SHA-256 trước khi lưu: email hay IP không nằm nguyên văn trong bảng.
-//! - Mỗi lần đếm là MỘT câu "chèn hoặc cộng" trả về số đếm (D-321) — database tự xếp hàng các
-//!   request đồng thời, không request nào ghi đè số đếm của request khác. [`Throttle::hit`] đếm
-//!   TRƯỚC rồi mới kiểm, nên N request bắn cùng lúc không vượt được `limit`.
-//! - Theo khách (bước 33): mỗi hàm nhận khách; số đếm nằm ở database của khách, khoá chính
-//!   `(tenant_id, key)` — một khách bị dồn không làm khoá người dùng của khách khác.
+//! - A module adds `throttle_migration("m00xx_create_throttle", "<module>")` to its own
+//!   migrations (table `<module>_throttle`), like `jobs_migration`.
+//! - Each key has a counting window of length `window`. Exceeding `limit` hits within the window blocks the key
+//!   for `lock` (default equal to `window`), then counting restarts from zero.
+//! - Counted keys are hashed with SHA-256 before storing: emails or IPs are not stored verbatim in the table.
+//! - Each count is ONE "insert or add" statement that returns the count (D-321) — the database queues
+//!   concurrent requests itself, and no request overwrites another request's count. [`Throttle::hit`] counts
+//!   FIRST and then checks, so N requests fired at once cannot exceed `limit`.
+//! - Per tenant (step 33): every function takes the tenant; counts live in the tenant's database, primary key
+//!   `(tenant_id, key)` — one tenant being flooded does not lock the users of another tenant.
 
 use crate::time::Timestamp;
 use jiff::SignedDuration;
@@ -31,11 +31,11 @@ use crate::error::Error;
 use crate::secret::sha256;
 use crate::tenancy::TenantContext;
 
-/// Kết quả của một lần xét.
+/// Result of one evaluation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Outcome {
     Allowed,
-    /// Bị chặn; thử lại sau chừng này giây (làm tròn lên).
+    /// Blocked; retry after this many seconds (rounded up).
     Limited {
         retry_after: u64,
     },
@@ -47,7 +47,7 @@ impl Outcome {
     }
 }
 
-/// Bộ đếm trên bảng `<module>_throttle`.
+/// A counter on the table `<module>_throttle`.
 #[derive(Clone)]
 pub struct Throttle {
     table: String,
@@ -66,25 +66,25 @@ impl std::fmt::Debug for Throttle {
 }
 
 impl Throttle {
-    /// Cho phép `limit` lần mỗi `window` trên bảng `<module>_throttle`.
+    /// Allows `limit` hits per `window` on the table `<module>_throttle`.
     pub fn new(module: &str, limit: u32, window: Duration) -> Result<Self, Error> {
         let limit = <i32 as TryFrom<u32>>::try_from(limit).map_err(Error::internal)?;
         let window = SignedDuration::try_from(window).map_err(Error::internal)?;
         Ok(Throttle { table: table_name(module), limit, window, lock: window })
     }
 
-    /// Module sở hữu bảng (`<module>_throttle`) — để chống spam đọc bảng nonce của cùng module.
+    /// The module that owns the table (`<module>_throttle`) — so anti-spam reads the nonce table of the same module.
     pub(crate) fn owner(&self) -> Option<&str> {
         self.table.strip_suffix("_throttle")
     }
 
-    /// Vượt giới hạn thì chặn trong `lock` (thay vì `window`).
+    /// When the limit is exceeded, blocks for `lock` (instead of `window`).
     pub fn with_lock(mut self, lock: Duration) -> Result<Self, Error> {
         self.lock = SignedDuration::try_from(lock).map_err(Error::internal)?;
         Ok(self)
     }
 
-    /// Khoá `key` của khách `tenant` có đang bị chặn không, KHÔNG đếm.
+    /// Whether key `key` of tenant `tenant` is currently blocked, WITHOUT counting.
     pub async fn check(&self, tenant: &TenantContext, key: &str) -> Result<Outcome, Error> {
         let now = now();
         let select = Query::select()
@@ -104,12 +104,12 @@ impl Throttle {
         })
     }
 
-    /// Đếm một lần cho `key` rồi xét: bị chặn (từ trước hoặc vì lần này vượt giới hạn) thì
-    /// [`Outcome::Limited`]. Lần đang bị chặn thì không đếm thêm.
+    /// Counts once for `key` and then evaluates: if blocked (from before or because this hit exceeded the
+    /// limit) it returns [`Outcome::Limited`]. A hit that is already blocked is not counted further.
     ///
-    /// Hai câu cho lượt được phép (D-321): đọc xem có đang bị chặn không (không khoá dòng — lượt bị
-    /// chặn dừng ở đây), rồi một câu "chèn hoặc cộng" trả về số đếm của CHÍNH lượt này. Mỗi lượt đồng
-    /// thời nhận một số đếm khác nhau, nên đúng `limit` lượt được phép.
+    /// Two statements for an allowed hit (D-321): read whether it is blocked (no row lock — a blocked hit
+    /// stops here), then one "insert or add" statement that returns the count of THIS very hit. Concurrent hits
+    /// each receive a different count, so exactly `limit` hits are allowed.
     pub async fn hit(&self, tenant: &TenantContext, key: &str) -> Result<Outcome, Error> {
         let before = self.check(tenant, key).await?;
         if !before.is_allowed() {
@@ -130,7 +130,7 @@ impl Throttle {
         Ok(Outcome::Allowed)
     }
 
-    /// Đếm một lần cho `key`, không xét (vd ghi một lần đăng nhập sai).
+    /// Counts once for `key` without evaluating (e.g. recording one failed login).
     pub async fn record(&self, tenant: &TenantContext, key: &str) -> Result<(), Error> {
         let hashed = sha256(key);
         let now = now();
@@ -140,10 +140,11 @@ impl Throttle {
         Ok(())
     }
 
-    /// Cộng một vào số đếm của khoá đã băm `hashed` bằng MỘT câu và trả số đếm sau khi cộng: chưa
-    /// có dòng thì chèn với 1; cửa sổ cũ đã hết thì bắt đầu cửa sổ mới với 1. `INSERT … ON CONFLICT
-    /// DO UPDATE … RETURNING` chạy trên cả SQLite (từ 3.35) và Postgres; database tự xếp hàng các
-    /// lượt cùng lúc trên dòng đó. Trả kèm `locked_until` của dòng (câu cộng không đổi cột này).
+    /// Adds one to the count of the hashed key `hashed` with ONE statement and returns the count after
+    /// adding: with no row yet it inserts with 1; when the old window has ended it starts a new window with 1.
+    /// `INSERT … ON CONFLICT DO UPDATE … RETURNING` runs on both SQLite (from 3.35) and Postgres; the
+    /// database queues concurrent hits on that row. Also returns the row's `locked_until` (the add statement
+    /// does not change this column).
     async fn count(
         &self,
         tenant: &TenantContext,
@@ -181,12 +182,12 @@ impl Throttle {
         })
     }
 
-    /// Lấy tối đa `n` lượt của khoá `key` trong cửa sổ hiện tại, bằng MỘT câu (D-375): dùng cho
-    /// rate limit theo lô — mỗi máy chủ lấy một lô rồi tiêu dần trong bộ nhớ, hết mới hỏi lại. Số
-    /// đếm cộng thẳng `n` (vượt `limit` cũng không sao: lượt sau trong cửa sổ nhận 0), nên số lượt
-    /// được cấp tính được từ số đếm trả về: `min(n, limit − (count − n))`. Các lượt đồng thời được
-    /// database xếp hàng trên dòng, tổng số lượt cấp trong một cửa sổ không vượt `limit`. Không đụng
-    /// tới `locked_until` (của [`hit`](Self::hit)).
+    /// Takes up to `n` hits of key `key` in the current window with ONE statement (D-375): used for batched
+    /// rate limiting — each server takes a batch and spends it gradually in memory, asking again only when it
+    /// is used up. The count adds `n` directly (exceeding `limit` is fine: later hits in the window get 0),
+    /// so the number of hits granted can be computed from the returned count: `min(n, limit − (count − n))`.
+    /// Concurrent hits are queued by the database on the row, so the total granted in one window does not
+    /// exceed `limit`. It does not touch `locked_until` (that belongs to [`hit`](Self::hit)).
     pub async fn take(&self, tenant: &TenantContext, key: &str, n: u32) -> Result<Taken, Error> {
         let wanted = <i32 as TryFrom<u32>>::try_from(n).map_err(Error::internal)?;
         let now = now();
@@ -230,7 +231,7 @@ impl Throttle {
         })
     }
 
-    /// Trả lại một lần đã đếm (vd lần thử hoá ra không sai): người dùng thật không bị tính oan.
+    /// Gives back one counted hit (e.g. the attempt turned out not to be wrong): a real user is not penalized unfairly.
     pub async fn refund(&self, tenant: &TenantContext, key: &str) -> Result<(), Error> {
         let update = Query::update()
             .table(Alias::new(&self.table))
@@ -243,7 +244,7 @@ impl Throttle {
         Ok(())
     }
 
-    /// Quên mọi lần đã đếm của `key` (vd đăng nhập đúng).
+    /// Forgets every counted hit of `key` (e.g. a correct login).
     pub async fn clear(&self, tenant: &TenantContext, key: &str) -> Result<(), Error> {
         let delete = Query::delete()
             .from_table(Alias::new(&self.table))
@@ -254,8 +255,8 @@ impl Throttle {
         Ok(())
     }
 
-    /// Xoá các dòng (mọi khách) của `database` có cửa sổ đã qua trước `before` và không còn bị
-    /// chặn. Module gọi trong job dọn dẹp định kỳ của mình. Trả số dòng đã xoá.
+    /// Deletes the rows (all tenants) of `database` whose window ended before `before` and that are no longer
+    /// blocked. Modules call it in their own periodic cleanup job. Returns the number of rows deleted.
     pub async fn purge(&self, database: &Database, before: Timestamp) -> Result<u64, Error> {
         let now = now();
         let delete = Query::delete()
@@ -271,8 +272,8 @@ impl Throttle {
         Ok(database.write().execute(&delete).await?.rows_affected())
     }
 
-    /// Vượt ngưỡng thì chặn tới `now + lock` và đếm lại từ đầu, để hết chặn là có đủ số lần
-    /// như mới.
+    /// When the threshold is exceeded, blocks until `now + lock` and restarts counting from zero, so once
+    /// unblocked the full number of attempts is available again as new.
     async fn lock_if_exceeded(
         &self,
         tenant: &TenantContext,
@@ -298,24 +299,24 @@ impl Throttle {
     }
 }
 
-/// Kết quả của [`Throttle::take`].
+/// Result of [`Throttle::take`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct Taken {
-    /// Số lượt được cấp, từ 0 tới số đã xin.
+    /// Number of hits granted, from 0 up to the number requested.
     pub granted: u32,
-    /// Thời gian còn lại của cửa sổ: lượt được cấp chỉ dùng trong khoảng này; cấp 0 thì thử lại sau
-    /// chừng này.
+    /// Time left in the window: granted hits can only be used within this span; when 0 is granted, retry after
+    /// this long.
     pub window_left: Duration,
 }
 
-/// Kết quả của câu "chèn hoặc cộng": số đếm của chính lượt này và hạn khoá của dòng (nếu có).
+/// Result of the "insert or add" statement: this hit's own count and the row's lock expiry (if any).
 struct Counted {
     count: i64,
     locked_until: Option<Timestamp>,
 }
 
-/// Số giây (làm tròn lên, ít nhất 1) của `duration`.
+/// Number of seconds (rounded up, at least 1) of `duration`.
 fn seconds_up(duration: SignedDuration) -> u64 {
     let millis = Ord::max(i64::try_from(duration.as_millis()).unwrap_or(i64::MAX), 0);
     Ord::max(<u64 as TryFrom<i64>>::try_from((millis + 999) / 1000).unwrap_or(1), 1)
@@ -329,8 +330,8 @@ fn table_name(module: &str) -> String {
     format!("{module}_throttle")
 }
 
-/// Migration tạo bảng `<module>_throttle`. Module dùng [`Throttle`] thêm nó vào danh sách
-/// migration của mình.
+/// Migration that creates the table `<module>_throttle`. A module that uses [`Throttle`] adds it to its list of
+/// migrations.
 pub fn throttle_migration(name: &'static str, module: &'static str) -> Box<dyn MigrationTrait> {
     Box::new(ThrottleMigration { name, module })
 }
@@ -380,8 +381,8 @@ impl MigrationTrait for ThrottleMigration {
     }
 }
 
-/// Bảng `<module>_throttle` sau khi nâng theo khách (bước 33 A4): khoá chính `(tenant_id, key)`;
-/// index dọn dẹp (mọi khách) `…_window_sweep_idx`. Thêm vào migration của module như
+/// The table `<module>_throttle` after upgrading per tenant (step 33 A4): primary key `(tenant_id, key)`;
+/// cleanup index (all tenants) `…_window_sweep_idx`. Added to the module's migration like
 /// [`event::tenant_table`](crate::event::tenant_table).
 pub fn tenant_table(module: &str) -> crate::tenancy::migration::TenantTable {
     let table = table_name(module);

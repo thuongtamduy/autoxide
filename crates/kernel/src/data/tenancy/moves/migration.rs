@@ -1,8 +1,8 @@
-//! Migration tạo bảng `kernel_tenant_moves`.
+//! Migration that creates the `kernel_tenant_moves` table.
 
 use super::*;
 
-/// Bảng `kernel_tenant_moves` (mặt điều khiển, chỉ database điều khiển có dữ liệu).
+/// The `kernel_tenant_moves` table (control plane; only the control database holds data).
 pub(crate) struct CreateTenantMoves;
 
 impl MigrationName for CreateTenantMoves {

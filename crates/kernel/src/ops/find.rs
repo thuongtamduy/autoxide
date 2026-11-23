@@ -1,9 +1,11 @@
-//! Tìm xuyên phân hệ (bước 51 P3, ô Ctrl K của giao diện): module khai **nguồn tìm** cho loại
-//! bản ghi của mình; `GET /api/v1/kernel/find?q=` hỏi các nguồn người gọi có permission, mỗi nguồn
-//! có hạn giờ như hộp việc, gom kết quả theo loại. So khớp không dấu (`autoxide_kernel::search`):
-//! nguồn tìm trên cột khoá tìm đã lưu sẵn, như mọi ô tìm của module.
+//! Cross-module search (step 51 P3, the UI's Ctrl K box): a module declares **search sources** for its record
+//! kinds; `GET /api/v1/kernel/find?q=` queries the sources the caller has permission for, each source with a
+//! time limit like the work inbox, and groups results by kind. Matching ignores diacritics
+//! (`autoxide_kernel::search`): a source searches a precomputed search-key column, like every module's search
+//! box.
 //!
-//! Lệnh ("tạo mới", "đi tới màn…") giao diện tự dựng từ sổ điều hướng; core không có danh sách lệnh.
+//! Commands ("create new", "go to screen…") are built by the UI from the navigation registry; the core has no
+//! command list.
 
 use std::sync::{Arc, PoisonError, RwLock};
 
@@ -20,17 +22,17 @@ use crate::error::{Error, FieldError};
 use crate::response::{Data, Problem};
 use crate::tenancy::{OrgId, TenantContext, root_of};
 
-/// Ít nhất chừng này ký tự (sau khi bỏ khoảng trắng hai đầu).
+/// At least this many characters (after trimming whitespace at both ends).
 const MIN_QUERY: usize = 2;
 
-/// Một bản ghi tìm thấy.
+/// A record found.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct Found {
     pub id: String,
     pub title: String,
     pub subtitle: Option<String>,
-    /// Màn của sổ điều hướng mở bản ghi (`NavItem::id`).
+    /// The screen in the navigation registry that opens the record (`NavItem::id`).
     pub screen: &'static str,
 }
 
@@ -46,7 +48,7 @@ impl Found {
     }
 }
 
-/// Phép so của một bộ lọc trong ô tìm.
+/// The comparison operator of a filter in the search box.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SearchOp {
     /// `field:value`
@@ -59,52 +61,52 @@ pub enum SearchOp {
     Lt(String),
     /// `field<=value`
     Le(String),
-    /// `field:from..to` (gồm hai đầu; một đầu trống là không giới hạn phía đó).
+    /// `field:from..to` (inclusive of both ends; an empty end means no limit on that side).
     Range(String, String),
 }
 
-/// Một bộ lọc trong ô tìm, vd `status:draft`, `-locale:en`, `updated>2026-01-01`.
+/// A filter in the search box, e.g. `status:draft`, `-locale:en`, `updated>2026-01-01`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SearchFilter {
-    /// Tên trường, chữ thường.
+    /// Field name, lowercase.
     pub field: String,
     pub op: SearchOp,
-    /// Có `-` đứng trước: loại bản ghi khớp.
+    /// Preceded by `-`: excludes matching records.
     pub negated: bool,
-    /// Nguyên văn trong ô tìm (để báo lại trong `ignored`).
+    /// Verbatim text from the search box (to report back in `ignored`).
     pub raw: String,
 }
 
-/// Phạm vi tìm theo cây tổ chức (bước 51 P9).
+/// Search scope over the organization tree (step 51 P9).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum SearchScope {
-    /// Mọi nút người gọi có quyền (mặc định; phạm vi quyền do nguồn tự áp).
+    /// Every node the caller has permission for (default; permission scope is applied by the source itself).
     #[default]
     Accessible,
-    /// Chỉ bản ghi của đúng nút này.
+    /// Only records of exactly this node.
     Node(OrgId),
-    /// Bản ghi của nút này và mọi nút con.
+    /// Records of this node and all its child nodes.
     Subtree(OrgId),
 }
 
-/// Truy vấn của ô tìm đã phân tích (bước 51 P9): từ khoá còn lại, loại (`is:`), bộ lọc.
+/// A parsed search-box query (step 51 P9): remaining keywords, kinds (`is:`), filters.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct SearchQuery {
-    /// Từ khoá còn lại, cách nhau một khoảng trắng.
+    /// Remaining keywords, separated by a single space.
     pub text: String,
-    /// `is:<loại>`: chỉ các loại này (tên đầy đủ `content.entry` hay phần sau dấu chấm `entry`).
+    /// `is:<kind>`: only these kinds (full name `content.entry` or the part after the dot `entry`).
     pub kinds: Vec<String>,
-    /// `-is:<loại>`: trừ các loại này.
+    /// `-is:<kind>`: excludes these kinds.
     pub excluded_kinds: Vec<String>,
     pub filters: Vec<SearchFilter>,
-    /// Phần không hiểu (từ khoá phủ định `-chữ`, phép so thiếu giá trị).
+    /// The parts not understood (negated keywords `-word`, comparisons missing a value).
     pub ignored: Vec<String>,
-    /// Phạm vi theo cây tổ chức (`scope=` của endpoint).
+    /// Scope over the organization tree (the endpoint's `scope=`).
     pub scope: SearchScope,
 }
 
 impl SearchQuery {
-    /// Phân tích ô tìm. Cụm trong ngoặc kép là một từ khoá (giữ khoảng trắng).
+    /// Parses the search box. A phrase in double quotes is one keyword (whitespace is kept).
     pub fn parse(input: &str) -> Self {
         let mut query = SearchQuery::default();
         let mut words = Vec::new();
@@ -140,7 +142,7 @@ impl SearchQuery {
         query
     }
 
-    /// Điều kiện phạm vi cho cột nút `column` của bảng nguồn; `None` với `Accessible`.
+    /// Scope condition for the node column `column` of the source table; `None` for `Accessible`.
     pub fn scope_condition<Col: sea_orm::ColumnTrait>(
         &self,
         tenant: &TenantContext,
@@ -155,7 +157,7 @@ impl SearchQuery {
         }
     }
 
-    /// Có loại `kind` (`<module>.<loại>`) theo `is:` / `-is:` không.
+    /// Whether kind `kind` (`<module>.<kind>`) is matched by `is:` / `-is:`.
     pub fn wants(&self, kind: &str) -> bool {
         let short = kind.rsplit('.').next().unwrap_or(kind);
         let named =
@@ -195,8 +197,8 @@ fn tokens(input: &str) -> Vec<Token> {
     out
 }
 
-/// `field:value`, `field>value`, `field>=value`, `field<value`, `field<=value`, `field:a..b`; tên
-/// trường là chữ thường, số, `_`.
+/// `field:value`, `field>value`, `field>=value`, `field<value`, `field<=value`, `field:a..b`; the field
+/// name is lowercase letters, digits, `_`.
 fn operator(body: &str) -> Option<(String, SearchOp)> {
     let split = body.find([':', '>', '<'])?;
     let field = &body[..split];
@@ -222,13 +224,13 @@ fn operator(body: &str) -> Option<(String, SearchOp)> {
     (!value.is_empty()).then(|| (field.to_lowercase(), op(value.to_owned())))
 }
 
-/// Một nguồn tìm module khai bằng [`StartContext::finder_source`](crate::module::StartContext).
-/// Nguồn tự áp phạm vi nút của người gọi và chỉ trả bản ghi người đó được xem.
+/// A search source a module declares with [`StartContext::finder_source`](crate::module::StartContext).
+/// The source applies the caller's node scope itself and returns only records that person may view.
 //
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
 #[async_trait::async_trait]
 pub trait FinderSource: Send + Sync {
-    /// Loại bản ghi, `<module>.<loại>` (như sổ đối tượng), vd `content.entry`.
+    /// Record kind, `<module>.<kind>` (like the entity registry), e.g. `content.entry`.
     fn kind(&self) -> &'static str;
     fn permission(&self) -> Permission;
     async fn find(
@@ -240,18 +242,18 @@ pub trait FinderSource: Send + Sync {
         limit: u16,
     ) -> Result<Vec<Found>, Error>;
 
-    /// Nguồn áp được `scope=node|subtree` (bản ghi có cột nút). Mặc định: không.
+    /// The source can apply `scope=node|subtree` (records have a node column). Default: no.
     fn scoped(&self) -> bool {
         false
     }
 
-    /// Trường lọc nguồn hiểu (bước 51 P9), vd `status`, `updated`. Mặc định: không trường nào.
+    /// Filter fields the source understands (step 51 P9), e.g. `status`, `updated`. Default: none.
     fn fields(&self) -> &'static [&'static str] {
         &[]
     }
 
-    /// Tìm theo truy vấn đã phân tích; chỉ nhận bộ lọc của [`fields`](Self::fields). Mặc định: tìm
-    /// theo từ khoá như [`find`](Self::find) (nguồn chưa hiểu bộ lọc).
+    /// Searches by the parsed query; only accepts the filters of [`fields`](Self::fields). Default: searches
+    /// by keywords like [`find`](Self::find) (a source that does not understand filters yet).
     async fn find_query(
         &self,
         tenant: &TenantContext,
@@ -266,7 +268,7 @@ pub trait FinderSource: Send + Sync {
 
 type Entry = (&'static str, Arc<dyn FinderSource>);
 
-/// Sổ nguồn tìm của mọi module. Clone rẻ.
+/// Registry of every module's search sources. Cheap to clone.
 #[derive(Clone, Default)]
 pub struct FinderSources {
     entries: Arc<RwLock<Vec<Entry>>>,

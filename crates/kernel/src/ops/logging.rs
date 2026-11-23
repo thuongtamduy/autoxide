@@ -1,18 +1,18 @@
-//! Log của chương trình.
+//! The program's logs.
 //!
-//! Code ở mọi nơi ghi log bằng macro của `tracing` (`tracing::info!(…)`,
-//! `tracing::error!(…)`), kèm trường có tên thay vì ghép chuỗi:
+//! Code everywhere logs with the `tracing` macros (`tracing::info!(…)`,
+//! `tracing::error!(…)`), with named fields instead of string concatenation:
 //!
 //! ```
 //! let user_id = 7;
 //! tracing::info!(user_id, "password changed");
 //! ```
 //!
-//! File này quyết định log đi đâu và trông thế nào: ra **stderr** (stdout dành cho
-//! kết quả của lệnh, vd `autoxide openapi`), dạng chữ cho người đọc hoặc JSON cho
-//! máy thu gom, lọc theo mức đã cấu hình.
+//! This file decides where logs go and what they look like: to **stderr** (stdout is reserved for
+//! command output, e.g. `autoxide openapi`), as text for people or JSON for
+//! collectors, filtered by the configured level.
 //!
-//! KHÔNG ghi secret, mật khẩu, token hay toàn bộ thân request vào log.
+//! Do NOT log secrets, passwords, tokens or whole request bodies.
 
 use std::fmt;
 
@@ -25,7 +25,7 @@ use tracing_subscriber::registry::Registry;
 
 use crate::config::{LogConfig, LogFormat, LogLevel};
 
-/// Lỗi khi bật log.
+/// Error when enabling logging.
 #[derive(Debug)]
 pub struct LogError(String);
 
@@ -37,18 +37,18 @@ impl fmt::Display for LogError {
 
 impl std::error::Error for LogError {}
 
-/// Một lớp xử lý log đã đóng hộp, để gom nhiều lớp khác kiểu vào một danh sách.
+/// A boxed log-processing layer, so layers of different types can be collected into one list.
 pub type BoxedLayer = Box<dyn Layer<Registry> + Send + Sync>;
 
-/// Bật log cho cả tiến trình, ghi ra stderr. Gọi một lần lúc khởi động; gọi lần
-/// hai là lỗi. `extra` là các lớp thêm (vd xuất trace ra OpenTelemetry).
+/// Enables logging for the whole process, writing to stderr. Call once at startup; a second call
+/// is an error. `extra` holds additional layers (e.g. exporting traces to OpenTelemetry).
 pub fn init(config: &LogConfig, extra: Vec<BoxedLayer>) -> Result<(), LogError> {
     tracing::subscriber::set_global_default(subscriber(config, std::io::stderr, extra))
         .map_err(|error| LogError(error.to_string()))
 }
 
-/// Dựng bộ nhận log ghi vào `writer`. Tách khỏi [`init`] để test bắt được nội dung
-/// log mà không đụng tới cấu hình toàn tiến trình.
+/// Builds a log subscriber that writes to `writer`. Split from [`init`] so tests can capture the log content
+/// without touching process-wide configuration.
 pub fn subscriber<W>(
     config: &LogConfig,
     writer: W,
@@ -96,7 +96,7 @@ mod tests {
     use super::*;
     use std::sync::{Arc, Mutex};
 
-    /// Nơi ghi log vào bộ nhớ, để test đọc lại.
+    /// A place that writes logs into memory, so tests can read them back.
     #[derive(Clone, Default)]
     struct Buffer(Arc<Mutex<Vec<u8>>>);
 
@@ -125,7 +125,7 @@ mod tests {
         }
     }
 
-    /// Chạy `emit` với bộ nhận log theo `config`; trả về những gì đã được ghi.
+    /// Runs `emit` with a log subscriber built from `config`; returns what was written.
     fn capture(config: LogConfig, emit: impl FnOnce()) -> String {
         let buffer = Buffer::default();
         tracing::subscriber::with_default(subscriber(&config, buffer.clone(), Vec::new()), emit);

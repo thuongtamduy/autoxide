@@ -1,14 +1,14 @@
-//! Bộ phát event: đọc event chưa giao trong bảng `<module>_events` của các module và
-//! giao cho bên nhận.
+//! Event dispatcher: reads undelivered events from the modules' `<module>_events` tables and delivers them
+//! to subscribers.
 //!
-//! Nhiều tiến trình chạy bộ phát cùng lúc vẫn đúng: mỗi event được "nhận việc"
-//! (`claimed_until`) bằng một câu `UPDATE` có điều kiện — chỉ một tiến trình nhận được,
-//! các tiến trình khác bỏ qua. Câu lệnh chạy giống nhau trên SQLite và Postgres. Tiến
-//! trình nhận việc rồi chết giữa chừng thì hết hạn nhận việc, tiến trình khác giao lại.
+//! Several processes can run the dispatcher at the same time and it stays correct: each event is "claimed"
+//! (`claimed_until`) with a conditional `UPDATE` statement, so only one process wins and the others skip
+//! it. The statement behaves the same on SQLite and Postgres. If a process claims an event and then dies
+//! midway, the claim expires and another process delivers it again.
 //!
-//! Nhiều database (bước 33): mỗi lượt duyệt mọi database được giao (`DatabaseRegistry::databases`,
-//! lọc theo `AUTOXIDE_WORKER_PLACEMENTS`); event mang khách (`tenant_id`) và bên nhận nhận ngữ cảnh
-//! khách đó trong [`Delivered::tenant`].
+//! Multiple databases (step 33): each pass walks every assigned database (`DatabaseRegistry::databases`,
+//! filtered by `AUTOXIDE_WORKER_PLACEMENTS`); an event carries its tenant (`tenant_id`) and the subscriber
+//! gets that tenant's context in [`Delivered::tenant`].
 
 use crate::time::Timestamp;
 use futures_util::FutureExt as _;
@@ -27,36 +27,37 @@ use crate::database::Database;
 use crate::error::Error;
 use crate::tenancy::{DatabaseRegistry, PlacementId, TenantId, TenantStatus};
 
-/// Số lần giao tối đa của một event; quá thì đánh dấu hỏng (`failed_at`) — trừ event xoá
-/// tài khoản ([`USER_DELETED`](crate::privacy::USER_DELETED)), thử lại mãi.
+/// The maximum number of delivery attempts for an event; beyond it the event is marked failed
+/// (`failed_at`), except account deletion events ([`USER_DELETED`](crate::privacy::USER_DELETED)), which
+/// retry forever.
 pub const MAX_ATTEMPTS: i32 = 10;
-/// Số event mỗi bảng xử lý trong một lượt.
+/// The number of events processed per table in one pass.
 const BATCH: u64 = 100;
-/// Một tiến trình giữ việc giao một event tối đa chừng này.
+/// A process holds the delivery of an event for at most this long.
 const CLAIM_SECONDS: i64 = 60;
-/// Một lần giao (mọi bên nhận của một event) tối đa chừng này — ngắn hơn thời gian giữ, nên
-/// không tiến trình nào khác nhận lại event đang giao (D-158). Bên nhận cần lâu hơn thì làm
-/// từng phần (lần sau làm tiếp) hoặc chuyển việc vào job.
+/// One delivery (all subscribers of one event) takes at most this long. It is shorter than the hold time,
+/// so no other process re-claims an event being delivered (D-158). A subscriber that needs longer should
+/// work in parts (continuing next time) or hand the work off to a job.
 const DELIVERY_TIMEOUT: Duration = Duration::from_secs(50);
-/// Không có event mới thì hỏi lại sau chừng này.
+/// With no new events, polls again after this long.
 const IDLE_POLL: Duration = Duration::from_secs(1);
-/// Độ dài tối đa của lỗi lưu lại.
+/// The maximum length of a stored error.
 const MAX_ERROR_LENGTH: usize = 2000;
-/// Giữ event đã giao chừng này rồi xoá (audit log đã có bản của nó).
+/// Keeps delivered events this long, then deletes them (the audit log already has its own copy).
 const KEEP_DELIVERED: SignedDuration = SignedDuration::from_hours(24 * 7);
-/// Dọn event đã giao mỗi chừng này.
+/// Cleans up delivered events this often.
 const CLEANUP_EVERY: Duration = Duration::from_secs(3600);
 
-/// Bộ phát event của chương trình.
+/// The program's event dispatcher.
 pub struct Dispatcher {
     databases: DatabaseRegistry,
-    /// Các module có bảng event.
+    /// The modules that have an event table.
     modules: Vec<&'static str>,
-    /// (module nhận, đăng ký).
+    /// (subscribing module, subscription).
     subscriptions: Vec<(&'static str, Subscription)>,
     wake: Arc<Notify>,
     last_cleanup: std::sync::Mutex<Option<std::time::Instant>>,
-    /// Quyền dùng theo khách (bước 35): bên nhận thuộc module gói của khách không có bị bỏ qua.
+    /// Per-tenant entitlements (step 35): subscribers in a module outside the tenant's plan are skipped.
     entitlements: crate::entitlement::EntitlementsHandle,
 }
 
@@ -77,7 +78,7 @@ impl Dispatcher {
         }
     }
 
-    /// Bỏ qua bên nhận thuộc module mà gói của khách của event không có (bước 35).
+    /// Skips subscribers in a module that the event's tenant plan does not include (step 35).
     pub(crate) fn with_entitlements(
         mut self,
         entitlements: crate::entitlement::EntitlementsHandle,
@@ -86,8 +87,9 @@ impl Dispatcher {
         self
     }
 
-    /// Bên nhận thuộc module `subscriber` có được nhận event của khách `tenant` không: module
-    /// `always_enabled`, hay gói của khách có module và khách không chỉ đọc vì thuê bao.
+    /// Whether a subscriber in module `subscriber` may receive an event of tenant `tenant`: the module is
+    /// `always_enabled`, or the tenant's plan includes the module and the tenant is not read-only due to
+    /// subscription.
     async fn admits(
         &self,
         subscriber: &str,
@@ -103,8 +105,8 @@ impl Dispatcher {
             && snapshot.access == crate::entitlement::TenantAccess::Full)
     }
 
-    /// Giao một lượt mọi event đang chờ; trả về số event đã xử lý (giao xong hoặc
-    /// hẹn lại).
+    /// Delivers one pass of every pending event; returns the number of events processed (delivered or
+    /// rescheduled).
     pub async fn run_once(&self) -> Result<usize, Error> {
         let databases = self.databases.databases().await?;
         self.cleanup(&databases).await?;
@@ -117,8 +119,8 @@ impl Dispatcher {
         Ok(handled)
     }
 
-    /// Giao event tới khi `shutdown` hoàn thành. Lỗi database thì ghi log rồi thử lại
-    /// ở lượt sau — bộ phát không được chết vì một lần database chập chờn.
+    /// Delivers events until `shutdown` completes. On a database error it logs and retries on the next
+    /// pass: the dispatcher must not die because of one database hiccup.
     pub async fn run(self, shutdown: impl Future<Output = ()>) {
         tokio::pin!(shutdown);
         loop {
@@ -140,8 +142,8 @@ impl Dispatcher {
         }
     }
 
-    /// Xoá event đã giao hơn [`KEEP_DELIVERED`], mỗi giờ một lần. Event hỏng hẳn được
-    /// giữ lại để người vận hành xem.
+    /// Deletes events delivered more than [`KEEP_DELIVERED`] ago, once an hour. Permanently failed events
+    /// are kept for operators to inspect.
     async fn cleanup(&self, databases: &[(PlacementId, String, Database)]) -> Result<(), Error> {
         {
             let mut last = self.last_cleanup.lock().map_err(|_| Error::internal("cleanup lock"))?;
@@ -163,10 +165,11 @@ impl Dispatcher {
         Ok(())
     }
 
-    /// Giao event chờ trong bảng event của `module` ở `database` (placement `placement`).
+    /// Delivers pending events in the event table of `module` on `database` (placement `placement`).
     ///
-    /// Khách đang dời (`moving`): hẹn event lại sau, không tính lần giao — event đi theo dữ liệu
-    /// sang đích. Khách đã ở placement khác: dòng này là bản sao còn sót ở nguồn, không giao.
+    /// Tenant being moved (`moving`): the event is rescheduled for later without counting as an attempt,
+    /// since it travels with the data to the destination. Tenant already on another placement: this row is
+    /// a leftover copy at the source and is not delivered.
     async fn run_table(
         &self,
         placement: PlacementId,
@@ -234,9 +237,9 @@ impl Dispatcher {
         Ok(handled)
     }
 
-    /// Giao cho mọi bên nhận khớp tên event, lần lượt; bên đầu tiên lỗi thì dừng. Bên nhận
-    /// panic hay chạy quá [`DELIVERY_TIMEOUT`] tính là một lần giao lỗi (thử lại theo backoff),
-    /// không làm chết dispatcher của cả tiến trình (D-158).
+    /// Delivers to every subscriber matching the event name, in order; stops at the first failing
+    /// subscriber. A subscriber that panics or runs longer than [`DELIVERY_TIMEOUT`] counts as one failed
+    /// attempt (retried with backoff) and does not kill the dispatcher of the whole process (D-158).
     async fn deliver(&self, event: &Delivered) -> Result<(), Error> {
         let all = async {
             for (subscriber, subscription) in &self.subscriptions {
@@ -283,7 +286,7 @@ impl Dispatcher {
         }
     }
 
-    /// Đọc một dòng event, kèm ngữ cảnh khách của nó.
+    /// Reads one event row, with its tenant context.
     async fn read_event(
         &self,
         module: &'static str,
@@ -322,7 +325,7 @@ impl Dispatcher {
     }
 }
 
-/// Đường vào đọc từ hai cột của outbox; dòng cũ (không có giá trị) là trực tiếp.
+/// The entry path read from the outbox's two columns; an old row (with no value) is direct.
 fn access_of(kind: Option<&str>, id: Option<Uuid>) -> crate::access::AccessPath {
     match (kind, id) {
         (Some("delegation"), Some(id)) => crate::access::AccessPath::Delegation(id),
@@ -332,7 +335,7 @@ fn access_of(kind: Option<&str>, id: Option<Uuid>) -> crate::access::AccessPath 
     }
 }
 
-/// Nhận việc giao event `id`. `false` nếu tiến trình khác đã nhận.
+/// Claims the delivery of event `id`. Returns `false` if another process already claimed it.
 async fn claim(
     database: &Database,
     table: &Alias,
@@ -347,7 +350,7 @@ async fn claim(
     Ok(database.write().execute(&update).await?.rows_affected() == 1)
 }
 
-/// Khách của event `id` đang dời: thử lại sau, không tính lần giao.
+/// The tenant of event `id` is being moved: retry later, without counting an attempt.
 async fn postpone(database: &Database, table: &Alias, id: Uuid) -> Result<(), Error> {
     let now = now();
     let mut update = Query::update();
@@ -359,7 +362,7 @@ async fn postpone(database: &Database, table: &Alias, id: Uuid) -> Result<(), Er
     Ok(())
 }
 
-/// Dòng event `id` không đọc được: hỏng hẳn, kèm lý do.
+/// The row of event `id` cannot be read: permanently failed, with the reason.
 async fn mark_unreadable(
     database: &Database,
     table: &Alias,
@@ -391,7 +394,7 @@ async fn mark_delivered(database: &Database, table: &Alias, id: Uuid) -> Result<
     Ok(())
 }
 
-/// Ghi một lần giao hỏng: hẹn lần sau theo backoff, hoặc đánh dấu hỏng hẳn.
+/// Records a failed delivery: schedules the next attempt with backoff, or marks it permanently failed.
 async fn mark_failed(
     database: &Database,
     table: &Alias,
@@ -444,7 +447,8 @@ async fn mark_failed(
     Ok(())
 }
 
-/// Điều kiện "đang chờ giao": chưa giao, chưa hỏng hẳn, tới giờ thử, không ai đang giữ.
+/// The "pending delivery" condition: not delivered, not permanently failed, due for a retry, and not held
+/// by anyone.
 fn pending(now: Timestamp) -> Condition {
     Condition::all()
         .add(Expr::col(Alias::new("delivered_at")).is_null())
@@ -457,13 +461,14 @@ fn pending(now: Timestamp) -> Condition {
         )
 }
 
-/// Chờ trước lần giao thứ `attempts + 1`: 2, 4, 8… giây, tối đa một giờ.
+/// The wait before attempt number `attempts + 1`: 2, 4, 8... seconds, at most one hour.
 fn backoff(attempts: i32) -> SignedDuration {
     let exponent = u32::try_from(attempts.clamp(1, 12)).unwrap_or(12);
     SignedDuration::from_secs(std::cmp::min(i64::from(2u32.pow(exponent)), 3600))
 }
 
-/// Lỗi kèm nguyên nhân gốc (lỗi nội bộ chỉ có câu chung; nguyên nhân mới có ích để sửa).
+/// An error with its root cause (an internal error carries only a generic message; the cause is what helps
+/// to fix it).
 fn describe(error: &Error) -> String {
     match std::error::Error::source(error) {
         Some(source) => format!("{}: {source}", error.code()),

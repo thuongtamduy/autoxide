@@ -1,5 +1,5 @@
-//! Service tách / gộp khách ([`TenantRelocations`]): kế hoạch, bắt đầu, chạy từng bước, yêu cầu
-//! của khách. Các bước (`planned` → … → `done`) ở `steps.rs`.
+//! The tenant split / merge service ([`TenantRelocations`]): plan, start, run step by step, tenant
+//! requests. The steps (`planned` → … → `done`) are in `steps.rs`.
 
 use crate::time::Timestamp;
 use jiff::SignedDuration;
@@ -25,33 +25,34 @@ use crate::tenancy::admin::Seeds;
 use crate::tenancy::moves::MoveSetup;
 use crate::tenancy::{DatabaseRegistry, TenantContext};
 
-/// Một bên giữ lượt tối đa chừng này mà không gia hạn; đang chạy thì gia hạn mỗi một phần ba.
+/// A party holds a run for at most this long without extending; while running it extends every third of that.
 pub(super) const LEASE: Duration = Duration::from_secs(120);
 
 pub(super) fn now() -> Timestamp {
     Timestamp::now()
 }
 
-/// Tách hay gộp những gì (CLI, REST).
+/// What to split or merge (CLI, REST).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RelocationInput {
     pub kind: RelocationKind,
-    /// Khách có dữ liệu đi: tách — khách có nhánh; gộp — khách bị gộp (ID hay slug).
+    /// The tenant whose data goes: split, the tenant that has the branch; merge, the tenant being merged (ID
+    /// or slug).
     pub tenant: String,
-    /// Tách: nút gốc của nhánh.
+    /// Split: the root node of the branch.
     pub org_id: Option<Uuid>,
-    /// Gộp: khách nhận (ID hay slug).
+    /// Merge: the receiving tenant (ID or slug).
     pub into: Option<String>,
-    /// Gộp: nút của khách nhận mà gốc của khách bị gộp thành con.
+    /// Merge: the node of the receiving tenant under which the merged tenant's root becomes a child.
     pub under_org: Option<Uuid>,
-    /// Tách: slug và tên của khách mới.
+    /// Split: slug and name of the new tenant.
     pub slug: Option<String>,
     pub name: Option<String>,
-    /// Tách: placement (database) của khách mới.
+    /// Split: placement (database) of the new tenant.
     pub placement: Option<String>,
-    /// Tách: khách mới là con của khách nguồn.
+    /// Split: the new tenant is a child of the source tenant.
     pub keep_parent: bool,
-    /// Vì sao dữ liệu chuyển giữa hai khách (bắt buộc).
+    /// Why the data moves between the two tenants (required).
     pub reason: String,
 }
 
@@ -76,14 +77,14 @@ impl RelocationInput {
     }
 }
 
-/// Tách / gộp khách. Module `kernel` công bố (`context.require::<TenantRelocations>()`).
+/// Splits / merges tenants. Published by the `kernel` module (`context.require::<TenantRelocations>()`).
 pub struct TenantRelocations {
     pub(super) registry: DatabaseRegistry,
     pub(super) setup: MoveSetup,
     pub(super) outbox: Outbox,
     pub(super) jobs: JobQueue,
-    /// Chờ chừng này (mili giây) sau khi khách thành `moving` (TTL cache khách + thời gian tối đa của
-    /// request). Atomic để test bỏ được thời gian chờ ([`TenantRelocations::skip_settle`]).
+    /// Waits this long (in milliseconds) after the tenant becomes `moving` (tenant cache TTL + the maximum
+    /// time of a request). Atomic so tests can skip the wait ([`TenantRelocations::skip_settle`]).
     pub(super) settle: std::sync::atomic::AtomicU64,
     /// `AUTOXIDE_RELOCATION_DRAIN_SECONDS`.
     pub(super) drain: Duration,
@@ -93,14 +94,14 @@ pub struct TenantRelocations {
 }
 
 impl TenantRelocations {
-    /// Thời gian chờ sau khi khách thành `moving`.
+    /// The wait after the tenant becomes `moving`.
     pub(super) fn settle(&self) -> Duration {
         Duration::from_millis(self.settle.load(std::sync::atomic::Ordering::Relaxed))
     }
 
-    /// Bỏ thời gian chờ máy chủ khác thấy khách đang dời (chỉ cho test, qua
-    /// `TestApp::skip_relocation_wait`): test không phải hạ `AUTOXIDE_HTTP_REQUEST_TIMEOUT_SECONDS`
-    /// xuống 1 giây — mức đó cắt request bình thường của test khi máy CI chậm.
+    /// Skips the wait for other servers to see the tenant being moved (tests only, through
+    /// `TestApp::skip_relocation_wait`): tests do not have to lower `AUTOXIDE_HTTP_REQUEST_TIMEOUT_SECONDS`
+    /// to 1 second, a level that cuts a test's ordinary requests when the CI machine is slow.
     pub fn skip_settle(&self) {
         self.settle.store(0, std::sync::atomic::Ordering::Relaxed);
     }
@@ -117,8 +118,8 @@ impl TenantRelocations {
         self.registry.control()
     }
 
-    /// Bảng cấp khách (trừ hàng đợi) mà không module nào khai chính sách tách / gộp, đọc ở
-    /// `database` — test của binary giữ danh sách này rỗng.
+    /// Tenant-level tables (except job queues) for which no module declares a split / merge policy, read at
+    /// `database`; the binary's tests keep this list empty.
     pub async fn uncovered_tables(&self, database: &Database) -> Result<Vec<String>, Error> {
         let (modules, control_plane) = self.setup.tables()?;
         let tables =
@@ -128,7 +129,7 @@ impl TenantRelocations {
         Ok(self.setup.policies()?.uncovered(&tables))
     }
 
-    /// Kế hoạch từ kết quả kiểm.
+    /// The plan from the check result.
     async fn plan_of(
         &self,
         prepared: &Prepared,
@@ -168,7 +169,8 @@ impl TenantRelocations {
         })
     }
 
-    /// Kế hoạch của `input`, không đổi gì: lý do chặn (câu theo `language`), xung đột, số dòng.
+    /// The plan for `input`, changing nothing: blocking reasons (sentences in `language`), conflicts, row
+    /// counts.
     pub async fn plan(
         &self,
         input: &RelocationInput,
@@ -180,10 +182,10 @@ impl TenantRelocations {
         self.plan_of(&prepared, language).await
     }
 
-    /// Bắt đầu lượt `input` (hay thực hiện yêu cầu `request` của khách với các giá trị của
-    /// `input`): kiểm, lập kế hoạch; lý do chặn đầu tiên thành lỗi; có xung đột thì lưu lượt
-    /// `failed` kèm báo cáo và trả `tenancy.relocation_conflict`. Chưa chép gì: gọi
-    /// [`run`](Self::run) (CLI) — `enqueue` thì job `kernel.relocate` chạy (REST).
+    /// Starts run `input` (or carries out the tenant's request `request` with the values of `input`):
+    /// checks, plans; the first blocking reason becomes an error; if there are conflicts, saves the run as
+    /// `failed` with a report and returns `tenancy.relocation_conflict`. Nothing is copied yet: call
+    /// [`run`](Self::run) (CLI); with `enqueue`, the job `kernel.relocate` runs it (REST).
     pub async fn start(
         &self,
         actor: Actor,
@@ -255,8 +257,9 @@ impl TenantRelocations {
         self.get(id).await
     }
 
-    /// Chạy lượt `id` tới xong (`done` / `failed`). `runner` phân biệt bên chạy (CLI, job). Lỗi:
-    /// lượt dừng ở trạng thái đang có, lỗi ghi vào `error`; gọi lại thì chạy tiếp.
+    /// Runs run `id` to completion (`done` / `failed`). `runner` tells apart the running party (CLI, job).
+    /// On an error: the run stops at its current state and the error is recorded in `error`; calling again
+    /// continues it.
     pub async fn run(&self, id: Uuid, runner: &str) -> Result<TenantRelocation, Error> {
         loop {
             let relocation = self.step(id, runner).await?;
@@ -273,7 +276,7 @@ impl TenantRelocations {
             .ok_or_else(|| errors::not_found(&id.to_string()))
     }
 
-    /// Lượt `id`.
+    /// Run `id`.
     pub async fn get(&self, id: Uuid) -> Result<TenantRelocation, Error> {
         let row = self.find(id).await?;
         let placement = match row.placement_id {
@@ -283,8 +286,8 @@ impl TenantRelocations {
         store::describe(row, placement)
     }
 
-    /// Khách `tenant` gửi yêu cầu tách / gộp `input` (khách nguồn là chính nó): lưu lượt
-    /// `requested` kèm kế hoạch thử, vào hộp việc của nhân sự nền tảng. Không đổi dữ liệu nào.
+    /// Tenant `tenant` submits a split / merge request `input` (the source tenant is itself): saves a run
+    /// `requested` with a trial plan, into the platform staff's work inbox. Changes no data.
     pub async fn request(
         &self,
         actor: Actor,
@@ -321,7 +324,7 @@ impl TenantRelocations {
         self.get(id).await
     }
 
-    /// Yêu cầu / lượt `id` của khách `tenant` (khách nguồn); của khách khác → không tìm thấy.
+    /// Request / run `id` of tenant `tenant` (the source tenant); one of another tenant → not found.
     pub async fn get_own(
         &self,
         tenant: &TenantContext,
@@ -334,7 +337,7 @@ impl TenantRelocations {
         self.get(id).await
     }
 
-    /// Yêu cầu đang chờ nhân sự nền tảng, cũ nhất trước.
+    /// Requests waiting for platform staff, oldest first.
     pub(crate) async fn requested(&self, limit: u64) -> Result<Vec<Model>, Error> {
         use sea_orm::{QueryOrder, QuerySelect};
         Ok(Entity::find()
@@ -345,7 +348,7 @@ impl TenantRelocations {
             .await?)
     }
 
-    /// Ghi trạng thái mới — chỉ khi bên này còn giữ lease và trạng thái chưa đổi.
+    /// Records a new state, only while this party still holds the lease and the state has not changed.
     pub(super) async fn set_state<C: ConnectionTrait>(
         &self,
         connection: &C,
@@ -374,7 +377,7 @@ impl TenantRelocations {
         Ok(())
     }
 
-    /// Nhận lease của lượt `id`. `None`: lượt đã kết thúc. Bên khác đang giữ: `in_progress`.
+    /// Takes the lease of run `id`. `None`: the run has ended. Another party holds it: `in_progress`.
     async fn acquire(&self, id: Uuid, runner: &str) -> Result<Option<Model>, Error> {
         let at = now();
         let until = at + SignedDuration::try_from(LEASE).map_err(Error::internal)?;
@@ -411,7 +414,7 @@ impl TenantRelocations {
         Ok(())
     }
 
-    /// Làm một bước của lượt `id` rồi trả lượt. Lỗi được ghi vào `error` của lượt.
+    /// Does one step of run `id` then returns the run. An error is recorded in the run's `error`.
     pub async fn step(&self, id: Uuid, runner: &str) -> Result<TenantRelocation, Error> {
         let Some(row) = self.acquire(id, runner).await? else {
             return self.get(id).await;
@@ -437,7 +440,7 @@ impl TenantRelocations {
         }
     }
 
-    /// Chạy `work`, gia hạn lease của lượt `id` mỗi một phần ba thời hạn cho tới khi xong.
+    /// Runs `work`, extending the lease of run `id` every third of the term until it finishes.
     async fn holding<T>(
         &self,
         id: Uuid,
@@ -483,7 +486,7 @@ impl TenantRelocations {
         }
     }
 
-    /// Tham số của lượt đã lưu.
+    /// Parameters of the saved run.
     pub(super) fn spec_of(row: &Model) -> Result<Spec, Error> {
         let kind = RelocationKind::parse(&row.kind).ok_or_else(|| {
             Error::internal(format!("relocation {} has kind `{}`", row.id, row.kind))
@@ -500,7 +503,7 @@ impl TenantRelocations {
     }
 }
 
-/// Job chạy lượt `relocation_id` tới xong.
+/// Job that runs run `relocation_id` to completion.
 #[derive(Debug, Serialize, Deserialize)]
 pub(super) struct Relocate {
     pub(super) relocation_id: Uuid,
@@ -510,7 +513,7 @@ impl Job for Relocate {
     const KIND: &'static str = super::RELOCATE;
 }
 
-/// Bộ chạy job `kernel.relocate` (job của database điều khiển).
+/// Runner of the job `kernel.relocate` (a control-database job).
 pub(crate) struct RelocateRunner(pub(crate) Arc<TenantRelocations>);
 
 #[async_trait::async_trait]
@@ -524,7 +527,7 @@ impl JobHandler for RelocateRunner {
     }
 }
 
-/// Phần tách / gộp trong module `kernel`: cấu hình, service, route, job.
+/// The split / merge part of the `kernel` module: configuration, service, routes, jobs.
 pub(crate) struct Wiring {
     drain: u64,
     service: Option<Arc<TenantRelocations>>,
@@ -537,7 +540,7 @@ impl Default for Wiring {
 }
 
 impl Wiring {
-    /// Đọc `AUTOXIDE_RELOCATION_DRAIN_SECONDS`.
+    /// Reads `AUTOXIDE_RELOCATION_DRAIN_SECONDS`.
     pub(crate) fn read(reader: &mut ConfigReader<'_>) -> Result<u64, Invalid> {
         reader
             .get_with(&super::DRAIN_SECONDS, |raw| crate::config::parse_in_range(raw, 1u64, 86_400))
@@ -547,7 +550,7 @@ impl Wiring {
         self.drain = drain;
     }
 
-    /// Dựng service, công bố nó và nguồn việc "yêu cầu tách / gộp".
+    /// Builds the service, publishes it and the work source "split / merge requests".
     pub(crate) fn start(
         &mut self,
         context: &mut StartContext<'_>,

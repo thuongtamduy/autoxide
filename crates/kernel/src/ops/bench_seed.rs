@@ -1,17 +1,18 @@
-//! Đồ dùng chung cho lệnh sinh dữ liệu đo (bước 39 B1): `autoxide task <module>.bench_seed`.
+//! Shared helpers for the benchmark data generation commands (step 39 B1): `autoxide task <module>.bench_seed`.
 //!
-//! Mỗi module tự ghi bảng của mình (luật kiến trúc 1); phần này chỉ giữ những gì mọi lệnh đều
-//! cần, để chúng nhận cùng tham số và cùng cách từ chối:
+//! Each module writes its own tables (architecture rule 1); this part keeps only what every command needs, so
+//! they accept the same parameters and refuse in the same way:
 //!
-//! - cờ xác nhận [`CONFIRM`]: thiếu thì lệnh từ chối — dữ liệu đo không bao giờ được trộn vào
-//!   database thật;
-//! - file ID (`ids=<đường dẫn>`, JSON `{ "<khoá>": ["<uuid>", …] }`): lệnh sau đọc ID lệnh trước
-//!   ghi (vd `content` lấy ảnh của `media`, `comments` lấy bài của `content`);
-//! - ghi theo lô bằng `insert_many`, chia lô theo số cột để không vượt giới hạn tham số của câu
-//!   SQL (SQLite 32 766, Postgres 65 535), mỗi lô một transaction ngắn.
+//! - the confirmation flag [`CONFIRM`]: without it the command refuses, since benchmark data must never be
+//!   mixed into a real database;
+//! - the ID file (`ids=<path>`, JSON `{ "<key>": ["<uuid>", ...] }`): a later command reads the IDs an earlier
+//!   command wrote (e.g. `content` takes images from `media`, `comments` takes articles from `content`);
+//! - batched writes with `insert_many`, split by column count so the SQL statement's parameter limit is not
+//!   exceeded (SQLite 32,766, Postgres 65,535), one short transaction per batch.
 //!
-//! Lệnh chỉ biên dịch khi bật cargo feature `bench-seed` của crate `autoxide` (bản phát hành
-//! không có); phần kernel này nhỏ, không chạm database thật nếu không có lệnh gọi.
+//! The commands are compiled only when the cargo feature `bench-seed` of the `autoxide` crate is enabled
+//! (release builds do not have it); this kernel part is small and does not touch a real database unless a
+//! command calls it.
 
 use std::path::{Path, PathBuf};
 
@@ -24,21 +25,21 @@ use crate::error::Error;
 use crate::task::{TaskArgs, TaskArgument};
 use crate::tenancy::{DatabaseRegistry, TenantContext};
 
-/// Giá trị bắt buộc của tham số `confirm`.
+/// Required value of the `confirm` parameter.
 pub const CONFIRM: &str = "yes-this-is-a-benchmark-database";
 
-/// Khoá trong file ID của từng lệnh (lệnh sau đọc khoá của lệnh trước).
+/// Key in each command's ID file (a later command reads the earlier command's key).
 pub const USERS_KEY: &str = "users";
 pub const MEDIA_KEY: &str = "media";
 pub const ENTRIES_KEY: &str = "entries";
 
-/// Số dòng tối đa mỗi transaction.
+/// Maximum rows per transaction.
 pub const ROWS_PER_TRANSACTION: usize = 1_000;
 
-/// Số tham số tối đa của một câu `INSERT` (dưới giới hạn của SQLite, 32 766).
+/// Maximum parameters of one `INSERT` statement (below SQLite's limit of 32,766).
 const MAX_PARAMETERS: usize = 30_000;
 
-/// Tham số mọi lệnh `bench_seed` nhận.
+/// Parameters every `bench_seed` command accepts.
 pub fn arguments() -> Vec<TaskArgument> {
     vec![
         TaskArgument::required(
@@ -56,7 +57,7 @@ pub fn arguments() -> Vec<TaskArgument> {
     ]
 }
 
-/// Tham số đã kiểm của một lệnh `bench_seed`.
+/// Validated parameters of a `bench_seed` command.
 #[derive(Debug, Clone)]
 pub struct SeedArgs {
     pub count: u64,
@@ -65,7 +66,7 @@ pub struct SeedArgs {
 }
 
 impl SeedArgs {
-    /// Kiểm cờ xác nhận và đọc tham số; `default_count` khi không đưa `count`.
+    /// Checks the confirmation flag and reads the parameters; `default_count` when `count` is not given.
     pub fn parse(args: &TaskArgs, default_count: u64) -> Result<Self, Error> {
         if args.get("confirm") != Some(CONFIRM) {
             return Err(refused(
@@ -85,20 +86,20 @@ impl SeedArgs {
         })
     }
 
-    /// Khách cần điền.
+    /// Tenant to fill.
     pub async fn tenant(&self, databases: &DatabaseRegistry) -> Result<TenantContext, Error> {
         databases.tenant_by_slug(&self.tenant).await
     }
 }
 
-/// Lỗi khi lệnh từ chối chạy (thiếu cờ, database đã có dữ liệu).
+/// Error when a command refuses to run (missing flag, database already has data).
 pub fn refused(reason: &str) -> Error {
     Error::bad_request("bench_seed_refused", "The benchmark seed task refused to run: {reason}.")
         .with_param("reason", reason)
 }
 
-/// ID đã ghi dưới khoá `key` của file `path`; file hay khoá chưa có thì lỗi nói lệnh nào cần chạy
-/// trước.
+/// IDs written under key `key` of file `path`; when the file or key does not exist the error says which command
+/// must run first.
 pub fn read_ids(path: &Path, key: &str) -> Result<Vec<Uuid>, Error> {
     let all = read_file(path)?;
     let Some(Value::Array(values)) = all.get(key) else {
@@ -117,7 +118,7 @@ pub fn read_ids(path: &Path, key: &str) -> Result<Vec<Uuid>, Error> {
         .collect()
 }
 
-/// Ghi `ids` dưới khoá `key` của file `path` (giữ các khoá khác).
+/// Writes `ids` under key `key` of file `path` (keeping the other keys).
 pub fn write_ids(path: &Path, key: &str, ids: &[Uuid]) -> Result<(), Error> {
     let mut all = if path.exists() { read_file(path)? } else { Map::new() };
     all.insert(key.to_owned(), ids.iter().map(|id| Value::String(id.to_string())).collect());
@@ -132,13 +133,13 @@ fn read_file(path: &Path) -> Result<Map<String, Value>, Error> {
         .map_err(|error| refused(&format!("`{}` is not a JSON object: {error}", path.display())))
 }
 
-/// Số dòng mỗi câu `INSERT` cho bảng có `columns` cột.
+/// Rows per `INSERT` statement for a table with `columns` columns.
 fn rows_per_statement(columns: usize) -> usize {
     (MAX_PARAMETERS / columns.max(1)).clamp(1, ROWS_PER_TRANSACTION)
 }
 
-/// Ghi `rows` vào bảng của `E`: mỗi [`ROWS_PER_TRANSACTION`] dòng một transaction, trong đó chia
-/// câu `INSERT` theo số cột. Chạy như nhau trên SQLite và Postgres.
+/// Writes `rows` into the table of `E`: one transaction per [`ROWS_PER_TRANSACTION`] rows, within which the
+/// `INSERT` statement is split by column count. Behaves the same on SQLite and Postgres.
 pub async fn insert_all<E, A>(database: &Database, rows: Vec<A>) -> Result<(), Error>
 where
     E: EntityTrait,
@@ -160,8 +161,8 @@ where
     Ok(())
 }
 
-/// Bộ sinh số giả ngẫu nhiên tất định (SplitMix64): cùng hạt giống cho cùng bộ dữ liệu, để hai
-/// lần đo so được với nhau. Không dùng cho gì cần bí mật.
+/// Deterministic pseudo-random number generator (SplitMix64): the same seed gives the same dataset, so two
+/// measurements can be compared. Not for anything that needs secrecy.
 #[derive(Debug, Clone)]
 pub struct Pseudo(u64);
 
@@ -178,12 +179,12 @@ impl Pseudo {
         z ^ (z >> 31)
     }
 
-    /// Số trong `0..bound` (`bound` > 0).
+    /// A number in `0..bound` (`bound` > 0).
     pub fn below(&mut self, bound: u64) -> u64 {
         self.next_u64() % bound.max(1)
     }
 
-    /// Một phần tử của `items` (không rỗng).
+    /// An element of `items` (non-empty).
     pub fn pick<'a, T>(&mut self, items: &'a [T]) -> Option<&'a T> {
         if items.is_empty() {
             return None;
@@ -192,7 +193,7 @@ impl Pseudo {
         items.get(index)
     }
 
-    /// Một câu giả gồm `words` từ.
+    /// A fake sentence of `words` words.
     pub fn sentence(&mut self, words: usize) -> String {
         let mut text = Vec::with_capacity(words);
         for _ in 0..words {
@@ -204,7 +205,7 @@ impl Pseudo {
     }
 }
 
-/// Kho từ cho văn bản giả: có từ tiếng Việt có dấu để bài đo đi qua đường bỏ dấu khi tìm.
+/// Word bank for fake text: includes Vietnamese words with diacritics so the benchmark goes through the diacritic-stripping search path.
 const WORDS: &[&str] = &[
     "autoxide",
     "backend",

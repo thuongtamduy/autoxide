@@ -1,5 +1,5 @@
-//! Nhà cung cấp thoại giả cho test (bước 61, D-232): giữ mọi lệnh trong bộ nhớ, không có HTTP client
-//! (không bao giờ gọi mạng), ký webhook bằng một khoá cố định, bản ghi âm là vài byte cố định.
+//! A fake voice provider for tests (step 61, D-232): keeps every command in memory, has no HTTP client
+//! (never touches the network), signs webhooks with a fixed key; a recording is a few fixed bytes.
 
 use autoxide_kernel::time::Timestamp;
 use jiff::SignedDuration;
@@ -19,24 +19,24 @@ use bytes::Bytes;
 use serde_json::{Value, json};
 use uuid::Uuid;
 
-/// Tên của nhà cung cấp giả (đường dẫn webhook `/voice/webhooks/fake/…`).
+/// Name of the fake provider (webhook path `/voice/webhooks/fake/…`).
 pub const FAKE_VOICE_PROVIDER: &str = "fake";
-/// Nội dung của mọi bản ghi âm giả.
+/// Content of every fake recording.
 pub const FAKE_RECORDING: &[u8] = b"fake-recording";
 const SECRET: &str = "fake-voice-secret";
 const SIGNATURE: &str = "x-fake-voice-signature";
 const TIMESTAMP: &str = "x-fake-voice-timestamp";
-/// Cửa sổ chống phát lại của chữ ký, giây.
+/// Replay-protection window of the signature, in seconds.
 const WINDOW: i64 = 300;
 
-/// Nhà cung cấp thoại giả.
+/// A fake voice provider.
 pub struct FakeVoiceProvider {
     recording_notice: AtomicBool,
     unavailable: AtomicUsize,
     sessions: Mutex<Vec<BrowserSessionRequest>>,
-    /// `call_id` → (lệnh gọi, mã cuộc gọi phía nhà cung cấp).
+    /// `call_id` → (call command, call code on the provider side).
     calls: Mutex<HashMap<Uuid, (OutboundCall, String)>>,
-    /// Bản ghi đang có ở nhà cung cấp → còn (chưa xoá).
+    /// Recordings currently at the provider → still present (not deleted).
     recordings: Mutex<HashMap<String, bool>>,
     events: AtomicUsize,
 }
@@ -55,13 +55,13 @@ impl Default for FakeVoiceProvider {
 }
 
 impl FakeVoiceProvider {
-    /// Nhà cung cấp phát (`true`, mặc định) hay không phát được câu thông báo ghi âm.
+    /// Whether the provider can (`true`, the default) or cannot play the recorded announcement.
     pub fn with_recording_notice(self, supported: bool) -> Self {
         self.recording_notice.store(supported, Ordering::SeqCst);
         self
     }
 
-    /// `n` lời gọi kế tiếp tới nhà cung cấp báo `voice.provider_unavailable`.
+    /// The next `n` calls to the provider report `voice.provider_unavailable`.
     pub fn fail_next(&self, n: usize) {
         self.unavailable.store(n, Ordering::SeqCst);
     }
@@ -74,22 +74,22 @@ impl FakeVoiceProvider {
         if failed { Err(provider_unavailable()) } else { Ok(()) }
     }
 
-    /// Các phiên WebRTC đã cấp.
+    /// WebRTC sessions issued.
     pub fn sessions(&self) -> Vec<BrowserSessionRequest> {
         lock(&self.sessions).clone()
     }
 
-    /// Các cuộc gọi ra đã đặt (mỗi `call_id` một lần).
+    /// Outbound calls placed (once per `call_id`).
     pub fn calls(&self) -> Vec<OutboundCall> {
         lock(&self.calls).values().map(|(call, _)| call.clone()).collect()
     }
 
-    /// Mã phía nhà cung cấp của cuộc gọi `call_id`.
+    /// Provider-side code of call `call_id`.
     pub fn provider_call_id(&self, call_id: Uuid) -> Option<String> {
         lock(&self.calls).get(&call_id).map(|(_, id)| id.clone())
     }
 
-    /// Bản ghi `id` còn ở nhà cung cấp không.
+    /// Whether recording `id` is still at the provider.
     pub fn has_recording(&self, id: &str) -> bool {
         lock(&self.recordings).get(id).copied().unwrap_or(false)
     }
@@ -101,8 +101,8 @@ impl FakeVoiceProvider {
         ))
     }
 
-    /// Webhook đã ký (header, thân) báo cuộc gọi `call_id` sang `status`; `recording`: có bản ghi
-    /// (mã `rec-<call_id>`, cuộc gọi hoàn tất). Mỗi lần gọi là một event mới.
+    /// A signed webhook (header, body) reporting call `call_id` moving to `status`; `recording`: has a
+    /// recording (code `rec-<call_id>`, call completed). Every call is a new event.
     pub fn emit(
         &self,
         call_id: Uuid,
@@ -129,7 +129,7 @@ impl FakeVoiceProvider {
         Self::signed(&body, Timestamp::now().as_unix_seconds())
     }
 
-    /// Thân `body` ký với mốc thời gian `timestamp` (thử chống phát lại, gửi lại cùng event).
+    /// Body `body` signed with timestamp `timestamp` (to test replay protection, resending the same event).
     pub fn signed(body: &Value, timestamp: i64) -> (Vec<(String, String)>, Vec<u8>) {
         let bytes = body.to_string().into_bytes();
         let headers = vec![

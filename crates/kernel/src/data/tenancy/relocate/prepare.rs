@@ -1,5 +1,5 @@
-//! Kiểm một lượt tách / gộp trước khi chạy: đầu vào, trạng thái các khách, nút, placement,
-//! database — mọi lý do chặn (không dừng ở lý do đầu) — rồi lập kế hoạch các bảng.
+//! Checks a split / merge run before it runs: the input, the state of the tenants, nodes, placements,
+//! databases (every blocking reason, not stopping at the first) and then plans the tables.
 
 use std::collections::HashSet;
 
@@ -24,11 +24,11 @@ fn transfer(error: TransferError) -> Error {
     Error::internal(error.to_string())
 }
 
-/// Tham số đã chuẩn hoá của một lượt.
+/// Normalized parameters of a run.
 #[derive(Debug, Clone)]
 pub(crate) struct Spec {
     pub(crate) kind: RelocationKind,
-    /// Khách có dữ liệu đi (ID hay slug).
+    /// The tenant whose data goes (ID or slug).
     pub(crate) tenant: String,
     pub(crate) org: Option<Uuid>,
     pub(crate) into: Option<String>,
@@ -37,7 +37,7 @@ pub(crate) struct Spec {
 }
 
 impl Spec {
-    /// Lỗi đầu vào (gom một lần, D-083).
+    /// Input errors (gathered once, D-083).
     pub(crate) fn check(&self, need_placement: bool) -> Result<(), Error> {
         let mut problems = Vec::new();
         if self.options.reason.trim().is_empty() {
@@ -80,7 +80,7 @@ impl Spec {
     }
 }
 
-/// Kết quả kiểm.
+/// Result of the check.
 pub(crate) struct Prepared {
     pub(crate) kind: RelocationKind,
     pub(crate) source: tenant::Model,
@@ -89,7 +89,7 @@ pub(crate) struct Prepared {
     pub(crate) org: OrgId,
     pub(crate) placement: placement::Model,
     pub(crate) blockers: Vec<Error>,
-    /// Database nguồn và đích, khi mở được và đủ migration.
+    /// The source and target databases, when they can be opened and are fully migrated.
     pub(crate) databases: Option<(Database, Database)>,
 }
 
@@ -119,7 +119,7 @@ impl TenantRelocations {
             .map_err(|error| tenancy::tenant_move_unreachable(&placement.name, &error.message()))
     }
 
-    /// Lượt chưa xong của khách `tenant` (nguồn hay đích), trừ lượt `except`.
+    /// An unfinished run of tenant `tenant` (source or target), other than run `except`.
     async fn unfinished(&self, tenant: Uuid, except: Option<Uuid>) -> Result<Option<Uuid>, Error> {
         let rows = Entity::find()
             .filter(
@@ -147,7 +147,7 @@ impl TenantRelocations {
         })
     }
 
-    /// Kiểm lượt `spec` (`resume`: lượt đã lưu đang chạy tiếp — bỏ qua trạng thái do chính nó đặt).
+    /// Checks run `spec` (`resume`: the saved run is continuing, so state set by the run itself is ignored).
     pub(super) async fn prepare(
         &self,
         spec: &Spec,
@@ -304,7 +304,7 @@ impl TenantRelocations {
         })
     }
 
-    /// Bảng của hai database và việc của từng bảng.
+    /// The tables of both databases and what each table does.
     pub(super) async fn resolve(
         &self,
         prepared: &Prepared,
@@ -323,7 +323,7 @@ impl TenantRelocations {
         Ok((tables, resolved))
     }
 
-    /// Ngữ cảnh cho bảng `Custom`, kèm thứ đi theo (tách).
+    /// Context for a `Custom` table, with what goes along (split).
     pub(super) async fn context(
         &self,
         id: Uuid,
@@ -354,7 +354,7 @@ impl TenantRelocations {
         ))
     }
 
-    /// Kế hoạch các bảng (khi hai database dùng được).
+    /// The plan of the tables (when both databases are usable).
     pub(super) async fn report(&self, prepared: &Prepared) -> Result<Option<Report>, Error> {
         let Some((source, target)) = &prepared.databases else { return Ok(None) };
         let (tables, resolved) = self.resolve(prepared, source, target).await?;

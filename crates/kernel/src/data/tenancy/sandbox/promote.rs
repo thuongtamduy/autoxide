@@ -1,5 +1,5 @@
-//! Service sao cấu hình vào sandbox và đẩy sang khách thật (bước 38, D-232,
-//! D-20261119-step38-sandbox-copy). REST và tool MCP cùng gọi vào đây.
+//! Service that copies configuration into a sandbox and pushes it to the real tenant (step 38, D-232,
+//! D-20261119-step38-sandbox-copy). REST and MCP tools both call into it.
 
 use std::collections::BTreeMap;
 
@@ -15,7 +15,7 @@ use crate::error::{Error, FieldError};
 use crate::event::{Actor, Event};
 use crate::tenancy::{TenantContext, TenantId};
 
-/// Số mục tối đa của một lần đẩy.
+/// Maximum number of items in one push.
 pub const MAX_PROMOTE_ITEMS: usize = 100;
 
 /// A kind of record that can be promoted from a sandbox to the real tenant.
@@ -94,7 +94,7 @@ impl Event for SandboxPromoted {
     const NAME: &'static str = "kernel.sandbox_promoted";
 }
 
-/// Mục dạng `<kind>:<id>` của tool MCP thành [`PromoteItem`]; sai dạng → 422 gom mọi mục.
+/// An MCP tool item of the form `<kind>:<id>` into a [`PromoteItem`]; a malformed one → 422 collecting every item.
 pub(crate) fn parse_items(raw: &[String]) -> Result<Vec<PromoteItem>, Error> {
     let mut items = Vec::new();
     let mut problems = Vec::new();
@@ -111,7 +111,7 @@ pub(crate) fn parse_items(raw: &[String]) -> Result<Vec<PromoteItem>, Error> {
     if problems.is_empty() { Ok(items) } else { Err(Error::validation(problems)) }
 }
 
-/// `tenancy.promote_kind_unknown` (422) của mục thứ `index`.
+/// `tenancy.promote_kind_unknown` (422) for item number `index`.
 fn kind_unknown(index: usize, kind: &str) -> FieldError {
     FieldError::new(
         format!("items[{index}].kind"),
@@ -122,7 +122,7 @@ fn kind_unknown(index: usize, kind: &str) -> FieldError {
 }
 
 impl TenantSandboxes {
-    /// Sao cấu hình của kernel rồi của mọi module từ `source` sang `sandbox`.
+    /// Copies the kernel's configuration and then every module's from `source` to `sandbox`.
     pub(super) async fn copy_configuration(
         &self,
         source: &TenantContext,
@@ -143,7 +143,7 @@ impl TenantSandboxes {
         Ok(())
     }
 
-    /// Các loại bản ghi đẩy được sang khách thật.
+    /// The record kinds that can be pushed to the real tenant.
     pub fn promotable(&self, principal: &Principal) -> Result<Vec<PromotableKind>, Error> {
         principal.require(&SANDBOXES_READ)?;
         Ok(self
@@ -158,8 +158,8 @@ impl TenantSandboxes {
             .collect())
     }
 
-    /// Đẩy các mục của sandbox `id` sang khách gốc (khách hiện tại của người gọi) thành bản nháp.
-    /// Mỗi mục chạy riêng: mục lỗi trùng thành `conflict`, mục khác vẫn chạy.
+    /// Pushes the items of sandbox `id` to the source tenant (the caller's current tenant) as drafts. Each item
+    /// runs separately: an item that fails with a duplicate becomes `conflict`, other items still run.
     pub async fn promote(
         &self,
         tenant: &TenantContext,
@@ -257,8 +257,8 @@ impl TenantSandboxes {
     }
 }
 
-/// `tenancy.promote_record_not_found` (404): sandbox không có bản ghi `id` loại `kind` — module trả
-/// trong `PromoteApply::promote`.
+/// `tenancy.promote_record_not_found` (404): the sandbox has no record `id` of kind `kind`; the module returns
+/// it from `PromoteApply::promote`.
 pub fn promote_record_not_found(kind: &str, id: Uuid) -> Error {
     Error::not_found(
         "tenancy.promote_record_not_found",

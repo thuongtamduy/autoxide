@@ -1,16 +1,17 @@
-//! Thao tác hàng loạt (bước 51 P8, D-201).
+//! Bulk operations (step 51 P8, D-201).
 //!
-//! Module khai hành động bằng [`StartContext::bulk_action`](crate::module::StartContext): danh sách
-//! (`resource`, id của P7), tên hành động, permission, hàm làm trên MỘT bản ghi.
-//! `POST /api/v1/kernel/bulk/{resource}/{action}` nhận **một trong hai**: `ids` (tối đa 500) hoặc
-//! `filter` + `expected_count` (bộ lọc của danh sách; kernel đếm bằng nguồn xuất của P16 — số khớp
-//! khác `expected_count` thì 409 `kernel.bulk_count_changed`, người dùng xem lại trước khi làm).
-//! `Idempotency-Key` bắt buộc (lớp idempotency của kernel trả lại kết quả lần đầu khi gọi lại).
+//! A module declares actions with [`StartContext::bulk_action`](crate::module::StartContext): a list
+//! (`resource`, the id from P7), the action name, the permission, and a function that works on ONE record.
+//! `POST /api/v1/kernel/bulk/{resource}/{action}` accepts **one of two**: `ids` (at most 500) or `filter` +
+//! `expected_count` (the list's filter; the kernel counts with the P16 export source; if the matching count
+//! differs from `expected_count` it returns 409 `kernel.bulk_count_changed` and the user reviews before doing
+//! it). `Idempotency-Key` is required (the kernel's idempotency layer returns the first result when called
+//! again).
 //!
-//! Việc chạy bằng job `kernel.bulk` (theo dõi qua P15) với quyền của người yêu cầu; mỗi bản ghi kiểm
-//! quyền riêng trong hàm của module. Kết quả từng bản ghi (`ok`, `skipped` kèm lý do, `failed` kèm
-//! `code`) nằm trong `result` của job. Hàm của module phải chịu được việc làm lại (job chạy lại sau
-//! khi hỏng giữa chừng): bản ghi đã ở trạng thái đích thì trả `skipped`.
+//! The work runs as the job `kernel.bulk` (tracked through P15) with the requester's permissions; each record
+//! is permission-checked separately inside the module's function. The result per record (`ok`, `skipped` with a
+//! reason, `failed` with a `code`) is in the job's `result`. The module's function must tolerate being redone
+//! (the job reruns after a mid-way failure): a record already in the target state returns `skipped`.
 
 use std::sync::{Arc, PoisonError, RwLock};
 
@@ -33,22 +34,22 @@ use crate::ops::list_exports::{ExportQuery, ExportSources, ListsHandle};
 use crate::response::{Created, Data, Problem};
 use crate::tenancy::TenantContext;
 
-/// Loại job chạy thao tác hàng loạt.
+/// Job kind that runs bulk operations.
 pub(crate) const BULK: &str = "kernel.bulk";
-/// Tối đa chừng này id gửi thẳng.
+/// At most this many ids sent directly.
 const MAX_IDS: usize = 500;
-/// Tối đa chừng này bản ghi chọn bằng bộ lọc.
+/// At most this many records selected by a filter.
 const MAX_MATCHED: usize = 10_000;
 
-/// Phần khai của một hành động hàng loạt.
+/// Declaration part of a bulk action.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct BulkInfo {
-    /// Id danh sách (`x-autoxide-list`), vd `content.list_content_entries`.
+    /// List id (`x-autoxide-list`), e.g. `content.list_content_entries`.
     pub resource: &'static str,
-    /// Tên hành động, chữ thường và `_`, vd `archive`.
+    /// Action name, lowercase letters and `_`, e.g. `archive`.
     pub action: &'static str,
-    /// Câu tiếng Anh cho người xem job, vd "Archive entries".
+    /// English sentence for people viewing the job, e.g. "Archive entries".
     pub label: &'static str,
 }
 
@@ -58,21 +59,21 @@ impl BulkInfo {
     }
 }
 
-/// Kết quả trên một bản ghi (lỗi thì trả `Err`: kết quả `failed` kèm `code` của lỗi).
+/// Result on one record (an error returns `Err`: the result is `failed` with the error's `code`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BulkOutcome {
     Done,
-    /// Không làm, kèm lý do ổn định (vd `already_archived`).
+    /// Not done, with a stable reason (e.g. `already_archived`).
     Skipped(&'static str),
 }
 
-/// Một hành động hàng loạt.
+/// A bulk action.
 //
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
 #[async_trait::async_trait]
 pub trait BulkAction: Send + Sync {
     fn info(&self) -> BulkInfo;
-    /// Permission người yêu cầu phải có (kiểm khi nhận yêu cầu; hàm `apply` vẫn kiểm từng bản ghi).
+    /// Permission the requester must have (checked on receiving the request; the `apply` function still checks each record).
     fn permission(&self) -> Permission;
     async fn apply(
         &self,
@@ -84,7 +85,7 @@ pub trait BulkAction: Send + Sync {
 
 type Entry = (&'static str, Arc<dyn BulkAction>);
 
-/// Sổ hành động hàng loạt của mọi module. Clone rẻ.
+/// Registry of every module's bulk actions. Cheap to clone.
 #[derive(Clone, Default)]
 pub struct BulkActions {
     entries: Arc<RwLock<Vec<Entry>>>,
@@ -141,7 +142,7 @@ impl BulkActions {
     }
 }
 
-/// Payload của job: id đã chọn và bản chụp người yêu cầu.
+/// Job payload: the selected ids and a snapshot of the requester.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct BulkJob {
     resource: String,
@@ -340,7 +341,7 @@ async fn run_bulk_action(
     Ok(Created::new(format!("/api/v1/kernel/jobs/{id}"), view).into_response())
 }
 
-/// Id mọi bản ghi khớp bộ lọc, đọc bằng nguồn xuất của danh sách (cột `id`), với quyền người gọi.
+/// Ids of every record matching the filter, read with the list's export source (column `id`), with the caller's permissions.
 async fn matching_ids(
     state: &BulkState,
     tenant: &TenantContext,
@@ -384,7 +385,7 @@ pub(crate) fn routes(state: BulkState) -> OpenApiRouter {
     OpenApiRouter::new().routes(routes!(run_bulk_action)).with_state(Arc::new(state))
 }
 
-/// Bộ chạy job `kernel.bulk`.
+/// Runner of the `kernel.bulk` job.
 pub(crate) struct BulkRunner {
     pub actions: BulkActions,
 }

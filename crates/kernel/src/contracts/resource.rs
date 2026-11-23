@@ -1,23 +1,24 @@
-//! Sổ đối tượng trung lập (D-123): module đăng ký một loại đối tượng (`<module>.<loại>`, vd
-//! `content.entry`) kèm bộ tra; module khác hỏi "đối tượng này có không, có công khai không, tên
-//! và đường dẫn là gì" mà không phụ thuộc module sở hữu và không đọc bảng của nó.
+//! Neutral resource registry (D-123): a module registers a kind of object (`<module>.<kind>`, e.g.
+//! `content.entry`) together with a resolver; other modules ask "does this object exist, is it public, what are
+//! its name and path" without depending on the owning module and without reading its tables.
 //!
-//! - `comments` kiểm đích của bình luận; `newsletter` lấy tiêu đề, tóm tắt, đường dẫn bài mới.
-//! - Đăng ký: `context.resource_type("content.entry", resolver)?` trong `Module::start`.
-//! - Tra: `context.resources()` (lấy lúc khởi động, giữ lại) rồi `resolve(loại, id)`. Sổ có cả
-//!   các loại do module khởi động SAU đăng ký.
-//! - Tra nhiều đối tượng một lần, theo ngôn ngữ: `resolve_many(loại, ids, locale)`; nhóm con của
-//!   loại có cây (vd danh mục): `children(loại, id, locale, limit)` (D-238, `menus` dùng).
+//! - `comments` validates the target of a comment; `newsletter` gets the title, summary and path of new articles.
+//! - Register: `context.resource_type("content.entry", resolver)?` in `Module::start`.
+//! - Resolve: `context.resources()` (obtained at startup and kept) then `resolve(kind, id)`. The registry also
+//!   contains kinds registered by modules that start AFTER.
+//! - Resolve many objects at once, by language: `resolve_many(kind, ids, locale)`; the children of a kind
+//!   that has a tree (e.g. categories): `children(kind, id, locale, limit)` (D-238, used by `menus`).
 //!
-//! Hai thứ đi kèm (D-202), cũng trung lập với nghiệp vụ:
+//! Two companions (D-202), also business-neutral:
 //!
-//! - **Event vòng đời** ([`ResourceEvent`]): module sở hữu khai qua `Module::resource_events`
-//!   event nào nghĩa là đối tượng "thôi nhận tương tác mới" ([`ResourceChange::Closed`]) hay "đã
-//!   gỡ" ([`ResourceChange::Removed`]). Module gắn dữ liệu vào đối tượng của module khác (vd
-//!   `comments`) nghe các event đó mà không cần biết module sở hữu là ai.
-//! - **Nhãn tác giả** ([`BadgeResolver`]): module đăng ký bộ tính nhãn cho một loại đối tượng
-//!   (`context.badge_source(…)`), vd `seller` cho người quản lý sản phẩm, `verified_buyer` cho
-//!   người đã nhận hàng. Bên hỏi nhận mã nhãn ổn định, không biết module nào tính ra.
+//! - **Lifecycle events** ([`ResourceEvent`]): the owning module declares through `Module::resource_events`
+//!   which event means an object "no longer accepts new interactions" ([`ResourceChange::Closed`]) or "was
+//!   removed" ([`ResourceChange::Removed`]). A module that attaches data to another module's objects (e.g.
+//!   `comments`) listens to those events without needing to know who the owning module is.
+//! - **Author badges** ([`BadgeResolver`]): a module registers a badge computer for a kind of object
+//!   (`context.badge_source(...)`), e.g. `seller` for the person managing a product, `verified_buyer` for
+//!   someone who received the goods. The asker receives stable badge codes and does not know which module
+//!   computed them.
 
 use crate::time::Timestamp;
 use std::collections::HashMap;
@@ -29,18 +30,18 @@ use crate::access::Principal;
 use crate::error::Error;
 use crate::tenancy::TenantContext;
 
-/// Điều một event của module sở hữu nghĩa là với đối tượng của nó.
+/// What an event of the owning module means for its object.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ResourceChange {
-    /// Không nhận tương tác mới nữa (vd bài bị lưu trữ); thứ đã có vẫn được xem.
+    /// No longer accepts new interactions (e.g. the article is archived); existing ones stay viewable.
     Closed,
-    /// Đã gỡ (vd bị xoá): thôi nhận và ẩn mọi thứ gắn vào nó.
+    /// Removed (e.g. deleted): stops accepting interactions and hides everything attached to it.
     Removed,
 }
 
-/// Một event vòng đời của một loại đối tượng: event `event` (do chính module sở hữu khai trong
-/// `Module::events`) với chủ thể `<kind>:<id>` nghĩa là `change` cho đối tượng `id`.
+/// A lifecycle event of a kind of object: event `event` (declared by the owning module itself in
+/// `Module::events`) with subject `<kind>:<id>` means `change` for the object `id`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct ResourceEvent {
@@ -50,13 +51,13 @@ pub struct ResourceEvent {
 }
 
 impl ResourceEvent {
-    /// Event `event` báo `change` cho đối tượng loại `kind`.
+    /// Event `event` reports `change` for objects of kind `kind`.
     pub const fn new(event: &'static str, kind: &'static str, change: ResourceChange) -> Self {
         ResourceEvent { event, kind, change }
     }
 
-    /// ID của đối tượng trong chủ thể `<kind>:<id>` của một event; `None` khi chủ thể không
-    /// thuộc loại này.
+    /// ID of the object in the `<kind>:<id>` subject of an event; `None` when the subject is not of
+    /// this kind.
     pub fn id_in<'a>(&self, subject: &'a str) -> Option<&'a str> {
         subject
             .strip_prefix(self.kind)
@@ -65,13 +66,13 @@ impl ResourceEvent {
     }
 }
 
-/// Bộ tính nhãn của tác giả trên một loại đối tượng.
+/// Computer of an author's badges on a kind of object.
 //
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
 #[async_trait::async_trait]
 pub trait BadgeResolver: Send + Sync {
-    /// Các nhãn `author` có trên đối tượng `id` (chỉ trong số nhãn đã khai lúc đăng ký; nhãn
-    /// khác bị bỏ). Đối tượng không có thì trả rỗng.
+    /// The badges `author` has on object `id` (only among the badges declared at registration; other
+    /// badges are dropped). Empty when the object has none.
     async fn badges(
         &self,
         tenant: &TenantContext,
@@ -80,26 +81,26 @@ pub trait BadgeResolver: Send + Sync {
     ) -> Result<Vec<&'static str>, Error>;
 }
 
-/// Bộ tính nhãn đã đăng ký: module, loại đối tượng, các nhãn nó có thể trả, bộ tính.
+/// A registered badge computer: module, kind of object, the badges it can return, the computer.
 type BadgeEntry = (&'static str, &'static str, &'static [&'static str], Arc<dyn BadgeResolver>);
 
-/// Điều module khác được biết về một đối tượng. Dựng bằng [`Resource::new`].
+/// What other modules may know about an object. Build it with [`Resource::new`].
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 #[non_exhaustive]
 pub struct Resource {
-    /// Người lạ có xem được không (vd bài đã đăng).
+    /// Whether a stranger may see it (e.g. the article is published).
     pub public: bool,
-    /// Tiêu đề và tóm tắt người lạ thấy; rỗng khi `public` là `false` (bộ tra không đưa nội dung
-    /// chưa công khai ra ngoài module của nó).
+    /// Title and summary that strangers see; empty when `public` is `false` (the resolver does not expose
+    /// non-public content outside its module).
     pub title: String,
     pub summary: String,
-    /// Đường dẫn công khai (không có tên miền), khi có.
+    /// Public path (without the domain), when there is one.
     pub url: Option<String>,
-    /// Ngôn ngữ (BCP 47), khi có.
+    /// Language (BCP 47), when there is one.
     pub locale: Option<String>,
-    /// Người dùng "sở hữu" đối tượng (vd tác giả), để báo cho họ khi cần.
+    /// Users who "own" the object (e.g. the author), to notify them when needed.
     pub owner_user_ids: Vec<Uuid>,
-    /// Ảnh đại diện (ID trong thư viện `media`), khi có. Bên hỏi tự kiểm ảnh có công khai không.
+    /// Representative image (ID in the `media` library), when there is one. The asker checks itself whether the image is public.
     pub image: Option<Uuid>,
 }
 
@@ -154,7 +155,7 @@ impl Resource {
     }
 }
 
-/// Chỉ tới một đối tượng trong sổ: loại (`<module>.<loại>`) và ID. Dựng bằng [`ResourceRef::new`].
+/// Points to an object in the registry: kind (`<module>.<kind>`) and ID. Build it with [`ResourceRef::new`].
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub struct ResourceRef {
@@ -169,18 +170,18 @@ impl ResourceRef {
     }
 }
 
-/// Bộ tra một loại đối tượng.
+/// Resolver for one kind of object.
 //
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
 #[async_trait::async_trait]
 pub trait ResourceResolver: Send + Sync {
-    /// Đối tượng `id` của khách `tenant`; `None` khi không có.
+    /// Object `id` of tenant `tenant`; `None` when it does not exist.
     async fn resolve(&self, tenant: &TenantContext, id: &str) -> Result<Option<Resource>, Error>;
 
-    /// Nhiều đối tượng một lần, với tiêu đề, đường dẫn theo ngôn ngữ `locale` khi loại có bản
-    /// dịch (thiếu bản dịch thì bộ tra tự chọn ngôn ngữ mặc định của nó). Đối tượng không có thì
-    /// vắng trong kết quả. Mặc định gọi [`resolve`](Self::resolve) từng cái, bỏ qua `locale`;
-    /// loại hay được tra theo lô (vd mục menu) nên cài bằng một câu query.
+    /// Many objects at once, with titles and paths in language `locale` when the kind has translations (when
+    /// a translation is missing the resolver picks its own default language). Objects that do not exist are
+    /// absent from the result. The default calls [`resolve`](Self::resolve) one by one and ignores `locale`;
+    /// kinds that are often resolved in batches (e.g. menu items) should implement it with a single query.
     async fn resolve_many(
         &self,
         tenant: &TenantContext,
@@ -200,14 +201,14 @@ pub trait ResourceResolver: Send + Sync {
         Ok(found)
     }
 
-    /// Loại này có cây không (vd danh mục có danh mục con): có thì [`children`](Self::children)
-    /// trả nhóm con. Mặc định `false`.
+    /// Whether this kind has a tree (e.g. categories with sub-categories): if so [`children`](Self::children)
+    /// returns the children. Defaults to `false`.
     fn has_children(&self) -> bool {
         false
     }
 
-    /// Tối đa `limit` đối tượng con trực tiếp của `id`, theo thứ tự hiển thị của module sở hữu,
-    /// chỉ những cái người lạ xem được. Mặc định rỗng.
+    /// At most `limit` direct children of `id`, in the owning module's display order, only those strangers can
+    /// see. Defaults to empty.
     async fn children(
         &self,
         tenant: &TenantContext,
@@ -222,7 +223,7 @@ pub trait ResourceResolver: Send + Sync {
 
 type Entry = (&'static str, Arc<dyn ResourceResolver>);
 
-/// Sổ các loại đối tượng. Clone rẻ: mọi bản clone thấy cùng một sổ.
+/// Registry of kinds of objects. Cheap to clone: every clone sees the same registry.
 #[derive(Clone, Default)]
 pub struct ResourceDirectory {
     // Ghi chỉ lúc khởi động; đọc mỗi lần tra. Không giữ khoá qua `await`.
@@ -236,7 +237,7 @@ impl std::fmt::Debug for ResourceDirectory {
     }
 }
 
-/// Mã nhãn: chữ thường, số, `_`, bắt đầu bằng chữ, tối đa 32 ký tự (vd `verified_buyer`).
+/// Badge code: lowercase letters, digits, `_`, starting with a letter, at most 32 characters (e.g. `verified_buyer`).
 fn is_badge(code: &str) -> bool {
     code.len() <= 32
         && code.starts_with(|c: char| c.is_ascii_lowercase())
@@ -244,7 +245,7 @@ fn is_badge(code: &str) -> bool {
 }
 
 impl ResourceDirectory {
-    /// Đăng ký loại `kind` của module `module` (tên phải là `<module>.<loại>`). Module dùng
+    /// Registers kind `kind` of module `module` (the name must be `<module>.<kind>`). Modules use
     /// [`StartContext::resource_type`](crate::module::StartContext::resource_type).
     pub fn register(
         &self,
@@ -272,7 +273,7 @@ impl ResourceDirectory {
         Ok(())
     }
 
-    /// Các loại đã đăng ký.
+    /// The registered kinds.
     pub fn types(&self) -> Vec<&'static str> {
         self.entries
             .read()
@@ -280,13 +281,13 @@ impl ResourceDirectory {
             .unwrap_or_default()
     }
 
-    /// Có bộ tra cho loại `kind` không.
+    /// Whether there is a resolver for kind `kind`.
     pub fn knows(&self, kind: &str) -> bool {
         self.types().contains(&kind)
     }
 
-    /// Đối tượng `id` thuộc loại `kind`. `Ok(None)` khi không có đối tượng đó; lỗi khi không
-    /// có bộ tra cho loại này (hỏi [`knows`](Self::knows) trước nếu loại có thể chưa có).
+    /// Object `id` of kind `kind`. `Ok(None)` when no such object exists; an error when there is no resolver
+    /// for this kind (ask [`knows`](Self::knows) first if the kind may not be registered yet).
     pub async fn resolve(
         &self,
         tenant: &TenantContext,
@@ -296,9 +297,9 @@ impl ResourceDirectory {
         self.resolver(kind)?.resolve(tenant, id).await
     }
 
-    /// Nhiều đối tượng loại `kind` một lần, theo ngôn ngữ `locale`: ID → đối tượng; ID không có
-    /// thì vắng. Lỗi khi không có bộ tra cho loại này. Có thể gọi module khác: gọi NGOÀI
-    /// transaction ghi.
+    /// Many objects of kind `kind` at once, in language `locale`: ID -> object; IDs that do not exist are
+    /// absent. An error when there is no resolver for this kind. May call another module: call it OUTSIDE a
+    /// write transaction.
     pub async fn resolve_many(
         &self,
         tenant: &TenantContext,
@@ -312,13 +313,13 @@ impl ResourceDirectory {
         self.resolver(kind)?.resolve_many(tenant, ids, locale).await
     }
 
-    /// Loại `kind` có cây không (có [`children`](Self::children)); `false` cả khi chưa đăng ký.
+    /// Whether kind `kind` has a tree (has [`children`](Self::children)); `false` also when not registered.
     pub fn has_children(&self, kind: &str) -> bool {
         self.resolver(kind).is_ok_and(|resolver| resolver.has_children())
     }
 
-    /// Tối đa `limit` đối tượng con công khai của `id` (loại `kind`). Lỗi khi không có bộ tra
-    /// cho loại này.
+    /// At most `limit` public children of `id` (kind `kind`). An error when there is no resolver
+    /// for this kind.
     pub async fn children(
         &self,
         tenant: &TenantContext,
@@ -344,9 +345,9 @@ impl ResourceDirectory {
             .ok_or_else(|| Error::internal(format!("no module resolves resource type `{kind}`")))
     }
 
-    /// Đăng ký bộ tính nhãn của module `module` cho loại `kind` — loại của module nào cũng
-    /// được (vd `orders` tính `verified_buyer` cho `catalog.product`). `codes`: mọi nhãn bộ
-    /// này có thể trả. Một nhãn của một loại chỉ do một module tính. Module dùng
+    /// Registers the badge computer of module `module` for kind `kind`; any module's kind is allowed
+    /// (e.g. `orders` computes `verified_buyer` for `catalog.product`). `codes`: every badge this
+    /// computer can return. A badge of a kind is computed by only one module. Modules use
     /// [`StartContext::badge_source`](crate::module::StartContext::badge_source).
     pub fn register_badges(
         &self,
@@ -373,7 +374,7 @@ impl ResourceDirectory {
         Ok(())
     }
 
-    /// Mọi nhãn có thể có của loại `kind`, theo thứ tự đăng ký.
+    /// Every possible badge of kind `kind`, in registration order.
     pub fn badge_codes(&self, kind: &str) -> Vec<&'static str> {
         self.badges
             .read()
@@ -387,9 +388,9 @@ impl ResourceDirectory {
             .unwrap_or_default()
     }
 
-    /// Nhãn của `author` trên đối tượng `id` loại `kind`, gom từ mọi bộ tính của loại đó, theo
-    /// thứ tự đăng ký, không trùng. Loại không có bộ tính nào thì rỗng. Có thể gọi module khác:
-    /// gọi NGOÀI transaction ghi.
+    /// Badges of `author` on object `id` of kind `kind`, gathered from every computer of that kind, in
+    /// registration order, without duplicates. Empty when the kind has no computer. May call another module:
+    /// call it OUTSIDE a write transaction.
     pub async fn badges(
         &self,
         tenant: &TenantContext,
@@ -444,7 +445,7 @@ mod tests {
         }
     }
 
-    /// Loại có cây: `p` có hai con `c1`, `c2`; tra theo lô và theo ngôn ngữ.
+    /// Kind with a tree: `p` has two children `c1`, `c2`; resolved in batches and by language.
     struct Tree;
 
     #[async_trait::async_trait]
@@ -675,18 +676,18 @@ mod tests {
     }
 }
 
-/// Một dòng lịch sử của một bản ghi (bước 51 P13): một event đã ghi về bản ghi đó.
+/// One history row of a record (step 51 P13): an event recorded about that record.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct HistoryLine {
     pub id: Uuid,
     pub at: Timestamp,
-    /// Tên event, vd `content.entry_published`.
+    /// Event name, e.g. `content.entry_published`.
     pub action: String,
     pub actor_user_id: Option<Uuid>,
-    /// Tên người làm, nếu biết.
+    /// Name of the actor, if known.
     pub actor_name: Option<String>,
-    /// Câu đọc được của event (`EventInfo::activity`), đã dịch; `None` khi event không có câu.
+    /// Human-readable sentence of the event (`EventInfo::activity`), translated; `None` when the event has none.
     pub sentence: Option<String>,
 }
 
@@ -714,14 +715,14 @@ impl HistoryLine {
     }
 }
 
-/// Lịch sử theo bản ghi, do module giữ nhật ký (`audit`) công bố bằng
-/// `context.provide::<dyn RecordHistory>(…)`. Kernel đã kiểm người gọi đọc được bản ghi trước khi
-/// hỏi.
+/// History by record, published by the module that keeps the log (`audit`) with
+/// `context.provide::<dyn RecordHistory>(...)`. The kernel has already checked that the caller can read the
+/// record before asking.
 //
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
 #[async_trait::async_trait]
 pub trait RecordHistory: Send + Sync {
-    /// Tối đa `limit` event mới nhất có chủ thể `subject` (`<kind>:<id>`), mới trước.
+    /// At most `limit` newest events with subject `subject` (`<kind>:<id>`), newest first.
     async fn history(
         &self,
         tenant: &TenantContext,

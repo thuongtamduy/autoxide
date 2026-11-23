@@ -1,6 +1,6 @@
-//! ID của request: header `x-request-id`.
+//! Request ID: the `x-request-id` header.
 //!
-//! Dùng để lần một request qua log và để người dùng báo lỗi ("request id là …").
+//! Used to trace a request through the logs and for users to report errors ("the request id is ...").
 
 use axum::extract::Request;
 use axum::http::{HeaderName, HeaderValue};
@@ -9,13 +9,13 @@ use axum::response::Response;
 use tower_http::request_id::{MakeRequestId, RequestId};
 use uuid::Uuid;
 
-/// Tên header mang ID của request, ở cả request lẫn response.
+/// Name of the header carrying the request ID, on both request and response.
 pub const REQUEST_ID_HEADER: HeaderName = HeaderName::from_static("x-request-id");
 
-/// ID do client gửi dài hơn mức này thì bị bỏ.
+/// A client-sent ID longer than this is dropped.
 const MAX_CLIENT_ID_LENGTH: usize = 128;
 
-/// Sinh ID cho request chưa có: UUIDv7, nên ID sắp được theo thời gian.
+/// Generates an ID for a request that has none: UUIDv7, so IDs sort by time.
 #[derive(Debug, Clone, Copy)]
 pub(super) struct MakeUuidV7;
 
@@ -25,9 +25,9 @@ impl MakeRequestId for MakeUuidV7 {
     }
 }
 
-/// Bỏ `x-request-id` do client gửi nếu nó không đáng tin: quá dài, hoặc chứa ký tự
-/// ngoài chữ, số và `-_.:`. ID này đi vào log; không để client nhét nội dung tuỳ ý.
-/// Lớp kế tiếp sẽ sinh ID mới cho request đó.
+/// Drops a client-sent `x-request-id` if it is untrustworthy: too long, or containing characters other than
+/// letters, digits and `-_.:`. This ID goes into the log; clients must not be able to inject arbitrary
+/// content. The next layer generates a new ID for that request.
 pub(super) async fn drop_untrusted(mut request: Request, next: Next) -> Response {
     let trusted = request.headers().get(&REQUEST_ID_HEADER).is_none_or(|value| {
         let bytes = value.as_bytes();

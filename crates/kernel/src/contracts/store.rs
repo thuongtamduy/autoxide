@@ -1,17 +1,18 @@
-//! Mua trong ứng dụng qua App Store và Google Play (bước 69 P4, D-20261119-step69-store): trait trung
-//! lập để kiểm giao dịch với máy chủ của cửa hàng ứng dụng và nhận thông báo của họ (App Store Server
-//! Notifications v2, Google Real-time Developer Notifications) có kiểm chữ ký.
+//! In-app purchases through the App Store and Google Play (step 69 P4, D-20261119-step69-store): neutral
+//! traits to verify transactions with the app store's server and to receive its notifications (App Store
+//! Server Notifications v2, Google Real-time Developer Notifications) with signature verification.
 //!
-//! Bộ cài đặt thật (App Store Server API, Google Play Developer API) là module riêng cần tài khoản nhà
-//! phát triển và key của chủ dự án, góp bằng `context.contribute::<dyn StorePurchases>(…)` và đăng ký
-//! TRƯỚC module `plans`. Test dùng `FakeStorePurchases` của testkit.
+//! The real implementations (App Store Server API, Google Play Developer API) are a separate module that
+//! needs a developer account and keys supplied by the deployer, contributed with
+//! `context.contribute::<dyn StorePurchases>(…)` and registered BEFORE the `plans` module. Tests use
+//! `FakeStorePurchases` from the testkit.
 //!
-//! Tiền do Apple / Google thu và giữ (đối tác có giấy phép) — đúng D-187: core không giữ tiền.
+//! Money is collected and held by Apple / Google (licensed partners) — in line with D-187: the core holds no money.
 
 use crate::error::Error;
 use crate::time::Timestamp;
 
-/// Cửa hàng ứng dụng.
+/// An app store.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum AppStore {
     /// Apple App Store (`app_store`).
@@ -23,7 +24,7 @@ pub enum AppStore {
 impl AppStore {
     pub const ALL: [AppStore; 2] = [AppStore::Apple, AppStore::Google];
 
-    /// Tên ổn định trong API và database.
+    /// Stable name in the API and database.
     pub fn as_str(self) -> &'static str {
         match self {
             AppStore::Apple => "app_store",
@@ -36,35 +37,35 @@ impl AppStore {
     }
 }
 
-/// Trạng thái của một giao dịch (thuê bao) theo cửa hàng.
+/// State of a transaction (subscription) according to the store.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PurchaseState {
-    /// Đang có hiệu lực tới `expires_at`.
+    /// Active until `expires_at`.
     Active,
-    /// Hết hạn, không gia hạn nữa.
+    /// Expired, no longer renewed.
     Expired,
-    /// Cửa hàng đã hoàn tiền: thu hồi quyền dùng ngay.
+    /// The store refunded: access is revoked immediately.
     Refunded,
-    /// Cửa hàng thu hồi (vd chia sẻ gia đình bị gỡ): thu hồi quyền dùng ngay.
+    /// The store revoked it (e.g. family sharing removed): access is revoked immediately.
     Revoked,
 }
 
-/// Một giao dịch đã được cửa hàng xác nhận (đã kiểm chữ ký / gọi máy chủ của họ).
+/// A transaction confirmed by the store (signature verified / its server called).
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct StorePurchase {
     pub store: AppStore,
-    /// Mã sản phẩm khai trên cửa hàng.
+    /// Product id declared in the store.
     pub product_id: String,
-    /// Mã gốc của chuỗi thuê bao (`originalTransactionId` / `purchaseToken` đầu tiên): không đổi qua
-    /// các lần gia hạn — khoá để gọi lại không cấp trùng.
+    /// Original id of the subscription chain (the first `originalTransactionId` / `purchaseToken`): unchanged
+    /// across renewals — the key that keeps a repeated call from granting twice.
     pub original_transaction_id: String,
-    /// Mã của lần mua / gia hạn này.
+    /// Id of this purchase / renewal.
     pub transaction_id: String,
     pub state: PurchaseState,
-    /// Hết hiệu lực lúc này (thuê bao); `None` với mua một lần.
+    /// Expires at this time (subscription); `None` for a one-time purchase.
     pub expires_at: Option<Timestamp>,
-    /// `true`: môi trường thử của cửa hàng (sandbox / license testing).
+    /// `true`: the store's test environment (sandbox / license testing).
     pub sandbox: bool,
 }
 
@@ -95,13 +96,13 @@ impl StorePurchase {
     }
 }
 
-/// Một thông báo máy chủ của cửa hàng, đã kiểm chữ ký.
+/// A server notification from the store, signature verified.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct StoreNotification {
-    /// Mã thông báo của cửa hàng (`notificationUUID` / `messageId`): nhận lại không xử lý hai lần.
+    /// The store's notification id (`notificationUUID` / `messageId`): a repeated delivery is not processed twice.
     pub id: String,
-    /// Trạng thái mới của giao dịch.
+    /// New state of the transaction.
     pub purchase: StorePurchase,
 }
 
@@ -111,7 +112,7 @@ impl StoreNotification {
     }
 }
 
-/// Lỗi 401 khi thông báo của cửa hàng không có chữ ký hợp lệ — bộ kết nối trả khi kiểm chữ ký hỏng.
+/// Error 401 when the store's notification has no valid signature — the connector returns it when signature verification fails.
 pub fn signature_invalid() -> Error {
     Error::unauthenticated(
         "store_signature_invalid",
@@ -119,17 +120,17 @@ pub fn signature_invalid() -> Error {
     )
 }
 
-/// Kết nối tới một cửa hàng ứng dụng.
+/// Connection to one app store.
 #[async_trait::async_trait]
 pub trait StorePurchases: Send + Sync {
     fn store(&self) -> AppStore;
 
-    /// Kiểm bằng chứng mua app gửi lên (giao dịch đã ký của StoreKit 2 / `purchaseToken` của Google
-    /// Play) với cửa hàng. Bằng chứng sai, giả hay của ứng dụng khác → lỗi `validation`.
+    /// Verifies with the store the purchase proof the app sent (StoreKit 2 signed transaction / Google
+    /// Play `purchaseToken`). Wrong, forged or another app's proof → error `validation`.
     async fn verify(&self, proof: &str) -> Result<StorePurchase, Error>;
 
-    /// Đọc và kiểm chữ ký một thông báo máy chủ của cửa hàng (`headers`: header của request webhook,
-    /// `body`: thân nguyên vẹn). Chữ ký sai → lỗi `unauthenticated`.
+    /// Reads and verifies the signature of a store server notification (`headers`: headers of the webhook
+    /// request, `body`: the untouched body). Wrong signature → error `unauthenticated`.
     async fn notification(
         &self,
         headers: &axum::http::HeaderMap,

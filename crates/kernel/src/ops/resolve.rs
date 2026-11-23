@@ -1,7 +1,8 @@
-//! Mở thẳng bản ghi theo mã (bước 51 P9): module đăng ký **bộ nhận dạng mã** (số đơn, mã vận đơn,
-//! số hoá đơn, đường dẫn bài…) bằng [`StartContext::code_resolver`](crate::module::StartContext).
-//! `GET /api/v1/kernel/resolve?code=` hỏi lần lượt các bộ người gọi có permission, trả bản ghi đầu
-//! tiên tìm thấy. Không có quyền hay không có bản ghi thì cùng một 404 — không lộ sự tồn tại.
+//! Open a record directly by code (step 51 P9): a module registers a **code resolver** (order number,
+//! tracking number, invoice number, article path, ...) with
+//! [`StartContext::code_resolver`](crate::module::StartContext). `GET /api/v1/kernel/resolve?code=` asks, in
+//! turn, the resolvers the caller has permission for and returns the first record found. No permission and no
+//! record give the same 404, so existence is not revealed.
 
 use std::sync::{Arc, PoisonError, RwLock};
 
@@ -18,15 +19,15 @@ use crate::find::Found;
 use crate::response::{Data, Problem};
 use crate::tenancy::TenantContext;
 
-/// Một bộ nhận dạng mã.
+/// A code resolver.
 //
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
 #[async_trait::async_trait]
 pub trait CodeResolver: Send + Sync {
-    /// Loại bản ghi, `<module>.<loại>`, vd `content.entry`.
+    /// Kind of record, `<module>.<kind>`, e.g. `content.entry`.
     fn kind(&self) -> &'static str;
     fn permission(&self) -> Permission;
-    /// Bản ghi mang mã `code` mà `principal` được xem; `None` khi không có (hay không được xem).
+    /// The record with code `code` that `principal` may see; `None` when there is none (or it may not be seen).
     async fn resolve(
         &self,
         tenant: &TenantContext,
@@ -37,7 +38,7 @@ pub trait CodeResolver: Send + Sync {
 
 type Entry = (&'static str, Arc<dyn CodeResolver>);
 
-/// Sổ bộ nhận dạng mã của mọi module. Clone rẻ.
+/// Registry of every module's code resolvers. Cheap to clone.
 #[derive(Clone, Default)]
 pub struct CodeResolvers {
     entries: Arc<RwLock<Vec<Entry>>>,

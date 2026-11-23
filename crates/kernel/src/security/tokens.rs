@@ -1,16 +1,16 @@
-//! Token dùng một lần (D-117): đặt lại mật khẩu, xác minh email, xác nhận đăng ký bản tin…
+//! One-time tokens (D-117): password reset, email verification, newsletter sign-up confirmation…
 //!
-//! - Module thêm `tokens_migration("m00xx_create_tokens", "<module>")` (bảng `<module>_tokens`).
-//! - Token là 32 byte ngẫu nhiên (base64url, 43 ký tự) gửi cho người dùng; database chỉ giữ
-//!   bản băm SHA-256 — lộ bảng cũng không dùng được token (OWASP).
-//! - Mỗi token có `purpose` (vd `password_reset`), `subject` (thường là ID của đối tượng) và
-//!   `data` tuỳ chọn (vd địa chỉ email đang xác minh).
-//! - [`OneTimeTokens::consume`] là MỘT câu `UPDATE … WHERE token_hash = ? AND used_at IS NULL
-//!   AND expires_at > now`: hai request cùng dùng một token thì đúng một bên thắng, trên cả hai
-//!   database.
-//! - Chống gửi dồn (dùng API làm công cụ spam hộp thư người khác): bên gọi xem
-//!   [`OneTimeTokens::recent`] trước khi phát token mới.
-//! - Theo khách (bước 33): token mang khách; dùng token ở khách khác thì như token lạ.
+//! - A module adds `tokens_migration("m00xx_create_tokens", "<module>")` (table `<module>_tokens`).
+//! - A token is 32 random bytes (base64url, 43 characters) sent to the user; the database keeps only
+//!   the SHA-256 hash — a leaked table still cannot be used as tokens (OWASP).
+//! - Each token has a `purpose` (e.g. `password_reset`), a `subject` (usually the ID of an object) and
+//!   optional `data` (e.g. the email address being verified).
+//! - [`OneTimeTokens::consume`] is ONE statement `UPDATE … WHERE token_hash = ? AND used_at IS NULL
+//!   AND expires_at > now`: two requests using the same token, exactly one wins, on both
+//!   databases.
+//! - Flood protection (using the API as a tool to spam other people's inboxes): the caller checks
+//!   [`OneTimeTokens::recent`] before issuing a new token.
+//! - Per tenant (step 33): a token carries its tenant; using a token in another tenant is like an unknown token.
 
 use crate::migration::prelude::{
     DbErr, Index, MigrationName, MigrationTrait, SchemaManager, Table,
@@ -26,7 +26,7 @@ use crate::error::Error;
 use crate::secret::{random_token, sha256};
 use crate::tenancy::TenantContext;
 
-/// Token vừa phát: giá trị gửi cho người dùng (không lưu ở đâu cả) và hạn dùng.
+/// A token just issued: the value sent to the user (stored nowhere) and its expiry.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct Issued {
@@ -35,7 +35,7 @@ pub struct Issued {
     pub expires_at: Timestamp,
 }
 
-/// Token vừa được dùng.
+/// A token that was just consumed.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct Consumed {
@@ -44,7 +44,7 @@ pub struct Consumed {
     pub data: Option<String>,
 }
 
-/// Token còn dùng được (xem [`OneTimeTokens::live`]).
+/// A token that is still usable (see [`OneTimeTokens::live`]).
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct Live {
@@ -52,7 +52,7 @@ pub struct Live {
     pub expires_at: Timestamp,
 }
 
-/// Vì sao một token bị từ chối.
+/// Why a token was rejected.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TokenRejection {
     Expired,
@@ -61,7 +61,7 @@ pub enum TokenRejection {
 }
 
 impl TokenRejection {
-    /// Giá trị `reason` của Problem: `expired`, `used`, `unknown`.
+    /// The `reason` value of the Problem: `expired`, `used`, `unknown`.
     pub fn as_str(self) -> &'static str {
         match self {
             TokenRejection::Expired => "expired",
@@ -71,7 +71,7 @@ impl TokenRejection {
     }
 }
 
-/// Token phát gần đây cho một đối tượng (để bên gọi quyết định có phát thêm không).
+/// A token issued recently for an object (so the caller can decide whether to issue another).
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct Recent {
@@ -79,8 +79,8 @@ pub struct Recent {
     pub created_at: Timestamp,
 }
 
-/// Token dùng một lần trên bảng `<module>_tokens`. Mọi hàm nhận kết nối (`database.write()`
-/// hay một transaction), để bên gọi phát token cùng transaction với thay đổi của mình.
+/// One-time tokens on the table `<module>_tokens`. Every function takes a connection (`database.write()`
+/// or a transaction), so the caller can issue a token in the same transaction as its own change.
 #[derive(Debug, Clone)]
 pub struct OneTimeTokens {
     table: String,
@@ -91,7 +91,7 @@ impl OneTimeTokens {
         OneTimeTokens { table: table_name(module) }
     }
 
-    /// Phát một token của khách `tenant` cho `subject`, dùng cho `purpose`, sống `ttl`.
+    /// Issues a token of tenant `tenant` for `subject`, for `purpose`, living for `ttl`.
     pub async fn issue<C: ConnectionTrait>(
         &self,
         connection: &C,
@@ -135,7 +135,7 @@ impl OneTimeTokens {
         Ok(Issued { id, token, expires_at })
     }
 
-    /// Token đã phát cho `subject` (mục đích `purpose`) từ `since` tới giờ, mới nhất trước.
+    /// Tokens issued for `subject` (purpose `purpose`) from `since` until now, newest first.
     pub async fn recent<C: ConnectionTrait>(
         &self,
         connection: &C,
@@ -164,8 +164,8 @@ impl OneTimeTokens {
             .collect()
     }
 
-    /// Token của `subject` cho `purpose` còn dùng được (chưa dùng, còn hạn), mới nhất trước — vd
-    /// email đang chờ xác minh.
+    /// Usable tokens (unused, not expired) of `subject` for `purpose`, newest first — e.g.
+    /// an email awaiting verification.
     pub async fn live<C: ConnectionTrait>(
         &self,
         connection: &C,
@@ -194,8 +194,9 @@ impl OneTimeTokens {
             .collect()
     }
 
-    /// Dùng `token` cho `purpose`: còn hạn, chưa dùng thì đánh dấu đã dùng và trả về; không thì
-    /// `None` (token lạ, sai mục đích, hết hạn hay đã dùng — bên gọi trả cùng một lỗi).
+    /// Consumes `token` for `purpose`: if not expired and unused, marks it used and returns it; otherwise
+    /// `None` (unknown token, wrong purpose, expired or already used — the caller returns one and the same
+    /// error).
     pub async fn consume<C: ConnectionTrait>(
         &self,
         connection: &C,
@@ -234,9 +235,10 @@ impl OneTimeTokens {
         }))
     }
 
-    /// Xem `token` còn dùng được cho `purpose` không mà KHÔNG dùng nó: trả chủ và dữ liệu, hay
-    /// `None`. Cho việc phải kiểm đầu vào trước khi tiêu token (vd lời mời: biết email trước khi
-    /// đòi mật khẩu) — rồi vẫn [`consume`](Self::consume) để chỉ một bên thắng.
+    /// Checks whether `token` is still usable for `purpose` WITHOUT consuming it: returns the owner and data,
+    /// or `None`. For cases that must validate input before spending the token (e.g. an invitation: know the
+    /// email before asking for a password) — then still call [`consume`](Self::consume) so only one side
+    /// wins.
     pub async fn peek<C: ConnectionTrait>(
         &self,
         connection: &C,
@@ -263,9 +265,9 @@ impl OneTimeTokens {
         }))
     }
 
-    /// Vì sao `token` không dùng được cho `purpose` (sau khi [`consume`](Self::consume) trả
-    /// `None`): đã dùng, hết hạn hay không có. Người giữ token biết token của mình; không lộ gì
-    /// về token khác. Token quá hạn lâu đã bị dọn (`purge`) thì là `Unknown`.
+    /// Why `token` is unusable for `purpose` (after [`consume`](Self::consume) returned
+    /// `None`): already used, expired or nonexistent. The holder knows their own token; nothing is revealed
+    /// about other tokens. A token long expired and already purged (`purge`) is `Unknown`.
     pub async fn rejection<C: ConnectionTrait>(
         &self,
         connection: &C,
@@ -293,8 +295,8 @@ impl OneTimeTokens {
         Ok(TokenRejection::Used)
     }
 
-    /// Mọi token chưa dùng của `subject` cho `purpose` hết hiệu lực (vd sau khi đặt lại mật
-    /// khẩu). Trả số token bị thu hồi.
+    /// Revokes every unused token of `subject` for `purpose` (e.g. after a password
+    /// reset). Returns the number of tokens revoked.
     pub async fn revoke<C: ConnectionTrait>(
         &self,
         connection: &C,
@@ -313,8 +315,8 @@ impl OneTimeTokens {
         Ok(connection.execute(&update).await?.rows_affected())
     }
 
-    /// Xoá mọi token của `subject`, mọi mục đích (vd khi xoá tài khoản hay xoá dữ liệu theo yêu
-    /// cầu của chủ dữ liệu). Trả số dòng đã xoá.
+    /// Deletes every token of `subject`, for every purpose (e.g. when deleting an account or erasing data on
+    /// the data subject's request). Returns the number of rows deleted.
     pub async fn forget<C: ConnectionTrait>(
         &self,
         connection: &C,
@@ -329,9 +331,9 @@ impl OneTimeTokens {
         Ok(connection.execute(&delete).await?.rows_affected())
     }
 
-    /// Xoá token (mọi khách) đã hết hạn trước `before` (job dọn dẹp của module) — token đã dùng cũng đi
-    /// theo khi tới hạn của nó (vài phút tới một ngày). Một điều kiện trên cột có index thay vì
-    /// `OR` với `used_at` (không index, buộc duyệt cả bảng — D-158). Trả số dòng đã xoá.
+    /// Deletes tokens (all tenants) that expired before `before` (the module's cleanup job) — used tokens go
+    /// away when they expire (a few minutes to a day). One condition on an indexed column instead of `OR`
+    /// with `used_at` (not indexed, forcing a full table scan — D-158). Returns the number of rows deleted.
     pub async fn purge<C: ConnectionTrait>(
         &self,
         connection: &C,
@@ -353,8 +355,8 @@ fn table_name(module: &str) -> String {
     format!("{module}_tokens")
 }
 
-/// Migration tạo bảng `<module>_tokens`. Module dùng [`OneTimeTokens`] thêm nó vào danh sách
-/// migration của mình.
+/// Migration that creates the table `<module>_tokens`. A module using [`OneTimeTokens`] adds it to its list of
+/// migrations.
 pub fn tokens_migration(name: &'static str, module: &'static str) -> Box<dyn MigrationTrait> {
     Box::new(TokensMigration { name, module })
 }
@@ -419,9 +421,10 @@ impl MigrationTrait for TokensMigration {
     }
 }
 
-/// Bảng `<module>_tokens` sau khi nâng theo khách (bước 33 A4): token duy nhất trong khách; index
-/// tra theo đối tượng bắt đầu bằng `tenant_id`; index dọn dẹp (mọi khách) `…_expires_sweep_idx`.
-/// Thêm vào migration của module như [`event::tenant_table`](crate::event::tenant_table).
+/// The table `<module>_tokens` after upgrading per tenant (step 33 A4): the token is unique within a tenant;
+/// the index for lookup by object starts with `tenant_id`; the cleanup index (all tenants)
+/// `…_expires_sweep_idx`. Add it to the module's migrations like
+/// [`event::tenant_table`](crate::event::tenant_table).
 pub fn tenant_table(module: &str) -> crate::tenancy::migration::TenantTable {
     let table = table_name(module);
     crate::tenancy::migration::TenantTable::new(&table)

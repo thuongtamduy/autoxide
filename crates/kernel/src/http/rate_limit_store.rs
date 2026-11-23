@@ -1,13 +1,15 @@
-//! Đếm giới hạn theo API key CHUNG giữa mọi máy chủ, qua bảng `kernel_throttle` (bước 40 P6, D-375).
+//! Per-API-key rate limit counting SHARED across all servers, through the `kernel_throttle` table (step 40
+//! P6, D-375).
 //!
-//! Bật bằng `AUTOXIDE_HTTP_RATE_LIMIT_STORE=database`. Để không thêm một câu ghi cho mỗi request,
-//! đếm **theo lô**: mỗi tiến trình lấy một lô `k = max(1, burst / 4)` lượt của một key bằng
-//! [`Throttle::take`] (một câu SQL), tiêu dần trong bộ nhớ, hết mới hỏi lại. Cửa sổ cố định 60 giây,
-//! giới hạn `max(per_minute, burst)` lượt mỗi cửa sổ; sai số tối đa `k × số máy chủ` mỗi cửa sổ
-//! (lượt đã lấy về một máy mà máy đó chưa dùng hết).
+//! Enabled with `AUTOXIDE_HTTP_RATE_LIMIT_STORE=database`. To avoid adding a write for every request,
+//! counting is **in batches**: each process takes a batch of `k = max(1, burst / 4)` units for a key with
+//! [`Throttle::take`] (one SQL statement), spends them down in memory, and only asks again when they run out.
+//! A fixed 60-second window, a limit of `max(per_minute, burst)` units per window; maximum error
+//! `k × number of servers` per window (units taken to one server that it has not used up).
 //!
-//! Database không trả lời thì cho qua (ghi log, đếm `http_rate_limit_store_errors_total`): bộ giới hạn
-//! không được làm sự cố database nặng thêm; request vẫn hỏng ở bước sau nếu database thật sự chết.
+//! If the database does not answer, the request is let through (logged, `http_rate_limit_store_errors_total`
+//! counted): the limiter must not make a database incident worse; the request still fails at a later step if
+//! the database is truly down.
 
 use crate::time::Timestamp;
 use jiff::SignedDuration;
@@ -23,25 +25,25 @@ use crate::config::RateLimit;
 use crate::tenancy::{DatabaseRegistry, TenantId};
 use crate::throttle::Throttle;
 
-/// Cửa sổ đếm.
+/// The counting window.
 const WINDOW: Duration = Duration::from_secs(60);
-/// Dọn dòng cũ của bảng đếm tối đa chừng này một lần mỗi tiến trình.
+/// Purges old rows of the count table at most this often, once per process.
 const PURGE_EVERY: Duration = Duration::from_secs(3600);
-/// Dọn lô đã hết hạn khỏi bộ nhớ sau mỗi chừng này lần xét.
+/// Prunes expired batches from memory every this many checks.
 const PRUNE_EVERY: u64 = 1024;
 
-/// Lô lượt của một key trong tiến trình này.
+/// A batch of units for one key in this process.
 #[derive(Default)]
 struct Lot {
-    /// Lượt còn dùng được.
+    /// Units still usable.
     left: u32,
-    /// Hết hạn lúc cửa sổ của database kết thúc.
+    /// Expires when the database's window ends.
     until: Option<Instant>,
-    /// Database đã cấp 0 lượt: chặn tới `until` mà không hỏi lại.
+    /// The database granted 0 units: blocked until `until` without asking again.
     denied: bool,
 }
 
-/// Lô của từng key (khách, API key).
+/// Batches per key (tenant, API key).
 type Lots = HashMap<(TenantId, Uuid), Arc<tokio::sync::Mutex<Lot>>>;
 
 pub(super) struct SharedCounter {
@@ -56,7 +58,7 @@ pub(super) struct SharedCounter {
 }
 
 impl SharedCounter {
-    /// `None` khi tắt (`per_minute = 0`).
+    /// `None` when disabled (`per_minute = 0`).
     pub(super) fn new(limit: RateLimit, registry: DatabaseRegistry) -> Option<Self> {
         if limit.per_minute == 0 {
             return None;
@@ -73,7 +75,7 @@ impl SharedCounter {
         })
     }
 
-    /// Xét một request của API key `key` thuộc khách `tenant`.
+    /// Checks one request of API key `key` belonging to tenant `tenant`.
     pub(super) async fn check(&self, tenant: TenantId, key: Uuid) -> Decision {
         let now = Instant::now();
         let cell = {
@@ -129,8 +131,8 @@ impl SharedCounter {
         }
     }
 
-    /// Dọn dòng đếm cũ (mọi khách) tối đa mỗi giờ một lần, chạy nền — không cần job theo lịch
-    /// (như nhật ký request, D-370).
+    /// Purges old count rows (all tenants) at most once an hour, in the background - no scheduled job needed
+    /// (like the request log, D-370).
     fn purge_now_and_then(&self, now: Instant) {
         let Ok(mut last) = self.last_purge.lock() else { return };
         if last.is_some_and(|last| now.duration_since(last) < PURGE_EVERY) {

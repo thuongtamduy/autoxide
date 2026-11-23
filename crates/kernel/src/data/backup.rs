@@ -1,19 +1,19 @@
-//! Lõi của bản backup (D-073, bước 39): lệnh `autoxide backup` và job backup theo lịch dùng CHUNG
-//! đường này — một việc, một cách làm.
+//! Core of the backup (D-073, step 39): the `autoxide backup` command and the scheduled backup job share THIS
+//! path — one task, one way to do it.
 //!
-//! Bản backup là một cây file, đọc được trên mọi máy và cho mọi cách cài:
+//! A backup is a file tree, readable on any machine and for every installation:
 //!
 //! ```text
-//! backup.json       mô tả: phiên bản, lúc tạo, số dòng mỗi bảng, số file
-//! database.sqlite   dữ liệu mọi module, chép từ SQLite hay PostgreSQL
-//! files/<khoá>      file từ nơi lưu (ổ đĩa hay S3), khi có chép file
+//! backup.json       description: version, creation time, row count per table, file count
+//! database.sqlite   data of every module, copied from SQLite or PostgreSQL
+//! files/<key>       files from the storage (disk or S3), when files are copied
 //! ```
 //!
-//! Nơi ghi là một [`BackupSink`]: thư mục trên máy ([`DirectorySink`], lệnh CLI) hay nơi lưu file
-//! dưới một tiền tố ([`StorageSink`], job theo lịch). Database được đọc trong một snapshot
-//! (`copy_modules`) nên nhất quán dù máy chủ đang chạy, và KHÔNG giữ transaction ghi nào trên nguồn.
-//! File dưới [`BACKUP_PREFIX`] (chính các bản backup theo lịch) không bao giờ được chép: không thì
-//! bản sau chứa bản trước, phình theo cấp số.
+//! The destination is a [`BackupSink`]: a directory on the machine ([`DirectorySink`], CLI command) or a file
+//! store under a prefix ([`StorageSink`], scheduled job). The database is read in one snapshot
+//! (`copy_modules`), so it is consistent while the server keeps running, and NO write transaction is held on
+//! the source. Files under [`BACKUP_PREFIX`] (the scheduled backups themselves) are never copied: otherwise
+//! each backup would contain the previous one and grow exponentially.
 
 pub mod scheduled;
 
@@ -31,26 +31,26 @@ use crate::migration::Migrator;
 use crate::storage::{ByteStream, Storage};
 use crate::transfer::copy_modules;
 
-/// Tên file mô tả.
+/// Name of the description file.
 pub const MANIFEST: &str = "backup.json";
-/// Tên file dữ liệu.
+/// Name of the data file.
 pub const DATABASE_FILE: &str = "database.sqlite";
-/// Thư mục con chứa file.
+/// Subdirectory that holds the files.
 pub const FILES_DIR: &str = "files";
-/// Phiên bản của định dạng bản backup.
+/// Version of the backup format.
 pub const FORMAT: u64 = 1;
-/// Tiền tố khoá nơi lưu của bản backup theo lịch — bị loại khỏi phần chép file của mọi bản backup.
+/// Storage key prefix of scheduled backups; excluded from the file copy of every backup.
 pub const BACKUP_PREFIX: &str = "kernel/backups/";
 
-/// Mô tả một bản backup (`backup.json`).
+/// Describes a backup (`backup.json`).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct BackupManifest {
     pub format: u64,
-    /// Phiên bản Autoxide đã tạo bản backup.
+    /// Autoxide version that created the backup.
     pub autoxide: String,
     pub created_at: Timestamp,
-    /// Loại database nguồn: `sqlite` hay `postgres`.
+    /// Kind of source database: `sqlite` or `postgres`.
     pub source: String,
     pub tables: Vec<BackupTable>,
     pub files: u64,
@@ -58,13 +58,13 @@ pub struct BackupManifest {
 }
 
 impl BackupManifest {
-    /// Tổng số dòng mọi bảng.
+    /// Total row count across all tables.
     pub fn rows(&self) -> u64 {
         self.tables.iter().map(|table| table.rows).sum()
     }
 }
 
-/// Số dòng đã chép của một bảng.
+/// Number of rows copied for a table.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct BackupTable {
@@ -72,21 +72,21 @@ pub struct BackupTable {
     pub rows: u64,
 }
 
-/// Nơi ghi một bản backup. `relative` là đường dẫn trong bản backup, phân cách bằng `/`.
+/// Destination of a backup. `relative` is the path inside the backup, separated by `/`.
 #[async_trait::async_trait]
 pub trait BackupSink: Send + Sync {
-    /// Ghi `content` vào `relative`; trả số byte đã ghi.
+    /// Writes `content` to `relative`; returns the number of bytes written.
     async fn put(&self, relative: &str, content: ByteStream) -> Result<u64, Error>;
 }
 
-/// Ghi vào một thư mục trên máy (lệnh `autoxide backup`).
+/// Writes to a directory on the machine (the `autoxide backup` command).
 #[derive(Debug, Clone)]
 pub struct DirectorySink {
     root: PathBuf,
 }
 
 impl DirectorySink {
-    /// Thư mục `root` (đã có, quyền `0700` — xem [`private_dir`]).
+    /// The `root` directory (already exists, mode `0700`; see [`private_dir`]).
     pub fn new(root: impl Into<PathBuf>) -> Self {
         DirectorySink { root: root.into() }
     }
@@ -112,7 +112,7 @@ impl BackupSink for DirectorySink {
     }
 }
 
-/// Ghi vào nơi lưu file dưới tiền tố `prefix` (kết thúc bằng `/`), cho job theo lịch.
+/// Writes to the file store under the prefix `prefix` (ending with `/`), for the scheduled job.
 #[derive(Clone)]
 pub struct StorageSink {
     storage: Arc<dyn Storage>,
@@ -138,9 +138,10 @@ impl BackupSink for StorageSink {
     }
 }
 
-/// Tạo một bản backup của `database` vào `sink`: bảng của `modules` (đã áp dụng đủ `migrator`), và
-/// mọi file của `files` (nếu có) trừ [`BACKUP_PREFIX`]. `scratch` là thư mục tạm riêng tư để dựng
-/// file SQLite trước khi đẩy vào `sink` (cần chỗ trống cỡ database); hàm tự dọn nó, kể cả khi lỗi.
+/// Creates a backup of `database` in `sink`: the tables of `modules` (with `migrator` fully applied) and
+/// every file of `files` (if any) except [`BACKUP_PREFIX`]. `scratch` is a private temporary directory used to
+/// build the SQLite file before pushing it to `sink` (needs free space about the size of the database); the
+/// function cleans it up itself, even on error.
 pub async fn write_backup(
     database: &Database,
     migrator: &Migrator,
@@ -184,7 +185,7 @@ pub async fn write_backup(
     result
 }
 
-/// Chép mọi file của `storage` (trừ [`BACKUP_PREFIX`]) vào `files/` của `sink`.
+/// Copies every file of `storage` (except [`BACKUP_PREFIX`]) into `files/` of `sink`.
 async fn copy_files(storage: &dyn Storage, sink: &dyn BackupSink) -> Result<(u64, u64), Error> {
     let mut files = 0;
     let mut bytes = 0;
@@ -200,7 +201,7 @@ async fn copy_files(storage: &dyn Storage, sink: &dyn BackupSink) -> Result<(u64
     Ok((files, bytes))
 }
 
-/// File SQLite ở `path` (tạo khi chưa có), đã áp dụng mọi migration của `migrator`.
+/// The SQLite file at `path` (created if missing), with every migration of `migrator` applied.
 pub async fn open_sqlite(path: &Path, migrator: &Migrator) -> Result<Database, Error> {
     let url = format!("sqlite://{}?mode=rwc", path.display());
     let source = ConfigSource::from_pairs([("DATABASE_URL", url.as_str())]);
@@ -217,10 +218,10 @@ pub async fn open_sqlite(path: &Path, migrator: &Migrator) -> Result<Database, E
     Ok(database)
 }
 
-/// Tạo thư mục `path` (và các thư mục cha) rồi, trên Unix, chỉ để chủ của nó đọc / ghi / mở
-/// (`0700`). Backup chứa hash mật khẩu, secret webhook, MFA, và khoá ký khi nó nằm trong
-/// database: người dùng khác trên cùng máy không được đọc (D-158). Khoá thư mục là đủ — file bên
-/// trong không mở được qua thư mục đã khoá.
+/// Creates the directory `path` (and its parents) and, on Unix, lets only its owner read / write / open it
+/// (`0700`). A backup contains password hashes, webhook secrets, MFA and, when stored in the database, signing
+/// keys: other users on the same machine must not read it (D-158). Locking the directory is enough: files
+/// inside cannot be opened through a locked directory.
 pub fn private_dir(path: &Path) -> std::io::Result<()> {
     std::fs::create_dir_all(path)?;
     #[cfg(unix)]
@@ -231,7 +232,7 @@ pub fn private_dir(path: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
-/// Nội dung file `path` dưới dạng luồng, đọc từng đoạn 64 KiB.
+/// Content of the file `path` as a stream, read in 64 KiB chunks.
 pub async fn read_file(path: PathBuf) -> Result<ByteStream, Error> {
     let file = tokio::fs::File::open(&path).await.map_err(io(&path))?;
     let stream = futures_util::stream::unfold(Some(file), |file| async move {
@@ -249,7 +250,7 @@ pub async fn read_file(path: PathBuf) -> Result<ByteStream, Error> {
     Ok(stream.boxed())
 }
 
-/// Lỗi vào ra kèm đường dẫn.
+/// I/O error with the path attached.
 fn io(path: &Path) -> impl Fn(std::io::Error) -> Error + '_ {
     move |error| Error::internal(format!("{}: {error}", path.display()))
 }

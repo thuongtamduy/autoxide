@@ -1,14 +1,15 @@
-//! Lô ghi của app ngoại tuyến (bước 69 P2, D-20261119-step69-sync): `POST /api/v1/kernel/sync/batch`
-//! nhận các lệnh ghi đã xếp hàng trên máy và chạy TỪNG lệnh như một request REST thật — qua router
-//! của module (xác thực, quyền theo gói, duyệt của agent), lớp idempotency, chuẩn hoá lỗi và dịch —
-//! nên mỗi lệnh đi đúng handler và service như khi gọi REST (luật kiến trúc 8): không có đường ghi
-//! thứ hai. Một lệnh hỏng không chặn lệnh khác.
+//! The write batch of an offline app (step 69 P2, D-20261119-step69-sync): `POST /api/v1/kernel/sync/batch`
+//! takes the write commands queued on the device and runs EACH command like a real REST request - through
+//! the module's router (authentication, plan-based permissions, agent approval), the idempotency layer,
+//! error normalization and translation - so each command goes through exactly the same handler and service
+//! as a REST call (architecture rule 8): there is no second write path. One failed command does not block
+//! the others.
 //!
-//! Router con chỉ chứa route của module có `sync_resources` (không có route này), nên không có vòng
-//! tham chiếu; nó được điền sau khi lớp HTTP dựng xong các lớp dùng chung.
+//! The sub-router contains only the routes of modules that have `sync_resources` (not this route), so there
+//! is no reference cycle; it is filled in after the HTTP layer finishes building the shared layers.
 //!
-//! Cùng file: `GET /api/v1/kernel/sync/resources` — các loại bản ghi đồng bộ được, để app biết
-//! đường dẫn của luồng thay đổi và đường dẫn lô ghi nhận.
+//! Same file: `GET /api/v1/kernel/sync/resources` - the record types that can be synced, so the app knows
+//! the path of the change stream and the path of the batch write.
 
 use std::sync::{Arc, OnceLock};
 
@@ -30,12 +31,13 @@ use crate::http::ValidJson;
 use crate::response::{Data, Problem};
 use crate::sync::SyncResource;
 
-/// Số lệnh tối đa của một lô.
+/// The maximum number of commands in one batch.
 const MAX_OPERATIONS: usize = 100;
-/// Thân response của một lệnh dài hơn chừng này thì không chép vào kết quả.
+/// A response body of a command longer than this is not copied into the result.
 const MAX_RESULT_BYTES: usize = 4 * 1024 * 1024;
 
-/// Header của request lô KHÔNG chép sang lệnh con: thân, điều kiện và khoá là của từng lệnh.
+/// The batch request's headers are NOT copied to the sub-commands: body, conditions and key belong to each
+/// command.
 const OWN_HEADERS: [header::HeaderName; 8] = [
     header::CONTENT_LENGTH,
     header::CONTENT_TYPE,
@@ -47,11 +49,11 @@ const OWN_HEADERS: [header::HeaderName; 8] = [
     header::IF_UNMODIFIED_SINCE,
 ];
 
-/// Trạng thái của hai endpoint.
+/// The state of the two endpoints.
 pub(super) struct SyncState {
-    /// `(tên module, khai báo)`.
+    /// `(module name, declaration)`.
     pub(super) resources: Vec<(&'static str, SyncResource)>,
-    /// Router con chạy lệnh của lô; điền ở cuối `build`.
+    /// The sub-router that runs the batch's commands; filled in at the end of `build`.
     pub(super) router: OnceLock<Router>,
 }
 
@@ -221,7 +223,7 @@ async fn sync_batch(
     Ok(Data { data: results })
 }
 
-/// Kiểm cả lô trước khi chạy lệnh nào; báo mọi lỗi một lần.
+/// Validates the whole batch before running any command; reports every error at once.
 fn check(resources: &[(&'static str, SyncResource)], input: &BatchRequest) -> Result<(), Error> {
     let mut problems = Vec::new();
     if input.operations.is_empty() || input.operations.len() > MAX_OPERATIONS {
@@ -256,12 +258,12 @@ fn check(resources: &[(&'static str, SyncResource)], input: &BatchRequest) -> Re
     if problems.is_empty() { Ok(()) } else { Err(Error::validation(problems)) }
 }
 
-/// Đường dẫn danh sách của loại `resource` của module `module`.
+/// The list path of resource type `resource` of module `module`.
 fn collection(module: &str, resource: &SyncResource) -> String {
     format!("{}/{module}{}", super::API_PREFIX, resource.path)
 }
 
-/// `path` nằm dưới đường dẫn của một loại đồng bộ được, không có đoạn lạ (`..`, `//`).
+/// `path` lies under the path of a syncable type, with no odd segments (`..`, `//`).
 fn allowed(resources: &[(&'static str, SyncResource)], path: &str) -> bool {
     let bare = path.split(['?', '#']).next().unwrap_or_default();
     if bare.contains("//") || bare.split('/').any(|segment| segment == "." || segment == "..") {
@@ -273,7 +275,7 @@ fn allowed(resources: &[(&'static str, SyncResource)], path: &str) -> bool {
     })
 }
 
-/// Chạy một lệnh qua router con với danh tính của request lô.
+/// Runs one command through the sub-router with the identity of the batch request.
 async fn run(
     router: &Router,
     parts: &Parts,
@@ -337,7 +339,7 @@ async fn run(
     Ok(BatchResult { id: operation.id, status, etag, location, body })
 }
 
-/// Kết quả của lệnh hỏng trước khi tới endpoint.
+/// The result of a command that failed before reaching the endpoint.
 fn failed(id: String, error: &Error) -> BatchResult {
     let problem = Problem::from(error);
     BatchResult {

@@ -1,8 +1,9 @@
-//! Token form do máy chủ ký: website lấy lúc HIỂN THỊ form (không nhúng trong HTML đã cache),
-//! gửi kèm bài. Chứa phạm vi (form nào), lúc phát và một nonce ngẫu nhiên.
+//! Form tokens signed by the server: the website fetches one when DISPLAYING the form (not embedded in cached
+//! HTML) and sends it with the submission. It contains the scope (which form), the issue time and a random
+//! nonce.
 //!
-//! Dạng: `base64url(độ dài phạm vi 1 byte ‖ phạm vi ‖ lúc phát i64 ‖ nonce 16 byte) .
-//! base64url(HMAC-SHA256)`, ký bằng khoá dẫn từ khoá của kernel (nhãn [`PURPOSE`]).
+//! Format: `base64url(scope length 1 byte ‖ scope ‖ issue time i64 ‖ nonce 16 bytes) .
+//! base64url(HMAC-SHA256)`, signed with a key derived from the kernel's key (label [`PURPOSE`]).
 
 use crate::time::Timestamp;
 use base64::Engine as _;
@@ -12,15 +13,15 @@ use sha2::Sha256;
 
 use crate::error::Error;
 
-/// Nhãn dẫn khoá ký token form.
+/// Label that derives the form token signing key.
 pub(crate) const PURPOSE: &str = "autoxide/antispam/form-token/v1";
 
-/// Nội dung đã kiểm chữ ký của một token form.
+/// The signature-checked content of a form token.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct FormToken {
     pub scope: String,
     pub issued_at: Timestamp,
-    /// Nonce (base64url) — khoá idempotency của bài gửi.
+    /// Nonce (base64url) — the idempotency key of the submission.
     pub nonce: String,
 }
 
@@ -39,7 +40,7 @@ pub(crate) fn sign(
     Ok(format!("{}.{}", URL_SAFE_NO_PAD.encode(&payload), URL_SAFE_NO_PAD.encode(signature)))
 }
 
-/// Kiểm chữ ký và đọc token; `None` khi sai dạng hay sai chữ ký.
+/// Verifies the signature and reads the token; `None` when malformed or the signature is wrong.
 pub(crate) fn open(key: &[u8; 32], token: &str) -> Option<FormToken> {
     let (payload, signature) = token.trim().split_once('.')?;
     let payload = URL_SAFE_NO_PAD.decode(payload).ok()?;
@@ -60,7 +61,7 @@ pub(crate) fn open(key: &[u8; 32], token: &str) -> Option<FormToken> {
     })
 }
 
-/// Nonce dạng chữ (base64url), như trong [`FormToken::nonce`].
+/// Nonce as text (base64url), as in [`FormToken::nonce`].
 pub(crate) fn encode_nonce(nonce: &[u8; 16]) -> String {
     URL_SAFE_NO_PAD.encode(nonce)
 }

@@ -1,10 +1,12 @@
-//! Số liệu tóm tắt (bước 51 P4, D-207): module khai số liệu của mình (tiền, số đếm, tỉ lệ) kèm câu
-//! **định nghĩa** — tính từ lúc nào, gồm gì — nằm cạnh code tính số, để hộp ⓘ của giao diện luôn
-//! đúng. `GET /api/v1/kernel/summary?group=` trả số liệu của một nhóm điều hướng (hay mọi nhóm, cho
-//! trang Tổng quan) mà người gọi có permission, mỗi số có hạn giờ như hộp việc.
+//! Summary figures (step 51 P4, D-207): a module declares its figures (money, counts, ratios) together with a
+//! **definition** sentence (since when it is computed, what it includes) kept next to the code that computes
+//! the figure, so the interface's info box is always correct. `GET /api/v1/kernel/summary?group=` returns the
+//! figures of one navigation group (or every group, for the Overview page) that the caller has permission for,
+//! each figure with a timeout like the work inbox.
 //!
-//! Định nghĩa là bắt buộc ([`MetricInfo::new`] nhận nó); nhãn và định nghĩa viết tiếng Anh, dịch qua
-//! `text:` của module, và `xtask` kiểm có bản dịch như mô tả permission.
+//! The definition is required ([`MetricInfo::new`] takes it); the label and definition are written in
+//! English, translated through the module's `text:`, and `xtask` checks that translations exist, like
+//! permission descriptions.
 
 use std::sync::{Arc, PoisonError, RwLock};
 
@@ -22,16 +24,16 @@ use crate::i18n::{Language, Translations};
 use crate::response::{Data, Problem};
 use crate::tenancy::{OrgId, TenantContext, root_of};
 
-/// Phần khai của một số liệu.
+/// Declaration part of a figure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct MetricInfo {
-    /// `<module>.<số liệu>`, vd `comments.pending`.
+    /// `<module>.<figure>`, e.g. `comments.pending`.
     pub id: &'static str,
-    /// Nhóm điều hướng (P1) của số liệu, vd `marketing`.
+    /// Navigation group (P1) of the figure, e.g. `marketing`.
     pub group: &'static str,
     pub label: &'static str,
-    /// Câu định nghĩa: tính thế nào, đúng như code của `value`.
+    /// Definition sentence: how it is computed, exactly as the code of `value` does.
     pub definition: &'static str,
 }
 
@@ -46,10 +48,10 @@ impl MetricInfo {
     }
 }
 
-/// Giá trị của một số liệu.
+/// Value of a figure.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MetricValue {
-    /// Tiền, đơn vị nhỏ nhất của `currency` (như `Money`).
+    /// Money, in the smallest unit of `currency` (like `Money`).
     Money {
         amount_minor: i64,
         currency: String,
@@ -61,8 +63,8 @@ pub enum MetricValue {
     },
 }
 
-/// Một số liệu module khai bằng [`StartContext::summary_metric`](crate::module::StartContext).
-/// Số nặng đọc từ bảng dẫn xuất, không quét bảng giao dịch mỗi lần mở trang.
+/// A figure that a module declares with [`StartContext::summary_metric`](crate::module::StartContext).
+/// Heavy figures are read from derived tables, not by scanning the transaction table on every page open.
 //
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
 #[async_trait::async_trait]
@@ -79,7 +81,7 @@ pub trait SummaryMetric: Send + Sync {
 
 type Entry = (&'static str, Arc<dyn SummaryMetric>);
 
-/// Sổ số liệu của mọi module. Clone rẻ.
+/// Registry of every module's figures. Cheap to clone.
 #[derive(Clone, Default)]
 pub struct SummaryMetrics {
     entries: Arc<RwLock<Vec<Entry>>>,
@@ -116,13 +118,13 @@ impl SummaryMetrics {
         self.entries.read().unwrap_or_else(PoisonError::into_inner).clone()
     }
 
-    /// Số liệu `id` (`<module>.<số liệu>`), nếu có module khai — cho module đọc số liệu của module
-    /// khác qua hợp đồng chung (vd cảnh báo bất thường của `automations`, bước 58).
+    /// Figure `id` (`<module>.<figure>`), if a module declares it; lets a module read another module's figures
+    /// through a shared contract (e.g. anomaly alerts of `automations`, step 58).
     pub fn find(&self, id: &str) -> Option<Arc<dyn SummaryMetric>> {
         self.all().into_iter().map(|(_, metric)| metric).find(|metric| metric.info().id == id)
     }
 
-    /// Phần khai của mọi số liệu, theo thứ tự đăng ký.
+    /// Declaration part of every figure, in registration order.
     pub fn infos(&self) -> Vec<MetricInfo> {
         self.all().iter().map(|(_, metric)| metric.info()).collect()
     }

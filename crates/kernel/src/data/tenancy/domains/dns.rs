@@ -1,6 +1,6 @@
-//! Bộ tra TXT thật: `hickory-resolver` với cấu hình DNS của hệ điều hành (`/etc/resolv.conf` trên
-//! Unix, registry trên Windows). Dựng lười ở lần tra đầu: máy không có cấu hình DNS vẫn khởi động
-//! được, chỉ việc xác minh tên miền báo lỗi.
+//! The real TXT resolver: `hickory-resolver` with the operating system's DNS configuration (`/etc/resolv.conf`
+//! on Unix, the registry on Windows). Built lazily on the first lookup: a machine without DNS configuration
+//! still starts, and only domain verification reports an error.
 
 use std::sync::OnceLock;
 use std::time::Duration;
@@ -11,8 +11,8 @@ use hickory_resolver::proto::rr::RData;
 use super::{DnsTxtLookup, tenant_domain_dns_failed};
 use crate::error::Error;
 
-/// Câu trả lời DNS (có hay không có bản ghi) giữ trong cache của resolver tối đa chừng này: người
-/// quản trị vừa sửa bản ghi TXT thì lần xác minh sau đó một phút thấy bản mới.
+/// A DNS answer (record present or absent) stays in the resolver cache at most this long: after an
+/// administrator just edits a TXT record, the verification a minute later sees the new one.
 const CACHE_TTL: Duration = Duration::from_secs(60);
 
 #[derive(Default)]

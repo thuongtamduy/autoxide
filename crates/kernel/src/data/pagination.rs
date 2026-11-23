@@ -1,30 +1,31 @@
-//! Pagination cho mọi endpoint trả danh sách: theo con trỏ (cursor), dựa trên ID.
+//! Pagination for every endpoint that returns a list: cursor-based, keyed on the ID.
 //!
-//! Mọi ID là UUIDv7 nên thứ tự ID chính là thứ tự tạo. Trang kế tiếp được lấy
-//! bằng "các dòng có ID đứng sau ID cuối của trang trước" — database đi thẳng tới
-//! chỗ đó bằng index của khoá chính. Khác với kiểu `OFFSET n`:
+//! Every ID is a UUIDv7, so ID order is creation order. The next page is fetched as "the rows whose ID comes
+//! after the last ID of the previous page"; the database goes straight to that spot using the primary key
+//! index. Unlike `OFFSET n`:
 //!
-//! - trang thứ một nghìn nhanh như trang đầu (không phải đọc rồi bỏ n dòng);
-//! - dữ liệu được thêm trong lúc client đang lật trang không làm trùng hay sót dòng.
+//! - the thousandth page is as fast as the first (no reading and discarding n rows);
+//! - rows added while the client is paging do not cause duplicate or missing rows.
 //!
-//! Cách dùng trong service:
+//! Usage in a service:
 //!
 //! ```ignore
 //! let page = fetch_page(note::Entity::find(), note::Column::Id, |row| row.id, &request, db.read())
 //!     .await?;
 //! ```
 //!
-//! Mọi danh sách dùng chung ba tham số query `limit`, `cursor`, `order` và cùng
-//! hình dạng response — học một endpoint là biết mọi endpoint.
+//! Every list shares the three query parameters `limit`, `cursor`, `order` and the same response shape:
+//! learn one endpoint and you know them all.
 //!
-//! Client cần tổng số dòng khớp bộ lọc (ô số liệu, số trên tab) thì gửi `count=true`: trang
-//! đầu trả thêm `pagination.total`. Đếm là một câu `COUNT` riêng trên cùng bộ lọc — chỉ chạy khi
-//! được hỏi, và chỉ ở trang đầu (lật trang tiếp không đếm lại), để đường lật trang vẫn rẻ.
+//! A client that needs the total number of rows matching the filters (a counter tile, a tab badge) sends
+//! `count=true`: the first page then also returns `pagination.total`. Counting is a separate `COUNT` query
+//! on the same filters, run only when asked and only on the first page (later pages do not count again), so
+//! paging stays cheap.
 //!
-//! Danh sách sắp theo một cột khác (tên, kích thước…) dùng [`fetch_page_by`]: con trỏ
-//! khi đó mang cả giá trị của cột đó lẫn ID ("keyset pagination"), vẫn đi thẳng tới chỗ
-//! cần đọc bằng index `(cột, id)` — cùng hai ưu điểm trên. Endpoint tự khai tham số
-//! `sort` của mình (vd `sort=name`), kernel lo con trỏ.
+//! A list sorted by another column (name, size...) uses [`fetch_page_by`]: the cursor then carries both the
+//! value of that column and the ID ("keyset pagination"), and still goes straight to the spot to read using
+//! an index on `(column, id)`, with the same two advantages. The endpoint declares its own `sort` parameter
+//! (e.g. `sort=name`); the kernel handles the cursor.
 
 use crate::time::Timestamp;
 use base64::Engine as _;
@@ -43,9 +44,9 @@ use axum::response::{IntoResponse, Response};
 
 use crate::error::{Error, FieldError};
 
-/// Số dòng một trang khi client không nêu `limit`.
+/// Number of rows per page when the client gives no `limit`.
 pub const DEFAULT_LIMIT: u32 = 50;
-/// Số dòng tối đa một trang.
+/// Maximum number of rows per page.
 pub const MAX_LIMIT: u32 = 200;
 
 /// Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers
@@ -91,7 +92,7 @@ impl PageQuery {
         PageQuery { limit, cursor, order, count: None }
     }
 
-    /// Như [`PageQuery::new`], kèm hỏi tổng số (`count=true`).
+    /// Like [`PageQuery::new`], also asking for the total (`count=true`).
     #[must_use]
     pub fn with_count(mut self, count: bool) -> Self {
         self.count = Some(count.to_string());
@@ -99,26 +100,26 @@ impl PageQuery {
     }
 }
 
-/// Yêu cầu một trang, đã kiểm.
+/// A validated page request.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PageRequest {
     limit: u32,
     position: Option<Position>,
     order: Order,
-    /// Client hỏi tổng số (`count=true`).
+    /// The client asked for the total (`count=true`).
     count: bool,
 }
 
-/// Chỗ trang kế bắt đầu: sau dòng có ID này, hoặc (danh sách sắp theo cột khác) sau dòng
-/// có giá trị cột này và ID này.
+/// Where the next page starts: after the row with this ID, or (for a list sorted by another column) after
+/// the row with this column value and this ID.
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Position {
     Id(Uuid),
     Key(KeyCursor),
 }
 
-/// Giá trị của cột sắp xếp (ngoài ID) mà con trỏ mang theo. Con trỏ ghi kèm loại giá trị
-/// (`{"i": …}`, `{"s": …}`, `{"t": …}`), để một chuỗi trông như ngày không bị đọc nhầm.
+/// Value of the sort column (other than the ID) that the cursor carries. The cursor records the value type
+/// (`{"i": …}`, `{"s": …}`, `{"t": …}`) so that a string that looks like a date is not misread.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum SortValue {
@@ -140,8 +141,8 @@ impl From<SortValue> for sea_orm::Value {
     }
 }
 
-/// Con trỏ của danh sách sắp theo cột `column`: giá trị cột và ID của dòng cuối trang
-/// trước. Gửi cho client dạng base64url của JSON — client coi là chuỗi mờ.
+/// Cursor of a list sorted by column `column`: the column value and the ID of the last row of the previous
+/// page. Sent to the client as base64url of JSON; the client treats it as an opaque string.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 struct KeyCursor {
     #[serde(rename = "c")]
@@ -176,24 +177,24 @@ fn wrong_cursor() -> Error {
 }
 
 impl PageRequest {
-    /// Trang đầu tiên. `limit` bị kẹp vào khoảng `1..=MAX_LIMIT`.
+    /// The first page. `limit` is clamped to the range `1..=MAX_LIMIT`.
     pub fn first(limit: u32, order: Order) -> Self {
         PageRequest { limit: limit.clamp(1, MAX_LIMIT), position: None, order, count: false }
     }
 
-    /// Hỏi thêm tổng số dòng khớp bộ lọc (`pagination.total`).
+    /// Also asks for the total number of rows matching the filters (`pagination.total`).
     #[must_use]
     pub fn counted(mut self) -> Self {
         self.count = true;
         self
     }
 
-    /// Có phải đếm tổng số cho trang này không: client hỏi, và đây là trang đầu.
+    /// Whether to count the total for this page: the client asked, and this is the first page.
     pub fn wants_total(&self) -> bool {
         self.count && self.position.is_none()
     }
 
-    /// Trang đứng sau dòng có ID `cursor`.
+    /// The page after the row with ID `cursor`.
     pub fn after(mut self, cursor: Uuid) -> Self {
         self.position = Some(Position::Id(cursor));
         self
@@ -203,8 +204,8 @@ impl PageRequest {
         self.limit
     }
 
-    /// ID của con trỏ (danh sách sắp theo ID). `None` ở trang đầu, hoặc khi con trỏ là của
-    /// danh sách sắp theo cột khác.
+    /// The cursor's ID (list sorted by ID). `None` on the first page, or when the cursor belongs to a list
+    /// sorted by another column.
     pub fn cursor(&self) -> Option<Uuid> {
         match &self.position {
             Some(Position::Id(id)) => Some(*id),
@@ -324,7 +325,7 @@ impl Pagination {
         Pagination { limit, next_cursor, total: None }
     }
 
-    /// Kèm tổng số dòng khớp bộ lọc.
+    /// Also carries the total number of rows matching the filters.
     #[must_use]
     pub const fn with_total(mut self, total: Option<u64>) -> Self {
         self.total = total;
@@ -333,8 +334,8 @@ impl Pagination {
 }
 
 impl<T> Page<T> {
-    /// Đổi từng dòng sang kiểu khác (vd từ dòng của database sang kiểu trả về của
-    /// API), giữ nguyên thông tin trang.
+    /// Converts each row to another type (e.g. from a database row to the API's return type), keeping the
+    /// page information.
     pub fn map<U>(self, convert: impl FnMut(T) -> U) -> Page<U> {
         Page { data: self.data.into_iter().map(convert).collect(), pagination: self.pagination }
     }
@@ -346,12 +347,12 @@ impl<T: Serialize> IntoResponse for Page<T> {
     }
 }
 
-/// Lấy một trang của `select`, sắp theo cột ID.
+/// Fetches one page of `select`, ordered by the ID column.
 ///
-/// - `id_column`: cột khoá chính (UUIDv7) của bảng.
-/// - `id_of`: lấy ID từ một dòng, để tính con trỏ của trang kế.
-/// - `select` có thể đã mang sẵn điều kiện lọc; KHÔNG được mang sẵn thứ tự sắp
-///   xếp hay giới hạn số dòng.
+/// - `id_column`: the table's primary key column (UUIDv7).
+/// - `id_of`: gets the ID from a row, to compute the next page's cursor.
+/// - `select` may already carry filter conditions; it must NOT already carry an ordering or a row
+///   limit.
 pub async fn fetch_page<E, C>(
     select: Select<E>,
     id_column: E::Column,
@@ -380,14 +381,14 @@ where
     Ok(Page { data: rows, pagination: Pagination { limit: request.limit, next_cursor, total } })
 }
 
-/// Như [`fetch_page`], nhưng sắp theo cột `sort_column` trước, rồi theo ID (để hai dòng
-/// cùng giá trị vẫn có thứ tự cố định).
+/// Like [`fetch_page`], but ordered by column `sort_column` first, then by ID (so two rows with the same
+/// value still have a fixed order).
 ///
-/// - `sort_value`: giá trị cột đó của một dòng, để tính con trỏ của trang kế. Cột có thể
-///   `NULL` thì không dùng được ở đây.
-/// - Cần index `(sort_column, id)` để nhanh.
-/// - Hai database phải so sánh giá trị cột như nhau: cột chữ nên lưu sẵn dạng so sánh
-///   được theo byte (vd chữ thường, collation `C` trên Postgres) để thứ tự giống nhau.
+/// - `sort_value`: that column's value for a row, to compute the next page's cursor. A column that can be
+///   `NULL` cannot be used here.
+/// - Needs an index on `(sort_column, id)` to be fast.
+/// - Both databases must compare the column values the same way: a text column should be stored in a
+///   byte-comparable form (e.g. lowercase, collation `C` on Postgres) so the order is identical.
 pub async fn fetch_page_by<E, C>(
     select: Select<E>,
     sort_column: E::Column,
@@ -434,16 +435,17 @@ where
     Ok(Page { data: rows, pagination: Pagination { limit: request.limit, next_cursor, total } })
 }
 
-/// Tên "cột" trong con trỏ của [`fetch_page_tiers`].
+/// The "column" name in the cursor of [`fetch_page_tiers`].
 const TIER: &str = "tier";
 
-/// Như [`fetch_page`], nhưng chia dòng thành nhiều tầng xếp hạng: mọi dòng khớp `tiers[0]` đứng
-/// trước, rồi các dòng khớp `tiers[1]` (mà không khớp tầng trước)… Trong mỗi tầng sắp theo ID
-/// như [`fetch_page`]; dòng không khớp tầng nào bị bỏ. Dùng cho tìm kiếm "khớp đúng dấu xếp
-/// trước khớp không dấu" (D-202): hạng phụ thuộc chữ người dùng gõ nên không lưu thành cột được.
+/// Like [`fetch_page`], but splits rows into ranked tiers: every row matching `tiers[0]` comes first,
+/// then the rows matching `tiers[1]` (and not the earlier tier)... Within each tier rows are ordered by ID
+/// as in [`fetch_page`]; a row matching no tier is dropped. Used for search where "exact accent match ranks
+/// before accent-insensitive match" (D-202): the rank depends on what the user typed, so it cannot be stored
+/// as a column.
 ///
-/// Con trỏ mang tầng và ID của dòng cuối. Một trang chạy tối đa `tiers.len()` câu truy vấn, mỗi
-/// câu đi theo index của bộ lọc chung như [`fetch_page`].
+/// The cursor carries the tier and the ID of the last row. A page runs at most `tiers.len()` queries, each
+/// using the index of the shared filter as in [`fetch_page`].
 pub async fn fetch_page_tiers<E, C>(
     select: Select<E>,
     tiers: &[Condition],
@@ -512,7 +514,7 @@ where
     })
 }
 
-/// Tổng số dòng của `select` (chỉ bộ lọc, chưa con trỏ) khi client hỏi và đây là trang đầu.
+/// Total number of rows of `select` (filters only, no cursor) when the client asks and this is the first page.
 pub async fn total_of<E, C>(
     select: &Select<E>,
     request: &PageRequest,
@@ -528,8 +530,9 @@ where
     Ok(Some(count_rows(select.clone(), connection).await?))
 }
 
-/// `SELECT COUNT(*)` bọc ngoài câu của `select` (giữ nguyên mọi bộ lọc, join). Tự dựng câu thay vì
-/// `PaginatorTrait::count` để hàm phân trang khỏi phải đòi thêm ràng buộc `Sync` cho kiểu dòng.
+/// `SELECT COUNT(*)` wrapped around the `select` query (keeping every filter and join). Built by hand
+/// instead of `PaginatorTrait::count` so the paging functions do not need an extra `Sync` bound on the row
+/// type.
 async fn count_rows<E, C>(select: Select<E>, connection: &C) -> Result<u64, Error>
 where
     E: EntityTrait,
@@ -548,9 +551,9 @@ where
     Ok(u64::try_from(total).unwrap_or_default())
 }
 
-/// Giá trị trong con trỏ có đúng kiểu của cột không. Con trỏ do client gửi lại nên có thể
-/// bị sửa: so chữ với cột số làm Postgres báo lỗi (500) còn SQLite thì không — kiểm trước
-/// để cả hai cùng trả `invalid_cursor` (D-149).
+/// Whether the value in the cursor has the column's right type. The cursor comes back from the client, so
+/// it may have been tampered with: comparing text with a numeric column makes Postgres fail (500) but not
+/// SQLite, so check first so both return `invalid_cursor` (D-149).
 fn fits<C: ColumnTrait>(column: &C, value: &SortValue) -> bool {
     use sea_orm::ColumnType;
     match column.def().get_column_type() {
@@ -573,7 +576,7 @@ fn fits<C: ColumnTrait>(column: &C, value: &SortValue) -> bool {
     }
 }
 
-/// Đọc tối đa `limit` dòng; kèm biết còn dòng sau hay không.
+/// Reads at most `limit` rows, and also learns whether more rows follow.
 async fn fetch_rows<E, C>(
     select: Select<E>,
     request: &PageRequest,

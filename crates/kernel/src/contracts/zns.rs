@@ -1,6 +1,7 @@
-//! Gửi tin Zalo ZNS (bước 37, D-348): trait trung lập cho tin theo mẫu đã được Zalo duyệt. Bộ nối Zalo
-//! là module riêng (cần khoá của Zalo Official Account) công bố `context.provide::<dyn ZnsSender>(…)`
-//! và đăng ký TRƯỚC module `notifications`. Test dùng `FakeZnsSender` của testkit.
+//! Sending Zalo ZNS messages (step 37, D-348): a neutral trait for template messages approved by Zalo. The Zalo
+//! adapter is its own module (needs the Zalo Official Account key) that publishes
+//! `context.provide::<dyn ZnsSender>(...)` and is registered BEFORE the `notifications` module. Tests use
+//! `FakeZnsSender` from the testkit.
 
 use serde_json::Value;
 
@@ -8,17 +9,17 @@ use crate::error::Error;
 use crate::sms::PhoneNumber;
 use crate::tenancy::TenantId;
 
-/// Một tin ZNS cần gửi: mã mẫu đã duyệt và giá trị các tham số của mẫu.
+/// A ZNS message to send: the approved template code and the values of the template's parameters.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct ZnsMessage {
     pub tenant: TenantId,
     pub to: PhoneNumber,
-    /// Mã mẫu ZNS đã được Zalo duyệt.
+    /// ZNS template code approved by Zalo.
     pub template_id: String,
-    /// Giá trị tham số của mẫu (`{"order_code": "…"}`).
+    /// Values of the template's parameters (`{"order_code": "..."}`).
     pub params: Value,
-    /// Mã chống gửi trùng ở nhà cung cấp.
+    /// Code that prevents duplicate sends at the provider.
     pub reference: String,
 }
 
@@ -40,19 +41,19 @@ impl ZnsMessage {
     }
 }
 
-/// Một nhà cung cấp gửi tin ZNS.
+/// A provider that sends ZNS messages.
 //
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
 #[async_trait::async_trait]
 pub trait ZnsSender: Send + Sync {
     fn provider(&self) -> &'static str;
 
-    /// Trả mã tin ở nhà cung cấp. Lỗi `Unavailable` là tạm thời (thử lại); `Validation` là vĩnh viễn
-    /// (số không dùng Zalo, mẫu chưa duyệt).
+    /// Returns the message code at the provider. The `Unavailable` error is temporary (retry); `Validation` is
+    /// permanent (the number does not use Zalo, the template is not approved).
     async fn send(&self, message: ZnsMessage) -> Result<String, Error>;
 }
 
-/// `zns_disabled` (503): chưa cấu hình gửi Zalo ZNS.
+/// `zns_disabled` (503): Zalo ZNS sending is not configured.
 pub fn zns_disabled() -> Error {
     Error::unavailable("zns_disabled", "Sending Zalo ZNS messages is not set up on this server.")
 }

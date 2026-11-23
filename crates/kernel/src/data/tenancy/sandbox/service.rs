@@ -1,5 +1,5 @@
-//! Service của sandbox: tạo, gia hạn, xoá, hết hạn; job sao cấu hình rồi kích hoạt. REST và tool
-//! MCP cùng gọi vào đây.
+//! Sandbox service: create, extend, delete, expire; the job that copies configuration and then activates. REST
+//! and MCP tools both call into it.
 
 use crate::time::Timestamp;
 use jiff::SignedDuration;
@@ -109,7 +109,7 @@ fn describe(row: &entity::Model) -> Sandbox {
     }
 }
 
-/// Payload chung của event sandbox (ghi ở khách gốc).
+/// Shared payload of sandbox events (recorded at the source tenant).
 #[derive(Debug, Serialize)]
 struct SandboxChanged {
     sandbox_id: Uuid,
@@ -143,7 +143,7 @@ fn changed(row: &entity::Model) -> SandboxChanged {
     }
 }
 
-/// Sandbox của khách: tạo, gia hạn, xoá, hết hạn.
+/// A tenant's sandboxes: create, extend, delete, expire.
 pub struct TenantSandboxes {
     pub(super) registry: DatabaseRegistry,
     admin: Arc<TenantAdmin>,
@@ -152,7 +152,7 @@ pub struct TenantSandboxes {
     entitlements: EntitlementsHandle,
     days: i64,
     max_products: u32,
-    /// Sao / đẩy của mọi module (điền sau khi mọi module khởi động).
+    /// Copy / push of every module (filled after every module starts).
     pub(super) catalog: super::copy::SandboxCatalog,
 }
 
@@ -161,8 +161,8 @@ impl TenantSandboxes {
         self.registry.control()
     }
 
-    /// Khách gốc `id` mà người gọi (ở khách `tenant`) được quản lý sandbox: chính khách của họ, hay
-    /// nhân sự nền tảng có `kernel.tenants.manage`. Khác: `tenant_not_found` (không lộ khách).
+    /// The source tenant `id` whose sandboxes the caller (at tenant `tenant`) may manage: their own tenant, or
+    /// platform staff with `kernel.tenants.manage`. Otherwise: `tenant_not_found` (the tenant is not revealed).
     async fn source(
         &self,
         tenant: &TenantContext,
@@ -178,7 +178,7 @@ impl TenantSandboxes {
         Err(errors::tenant_not_found(&id.to_string()))
     }
 
-    /// Dòng sandbox `id` của khách người gọi (hay nhân sự nền tảng); khác → `tenancy.sandbox_not_found`.
+    /// Sandbox row `id` of the caller's tenant (or platform staff); otherwise → `tenancy.sandbox_not_found`.
     pub(super) async fn owned(
         &self,
         tenant: &TenantContext,
@@ -196,7 +196,7 @@ impl TenantSandboxes {
         if mine || staff { Ok(row) } else { Err(sandbox_not_found(id)) }
     }
 
-    /// Một trang sandbox (chưa xoá) của khách `source_id`, mới nhất trước.
+    /// A page of (not deleted) sandboxes of tenant `source_id`, newest first.
     pub async fn list(
         &self,
         tenant: &TenantContext,
@@ -216,7 +216,7 @@ impl TenantSandboxes {
         Ok(page.map(|row| describe(&row)))
     }
 
-    /// Số sandbox khách được giữ cùng lúc: mức của gói, gói không đặt (hay không thuê bao) thì 1.
+    /// Number of sandboxes the tenant may hold at once: the plan's level; 1 when the plan sets none (or no subscription).
     async fn allowed(&self, source: TenantId) -> Result<Option<i64>, Error> {
         let snapshot = self.entitlements.snapshot(source).await?;
         if snapshot.unrestricted {
@@ -228,8 +228,8 @@ impl TenantSandboxes {
         })
     }
 
-    /// Tạo sandbox của khách `source_id`: dòng `provisioning` cùng placement với khách gốc, rồi job
-    /// `kernel.sandbox_copy` gieo dữ liệu ban đầu, sao cấu hình và kích hoạt.
+    /// Creates a sandbox of tenant `source_id`: a `provisioning` row on the same placement as the source
+    /// tenant, then the `kernel.sandbox_copy` job seeds initial data, copies configuration and activates.
     pub async fn create(
         &self,
         tenant: &TenantContext,
@@ -312,7 +312,7 @@ impl TenantSandboxes {
         Ok(SandboxCreated { sandbox: describe(&row), job_id })
     }
 
-    /// Xếp job sao cấu hình ở database của khách gốc, kèm dòng theo dõi (job API chung).
+    /// Queues the configuration-copy job at the source tenant's database, with a tracking row (the shared API job).
     async fn enqueue_copy(
         &self,
         source: &TenantContext,
@@ -345,8 +345,9 @@ impl TenantSandboxes {
         Ok(job)
     }
 
-    /// Job `kernel.sandbox_copy`: gieo dữ liệu ban đầu của mọi module (như khách mới), kích hoạt,
-    /// ghi `kernel.sandbox_created` ở khách gốc. Chạy lại được (bên nghe event chịu nhận lại).
+    /// The `kernel.sandbox_copy` job: seeds the initial data of every module (as for a new tenant),
+    /// activates, records `kernel.sandbox_created` at the source tenant. Re-runnable (event listeners
+    /// tolerate redelivery).
     async fn copy(&self, sandbox_id: Uuid) -> Result<(), Error> {
         let Some(row) = entity::Entity::find_by_id(sandbox_id).one(self.control().read()).await?
         else {
@@ -381,7 +382,7 @@ impl TenantSandboxes {
         self.outbox.record(source.database().write(), source, actor, subject, event).await
     }
 
-    /// Gia hạn sandbox `id`: hết hạn lại sau `AUTOXIDE_TENANCY_SANDBOX_DAYS` ngày tính từ bây giờ.
+    /// Extends sandbox `id`: expires again after `AUTOXIDE_TENANCY_SANDBOX_DAYS` days from now.
     pub async fn extend(
         &self,
         tenant: &TenantContext,
@@ -401,7 +402,7 @@ impl TenantSandboxes {
         Ok(describe(&row))
     }
 
-    /// Xoá ngay sandbox `id` theo luồng xoá khách (tạm khoá rồi xoá hẳn dữ liệu).
+    /// Deletes sandbox `id` immediately through the tenant erasure flow (suspend, then permanently erase the data).
     pub async fn delete(
         &self,
         tenant: &TenantContext,
@@ -437,8 +438,9 @@ impl TenantSandboxes {
         Ok(())
     }
 
-    /// Lịch `kernel.expire_sandboxes`: xoá sandbox quá hạn, và sandbox mà khách gốc đã xoá / gộp.
-    /// Trả số sandbox đã xoá (lệnh vận hành và test gọi thẳng được).
+    /// The `kernel.expire_sandboxes` schedule: deletes expired sandboxes, and sandboxes whose source tenant
+    /// was deleted / merged. Returns the number of sandboxes deleted (operator commands and tests can call it
+    /// directly).
     pub async fn expire_due(&self) -> Result<u64, Error> {
         let now = now();
         let rows = entity::Entity::find()
@@ -474,7 +476,7 @@ impl TenantSandboxes {
     }
 }
 
-/// Bộ chạy job `kernel.sandbox_copy` (job của khách gốc, payload `{"sandbox_id": …}`).
+/// Runner of the `kernel.sandbox_copy` job (a job of the source tenant, payload `{"sandbox_id": …}`).
 pub(crate) struct CopyRunner(pub(crate) Arc<TenantSandboxes>);
 
 #[async_trait::async_trait]
@@ -488,7 +490,7 @@ impl JobHandler for CopyRunner {
     }
 }
 
-/// Bộ chạy lịch `kernel.expire_sandboxes` (database điều khiển).
+/// Runner of the `kernel.expire_sandboxes` schedule (control database).
 pub(crate) struct ExpireRunner(pub(crate) Arc<TenantSandboxes>);
 
 #[async_trait::async_trait]
@@ -502,7 +504,7 @@ impl JobHandler for ExpireRunner {
     }
 }
 
-/// Phần của module `kernel` cho sandbox: cấu hình, service, route, tool, job, lịch.
+/// The `kernel` module's part for sandboxes: configuration, service, routes, tools, jobs, schedule.
 pub(crate) struct Wiring {
     days: i64,
     max_products: u32,
@@ -516,7 +518,7 @@ impl Default for Wiring {
 }
 
 impl Wiring {
-    /// Đọc `AUTOXIDE_TENANCY_SANDBOX_DAYS` và `AUTOXIDE_TENANCY_SANDBOX_MAX_PRODUCTS`.
+    /// Reads `AUTOXIDE_TENANCY_SANDBOX_DAYS` and `AUTOXIDE_TENANCY_SANDBOX_MAX_PRODUCTS`.
     pub(crate) fn read(reader: &mut ConfigReader<'_>) -> Result<(i64, u32), Invalid> {
         let days =
             reader.get_with(&SANDBOX_DAYS, |raw| crate::config::parse_in_range(raw, 1i64, 365));
@@ -568,7 +570,7 @@ impl Wiring {
         ]
     }
 
-    /// Mỗi giờ, chỉ trên database điều khiển (nơi duy nhất có sổ khách); chế độ `single` không có.
+    /// Every hour, on the control database only (the only one with the tenant registry); `single` mode has none.
     pub(crate) fn schedules(&self, multi: bool) -> Vec<Schedule> {
         if !multi || self.service.is_none() {
             return Vec::new();

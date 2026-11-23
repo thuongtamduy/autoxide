@@ -1,20 +1,21 @@
-//! Tiền: số nguyên đơn vị nhỏ nhất + mã tiền tệ ISO 4217 — một kiểu cho mọi module (D-180).
+//! Money: an integer in the smallest unit plus an ISO 4217 currency code, one type for every module (D-180).
 //!
-//! Luật dữ liệu của `CLAUDE.md`: tiền không bao giờ là `f32`/`f64` hay kiểu thập phân của
-//! database. [`Money`] giữ số **đơn vị nhỏ nhất** (`i64`: cent của USD, đồng của VND) và một
-//! [`Currency`] biết mã có mấy chữ số thập phân.
+//! The data rule of `CLAUDE.md`: money is never `f32`/`f64` or a decimal database type. [`Money`] holds the
+//! number of **smallest units** (`i64`: cents of USD, dong of VND) and a [`Currency`] that knows how many
+//! decimal places the code has.
 //!
-//! - Cộng, trừ, nhân với số nguyên đều **có kiểm tràn** và trả [`Error`] thay vì quay vòng.
-//! - Phép tính giữa hai loại tiền khác nhau bị từ chối (`money.currency_mismatch`): đổi tiền là
-//!   việc của nghiệp vụ, có tỉ giá và quy tắc làm tròn riêng.
-//! - Chia theo tỉ lệ bằng [`Money::allocate`] / [`Money::split`]: tổng các phần luôn bằng số ban
-//!   đầu, không mất đơn vị nào (100 chia 3 → 34, 33, 33).
-//! - JSON: `{"amount": "1999", "currency": "USD"}` — `amount` là **chuỗi** số nguyên, vì
-//!   JavaScript đọc số JSON thành `f64` và làm tròn sai mọi số lớn hơn 2⁵³.
-//! - Lưu trong database: hai cột `<tên>_minor` (`BIGINT`) và `<tên>_currency` (chuỗi 3 ký tự),
-//!   chạy như nhau trên SQLite và Postgres. Đọc lại bằng [`Money::from_columns`].
+//! - Addition, subtraction and multiplication by an integer are all **overflow-checked** and return [`Error`]
+//!   instead of wrapping around.
+//! - Arithmetic between two different currencies is refused (`money.currency_mismatch`): converting currency is
+//!   business logic, with its own exchange rate and rounding rules.
+//! - Proportional division with [`Money::allocate`] / [`Money::split`]: the parts always sum to the original
+//!   amount, with no unit lost (100 split by 3 -> 34, 33, 33).
+//! - JSON: `{"amount": "1999", "currency": "USD"}`; `amount` is an integer **string**, because JavaScript reads
+//!   a JSON number as `f64` and rounds every number larger than 2^53 incorrectly.
+//! - Stored in the database: two columns `<name>_minor` (`BIGINT`) and `<name>_currency` (a 3-character
+//!   string), behaving the same on SQLite and Postgres. Read back with [`Money::from_columns`].
 //!
-//! Khái niệm như tài khoản, số dư, sổ cái không ở đây — chúng thuộc module.
+//! Concepts such as account, balance and ledger are not here; they belong to modules.
 
 use std::cmp::Ordering;
 use std::fmt;
@@ -27,10 +28,11 @@ use utoipa::{PartialSchema, ToSchema};
 
 use crate::error::{Error, ErrorKind};
 
-/// Một loại tiền theo ISO 4217: mã ba chữ cái và số chữ số thập phân của nó.
+/// A currency under ISO 4217: a three-letter code and its number of decimal places.
 ///
-/// Chỉ nhận mã đang lưu hành có đơn vị nhỏ (bảng [`CURRENCIES`]); mã kim loại quý, mã quỹ
-/// không có số chữ số thập phân (`XAU`, `XDR`…) và mã đã thôi dùng bị từ chối.
+/// Accepts only codes currently in circulation that have a minor unit (the [`CURRENCIES`] table); precious
+/// metal codes, fund codes with no decimal places (`XAU`, `XDR`, ...) and
+/// withdrawn codes are refused.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Currency {
     // `&'static str`: trỏ thẳng vào bảng viết sẵn trong binary, nên `Currency` là `Copy` và
@@ -40,17 +42,17 @@ pub struct Currency {
 }
 
 impl Currency {
-    /// Đô la Mỹ (2 chữ số thập phân).
+    /// US dollar (2 decimal places).
     pub const USD: Currency = Currency { code: "USD", minor_units: 2 };
-    /// Euro (2 chữ số thập phân).
+    /// Euro (2 decimal places).
     pub const EUR: Currency = Currency { code: "EUR", minor_units: 2 };
-    /// Đồng Việt Nam (0 chữ số thập phân).
+    /// Vietnamese dong (0 decimal places).
     pub const VND: Currency = Currency { code: "VND", minor_units: 0 };
-    /// Yên Nhật (0 chữ số thập phân).
+    /// Japanese yen (0 decimal places).
     pub const JPY: Currency = Currency { code: "JPY", minor_units: 0 };
 
-    /// Tra mã ISO 4217 (`"USD"`, `"vnd"` — không phân biệt hoa thường). Mã không có trong bảng
-    /// trả lỗi `money.currency_unknown`.
+    /// Looks up an ISO 4217 code (`"USD"`, `"vnd"`; case-insensitive). A code not in the table
+    /// returns the error `money.currency_unknown`.
     pub fn parse(code: &str) -> Result<Currency, Error> {
         let upper = code.trim().to_ascii_uppercase();
         CURRENCIES
@@ -60,12 +62,12 @@ impl Currency {
             .ok_or_else(|| currency_unknown(code))
     }
 
-    /// Mã ba chữ cái viết hoa, vd `"USD"`.
+    /// Three-letter uppercase code, e.g. `"USD"`.
     pub fn code(self) -> &'static str {
         self.code
     }
 
-    /// Số chữ số thập phân: 2 với USD (1 USD = 100 cent), 0 với VND, 3 với KWD.
+    /// Number of decimal places: 2 for USD (1 USD = 100 cents), 0 for VND, 3 for KWD.
     pub fn minor_units(self) -> u8 {
         self.minor_units
     }
@@ -138,25 +140,25 @@ pub struct Money {
 }
 
 impl Money {
-    /// `minor` đơn vị nhỏ nhất của `currency`: `Money::new(1999, Currency::USD)` là 19,99 USD.
+    /// `minor` smallest units of `currency`: `Money::new(1999, Currency::USD)` is 19.99 USD.
     pub const fn new(minor: i64, currency: Currency) -> Money {
         Money { minor, currency }
     }
 
-    /// Số 0 của `currency`.
+    /// The zero of `currency`.
     pub const fn zero(currency: Currency) -> Money {
         Money { minor: 0, currency }
     }
 
-    /// Đọc từ đầu vào của người gọi: `amount` là chuỗi số nguyên đơn vị nhỏ nhất (`"1999"`,
-    /// `"-5"`), `currency` là mã ISO 4217. Sai thì lỗi `money.amount_invalid` hoặc
+    /// Reads from the caller's input: `amount` is an integer string in the smallest unit (`"1999"`,
+    /// `"-5"`), `currency` is an ISO 4217 code. Otherwise the error is `money.amount_invalid` or
     /// `money.currency_unknown`.
     pub fn parse(amount: &str, currency: &str) -> Result<Money, Error> {
         Ok(Money { minor: parse_minor(amount)?, currency: Currency::parse(currency)? })
     }
 
-    /// Dựng lại từ hai cột lưu chuẩn `<tên>_minor` và `<tên>_currency`. Mã tiền tệ trong
-    /// database không còn hợp lệ là dữ liệu hỏng: lỗi nội bộ, không phải lỗi của người gọi.
+    /// Rebuilds from the two standard storage columns `<name>_minor` and `<name>_currency`. A currency code
+    /// in the database that is no longer valid is corrupt data: an internal error, not the caller's error.
     pub fn from_columns(minor: i64, currency: &str) -> Result<Money, Error> {
         let currency = Currency::parse(currency).map_err(|_| {
             Error::internal(format!(
@@ -166,12 +168,12 @@ impl Money {
         Ok(Money { minor, currency })
     }
 
-    /// Số đơn vị nhỏ nhất — giá trị cho cột `<tên>_minor`.
+    /// Number of smallest units: the value for the column `<name>_minor`.
     pub const fn minor(self) -> i64 {
         self.minor
     }
 
-    /// Loại tiền; `currency().code()` là giá trị cho cột `<tên>_currency`.
+    /// The currency; `currency().code()` is the value for the column `<name>_currency`.
     pub const fn currency(self) -> Currency {
         self.currency
     }
@@ -188,45 +190,46 @@ impl Money {
         self.minor < 0
     }
 
-    /// `self + other`. Khác loại tiền: `money.currency_mismatch`; tràn `i64`: `money.overflow`.
+    /// `self + other`. Different currencies: `money.currency_mismatch`; `i64` overflow: `money.overflow`.
     pub fn checked_add(self, other: Money) -> Result<Money, Error> {
         self.same_currency(other)?;
         self.with_minor(self.minor.checked_add(other.minor))
     }
 
-    /// `self - other`. Khác loại tiền: `money.currency_mismatch`; tràn `i64`: `money.overflow`.
+    /// `self - other`. Different currencies: `money.currency_mismatch`; `i64` overflow: `money.overflow`.
     pub fn checked_sub(self, other: Money) -> Result<Money, Error> {
         self.same_currency(other)?;
         self.with_minor(self.minor.checked_sub(other.minor))
     }
 
-    /// `self × factor` (vd đơn giá × số lượng). Tràn `i64`: `money.overflow`.
+    /// `self × factor` (e.g. unit price × quantity). `i64` overflow: `money.overflow`.
     pub fn checked_mul(self, factor: i64) -> Result<Money, Error> {
         self.with_minor(self.minor.checked_mul(factor))
     }
 
-    /// `-self` (vd số tiền của giao dịch đảo). Tràn (`i64::MIN`): `money.overflow`.
+    /// `-self` (e.g. the amount of a reversing transaction). Overflow (`i64::MIN`): `money.overflow`.
     pub fn checked_neg(self) -> Result<Money, Error> {
         self.with_minor(self.minor.checked_neg())
     }
 
-    /// Tổng của `items`, tất cả phải là `currency` (danh sách rỗng cho số 0).
+    /// Sum of `items`, all of which must be `currency` (an empty list gives zero).
     pub fn sum(currency: Currency, items: impl IntoIterator<Item = Money>) -> Result<Money, Error> {
         items.into_iter().try_fold(Money::zero(currency), Money::checked_add)
     }
 
-    /// So hai số tiền cùng loại. Khác loại tiền: `money.currency_mismatch`.
+    /// Compares two amounts of the same currency. Different currencies: `money.currency_mismatch`.
     pub fn compare(self, other: Money) -> Result<Ordering, Error> {
         self.same_currency(other)?;
         Ok(self.minor.cmp(&other.minor))
     }
 
-    /// Chia thành từng phần theo `ratios` (vd `[1, 1, 1]` chia ba, `[70, 30]` chia 70/30).
+    /// Splits into parts according to `ratios` (e.g. `[1, 1, 1]` splits in three, `[70, 30]` splits 70/30).
     ///
-    /// Tổng các phần **luôn** bằng `self`: mỗi phần lấy phần nguyên của số chia, rồi các đơn vị
-    /// còn dư được trao lần lượt cho phần có phần lẻ lớn nhất (bằng nhau thì phần đứng trước) —
-    /// 100 chia `[1, 1, 1]` thành 34, 33, 33. Phần có tỉ lệ 0 luôn nhận 0. Số âm chia đối xứng
-    /// với số dương. Cần ít nhất một tỉ lệ khác 0, không thì `money.allocation_invalid`.
+    /// The parts **always** sum to `self`: each part takes the integer part of its share, then the leftover
+    /// units are handed out one by one to the parts with the largest remainders (ties go to the earlier
+    /// part); 100 split by `[1, 1, 1]` gives 34, 33, 33. A part with ratio 0 always gets 0. A negative amount
+    /// splits symmetrically to a positive one. At least one non-zero ratio is required, otherwise
+    /// `money.allocation_invalid`.
     pub fn allocate(self, ratios: &[u64]) -> Result<Vec<Money>, Error> {
         // Tính bằng `i128`: `minor × ratio` của hai số 64-bit không bao giờ tràn 128-bit.
         let total: i128 = ratios.iter().map(|&ratio| i128::from(ratio)).sum();
@@ -262,7 +265,7 @@ impl Money {
             .collect()
     }
 
-    /// Chia đều thành `parts` phần (100 chia 3 → 34, 33, 33). `parts` = 0:
+    /// Splits evenly into `parts` parts (100 split by 3 -> 34, 33, 33). `parts` = 0:
     /// `money.allocation_invalid`.
     pub fn split(self, parts: usize) -> Result<Vec<Money>, Error> {
         self.allocate(&vec![1; parts])
@@ -288,7 +291,7 @@ impl Money {
     }
 }
 
-/// Dạng đọc được cho log và thư: `-12.34 USD`, `50000 VND`.
+/// Readable form for logs and mail: `-12.34 USD`, `50000 VND`.
 impl fmt::Display for Money {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let digits = usize::from(self.currency.minor_units);
@@ -309,7 +312,7 @@ impl fmt::Debug for Money {
     }
 }
 
-/// `amount` của JSON: chuỗi số nguyên (xem tài liệu đầu file).
+/// The `amount` of the JSON: an integer string (see the documentation at the top of the file).
 mod amount_string {
     use serde::{Deserialize, Deserializer, Serializer};
 
@@ -323,7 +326,7 @@ mod amount_string {
     }
 }
 
-/// Chuỗi số nguyên thập phân: `-` tuỳ chọn rồi 1–19 chữ số, không khoảng trắng, không `+`.
+/// Decimal integer string: an optional `-` then 1-19 digits, no whitespace, no `+`.
 fn parse_minor(text: &str) -> Result<i64, Error> {
     let digits = text.strip_prefix('-').unwrap_or(text);
     let well_formed =
@@ -373,10 +376,10 @@ fn allocation_invalid() -> Error {
     )
 }
 
-/// Mã ISO 4217 đang lưu hành và số chữ số thập phân của chúng (bảng A.1 của ISO 4217, gồm cả
-/// mã quỹ có đơn vị nhỏ như `CLF`, `UYW`). Không có: kim loại quý và mã không có đơn vị nhỏ
-/// (`XAU`, `XAG`, `XDR`, `XSU`, `XUA`…), mã thử (`XTS`, `XXX`) và mã đã thôi dùng (`HRK`,
-/// `ZWL`, `SLL`, `ANG`…). Thêm mã khi ISO công bố sửa đổi.
+/// ISO 4217 codes currently in circulation and their number of decimal places (table A.1 of ISO 4217,
+/// including fund codes with a minor unit such as `CLF`, `UYW`). Not included: precious metals and codes with
+/// no minor unit (`XAU`, `XAG`, `XDR`, `XSU`, `XUA`, ...), test codes (`XTS`, `XXX`) and withdrawn codes
+/// (`HRK`, `ZWL`, `SLL`, `ANG`, ...). Add a code when ISO publishes an amendment.
 // Viết bảy mã một dòng cho dễ dò; rustfmt sẽ tách mỗi mã một dòng (gần 200 dòng).
 #[rustfmt::skip]
 pub const CURRENCIES: &[(&str, u8)] = &[

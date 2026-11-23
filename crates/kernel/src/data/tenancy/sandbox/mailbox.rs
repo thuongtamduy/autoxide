@@ -1,13 +1,13 @@
-//! Hộp thư giả của sandbox (bước 38, D-232): thứ sandbox lẽ ra gửi ra ngoài mà bị giữ lại — lời gọi
-//! đối tác (thanh toán, chi trả, hoá đơn điện tử, eKYC), SMS, ZNS, đẩy thông báo, mail tới người
-//! ngoài nhân viên, webhook tới URL chưa cho phép.
+//! The sandbox's fake mailbox (step 38, D-232): what the sandbox would have sent out but is held back: partner
+//! calls (payments, payouts, e-invoices, eKYC), SMS, ZNS, push notifications, mail to people
+//! other than staff, webhooks to URLs not allowed.
 //!
-//! - Bảng `kernel_sandbox_messages`, cấp khách hàng, ở database của sandbox (cùng placement với khách
-//!   gốc); xoá cùng sandbox theo luồng xoá khách. Chỉ thêm, không sửa.
-//! - Ghi bằng [`hold_back`] ngoài mọi transaction của bên gọi (lời gọi đối tác vốn không được nằm
-//!   trong transaction ghi): dòng là nhật ký cho người thử xem, mất một dòng khi database lỗi không
-//!   làm hỏng nghiệp vụ.
-//! - Người trong sandbox đọc bằng `GET /api/v1/kernel/sandbox/messages` (`kernel.sandboxes.read`).
+//! - The `kernel_sandbox_messages` table, tenant-level, in the sandbox's database (the same placement as
+//!   the original tenant); deleted together with the sandbox in the tenant deletion flow. Append-only.
+//! - Written with [`hold_back`] outside any transaction of the caller (a partner call must not sit inside a
+//!   write transaction anyway): a row is a log for the person testing to look at; losing a row when the
+//!   database fails does not break the business operation.
+//! - People in the sandbox read it with `GET /api/v1/kernel/sandbox/messages` (`kernel.sandboxes.read`).
 use crate::time::Timestamp;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 use serde::{Deserialize, Serialize};
@@ -23,11 +23,11 @@ use crate::pagination::{Page, PageRequest, fetch_page};
 use crate::tenancy::{ScopeExt, TenantContext, TenantScoped};
 
 const TABLE: &str = "kernel_sandbox_messages";
-/// Trần độ dài chữ ghi vào hộp thư (chủ đề, người nhận): cắt bớt thay vì lỗi.
+/// Maximum length of text written to the mailbox (subject, recipient): truncated instead of erroring.
 const SHORT_MAX: usize = 320;
 
 pub(crate) mod entity {
-    //! Bảng `kernel_sandbox_messages`.
+    //! The `kernel_sandbox_messages` table.
     use crate::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
@@ -43,7 +43,7 @@ pub(crate) mod entity {
         pub reason: String,
         pub recipient: Option<String>,
         pub subject: Option<String>,
-        /// JSON: chi tiết của lời gọi (số tiền, nội dung…).
+        /// JSON: details of the call (amount, content...).
         pub body: String,
         pub created_at: Timestamp,
     }
@@ -57,14 +57,14 @@ impl TenantScoped for entity::Entity {
     }
 }
 
-/// Kênh của một thứ bị giữ lại.
+/// Channel of a held-back item.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HeldChannel {
-    /// Lời gọi đối tác: thanh toán, chi trả, biến động số dư, hoá đơn điện tử, eKYC.
+    /// Partner call: payment, payout, balance movement, e-invoice, eKYC.
     Partner,
     Sms,
     Zns,
-    /// Đẩy thông báo tới trình duyệt / điện thoại.
+    /// Push notification to a browser / phone.
     Push,
     Mail,
     Webhook,
@@ -83,14 +83,14 @@ impl HeldChannel {
     }
 }
 
-/// Vì sao bị giữ lại.
+/// Why it was held back.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HeldReason {
-    /// Đối tác luôn được giả lập trong sandbox.
+    /// Partners are always simulated in a sandbox.
     Simulated,
-    /// Mail tới người không phải nhân viên vào được sandbox.
+    /// Mail to a person who is not a staff member who can enter the sandbox.
     RecipientNotAllowed,
-    /// Webhook tới URL không có trong `kernel.sandbox.webhook_urls`.
+    /// Webhook to a URL not in `kernel.sandbox.webhook_urls`.
     UrlNotAllowed,
 }
 
@@ -104,12 +104,12 @@ impl HeldReason {
     }
 }
 
-/// Một thứ sandbox lẽ ra gửi ra ngoài.
+/// Something the sandbox would have sent out.
 #[derive(Clone, Debug)]
 #[non_exhaustive]
 pub struct HeldMessage {
     pub channel: HeldChannel,
-    /// Tên đối tác (`vnpay`, `smtp`…) hay thao tác (`payment.create`).
+    /// Name of the partner (`vnpay`, `smtp`...) or the operation (`payment.create`).
     pub provider: String,
     pub reason: HeldReason,
     pub recipient: Option<String>,
@@ -152,7 +152,7 @@ fn short(text: Option<String>) -> Option<String> {
     text.map(|text| text.chars().take(SHORT_MAX).collect())
 }
 
-/// Ghi một thứ bị giữ lại vào hộp thư giả của sandbox `tenant`. Gọi ngoài transaction.
+/// Writes a held-back item into the fake mailbox of sandbox `tenant`. Call it outside a transaction.
 pub async fn hold_back(tenant: &TenantContext, message: HeldMessage) -> Result<(), Error> {
     let id = Uuid::now_v7();
     entity::ActiveModel {
@@ -217,7 +217,7 @@ fn describe(row: entity::Model) -> SandboxMessage {
     }
 }
 
-/// `tenancy.sandbox_only` (409): việc chỉ có nghĩa trong một sandbox.
+/// `tenancy.sandbox_only` (409): an action that only makes sense inside a sandbox.
 pub fn sandbox_only() -> Error {
     Error::conflict(
         "tenancy.sandbox_only",
@@ -225,7 +225,7 @@ pub fn sandbox_only() -> Error {
     )
 }
 
-/// Một trang hộp thư giả của sandbox hiện tại; `channel` lọc theo kênh.
+/// One page of the current sandbox's fake mailbox; `channel` filters by channel.
 pub(crate) async fn list(
     tenant: &TenantContext,
     principal: &Principal,
@@ -245,11 +245,13 @@ pub(crate) async fn list(
     Ok(page.map(describe))
 }
 
-/// Bảng nối bản ghi của sandbox với bản ghi gốc ở khách thật (sao cấu hình, đẩy sang khách thật).
+/// The table linking a sandbox record to its original record in the real tenant (configuration copy, push to
+/// the real tenant).
 const LINKS: &str = "kernel_sandbox_links";
 
-/// Migration `m0038_create_sandbox_tables`, ở mọi database dữ liệu: hộp thư giả và bảng nối bản ghi
-/// sandbox ↔ khách gốc (`kind`, bản ghi ở sandbox, bản ghi gốc, bản đã đẩy sang khách thật).
+/// Migration `m0038_create_sandbox_tables`, in every data database: the fake mailbox and the table linking
+/// sandbox records ↔ original tenant (`kind`, record in the sandbox, original record, record pushed to the
+/// real tenant).
 pub(crate) struct CreateSandboxMessages;
 
 impl MigrationName for CreateSandboxMessages {

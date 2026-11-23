@@ -1,11 +1,11 @@
-//! Kiểm schema theo khách (bước 33, D-253) trên một database đã migrate:
+//! Checks the per-tenant schema (step 33, D-253) on a migrated database:
 //!
-//! - bảng cấp khách hàng (mọi bảng trừ bảng mặt điều khiển module khai qua
-//!   `Module::control_plane_tables` và bảng lịch sử `<m>_migrations`) có `tenant_id` NOT NULL,
-//!   không `DEFAULT`;
-//! - mọi khoá unique (kể cả khoá chính) bắt đầu bằng `tenant_id`, trừ khoá chỉ gồm cột UUID (ID
-//!   sinh trong ứng dụng, duy nhất toàn cục — vd khoá chính `id`);
-//! - mọi index thường bắt đầu bằng `tenant_id`, trừ index quét cả database có tên `…_sweep_idx`.
+//! - tenant-level tables (every table except control-plane tables a module declares through
+//!   `Module::control_plane_tables` and the history table `<m>_migrations`) have `tenant_id` NOT NULL,
+//!   with no `DEFAULT`;
+//! - every unique key (primary keys included) starts with `tenant_id`, except a key made only of UUID columns
+//!   (IDs generated in the application, globally unique — e.g. the primary key `id`);
+//! - every ordinary index starts with `tenant_id`, except an index that sweeps the whole database and is named `…_sweep_idx`.
 
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -17,14 +17,14 @@ use autoxide_kernel::tenancy::{
 
 use crate::schema::{SchemaSnapshot, TableSnapshot};
 
-/// Cấu hình theo khách giữ trong bộ nhớ, cho test dựng service của module bằng tay (không qua
-/// `TestApp`). Không kiểm giá trị như kernel: test đặt gì module đọc nấy. Test cần kernel thật
-/// (bộ kiểm, REST) thì dùng `TestApp` và `app.api::<dyn TenantSettings>()`.
+/// In-memory per-tenant settings, for tests that build a module's service by hand (not through `TestApp`).
+/// Does not validate values like the kernel: whatever the test sets, the module reads. Tests that need the
+/// real kernel (checkers, REST) use `TestApp` and `app.api::<dyn TenantSettings>()`.
 #[derive(Debug, Default)]
 pub struct FakeTenantSettings(Mutex<HashMap<(TenantId, String), String>>);
 
 impl FakeTenantSettings {
-    /// Khách `tenant` đặt `name` = `value`.
+    /// Tenant `tenant` sets `name` = `value`.
     pub fn set(&self, tenant: TenantId, name: &str, value: &str) {
         self.0
             .lock()
@@ -32,7 +32,7 @@ impl FakeTenantSettings {
             .insert((tenant, name.to_owned()), value.to_owned());
     }
 
-    /// Khách `tenant` bỏ `name` (về cấu hình chung).
+    /// Tenant `tenant` removes `name` (falls back to the shared setting).
     pub fn remove(&self, tenant: TenantId, name: &str) {
         self.0
             .lock()
@@ -57,7 +57,7 @@ impl TenantSettings for FakeTenantSettings {
     }
 }
 
-/// Các vi phạm (đã sắp xếp); rỗng nghĩa là hợp lệ. `control_plane`: bảng mặt điều khiển đã khai.
+/// The violations (sorted); empty means valid. `control_plane`: the declared control-plane tables.
 pub fn schema_tenancy_violations(snapshot: &SchemaSnapshot, control_plane: &[&str]) -> Vec<String> {
     let mut violations = Vec::new();
     for table in &snapshot.tables {

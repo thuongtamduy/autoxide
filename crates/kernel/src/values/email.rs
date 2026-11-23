@@ -1,27 +1,27 @@
-//! Địa chỉ email do người ngoài gửi lên (form, bình luận, đăng ký bản tin…): chuẩn hoá và kiểm
-//! dạng — một cách cho mọi module (D-174).
+//! Email addresses submitted by outsiders (forms, comments, newsletter sign-ups, ...): normalization and shape
+//! checking, one way for every module (D-174).
 //!
-//! Luật đủ dùng chứ không đầy đủ RFC 5322: đủ để chặn chữ rác và chắc chắn gửi mail tới được.
-//! Độ dài đếm theo BYTE như bên gửi mail (`lettre`) và RFC 5321: cả địa chỉ tối đa
-//! [`MAX_LENGTH`] byte, phần trước `@` 1–64 byte, tên miền có ít nhất một dấu chấm, mỗi nhãn 1–63
-//! byte chữ, số hoặc `-` (không ở đầu hay cuối nhãn).
+//! The rules are sufficient rather than the full RFC 5322: enough to block junk text and to be sure mail can
+//! be delivered. Length is counted in BYTES like the mail sender (`lettre`) and RFC 5321: the whole address
+//! is at most [`MAX_LENGTH`] bytes, the part before `@` is 1-64 bytes, the domain has at least one dot, and
+//! each label is 1-63 bytes of letters, digits or `-` (not at the start or end of a label).
 
 use crate::error::FieldError;
 
-/// Độ dài tối đa của một địa chỉ, theo byte (RFC 5321: đường dẫn 256 byte gồm cả `<` `>`).
+/// Maximum length of an address in bytes (RFC 5321: a 256-byte path including `<` and `>`).
 pub const MAX_LENGTH: usize = 254;
 const LOCAL_MAX: usize = 64;
 const LABEL_MAX: usize = 63;
-/// Ký tự không được có trong phần trước `@` (ký tự đặc biệt của header mail).
+/// Characters not allowed in the part before `@` (special characters of mail headers).
 const LOCAL_FORBIDDEN: &str = "<>()[]\\,;:\"@";
 
-/// Email để lưu và tra: bỏ khoảng trắng hai đầu, viết thường.
+/// Email for storing and lookup: surrounding whitespace removed, lowercased.
 pub fn normalize(email: &str) -> String {
     email.trim().to_lowercase()
 }
 
-/// `email` có đúng dạng `phần-trước@tên.miền` theo luật ở đầu module không. Gọi trên bản đã
-/// [`normalize`].
+/// Whether `email` has the right shape `local-part@domain` under the rules at the top of the module. Call it on
+/// a value already passed through [`normalize`].
 pub fn is_valid(email: &str) -> bool {
     if email.len() > MAX_LENGTH {
         return false;
@@ -45,13 +45,13 @@ pub fn is_valid(email: &str) -> bool {
     local_ok && domain_ok
 }
 
-/// Lỗi của trường `field` khi email sai dạng (mã `email`).
+/// Error of field `field` when the email has the wrong shape (code `email`).
 pub fn invalid(field: &str) -> FieldError {
     FieldError::new(field, "email", "must be an email address like `name@example.com`")
 }
 
-/// Email đã chuẩn hoá của `raw`; sai dạng thì thêm lỗi của `field` vào `problems` và trả `None`
-/// (service gom mọi lỗi rồi báo một lần, D-083).
+/// The normalized email of `raw`; if the shape is wrong, adds an error of `field` to `problems` and returns
+/// `None` (the service gathers all errors and reports them once, D-083).
 pub fn checked(raw: &str, field: &str, problems: &mut Vec<FieldError>) -> Option<String> {
     let email = normalize(raw);
     if is_valid(&email) {

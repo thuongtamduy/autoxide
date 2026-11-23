@@ -1,6 +1,6 @@
-//! Tồn đọng qua REST và MCP (bước 39, A3): cùng số liệu với gauge ở `/metrics`, cho người vận hành
-//! và agent không có Prometheus. Chỉ nhân sự của khách nền tảng (`require_platform`), với
-//! permission `kernel.ops.read`: số liệu là của cả database, gồm mọi khách trên đó.
+//! Backlog over REST and MCP (step 39, A3): the same figures as the gauges at `/metrics`, for operators and
+//! agents without Prometheus. Only platform tenant staff (`require_platform`), with permission
+//! `kernel.ops.read`: the figures cover the whole database, including every tenant on it.
 
 use crate::time::Timestamp;
 use std::sync::Arc;
@@ -109,14 +109,14 @@ impl DatabaseBacklog {
     }
 }
 
-/// Thứ REST và MCP cần.
+/// What REST and MCP need.
 #[derive(Clone)]
 pub(crate) struct BacklogState {
     pub registry: DatabaseRegistry,
     pub modules: BacklogModules,
 }
 
-/// Kiểm quyền rồi đọc — một chỗ cho cả REST và MCP (luật kiến trúc 8).
+/// Checks permission then reads - one place for both REST and MCP (architecture rule 8).
 async fn read(state: &BacklogState, principal: &Principal) -> Result<OpsBacklog, Error> {
     principal.require(&OPS_READ)?;
     crate::tenancy::require_platform(principal)?;
@@ -152,7 +152,7 @@ async fn get_backlog(
     Ok(Data { data: read(&state, &principal).await? })
 }
 
-/// Tool MCP `kernel.ops_backlog` — gọi đúng hàm REST dùng.
+/// The MCP tool `kernel.ops_backlog` - calls exactly the function REST uses.
 pub(crate) fn tools(state: BacklogState) -> Vec<Tool> {
     vec![
         Tool::new(

@@ -1,20 +1,21 @@
-//! Tool MCP (Model Context Protocol): AI agent gọi chức năng của hệ thống như công cụ.
+//! MCP (Model Context Protocol) tools: an AI agent calls the system's functions as tools.
 //!
-//! Module khai tool qua `Module::tools` (gọi sau `start`), như khai route REST. Mỗi tool:
+//! A module declares tools through `Module::tools` (called after `start`), like declaring REST routes. Each
+//! tool:
 //!
-//! - tên `<module>.<tên>` (kernel thêm tiền tố module);
-//! - đầu vào là một kiểu Rust (`Deserialize + Validate + ToSchema`) — kiểm y như thân
-//!   JSON của REST (`ValidJson`), JSON Schema sinh từ cùng kiểu đó;
-//! - permission cần có (nếu có): người gọi thiếu permission thì không thấy và không gọi
-//!   được tool;
-//! - thân nhận khách của request (`TenantContext`), người gọi và đầu vào, rồi gọi vào service
-//!   layer — cùng service với REST, nên tool không làm
-//!   được gì mà REST với cùng permission không làm được, và lệnh ghi đi qua event /
-//!   audit log như REST (luật kiến trúc 8).
+//! - is named `<module>.<name>` (the kernel adds the module prefix);
+//! - takes a Rust type as input (`Deserialize + Validate + ToSchema`) - validated just like REST's JSON
+//!   body (`ValidJson`), with the JSON Schema generated from that same type;
+//! - the required permission (if any): a caller lacking the permission cannot see or call
+//!   the tool;
+//! - the body receives the request's tenant (`TenantContext`), the caller and the input, then calls into
+//!   the service layer — the same service as REST, so a tool cannot do
+//!   anything REST with the same permission cannot, and writes go through events /
+//!   the audit log like REST (architecture rule 8).
 //!
-//! Ngoài tool, module khai thêm **resource** ([`McpResource`]: tài liệu chỉ đọc, vd hướng dẫn hay
-//! JSON Schema của một loại bản ghi) và **prompt** ([`Prompt`]: mẫu lời nhắc cho việc hay làm) qua
-//! `Module::mcp_resources` và `Module::prompts` (bước 40 P2). Cả hai lọc theo permission như tool.
+//! Besides tools, a module declares **resources** ([`McpResource`]: read-only documents, e.g. a guide or the
+//! JSON Schema of a record kind) and **prompts** ([`Prompt`]: prompt templates for common tasks) through
+//! `Module::mcp_resources` and `Module::prompts` (step 40 P2). Both are filtered by permission like tools.
 //!
 //! ```
 //! use autoxide_kernel::access::{Permission, Principal};
@@ -27,7 +28,7 @@
 //!     "count",
 //!     "Count the notes of the caller.",
 //!     |tenant: TenantContext, principal: Principal, _: NoInput| async move {
-//!         // Gọi service ở đây, vd `service.count(&tenant, &principal).await`.
+//!         // Call the service here, e.g. `service.count(&tenant, &principal).await`.
 //!         let _ = (tenant, principal);
 //!         Ok(serde_json::json!({ "count": 0 }))
 //!     },
@@ -88,7 +89,7 @@ impl PageInput {
         PageInput { limit, cursor, order, count: None }
     }
 
-    /// Yêu cầu trang đã kiểm, như của REST.
+    /// Validated page request, like REST's.
     pub fn page(self) -> Result<PageRequest, Error> {
         let count = self.count.unwrap_or(false);
         PageRequest::try_from(
@@ -98,7 +99,7 @@ impl PageInput {
     }
 }
 
-/// Thân của một tool: nhận khách, người gọi và đối số JSON, trả kết quả JSON.
+/// The body of a tool: receives the tenant, the caller and JSON arguments, returns a JSON result.
 //
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait` (xem `api.rs` của module auth).
 #[async_trait::async_trait]
@@ -111,21 +112,21 @@ pub trait ToolHandler: Send + Sync {
     ) -> Result<Value, Error>;
 }
 
-/// Tool đã deprecated (khai bằng `Deprecation::tool` trong `Module::deprecations`, D-240): ngày,
-/// ngày gỡ và tool dùng thay, tên đầy đủ.
+/// A deprecated tool (declared with `Deprecation::tool` in `Module::deprecations`, D-240): the date,
+/// the removal date and the replacement tool, full names.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct ToolDeprecation {
     /// `YYYY-MM-DD` (UTC).
     pub since: String,
-    /// Ngày tool bị gỡ, `YYYY-MM-DD` (UTC), nếu đã định.
+    /// Date the tool is removed, `YYYY-MM-DD` (UTC), if decided.
     pub sunset: Option<String>,
-    /// Tool dùng thay, tên đầy đủ `<module>.<tên>`.
+    /// The replacement tool, full name `<module>.<name>`.
     pub successor: Option<String>,
 }
 
 impl ToolDeprecation {
-    /// Câu tiếng Anh nối vào mô tả của tool và cảnh báo trong kết quả.
+    /// The English sentence appended to the tool's description and to the warning in the result.
     pub fn sentence(&self, tool: &str) -> String {
         let mut text = format!("Tool `{tool}` is deprecated since {}.", self.since);
         if let Some(sunset) = &self.sunset {
@@ -138,14 +139,14 @@ impl ToolDeprecation {
     }
 }
 
-/// Một tool MCP do module khai.
+/// An MCP tool declared by a module.
 #[derive(Clone)]
 pub struct Tool {
     name: String,
     description: &'static str,
     permission: Option<Permission>,
-    /// Permission thay thế: có một trong hai là được (vd `content.write` hay
-    /// `content.write_own` — service kiểm phạm vi chi tiết).
+    /// Alternative permission: having either one is enough (e.g. `content.write` or
+    /// `content.write_own` - the service checks the detailed scope).
     alternative: Option<Permission>,
     read_only: bool,
     destructive: bool,
@@ -153,11 +154,12 @@ pub struct Tool {
     input_schema: Value,
     handler: Arc<dyn ToolHandler>,
     deprecation: Option<ToolDeprecation>,
-    /// Tool của module thử nghiệm (gắn bởi `Modules::tools`, bước 70 P3).
+    /// Tool of an experimental module (set by `Modules::tools`, step 70 P3).
     experimental: bool,
-    /// Khai tường minh: mọi người đã đăng nhập gọi được (service tự giới hạn vào dữ liệu của họ).
+    /// Declared explicitly: anyone signed in may call it (the service limits itself to their own data).
     any_signed_in: bool,
-    /// Lệnh rủi ro: agent gọi thì bị từ chối, chỉ sang REST để xin duyệt (bước 51 P12).
+    /// Risky command: when an agent calls it, it is rejected and pointed to REST to ask for approval (step
+    /// 51 P12).
     approval_for_agent: bool,
 }
 
@@ -168,8 +170,8 @@ impl std::fmt::Debug for Tool {
 }
 
 impl Tool {
-    /// Tool tên `name` (chữ thường, số, `_`; kernel thêm tiền tố `<module>.`), mô tả
-    /// tiếng Anh `description` cho AI agent đọc, đầu vào kiểu `I`, thân `handler`.
+    /// A tool named `name` (lowercase, digits, `_`; the kernel adds the `<module>.` prefix), with the English
+    /// description `description` for AI agents to read, input type `I`, body `handler`.
     pub fn new<I, O, F, Fut>(name: &'static str, description: &'static str, handler: F) -> Self
     where
         I: DeserializeOwned + Validate + ToSchema + Send + 'static,
@@ -195,9 +197,9 @@ impl Tool {
         }
     }
 
-    /// Lệnh rủi ro (bước 51 P12): REST tương ứng khai `x-approval: "agent"`. Agent gọi tool này thì
-    /// bị từ chối (`approval_required`) và được chỉ sang endpoint REST để xin người duyệt — MCP
-    /// không làm được điều REST cấm.
+    /// Risky command (step 51 P12): the corresponding REST declares `x-approval: "agent"`. When an agent
+    /// calls this tool it is rejected (`approval_required`) and pointed to the REST endpoint to ask a person
+    /// to approve - MCP cannot do what REST forbids.
     pub fn requires_approval_for_agent(mut self) -> Self {
         self.approval_for_agent = true;
         self
@@ -208,23 +210,23 @@ impl Tool {
         self.approval_for_agent
     }
 
-    /// Chỉ người có `permission` mới thấy và gọi được tool.
+    /// Only people with `permission` can see and call the tool.
     pub fn requires(mut self, permission: Permission) -> Self {
         self.permission = Some(permission);
         self
     }
 
-    /// Người có `permission` này (thay cho permission của [`requires`](Self::requires)) cũng
-    /// thấy và gọi được tool. Dùng khi một permission hẹp hơn (vd "chỉ mục của mình") đủ để gọi;
-    /// service vẫn kiểm phạm vi.
+    /// People with this `permission` (in place of the permission of [`requires`](Self::requires)) can also
+    /// see and call the tool. Use when a narrower permission (e.g. "only my own entries") is enough to call it;
+    /// the service still checks the scope.
     pub fn or_requires(mut self, permission: Permission) -> Self {
         self.alternative = Some(permission);
         self
     }
 
-    /// Mọi người đã đăng nhập gọi được, không cần permission — vd việc trên tài khoản của chính họ
-    /// (service tự giới hạn). Như `x-permissions: []` của endpoint: test độ phủ phân quyền đòi mỗi
-    /// tool hoặc có permission, hoặc khai điều này (D-245).
+    /// Anyone signed in may call it, no permission needed - e.g. an action on their own account (the service
+    /// limits itself). Like an endpoint's `x-permissions: []`: the permission-coverage test requires every
+    /// tool to either have a permission or declare this (D-245).
     pub fn for_any_signed_in(mut self) -> Self {
         self.any_signed_in = true;
         self
@@ -235,21 +237,21 @@ impl Tool {
         self.any_signed_in
     }
 
-    /// Tool chỉ đọc, không đổi gì (gợi ý cho client MCP: gọi không cần hỏi lại).
+    /// A read-only tool that changes nothing (a hint for MCP clients: call without asking again).
     pub fn read_only(mut self) -> Self {
         self.read_only = true;
         self
     }
 
-    /// Tool xoá hay ghi đè dữ liệu không lấy lại được (gợi ý cho client MCP: hỏi người
-    /// dùng trước khi gọi).
+    /// A tool that deletes or overwrites data irrecoverably (a hint for MCP clients: ask the
+    /// user before calling).
     pub fn destructive(mut self) -> Self {
         self.destructive = true;
         self
     }
 
-    /// Kết quả chứa secret chỉ trả một lần (vd API key mới): response mang
-    /// `Cache-Control: no-store`, nên không bị lưu lại — kể cả bởi lớp idempotency (D-149).
+    /// The result contains a secret returned only once (e.g. a new API key): the response carries
+    /// `Cache-Control: no-store`, so it is not stored - including by the idempotency layer (D-149).
     pub fn returns_secret(mut self) -> Self {
         self.secret = true;
         self
@@ -267,7 +269,7 @@ impl Tool {
         self.permission
     }
 
-    /// Permission thay thế (xem [`or_requires`](Self::or_requires)).
+    /// The alternative permission (see [`or_requires`](Self::or_requires)).
     pub fn alternative(&self) -> Option<Permission> {
         self.alternative
     }
@@ -285,17 +287,17 @@ impl Tool {
         self.secret
     }
 
-    /// JSON Schema của đầu vào.
+    /// JSON Schema of the input.
     pub fn input_schema(&self) -> &Value {
         &self.input_schema
     }
 
-    /// Tool đã deprecated thì có (gắn bởi `Modules::tools` từ `Module::deprecations`).
+    /// Present when the tool is deprecated (set by `Modules::tools` from `Module::deprecations`).
     pub fn deprecation(&self) -> Option<&ToolDeprecation> {
         self.deprecation.as_ref()
     }
 
-    /// Tool thuộc module thử nghiệm: tham số và kết quả có thể đổi giữa các bản.
+    /// The tool belongs to an experimental module: parameters and results may change between releases.
     pub fn is_experimental(&self) -> bool {
         self.experimental
     }
@@ -310,15 +312,15 @@ impl Tool {
         self
     }
 
-    /// Người gọi có được thấy và gọi tool không.
+    /// Whether the caller may see and call the tool.
     pub fn allows(&self, principal: &Principal) -> bool {
         self.permission.is_none_or(|permission| principal.has(&permission))
             || self.alternative.is_some_and(|permission| principal.has(&permission))
     }
 
-    /// Như [`allows`](Self::allows) nhưng đủ như REST: kiểm cả xác nhận lại (step-up) của
-    /// permission nhạy cảm qua [`Principal::require`]. Bên chạy tool gọi trước khi chạy — `allows`
-    /// chỉ để lọc danh sách tool.
+    /// Like [`allows`](Self::allows) but as complete as REST: also checks the re-confirmation (step-up) of a
+    /// sensitive permission through [`Principal::require`]. The tool runner calls this before running -
+    /// `allows` is only for filtering the tool list.
     pub fn authorize(&self, principal: &Principal) -> Result<(), Error> {
         let Some(permission) = self.permission else { return Ok(()) };
         if principal.has(&permission) {
@@ -332,7 +334,7 @@ impl Tool {
         principal.require(&permission)
     }
 
-    /// Gọi tool (không kiểm permission — bên gọi kiểm bằng [`allows`](Self::allows)).
+    /// Calls the tool (no permission check - the caller checks with [`allows`](Self::allows)).
     pub async fn call(
         &self,
         tenant: TenantContext,
@@ -350,13 +352,13 @@ impl Tool {
         self.handler.call(tenant, principal, arguments).await
     }
 
-    /// Đổi tên thành tên đầy đủ `<module>.<tên>`.
+    /// Renames to the full name `<module>.<name>`.
     pub(crate) fn qualify(mut self, module: &str) -> Self {
         self.name = format!("{module}.{}", self.name);
         self
     }
 
-    /// Các vấn đề của khai báo (tên sai dạng, schema đầu vào dùng được không).
+    /// The problems of the declaration (a badly formed name, whether the input schema is usable).
     pub(crate) fn problems(&self, module: &str) -> Vec<String> {
         let mut problems = Vec::new();
         let short = self.name.strip_prefix(&format!("{module}.")).unwrap_or(&self.name);
@@ -389,7 +391,7 @@ impl Tool {
     }
 }
 
-/// Thân tool có kiểu: đọc đối số thành `I`, kiểm, gọi `handler`, đổi kết quả thành JSON.
+/// A typed tool body: reads the arguments as `I`, validates, calls `handler`, converts the result to JSON.
 struct Typed<I, F> {
     handler: F,
     // `PhantomData<fn() -> I>`: nhớ kiểu `I` mà không giữ giá trị nào của nó, và không
@@ -448,8 +450,8 @@ mod tests {
         .requires(DROP)
     }
 
-    /// Tool gọi qua MCP (hay luật tự động hoá) cũng đòi xác nhận lại như REST: có permission mà lần
-    /// xác thực đã cũ thì `step_up_required`.
+    /// A tool called through MCP (or an automation rule) also demands re-confirmation like REST: with the
+    /// permission but an old authentication it gives `step_up_required`.
     #[test]
     fn tool_nhay_cam_doi_xac_nhan_lai_nhu_rest() {
         let stale = StepUp {

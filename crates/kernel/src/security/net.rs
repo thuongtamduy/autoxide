@@ -1,17 +1,19 @@
-//! Chặn gọi ra ngoài vào mạng nội bộ (SSRF, D-149): khi người dùng hay quản trị khách chọn địa
-//! chỉ máy chủ gọi tới (webhook, issuer OIDC), không có lọc thì máy chủ thành công cụ dò và gọi
-//! dịch vụ chỉ mở trong mạng riêng (vd `169.254.169.254` của nhà cung cấp cloud, database, trang
-//! quản trị nội bộ). Dời từ `webhooks` (bước 40) để mọi module dùng một cách làm.
+//! Blocks outbound calls into internal networks (SSRF, D-149): when a user or tenant admin chooses an address
+//! the server calls (webhook, OIDC issuer), without filtering the server becomes a probing tool and calls
+//! services that are only open on the private network (e.g. the cloud provider's `169.254.169.254`, the
+//! database, internal admin pages). Moved from `webhooks` (step 40) so every module uses one approach.
 //!
-//! Lọc ở hai chỗ:
-//! - lúc nhận địa chỉ: IP (hay `localhost`) không public thì từ chối ngay ([`is_public_host`]) —
-//!   reqwest KHÔNG gọi bộ phân giải cho URL là IP, nên kiểm này bắt buộc trước mỗi lần gọi;
-//! - lúc gọi: tên miền được phân giải bằng [`PublicOnly`], bỏ mọi IP không public. Lọc lúc
-//!   kết nối (không phải lúc kiểm URL) chặn được cả "DNS rebinding" — tên miền trả IP public
-//!   khi kiểm rồi IP nội bộ khi gọi.
+//! Filtering happens in two places:
+//! - when the address is received: an IP (or `localhost`) that is not public is rejected immediately
+//!   ([`is_public_host`]) — reqwest does NOT call the resolver for a URL that is an IP, so this check is
+//!   mandatory before every call;
+//! - when calling: a domain name is resolved with [`PublicOnly`], dropping every non-public IP. Filtering at
+//!   connect time (not at URL check time) also blocks "DNS rebinding" — a domain that returns a public IP
+//!   at check time and then an internal IP at call time.
 //!
-//! Giao thức không đi qua reqwest (SMTP của khách…) dùng cùng hai bước: [`check_target_url`] lúc
-//! lưu, [`resolve_target`] ngay trước khi kết nối rồi kết nối vào ĐÚNG IP nó trả (D-20261121-ssrf-targets).
+//! Protocols that do not go through reqwest (a tenant's SMTP…) use the same two steps: [`check_target_url`]
+//! at save time, [`resolve_target`] right before connecting, then connect to EXACTLY the IP it returns
+//! (D-20261121-ssrf-targets).
 
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 
@@ -19,11 +21,11 @@ use reqwest::dns::{Addrs, Name, Resolve, Resolving};
 
 use crate::error::FieldError;
 
-/// URL đã kiểm (dùng lại kiểu của reqwest để module không phải khai thêm thư viện `url`).
+/// A validated URL (reusing reqwest's type so modules need not declare the `url` library as well).
 pub use reqwest::Url;
 
-/// `ip` có phải địa chỉ public trên Internet không (không loopback, mạng riêng, link-local,
-/// CGNAT, multicast, địa chỉ dành cho tài liệu hay dự trữ).
+/// Whether `ip` is a public Internet address (not loopback, private network, link-local,
+/// CGNAT, multicast, documentation-reserved or reserved).
 pub fn is_public(ip: IpAddr) -> bool {
     match ip {
         IpAddr::V4(ip) => is_public_v4(ip),
@@ -81,19 +83,19 @@ fn is_public_v6(ip: Ipv6Addr) -> bool {
         || (segments[0] == 0x64 && segments[1] == 0xff9b && segments[2] == 1)) // NAT64 nội bộ 64:ff9b:1::/48
 }
 
-/// Tên máy chỉ máy này (`localhost`, `*.localhost`), không cần phân giải cũng biết.
+/// Host names that mean this machine only (`localhost`, `*.localhost`), known without resolving.
 pub fn is_local_name(host: &str) -> bool {
     let host = host.trim_end_matches('.').to_ascii_lowercase();
     host == "localhost" || host.ends_with(".localhost")
 }
 
-/// Host của `url` không bị biết trước là nội bộ: IP thì phải public, tên thì không phải
-/// `localhost` (tên miền khác được kiểm lúc gửi, bằng [`PublicOnly`]).
+/// The host of `url` is not known in advance to be internal: an IP must be public, a name must not be
+/// `localhost` (other domain names are checked at send time, with [`PublicOnly`]).
 pub fn is_public_host(url: &reqwest::Url) -> bool {
     url.host_str().is_some_and(is_public_host_name)
 }
 
-/// Như [`is_public_host`], cho host trần (`smtp.example.com`, `10.0.0.1`, `[::1]`).
+/// Like [`is_public_host`], for a bare host (`smtp.example.com`, `10.0.0.1`, `[::1]`).
 pub fn is_public_host_name(host: &str) -> bool {
     // IPv6 trong URL nằm trong ngoặc vuông: `https://[::1]/`.
     let bare = host.trim_start_matches('[').trim_end_matches(']');
@@ -103,10 +105,11 @@ pub fn is_public_host_name(host: &str) -> bool {
     }
 }
 
-/// Kiểm địa chỉ người dùng chọn cho máy chủ gọi tới, lúc LƯU (cấu hình của khách): đọc được là URL,
-/// scheme thuộc `schemes`, có host, và — trừ khi `allow_private` — host không bị biết trước là nội
-/// bộ (IP không public, `localhost`). Tên miền khác chỉ biết lúc kết nối: [`resolve_target`]. Lỗi
-/// là lỗi của ô `value` (như bộ kiểm cấu hình của khách).
+/// Validates an address a user chose for the server to call, when SAVING (tenant configuration): it must
+/// parse as a URL, the scheme must be in `schemes`, it must have a host, and — unless `allow_private` — the
+/// host must not be known in advance to be internal (non-public IP, `localhost`). Other domain names are only
+/// known at connect time: [`resolve_target`]. The error is an error of the `value` field (like the tenant
+/// configuration validator).
 pub fn check_target_url(
     raw: &str,
     schemes: &[&str],
@@ -141,10 +144,10 @@ pub fn check_target_url(
     Ok(url)
 }
 
-/// Phân giải `host` (tên hay IP) ngay trước khi kết nối và chỉ giữ IP public (trừ khi
-/// `allow_private`); không còn IP nào thì lỗi [`PrivateAddress`]. Bên gọi kết nối vào chính các
-/// địa chỉ trả về — không phân giải lại — nên tên miền không đổi được sang IP nội bộ giữa lúc kiểm và
-/// lúc gọi (DNS rebinding).
+/// Resolves `host` (name or IP) right before connecting and keeps only public IPs (unless `allow_private`);
+/// if no IP remains the error is [`PrivateAddress`]. The caller connects to exactly the returned addresses —
+/// without resolving again — so a domain name cannot switch to an internal IP between the check and the call
+/// (DNS rebinding).
 pub async fn resolve_target(
     host: &str,
     port: u16,
@@ -164,10 +167,10 @@ pub async fn resolve_target(
     Ok(found)
 }
 
-/// Bộ phân giải tên miền chỉ trả IP public; không còn IP nào thì báo lỗi.
+/// Domain name resolver that returns only public IPs; if none remain it reports an error.
 pub struct PublicOnly;
 
-/// Lỗi khi tên miền chỉ trỏ vào mạng riêng — nhận ra được trong chuỗi lỗi của reqwest.
+/// Error when a domain name points only into the private network — recognizable in reqwest's error chain.
 #[derive(Debug)]
 pub struct PrivateAddress;
 

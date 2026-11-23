@@ -1,14 +1,13 @@
-//! Cấu hình: đọc từ biến môi trường (và file `.env`), kiểm lúc khởi động.
+//! Configuration: read from environment variables (and the `.env` file), validated at startup.
 //!
-//! - Mỗi biến khai một lần bằng [`Setting`] ở cạnh code dùng nó.
-//! - [`ConfigSource`] gom giá trị thô; [`ConfigReader`] đổi kiểu, kiểm, và gom
-//!   mọi lỗi để báo một lượt.
-//! - [`Config`] là cấu hình của kernel. Module đọc cấu hình riêng của mình bằng
-//!   cùng một [`ConfigReader`], nên lỗi của kernel và của mọi module hiện chung
-//!   trong một thông báo.
+//! - Each variable is declared once with a [`Setting`], next to the code that uses it.
+//! - [`ConfigSource`] collects raw values; [`ConfigReader`] converts types, validates, and collects every
+//!   error to report them in one pass.
+//! - [`Config`] is the kernel configuration. Modules read their own configuration with the same
+//!   [`ConfigReader`], so kernel and module errors show up together in one message.
 //!
-//! Quy ước tên biến: tên chuẩn ngành nếu có (`DATABASE_URL`), còn lại mang tiền
-//! tố `AUTOXIDE_` (docs/DECISIONS.md D-034).
+//! Variable naming convention: the industry-standard name if one exists (`DATABASE_URL`), otherwise the
+//! `AUTOXIDE_` prefix (docs/DECISIONS.md D-034).
 
 mod database;
 mod env_example;
@@ -32,7 +31,7 @@ pub use setting::Setting;
 pub use source::ConfigSource;
 pub use trace::TraceConfig;
 
-/// Cấu hình của kernel. Mỗi mục của lộ trình thêm nhóm của mình vào đây.
+/// The kernel configuration. Each roadmap item adds its own group here.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct Config {
@@ -41,13 +40,13 @@ pub struct Config {
     pub log: LogConfig,
     pub trace: TraceConfig,
     pub process: ProcessConfig,
-    /// Đa khách (`AUTOXIDE_TENANCY_*`, bước 33).
+    /// Multi-tenancy (`AUTOXIDE_TENANCY_*`, step 33).
     pub tenancy: crate::tenancy::TenancyConfig,
 }
 
 impl Config {
-    /// Đọc cấu hình của kernel. Lỗi được ghi vào `reader`; gọi
-    /// [`ConfigReader::finish`] sau khi mọi phần (kernel và module) đã đọc xong.
+    /// Reads the kernel configuration. Errors are recorded in `reader`; call [`ConfigReader::finish`] after
+    /// every part (kernel and modules) has been read.
     pub fn read(reader: &mut ConfigReader) -> Result<Self, Invalid> {
         let database = DatabaseConfig::read(reader);
         let http = HttpConfig::read(reader);

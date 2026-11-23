@@ -1,5 +1,5 @@
-//! Chờ job / event của một khách đang bị giữ ở database nguồn chạy xong — dùng chung cho dời khách
-//! giữa placement và tách / gộp khách (bước 38).
+//! Waits for the jobs / events of a tenant held at the source database to finish; shared by moving a tenant
+//! between placements and by splitting / merging tenants (step 38).
 
 use std::time::Duration;
 
@@ -12,14 +12,14 @@ use crate::error::Error;
 use crate::tenancy::{TenantId, errors};
 use crate::transfer::{TableKind, TenantTables};
 
-/// Hỏi lại job / event còn bị giữ ở nguồn sau chừng này.
+/// Re-checks whether jobs / events are still held at the source after this long.
 const CLAIM_POLL: Duration = Duration::from_millis(500);
-/// Chờ job / event ở nguồn hết bị giữ tối đa chừng này (job giữ tối đa 5 phút).
+/// Waits for jobs / events at the source to be released for at most this long (a job is held for at most 5 minutes).
 const CLAIM_WAIT: Duration = Duration::from_secs(330);
 
-/// Chờ tới khi không job hay event nào của khách `tenant` ở `source` còn bị giữ (worker hay bộ phát
-/// đang chạy nó). Worker và bộ phát không nhận việc mới của khách `moving`, nên chỉ phải chờ phần đã
-/// nhận trước đó — tối đa thời hạn giữ của job.
+/// Waits until no job or event of tenant `tenant` at `source` is still held (by a worker or an event
+/// dispatcher running it). Workers and dispatchers accept no new work of a `moving` tenant, so only the part
+/// accepted earlier must be awaited, at most the job hold period.
 pub(crate) async fn wait_claims(
     source: &Database,
     tables: &TenantTables,

@@ -317,12 +317,16 @@ sẵn lệnh.
 - Doc comment `///` trên kiểu có `ToSchema` / `IntoParams` và trên handler có
   `#[utoipa::path]` được chép vào tài liệu OpenAPI: viết **tiếng Anh**, cho người
   gọi API. Giải thích cho người đọc code thì dùng `//`.
+- Doc comment (`///`, `//!`) của phần công khai — `crates/kernel/src`, `crates/testkit/src`,
+  `crates/app/src/lib.rs`, `modules/<tên>/src/api.rs` và `api/…` — viết **tiếng Anh** (người lạ đọc
+  docs.rs). Ghi chú cài đặt hay giải thích Rust cho chủ dự án ở đó thì dùng `//` tiếng Việt. Gate
+  `doc-language` chặn chữ có dấu tiếng Việt trong các dòng doc đó (trừ trong `code span`) (D-20261123-english-rustdoc).
 - Log bằng macro của `tracing` với trường có tên (`tracing::info!(user_id, "…")`),
   không `println!`. Không ghi secret, token, mật khẩu hay thân request vào log. Số
   đo ghi bằng macro của `metrics`, tên mang tiền tố `<module>_`, nhãn chỉ nhận giá
   trị thuộc tập nhỏ cố định (không dùng ID hay đường dẫn thô làm nhãn).
-- Tên trong code và OpenAPI bằng tiếng Anh. Comment, tài liệu, tên test viết tiếng
-  Việt được.
+- Tên trong code và OpenAPI bằng tiếng Anh. Comment `//`, tài liệu, tên test viết tiếng
+  Việt được (trừ doc comment của phần công khai, xem trên).
 - Secret không vào git: chỉ có `.env.example`, không có `.env`.
 - Cấu hình: mỗi biến khai một lần bằng `Setting` và đọc qua `ConfigReader` của
   `autoxide_kernel::config`; không gọi `std::env::var` trực tiếp. Tên biến: tên
@@ -339,11 +343,12 @@ sẵn lệnh.
 Hai nhóm tài liệu, hai ngôn ngữ:
 
 - **Cho người ngoài** — `README`, hướng dẫn cài đặt và sử dụng, mô tả trong
-  OpenAPI và MCP: viết **tiếng Anh**, kèm bản **tiếng Việt song song** cho README
+  OpenAPI và MCP, doc comment `///` / `//!` của phần công khai (kernel, testkit, `autoxide`, `api`
+  của module — D-20261123-english-rustdoc): viết **tiếng Anh**, kèm bản **tiếng Việt song song** cho README
   và các hướng dẫn (`README.md` + `README.vi.md`). Hai bản phải cùng nội dung; sửa
   một bản thì sửa bản kia trong cùng commit.
 - **Nội bộ, cho chủ dự án và agent** — file này, `STACK.md`, `docs/ROADMAP.md`,
-  `docs/DECISIONS.md`, skill, comment trong code, báo cáo: viết **tiếng Việt**.
+  `docs/DECISIONS.md`, skill, comment `//` trong code, báo cáo: viết **tiếng Việt**.
 
 Trong tài liệu tiếng Việt, **thuật ngữ kỹ thuật giữ nguyên tiếng Anh, không dịch**. Từ dịch dễ trùng nghĩa (cổng = gate hay port, khoá = key
 hay lock, luồng = thread hay stream) và làm agent hiểu sai.

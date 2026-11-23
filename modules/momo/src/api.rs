@@ -1,6 +1,6 @@
-//! Hợp đồng của module `momo`: không có trait riêng. Module góp một `dyn PaymentGateway`
-//! (`autoxide_kernel::payment`) cho `ledger`; module khác chỉ cần tên đối tác để chọn cổng.
+//! Contract of the `momo` module: no trait of its own. The module contributes a `dyn PaymentGateway`
+//! (`autoxide_kernel::payment`) to `ledger`; other modules only need the partner name to choose a gateway.
 
-/// Tên đối tác: giá trị `provider` của một thanh toán và đoạn trong đường dẫn webhook
+/// Partner name: the `provider` value of a payment and the segment in the webhook path
 /// (`/api/v1/ledger/webhooks/momo/{hook}`).
 pub const PROVIDER: &str = "momo";

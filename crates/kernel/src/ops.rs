@@ -1,5 +1,5 @@
-//! Vận hành: log, số đo, OpenTelemetry, `autoxide doctor`, `autoxide task`; module nội bộ
-//! `kernel` (`builtin`) với sổ module đã cài và cờ theo người dùng.
+//! Operations: logs, metrics, OpenTelemetry, `autoxide doctor`, `autoxide task`; the internal
+//! module `kernel` (`builtin`) with the installed-module registry and per-user flags.
 
 pub(crate) mod alerts;
 pub(crate) mod approvals;

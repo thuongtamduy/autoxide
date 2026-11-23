@@ -1,14 +1,16 @@
-//! Chép **có lọc dòng và ghi đè cột** (bước 38, tách / gộp khách — `tenancy::relocate`): cùng cách
-//! đọc theo kiểu cột của nguồn, ghi theo kiểu cột của đích như [`TenantTables::copy`], nhưng
+//! Copy **with row filtering and column overrides** (step 38, split / merge of tenants,
+//! `tenancy::relocate`): the same way of reading by the source's column type and writing by the target's
+//! column type as [`TenantTables::copy`], but
 //!
-//! - chỉ dòng thoả một điều kiện SQL (vd "nút thuộc nhánh N", "dòng cha đi theo");
-//! - mỗi dòng qua một hàm ghi đè trước khi ghi (đổi `tenant_id`, đổi nút cha của gốc nhánh, mã hoá
-//!   lại secret cho khách mới…);
-//! - tuỳ chọn bỏ qua dòng mà khoá đã có ở đích (`ON CONFLICT DO NOTHING`, chạy như nhau trên SQLite
-//!   và Postgres) — gộp khách gặp lại đúng dòng đã chép khi tách.
+//! - only the rows that satisfy an SQL condition (e.g. "node belongs to branch N", "the parent row goes
+//!   along");
+//! - each row goes through an override function before being written (change `tenant_id`, change the parent
+//!   node of the branch root, re-encrypt secrets for the new tenant...);
+//! - optionally skip rows whose key already exists at the target (`ON CONFLICT DO NOTHING`, behaving the
+//!   same on SQLite and Postgres): a merge meets the very rows already copied by a split.
 //!
-//! Kèm đọc cấu trúc bảng ở database (khoá chính, unique index, foreign key) để kế hoạch tìm xung
-//! đột trước khi chép, không phải giữa lúc chép.
+//! Also reads the table structure in the database (primary key, unique indexes, foreign keys) so the plan
+//! finds conflicts before copying, not in the middle of it.
 
 use crate::time::{Date, Precision, Timestamp};
 use sea_orm::sea_query::{Condition, OnConflict};
@@ -21,7 +23,7 @@ use futures_util::TryStreamExt as _;
 use sea_orm::sea_query::{Alias, Expr, ExprTrait as _, Query, SimpleExpr, Value};
 use sea_orm::{ConnectionTrait, DatabaseBackend, StreamTrait};
 
-/// Một dòng đọc từ nguồn: tên cột và giá trị, theo thứ tự cột của nguồn.
+/// A row read from the source: column names and values, in the source's column order.
 #[derive(Debug, Clone)]
 pub(crate) struct Row(Vec<(String, Value)>);
 
@@ -30,7 +32,7 @@ impl Row {
         self.0.iter().find(|(name, _)| name == column).map(|(_, value)| value)
     }
 
-    /// Đặt giá trị cột `column` (cột không có: bỏ qua — bảng không có cột đó).
+    /// Sets the value of column `column` (a column that does not exist: ignored, the table has no such column).
     pub(crate) fn set(&mut self, column: &str, value: Value) {
         if let Some(slot) = self.0.iter_mut().find(|(name, _)| name == column) {
             slot.1 = value;
@@ -53,10 +55,10 @@ impl Row {
     }
 }
 
-/// Hàm ghi đè một dòng trước khi ghi vào đích.
+/// A function that overrides a row before it is written to the target.
 pub(crate) type Rewrite<'a> = &'a (dyn Fn(&mut Row) -> Result<(), TransferError> + Sync);
 
-/// Giá trị dạng chữ ổn định, để so khoá giữa hai database (`None` = `NULL`).
+/// A stable text form of a value, to compare keys between two databases (`None` = `NULL`).
 pub(crate) fn canonical(value: &Value) -> Option<String> {
     match value {
         Value::Uuid(value) => value.map(|id| id.to_string()),
@@ -81,24 +83,25 @@ impl TenantTables {
         })
     }
 
-    /// Bảng `table` có trong danh sách không.
+    /// Whether table `table` is in the list.
     pub(crate) fn contains(&self, table: &str) -> bool {
         self.tables.iter().any(|plan| plan.name == table)
     }
 
-    /// Bảng `table` có cột `column` ở nguồn không.
+    /// Whether table `table` has column `column` at the source.
     pub(crate) fn has_column(&self, table: &str, column: &str) -> bool {
         self.plan_of(table).is_ok_and(|plan| plan.from.iter().any(|found| found.name == column))
     }
 
-    /// Cột `column` của `table` là UUID.
+    /// Whether column `column` of `table` is a UUID.
     pub(crate) fn is_uuid_column(&self, table: &str, column: &str) -> bool {
         self.plan_of(table).is_ok_and(|plan| {
             plan.from.iter().any(|found| found.name == column && found.kind == Kind::Uuid)
         })
     }
 
-    /// Đếm dòng của `table` thoả `condition` ở `database` (đọc qua kết nối thấy dữ liệu mới nhất).
+    /// Counts the rows of `table` that satisfy `condition` at `database` (read through a connection that sees
+    /// the latest data).
     pub(crate) async fn count_matching(
         &self,
         database: &Database,
@@ -108,7 +111,7 @@ impl TenantTables {
         count_condition(fresh(database), table, condition).await
     }
 
-    /// Xoá dòng của `table` thoả `condition`, qua `connection` (transaction của bên gọi).
+    /// Deletes the rows of `table` that satisfy `condition`, through `connection` (the caller's transaction).
     pub(crate) async fn delete_matching<C: ConnectionTrait>(
         &self,
         connection: &C,
@@ -120,8 +123,8 @@ impl TenantTables {
         Ok(connection.execute(&delete).await?.rows_affected())
     }
 
-    /// Giá trị (dạng chữ, [`canonical`]) của các cột `columns` ở mọi dòng của `table` thoả
-    /// `condition`, đọc qua `connection`.
+    /// The values (in text form, [`canonical`]) of the columns `columns` in every row of `table` that satisfies
+    /// `condition`, read through `connection`.
     pub(crate) async fn values<C: ConnectionTrait>(
         &self,
         connection: &C,
@@ -160,7 +163,8 @@ impl TenantTables {
         Ok(found)
     }
 
-    /// Đọc qua `connection` mọi dòng của `table` thoả `condition`, đầy đủ cột của nguồn.
+    /// Reads through `connection` every row of `table` that satisfies `condition`, with all the source's
+    /// columns.
     pub(crate) async fn rows<C: ConnectionTrait>(
         &self,
         connection: &C,
@@ -186,8 +190,9 @@ impl TenantTables {
         Ok(found)
     }
 
-    /// Ghi `rows` (đọc bằng [`rows`](Self::rows) từ cùng bảng) vào `table` qua `target`;
-    /// `skip_existing`: dòng mà khoá đã có ở đích bị bỏ qua. Trả số dòng đã ghi.
+    /// Writes `rows` (read with [`rows`](Self::rows) from the same table) into `table` through `target`;
+    /// `skip_existing`: a row whose key already exists at the target is skipped. Returns the number of rows
+    /// written.
     pub(crate) async fn insert_rows<C: ConnectionTrait>(
         &self,
         target: &C,
@@ -217,9 +222,10 @@ impl TenantTables {
         Ok(written)
     }
 
-    /// Chép dòng của `table` thoả `condition` từ `source` vào `target` (transaction ở database
-    /// đích của bên gọi), mỗi dòng qua `rewrite` trước khi ghi. `skip_existing`: dòng mà khoá
-    /// (khoá chính hay unique) đã có ở đích bị bỏ qua, không lỗi. Trả số dòng đã ghi.
+    /// Copies the rows of `table` that satisfy `condition` from `source` into `target` (the caller's
+    /// transaction on the target database), each row going through `rewrite` before being written.
+    /// `skip_existing`: a row whose key (primary or unique) already exists at the target is skipped,
+    /// without an error. Returns the number of rows written.
     pub(crate) async fn copy_where<C: ConnectionTrait>(
         &self,
         source: &Database,
@@ -268,7 +274,7 @@ impl TenantTables {
     }
 }
 
-/// Giá trị của `row` theo kiểu cột ở đích.
+/// The value of `row` by the column type at the target.
 fn target_values(
     plan: &super::TablePlan,
     row: Row,
@@ -330,12 +336,12 @@ async fn count_condition<C: ConnectionTrait>(
     u64::try_from(rows).map_err(|error| TransferError(error.to_string()))
 }
 
-/// Điều kiện `tenant_id = tenant` của bảng cấp khách hàng.
+/// The condition `tenant_id = tenant` of a tenant-level table.
 pub(crate) fn tenant_is(tenant: crate::tenancy::TenantId) -> Condition {
     Condition::all().add(Expr::col(Alias::new(TENANT_COLUMN)).eq(tenant.as_uuid()))
 }
 
-/// Một foreign key một cột: `table.column` trỏ tới `parent.parent_column`.
+/// A single-column foreign key: `table.column` points at `parent.parent_column`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ForeignKey {
     pub(crate) column: String,
@@ -343,7 +349,7 @@ pub(crate) struct ForeignKey {
     pub(crate) parent_column: String,
 }
 
-/// Cột khoá chính của `table`, theo thứ tự trong khoá.
+/// The primary key columns of `table`, in key order.
 pub(crate) async fn primary_key<C: ConnectionTrait>(
     connection: &C,
     table: &str,
@@ -369,9 +375,9 @@ pub(crate) async fn primary_key<C: ConnectionTrait>(
     rows.iter().map(|row| row.try_get::<String>("", "name").map_err(Into::into)).collect()
 }
 
-/// Unique index (không phải khoá chính) của `table` chỉ gồm cột thường, không điều kiện: danh sách
-/// cột của từng index. Index một phần hay theo biểu thức bị bỏ qua (kế hoạch không so được; lệnh
-/// chép vẫn báo lỗi nếu đụng).
+/// The unique indexes (not the primary key) of `table` that consist only of plain columns, with no
+/// condition: the list of columns of each index. Partial or expression indexes are skipped (the plan cannot
+/// compare them; the copy command still reports an error if it hits one).
 pub(crate) async fn unique_indexes<C: ConnectionTrait>(
     connection: &C,
     table: &str,
@@ -443,7 +449,7 @@ pub(crate) async fn unique_indexes<C: ConnectionTrait>(
     }
 }
 
-/// Foreign key một cột của `table`.
+/// A single-column foreign key of `table`.
 pub(crate) async fn foreign_keys<C: ConnectionTrait>(
     connection: &C,
     table: &str,

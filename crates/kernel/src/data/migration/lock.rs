@@ -1,18 +1,18 @@
-//! Khoá migration: chỉ MỘT tiến trình chạy migration của database tại một lúc.
+//! Migration lock: only ONE process runs a database's migrations at a time.
 //!
-//! Cần khi máy chủ tự migrate lúc khởi động (`AUTOXIDE_MIGRATE_ON_START`,
-//! D-20261121-migrate-on-start): nhiều bản máy chủ khởi động cùng lúc thì bản đầu tiên migrate,
-//! các bản sau chờ nó xong rồi thấy không còn gì phải làm. `autoxide migrate up` cũng lấy khoá này.
+//! Needed when the server migrates itself on startup (`AUTOXIDE_MIGRATE_ON_START`,
+//! D-20261121-migrate-on-start): when several server instances start at once, the first one migrates and the
+//! others wait for it to finish, then find nothing left to do. `autoxide migrate up` takes this lock too.
 //!
-//! Hai database không có chung một cơ chế, nên rẽ nhánh ở đây (sau một kiểu duy nhất,
-//! [`MigrationLock`]) và test chạy trên cả hai:
+//! The two databases have no common mechanism, so the code branches here (behind a single type,
+//! [`MigrationLock`]) and tests run on both:
 //!
-//! - **Postgres**: advisory lock theo transaction (`pg_try_advisory_xact_lock`) trên một kết nối
-//!   riêng, transaction giữ mở tới khi nhả khoá. Tiến trình chết thì kết nối đứt, Postgres tự
-//!   nhả — không có khoá "mồ côi".
-//! - **SQLite**: database là một file trên máy, nên khoá là khoá file của hệ điều hành
-//!   (`File::try_lock`) trên file `<database>.migrate-lock` cạnh nó. Tiến trình chết thì hệ điều
-//!   hành tự nhả. SQLite trong bộ nhớ chỉ một tiến trình thấy được: không cần khoá.
+//! - **Postgres**: a transaction-scoped advisory lock (`pg_try_advisory_xact_lock`) on a dedicated connection;
+//!   the transaction stays open until the lock is released. If the process dies the connection drops and
+//!   Postgres releases the lock itself, so there is no "orphan" lock.
+//! - **SQLite**: the database is a local file, so the lock is an operating-system file lock
+//!   (`File::try_lock`) on the file `<database>.migrate-lock` next to it. If the process dies the operating
+//!   system releases it. An in-memory SQLite database is visible to one process only: no lock is needed.
 
 use std::fs::{File, TryLockError};
 use std::path::PathBuf;
@@ -25,21 +25,21 @@ use sea_orm::{
 use super::MigrationError;
 use crate::config::{DatabaseBackend, DatabaseConfig};
 
-/// Số định danh advisory lock của migration trên Postgres: chữ "autoxide" (8 byte ASCII) đọc thành
-/// số nguyên 64 bit. Cố định — mọi phiên bản Autoxide dùng cùng số này.
+/// Advisory lock identifier of the migration on Postgres: the string "autoxide" (8 ASCII bytes) read as a
+/// 64-bit integer. Fixed: every Autoxide version uses this same number.
 const POSTGRES_KEY: i64 = i64::from_be_bytes(*b"autoxide");
 
-/// Đuôi thêm vào đường dẫn file SQLite để thành file khoá.
+/// Suffix appended to the SQLite file path to form the lock file.
 const LOCK_FILE_SUFFIX: &str = ".migrate-lock";
 
-/// Khoảng giữa hai lần thử lấy khoá khi tiến trình khác đang giữ.
+/// Interval between two attempts to take the lock while another process holds it.
 const RETRY_EVERY: Duration = Duration::from_millis(250);
 
-/// Khoảng giữa hai dòng log "đang chờ".
+/// Interval between two "waiting" log lines.
 const LOG_EVERY: Duration = Duration::from_secs(10);
 
-/// Khoá migration đang giữ. Nhả bằng [`release`](Self::release); bị drop thì cũng nhả (kết nối
-/// hay file đóng lại), chỉ là không chờ được Postgres xác nhận.
+/// The migration lock being held. Release it with [`release`](Self::release); dropping it also releases it
+/// (the connection or file closes), only without waiting for Postgres to confirm.
 #[derive(Debug)]
 pub struct MigrationLock {
     held: Held,
@@ -55,13 +55,13 @@ enum Held {
     },
     // Khoá file nằm trên file handle: đóng file (drop) là nhả.
     File(File),
-    /// SQLite trong bộ nhớ.
+    /// In-memory SQLite.
     Nothing,
 }
 
 impl MigrationLock {
-    /// Lấy khoá migration của database `config`. Tiến trình khác đang giữ thì chờ, thử lại mỗi
-    /// 250 ms, tối đa `wait`; quá hạn thì lỗi nói rõ phải làm gì.
+    /// Takes the migration lock of database `config`. If another process holds it, waits and retries every
+    /// 250 ms, up to `wait`; on timeout returns an error that says what to do.
     pub async fn acquire(config: &DatabaseConfig, wait: Duration) -> Result<Self, MigrationError> {
         let held = match config.url.backend() {
             DatabaseBackend::Postgres => acquire_postgres(config, wait).await?,
@@ -73,7 +73,7 @@ impl MigrationLock {
         Ok(MigrationLock { held })
     }
 
-    /// Nhả khoá.
+    /// Releases the lock.
     pub async fn release(self) -> Result<(), MigrationError> {
         match self.held {
             Held::Postgres { transaction, connection } => {
@@ -158,8 +158,8 @@ async fn acquire_file(path: PathBuf, wait: Duration) -> Result<Held, MigrationEr
     }
 }
 
-/// Ngủ một lượt trước lần thử sau; quá `wait` thì lỗi. Cứ [`LOG_EVERY`] ghi một dòng log để người
-/// vận hành biết tiến trình đang chờ chứ không treo.
+/// Sleeps before the next attempt; past `wait` it is an error. Every [`LOG_EVERY`] it logs a line so the
+/// operator knows the process is waiting and not hung.
 async fn wait_turn(
     started: Instant,
     logged: &mut Instant,

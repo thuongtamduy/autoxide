@@ -1,10 +1,10 @@
-//! Bảng mặt điều khiển của phần đa khách (module nội bộ `kernel`, đặc tả 33 "Bảng dữ liệu"):
-//! `kernel_placements`, `kernel_tenants`, `kernel_tenant_domains`. Không có `tenant_id` (loại C):
-//! chúng mô tả các khách, không thuộc về khách nào. Mọi database có cùng schema (D-253 mục 2), nhưng
-//! chỉ database điều khiển có dữ liệu.
+//! Control-plane tables of the multi-tenant part (internal `kernel` module, spec 33 "Data tables"):
+//! `kernel_placements`, `kernel_tenants`, `kernel_tenant_domains`. There is no `tenant_id` (class C): they
+//! describe the tenants and belong to no tenant. Every database has the same schema (D-253 item 2), but only
+//! the control database has data.
 //!
-//! Migration gieo placement `main` (database điều khiển) và khách mặc định — dữ liệu của bản cài cũ
-//! thuộc về khách này.
+//! The migration seeds the placement `main` (the control database) and the default tenant; the data of an
+//! older installation belongs to this tenant.
 
 use crate::migration::prelude::*;
 use crate::time::Timestamp;

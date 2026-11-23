@@ -1,2 +1,2 @@
-//! Hợp đồng của module `mail`: không có gì riêng. Module công bố trait chung
-//! `autoxide_kernel::mail::Mailer`; module khác dùng trait đó.
+//! Contract of the `mail` module: nothing module-specific. The module publishes the shared trait
+//! `autoxide_kernel::mail::Mailer`; other modules use that trait.

@@ -1,11 +1,12 @@
-//! Lời thường thành bộ lọc (bước 52 mục 3, D-109): `POST /api/v1/kernel/filters/parse` nhận tên
-//! danh sách và một câu ("bài nháp của tôi tuần này"), nhờ mô hình AI đổi thành tham số của danh
-//! sách, rồi **kiểm từng tham số theo schema bộ lọc** (P7 bước 51) — tham số sai tên, sai kiểu hay
-//! ngoài tập giá trị bị bỏ sang `ignored`. Không bao giờ chạy lệnh nào: giao diện dùng kết quả để
-//! gọi endpoint danh sách, nơi permission được kiểm như mọi lần.
+//! Plain language to filter (step 52 item 3, D-109): `POST /api/v1/kernel/filters/parse` takes a list name
+//! and a sentence ("my drafts this week"), has an AI model turn it into the list's parameters, then
+//! **validates each parameter against the filter schema** (P7 of step 51) — a parameter with a wrong name,
+//! wrong type or outside the value set goes to `ignored`. It never runs any command: the UI uses the result
+//! to call the list endpoint, where permissions are checked as always.
 //!
-//! Endpoint ở kernel vì schema bộ lọc là của kernel; mô hình là `dyn TextModel` do module `ai`
-//! công bố, nối vào sau khi mọi module khởi động (kernel khởi động trước module `ai`).
+//! The endpoint lives in the kernel because the filter schema belongs to the kernel; the model is a
+//! `dyn TextModel` published by the `ai` module, wired in after every module has started (the kernel starts
+//! before the `ai` module).
 
 use std::sync::{Arc, OnceLock};
 
@@ -25,10 +26,10 @@ use crate::ops::views::check_params;
 use crate::response::{Data, Problem};
 use crate::tenancy::TenantContext;
 
-/// Độ dài tối đa của câu người dùng gõ.
+/// Maximum length of the sentence the user types.
 const TEXT_MAX: usize = 500;
 
-/// Chỗ giữ mô hình AI: `Modules::start` điền sau khi mọi module khởi động.
+/// Holder of the AI model: `Modules::start` fills it in after every module has started.
 #[derive(Clone, Default)]
 pub(crate) struct TextModelSlot(Arc<OnceLock<Option<Arc<dyn TextModel>>>>);
 

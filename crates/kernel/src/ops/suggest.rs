@@ -1,13 +1,14 @@
-//! Gợi ý tìm cho website (D-201): khi người mua gõ vào ô tìm, website hỏi một endpoint và nhận gợi
-//! ý gom từ nhiều module — sản phẩm, danh mục (`catalog`), bài viết (`content`), cửa hàng
-//! (`organizations`). Module góp một [`SuggestSource`] bằng
-//! [`StartContext::suggest_source`](crate::module::StartContext::suggest_source); module phục vụ
-//! endpoint giữ [`SuggestSources`] lấy bằng
+//! Search suggestions for the website (D-201): when a shopper types in the search box, the website asks one
+//! endpoint and gets suggestions collected from several modules — products, categories (`catalog`), articles
+//! (`content`), stores (`organizations`). A module contributes a [`SuggestSource`] with
+//! [`StartContext::suggest_source`](crate::module::StartContext::suggest_source); the module that serves the
+//! endpoint holds the [`SuggestSources`] obtained with
 //! [`StartContext::suggest_sources`](crate::module::StartContext::suggest_sources).
 //!
-//! Xếp hạng hai tầng tính trong ứng dụng (D-202): gợi ý khớp đúng dấu (`exact`) trước, khớp không
-//! dấu sau — tiếng Việt "dấu / dầu / dâu" khác nghĩa. Một nguồn lỗi không làm hỏng câu trả lời:
-//! ghi log và trả gợi ý của các nguồn còn lại.
+//! Two-tier ranking computed in the application (D-202): suggestions that match with diacritics (`exact`)
+//! come first, then those matching without diacritics — in Vietnamese `dấu` / `dầu` / `dâu` mean different
+//! things. One failing source does not break the answer: it is logged and the suggestions of the remaining
+//! sources are returned.
 
 use std::sync::{Arc, PoisonError, RwLock};
 
@@ -16,25 +17,25 @@ use uuid::Uuid;
 use crate::error::Error;
 use crate::tenancy::{Site, TenantContext};
 
-/// Số gợi ý tối đa của một lần hỏi, gom mọi nguồn.
+/// Maximum number of suggestions per query, across all sources.
 pub const MAX_SUGGESTIONS: u16 = 10;
 
-/// Một gợi ý tìm.
+/// One search suggestion.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct Suggestion {
-    /// Loại, `<module>.<loại>`, vd `catalog.product`, `content.entry`.
+    /// Kind, `<module>.<kind>`, e.g. `catalog.product`, `content.entry`.
     pub kind: String,
-    /// Chữ hiện cho người dùng.
+    /// Text shown to the user.
     pub label: String,
-    /// Đường dẫn trên website (không có tên miền, không có tiền tố ngôn ngữ); `None`: gợi ý là một
-    /// câu tìm (bấm vào thì tìm `label`).
+    /// Path on the website (no domain, no language prefix); `None`: the suggestion is a
+    /// search phrase (clicking it searches for `label`).
     pub path: Option<String>,
-    /// ID bản ghi, khi gợi ý là một bản ghi.
+    /// Record ID, when the suggestion is a record.
     pub id: Option<Uuid>,
-    /// Khớp đúng dấu (xếp trước); `false`: chỉ khớp khi bỏ dấu.
+    /// Matches with diacritics (ranked first); `false`: matches only when diacritics are removed.
     pub exact: bool,
-    /// Ngữ cảnh ngắn, vd "trong Áo" của gợi ý danh mục; rỗng nếu không có.
+    /// Short context, e.g. "in Shirts" for a category suggestion; empty if none.
     pub context: String,
 }
 
@@ -69,16 +70,16 @@ impl Suggestion {
     }
 }
 
-/// Nguồn gợi ý của một module. Nguồn chỉ đọc dữ liệu công khai của khách `tenant`, thấy được ở
-/// website `site` (như đọc công khai của chính module đó) — không bao giờ của khách khác.
+/// The suggestion source of one module. A source only reads the public data of the tenant `tenant`, visible on
+/// the website `site` (like the module's own public reads) — never another tenant's.
 //
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
 #[async_trait::async_trait]
 pub trait SuggestSource: Send + Sync {
-    /// Loại gợi ý, `<module>.<loại>`.
+    /// Suggestion kind, `<module>.<kind>`.
     fn kind(&self) -> &'static str;
 
-    /// Tối đa `limit` gợi ý cho câu gõ `q` (đã cắt khoảng trắng, không rỗng) ở ngôn ngữ `locale`.
+    /// At most `limit` suggestions for the typed phrase `q` (trimmed, non-empty) in the language `locale`.
     async fn suggest(
         &self,
         tenant: &TenantContext,
@@ -91,7 +92,7 @@ pub trait SuggestSource: Send + Sync {
 
 type Entry = (&'static str, Arc<dyn SuggestSource>);
 
-/// Sổ nguồn gợi ý. Dùng chung (`Arc`): nguồn đăng ký sau lúc module phục vụ lấy sổ vẫn có mặt.
+/// Registry of suggestion sources. Shared (`Arc`): a source registered after the serving module obtained the registry is still present.
 #[derive(Clone, Default)]
 pub struct SuggestSources {
     entries: Arc<RwLock<Vec<Entry>>>,
@@ -117,8 +118,8 @@ impl SuggestSources {
         Ok(())
     }
 
-    /// Gợi ý của mọi nguồn cho `q`: khớp đúng dấu trước, rồi theo thứ tự đăng ký nguồn; tối đa
-    /// `limit` (kẹp vào `1..=`[`MAX_SUGGESTIONS`]). Nguồn lỗi bị bỏ qua (ghi log).
+    /// Suggestions from all sources for `q`: diacritic-exact matches first, then in source registration
+    /// order; at most `limit` (clamped to `1..=`[`MAX_SUGGESTIONS`]). Failing sources are skipped (logged).
     pub async fn suggest(
         &self,
         tenant: &TenantContext,
@@ -147,14 +148,14 @@ impl SuggestSources {
         rank(found, limit)
     }
 
-    /// Có nguồn nào chưa.
+    /// Whether there are any sources yet.
     pub fn is_empty(&self) -> bool {
         self.entries.read().unwrap_or_else(PoisonError::into_inner).is_empty()
     }
 }
 
-/// Xếp hai tầng: khớp đúng dấu trước, giữ thứ tự trong mỗi tầng; bỏ gợi ý trùng (cùng loại và
-/// chữ); cắt ở `limit`.
+/// Two-tier ordering: diacritic-exact matches first, keeping the order within each tier; drops duplicate
+/// suggestions (same kind and text); cuts at `limit`.
 fn rank(found: Vec<Suggestion>, limit: u16) -> Vec<Suggestion> {
     let (mut exact, loose): (Vec<_>, Vec<_>) = found.into_iter().partition(|item| item.exact);
     exact.extend(loose);

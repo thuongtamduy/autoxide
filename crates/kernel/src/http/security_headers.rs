@@ -1,8 +1,9 @@
-//! Header bảo mật cho mọi response (bước 40 P1, D-320).
+//! Security headers for every response (step 40 P1, D-320).
 //!
-//! Lớp này đặt ngoài lớp log, trong lớp request id: mọi response đều đi qua — kể cả 404 của router,
-//! 429 của rate limiting, preflight CORS, `/health/*`, `/metrics`, `/mcp`. Header chỉ được đặt khi
-//! handler **chưa** đặt: handler giữ quyền đặt giá trị chặt hơn (vd tải file).
+//! This layer sits outside the log layer, inside the request id layer: every response passes through -
+//! including the router's 404, rate limiting's 429, CORS preflight, `/health/*`, `/metrics`, `/mcp`. A header
+//! is set only when the handler has **not** set it: a handler keeps the right to set a stricter value (e.g.
+//! file download).
 
 use std::sync::Arc;
 
@@ -13,15 +14,15 @@ use axum::response::Response;
 
 use crate::config::SecurityHeaders;
 
-/// CSP mặc định của API: response là JSON hay file người dùng tải lên, không cần nạp gì; `sandbox`
-/// làm file HTML tải lên không chạy được script, kể cả khi mở thẳng trong trình duyệt.
+/// The API's default CSP: responses are JSON or user-uploaded files, nothing needs to be loaded; `sandbox`
+/// stops uploaded HTML files from running scripts, even when opened directly in a browser.
 pub const API_CSP: &str =
     "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'; sandbox";
 
-/// CSP của trang tài liệu API (`/api/docs`): trang Scalar nạp script, style từ jsdelivr, font từ
-/// jsdelivr và `fonts.scalar.com` (đã kiểm trong Chromium: thiếu nguồn này thì font bị chặn, D-320),
-/// và gọi `openapi.json` cùng origin. Khối `<script type="application/json">` chỉ là dữ liệu, CSP
-/// không chặn.
+/// CSP of the API documentation page (`/api/docs`): the Scalar page loads scripts and styles from jsdelivr,
+/// fonts from jsdelivr and `fonts.scalar.com` (checked in Chromium: without this source the fonts are
+/// blocked, D-320), and calls `openapi.json` on the same origin. The `<script type="application/json">` block
+/// is only data, and CSP does not block it.
 pub const DOCS_CSP: &str = concat!(
     "default-src 'none'; ",
     "script-src https://cdn.jsdelivr.net; ",
@@ -32,7 +33,7 @@ pub const DOCS_CSP: &str = concat!(
     "frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
 );
 
-/// Header đã dựng sẵn từ cấu hình (dựng một lần, mỗi response chỉ chép).
+/// Headers prebuilt from configuration (built once, each response only copies them).
 pub(crate) struct Prepared {
     common: Vec<(HeaderName, HeaderValue)>,
     api_csp: HeaderValue,
@@ -40,7 +41,7 @@ pub(crate) struct Prepared {
 }
 
 impl Prepared {
-    /// `None` khi cấu hình tắt header bảo mật.
+    /// `None` when configuration disables security headers.
     pub(crate) fn new(config: &SecurityHeaders) -> Option<Arc<Self>> {
         if !config.enabled {
             return None;
@@ -82,7 +83,7 @@ impl Prepared {
     }
 }
 
-/// Lớp gắn header. `prepared = None`: cấu hình tắt, cho qua nguyên vẹn.
+/// The header-attaching layer. `prepared = None`: disabled by configuration, passes through unchanged.
 pub(crate) async fn add(prepared: Option<Arc<Prepared>>, request: Request, next: Next) -> Response {
     let Some(prepared) = prepared else {
         return next.run(request).await;

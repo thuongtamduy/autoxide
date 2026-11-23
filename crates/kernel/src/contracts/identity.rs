@@ -1,17 +1,18 @@
-//! Xác thực danh tính (KYC) qua nhà cung cấp (bước 37, D-186): trait trung lập để module
-//! `compliance` dùng VNeID (qua nhà cung cấp được phép), eKYC hay tra cứu đăng ký kinh doanh mà không
-//! phụ thuộc nhà cung cấp nào. Bộ nối của một nhà cung cấp là module riêng, công bố
-//! `context.provide::<dyn IdentityVerifier>(…)`. Test dùng `FakeIdentityVerifier` của testkit.
+//! Identity verification (KYC) through a provider (step 37, D-186): neutral traits that let the `compliance`
+//! module use VNeID (through an authorized provider), eKYC or business registration lookup without depending on
+//! any specific provider. A provider's adapter is its own module that publishes
+//! `context.provide::<dyn IdentityVerifier>(...)`. Tests use `FakeIdentityVerifier` from the testkit.
 //!
-//! Lưu tối thiểu (Luật Bảo vệ dữ liệu cá nhân 91/2025): `compliance` chỉ lưu kết quả, mã tham chiếu, tên
-//! đã xác thực, băm và 4 số cuối của số giấy tờ — không lưu ảnh khuôn mặt hay dữ liệu sinh trắc học.
+//! Minimal storage (Personal Data Protection Law 91/2025): `compliance` stores only the result, the reference
+//! code, the verified name, and a hash plus the last 4 digits of the document number; it stores no face images
+//! or biometric data.
 use crate::time::Timestamp;
 use uuid::Uuid;
 
 use crate::error::{Error, ErrorKind};
 use crate::tenancy::TenantId;
 
-/// Loại bên được xác thực.
+/// Kind of party being verified.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PartyType {
     Individual,
@@ -38,16 +39,16 @@ impl PartyType {
     }
 }
 
-/// Cách xác thực.
+/// Verification method.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum VerificationMethod {
-    /// Tài khoản định danh điện tử VNeID (qua nhà cung cấp được phép).
+    /// VNeID electronic identity account (through an authorized provider).
     Vneid,
-    /// eKYC: ảnh giấy tờ + khuôn mặt, nhà cung cấp đối chiếu.
+    /// eKYC: photo of the document plus a face image, matched by the provider.
     Ekyc,
-    /// Tra cứu đăng ký kinh doanh.
+    /// Business registration lookup.
     BusinessRegistry,
-    /// Người duyệt xem giấy tờ tải lên.
+    /// A reviewer inspects an uploaded document.
     Manual,
 }
 
@@ -72,12 +73,12 @@ impl VerificationMethod {
     }
 }
 
-/// Một lượt xác thực cần bắt đầu.
+/// A verification attempt to start.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct VerificationRequest {
     pub tenant: TenantId,
-    /// ID lượt thử trong hệ thống (nhà cung cấp gửi lại trong callback).
+    /// ID of the attempt in this system (the provider sends it back in the callback).
     pub attempt_id: Uuid,
     pub party: PartyType,
     pub method: VerificationMethod,
@@ -115,19 +116,19 @@ impl VerificationRequest {
     }
 }
 
-/// Cách người dùng tiếp tục lượt xác thực.
+/// How the user continues the verification attempt.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum VerificationSession {
-    /// Mở trang của nhà cung cấp.
+    /// Opens the provider's page.
     Redirect { provider_reference: String, url: String, expires_at: Timestamp },
-    /// Ứng dụng di động mở SDK bằng token.
+    /// A mobile app opens the SDK with a token.
     Sdk { provider_reference: String, token: String, expires_at: Timestamp },
-    /// Không cần người dùng làm gì (vd tra cứu đăng ký kinh doanh); kết quả về sau.
+    /// Nothing for the user to do (e.g. business registration lookup); the result arrives later.
     Pending { provider_reference: String },
 }
 
 impl VerificationSession {
-    /// Mã lượt xác thực ở nhà cung cấp.
+    /// Verification attempt code at the provider.
     pub fn provider_reference(&self) -> &str {
         match self {
             VerificationSession::Redirect { provider_reference, .. }
@@ -137,7 +138,7 @@ impl VerificationSession {
     }
 }
 
-/// Kết quả xác thực.
+/// Verification outcome.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum OutcomeStatus {
     Verified,
@@ -145,18 +146,18 @@ pub enum OutcomeStatus {
     Pending,
 }
 
-/// Kết quả nhà cung cấp trả.
+/// Result returned by the provider.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct VerificationOutcome {
     pub provider_reference: String,
     pub status: OutcomeStatus,
     pub verified_name: Option<String>,
-    /// Loại giấy tờ (`cccd`, `passport`, `business_registration`…).
+    /// Document type (`cccd`, `passport`, `business_registration`, ...).
     pub document_kind: Option<String>,
-    /// Số giấy tờ: `compliance` chỉ lưu băm và 4 số cuối, không lưu nguyên.
+    /// Document number: `compliance` stores only a hash and the last 4 digits, never the full number.
     pub document_number: Option<String>,
-    /// Mức bảo đảm, vd `vneid_level_2`.
+    /// Assurance level, e.g. `vneid_level_2`.
     pub assurance: Option<String>,
     pub expires_at: Option<Timestamp>,
 }
@@ -194,12 +195,12 @@ impl VerificationOutcome {
     }
 }
 
-/// Một nhà cung cấp xác thực danh tính.
+/// An identity verification provider.
 //
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
 #[async_trait::async_trait]
 pub trait IdentityVerifier: Send + Sync {
-    /// Tên ổn định (`vnpt_ekyc`, `fake`…): nằm trong đường dẫn callback.
+    /// Stable name (`vnpt_ekyc`, `fake`, ...): part of the callback path.
     fn provider(&self) -> &'static str;
 
     fn methods(&self) -> Vec<VerificationMethod>;
@@ -208,7 +209,7 @@ pub trait IdentityVerifier: Send + Sync {
 
     async fn fetch(&self, provider_reference: &str) -> Result<VerificationOutcome, Error>;
 
-    /// Kiểm chữ ký callback trên thân thô; sai → [`callback_invalid`].
+    /// Verifies the callback signature over the raw body; a wrong signature yields [`callback_invalid`].
     async fn verify_callback(
         &self,
         headers: &axum::http::HeaderMap,
@@ -216,7 +217,7 @@ pub trait IdentityVerifier: Send + Sync {
     ) -> Result<VerificationOutcome, Error>;
 }
 
-/// `identity_verification_disabled` (503): chưa cấu hình nhà cung cấp.
+/// `identity_verification_disabled` (503): no provider is configured.
 pub fn verification_disabled() -> Error {
     Error::unavailable(
         "identity_verification_disabled",
@@ -224,7 +225,7 @@ pub fn verification_disabled() -> Error {
     )
 }
 
-/// `identity_callback_invalid` (401): chữ ký callback sai.
+/// `identity_callback_invalid` (401): the callback signature is wrong.
 pub fn callback_invalid() -> Error {
     Error::new(
         ErrorKind::Unauthenticated,

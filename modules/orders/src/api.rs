@@ -1,21 +1,22 @@
-//! Hợp đồng của module `orders` cho module khác (`marketplace` bước 46, `customers` 47, `channels`
-//! 48, `affiliate` 49, `auth`, `support`, `reporting`…): chỉ những gì ở đây được dùng từ bên ngoài
-//! (`autoxide_orders::api::…`). File này không tham chiếu phần bên trong module.
+//! Contract of the `orders` module for other modules (`marketplace` step 46, `customers` 47, `channels`
+//! 48, `affiliate` 49, `auth`, `support`, `reporting`…): only what is here is used from outside
+//! (`autoxide_orders::api::…`). This file does not reference the module's internals.
 //!
-//! Hai cách nối với `orders`:
+//! Two ways to connect to `orders`:
 //!
-//! 1. Module đăng ký SAU `orders` lấy trait lúc khởi động:
+//! 1. A module registered AFTER `orders` gets the trait at startup:
 //!
 //!    ```text
 //!    let orders = context.require::<dyn autoxide_orders::api::Orders>()?;
 //!    ```
 //!
-//! 2. Module đăng ký SAU `orders` mà `orders` cần gọi tới (người bán của sàn, nhóm khách, điểm /
-//!    thẻ quà tặng) tự CẮM vào [`OrderExtensions`] trong `Module::start` của nó — `orders` khởi động
-//!    trước nên không `require` được trait của module sau (D-198, D-20261118-step45-orders-api).
+//! 2. A module registered AFTER `orders` that `orders` needs to call (the marketplace seller, customer
+//!    groups, points / gift cards) PLUGS itself into [`OrderExtensions`] in its own `Module::start` —
+//!    `orders` starts first so it cannot `require` a trait of a later module (D-198,
+//!    D-20261118-step45-orders-api).
 //!
-//! Mã đơn là `Uuid` (UUIDv7), như `order_id` trong hợp đồng của `inventory`, `promotions`,
-//! `shipping`. Mã tham chiếu giữ chỗ chung: [`hold_reference`] (`orders:<order_id>`).
+//! The order ID is a `Uuid` (UUIDv7), like `order_id` in the contracts of `inventory`, `promotions`,
+//! `shipping`. The shared hold reference code: [`hold_reference`] (`orders:<order_id>`).
 
 use autoxide_kernel::time::Timestamp;
 use std::fmt;
@@ -28,87 +29,88 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use uuid::Uuid;
 
-/// Tên event `orders` phát (payload `{"before": …, "after": …}`; `after` luôn có `order_id`,
-/// `tenant_id`, `org_id`, `channel` khi là event của một đơn). Không event nào mang secret, token
-/// hay `Cart-Token`. Event của một đơn (đặt, xác nhận, đổi trạng thái…) có thêm `buyer_key` (khoá
-/// liên hệ HMAC theo khách của số người mua, không phải số), `placed_at` và `goods_paid` (tiền người
-/// mua trả cho hàng hoá: sau giảm, gồm thuế, không phí giao — cơ sở điểm của bước 47, D-226).
+/// Names of the events `orders` emits (payload `{"before": …, "after": …}`; `after` always has `order_id`,
+/// `tenant_id`, `org_id`, `channel` for an event about one order). No event carries a secret, token or
+/// `Cart-Token`. An event about one order (placed, confirmed, status change…) also has `buyer_key` (a
+/// per-tenant HMAC contact key of the buyer's phone number, not the number), `placed_at` and `goods_paid`
+/// (what the buyer paid for goods: after discounts, including tax, excluding shipping fees — the basis for
+/// points in step 47, D-226).
 pub mod events {
-    /// Đơn vừa tạo (`pending_payment` hay `confirmed`).
+    /// An order just created (`pending_payment` or `confirmed`).
     pub const ORDER_PLACED: &str = "orders.order_placed";
-    /// Đơn đã xác nhận (đã thu đủ, COD đủ điều kiện, POS, kênh): `inventory`, `promotions`, `Tender`
-    /// xác nhận chỗ giữ. `after`: `order_id`, `hold_reference`, dòng, kho.
+    /// An order confirmed (fully paid, COD-eligible, POS, channel): `inventory`, `promotions`, `Tender`
+    /// confirm their holds. `after`: `order_id`, `hold_reference`, lines, warehouse.
     pub const ORDER_CONFIRMED: &str = "orders.order_confirmed";
-    /// Mọi lần đổi `status`.
+    /// Every change of `status`.
     pub const ORDER_STATUS_CHANGED: &str = "orders.order_status_changed";
-    /// Đơn bị huỷ: bên giữ chỗ trả lại. `after`: `order_id`, `hold_reference`, `cause`.
+    /// An order cancelled: holders release their holds. `after`: `order_id`, `hold_reference`, `cause`.
     pub const ORDER_CANCELLED: &str = "orders.order_cancelled";
-    /// Đơn đã giao xong.
+    /// An order fully delivered.
     pub const ORDER_DELIVERED: &str = "orders.order_delivered";
-    /// Đơn hoàn tất (hết hạn đổi trả, không còn hoãn): mốc hoa hồng, điểm, chi trả người bán.
+    /// An order completed (return window over, no longer deferred): the trigger for commission, points, seller payout.
     pub const ORDER_COMPLETED: &str = "orders.order_completed";
-    /// Yêu cầu giao một kiện: `after.shipment` là `ShipmentRequest` của `shipping`.
+    /// A request to ship a parcel: `after.shipment` is the `ShipmentRequest` of `shipping`.
     pub const FULFILLMENT_REQUESTED: &str = "orders.fulfillment_requested";
-    /// Trả hàng cần hãng tới lấy: `after.shipment` là `ShipmentRequest` (`direction = return`).
+    /// A return that needs a carrier pickup: `after.shipment` is a `ShipmentRequest` (`direction = return`).
     pub const RETURN_PICKUP_REQUESTED: &str = "orders.return_pickup_requested";
-    /// Đơn nhập từ kênh ngoài thiếu hàng.
+    /// An order imported from an external channel that is short of stock.
     pub const STOCK_SHORTAGE: &str = "orders.stock_shortage";
-    /// Ghi nhận một khoản thu của đơn.
+    /// A payment received for an order is recorded.
     pub const PAYMENT_RECORDED: &str = "orders.payment_recorded";
-    /// Đã hoàn tiền (dòng và số tiền hoàn): `Tender` của bước 47 nghe để hoàn điểm / số dư.
+    /// Money refunded (lines and refunded amount): the `Tender` of step 47 listens to refund points / balance.
     pub const REFUND_COMPLETED: &str = "orders.refund_completed";
-    /// Người mua yêu cầu trả hàng (kèm `photo_count`, không có ID ảnh).
+    /// The buyer requests a return (with `photo_count`, no photo IDs).
     pub const RETURN_REQUESTED: &str = "orders.return_requested";
-    /// Hàng trả đã về kho: `inventory` nhập lại. `after`: `return_id`, `order_id`,
+    /// Returned goods are back in the warehouse: `inventory` restocks. `after`: `return_id`, `order_id`,
     /// `warehouse_org_id`, `lines[{variant_id, quantity, sellable, lot_code?, serials[]}]`.
     pub const RETURN_RECEIVED: &str = "orders.return_received";
-    /// Một yêu cầu trả hàng đổi trạng thái (duyệt, từ chối, nhận hàng, hoàn tiền, đóng).
+    /// A return request changes status (approved, rejected, goods received, refunded, closed).
     pub const RETURN_STATUS_CHANGED: &str = "orders.return_status_changed";
-    /// Đơn nhận tại cửa hàng đã sẵn sàng: `after.pickup_code` (mã nhận 6 số gửi người mua),
+    /// A store-pickup order is ready: `after.pickup_code` (a 6-digit pickup code sent to the buyer),
     /// `hold_until`, `pickup_org_id`.
     pub const PICKUP_READY: &str = "orders.pickup_ready";
-    /// Còn dưới 24 giờ là hết hạn giữ hàng chờ nhận (gửi một lần).
+    /// Less than 24 hours until the pickup hold expires (sent once).
     pub const PICKUP_REMINDER: &str = "orders.pickup_reminder";
-    /// Hết hạn giữ hàng chờ nhận (`after.action`: `cancel_refund` hay `keep_waiting`).
+    /// The pickup hold expired (`after.action`: `cancel_refund` or `keep_waiting`).
     pub const PICKUP_EXPIRED: &str = "orders.pickup_expired";
-    /// Ngày giao của hàng đặt trước dời muộn hơn ngày đã hứa: người mua được huỷ miễn phí
-    /// (`after.promised_on`, `after.expected_on`, `after.line_id`).
+    /// The delivery date of a pre-order item slipped later than the promised date: the buyer may cancel for
+    /// free (`after.promised_on`, `after.expected_on`, `after.line_id`).
     pub const PREORDER_DELAYED: &str = "orders.preorder_delayed";
-    /// Phần đặt trước chưa có hàng của đơn bị huỷ (`after.reason`: `preorder_stopped`,
-    /// `buyer_cancelled`; `after.lines`, `after.amount` hoàn lại).
+    /// The not-yet-in-stock pre-order part of a cancelled order (`after.reason`: `preorder_stopped`,
+    /// `buyer_cancelled`; `after.lines`, `after.amount` refunded).
     pub const PREORDER_CANCELLED: &str = "orders.preorder_cancelled";
-    /// Một hoá đơn điện tử đã gắn vào đơn.
+    /// An e-invoice has been attached to the order.
     pub const INVOICE_LINKED: &str = "orders.invoice_linked";
-    /// Giỏ bị bỏ dở (người mua, tóm tắt giỏ) — cho bước 47.
+    /// An abandoned cart (buyer, cart summary) — for step 47.
     pub const CART_ABANDONED: &str = "orders.cart_abandoned";
-    /// Đánh giá được đăng.
+    /// A review is posted.
     pub const REVIEW_PUBLISHED: &str = "orders.review_published";
-    /// Đánh giá bị ẩn / mở lại.
+    /// A review is hidden / reopened.
     pub const REVIEW_MODERATED: &str = "orders.review_moderated";
-    /// Đóng ca bán tại quầy.
+    /// A point-of-sale shift is closed.
     pub const POS_SHIFT_CLOSED: &str = "orders.pos_shift_closed";
-    /// Phiếu bảo hành đổi trạng thái.
+    /// A warranty ticket changes status.
     pub const WARRANTY_CLAIM_CHANGED: &str = "orders.warranty_claim_changed";
-    /// Danh sách chặn COD đổi.
+    /// The COD block list changes.
     pub const COD_BLOCK_CHANGED: &str = "orders.cod_block_changed";
-    /// Yêu cầu trả phần còn lại của đơn trả trước một phần (số tiền, hạn).
+    /// A request to pay the remainder of a partially prepaid order (amount, deadline).
     pub const PREORDER_BALANCE_REQUESTED: &str = "orders.preorder_balance_requested";
-    /// Quá hạn trả phần còn lại.
+    /// The deadline to pay the remainder has passed.
     pub const PREORDER_BALANCE_OVERDUE: &str = "orders.preorder_balance_overdue";
-    /// Người mua (vãng lai, qua mã lần hai) đổi địa chỉ giao trước khi hàng rời kho. `after`:
-    /// `order_id`, `number`, `by`; không mang địa chỉ.
+    /// The buyer (a guest, via a second-factor code) changes the shipping address before the goods leave the
+    /// warehouse. `after`: `order_id`, `number`, `by`; it carries no address.
     pub const DELIVERY_ADDRESS_CHANGED: &str = "orders.delivery_address_changed";
-    /// Đơn vãng lai được gắn vào tài khoản đã chứng minh số điện thoại. `after`: `buyer_user_id`,
+    /// A guest order is attached to an account that has proven a phone number. `after`: `buyer_user_id`,
     /// `order_ids`.
     pub const ORDERS_CLAIMED: &str = "orders.orders_claimed";
 }
 
-/// Mã tham chiếu giữ chỗ chung của một đơn ở mọi bên giữ chỗ (`Tender`, nhật ký): `orders:<id>`.
+/// The shared hold reference code of an order across every holder (`Tender`, journal): `orders:<id>`.
 pub fn hold_reference(order_id: Uuid) -> String {
     format!("orders:{order_id}")
 }
 
-/// Trạng thái của đơn (máy trạng thái, đặc tả 45).
+/// Status of an order (state machine, spec 45).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum OrderStatus {
@@ -158,8 +160,8 @@ impl fmt::Display for OrderStatus {
     }
 }
 
-/// Chế độ dòng tiền của đơn (D-216). Ba chế độ đầu cùng tên với `FlowMode` của `ledger`;
-/// `ChannelCollect`: kênh bán ngoài (bước 48) thu tiền rồi trả lại cho người bán.
+/// Cash-flow mode of an order (D-216). The first three modes share names with `FlowMode` of `ledger`;
+/// `ChannelCollect`: an external sales channel (step 48) collects the money then returns it to the seller.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum FundsFlow {
@@ -191,7 +193,7 @@ impl FundsFlow {
     }
 }
 
-/// Nguồn đơn được ghi công (tiếp thị liên kết, livestream — bước 49).
+/// The source an order is credited to (affiliate marketing, livestream — step 49).
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct Attribution {
@@ -210,36 +212,36 @@ impl Attribution {
     }
 }
 
-/// Một dòng của đơn, đủ cho hoa hồng, phí sàn, điểm, báo cáo.
+/// A line of an order, enough for commission, marketplace fees, points, reports.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct OrderLineSummary {
     pub id: Uuid,
     pub variant_id: Uuid,
     pub product_id: Uuid,
-    /// Danh mục đầu tiên của sản phẩm lúc đặt (nếu có).
+    /// The first category of the product at order time (if any).
     pub category_id: Option<Uuid>,
-    /// Nút bán của dòng (cửa hàng / người bán).
+    /// The selling node of the line (store / seller).
     pub seller_org_id: OrgId,
     pub quantity: i64,
-    /// Số tiền người mua trả cho dòng: sau giảm, gồm thuế.
+    /// The amount the buyer paid for the line: after discounts, including tax.
     pub net: Money,
-    /// Thuế của dòng (đã gồm trong `net`).
+    /// The line's tax (already included in `net`).
     pub tax: Money,
     pub returned_quantity: i64,
 }
 
-/// Ảnh tóm tắt một đơn cho module khác.
+/// A summary snapshot of an order for other modules.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct OrderSummary {
     pub id: Uuid,
     pub tenant_id: TenantId,
-    /// Nút bán (cửa hàng / người bán).
+    /// The selling node (store / seller).
     pub org_id: OrgId,
     pub number: String,
     pub buyer_user_id: Option<Uuid>,
-    /// `web`, `pos` hay mã kênh ngoài.
+    /// `web`, `pos` or an external channel code.
     pub channel: String,
     pub status: OrderStatus,
     pub funds_flow: FundsFlow,
@@ -249,17 +251,17 @@ pub struct OrderSummary {
     pub attribution: Option<Attribution>,
 }
 
-/// Đọc đơn.
+/// Reads orders.
 //
 // `#[async_trait]`: Rust chưa cho gọi hàm `async` của trait qua `dyn Trait`; macro này đổi hàm
 // `async` thành hàm trả `Box<dyn Future>` để gọi được.
 #[async_trait::async_trait]
 pub trait Orders: Send + Sync {
-    /// Một đơn, hoặc `None`.
+    /// One order, or `None`.
     async fn find(&self, tenant: &TenantContext, id: Uuid) -> Result<Option<OrderSummary>, Error>;
 
-    /// ID các dòng ĐÃ GIAO của biến thể `variant_id` cho người mua `buyer` (đơn `delivered` /
-    /// `completed`) — đánh giá, bảo hành, nhãn `verified_buyer` của hỏi đáp (D-202).
+    /// IDs of the DELIVERED lines of variant `variant_id` for buyer `buyer` (orders `delivered` /
+    /// `completed`) — reviews, warranty, the `verified_buyer` label on Q&A (D-202).
     async fn delivered_lines(
         &self,
         tenant: &TenantContext,
@@ -268,15 +270,15 @@ pub trait Orders: Send + Sync {
     ) -> Result<Vec<Uuid>, Error>;
 }
 
-/// Một dòng của đơn nhập từ ngoài: giá do nguồn quyết, không tính lại.
+/// A line of an order imported from outside: the price is decided by the source, not recomputed.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct ImportedLine {
     pub variant_id: Uuid,
     pub quantity: i64,
-    /// Giá một đơn vị trước giảm, gồm thuế.
+    /// Price of one unit before discount, including tax.
     pub unit_price: Money,
-    /// Tổng giảm của cả dòng.
+    /// Total discount of the whole line.
     pub discount: Money,
 }
 
@@ -293,15 +295,15 @@ impl ImportedLine {
     }
 }
 
-/// Đơn từ kênh ngoài hay nhập dữ liệu (bước 48, 56).
+/// An order from an external channel or a data import (steps 48, 56).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct ImportedOrder {
-    /// Nút bán.
+    /// The selling node.
     pub org_id: OrgId,
-    /// Mã kênh (`shopee`, `tiktok`, `import`…).
+    /// Channel code (`shopee`, `tiktok`, `import`…).
     pub channel: String,
-    /// Mã đơn ở kênh; (`channel`, `external_ref`) là khoá chống trùng.
+    /// Order ID at the channel; (`channel`, `external_ref`) is the deduplication key.
     pub external_ref: String,
     pub currency: Currency,
     pub buyer_user_id: Option<Uuid>,
@@ -344,19 +346,19 @@ impl ImportedOrder {
     }
 }
 
-/// Đơn từ ngoài (bước 48 kênh bán, 56 nhập dữ liệu).
+/// An order from outside (step 48 sales channels, 56 data import).
 #[async_trait::async_trait]
 pub trait OrderIntake: Send + Sync {
-    /// Không trùng theo (`channel`, `external_ref`) — gửi lại trả `Replayed`. Giữ và xác nhận tồn
-    /// ngay; thiếu hàng KHÔNG từ chối (kênh đã bán): đơn có `stock_shortage` và event
-    /// `orders.stock_shortage`. Đơn vào thẳng `confirmed`.
+    /// Deduplicated by (`channel`, `external_ref`) — resending returns `Replayed`. Holds and confirms stock
+    /// at once; a shortage does NOT reject (the channel already sold): the order gets `stock_shortage` and
+    /// the event `orders.stock_shortage`. The order goes straight to `confirmed`.
     async fn import(
         &self,
         tenant: &TenantContext,
         order: ImportedOrder,
     ) -> Result<Submitted<OrderSummary>, Error>;
 
-    /// Kênh báo trạng thái — đi qua cùng máy trạng thái, nguyên nhân `channel`.
+    /// A channel reports status — goes through the same state machine, with cause `channel`.
     async fn external_transition(
         &self,
         tenant: &TenantContext,
@@ -366,10 +368,10 @@ pub trait OrderIntake: Send + Sync {
     ) -> Result<(), Error>;
 }
 
-/// Hoàn tiền do module khác quyết (tranh chấp của bước 46): cùng service với `POST /{id}/refunds`.
+/// A refund decided by another module (a step 46 dispute): same service as `POST /{id}/refunds`.
 #[async_trait::async_trait]
 pub trait OrderRefunds: Send + Sync {
-    /// Trả ID khoản hoàn; cùng `reference` + cùng nội dung → `Replayed`.
+    /// Returns the ID of the refund; the same `reference` + the same content → `Replayed`.
     async fn refund(
         &self,
         tenant: &TenantContext,
@@ -380,10 +382,10 @@ pub trait OrderRefunds: Send + Sync {
     ) -> Result<Submitted<Uuid>, Error>;
 }
 
-/// Hoãn hoàn tất đơn (tranh chấp của bước 46, yêu cầu trả hàng).
+/// Defers completion of an order (a step 46 dispute, a return request).
 #[async_trait::async_trait]
 pub trait OrderHolds: Send + Sync {
-    /// Gọi lại cùng `reference` không thêm dòng.
+    /// Calling again with the same `reference` adds no line.
     async fn hold_completion(
         &self,
         tenant: &TenantContext,
@@ -399,11 +401,11 @@ pub trait OrderHolds: Send + Sync {
     ) -> Result<(), Error>;
 }
 
-/// Tra số đã xác thực của token xem đơn (D-202). `auth` dùng bản trung lập của kernel
-/// (`autoxide_kernel::sms::VerifiedPhoneTokens`, cùng bộ cài đặt) để không phụ thuộc `orders`.
+/// Looks up the verified number of an order-view token (D-202). `auth` uses the kernel's neutral version
+/// (`autoxide_kernel::sms::VerifiedPhoneTokens`, the same implementation) so as not to depend on `orders`.
 #[async_trait::async_trait]
 pub trait OrderLookups: Send + Sync {
-    /// Số điện thoại (E.164) đã qua OTP của token xem đơn `token`, khi token còn hạn.
+    /// The phone number (E.164) that passed OTP for order-view token `token`, while the token is still valid.
     async fn verified_phone(
         &self,
         tenant: &TenantContext,
@@ -411,13 +413,13 @@ pub trait OrderLookups: Send + Sync {
     ) -> Result<Option<String>, Error>;
 }
 
-/// Một dòng giỏ đưa cho [`SellerSplit`].
+/// A cart line handed to [`SellerSplit`].
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct SplitLine {
     pub line_key: String,
     pub variant_id: Uuid,
-    /// Nút sở hữu sản phẩm theo `catalog`.
+    /// The node that owns the product per `catalog`.
     pub owner_org_id: OrgId,
     pub quantity: i64,
 }
@@ -433,7 +435,7 @@ impl SplitLine {
     }
 }
 
-/// Một nhóm dòng của cùng một người bán (một đơn con).
+/// A group of lines from the same seller (one child order).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct SellerGroup {
@@ -448,10 +450,10 @@ impl SellerGroup {
     }
 }
 
-/// Tách giỏ theo người bán (bước 46 cắm vào).
+/// Splits a cart by seller (step 46 plugs in).
 #[async_trait::async_trait]
 pub trait SellerSplit: Send + Sync {
-    /// Gom dòng theo nút bán. Lỗi nếu người bán không được bán (KYC, tạm khoá).
+    /// Groups lines by selling node. Errors if a seller may not sell (KYC, temporarily locked).
     async fn split(
         &self,
         tenant: &TenantContext,
@@ -459,15 +461,15 @@ pub trait SellerSplit: Send + Sync {
     ) -> Result<Vec<SellerGroup>, Error>;
 }
 
-/// Hồ sơ giá / khuyến mại của người mua (bước 47 cắm vào).
+/// Pricing / promotion profile of the buyer (step 47 plugs in).
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct BuyerProfile {
-    /// Nhóm / phân khúc khách (cho `promotions`).
+    /// Customer group / segment (for `promotions`).
     pub groups: Vec<Uuid>,
-    /// Hạng thành viên.
+    /// Membership tier.
     pub membership_tier: Option<String>,
-    /// Mã nhóm khách cho bảng giá của `catalog`.
+    /// Customer group code for `catalog` price lists.
     pub price_group: Option<String>,
 }
 
@@ -486,15 +488,15 @@ pub trait BuyerGroups: Send + Sync {
     async fn profile_of(&self, tenant: &TenantContext, buyer: Uuid) -> Result<BuyerProfile, Error>;
 }
 
-/// Một cách trả bằng giá trị nội bộ (điểm, thẻ quà tặng, số dư — bước 47 cắm vào). Xác nhận / hoàn
-/// lại: bên cài nghe `orders.order_confirmed` / `orders.order_cancelled` / `orders.refund_completed`.
+/// A way to pay with an internal value (points, gift card, balance — step 47 plugs in). Confirm / refund:
+/// the implementer listens to `orders.order_confirmed` / `orders.order_cancelled` / `orders.refund_completed`.
 #[async_trait::async_trait]
 pub trait Tender: Send + Sync {
     /// `points`, `gift_card`, `store_credit`.
     fn kind(&self) -> &'static str;
 
-    /// Giữ tối đa `max` theo `reference` tới `expires_at`; trả số đã giữ. Gọi lại cùng `reference`
-    /// trả lại kết quả cũ.
+    /// Holds at most `max` under `reference` until `expires_at`; returns the amount held. Calling again with
+    /// the same `reference` returns the earlier result.
     async fn hold(
         &self,
         tenant: &TenantContext,
@@ -505,13 +507,13 @@ pub trait Tender: Send + Sync {
         expires_at: Timestamp,
     ) -> Result<Money, Error>;
 
-    /// Trả chỗ giữ của `reference` (không có thì không làm gì).
+    /// Releases the hold of `reference` (does nothing if none exists).
     async fn release(&self, tenant: &TenantContext, reference: &str) -> Result<(), Error>;
 
-    /// Tối đa người mua `buyer` trả được bằng tender này cho một giỏ còn phải trả `max` — báo giá giỏ
-    /// hiện trước khi đặt (vd số điểm tối đa dùng được). Không ghi gì. `None`: không báo trước được
-    /// (cần mã như thẻ quà tặng, chưa đăng nhập, không có chương trình). Mặc định `None` để bên cài
-    /// cũ không phải sửa (D-038).
+    /// The most buyer `buyer` can pay with this tender for a cart that still has `max` to pay — quotes the
+    /// cart before placing the order (e.g. the maximum usable points). Writes nothing. `None`: cannot be
+    /// quoted in advance (needs a code such as a gift card, not signed in, no program). Defaults to `None` so
+    /// older implementers need no change (D-038).
     async fn limit(
         &self,
         tenant: &TenantContext,
@@ -523,13 +525,13 @@ pub trait Tender: Send + Sync {
     }
 }
 
-/// Tối đa dùng được của một tender cho một giỏ ([`Tender::limit`]).
+/// The most a tender can apply to a cart ([`Tender::limit`]).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct TenderLimit {
-    /// Số tiền tối đa trừ được (không quá phần còn phải trả).
+    /// The maximum amount that can be deducted (not more than what is still to be paid).
     pub amount: Money,
-    /// Số đơn vị riêng của tender tương ứng (vd số điểm), khi có.
+    /// The tender's own unit count (e.g. points), when there is one.
     pub units: Option<i64>,
 }
 
@@ -539,12 +541,12 @@ impl TenderLimit {
     }
 }
 
-/// Điểm cắm cho module đăng ký SAU `orders` (bước 46–49): gọi trong `Module::start` của họ. Mỗi
-/// điểm cắm `set_…` chỉ cắm được một lần; cắm lần hai → lỗi khởi động. Không ai cắm thì `orders`
-/// chạy như không có tính năng đó (một người bán, không nhóm khách, không điểm).
+/// Plug points for modules registered AFTER `orders` (steps 46–49): called in their `Module::start`. Each
+/// `set_…` plug point can be plugged only once; a second plug → a startup error. If nobody plugs in, `orders`
+/// runs as if it had no such feature (one seller, no customer groups, no points).
 pub trait OrderExtensions: Send + Sync {
     fn set_seller_split(&self, split: std::sync::Arc<dyn SellerSplit>) -> Result<(), Error>;
     fn set_buyer_groups(&self, groups: std::sync::Arc<dyn BuyerGroups>) -> Result<(), Error>;
-    /// Hai `Tender` cùng `kind()` → lỗi.
+    /// Two `Tender`s with the same `kind()` → error.
     fn add_tender(&self, tender: std::sync::Arc<dyn Tender>) -> Result<(), Error>;
 }

@@ -1,11 +1,11 @@
-//! Hợp đồng với nhà cung cấp thoại (bước 61, D-232): gọi cửa hàng từ trình duyệt (WebRTC), gọi lại
-//! cho người mua, webhook trạng thái cuộc gọi, bản ghi âm. Bộ nối một nhà cung cấp (Stringee,
-//! Twilio…) là module riêng chỉ phụ thuộc kernel, đăng ký TRƯỚC module dùng (`conversations`) và góp
-//! bằng `context.contribute::<dyn VoiceProvider>(Arc::new(…))?`. Mọi hàm nhận khách: bộ nối tự đọc
-//! thông tin kết nối của khách từ kho secret theo khách (bước 33). Test dùng `FakeVoiceProvider` của
-//! `autoxide-testkit`.
+//! Contract with voice providers (step 61, D-232): calling the shop from a browser (WebRTC), calling the buyer
+//! back, call status webhooks, call recordings. A provider's adapter (Stringee, Twilio, ...) is its own module
+//! that depends only on the kernel, is registered BEFORE the module that uses it (`conversations`) and
+//! contributes with `context.contribute::<dyn VoiceProvider>(Arc::new(...))?`. Every function takes the tenant:
+//! the adapter reads the tenant's connection settings from the per-tenant secret store itself (step 33). Tests
+//! use `FakeVoiceProvider` from `autoxide-testkit`.
 //!
-//! Số điện thoại đầy đủ chỉ đi tới nhà cung cấp; bên gọi không ghi nó vào log, event hay lỗi (dùng
+//! The full phone number goes only to the provider; the caller does not write it to logs, events or errors (use
 //! [`PhoneNumber::masked`](crate::sms::PhoneNumber::masked)).
 use crate::time::Timestamp;
 use uuid::Uuid;
@@ -15,72 +15,72 @@ use crate::sms::PhoneNumber;
 use crate::storage::ByteStream;
 use crate::tenancy::TenantId;
 
-/// Nhà cung cấp làm được gì.
+/// What the provider can do.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct VoiceCapabilities {
-    /// Người mua gọi được từ trình duyệt / ứng dụng (SDK WebRTC của nhà cung cấp).
+    /// The buyer can call from a browser / app (the provider's WebRTC SDK).
     pub browser_calls: bool,
-    /// Gọi ra số điện thoại (gọi lại cho người mua).
+    /// Outbound calls to a phone number (calling the buyer back).
     pub outbound: bool,
-    /// Ghi âm cuộc gọi.
+    /// Call recording.
     pub recording: bool,
-    /// Phát được câu thông báo ghi âm ở đầu cuộc gọi. Không có thì không được bật ghi âm.
+    /// Can play a recording announcement at the start of the call. Without it, recording cannot be enabled.
     pub recording_notice: bool,
 }
 
-/// Ai cần phiên WebRTC.
+/// Who needs a WebRTC session.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SessionRole {
-    /// Người mua: chỉ gọi được tới `hotline`.
+    /// Buyer: can only call `hotline`.
     Customer,
-    /// Nhân viên: nhận cuộc gọi tới hotline và gọi ra, danh tính là `identity`.
+    /// Staff: receive calls to the hotline and make outbound calls; the identity is `identity`.
     Agent,
 }
 
-/// Yêu cầu một phiên WebRTC ngắn hạn.
+/// Request for a short-lived WebRTC session.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BrowserSessionRequest {
     pub role: SessionRole,
-    /// Danh tính trong phiên (user id): webhook báo đúng người nghe máy.
+    /// Identity in the session (user id): the webhook reports the right person who picked up.
     pub identity: String,
-    /// Số công khai của cửa hàng.
+    /// The shop's public number.
     pub hotline: PhoneNumber,
-    /// Cuộc gọi phía mình (người mua gọi), để nhà cung cấp báo lại; `None` cho phiên nhân viên.
+    /// Our own call (the buyer calls) so the provider can report back; `None` for a staff session.
     pub call_id: Option<Uuid>,
-    /// Câu thông báo ghi âm (đã dịch) khi cuộc gọi được ghi âm.
+    /// Recording announcement (translated) when the call is recorded.
     pub recording_notice: Option<String>,
 }
 
-/// Phiên WebRTC cho SDK của nhà cung cấp.
+/// WebRTC session for the provider's SDK.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BrowserSession {
-    /// Token ngắn hạn đưa cho SDK; không lưu.
+    /// Short-lived token handed to the SDK; not stored.
     pub token: String,
     pub expires_at: Timestamp,
 }
 
-/// Một cuộc gọi ra: nối máy nhân viên với số người mua.
+/// An outbound call: connects the staff member's phone with the buyer's number.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OutboundCall {
-    /// Mã phía mình: nhà cung cấp dùng để chống trùng (gọi lại cùng mã → cùng cuộc gọi).
+    /// Our own code: the provider uses it to de-duplicate (calling again with the same code -> the same call).
     pub call_id: Uuid,
-    /// Số người mua thấy: hotline của cửa hàng, không bao giờ là số nhân viên.
+    /// Number the buyer sees: the shop's hotline, never a staff number.
     pub from: PhoneNumber,
     pub to: PhoneNumber,
     pub agent_identity: String,
     pub record: bool,
-    /// Câu thông báo ghi âm (đã dịch); bắt buộc khi `record`.
+    /// Recording announcement (translated); required when `record`.
     pub recording_notice: Option<String>,
 }
 
-/// Cuộc gọi phía nhà cung cấp.
+/// A call on the provider's side.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProviderCall {
     pub provider_call_id: String,
     pub status: CallStatus,
 }
 
-/// Trạng thái cuộc gọi. Thứ tự tiến: `Queued` → `Ringing` → `InProgress` → một trạng thái cuối.
+/// Call status. Order of progress: `Queued` -> `Ringing` -> `InProgress` -> a final status.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CallStatus {
     Queued,
@@ -121,12 +121,12 @@ impl CallStatus {
         })
     }
 
-    /// Trạng thái cuối: không đổi nữa.
+    /// Final status: no longer changes.
     pub fn is_final(self) -> bool {
         self.rank() == 3
     }
 
-    /// Bậc tiến của trạng thái: webhook tới sai thứ tự không được lùi bậc.
+    /// Progress rank of a status: a webhook arriving out of order must not move the rank backwards.
     pub fn rank(self) -> u8 {
         match self {
             CallStatus::Queued => 0,
@@ -137,13 +137,13 @@ impl CallStatus {
     }
 }
 
-/// Một thông báo trạng thái từ webhook đã kiểm chữ ký.
+/// A status notification from a webhook whose signature has been verified.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VoiceNotification {
-    /// Mã event phía nhà cung cấp: chống nhận trùng.
+    /// Event code on the provider's side: prevents duplicate handling.
     pub provider_event_id: String,
     pub provider_call_id: String,
-    /// Mã phía mình khi nhà cung cấp báo lại (`OutboundCall::call_id`, `BrowserSessionRequest::call_id`).
+    /// Our own code when the provider reports back (`OutboundCall::call_id`, `BrowserSessionRequest::call_id`).
     pub call_id: Option<Uuid>,
     pub status: CallStatus,
     pub agent_identity: Option<String>,
@@ -152,32 +152,32 @@ pub struct VoiceNotification {
     pub provider_recording_id: Option<String>,
 }
 
-/// Một nhà cung cấp thoại.
+/// A voice provider.
 //
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
 #[async_trait::async_trait]
 pub trait VoiceProvider: Send + Sync {
-    /// Tên ổn định (`stringee`, `twilio`, `fake`…): nằm trong đường dẫn webhook và trên mỗi cuộc gọi.
+    /// Stable name (`stringee`, `twilio`, `fake`, ...): part of the webhook path and on every call.
     fn provider(&self) -> &'static str;
 
     fn capabilities(&self) -> VoiceCapabilities;
 
-    /// Token ngắn hạn cho SDK WebRTC.
+    /// Short-lived token for the WebRTC SDK.
     async fn browser_session(
         &self,
         tenant: TenantId,
         request: &BrowserSessionRequest,
     ) -> Result<BrowserSession, Error>;
 
-    /// Gọi ra. Gọi lại cùng `call_id` phải trả cùng cuộc gọi (không gọi thêm).
+    /// Places an outbound call. Calling again with the same `call_id` must return the same call (no extra call).
     async fn place_call(
         &self,
         tenant: TenantId,
         call: &OutboundCall,
     ) -> Result<ProviderCall, Error>;
 
-    /// Kiểm chữ ký trên **thân thô** (so sánh thời gian hằng) và cửa sổ chống phát lại, rồi mới đọc
-    /// nội dung. Sai → [`signature_invalid`].
+    /// Verifies the signature over the **raw body** (constant-time comparison) and the replay window, and
+    /// only then reads the content. A wrong signature yields [`signature_invalid`].
     fn verify_webhook(
         &self,
         tenant: TenantId,
@@ -185,14 +185,14 @@ pub trait VoiceProvider: Send + Sync {
         body: &[u8],
     ) -> Result<Vec<VoiceNotification>, Error>;
 
-    /// Tải bản ghi âm.
+    /// Downloads the recording.
     async fn fetch_recording(
         &self,
         tenant: TenantId,
         provider_recording_id: &str,
     ) -> Result<ByteStream, Error>;
 
-    /// Xoá bản ghi ở nhà cung cấp (sau khi đã lưu về). Xoá cái đã xoá thì thành công.
+    /// Deletes the recording at the provider (after it has been saved locally). Deleting what is already deleted succeeds.
     async fn delete_recording(
         &self,
         tenant: TenantId,
@@ -200,7 +200,7 @@ pub trait VoiceProvider: Send + Sync {
     ) -> Result<(), Error>;
 }
 
-/// `voice.signature_invalid` (401): chữ ký webhook sai hay quá cửa sổ thời gian.
+/// `voice.signature_invalid` (401): the webhook signature is wrong or outside the time window.
 pub fn signature_invalid() -> Error {
     Error::new(
         ErrorKind::Unauthenticated,
@@ -209,7 +209,7 @@ pub fn signature_invalid() -> Error {
     )
 }
 
-/// `voice.provider_unavailable` (503): nhà cung cấp không trả lời.
+/// `voice.provider_unavailable` (503): the provider does not respond.
 pub fn provider_unavailable() -> Error {
     Error::unavailable(
         "voice.provider_unavailable",

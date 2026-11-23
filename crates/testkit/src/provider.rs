@@ -1,17 +1,17 @@
-//! Máy chủ giả của một nhà cung cấp (bước 70 P7, D-20261121-provider-accounts): bộ nối test request,
-//! chữ ký và webhook theo đúng tài liệu của nhà cung cấp mà không ra mạng.
+//! A fake server for a provider (step 70 P7, D-20261121-provider-accounts): a connector tests requests,
+//! signatures and webhooks exactly per the provider's documentation without going on the network.
 //!
 //! ```ignore
 //! let server = FakeProviderServer::start().await;
 //! server.reply("POST", "/v1/orders", 200, json!({"code": 0, "id": "A1"}));
-//! // … trỏ bộ nối vào `server.url()` (biến `AUTOXIDE_<TÊN>_API_URL`), gọi bộ nối …
+//! // … point the connector at `server.url()` (variable `AUTOXIDE_<NAME>_API_URL`), call the connector …
 //! let seen = server.take_requests();
 //! assert_eq!(seen[0].header("authorization"), Some("Bearer tenant-a-key"));
 //! ```
 //!
-//! Câu trả lời xếp hàng theo (method, đường dẫn): mỗi request lấy câu đầu hàng; hàng còn một câu thì
-//! câu đó được dùng lại mãi (bộ nối gọi lại vẫn nhận cùng câu). Request không có câu nào → 501 và
-//! vẫn được ghi lại.
+//! Answers are queued by (method, path): each request takes the answer at the head of the queue; when one
+//! answer is left it is reused forever (the connector calling again gets the same answer). A request with no
+//! answer → 501 and is still recorded.
 
 use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Mutex, PoisonError};
@@ -22,29 +22,29 @@ use axum::http::{HeaderMap, Method, StatusCode, Uri};
 use axum::response::{IntoResponse, Response};
 use serde_json::Value;
 
-/// Một request máy chủ giả đã nhận.
+/// A request the fake server has received.
 #[derive(Debug, Clone)]
 pub struct ProviderRequest {
     pub method: String,
     pub path: String,
-    /// Chuỗi truy vấn thô (không có `?`), rỗng khi không có.
+    /// Raw query string (without the `?`), empty when absent.
     pub query: String,
     pub headers: HeaderMap,
     pub body: Bytes,
 }
 
 impl ProviderRequest {
-    /// Giá trị header `name` (không phân biệt hoa thường).
+    /// Value of header `name` (case-insensitive).
     pub fn header(&self, name: &str) -> Option<&str> {
         self.headers.get(name).and_then(|value| value.to_str().ok())
     }
 
-    /// Thân đọc thành JSON; `Value::Null` khi không phải JSON.
+    /// Body read as JSON; `Value::Null` when it is not JSON.
     pub fn json(&self) -> Value {
         serde_json::from_slice(&self.body).unwrap_or(Value::Null)
     }
 
-    /// Giá trị tham số `name` trong chuỗi truy vấn (chưa giải mã phần trăm).
+    /// Value of parameter `name` in the query string (not percent-decoded).
     pub fn query_param(&self, name: &str) -> Option<&str> {
         self.query
             .split('&')
@@ -66,7 +66,7 @@ struct Shared {
     requests: Mutex<Vec<ProviderRequest>>,
 }
 
-/// Máy chủ HTTP giả trên `127.0.0.1`, cổng ngẫu nhiên. Tắt khi tiến trình test kết thúc.
+/// A fake HTTP server on `127.0.0.1`, random port. Shuts down when the test process ends.
 #[derive(Clone)]
 pub struct FakeProviderServer {
     url: String,
@@ -74,7 +74,7 @@ pub struct FakeProviderServer {
 }
 
 impl FakeProviderServer {
-    /// Mở máy chủ. `Err` khi không mở được cổng.
+    /// Opens the server. `Err` when the port cannot be opened.
     pub async fn start() -> std::io::Result<Self> {
         let shared = Arc::new(Shared::default());
         // Một handler nhận mọi request (đây không phải API của Autoxide nên không qua `routes!`).
@@ -85,17 +85,17 @@ impl FakeProviderServer {
         Ok(FakeProviderServer { url: format!("http://{address}"), shared })
     }
 
-    /// Địa chỉ gốc, vd `http://127.0.0.1:41873` (không có `/` cuối).
+    /// Base address, e.g. `http://127.0.0.1:41873` (no trailing `/`).
     pub fn url(&self) -> &str {
         &self.url
     }
 
-    /// Xếp một câu trả lời JSON cho `method` `path`.
+    /// Queues a JSON answer for `method` `path`.
     pub fn reply(&self, method: &str, path: &str, status: u16, body: Value) {
         self.push(method, path, status, "application/json", body.to_string().into_bytes().into());
     }
 
-    /// Xếp một câu trả lời thân thô (PDF, XML, chữ…) cho `method` `path`.
+    /// Queues a raw-body answer (PDF, XML, text…) for `method` `path`.
     pub fn reply_raw(
         &self,
         method: &str,
@@ -117,7 +117,7 @@ impl FakeProviderServer {
             .push_back(Canned { status, content_type, body });
     }
 
-    /// Mọi request đã nhận từ lần lấy trước, theo thứ tự tới.
+    /// All requests received since the previous take, in order of arrival.
     pub fn take_requests(&self) -> Vec<ProviderRequest> {
         std::mem::take(&mut *self.shared.requests.lock().unwrap_or_else(PoisonError::into_inner))
     }

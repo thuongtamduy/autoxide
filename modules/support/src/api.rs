@@ -1,5 +1,5 @@
-//! Hợp đồng của module `support` cho module khác (`autoxide_support::api::…`). Module dùng phải
-//! đăng ký SAU `support` trong `crates/app/src/modules.rs` và lấy trait lúc khởi động:
+//! Contract of the `support` module for other modules (`autoxide_support::api::…`). A module using it must
+//! register AFTER `support` in `crates/app/src/modules.rs` and get the trait at startup:
 //!
 //! ```text
 //! let intake = context.require::<dyn autoxide_support::api::SupportIntake>()?;
@@ -9,77 +9,77 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::tenancy::TenantContext;
 use uuid::Uuid;
 
-/// Người hỏi của một phiếu.
+/// The asker of a ticket.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Requester {
-    /// Một tài khoản (người mua đã đăng nhập).
+    /// An account (a signed-in buyer).
     User(Uuid),
-    /// Số điện thoại người hỏi đã chứng minh (vd OTP của trang xem đơn, bước 45), dạng E.164.
+    /// The asker's phone number, proven (e.g. OTP on the order-view page, step 45), in E.164 form.
     VerifiedPhone(String),
-    /// Email người hỏi đã chứng minh.
+    /// The asker's email, proven.
     VerifiedEmail(String),
 }
 
-/// Một phiếu module khác mở thay người mua (vd nút "mở hỗ trợ" trên trang đơn).
+/// A ticket another module opens on behalf of a buyer (e.g. a "open support" button on the order page).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NewTicket {
-    /// Nút nhận phiếu (cửa hàng, gian hàng); nút gốc = ID của khách.
+    /// The node that receives the ticket (store, stall); the root node = the tenant ID.
     pub org_id: Uuid,
     pub requester: Requester,
-    /// Tên hiển thị của người hỏi (rỗng: "Customer").
+    /// Display name of the asker (empty: "Customer").
     pub requester_name: String,
-    /// Mã loại (`order`, `product`, `payment`, `account`, `other` hay loại khách tự khai).
+    /// Kind code (`order`, `product`, `payment`, `account`, `other`, or a kind the tenant declared itself).
     pub category: String,
     pub subject: String,
     pub body: String,
-    /// Bản ghi liên quan, dạng `<kind>:<id>` (vd `orders.order:<id>`).
+    /// Related record, in the form `<kind>:<id>` (e.g. `orders.order:<id>`).
     pub links: Vec<String>,
-    /// Khoá chống trùng của bên gọi: gọi lại cùng `reference` trả phiếu cũ, không tạo phiếu mới.
+    /// The caller's deduplication key: calling again with the same `reference` returns the existing ticket, creating no new one.
     pub reference: String,
 }
 
-/// Phiếu vừa mở (hay đã có với cùng `reference`).
+/// The ticket just opened (or already existing with the same `reference`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TicketRef {
     pub id: Uuid,
-    /// Số phiếu hiển thị cho người mua.
+    /// The ticket number shown to the buyer.
     pub number: String,
-    /// Token xem phiếu của người mua vãng lai — chỉ có ở lần tạo đầu tiên (database chỉ giữ bản
-    /// băm); `None` với người hỏi có tài khoản hay khi gọi lại.
+    /// The view token of a guest buyer's ticket — present only on the first creation (the database keeps only
+    /// the hash); `None` for an asker with an account or when called again.
     pub access_token: Option<String>,
 }
 
-/// Mở phiếu hỗ trợ thay người mua.
+/// Opens a support ticket on behalf of a buyer.
 //
 // `#[async_trait]`: Rust chưa cho gọi hàm `async` của trait qua `dyn Trait`; macro đổi hàm `async`
 // thành hàm trả `Box<dyn Future>`.
 #[async_trait::async_trait]
 pub trait SupportIntake: Send + Sync {
-    /// Tạo phiếu; cùng `reference` → phiếu cũ.
+    /// Creates a ticket; the same `reference` → the existing ticket.
     async fn open(&self, tenant: &TenantContext, ticket: NewTicket) -> Result<TicketRef, Error>;
 }
 
-/// Một ý định câu hỏi mà một [`FactSource`] trả lời được bằng dữ liệu chính xác (D-230).
+/// A question intent that a [`FactSource`] can answer with exact data (D-230).
 #[derive(Debug, Clone, PartialEq)]
 pub struct FactIntent {
-    /// `<module>.<ý định>`, vd `shipping.tracking`; duy nhất trong cả chương trình.
+    /// `<module>.<intent>`, e.g. `shipping.tracking`; unique across the whole program.
     pub intent: &'static str,
-    /// Câu tiếng Anh mô tả câu hỏi cho bộ phân loại (dịch qua `text:` của module khai).
+    /// An English sentence describing the question for the classifier (translated through the declaring module's `text:`).
     pub description: &'static str,
-    /// JSON Schema của tham số bộ phân loại rút từ câu hỏi (vd `{"order_number": …}`).
+    /// JSON Schema of the parameters the classifier extracts from the question (e.g. `{"order_number": …}`).
     pub params: serde_json::Value,
 }
 
-/// Nguồn câu trả lời dựng từ dữ liệu chính xác (trạng thái đơn, hành trình vận đơn…). Câu trả lời
-/// là mẫu câu i18n của module nguồn điền dữ liệu thật — không bao giờ là chữ do mô hình viết.
+/// A source of answers built from exact data (order status, shipment journey…). The answer
+/// is a sentence template i18n of the source module filled with real data — never text written by a model.
 #[async_trait::async_trait]
 pub trait FactSource: Send + Sync {
-    /// Các ý định nguồn này trả lời.
+    /// The intents this source answers.
     fn intents(&self) -> Vec<FactIntent>;
 
-    /// Câu trả lời cho `intent` với tham số `params`, bằng ngôn ngữ `locale`. `None` khi không
-    /// chắc chắn: không tìm thấy, nhiều kết quả, hay `requester` không chứng minh được là chủ dữ liệu
-    /// (vd đơn không thuộc tài khoản hay số điện thoại đã xác thực của người hỏi).
+    /// The answer for `intent` with parameters `params`, in language `locale`. `None` when not
+    /// certain: not found, several results, or `requester` cannot prove they own the data
+    /// (e.g. the order does not belong to the asker's account or verified phone number).
     async fn answer(
         &self,
         tenant: &TenantContext,
@@ -90,45 +90,45 @@ pub trait FactSource: Send + Sync {
     ) -> Result<Option<String>, Error>;
 }
 
-/// Điểm cắm cho module đăng ký SAU `support` (vd `shipping`, `orders`): gắn [`FactSource`] lúc
-/// `start` bằng `context.require::<dyn SupportFacts>()?.attach(Arc::new(…))`. Không có module nào
-/// gắn thì trả lời tự động chỉ dùng câu trả lời mẫu đã duyệt.
+/// Plug point for modules registered AFTER `support` (e.g. `shipping`, `orders`): attach a [`FactSource`] at
+/// `start` with `context.require::<dyn SupportFacts>()?.attach(Arc::new(…))`. If no module
+/// attaches one, automatic replies use only the approved canned answers.
 pub trait SupportFacts: Send + Sync {
-    /// Gắn một nguồn; ý định trùng với nguồn đã gắn, hay không mang tiền tố module → lỗi.
+    /// Attaches a source; an intent that clashes with an attached source, or lacks the module prefix → error.
     fn attach(&self, source: std::sync::Arc<dyn FactSource>) -> Result<(), Error>;
 }
 
-/// Một thư trả lời nhận được (bộ nhận thư thật — webhook của nhà cung cấp email — là module riêng).
+/// A reply email received (the real mail receiver — an email provider's webhook — is a separate module).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InboundEmail {
-    /// Địa chỉ nhận, dạng `support+<khoá trả lời>@…`.
+    /// Receiving address, in the form `support+<reply key>@…`.
     pub recipient: String,
-    /// Địa chỉ người gửi.
+    /// Sender address.
     pub sender: String,
-    /// Nội dung chữ thuần của thư (phần trích dẫn thư cũ sẽ bị cắt).
+    /// Plain-text body of the email (quoted older mail is cut off).
     pub text: String,
 }
 
-/// Thư đã đi đâu.
+/// Where the email went.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum InboundOutcome {
-    /// Thành một tin của phiếu.
+    /// Becomes a message of the ticket.
     Added { ticket_id: Uuid },
-    /// Bỏ: không khớp phiếu, người gửi lạ, phiếu đã đóng, hay nút chưa bật nhận thư.
+    /// Dropped: matches no ticket, unknown sender, ticket closed, or the node has not enabled inbound email.
     Dropped,
 }
 
-/// Điểm nhận email trả lời vào lại phiếu (tắt mặc định: chính sách `inbound_email` của nút).
+/// The point where reply emails come back into a ticket (off by default: the node's `inbound_email` policy).
 #[async_trait::async_trait]
 pub trait InboundMail: Send + Sync {
-    /// Khoá trả lời của phiếu: địa chỉ `Reply-To` của thư thông báo là `support+<khoá>@<miền>`.
+    /// Reply key of the ticket: the `Reply-To` address of the notification email is `support+<key>@<domain>`.
     async fn reply_address_key(
         &self,
         tenant: &TenantContext,
         ticket_id: Uuid,
     ) -> Result<String, Error>;
 
-    /// Nhận một thư; không bao giờ tạo phiếu mới.
+    /// Receives an email; never creates a new ticket.
     async fn receive(
         &self,
         tenant: &TenantContext,
@@ -136,42 +136,42 @@ pub trait InboundMail: Send + Sync {
     ) -> Result<InboundOutcome, Error>;
 }
 
-/// Một câu hỏi của người mua cần quyết có trả lời tự động không (phiếu hay chat của bước 61).
+/// A buyer's question that must be decided for automatic reply or not (a ticket or a step 61 chat).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InboundQuestion {
-    /// Nút nhận câu hỏi: chính sách trả lời tự động và câu trả lời mẫu của nút này.
+    /// The node receiving the question: its automatic-reply policy and canned answers apply.
     pub org_id: Uuid,
-    /// Luồng hỏi đáp: `support.ticket:<id>` hay `conversations.thread:<id>`.
+    /// The Q&A thread: `support.ticket:<id>` or `conversations.thread:<id>`.
     pub thread: String,
     pub requester: Requester,
     pub text: String,
-    /// Ngôn ngữ của người mua (`vi`, `en`).
+    /// The buyer's language (`vi`, `en`).
     pub locale: String,
-    /// Số câu trả lời tự động liên tiếp đã gửi trong luồng.
+    /// Number of consecutive automatic replies already sent in the thread.
     pub auto_replies_in_row: u32,
 }
 
-/// Nguồn của câu trả lời tự động.
+/// Source of an automatic reply.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AutoSource {
-    /// Câu trả lời mẫu đã duyệt (nguyên văn, đã điền biến).
+    /// An approved canned answer (verbatim, variables filled in).
     Macro(Uuid),
-    /// Mẫu câu của một [`FactSource`].
+    /// A sentence template of a [`FactSource`].
     Fact { intent: String },
 }
 
-/// Quyết định cho một câu hỏi.
+/// The decision for a question.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ReplyDecision {
-    /// Gửi nguyên văn `text` (gắn nhãn "Trả lời tự động" và nút "Gặp nhân viên").
+    /// Send `text` verbatim (labeled "Automatic reply" and with a "Talk to an agent" button).
     Send { text: String, source: AutoSource },
-    /// Không đủ điều kiện: để nhân viên trả lời (bên gọi có thể soạn bản nháp AI).
+    /// Not eligible: leave it to staff to answer (the caller may draft an AI suggestion).
     Draft { text: String },
-    /// Chuyển người ngay (rủi ro, từ khoá chặn, quá số lần, tắt).
+    /// Hand over to a person immediately (risk, blocking keyword, too many replies, turned off).
     Handoff,
 }
 
-/// Bộ trả lời tự động (D-230) — `conversations` (bước 61) gọi cho tin chat.
+/// The automatic responder (D-230) — `conversations` (step 61) calls it for chat messages.
 #[async_trait::async_trait]
 pub trait AutoResponder: Send + Sync {
     async fn decide(

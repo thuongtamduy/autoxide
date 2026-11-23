@@ -1,10 +1,10 @@
-//! Hợp đồng của module `invoices` cho module khác: lập chứng từ (nháp), phát hành (cấp số không nhảy
-//! số), đọc, huỷ. Module khác lấy lúc khởi động: `context.require::<dyn Invoices>()` (đăng ký SAU
+//! Contract of the `invoices` module for other modules: create documents (draft), issue (gapless numbering),
+//! read, cancel. Other modules obtain it at startup: `context.require::<dyn Invoices>()` (registered AFTER
 //! `invoices`).
 //!
-//! `invoices` tính thuế qua `dyn TaxEngine` và ghi sổ qua `dyn Ledger` khi phát hành chứng từ bán
-//! hàng (Nợ `receivable.customer` / Có `revenue.sales`, `tax.vat_output`): module gọi không tự đánh
-//! số, không tự tính thuế, không tự ghi sổ cho chứng từ.
+//! `invoices` computes tax through `dyn TaxEngine` and posts to the ledger through `dyn Ledger` when issuing
+//! a sales document (Debit `receivable.customer` / Credit `revenue.sales`, `tax.vat_output`): the calling
+//! module does not number, compute tax, or post to the ledger for documents itself.
 
 use autoxide_kernel::decimal::DecimalString;
 use autoxide_kernel::error::Error;
@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-/// Loại chứng từ. Bốn loại đầu là chứng từ bán hàng (tính thuế, ghi sổ khi phát hành).
+/// Document kind. The first four kinds are sales documents (taxed, posted to the ledger on issue).
 pub const KINDS: [&str; 9] = [
     "vat_invoice",
     "sales_invoice",
@@ -30,7 +30,7 @@ pub const KINDS: [&str; 9] = [
     "withholding_certificate",
 ];
 
-/// Chứng từ bán hàng: tính thuế qua `TaxEngine`, ghi doanh thu khi phát hành.
+/// Sales document: tax computed through `TaxEngine`, revenue posted on issue.
 pub fn is_sales_kind(kind: &str) -> bool {
     matches!(kind, "vat_invoice" | "sales_invoice" | "cash_register_invoice" | "retail_receipt")
 }
@@ -152,20 +152,20 @@ impl NewDocumentLine {
     }
 }
 
-/// Một chứng từ nháp cần lập. `reference` bắt buộc (D-184): duy nhất theo (khách, `source_module`).
+/// A draft document to create. `reference` is required (D-184): unique per (tenant, `source_module`).
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct NewDocument {
-    /// Nút lập chứng từ.
+    /// Branch creating the document.
     pub org: OrgId,
-    /// Người bán được lập thay (cần uỷ nhiệm còn hiệu lực).
+    /// Seller on whose behalf it is created (requires an authorization still in effect).
     pub on_behalf_of: Option<OrgId>,
     pub kind: String,
-    /// Ký hiệu; bỏ trống thì dùng ký hiệu đang dùng duy nhất của nút cho loại này và năm phát hành.
+    /// Series symbol; if empty, uses the only series symbol in use of the branch for this kind and issue year.
     pub series: Option<Uuid>,
-    /// Ngày lập dự kiến; bỏ trống thì là ngày phát hành.
+    /// Expected document date; if empty, it is the issue date.
     pub issue_date: Option<Date>,
-    /// Giá trên dòng đã gồm thuế (`true`) hay chưa (`false`).
+    /// Whether line prices include tax (`true`) or not (`false`).
     pub prices_include_tax: bool,
     pub currency: Currency,
     pub buyer: Buyer,
@@ -173,8 +173,8 @@ pub struct NewDocument {
     pub source_module: String,
     pub source_id: Option<String>,
     pub reference: String,
-    /// Bên lập đã tự ghi doanh thu vào sổ (vd `orders` ghi khi giao xong): phát hành không ghi bút
-    /// toán, chứng từ chỉ là hoá đơn. Mặc định `false`.
+    /// The creator already booked the revenue in the ledger itself (e.g. `orders` books it when delivery
+    /// completes): issuing posts no journal entry, the document is just an invoice. Defaults to `false`.
     pub booked_by_source: bool,
 }
 
@@ -205,7 +205,7 @@ impl NewDocument {
         }
     }
 
-    /// Bên lập đã tự ghi doanh thu (xem [`NewDocument::booked_by_source`]).
+    /// The creator already booked the revenue (see [`NewDocument::booked_by_source`]).
     #[must_use]
     pub fn booked_by_source(mut self) -> Self {
         self.booked_by_source = true;
@@ -315,16 +315,16 @@ pub struct Document {
     pub updated_at: Timestamp,
 }
 
-/// Định dạng bản in.
+/// Print format.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RenderFormat {
-    /// HTML dựng từ mẫu của khách (hay mẫu mặc định).
+    /// HTML built from the tenant's template (or the default template).
     Html,
-    /// PDF bố cục cố định từ cùng view model.
+    /// Fixed-layout PDF from the same view model.
     Pdf,
 }
 
-/// Một bản in: kiểu nội dung, tên file gợi ý, nội dung.
+/// A print: content type, suggested file name, content.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct Rendered {
@@ -339,12 +339,12 @@ impl Rendered {
     }
 }
 
-/// Lập, phát hành và đọc chứng từ.
+/// Creates, issues and reads documents.
 //
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
 #[async_trait::async_trait]
 pub trait Invoices: Send + Sync {
-    /// Lập chứng từ nháp (chưa có số), thuế tính sẵn. Cùng `reference` + cùng nội dung → `Replayed`.
+    /// Creates a draft document (no number yet), tax precomputed. Same `reference` + same content → `Replayed`.
     async fn create_document(
         &self,
         tenant: &TenantContext,
@@ -352,8 +352,8 @@ pub trait Invoices: Send + Sync {
         draft: NewDocument,
     ) -> Result<Submitted<Document>, Error>;
 
-    /// Phát hành: cấp số tiếp theo của ký hiệu (không nhảy số), gửi hoá đơn điện tử nếu ký hiệu có
-    /// nhà cung cấp, ghi sổ. Gọi lại → cùng số.
+    /// Issues: assigns the next number of the series symbol (gapless), sends the e-invoice if the symbol has
+    /// a provider, posts to the ledger. Calling again → the same number.
     async fn issue(
         &self,
         tenant: &TenantContext,
@@ -361,12 +361,12 @@ pub trait Invoices: Send + Sync {
         document: Uuid,
     ) -> Result<Document, Error>;
 
-    /// Một chứng từ, hoặc `None`.
+    /// A document, or `None`.
     async fn document(&self, tenant: &TenantContext, id: Uuid) -> Result<Option<Document>, Error>;
 
-    /// Lập nháp hoá đơn điều chỉnh (`direction`: `increase` / `decrease`) của chứng từ đã phát hành
-    /// `original`, dòng là phần chênh lệch (vd hàng trả lại). Cùng `reference` + cùng nội dung →
-    /// `Replayed`. Phát hành nháp bằng [`Invoices::issue`] mới đánh dấu chứng từ gốc `adjusted`.
+    /// Creates a draft adjustment invoice (`direction`: `increase` / `decrease`) for the issued document
+    /// `original`, lines being the difference (e.g. returned goods). Same `reference` + same content →
+    /// `Replayed`. Only issuing the draft with [`Invoices::issue`] marks the original document `adjusted`.
     async fn adjust(
         &self,
         tenant: &TenantContext,
@@ -377,7 +377,7 @@ pub trait Invoices: Send + Sync {
         reference: String,
     ) -> Result<Submitted<Document>, Error>;
 
-    /// Huỷ chứng từ đã phát hành (thông báo sai sót với nhà cung cấp, đảo bút toán).
+    /// Cancels an issued document (reports the error to the provider, reverses the journal entry).
     async fn cancel(
         &self,
         tenant: &TenantContext,
@@ -386,9 +386,9 @@ pub trait Invoices: Send + Sync {
         reason: String,
     ) -> Result<Document, Error>;
 
-    /// Bản in của chứng từ (D-353): module khác (đơn hàng, kho) lập phiếu giao hàng, phiếu nhập,
-    /// phiếu thu… qua [`Invoices::create_document`] rồi in qua đây — một chỗ giữ mẫu in theo khách.
-    /// `locale`: `vi` hay `en`. Không có chứng từ: `invoices.document_not_found`.
+    /// Print of a document (D-353): other modules (orders, inventory) create delivery notes, goods-receipt
+    /// notes, receipts… through [`Invoices::create_document`] and then print through here — one place holding
+    /// per-tenant print templates. `locale`: `vi` or `en`. No such document: `invoices.document_not_found`.
     async fn render(
         &self,
         tenant: &TenantContext,
@@ -397,7 +397,8 @@ pub trait Invoices: Send + Sync {
         locale: &str,
     ) -> Result<Rendered, Error>;
 
-    /// Gói lưu trữ kế toán của khách (sổ nhật ký chung, chứng từ, `manifest.json` có SHA-256 từng
-    /// file) vào nơi lưu chung, ngoài thư mục của khách — còn lại sau khi xoá hẳn khách. Trả ID bản lưu.
+    /// Packs the tenant's accounting archive (general journal, documents, `manifest.json` with the SHA-256 of
+    /// each file) into shared storage, outside the tenant's directory — it remains after the tenant is fully
+    /// deleted. Returns the archive ID.
     async fn archive(&self, tenant: &TenantContext, actor: Actor) -> Result<Uuid, Error>;
 }

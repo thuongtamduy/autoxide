@@ -1,19 +1,19 @@
-//! Quyền truy cập: permission do module khai, và "ai đang gọi" ([`Principal`]).
+//! Access control: permissions declared by modules, and "who is calling" ([`Principal`]).
 //!
-//! - Mỗi module khai các permission của mình qua `Module::permissions`. Tên viết
-//!   `<module>.<việc>` (vd `notes.write`, `auth.roles.manage`); core kiểm tên lúc
-//!   khởi động và gom thành một danh mục ([`PermissionCatalog`]).
-//! - Một module (thường là `auth`) công bố trait [`Authenticator`]: đọc header
-//!   `Authorization` và trả về [`Principal`]. Kernel gắn nó vào mọi request.
-//! - Handler cần đăng nhập nhận `principal: Principal` làm tham số, rồi gọi
-//!   `principal.require(&NOTES_WRITE)?`. Thiếu quyền thì trả 403 `permission_denied`.
-//! - Endpoint công khai (ai cũng gọi được, người đăng nhập thấy nhiều hơn) nhận
-//!   `principal: Option<Principal>`: không gửi `Authorization` thì `None`; gửi mà sai
-//!   thì vẫn 401 như endpoint thường — không lặng lẽ coi như khách. Tài liệu OpenAPI của
-//!   handler đó khai `security((), ("bearer" = []))`.
+//! - Each module declares its permissions through `Module::permissions`. Names are written
+//!   `<module>.<action>` (e.g. `notes.write`, `auth.roles.manage`); the core validates names at
+//!   startup and collects them into one catalog ([`PermissionCatalog`]).
+//! - One module (usually `auth`) publishes the trait [`Authenticator`]: it reads the
+//!   `Authorization` header and returns the [`Principal`]. The kernel attaches it to every request.
+//! - A handler that needs sign-in takes `principal: Principal` as a parameter, then calls
+//!   `principal.require(&NOTES_WRITE)?`. A missing permission returns 403 `permission_denied`.
+//! - A public endpoint (anyone can call it, signed-in users see more) takes `principal: Option<Principal>`:
+//!   without `Authorization` it is `None`; if one is sent but is wrong it is still 401 like a normal endpoint
+//!   — it is not silently treated as a guest. The OpenAPI documentation of that handler declares
+//!   `security((), ("bearer" = []))`.
 //!
-//! Nhờ vậy module nghiệp vụ kiểm quyền mà không phụ thuộc module `auth`, và module
-//! `auth` có thể thay bằng cách xác thực khác mà không module nào phải sửa.
+//! This way business modules check permissions without depending on the `auth` module, and the `auth`
+//! module can be replaced by another authentication method without any module needing changes.
 
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
@@ -38,7 +38,7 @@ use crate::module::is_identifier;
 use crate::tenancy::TenantContext;
 use crate::tenancy::{DEFAULT_TENANT, OrgId, OrgTree, TenantHint, TenantId, root_of};
 
-/// Một permission do module khai.
+/// A permission declared by a module.
 ///
 /// ```
 /// use autoxide_kernel::access::Permission;
@@ -51,7 +51,7 @@ pub struct Permission {
     name: &'static str,
     description: &'static str,
     risk: Risk,
-    /// Áp lên dữ liệu có `org_id` (bước 34): role cấp được với độ sâu hẹp hơn `tenant`.
+    /// Applies to data that has `org_id` (step 34): a role can grant it with a depth narrower than `tenant`.
     scoped: bool,
 }
 
@@ -78,7 +78,7 @@ pub enum Scope {
 }
 
 impl Scope {
-    /// Tên ổn định trong API và database: `own`, `unit`, `subtree`, `tenant`.
+    /// Stable name in the API and database: `own`, `unit`, `subtree`, `tenant`.
     pub const fn as_str(self) -> &'static str {
         match self {
             Scope::Own => "own",
@@ -88,7 +88,7 @@ impl Scope {
         }
     }
 
-    /// Đọc từ tên ổn định; tên lạ → `None`.
+    /// Reads from the stable name; an unknown name → `None`.
     pub fn parse(text: &str) -> Option<Self> {
         match text {
             "own" => Some(Scope::Own),
@@ -100,7 +100,7 @@ impl Scope {
     }
 }
 
-/// Một quyền cụ thể: ở nút `org`, độ sâu `scope`.
+/// A concrete permission: at node `org`, depth `scope`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Grant {
     pub org: OrgId,
@@ -113,8 +113,8 @@ impl Grant {
     }
 }
 
-/// Đích của một lần kiểm quyền trên một bản ghi: nút sở hữu bản ghi và người sở hữu (nếu bản ghi
-/// có khái niệm người sở hữu — độ sâu `own` cần nó; không có thì `own` hiểu như `unit`).
+/// Target of a permission check on a record: the node that owns the record and the owner (if the record
+/// has the notion of an owner — depth `own` needs it; without one `own` is treated like `unit`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct OrgTarget {
     pub org: OrgId,
@@ -141,8 +141,8 @@ pub enum Realm {
     Customer,
 }
 
-/// Loại bên làm (bước 51 P12, D-224): ghi vào audit (`actor_kind`), dùng để buộc duyệt lệnh rủi ro
-/// khi agent gọi. Người dùng đăng nhập là `Human` (giá trị `user` trong audit, giữ như trước).
+/// Kind of actor (step 51 P12, D-224): written to the audit (`actor_kind`), used to require approval of risky
+/// commands when an agent calls. A signed-in user is `Human` (the value `user` in the audit, kept as before).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ActorKind {
@@ -164,7 +164,7 @@ pub enum ActorKind {
 }
 
 impl ActorKind {
-    /// Giá trị cột `actor_kind` của event / audit. `Human` là `user` (giá trị có từ trước bước 51).
+    /// Value of the `actor_kind` column of events / audit. `Human` is `user` (the value that existed before step 51).
     pub const fn as_str(self) -> &'static str {
         match self {
             ActorKind::Human => "user",
@@ -177,7 +177,7 @@ impl ActorKind {
         }
     }
 
-    /// Ngược của [`as_str`](Self::as_str); `human` cũng là `Human`.
+    /// Inverse of [`as_str`](Self::as_str); `human` is also `Human`.
     pub fn parse(raw: &str) -> Option<Self> {
         Some(match raw {
             "user" | "human" => ActorKind::Human,
@@ -192,24 +192,26 @@ impl ActorKind {
     }
 }
 
-/// Đường bên gọi vào khách hiện tại (bước 34): membership trực tiếp, uỷ quyền từ khách cha, hay
-/// quyền vào hỗ trợ của nhân sự nền tảng. Ghi vào event (`Actor::access`) để audit thấy.
+/// The route by which the caller enters the current tenant (step 34): direct membership, delegation from the
+/// parent tenant, or a support access grant of platform staff. Recorded in events (`Actor::access`) so the
+/// audit can see it.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "id", rename_all = "snake_case")]
 pub enum AccessPath {
     #[default]
     Direct,
-    /// Qua uỷ quyền có ID này.
+    /// Through the delegation with this ID.
     Delegation(Uuid),
-    /// Qua lần cấp quyền vào hỗ trợ có ID này.
+    /// Through the support access grant with this ID.
     Support(Uuid),
-    /// Hành động của một luật tự động hoá (bước 58), trong lần chạy có ID này: luật chạy với quyền
-    /// của người tạo, event sinh ra mang lần chạy để module `automations` chống vòng lặp giữa các luật.
+    /// Action of an automation rule (step 58), in the run with this ID: the rule runs with the permissions of
+    /// its creator, and the events it produces carry the run so the `automations` module can prevent loops
+    /// between rules.
     Automation(Uuid),
 }
 
 impl AccessPath {
-    /// Tên ổn định: `direct`, `delegation`, `support`, `automation`.
+    /// Stable name: `direct`, `delegation`, `support`, `automation`.
     pub const fn as_str(self) -> &'static str {
         match self {
             AccessPath::Direct => "direct",
@@ -219,7 +221,7 @@ impl AccessPath {
         }
     }
 
-    /// ID của uỷ quyền / lần cấp hỗ trợ; `None` khi trực tiếp.
+    /// ID of the delegation / support grant; `None` when direct.
     pub const fn id(self) -> Option<Uuid> {
         match self {
             AccessPath::Direct => None,
@@ -230,26 +232,26 @@ impl AccessPath {
     }
 }
 
-/// Mức rủi ro của một permission, đọc được bằng máy (D-205, đặc tả 54 P1): giao diện và AI agent
-/// biết trước việc nào chỉ đọc, việc nào cần cẩn thận; tool MCP chỉ đọc chỉ được đòi permission
-/// mức [`Risk::Read`].
+/// Risk level of a permission, machine-readable (D-205, spec 54 P1): the UI and AI agents know in advance
+/// which actions are read-only and which need care; a read-only MCP tool may only require a permission of
+/// level [`Risk::Read`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[non_exhaustive]
 pub enum Risk {
-    /// Chỉ xem.
+    /// View only.
     Read,
-    /// Tạo, sửa.
+    /// Create, edit.
     Write,
-    /// Xoá hay ghi đè không lấy lại được.
+    /// Delete or overwrite irrecoverably.
     Destructive,
-    /// Xem hay xuất dữ liệu cá nhân của người khác.
+    /// View or export other people's personal data.
     SensitiveData,
-    /// Chạm tới tiền.
+    /// Touches money.
     Money,
 }
 
 impl Risk {
-    /// Tên ổn định trong API: `read`, `write`, `destructive`, `sensitive_data`, `money`.
+    /// Stable name in the API: `read`, `write`, `destructive`, `sensitive_data`, `money`.
     pub const fn as_str(self) -> &'static str {
         match self {
             Risk::Read => "read",
@@ -261,7 +263,7 @@ impl Risk {
     }
 }
 
-/// `text` kết thúc bằng `suffix` (dùng được trong `const fn`).
+/// `text` ends with `suffix` (usable in a `const fn`).
 const fn ends_with(text: &str, suffix: &str) -> bool {
     let (text, suffix) = (text.as_bytes(), suffix.as_bytes());
     if suffix.len() > text.len() {
@@ -279,30 +281,30 @@ const fn ends_with(text: &str, suffix: &str) -> bool {
 }
 
 impl Permission {
-    /// `name`: `<module>.<việc>`, các đoạn là chữ thường, số và `_`.
-    /// `description`: câu tiếng Anh cho người cấp quyền đọc (hiện trong API).
+    /// `name`: `<module>.<action>`, the segments being lowercase letters, digits and `_`.
+    /// `description`: an English sentence for the person granting permissions to read (shown in the API).
     ///
-    /// Mức rủi ro suy từ tên: `….read` là [`Risk::Read`], còn lại [`Risk::Write`]; khác thì đặt bằng
-    /// [`with_risk`](Self::with_risk).
+    /// Risk level derived from the name: `….read` is [`Risk::Read`], anything else is [`Risk::Write`];
+    /// otherwise set it with [`with_risk`](Self::with_risk).
     pub const fn new(name: &'static str, description: &'static str) -> Self {
         let risk = if ends_with(name, ".read") { Risk::Read } else { Risk::Write };
         Permission { name, description, risk, scoped: false }
     }
 
-    /// Permission áp lên dữ liệu có `org_id` (bước 34): role cấp được với độ sâu `own`, `unit`,
-    /// `subtree`. Permission không `scoped` chỉ cấp ở độ sâu `tenant` và có hiệu lực toàn khách
-    /// dù membership ở nút nào.
+    /// Permission that applies to data with `org_id`: a role can grant it with depth `own`, `unit`,
+    /// `subtree`. A permission that is not `scoped` is granted only at depth `tenant` and takes effect across
+    /// the whole tenant regardless of which node the membership is at.
     pub const fn scoped(mut self) -> Self {
         self.scoped = true;
         self
     }
 
-    /// Có [`scoped`](Self::scoped) không.
+    /// Whether it is [`scoped`](Self::scoped).
     pub const fn is_scoped(&self) -> bool {
         self.scoped
     }
 
-    /// Đặt mức rủi ro, vd `Permission::new("notes.purge", "…").with_risk(Risk::Destructive)`.
+    /// Sets the risk level, e.g. `Permission::new("notes.purge", "…").with_risk(Risk::Destructive)`.
     pub const fn with_risk(mut self, risk: Risk) -> Self {
         self.risk = risk;
         self
@@ -321,7 +323,7 @@ impl Permission {
     }
 }
 
-/// Mọi permission của chương trình, theo thứ tự tên.
+/// All permissions of the program, in name order.
 #[derive(Debug, Clone, Default)]
 pub struct PermissionCatalog {
     // `Arc`: danh mục dựng một lần lúc khởi động rồi chia cho nhiều module đọc.
@@ -329,8 +331,8 @@ pub struct PermissionCatalog {
 }
 
 impl PermissionCatalog {
-    /// Kiểm và gom permission của các module (`(tên module, permission của nó)`).
-    /// Trả về mọi vấn đề cùng lúc nếu có.
+    /// Validates and collects the permissions of modules (`(module name, its permissions)`).
+    /// Returns all problems at once if there are any.
     pub fn new(modules: Vec<(&'static str, Vec<Permission>)>) -> Result<Self, Vec<String>> {
         let mut problems = Vec::new();
         let mut seen = BTreeSet::new();
@@ -357,18 +359,18 @@ impl PermissionCatalog {
         Ok(PermissionCatalog { permissions: Arc::new(permissions) })
     }
 
-    /// Có permission tên `name` không.
+    /// Whether a permission named `name` exists.
     pub fn contains(&self, name: &str) -> bool {
         self.permissions.iter().any(|permission| permission.name == name)
     }
 
-    /// Mọi permission, theo thứ tự tên.
+    /// All permissions, in name order.
     pub fn iter(&self) -> impl Iterator<Item = &Permission> {
         self.permissions.iter()
     }
 }
 
-/// Vấn đề của tên permission `name` khai bởi module `module`, nếu có.
+/// Problem with the permission name `name` declared by module `module`, if any.
 fn name_problem(module: &str, name: &str) -> Option<String> {
     let mut segments = name.split('.');
     let valid = segments.next() == Some(module)
@@ -382,51 +384,51 @@ fn name_problem(module: &str, name: &str) -> Option<String> {
     })
 }
 
-/// Bên đang gọi API, đã xác thực: người dùng nào và có những permission nào.
+/// The authenticated caller of the API: which user and which permissions they have.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Principal {
     user_id: Uuid,
     grants: Grants,
-    /// ID của API key, khi request đến bằng API key thay vì phiên đăng nhập.
+    /// ID of the API key, when the request arrives with an API key instead of a login session.
     api_key: Option<Uuid>,
-    /// Khách của bên gọi (bước 33): khách mặc định trừ khi credential mang khách khác.
+    /// The caller's tenant (step 33): the default tenant unless the credential carries another tenant.
     tenant: TenantId,
-    /// Khách nền tảng của nhân sự đang vào khách khác qua header `Autoxide-Tenant`.
+    /// The platform tenant of staff entering another tenant through the `Autoxide-Tenant` header.
     operator_from: Option<TenantId>,
-    /// Nhân sự hay người mua (bước 34).
+    /// Staff or buyer (step 34).
     realm: Realm,
-    /// Hàng rào của API key gắn nút: mọi quyền chỉ có hiệu lực trong nhánh này.
+    /// Fence of a node-bound API key: all permissions take effect only within this branch.
     fence: Option<OrgId>,
-    /// Đường vào khách hiện tại.
+    /// The route into the current tenant.
     access: AccessPath,
-    /// Loại bên làm theo credential (API key `agent`, `service`…).
+    /// Kind of actor from the credential (API key `agent`, `service`…).
     kind: ActorKind,
-    /// Permission bị role cấm (bước 54, deny thắng allow): đã bỏ khỏi `grants`; giữ tên để lỗi
-    /// nói rõ lý do (`denied_by_role`) thay vì "thiếu". Permission ngoài rào của khách (bước 54)
-    /// cũng bị bỏ, lý do `outside_guardrail`.
+    /// Permissions banned by a role (step 54, deny wins over allow): removed from `grants`; the names are
+    /// kept so the error states the reason (`denied_by_role`) rather than "missing". Permissions outside the
+    /// tenant's guardrail (step 54) are also removed, with the reason `outside_guardrail`.
     denied: Arc<BTreeMap<String, &'static str>>,
-    /// Dải IP được gọi (API key khai `allowed_ips`, bước 54); `None`: mọi địa chỉ.
+    /// IP ranges allowed to call (the API key declares `allowed_ips`, step 54); `None`: any address.
     networks: Option<Arc<Vec<crate::config::IpRange>>>,
-    /// Xác nhận lại cho việc nhạy cảm (bước 54 P5); `None`: không đòi.
+    /// Re-confirmation for sensitive actions (step 54 P5); `None`: not required.
     step_up: Option<StepUp>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Grants {
-    /// Mọi permission ở độ sâu `tenant`, kể cả permission thêm sau (role `admin`).
+    /// All permissions at depth `tenant`, including permissions added later (role `admin`).
     All,
-    /// Permission → các grant (nút, độ sâu). Tên có mặt nghĩa là có permission ở ít nhất một nút.
+    /// Permission → its grants (node, depth). A name being present means having the permission at at least one node.
     Only(Arc<BTreeMap<String, Vec<Grant>>>),
 }
 
-/// Bản chụp của một [`Principal`] để ghi vào payload của job (bước 51 P15–P16): job chạy sau,
-/// không có request, nhưng phải kiểm quyền đúng như người đã yêu cầu — cùng grant ở cùng nút, cùng
-/// hàng rào của API key. Quyền bị thu hồi sau khi xếp job thì job vẫn chạy với quyền lúc yêu cầu
-/// (như mọi hàng đợi job): job ngắn và có audit.
+/// Snapshot of a [`Principal`] to write into a job's payload (step 51 P15–P16): the job runs later, with no
+/// request, but must check permissions exactly as the person who requested it — the same grants at the same
+/// nodes, the same API key fence. If permissions are revoked after the job is enqueued, the job still runs
+/// with the permissions at request time (like every job queue): jobs are short and audited.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PrincipalSnapshot {
     user_id: Uuid,
-    /// `None`: mọi permission (role `admin`).
+    /// `None`: all permissions (role `admin`).
     grants: Option<Vec<(String, Uuid, Scope)>>,
     api_key: Option<Uuid>,
     tenant: Uuid,
@@ -441,7 +443,7 @@ pub struct PrincipalSnapshot {
 }
 
 impl PrincipalSnapshot {
-    /// Dựng lại người gọi đã chụp.
+    /// Rebuilds the snapshotted caller.
     pub fn restore(&self) -> Principal {
         let grants = match &self.grants {
             None => Grants::All,
@@ -475,14 +477,14 @@ impl PrincipalSnapshot {
         }
     }
 
-    /// Người đã yêu cầu.
+    /// The person who made the request.
     pub fn user_id(&self) -> Uuid {
         self.user_id
     }
 }
 
 impl Principal {
-    /// Chụp người gọi để job chạy sau kiểm quyền như họ ([`PrincipalSnapshot::restore`]).
+    /// Snapshots the caller so a job running later checks permissions as them ([`PrincipalSnapshot::restore`]).
     pub fn snapshot(&self) -> PrincipalSnapshot {
         let grants = match &self.grants {
             Grants::All => None,
@@ -512,13 +514,13 @@ impl Principal {
 }
 
 impl Principal {
-    /// Đặt loại bên làm (bộ xác thực, theo loại API key).
+    /// Sets the kind of actor (the authenticator, by API key kind).
     pub fn with_actor_kind(mut self, kind: ActorKind) -> Self {
         self.kind = kind;
         self
     }
 
-    /// Loại bên làm: `Support` khi vào bằng quyền vào hỗ trợ, không thì theo credential.
+    /// Kind of actor: `Support` when entering through a support access grant, otherwise by credential.
     pub fn actor_kind(&self) -> ActorKind {
         match self.access {
             AccessPath::Support(_) => ActorKind::Support,
@@ -526,7 +528,7 @@ impl Principal {
         }
     }
 
-    /// Người dùng `user_id` với đúng các permission `permissions`, ở độ sâu `tenant`.
+    /// The user `user_id` with exactly the permissions `permissions`, at depth `tenant`.
     pub fn new(user_id: Uuid, permissions: impl IntoIterator<Item = String>) -> Self {
         let root = root_of(DEFAULT_TENANT);
         Principal::with_grants(
@@ -535,8 +537,8 @@ impl Principal {
         )
     }
 
-    /// Người dùng `user_id` với các grant `(permission, grant)` — một permission có thể có nhiều
-    /// grant ở nhiều nút; quyền là hợp của chúng.
+    /// The user `user_id` with the grants `(permission, grant)` — one permission can have several
+    /// grants at several nodes; the permission is their union.
     pub fn with_grants(user_id: Uuid, grants: impl IntoIterator<Item = (String, Grant)>) -> Self {
         let mut map: BTreeMap<String, Vec<Grant>> = BTreeMap::new();
         for (permission, grant) in grants {
@@ -548,7 +550,7 @@ impl Principal {
         Principal::with(user_id, Grants::Only(Arc::new(map)))
     }
 
-    /// Người dùng `user_id` có mọi permission.
+    /// The user `user_id` with every permission.
     pub fn with_all_permissions(user_id: Uuid) -> Self {
         Principal::with(user_id, Grants::All)
     }
@@ -570,43 +572,43 @@ impl Principal {
         }
     }
 
-    /// Người mua `user_id` (bước 34): đăng nhập được, không có permission nào.
+    /// The buyer `user_id` (step 34): can sign in, has no permissions.
     pub fn customer(user_id: Uuid) -> Self {
         let mut principal = Principal::with(user_id, Grants::Only(Arc::default()));
         principal.realm = Realm::Customer;
         principal
     }
 
-    /// Nhân sự hay người mua.
+    /// Staff or buyer.
     pub fn realm(&self) -> Realm {
         self.realm
     }
 
-    /// Mọi quyền chỉ có hiệu lực trong nhánh của nút `org` (API key gắn nút). Nút gốc của khách
-    /// nghĩa là không rào.
+    /// All permissions take effect only within the branch of node `org` (node-bound API key). The tenant's
+    /// root node means no fence.
     pub fn with_fence(mut self, org: OrgId) -> Self {
         self.fence = Some(org);
         self
     }
 
-    /// Hàng rào đang có hiệu lực; `None` khi không rào (kể cả khi rào ở nút gốc).
+    /// The fence currently in effect; `None` when there is none (including when the fence is at the root node).
     pub fn fence(&self) -> Option<OrgId> {
         self.fence.filter(|org| *org != root_of(self.tenant))
     }
 
-    /// Đánh dấu đường vào khách hiện tại (uỷ quyền, hỗ trợ).
+    /// Marks the route into the current tenant (delegation, support).
     pub fn with_access(mut self, access: AccessPath) -> Self {
         self.access = access;
         self
     }
 
-    /// Đường vào khách hiện tại.
+    /// The route into the current tenant.
     pub fn access(&self) -> AccessPath {
         self.access
     }
 
-    /// Chỉ giữ các permission trong `names`, mỗi cái với đúng grant (nút, độ sâu) đang có — vd
-    /// quyền của API key = permission của key ∩ quyền hiện tại của chủ key.
+    /// Keeps only the permissions in `names`, each with exactly the grants (node, depth) it currently has —
+    /// e.g. an API key's permissions = the key's permissions ∩ the key owner's current permissions.
     #[must_use]
     pub fn only<'a>(mut self, names: impl IntoIterator<Item = &'a str>) -> Self {
         let root = root_of(self.tenant);
@@ -624,10 +626,10 @@ impl Principal {
         self
     }
 
-    /// Bỏ các permission `denied` (bước 54: deny thắng allow — một role cấm thì không role nào
-    /// khác, kể cả role toàn quyền, cấp lại được). Người có mọi permission thành người có mọi
-    /// permission của `catalog` (độ sâu `tenant`) trừ phần bị cấm; quyền nạp lại mỗi request nên
-    /// permission thêm sau vẫn có ở request kế.
+    /// Removes the permissions `denied` (step 54: deny wins over allow — when one role bans a permission no
+    /// other role, including a full-access role, can grant it back). A person with every permission becomes a
+    /// person with every permission of `catalog` (depth `tenant`) except the banned part; permissions are
+    /// reloaded on every request, so a permission added later is still present on the next request.
     #[must_use]
     pub fn without(
         self,
@@ -638,16 +640,16 @@ impl Principal {
         self.remove(|name| denied.contains(name), DENIED_BY_ROLE, catalog)
     }
 
-    /// Chỉ giữ permission nằm trong rào của khách (bước 54, như SCP của AWS): khách cha / nền tảng
-    /// đặt quyền tối đa cho khách con, không role nào của khách con — kể cả `admin` — vượt được.
-    /// `allowed`: `None` khi khách không bị rào.
+    /// Keeps only the permissions inside the tenant's guardrail (step 54, like AWS SCPs): the parent tenant /
+    /// platform sets the maximum permissions for a child tenant, and no role of the child tenant — including
+    /// `admin` — can exceed it. `allowed`: `None` when the tenant has no guardrail.
     #[must_use]
     pub fn within(self, allowed: Option<&BTreeSet<String>>, catalog: &PermissionCatalog) -> Self {
         let Some(allowed) = allowed else { return self };
         self.remove(|name| !allowed.contains(name), OUTSIDE_GUARDRAIL, catalog)
     }
 
-    /// Bỏ mọi permission `drop` chọn, ghi `reason` cho lỗi về sau.
+    /// Removes every permission selected by `drop`, recording `reason` for later errors.
     fn remove(
         mut self,
         drop: impl Fn(&str) -> bool,
@@ -692,16 +694,17 @@ impl Principal {
         self
     }
 
-    /// Chỉ nhận request từ các dải `networks` (API key khai `allowed_ips`). Danh sách rỗng là không
-    /// giới hạn.
+    /// Accepts requests only from the ranges `networks` (the API key declares `allowed_ips`). An empty list
+    /// means no restriction.
     #[must_use]
     pub fn with_networks(mut self, networks: Vec<crate::config::IpRange>) -> Self {
         self.networks = (!networks.is_empty()).then(|| Arc::new(networks));
         self
     }
 
-    /// `Ok` khi request từ địa chỉ `client` được phép; không thì 403 `network_not_allowed`. Không
-    /// biết địa chỉ (không qua HTTP) mà credential có giới hạn dải thì từ chối: không đoán.
+    /// `Ok` when the request from address `client` is allowed; otherwise 403 `network_not_allowed`. If the
+    /// address is unknown (not over HTTP) and the credential has a range restriction, it is rejected: no
+    /// guessing.
     pub fn admits(&self, client: Option<std::net::IpAddr>) -> Result<(), Error> {
         let Some(networks) = &self.networks else { return Ok(()) };
         if client.is_some_and(|ip| networks.iter().any(|range| range.contains(ip))) {
@@ -715,21 +718,21 @@ impl Principal {
         ))
     }
 
-    /// Permission `name` bị một role cấm hay nằm ngoài rào của khách.
+    /// The permission `name` is banned by a role or lies outside the tenant's guardrail.
     pub fn is_denied(&self, name: &str) -> bool {
         self.denied.contains_key(name)
     }
 
-    /// Lỗi 403 `permission_denied` cho `permission`, với `reason` `denied_by_role`,
+    /// Error 403 `permission_denied` for `permission`, with the `reason` `denied_by_role`,
     /// `outside_guardrail` hay `missing`.
     fn refuse(&self, permission: &Permission) -> Error {
         let reason = self.denied.get(permission.name).copied().unwrap_or("missing");
         permission_denied(permission).with_reason(reason)
     }
 
-    /// Nút mặc định cho bản ghi mới khi người tạo không chọn (bước 34): nút gốc nếu họ có
-    /// `permission` cho cả khách; nút duy nhất nếu mọi grant của nó ở một nút; `None` khi họ làm ở
-    /// nhiều nút (phải chọn) hay không có `permission`.
+    /// Default node for a new record when the creator does not choose one (step 34): the root node if they
+    /// have `permission` for the whole tenant; the only node if all their grants are at one node; `None` when
+    /// they work at several nodes (they must choose) or do not have `permission`.
     pub fn home_org(&self, tenant: TenantId, permission: &Permission) -> Option<OrgId> {
         let grants = self.grants(permission);
         let first = grants.first()?;
@@ -739,7 +742,7 @@ impl Principal {
         grants.iter().all(|grant| grant.org == first.org).then_some(first.org)
     }
 
-    /// Mọi grant theo permission (tên → grant); `None` khi có mọi permission ở độ sâu `tenant`.
+    /// All grants by permission (name → grants); `None` when they have every permission at depth `tenant`.
     pub fn grant_map(&self) -> Option<&BTreeMap<String, Vec<Grant>>> {
         match &self.grants {
             Grants::All => None,
@@ -747,9 +750,9 @@ impl Principal {
         }
     }
 
-    /// Bên gọi có làm việc ở nút `org` không: một grant bất kỳ (permission bất kỳ) ở độ sâu
-    /// `tenant`, hay `unit` / `subtree` phủ nút đó. Dùng khi bên gọi tự nêu một nút cho thứ không
-    /// gắn với một permission riêng (vd API key gắn nút).
+    /// Whether the caller works at node `org`: any grant (any permission) at depth
+    /// `tenant`, or `unit` / `subtree` covering that node. Used when the caller names a node for something not
+    /// tied to one particular permission (e.g. a node-bound API key).
     pub async fn reaches<D: ConnectionTrait>(&self, db: &D, org: OrgId) -> Result<bool, Error> {
         let Grants::Only(map) = &self.grants else { return Ok(true) };
         let mut subtrees = Vec::new();
@@ -767,8 +770,8 @@ impl Principal {
         OrgTree::is_within(db, self.tenant, org, &subtrees).await
     }
 
-    /// Các grant của `permission`; rỗng khi không có. Permission không `scoped` có grant ở đâu
-    /// cũng thành một grant `tenant` (có hiệu lực toàn khách).
+    /// The grants of `permission`; empty when there are none. A permission that is not `scoped` becomes a
+    /// `tenant` grant wherever it has a grant (effective across the whole tenant).
     pub fn grants(&self, permission: &Permission) -> Vec<Grant> {
         let tenant_wide = vec![Grant::new(root_of(self.tenant), Scope::Tenant)];
         match &self.grants {
@@ -781,24 +784,24 @@ impl Principal {
         }
     }
 
-    /// Bên gọi thuộc khách `tenant` (bộ xác thực đặt theo khách trong credential).
+    /// The caller belongs to tenant `tenant` (the authenticator sets it from the tenant in the credential).
     pub fn in_tenant(mut self, tenant: TenantId) -> Self {
         self.tenant = tenant;
         self
     }
 
-    /// Khách của request: khách của credential, hay khách nhân sự nền tảng đang vào.
+    /// The request's tenant: the credential's tenant, or the tenant that platform staff are entering.
     pub fn tenant_id(&self) -> TenantId {
         self.tenant
     }
 
-    /// Khách nền tảng của nhân sự đang vào khách khác (`Autoxide-Tenant`); `None` khi gọi trong
-    /// chính khách của mình.
+    /// The platform tenant of staff entering another tenant (`Autoxide-Tenant`); `None` when calling within
+    /// their own tenant.
     pub fn operator_from(&self) -> Option<TenantId> {
         self.operator_from
     }
 
-    /// Nhân sự nền tảng vào khách `target`: quyền giữ nguyên, khách của request đổi.
+    /// Platform staff enter tenant `target`: permissions are kept, the request's tenant changes.
     pub fn operating(mut self, target: TenantId) -> Self {
         if target != self.tenant {
             self.operator_from = Some(self.tenant);
@@ -807,13 +810,13 @@ impl Principal {
         self
     }
 
-    /// Đánh dấu request đến bằng API key `id`.
+    /// Marks that the request arrived with API key `id`.
     pub fn via_api_key(mut self, id: Uuid) -> Self {
         self.api_key = Some(id);
         self
     }
 
-    /// ID của API key nếu request đến bằng API key.
+    /// ID of the API key if the request arrived with an API key.
     pub fn api_key_id(&self) -> Option<Uuid> {
         self.api_key
     }
@@ -822,12 +825,12 @@ impl Principal {
         self.user_id
     }
 
-    /// Có mọi permission (kể cả permission chưa tồn tại lúc cấp) không.
+    /// Whether it has every permission (including permissions that did not exist when granted).
     pub fn has_all_permissions(&self) -> bool {
         self.grants == Grants::All
     }
 
-    /// Các permission được cấp rõ ràng (ở bất kỳ độ sâu nào), theo thứ tự tên. Rỗng khi
+    /// The explicitly granted permissions (at any depth), in name order. Empty when
     /// [`has_all_permissions`](Self::has_all_permissions).
     pub fn permissions(&self) -> Vec<String> {
         match &self.grants {
@@ -840,8 +843,8 @@ impl Principal {
         self.allows(permission.name)
     }
 
-    /// Như [`has`](Self::has), theo tên permission (vd tên do client gửi lên). Có ở bất kỳ độ
-    /// sâu nào là có.
+    /// Like [`has`](Self::has), by permission name (e.g. a name sent by the client). Having it at any
+    /// depth counts as having it.
     pub fn allows(&self, permission: &str) -> bool {
         match &self.grants {
             Grants::All => true,
@@ -849,8 +852,8 @@ impl Principal {
         }
     }
 
-    /// `Ok` nếu có `permission` (ở bất kỳ độ sâu nào); không thì lỗi 403 `permission_denied` nêu
-    /// tên nó. Dữ liệu theo nút kiểm thêm bằng [`require_at`](Self::require_at) hay
+    /// `Ok` if it has `permission` (at any depth); otherwise a 403 `permission_denied` error naming
+    /// it. Node-scoped data is checked further with [`require_at`](Self::require_at) or
     /// [`scope_condition`](Self::scope_condition).
     pub fn require(&self, permission: &Permission) -> Result<(), Error> {
         if self.has(permission) {
@@ -860,9 +863,9 @@ impl Principal {
     }
 }
 
-/// Lý do `permission_denied`: một role của người gọi cấm permission.
+/// Reason of `permission_denied`: a role of the caller bans the permission.
 const DENIED_BY_ROLE: &str = "denied_by_role";
-/// Lý do `permission_denied`: permission nằm ngoài rào khách cha đặt cho khách này.
+/// Reason of `permission_denied`: the permission lies outside the guardrail the parent tenant set for this tenant.
 const OUTSIDE_GUARDRAIL: &str = "outside_guardrail";
 
 fn permission_denied(permission: &Permission) -> Error {
@@ -884,28 +887,28 @@ fn org_out_of_scope(org: OrgId, permission: &Permission) -> Error {
     .with_param("permission", permission.name)
 }
 
-/// Xác thực request: đọc giá trị header `Authorization` và trả về bên đang gọi.
-/// Một module công bố trait này lúc khởi động
-/// (`context.provide::<dyn Authenticator>(…)`); kernel gắn nó vào mọi request.
+/// Authenticates a request: reads the value of the `Authorization` header and returns the calling party. A
+/// module publishes this trait at startup (`context.provide::<dyn Authenticator>(…)`); the kernel attaches it
+/// to every request.
 //
 // `#[async_trait]`: Rust chưa cho gọi hàm `async` của trait qua `dyn Trait`.
 #[async_trait::async_trait]
 pub trait Authenticator: Send + Sync {
-    /// `authorization` là nguyên giá trị header (`None` khi không có); `hint` là khách mà request
-    /// nhắm tới (tên miền, header `Autoxide-Tenant`) — credential cấp trước bước 33 không mang khách,
-    /// bộ xác thực dùng nó để biết tìm ở database nào. Lỗi trả về thường là 401 (thiếu, sai, hết
-    /// hạn) hoặc 403 (tài khoản bị khoá).
+    /// `authorization` is the whole header value (`None` when absent); `hint` is the tenant the request
+    /// targets (domain, `Autoxide-Tenant` header) — credentials issued before step 33 do not carry a tenant,
+    /// and the authenticator uses it to know which database to look in. The returned error is usually 401
+    /// (missing, wrong, expired) or 403 (account locked).
     async fn authenticate(
         &self,
         authorization: Option<&str>,
         hint: &TenantHint,
     ) -> Result<Principal, Error>;
 
-    /// Người đã xác thực ở khách nhà (`principal.tenant_id()`) xin vào khách `target` (header
-    /// `Autoxide-Tenant`, bước 34): uỷ quyền từ khách cha, quyền vào hỗ trợ có thời hạn. Trả
-    /// `Principal` mới ở khách `target` (quyền theo đường vào, [`Principal::with_access`]) hay
-    /// `None` khi không có đường vào nào. Tính lại mỗi request: thu hồi, hết hạn có hiệu lực
-    /// ngay request kế. Mặc định: không có đường vào.
+    /// A user authenticated in the home tenant (`principal.tenant_id()`) asks to enter tenant `target` (header
+    /// `Autoxide-Tenant`, step 34): delegation from the parent tenant, or time-limited support access. Returns
+    /// a new `Principal` in tenant `target` (permissions by route of entry, [`Principal::with_access`]) or
+    /// `None` when there is no route in. Recomputed on every request: revocation and expiry take effect
+    /// on the next request. Default: no route in.
     async fn enter(
         &self,
         principal: &Principal,
@@ -915,16 +918,17 @@ pub trait Authenticator: Send + Sync {
         Ok(None)
     }
 
-    /// `true`: chỉ [`enter`](Self::enter) quyết ai vào khách khác — nhân sự nền tảng có
-    /// `kernel.tenants.operate` cũng phải có lần cấp quyền vào hỗ trợ (D-190, D-313). Mặc định
-    /// `false`: luật nhân sự nền tảng của kernel (bước 33) còn áp.
+    /// `true`: only [`enter`](Self::enter) decides who enters another tenant — platform staff with
+    /// `kernel.tenants.operate` must also have a support access grant (D-190, D-313). Default
+    /// `false`: the kernel's platform staff rule (step 33) still applies.
     fn decides_entry(&self) -> bool {
         false
     }
 
-    /// Quyền hiện tại của người dùng `user_id` ở khách `tenant`, không qua request (bước 51 P10,
-    /// P11): kiểm người được giao việc có quyền của nguồn, liệt kê người cấp được quyền. `None`:
-    /// không có người dùng đang hoạt động đó (hay bộ xác thực không biết). Mặc định: `None`.
+    /// Current permissions of the user `user_id` in tenant `tenant`, without a request (step 51 P10, P11): to
+    /// check that the person assigned a task has the source's permission, and to list people who can be
+    /// granted a permission. `None`: there is no such active user (or the authenticator does not know).
+    /// Default: `None`.
     async fn principal_of(
         &self,
         tenant: &TenantContext,
@@ -935,39 +939,39 @@ pub trait Authenticator: Send + Sync {
     }
 }
 
-/// Hỏi "tài khoản này đã xác thực (số điện thoại / định danh) để đăng nội dung chưa" — điểm nối
-/// cho yêu cầu xác thực tài khoản đăng nội dung của Nghị định 147/2024/NĐ-CP (D-202). Module giữ
-/// trạng thái xác thực (bước 37) đăng ký bằng
-/// [`StartContext::posting_verifier`](crate::module::StartContext::posting_verifier); module nhận
-/// nội dung của người dùng (vd `comments`) hỏi qua [`PostingVerification`].
+/// Asks "has this account verified (phone number / identity) to post content" — the hook for the requirement
+/// to verify accounts that post content under Decree 147/2024/ND-CP (D-202). The module that holds
+/// verification state (step 37) registers it with
+/// [`StartContext::posting_verifier`](crate::module::StartContext::posting_verifier); modules that accept
+/// user content (e.g. `comments`) ask through [`PostingVerification`].
 //
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
 #[async_trait::async_trait]
 pub trait PostingVerifier: Send + Sync {
-    /// Người dùng `user_id` của khách `tenant` đã xác thực để đăng nội dung chưa.
+    /// Whether the user `user_id` of tenant `tenant` has verified to post content.
     async fn is_verified(&self, tenant: &TenantContext, user_id: Uuid) -> Result<bool, Error>;
 
-    /// Khách `tenant` đòi xác thực ở MỌI chỗ đăng nội dung (không chỉ các loại đích bên hỏi tự cấu
-    /// hình là "chỉ tài khoản đã xác thực") — vd khách đặt chính sách đăng bình luận cần số điện
-    /// thoại. Mặc định `false` (D-038): bộ hỏi cũ không phải sửa.
+    /// Tenant `tenant` requires verification at EVERY place content is posted (not only the target kinds the
+    /// asking party itself configures as "verified accounts only") — e.g. a tenant sets a policy that posting
+    /// comments needs a phone number. Default `false` (D-038): old verifiers need no changes.
     async fn required_everywhere(&self, tenant: &TenantContext) -> Result<bool, Error> {
         let _ = tenant;
         Ok(false)
     }
 }
 
-/// Chỗ giữ bộ [`PostingVerifier`] duy nhất của chương trình. Clone rẻ: mọi bản clone thấy cùng
-/// một chỗ, kể cả khi module đăng ký khởi động SAU module hỏi.
+/// Holder of the program's single [`PostingVerifier`]. Cheap to clone: all clones see the same
+/// holder, even when the registering module starts AFTER the asking module.
 ///
-/// Chưa module nào đăng ký thì mọi tài khoản đăng nhập được tính là đã xác thực — giữ hành vi
-/// trước D-202; khách (không tài khoản) thì bên hỏi tự từ chối.
+/// If no module has registered, every signed-in account counts as verified — keeping the behavior
+/// before D-202; a guest (no account) is rejected by the asking party itself.
 #[derive(Clone, Default)]
 pub struct PostingVerification {
     // Ghi một lần lúc khởi động; đọc mỗi lần hỏi. Không giữ khoá qua `await`.
     verifier: Arc<std::sync::RwLock<Option<Registered>>>,
 }
 
-/// Bộ hỏi đã đăng ký và module đăng ký nó.
+/// The registered verifier and the module that registered it.
 type Registered = (&'static str, Arc<dyn PostingVerifier>);
 
 impl std::fmt::Debug for PostingVerification {
@@ -977,7 +981,7 @@ impl std::fmt::Debug for PostingVerification {
 }
 
 impl PostingVerification {
-    /// Đăng ký bộ hỏi của module `module`. Chỉ một module được đăng ký.
+    /// Registers the verifier of module `module`. Only one module may register.
     pub fn register(
         &self,
         module: &'static str,
@@ -994,12 +998,12 @@ impl PostingVerification {
         Ok(())
     }
 
-    /// Đã có module đăng ký bộ hỏi chưa.
+    /// Whether a module has registered a verifier yet.
     pub fn is_registered(&self) -> bool {
         self.verifier.read().is_ok_and(|slot| slot.is_some())
     }
 
-    /// Người dùng `user_id` đã xác thực chưa; `true` khi chưa module nào đăng ký bộ hỏi.
+    /// Whether the user `user_id` has verified; `true` when no module has registered a verifier.
     pub async fn is_verified(&self, tenant: &TenantContext, user_id: Uuid) -> Result<bool, Error> {
         let verifier = {
             let slot = self.verifier.read().map_err(|_| poisoned_verification())?;
@@ -1011,8 +1015,8 @@ impl PostingVerification {
         }
     }
 
-    /// Khách `tenant` có đòi xác thực ở mọi chỗ đăng nội dung không; `false` khi chưa module nào
-    /// đăng ký bộ hỏi.
+    /// Whether tenant `tenant` requires verification at every place content is posted; `false` when no module
+    /// has registered a verifier.
     pub async fn required_everywhere(&self, tenant: &TenantContext) -> Result<bool, Error> {
         let verifier = {
             let slot = self.verifier.read().map_err(|_| poisoned_verification())?;

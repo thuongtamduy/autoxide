@@ -1,4 +1,4 @@
-//! Sinh nội dung file `.env.example` từ danh sách biến đã khai trong code.
+//! Generates the content of the `.env.example` file from the list of variables declared in code.
 
 use super::SettingValue;
 
@@ -12,10 +12,10 @@ const HEADER: &str = "\
 # `autoxide config --env-example`. A test fails when it is out of date.
 ";
 
-/// Độ rộng tối đa của một dòng chú thích.
+/// Maximum width of a comment line.
 const WIDTH: usize = 80;
 
-/// Nội dung `.env.example` cho các biến trong `values` (theo thứ tự đã đọc).
+/// The `.env.example` content for the variables in `values` (in the order they were read).
 pub fn render_env_example(values: &[SettingValue]) -> String {
     let mut output = String::from(HEADER);
     for value in values {
@@ -44,7 +44,7 @@ pub fn render_env_example(values: &[SettingValue]) -> String {
     output
 }
 
-/// Ngắt `text` thành các dòng dài tối đa `width` ký tự, ngắt ở khoảng trắng.
+/// Breaks `text` into lines of at most `width` characters, breaking at whitespace.
 fn wrap(text: &str, width: usize) -> Vec<String> {
     let mut lines: Vec<String> = Vec::new();
     for word in text.split_whitespace() {

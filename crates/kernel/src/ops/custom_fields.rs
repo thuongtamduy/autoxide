@@ -1,22 +1,23 @@
-//! Trường tự định nghĩa trên bản ghi (bước 51 P19, D-235): khách thêm ô dữ liệu của riêng mình cho một
-//! loại bản ghi ("ngày sinh con" cho khách hàng, "người phụ trách" cho bài viết) mà không sửa code.
+//! Custom fields on records (step 51 P19, D-235): a tenant adds its own data cells to a
+//! record kind ("child's birthday" for customers, "person in charge" for posts) without changing code.
 //!
-//! - **Module chọn tham gia** bằng [`Module::custom_field_targets`](crate::module::Module): loại bản
-//!   ghi của sổ đối tượng, permission đọc / ghi, mức hiện hỗ trợ.
-//! - **Định nghĩa** ở `kernel_custom_fields` (cấp khách hàng): `key` (không đổi), `data_type`, nhãn /
-//!   trợ giúp theo ngôn ngữ, bắt buộc, lựa chọn, ràng buộc độ dài / khoảng giá trị (không nhận biểu
-//!   thức chính quy do khách viết), mặc định, mức hiện, lọc được, dữ liệu cá nhân, thứ tự, bật / tắt.
-//!   API `GET/POST /api/v1/kernel/custom-fields?target=`, `GET/PATCH/DELETE …/{id}`
-//!   (`kernel.custom_fields.manage`; đọc định nghĩa thì cần permission đọc của loại bản ghi).
-//! - **Giá trị nằm trên bản ghi** của module (cột `custom_fields`, JSON trong `text`). Service gọi
-//!   [`CustomFields::validate`]: kiểm theo định nghĩa đang bật, gom mọi lỗi một lần (đường dẫn
-//!   `custom_fields.<key>`), trả giá trị đã chuẩn hoá.
-//! - **Lọc** trường `filterable`: module thêm [`index_migration`] (bảng `<module>_custom_index`), ghi
-//!   index cùng transaction với bản ghi ([`CustomFields::write_index`]); danh sách nhận
-//!   `cf.<key>=<toán tử>:<giá trị>` (`eq`, `in`, `gte`, `lte`, `prefix`) và kernel dựng điều kiện `id IN
-//!   (subquery)` ([`CustomFields::condition`]) — câu SQL thường, như nhau trên hai database.
-//! - **Đổi định nghĩa:** nhãn, lựa chọn, ràng buộc đổi được; `key` không bao giờ; `data_type` chỉ khi
-//!   chưa bản ghi nào có giá trị (`kernel.custom_field_type_locked`, 409). Xoá là tắt (`active=false`).
+//! - **A module opts in** with [`Module::custom_field_targets`](crate::module::Module): the record kind
+//!   of the entity registry, the read / write permissions, and the supported visibility levels.
+//! - **Definitions** live in `kernel_custom_fields` (tenant level): `key` (immutable), `data_type`, label /
+//!   help per language, required, choices, length / value-range constraints (regular expressions written by a
+//!   tenant are not accepted), default, visibility, filterable, personal data, order, enabled / disabled. API
+//!   `GET/POST /api/v1/kernel/custom-fields?target=`, `GET/PATCH/DELETE …/{id}`
+//!   (`kernel.custom_fields.manage`; reading definitions needs the record kind's read permission).
+//! - **Values live on the module's record** (column `custom_fields`, JSON in `text`). A service calls
+//!   [`CustomFields::validate`]: it validates against the enabled definitions, collects every error at once
+//!   (path `custom_fields.<key>`), and returns the normalized value.
+//! - **Filtering** a `filterable` field: the module adds [`index_migration`] (table `<module>_custom_index`)
+//!   and writes the index in the same transaction as the record ([`CustomFields::write_index`]); lists accept
+//!   `cf.<key>=<operator>:<value>` (`eq`, `in`, `gte`, `lte`, `prefix`) and the kernel builds an
+//!   `id IN (subquery)` condition ([`CustomFields::condition`]) — plain SQL, identical on both databases.
+//! - **Changing a definition:** label, choices and constraints may change; `key` never; `data_type` only when
+//!   no record has a value yet (`kernel.custom_field_type_locked`, 409). Deleting means disabling
+//!   (`active=false`).
 
 use crate::time::{Date, Timestamp};
 use std::collections::BTreeMap;
@@ -55,18 +56,18 @@ pub(crate) use http::{routes, tools};
 pub(crate) use migration::CreateCustomFields;
 
 const TABLE: &str = "kernel_custom_fields";
-/// Tối đa chừng này trường mỗi loại bản ghi (trần máy chủ).
+/// At most this many fields per record kind (server ceiling).
 const MAX_PER_TARGET: usize = 100;
-/// Giá trị của mọi trường trên một bản ghi tối đa chừng này byte (JSON).
+/// The values of all fields on one record total at most this many bytes (JSON).
 const MAX_BYTES: usize = 16_384;
 
-/// Định nghĩa trường tự định nghĩa của khách.
+/// Definition of a tenant's custom field.
 pub const CUSTOM_FIELDS_MANAGE: Permission = Permission::new(
     "kernel.custom_fields.manage",
     "Define the tenant's own fields on records (custom fields).",
 );
 
-/// Kiểu dữ liệu nhận được.
+/// Accepted data types.
 pub const DATA_TYPES: [&str; 14] = [
     "text",
     "long_text",
@@ -84,18 +85,19 @@ pub const DATA_TYPES: [&str; 14] = [
     "reference",
 ];
 
-/// Một loại bản ghi module cho gắn trường tự định nghĩa.
+/// A record kind a module allows custom fields on.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct CustomFieldTarget {
-    /// Loại bản ghi của sổ đối tượng, vd `content.entry`.
+    /// Record kind of the entity registry, e.g. `content.entry`.
     pub target: &'static str,
     pub read_permission: Permission,
     pub write_permission: Permission,
-    /// Mức hiện loại này hỗ trợ: `internal` (luôn có), `public`, `buyer_input`.
+    /// Visibility levels this kind supports: `internal` (always present), `public`, `buyer_input`.
     pub visibilities: &'static [&'static str],
-    /// Nhận cả loại con `<target>.<khoá>` do khách tạo lúc chạy (vd `content.type.du_an` cho loại nội
-    /// dung tự định nghĩa — bước 67, D-235): mỗi loại con một bộ trường riêng, cùng permission.
+    /// Also accepts sub-kinds `<target>.<key>` created by a tenant at runtime (e.g. `content.type.du_an` for
+    /// a custom content type — step 67, D-235): each sub-kind has its own set of fields, with the same
+    /// permissions.
     pub subtypes: bool,
 }
 
@@ -110,7 +112,7 @@ impl CustomFieldTarget {
         }
     }
 
-    /// Nhận cả loại con `<target>.<khoá>` (khoá `snake_case`) do module tạo lúc chạy.
+    /// Also accepts sub-kinds `<target>.<key>` (`snake_case` key) created by the module at runtime.
     #[must_use]
     pub const fn with_subtypes(mut self) -> Self {
         self.subtypes = true;
@@ -164,7 +166,8 @@ pub struct CustomFieldView {
     pub updated_at: Timestamp,
 }
 
-/// Sổ loại bản ghi tham gia, điền khi khởi động; tra định nghĩa từ database. Clone rẻ.
+/// Registry of participating record kinds, filled at startup; definitions are looked up from the database.
+/// Cheap to clone.
 #[derive(Clone, Default)]
 pub struct CustomFields {
     targets: Arc<OnceLock<BTreeMap<&'static str, CustomFieldTarget>>>,
@@ -192,7 +195,7 @@ impl CustomFields {
         targets.get(parent).filter(|target| target.subtypes && is_key(key)).copied()
     }
 
-    /// Khoá các trường đang bật ở mức `public` của loại `target`: phần được đọc công khai.
+    /// Keys of the enabled fields at `public` level of kind `target`: the publicly readable part.
     pub async fn public_keys(
         &self,
         tenant: &TenantContext,
@@ -207,7 +210,7 @@ impl CustomFields {
             .collect())
     }
 
-    /// Phần công khai của giá trị đã lưu (`stored`, JSON trong `text`): chỉ khoá trong `keys`.
+    /// The public part of a stored value (`stored`, JSON in `text`): only the keys in `keys`.
     pub fn pick_public(
         stored: Option<&str>,
         keys: &std::collections::BTreeSet<String>,
@@ -220,7 +223,7 @@ impl CustomFields {
             .collect()
     }
 
-    /// Định nghĩa đang bật của loại `target`, theo thứ tự.
+    /// The enabled definitions of kind `target`, in order.
     pub async fn definitions(
         &self,
         tenant: &TenantContext,
@@ -229,9 +232,10 @@ impl CustomFields {
         Ok(list(tenant, Some(target)).await?.into_iter().filter(|field| field.active).collect())
     }
 
-    /// Kiểm `incoming` (giá trị người dùng gửi, `null` xoá một trường) gộp vào `current` (giá trị
-    /// đang có) theo định nghĩa đang bật của `target`. Gom mọi lỗi một lần (`custom_fields.<key>`),
-    /// trả bản đã chuẩn hoá để lưu. Trường đã tắt giữ nguyên giá trị cũ, không nhận giá trị mới.
+    /// Validates `incoming` (the value the user sent, `null` deletes a field) merged into `current` (the
+    /// existing value) against the enabled definitions of `target`. Collects every error at once
+    /// (`custom_fields.<key>`) and returns the normalized value to store. A disabled field keeps its old
+    /// value and accepts no new value.
     pub async fn validate(
         &self,
         tenant: &TenantContext,
@@ -244,9 +248,10 @@ impl CustomFields {
         check_values(&fields, incoming, current, creating)
     }
 
-    /// Như [`validate`](Self::validate) khi người dùng cuối tạo bản ghi (vd người mua đặt hàng —
-    /// D-235): chỉ xét trường mức `buyer_input` của `target` — khoá khác (kể cả trường `internal`)
-    /// là lỗi `unknown`, và trường `internal` bắt buộc không chặn người dùng cuối (nhân sự điền sau).
+    /// Like [`validate`](Self::validate) when an end user creates a record (e.g. a buyer placing an order —
+    /// D-235): only fields at `buyer_input` level of `target` are considered — any other key (including
+    /// `internal` fields) is an `unknown` error, and a required `internal` field does not block the end user
+    /// (staff fill it in later).
     pub async fn validate_buyer_input(
         &self,
         tenant: &TenantContext,
@@ -263,7 +268,8 @@ impl CustomFields {
     }
 }
 
-/// Kiểm `incoming` gộp vào `current` theo `fields` (định nghĩa đang bật), gom mọi lỗi một lần.
+/// Validates `incoming` merged into `current` against `fields` (the enabled definitions), collecting every
+/// error at once.
 fn check_values(
     fields: &[CustomFieldView],
     incoming: Option<&Map<String, Value>>,
@@ -465,7 +471,7 @@ pub(crate) struct CustomFieldsState {
     pub entitlements: crate::entitlement::EntitlementsHandle,
 }
 
-/// Hạn mức theo gói (bước 35): số trường tự định nghĩa đang bật của khách, mọi loại bản ghi.
+/// Plan quota (step 35): the number of enabled custom fields of a tenant, across all record kinds.
 pub const CUSTOM_FIELDS_LIMIT: crate::entitlement::Limit = crate::entitlement::Limit::count(
     "kernel.custom_fields",
     "Custom fields a tenant can have on at once, across every record type.",
@@ -480,7 +486,7 @@ fn not_found(id: Uuid) -> Error {
         .with_param("id", id)
 }
 
-/// Kiểm và áp `settings` lên `field` (đang có hay mới).
+/// Validates and applies `settings` to `field` (existing or new).
 fn apply(
     field: &mut CustomFieldView,
     settings: FieldSettings,
@@ -640,7 +646,7 @@ async fn save(tenant: &TenantContext, field: &CustomFieldView, insert: bool) -> 
 }
 
 mod erased {
-    //! Đổi giá trị bất kỳ thành JSON dạng chữ để lưu (cột `text`, như nhau trên hai database).
+    //! Converts any value to a JSON string for storage (column `text`, identical on both databases).
     pub(super) trait Json {
         fn text(&self) -> String;
     }

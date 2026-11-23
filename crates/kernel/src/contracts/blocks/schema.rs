@@ -1,20 +1,20 @@
-//! Kiểm props của khối theo JSON Schema (bước 67, D-20261122-block-registry).
+//! Validates block props against a JSON Schema (step 67, D-20261122-block-registry).
 //!
-//! Chỉ nhận một phần nhỏ của JSON Schema (draft 2020-12) — đủ để mô tả props của khối, đủ để
-//! giao diện dựng bảng thuộc tính và để mô hình AI hiểu: `type`, `properties`, `required`,
+//! Accepts only a small subset of JSON Schema (draft 2020-12) — enough to describe a block's props, to let
+//! the UI build a property panel and to let AI models understand: `type`, `properties`, `required`,
 //! `additionalProperties`, `items`, `enum`, `const`, `minLength` / `maxLength`, `minimum` /
 //! `maximum`, `minItems` / `maxItems`, `format` (`uuid`, `date-time`), `title`, `description`,
-//! `default`, `examples`, cùng ba từ khoá riêng của Autoxide:
+//! `default`, `examples`, plus three Autoxide-specific keywords:
 //!
-//! - `x-responsive: true` — giá trị là một giá trị đơn, hoặc `{base, md?, lg?}` theo cỡ màn hình;
-//! - `x-media: true` — chuỗi là ID ảnh / video của module `media` (UUID), không phải URL;
-//! - `x-link: true` — link theo luật link của thân bài (D-102): `http(s)`, `mailto:`, `tel:`, hoặc
-//!   đường dẫn trong site (`/…`, không `//`); không bao giờ `javascript:`.
+//! - `x-responsive: true` — the value is a single value, or `{base, md?, lg?}` per screen size;
+//! - `x-media: true` — the string is an image / video ID of the `media` module (a UUID), not a URL;
+//! - `x-link: true` — a link following the post-body link rule (D-102): `http(s)`, `mailto:`, `tel:`, or
+//!   a path inside the site (`/…`, not `//`); never `javascript:`.
 //!
-//! Từ khoá ngoài danh sách là lỗi khai báo (báo lúc khởi động): kiểm "từ chối mặc định" chỉ đúng
-//! khi mọi điều schema nói đều được kiểm thật. Object nào cũng phải đóng
-//! (`additionalProperties: false`). Mọi chuỗi trong props là chữ thuần: chuỗi có dạng thẻ HTML
-//! (`<b`, `</`, `<!`) bị từ chối — giao diện hiện chữ, không chèn HTML.
+//! A keyword outside the list is a declaration error (reported at startup): "reject by default" validation is
+//! only correct when everything the schema says is really checked. Every object must be closed
+//! (`additionalProperties: false`). Every string in props is plain text: a string shaped like an HTML tag
+//! (`<b`, `</`, `<!`) is rejected — the UI renders text and never injects HTML.
 
 use serde_json::{Map, Value};
 
@@ -46,10 +46,10 @@ const KEYWORDS: [&str; 22] = [
 ];
 const TYPES: [&str; 7] = ["object", "array", "string", "integer", "number", "boolean", "null"];
 const FORMATS: [&str; 2] = ["uuid", "date-time"];
-/// Cỡ màn hình của giá trị `x-responsive`: `base` (mọi cỡ, bắt buộc), `md`, `lg`.
+/// Screen size of an `x-responsive` value: `base` (all sizes, required), `md`, `lg`.
 pub const BREAKPOINTS: [&str; 3] = ["base", "md", "lg"];
 
-/// Lỗi khai báo của schema `schema` (đã đọc từ JSON) của khối `block`. Rỗng: dùng được.
+/// Declaration errors of schema `schema` (read from JSON) of block `block`. Empty: usable.
 pub(crate) fn declaration_problems(block: &str, schema: &Value) -> Vec<String> {
     let mut found = Vec::new();
     if schema.get("type").and_then(Value::as_str) != Some("object") {
@@ -173,8 +173,8 @@ fn flag(object: &Map<String, Value>, key: &str) -> bool {
     object.get(key) == Some(&Value::Bool(true))
 }
 
-/// Kiểm `value` theo `schema` (đã qua [`declaration_problems`]); mọi chỗ sai vào `found`, mỗi chỗ
-/// một [`FieldError`] có đường dẫn bắt đầu bằng `at` (vd `sections[0].props.title`).
+/// Validates `value` against `schema` (already passed through [`declaration_problems`]); every mismatch goes
+/// into `found`, each one a [`FieldError`] whose path starts with `at` (e.g. `sections[0].props.title`).
 pub(crate) fn check(schema: &Value, value: &Value, at: &str, found: &mut Vec<FieldError>) {
     let Some(object) = schema.as_object() else {
         return;
@@ -346,15 +346,15 @@ fn is_type(value: &Value, expected: &str) -> bool {
     }
 }
 
-/// Chuỗi có dạng thẻ HTML: `<` ngay trước chữ cái, `/`, `!` hay `?`.
+/// A string shaped like an HTML tag: `<` right before a letter, `/`, `!` or `?`.
 fn looks_like_html(text: &str) -> bool {
     text.as_bytes().windows(2).any(|pair| {
         pair[0] == b'<' && (pair[1].is_ascii_alphabetic() || matches!(pair[1], b'/' | b'!' | b'?'))
     })
 }
 
-/// Link an toàn (luật link của thân bài, D-102): `http`, `https`, `mailto`, `tel`, hoặc đường dẫn
-/// trong site (`/…`, không `//`).
+/// A safe link (post-body link rule, D-102): `http`, `https`, `mailto`, `tel`, or a path
+/// inside the site (`/…`, not `//`).
 pub(crate) fn safe_link(href: &str) -> bool {
     let lower = href.trim().to_ascii_lowercase();
     // `\` thành `/` trong trình duyệt: `/\evil.com` là `//evil.com` — link ra ngoài trá hình

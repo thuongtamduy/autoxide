@@ -1,14 +1,14 @@
-//! Slug: phần cuối của đường dẫn (`duong-den-da-lat`), dùng chung mọi module (`content`, `catalog`…;
-//! dời từ `content` ở bước 41). Sinh từ tiêu đề bằng crate `slug`
-//! (chuyển mọi chữ sang ASCII: bỏ dấu, `đ` → `d`); slug người dùng gửi phải đúng dạng
-//! `[a-z0-9]+(-[a-z0-9]+)*`, dài tối đa [`MAX_LENGTH`] ký tự (D-102).
+//! Slug: the last part of a path (`duong-den-da-lat`), shared by every module (`content`, `catalog`, ...;
+//! moved from `content` in step 41). Generated from a title with the `slug` crate (converts every letter to
+//! ASCII: strips diacritics, `đ` -> `d`); a slug submitted by a user must have the form
+//! `[a-z0-9]+(-[a-z0-9]+)*` and be at most [`MAX_LENGTH`] characters long (D-102).
 
 use uuid::Uuid;
 
-/// Độ dài tối đa của slug.
+/// Maximum length of a slug.
 pub const MAX_LENGTH: usize = 100;
 
-/// Slug có đúng dạng không.
+/// Whether the slug has the right shape.
 pub fn is_valid(slug: &str) -> bool {
     !slug.is_empty()
         && slug.len() <= MAX_LENGTH
@@ -17,8 +17,8 @@ pub fn is_valid(slug: &str) -> bool {
         })
 }
 
-/// Slug sinh từ `title` (bỏ emoji, ký hiệu); tiêu đề không cho ra chữ nào (vd chỉ có emoji)
-/// thì dùng đoạn đầu của `id`.
+/// Slug generated from `title` (emoji and symbols dropped); when the title yields no letters at all (e.g. only
+/// emoji), the first part of `id` is used.
 pub fn from_title(title: &str, id: Uuid) -> String {
     // Chỉ giữ chữ, số và dấu ngăn từ: emoji và ký hiệu bị bỏ (không thì thành chữ tiếng Anh).
     let kept: String = title.chars().map(|c| if c.is_alphanumeric() { c } else { ' ' }).collect();
@@ -44,7 +44,7 @@ pub fn from_title(title: &str, id: Uuid) -> String {
     }
 }
 
-/// `base` kèm hậu tố thứ `n` (`n` ≥ 2): `slug-2`, cắt bớt `base` cho vừa giới hạn.
+/// `base` with the `n`th suffix (`n` >= 2): `slug-2`, with `base` truncated to fit the limit.
 pub fn with_suffix(base: &str, n: u32) -> String {
     let suffix = format!("-{n}");
     let room = MAX_LENGTH.saturating_sub(suffix.len());

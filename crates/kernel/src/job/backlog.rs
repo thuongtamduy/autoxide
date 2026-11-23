@@ -1,15 +1,15 @@
-//! Số đo tồn đọng (bước 39, mục A3): job đang chờ, tuổi của job tới hạn chờ lâu nhất, job trong
-//! dead-letter queue, event chưa giao và tuổi của event cũ nhất, kết nối database đang dùng / còn
-//! rảnh — theo database và module. Bộ đếm cộng dồn (`jobs_failed_total`…) không cho thấy hàng đợi
-//! KẸT; các gauge này thì có.
+//! Backlog measurements (step 39, item A3): pending jobs, the age of the longest-waiting due job, jobs in the
+//! dead-letter queue, undelivered events and the age of the oldest event, database connections in use / idle
+//! — per database and module. Cumulative counters (`jobs_failed_total`…) do not show that a queue is STUCK;
+//! these gauges do.
 //!
-//! Hai phần tách nhau để test được trên cả hai database mà không đụng bộ thu số đo của tiến trình:
-//! [`backlog`] chỉ đọc database và trả một [`BacklogSnapshot`]; [`publish`] chỉ đặt gauge.
-//! [`BacklogMonitor`] chạy cả hai định kỳ ở tiến trình chạy job (vai `worker` / `all`).
+//! Two parts kept separate so they can be tested on both databases without touching the process's metrics
+//! recorder: [`backlog`] only reads the database and returns a [`BacklogSnapshot`]; [`publish`] only sets
+//! gauges. [`BacklogMonitor`] runs both periodically in the process that runs jobs (role `worker` / `all`).
 //!
-//! Nhãn: `database` (tên placement, bị chặn bởi `AUTOXIDE_METRICS_MAX_DATABASE_LABELS` — phần vượt
-//! gộp vào `other`), `module` (module đã đăng ký: tập nhỏ cố định), `pool`, `state`. KHÔNG có nhãn
-//! theo khách: tra theo khách đi qua log, trace và CLI (luật code về nhãn số đo).
+//! Labels: `database` (the placement name, capped by `AUTOXIDE_METRICS_MAX_DATABASE_LABELS` - the excess is
+//! merged into `other`), `module` (registered modules: a small fixed set), `pool`, `state`. NO per-tenant
+//! label: per-tenant lookup goes through logs, traces and the CLI (the code rule on metric labels).
 
 use crate::time::Timestamp;
 use sea_orm::ConnectionTrait;
@@ -22,11 +22,11 @@ use crate::database::Database;
 use crate::error::Error;
 use crate::tenancy::DatabaseRegistry;
 
-/// Nhãn `database` cho phần database vượt giới hạn.
+/// The `database` label for databases beyond the limit.
 pub const OTHER_DATABASE: &str = "other";
 
-/// Tên mọi gauge [`publish`] đặt. Test của dashboard và luật cảnh báo trong `deploy/` so tên số đo
-/// với danh sách này (cùng các số đo khác của kernel).
+/// Names of every gauge [`publish`] sets. The dashboard tests and the alert rules in `deploy/` compare metric
+/// names against this list (along with the kernel's other metrics).
 pub const METRICS: &[&str] = &[
     "jobs_pending",
     "jobs_oldest_pending_seconds",
@@ -38,38 +38,38 @@ pub const METRICS: &[&str] = &[
     "database_connections_max",
 ];
 
-/// Tồn đọng của một database.
+/// The backlog of one database.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct BacklogSnapshot {
-    /// Tên database (placement): `main`, hay tên placement của bước 33.
+    /// Database (placement) name: `main`, or a step 33 placement name.
     pub database: String,
     pub modules: Vec<ModuleBacklog>,
     pub pools: Vec<PoolUsage>,
 }
 
-/// Tồn đọng của một module trên một database. Module không có bảng job (hay bảng event) thì các
-/// số tương ứng là 0.
+/// The backlog of one module on one database. A module without a job table (or event table) has the
+/// corresponding numbers as 0.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct ModuleBacklog {
     pub module: &'static str,
-    /// Job chưa xong, chưa vào dead-letter queue (kể cả job hẹn giờ chưa tới).
+    /// Jobs not yet done and not in the dead-letter queue (including scheduled jobs not yet due).
     pub jobs_pending: u64,
-    /// Tuổi (giây) của job TỚI HẠN chờ lâu nhất: `now - run_at`; 0 khi không có. Job hẹn giờ
-    /// tương lai không tính — nó chưa chờ ai.
+    /// Age (seconds) of the longest-waiting DUE job: `now - run_at`; 0 when there is none. A job scheduled
+    /// for the future does not count - it is not waiting on anyone yet.
     pub jobs_oldest_pending_seconds: u64,
-    /// Job trong dead-letter queue (`failed_at` có giá trị).
+    /// Jobs in the dead-letter queue (`failed_at` has a value).
     pub jobs_dead: u64,
-    /// Event chưa giao, chưa hỏng hẳn.
+    /// Events not yet delivered and not permanently failed.
     pub events_pending: u64,
-    /// Tuổi (giây) của event chưa giao cũ nhất: `now - occurred_at`; 0 khi không có.
+    /// Age (seconds) of the oldest undelivered event: `now - occurred_at`; 0 when there is none.
     pub events_oldest_pending_seconds: u64,
-    /// Event hỏng hẳn (`failed_at` có giá trị).
+    /// Permanently failed events (`failed_at` has a value).
     pub events_dead: u64,
 }
 
-/// Kết nối của một pool.
+/// The connections of one pool.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct PoolUsage {
@@ -80,8 +80,8 @@ pub struct PoolUsage {
     pub max: u32,
 }
 
-/// Đọc tồn đọng của `database` (tên `name`): bảng job của `job_modules`, bảng event của
-/// `event_modules`, và hai pool. Chỉ dùng kết nối ĐỌC (SQLite chỉ có một kết nối ghi).
+/// Reads the backlog of `database` (named `name`): the job tables of `job_modules`, the event tables of
+/// `event_modules`, and the two pools. Uses only the READ connection (SQLite has only one write connection).
 pub async fn backlog(
     database: &Database,
     name: &str,
@@ -125,7 +125,7 @@ pub async fn backlog(
     Ok(BacklogSnapshot { database: name.to_owned(), modules, pools: pools(database) })
 }
 
-/// Số dòng của `table` thoả `condition`.
+/// Number of rows of `table` satisfying `condition`.
 async fn count(database: &Database, table: &str, condition: Condition) -> Result<u64, Error> {
     let select = Query::select()
         .expr_as(Func::count(Expr::col(Alias::new("id"))), Alias::new("n"))
@@ -140,9 +140,10 @@ async fn count(database: &Database, table: &str, condition: Condition) -> Result
     Ok(u64::try_from(n).unwrap_or(0))
 }
 
-/// Tuổi (giây, tính tới `now`) của dòng có `column` nhỏ nhất trong các dòng thoả `condition`; 0
-/// khi không có dòng nào. Lấy dòng đầu theo thứ tự thay vì `MIN(...)`: kiểu trả về của hàm gộp
-/// trên cột thời gian khác nhau giữa SQLite (chữ) và Postgres, còn đọc một cột thì như mọi chỗ khác.
+/// Age (seconds, up to `now`) of the row with the smallest `column` among the rows satisfying `condition`; 0
+/// when there are no rows. Takes the first row in order instead of `MIN(...)`: the return type of an aggregate
+/// over a time column differs between SQLite (text) and Postgres, whereas reading a column is like
+/// everywhere else.
 async fn oldest(
     database: &Database,
     table: &str,
@@ -164,7 +165,7 @@ async fn oldest(
     Ok(u64::try_from((now - at).as_secs()).unwrap_or(0))
 }
 
-/// Kết nối của hai pool. Đọc thẳng từ pool của sqlx (không truy vấn database).
+/// The connections of the two pools. Read straight from sqlx's pool (no database query).
 fn pools(database: &Database) -> Vec<PoolUsage> {
     [("read", database.read()), ("write", database.write())]
         .into_iter()
@@ -185,9 +186,9 @@ fn pools(database: &Database) -> Vec<PoolUsage> {
         .collect()
 }
 
-/// Đặt gauge theo `snapshots`. Quá `max_database_labels` database thì phần còn lại (theo thứ tự
-/// của `snapshots`) gộp vào nhãn `database="other"`: cộng số đếm, lấy tuổi lớn nhất — để số chuỗi
-/// số đo có trần dù mỗi khách có database riêng.
+/// Sets the gauges from `snapshots`. Beyond `max_database_labels` databases the rest (in the order of
+/// `snapshots`) are merged into the label `database="other"`: counts are summed, the largest age is taken -
+/// so the number of metric series has a ceiling even when each tenant has its own database.
 pub fn publish(snapshots: &[BacklogSnapshot], max_database_labels: usize) {
     let (named, rest) = snapshots.split_at(snapshots.len().min(max_database_labels));
     for snapshot in named {
@@ -255,8 +256,8 @@ fn publish_one(database: &str, modules: &[ModuleBacklog], pools: &[PoolUsage]) {
     }
 }
 
-/// Cập nhật gauge tồn đọng định kỳ cho mọi database máy chủ này chạy job. Dựng bằng
-/// `Modules::backlog_monitor`; chạy ở tiến trình có vai `worker` hay `all`.
+/// Periodically updates the backlog gauges for every database this server runs jobs on. Built with
+/// `Modules::backlog_monitor`; runs in a process with role `worker` or `all`.
 pub struct BacklogMonitor {
     databases: DatabaseRegistry,
     job_modules: Vec<&'static str>,
@@ -280,20 +281,20 @@ impl BacklogMonitor {
         }
     }
 
-    /// Chu kỳ cập nhật (`AUTOXIDE_METRICS_BACKLOG_SECONDS`).
+    /// Update interval (`AUTOXIDE_METRICS_BACKLOG_SECONDS`).
     pub fn every(mut self, every: Duration) -> Self {
         self.every = every.max(Duration::from_secs(1));
         self
     }
 
-    /// Số nhãn `database` tối đa (`AUTOXIDE_METRICS_MAX_DATABASE_LABELS`).
+    /// Maximum number of `database` labels (`AUTOXIDE_METRICS_MAX_DATABASE_LABELS`).
     pub fn max_database_labels(mut self, max: usize) -> Self {
         self.max_database_labels = max.max(1);
         self
     }
 
-    /// Một lượt: đọc tồn đọng của mọi database. Database lỗi thì ghi log rồi bỏ qua, không làm
-    /// hỏng lượt của database khác.
+    /// One round: reads the backlog of every database. A failing database is logged and skipped, without
+    /// breaking the round for other databases.
     pub async fn collect(&self) -> Result<Vec<BacklogSnapshot>, Error> {
         let now = Timestamp::now();
         let mut snapshots = Vec::new();
@@ -308,7 +309,7 @@ impl BacklogMonitor {
         Ok(snapshots)
     }
 
-    /// Chạy tới khi `shutdown` hoàn thành: mỗi chu kỳ một lượt [`collect`](Self::collect) rồi
+    /// Runs until `shutdown` completes: each interval one [`collect`](Self::collect) round and then
     /// [`publish`].
     pub async fn run(self, shutdown: impl Future<Output = ()>) {
         tokio::pin!(shutdown);
@@ -344,8 +345,8 @@ mod tests {
         }
     }
 
-    /// Quá giới hạn nhãn thì database còn lại gộp vào `other`: cộng số đếm, lấy tuổi lớn nhất.
-    /// Dùng bộ thu số đo cục bộ để không đụng bộ thu của cả tiến trình.
+    /// Beyond the label limit the remaining databases are merged into `other`: counts are summed, the largest
+    /// age is taken. Uses a local metrics recorder so as not to touch the process-wide one.
     #[test]
     fn publish_gop_database_vuot_gioi_han_thanh_other() {
         let recorder = metrics_exporter_prometheus::PrometheusBuilder::new().build_recorder();
@@ -371,8 +372,8 @@ mod tests {
     }
 }
 
-/// Module có bảng job và bảng event, cho [`status`] (REST, MCP). `Modules` điền sau khi mọi module
-/// khởi động; trước đó trống. `Clone` rẻ (con trỏ đếm tham chiếu).
+/// Modules that have a job table and an event table, for [`status`] (REST, MCP). `Modules` fills it in after
+/// every module has started; empty before that. Cheap to `Clone` (a reference-counted pointer).
 #[derive(Clone, Default)]
 pub(crate) struct BacklogModules(std::sync::Arc<std::sync::OnceLock<ModuleLists>>);
 
@@ -388,8 +389,8 @@ impl BacklogModules {
     }
 }
 
-/// Tồn đọng của mọi database, kèm bản backup tốt mới nhất của mỗi database — cho
-/// `GET /api/v1/kernel/ops/backlog` và tool MCP `kernel.ops_backlog`.
+/// The backlog of every database, with the latest good backup of each database - for
+/// `GET /api/v1/kernel/ops/backlog` and the MCP tool `kernel.ops_backlog`.
 pub(crate) async fn status(
     registry: &DatabaseRegistry,
     modules: &BacklogModules,

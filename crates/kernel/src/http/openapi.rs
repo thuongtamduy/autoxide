@@ -1,13 +1,13 @@
-//! Tài liệu OpenAPI: hoàn thiện phần chung, phục vụ qua HTTP, và kiểm chất lượng.
+//! OpenAPI document: completes the shared parts, serves it over HTTP, and checks its quality.
 //!
-//! Tài liệu sinh từ chính khai báo route (`routes!`), nên đường dẫn và method
-//! không thể lệch với code. File này thêm những thứ giống nhau ở mọi endpoint để
-//! người viết module không phải lặp lại:
+//! The document is generated from the route declarations themselves (`routes!`), so paths and methods
+//! cannot drift from the code. This file adds the things that are identical on every endpoint so module
+//! authors need not repeat them:
 //!
-//! - tag = tên module, để tài liệu gom theo module;
-//! - `operationId` mang tiền tố module, để không trùng giữa các module (công cụ
-//!   sinh SDK dùng nó làm tên hàm);
-//! - response `default` = Problem Details: mọi endpoint đều có thể trả lỗi dạng đó.
+//! - tag = the module name, so the document groups by module;
+//! - `operationId` carries the module prefix, so it does not collide across modules (SDK generators use it
+//!   as the function name);
+//! - the `default` response = Problem Details: every endpoint can return an error of that form.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -24,13 +24,13 @@ use utoipa::openapi::{
 
 use crate::response::{PROBLEM_CONTENT_TYPE, Problem};
 
-/// Đường dẫn phục vụ tài liệu OpenAPI dạng JSON.
+/// The path serving the OpenAPI document as JSON.
 pub const OPENAPI_PATH: &str = "/api/v1/openapi.json";
-/// Đường dẫn trang xem tài liệu API (khi được bật).
+/// The path of the API documentation viewer page (when enabled).
 pub const DOCS_PATH: &str = "/api/docs";
 
-/// Tên cách xác thực "bearer token" trong tài liệu. Handler cần đăng nhập khai
-/// `security((BEARER_AUTH = []))` — viết chữ `"bearer"` trong `#[utoipa::path]`.
+/// The name of the "bearer token" authentication scheme in the document. A handler that requires sign-in
+/// declares `security((BEARER_AUTH = []))` - write the string `"bearer"` in `#[utoipa::path]`.
 pub const BEARER_AUTH: &str = "bearer";
 
 const DESCRIPTION: &str = "\
@@ -91,7 +91,7 @@ it when reporting a problem.
 - **IDs** are UUIDv7 strings; **timestamps** are UTC in RFC 3339; **money** is an integer amount \
 in the smallest currency unit plus a currency code.";
 
-/// Phần đầu của tài liệu: tên, phiên bản, và các quy ước chung của API.
+/// The top of the document: name, version, and the API's shared conventions.
 pub(super) fn base_document() -> OpenApi {
     OpenApiBuilder::new()
         .info(
@@ -113,7 +113,7 @@ pub(super) fn base_document() -> OpenApi {
         .build()
 }
 
-/// Gắn nhãn cho tài liệu của MỘT module trước khi ghép vào tài liệu chung.
+/// Tags the document of ONE module before it is merged into the shared document.
 pub(super) fn label_module(module: &str, openapi: &mut OpenApi) {
     for item in openapi.paths.paths.values_mut() {
         for (_, operation) in operations_mut(item) {
@@ -128,8 +128,8 @@ pub(super) fn label_module(module: &str, openapi: &mut OpenApi) {
     }
 }
 
-/// Ghi vào mọi operation của một module bị gói chi phối (bước 35) rằng nó có thể trả 403 vì gói:
-/// thêm câu vào response 403 sẵn có, hay thêm response 403 mới.
+/// Records on every operation of a plan-governed module (step 35) that it may return 403 because of the
+/// plan: appends a sentence to an existing 403 response, or adds a new 403 response.
 pub(super) fn document_plan_gate(openapi: &mut OpenApi) {
     for item in openapi.paths.paths.values_mut() {
         for (method, operation) in operations_mut(item) {
@@ -163,10 +163,10 @@ pub(super) fn document_plan_gate(openapi: &mut OpenApi) {
     }
 }
 
-/// Hoàn thiện tài liệu chung sau khi đã ghép mọi module.
-/// Hoàn tất tài liệu: schema `Problem`, cách xác thực, response lỗi mặc định, và các
-/// header chung khai trên từng operation (để SDK sinh tự động có sẵn tham số).
-/// `idempotency`: có nơi lưu idempotency key (header `Idempotency-Key` có tác dụng).
+/// Completes the shared document after every module has been merged. Finalizes the document: the `Problem`
+/// schema, authentication, default error responses, and the shared headers declared on each operation (so
+/// generated SDKs have the parameters ready). `idempotency`: whether an idempotency key store exists (the
+/// `Idempotency-Key` header has an effect).
 pub(super) fn finish(openapi: &mut OpenApi, idempotency: bool) {
     // Schema `Problem` (và các schema nó dùng) phải có mặt để `$ref` bên dưới trỏ tới.
     let mut schemas =
@@ -246,7 +246,7 @@ pub(super) fn finish(openapi: &mut OpenApi, idempotency: bool) {
     }
 }
 
-/// Response có thân là `Problem` khai dưới `application/json` thì chuyển sang
+/// A response whose body is `Problem` declared under `application/json` is switched to
 /// `application/problem+json`.
 fn problem_media_type(response: &mut utoipa::openapi::Response) {
     let problem_ref = format!("#/components/schemas/{}", Problem::name());
@@ -261,13 +261,15 @@ fn problem_media_type(response: &mut utoipa::openapi::Response) {
     }
 }
 
-/// Hợp đồng quyền đọc được bằng máy (D-205, đặc tả 54 P1, D-245): mỗi operation khai đúng một trong
-/// - `x-public: true` — gọi được không cần đăng nhập;
-/// - `x-permissions: [..]` — cần đăng nhập và một trong các permission (danh sách rỗng: chỉ cần đăng
-///   nhập).
+/// The machine-readable permission contract (D-205, spec 54 P1, D-245): each operation declares exactly one
+/// of:
 ///
-/// Mỗi permission khai phải được nói tới trong mô tả hay response 403 của operation, để chữ cho người
-/// đọc không lệch khai báo.
+/// - `x-public: true` - callable without signing in;
+/// - `x-permissions: [..]` - requires sign-in and one of the permissions (an empty list: only sign-in is
+///   required).
+///
+/// Each declared permission must be mentioned in the operation's description or 403 response, so the
+/// human-readable text does not drift from the declaration.
 fn access_problems(endpoint: &str, operation: &utoipa::openapi::path::Operation) -> Vec<String> {
     let extensions = operation.extensions.as_ref();
     let public = extensions.and_then(|extensions| extensions.get("x-public"));
@@ -303,8 +305,9 @@ fn access_problems(endpoint: &str, operation: &utoipa::openapi::path::Operation)
     }
 }
 
-/// Kiểm tài liệu có đủ để gọi đúng API mà không cần đọc mã nguồn. Trả về danh sách
-/// vấn đề; rỗng nghĩa là đạt. Gate chạy hàm này trên tài liệu của cả chương trình.
+/// Checks whether the document is enough to call the API correctly without reading the source code. Returns
+/// the list of problems; empty means it passes. The gate runs this function on the document of the whole
+/// program.
 pub fn lint(openapi: &OpenApi) -> Vec<String> {
     let mut problems = Vec::new();
     let mut operation_ids = BTreeSet::new();
@@ -383,8 +386,9 @@ pub fn lint(openapi: &OpenApi) -> Vec<String> {
     problems
 }
 
-/// Tên schema mà hai nơi trong `documents` (tên nơi, tài liệu của nơi đó) khai với nội dung khác
-/// nhau. Cùng tên cùng nội dung (vd `Problem` của kernel mà module nào cũng dùng) thì không sao.
+/// The names of schemas that two places in `documents` (place name, that place's document) declare with
+/// different content. The same name with the same content (e.g. the kernel's `Problem`, used by every
+/// module) is fine.
 pub(super) fn schema_conflicts<'a>(
     documents: impl IntoIterator<Item = (&'a str, &'a OpenApi)>,
 ) -> Vec<String> {
@@ -409,8 +413,8 @@ pub(super) fn schema_conflicts<'a>(
     problems
 }
 
-/// Mọi `$ref` phải trỏ tới một mục có thật trong chính tài liệu: thiếu một mục là tài
-/// liệu không hợp lệ — trình kiểm chuẩn và công cụ sinh SDK từ chối cả file.
+/// Every `$ref` must point to an entry that exists in the document itself: a missing entry makes the
+/// document invalid - standard validators and SDK generators reject the whole file.
 fn dangling_refs(document: &serde_json::Value) -> Vec<String> {
     let mut refs = BTreeSet::new();
     collect_refs(document, &mut refs);
@@ -447,9 +451,9 @@ fn collect_refs(node: &serde_json::Value, refs: &mut BTreeSet<String>) {
     }
 }
 
-/// Mô tả gửi ra ngoài (OpenAPI, tool MCP) phải là tiếng Anh: `///` trên kiểu có
-/// `ToSchema` / `IntoParams` được chép thẳng vào đó. Báo mọi `summary` / `description`
-/// có chữ tiếng Việt; `what` là tên tài liệu trong thông báo.
+/// Descriptions sent outward (OpenAPI, MCP tools) must be in English: `///` on a type with `ToSchema` /
+/// `IntoParams` is copied straight into them. Reports every `summary` / `description` containing Vietnamese
+/// text; `what` is the document's name in the message.
 pub(crate) fn untranslated_text(document: &serde_json::Value, what: &str) -> Vec<String> {
     let mut problems = Vec::new();
     collect_untranslated(document, what, &mut problems);
@@ -482,7 +486,7 @@ fn collect_untranslated(node: &serde_json::Value, what: &str, problems: &mut Vec
     }
 }
 
-/// Có chữ cái riêng của tiếng Việt (ă â đ ê ô ơ ư, hoặc nguyên âm mang dấu thanh).
+/// Contains letters specific to Vietnamese (`ă â đ ê ô ơ ư`, or vowels with tone marks).
 pub(crate) fn looks_vietnamese(text: &str) -> bool {
     text.chars().any(|c| {
         matches!(c, 'ă' | 'Ă' | 'đ' | 'Đ' | 'ơ' | 'Ơ' | 'ư' | 'Ư')
@@ -490,7 +494,8 @@ pub(crate) fn looks_vietnamese(text: &str) -> bool {
     })
 }
 
-/// Thêm một header chung vào danh sách tham số, trừ khi operation đã khai header cùng tên.
+/// Adds a shared header to the parameter list, unless the operation already declares a header of the same
+/// name.
 fn push_header(parameters: &mut Vec<RefOr<Parameter>>, header: Parameter) {
     let declared = parameters.iter().any(|parameter| {
         matches!(parameter, RefOr::T(parameter)
@@ -502,7 +507,7 @@ fn push_header(parameters: &mut Vec<RefOr<Parameter>>, header: Parameter) {
     }
 }
 
-/// Header `Accept-Language`, có ở mọi operation.
+/// The `Accept-Language` header, present on every operation.
 fn accept_language() -> Parameter {
     ParameterBuilder::new()
         .name("Accept-Language")
@@ -516,7 +521,7 @@ fn accept_language() -> Parameter {
         .build()
 }
 
-/// Header `Idempotency-Key`, có ở mọi lệnh ghi cần đăng nhập.
+/// The `Idempotency-Key` header, present on every write operation that requires sign-in.
 fn idempotency_key() -> Parameter {
     ParameterBuilder::new()
         .name("Idempotency-Key")
@@ -536,7 +541,7 @@ fn idempotency_key() -> Parameter {
         .build()
 }
 
-/// Các operation của một đường dẫn, kèm tên method.
+/// The operations of one path, with the method name.
 fn operations(item: &PathItem) -> impl Iterator<Item = (&'static str, &Operation)> {
     [
         ("get", &item.get),

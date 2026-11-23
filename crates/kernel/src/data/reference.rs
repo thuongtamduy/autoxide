@@ -1,17 +1,18 @@
-//! Mã tham chiếu do client đặt (`reference`) — chống trùng lệnh ở tầng nghiệp vụ (D-184).
+//! Client-set reference code (`reference`): guards against duplicate commands at the business level (D-184).
 //!
-//! Idempotency key của HTTP (`Idempotency-Key`) chỉ giữ 24 giờ và chỉ chặn gửi lại cùng một
-//! request. Lệnh có hậu quả lâu dài (chuyển tiền, tạo giao dịch) cần mạnh hơn: client đặt một
-//! `reference` (vd mã hoá đơn, mã lệnh trong hệ thống của họ), module lưu nó **vĩnh viễn cùng
-//! bản ghi**, duy nhất theo người gọi:
+//! The HTTP idempotency key (`Idempotency-Key`) is kept for only 24 hours and only blocks resending the
+//! same request. A command with lasting consequences (moving money, creating a transaction) needs something
+//! stronger: the client sets a `reference` (e.g. an invoice number or an order ID in its own system), and
+//! the module stores it **permanently with the record**, unique per caller:
 //!
-//! - gửi lại cùng `reference`, cùng nội dung → trả lại bản ghi đã tạo (không tạo thêm);
-//! - cùng `reference`, nội dung khác → lỗi `reference_reused` (422);
-//! - hai request cùng `reference` chạy đồng thời → đúng một bản ghi được tạo.
+//! - resend with the same `reference` and the same content → returns the record already created (nothing new
+//!   is created);
+//! - same `reference`, different content → error `reference_reused` (422);
+//! - two requests with the same `reference` running concurrently → exactly one record is created.
 //!
-//! Cách lưu chuẩn trong bảng của module: cột `reference` (chuỗi, tối đa [`MAX_LENGTH`]) và
-//! `reference_fingerprint` ([`fingerprint`] của nội dung lệnh), cùng một **unique index** trên
-//! (người sở hữu, `reference`). Service gọi [`submit_once`] và [`replayed`].
+//! Standard storage in the module's table: a `reference` column (string, at most [`MAX_LENGTH`]) and
+//! `reference_fingerprint` (the [`fingerprint`] of the command content), plus one **unique index** on
+//! (owner, `reference`). The service calls [`submit_once`] and [`replayed`].
 
 use std::fmt;
 use std::future::Future;
@@ -23,16 +24,16 @@ use serde_json::Value;
 use crate::database::Database;
 use crate::error::{Error, ErrorKind, FieldError};
 
-/// Độ dài tối đa của một `reference`, theo byte.
+/// Maximum length of a `reference`, in bytes.
 pub const MAX_LENGTH: usize = 100;
 
-/// Một mã tham chiếu đã kiểm: 1–[`MAX_LENGTH`] ký tự ASCII nhìn thấy được (không khoảng trắng).
+/// A validated reference code: 1 to [`MAX_LENGTH`] visible ASCII characters (no whitespace).
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Reference(String);
 
 impl Reference {
-    /// Kiểm `raw` của trường `field`; sai thì thêm lỗi vào `problems` và trả `None` (service gom
-    /// mọi lỗi rồi báo một lần, D-083).
+    /// Validates `raw` of field `field`; if invalid, adds an error to `problems` and returns `None` (the
+    /// service gathers every error and reports once, D-083).
     pub fn checked(raw: &str, field: &str, problems: &mut Vec<FieldError>) -> Option<Reference> {
         let valid =
             (1..=MAX_LENGTH).contains(&raw.len()) && raw.bytes().all(|b| b.is_ascii_graphic());
@@ -69,9 +70,9 @@ impl fmt::Display for Reference {
     }
 }
 
-/// Dấu vân tay của nội dung lệnh: SHA-256 của JSON chuẩn hoá (khoá sắp theo thứ tự, không khoảng
-/// trắng) — cùng nội dung luôn cho cùng dấu vân tay, dù client gửi khoá theo thứ tự nào. Chỉ
-/// đưa vào những trường quyết định kết quả của lệnh (không đưa `reference` hay thời gian gửi).
+/// Fingerprint of the command content: SHA-256 of canonical JSON (keys in sorted order, no whitespace).
+/// The same content always gives the same fingerprint, whatever order the client sent the keys in. Include only
+/// the fields that determine the command's result (not `reference` or the send time).
 pub fn fingerprint(content: &impl Serialize) -> Result<String, Error> {
     let value = serde_json::to_value(content).map_err(Error::internal)?;
     let mut text = String::new();
@@ -79,8 +80,8 @@ pub fn fingerprint(content: &impl Serialize) -> Result<String, Error> {
     Ok(crate::secret::sha256(&text))
 }
 
-/// Viết `value` thành JSON với khoá của object sắp tăng dần. Không dựa vào thứ tự của
-/// `serde_json::Map`: một thư viện khác bật feature `preserve_order` là thứ tự đổi theo.
+/// Writes `value` as JSON with object keys in ascending order. Does not rely on the order of
+/// `serde_json::Map`: if another library enables the `preserve_order` feature, the order changes with it.
 fn canonical(value: &Value, out: &mut String) {
     match value {
         Value::Object(fields) => {
@@ -113,17 +114,17 @@ fn canonical(value: &Value, out: &mut String) {
     }
 }
 
-/// Kết quả của [`submit_once`].
+/// Result of [`submit_once`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Submitted<T> {
-    /// Lần đầu: bản ghi vừa tạo (REST trả 201).
+    /// First time: the record just created (REST returns 201).
     Created(T),
-    /// Đã có từ lần gửi trước với cùng `reference` và cùng nội dung (REST trả 200).
+    /// Already existed from an earlier send with the same `reference` and the same content (REST returns 200).
     Replayed(T),
 }
 
 impl<T> Submitted<T> {
-    /// Bản ghi, dù mới tạo hay có sẵn.
+    /// The record, whether newly created or already present.
     pub fn into_inner(self) -> T {
         match self {
             Submitted::Created(value) | Submitted::Replayed(value) => value,
@@ -131,12 +132,13 @@ impl<T> Submitted<T> {
     }
 }
 
-/// So bản ghi đã có với lệnh đang gửi. `stored`: bản ghi của người gọi mang `reference` này cùng
-/// dấu vân tay đã lưu, nếu có (tìm trong transaction ghi của lệnh). Trả:
+/// Compares an existing record with the command being sent. `stored`: the caller's record that carries this
+/// `reference` together with the stored fingerprint, if any (looked up in the command's write transaction).
+/// Returns:
 ///
-/// - `Ok(None)`: chưa có — tạo bản ghi mới (lưu kèm `reference` và `fingerprint`);
-/// - `Ok(Some(bản ghi))`: đã có, cùng nội dung — trả lại nó, không tạo thêm;
-/// - `Err(reference_reused)`: đã có, nội dung khác.
+/// - `Ok(None)`: none yet; create a new record (store it with `reference` and `fingerprint`);
+/// - `Ok(Some(record))`: exists with the same content; return it, create nothing more;
+/// - `Err(reference_reused)`: exists with different content.
 pub fn replayed<T>(
     stored: Option<(T, String)>,
     reference: &Reference,
@@ -149,14 +151,14 @@ pub fn replayed<T>(
     }
 }
 
-/// Chạy lệnh mang `reference` đúng một lần. `work` (như của
-/// [`Database::write_with_retry`]) mở transaction ghi, tìm bản ghi đã có rồi gọi [`replayed`],
-/// tạo bản ghi nếu chưa có, commit, và trả [`Submitted`].
+/// Runs a command that carries a `reference` exactly once. `work` (like the one of
+/// [`Database::write_with_retry`]) opens a write transaction, looks up the existing record, then calls
+/// [`replayed`], creates the record if none exists, commits, and returns [`Submitted`].
 ///
-/// Hai request cùng `reference` chạy đồng thời: SQLite xếp chúng nối đuôi (một bên ghi); trên
-/// Postgres cả hai cùng thấy "chưa có", unique index chặn bên thứ hai — hàm này chạy lại `work`
-/// của bên đó một lần, và lần này nó thấy bản ghi của bên kia. Xung đột tạm thời cũng được chạy
-/// lại như `write_with_retry`, nên `work` phải chịu được chạy lại.
+/// Two requests with the same `reference` running concurrently: SQLite queues them one after another (single
+/// writer); on Postgres both see "none yet" and the unique index blocks the second; this function reruns that
+/// side's `work` once, and this time it sees the other's record. A transient conflict is also rerun as in
+/// `write_with_retry`, so `work` must tolerate being rerun.
 ///
 /// ```ignore
 /// let (database, reference, fingerprint) = (&self.database, &reference, &fingerprint);
@@ -206,7 +208,7 @@ fn reused(reference: &Reference) -> Error {
     ))
 }
 
-/// Lỗi vi phạm unique (của database) có nằm trong chuỗi nguyên nhân của `error` không.
+/// Whether a unique-violation error (from the database) appears in the cause chain of `error`.
 fn is_unique_violation(error: &Error) -> bool {
     let mut current: Option<&(dyn std::error::Error + 'static)> = Some(error);
     while let Some(error) = current {

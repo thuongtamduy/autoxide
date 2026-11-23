@@ -1,21 +1,22 @@
-//! Chép dữ liệu của các module từ database này sang database khác — SQLite sang
-//! Postgres hay ngược lại (D-070). Dùng khi một bản cài lớn lên và chuyển sang
-//! Postgres, hay để mang dữ liệu thật về máy dev.
+//! Copies the data of the modules from one database to another: SQLite to
+//! Postgres or the reverse (D-070). Used when an installation grows and moves to
+//! Postgres, or to bring real data to a dev machine.
 //!
-//! - Hai database phải có CÙNG phiên bản schema (cùng migration đã áp dụng). Đích phải
-//!   là database MỚI mà bên gọi vừa áp dụng migration: dữ liệu migration gieo sẵn ở đích
-//!   (vd role `admin`) bị xoá rồi thay bằng dữ liệu của nguồn. Lệnh `autoxide copy` kiểm
-//!   đích chưa từng có migration nào trước khi gọi.
-//! - Bảng được chép theo thứ tự tạo bảng ở đích (tức thứ tự migration), nên bảng được
-//!   tham chiếu luôn có trước bảng tham chiếu nó (foreign key trong một module).
-//! - Mỗi giá trị được đọc theo kiểu cột của nguồn và ghi theo kiểu cột của đích (UUID,
-//!   thời gian, chữ, số nguyên, boolean, byte, số thực), nên cách mỗi database lưu kiểu
-//!   đó không quan trọng.
-//! - Mọi thứ ghi trong MỘT transaction ở đích: hỏng giữa chừng thì đích vẫn trống.
+//! - Both databases must have the SAME schema version (the same migrations applied). The target must be a
+//!   NEW database to which the caller has just applied the migrations: data the migrations seeded at the
+//!   target (e.g. the `admin` role) is deleted and replaced by the source's data. The command
+//!   `autoxide copy` checks that the target has never had any migration before calling.
+//! - Tables are copied in the order they were created at the target (that is, migration order), so a
+//!   referenced table always comes before the table that references it (foreign key within a module).
+//! - Each value is read by the source's column type and written by the target's column type (UUID,
+//!   time, text, integer, boolean, bytes, float), so how each database stores that type
+//!   does not matter.
+//! - Everything is written in ONE transaction at the target: if it fails midway the target stays empty.
 //!
-//! Dời một khách giữa hai placement (đặc tả 33 "Cấp phát và dời khách") dùng [`TenantTables`]:
-//! cùng cách đọc / ghi theo kiểu cột, nhưng chỉ dòng `tenant_id = X` của bảng cấp khách hàng (bỏ
-//! bảng mặt điều khiển), và bên gọi tự mở transaction ở đích.
+//! Moving a tenant between two placements (spec 33 "Provisioning and moving tenants") uses
+//! [`TenantTables`]: the same column-typed reading / writing, but only the `tenant_id = X` rows of
+//! tenant-level tables (leaving out control-plane tables), and the caller opens the transaction at the
+//! target itself.
 
 use crate::time::{Date, Timestamp};
 use futures_util::TryStreamExt as _;
@@ -31,10 +32,10 @@ mod filtered;
 
 pub(crate) use filtered::{Row, canonical, foreign_keys, primary_key, tenant_is, unique_indexes};
 
-/// Số dòng mỗi câu `INSERT` (SQLite giới hạn số tham số mỗi câu).
+/// Number of rows per `INSERT` statement (SQLite limits the number of parameters per statement).
 const BATCH_ROWS: usize = 100;
 
-/// Lỗi khi chép, với câu nói rõ phải làm gì.
+/// Error while copying, with a sentence that says what to do.
 #[derive(Debug)]
 pub struct TransferError(String);
 
@@ -47,7 +48,7 @@ impl std::fmt::Display for TransferError {
 impl std::error::Error for TransferError {}
 
 impl TransferError {
-    /// Lỗi với câu `message`.
+    /// An error with the sentence `message`.
     pub(crate) fn new(message: impl Into<String>) -> Self {
         TransferError(message.into())
     }
@@ -59,7 +60,7 @@ impl From<sea_orm::DbErr> for TransferError {
     }
 }
 
-/// Kết quả chép một bảng.
+/// Result of copying one table.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct CopiedTable {
@@ -74,12 +75,12 @@ impl CopiedTable {
     }
 }
 
-/// Kiểu của một cột, chung cho hai database.
+/// The type of a column, common to both databases.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Kind {
     Uuid,
     Timestamp,
-    /// Ngày (Postgres `date`, SQLite `date_text` — chữ `YYYY-MM-DD`).
+    /// Date (Postgres `date`, SQLite `date_text`: the text `YYYY-MM-DD`).
     Date,
     Text,
     SmallInt,
@@ -96,9 +97,9 @@ pub(crate) struct Column {
     kind: Kind,
 }
 
-/// Chép mọi bảng của `modules` (trừ bảng lịch sử migration) từ `source` sang `target`.
-/// XOÁ dữ liệu đang có trong các bảng đó ở đích (dữ liệu migration gieo sẵn) trước khi
-/// chép, trong cùng transaction: chỉ gọi với một database mới.
+/// Copies every table of `modules` (except the migration history tables) from `source` to `target`.
+/// DELETES the data currently in those tables at the target (data seeded by migrations) before
+/// copying, in the same transaction: call it only with a new database.
 pub async fn copy_modules(
     source: &Database,
     target: &Database,
@@ -150,7 +151,7 @@ pub async fn copy_modules(
     Ok(copied)
 }
 
-/// Bảng của `modules` theo thứ tự tạo, bỏ bảng `<module>_migrations`.
+/// The tables of `modules` in creation order, leaving out the `<module>_migrations` tables.
 pub(crate) async fn module_tables<C: ConnectionTrait>(
     connection: &C,
     modules: &[&str],
@@ -184,7 +185,7 @@ pub(crate) async fn module_tables<C: ConnectionTrait>(
     Ok(tables)
 }
 
-/// Cột của `table` và kiểu của chúng.
+/// The columns of `table` and their types.
 pub(crate) async fn columns<C: ConnectionTrait>(
     connection: &C,
     table: &str,
@@ -225,7 +226,7 @@ pub(crate) async fn columns<C: ConnectionTrait>(
     Ok(columns)
 }
 
-/// Kiểu chung từ tên kiểu khai ở SQLite (do sea-query đặt, vd `uuid_text`) hay ở
+/// The common type from the type name declared in SQLite (set by sea-query, e.g. `uuid_text`) or in
 /// Postgres (`information_schema.columns.data_type`).
 fn kind_of(declared: &str) -> Option<Kind> {
     let declared = declared.to_ascii_lowercase();
@@ -296,7 +297,7 @@ async fn copy_table<S: ConnectionTrait + StreamTrait, C: ConnectionTrait>(
     Ok(copied)
 }
 
-/// Đọc một giá trị theo kiểu cột ở nguồn.
+/// Reads a value by the column type at the source.
 fn read(row: &QueryResult, column: &Column) -> Result<Value, TransferError> {
     let name = column.name.as_str();
     Ok(match column.kind {
@@ -313,8 +314,8 @@ fn read(row: &QueryResult, column: &Column) -> Result<Value, TransferError> {
     })
 }
 
-/// Đổi giá trị sang kiểu cột ở đích (vd số nguyên của SQLite sang `integer` 4 byte
-/// của Postgres). Giá trị không vừa thì báo lỗi, không cắt.
+/// Converts a value to the column type at the target (e.g. a SQLite integer to a 4-byte `integer`
+/// of Postgres). A value that does not fit is an error, not truncated.
 fn convert(value: Value, kind: Kind, table: &str, column: &str) -> Result<Value, TransferError> {
     let too_big =
         || TransferError(format!("a value of `{table}.{column}` does not fit the target"));
@@ -376,10 +377,10 @@ async fn count_where<C: ConnectionTrait>(
     u64::try_from(rows).map_err(|error| TransferError(error.to_string()))
 }
 
-/// Cột khách của bảng cấp khách hàng.
+/// The tenant column of a tenant-level table.
 const TENANT_COLUMN: &str = "tenant_id";
 
-/// Một bảng cấp khách hàng: cột ở nguồn và ở đích.
+/// A tenant-level table: the columns at the source and at the target.
 #[derive(Debug, Clone)]
 struct TablePlan {
     name: String,
@@ -387,15 +388,15 @@ struct TablePlan {
     to: Vec<Column>,
 }
 
-/// Loại một bảng cấp khách hàng, nhận theo cột.
+/// The kind of a tenant-level table, recognized by its columns.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum TableKind {
-    /// Dữ liệu của module.
+    /// Module data.
     Data,
-    /// Hàng đợi job `<module>_jobs` (có `run_at`, `claimed_until`, `completed_at`).
+    /// The job queue `<module>_jobs` (has `run_at`, `claimed_until`, `completed_at`).
     Jobs,
-    /// Outbox `<module>_events` (có `next_attempt_at`, `claimed_until`, `delivered_at`).
+    /// The outbox `<module>_events` (has `next_attempt_at`, `claimed_until`, `delivered_at`).
     Events,
 }
 
@@ -412,21 +413,21 @@ impl TablePlan {
     }
 }
 
-/// Bảng cấp khách hàng của các module ở hai database cùng schema, theo thứ tự tạo bảng ở đích —
-/// để đếm, chép và xoá dòng của MỘT khách (dời khách giữa hai placement, đặc tả 33).
+/// The tenant-level tables of the modules in two databases of the same schema, in creation order at the target,
+/// to count, copy and delete the rows of ONE tenant (moving a tenant between two placements, spec 33).
 ///
-/// - Bỏ bảng `<module>_migrations` và bảng mặt điều khiển (chỉ database điều khiển có dữ liệu).
-/// - Mọi bảng còn lại phải có cột `tenant_id` (luật bảng cấp khách hàng, D-253); thiếu thì báo lỗi
-///   thay vì chép cả bảng.
-/// - Dòng của khách được đọc qua kết nối luôn thấy dữ liệu mới nhất ([`fresh`]): SQLite đọc qua
-///   pool đọc (không giữ kết nối ghi duy nhất của database chung), Postgres qua pool ghi (pool đọc
-///   có thể là read replica đang trễ).
+/// - Leaves out `<module>_migrations` tables and control-plane tables (only the control database holds data).
+/// - Every other table must have a `tenant_id` column (the tenant-level table rule, D-253); if missing it
+///   is an error instead of copying the whole table.
+/// - The tenant's rows are read through a connection that always sees the latest data ([`fresh`]): SQLite
+///   reads through the read pool (not holding the shared database's single write connection), Postgres
+///   through the write pool (the read pool may be a lagging read replica).
 #[derive(Debug, Clone)]
 pub struct TenantTables {
     tables: Vec<TablePlan>,
 }
 
-/// Kết nối thấy mọi thay đổi đã commit của `database` (xem [`TenantTables`]).
+/// A connection that sees every committed change of `database` (see [`TenantTables`]).
 fn fresh(database: &Database) -> &sea_orm::DatabaseConnection {
     match database.backend() {
         crate::config::DatabaseBackend::Sqlite => database.read(),
@@ -435,8 +436,9 @@ fn fresh(database: &Database) -> &sea_orm::DatabaseConnection {
 }
 
 impl TenantTables {
-    /// Bảng cấp khách hàng của `modules` (trừ `control_plane`) có ở `target`, kèm cột của chúng ở
-    /// `source` và `target`. Bảng thiếu ở nguồn hay thiếu cột: hai database chưa cùng schema.
+    /// The tenant-level tables of `modules` (except `control_plane`) that exist at `target`, with their
+    /// columns at `source` and `target`. A table missing at the source or a missing column: the two
+    /// databases do not have the same schema yet.
     pub async fn read(
         source: &Database,
         target: &Database,
@@ -469,17 +471,17 @@ impl TenantTables {
         Ok(TenantTables { tables })
     }
 
-    /// Tên bảng, theo thứ tự tạo.
+    /// Table names, in creation order.
     pub fn names(&self) -> Vec<&str> {
         self.tables.iter().map(|table| table.name.as_str()).collect()
     }
 
-    /// Loại của bảng `name` (bảng không có trong danh sách: [`TableKind::Data`]).
+    /// The kind of table `name` (a table not in the list: [`TableKind::Data`]).
     pub fn kind(&self, name: &str) -> TableKind {
         self.tables.iter().find(|table| table.name == name).map_or(TableKind::Data, TablePlan::kind)
     }
 
-    /// Hàng đợi job và outbox trong các bảng, kèm loại.
+    /// The job queues and outboxes among the tables, with their kinds.
     pub fn queues(&self) -> Vec<(&str, TableKind)> {
         self.tables
             .iter()
@@ -488,7 +490,7 @@ impl TenantTables {
             .collect()
     }
 
-    /// Số dòng của khách `tenant` trong từng bảng của `database`, theo thứ tự tạo.
+    /// The row count of tenant `tenant` in each table of `database`, in creation order.
     pub async fn count(
         &self,
         database: &Database,
@@ -503,9 +505,9 @@ impl TenantTables {
         Ok(counts)
     }
 
-    /// Xoá dòng của khách `tenant` trong mọi bảng có tên thoả `only`, qua `connection` (thường
-    /// là transaction của bên gọi): bảng tham chiếu trước bảng được tham chiếu (ngược thứ tự tạo).
-    /// Trả số dòng đã xoá.
+    /// Deletes the rows of tenant `tenant` in every table whose name satisfies `only`, through `connection`
+    /// (usually the caller's transaction): referencing tables before referenced tables (reverse creation
+    /// order). Returns the number of rows deleted.
     pub async fn delete<C: ConnectionTrait>(
         &self,
         connection: &C,
@@ -523,9 +525,10 @@ impl TenantTables {
         Ok(deleted)
     }
 
-    /// Chép dòng của khách `tenant` từ `source` vào `target` (transaction ở database đích của bên
-    /// gọi): xoá dòng của khách đang có ở đích trước (lần chép trước bị ngắt, bản giữ lại của lần
-    /// dời trước), rồi chép từng bảng theo thứ tự tạo. Trả số dòng đã chép mỗi bảng.
+    /// Copies the rows of tenant `tenant` from `source` into `target` (the caller's transaction on the
+    /// target database): first deletes the tenant's rows already at the target (an earlier copy that was
+    /// interrupted, a copy kept from an earlier move), then copies each table in creation order. Returns
+    /// the number of rows copied per table.
     pub async fn copy<C: ConnectionTrait>(
         &self,
         source: &Database,
@@ -546,8 +549,8 @@ impl TenantTables {
     }
 }
 
-/// Cột không đưa vào bản xuất dữ liệu của khách (bước 35, D-328): bản băm mật khẩu / token, secret,
-/// dữ liệu đã niêm phong — không giúp gì khách khi mang dữ liệu đi, chỉ thêm rủi ro nếu bản xuất lộ.
+/// Columns left out of a tenant's data export (step 35, D-328): password / token hashes, secrets,
+/// sealed data. They do not help the tenant when taking their data away, and only add risk if the export leaks.
 pub fn is_secret_column(name: &str) -> bool {
     name.ends_with("_hash")
         || name.ends_with("_token")
@@ -557,10 +560,10 @@ pub fn is_secret_column(name: &str) -> bool {
 }
 
 impl TenantTables {
-    /// Xuất mọi dòng của khách `tenant` ở `source` thành JSON Lines (`{"table": …, "row": {…}}` mỗi
-    /// dòng), gửi từng khúc ~64 KiB qua `sink`. Bỏ hàng đợi job / outbox và cột bí mật
-    /// ([`is_secret_column`]). Byte ghi base64, thời điểm RFC 3339 UTC, ngày `YYYY-MM-DD`. Trả số dòng mỗi
-    /// bảng.
+    /// Exports every row of tenant `tenant` at `source` as JSON Lines (`{"table": …, "row": {…}}` per
+    /// line), sending ~64 KiB chunks through `sink`. Leaves out job queues / outboxes and secret columns
+    /// ([`is_secret_column`]). Bytes are written as base64, times as RFC 3339 UTC, dates as `YYYY-MM-DD`.
+    /// Returns the row count per table.
     pub async fn export(
         &self,
         source: &Database,
@@ -636,10 +639,11 @@ impl TenantTables {
     }
 }
 
-/// `a` và `b` là cùng một database không (hai placement trỏ tới cùng một chỗ): SQLite so file,
-/// Postgres so tên database, schema và lúc máy chủ khởi động (`pg_postmaster_start_time`, khác
-/// nhau giữa hai máy chủ dù cùng tên database). Dời khách giữa hai "database" thật ra là một sẽ
-/// xoá mất dữ liệu ở bước dọn nguồn — bên gọi phải từ chối.
+/// Whether `a` and `b` are the same database (two placements pointing at the same place): SQLite compares
+/// files, Postgres compares the database name, schema and the server start time
+/// (`pg_postmaster_start_time`, which differs between two servers even with the same database name). Moving
+/// a tenant between two "databases" that are really one would delete the data in the source cleanup step,
+/// so the caller must refuse.
 pub async fn same_database(a: &Database, b: &Database) -> Result<bool, TransferError> {
     if a.backend() != b.backend() {
         return Ok(false);

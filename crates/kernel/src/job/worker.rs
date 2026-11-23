@@ -1,11 +1,11 @@
-//! Worker: claim job từ bảng `<module>_jobs` của các module, chạy, ghi kết quả; đưa
-//! job của lịch định kỳ vào hàng đợi; dọn job đã xong lâu.
+//! Worker: claims jobs from modules' `<module>_jobs` tables, runs them, records results; puts
+//! the periodic schedule's jobs into the queue; cleans up long-finished jobs.
 //!
-//! Nhiều database (bước 33): mỗi lượt duyệt mọi database được giao (`DatabaseRegistry::databases`,
-//! lọc theo `AUTOXIDE_WORKER_PLACEMENTS`). Lịch chạy mỗi database một lần, với
-//! [`NO_TENANT`]. **Chia lượt công bằng**: trong một database × module, các khách đang có job tới
-//! hạn chia đều số chỗ trống (ít nhất một mỗi khách, điểm bắt đầu xoay vòng giữa các lượt); chỗ
-//! còn thừa đi cho job tới hạn sớm nhất của bất kỳ khách nào.
+//! Multiple databases (step 33): each round goes through every assigned database
+//! (`DatabaseRegistry::databases`, filtered by `AUTOXIDE_WORKER_PLACEMENTS`). Schedules run once per
+//! database, with [`NO_TENANT`]. **Fair round sharing**: within one database x module, tenants that have due
+//! jobs split the free slots evenly (at least one per tenant, the starting point rotating between rounds);
+//! leftover slots go to the earliest-due jobs of any tenant.
 
 use crate::time::Timestamp;
 use futures_util::FutureExt as _;
@@ -32,63 +32,64 @@ use crate::database::Database;
 use crate::error::Error;
 use crate::tenancy::{DatabaseRegistry, NO_TENANT, PlacementId, TenantId, TenantStatus};
 
-/// Số lần chạy tối đa mặc định của một job.
+/// Default maximum number of runs of a job.
 pub const DEFAULT_MAX_ATTEMPTS: i32 = 10;
-/// Một worker giữ một job tối đa chừng này; job chạy lâu hơn bị coi là treo.
+/// A worker holds a job for at most this long; a job running longer is considered hung.
 const LEASE: Duration = Duration::from_secs(300);
-/// Không có job thì hỏi lại sau chừng này.
+/// With no jobs, poll again after this long.
 const IDLE_POLL: Duration = Duration::from_secs(1);
-/// Giữ job đã xong chừng này rồi xoá.
+/// Keep finished jobs this long and then delete them.
 const KEEP_COMPLETED: SignedDuration = SignedDuration::from_hours(24 * 7);
-/// Dọn job đã xong mỗi chừng này.
+/// Clean up finished jobs this often.
 const CLEANUP_EVERY: Duration = Duration::from_secs(3600);
-/// Độ dài tối đa của lỗi lưu lại.
+/// Maximum length of a stored error.
 const MAX_ERROR_LENGTH: usize = 2000;
-/// Số khách tối đa xét trong một lượt chia chỗ của một database × module; khách sau lượt này chờ
-/// lượt sau (điểm bắt đầu xoay vòng).
+/// Maximum number of tenants considered in one slot-sharing round of a database x module; tenants beyond this
+/// wait for the next round (the starting point rotates).
 const MAX_TENANTS_PER_ROUND: u64 = 256;
 
-/// Một database được giao cho worker: placement và kết nối.
+/// A database assigned to the worker: placement and connection.
 type Placement = (PlacementId, String, Database);
 
-/// Worker của chương trình.
+/// The program's worker.
 pub struct Worker {
     databases: DatabaseRegistry,
-    /// Các module có bảng job.
+    /// Modules that have a job table.
     modules: Vec<&'static str>,
     handlers: Arc<HashMap<&'static str, Arc<dyn JobHandler>>>,
-    /// Thời gian chạy tối đa riêng của loại job (`JobRegistration::timeout`).
+    /// The job kind's own maximum run time (`JobRegistration::timeout`).
     timeouts: Arc<HashMap<&'static str, Duration>>,
-    /// Hạn giữ một job đã claim ([`LEASE`]; test đặt ngắn hơn).
+    /// How long a claimed job is held ([`LEASE`]; tests set it shorter).
     lease: Duration,
     schedules: Vec<Schedule>,
-    /// Tên worker ghi vào `claimed_by`: phân biệt các tiến trình.
+    /// Worker name recorded in `claimed_by`: tells processes apart.
     id: String,
-    /// Số job chạy cùng lúc.
+    /// Number of jobs running at once.
     concurrency: u64,
-    /// Khoảng thời gian gần nhất đã đưa job vào hàng đợi, theo (database, tên lịch): khỏi thử
-    /// chèn mỗi giây.
+    /// The most recent time slot for which a job was enqueued, per (database, schedule name): avoids trying
+    /// to insert every second.
     last_slots: Mutex<HashMap<(PlacementId, &'static str), i64>>,
     last_cleanup: Mutex<Option<Instant>>,
-    /// Luồng thay đổi đồng bộ của các module (bước 69 P2): dọn dòng quá hạn cùng lượt dọn job.
+    /// Modules' sync change streams (step 69 P2): expired rows are cleaned up in the same pass as job cleanup.
     sync: Vec<crate::sync::SyncLog>,
-    /// Điểm bắt đầu xoay vòng giữa các khách; tăng mỗi lượt chia chỗ.
+    /// Starting point that rotates between tenants; increments each slot-sharing round.
     turn: AtomicUsize,
-    /// Quyền dùng theo khách (bước 35): job của module mà gói của khách không có bị hoãn.
+    /// Per-tenant entitlements (step 35): jobs of a module that the tenant's plan lacks are postponed.
     gate: Gate,
 }
 
-/// Điều kiện chạy job theo gói của khách (bước 35, D-325).
+/// Condition for running jobs per the tenant's plan (step 35, D-325).
 #[derive(Clone, Default)]
 pub(crate) struct Gate {
     pub entitlements: crate::entitlement::EntitlementsHandle,
-    /// Hoãn job bị chặn chừng này (không tính lượt thử).
+    /// Postpone a blocked job by this much (the attempt is not counted).
     pub delay: Option<SignedDuration>,
 }
 
 impl Gate {
-    /// Job của module `module` cho khách `tenant` có bị gói chặn không: module chưa bật cho khách,
-    /// hay khách chỉ đọc vì thuê bao. Module `always_enabled` không bao giờ bị chặn.
+    /// Whether the job of module `module` for tenant `tenant` is blocked by the plan: the module is not
+    /// enabled for the tenant, or the tenant is read-only because of its subscription. A module that is
+    /// `always_enabled` is never blocked.
     async fn blocks(
         &self,
         module: &str,
@@ -129,7 +130,7 @@ impl Worker {
         }
     }
 
-    /// Luồng thay đổi đồng bộ cần dọn (bước 69 P2).
+    /// The sync change streams that need cleaning (step 69 P2).
     pub(crate) fn with_sync(mut self, sync: Vec<crate::sync::SyncLog>) -> Self {
         self.sync = sync;
         self
@@ -140,15 +141,15 @@ impl Worker {
         self
     }
 
-    /// Hạn giữ một job đã claim (mặc định 5 phút). Chỉ để test việc gia hạn với hạn ngắn; chương
-    /// trình không đổi nó.
+    /// How long a claimed job is held (default 5 minutes). Only for testing lease renewal with a short lease;
+    /// the program does not change it.
     #[doc(hidden)]
     pub fn lease(mut self, lease: Duration) -> Self {
         self.lease = lease.max(Duration::from_secs(1));
         self
     }
 
-    /// Hoãn job của module mà gói của khách không có (bước 35). `Modules::worker` gọi.
+    /// Postpones jobs of modules that the tenant's plan lacks (step 35). Called by `Modules::worker`.
     pub(crate) fn with_entitlements(
         mut self,
         entitlements: crate::entitlement::EntitlementsHandle,
@@ -157,15 +158,15 @@ impl Worker {
         self
     }
 
-    /// Hoãn job bị gói chặn `delay` (mặc định một giờ, `AUTOXIDE_JOBS_BLOCKED_DELAY_SECONDS`).
+    /// Postpones plan-blocked jobs by `delay` (default one hour, `AUTOXIDE_JOBS_BLOCKED_DELAY_SECONDS`).
     pub fn blocked_delay(mut self, delay: Duration) -> Self {
         self.gate.delay = SignedDuration::try_from(delay).ok();
         self
     }
 
-    /// Một lượt: đưa job của lịch tới hạn vào hàng đợi, rồi chạy tối đa `concurrency`
-    /// job của mỗi module trên mỗi database và chờ chúng xong. Trả về số job đã chạy. Cho test và
-    /// công cụ; chương trình dùng [`run`](Self::run), không chờ theo lượt.
+    /// One round: puts due schedule jobs into the queue, then runs at most `concurrency` jobs of each module
+    /// on each database and waits for them to finish. Returns the number of jobs run. For tests and tools;
+    /// the program uses [`run`](Self::run), which does not wait per round.
     pub async fn run_once(&self) -> Result<usize, Error> {
         let databases = self.databases.databases().await?;
         self.enqueue_schedules(&databases).await?;
@@ -186,12 +187,12 @@ impl Worker {
         Ok(ran)
     }
 
-    /// Chạy tới khi `shutdown` hoàn thành, rồi chờ các job đang chạy xong. Lỗi database thì
-    /// ghi log rồi thử lại.
+    /// Runs until `shutdown` completes, then waits for running jobs to finish. On a database error it
+    /// logs and retries.
     ///
-    /// Mỗi module tối đa `concurrency` job cùng lúc (cộng mọi database), độc lập với nhau: một job
-    /// chậm (gọi AI, webhook tới máy chủ chậm) chỉ giữ chỗ của chính nó — job khác, của module
-    /// khác (mail đặt lại mật khẩu) vẫn được nhận ngay khi có chỗ (D-158).
+    /// Each module runs at most `concurrency` jobs at once (summed over all databases), independently of each
+    /// other: one slow job (an AI call, a webhook to a slow server) holds only its own slot - another
+    /// module's job (password reset mail) is still accepted as soon as a slot is free (D-158).
     pub async fn run(self, shutdown: impl Future<Output = ()>) {
         tokio::pin!(shutdown);
         let slots: HashMap<&'static str, Arc<Semaphore>> = self
@@ -226,8 +227,8 @@ impl Worker {
         }
     }
 
-    /// Một vòng của [`run`](Self::run): lịch, dọn dẹp, rồi claim cho mỗi module đúng số chỗ
-    /// còn trống. Trả số job vừa nhận.
+    /// One iteration of [`run`](Self::run): schedules, cleanup, then claims for each module exactly the
+    /// number of free slots. Returns the number of jobs just accepted.
     async fn claim_free(
         &self,
         slots: &HashMap<&'static str, Arc<Semaphore>>,
@@ -258,7 +259,7 @@ impl Worker {
         Ok(claimed)
     }
 
-    /// Claim tối đa `limit` job tới hạn của `module` trên `database`, chia đều giữa các khách.
+    /// Claims at most `limit` due jobs of `module` on `database`, shared evenly among tenants.
     async fn claim(
         &self,
         database: &Database,
@@ -303,8 +304,8 @@ impl Worker {
         Ok(claimed)
     }
 
-    /// Task chạy `job` của `module` trên `database` (placement `placement`); giữ `permit` (chỗ của
-    /// module) tới khi xong.
+    /// A task that runs `job` of `module` on `database` (placement `placement`); holds `permit` (the module's
+    /// slot) until it finishes.
     fn job_task(
         &self,
         placement: PlacementId,
@@ -336,8 +337,8 @@ impl Worker {
         }
     }
 
-    /// Job trạng thái `status` của module `module` trên mọi database (cho lệnh `autoxide jobs`),
-    /// mới nhất trước.
+    /// Jobs with status `status` of module `module` across every database (for the `autoxide jobs` command),
+    /// newest first.
     pub async fn list(
         &self,
         module: &str,
@@ -354,7 +355,7 @@ impl Worker {
         Ok(all)
     }
 
-    /// Đưa job hỏng hẳn `id` của module `module` trở lại hàng đợi.
+    /// Puts the permanently failed job `id` of module `module` back into the queue.
     pub async fn retry(&self, module: &str, id: Uuid) -> Result<(), Error> {
         self.known(module)?;
         for (_, _, database) in self.databases.databases().await? {
@@ -372,7 +373,7 @@ impl Worker {
         .with_param("id", id))
     }
 
-    /// Các module có bảng job.
+    /// Modules that have a job table.
     pub fn modules(&self) -> &[&'static str] {
         &self.modules
     }
@@ -389,8 +390,8 @@ impl Worker {
         .with_param("modules", self.modules.join(", ")))
     }
 
-    /// Mỗi lịch, mỗi database, mỗi khoảng thời gian: một job của cả database (`NO_TENANT`),
-    /// chống trùng bằng `unique_key` — nhiều worker cùng chạy vẫn chỉ có một job cho mỗi khoảng.
+    /// For each schedule, each database, each time slot: one database-wide job (`NO_TENANT`),
+    /// deduplicated by `unique_key` - several workers running together still produce only one job per slot.
     async fn enqueue_schedules(&self, databases: &[Placement]) -> Result<(), Error> {
         let now = now();
         for (placement, _, database) in databases {
@@ -439,7 +440,7 @@ impl Worker {
         Ok(())
     }
 
-    /// Xoá job đã xong hơn [`KEEP_COMPLETED`], mỗi giờ một lần, trên mọi database.
+    /// Deletes jobs finished more than [`KEEP_COMPLETED`] ago, once an hour, on every database.
     async fn cleanup(&self, databases: &[Placement]) -> Result<(), Error> {
         {
             let mut last = self.last_cleanup.lock().map_err(|_| Error::internal("cleanup lock"))?;
@@ -460,7 +461,7 @@ impl Worker {
     }
 }
 
-/// Khách đang có job tới hạn trong bảng `table` (tối đa [`MAX_TENANTS_PER_ROUND`]).
+/// Tenants that have due jobs in table `table` (at most [`MAX_TENANTS_PER_ROUND`]).
 async fn due_tenants(
     database: &Database,
     table: &str,
@@ -483,8 +484,8 @@ async fn due_tenants(
     Ok(tenants)
 }
 
-/// Dọn bảng job của `module` trên `database`: xoá job đã xong lâu; job chạy đủ lần mà chưa ghi
-/// được kết quả vào dead-letter queue.
+/// Cleans up the job table of `module` on `database`: deletes long-finished jobs; jobs that ran the full
+/// number of times without having a result recorded go to the dead-letter queue.
 async fn cleanup_table(database: &Database, module: &str) -> Result<(), Error> {
     let now = now();
     let before = now - KEEP_COMPLETED;
@@ -520,19 +521,20 @@ async fn cleanup_table(database: &Database, module: &str) -> Result<(), Error> {
     Ok(())
 }
 
-/// Ghi log task job kết thúc bất thường (đáng lẽ không xảy ra: `run_job` tự bắt panic).
+/// Logs a job task that ended abnormally (should not happen: `run_job` catches panics itself).
 fn log_task(result: Result<(), tokio::task::JoinError>) {
     if let Err(error) = result {
         tracing::error!(error = %error, "a job task ended abnormally");
     }
 }
 
-/// Chạy một job đã claim và ghi kết quả.
+/// Runs a claimed job and records the result.
 ///
-/// Khách đang dời sang placement khác (`moving`): trả job về hàng đợi, không tính lần chạy — dữ liệu
-/// của khách đang được chép, job chạy ở đích sau khi dời xong. Khách đã ở placement khác: dòng job
-/// này là bản sao còn sót ở nguồn (dời với `keep_source`) — không chạy, đánh dấu hỏng hẳn.
-/// Thứ mọi job cần để chạy: sổ database (tìm khách), bộ chạy theo loại, điều kiện theo gói.
+/// A tenant being moved to another placement (`moving`): the job is returned to the queue, the run is not
+/// counted - the tenant's data is being copied, and the job runs at the destination after the move finishes.
+/// A tenant already on another placement: this job row is a leftover copy at the source (a move with
+/// `keep_source`) - it is not run, and is marked permanently failed. Everything a job needs to run: the
+/// database registry (to find the tenant), the per-kind runner, the plan condition.
 struct JobEnv<'a> {
     registry: &'a DatabaseRegistry,
     handlers: &'a HashMap<&'static str, Arc<dyn JobHandler>>,
@@ -703,9 +705,9 @@ async fn run_job(
     Ok(())
 }
 
-/// Gia hạn giữ job `id` mỗi một phần ba `lease`, tới khi mất quyền giữ (không còn dòng nào
-/// `claimed_by` là worker này) hay lỗi database liên tiếp — khi đó trả lý do. Chỉ trả về khi phải
-/// dừng job; job xong trước thì future này bị bỏ.
+/// Renews the hold on job `id` every third of `lease`, until the hold is lost (no row has `claimed_by` as
+/// this worker) or consecutive database errors occur - then it returns the reason. It returns only when the
+/// job must be stopped; if the job finishes first this future is dropped.
 async fn keep_claim(
     database: &Database,
     table: &str,
@@ -740,13 +742,13 @@ async fn keep_claim(
     }
 }
 
-/// Khách đang dời: chờ sau chừng này rồi mới nhận lại job của khách.
+/// A tenant being moved: wait this long before taking the tenant's jobs again.
 const MOVING_DELAY: SignedDuration = SignedDuration::from_secs(30);
 
-/// Job bị gói chặn: chờ sau chừng này (khi chương trình không đặt khác).
+/// A plan-blocked job: wait this long (when the program does not set otherwise).
 const BLOCKED_DELAY: SignedDuration = SignedDuration::from_secs(3600);
 
-/// Trả job vừa claim về hàng đợi (khách đang dời), không tính lần chạy này.
+/// Returns the just-claimed job to the queue (the tenant is being moved), not counting this run.
 async fn put_back(
     database: &Database,
     table: &str,
@@ -756,7 +758,7 @@ async fn put_back(
     put_back_after(database, table, worker, job, MOVING_DELAY).await
 }
 
-/// Trả job vừa claim về hàng đợi, chạy lại sau `delay`, không tính lần chạy này.
+/// Returns the just-claimed job to the queue, to run again after `delay`, not counting this run.
 async fn put_back_after(
     database: &Database,
     table: &str,
@@ -778,7 +780,7 @@ async fn put_back_after(
     Ok(())
 }
 
-/// Job của khách đã dời sang placement khác: bản sao còn sót ở nguồn, không chạy.
+/// A job of a tenant that has been moved to another placement: a leftover copy at the source, not run.
 async fn left_over(
     database: &Database,
     table: &str,
@@ -804,13 +806,13 @@ async fn left_over(
     Ok(())
 }
 
-/// Chờ trước lần chạy thứ `attempts + 1`: 2, 4, 8… giây, tối đa một giờ.
+/// Wait before run number `attempts + 1`: 2, 4, 8... seconds, at most one hour.
 fn backoff(attempts: i32) -> SignedDuration {
     let exponent = u32::try_from(attempts.clamp(1, 12)).unwrap_or(12);
     SignedDuration::from_secs(std::cmp::min(i64::from(2u32.pow(exponent)), 3600))
 }
 
-/// Lỗi kèm nguyên nhân gốc, để người vận hành biết sửa gì.
+/// The error with its root cause, so operators know what to fix.
 fn describe(error: &Error) -> String {
     match std::error::Error::source(error) {
         Some(source) => format!("{}: {source}", error.code()),

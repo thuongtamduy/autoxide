@@ -1,9 +1,11 @@
-//! Hoá đơn điện tử qua nhà cung cấp (bước 36): trait chung để module `invoices` gửi hoá đơn tới nhà
-//! cung cấp dịch vụ hoá đơn điện tử (chuyển cơ quan thuế) mà không phụ thuộc nhà cung cấp nào.
+//! E-invoicing through a provider (step 36): shared traits that let the `invoices` module send invoices to an
+//! e-invoice service provider (which forwards them to the tax authority) without depending on any specific
+//! provider.
 //!
-//! Bộ nối của một nhà cung cấp là một module riêng, chỉ phụ thuộc kernel, đăng ký TRƯỚC `invoices`,
-//! góp bằng `context.contribute::<dyn EInvoiceProvider>(…)`. Mọi hàm nhận khách (`TenantId`): bộ nối
-//! tự đọc thông tin kết nối của khách đó. Test dùng `FakeEInvoiceProvider` của testkit.
+//! A provider's adapter is its own module that depends only on the kernel and is registered BEFORE
+//! `invoices`, contributing via `context.contribute::<dyn EInvoiceProvider>(...)`. Every function takes the
+//! tenant (`TenantId`): the adapter reads that tenant's connection settings itself. Tests use
+//! `FakeEInvoiceProvider` from the testkit.
 use crate::time::Date;
 use uuid::Uuid;
 
@@ -11,17 +13,17 @@ use crate::error::{Error, ErrorKind};
 use crate::money::{Currency, Money};
 use crate::tenancy::TenantId;
 
-/// Loại hoá đơn điện tử.
+/// Kind of e-invoice.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum EInvoiceKind {
-    /// Hoá đơn giá trị gia tăng.
+    /// Value-added tax invoice.
     Vat,
-    /// Hoá đơn bán hàng.
+    /// Sales invoice.
     Sales,
-    /// Hoá đơn khởi tạo từ máy tính tiền.
+    /// Invoice generated from a cash register.
     CashRegister,
-    /// Chứng từ khấu trừ thuế thu nhập cá nhân.
+    /// Personal income tax withholding certificate.
     WithholdingCertificate,
 }
 
@@ -36,12 +38,12 @@ impl EInvoiceKind {
     }
 }
 
-/// Những gì một nhà cung cấp làm được.
+/// What a provider can do.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct EInvoiceCapabilities {
     pub kinds: Vec<EInvoiceKind>,
-    /// Nhà cung cấp tự cấp số hoá đơn (số nội bộ vẫn cấp; số của nhà cung cấp lưu khi chấp nhận).
+    /// The provider assigns invoice numbers itself (an internal number is still assigned; the provider's number is stored on acceptance).
     pub assigns_numbers: bool,
     pub adjust: bool,
     pub replace: bool,
@@ -53,7 +55,7 @@ impl EInvoiceCapabilities {
         EInvoiceCapabilities { kinds: kinds.to_vec(), ..EInvoiceCapabilities::default() }
     }
 
-    /// Điều chỉnh, thay thế, huỷ đều được.
+    /// Adjusting, replacing and cancelling are all supported.
     #[must_use]
     pub fn with_corrections(mut self) -> Self {
         self.adjust = true;
@@ -69,13 +71,13 @@ impl EInvoiceCapabilities {
     }
 }
 
-/// Một bên trên hoá đơn (ảnh chụp lúc lập).
+/// A party on the invoice (snapshot taken when issued).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct Party {
     pub name: String,
     pub tax_code: Option<String>,
-    /// Địa chỉ dạng một dòng chữ.
+    /// Address as a single line of text.
     pub address: Option<String>,
     pub email: Option<String>,
 }
@@ -104,26 +106,26 @@ impl Party {
     }
 }
 
-/// Một dòng hoá đơn.
+/// One invoice line.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct EInvoiceLine {
     pub line_no: i32,
     pub description: String,
     pub unit: Option<String>,
-    /// Số lượng, chữ thập phân chuẩn hoá (vd `"2"`, `"1.5"`).
+    /// Quantity, normalized decimal string (e.g. `"2"`, `"1.5"`).
     pub quantity: String,
     pub unit_price: Money,
-    /// Tiền trước thuế (sau chiết khấu).
+    /// Amount before tax (after discount).
     pub net: Money,
-    /// Thuế suất (vd `"8"`), `None` khi không chịu thuế.
+    /// Tax rate (e.g. `"8"`), `None` when not taxable.
     pub rate_percent: Option<String>,
     pub tax: Money,
     pub total: Money,
 }
 
 impl EInvoiceLine {
-    /// Dòng `line_no`: số lượng (chữ thập phân), đơn giá, tiền trước thuế, thuế.
+    /// Line `line_no`: quantity (decimal string), unit price, amount before tax, tax.
     pub fn new(
         line_no: i32,
         description: impl Into<String>,
@@ -159,7 +161,7 @@ impl EInvoiceLine {
     }
 }
 
-/// Tổng theo thuế suất.
+/// Totals per tax rate.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct EInvoiceTaxTotal {
@@ -174,14 +176,14 @@ impl EInvoiceTaxTotal {
     }
 }
 
-/// Quan hệ với hoá đơn đã phát hành (NĐ 123/2020 Điều 19, sửa bởi NĐ 70/2025 — cần đối chiếu).
+/// Relationship to an already issued invoice (Decree 123/2020 Article 19, amended by Decree 70/2025; needs verification).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Relation {
     Adjustment,
     Replacement,
 }
 
-/// Hoá đơn liên quan (bị điều chỉnh / bị thay thế).
+/// Related invoice (the one being adjusted / replaced).
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct RelatedInvoice {
@@ -209,24 +211,25 @@ impl RelatedInvoice {
     }
 }
 
-/// Một hoá đơn gửi nhà cung cấp.
+/// An invoice sent to the provider.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct EInvoice {
-    /// ID chứng từ trong hệ thống: nhà cung cấp chống trùng theo mã này (gửi lại cùng hoá đơn).
+    /// ID of the document in this system: the provider de-duplicates by this value (resending the same
+    /// invoice).
     pub document_id: Uuid,
     pub kind: EInvoiceKind,
     pub seller: Party,
-    /// Người bán được lập thay khi có uỷ nhiệm (bên lập là `seller`).
+    /// Seller issued on behalf of when there is an authorization (the issuing party is `seller`).
     pub on_behalf_of: Option<Party>,
     pub buyer: Party,
-    /// Ký hiệu, vd `1C26TAA`.
+    /// Series symbol, e.g. `1C26TAA`.
     pub series: String,
-    /// Số nội bộ; nhà cung cấp tự cấp số thì có thể bỏ qua.
+    /// Internal number; may be omitted when the provider assigns numbers.
     pub number: Option<i64>,
     pub issue_date: Date,
     pub currency: Currency,
-    /// Tỉ giá sang đồng Việt Nam (chữ thập phân), khi khác VND.
+    /// Exchange rate to Vietnamese dong (decimal string), when the currency is not VND.
     pub exchange_rate: Option<String>,
     pub lines: Vec<EInvoiceLine>,
     pub totals: Vec<EInvoiceTaxTotal>,
@@ -235,7 +238,7 @@ pub struct EInvoice {
 }
 
 impl EInvoice {
-    /// Hoá đơn chưa có ký hiệu, dòng: thêm bằng [`series`](Self::series), [`lines`](Self::lines).
+    /// An invoice with no series and no lines yet: add them with [`series`](Self::series), [`lines`](Self::lines).
     pub fn new(
         document_id: Uuid,
         kind: EInvoiceKind,
@@ -289,16 +292,16 @@ impl EInvoice {
     }
 }
 
-/// Hoá đơn nhà cung cấp đã nhận.
+/// An invoice the provider has accepted.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct IssuedEInvoice {
     pub provider_ref: String,
-    /// Số do nhà cung cấp cấp (khi `assigns_numbers`).
+    /// Number assigned by the provider (when `assigns_numbers`).
     pub number: Option<i64>,
-    /// Mã của cơ quan thuế, nếu có ngay.
+    /// Tax authority code, if available immediately.
     pub authority_code: Option<String>,
-    /// Mã tra cứu cho người mua.
+    /// Lookup code for the buyer.
     pub lookup_code: Option<String>,
 }
 
@@ -325,15 +328,16 @@ impl IssuedEInvoice {
     }
 }
 
-/// Trạng thái ở cơ quan thuế.
+/// Status at the tax authority.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EInvoiceStatus {
     Pending,
     Accepted {
         authority_code: Option<String>,
-        /// Số hoá đơn do nhà cung cấp cấp, khi nhà cung cấp tự cấp số và chỉ biết số lúc được chấp
-        /// nhận (`None`: không có, hay đã trả ở [`IssuedEInvoice::number`]). Đây là số hợp lệ về
-        /// thuế — `invoices` lưu và trả ra cùng mã cơ quan thuế (D-20261122-einvoice-provider-number).
+        /// Invoice number assigned by the provider, when the provider assigns numbers itself and only learns
+        /// the number once accepted (`None`: none, or already returned in [`IssuedEInvoice::number`]). This
+        /// is the legally valid number for tax purposes; `invoices` stores it and returns it together with
+        /// the tax authority code (D-20261122-einvoice-provider-number).
         number: Option<i64>,
     },
     Rejected {
@@ -341,7 +345,7 @@ pub enum EInvoiceStatus {
     },
 }
 
-/// Huỷ / thông báo sai sót một hoá đơn.
+/// Cancels / reports an error on an invoice.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct EInvoiceCancel {
@@ -355,24 +359,24 @@ impl EInvoiceCancel {
     }
 }
 
-/// Định dạng tải về.
+/// Download format.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EInvoiceFormat {
     Xml,
     Pdf,
 }
 
-/// Một nhà cung cấp hoá đơn điện tử.
+/// An e-invoice provider.
 //
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
 #[async_trait::async_trait]
 pub trait EInvoiceProvider: Send + Sync {
-    /// Tên ổn định (`vnpt`, `fake`…): ghi trên ký hiệu chứng từ.
+    /// Stable name (`vnpt`, `fake`, ...): written on the document series.
     fn provider(&self) -> &'static str;
 
     fn capabilities(&self) -> EInvoiceCapabilities;
 
-    /// Gửi hoá đơn. Gửi lại cùng `document_id` (sau khi bị từ chối và sửa) dùng lại cùng số.
+    /// Sends an invoice. Resending the same `document_id` (after a rejection and a fix) reuses the same number.
     async fn issue(&self, tenant: TenantId, invoice: &EInvoice) -> Result<IssuedEInvoice, Error>;
 
     async fn status(&self, tenant: TenantId, provider_ref: &str) -> Result<EInvoiceStatus, Error>;
@@ -395,7 +399,7 @@ pub fn provider_unavailable() -> Error {
     )
 }
 
-/// `einvoice.rejected` (422): nhà cung cấp / cơ quan thuế từ chối.
+/// `einvoice.rejected` (422): the provider / tax authority rejected it.
 pub fn rejected(reason: impl ToString) -> Error {
     Error::new(
         ErrorKind::Validation,

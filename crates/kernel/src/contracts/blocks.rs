@@ -1,19 +1,19 @@
-//! Sổ khối của trang dựng từ khối (bước 67, D-229, D-20261122-block-registry).
+//! Block registry for pages built from blocks (step 67, D-229, D-20261122-block-registry).
 //!
-//! Module khai khối nó cung cấp bằng [`Module::blocks`](crate::module::Module::blocks): tên
-//! `<module>.<khối>`, nhóm, nhãn và gợi ý cho AI (câu tiếng Anh, dịch qua `text:` của module —
-//! `cargo xtask check` chặn câu chưa dịch), JSON Schema của props (phần con ở [`schema`]), có cần
-//! dữ liệu lúc đọc công khai không, có chứa khối con không, tính năng của gói cần có. Khai sai
-//! (tên, schema) thì chương trình không khởi động.
+//! A module declares the blocks it provides with [`Module::blocks`](crate::module::Module::blocks): the name
+//! `<module>.<block>`, group, label and hint for AI (English sentences, translated through the module's
+//! `text:` — `cargo xtask check` rejects untranslated sentences), the JSON Schema of the props (sub-parts in
+//! [`schema`]), whether it needs data on public reads, whether it can contain child blocks, and the plan
+//! feature it requires. A wrong declaration (name, schema) stops the program from starting.
 //!
-//! Khối cần dữ liệu (lưới sản phẩm, flash sale…) gắn một [`BlockData`] lúc `start` bằng
-//! `StartContext::block_data`. Module dùng khối (`content`) giữ [`Blocks`] lấy từ
-//! `StartContext::blocks` — sổ có cả khối của module khởi động SAU nó — và gọi
-//! [`Blocks::resolve`]: kernel gom khối theo loại, gọi mỗi loại **một lần** (song song, có hạn
-//! giờ), khối lỗi hay hết giờ thành `null`, trang vẫn trả.
+//! A block that needs data (product grid, flash sale…) attaches a [`BlockData`] at `start` with
+//! `StartContext::block_data`. A module that uses blocks (`content`) keeps the [`Blocks`] obtained from
+//! `StartContext::blocks` — the registry also holds the blocks of modules that start AFTER it — and calls
+//! [`Blocks::resolve`]: the kernel groups blocks by type and calls each type **once** (in parallel, with a
+//! timeout); a block that fails or times out becomes `null` and the page is still returned.
 //!
-//! `GET /api/v1/kernel/blocks` liệt kê khối khách đang dùng được: của module đang chạy
-//! (`AUTOXIDE_MODULES`), module có trong gói của khách và tính năng của khối có trong gói.
+//! `GET /api/v1/kernel/blocks` lists the blocks a tenant can use: those of running modules
+//! (`AUTOXIDE_MODULES`), modules included in the tenant's plan, and blocks whose feature is in the plan.
 
 mod routes;
 pub mod schema;
@@ -32,7 +32,7 @@ use crate::tenancy::{Site, TenantContext};
 
 pub(crate) use routes::{BlocksState, routes};
 
-/// Hạn giờ của mỗi lần gọi [`BlockData::resolve`]: quá hạn thì khối thành `null`.
+/// Timeout of each [`BlockData::resolve`] call: past it the block becomes `null`.
 pub const RESOLVE_TIMEOUT: Duration = Duration::from_secs(2);
 
 // Nhóm của khối trong bộ chọn khối.
@@ -72,28 +72,28 @@ pub enum Children {
     Blocks,
 }
 
-/// Một loại khối module khai qua [`Module::blocks`](crate::module::Module::blocks).
+/// A block type that a module declares through [`Module::blocks`](crate::module::Module::blocks).
 #[derive(Debug, Clone, Copy)]
 #[non_exhaustive]
 pub struct BlockType {
-    /// `<module>.<khối>`, vd `catalog.product_grid`.
+    /// `<module>.<block>`, e.g. `catalog.product_grid`.
     pub name: &'static str,
     pub category: BlockCategory,
-    /// Tên khối trong bộ chọn (tiếng Anh; bản dịch ở `text:<câu>` của module).
+    /// Block name in the picker (English; the translation is under the module's `text:<sentence>`).
     pub label: &'static str,
-    /// Một câu cho AI biết khi nào dùng khối (tiếng Anh; dịch như `label`).
+    /// One sentence telling AI when to use the block (English; translated like `label`).
     pub ai_hint: &'static str,
-    /// JSON Schema của props — nguồn kiểm duy nhất (phần con ở [`schema`]).
+    /// JSON Schema of the props — the only source of validation (sub-parts in [`schema`]).
     pub props_schema: &'static str,
-    /// Cần [`BlockData`] lúc đọc công khai không.
+    /// Whether it needs [`BlockData`] on public reads.
     pub has_data: bool,
     pub children: Children,
-    /// Tính năng của gói (bước 35) cần có để dùng khối; tính năng phải do chính module khai.
+    /// Plan feature (step 35) required to use the block; the feature must be declared by the module itself.
     pub feature: Option<Feature>,
 }
 
 impl BlockType {
-    /// Khối lá, không cần dữ liệu, không cần tính năng.
+    /// A leaf block: needs no data and no feature.
     pub const fn new(
         name: &'static str,
         category: BlockCategory,
@@ -113,21 +113,21 @@ impl BlockType {
         }
     }
 
-    /// Khối cần dữ liệu lúc đọc công khai: module phải gắn [`BlockData`] lúc `start`.
+    /// A block that needs data on public reads: the module must attach a [`BlockData`] at `start`.
     #[must_use]
     pub const fn with_data(mut self) -> Self {
         self.has_data = true;
         self
     }
 
-    /// Khối chứa khối con.
+    /// A block that contains child blocks.
     #[must_use]
     pub const fn with_children(mut self) -> Self {
         self.children = Children::Blocks;
         self
     }
 
-    /// Chỉ khách có tính năng `feature` trong gói mới dùng được khối.
+    /// Only tenants with the feature `feature` in their plan can use the block.
     #[must_use]
     pub const fn requires(mut self, feature: Feature) -> Self {
         self.feature = Some(feature);
@@ -135,13 +135,13 @@ impl BlockType {
     }
 }
 
-/// Một khối trong trang, gửi cho [`BlockData::resolve`].
+/// A block in a page, passed to [`BlockData::resolve`].
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct BlockRef {
-    /// `id` của khối trong trang (duy nhất trong trang).
+    /// `id` of the block in the page (unique within the page).
     pub id: String,
-    /// Props đã qua kiểm theo schema của khối.
+    /// Props already validated against the block's schema.
     pub props: Value,
 }
 
@@ -151,14 +151,14 @@ impl BlockRef {
     }
 }
 
-/// Ngữ cảnh của một lần đọc dữ liệu khối.
+/// Context of one block data read.
 #[derive(Clone, Copy)]
 #[non_exhaustive]
 pub struct BlockRequest<'a> {
     pub tenant: &'a TenantContext,
-    /// Website đang xem (bước 34): đọc công khai của module lọc theo nó như endpoint công khai.
+    /// The website being viewed (step 34): the module's public read filters by it like a public endpoint.
     pub site: &'a Site,
-    /// Ngôn ngữ của trang, vd `vi`.
+    /// Language of the page, e.g. `vi`.
     pub locale: &'a str,
 }
 
@@ -168,14 +168,14 @@ impl<'a> BlockRequest<'a> {
     }
 }
 
-/// Dữ liệu cho khối lúc đọc công khai, theo lô.
+/// Data for blocks on public reads, in batches.
 //
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
 #[async_trait::async_trait]
 pub trait BlockData: Send + Sync {
-    /// Dữ liệu cho mọi khối loại `block` của trang trong MỘT lần gọi (không N+1): kết quả cùng
-    /// thứ tự, cùng số phần tử với `items`. Chỉ trả dữ liệu công khai; tham chiếu không còn công
-    /// khai → `None` (giao diện ẩn khối, cả trang không lỗi).
+    /// Data for every block of type `block` in the page in ONE call (no N+1): the result has the same order
+    /// and the same number of elements as `items`. Returns public data only; a reference that is no longer
+    /// public → `None` (the UI hides the block, the page as a whole does not fail).
     async fn resolve(
         &self,
         request: &BlockRequest<'_>,
@@ -184,7 +184,7 @@ pub trait BlockData: Send + Sync {
     ) -> Result<Vec<Option<Value>>, Error>;
 }
 
-/// Một khối đã khai, kèm module và schema đã đọc.
+/// A declared block, with its module and the parsed schema.
 #[derive(Debug)]
 #[non_exhaustive]
 pub struct BlockInfo {
@@ -201,12 +201,12 @@ struct Inner {
     entitlements: OnceLock<EntitlementsHandle>,
 }
 
-/// Sổ khối của mọi module. Clone rẻ; mọi bản clone dùng chung một sổ.
+/// Block registry of all modules. Cheap to clone; all clones share one registry.
 #[derive(Clone, Default)]
 pub struct Blocks(Arc<Inner>);
 
 impl Blocks {
-    /// Kiểm khai báo của mọi module rồi điền sổ (một lần, lúc dựng `Modules`).
+    /// Validates the declarations of all modules and then fills the registry (once, when `Modules` is built).
     pub(crate) fn fill(
         &self,
         declared: Vec<(&'static str, Vec<Feature>, Vec<BlockType>)>,
@@ -266,12 +266,12 @@ impl Blocks {
         self.0.declared.get().into_iter().flat_map(BTreeMap::values)
     }
 
-    /// Khối tên `name`, nếu có module đang chạy khai nó.
+    /// The block named `name`, if a running module declares it.
     pub fn get(&self, name: &str) -> Option<Arc<BlockInfo>> {
         self.0.declared.get().and_then(|blocks| blocks.get(name)).cloned()
     }
 
-    /// Gắn `source` cho khối `name` của `module` (lúc `start`).
+    /// Attaches `source` to the block `name` of `module` (at `start`).
     pub(crate) fn register(
         &self,
         module: &'static str,
@@ -292,7 +292,7 @@ impl Blocks {
         Ok(())
     }
 
-    /// Khối khai `with_data` mà module chưa gắn [`BlockData`] (kiểm sau khi mọi module khởi động).
+    /// Blocks declared `with_data` to which the module has not attached a [`BlockData`] (checked after all modules start).
     pub(crate) fn missing_sources(&self) -> Vec<&'static str> {
         let sources = self.0.sources.read().unwrap_or_else(PoisonError::into_inner);
         self.declared()
@@ -301,8 +301,8 @@ impl Blocks {
             .collect()
     }
 
-    /// Khối khách `tenant` đang dùng được: module có trong gói, tính năng của khối có trong gói.
-    /// Theo tên.
+    /// Blocks the tenant `tenant` can use: the module is in the plan and the block's feature is in the plan.
+    /// Ordered by name.
     pub async fn usable(&self, tenant: &TenantContext) -> Result<Vec<Arc<BlockInfo>>, Error> {
         let Some(entitlements) = self.0.entitlements.get() else {
             return Ok(self.declared().cloned().collect());
@@ -319,8 +319,8 @@ impl Blocks {
             .collect())
     }
 
-    /// Kiểm `props` của khối `name` theo schema của nó; lỗi có đường dẫn bắt đầu bằng `at`.
-    /// Khối không có trong sổ: một lỗi `unknown` ở `at`.
+    /// Validates `props` of the block `name` against its schema; errors carry a path starting at `at`.
+    /// A block not in the registry: one `unknown` error at `at`.
     pub fn check_props(&self, name: &str, props: &Value, at: &str) -> Vec<FieldError> {
         let mut found = Vec::new();
         match self.get(name) {
@@ -333,9 +333,10 @@ impl Blocks {
         found
     }
 
-    /// Dữ liệu của các khối `items` (`(tên khối, khối)`): mỗi loại khối có [`BlockData`] được gọi
-    /// một lần, song song, hạn [`RESOLVE_TIMEOUT`]. Kết quả theo `id` của khối; khối lỗi, hết giờ
-    /// hay tham chiếu không còn công khai là `null`. Khối không cần dữ liệu không có trong kết quả.
+    /// Data of the blocks `items` (`(block name, block)`): each block type that has a [`BlockData`] is called
+    /// once, in parallel, with the timeout [`RESOLVE_TIMEOUT`]. The result is keyed by the block's `id`; a
+    /// block that fails, times out or whose reference is no longer public is `null`. A block that needs no
+    /// data is absent from the result.
     pub async fn resolve(
         &self,
         request: &BlockRequest<'_>,

@@ -1,14 +1,14 @@
-//! Số thập phân cho tính toán tiền, thuế, tỉ giá (bước 36 mục 1, D-188, D-322).
+//! Decimal numbers for computing money, tax and exchange rates (step 36 item 1, D-188, D-322).
 //!
-//! Tiền LƯU vẫn là [`Money`] — số nguyên đơn vị nhỏ nhất (D-180). [`Decimal`] chỉ dùng khi TÍNH:
-//! thuế suất `0.08`, tỉ giá `25345.5`, số lượng `1.5` kg. Ba luật:
+//! Money is still STORED as [`Money`] — an integer in the smallest unit (D-180). [`Decimal`] is used only
+//! when COMPUTING: a tax rate `0.08`, an exchange rate `25345.5`, a quantity `1.5` kg. Three rules:
 //!
-//! - **Không bao giờ đi qua `f64`**: số thập phân đọc từ chuỗi, ghi ra chuỗi.
-//! - **Làm tròn có chủ đích**: mỗi chỗ đổi `Decimal` về `Money` nêu một [`Rounding`]; không có quy
-//!   tắc mặc định ngầm.
-//! - **Lưu và gửi dạng chữ**: cột database là chuỗi đã chuẩn hoá ([`to_column`] / [`from_column`]),
-//!   không dùng kiểu thập phân của database (SQLite không có); JSON là chuỗi ([`DecimalString`]),
-//!   vì JavaScript đọc số JSON thành `f64`.
+//! - **Never goes through `f64`**: decimals are read from strings and written to strings.
+//! - **Rounding is deliberate**: every place that converts a `Decimal` back to `Money` names a [`Rounding`];
+//!   there is no implicit default rule.
+//! - **Stored and sent as text**: the database column is a normalized string ([`to_column`] / [`from_column`]),
+//!   not the database's decimal type (SQLite has none); JSON is a string ([`DecimalString`]),
+//!   because JavaScript reads JSON numbers as `f64`.
 
 use std::fmt;
 use std::str::FromStr;
@@ -24,27 +24,27 @@ use crate::money::{Currency, Money};
 
 pub use rust_decimal::Decimal;
 
-/// Dạng chữ của một số thập phân ở API: `-` tuỳ chọn, chữ số, phần lẻ tuỳ chọn sau dấu chấm.
+/// Text form of a decimal at the API: optional `-`, digits, an optional fractional part after the dot.
 pub const PATTERN: &str = "^-?[0-9]+(\\.[0-9]+)?$";
 
-/// Số chữ số tối đa `rust_decimal` giữ được (mantissa 96 bit).
+/// Maximum number of digits `rust_decimal` can hold (96-bit mantissa).
 const MAX_DIGITS: usize = 28;
 
-/// Quy tắc làm tròn khi đổi một số thập phân về số đơn vị nhỏ nhất. Mỗi chỗ dùng chọn một (bảng
-/// làm tròn của đặc tả bước 36): thuế GTGT `HalfUp`, chiết khấu thường `Down`…
+/// Rounding rule when converting a decimal to a number of smallest units. Each caller picks one (the rounding
+/// table of the step 36 spec): VAT `HalfUp`, ordinary discounts `Down`…
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Rounding {
-    /// Nửa thì làm tròn ra xa số 0: 2.5 → 3, −2.5 → −3.
+    /// Halves round away from zero: 2.5 → 3, −2.5 → −3.
     HalfUp,
-    /// Nửa thì làm tròn về số chẵn (làm tròn ngân hàng): 2.5 → 2, 3.5 → 4.
+    /// Halves round to even (banker's rounding): 2.5 → 2, 3.5 → 4.
     HalfEven,
-    /// Bỏ phần lẻ, về phía số 0: 2.9 → 2, −2.9 → −2.
+    /// Drops the fraction, toward zero: 2.9 → 2, −2.9 → −2.
     Down,
-    /// Có phần lẻ thì ra xa số 0: 2.1 → 3, −2.1 → −3.
+    /// Any fraction goes away from zero: 2.1 → 3, −2.1 → −3.
     Up,
-    /// Về phía âm vô cùng: 2.9 → 2, −2.1 → −3.
+    /// Toward negative infinity: 2.9 → 2, −2.1 → −3.
     Floor,
-    /// Về phía dương vô cùng: 2.1 → 3, −2.9 → −2.
+    /// Toward positive infinity: 2.1 → 3, −2.9 → −2.
     Ceiling,
 }
 
@@ -61,13 +61,13 @@ impl Rounding {
     }
 }
 
-/// `value` làm tròn tới `places` chữ số sau dấu chấm theo `rounding`.
+/// `value` rounded to `places` digits after the dot according to `rounding`.
 pub fn round(value: Decimal, places: u32, rounding: Rounding) -> Decimal {
     value.round_dp_with_strategy(places, rounding.strategy())
 }
 
-/// Đọc đầu vào của người gọi: `"12.5"`, `"-0.08"`, `"25345"`. Dấu phẩy, khoảng trắng, `+`, số mũ
-/// hay quá 28 chữ số → `decimal.invalid`.
+/// Reads caller input: `"12.5"`, `"-0.08"`, `"25345"`. A comma, whitespace, `+`, an exponent
+/// or more than 28 digits → `decimal.invalid`.
 pub fn parse(text: &str) -> Result<Decimal, Error> {
     let unsigned = text.strip_prefix('-').unwrap_or(text);
     let (whole, fraction) = match unsigned.split_once('.') {
@@ -83,14 +83,14 @@ pub fn parse(text: &str) -> Result<Decimal, Error> {
     Decimal::from_str_exact(text).map_err(|_| invalid(text))
 }
 
-/// Giá trị cho cột lưu số thập phân: dạng chữ đã chuẩn hoá (`0.080` → `"0.08"`, `-0` → `"0"`), chạy
-/// như nhau trên SQLite và Postgres.
+/// Value for a decimal-storing column: the normalized text form (`0.080` → `"0.08"`, `-0` → `"0"`), behaving
+/// identically on SQLite and Postgres.
 pub fn to_column(value: Decimal) -> String {
     value.normalize().to_string()
 }
 
-/// Đọc lại cột ghi bằng [`to_column`]. Chuỗi không hợp lệ trong database là dữ liệu hỏng: lỗi nội
-/// bộ, không phải lỗi của người gọi.
+/// Reads back a column written with [`to_column`]. An invalid string in the database is corrupt data: an
+/// internal error, not the caller's error.
 pub fn from_column(text: &str) -> Result<Decimal, Error> {
     parse(text).map_err(|_| {
         Error::internal(format!(
@@ -101,15 +101,15 @@ pub fn from_column(text: &str) -> Result<Decimal, Error> {
 }
 
 impl Money {
-    /// Số tiền dạng thập phân theo đơn vị chính, chính xác: 1999 cent USD → `19.99`, 50000 VND →
+    /// The amount as an exact decimal in the main unit: 1999 USD cents → `19.99`, 50000 VND →
     /// `50000`.
     pub fn to_decimal(self) -> Decimal {
         // `Decimal::new` chỉ dừng chương trình khi số chữ số thập phân > 28; tiền tệ có tối đa 4.
         Decimal::new(self.minor(), u32::from(self.currency().minor_units()))
     }
 
-    /// Số tiền từ một số thập phân theo đơn vị chính của `currency`, làm tròn tới đơn vị nhỏ nhất
-    /// theo `rounding`: `19.995` USD `HalfUp` → 2000 cent. Ngoài khoảng `i64` → `money.overflow`.
+    /// The amount from a decimal in the main unit of `currency`, rounded to the smallest unit
+    /// according to `rounding`: `19.995` USD `HalfUp` → 2000 cents. Outside the `i64` range → `money.overflow`.
     pub fn from_decimal(
         value: Decimal,
         currency: Currency,
@@ -126,21 +126,21 @@ impl Money {
         Ok(Money::new(minor, currency))
     }
 
-    /// `self × rate` cùng loại tiền, làm tròn theo `rounding` (vd thuế 8%: `rate = 0.08`).
+    /// `self × rate` in the same currency, rounded according to `rounding` (e.g. 8% tax: `rate = 0.08`).
     pub fn apply_rate(self, rate: Decimal, rounding: Rounding) -> Result<Money, Error> {
         self.convert(rate, self.currency(), rounding)
     }
 
-    /// Đổi sang loại tiền `to` theo tỉ giá `rate` (một đơn vị chính của tiền này = `rate` đơn vị
-    /// chính của `to`), làm tròn theo `rounding`: 10 USD × 25345.5 → 253455 VND.
+    /// Converts to currency `to` at exchange rate `rate` (one main unit of this currency = `rate` main
+    /// units of `to`), rounded according to `rounding`: 10 USD × 25345.5 → 253455 VND.
     pub fn convert(self, rate: Decimal, to: Currency, rounding: Rounding) -> Result<Money, Error> {
         let product = self.to_decimal().checked_mul(rate).ok_or_else(crate::money::overflow)?;
         Money::from_decimal(product, to, rounding)
     }
 }
 
-/// Số thập phân ở API: JSON là **chuỗi** (`"0.08"`), không phải số — số JSON bị JavaScript đọc
-/// thành `f64` và mất chính xác. Đầu vào sai (kể cả số JSON) bị từ chối với `decimal.invalid`.
+/// A decimal at the API: JSON is a **string** (`"0.08"`), not a number — JavaScript reads JSON numbers
+/// as `f64` and loses precision. Wrong input (including a JSON number) is rejected with `decimal.invalid`.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct DecimalString(pub Decimal);
 
