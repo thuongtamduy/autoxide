@@ -20,6 +20,25 @@ pub(crate) struct RawBody {
 }
 
 impl Automations {
+    /// Lưu hay bật luật là trao quyền chạy về sau không cần xác nhận lại: người lưu phải đủ điều kiện
+    /// như gọi REST ngay lúc này, kể cả xác nhận lại (step-up) cho permission `money` / `destructive`
+    /// — không thì token cũ bị lộ lưu một luật để làm việc mà REST đòi xác nhận (rà soát bảo mật
+    /// 2026-11). Gọi sau [`validate`](Self::validate) (lỗi thiếu permission đã báo ở đó).
+    pub(crate) fn authorize_actions(
+        &self,
+        principal: &Principal,
+        body: &RuleBody,
+    ) -> Result<(), Error> {
+        for action in &body.actions {
+            if let Action::Tool { tool, .. } = action
+                && let Some(tool) = self.directory.tool(tool)
+            {
+                tool.authorize(principal)?;
+            }
+        }
+        Ok(())
+    }
+
     /// Đọc và kiểm thân luật cho người tạo / sửa `principal`. Lỗi nào cũng gom vào một
     /// `validation_failed`.
     pub(crate) async fn validate(
@@ -34,6 +53,18 @@ impl Automations {
             return Err(Error::validation(errors));
         };
         self.check_trigger(&body.trigger, &mut errors);
+        // Lần chạy mang `event` (đọc lại được qua API lần chạy): người lưu phải được tự xem event đó
+        // qua luồng event, như webhook (D-20261121-hardening-batch mục 2) — không thì luật thành
+        // đường vòng đọc event mà luồng event chặn (rà soát bảo mật 2026-11).
+        if let Trigger::Event { event } = &body.trigger
+            && let Some(permission) = self
+                .events
+                .iter()
+                .find(|info| info.name() == event.as_str())
+                .and_then(|info| info.stream_permission())
+        {
+            principal.require(&permission)?;
+        }
         for (index, action) in body.actions.iter().enumerate() {
             let field = format!("actions.{index}");
             match action {

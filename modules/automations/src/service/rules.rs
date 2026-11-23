@@ -76,6 +76,7 @@ impl Automations {
             None => default_org(tenant, principal)?,
         };
         let body = self.validate(tenant, principal, &input.body).await?;
+        self.authorize_actions(principal, &body)?;
         let zone = self.zone(tenant, org, &body).await;
         let now = now();
         let agent = principal.actor_kind() == ActorKind::Agent;
@@ -183,6 +184,7 @@ impl Automations {
             actions: changes.actions.unwrap_or_else(|| parse_json(&current.actions)),
         };
         let body = self.validate(tenant, principal, &raw).await?;
+        self.authorize_actions(principal, &body)?;
         let org = OrgId::from_uuid(current.org_id);
         let zone = self.zone(tenant, org, &body).await;
         let agent = principal.actor_kind() == ActorKind::Agent;
@@ -259,6 +261,7 @@ impl Automations {
             actions: parse_json(&current.actions),
         };
         let body = self.validate(tenant, principal, &raw).await?;
+        self.authorize_actions(principal, &body)?;
         let zone = self.zone(tenant, OrgId::from_uuid(current.org_id), &body).await;
         let checked = Some((&body, zone, current.version));
         self.set_status(tenant, principal, id, (ACTIVE, checked), expected).await

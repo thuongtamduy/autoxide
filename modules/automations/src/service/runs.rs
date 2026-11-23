@@ -210,13 +210,10 @@ impl Automations {
             .and_then(|index| actions.get(index));
         if let Some(Action::Tool { tool, .. }) = step
             && let Some(tool) = self.directory.tool(tool)
-            && !tool.allows(principal)
         {
-            // Người duyệt phải tự làm được bước đó.
-            let permission = tool.permission().or(tool.alternative());
-            if let Some(permission) = permission {
-                principal.require(&permission)?;
-            }
+            // Người duyệt phải tự làm được bước đó, như gọi REST: kể cả xác nhận lại (step-up) cho
+            // permission nhạy cảm (rà soát bảo mật 2026-11).
+            tool.authorize(principal)?;
         }
         Ok(run)
     }

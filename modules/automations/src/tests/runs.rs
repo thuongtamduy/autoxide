@@ -380,3 +380,40 @@ async fn chay_cung_luc_khong_vuot_so_lan_moi_gio() {
     .await
     .unwrap();
 }
+
+/// Rà soát bảo mật 2026-11: duyệt bước dùng permission `money` cần phiên vừa xác nhận lại, như gọi
+/// REST — người duyệt có quyền nhưng phiên cũ thì `step_up_required`.
+#[tokio::test]
+async fn duyet_buoc_nhay_cam_doi_xac_nhan_lai() {
+    use autoxide_kernel::access::StepUp;
+    use autoxide_kernel::time::Timestamp;
+    use jiff::SignedDuration;
+
+    TestDatabase::run(async |test| {
+        let harness = Harness::new(test).await;
+        let mut permissions = OWNER.to_vec();
+        permissions.push("shop.refund");
+        let window = SignedDuration::from_mins(15);
+        let at = |minutes: i64| StepUp {
+            authenticated_at: Some(Timestamp::now() - SignedDuration::from_mins(minutes)),
+            window,
+        };
+        let fresh = person(6, &permissions).with_step_up(at(0));
+        // Lần chạy lấy quyền hiện tại của người tạo qua bộ xác thực của test.
+        harness.people.set(person(6, &permissions));
+        let rule = harness
+            .rule_by(&fresh, on_order(), json!(null), json!([{"tool": "shop.refund"}]))
+            .await
+            .unwrap();
+        harness.shop.place(&harness.tenant, 100).await;
+        harness.settle().await;
+        let run = harness.runs(rule.id).await.remove(0);
+        assert_eq!(run.status, AWAITING_APPROVAL);
+        let stale = person(6, &permissions).with_step_up(at(60));
+        let error = harness.service.approve_run(&harness.tenant, &stale, run.id).await.unwrap_err();
+        assert_eq!(error.code(), "step_up_required");
+        harness.service.approve_run(&harness.tenant, &fresh, run.id).await.unwrap();
+    })
+    .await
+    .unwrap();
+}
