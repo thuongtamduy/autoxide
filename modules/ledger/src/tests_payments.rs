@@ -376,3 +376,32 @@ async fn so_tien_khac_va_tien_ve_tre_vao_hang_cho() {
     .await
     .unwrap();
 }
+
+/// Rà soát bảo mật 2026-11 (L-6): nhận thiếu rồi người duyệt chấp nhận số đã nhận — trần hoàn là số
+/// đã thu, không phải số phải thu (hoàn theo số phải thu là trả ra nhiều hơn tiền đã vào).
+#[tokio::test]
+async fn nhan_thieu_roi_chap_nhan_thi_hoan_toi_da_so_da_thu() {
+    TestDatabase::run(async |test| {
+        let (app, gateway) = app(test).await;
+        let short = pay(&app, 100_000, "S").await;
+        assert_eq!(
+            webhook(&app, gateway.paid(short.id, vnd(90_000), "evt-s")).await,
+            StatusCode::OK
+        );
+        drain(&app).await;
+        let open = exceptions(&app).await;
+        let uri = format!("/exceptions/{}/resolve", open[0]["id"].as_str().unwrap());
+        let body = json!({"action": "accept_received", "payment_id": short.id});
+        let (code, resolved) = call(&app, "POST", &uri, Some(body)).await;
+        assert_eq!(code, StatusCode::OK, "{resolved}");
+        assert_eq!(status(&app, short.id).await, "succeeded");
+        let tenant = app.default_tenant();
+        let too_much = NewRefund::new(short.id, vnd(95_000), "Returned", "R-1");
+        let error = ledger(&app).refund(&tenant, Actor::system(), too_much).await.unwrap_err();
+        assert_eq!(error.code(), "ledger.refund_exceeds_payment");
+        let all = NewRefund::new(short.id, vnd(90_000), "Returned", "R-2");
+        ledger(&app).refund(&tenant, Actor::system(), all).await.unwrap();
+    })
+    .await
+    .unwrap();
+}

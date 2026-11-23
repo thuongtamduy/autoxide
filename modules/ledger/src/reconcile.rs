@@ -19,7 +19,7 @@ use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::payment::StatementKind;
 use autoxide_kernel::rows;
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext, TenantId};
-use sea_orm::sea_query::OnConflict;
+use sea_orm::sea_query::{Expr, OnConflict};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QuerySelect, Set};
 use serde_json::{Value, json};
 use uuid::Uuid;
@@ -31,6 +31,9 @@ use crate::permissions::{READ, RECONCILE};
 use crate::service::{LedgerService, now};
 
 pub(crate) const RECONCILE_JOB: &str = "ledger.reconcile";
+
+/// Mục chờ đang được một lệnh khớp / nhận số thực thu giữ trong lúc ghi thu.
+const RESOLVING: &str = "resolving";
 
 pub(crate) fn exception_not_found() -> Error {
     Error::not_found("ledger.exception_not_found", "There is no such item to resolve.")
@@ -226,6 +229,7 @@ impl LedgerService {
         if current.status != "open" {
             return Ok(current);
         }
+        let claimed = matches!(resolution, Resolution::Match(_) | Resolution::AcceptReceived(_));
         let (label, status) = match &resolution {
             Resolution::Match(payment_id) | Resolution::AcceptReceived(payment_id) => {
                 let accept = matches!(resolution, Resolution::AcceptReceived(_));
@@ -240,7 +244,38 @@ impl LedgerService {
                     return Err(amount_differs(received, expected));
                 }
                 let via = if accept { crate::payments::VIA_ACCEPTED } else { "manual" };
-                self.capture(tenant, found.id, received, via).await?;
+                // Nhận mục chờ TRƯỚC khi ghi thu (rà soát bảo mật 2026-11): hai lệnh khớp cùng lúc
+                // vào hai thanh toán khác nhau từng cùng thấy `open` và cùng ghi thu — một khoản
+                // tiền trả cho hai đơn. Cập nhật có điều kiện: chỉ một bên đổi được `open` →
+                // `resolving`; bên kia trả mục như hiện có.
+                let claimed = exception::Entity::update_many()
+                    .col_expr(exception::Column::Status, Expr::value(RESOLVING))
+                    .col_expr(exception::Column::UpdatedAt, Expr::value(now()))
+                    .filter(exception::Column::Id.eq(id))
+                    .filter(exception::Column::Status.eq("open"))
+                    .scoped(tenant)
+                    .exec(database.write())
+                    .await?
+                    .rows_affected
+                    == 1;
+                if !claimed {
+                    return exception::Entity::find_by_id(id)
+                        .scoped(tenant)
+                        .one(database.write())
+                        .await?
+                        .ok_or_else(exception_not_found);
+                }
+                if let Err(error) = self.capture(tenant, found.id, received, via).await {
+                    // Ghi thu hỏng: trả mục về `open` để xử lý lại.
+                    exception::Entity::update_many()
+                        .col_expr(exception::Column::Status, Expr::value("open"))
+                        .filter(exception::Column::Id.eq(id))
+                        .filter(exception::Column::Status.eq(RESOLVING))
+                        .scoped(tenant)
+                        .exec(database.write())
+                        .await?;
+                    return Err(error);
+                }
                 (if accept { "accept_received" } else { "match" }, "resolved")
             }
             Resolution::Ignore => ("ignore", "ignored"),
@@ -255,7 +290,8 @@ impl LedgerService {
                     rows::lock_one(&transaction, exception::Entity::find_by_id(id).scoped(tenant))
                         .await?
                         .ok_or_else(exception_not_found)?;
-                if row.status != "open" {
+                // `resolving`: chính lệnh này đã nhận mục ở trên (chỉ khớp / nhận số thực thu).
+                if row.status != "open" && !(claimed && row.status == RESOLVING) {
                     return Ok(row);
                 }
                 let mut active: exception::ActiveModel = row.into();
