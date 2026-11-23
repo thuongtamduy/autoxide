@@ -310,6 +310,32 @@ async fn bao_sai_du_nguong_thoi_dung_cau_tra_loi() {
 }
 
 #[tokio::test]
+async fn nguoi_mua_bao_phan_hoi_bang_id_tin_ho_thay() {
+    TestDatabase::run(async |test| {
+        let setup = setup(test, true, &[]).await;
+        setup.classify(setup.macro_answer(9900));
+        let id = setup.ask("Mấy giờ mở cửa?").await;
+        let sent = setup.automatic(&id).await;
+        // Người mua chỉ thấy tin (cờ `auto_reply`), không đọc được nhật ký của nhân viên.
+        let message = sent[0]["id"].as_str().unwrap().to_owned();
+        let path = format!("/me/tickets/{id}/auto-replies/{message}/feedback");
+        let (status, body) =
+            call(&setup.app, "POST", &path, "buyer", Some(json!({"helpful": true}))).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        assert_eq!(body["data"]["feedback"], "helpful");
+        assert_eq!(body["data"]["reply_message_id"], message.as_str());
+        // Id lạ vẫn là không tìm thấy.
+        let path = format!("/me/tickets/{id}/auto-replies/{}/feedback", Uuid::now_v7());
+        let (status, body) =
+            call(&setup.app, "POST", &path, "buyer", Some(json!({"helpful": true}))).await;
+        assert_eq!(status, StatusCode::NOT_FOUND, "{body}");
+        assert_eq!(body["code"], "support.auto_reply_not_found");
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
 async fn het_han_ra_lai_thoi_dung() {
     TestDatabase::run(async |test| {
         let setup = setup(test, true, &[]).await;

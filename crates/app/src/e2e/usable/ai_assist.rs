@@ -16,6 +16,16 @@ pub(crate) async fn app_with_ai(
     server: &FakeProviderServer,
     settings: &[(&str, &str)],
 ) -> TestApp {
+    app_with_ai_and(test, server, settings, |builder| builder).await
+}
+
+/// [`app_with_ai`]; `more` chỉnh builder thêm (vd người mua).
+pub(crate) async fn app_with_ai_and(
+    test: &TestDatabase,
+    server: &FakeProviderServer,
+    settings: &[(&str, &str)],
+    more: impl FnOnce(autoxide_testkit::TestAppBuilder<'_>) -> autoxide_testkit::TestAppBuilder<'_>,
+) -> TestApp {
     let url = server.url().to_owned();
     let settings: Vec<(String, String)> =
         settings.iter().map(|(name, value)| ((*name).to_owned(), (*value).to_owned())).collect();
@@ -36,7 +46,7 @@ pub(crate) async fn app_with_ai(
         for (name, value) in &settings {
             builder = builder.setting(name, value);
         }
-        builder
+        more(builder)
     })
     .await
 }

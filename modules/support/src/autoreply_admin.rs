@@ -10,7 +10,9 @@ use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext};
-use sea_orm::{ColumnTrait, EntityTrait, IntoActiveModel, PaginatorTrait, QueryFilter, Set};
+use sea_orm::{
+    ColumnTrait, Condition, EntityTrait, IntoActiveModel, PaginatorTrait, QueryFilter, Set,
+};
 use serde_json::json;
 use uuid::Uuid;
 
@@ -139,7 +141,7 @@ impl SupportService {
             .await
     }
 
-    /// Người mua báo câu trả lời tự động `reply_id` của phiếu là hữu ích hay không đúng. Câu trả lời
+    /// Người mua báo câu trả lời tự động `reply_id` (id nhật ký hay id tin đã gửi) của phiếu là hữu ích hay không đúng. Câu trả lời
     /// mẫu bị báo "không đúng" từ `AUTOXIDE_SUPPORT_AUTO_REPLY_FLAG_LIMIT` lần trong 7 ngày thì thôi dùng.
     pub(crate) async fn feedback(
         &self,
@@ -151,7 +153,14 @@ impl SupportService {
     ) -> Result<AutoReply, Error> {
         self.get(tenant, viewer, ticket_id).await?;
         let transaction = tenant.database().begin_write().await?;
-        let current = auto_reply::Entity::find_by_id(reply_id)
+        // Người mua chỉ thấy tin nhắn (cờ `auto_reply`), không thấy nhật ký: nhận cả id nhật ký lẫn id
+        // của tin đã gửi.
+        let current = auto_reply::Entity::find()
+            .filter(
+                Condition::any()
+                    .add(auto_reply::Column::Id.eq(reply_id))
+                    .add(auto_reply::Column::ReplyMessageId.eq(reply_id)),
+            )
             .filter(auto_reply::Column::Thread.eq(format!("support.ticket:{ticket_id}")))
             .scoped(tenant)
             .one(&transaction)
