@@ -1,12 +1,12 @@
-//! Dữ liệu cá nhân: xuất và xoá dữ liệu của một người dùng xuyên mọi module.
+//! Personal data: exporting and deleting one user's data across every module.
 //!
-//! - **Xuất:** module nào giữ dữ liệu của người dùng thì cài [`PersonalData`] và đăng ký
-//!   bằng [`StartContext::personal_data`](crate::module::StartContext::personal_data).
-//!   Module quản lý tài khoản gom mọi phần lại bằng [`PersonalDataExport::export`].
-//! - **Xoá:** module quản lý tài khoản phát event [`USER_DELETED`] khi một tài khoản bị
-//!   xoá; module khác nhận nó qua `Module::subscriptions` rồi xoá dữ liệu của người đó
-//!   (lấy id bằng [`deleted_user`]). Event được giao lại tới khi bên nhận xong việc, nên
-//!   bên nhận phải chịu được việc nhận lại.
+//! - **Export:** a module that holds user data implements [`PersonalData`] and registers it with
+//!   [`StartContext::personal_data`](crate::module::StartContext::personal_data).
+//!   The account-management module gathers all parts with [`PersonalDataExport::export`].
+//! - **Deletion:** the account-management module emits the [`USER_DELETED`] event when an account is
+//!   deleted; other modules receive it through `Module::subscriptions` and delete that person's data
+//!   (get the id with [`deleted_user`]). Events are redelivered until the receiver finishes, so the
+//!   receiver must tolerate receiving it again.
 
 use std::collections::BTreeMap;
 use std::sync::{Arc, RwLock};
@@ -18,12 +18,12 @@ use crate::error::Error;
 use crate::event::Delivered;
 use crate::tenancy::TenantContext;
 
-/// Tên event phát khi một tài khoản người dùng bị xoá. `payload.before.id` là id của
-/// người dùng.
+/// Name of the event emitted when a user account is deleted. `payload.before.id` is the id of the
+/// user.
 pub const USER_DELETED: &str = "auth.user_deleted";
 
-/// Id người dùng của một event [`USER_DELETED`]; `None` nếu event khác hoặc sai hình
-/// dạng.
+/// User id of a [`USER_DELETED`] event; `None` if the event is different or has the wrong
+/// shape.
 pub fn deleted_user(event: &Delivered) -> Option<Uuid> {
     if event.name != USER_DELETED {
         return None;
@@ -31,21 +31,21 @@ pub fn deleted_user(event: &Delivered) -> Option<Uuid> {
     event.payload.get("before")?.get("id")?.as_str()?.parse().ok()
 }
 
-/// Một module xuất dữ liệu nó giữ về một người dùng.
+/// A module exports the data it holds about a user.
 //
 // `#[async_trait]`: Rust chưa cho gọi hàm `async` của trait qua `dyn Trait`.
 #[async_trait::async_trait]
 pub trait PersonalData: Send + Sync {
-    /// Mọi dữ liệu của người dùng `user_id` của khách `tenant` mà module giữ, dạng JSON đọc
-    /// được (không có secret, hash hay token).
+    /// All data of user `user_id` of tenant `tenant` that the module holds, as human-readable JSON
+    /// (no secrets, hashes or tokens).
     async fn export(&self, tenant: &TenantContext, user_id: Uuid) -> Result<Value, Error>;
 }
 
-/// Phần của một module: (tên module, bộ xuất).
+/// Part of a module: (module name, exporter).
 type Exporter = (&'static str, Arc<dyn PersonalData>);
 
-/// Sổ các [`PersonalData`] đã đăng ký, dùng chung cho mọi module. Clone rẻ: mọi bản
-/// clone thấy cùng một sổ, kể cả phần đăng ký sau khi clone.
+/// Registry of the registered [`PersonalData`] exporters, shared by all modules. Cloning is cheap: every
+/// clone sees the same registry, including registrations made after the clone.
 #[derive(Clone, Default)]
 pub struct PersonalDataExport {
     // Ghi chỉ lúc khởi động; đọc mỗi lần xuất. `RwLock` của thư viện chuẩn: không bao
@@ -54,9 +54,9 @@ pub struct PersonalDataExport {
 }
 
 impl PersonalDataExport {
-    /// Đăng ký phần của module `module`. Module dùng
-    /// [`StartContext::personal_data`](crate::module::StartContext::personal_data); gọi
-    /// thẳng hàm này chỉ dành cho test.
+    /// Registers the part for module `module`. Modules use
+    /// [`StartContext::personal_data`](crate::module::StartContext::personal_data); calling this function
+    /// directly is for tests only.
     pub fn register(
         &self,
         module: &'static str,
@@ -72,8 +72,8 @@ impl PersonalDataExport {
         Ok(())
     }
 
-    /// Dữ liệu của người dùng `user_id` của khách `tenant` từ mọi module đã đăng ký, theo tên
-    /// module.
+    /// Data of user `user_id` of tenant `tenant` from every registered module, keyed by module
+    /// name.
     pub async fn export(
         &self,
         tenant: &TenantContext,
@@ -122,28 +122,28 @@ impl DataCategory {
     }
 }
 
-/// Giữ bao lâu.
+/// How long it is kept.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Keep {
-    /// Xoá sau số ngày này.
+    /// Deleted after this many days.
     Days(u32),
-    /// Giữ tới khi người dùng (hay khách) xoá.
+    /// Kept until the user (or tenant) deletes it.
     UntilDeleted,
-    /// Giữ mãi (chỉ hợp với chứng từ / bằng chứng luật buộc giữ).
+    /// Kept forever (only suitable for documents / evidence the law requires keeping).
     Forever,
 }
 
-/// Một loại dữ liệu module giữ và thời hạn lưu của nó (`Module::retention`). `keep` đọc từ cấu
-/// hình đang có của module (gọi sau `configure`).
+/// A kind of data a module holds and its retention period (`Module::retention`). `keep` is read from the
+/// module's current configuration (called after `configure`).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RetentionPolicy {
-    /// `<module>.<loại>`, vd `auth.sessions`.
+    /// `<module>.<kind>`, e.g. `auth.sessions`.
     pub name: &'static str,
-    /// Mô tả tiếng Anh cho người đọc API (`GET /api/v1/compliance/retention`).
+    /// English description for API readers (`GET /api/v1/compliance/retention`).
     pub description: &'static str,
     pub category: DataCategory,
     pub keep: Keep,
-    /// Biến cấu hình đặt thời hạn này, nếu có.
+    /// Configuration variable that sets this period, if any.
     pub setting: Option<&'static str>,
 }
 
@@ -164,17 +164,17 @@ impl RetentionPolicy {
     }
 }
 
-/// Sổ thời hạn lưu của mọi module (gom một lần lúc khởi động, sau `configure`). Clone rẻ.
+/// Registry of every module's retention periods (gathered once at startup, after `configure`). Cheap to clone.
 #[derive(Clone, Debug, Default)]
 pub struct RetentionCatalog(Arc<Vec<(&'static str, RetentionPolicy)>>);
 
 impl RetentionCatalog {
-    /// Sổ từ (tên module, thời hạn); kernel dựng, test dựng tay.
+    /// Registry from (module name, period); built by the kernel, built by hand in tests.
     pub fn new(policies: Vec<(&'static str, RetentionPolicy)>) -> Self {
         RetentionCatalog(Arc::new(policies))
     }
 
-    /// Mọi mục, theo thứ tự đăng ký module.
+    /// Every entry, in module registration order.
     pub fn all(&self) -> &[(&'static str, RetentionPolicy)] {
         &self.0
     }

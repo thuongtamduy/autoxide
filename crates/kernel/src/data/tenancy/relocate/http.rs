@@ -1,7 +1,8 @@
-//! REST của tách / gộp khách (D-210): nhân sự nền tảng chạy (`/api/v1/kernel/relocations`, dry-run
-//! mặc định, chạy thật bằng job); khách chỉ gửi yêu cầu (`/api/v1/kernel/tenant/relocation-requests`),
-//! yêu cầu vào hộp việc của nhân sự nền tảng ([`RelocationRequestsWork`]). Không có tool MCP: việc
-//! của người vận hành, không hoàn tác được bằng một lệnh.
+//! REST for splitting / merging tenants (D-210): platform staff run it (`/api/v1/kernel/relocations`, dry
+//! run by default, a real run is done by a job); a tenant only submits a request
+//! (`/api/v1/kernel/tenant/relocation-requests`), and the request goes into the platform staff's work inbox
+//! ([`RelocationRequestsWork`]). There is no MCP tool: it is operator work that cannot be undone with a
+//! single command.
 
 use std::sync::Arc;
 
@@ -254,7 +255,7 @@ async fn get_relocation_request(
     Ok(Data { data: service.get_own(&tenant, id).await? })
 }
 
-/// Route dưới `/api/v1/kernel`.
+/// Routes under `/api/v1/kernel`.
 pub(crate) fn routes(service: Arc<TenantRelocations>) -> OpenApiRouter {
     OpenApiRouter::new()
         .routes(routes!(relocate_tenant))
@@ -264,7 +265,7 @@ pub(crate) fn routes(service: Arc<TenantRelocations>) -> OpenApiRouter {
         .with_state(service)
 }
 
-/// Hộp việc của nhân sự nền tảng: yêu cầu tách / gộp của khách đang chờ.
+/// The platform staff's work inbox: tenants' pending split / merge requests.
 pub(crate) struct RelocationRequestsWork(pub(crate) Arc<TenantRelocations>);
 
 #[async_trait::async_trait]

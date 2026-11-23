@@ -1,18 +1,20 @@
-//! Danh sách lý do theo khách (bước 51 P18, D-223): lý do huỷ đơn, hoàn tiền, ẩn đánh giá…
+//! Per-tenant reason lists (step 51 P18, D-223): reasons for cancelling an order, refunding, hiding a review…
 //!
-//! Module khai danh sách và mã mặc định bằng [`Module::reason_lists`](crate::module::Module) — tên
-//! `<module>.<việc>`, mã `snake_case`, nhãn tiếng Anh (dịch qua `text:` của module, `xtask` kiểm có
-//! bản dịch). Bảng `kernel_reason_codes` (cấp khách hàng) chỉ giữ **phần khách đổi**: nhãn riêng,
-//! bật / tắt, thứ tự của mã mặc định, và mã riêng khách thêm. Đọc thì gộp mã mặc định với phần của
-//! khách — mã mặc định mới của bản nâng cấp có ngay, không cần đồng bộ, và không mã nào bị xoá.
+//! A module declares a list and its default codes with [`Module::reason_lists`](crate::module::Module) — name
+//! `<module>.<action>`, `snake_case` code, English label (translated through the module's `text:`; `xtask`
+//! checks that translations exist). The table `kernel_reason_codes` (tenant level) holds only **what the
+//! tenant changed**: its own labels, enabled / disabled, order of default codes, and codes the tenant added.
+//! Reading merges the default codes with the tenant's part — new default codes from an upgrade appear
+//! immediately, no sync needed, and no code is ever deleted.
 //!
-//! - `GET /api/v1/kernel/reasons/{list}?include_inactive=` — người đọc được module sở hữu danh
-//!   sách (`<module>.read`) hay có `kernel.reasons.manage`;
-//! - `PUT /api/v1/kernel/reasons/{list}/{code}` (`kernel.reasons.manage`) — nhãn, bật / tắt, thứ
-//!   tự; mã chưa có là mã riêng của khách. Mã `legal` không tắt được (`kernel.reason_legal`).
+//! - `GET /api/v1/kernel/reasons/{list}?include_inactive=` — whoever can read the module that owns the
+//!   list (`<module>.read`) or has `kernel.reasons.manage`;
+//! - `PUT /api/v1/kernel/reasons/{list}/{code}` (`kernel.reasons.manage`) — label, enabled / disabled,
+//!   order; a code that does not exist yet is a tenant's own code. The `legal` code cannot be disabled
+//!   (`kernel.reason_legal`).
 //!
-//! Service của module kiểm mã người dùng gửi bằng [`ReasonCodes::ensure`]. Dòng dữ liệu lưu mã,
-//! không lưu nhãn: đổi nhãn không sửa lịch sử; mã đã dùng không xoá được, chỉ tắt.
+//! A module's service validates the code a user submits with [`ReasonCodes::ensure`]. Data rows store the code,
+//! not the label: changing a label does not rewrite history; a code in use cannot be deleted, only disabled.
 
 use crate::time::Timestamp;
 use std::collections::BTreeMap;
@@ -36,20 +38,20 @@ use crate::tenancy::TenantContext;
 
 const TABLE: &str = "kernel_reason_codes";
 
-/// Sửa danh sách lý do của khách.
+/// Edits a tenant's reason list.
 pub const REASONS_MANAGE: Permission = Permission::new(
     "kernel.reasons.manage",
     "Change the tenant's lists of reasons: labels, order, turn codes off, add codes.",
 );
 
-/// Một mã mặc định của danh sách.
+/// A default code of the list.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct ReasonDefault {
     pub code: &'static str,
-    /// Nhãn tiếng Anh (dịch qua `text:` của module).
+    /// English label (translated through the module's `text:`).
     pub label: &'static str,
-    /// Lý do pháp luật đòi phải có: không tắt được.
+    /// A reason the law requires to exist: cannot be disabled.
     pub legal: bool,
 }
 
@@ -64,11 +66,11 @@ impl ReasonDefault {
     }
 }
 
-/// Một danh sách lý do module khai.
+/// A reason list declared by a module.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct ReasonList {
-    /// `<module>.<việc>`, vd `orders.cancel`.
+    /// `<module>.<action>`, vd `orders.cancel`.
     pub name: &'static str,
     pub defaults: Vec<ReasonDefault>,
 }
@@ -85,7 +87,7 @@ fn is_code(code: &str) -> bool {
         && code.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_')
 }
 
-/// Kiểm khai báo của mọi module: tên `<module>.<việc>`, mã đúng dạng, không trùng.
+/// Validates the declarations of every module: name `<module>.<action>`, well-formed codes, no duplicates.
 pub(crate) fn check(module: &str, lists: &[ReasonList], problems: &mut Vec<String>) {
     for list in lists {
         let own = list
@@ -111,13 +113,13 @@ pub(crate) fn check(module: &str, lists: &[ReasonList], problems: &mut Vec<Strin
     }
 }
 
-/// Sổ danh sách lý do của mọi module, điền một lần khi khởi động. Clone rẻ.
+/// Registry of every module's reason lists, filled once at startup. Cheap to clone.
 #[derive(Clone, Default)]
 pub struct ReasonCodes {
     lists: Arc<OnceLock<BTreeMap<&'static str, ReasonList>>>,
 }
 
-/// Một mã sau khi gộp mặc định với phần của khách.
+/// A code after merging the defaults with the tenant's part.
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Merged {
     code: String,
@@ -138,8 +140,8 @@ impl ReasonCodes {
         self.lists.get().and_then(|lists| lists.get(name))
     }
 
-    /// Mã `code` có trong danh sách `list` và đang bật ở khách `tenant` không; không thì lỗi 422
-    /// `kernel.reason_unknown` (service gọi trước khi lưu mã người dùng gửi).
+    /// Whether code `code` is in list `list` and enabled for tenant `tenant`; if not, error 422
+    /// `kernel.reason_unknown` (a service calls this before saving a code a user submitted).
     pub async fn ensure(
         &self,
         tenant: &TenantContext,
@@ -479,7 +481,7 @@ pub(crate) fn routes(state: ReasonsState) -> OpenApiRouter {
         .with_state(Arc::new(state))
 }
 
-/// Migration tạo bảng `kernel_reason_codes` (cấp khách hàng, mọi database dữ liệu).
+/// Migration that creates the table `kernel_reason_codes` (tenant level, every data database).
 pub(crate) struct CreateReasonCodes;
 
 impl MigrationName for CreateReasonCodes {

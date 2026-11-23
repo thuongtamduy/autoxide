@@ -1,18 +1,18 @@
-//! Đề proof-of-work theo giao thức ALTCHA v2 (MIT), tự viết bằng `hmac` / `sha2` đang có — không
-//! dùng crate `altcha` vì nó kéo theo bản cũ của hai thư viện đó (D-120). Mặc định tắt
-//! (`AUTOXIDE_ANTISPAM_CHALLENGE=altcha` để bật).
+//! Proof-of-work challenges following the ALTCHA v2 protocol (MIT), written in-house with the existing `hmac`
+//! / `sha2` — the `altcha` crate is not used because it pulls in older versions of those two libraries
+//! (D-120). Off by default (`AUTOXIDE_ANTISPAM_CHALLENGE=altcha` turns it on).
 //!
-//! Cố định phần giao thức (widget, bộ giải và bộ kiểm phải khớp nhau):
+//! Fixed protocol details (the widget, the solver and the verifier must agree):
 //!
-//! - thuật toán `SHA-256` lặp: khoá = SHA-256 lặp `cost` lần trên `salt ‖ nonce ‖ bộ đếm`;
-//! - bộ đếm 4 byte big-endian (`CounterMode::Uint32`, mặc định của v2);
-//! - "deterministic mode": máy chủ chọn bộ đếm ngẫu nhiên trong [32, 64], `keyPrefix` là nửa đầu
-//!   khoá của bộ đếm đó; trình duyệt dò bộ đếm từ 0 tới khi khớp;
-//! - chữ ký: HMAC-SHA256 (hex) trên JSON của `parameters` đã sắp khoá ở mọi tầng;
-//! - `data` mang phạm vi form và `binding` = nonce của token form, nên một lời giải chỉ dùng được
-//!   cho đúng một token form — mà token form chỉ được nhận một lần (bảng nonce của module).
+//! - iterated `SHA-256` algorithm: key = SHA-256 iterated `cost` times over `salt ‖ nonce ‖ counter`;
+//! - 4-byte big-endian counter (`CounterMode::Uint32`, the v2 default);
+//! - "deterministic mode": the server picks a random counter in [32, 64], and `keyPrefix` is the first half of
+//!   that counter's key; the browser probes counters from 0 until one matches;
+//! - signature: HMAC-SHA256 (hex) over the JSON of `parameters` with keys sorted at every level;
+//! - `data` carries the form scope and `binding` = the nonce of the form token, so a solution works for exactly
+//!   one form token — and a form token is accepted only once (the module's nonce table).
 //!
-//! Lời giải trình duyệt gửi là base64 (chuẩn) của JSON `{"challenge": …, "solution": …}`.
+//! The solution the browser sends is the base64 (standard) of the JSON `{"challenge": …, "solution": …}`.
 
 use crate::time::Timestamp;
 use std::collections::BTreeMap;
@@ -27,18 +27,18 @@ use super::{ChallengeOutcome, ChallengeVerifier};
 use crate::error::Error;
 use crate::secret::SecretKey;
 
-/// Nhãn dẫn khoá ký đề.
+/// Label that derives the challenge signing key.
 const PURPOSE: &str = "autoxide/antispam/altcha/v1";
-/// Độ dài khoá (byte) và tên thuật toán của giao thức.
+/// Key length (bytes) and algorithm name of the protocol.
 const KEY_LENGTH: usize = 32;
 const ALGORITHM: &str = "SHA-256";
-/// Đề sống chừng này giây.
+/// A challenge lives this many seconds.
 const TTL_SECONDS: i64 = 600;
-/// Khoảng bộ đếm máy chủ chọn: trình duyệt thử trung bình ~48 lần, mỗi lần `cost` vòng SHA-256.
+/// Range of counters the server picks from: the browser tries about 48 times on average, each time `cost` rounds of SHA-256.
 const COUNTER_MIN: u32 = 32;
 const COUNTER_MAX: u32 = 64;
 
-/// Bộ đề ALTCHA v2.
+/// The ALTCHA v2 challenge set.
 pub struct Altcha {
     secret: SecretKey,
     cost: u32,
@@ -109,7 +109,7 @@ impl ChallengeVerifier for Altcha {
     }
 }
 
-/// Điều lời giải phải khớp.
+/// What the solution must match.
 struct Expected<'a> {
     scope: &'a str,
     binding: &'a str,
@@ -117,7 +117,7 @@ struct Expected<'a> {
     now: i64,
 }
 
-/// Lời giải `payload` (base64 JSON) có đúng không. Mọi chỗ sai dạng đều là "sai".
+/// Whether the solution `payload` (base64 JSON) is correct. Any malformed part counts as "wrong".
 fn check(payload: &str, key: &str, expected: &Expected<'_>) -> bool {
     let Ok(bytes) = STANDARD.decode(payload.trim()) else {
         return false;
@@ -166,7 +166,7 @@ fn check(payload: &str, key: &str, expected: &Expected<'_>) -> bool {
         && derived.starts_with(&prefix)
 }
 
-/// Khoá của bộ đếm `counter`: SHA-256 lặp `cost` lần trên `salt ‖ nonce ‖ counter`.
+/// Key of the counter `counter`: SHA-256 iterated `cost` times over `salt ‖ nonce ‖ counter`.
 fn derive(salt: &[u8], nonce: &[u8], counter: u32, cost: u32) -> Vec<u8> {
     let mut data: Vec<u8> =
         salt.iter().chain(nonce).copied().chain(counter.to_be_bytes()).collect();
@@ -177,7 +177,7 @@ fn derive(salt: &[u8], nonce: &[u8], counter: u32, cost: u32) -> Vec<u8> {
     data
 }
 
-/// HMAC-SHA256 (hex) trên JSON của `parameters` đã sắp khoá ở mọi tầng; khoá là chuỗi `key`.
+/// HMAC-SHA256 (hex) over the JSON of `parameters` with keys sorted at every level; the key is the string `key`.
 fn sign(parameters: &Value, key: &str) -> Result<String, Error> {
     let canonical = serde_json::to_string(&sorted(parameters.clone())).map_err(Error::internal)?;
     let mut mac = <Hmac<Sha256> as KeyInit>::new_from_slice(key.as_bytes())
@@ -217,8 +217,8 @@ fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
 mod tests {
     use super::*;
 
-    /// Sinh MỘT lần bằng thư viện chính thức `altcha` 1.1.0 (`create_challenge` với
-    /// `SHA-256`, `cost` 500, `counter` 73, khoá ký `fixture-secret`, rồi `solve_challenge`).
+    /// Generated ONCE with the official `altcha` 1.1.0 library (`create_challenge` with
+    /// `SHA-256`, `cost` 500, `counter` 73, signing key `fixture-secret`, then `solve_challenge`).
     const FIXTURE: &str = include_str!("fixtures/altcha_v2.json");
     const KEY: &str = "fixture-secret";
 
@@ -259,7 +259,7 @@ mod tests {
         assert!(!check(&STANDARD.encode("{}"), KEY, &expected(0)));
     }
 
-    /// Đề do bộ này phát giải được theo đúng cách widget giải (dò bộ đếm từ 0).
+    /// A challenge issued by this generator can be solved the way the widget solves it (probing counters from 0).
     #[test]
     fn de_tu_phat_giai_duoc() {
         let (salt, nonce, cost) = ([1u8; 16], [2u8; 16], 50);

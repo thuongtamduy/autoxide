@@ -1,12 +1,12 @@
-//! Migrate placement bằng API (D-334): nhà vận hành chạy migration của các database khách (placement)
-//! từ giao diện, không phải vào máy chủ gõ `autoxide migrate up --all`.
+//! Migrating placements through the API (D-334): the operator runs migrations of tenant databases (placements)
+//! from the UI, without logging into the server to type `autoxide migrate up --all`.
 //!
-//! - `dry_run: true`: trả ngay migration còn chờ của từng placement, không đổi gì.
-//! - Ngược lại: một dòng `kernel_migration_runs` (mặt điều khiển) và một job `kernel.migrate_placements`
-//!   của database điều khiển; job chạy như phần placement của `migrate up --all` (từng placement theo
-//!   tên, `migrating` → `ready`, hỏng thì `behind` và dừng). Chỉ một lượt chạy một lúc.
-//! - Database điều khiển (`main`) không migrate qua API: `serve` không chạy khi `main` còn migration
-//!   chờ, nên máy chủ đang trả lời API thì `main` đã xong.
+//! - `dry_run: true`: immediately returns the pending migrations of each placement, changing nothing.
+//! - Otherwise: one `kernel_migration_runs` row (control plane) and one `kernel.migrate_placements` job of the
+//!   control database; the job runs like the placement part of `migrate up --all` (each placement by name,
+//!   `migrating` → `ready`, on failure `behind` and stop). Only one run at a time.
+//! - The control database (`main`) is not migrated through the API: `serve` does not run while `main` has
+//!   pending migrations, so when the server is answering the API, `main` is already done.
 
 use crate::time::Timestamp;
 use std::sync::Arc;
@@ -34,11 +34,11 @@ use crate::http::ValidJson;
 use crate::job::{EnqueueOptions, Job, JobContext, JobHandler, JobQueue};
 use crate::response::{Created, Data, Problem};
 
-/// Job chạy một lượt migrate (job của database điều khiển).
+/// Job that runs one migrate run (a job of the control database).
 pub(crate) const MIGRATE_PLACEMENTS: &str = "kernel.migrate_placements";
 
 mod entity {
-    //! Bảng `kernel_migration_runs` (mặt điều khiển).
+    //! The `kernel_migration_runs` table (control plane).
     use crate::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
@@ -48,7 +48,7 @@ mod entity {
     pub struct Model {
         #[sea_orm(primary_key, auto_increment = false)]
         pub id: Uuid,
-        /// Tên placement; `None`: mọi placement.
+        /// Placement name; `None`: every placement.
         pub placement: Option<String>,
         /// `pending`, `running`, `done`, `failed`.
         pub status: String,
@@ -58,8 +58,8 @@ mod entity {
         pub error: Option<String>,
         pub created_at: Timestamp,
         pub updated_at: Timestamp,
-        /// `active` khi lượt chưa xong (`pending` / `running`), trống khi đã xong; unique — mỗi
-        /// lúc chỉ một lượt chạy (m0039).
+        /// `active` while the run is unfinished (`pending` / `running`), empty once finished; unique, so only
+        /// one run at a time (m0039).
         pub active_key: Option<String>,
     }
 
@@ -68,7 +68,7 @@ mod entity {
 
 use entity::{Column, Entity, Model};
 
-/// Bảng `kernel_migration_runs`.
+/// The `kernel_migration_runs` table.
 pub(crate) struct CreateMigrationRuns;
 
 impl MigrationName for CreateMigrationRuns {
@@ -102,13 +102,13 @@ impl MigrationTrait for CreateMigrationRuns {
     }
 }
 
-/// Giá trị của `active_key` khi lượt chưa xong.
+/// Value of `active_key` while the run is unfinished.
 const ACTIVE: &str = "active";
 const ACTIVE_INDEX: &str = "kernel_migration_runs_active_key_idx";
 
-/// Cột `active_key` (unique) của `kernel_migration_runs`: chặn hai lượt chạy cùng lúc bằng index
-/// thay vì "đọc — chưa có lượt nào — chèn" (hai request cùng lúc từng cùng thấy trống trên Postgres
-/// và xếp hai lượt migrate song song). Dữ liệu cũ: lượt chưa xong mới nhất nhận khoá.
+/// The `active_key` column (unique) of `kernel_migration_runs`: prevents two simultaneous runs with an index
+/// instead of "read, find no run, insert" (two concurrent requests once both saw empty on Postgres and queued
+/// two parallel migrate runs). Existing data: the newest unfinished run receives the key.
 pub(crate) struct AddMigrationRunActiveKey;
 
 impl MigrationName for AddMigrationRunActiveKey {
@@ -230,7 +230,7 @@ fn now() -> Timestamp {
     Timestamp::now()
 }
 
-/// Migrate placement bằng API.
+/// Migrates placements through the API.
 pub(crate) struct MigrationRuns {
     registry: DatabaseRegistry,
     setup: super::moves::MoveSetup,
@@ -250,13 +250,13 @@ impl MigrationRuns {
         self.registry.control()
     }
 
-    /// Migration còn chờ (chạy thử).
+    /// Pending migrations (dry run).
     async fn pending(&self, placement: Option<&str>) -> Result<Vec<PlacementMigrationList>, Error> {
         let placements = self.setup.placements()?;
         Ok(lists(placements.pending(placement).await?))
     }
 
-    /// Xếp một lượt chạy. Đang có lượt chưa xong → `kernel.migration_run_busy` (409).
+    /// Queues a run. If an unfinished run exists → `kernel.migration_run_busy` (409).
     async fn start(&self, actor: Actor, placement: Option<String>) -> Result<MigrationRun, Error> {
         // Placement phải có (báo ngay thay vì để job hỏng).
         self.setup.placements()?.pending(placement.as_deref()).await?;
@@ -325,7 +325,7 @@ impl MigrationRuns {
         Ok(rows.into_iter().map(Into::into).collect())
     }
 
-    /// Chạy lượt `id` (bộ chạy job).
+    /// Runs the run `id` (the job runner).
     async fn run(&self, id: Uuid) -> Result<(), Error> {
         let Some(row) = Entity::find_by_id(id).one(self.control().write()).await? else {
             return Ok(());
@@ -385,7 +385,7 @@ impl MigrationRuns {
     }
 }
 
-/// Bộ chạy job `kernel.migrate_placements`.
+/// Runner of the `kernel.migrate_placements` job.
 pub(crate) struct MigrateRunner(pub(crate) Arc<MigrationRuns>);
 
 #[async_trait::async_trait]
@@ -399,7 +399,7 @@ impl JobHandler for MigrateRunner {
 
 // ---- REST ----------------------------------------------------------------------------------------
 
-/// Nhân sự nền tảng có `kernel.tenants.operate`.
+/// Platform staff with `kernel.tenants.operate`.
 fn operator(principal: &Principal) -> Result<(), Error> {
     principal.require(&crate::builtin::TENANTS_OPERATE)?;
     super::require_platform(principal)
@@ -533,7 +533,7 @@ pub(crate) struct MigrationRunRef {
     id: Uuid,
 }
 
-/// Kết quả của tool `kernel.migrate_placements`: chạy thử hay lượt vừa xếp.
+/// Result of the `kernel.migrate_placements` tool: a dry run or the run just queued.
 #[derive(Debug, Serialize)]
 #[serde(untagged)]
 enum ToolAnswer {

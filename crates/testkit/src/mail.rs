@@ -1,8 +1,8 @@
-//! Bên gửi mail giả cho test (như `FakeTextModel`): giữ mail trong bộ nhớ thay vì gửi.
+//! Fake mail sender for tests (like `FakeTextModel`): keeps mail in memory instead of sending it.
 //!
-//! Giống module `mail` thật ở chỗ module khác dựa vào: mail cùng `dedupe_key` đã nhận thì mail sau
-//! bị bỏ qua. `reject_reply_to` giả máy chủ mail từ chối địa chỉ `reply_to`
-//! (`validation_failed`, trường `reply_to`).
+//! Behaves like the real `mail` module in the way other modules rely on: once mail with a given `dedupe_key`
+//! has been accepted, later mail with the same key is ignored. `reject_reply_to` simulates a mail server
+//! rejecting the `reply_to` address (`validation_failed`, field `reply_to`).
 //!
 //! ```ignore
 //! let mailer = Arc::new(FakeMailer::new());
@@ -19,13 +19,13 @@ use autoxide_kernel::tenancy::TenantContext;
 
 #[derive(Default)]
 struct State {
-    /// Mail đã nhận (mail trùng `dedupe_key` không thêm).
+    /// Mail accepted (mail with a duplicate `dedupe_key` is not added).
     sent: Vec<Mail>,
-    /// Số lần `send` được gọi, kể cả mail trùng khoá bị bỏ và mail bị từ chối.
+    /// Number of `send` calls, including mail dropped as a duplicate key and mail rejected.
     calls: usize,
 }
 
-/// Bên gửi mail giả. Công bố vào app bằng `TestApp::builder(…).provide::<dyn Mailer>(mailer.clone())`.
+/// Fake mail sender. Publish it into the app with `TestApp::builder(…).provide::<dyn Mailer>(mailer.clone())`.
 #[derive(Default)]
 pub struct FakeMailer {
     state: Mutex<State>,
@@ -42,34 +42,34 @@ impl FakeMailer {
         FakeMailer::default()
     }
 
-    /// Mail đã nhận, theo thứ tự.
+    /// Mail accepted, in order.
     pub fn sent(&self) -> Vec<Mail> {
         lock(&self.state).sent.clone()
     }
 
-    /// Mail gửi tới đúng địa chỉ `address`.
+    /// Mail sent to exactly the address `address`.
     pub fn to(&self, address: &str) -> Vec<Mail> {
         lock(&self.state).sent.iter().filter(|mail| mail.to == address).cloned().collect()
     }
 
-    /// Mail gửi sau cùng, nếu có.
+    /// The last mail sent, if any.
     pub fn last(&self) -> Option<Mail> {
         lock(&self.state).sent.last().cloned()
     }
 
-    /// Số lần `send` được gọi (kể cả mail trùng khoá bị bỏ, mail bị từ chối).
+    /// Number of `send` calls (including mail dropped as a duplicate key and mail rejected).
     pub fn calls(&self) -> usize {
         lock(&self.state).calls
     }
 
-    /// Quên mọi mail đã nhận.
+    /// Forgets all mail received.
     pub fn clear(&self) {
         let mut state = lock(&self.state);
         state.sent.clear();
         state.calls = 0;
     }
 
-    /// Bật thì mọi mail có `reply_to` bị từ chối như máy chủ mail không chấp nhận địa chỉ đó.
+    /// When enabled, every mail with a `reply_to` is rejected, as a mail server would reject that address.
     pub fn reject_reply_to(&self, reject: bool) {
         self.reject_reply_to.store(reject, Ordering::SeqCst);
     }

@@ -1,34 +1,36 @@
-//! Phần giao thức của MCP mà kernel tự viết theo đặc tả công khai (thay `rmcp`, D-20261121-mcp-server):
-//! tin nhắn JSON-RPC 2.0, phiên bản giao thức và lỗi.
+//! The part of the MCP protocol the kernel writes itself from the public specification (replacing `rmcp`,
+//! D-20261121-mcp-server): JSON-RPC 2.0 messages, the protocol version, and errors.
 //!
-//! Hai "thế hệ" giao thức cùng phục vụ trên một endpoint (đặc tả 2026-07-28, mục "Versioning"):
+//! Two "generations" of the protocol are served on one endpoint (spec 2026-07-28, section "Versioning"):
 //!
-//! - **Cũ** (`2024-11-05` … `2025-11-25`): client bắt tay bằng `initialize`; các request sau mang header
-//!   `MCP-Protocol-Version` (thiếu thì hiểu là `2025-03-26`). Lỗi JSON-RPC trả HTTP 200.
-//! - **Mới** (`2026-07-28`): không bắt tay; mỗi request mang phiên bản và khả năng của client trong
-//!   `params._meta`, header `Mcp-Method` / `Mcp-Name` phải khớp thân; có `server/discover`; kết quả mang
-//!   `resultType`. Một số lỗi đổi mã HTTP (400, 404).
+//! - **Old** (`2024-11-05` … `2025-11-25`): the client handshakes with `initialize`; later requests carry
+//!   the `MCP-Protocol-Version` header (if missing, it is taken as `2025-03-26`). JSON-RPC errors return
+//!   HTTP 200.
+//! - **New** (`2026-07-28`): no handshake; each request carries the client's version and capabilities in
+//!   `params._meta`, the `Mcp-Method` / `Mcp-Name` headers must match the body; there is `server/discover`;
+//!   results carry `resultType`. Some errors change HTTP code (400, 404).
 //!
-//! Máy chủ không giữ phiên (giống cấu hình `rmcp` trước đây): mỗi request tự đủ thông tin.
+//! The server keeps no session (same as the earlier `rmcp` configuration): each request is self-contained.
 
 use serde_json::{Map, Value, json};
 
-/// Các phiên bản giao thức máy chủ hỗ trợ, mới nhất trước.
+/// The protocol versions the server supports, newest first.
 pub(super) const SUPPORTED_VERSIONS: [&str; 5] =
     ["2026-07-28", "2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];
 
-/// Phiên bản đầu tiên không còn `initialize` (thế hệ mới).
+/// The first version without `initialize` (the new generation).
 pub(super) const MODERN: &str = "2026-07-28";
 
-/// Phiên bản mới nhất còn bắt tay bằng `initialize`: trả cho client `initialize` xin phiên bản lạ.
+/// The newest version that still has the `initialize` handshake: returned to a client whose `initialize`
+/// asks for an unknown version.
 pub(super) const LATEST_WITH_INITIALIZE: &str = "2025-11-25";
 
-/// Khoá `_meta` của đặc tả.
+/// The `_meta` key of the specification.
 pub(super) const META_PROTOCOL_VERSION: &str = "io.modelcontextprotocol/protocolVersion";
 pub(super) const META_CLIENT_CAPABILITIES: &str = "io.modelcontextprotocol/clientCapabilities";
 pub(super) const META_SERVER_INFO: &str = "io.modelcontextprotocol/serverInfo";
 
-/// Mã lỗi JSON-RPC 2.0 và của MCP.
+/// JSON-RPC 2.0 and MCP error codes.
 pub(super) mod code {
     pub(crate) const PARSE_ERROR: i64 = -32700;
     pub(crate) const INVALID_REQUEST: i64 = -32600;
@@ -39,18 +41,20 @@ pub(super) mod code {
     pub(crate) const UNSUPPORTED_PROTOCOL_VERSION: i64 = -32022;
 }
 
-/// Một phiên bản có được hỗ trợ không.
+/// Whether a version is supported.
 pub(super) fn is_supported(version: &str) -> bool {
     SUPPORTED_VERSIONS.contains(&version)
 }
 
-/// Phiên bản thuộc thế hệ mới (không `initialize`). Phiên bản `YYYY-MM-DD` so như chuỗi là đúng thứ tự.
+/// Whether a version belongs to the new generation (no `initialize`). Versions of the form `YYYY-MM-DD`
+/// compare correctly as strings.
 pub(super) fn is_modern(version: &str) -> bool {
     version >= MODERN
 }
 
-/// Phiên bản trả cho `initialize`: đúng bản client xin nếu hỗ trợ và còn `initialize`, không thì bản mới
-/// nhất còn `initialize` (client tự quyết có dùng được không).
+/// The version returned for `initialize`: exactly the one the client asks for if it is supported and still
+/// has `initialize`, otherwise the newest version that still has `initialize` (the client decides whether
+/// it can use it).
 pub(super) fn negotiate_initialize(requested: &str) -> &'static str {
     SUPPORTED_VERSIONS
         .iter()
@@ -59,21 +63,22 @@ pub(super) fn negotiate_initialize(requested: &str) -> &'static str {
         .unwrap_or(LATEST_WITH_INITIALIZE)
 }
 
-/// ID của request JSON-RPC: số hay chuỗi, trả lại nguyên như client gửi.
+/// The ID of a JSON-RPC request: a number or a string, returned exactly as the client sent it.
 pub(super) type RequestId = Value;
 
-/// Một tin nhắn client gửi, đã tách ra.
+/// A message the client sent, parsed.
 pub(super) enum Incoming {
-    /// Có `id`: phải trả lời.
+    /// Has an `id`: must be answered.
     Request { id: RequestId, method: String, params: Map<String, Value> },
-    /// Không `id`: chỉ nhận (`notifications/initialized`, `notifications/cancelled`…).
+    /// No `id`: only received (`notifications/initialized`, `notifications/cancelled`...).
     Notification,
-    /// Client gửi câu trả lời (`result` / `error`): máy chủ không giữ phiên nên không có request nào đang
-    /// chờ — từ chối.
+    /// The client sends a reply (`result` / `error`): the server keeps no session so no request is
+    /// waiting - rejected.
     Response,
 }
 
-/// Đọc thân POST thành một tin nhắn. Lỗi: tin nhắn trả về cho client (không có `id` khi không đọc được).
+/// Parses a POST body into a message. On error: the message to return to the client (without an `id` when
+/// it cannot be read).
 pub(super) fn parse(body: &[u8]) -> Result<Incoming, RpcError> {
     let value: Value = serde_json::from_slice(body)
         .map_err(|error| RpcError::new(code::PARSE_ERROR, format!("Parse error: {error}")))?;
@@ -124,12 +129,12 @@ pub(super) fn parse(body: &[u8]) -> Result<Incoming, RpcError> {
     }
 }
 
-/// `params._meta` của request (rỗng khi không có).
+/// The request's `params._meta` (empty when absent).
 pub(super) fn meta(params: &Map<String, Value>) -> Option<&Map<String, Value>> {
     params.get("_meta").and_then(Value::as_object)
 }
 
-/// Lỗi JSON-RPC trả cho client.
+/// A JSON-RPC error returned to the client.
 #[derive(Debug, Clone, PartialEq)]
 pub(super) struct RpcError {
     pub(super) code: i64,
@@ -168,7 +173,7 @@ impl RpcError {
             .with_data(json!({"supported": SUPPORTED_VERSIONS, "requested": requested}))
     }
 
-    /// Tin nhắn lỗi JSON-RPC (`id` là `null` khi không đọc được ID của request).
+    /// A JSON-RPC error message (`id` is `null` when the request ID cannot be read).
     pub(super) fn into_message(self, id: Option<RequestId>) -> Value {
         let mut error = json!({"code": self.code, "message": self.message});
         if let Some(data) = self.data {
@@ -178,18 +183,18 @@ impl RpcError {
     }
 }
 
-/// Tin nhắn kết quả JSON-RPC.
+/// A JSON-RPC result message.
 pub(super) fn result_message(id: RequestId, result: Value) -> Value {
     json!({"jsonrpc": "2.0", "id": id, "result": result})
 }
 
-/// Một khối nội dung chữ (`ContentBlock` loại `text`).
+/// A block of text content (`ContentBlock` of type `text`).
 pub(super) fn text_block(text: impl Into<String>) -> Value {
     json!({"type": "text", "text": text.into()})
 }
 
-/// Kết quả `tools/call` có cấu trúc: giá trị nằm ở `structuredContent`, kèm bản chữ của chính giá trị đó
-/// trong `content` cho client chỉ đọc chữ (như `CallToolResult::structured` của `rmcp`).
+/// A structured `tools/call` result: the value is in `structuredContent`, with a text copy of that same
+/// value in `content` for clients that read only text (like `CallToolResult::structured` of `rmcp`).
 pub(super) fn tool_result(value: Value, is_error: bool) -> Map<String, Value> {
     let mut result = Map::new();
     result.insert("content".to_owned(), Value::Array(vec![text_block(value.to_string())]));
@@ -198,18 +203,18 @@ pub(super) fn tool_result(value: Value, is_error: bool) -> Map<String, Value> {
     result
 }
 
-/// Thông tin máy chủ (`Implementation`).
+/// Server information (`Implementation`).
 pub(super) fn server_info() -> Value {
     json!({"name": "autoxide", "version": env!("CARGO_PKG_VERSION")})
 }
 
-/// Khả năng máy chủ công bố: tool, resource, prompt (không gửi thông báo thay đổi).
+/// The capabilities the server declares: tools, resources, prompts (no change notifications are sent).
 pub(super) fn capabilities() -> Value {
     json!({"prompts": {}, "resources": {}, "tools": {}})
 }
 
-/// Giải `=?base64?…?=` của header `Mcp-Name` / `Mcp-Param-*` (đặc tả: "Value Encoding"); giá trị thường giữ
-/// nguyên. `None` khi dạng base64 hỏng.
+/// Decodes `=?base64?…?=` in the `Mcp-Name` / `Mcp-Param-*` headers (spec: "Value Encoding"); plain values
+/// are kept as is. `None` when the base64 form is malformed.
 pub(super) fn decode_header_value(raw: &str) -> Option<String> {
     use base64::Engine as _;
     match raw.strip_prefix("=?base64?").and_then(|rest| rest.strip_suffix("?=")) {

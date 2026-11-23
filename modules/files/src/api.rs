@@ -1,10 +1,11 @@
-//! Hợp đồng của module `files`:
+//! Contract of the `files` module:
 //!
-//! - trait chung `autoxide_kernel::storage::Storage` (nơi lưu); module khác lấy bằng
-//!   `context.require::<dyn Storage>()` (đăng ký SAU `files`);
-//! - trait [`Files`]: đọc một file người dùng đã tải lên qua `/api/v1/files`, với đúng luật xem của
-//!   `files` (chủ file hay `files.manage`). Module khác dùng nó để nhận một file người dùng đã tải
-//!   lên (vd `catalog` chép file của hàng số vào chỗ của mình) mà không đọc bảng `files_file`.
+//! - the shared trait `autoxide_kernel::storage::Storage` (where files are stored); other modules get it with
+//!   `context.require::<dyn Storage>()` (registered AFTER `files`);
+//! - the [`Files`] trait: reads a file a user uploaded through `/api/v1/files`, under exactly the viewing
+//!   rule of `files` (the file owner or `files.manage`). Other modules use it to receive a file a user
+//!   uploaded (e.g. `catalog` copies the file of a digital good into its own place) without reading the
+//!   `files_file` table.
 
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
@@ -13,23 +14,23 @@ use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::time::Timestamp;
 use uuid::Uuid;
 
-/// Thông tin một file đã tải lên.
+/// Information about an uploaded file.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct FileInfo {
     pub id: Uuid,
-    /// Tên hiển thị (đã kiểm: không có `/`, `\`, ký tự điều khiển).
+    /// Display name (validated: no `/`, `\`, or control characters).
     pub name: String,
     pub content_type: String,
-    /// Số byte.
+    /// Size in bytes.
     pub size: u64,
-    /// SHA-256 của nội dung, hex chữ thường.
+    /// SHA-256 of the content, lowercase hex.
     pub sha256: String,
     pub created_at: Timestamp,
 }
 
 impl FileInfo {
-    /// Dựng thông tin file (cho bản giả trong test của module khác).
+    /// Builds file information (for fakes in other modules' tests).
     pub fn new(
         id: Uuid,
         name: impl Into<String>,
@@ -49,7 +50,7 @@ impl FileInfo {
     }
 }
 
-/// Một file mở ra: thông tin và nội dung.
+/// An opened file: information and content.
 #[non_exhaustive]
 pub struct OpenedFile {
     pub info: FileInfo,
@@ -62,12 +63,12 @@ impl OpenedFile {
     }
 }
 
-/// File người dùng đã tải lên. Module `files` công bố `dyn Files`.
+/// Files a user has uploaded. The `files` module publishes `dyn Files`.
 #[async_trait::async_trait]
 pub trait Files: Send + Sync {
-    /// Thông tin file `id` của khách `tenant`, nếu `principal` được xem nó (chủ file còn
-    /// `files.upload`, hay có `files.manage`). Không có hay không được xem: `files.file_not_found`
-    /// (không lộ file của người khác có tồn tại).
+    /// Information about file `id` of tenant `tenant`, if `principal` may view it (the file owner who still has
+    /// `files.upload`, or someone with `files.manage`). Missing or not viewable: `files.file_not_found`
+    /// (does not reveal whether another person's file exists).
     async fn find(
         &self,
         tenant: &TenantContext,
@@ -75,7 +76,7 @@ pub trait Files: Send + Sync {
         id: Uuid,
     ) -> Result<FileInfo, Error>;
 
-    /// Như [`find`](Self::find), kèm nội dung để đọc (chép, xử lý).
+    /// Like [`find`](Self::find), with the content to read (copy, process).
     async fn open(
         &self,
         tenant: &TenantContext,

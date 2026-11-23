@@ -1,27 +1,27 @@
-//! Metrics theo định dạng Prometheus.
+//! Metrics in Prometheus format.
 //!
-//! Code ở mọi nơi ghi số đo bằng macro của thư viện `metrics`:
+//! Code anywhere records measurements with the macros of the `metrics` library:
 //!
 //! ```
 //! metrics::counter!("notes_created_total").increment(1);
 //! ```
 //!
-//! Tên số đo của module mang tiền tố `<module>_`. Nhãn (label) chỉ nhận giá trị
-//! thuộc một tập NHỎ và cố định (method, mẫu route, mã trạng thái): mỗi tổ hợp
-//! nhãn là một chuỗi số đo riêng trong bộ nhớ, nên KHÔNG dùng ID, email hay đường
-//! dẫn thô làm nhãn.
+//! A module's metric names carry the prefix `<module>_`. Labels accept only values
+//! from a SMALL, fixed set (method, route pattern, status code): each combination
+//! of labels is a separate series in memory, so do NOT use an ID, email or raw
+//! path as a label.
 //!
-//! Khi chưa gọi [`Metrics::install`], các macro trên không làm gì.
+//! Until [`Metrics::install`] is called, the macros above do nothing.
 
 use std::fmt;
 use std::time::Duration;
 
 use metrics_exporter_prometheus::{PrometheusBuilder, PrometheusHandle};
 
-/// Ranh giới các "xô" đo thời gian (giây), từ 5 ms tới 10 giây.
+/// Boundaries of the time-measurement buckets (seconds), from 5 ms to 10 seconds.
 const DURATION_BUCKETS: [f64; 11] = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0];
 
-/// Lỗi khi bật metrics.
+/// Error when enabling metrics.
 #[derive(Debug)]
 pub struct MetricsError(String);
 
@@ -33,14 +33,14 @@ impl fmt::Display for MetricsError {
 
 impl std::error::Error for MetricsError {}
 
-/// Bộ thu số đo của tiến trình. `Clone` rẻ.
+/// The process's metrics collector. Cheap to `Clone`.
 #[derive(Clone)]
 pub struct Metrics {
     handle: PrometheusHandle,
 }
 
 impl Metrics {
-    /// Bật thu số đo cho cả tiến trình. Gọi một lần lúc khởi động; lần hai là lỗi.
+    /// Enables metrics collection for the whole process. Call it once at startup; a second call is an error.
     pub fn install() -> Result<Self, MetricsError> {
         let handle = PrometheusBuilder::new()
             .set_buckets(&DURATION_BUCKETS)
@@ -49,14 +49,14 @@ impl Metrics {
         Ok(Metrics { handle })
     }
 
-    /// Mọi số đo hiện có, ở định dạng văn bản của Prometheus.
+    /// All current metrics, in Prometheus text format.
     pub fn render(&self) -> String {
         self.handle.render()
     }
 
-    /// Chạy việc bảo trì định kỳ của bộ thu (gom dữ liệu histogram) ở một task nền,
-    /// để bộ nhớ không phình khi không ai đọc `/metrics`. Phải gọi từ trong runtime
-    /// tokio.
+    /// Runs the collector's periodic maintenance (aggregating histogram data) in a background task,
+    /// so memory does not grow when nobody reads `/metrics`. Must be called from inside the tokio
+    /// runtime.
     pub fn spawn_upkeep(&self) {
         let handle = self.handle.clone();
         tokio::spawn(async move {

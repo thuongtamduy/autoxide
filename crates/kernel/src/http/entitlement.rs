@@ -1,14 +1,14 @@
-//! Lớp chặn theo gói cho route REST của một module (bước 35, D-325): bọc router của từng module khi
-//! ghép dưới `/api/v1/<module>`; đếm request cho hạn mức `kernel.api_requests` ở mọi module, chặn
-//! chỉ ở module không `always_enabled`.
+//! Plan-based gating layer for a module's REST routes (step 35, D-325): wraps each module's router when
+//! mounted under `/api/v1/<module>`; counts requests for the `kernel.api_requests` quota in every module,
+//! and blocks only in modules that are not `always_enabled`.
 //!
-//! - Gói của khách không có module → 403 `module_not_enabled`;
-//! - khách chỉ đọc vì thuê bao (tạm khoá / huỷ) → lệnh ghi (`POST`, `PUT`, `PATCH`, `DELETE`) bị
-//!   403 `tenant_read_only`; đọc vẫn qua.
+//! - The tenant's plan lacks the module: 403 `module_not_enabled`;
+//! - the tenant is read-only due to its subscription (suspended / cancelled): write requests (`POST`,
+//!   `PUT`, `PATCH`, `DELETE`) get 403 `tenant_read_only`; reads still pass.
 //!
-//! Khách của request giải bằng cùng extractor handler dùng (kết quả cất trong request, handler
-//! không giải lại). Không giải được (route công khai không có khách…) thì cho qua: handler tự trả
-//! lỗi của nó.
+//! The request's tenant is resolved with the same extractor the handlers use (the result is cached in the
+//! request, so handlers do not resolve it again). If it cannot be resolved (a public route without a
+//! tenant...), the request passes through: the handler returns its own error.
 
 use axum::extract::Request;
 use axum::http::Method;

@@ -1,19 +1,21 @@
-//! Stream event thời gian thực (bước 40 P5, D-378): đẩy tới client qua Server-Sent Events những
-//! event module **chủ động khai** stream được ([`EventInfo::streamable`](super::EventInfo::streamable)),
-//! cùng nội dung và quyền như đọc bản ghi qua REST. KHÔNG phải "realtime theo bảng" (đẩy mọi thay đổi
-//! dòng): bảng không bao giờ lộ ra ngoài, chỉ event đã khai.
+//! Real-time event stream (step 40 P5, D-378): pushes to clients over Server-Sent Events the events that
+//! modules **explicitly declare** streamable ([`EventInfo::streamable`](super::EventInfo::streamable)), with
+//! the same content and permissions as reading the record through REST. NOT "per-table realtime" (pushing
+//! every row change): tables are never exposed, only declared events.
 //!
-//! Đọc từ bảng `<module>_events` (transactional outbox) — đúng khi nhiều máy chủ: event ghi ở máy chủ
-//! A, client nối với máy chủ B vẫn nhận. Mỗi tiến trình một [`StreamHub`]: một vòng hỏi chung cho mọi
-//! kết nối (N kết nối không thành N câu hỏi mỗi giây), chỉ hỏi database của khách đang có người nghe,
-//! rồi phát cho các kết nối qua `tokio::sync::broadcast`.
+//! Reads from the `<module>_events` tables (transactional outbox) - correct with multiple servers: an event
+//! written on server A is still received by a client connected to server B. One [`StreamHub`] per process: a
+//! single shared polling loop for all connections (N connections do not become N queries per second),
+//! querying only the databases of tenants that have listeners, then broadcasting to connections through
+//! `tokio::sync::broadcast`.
 //!
-//! Vì sao lùi lại một khoảng [`GRACE`] mỗi lượt hỏi: ID event (UUIDv7) và `occurred_at` gán lúc GHI,
-//! còn event chỉ thấy được lúc COMMIT. Transaction mở trước, commit sau có thể mang thời điểm sớm hơn
-//! event đã phát; hỏi lùi lại `GRACE` rồi khử trùng theo ID đã phát thì không mất nó.
+//! Why each poll looks back by a [`GRACE`] interval: the event ID (UUIDv7) and `occurred_at` are assigned at
+//! WRITE time, while an event only becomes visible at COMMIT time. A transaction opened earlier and committed
+//! later can carry an earlier timestamp than an event already broadcast; polling back `GRACE` and
+//! de-duplicating by already-broadcast IDs does not lose it.
 //!
-//! Giao **ít nhất một lần**: nối lại bằng `Last-Event-ID` gửi lại event trong khoảng `GRACE` trước
-//! event đó; client khử trùng theo `id`.
+//! **At-least-once** delivery: reconnecting with `Last-Event-ID` resends events within `GRACE` before
+//! that event; the client de-duplicates by `id`.
 
 use crate::time::Timestamp;
 use jiff::SignedDuration;
@@ -74,25 +76,27 @@ pub(crate) const WS_RECHECK_SECONDS: Setting = Setting::new(
 )
 .with_default("60");
 
-/// Lùi lại chừng này mỗi lượt hỏi (xem đầu file): transaction ghi phải ngắn (luật dữ liệu), nên
-/// 5 giây giữa lúc ghi event và lúc commit là dư.
+/// Look back this far on each poll (see the top of the file): write transactions must be short (data rules), so
+/// 5 seconds between writing the event and committing is more than enough.
 pub(crate) const GRACE: Duration = Duration::from_secs(5);
-/// Event đã giao được giữ chừng này rồi bị dọn (`KEEP_DELIVERED` của bộ phát); nối lại với ID cũ
-/// hơn thì client nhận `reset` (tải lại trạng thái) thay vì đọc bù.
+/// Delivered events are kept this long and then cleaned up (`KEEP_DELIVERED` of the dispatcher); reconnecting
+/// with an older ID makes the client receive `reset` (reload state) instead of a backfill.
 const RETENTION: SignedDuration = SignedDuration::from_hours(24 * 7);
-/// Một kết nối sống tối đa chừng này rồi máy chủ đóng; client nối lại bằng `Last-Event-ID` và
-/// quyền được xét lại (permission bị thu hồi không giữ stream mãi).
+/// A connection lives at most this long and then the server closes it; the client reconnects with
+/// `Last-Event-ID` and permissions are re-evaluated (a revoked permission does not keep a stream open
+/// forever).
 pub(crate) const LIFETIME: Duration = Duration::from_secs(30 * 60);
-/// Đọc bù tối đa chừng này event; nhiều hơn thì gửi `reset`.
+/// Backfills at most this many events; beyond that, `reset` is sent.
 const BACKFILL_MAX: usize = 10_000;
-/// Mỗi câu hỏi lấy tối đa chừng này dòng một bảng (lặp tới khi hết).
+/// Each query fetches at most this many rows of a table (repeating until exhausted).
 const PAGE: u64 = 500;
-/// Số event bộ phát của hub giữ cho kết nối chậm; tụt quá thì kết nối đọc bù từ database.
+/// Number of events the hub's broadcaster holds for slow connections; a connection that falls further
+/// behind backfills from the database.
 const BROADCAST_CAPACITY: usize = 4096;
-/// Số mục `names` tối đa của một kết nối.
+/// Maximum number of `names` entries per connection.
 const MAX_NAMES: usize = 50;
 
-/// Cấu hình stream (đọc trong `configure` của module `kernel`).
+/// Stream configuration (read in the `kernel` module's `configure`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct StreamConfig {
     pub enabled: bool,
@@ -100,7 +104,7 @@ pub(crate) struct StreamConfig {
     pub max_connections: usize,
     pub max_per_tenant: usize,
     pub max_per_user: usize,
-    /// WebSocket xét lại thông tin xác thực sau mỗi khoảng này (bước 69 P3).
+    /// The WebSocket re-evaluates credentials every this interval (step 69 P3).
     pub ws_recheck: Duration,
 }
 
@@ -140,7 +144,7 @@ impl StreamConfig {
     }
 }
 
-/// Một event gửi qua stream: cùng hình dạng với `data:` của mỗi khung SSE.
+/// An event sent through the stream: the same shape as the `data:` of each SSE frame.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub(crate) struct StreamedEvent {
     pub id: Uuid,
@@ -153,26 +157,28 @@ pub(crate) struct StreamedEvent {
     pub tenant_id: Uuid,
     #[serde(skip)]
     pub actor_user_id: Option<Uuid>,
-    /// Người được nêu tên trong trường `audience` của payload (đã bỏ khỏi `payload`).
+    /// People named in the payload's `audience` field (removed from `payload`).
     #[serde(skip)]
     pub audience: Vec<Uuid>,
 }
 
-/// Một khung gửi cho client.
+/// A frame sent to the client.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum Frame {
     Event(Arc<StreamedEvent>),
-    /// Event cần đọc bù đã bị dọn (hay quá nhiều): client tải lại trạng thái qua REST.
+    /// The event to backfill has been cleaned up (or there are too many): the client reloads state through
+    /// REST.
     Reset,
 }
 
-/// Hub stream của một tiến trình. Clone rẻ (cùng một hub).
+/// The stream hub of one process. Cheap to clone (the same hub).
 #[derive(Clone)]
 pub struct StreamHub(Arc<Hub>);
 
 struct Hub {
     config: StreamConfig,
-    /// Event stream được: tên → (module phát, permission cần, có tới người trong `audience`).
+    /// Streamable events: name -> (emitting module, required permission, whether it reaches people in
+    /// `audience`).
     events: BTreeMap<&'static str, (&'static str, Permission, bool)>,
     sender: broadcast::Sender<Arc<StreamedEvent>>,
     sources: Mutex<HashMap<PlacementId, Source>>,
@@ -181,13 +187,13 @@ struct Hub {
     poller_started: std::sync::atomic::AtomicBool,
 }
 
-/// Một database đang có người nghe.
+/// A database that has listeners.
 struct Source {
     database: Database,
     listeners: usize,
-    /// Lúc bắt đầu lượt hỏi trước (`None`: chưa hỏi lần nào).
+    /// Start time of the previous poll (`None`: never polled).
     since: Option<Timestamp>,
-    /// ID đã phát trong khoảng `GRACE` gần nhất → thời điểm của nó.
+    /// IDs broadcast within the most recent `GRACE` window -> their timestamps.
     seen: HashMap<Uuid, Timestamp>,
 }
 
@@ -198,21 +204,21 @@ struct Counts {
     users: HashMap<(TenantId, Uuid), usize>,
 }
 
-/// Người gọi thấy một event tới mức nào.
+/// How much of an event the caller may see.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Reach {
-    /// Mọi event cùng khách (permission ở độ sâu `tenant`, không hàng rào nút).
+    /// Every event of the same tenant (permission at `tenant` depth, no node fence).
     Tenant,
-    /// Chỉ event do chính người gọi gây ra. Event chưa mang nút (`org_id`) nên chưa lọc được theo
-    /// nhánh: quyền hẹp hơn `tenant` chỉ thấy việc của mình — không bao giờ thấy bản ghi của nhánh khác.
-    /// Event khai `to_audience`: cả event nêu tên người gọi trong `audience`.
+    /// Only events caused by the caller. Events do not yet carry a node (`org_id`) so they cannot be filtered
+    /// by branch: a permission narrower than `tenant` sees only its own actions - never another branch's
+    /// records. Events declaring `to_audience`: also events naming the caller in `audience`.
     Own,
-    /// Không có permission của event, nhưng event khai `to_audience`: chỉ event nêu tên người gọi
-    /// trong `audience` (vd người mua nhận tin trả lời trong cuộc trò chuyện của mình).
+    /// No permission for the event, but the event declares `to_audience`: only events naming the caller
+    /// in `audience` (e.g. a buyer receiving replies in their own conversation).
     Audience,
 }
 
-/// Bộ lọc của một kết nối.
+/// A connection's filter.
 pub(crate) struct StreamFilter {
     tenant: Uuid,
     user: Uuid,
@@ -234,7 +240,7 @@ impl StreamFilter {
 }
 
 impl StreamHub {
-    /// Hub cho các event stream được trong `catalog`.
+    /// A hub for the streamable events in `catalog`.
     pub(crate) fn new(config: StreamConfig, catalog: &super::EventCatalog) -> Self {
         let events = catalog
             .streamable()
@@ -258,9 +264,9 @@ impl StreamHub {
         }))
     }
 
-    /// Đóng mọi stream đang mở và không nhận stream mới — gọi khi tiến trình bắt đầu tắt (graceful
-    /// shutdown), để máy chủ không chờ những kết nối không bao giờ tự kết thúc. Client nối lại
-    /// sang máy chủ khác bằng `Last-Event-ID`.
+    /// Closes every open stream and accepts no new ones - called when the process starts shutting down
+    /// (graceful shutdown), so the server does not wait for connections that never end on their own. Clients
+    /// reconnect to another server with `Last-Event-ID`.
     pub fn close(&self) {
         let _ = self.0.closed.send(true);
     }
@@ -269,17 +275,18 @@ impl StreamHub {
         self.0.config.enabled
     }
 
-    /// Khoảng WebSocket xét lại thông tin xác thực.
+    /// The interval at which the WebSocket re-evaluates credentials.
     pub(crate) fn ws_recheck(&self) -> Duration {
         self.0.config.ws_recheck
     }
 
-    /// Số stream đang mở ở tiến trình này.
+    /// Number of streams open in this process.
     pub fn open_streams(&self) -> usize {
         lock(&self.0.counts).total
     }
 
-    /// Kiểm `names` (`module.việc` hay `module.*`) và quyền của `principal`, ra bộ lọc.
+    /// Validates `names` (`module.action` or `module.*`) and the permissions of `principal`, producing a
+    /// filter.
     pub(crate) fn filter(
         &self,
         tenant: &TenantContext,
@@ -347,8 +354,9 @@ impl StreamHub {
         Ok(StreamFilter { tenant: tenant.id().as_uuid(), user: principal.user_id(), names: chosen })
     }
 
-    /// Mở một stream: khung đi ra qua kênh trả về, tới khi client ngắt, hub đóng hay hết
-    /// [`LIFETIME`]. `last_event_id`: đọc bù từ sau event đó. Vượt giới hạn kết nối → 429.
+    /// Opens a stream: frames come out through the returned channel, until the client disconnects, the hub
+    /// closes or [`LIFETIME`] runs out. `last_event_id`: backfill from after that event. Exceeding the
+    /// connection limit -> 429.
     pub(crate) fn open(
         &self,
         tenant: &TenantContext,
@@ -359,8 +367,9 @@ impl StreamHub {
         Ok(self.connect(tenant, filter, last_event_id, Some(ticket)))
     }
 
-    /// Giữ một chỗ kết nối cho cả một phiên (WebSocket, bước 69 P3): phiên đổi bộ lọc nhiều lần,
-    /// mỗi lần [`connect`](Self::connect) không vé, vẫn chỉ tính một kết nối. Hub đang đóng → 503.
+    /// Reserves a connection slot for a whole session (WebSocket, step 69 P3): a session changes its filter
+    /// many times, each [`connect`](Self::connect) without a ticket, still counting as one connection. Hub
+    /// closing -> 503.
     pub(crate) fn session(&self, tenant: &TenantContext, user: Uuid) -> Result<Ticket, Error> {
         if self.is_closed() {
             return Err(Error::unavailable(
@@ -371,12 +380,13 @@ impl StreamHub {
         self.admit(tenant.id(), user)
     }
 
-    /// Hub đã đóng (tiến trình đang tắt).
+    /// The hub is closed (the process is shutting down).
     pub(crate) fn is_closed(&self) -> bool {
         *self.0.closed.borrow()
     }
 
-    /// Nối một luồng khung với bộ lọc `filter`; `ticket`: chỗ đã giữ (`None` khi phiên giữ chỗ).
+    /// Attaches a frame stream with filter `filter`; `ticket`: the reserved slot (`None` when the session
+    /// holds the slot).
     pub(crate) fn connect(
         &self,
         tenant: &TenantContext,
@@ -408,7 +418,7 @@ impl StreamHub {
         receiver
     }
 
-    /// Giữ một chỗ trong giới hạn kết nối (trả lại khi vé bị bỏ).
+    /// Reserves a slot within the connection limit (returned when the ticket is dropped).
     fn admit(&self, tenant: TenantId, user: Uuid) -> Result<Ticket, Error> {
         let config = &self.0.config;
         let mut counts = lock(&self.0.counts);
@@ -439,7 +449,7 @@ impl StreamHub {
         Ok(Ticket { hub: self.clone(), tenant, user })
     }
 
-    /// Thêm một người nghe cho database của khách `tenant`.
+    /// Adds a listener for the database of tenant `tenant`.
     fn attach(&self, tenant: &TenantContext) -> Attachment {
         let placement = tenant.placement();
         let mut sources = lock(&self.0.sources);
@@ -453,7 +463,7 @@ impl StreamHub {
         Attachment { hub: self.clone(), placement }
     }
 
-    /// Chạy vòng hỏi chung (một lần mỗi tiến trình, từ lúc có kết nối đầu tiên).
+    /// Runs the shared polling loop (once per process, starting from the first connection).
     fn start_poller(&self) {
         use std::sync::atomic::Ordering;
         if self.0.poller_started.swap(true, Ordering::AcqRel) {
@@ -474,7 +484,7 @@ impl StreamHub {
         });
     }
 
-    /// Một lượt hỏi mọi database đang có người nghe; phát event mới.
+    /// One poll of every database that has listeners; broadcasts new events.
     pub(crate) async fn poll_once(&self) -> Result<usize, Error> {
         let targets: Vec<(PlacementId, Database, Option<Timestamp>)> = {
             let mut sources = lock(&self.0.sources);
@@ -512,8 +522,8 @@ impl StreamHub {
         self.0.events.keys().copied().collect()
     }
 
-    /// Event stream được trong `names`, có ID từ thời điểm `from` (và sau `after` nếu có), của khách
-    /// `tenant` (hay mọi khách), theo thứ tự ID. Tối đa [`BACKFILL_MAX`] + 1 event.
+    /// Streamable events in `names`, with IDs from time `from` (and after `after` if given), of tenant
+    /// `tenant` (or every tenant), in ID order. At most [`BACKFILL_MAX`] + 1 events.
     async fn read(
         &self,
         database: &Database,
@@ -603,16 +613,16 @@ fn streamed(row: &sea_orm::QueryResult) -> Result<StreamedEvent, Error> {
     })
 }
 
-/// Một kết nối đang mở.
+/// An open connection.
 struct Connection {
     hub: StreamHub,
     database: Database,
     filter: StreamFilter,
     live: broadcast::Receiver<Arc<StreamedEvent>>,
     sender: mpsc::Sender<Frame>,
-    /// ID đã gửi gần đây → thời điểm (khử trùng giữa đọc bù và phát trực tiếp).
+    /// IDs sent recently -> their timestamps (de-duplication between backfill and live broadcast).
     delivered: HashMap<Uuid, Timestamp>,
-    /// ID cuối đã gửi (hay client báo qua `Last-Event-ID`).
+    /// The last ID sent (or reported by the client through `Last-Event-ID`).
     last: Option<Uuid>,
     _ticket: Option<Ticket>,
     _source: Attachment,
@@ -650,7 +660,7 @@ impl Connection {
         }
     }
 
-    /// Đọc bù từ sau `last` (lùi lại `GRACE`). `false`: client đã ngắt.
+    /// Backfills from after `last` (looking back `GRACE`). `false`: the client has disconnected.
     async fn backfill(&mut self, last: Uuid) -> bool {
         let Some(at) = time_of(last) else {
             return self.send(Frame::Reset).await;
@@ -681,7 +691,7 @@ impl Connection {
         true
     }
 
-    /// Gửi `event` nếu người gọi được thấy và chưa gửi. `false`: client đã ngắt.
+    /// Sends `event` if the caller may see it and it has not been sent. `false`: the client has disconnected.
     async fn deliver(&mut self, event: Arc<StreamedEvent>) -> bool {
         if !self.filter.admits(&event) || self.delivered.contains_key(&event.id) {
             return true;
@@ -701,7 +711,7 @@ impl Connection {
     }
 }
 
-/// Chỗ đã giữ trong giới hạn kết nối; bỏ thì trả lại.
+/// A slot reserved within the connection limit; dropping it returns the slot.
 pub(crate) struct Ticket {
     hub: StreamHub,
     tenant: TenantId,
@@ -718,7 +728,7 @@ impl Drop for Ticket {
     }
 }
 
-/// Một người nghe của database; bỏ thì bớt.
+/// A listener of a database; dropping it removes it.
 struct Attachment {
     hub: StreamHub,
     placement: PlacementId,
@@ -741,8 +751,8 @@ fn decrement<K: std::hash::Hash + Eq>(map: &mut HashMap<K, usize>, key: K) {
     }
 }
 
-/// Mutex bị "đầu độc" (một thread panic khi đang giữ) vẫn dùng tiếp: dữ liệu bên trong chỉ là bộ
-/// đếm và tập ID, không có bất biến nào bị phá dở.
+/// A "poisoned" mutex (a thread panicked while holding it) is still used: the data inside is only counters
+/// and sets of IDs, with no invariant broken halfway.
 fn lock<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
 }
@@ -751,20 +761,20 @@ fn grace() -> SignedDuration {
     SignedDuration::try_from(GRACE).unwrap_or_else(|_| SignedDuration::from_secs(5))
 }
 
-/// UUIDv7 nhỏ nhất của mili giây `at`: so sánh ID (khoá chính, có index) thay cho `occurred_at`
-/// (không có index) — UUIDv7 bắt đầu bằng thời điểm tạo, xếp theo byte trên cả hai database.
+/// The smallest UUIDv7 of millisecond `at`: compares IDs (primary key, indexed) instead of `occurred_at`
+/// (not indexed) - a UUIDv7 starts with its creation time, ordered by bytes on both databases.
 fn lowest_id_at(at: Timestamp) -> Uuid {
     let millis = u128::try_from(at.as_unix_millis()).unwrap_or(0);
     Uuid::from_u128(millis << 80)
 }
 
-/// Thời điểm tạo ghi trong UUIDv7 `id`.
+/// The creation time recorded in UUIDv7 `id`.
 fn time_of(id: Uuid) -> Option<Timestamp> {
     let (seconds, nanos) = id.get_timestamp()?.to_unix();
     Timestamp::from_unix(i64::try_from(seconds).ok()?, nanos)
 }
 
-/// Người gọi thấy event cần `permission` tới đâu; `None`: không thấy.
+/// How far the caller sees an event that needs `permission`; `None`: does not see it.
 fn reach(principal: &Principal, permission: &Permission) -> Option<Reach> {
     let grants = principal.grants(permission);
     if grants.is_empty() {
@@ -794,7 +804,7 @@ fn unknown_event(name: &str) -> Error {
     .with_param("name", name)
 }
 
-/// Mã lỗi khi stream bị tắt bằng cấu hình.
+/// The error code when the stream is disabled by configuration.
 pub(crate) fn disabled() -> Error {
     Error::not_found(
         "kernel.stream_disabled",
@@ -802,7 +812,7 @@ pub(crate) fn disabled() -> Error {
     )
 }
 
-/// ID trong `Last-Event-ID` (hay `last_event_id`); sai dạng → lỗi `validation`.
+/// The ID in `Last-Event-ID` (or `last_event_id`); wrong format -> a `validation` error.
 pub(crate) fn parse_last_event_id(raw: &str) -> Result<Uuid, Error> {
     Uuid::parse_str(raw.trim()).map_err(|_| {
         Error::validation(vec![FieldError::new(

@@ -1,19 +1,21 @@
-//! Đổi câu chữ hiển thị theo khách (bước 51 P21, D-235): khách thay thuật ngữ, câu hướng tới người
-//! dùng cuối ("Đơn hàng" → "Phiếu đặt") mà không sửa code.
+//! Per-tenant display text overrides (step 51 P21, D-235): a tenant replaces terminology and sentences aimed at
+//! end users ("Order" -> "Request form") without changing code.
 //!
-//! - Module đánh dấu câu **đổi được** bằng [`Module::overridable_texts`](crate::module::Module) —
-//!   khoá `<module>.<…>`, câu tiếng Anh mặc định (dịch qua `text:` của module), `legal` (câu pháp
-//!   lý: không đổi được). Mã lỗi và câu của lỗi không bao giờ đổi được: chúng là hợp đồng với máy.
-//! - Không gian `ui.*` cho repo giao diện: core chỉ kiểm dạng khoá, độ dài và giữ — tối đa
-//!   `AUTOXIDE_TEXT_OVERRIDES_UI_MAX` khoá mỗi khách.
-//! - Bảng `kernel_text_overrides` (cấp khách hàng). Kiểm khi lưu: chữ thuần (không thẻ HTML), tối đa
-//!   500 ký tự, tập chỗ điền `{tên}` trùng khớp câu mặc định.
-//! - Đọc: [`TextOverrides::text`] tra câu của khách trong cache bộ nhớ theo khách (một map, xoá khi
-//!   ghi, sống tối đa 30 giây — máy chủ khác thấy câu mới sau chừng đó), không query ở đường nóng.
+//! - A module marks **replaceable** texts with [`Module::overridable_texts`](crate::module::Module): key
+//!   `<module>.<...>`, the default English text (translated through the module's `text:`), and `legal` (a legal
+//!   text: cannot be replaced). Error codes and error messages can never be replaced: they are a contract with
+//!   machines.
+//! - Namespace `ui.*` for the interface repo: the core only checks the key shape, the length and stores it, at
+//!   most `AUTOXIDE_TEXT_OVERRIDES_UI_MAX` keys per tenant.
+//! - Table `kernel_text_overrides` (tenant level). Checked on save: plain text (no HTML tags), at most 500
+//!   characters, and the set of `{name}` placeholders matches the default text.
+//! - Reading: [`TextOverrides::text`] looks up the tenant's text in an in-memory per-tenant cache (one map,
+//!   cleared on write, living at most 30 seconds, so other servers see the new text after about that long),
+//!   with no query on the hot path.
 //!
 //! API: `GET /api/v1/kernel/texts?locale&prefix&overridden`, `PUT/DELETE
 //! /api/v1/kernel/texts/{locale}/{key}` (`kernel.texts.manage`); `GET
-//! /api/v1/kernel/public/texts?locale&prefix=ui.` (công khai, `ETag`) cho giao diện.
+//! /api/v1/kernel/public/texts?locale&prefix=ui.` (public, `ETag`) for the interface.
 
 use crate::time::Timestamp;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -41,12 +43,12 @@ use crate::response::{Data, Problem};
 use crate::tenancy::{TenantContext, TenantId};
 
 const TABLE: &str = "kernel_text_overrides";
-/// Câu của khách dài tối đa chừng này ký tự.
+/// A tenant's text is at most this many characters long.
 const TEXT_MAX: usize = 500;
-/// Cache theo khách sống chừng này.
+/// The per-tenant cache lives this long.
 const CACHE_TTL: Duration = Duration::from_secs(30);
 
-/// Đổi câu chữ hiển thị của khách.
+/// Replaces a tenant's display text.
 pub const TEXTS_MANAGE: Permission = Permission::new(
     "kernel.texts.manage",
     "Replace the wording the tenant's users see: terms of modules and texts of the interface.",
@@ -58,15 +60,15 @@ pub const UI_MAX: Setting = Setting::new(
 )
 .with_default("1000");
 
-/// Một câu module cho khách đổi.
+/// A text a module lets tenants replace.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct OverridableText {
-    /// `<module>.<…>`, vd `orders.term.order`.
+    /// `<module>.<...>`, e.g. `orders.term.order`.
     pub key: &'static str,
-    /// Câu tiếng Anh mặc định (dịch qua `text:` của module).
+    /// Default English text (translated through the module's `text:`).
     pub default: &'static str,
-    /// Câu pháp lý: không đổi được.
+    /// Legal text: cannot be replaced.
     pub legal: bool,
 }
 
@@ -92,7 +94,7 @@ fn is_locale(locale: &str) -> bool {
         && locale.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
 }
 
-/// Chỗ điền `{tên}` của một câu.
+/// The `{name}` placeholders of a text.
 fn placeholders(text: &str) -> BTreeSet<String> {
     let mut found = BTreeSet::new();
     let mut rest = text;
@@ -108,7 +110,7 @@ fn placeholders(text: &str) -> BTreeSet<String> {
     found
 }
 
-/// Kiểm khai báo của module: khoá `<module>.<…>` đúng dạng, không trùng.
+/// Checks a module's declaration: key `<module>.<...>` has the right shape and is not duplicated.
 pub(crate) fn check(module: &str, texts: &[OverridableText], problems: &mut Vec<String>) {
     let mut seen = BTreeSet::new();
     for text in texts {
@@ -126,7 +128,7 @@ pub(crate) fn check(module: &str, texts: &[OverridableText], problems: &mut Vec<
 
 type Cached = (Instant, Arc<HashMap<(String, String), String>>);
 
-/// Câu khách đã đổi: sổ câu đổi được của mọi module và cache theo khách. Clone rẻ.
+/// Texts a tenant has replaced: the registry of replaceable texts of every module and the per-tenant cache. Cheap to clone.
 #[derive(Clone, Default)]
 pub struct TextOverrides {
     declared: Arc<OnceLock<BTreeMap<&'static str, OverridableText>>>,
@@ -148,7 +150,7 @@ impl TextOverrides {
         self.declared.get().unwrap_or(&EMPTY)
     }
 
-    /// Câu khách `tenant` đặt cho khoá `key` bằng ngôn ngữ `locale`; `None`: dùng câu mặc định.
+    /// Text tenant `tenant` set for key `key` in language `locale`; `None`: use the default text.
     pub async fn text(
         &self,
         tenant: &TenantContext,
@@ -529,7 +531,7 @@ pub(crate) fn routes(state: TextsState) -> OpenApiRouter {
         .with_state(Arc::new(state))
 }
 
-/// Migration tạo bảng `kernel_text_overrides` (cấp khách hàng, mọi database dữ liệu).
+/// Migration that creates the table `kernel_text_overrides` (tenant level, every data database).
 pub(crate) struct CreateTextOverrides;
 
 impl MigrationName for CreateTextOverrides {

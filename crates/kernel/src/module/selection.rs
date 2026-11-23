@@ -1,17 +1,19 @@
-//! Chọn module nào chạy (`AUTOXIDE_MODULES`, bước 70 P1 và P3, D-20261121-module-selection).
+//! Choosing which modules run (`AUTOXIDE_MODULES`, step 70 P1 and P3, D-20261121-module-selection).
 //!
-//! Binary có sẵn mọi module, nhưng một bản cài chỉ chạy những module nó cần. [`Modules::select`]
-//! nhận DANH SÁCH module (của repo này hay viết ngoài repo) cùng lựa chọn đã đọc từ cấu hình, và
-//! chỉ đăng ký những module được bật. Module tắt không vào [`Modules`]: không route, không tài liệu
-//! OpenAPI lúc chạy, không tool MCP, không job, không nhận event, không migration. Bảng nó đã có
-//! trong database không ai chạm tới — dữ liệu còn nguyên, bật lại là dùng tiếp.
+//! The binary has every module, but an installation runs only the modules it needs. [`Modules::select`]
+//! takes a LIST of modules (from this repo or written outside it) together with the selection read from
+//! configuration, and registers only the enabled modules. A disabled module does not enter [`Modules`]: no
+//! routes, no runtime OpenAPI documentation, no MCP tools, no jobs, no event receiving, no migrations.
+//! Tables it already has in the database are untouched - the data stays intact and re-enabling it picks up
+//! where it left off.
 //!
-//! Ba điều module tự khai (đều có mặc định, D-038):
+//! Three things a module declares itself (all have defaults, D-038):
 //!
-//! - [`Module::stability`]: hạng `Official` (mặc định) hay `Experimental` (có thể đổi, phải bật rõ);
-//! - [`Module::essential`]: core không chạy được nếu thiếu (đăng nhập, idempotency) — không tắt được;
-//! - [`Module::depends_on`]: module mà nó BUỘC phải có (`context.require::<…>()?`). Bật một module
-//!   thì module nó cần được bật kèm.
+//! - [`Module::stability`]: tier `Official` (default) or `Experimental` (may change, must be enabled
+//!   explicitly);
+//! - [`Module::essential`]: the core cannot run without it (login, idempotency) - it cannot be disabled;
+//! - [`Module::depends_on`]: modules it MUST have (`context.require::<…>()?`). Enabling a module also
+//!   enables the modules it needs.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
@@ -23,7 +25,7 @@ use super::{Module, ModuleError, Modules, module_name_problems};
 use crate::config::Setting;
 use crate::database::Database;
 
-/// Biến chọn module. Mặc định `official`: bản cài mới chỉ chạy module chính thức.
+/// The module selection variable. Default `official`: a new installation runs only official modules.
 pub const MODULES: Setting = Setting::new(
     "AUTOXIDE_MODULES",
     "Which modules run. A comma-separated list of: `core` (only the modules the core cannot run \
@@ -39,20 +41,20 @@ pub const MODULES: Setting = Setting::new(
 const CORE: &str = "core";
 const OFFICIAL: &str = "official";
 const ALL: &str = "all";
-/// Từ khoá của danh sách; module không được mang các tên này.
+/// Keywords of the list; a module must not carry these names.
 const KEYWORDS: [&str; 3] = [CORE, OFFICIAL, ALL];
 
-/// Hạng của một module.
+/// The tier of a module.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Stability {
-    /// Chính thức: chạy mặc định; API giữ tương thích theo chính sách phiên bản.
+    /// Official: runs by default; the API stays compatible under the versioning policy.
     Official,
-    /// Thử nghiệm: API và bảng có thể đổi giữa các bản; chỉ chạy khi được bật rõ.
+    /// Experimental: the API and tables may change between releases; runs only when explicitly enabled.
     Experimental,
 }
 
 impl Stability {
-    /// Tên cho máy và tài liệu: `official` / `experimental`.
+    /// The name for machines and documentation: `official` / `experimental`.
     pub fn as_str(self) -> &'static str {
         match self {
             Stability::Official => OFFICIAL,
@@ -67,38 +69,38 @@ impl fmt::Display for Stability {
     }
 }
 
-/// Tập khởi đầu của một lựa chọn; tập sau chứa tập trước.
+/// The starting set of a selection; each later set contains the one before.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum Base {
-    /// Chỉ module core buộc phải có.
+    /// Only the modules the core must have.
     Core,
     Official,
     All,
 }
 
-/// Lựa chọn module đã đọc từ `AUTOXIDE_MODULES` (chưa đối chiếu với danh sách module).
+/// The module selection read from `AUTOXIDE_MODULES` (not yet matched against the module list).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Selection {
-    /// `None`: danh sách không có từ khoá nào.
+    /// `None`: the list has no keyword.
     base: Option<Base>,
     add: Vec<String>,
     remove: Vec<String>,
-    /// Nguyên văn người cài viết; `None` khi là mặc định của chương trình.
+    /// Verbatim as the installer wrote it; `None` when it is the program's default.
     text: Option<String>,
 }
 
 impl Selection {
-    /// Mọi module, kể cả thử nghiệm — cho hợp đồng đầy đủ (`docs/openapi.json`) và test.
+    /// Every module, including experimental ones - for the full contract (`docs/openapi.json`) and tests.
     pub fn all() -> Self {
         Selection { base: Some(Base::All), add: Vec::new(), remove: Vec::new(), text: None }
     }
 
-    /// Mặc định của chương trình khi biến không được đặt: module chính thức.
+    /// The program's default when the variable is not set: official modules.
     pub fn official() -> Self {
         Selection { base: Some(Base::Official), add: Vec::new(), remove: Vec::new(), text: None }
     }
 
-    /// Đọc danh sách do người cài viết. Lỗi nói rõ phải viết thế nào.
+    /// Reads the list the installer wrote. Errors say plainly how it must be written.
     pub fn parse(text: &str) -> Result<Self, String> {
         let mut selection = Selection {
             base: None,
@@ -131,13 +133,13 @@ impl Selection {
         Ok(selection)
     }
 
-    /// Người cài tự đặt `AUTOXIDE_MODULES` (không phải mặc định).
+    /// The installer set `AUTOXIDE_MODULES` explicitly (it is not the default).
     pub fn is_explicit(&self) -> bool {
         self.text.is_some()
     }
 }
 
-/// Một module có trong binary nhưng không chạy ở bản cài này.
+/// A module that is in the binary but does not run in this installation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InactiveModule {
     pub name: &'static str,
@@ -145,25 +147,26 @@ pub struct InactiveModule {
     pub stability: Stability,
 }
 
-/// Module đang tắt mà database vẫn còn bảng của nó.
+/// A disabled module whose tables still exist in the database.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DormantModule {
     pub name: &'static str,
     pub stability: Stability,
-    /// Bảng của module đang có dòng (không tính bảng job, event và lịch sử migration); rỗng nghĩa
-    /// là bảng có đó nhưng chưa từng được dùng.
+    /// The module's tables that have rows (not counting job, event and migration history tables); empty
+    /// means the tables exist but were never used.
     pub tables_with_data: Vec<String>,
-    /// Placement (ngoài `main`) có dữ liệu của module; chỉ [`Modules::dormant_everywhere`] điền.
+    /// Placements (other than `main`) holding the module's data; only [`Modules::dormant_everywhere`] fills
+    /// this in.
     pub placements: Vec<String>,
 }
 
-/// Kết quả chọn: module chạy, module nghỉ, và module được bật kèm vì module khác cần.
-/// Vì sao không chọn được module.
+/// The result of selection: running modules, dormant modules, and modules enabled along because another
+/// module needs them. Why modules could not be selected.
 #[derive(Debug)]
 pub enum SelectionError {
-    /// `AUTOXIDE_MODULES` viết sai (lỗi của người cài): câu nói rõ phải sửa gì.
+    /// `AUTOXIDE_MODULES` is written wrongly (the installer's error): the message says plainly what to fix.
     Setting(String),
-    /// Module khai sai (lỗi của người viết module).
+    /// A module declares something wrong (the module author's error).
     Modules(ModuleError),
 }
 
@@ -181,11 +184,11 @@ impl std::error::Error for SelectionError {}
 pub(super) struct Selected {
     pub(super) modules: Vec<Box<dyn Module>>,
     pub(super) inactive: Vec<InactiveModule>,
-    /// `(module được bật kèm, module cần nó)`.
+    /// `(module enabled along, module that needs it)`.
     pub(super) implied: Vec<(&'static str, &'static str)>,
 }
 
-/// Lỗi trong khai báo của module (lỗi của người viết module, không phải của người cài).
+/// An error in a module's declaration (the module author's error, not the installer's).
 fn declaration_problems(modules: &[Box<dyn Module>]) -> Vec<String> {
     let names: Vec<&str> = modules.iter().map(|module| module.name()).collect();
     let mut problems = module_name_problems(&names);
@@ -223,7 +226,7 @@ fn declaration_problems(modules: &[Box<dyn Module>]) -> Vec<String> {
     problems
 }
 
-/// Chọn trong `modules` theo `selection`, giữ thứ tự đăng ký.
+/// Selects from `modules` according to `selection`, keeping registration order.
 pub(super) fn select(
     modules: Vec<Box<dyn Module>>,
     selection: &Selection,
@@ -346,10 +349,10 @@ pub(super) fn select(
     Ok(Selected { modules: active, inactive, implied })
 }
 
-/// Bảng của module `module` trong `connection` đang có dòng — của khách `tenant` nếu nêu (bảng
-/// không có cột `tenant_id` thì bỏ qua), của bất kỳ ai nếu không. Không tính bảng job, event và
-/// lịch sử migration: chúng có dòng không có nghĩa là người dùng có dữ liệu ở module. `None`:
-/// database chưa từng có bảng của module.
+/// The module `module`'s tables in `connection` that have rows - of tenant `tenant` if given (a table
+/// without a `tenant_id` column is skipped), of anyone otherwise. Job, event and migration history tables
+/// are not counted: their having rows does not mean the user has data in the module. `None`: the database
+/// never had the module's tables.
 pub(crate) async fn tables_with_data<C: ConnectionTrait>(
     connection: &C,
     module: &str,
@@ -382,8 +385,8 @@ pub(crate) async fn tables_with_data<C: ConnectionTrait>(
     Ok(Some(found))
 }
 
-/// Tên các module trong `inactive` còn dữ liệu của khách `tenant` ở `connection` — thứ một lượt
-/// dời / tách / gộp khách sẽ để lại, vì nó chỉ chép bảng của module đang bật.
+/// The names of modules in `inactive` that still have data of tenant `tenant` in `connection` - what a move
+/// / split / merge of the tenant would leave behind, since it copies only the tables of enabled modules.
 pub(crate) async fn inactive_with_tenant_data<C: ConnectionTrait>(
     connection: &C,
     inactive: &[&'static str],
@@ -400,9 +403,9 @@ pub(crate) async fn inactive_with_tenant_data<C: ConnectionTrait>(
 }
 
 impl Modules {
-    /// Đăng ký những module của `modules` mà `selection` bật (xem đầu file). Đây là cửa DUY NHẤT
-    /// binary dùng để đăng ký: danh sách module do bên gọi đưa vào, nên module viết ngoài repo đi
-    /// qua đúng bộ lọc này.
+    /// Registers the modules of `modules` that `selection` enables (see the top of the file). This is the
+    /// ONLY door the binary uses to register: the caller supplies the module list, so modules written
+    /// outside the repo go through this same filter.
     pub fn select(
         modules: Vec<Box<dyn Module>>,
         selection: &Selection,
@@ -415,21 +418,21 @@ impl Modules {
         Ok(registered)
     }
 
-    /// Module có trong binary nhưng đang tắt, theo thứ tự đăng ký.
+    /// Modules that are in the binary but disabled, in registration order.
     pub fn inactive(&self) -> &[InactiveModule] {
         &self.inactive
     }
 
-    /// `(module được bật kèm, module cần nó)`: module người cài không nêu nhưng chạy vì một module
-    /// đang bật phụ thuộc vào nó.
+    /// `(module enabled along, module that needs it)`: a module the installer did not name but that runs
+    /// because an enabled module depends on it.
     pub fn implied(&self) -> &[(&'static str, &'static str)] {
         &self.implied
     }
 
-    /// Module đang tắt mà `database` còn bảng của nó — bản cài từng chạy module đó. Chỉ đọc; không
-    /// đổi gì. Với mỗi module, nêu bảng đang có dữ liệu để người cài biết tắt nó có làm mất chức
-    /// năng đang dùng không. Chỉ xem MỘT database; xem cả các placement thì
-    /// [`dormant_everywhere`](Self::dormant_everywhere).
+    /// Disabled modules whose tables `database` still has - an installation that once ran that module.
+    /// Read-only; it changes nothing. For each module, it lists the tables that hold data so the installer
+    /// knows whether disabling it loses a feature in use. It looks at ONE database only; to look at the
+    /// placements too, use
     pub async fn dormant(&self, database: &Database) -> Result<Vec<DormantModule>, DbErr> {
         let mut dormant = Vec::new();
         for module in &self.inactive {
@@ -447,10 +450,10 @@ impl Modules {
         Ok(dormant)
     }
 
-    /// Như [`dormant`](Self::dormant) nhưng xem database điều khiển VÀ database của mọi placement
-    /// (khách có database riêng giữ dữ liệu của họ ở đó). Gọi sau [`start`](Self::start).
-    /// Placement không kết nối được thì bỏ qua và nêu tên trong `unreachable` — một câu nhắc không
-    /// được chặn việc khởi động.
+    /// Like [`dormant`](Self::dormant) but looks at the control database AND the database of every
+    /// placement (a tenant with its own database keeps their data there). Call after
+    /// [`start`](Self::start). A placement that cannot be connected to is skipped and named in
+    /// `unreachable` - a reminder must not block startup.
     pub async fn dormant_everywhere(&self) -> Result<(Vec<DormantModule>, Vec<String>), DbErr> {
         let registry = self.tenancy().ok_or_else(|| {
             DbErr::Custom("start the modules before looking at the placements".to_owned())
@@ -504,18 +507,18 @@ impl Modules {
         Ok((dormant, unreachable))
     }
 
-    /// Giá trị `AUTOXIDE_MODULES` người cài đã đặt, nguyên văn; `None`: mặc định của chương trình.
+    /// The `AUTOXIDE_MODULES` value the installer set, verbatim; `None`: the program's default.
     pub fn selection_text(&self) -> Option<&str> {
         self.selection_text.as_deref()
     }
 
-    /// Người cài tự đặt `AUTOXIDE_MODULES` (không phải mặc định của chương trình).
+    /// The installer set `AUTOXIDE_MODULES` explicitly (it is not the program's default).
     pub fn selection_is_explicit(&self) -> bool {
         self.selection_text.is_some()
     }
 
-    /// Dòng cấu hình bật thêm các module `names` so với lựa chọn hiện tại — để thông báo đưa đúng
-    /// thứ người cài cần thêm vào `.env`.
+    /// The configuration line that enables the extra modules `names` beyond the current selection - so the
+    /// message gives exactly what the installer needs to add to `.env`.
     pub fn setting_enabling(&self, names: &[&str]) -> String {
         setting_enabling(self.selection_text.as_deref(), names)
     }
@@ -574,7 +577,7 @@ mod tests {
         }
     }
 
-    /// `mail` ← `auth` (core); `catalog` ← `orders`; `support` thử nghiệm.
+    /// `mail` depends on `auth` (core); `catalog` depends on `orders`; `support` is experimental.
     fn modules() -> Vec<Box<dyn Module>> {
         vec![
             Box::new(fake("mail", &[])),

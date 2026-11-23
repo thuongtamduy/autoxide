@@ -1,5 +1,5 @@
-//! Bên gửi giả cho Zalo ZNS, web push và đẩy di động (bước 37, D-348): giữ mọi tin trong bộ nhớ; đánh
-//! dấu một endpoint / token là "đã mất" để thử nhánh nhà cung cấp trả 404 / 410.
+//! Fake senders for Zalo ZNS, web push and mobile push (step 37, D-348): keep every message in memory; mark
+//! an endpoint / token as "gone" to exercise the branch where the provider returns 404 / 410.
 
 use std::collections::HashSet;
 use std::sync::Mutex;
@@ -11,7 +11,7 @@ use autoxide_kernel::push::{
 use autoxide_kernel::tenancy::TenantId;
 use autoxide_kernel::zns::{ZnsMessage, ZnsSender};
 
-/// Gửi ZNS giả: giữ mọi tin.
+/// A fake ZNS sender: keeps every message.
 #[derive(Default)]
 pub struct FakeZnsSender {
     pub sent: Mutex<Vec<ZnsMessage>>,
@@ -22,7 +22,7 @@ impl FakeZnsSender {
         FakeZnsSender::default()
     }
 
-    /// Số tin đã gửi.
+    /// Number of messages sent.
     pub fn count(&self) -> usize {
         self.sent.lock().map_or(0, |sent| sent.len())
     }
@@ -43,7 +43,7 @@ impl ZnsSender for FakeZnsSender {
     }
 }
 
-/// Web push giả: giữ (endpoint, nội dung) đã gửi; endpoint trong `gone` trả [`PushDelivery::Gone`].
+/// A fake web push: keeps the (endpoint, content) sent; an endpoint in `gone` returns [`PushDelivery::Gone`].
 #[derive(Default)]
 pub struct FakeWebPushSender {
     pub sent: Mutex<Vec<(String, PushContent)>>,
@@ -55,14 +55,14 @@ impl FakeWebPushSender {
         FakeWebPushSender::default()
     }
 
-    /// Từ nay endpoint `endpoint` trả "đã mất" (như HTTP 410 của dịch vụ đẩy).
+    /// From now on endpoint `endpoint` returns "gone" (like HTTP 410 from the push service).
     pub fn mark_gone(&self, endpoint: &str) {
         if let Ok(mut gone) = self.gone.lock() {
             gone.insert(endpoint.to_owned());
         }
     }
 
-    /// Số tin đã gửi thành công.
+    /// Number of messages sent successfully.
     pub fn count(&self) -> usize {
         self.sent.lock().map_or(0, |sent| sent.len())
     }
@@ -94,7 +94,7 @@ impl WebPushSender for FakeWebPushSender {
     }
 }
 
-/// Đẩy di động giả: giữ (token, nội dung) đã gửi; token trong `gone` trả [`PushDelivery::Gone`].
+/// A fake mobile push: keeps the (token, content) sent; a token in `gone` returns [`PushDelivery::Gone`].
 #[derive(Default)]
 pub struct FakeMobilePushSender {
     pub sent: Mutex<Vec<(String, PushContent)>>,
@@ -106,14 +106,14 @@ impl FakeMobilePushSender {
         FakeMobilePushSender::default()
     }
 
-    /// Từ nay token `token` trả "hết hiệu lực".
+    /// From now on token `token` returns "expired".
     pub fn mark_gone(&self, token: &str) {
         if let Ok(mut gone) = self.gone.lock() {
             gone.insert(token.to_owned());
         }
     }
 
-    /// Số tin đã gửi thành công.
+    /// Number of messages sent successfully.
     pub fn count(&self) -> usize {
         self.sent.lock().map_or(0, |sent| sent.len())
     }

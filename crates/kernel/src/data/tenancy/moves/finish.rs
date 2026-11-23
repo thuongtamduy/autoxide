@@ -1,11 +1,12 @@
-//! Huỷ, xoá bản sao dự phòng, đọc và mô tả một lượt dời.
+//! Abort, delete the backup copy, read and describe a move.
 
 use super::files::{delete_files, tenant_prefix};
 use super::*;
 
 impl TenantMoves {
-    /// Huỷ lượt dời chưa đổi placement của khách `tenant`: xoá dòng đã chép ở đích, khách trở lại
-    /// `active` ở placement cũ. Đã đổi placement: `tenant_move_not_abortable` (chạy tiếp thay vì huỷ).
+    /// Aborts a move that has not yet changed the placement of tenant `tenant`: deletes the rows already
+    /// copied at the target, and the tenant returns to `active` at the old placement. Once the placement has
+    /// changed: `tenant_move_not_abortable` (resume instead of aborting).
     pub async fn abort(&self, tenant: &str) -> Result<TenantMove, Error> {
         let row = self.tenant_row(tenant).await?;
         let moving = self
@@ -67,9 +68,9 @@ impl TenantMoves {
         self.describe(self.find(moving.id).await?).await
     }
 
-    /// Xoá bản sao dữ liệu của khách `tenant` còn ở placement `placement` (để lại bởi `keep_source`
-    /// hay lượt dời huỷ mà không xoá được đích). Không bao giờ xoá placement khách đang dùng. Trả
-    /// số dòng đã xoá mỗi bảng.
+    /// Deletes the data copy of tenant `tenant` still at placement `placement` (left by `keep_source` or by
+    /// an aborted move whose target could not be deleted). Never deletes the placement the tenant is using.
+    /// Returns the number of rows deleted per table.
     pub async fn purge(
         &self,
         tenant: &str,
@@ -113,7 +114,7 @@ impl TenantMoves {
         Ok(counts.into_iter().map(TenantTableRows::from).filter(|table| table.rows > 0).collect())
     }
 
-    /// Lượt dời `id` của khách `tenant` (ID hay slug).
+    /// Move `id` of tenant `tenant` (ID or slug).
     pub async fn get(&self, tenant: &str, id: Uuid) -> Result<TenantMove, Error> {
         let row = self.tenant_row(tenant).await?;
         let moving = Entity::find_by_id(id)

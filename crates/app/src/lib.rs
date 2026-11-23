@@ -1,12 +1,12 @@
-//! Crate `autoxide`: máy chủ và giao diện dòng lệnh (CLI), dùng được như THƯ VIỆN.
+//! Crate `autoxide`: the server and command-line interface (CLI), usable as a LIBRARY.
 //!
-//! Đây là nơi DUY NHẤT ghép kernel với các module thành một chương trình. Binary chính thức
-//! (`main.rs`) chỉ gọi [`Autoxide::new`] rồi [`Autoxide::run`]. Người viết module ở repo riêng
-//! viết binary của họ đúng như vậy, thêm `.module(…)` cho từng module của mình — không phải fork
-//! repo này (bước 70 P2, D-20261121-external-modules). Hướng dẫn: `docs/guides/writing-a-module.md`.
+//! This is the ONLY place that wires the kernel together with the modules into one program. The official binary
+//! (`main.rs`) only calls [`Autoxide::new`] and then [`Autoxide::run`]. Authors of modules in their own repo
+//! write their binary the same way, adding `.module(…)` for each of their modules — no need to fork
+//! this repo (step 70 P2, D-20261121-external-modules). Guide: `docs/guides/writing-a-module.md`.
 //!
-//! Phần công khai của crate này CHỈ là [`Autoxide`]: mọi thứ khác (lệnh, cấu hình, khởi động) là
-//! riêng tư, nên đổi được mà không phá binary của người khác.
+//! The public surface of this crate is ONLY [`Autoxide`]: everything else (commands, configuration, startup) is
+//! private, so it can change without breaking anyone else's binary.
 
 mod commands;
 #[cfg(test)]

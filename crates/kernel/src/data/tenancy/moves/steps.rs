@@ -1,13 +1,13 @@
-//! Bắt đầu, chạy từng bước, lease và ghi trạng thái của một lượt dời.
+//! Starting, running step by step, leasing, and recording the state of one move.
 
 use super::*;
 use crate::time::Timestamp;
 use jiff::SignedDuration;
 
 impl TenantMoves {
-    /// Bắt đầu dời khách `tenant` sang `to` (khách thành `moving`), hay trả lượt dời sang `to` đã
-    /// dừng giữa chừng để chạy tiếp. Lý do chặn đầu tiên thành lỗi. Chưa chép gì: gọi
-    /// [`run`](Self::run) (CLI) — `enqueue` thì một job nền chạy (REST / MCP).
+    /// Starts moving tenant `tenant` to `to` (the tenant becomes `moving`), or returns the move to `to` that
+    /// stopped midway so it can continue. The first blocking reason becomes the error. Copies nothing yet:
+    /// call [`run`](Self::run) (CLI); with `enqueue`, a background job runs it (REST / MCP).
     pub async fn start(
         &self,
         actor: Actor,
@@ -89,8 +89,8 @@ impl TenantMoves {
         self.describe(moving).await
     }
 
-    /// Chạy lượt dời `id` tới xong (`done` / `aborted`). `runner` phân biệt bên chạy (CLI, job).
-    /// Lỗi: lượt dời dừng ở trạng thái đang có, lỗi được ghi vào `error`; gọi lại thì chạy tiếp.
+    /// Runs move `id` to completion (`done` / `aborted`). `runner` identifies who runs it (CLI, job).
+    /// On error: the move stops in its current state, the error is written to `error`; calling again continues.
     pub async fn run(&self, id: Uuid, runner: &str) -> Result<TenantMove, Error> {
         loop {
             let moving = self.step(id, runner).await?;
@@ -100,8 +100,8 @@ impl TenantMoves {
         }
     }
 
-    /// Làm một bước của lượt dời `id` (`copying` → `copied` → `switched` → `done`) rồi trả lượt dời.
-    /// Lỗi được ghi vào `error` của lượt dời.
+    /// Performs one step of move `id` (`copying` → `copied` → `switched` → `done`) then returns the move.
+    /// An error is written to the move's `error`.
     pub async fn step(&self, id: Uuid, runner: &str) -> Result<TenantMove, Error> {
         let Some(moving) = self.acquire(id, runner).await? else {
             let moving = self.find(id).await?;
@@ -135,7 +135,7 @@ impl TenantMoves {
             .ok_or_else(|| errors::tenant_move_not_found(&id.to_string()))
     }
 
-    /// Nhận lease của lượt dời `id`. `None`: lượt dời đã kết thúc. Bên khác đang giữ:
+    /// Takes the lease of move `id`. `None`: the move has ended. Held by another party:
     /// `tenant_move_running`.
     pub(super) async fn acquire(&self, id: Uuid, runner: &str) -> Result<Option<Model>, Error> {
         let at = now();
@@ -178,9 +178,9 @@ impl TenantMoves {
         Ok(())
     }
 
-    /// Chạy `work`, gia hạn lease của lượt dời `id` mỗi một phần ba thời hạn cho tới khi xong.
-    /// Gia hạn hỏng (vd database điều khiển SQLite đang bận vì chính bước chép) chỉ ghi log: bên
-    /// khác cũng cần kết nối ghi đó để nhận lease, nên không chen vào được.
+    /// Runs `work`, renewing the lease of move `id` every third of its duration until it finishes.
+    /// A failed renewal (e.g. the SQLite control database is busy because of the copy step itself) is only
+    /// logged: the other party also needs that write connection to take the lease, so it cannot interleave.
     pub(super) async fn holding<T>(
         &self,
         id: Uuid,
@@ -241,7 +241,7 @@ impl TenantMoves {
             .map_err(transfer)
     }
 
-    /// Ghi trạng thái mới của lượt dời — chỉ khi bên này còn giữ lease và trạng thái chưa đổi.
+    /// Records the new state of the move, only when this party still holds the lease and the state is unchanged.
     pub(super) async fn set_state<C: ConnectionTrait>(
         &self,
         connection: &C,

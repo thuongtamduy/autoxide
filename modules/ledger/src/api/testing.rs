@@ -1,25 +1,26 @@
-//! Sổ cái giả dùng chung cho test của module khác (feature `testing`, chỉ khai ở `[dev-dependencies]`).
+//! A shared fake ledger for other modules' tests (feature `testing`, declared only in `[dev-dependencies]`).
 //!
-//! Vì sao nằm ở đây mà không ở `autoxide-testkit`: testkit không được biết module nào (luật
-//! `dependency` của `cargo xtask check`), mà trait [`Ledger`] là hợp đồng của module `ledger`. Nên
-//! bản giả đi cùng hợp đồng, sau một feature để bản build thật không mang nó
+//! Why it lives here and not in `autoxide-testkit`: the testkit must not know any module (the `dependency`
+//! rule of `cargo xtask check`), while the [`Ledger`] trait is the contract of the `ledger` module. So the
+//! fake ships with the contract, behind a feature so the real build does not carry it
 //! (D-20261122-module-test-fakes).
 //!
-//! Hành vi giống `ledger` thật ở những chỗ module khác dựa vào:
-//! - bút toán chống trùng theo `reference` (gửi lại trả `Replayed`, không ghi thêm), phải cân Nợ = Có;
-//! - tài khoản suy từ khoá, bên thường theo [`OpenAccount`] hay [`PURPOSES`]; số dư theo bên thường;
-//! - lượt thu và lượt hoàn chống trùng theo `reference`; hoàn cộng dồn vào `refunded` của lượt thu;
-//! - cài đặt dòng tiền mặc định "tự thu";
-//! - có [`FakeLedgerModule`] thì phát được event `ledger.payment_succeeded` đúng đường thật
-//!   (outbox → dispatcher → bộ nghe của module đang test).
+//! Behaves like the real `ledger` where other modules rely on it:
+//! - journal entries are deduplicated by `reference` (resending returns `Replayed`, writes nothing more) and must balance Debit = Credit;
+//! - accounts derive from keys, the normal side per [`OpenAccount`] or [`PURPOSES`]; balances follow the normal side;
+//! - payments and refunds are deduplicated by `reference`; refunds accumulate into the payment's `refunded`;
+//! - the cash-flow setting defaults to "self-collect";
+//! - with [`FakeLedgerModule`] the event `ledger.payment_succeeded` is emitted along the real path
+//!   (outbox → dispatcher → the listener of the module under test).
 //!
-//! Không làm: kỳ kế toán, chuỗi băm, tạm giữ, chi trả, tỉ giá, sổ nhật ký — các hàm đó trả lỗi
-//! `internal_error` nói rõ hàm nào chưa có, để test dùng tới thấy ngay.
+//! Not implemented: accounting periods, hash chains, holds, payouts, exchange rates, journals — those
+//! functions return `internal_error` saying which function is missing, so a test that reaches one sees it at
+//! once.
 //!
 //! ```ignore
 //! let ledger = Arc::new(FakeLedger::new());
 //! let app = TestApp::builder(test).module(ledger.module()).module(my_module()).build().await?;
-//! // … module đang test tạo lượt thu …
+//! // … the module under test creates a payment …
 //! let payment = ledger.last_payment().unwrap();
 //! ledger.succeed(&app.default_tenant(), &payment).await?;
 //! ```
@@ -48,22 +49,22 @@ use super::{
     normal_side_of,
 };
 
-/// Tên đối tác của lượt thu khi người gọi không chọn.
+/// Name of the partner of a payment when the caller does not choose one.
 pub const FAKE_LEDGER_PROVIDER: &str = "fake";
-/// Hạn của lượt thu giả.
+/// Deadline of a fake payment.
 const PAYMENT_TTL_MINUTES: i64 = 30;
 
-/// Một dòng bút toán đã ghi.
+/// A journal entry line that has been recorded.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PostedLine {
-    /// ID tài khoản (suy từ khoá: [`FakeLedger::account_id`]).
+    /// Account ID (derived from the key: [`FakeLedger::account_id`]).
     pub account: Uuid,
     pub side: Side,
-    /// Số tiền, đơn vị nhỏ nhất.
+    /// Amount, in the smallest unit.
     pub amount: i64,
 }
 
-/// Một bút toán đã ghi.
+/// A journal entry that has been recorded.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PostedEntry {
     pub id: Uuid,
@@ -73,7 +74,7 @@ pub struct PostedEntry {
 }
 
 impl PostedEntry {
-    /// Tổng các dòng bên `side`.
+    /// Sum of the lines on side `side`.
     pub fn total(&self, side: Side) -> i64 {
         self.lines.iter().filter(|line| line.side == side).map(|line| line.amount).sum()
     }
@@ -82,32 +83,32 @@ impl PostedEntry {
 #[derive(Default)]
 struct State {
     entries: Vec<PostedEntry>,
-    /// Bút toán đã bị đảo: ID bút toán gốc.
+    /// The entry that was reversed: the ID of the original entry.
     reversed: Vec<Uuid>,
-    /// Bên thường của tài khoản đã mở.
+    /// The normal side of the opened account.
     accounts: HashMap<Uuid, Side>,
     payments: Vec<Payment>,
-    /// Đối tác người gọi chọn cho từng lượt thu, cùng thứ tự với `payments`.
+    /// The partner the caller chose for each payment, in the same order as `payments`.
     providers: Vec<Option<String>>,
     refunds: Vec<Refund>,
-    /// Số lần `post` kế tiếp trả `ledger.period_closed`.
+    /// Number of upcoming `post` calls that return `ledger.period_closed`.
     fail_posts: usize,
-    /// Số lần `create_payment` kế tiếp trả `ledger.gateway_not_configured`.
+    /// Number of upcoming `create_payment` calls that return `ledger.gateway_not_configured`.
     fail_payments: usize,
-    /// `return_url` người gọi gửi cho từng lượt thu qua cổng, theo thứ tự.
+    /// The `return_url` the caller sent for each payment through the gateway, in order.
     return_urls: Vec<Option<String>>,
 }
 
-/// Sổ cái giả, giữ mọi thứ trong bộ nhớ. Công bố vào app bằng
-/// `TestApp::builder(…).provide::<dyn Ledger>(ledger.clone())`, hay bằng [`FakeLedger::module`] khi
-/// test cần event của `ledger`.
+/// A fake ledger that keeps everything in memory. Publish it into the app with
+/// `TestApp::builder(…).provide::<dyn Ledger>(ledger.clone())`, or with [`FakeLedger::module`] when the
+/// test needs the events of `ledger`.
 #[derive(Default)]
 pub struct FakeLedger {
     state: Mutex<State>,
     outbox: Mutex<Option<Outbox>>,
 }
 
-/// Event `ledger.payment_succeeded` (thân JSON như `ledger` thật ghi).
+/// The event `ledger.payment_succeeded` (JSON body as the real `ledger` records it).
 #[derive(Debug, serde::Serialize)]
 #[serde(transparent)]
 struct PaymentSucceeded(Value);
@@ -130,13 +131,13 @@ impl FakeLedger {
         FakeLedger::default()
     }
 
-    /// Module `ledger` giả bọc sổ này: công bố `dyn Ledger`, khai event `ledger.payment_succeeded`
-    /// và bảng outbox, để [`succeed`](Self::succeed) phát được event.
+    /// A fake `ledger` module wrapping this ledger: publishes `dyn Ledger`, declares the event
+    /// `ledger.payment_succeeded` and the outbox table, so [`succeed`](Self::succeed) can emit the event.
     pub fn module(self: &Arc<Self>) -> FakeLedgerModule {
         FakeLedgerModule { ledger: self.clone() }
     }
 
-    /// ID tài khoản mang khoá `key` (cùng khoá → cùng ID, như `ensure_account`).
+    /// Account ID carrying key `key` (same key → same ID, like `ensure_account`).
     pub fn account_id(key: &AccountKey) -> Uuid {
         let party = key
             .counterparty
@@ -152,38 +153,38 @@ impl FakeLedger {
         Uuid::from_u64_pair(hash("a"), hash("b"))
     }
 
-    /// `count` lần `post` kế tiếp lỗi `ledger.period_closed` (thử đường ghi lại khi sổ từ chối).
+    /// The next `count` `post` calls fail with `ledger.period_closed` (to test the retry path when the ledger refuses).
     pub fn fail_next_posts(&self, count: usize) {
         lock(&self.state).fail_posts = count;
     }
 
-    /// `count` lần `create_payment` kế tiếp lỗi `ledger.gateway_not_configured` (thử đường đối tác
-    /// từ chối khởi tạo lượt thu).
+    /// The next `count` `create_payment` calls fail with `ledger.gateway_not_configured` (to test the path
+    /// where the partner refuses to start a payment).
     pub fn fail_next_payments(&self, count: usize) {
         lock(&self.state).fail_payments = count;
     }
 
-    /// `return_url` của từng lần gọi `create_payment` thành công (`None`: không gửi), theo thứ tự.
+    /// The `return_url` of each successful `create_payment` call (`None`: not sent), in order.
     pub fn return_urls(&self) -> Vec<Option<String>> {
         lock(&self.state).return_urls.clone()
     }
 
-    /// Bút toán đã ghi, theo thứ tự (lần gửi lại không thêm dòng).
+    /// Entries recorded, in order (a resend adds no lines).
     pub fn entries(&self) -> Vec<PostedEntry> {
         lock(&self.state).entries.clone()
     }
 
-    /// Bút toán mang mã tham chiếu `reference`, nếu có.
+    /// The entry carrying reference code `reference`, if any.
     pub fn entry_by_reference(&self, reference: &str) -> Option<PostedEntry> {
         lock(&self.state).entries.iter().find(|entry| entry.reference == reference).cloned()
     }
 
-    /// Mã tham chiếu của các bút toán đã ghi, theo thứ tự.
+    /// Reference codes of the entries recorded, in order.
     pub fn references(&self) -> Vec<String> {
         lock(&self.state).entries.iter().map(|entry| entry.reference.clone()).collect()
     }
 
-    /// Nợ − Có của tài khoản `key`, không xét bên thường.
+    /// Debit − Credit of account `key`, ignoring the normal side.
     pub fn net_debit(&self, key: &AccountKey) -> i64 {
         let id = Self::account_id(key);
         lock(&self.state)
@@ -195,27 +196,27 @@ impl FakeLedger {
             .sum()
     }
 
-    /// Lượt thu đã tạo, theo thứ tự.
+    /// Payments created, in order.
     pub fn payments(&self) -> Vec<Payment> {
         lock(&self.state).payments.clone()
     }
 
-    /// Lượt thu tạo sau cùng.
+    /// The most recently created payment.
     pub fn last_payment(&self) -> Option<Payment> {
         lock(&self.state).payments.last().cloned()
     }
 
-    /// Đối tác người gọi chọn cho từng lượt thu (`None`: không chọn), theo thứ tự.
+    /// The partner the caller chose for each payment (`None`: none chosen), in order.
     pub fn providers(&self) -> Vec<Option<String>> {
         lock(&self.state).providers.clone()
     }
 
-    /// Lượt hoàn đã nhận, theo thứ tự.
+    /// Refunds received, in order.
     pub fn refunds(&self) -> Vec<Refund> {
         lock(&self.state).refunds.clone()
     }
 
-    /// Tổng đã hoàn của lượt thu `payment`, đơn vị nhỏ nhất.
+    /// Total refunded of payment `payment`, in the smallest unit.
     pub fn refunded(&self, payment: Uuid) -> i64 {
         lock(&self.state)
             .refunds
@@ -225,14 +226,15 @@ impl FakeLedger {
             .sum()
     }
 
-    /// Đối tác báo đã thu đủ `payment`: đánh dấu đã thu và ghi event `ledger.payment_succeeded` vào
-    /// outbox (chưa giao: test chạy dispatcher). Cần app dựng với [`FakeLedger::module`].
+    /// The partner reports `payment` fully collected: marks it collected and records the event
+    /// `ledger.payment_succeeded` in the outbox (not delivered: the test runs the dispatcher). Needs an app
+    /// built with [`FakeLedger::module`].
     pub async fn succeed(&self, tenant: &TenantContext, payment: &Payment) -> Result<(), Error> {
         self.succeed_with(tenant, payment, payment.amount).await
     }
 
-    /// Như [`succeed`](Self::succeed), với số thực thu `amount` (`ledger` thật cũng báo số thu
-    /// thiếu khi đối soát chấp nhận số đã nhận).
+    /// Like [`succeed`](Self::succeed), with the actual amount received `amount` (the real `ledger` also
+    /// reports a short receipt when reconciliation accepts the amount received).
     pub async fn succeed_with(
         &self,
         tenant: &TenantContext,
@@ -259,8 +261,8 @@ impl FakeLedger {
         .await
     }
 
-    /// Ghi event `ledger.payment_succeeded` với thân tự chọn (thử thân thiếu trường, lượt thu không
-    /// đi qua sổ giả này…).
+    /// Records the event `ledger.payment_succeeded` with a chosen body (to test a body missing fields, a
+    /// payment that does not go through this fake ledger…).
     pub async fn record_payment_succeeded(
         &self,
         tenant: &TenantContext,
@@ -345,7 +347,7 @@ impl FakeLedger {
     }
 }
 
-/// Phần chung của lượt thu qua cổng và lượt thu chuyển khoản.
+/// The part shared by a gateway payment and a bank-transfer payment.
 struct PaymentRequest {
     provider: Option<String>,
     method: String,
@@ -677,8 +679,8 @@ impl Ledger for FakeLedger {
     }
 }
 
-/// Module `ledger` giả: công bố [`FakeLedger`], khai event `ledger.payment_succeeded` và bảng outbox
-/// của nó. Đăng ký TRƯỚC module đang test (module đó `require::<dyn Ledger>()`).
+/// A fake `ledger` module: publishes [`FakeLedger`], declares the event `ledger.payment_succeeded` and its
+/// outbox table. Register BEFORE the module under test (that module calls `require::<dyn Ledger>()`).
 pub struct FakeLedgerModule {
     ledger: Arc<FakeLedger>,
 }

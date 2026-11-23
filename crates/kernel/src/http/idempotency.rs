@@ -1,4 +1,4 @@
-//! Lớp HTTP của idempotency key (xem `crate::idempotency`).
+//! The HTTP layer of the idempotency key (see `crate::idempotency`).
 
 use crate::time::Timestamp;
 use jiff::SignedDuration;
@@ -17,13 +17,13 @@ use sha2::{Digest, Sha256};
 use crate::error::Error;
 use crate::idempotency::{Begin, IdempotencyStore, StoredResponse};
 
-/// Header client gửi.
+/// The header the client sends.
 pub const IDEMPOTENCY_KEY: HeaderName = HeaderName::from_static("idempotency-key");
-/// Header đánh dấu response là bản đã lưu.
+/// The header that marks a response as a stored copy.
 pub const IDEMPOTENT_REPLAYED: HeaderName = HeaderName::from_static("idempotent-replayed");
-/// Độ dài tối đa của key.
+/// The maximum length of a key.
 const MAX_KEY_LENGTH: usize = 255;
-/// Header của response được lưu và trả lại khi gửi lại.
+/// The response headers that are stored and returned on a retry.
 const KEPT_HEADERS: [HeaderName; 6] = [
     header::CONTENT_TYPE,
     header::ETAG,
@@ -33,27 +33,27 @@ const KEPT_HEADERS: [HeaderName; 6] = [
     header::CONTENT_LANGUAGE,
 ];
 
-/// Đánh dấu trên response: request có thể đã làm xong việc dù trả lỗi (hết giờ, panic giữa
-/// chừng — transaction có thể đã commit). Lớp idempotency không cho chạy lại bằng cùng key
-/// (D-157).
+/// Marker on a response: the request may have finished its work even though it returned an error (timeout,
+/// or a panic midway; the transaction may have committed). The idempotency layer does not allow re-running
+/// with the same key (D-157).
 #[derive(Debug, Clone, Copy)]
 pub(super) struct OutcomeUnknown;
 
-/// Response lớn hơn chừng này không được lưu (thay bằng lời giải thích): kho idempotency không
-/// phình theo response lớn (đọc file qua MCP…).
+/// A response larger than this is not stored (replaced by an explanation): the idempotency store does not
+/// bloat from large responses (file reads over MCP...).
 const MAX_STORED_BODY: usize = 256 * 1024;
 
 pub(super) struct Settings {
     pub store: Arc<dyn IdempotencyStore>,
-    /// Xác thực người gọi TRƯỚC khi đọc thân request: người lạ không làm máy chủ giữ thân
-    /// request trong bộ nhớ hay ghi dòng nào vào kho (đo được khi rà soát, D-079).
+    /// Authenticates the caller BEFORE reading the request body: a stranger cannot make the server hold a
+    /// request body in memory or write any row to the store (measured during review, D-079).
     pub authenticator: Option<Arc<dyn crate::access::Authenticator>>,
-    /// Giới hạn thân request (đọc trước để băm).
+    /// The request body limit (read up front to hash it).
     pub body_limits: Arc<super::body_limit::BodyLimits>,
-    /// Thời gian tối đa của một request: hết thì lần đầu coi như đã chết.
+    /// The maximum duration of one request: once exceeded, the first attempt is treated as dead.
     pub request_timeout: Duration,
-    /// Sổ database: bản ghi idempotency nằm ở database của khách người gọi. `None`: ứng dụng
-    /// không có sổ database (chỉ ở test dựng router tay) — bỏ qua idempotency.
+    /// The database registry: idempotency records live in the database of the caller's tenant. `None`: the
+    /// app has no database registry (only in tests that build the router by hand) - idempotency is skipped.
     pub databases: Option<crate::tenancy::DatabaseRegistry>,
 }
 
@@ -214,7 +214,8 @@ async fn run(
     Ok(response)
 }
 
-/// Quyết định lưu gì cho lần chạy `id` vừa trả `response`, rồi trả response cho client.
+/// Decides what to store for the run `id` that just returned `response`, then returns the response to the
+/// client.
 async fn settle(
     settings: &Settings,
     tenant: &crate::tenancy::TenantContext,
@@ -276,7 +277,7 @@ async fn settle(
     (Response::from_parts(response_parts, Body::from(body)), outcome)
 }
 
-/// Lỗi tạm thời: gửi lại sau sẽ khác.
+/// A temporary error: retrying later will behave differently.
 fn is_temporary(status: StatusCode) -> bool {
     matches!(
         status,
@@ -284,12 +285,12 @@ fn is_temporary(status: StatusCode) -> bool {
     )
 }
 
-/// Response (409) thay cho kết quả không lưu được.
+/// The (409) response used in place of a result that could not be stored.
 fn not_kept(error: Error) -> Response {
     error.into_response()
 }
 
-/// Lưu `refusal` làm kết quả của lần chạy `id`.
+/// Stores `refusal` as the result of the run `id`.
 async fn keep(
     settings: &Settings,
     tenant: &crate::tenancy::TenantContext,
@@ -301,7 +302,7 @@ async fn keep(
     settings.store.complete(tenant, id, stored(&parts, &body)).await
 }
 
-/// Bản lưu của một response: status, các header cần giữ, thân.
+/// The stored copy of a response: status, the headers to keep, body.
 fn stored(parts: &axum::http::response::Parts, body: &[u8]) -> StoredResponse {
     let headers = KEPT_HEADERS
         .iter()
@@ -313,7 +314,7 @@ fn stored(parts: &axum::http::response::Parts, body: &[u8]) -> StoredResponse {
     StoredResponse { status: parts.status.as_u16(), headers, body: body.to_vec() }
 }
 
-/// Response có `Cache-Control: no-store` không.
+/// Whether the response has `Cache-Control: no-store`.
 fn no_store(headers: &axum::http::HeaderMap) -> bool {
     headers.get_all(header::CACHE_CONTROL).iter().any(|value| {
         value.to_str().is_ok_and(|value| {
@@ -322,13 +323,13 @@ fn no_store(headers: &axum::http::HeaderMap) -> bool {
     })
 }
 
-/// Thân request có chảy thẳng vào handler (không đọc trước để băm) không: chỉ khi route nhận
-/// thân lớn hơn mức được giữ trong bộ nhớ và thân không tự khai là nhỏ.
+/// Whether the request body streams straight into the handler (not read up front to hash it): only when the
+/// route accepts a body larger than what is kept in memory and the body does not declare itself small.
 fn streams(limit: usize, buffer_limit: usize, declared: Option<usize>) -> bool {
     limit > buffer_limit && declared.is_none_or(|length| length > buffer_limit)
 }
 
-/// Response đã lưu, dựng lại.
+/// The stored response, rebuilt.
 fn replay(stored: StoredResponse) -> Response {
     let mut response = Response::new(Body::from(stored.body));
     *response.status_mut() = StatusCode::from_u16(stored.status).unwrap_or(StatusCode::OK);
@@ -341,7 +342,8 @@ fn replay(stored: StoredResponse) -> Response {
     response
 }
 
-/// SHA-256 của các phần nối nhau (mỗi phần kèm độ dài, để `ab|c` khác `a|bc`).
+/// The SHA-256 of the parts joined together (each part with its length, so that `ab|c` differs from
+/// `a|bc`).
 fn hash(parts: &[&[u8]]) -> String {
     let mut digest = Sha256::new();
     for part in parts {

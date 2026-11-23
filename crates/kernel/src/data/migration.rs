@@ -1,22 +1,21 @@
-//! Migration theo module: mỗi module tự khai migration của mình, có bảng theo dõi
-//! riêng, và lên / xuống độc lập với module khác.
+//! Per-module migrations: each module declares its own migrations, has its own tracking table, and moves
+//! up / down independently of other modules.
 //!
-//! - Module `notes` ghi lịch sử migration vào bảng `notes_migrations`. Module sở
-//!   hữu bảng của mình kể cả bảng này, nên gỡ một module hay tách nó thành service
-//!   riêng không đụng tới module khác.
-//! - Mọi migration chạy trong một transaction trên CẢ HAI database: hỏng giữa
-//!   chừng thì không để lại gì. (Mặc định của thư viện là SQLite không dùng
-//!   transaction; ở đây ép dùng để hai database xử như nhau.)
-//! - Migration đã commit thì không sửa — thêm migration mới (`CLAUDE.md`).
+//! - The `notes` module records its migration history in the table `notes_migrations`. A module owns its
+//!   tables, this one included, so removing a module or splitting it into its own service does not touch
+//!   other modules.
+//! - Every migration runs in a transaction on BOTH databases: a failure midway leaves nothing behind. (The
+//!   library default is to not use a transaction on SQLite; here it is forced so both databases behave alike.)
+//! - A committed migration is never edited: add a new migration (`CLAUDE.md`).
 //!
-//! Module viết migration bằng `use autoxide_kernel::migration::prelude::*;`.
+//! Modules write migrations with `use autoxide_kernel::migration::prelude::*;`.
 //!
-//! **Upgrade dữ liệu** ([`DataUpgrade`], `Module::upgrades`, D-257): việc nâng cấp dữ liệu cần cấu hình
-//! của chương trình (vd mã hoá secret cũ bằng khoá `AUTOXIDE_SECRET_KEY`). Tên `u0001_…`, ghi vào
-//! cùng bảng `<m>_migrations`, chạy bởi `migrate up` ngay sau migration schema nó khai trong
-//! [`DataUpgrade::after`]; còn upgrade chờ thì `serve` từ chối chạy như còn migration chờ. Upgrade
-//! chạy NGOÀI transaction của migration (nó tự mở transaction của mình) và phải chạy lại được từ
-//! đầu: hỏng giữa chừng thì lần sau làm tiếp phần chưa xong.
+//! **Data upgrades** ([`DataUpgrade`], `Module::upgrades`, D-257): data upgrade work that needs the program
+//! configuration (e.g. re-encrypting old secrets with the `AUTOXIDE_SECRET_KEY` key). Named `u0001_…`,
+//! recorded in the same `<m>_migrations` table, run by `migrate up` right after the schema migration declared
+//! in [`DataUpgrade::after`]; while an upgrade is pending, `serve` refuses to run, as with a pending
+//! migration. An upgrade runs OUTSIDE the migration transaction (it opens its own transaction) and must be
+//! re-runnable from the start: after a failure midway, the next run continues with the unfinished part.
 
 use std::collections::BTreeSet;
 use std::fmt;
@@ -40,25 +39,25 @@ pub use helpers::{HelperTable, helper_tables};
 pub use lock::MigrationLock;
 pub(crate) use manager::has_table as table_exists;
 
-/// Một upgrade dữ liệu của module. Xem đầu file.
+/// A data upgrade of a module. See the top of the file.
 //
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
 #[async_trait::async_trait]
 pub trait DataUpgrade: Send + Sync {
-    /// Tên, duy nhất trong module, dạng `u0001_<việc>`.
+    /// Name, unique within the module, of the form `u0001_<task>`.
     fn name(&self) -> &'static str;
 
-    /// Migration schema của cùng module mà upgrade chạy ngay sau.
+    /// Schema migration of the same module that the upgrade runs right after.
     fn after(&self) -> &'static str;
 
-    /// Nâng dữ liệu. Chạy lại được (bỏ qua dòng đã nâng).
+    /// Upgrades the data. Re-runnable (skips rows already upgraded).
     async fn up(&self, context: &UpgradeContext) -> Result<(), Error>;
 
-    /// Đưa dữ liệu về như trước (để bản cũ của chương trình đọc được). Chạy lại được.
+    /// Restores the data to its previous form (so an older program version can read it). Re-runnable.
     async fn down(&self, context: &UpgradeContext) -> Result<(), Error>;
 }
 
-/// Thứ một upgrade dữ liệu cần: database và khoá của chương trình.
+/// What a data upgrade needs: the database and the program key.
 #[derive(Clone, Debug)]
 pub struct UpgradeContext {
     database: Database,
@@ -66,8 +65,8 @@ pub struct UpgradeContext {
 }
 
 impl UpgradeContext {
-    /// Ngữ cảnh trên `database` với khoá `secret` — cho test của module; chương trình dựng nó
-    /// trong `Migrator`.
+    /// Context on `database` with the key `secret`; for module tests. The program builds it inside
+    /// `Migrator`.
     pub fn new(database: Database, secret: SecretKey) -> Self {
         UpgradeContext { database, secret }
     }
@@ -76,13 +75,13 @@ impl UpgradeContext {
         &self.database
     }
 
-    /// Khoá của chương trình (`SecretKey::sealer` để mã hoá secret).
+    /// The program key (`SecretKey::sealer` to encrypt secrets).
     pub fn secret(&self) -> &SecretKey {
         &self.secret
     }
 }
 
-/// Những thứ cần để viết một migration.
+/// Everything needed to write a migration.
 //
 // Cùng các tên `sea-orm-migration` từng cung cấp (kernel tự giữ phần đó, D-20261121-own-migrations), nên
 // migration của module không phải sửa.
@@ -94,7 +93,7 @@ pub mod prelude {
     pub use sea_orm::{self, ConnectionTrait, DbErr, DeriveIden};
 }
 
-/// Lỗi khi khai báo hoặc chạy migration.
+/// Error while declaring or running migrations.
 #[derive(Debug)]
 pub struct MigrationError(String);
 
@@ -106,7 +105,7 @@ impl fmt::Display for MigrationError {
 
 impl std::error::Error for MigrationError {}
 
-/// Các migration của một module, theo thứ tự áp dụng.
+/// The migrations of one module, in the order they are applied.
 #[derive(Clone)]
 pub struct ModuleMigrations {
     module: &'static str,
@@ -118,8 +117,8 @@ pub struct ModuleMigrations {
 }
 
 impl ModuleMigrations {
-    /// `module` là tên module (chữ thường, số, `_`; bắt đầu bằng chữ). Mọi bảng của
-    /// module phải mang tiền tố `<module>_`.
+    /// `module` is the module name (lowercase, digits, `_`; starts with a letter). Every table of the
+    /// module must carry the prefix `<module>_`.
     pub fn new(module: &'static str, migrations: Vec<Box<dyn MigrationTrait>>) -> Self {
         ModuleMigrations {
             module,
@@ -128,13 +127,13 @@ impl ModuleMigrations {
         }
     }
 
-    /// Thêm các upgrade dữ liệu của module.
+    /// Adds the data upgrades of the module.
     pub fn with_upgrades(mut self, upgrades: Vec<Box<dyn DataUpgrade>>) -> Self {
         self.upgrades = upgrades.into_iter().map(Arc::from).collect();
         self
     }
 
-    /// Migration schema và upgrade theo thứ tự chạy: mỗi upgrade ngay sau migration nó khai.
+    /// Schema migrations and upgrades in run order: each upgrade right after the migration it declares.
     fn entries(&self) -> Vec<Entry> {
         let mut entries = Vec::new();
         for migration in &self.migrations {
@@ -152,7 +151,7 @@ impl ModuleMigrations {
         self.module
     }
 
-    /// Tên bảng ghi lịch sử migration của module.
+    /// Name of the table that records the migration history of the module.
     pub fn history_table(&self) -> String {
         format!("{}_migrations", self.module)
     }
@@ -175,7 +174,7 @@ impl fmt::Debug for ModuleMigrations {
     }
 }
 
-/// Trạng thái của một migration.
+/// State of one migration.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct MigrationState {
@@ -184,20 +183,20 @@ pub struct MigrationState {
     pub applied: bool,
 }
 
-/// Chạy migration của mọi module đã đăng ký.
+/// Runs the migrations of every registered module.
 #[derive(Debug)]
 pub struct Migrator {
     modules: Vec<ModuleMigrations>,
-    /// Khoá cho upgrade dữ liệu. Mặc định: khoá gốc kernel giữ trong database.
+    /// Key for data upgrades. Default: the root key the kernel keeps in the database.
     keys: KeyConfig,
-    /// Database giữ khoá gốc tự sinh (khi `AUTOXIDE_SECRET_KEY` chưa đặt). `None`: chính
-    /// database đang migrate. Placement dùng khoá của database điều khiển ([`Migrator::keyed_on`]).
+    /// Database that holds the auto-generated root key (when `AUTOXIDE_SECRET_KEY` is unset). `None`: the
+    /// database being migrated itself. Placement uses the key of the control database ([`Migrator::keyed_on`]).
     key_database: Option<Database>,
 }
 
 impl Migrator {
-    /// Kiểm khai báo rồi dựng migrator. Lỗi khai báo (tên trùng, tên sai dạng) là
-    /// lỗi của người viết module, báo ngay lúc khởi động chứ không đợi tới khi chạy.
+    /// Checks the declarations and builds the migrator. A declaration error (duplicate name, malformed name)
+    /// is the module author's error, reported at startup rather than waiting until run time.
     pub fn new(modules: Vec<ModuleMigrations>) -> Result<Self, MigrationError> {
         let module_names: Vec<&str> = modules.iter().map(|set| set.module).collect();
         let mut problems = module_name_problems(&module_names);
@@ -246,23 +245,24 @@ impl Migrator {
         }
     }
 
-    /// Khoá của chương trình cho upgrade dữ liệu (`Modules::migrator` đặt).
+    /// The program key for data upgrades (set by `Modules::migrator`).
     pub(crate) fn with_keys(mut self, keys: KeyConfig) -> Self {
         self.keys = keys;
         self
     }
 
-    /// Upgrade dữ liệu dùng khoá gốc của `control` (database điều khiển), dù migrate database nào —
-    /// module mã hoá secret của mọi khách bằng khoá đó, nên upgrade trên placement cũng phải vậy.
+    /// Data upgrades use the root key of `control` (the control database), whichever database is migrated;
+    /// the module encrypts the secrets of every tenant with that key, so upgrades on a placement must do so
+    /// too.
     #[must_use]
     pub fn keyed_on(mut self, control: &Database) -> Self {
         self.key_database = Some(control.clone());
         self
     }
 
-    /// Tên mọi migration và upgrade dữ liệu theo đúng thứ tự `up` chạy, dạng `<module>/<tên>`.
-    /// Không cần database. Dùng làm khoá cache của database mẫu đã migrate trong test
-    /// (`autoxide-testkit`, D-20261120-test-db-template): đổi migration thì khoá đổi.
+    /// Names of every migration and data upgrade in the exact order `up` runs them, as `<module>/<name>`.
+    /// Needs no database. Used as the cache key of the migrated template database in tests
+    /// (`autoxide-testkit`, D-20261120-test-db-template): changing a migration changes the key.
     pub fn names(&self) -> Vec<String> {
         let mut names = Vec::new();
         for set in &self.modules {
@@ -277,15 +277,15 @@ impl Migrator {
         names
     }
 
-    /// Khoá gốc của chương trình có được cấu hình (`AUTOXIDE_SECRET_KEY`) không. Không thì upgrade
-    /// dữ liệu cần khoá sinh khoá gốc và lưu nó trong database đang migrate — kết quả migration khác
-    /// nhau, nên khoá cache của database mẫu trong test có phần này (D-20261120-test-db-template).
+    /// Whether the program root key is configured (`AUTOXIDE_SECRET_KEY`). If not, data upgrades need the
+    /// key that generates the root key and stores it in the database being migrated, so migration results
+    /// differ; the template-database cache key in tests includes this part (D-20261120-test-db-template).
     pub fn uses_configured_key(&self) -> bool {
         self.keys.is_configured()
     }
 
-    /// Trạng thái mọi migration, theo thứ tự module đăng ký rồi thứ tự khai báo.
-    /// Chỉ đọc: không tạo bảng nào, chạy được trên database trống.
+    /// State of every migration, in module registration order then declaration order.
+    /// Read-only: creates no table and works on an empty database.
     pub async fn status(&self, database: &Database) -> Result<Vec<MigrationState>, MigrationError> {
         let mut states = Vec::new();
         for set in &self.modules {
@@ -299,7 +299,7 @@ impl Migrator {
         Ok(states)
     }
 
-    /// Các migration chưa áp dụng.
+    /// Migrations not yet applied.
     pub async fn pending(
         &self,
         database: &Database,
@@ -308,8 +308,8 @@ impl Migrator {
         Ok(states.into_iter().filter(|state| !state.applied).collect())
     }
 
-    /// Áp dụng mọi migration còn thiếu của mọi module. Trả về những migration vừa
-    /// áp dụng. Gặp lỗi thì dừng; các migration trước đó vẫn được giữ.
+    /// Applies every missing migration of every module. Returns the migrations just applied. Stops on
+    /// error; earlier migrations stay applied.
     pub async fn up(&self, database: &Database) -> Result<Vec<MigrationState>, MigrationError> {
         let mut done = Vec::new();
         let context = self.context(database);
@@ -340,8 +340,8 @@ impl Migrator {
         Ok(done)
     }
 
-    /// Gỡ `steps` migration mới nhất của MỘT module. Trả về những migration vừa gỡ,
-    /// mới nhất trước.
+    /// Reverts the newest `steps` migrations of ONE module. Returns the migrations just reverted, newest
+    /// first.
     pub async fn down(
         &self,
         database: &Database,
@@ -381,8 +381,8 @@ impl Migrator {
     }
 }
 
-/// Tên các migration (và upgrade) đã áp dụng của module. Tên có trong database mà không có trong code là lỗi:
-/// database được bản khác (mới hơn) của chương trình migrate.
+/// Names of the migrations (and upgrades) already applied for the module. A name present in the database but
+/// absent from the code is an error: the database was migrated by another (newer) version of the program.
 async fn applied_names<C: sea_orm::ConnectionTrait>(
     set: &ModuleMigrations,
     connection: &C,
@@ -422,7 +422,7 @@ impl Migrator {
     }
 }
 
-/// Một mục trong danh sách chạy của module.
+/// One entry in the run list of a module.
 enum Entry {
     Schema(Arc<dyn MigrationTrait>),
     Upgrade(Arc<dyn DataUpgrade>),
@@ -442,9 +442,9 @@ impl Entry {
         }
     }
 
-    /// Áp dụng (hay gỡ) rồi ghi (hay xoá) dòng lịch sử. Migration schema: cả hai trong MỘT transaction, trên
-    /// database nào cũng vậy — hỏng giữa chừng thì không để lại gì. Upgrade dữ liệu: ngoài transaction (nó tự
-    /// mở transaction của mình), ghi lịch sử sau khi xong.
+    /// Applies (or reverts) and then records (or deletes) the history row. Schema migration: both in ONE
+    /// transaction, on either database; a failure midway leaves nothing behind. Data upgrade: outside the
+    /// transaction (it opens its own), recording the history after it finishes.
     async fn run(
         &self,
         module: &str,
@@ -491,10 +491,10 @@ impl Entry {
     }
 }
 
-/// Lỗi "database chưa migrate" (`kernel.migrations_pending`) cho lệnh CLI: chỉ nêu SỐ migration
-/// chưa chạy và vài tên đầu, kèm lệnh cần chạy. Không liệt kê hết — database mới tinh có hàng
-/// trăm migration và một dòng lỗi dài vài KB che mất lệnh sửa. Danh sách đầy đủ:
-/// `autoxide migrate status`.
+/// The "database not migrated" error (`kernel.migrations_pending`) for CLI commands: states only the COUNT
+/// of pending migrations and the first few names, plus the command to run. It does not list them all; a
+/// brand-new database has hundreds of migrations and a multi-KB error line would hide the fix command.
+/// Full list: `autoxide migrate status`.
 pub fn pending_error(pending: &[MigrationState]) -> Error {
     const SHOWN: usize = 3;
     let first: Vec<String> = pending

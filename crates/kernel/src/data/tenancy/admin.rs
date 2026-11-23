@@ -1,15 +1,15 @@
-//! Quản lý khách (đặc tả 33 "Cấp phát và dời khách", "API REST", D-260): tạo, gieo dữ liệu ban
-//! đầu, xem, tạm khoá / mở lại; khách hiện tại của người gọi.
+//! Tenant management (spec 33 "Provisioning and moving tenants", "REST API", D-260): create, seed initial
+//! data, view, suspend / resume; the caller's current tenant.
 //!
-//! - Tạo khách: ghi `kernel_tenants` trạng thái `provisioning` → gọi `TenantSeed` của mọi module
-//!   theo thứ tự đăng ký (gieo role `admin`, dòng khoá, đầu chuỗi audit…) → `active`. Hỏng giữa
-//!   chừng thì khách giữ `provisioning`; `autoxide tenant provision <slug>` chạy lại (mọi bước chạy
-//!   lại được).
-//! - Quản lý khách là việc của **nhân sự khách nền tảng** (khách mặc định), không phải của admin một
-//!   khách thường: role `admin` của khách nào cũng có mọi permission, nên chỉ kiểm permission là lỗ
-//!   hổng — kiểm thêm khách của người gọi ([`require_platform`]), và không cho nhân sự nền tảng
-//!   đang "vào" khách khác bằng header làm việc này từ trong khách đó.
-//! - Chế độ `single`: chỉ có khách mặc định; tạo khách là lỗi `tenant_single_mode`.
+//! - Creating a tenant: writes `kernel_tenants` with status `provisioning` → calls the `TenantSeed` of
+//!   every module in registration order (seeds the `admin` role, lock rows, the head of the audit chain...)
+//!   → `active`. If it fails midway the tenant stays `provisioning`; `autoxide tenant provision <slug>`
+//!   reruns it (every step is safe to rerun).
+//! - Managing tenants is the job of the **platform tenant's staff** (the default tenant), not of the admin
+//!   of an ordinary tenant: the `admin` role of every tenant has every permission, so checking permission
+//!   alone is a hole; it also checks the caller's tenant ([`require_platform`]), and does not let platform
+//!   staff who are "entering" another tenant with a header do this from inside that tenant.
+//! - `single` mode: only the default tenant exists; creating a tenant is the error `tenant_single_mode`.
 
 use crate::time::Timestamp;
 use std::collections::HashMap;
@@ -57,8 +57,8 @@ pub(crate) const TENANT_CREATED: EventInfo =
 pub(crate) const TENANT_UPDATED: EventInfo =
     EventInfo::new("kernel.tenant_updated", "A tenant was renamed, suspended or resumed.");
 
-/// Gieo dữ liệu ban đầu của một module cho khách mới (vd role `admin`, dòng khoá). Phải chạy lại
-/// được: khách cấp phát hỏng giữa chừng thì chạy lại từ đầu.
+/// Seeds a module's initial data for a new tenant (e.g. role `admin`, lock rows). Must be safe to
+/// rerun: a tenant whose provisioning failed midway is rerun from the start.
 //
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
 #[async_trait::async_trait]
@@ -66,11 +66,11 @@ pub trait TenantSeed: Send + Sync {
     async fn seed(&self, tenant: &TenantContext) -> Result<(), Error>;
 }
 
-/// Bộ gieo của một module, kèm tên module (để báo lỗi rõ module nào hỏng).
+/// One module's seeder, with the module name (so an error says which module failed).
 pub(crate) type NamedSeed = (&'static str, Arc<dyn TenantSeed>);
 
-/// Bộ gieo của mọi module (dữ liệu ban đầu, và dữ liệu mẫu khi cấp phát — `Module::sample_data`),
-/// theo thứ tự đăng ký; điền sau khi mọi module đã khởi động. Clone rẻ.
+/// The seeders of every module (initial data, and sample data when provisioning: `Module::sample_data`),
+/// in registration order; filled in after every module has started. Cheap to clone.
 #[derive(Clone, Default)]
 pub(crate) struct Seeds(Arc<OnceLock<(Vec<NamedSeed>, Vec<NamedSeed>)>>);
 
@@ -88,7 +88,7 @@ impl Seeds {
     }
 }
 
-/// Người gọi là nhân sự khách nền tảng, đang làm việc trong chính khách nền tảng.
+/// The caller is platform-tenant staff, working inside the platform tenant itself.
 pub fn require_platform(principal: &Principal) -> Result<(), Error> {
     if principal.tenant_id() == DEFAULT_TENANT && principal.operator_from().is_none() {
         Ok(())
@@ -98,7 +98,7 @@ pub fn require_platform(principal: &Principal) -> Result<(), Error> {
 }
 
 pub(super) mod tenant {
-    //! Bảng `kernel_tenants` (mặt điều khiển).
+    //! The `kernel_tenants` table (control plane).
     use crate::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
@@ -115,9 +115,9 @@ pub(super) mod tenant {
         pub placement_id: Uuid,
         pub created_at: Timestamp,
         pub updated_at: Timestamp,
-        /// Chỉ đọc: đọc được, mọi lệnh ghi bị chặn (`tenant_read_only`); độc lập với `status`.
+        /// Read-only: reads work, every write is blocked (`tenant_read_only`); independent of `status`.
         pub read_only: bool,
-        /// Nước khách buộc lưu dữ liệu (ISO 3166-1 alpha-2), `None` khi không buộc (D-360).
+        /// Country where the tenant must keep its data (ISO 3166-1 alpha-2), `None` when not required (D-360).
         pub data_residency: Option<String>,
     }
 
@@ -125,7 +125,7 @@ pub(super) mod tenant {
 }
 
 pub(super) mod placement {
-    //! Bảng `kernel_placements` (mặt điều khiển).
+    //! The `kernel_placements` table (control plane).
     use crate::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
@@ -145,7 +145,7 @@ pub(super) mod placement {
         pub schema_checked_at: Option<Timestamp>,
         pub created_at: Timestamp,
         pub updated_at: Timestamp,
-        /// Nước đặt máy chủ (ISO 3166-1 alpha-2), `None` khi chưa ghi (D-360).
+        /// Country where the server is located (ISO 3166-1 alpha-2), `None` when not recorded (D-360).
         pub country_code: Option<String>,
     }
 
@@ -312,18 +312,18 @@ pub struct TenantFilter {
     pub expand: Option<String>,
 }
 
-/// Trạng thái thuê bao bộ lọc nhận (đặc tả 35).
+/// Subscription status the filter accepts (spec 35).
 const SUBSCRIPTION_STATES: [&str; 6] =
     ["trialing", "active", "past_due", "suspended", "canceled", "deleted"];
 
-/// Thứ `expand` nhận.
+/// What `expand` accepts.
 const EXPANSIONS: [&str; 3] = ["placement", "subscription", "usage"];
 
 #[derive(Debug, Serialize)]
 struct TenantChanged {
     before: Option<Tenant>,
     after: Option<Tenant>,
-    /// Lý do người làm nêu (chỉ có ở lần sửa).
+    /// Reason given by the person making the change (only on an edit).
     #[serde(skip_serializing_if = "Option::is_none")]
     reason: Option<String>,
 }
@@ -344,14 +344,14 @@ impl Event for TenantUpdated {
     const NAME: &'static str = "kernel.tenant_updated";
 }
 
-/// Dịch vụ quản lý khách. Module `kernel` công bố (`context.require::<TenantAdmin>()`).
+/// The tenant management service. Published by the `kernel` module (`context.require::<TenantAdmin>()`).
 pub struct TenantAdmin {
     registry: DatabaseRegistry,
     seeds: Seeds,
     outbox: Outbox,
-    /// Thuê bao, hạn mức (module `plans`, bước 35): bộ lọc `subscription_status`, `near_limit`.
+    /// Subscription and limits (module `plans`, step 35): filters `subscription_status`, `near_limit`.
     entitlements: crate::entitlement::EntitlementsHandle,
-    /// Bảng của các module (xoá hẳn khách, D-337); `None` khi chưa gắn.
+    /// Tables of the modules (for deleting a tenant for good, D-337); `None` when not attached.
     setup: Option<super::moves::MoveSetup>,
 }
 
@@ -377,7 +377,7 @@ impl TenantAdmin {
         TenantAdmin { registry, seeds, outbox, entitlements: Default::default(), setup: None }
     }
 
-    /// Bảng của các module, cho xoá hẳn khách (D-337).
+    /// Tables of the modules, for deleting a tenant for good (D-337).
     pub(crate) fn with_setup(mut self, setup: super::moves::MoveSetup) -> Self {
         self.setup = Some(setup);
         self
@@ -395,7 +395,7 @@ impl TenantAdmin {
         &self.outbox
     }
 
-    /// Thuê bao và hạn mức cho bộ lọc của danh sách khách (bước 35).
+    /// Subscription and limits for the tenant-list filters (step 35).
     pub(crate) fn with_entitlements(
         mut self,
         entitlements: crate::entitlement::EntitlementsHandle,
@@ -417,8 +417,8 @@ impl TenantAdmin {
         Ok(describe(row, &placements))
     }
 
-    /// Một trang khách, mới nhất trước (trừ khi `order=asc`). Hai câu truy vấn cho cả trang (bảng
-    /// placement nhỏ, rồi trang khách đã lọc), không gọi riêng từng dòng.
+    /// One page of tenants, newest first (unless `order=asc`). Two queries for the whole page (the small
+    /// placement table, then the filtered page of tenants), not one call per row.
     pub async fn list(
         &self,
         filter: &TenantFilter,
@@ -568,7 +568,7 @@ impl TenantAdmin {
             .ok_or_else(|| errors::tenant_not_found(slug))
     }
 
-    /// Khách theo ID hay slug.
+    /// A tenant by ID or slug.
     pub async fn get(&self, id_or_slug: &str) -> Result<Tenant, Error> {
         let row = match id_or_slug.parse::<Uuid>() {
             Ok(id) => self.find(id).await?,
@@ -577,7 +577,7 @@ impl TenantAdmin {
         self.describe(row).await
     }
 
-    /// Tạo khách rồi cấp phát (gieo dữ liệu của mọi module). Chế độ `single`: `tenant_single_mode`.
+    /// Creates a tenant then provisions it (seeds every module's data); `single` mode: `tenant_single_mode`.
     pub async fn create(&self, actor: Actor, input: NewTenant) -> Result<Tenant, Error> {
         if self.registry.mode() == TenancyMode::Single {
             return Err(errors::tenant_single_mode());
@@ -649,13 +649,13 @@ impl TenantAdmin {
         self.provision_id(actor, id).await
     }
 
-    /// Module có dữ liệu mẫu cho khách mới (`Module::sample_data`), theo thứ tự đăng ký.
+    /// Modules that have sample data for a new tenant (`Module::sample_data`), in registration order.
     pub fn sample_modules(&self) -> Vec<&'static str> {
         self.seeds.samples().iter().map(|(module, _)| *module).collect()
     }
 
-    /// Gieo dữ liệu mẫu của các module `modules` (module không có dữ liệu mẫu bị bỏ qua) cho khách
-    /// `tenant` — cấp phát khách mới theo gói (bước 35). Chạy lại được. Trả các module đã gieo.
+    /// Seeds the sample data of `modules` (a module without sample data is skipped) for `tenant`:
+    /// provisioning a new tenant by plan (step 35). Safe to rerun. Returns the seeded modules.
     pub async fn seed_samples(
         &self,
         tenant: TenantId,
@@ -676,7 +676,7 @@ impl TenantAdmin {
         Ok(seeded)
     }
 
-    /// Cấp phát lại khách `id_or_slug` đang `provisioning` (chạy lại được).
+    /// Reprovisions tenant `id_or_slug` that is `provisioning` (safe to rerun).
     pub async fn provision(&self, actor: Actor, id_or_slug: &str) -> Result<Tenant, Error> {
         let row = match id_or_slug.parse::<Uuid>() {
             Ok(id) => self.find(id).await?,
@@ -718,7 +718,7 @@ impl TenantAdmin {
         Ok(tenant)
     }
 
-    /// Đổi tên, trạng thái (`active` / `suspended`) hay cờ chỉ đọc của khách `id`.
+    /// Changes the name, status (`active` / `suspended`) or read-only flag of tenant `id`.
     pub async fn update(
         &self,
         actor: Actor,
@@ -819,7 +819,7 @@ impl TenantAdmin {
         Ok(after)
     }
 
-    /// Mọi placement, theo tên.
+    /// Every placement, by name.
     pub async fn placements(&self) -> Result<Vec<Placement>, Error> {
         let mut rows = self.placement_names().await?;
         rows.sort_by(|a, b| a.name.cmp(&b.name));
@@ -831,7 +831,7 @@ impl TenantAdmin {
     }
 }
 
-/// Placement cho API: không bao giờ có URL hay khoá bí mật của nơi lưu.
+/// A placement for the API: never carries the URL or secret key of the store.
 pub(super) async fn describe_placement(
     registry: &DatabaseRegistry,
     row: placement::Model,
@@ -869,7 +869,7 @@ pub(super) async fn describe_placement(
     }
 }
 
-/// Phần không bí mật của nơi lưu riêng.
+/// The non-secret part of a dedicated store.
 fn describe_storage(location: &crate::storage::StorageLocation) -> PlacementStorage {
     use crate::storage::StorageLocation;
     match location {
@@ -1094,7 +1094,7 @@ async fn list_placements(
     Ok(Data { data: admin.placements().await? })
 }
 
-/// Route dưới `/api/v1/kernel`.
+/// Routes under `/api/v1/kernel`.
 pub(crate) fn routes(admin: Arc<TenantAdmin>) -> OpenApiRouter {
     OpenApiRouter::new()
         .routes(routes!(get_current_tenant))
@@ -1115,7 +1115,7 @@ pub(crate) struct TenantRef {
     tenant: String,
 }
 
-/// Tool MCP — gọi đúng các hàm REST dùng.
+/// MCP tools: call exactly the functions REST uses.
 pub(crate) fn tools(admin: Arc<TenantAdmin>) -> Vec<Tool> {
     let (current, list, get) = (admin.clone(), admin.clone(), admin);
     vec![
@@ -1161,8 +1161,8 @@ pub(crate) fn tools(admin: Arc<TenantAdmin>) -> Vec<Tool> {
 
 // --- Migration ------------------------------------------------------------------------------
 
-/// Cột `read_only` của `kernel_tenants`: khách chỉ đọc (đọc được, ghi bị chặn), độc lập với
-/// `status` (tạm khoá chặn cả đọc) — đối chiếu thiết kế 2, A-3.11.
+/// The `read_only` column of `kernel_tenants`: a read-only tenant (reads work, writes are blocked),
+/// independent of `status` (suspension blocks reads too); see design 2, A-3.11.
 pub(crate) struct AddReadOnly;
 
 impl crate::migration::prelude::MigrationName for AddReadOnly {

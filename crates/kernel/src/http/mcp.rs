@@ -1,22 +1,24 @@
-//! Endpoint MCP (Streamable HTTP) ở `/mcp` (D-068). Giao thức do kernel tự cài theo đặc tả công khai
-//! (`mcp/protocol.rs`, `mcp/transport.rs`; thay thư viện `rmcp` — D-20261121-mcp-server), phục vụ cả bản
-//! mới (`2026-07-28`: không bắt tay, `_meta` theo request, `server/discover`) lẫn các bản cũ còn `initialize`.
+//! MCP endpoint (Streamable HTTP) at `/mcp` (D-068). The kernel implements the protocol itself from the
+//! public specification (`mcp/protocol.rs`, `mcp/transport.rs`; replacing the `rmcp` library -
+//! D-20261121-mcp-server), serving both the new version (`2026-07-28`: no handshake, per-request `_meta`,
+//! `server/discover`) and older versions that still have `initialize`.
 //!
-//! - Không giữ phiên (stateless) và trả JSON: mỗi request độc lập, chạy được trên nhiều
-//!   máy chủ như REST.
-//! - Xác thực như REST (`Authorization: Bearer <access token hoặc API key>`), ở một lớp
-//!   chạy trước phần giao thức: thiếu hay sai token thì 401 kiểu Problem. Người gọi
-//!   ([`Principal`]) được đặt vào request; phần giao thức đọc lại từ đó.
-//! - `tools/list` chỉ liệt kê tool người gọi có permission; `tools/call` tool khác coi
-//!   như không tồn tại.
-//! - Lỗi của tool trả về như kết quả lỗi của tool (`isError`), kèm `code` ổn định và
-//!   `message` dịch theo `Accept-Language` — agent đọc được và tự sửa.
-//! - `resources/list` và `prompts/list` lọc theo permission y như `tools/list` (bước 40 P2);
-//!   `resources/read` / `prompts/get` với URI / tên không có hay không được dùng trả cùng một lỗi.
-//! - `/mcp/<module>` là endpoint riêng của một module (D-20261118-module-contracts): cùng xác thực,
-//!   cùng luật, nhưng chỉ có tool, resource và prompt của module đó. Chuẩn MCP không có tham số lọc
-//!   cho `tools/list`; một endpoint mỗi module thì client nào cũng dùng được, và agent chỉ làm việc với
-//!   một module không phải nạp mô tả của gần hai trăm tool.
+//! - Sessionless (stateless) and returns JSON: each request is independent, and it can run on several
+//!   servers like REST.
+//! - Authenticated like REST (`Authorization: Bearer <access token or API key>`), in a layer that runs
+//!   before the protocol part: a missing or wrong token gives a Problem-style 401. The caller
+//!   ([`Principal`]) is placed in the request; the protocol part reads it back from there.
+//! - `tools/list` lists only tools the caller has permission for; `tools/call` on any other tool is treated
+//!   as nonexistent.
+//! - A tool error is returned as a tool error result (`isError`), with a stable `code` and a `message`
+//!   translated per `Accept-Language` - an agent can read it and fix the call itself.
+//! - `resources/list` and `prompts/list` filter by permission exactly like `tools/list` (step 40 P2);
+//!   `resources/read` / `prompts/get` with a URI / name that does not exist or is not allowed return the
+//!   same error.
+//! - `/mcp/<module>` is the dedicated endpoint of one module (D-20261118-module-contracts): same
+//!   authentication, same rules, but only that module's tools, resources and prompts. The MCP standard has
+//!   no filter parameter for `tools/list`; one endpoint per module works with any client, and an agent
+//!   working with only one module need not load the descriptions of nearly two hundred tools.
 
 mod protocol;
 mod transport;
@@ -40,10 +42,10 @@ use crate::i18n::{Language, Translations};
 use crate::mcp::{McpResource, Prompt, PromptMessage, Tool};
 use crate::tenancy::TenantContext;
 
-/// Đường dẫn của endpoint MCP.
+/// The path of the MCP endpoint.
 pub const MCP_PATH: &str = "/mcp";
 
-/// Hướng dẫn gửi cho client lúc bắt tay.
+/// Instructions sent to the client during the handshake.
 const INSTRUCTIONS: &str = "Tools of this Autoxide server. Each tool calls the same service as \
 the REST API (`/api/v1/openapi.json`) with the caller's permissions; only the tools the caller \
 may use are listed. Results have the same shape as REST: the value under `data`, and lists also \
@@ -58,31 +60,31 @@ templates for common jobs that lead to tools you may call; text inside tags such
 #[derive(Clone)]
 struct McpServer {
     tools: Arc<Vec<Tool>>,
-    /// Resource MCP (của module và của kernel), URI đầy đủ.
+    /// The MCP resources (of modules and of the kernel), with full URIs.
     resources: Arc<Vec<McpResource>>,
-    /// Prompt MCP của module, tên đầy đủ.
+    /// The MCP prompts of modules, with full names.
     prompts: Arc<Vec<Prompt>>,
     translations: Arc<Translations>,
-    /// Quyền dùng theo khách (bước 35): tool của module gói không có bị ẩn và bị chặn.
+    /// Per-tenant entitlements (step 35): tools of a module outside the plan are hidden and blocked.
     entitlements: crate::entitlement::EntitlementsHandle,
-    /// Nhật ký request theo khách (bước 52); `None` khi tắt.
+    /// The per-tenant request log (step 52); `None` when disabled.
     request_log: Option<crate::ops::request_log::RequestLog>,
 }
 
-/// Tool, resource và prompt mà endpoint phục vụ.
+/// The tools, resources and prompts the endpoint serves.
 pub(super) struct McpCatalog {
     pub(super) tools: Vec<Tool>,
     pub(super) resources: Vec<McpResource>,
     pub(super) prompts: Vec<Prompt>,
 }
 
-/// Đường dẫn endpoint MCP riêng của module `module`.
+/// The path of the dedicated MCP endpoint of module `module`.
 pub(super) fn module_path(module: &str) -> String {
     format!("{MCP_PATH}/{module}")
 }
 
-/// Router của endpoint MCP (`/mcp` và `/mcp/<module>`); `None` khi chưa module nào xác thực
-/// (không biết ai gọi thì không có tool nào gọi được).
+/// The router of the MCP endpoint (`/mcp` and `/mcp/<module>`); `None` when no module has authentication
+/// yet (if it is unknown who calls, no tool can be called).
 pub(super) fn router(
     catalog: McpCatalog,
     translations: Arc<Translations>,
@@ -119,7 +121,7 @@ pub(super) fn router(
     Some(router)
 }
 
-/// Lớp xác thực: đặt [`Principal`] và khách vào request, hoặc trả 401.
+/// The authentication layer: places the [`Principal`] and tenant in the request, or returns 401.
 async fn authenticate(
     authenticator: Arc<dyn Authenticator>,
     request: Request,
@@ -157,7 +159,8 @@ async fn authenticate(
     }
 }
 
-/// Tool cho `tools/list`: mô tả kèm permission cần có và cảnh báo deprecated; gợi ý chỉ đọc / phá huỷ.
+/// A tool for `tools/list`: the description with the required permission and the deprecated warning;
+/// read-only / destructive hints.
 fn describe(tool: &Tool) -> Value {
     let mut description = tool.description().to_owned();
     match (tool.permission(), tool.alternative()) {
@@ -192,7 +195,7 @@ fn describe(tool: &Tool) -> Value {
 }
 
 impl McpServer {
-    /// Module có ít nhất một tool, resource hay prompt, theo tên.
+    /// The modules that have at least one tool, resource or prompt, by name.
     fn modules(&self) -> std::collections::BTreeSet<String> {
         let prefix = |name: &str| name.split('.').next().unwrap_or_default().to_owned();
         self.tools
@@ -203,7 +206,7 @@ impl McpServer {
             .collect()
     }
 
-    /// Bản chỉ có tool, resource và prompt của `module` (cho `/mcp/<module>`).
+    /// A copy with only the tools, resources and prompts of `module` (for `/mcp/<module>`).
     fn only(&self, module: &str) -> McpServer {
         let prefix = format!("{module}.");
         McpServer {
@@ -234,7 +237,7 @@ impl McpServer {
         }
     }
 
-    /// Chạy tool sau khi kiểm gói và trạng thái chỉ đọc của khách; lỗi nào cũng là `Error`.
+    /// Runs a tool after checking the plan and the tenant's read-only state; every failure is an `Error`.
     async fn run(
         &self,
         tool: &Tool,
@@ -245,8 +248,8 @@ impl McpServer {
         call_tool(&self.entitlements, tool, tenant, principal, arguments).await
     }
 
-    /// Module của tool (`<module>.<tên>`) có được dùng ở khách `tenant` không, và khách có chỉ
-    /// đọc vì thuê bao không (bước 35). `(true, false)` khi không có gói nào áp dụng.
+    /// Whether the tool's module (`<module>.<name>`) may be used by tenant `tenant`, and whether the tenant
+    /// is read-only due to its subscription (step 35). `(true, false)` when no plan applies.
     async fn plan_allows(
         &self,
         tool: &Tool,
@@ -255,7 +258,8 @@ impl McpServer {
         tool_allowed(&self.entitlements, tool, tenant).await
     }
 
-    /// Module `module` có được dùng ở khách `tenant` không, và khách có chỉ đọc vì thuê bao không.
+    /// Whether module `module` may be used by tenant `tenant`, and whether the tenant is read-only due to
+    /// its subscription.
     async fn module_allowed(
         &self,
         module: &str,
@@ -264,8 +268,8 @@ impl McpServer {
         module_allowed(&self.entitlements, module, tenant).await
     }
 
-    /// Lỗi khi đọc resource hay dựng prompt (không có "kết quả lỗi" như tool): lỗi giao thức
-    /// mang cùng `code`, `message` và `errors` như Problem của REST trong `data`.
+    /// The error when reading a resource or building a prompt (there is no "error result" as with tools): a
+    /// protocol error carrying the same `code`, `message` and `errors` as the REST Problem in `data`.
     fn protocol_error(&self, what: &str, error: &Error, language: Language) -> RpcError {
         if error.kind() == ErrorKind::Internal {
             tracing::error!(what, error = ?error, "MCP resource or prompt failed");
@@ -277,7 +281,7 @@ impl McpServer {
         RpcError::invalid_params(message).with_data(body)
     }
 
-    /// Lỗi của tool thành thân kết quả lỗi mà agent đọc được (`code`, `message`, `errors`).
+    /// Turns a tool error into an error result body that the agent can read (`code`, `message`, `errors`).
     fn failure_body(&self, tool: &str, error: &Error, language: Language) -> Value {
         if error.kind() == ErrorKind::Internal {
             tracing::error!(tool, error = ?error, "MCP tool failed");
@@ -304,8 +308,8 @@ impl McpServer {
         body
     }
 
-    /// Một request JSON-RPC đã qua lớp HTTP. Kết quả là `result` (chưa gắn trường của bản mới); lỗi là
-    /// lỗi JSON-RPC.
+    /// A JSON-RPC request that has passed the HTTP layer. The result is `result` (without the newer
+    /// version's fields yet); an error is a JSON-RPC error.
     pub(super) async fn dispatch(
         &self,
         method: &str,
@@ -529,7 +533,7 @@ impl McpServer {
     }
 }
 
-/// Đối tượng JSON dựng bằng `json!({…})` thành `Map` (giá trị khác: rỗng — không xảy ra).
+/// A JSON object built with `json!({…})` becomes a `Map` (any other value: empty - does not happen).
 fn object(value: Value) -> Map<String, Value> {
     match value {
         Value::Object(map) => map,
@@ -537,9 +541,9 @@ fn object(value: Value) -> Map<String, Value> {
     }
 }
 
-/// Chạy tool sau khi kiểm gói và trạng thái chỉ đọc của khách (không kiểm permission — bên gọi
-/// kiểm bằng `Tool::allows`). Endpoint `/mcp` và sổ tool của tự động hoá (bước 58) dùng chung, nên
-/// luật tự động hoá không làm được điều MCP không làm được.
+/// Runs a tool after checking the plan and the tenant's read-only state (no permission check - the caller
+/// checks with `Tool::allows`). The `/mcp` endpoint and the automation tool registry (step 58) share it, so
+/// an automation rule cannot do what MCP cannot.
 pub(crate) async fn call_tool(
     entitlements: &crate::entitlement::EntitlementsHandle,
     tool: &Tool,
@@ -566,8 +570,8 @@ pub(crate) async fn call_tool(
     tracing::Instrument::instrument(tool.call(tenant, principal, arguments), span).await
 }
 
-/// Module của tool (`<module>.<tên>`) có được dùng ở khách `tenant` không, và khách có chỉ đọc vì
-/// thuê bao không (bước 35). `(true, false)` khi không có gói nào áp dụng.
+/// Whether the tool's module (`<module>.<name>`) may be used by tenant `tenant`, and whether the tenant is
+/// read-only due to its subscription (step 35). `(true, false)` when no plan applies.
 pub(crate) async fn tool_allowed(
     entitlements: &crate::entitlement::EntitlementsHandle,
     tool: &Tool,
@@ -577,7 +581,8 @@ pub(crate) async fn tool_allowed(
     module_allowed(entitlements, module, tenant).await
 }
 
-/// Module `module` có được dùng ở khách `tenant` không, và khách có chỉ đọc vì thuê bao không.
+/// Whether module `module` may be used by tenant `tenant`, and whether the tenant is read-only due to its
+/// subscription.
 pub(crate) async fn module_allowed(
     entitlements: &crate::entitlement::EntitlementsHandle,
     module: &str,
@@ -590,10 +595,10 @@ pub(crate) async fn module_allowed(
     Ok((snapshot.has_module(module), snapshot.access == crate::entitlement::TenantAccess::ReadOnly))
 }
 
-/// Tool deprecated: kết quả giữ nguyên envelope `{"data": …}`, thêm `_meta`
-/// `autoxide/deprecation` cho máy và một đoạn văn bản cảnh báo cho mô hình đọc (D-240, như
-/// header `Deprecation` / `Sunset` của endpoint — D-059). Tên tool là tập cố định do code khai, nên
-/// dùng làm nhãn số đo được.
+/// A deprecated tool: the result keeps the `{"data": …}` envelope and adds `_meta` `autoxide/deprecation`
+/// for machines and a warning text block for the model to read (D-240, like the `Deprecation` / `Sunset`
+/// headers of an endpoint - D-059). A tool name comes from a fixed set declared in code, so it is fine to
+/// use as a metric label.
 fn warn_deprecated(
     result: &mut Map<String, Value>,
     tool: &str,
@@ -612,8 +617,8 @@ fn warn_deprecated(
     }
 }
 
-/// Kết quả tool theo đúng envelope của REST: một trang (`Page`: `data` + `pagination`)
-/// giữ nguyên; giá trị khác bọc thành `{"data": …}` (như `Data`).
+/// The tool result in exactly the REST envelope: a page (`Page`: `data` + `pagination`) is kept as is; any
+/// other value is wrapped as `{"data": …}` (like `Data`).
 fn envelope(value: Value) -> Value {
     let is_page = value.as_object().is_some_and(|object| {
         object.len() == 2 && object.contains_key("data") && object.contains_key("pagination")
@@ -621,7 +626,7 @@ fn envelope(value: Value) -> Value {
     if is_page { value } else { json!({ "data": value }) }
 }
 
-/// Resource cho `resources/list`; mô tả kèm permission cần có, như tool.
+/// A resource for `resources/list`; the description includes the required permission, like a tool.
 fn describe_resource(resource: &McpResource) -> Value {
     let mut description = resource.description().to_owned();
     if let Some(permission) = resource.permission() {
@@ -635,7 +640,7 @@ fn describe_resource(resource: &McpResource) -> Value {
     })
 }
 
-/// Prompt cho `prompts/list`; mô tả kèm tool mà prompt dẫn tới.
+/// A prompt for `prompts/list`; the description includes the tool the prompt leads to.
 fn describe_prompt(prompt: &Prompt) -> Value {
     let mut description = prompt.description().to_owned();
     let tools = prompt.tools();

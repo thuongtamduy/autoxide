@@ -1,5 +1,5 @@
-//! Cấu hình tiến trình: tiến trình này làm việc gì (API, worker hay cả hai) và chạy bao
-//! nhiêu job cùng lúc.
+//! Process configuration: what this process does (API, worker or both) and how many jobs it runs
+//! at once.
 
 use super::{ConfigReader, Invalid, Setting, parse_in_range};
 
@@ -43,25 +43,25 @@ pub const METRICS_MAX_DATABASE_LABELS: Setting = Setting::new(
 )
 .with_default("50");
 
-/// Tiến trình `serve` làm việc gì.
+/// What the `serve` process does.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ProcessRole {
-    /// API và việc nền.
+    /// API and background work.
     All,
-    /// Chỉ API.
+    /// API only.
     Api,
-    /// Chỉ việc nền (kèm health check).
+    /// Background work only (plus health check).
     Worker,
 }
 
 impl ProcessRole {
-    /// Tiến trình phục vụ API của các module.
+    /// The process serves the modules' API.
     pub fn serves_api(self) -> bool {
         matches!(self, ProcessRole::All | ProcessRole::Api)
     }
 
-    /// Tiến trình chạy job, lịch định kỳ và giao event.
+    /// The process runs jobs, periodic schedules and event delivery.
     pub fn runs_background_work(self) -> bool {
         matches!(self, ProcessRole::All | ProcessRole::Worker)
     }
@@ -72,11 +72,11 @@ impl ProcessRole {
 pub struct ProcessConfig {
     pub role: ProcessRole,
     pub job_concurrency: u64,
-    /// Hoãn job bị gói chặn chừng này giây (bước 35).
+    /// Delay for a job blocked by a package, in seconds (step 35).
     pub job_blocked_delay: u64,
-    /// Chu kỳ cập nhật gauge tồn đọng, giây (bước 39).
+    /// Refresh interval of the backlog gauge, in seconds (step 39).
     pub metrics_backlog_seconds: u64,
-    /// Số nhãn `database` tối đa của gauge tồn đọng.
+    /// Maximum number of `database` labels on the backlog gauge.
     pub metrics_max_database_labels: u64,
 }
 

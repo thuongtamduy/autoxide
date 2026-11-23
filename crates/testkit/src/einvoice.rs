@@ -1,5 +1,5 @@
-//! Nhà cung cấp hoá đơn điện tử giả cho test: nhận mọi hoá đơn, mặc định cơ quan thuế chấp nhận,
-//! cho giả lập từ chối và không trả lời.
+//! A fake e-invoice provider for tests: accepts every invoice, the tax authority accepts by default,
+//! and it can simulate rejection and no response.
 
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -12,18 +12,18 @@ use autoxide_kernel::einvoice::{
 use autoxide_kernel::error::Error;
 use autoxide_kernel::tenancy::TenantId;
 
-/// Tên của nhà cung cấp giả.
+/// Name of the fake provider.
 pub const FAKE_EINVOICE_PROVIDER: &str = "fake";
 
-/// Nhà cung cấp hoá đơn điện tử giả. Góp vào app bằng
+/// A fake e-invoice provider. Contribute it to the app with
 /// `TestApp::builder(…).contribute::<dyn EInvoiceProvider>(provider.clone())`.
 #[derive(Default)]
 pub struct FakeEInvoiceProvider {
-    /// Hoá đơn đã nhận, theo thứ tự (gửi lại sau khi sửa thì có thêm một bản).
+    /// Invoices received, in order (resending after a fix adds another copy).
     pub issued: Mutex<Vec<EInvoice>>,
-    /// Hoá đơn đã huỷ (mã ở nhà cung cấp).
+    /// Cancelled invoices (the provider-side code).
     pub cancelled: Mutex<Vec<String>>,
-    /// Lý do từ chối của lần gửi gần nhất của từng hoá đơn.
+    /// Rejection reason of the most recent submission of each invoice.
     rejections: Mutex<HashMap<String, String>>,
     reject_next: Mutex<Option<String>>,
     unavailable: AtomicUsize,
@@ -34,14 +34,14 @@ impl FakeEInvoiceProvider {
         FakeEInvoiceProvider::default()
     }
 
-    /// Hoá đơn gửi kế tiếp bị cơ quan thuế từ chối với lý do `reason`.
+    /// The next invoice submitted is rejected by the tax authority with the reason `reason`.
     pub fn reject_next(&self, reason: &str) {
         if let Ok(mut slot) = self.reject_next.lock() {
             *slot = Some(reason.to_owned());
         }
     }
 
-    /// `count` lời gọi kế tiếp lỗi như khi nhà cung cấp không trả lời.
+    /// The next `count` calls fail as if the provider did not respond.
     pub fn fail_next(&self, count: usize) {
         self.unavailable.store(count, Ordering::SeqCst);
     }

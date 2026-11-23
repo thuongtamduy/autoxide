@@ -1,4 +1,4 @@
-//! Kiểu giá trị dùng chung: tiền, số thập phân cho tính toán, email, URL công khai của API, bộ dựng mẫu, thời gian.
+//! Shared value types: money, decimal numbers for calculation, email, the API's public URL, a template builder, time.
 
 pub mod csv;
 pub mod decimal;

@@ -1,26 +1,27 @@
-//! Database mẫu đã migrate (D-20261120-test-db-template).
+//! Migrated template database (D-20261120-test-db-template).
 //!
-//! Test đầu-cuối dựng mọi module, và trước đây mỗi bài chạy lại toàn bộ migration của mọi module
-//! trên database trống của nó — phần lớn thời gian của bài test. Giờ migration chạy MỘT lần vào
-//! một database mẫu cho mỗi bộ migration, rồi mỗi bài test chép database mẫu vào database của nó:
+//! End-to-end tests build every module, and previously each test reran every module's whole migration
+//! on its own empty database — most of a test's time. Now migrations run ONCE into
+//! a template database for each migration set, and each test then copies the template into its own database:
 //!
-//! - SQLite: chép file mẫu vào chỗ file của bài test (file chưa tồn tại = chưa ai mở).
-//! - Postgres: `DROP DATABASE` database trống của bài test rồi `CREATE DATABASE … TEMPLATE <mẫu>`
-//!   cùng tên (URL không đổi). Database mẫu đặt `ALLOW_CONNECTIONS false`: Postgres chỉ chép được
-//!   từ database không có kết nối nào.
+//! - SQLite: copy the template file to the test's file location (a file that does not exist yet = nobody opened it).
+//! - Postgres: `DROP DATABASE` the test's empty database then `CREATE DATABASE … TEMPLATE <template>` with
+//!   the same name (the URL does not change). The template database is set to `ALLOW_CONNECTIONS false`:
+//!   Postgres can only copy from a database with no connections.
 //!
-//! Khoá của mẫu: loại database, danh sách migration theo thứ tự ([`Migrator::names`]), chương
-//! trình test đang chạy (đường dẫn, kích thước, thời điểm sửa — build lại thì khoá đổi, nên sửa nội
-//! dung một migration chưa commit cũng không dùng nhầm mẫu cũ) và phần thêm bên gọi đưa vào (vd
-//! khoá bí mật của chương trình, upgrade dữ liệu dùng nó). Nhiều test, nhiều tiến trình cùng cần
-//! một mẫu: một bên dựng, bên khác chờ — lock file (SQLite) hay advisory lock (Postgres).
+//! Template key: database kind, the migration list in order ([`Migrator::names`]), the running test
+//! program (path, size, modification time — after a rebuild the key changes, so editing the content of an
+//! uncommitted migration never reuses a stale template) and the extra part the caller supplies (e.g. the
+//! program's secret key, for data upgrades that use it). Many tests and processes need the same
+//! template: one builds, the others wait — a lock file (SQLite) or an advisory lock (Postgres).
 //!
-//! Chỉ chép khi chắc database của bài test còn nguyên: SQLite thì file chưa có, Postgres thì không
-//! có bảng nào và không ai đang kết nối. Không chắc, hay có gì hỏng, thì trả `false` và bên gọi chạy
-//! migration như cũ — mẫu chỉ làm nhanh, không bao giờ đổi kết quả.
+//! Copies only when the test's database is certainly untouched: for SQLite the file does not exist, for
+//! Postgres there are no tables and nobody is connected. When unsure, or on any failure, it returns `false`
+//! and the caller runs the migrations as before — the template only speeds things up, never changes the
+//! result.
 //!
-//! `CREATE / DROP / ALTER DATABASE` và advisory lock là lệnh chỉ Postgres có, không viết được bằng
-//! query builder: SQL viết tay, chỉ trong đồ test (như `postgres.rs`, D-031).
+//! `CREATE / DROP / ALTER DATABASE` and advisory locks are Postgres-only commands that the
+//! query builder cannot express: hand-written SQL, only in test helpers (like `postgres.rs`, D-031).
 
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::{Path, PathBuf};
@@ -34,28 +35,29 @@ use uuid::Uuid;
 
 use crate::{TEST_DATABASE_URL, TestDatabaseError, postgres, sqlite};
 
-/// Biến môi trường tắt database mẫu (`TEST_DATABASE_TEMPLATE=off`): mọi test migrate trên database
-/// trống như trước — để đo, hay để loại trừ khi nghi mẫu gây lỗi.
+/// Environment variable that turns the template database off (`TEST_DATABASE_TEMPLATE=off`): every test
+/// migrates on an empty database as before — to measure, or to rule the template out when it is suspected of
+/// causing a failure.
 pub const TEST_DATABASE_TEMPLATE: &str = "TEST_DATABASE_TEMPLATE";
 
-/// Tiền tố tên database mẫu trên Postgres: `autoxide_tpl_<khoá 16 hex>_<UUIDv7>`.
+/// Prefix of template database names on Postgres: `autoxide_tpl_<16-hex key>_<UUIDv7>`.
 pub(crate) const POSTGRES_PREFIX: &str = "autoxide_tpl_";
 
-/// Thư mục chứa file mẫu SQLite (`<khoá>.sqlite`, `<khoá>.lock`) dưới thư mục tạm.
+/// Directory holding SQLite template files (`<key>.sqlite`, `<key>.lock`) under the temp directory.
 pub(crate) const SQLITE_DIRECTORY: &str = "autoxide-templates";
 
-/// Database mẫu có được dùng không: không tắt bằng [`TEST_DATABASE_TEMPLATE`].
+/// Whether the template database is used: not turned off by [`TEST_DATABASE_TEMPLATE`].
 pub fn enabled() -> bool {
     !std::env::var(TEST_DATABASE_TEMPLATE)
         .is_ok_and(|value| matches!(value.trim(), "off" | "0" | "false" | "no"))
 }
 
-/// Đưa database test của `config` (do [`TestDatabase`](crate::TestDatabase) tạo, chưa ai dùng)
-/// về trạng thái đã chạy mọi migration của `migrator`, bằng cách chép database mẫu.
+/// Brings the test database of `config` (created by [`TestDatabase`](crate::TestDatabase), not yet used)
+/// to the state where every migration of `migrator` has run, by copying the template database.
 ///
-/// Trả `true` khi đã chép; `false` khi không chép (đã tắt, database không còn nguyên, không phải
-/// database của testkit, hay lỗi) — bên gọi vẫn chạy `migrator.up` như thường, lúc đó nó làm hết
-/// việc; sau khi chép thì `up` không còn gì để làm.
+/// Returns `true` when copied; `false` when not copied (turned off, the database is no longer untouched, it
+/// is not a testkit database, or an error) — the caller still runs `migrator.up` as usual, in which case it
+/// does all the work; after a copy, `up` has nothing left to do.
 pub async fn prepare(config: &DatabaseConfig, migrator: &Migrator) -> bool {
     if !enabled() {
         return false;
@@ -71,7 +73,7 @@ pub async fn prepare(config: &DatabaseConfig, migrator: &Migrator) -> bool {
     }
 }
 
-/// Khoá của database mẫu: 16 chữ số hex.
+/// Key of a template database: 16 hex digits.
 fn key(backend: DatabaseBackend, migrator: &Migrator) -> std::io::Result<String> {
     let executable = std::env::current_exe()?;
     let metadata = std::fs::metadata(&executable)?;
@@ -133,8 +135,8 @@ async fn sqlite_prepare(
     Ok(true)
 }
 
-/// Dựng file mẫu: migrate một file mới rồi đổi tên thành `template` (đổi tên là nguyên tử, nên
-/// file mẫu luôn hoặc chưa có hoặc đầy đủ).
+/// Builds the template file: migrates a fresh file then renames it to `template` (a rename is atomic, so
+/// the template file either does not exist or is complete).
 async fn sqlite_build(
     config: &DatabaseConfig,
     migrator: &Migrator,
@@ -159,8 +161,9 @@ fn sqlite_companions(file: &Path) -> [PathBuf; 3] {
     [file.to_path_buf(), with("-wal"), with("-shm")]
 }
 
-/// Xoá file mẫu SQLite cũ hơn [`STALE_AFTER`](crate::stale::STALE_AFTER) (theo thời điểm sửa:
-/// file mẫu không bao giờ bị sửa sau khi dựng). Bài test đang dùng mẫu vừa bị xoá thì dựng lại.
+/// Deletes SQLite template files older than [`STALE_AFTER`](crate::stale::STALE_AFTER) (by modification time:
+/// a template file is never modified after it is built). A test using a template that was just deleted
+/// rebuilds it.
 pub(crate) fn remove_stale_sqlite(parent: &Path, now: SystemTime) -> usize {
     let Ok(entries) = std::fs::read_dir(parent.join(SQLITE_DIRECTORY)) else {
         return 0;
@@ -208,7 +211,7 @@ async fn postgres_prepare(
     result
 }
 
-/// Database chưa có bảng, view hay sequence nào ngoài của hệ thống.
+/// A database with no tables, views or sequences other than the system's.
 async fn postgres_is_pristine(url: &str) -> Result<bool, TestDatabaseError> {
     let connection = postgres::connect_admin(url).await?;
     let count = connection
@@ -254,7 +257,7 @@ async fn postgres_clone(
     Ok(true)
 }
 
-/// Mẫu đã dựng xong của `key` (đã đánh dấu `IS_TEMPLATE`), nếu có.
+/// The already built template of `key` (marked `IS_TEMPLATE`), if any.
 async fn postgres_find(
     admin: &DatabaseConnection,
     key: &str,
@@ -275,7 +278,7 @@ async fn postgres_find(
     Ok(None)
 }
 
-/// Dựng mẫu của `key` dưới advisory lock (một bên dựng, bên khác chờ rồi dùng).
+/// Builds the template of `key` under an advisory lock (one builds, the others wait then use it).
 async fn postgres_build(
     admin: &DatabaseConnection,
     admin_url: &str,
@@ -312,8 +315,9 @@ async fn postgres_build(
     built
 }
 
-/// Xoá database mẫu cũ hơn [`STALE_AFTER`](crate::stale::STALE_AFTER) (thời điểm dựng nằm trong
-/// UUIDv7 cuối tên). Bài test đang dùng mẫu vừa bị xoá thì dựng lại. Trả về số mẫu đã xoá.
+/// Deletes template databases older than [`STALE_AFTER`](crate::stale::STALE_AFTER) (the build time is in the
+/// UUIDv7 at the end of the name). A test using a template that was just deleted rebuilds it. Returns the
+/// number of templates deleted.
 pub(crate) async fn remove_stale_postgres(
     admin: &DatabaseConnection,
     now: SystemTime,
@@ -348,7 +352,7 @@ pub(crate) async fn remove_stale_postgres(
     Ok(removed)
 }
 
-/// Tên database trong URL `scheme://authority/<tên>?…`.
+/// Database name in a URL `scheme://authority/<name>?…`.
 fn database_name(url: &str) -> Option<String> {
     let base = url.split('?').next()?;
     let (_, rest) = base.split_once("://")?;
@@ -358,8 +362,8 @@ fn database_name(url: &str) -> Option<String> {
 
 // --- chung --------------------------------------------------------------------------------------
 
-/// Chạy mọi migration lên database ở `url`, cùng cấu hình kết nối như bài test (kernel tự đặt
-/// WAL… cho SQLite), rồi đóng hết kết nối.
+/// Runs every migration on the database at `url`, with the same connection settings as a test (the kernel sets
+/// WAL… itself for SQLite), then closes all connections.
 async fn migrate(
     config: &DatabaseConfig,
     url: &str,

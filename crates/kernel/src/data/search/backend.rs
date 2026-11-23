@@ -1,13 +1,15 @@
-//! Bộ máy tìm kiếm thay được (bước 40 P7, D-220): module khai **loại tài liệu tìm được**
-//! ([`SearchKind`] + [`SearchSource`]), kernel giữ chỉ mục qua một [`SearchBackend`]. Mặc định là
-//! [`DatabaseSearch`](super::DatabaseSearch) — bảng `kernel_search_docs` trong chính database của khách,
-//! khớp đúng dấu xếp trước khớp không dấu (D-202), chạy như nhau trên SQLite và Postgres. Bộ tìm
-//! chuyên dụng (Meilisearch, Typesense, OpenSearch…) là module riêng cài trait này và đăng ký bằng
-//! `StartContext::search_backend`; chọn bằng `AUTOXIDE_SEARCH_BACKEND` — module nghiệp vụ không sửa gì.
+//! Replaceable search engine (step 40 P7, D-220): a module declares its **searchable document kinds**
+//! ([`SearchKind`] + [`SearchSource`]), and the kernel keeps the index through a [`SearchBackend`]. The default
+//! is [`DatabaseSearch`](super::DatabaseSearch): the table `kernel_search_docs` in the tenant's own database,
+//! where an exact-diacritic match ranks before a diacritic-insensitive one (D-202), behaving the same on
+//! SQLite and Postgres. A dedicated search engine (Meilisearch, Typesense, OpenSearch…) is a separate module
+//! that implements this trait and registers via `StartContext::search_backend`; it is selected with
+//! `AUTOXIDE_SEARCH_BACKEND`, and business modules change nothing.
 //!
-//! Khác ô tìm "chứa chuỗi" trên cột khoá tìm của từng module ([`fold`](super::fold),
-//! [`contains`](super::contains)) và tìm xuyên phân hệ (`autoxide_kernel::find`): hai thứ đó giữ
-//! nguyên (không phá API); module chuyển sang chỉ mục khi bảng của nó lớn tới mức "chứa" quét chậm.
+//! This differs from the "contains" box on each module's search key column ([`fold`](super::fold),
+//! [`contains`](super::contains)) and from cross-module search (`autoxide_kernel::find`): those two remain
+//! unchanged (no API break); a module moves to the index when its table grows large enough that "contains"
+//! scans too slowly.
 
 use std::collections::BTreeMap;
 
@@ -20,20 +22,20 @@ use crate::error::Error;
 use crate::pagination::{Page, PageRequest};
 use crate::tenancy::{OrgId, TenantContext};
 
-/// Một tài liệu trong chỉ mục: bản chụp phần tìm được của một bản ghi.
+/// A document in the index: a snapshot of the searchable part of a record.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SearchDoc {
-    /// Loại, `<module>.<loại>` (như sổ đối tượng), vd `catalog.product`.
+    /// Kind, `<module>.<kind>` (like the object registry), e.g. `catalog.product`.
     pub kind: String,
-    /// ID bản ghi.
+    /// Record ID.
     pub id: Uuid,
-    /// Nút sở hữu bản ghi (lọc theo phạm vi quyền ngay trong backend).
+    /// Node that owns the record (permission scope is filtered inside the backend).
     pub org_id: OrgId,
-    /// Ngôn ngữ của nội dung (`vi`, `en`…); rỗng: không theo ngôn ngữ.
+    /// Language of the content (`vi`, `en`…); empty: not language-specific.
     pub locale: String,
-    /// Trường tìm được, theo tên đã khai trong [`SearchKind::fields`].
+    /// Searchable fields, by the names declared in [`SearchKind::fields`].
     pub fields: BTreeMap<String, String>,
-    /// Giá trị lọc, theo tên đã khai trong [`SearchKind::filters`] (chuỗi, số hay bool).
+    /// Filter values, by the names declared in [`SearchKind::filters`] (string, number or bool).
     pub filters: BTreeMap<String, Value>,
 }
 
@@ -68,16 +70,16 @@ impl SearchDoc {
     }
 }
 
-/// Khai báo một loại tài liệu tìm được.
+/// Declaration of one searchable document kind.
 #[derive(Debug, Clone)]
 pub struct SearchKind {
-    /// `<module>.<loại>`.
+    /// `<module>.<kind>`.
     pub kind: &'static str,
-    /// Trường tìm được và trọng số (lớn hơn xếp trước; trọng số cao nhất là "tiêu đề").
+    /// Searchable fields and their weights (higher ranks first; the highest weight is the "title").
     pub fields: Vec<(&'static str, u8)>,
-    /// Tên các bộ lọc so bằng.
+    /// Names of the equality filters.
     pub filters: Vec<&'static str>,
-    /// Permission để đọc kết quả; phạm vi nút của nó giới hạn kết quả. `None`: công khai.
+    /// Permission required to read results; its node scope limits the results. `None`: public.
     pub permission: Option<Permission>,
 }
 
@@ -104,7 +106,7 @@ impl SearchKind {
         self
     }
 
-    /// Trường theo trọng số giảm dần (cùng trọng số: theo thứ tự khai).
+    /// Fields by descending weight (same weight: declaration order).
     pub fn ranked_fields(&self) -> Vec<&'static str> {
         let mut fields = self.fields.clone();
         fields.sort_by_key(|(_, weight)| std::cmp::Reverse(*weight));
@@ -112,33 +114,33 @@ impl SearchKind {
     }
 }
 
-/// Phạm vi nút của một truy vấn, lấy từ grant của người gọi (như `Principal::scope_condition`).
-/// Backend phải lọc NGAY trong chỉ mục, không lọc sau (trang kết quả mới đúng).
+/// Node scope of a query, taken from the caller's grants (like `Principal::scope_condition`).
+/// The backend must filter RIGHT INSIDE the index, not afterwards (so result pages stay correct).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct OrgScope {
-    /// Bản ghi ở các nút này hay nút con của chúng.
+    /// Records at these nodes or their child nodes.
     pub subtrees: Vec<OrgId>,
-    /// Bản ghi ở đúng các nút này.
+    /// Records at exactly these nodes.
     pub units: Vec<OrgId>,
-    /// Hàng rào: chỉ trong cây con này (thêm vào điều kiện trên).
+    /// Fence: only within this subtree (in addition to the conditions above).
     pub fence: Option<OrgId>,
 }
 
-/// Một truy vấn trên một loại tài liệu.
+/// A query on one document kind.
 #[derive(Debug, Clone)]
 pub struct SearchRequest {
     pub kind: String,
-    /// Chữ người dùng gõ; rỗng: mọi tài liệu (theo bộ lọc).
+    /// Text typed by the user; empty: every document (subject to the filters).
     pub text: String,
-    /// Bộ lọc so bằng (tên đã khai → giá trị dạng chuỗi).
+    /// Equality filters (declared name → value as a string).
     pub filters: BTreeMap<String, String>,
     pub locale: Option<String>,
-    /// `None`: cả khách.
+    /// `None`: the whole tenant.
     pub scope: Option<OrgScope>,
     pub page: PageRequest,
 }
 
-/// Một kết quả.
+/// One result.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct SearchHit {
     pub kind: String,
@@ -148,21 +150,21 @@ pub struct SearchHit {
     pub fields: BTreeMap<String, String>,
 }
 
-/// Một trang kết quả (`limit` / `cursor` như mọi danh sách).
+/// A page of results (`limit` / `cursor` as in every list).
 pub type SearchHits = Page<SearchHit>;
 
-/// Bộ máy giữ chỉ mục. Mọi hàm nhận khách: tài liệu của khách này không bao giờ ra ở khách khác.
-/// Cài đặt phải chịu được gọi lại (job đồng bộ chạy lại sau lỗi): `index` là upsert, `remove`
-/// tài liệu không có là thành công.
+/// The engine that holds the index. Every function takes a tenant: documents of one tenant never surface in
+/// another. Implementations must tolerate being called again (the sync job re-runs after a failure): `index`
+/// is an upsert, and `remove` of a missing document succeeds.
 #[async_trait::async_trait]
 pub trait SearchBackend: Send + Sync {
-    /// Thêm hay thay tài liệu.
+    /// Adds or replaces documents.
     async fn index(&self, tenant: &TenantContext, docs: &[SearchDoc]) -> Result<(), Error>;
-    /// Bỏ tài liệu `ids` của loại `kind`.
+    /// Removes the documents `ids` of kind `kind`.
     async fn remove(&self, tenant: &TenantContext, kind: &str, ids: &[Uuid]) -> Result<(), Error>;
-    /// Bỏ mọi tài liệu của loại `kind` (trước khi dựng lại chỉ mục).
+    /// Removes every document of kind `kind` (before rebuilding the index).
     async fn clear(&self, tenant: &TenantContext, kind: &str) -> Result<(), Error>;
-    /// Tìm. `kind` của truy vấn đã được kiểm là loại có khai; bộ lọc chỉ gồm tên đã khai.
+    /// Searches. The query `kind` has already been checked to be a declared kind; filters only contain declared names.
     async fn query(
         &self,
         tenant: &TenantContext,
@@ -171,12 +173,12 @@ pub trait SearchBackend: Send + Sync {
     ) -> Result<SearchHits, Error>;
 }
 
-/// Nơi module cung cấp tài liệu của một loại (đọc từ bảng của chính module).
+/// Where a module supplies the documents of one kind (read from the module's own tables).
 #[async_trait::async_trait]
 pub trait SearchSource: Send + Sync {
-    /// Tài liệu hiện tại của các bản ghi `ids`; bản ghi đã xoá thì vắng (bị bỏ khỏi chỉ mục).
+    /// Current documents of the records `ids`; a deleted record is absent (and dropped from the index).
     async fn load(&self, tenant: &TenantContext, ids: &[Uuid]) -> Result<Vec<SearchDoc>, Error>;
-    /// Tối đa `limit` tài liệu có ID lớn hơn `after`, theo ID tăng dần (dựng lại chỉ mục).
+    /// Up to `limit` documents with ID greater than `after`, in ascending ID order (index rebuild).
     async fn scan(
         &self,
         tenant: &TenantContext,

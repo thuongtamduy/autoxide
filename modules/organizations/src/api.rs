@@ -1,19 +1,19 @@
-//! Hợp đồng của module `organizations` cho module khác (`autoxide_organizations::api::…`). Lấy
-//! trait lúc khởi động: `context.require::<dyn OrgDirectory>()?`; module đó đăng ký SAU
-//! `organizations` trong `crates/app/src/modules.rs`.
+//! Contract of the `organizations` module for other modules (`autoxide_organizations::api::…`). Get the
+//! trait at startup: `context.require::<dyn OrgDirectory>()?`; that module registers AFTER
+//! `organizations` in `crates/app/src/modules.rs`.
 //!
-//! Lọc dữ liệu theo nhánh không cần module này: dùng `Principal::scope_condition` /
-//! `require_at` và `OrgTree` của kernel. Trait ở đây cho phần nghĩa của nút (tên, loại, trạng
-//! thái) — vd `auth` kiểm nút có thật khi cấp membership.
+//! Filtering data by branch does not need this module: use the kernel's `Principal::scope_condition` /
+//! `require_at` and `OrgTree`. The trait here covers the meaning of a node (name, kind, status)
+//! — e.g. `auth` checks that a node really exists when granting a membership.
 
 use autoxide_kernel::error::Error;
 use autoxide_kernel::tenancy::{OrgId, TenantContext};
 
-/// Trạng thái của một nút. Chỉ nút `active` (và mọi nút trên nó `active`) mới ghi dữ liệu được.
+/// Status of a node. Only an `active` node (with every node above it `active`) can write data.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum UnitStatus {
-    /// Chờ người có `organizations.units.manage` duyệt.
+    /// Waiting for someone with `organizations.units.manage` to approve.
     Pending,
     Active,
     Suspended,
@@ -21,7 +21,7 @@ pub enum UnitStatus {
 }
 
 impl UnitStatus {
-    /// Tên ổn định: `pending`, `active`, `suspended`, `archived`.
+    /// Stable names: `pending`, `active`, `suspended`, `archived`.
     pub const fn as_str(self) -> &'static str {
         match self {
             UnitStatus::Pending => "pending",
@@ -42,12 +42,12 @@ impl UnitStatus {
     }
 }
 
-/// Một nút của cây tổ chức.
+/// A node of the organization tree.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct Unit {
     pub id: OrgId,
-    /// `None` chỉ ở nút gốc.
+    /// `None` only for the root node.
     pub parent_id: Option<OrgId>,
     pub unit_type: String,
     pub name: String,
@@ -56,7 +56,7 @@ pub struct Unit {
 }
 
 impl Unit {
-    /// Một nút đang hoạt động (cho cài đặt `OrgDirectory` giả trong test của module khác).
+    /// An active node (for fake `OrgDirectory` implementations in other modules' tests).
     pub fn new(
         id: OrgId,
         parent_id: Option<OrgId>,
@@ -74,21 +74,21 @@ impl Unit {
     }
 }
 
-/// Giá trị hiệu lực của một cài đặt ở một nút (cài đặt kế thừa theo cây, bước 34 mục 4).
+/// The effective value of a setting at a node (settings inherit down the tree, step 34 item 4).
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct EffectiveSetting {
     pub key: String,
-    /// `None`: không nút nào đặt và cài đặt không có mặc định.
+    /// `None`: no node set it and the setting has no default.
     pub value: Option<serde_json::Value>,
-    /// Nút đã đặt giá trị; `None`: giá trị mặc định.
+    /// The node that set the value; `None`: the default value.
     pub source_unit_id: Option<OrgId>,
-    /// Giá trị đến từ nút khác (cấp trên) hay mặc định, không do chính nút đặt.
+    /// Whether the value comes from another (ancestor) node or is the default, not set by the node itself.
     pub inherited: bool,
 }
 
 impl EffectiveSetting {
-    /// Giá trị hiệu lực (cho cài đặt `OrgDirectory` giả trong test của module khác).
+    /// The effective value (for fake `OrgDirectory` implementations in other modules' tests).
     pub fn new(
         key: impl Into<String>,
         value: Option<serde_json::Value>,
@@ -99,11 +99,11 @@ impl EffectiveSetting {
     }
 }
 
-/// Giờ mở cửa của một ngày trong tuần, giờ địa phương của nút (hồ sơ công khai, bước 34).
+/// Opening hours of one weekday, in the node's local time (public profile, step 34).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct OpeningRange {
-    /// Ngày trong tuần theo ISO: 1 thứ Hai … 7 Chủ nhật.
+    /// Weekday per ISO: 1 Monday … 7 Sunday.
     pub day: u8,
     pub opens: jiff::civil::Time,
     pub closes: jiff::civil::Time,
@@ -115,16 +115,16 @@ impl OpeningRange {
     }
 }
 
-/// Tra nút của cây tổ chức.
+/// Lookup of nodes in the organization tree.
 //
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
 #[async_trait::async_trait]
 pub trait OrgDirectory: Send + Sync {
-    /// Nút `id` của khách, hoặc `None`.
+    /// Node `id` of the tenant, or `None`.
     async fn unit(&self, tenant: &TenantContext, id: OrgId) -> Result<Option<Unit>, Error>;
-    /// Các nút trong `ids` có thật ở khách (thứ tự bất kỳ; ID không có thì vắng). Cho trang liệt
-    /// kê nhiều người bán: một lần tra thay vì một lần mỗi nút. Mặc định: gọi [`Self::unit`] từng
-    /// ID (cài đặt thật đọc một câu).
+    /// The nodes in `ids` that really exist in the tenant (any order; a missing ID is absent). For a page
+    /// listing many sellers: one lookup instead of one per node. Default: calls [`Self::unit`] for each ID
+    /// (the real implementation reads with one statement).
     async fn units(&self, tenant: &TenantContext, ids: &[OrgId]) -> Result<Vec<Unit>, Error> {
         let mut found = Vec::new();
         for id in ids {
@@ -134,19 +134,19 @@ pub trait OrgDirectory: Send + Sync {
         }
         Ok(found)
     }
-    /// Nút gốc của khách (tạo nếu còn thiếu — chịu được event "khách mới" đến chậm).
+    /// The tenant's root node (created if missing — tolerates a late "new tenant" event).
     async fn root(&self, tenant: &TenantContext) -> Result<Unit, Error>;
-    /// Các nút trên `id`, gần nhất trước, gồm gốc; không gồm chính nó.
+    /// The nodes above `id`, nearest first, including the root; not including the node itself.
     async fn ancestors(&self, tenant: &TenantContext, id: OrgId) -> Result<Vec<Unit>, Error>;
-    /// `id` có thuộc nhánh của `root` (gồm chính `root`) không.
+    /// Whether `id` belongs to the branch of `root` (including `root` itself).
     async fn is_within(
         &self,
         tenant: &TenantContext,
         id: OrgId,
         root: OrgId,
     ) -> Result<bool, Error>;
-    /// Giá trị hiệu lực của cài đặt `key` ở nút `id` (nút gần nhất trên chuỗi có đặt, hay mặc
-    /// định). Cài đặt không ai khai → `organizations.setting_unknown`.
+    /// The effective value of setting `key` at node `id` (the nearest node up the chain that sets it, or the
+    /// default). A setting nobody declared → `organizations.setting_unknown`.
     async fn setting(
         &self,
         tenant: &TenantContext,
@@ -154,8 +154,8 @@ pub trait OrgDirectory: Send + Sync {
         key: &str,
     ) -> Result<Option<EffectiveSetting>, Error>;
 
-    /// Giờ mở cửa trong hồ sơ công khai của nút `id`; `None` khi nút chưa khai (bên gọi dùng giờ
-    /// mặc định của mình). Mặc định: `None`.
+    /// Opening hours in the public profile of node `id`; `None` when the node has not declared any (the
+    /// caller uses its own default hours). Default: `None`.
     async fn opening_hours(
         &self,
         _tenant: &TenantContext,
@@ -165,12 +165,12 @@ pub trait OrgDirectory: Send + Sync {
     }
 }
 
-/// Nhóm nút ngoài cây (bước 38, D-232): `organizations` công bố, `reporting` lấy bằng
-/// `context.require::<dyn OrgGroups>()` để lọc / gom báo cáo. Nhóm không cấp quyền.
+/// Node groups outside the tree (step 38, D-232): `organizations` publishes them, `reporting` gets them with
+/// `context.require::<dyn OrgGroups>()` to filter / aggregate reports. A group grants no permission.
 #[async_trait::async_trait]
 pub trait OrgGroups: Send + Sync {
-    /// Nút thành viên của nhóm `group`; `None` khi khách không có nhóm này. KHÔNG lọc theo quyền —
-    /// bên gọi giao với phạm vi của người xem.
+    /// Member nodes of group `group`; `None` when the tenant has no such group. NOT filtered by permission —
+    /// the caller intersects with the viewer's scope.
     async fn members(
         &self,
         tenant: &TenantContext,

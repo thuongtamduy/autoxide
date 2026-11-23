@@ -1,4 +1,4 @@
-//! Ba pha dữ liệu: chép (copy), chuyển (switch), dọn nguồn (clean).
+//! The three data phases: copy, switch, clean the source.
 
 use super::files::{copy_files, delete_files, tenant_prefix, verify};
 use super::*;
@@ -68,7 +68,7 @@ impl TenantMoves {
         self.find(moving.id).await
     }
 
-    /// `copied` → `switched`: khách dùng placement mới, `active`.
+    /// `copied` → `switched`: the tenant uses the new placement, `active`.
     pub(super) async fn switch(&self, moving: &Model, runner: &str) -> Result<Model, Error> {
         let tenant = TenantId::from_uuid(moving.tenant_id);
         let (from, to) = (
@@ -109,7 +109,8 @@ impl TenantMoves {
         self.find(moving.id).await
     }
 
-    /// `switched` → `done`: xoá dòng của khách ở nguồn (`keep_source`: chỉ hàng đợi job và outbox).
+    /// `switched` → `done`: deletes the tenant's rows at the source (`keep_source`: only the job queue and
+    /// outbox).
     pub(super) async fn clean(&self, moving: &Model, runner: &str) -> Result<Model, Error> {
         let tenant = TenantId::from_uuid(moving.tenant_id);
         let (from, to) = (

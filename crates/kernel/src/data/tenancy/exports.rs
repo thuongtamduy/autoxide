@@ -1,18 +1,20 @@
-//! Xuất toàn bộ dữ liệu một khách (bước 35 "đối chiếu thiết kế 2", A-b9, D-328).
+//! Export of a whole tenant's data (step 35 "design 2 review", A-b9, D-328).
 //!
-//! Một lượt xuất là một dòng `kernel_tenant_exports` (mặt điều khiển) và một job `kernel.export_tenant`
-//! của database điều khiển: job đọc mọi dòng của khách trong mọi bảng cấp khách hàng (cùng cách đọc
-//! theo kiểu cột của lượt dời khách) và ghi thành MỘT file JSON Lines vào nơi lưu của khách
-//! (`exports/<id>.jsonl`). Bỏ hàng đợi job / outbox và cột bí mật (bản băm, secret). Nội dung file
-//! người dùng tải lên KHÔNG nằm trong bản xuất (bản xuất có dòng `files_file` / `media_*` trỏ tới
-//! chúng; tải từng file qua API của module).
+//! One export run is one `kernel_tenant_exports` row (control plane) and one `kernel.export_tenant` job of
+//! the control database: the job reads every row of the tenant in every tenant-level table (the same
+//! column-typed reading as a tenant move) and writes it as ONE JSON Lines file to the tenant's store
+//! (`exports/<id>.jsonl`). The job queue / outbox and secret columns (hashes, secrets) are left out. The
+//! content of files users uploaded is NOT in the export (the export has `files_file` / `media_*` rows
+//! pointing to them; download each file through the module's API).
 //!
-//! - Quản trị của chính khách (`kernel.data.export`) xin xuất được; nhân sự nền tảng
-//!   (`kernel.tenants.operate`) chỉ xuất khách khác khi đã VÀO khách đó bằng lần cấp quyền vào hỗ trợ
-//!   còn hạn (D-313, D-20261121-export-entry). Xin, tải, tạo link đều ghi event vào chính khách.
-//! - Tải về bằng request đã đăng nhập, hay bằng link có hạn (24 giờ) để mở trong trình duyệt.
-//! - File giữ `AUTOXIDE_TENANCY_EXPORT_RETENTION_DAYS` ngày (mặc định 30), rồi job dọn xoá.
-//! - Module `plans` tự xin một lượt xuất khi thuê bao bị huỷ.
+//! - The tenant's own administrators (`kernel.data.export`) can request an export; platform staff
+//!   (`kernel.tenants.operate`) can export another tenant only after ENTERING that tenant through a support
+//!   access grant that is still valid (D-313, D-20261121-export-entry). Requesting, downloading and
+//!   creating a link all write events into the tenant itself.
+//! - Download with a signed-in request, or with a time-limited link (24 hours) to open in a browser.
+//! - The file is kept `AUTOXIDE_TENANCY_EXPORT_RETENTION_DAYS` days (default 30), then a cleanup job deletes
+//!   it.
+//! - The `plans` module requests an export itself when a subscription is canceled.
 
 use crate::time::Timestamp;
 use jiff::SignedDuration;
@@ -45,11 +47,11 @@ use crate::job::{EnqueueOptions, Job, JobContext, JobHandler, JobQueue};
 use crate::response::{Created, Data, Problem};
 use crate::storage::{Storage, TenantStorage};
 
-/// Job xuất một khách (job của database điều khiển).
+/// Job that exports one tenant (a control-database job).
 pub(crate) const EXPORT_TENANT: &str = "kernel.export_tenant";
-/// Job dọn bản xuất hết hạn (hằng ngày, database điều khiển).
+/// Job that cleans up expired exports (daily, control database).
 pub(crate) const CLEAN_EXPORTS: &str = "kernel.clean_exports";
-/// Link tải không cần đăng nhập sống chừng này.
+/// The download link that needs no sign-in lives this long.
 const LINK_HOURS: i64 = 24;
 
 pub const EXPORT_RETENTION_DAYS: Setting = Setting::new(
@@ -58,8 +60,8 @@ pub const EXPORT_RETENTION_DAYS: Setting = Setting::new(
 )
 .with_default("30");
 
-/// Event ghi vào CHÍNH khách bị xuất (audit của khách thấy ai xuất, qua đường vào nào — kể cả lần
-/// cấp quyền vào hỗ trợ của nhân sự nền tảng; D-20261121-export-entry).
+/// Event written into the exported tenant ITSELF (the tenant's audit shows who exported and through which
+/// path, including a platform staff member's support access grant; D-20261121-export-entry).
 pub(crate) const TENANT_EXPORT_REQUESTED: EventInfo = EventInfo::new(
     "kernel.tenant_export_requested",
     "An export of all the data of the tenant was requested (`export_id`, `reason`).",
@@ -90,7 +92,7 @@ impl Event for ExportAccessed {
     const NAME: &'static str = "kernel.tenant_export_accessed";
 }
 
-/// Permission của quản trị viên một khách: xuất toàn bộ dữ liệu của khách mình.
+/// Permission of a tenant's administrator: export all of their own tenant's data.
 pub const DATA_EXPORT: Permission = Permission::new(
     "kernel.data.export",
     "Export all the data of your tenant as one file (to keep a copy or move to another service).",
@@ -98,7 +100,7 @@ pub const DATA_EXPORT: Permission = Permission::new(
 .with_risk(Risk::SensitiveData);
 
 mod entity {
-    //! Bảng `kernel_tenant_exports` (mặt điều khiển).
+    //! The `kernel_tenant_exports` table (control plane).
     use crate::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
@@ -111,14 +113,14 @@ mod entity {
         pub tenant_id: Uuid,
         /// `pending`, `running`, `ready`, `failed`, `expired`.
         pub status: String,
-        /// `manual` hay `subscription_canceled`.
+        /// `manual` or `subscription_canceled`.
         pub reason: String,
         pub requested_by: Option<Uuid>,
         /// JSON `[{"table": …, "rows": …}]`.
         pub tables: String,
         pub size: Option<i64>,
         pub error: Option<String>,
-        /// Bản băm của token trong link tải đang có hiệu lực.
+        /// Hash of the token in the currently valid download link.
         pub link_hash: Option<String>,
         pub link_expires_at: Option<Timestamp>,
         pub expires_at: Option<Timestamp>,
@@ -131,7 +133,7 @@ mod entity {
 
 use entity::{Column, Entity, Model};
 
-/// Bảng `kernel_tenant_exports`.
+/// The `kernel_tenant_exports` table.
 pub(crate) struct CreateTenantExports;
 
 impl MigrationName for CreateTenantExports {
@@ -245,7 +247,7 @@ fn now() -> Timestamp {
     Timestamp::now()
 }
 
-/// Xuất dữ liệu khách. Module `kernel` công bố (`context.require::<TenantExports>()`).
+/// Tenant data export. Published by the `kernel` module (`context.require::<TenantExports>()`).
 pub struct TenantExports {
     registry: DatabaseRegistry,
     setup: super::moves::MoveSetup,
@@ -281,8 +283,8 @@ impl TenantExports {
         self.registry.control()
     }
 
-    /// Xin xuất dữ liệu khách `tenant` (`reason`: `manual`, `subscription_canceled`). Đang có lượt
-    /// chưa xong thì trả lượt đó, không xếp thêm.
+    /// Requests an export of tenant `tenant`'s data (`reason`: `manual`, `subscription_canceled`). If a run is
+    /// already unfinished it returns that run and queues no more.
     pub async fn request(
         &self,
         actor: Actor,
@@ -332,8 +334,8 @@ impl TenantExports {
         Ok(row.into())
     }
 
-    /// Ghi event vào outbox của chính khách `tenant` (database của khách có thể khác database điều
-    /// khiển nên là transaction riêng, sau khi dòng của lượt xuất đã commit).
+    /// Writes an event to the outbox of tenant `tenant` itself (the tenant's database may differ from the
+    /// control database, so this is a separate transaction, after the export row has committed).
     async fn record<E: Event + Sync>(
         &self,
         tenant: TenantId,
@@ -346,7 +348,7 @@ impl TenantExports {
         self.outbox.record(context.database().write(), &context, actor, subject, event).await
     }
 
-    /// Lượt xuất `id` của khách `tenant`.
+    /// Export `id` of tenant `tenant`.
     pub async fn get(&self, tenant: TenantId, id: Uuid) -> Result<TenantExport, Error> {
         Ok(self.find(tenant, id).await?.into())
     }
@@ -359,7 +361,7 @@ impl TenantExports {
             .ok_or_else(|| export_not_found(id))
     }
 
-    /// Các lượt xuất của khách `tenant`, mới trước (tối đa 50).
+    /// The exports of tenant `tenant`, newest first (at most 50).
     pub async fn list(&self, tenant: TenantId) -> Result<Vec<TenantExport>, Error> {
         let rows = Entity::find()
             .filter(Column::TenantId.eq(tenant.as_uuid()))
@@ -370,7 +372,7 @@ impl TenantExports {
         Ok(rows.into_iter().map(Into::into).collect())
     }
 
-    /// Chạy lượt xuất `id`: ghi file vào nơi lưu của khách, rồi `ready` (hay `failed`).
+    /// Runs export `id`: writes the file to the tenant's store, then `ready` (or `failed`).
     async fn run(&self, id: Uuid) -> Result<(), Error> {
         let Some(row) = Entity::find_by_id(id).one(self.control().write()).await? else {
             return Ok(());
@@ -407,7 +409,7 @@ impl TenantExports {
         }
     }
 
-    /// Ghi file JSON Lines của khách `tenant`; trả số dòng mỗi bảng và cỡ file.
+    /// Writes the JSON Lines file of tenant `tenant`; returns the row count per table and the file size.
     async fn write_file(
         &self,
         tenant: TenantId,
@@ -477,8 +479,8 @@ impl TenantExports {
         Ok(())
     }
 
-    /// Link tải không cần đăng nhập cho lượt xuất `id` (24 giờ, thay link cũ); `actor` ghi vào audit
-    /// của khách.
+    /// A download link that needs no sign-in for export `id` (24 hours, replaces the old link); `actor` is
+    /// written to the audit of the tenant.
     pub async fn link(
         &self,
         actor: Actor,
@@ -505,8 +507,8 @@ impl TenantExports {
         })
     }
 
-    /// Nội dung lượt xuất `id` của khách `tenant` (người gọi đã được kiểm quyền); `actor` ghi vào
-    /// audit của khách.
+    /// Content of export `id` of tenant `tenant` (the caller's permission has already been checked);
+    /// `actor` is written to the tenant's audit.
     pub async fn content(
         &self,
         actor: Actor,
@@ -519,7 +521,7 @@ impl TenantExports {
         Ok(response)
     }
 
-    /// Nội dung theo token của link (`<id>.<phần thô>`). Sai, hết hạn hay đã thay: 404 như không có.
+    /// Content by the link's token (`<id>.<raw part>`). Wrong, expired or replaced: 404 as if it did not exist.
     pub async fn content_by_token(&self, token: &str) -> Result<Response, Error> {
         let missing = || export_link_invalid();
         let (id, raw) = token.split_once('.').ok_or_else(missing)?;
@@ -560,7 +562,7 @@ impl TenantExports {
         Ok(response)
     }
 
-    /// Xoá file của các lượt xuất đã quá hạn giữ; trả số lượt đã dọn.
+    /// Deletes the files of exports past their retention; returns the number of exports cleaned.
     pub(crate) async fn clean(&self, at: Timestamp) -> Result<usize, Error> {
         let due = Entity::find()
             .filter(Column::Status.eq("ready"))
@@ -610,7 +612,7 @@ fn export_link_invalid() -> Error {
     )
 }
 
-/// Bộ chạy job `kernel.export_tenant`.
+/// Runner of the job `kernel.export_tenant`.
 pub(crate) struct ExportRunner(pub(crate) Arc<TenantExports>);
 
 #[async_trait::async_trait]
@@ -622,7 +624,7 @@ impl JobHandler for ExportRunner {
     }
 }
 
-/// Bộ chạy job `kernel.clean_exports`.
+/// Runner of the job `kernel.clean_exports`.
 pub(crate) struct CleanRunner(pub(crate) Arc<TenantExports>);
 
 #[async_trait::async_trait]
@@ -639,15 +641,16 @@ pub(crate) fn schedule() -> crate::job::Schedule {
 
 // ---- REST ----------------------------------------------------------------------------------------
 
-/// Khách của đường dẫn `{id}` (ID hay slug) mà người gọi được xuất (D-313, D-20261121-export-entry):
+/// The tenant of the `{id}` path (ID or slug) that the caller may export (D-313, D-20261121-export-entry):
 ///
-/// - quản trị viên của chính khách đó có `kernel.data.export`;
-/// - nhân sự nền tảng đã VÀO khách đó (header `Autoxide-Tenant`, qua lần cấp quyền vào hỗ trợ còn
-///   hạn — căn cứ `support` hay `legal_request` có số văn bản) có `kernel.tenants.operate` hay
-///   `kernel.data.export`;
-/// - nhân sự nền tảng ở khách nền tảng chỉ xuất được chính khách nền tảng. Nhắm khách khác mà chưa
-///   vào thì 403 `kernel.export_needs_tenant_access` — không có lối tắt "`kernel.tenants.operate` xuất
-///   mọi khách" (dữ liệu cá nhân của khách chỉ ra ngoài khi có căn cứ và để lại vết).
+/// - the tenant's own administrator, who has `kernel.data.export`;
+/// - platform staff who have ENTERED that tenant (header `Autoxide-Tenant`, through a support access grant
+///   still valid; grounds `support` or `legal_request` with a document number) and have
+///   `kernel.tenants.operate` or `kernel.data.export`;
+/// - platform staff in the platform tenant can export only the platform tenant itself. Targeting another
+///   tenant without entering it gives 403 `kernel.export_needs_tenant_access`; there is no shortcut where
+///   "`kernel.tenants.operate` exports every tenant" (a tenant's personal data leaves only with grounds and
+///   leaves a trace).
 async fn allowed(
     exports: &TenantExports,
     principal: &Principal,

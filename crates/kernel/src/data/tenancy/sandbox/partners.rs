@@ -1,19 +1,21 @@
-//! Đối tác buộc dùng bộ giả trong sandbox (bước 38, D-232, D-20261119-step38-sandbox-isolation).
+//! Partners forced onto fake implementations in a sandbox (step 38, D-232, D-20261119-step38-sandbox-isolation).
 //!
-//! Kernel bọc MỌI bộ cài đặt hợp đồng đối tác ngay khi module công bố (`StartContext::provide` /
-//! `contribute`): thanh toán, chi trả, biến động số dư, SMS, ZNS, đẩy thông báo, hoá đơn điện tử,
-//! eKYC, mail và nhà cung cấp thoại (bước 61, D-232). Lời gọi cho một khách sandbox không tới đối tác: bộ bọc trả kết quả giả xác định
-//! (thanh toán thành công, hoá đơn số `SANDBOX-…`, eKYC duyệt) và ghi vào hộp thư giả
-//! ([`super::mailbox`]); khách thật đi thẳng tới bộ cài đặt gốc. Module nghiệp vụ không rẽ nhánh.
+//! The kernel wraps EVERY implementation of a partner contract as soon as a module publishes it
+//! (`StartContext::provide` / `contribute`): payments, payouts, balance movements, SMS, ZNS, push
+//! notifications, e-invoices, eKYC, mail and voice providers (step 61, D-232). A call for a sandbox tenant
+//! does not reach the partner: the wrapper returns a deterministic fake result (successful payment, invoice
+//! number `SANDBOX-…`, eKYC approved) and records it in the fake mailbox ([`super::mailbox`]); a real tenant
+//! goes straight to the original implementation. Business modules do not branch.
 //!
-//! Mail là ngoại lệ có điều kiện: mail tới email đã xác minh của nhân viên vào được sandbox
-//! ([`SandboxRecipients`], module `auth` công bố) vẫn gửi thật; người nhận khác vào hộp thư giả.
+//! Mail is a conditional exception: mail to the verified email of a staff member who may enter the sandbox
+//! ([`SandboxRecipients`], published by the `auth` module) is still really sent; other recipients go to the
+//! fake mailbox.
 //!
-//! Biết khách có phải sandbox: tra sổ khách theo ID ([`DatabaseRegistry::tenant`], có cache TTL);
-//! chế độ một khách không bao giờ có sandbox nên không tra.
+//! Whether a tenant is a sandbox is looked up in the tenant registry by ID ([`DatabaseRegistry::tenant`],
+//! with a TTL cache); single-tenant mode never has a sandbox so it does no lookup.
 //!
-//! Không bọc: `TextModel` / `Embedder` (không có hệ quả pháp lý hay tiền, hạn mức AI đếm riêng cho
-//! sandbox), `ExchangeRateSource` (chỉ đọc dữ liệu công khai), `Storage`.
+//! Not wrapped: `TextModel` / `Embedder` (no legal or monetary consequence; the AI quota is counted separately
+//! for sandboxes), `ExchangeRateSource` (reads public data only), `Storage`.
 
 use crate::time::{Date, Timestamp};
 use jiff::SignedDuration;
@@ -53,23 +55,23 @@ use crate::voice::{
 };
 use crate::zns::{ZnsMessage, ZnsSender};
 
-/// Tiền tố của mọi mã do bộ giả cấp: không bao giờ là căn cứ pháp lý ở khách thật.
+/// Prefix of every code issued by the fake implementations: never a legal basis at a real tenant.
 pub const SANDBOX_PREFIX: &str = "SANDBOX-";
-/// Tiền tố mã lượt eKYC giả (`fetch` không mang khách, nhận ra lượt giả bằng mã).
+/// Prefix of fake eKYC session codes (`fetch` carries no tenant, so a fake session is recognized by its code).
 const IDENTITY_PREFIX: &str = "sandbox:";
 
-/// Ai nhận được mail thật từ sandbox: email đã xác minh của nhân viên khách gốc vào được sandbox.
-/// Module `auth` công bố bằng `context.provide::<dyn SandboxRecipients>(…)`; không ai công bố thì
-/// mọi mail của sandbox vào hộp thư giả.
+/// Who receives real mail from a sandbox: the verified email of staff of the source tenant who may enter the
+/// sandbox. The `auth` module publishes it with `context.provide::<dyn SandboxRecipients>(…)`; if nobody
+/// publishes it, all sandbox mail goes to the fake mailbox.
 //
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
 #[async_trait::async_trait]
 pub trait SandboxRecipients: Send + Sync {
-    /// `email` (đã chuẩn hoá chữ thường, không tên hiển thị) nhận được mail của sandbox `sandbox`.
+    /// `email` (normalized to lowercase, no display name) receives mail from sandbox `sandbox`.
     async fn allowed(&self, sandbox: &TenantContext, email: &str) -> Result<bool, Error>;
 }
 
-/// Bộ quyết "khách này có phải sandbox" cho các bộ bọc. Clone rẻ.
+/// Decides "is this tenant a sandbox" for the wrappers. Cheap to clone.
 #[derive(Clone)]
 pub(crate) struct PartnerGuard(Arc<GuardInner>);
 
@@ -83,12 +85,12 @@ impl PartnerGuard {
         PartnerGuard(Arc::new(GuardInner { registry, recipients: OnceLock::new() }))
     }
 
-    /// Điền bên công bố [`SandboxRecipients`] sau khi mọi module đã khởi động.
+    /// Fills in the publisher of [`SandboxRecipients`] after every module has started.
     pub(crate) fn fill(&self, recipients: Option<Arc<dyn SandboxRecipients>>) {
         let _ = self.0.recipients.set(recipients);
     }
 
-    /// Ngữ cảnh của khách `tenant` nếu nó là sandbox.
+    /// The context of tenant `tenant` if it is a sandbox.
     async fn sandbox(&self, tenant: TenantId) -> Result<Option<TenantContext>, Error> {
         if self.0.registry.mode() == TenancyMode::Single {
             return Ok(None);
@@ -107,7 +109,7 @@ impl PartnerGuard {
         recipients.allowed(sandbox, &email).await
     }
 
-    /// Bọc `api` nếu `T` là một hợp đồng đối tác; trả nguyên `api` với mọi trait khác.
+    /// Wraps `api` if `T` is a partner contract; returns `api` unchanged for every other trait.
     //
     // `T` chỉ biết lúc biên dịch là "một kiểu nào đó": so `TypeId` (qua `dyn Any`) với từng hợp
     // đồng để lấy ra `Arc<dyn Hợp đồng>`, bọc, rồi ép ngược về `Arc<T>` — cả hai lần ép đều có
@@ -143,7 +145,7 @@ impl PartnerGuard {
     }
 }
 
-/// Email trong `Ada <ada@example.com>` hay `ada@example.com`, chữ thường.
+/// The email in `Ada <ada@example.com>` or `ada@example.com`, lowercase.
 fn address_of(to: &str) -> Option<String> {
     let raw = match (to.rfind('<'), to.rfind('>')) {
         (Some(start), Some(end)) if start < end => &to[start + 1..end],
@@ -153,7 +155,7 @@ fn address_of(to: &str) -> Option<String> {
     email.contains('@').then_some(email)
 }
 
-/// Ghi lời gọi đối tác bị giả lập vào hộp thư giả.
+/// Records a simulated partner call in the fake mailbox.
 async fn simulated(
     sandbox: &TenantContext,
     channel: HeldChannel,
@@ -181,7 +183,7 @@ struct GuardedPayments {
     guard: PartnerGuard,
 }
 
-/// Mã giao dịch giả mang số tiền: `payment_status` trả lại đúng số đã thu mà không cần lưu gì.
+/// Fake transaction code carrying the amount: `payment_status` returns exactly the collected amount without storing anything.
 fn payment_ref(intent: &PaymentIntent) -> String {
     format!(
         "{SANDBOX_PREFIX}{}-{}-{}",
@@ -685,8 +687,8 @@ impl Mailer for GuardedMailer {
 
 // ---- Thoại ----------------------------------------------------------------------------------
 
-/// Sandbox không gọi điện thật: phiên WebRTC và cuộc gọi ra là giả (mã `SANDBOX-…`), ghi vào hộp thư
-/// giả với số đã che; không có bản ghi âm.
+/// A sandbox makes no real calls: WebRTC sessions and outgoing calls are fake (code `SANDBOX-…`), recorded in
+/// the fake mailbox with the number masked; there is no recording.
 struct GuardedVoice {
     inner: Arc<dyn VoiceProvider>,
     guard: PartnerGuard,

@@ -1,21 +1,22 @@
-//! Xoá hẳn một khách (bước 35, D-327, D-337): khi thuê bao hết thời hạn lưu dữ liệu, hay khi nhân
-//! sự nền tảng quyết. Không hoàn tác được.
+//! Permanently erasing a tenant (step 35, D-327, D-337): when a subscription's data retention period ends, or
+//! when platform staff decide. Cannot be undone.
 //!
-//! - Chỉ xoá khách đang **tạm khoá** (`suspended`): bước khoá trước cho mọi máy chủ ngừng phục vụ
-//!   khách (TTL cache khách), và là chỗ để xuất dữ liệu lần cuối. Không bao giờ xoá khách nền tảng,
-//!   khách đang dời database.
-//! - Xoá mọi dòng `tenant_id = X` của mọi bảng cấp khách hàng ở database của khách (cả outbox và
-//!   hàng đợi job: không gì chạy tiếp cho khách), TRỪ bảng module khai giữ lại khi xoá khách
-//!   (`Module::retained_tables` — chứng từ kế toán phải lưu ít nhất 10 năm, Luật Kế toán 88/2015
-//!   Điều 41, D-190; bước 36 khai).
-//! - Xoá mọi file dưới `tenants/<id>/` ở nơi lưu chung và nơi lưu riêng của placement (kể cả bản
-//!   xuất dữ liệu), tên miền và lượt xuất của khách ở mặt điều khiển.
-//! - Giữ dòng `kernel_tenants` với trạng thái `deleted` (bia mộ): bảng mặt điều khiển của module
-//!   khác (vd kỳ thanh toán của `plans` — sổ sách của nhà vận hành) vẫn trỏ được tới khách; slug
-//!   không được dùng lại. Request tới khách đã xoá nhận `tenant_not_found`.
-//! - Event `kernel.tenant_deleted` ghi ở khách nền tảng (outbox của khách đã bị xoá).
+//! - Only a tenant that is **suspended** (`suspended`) can be erased: the earlier suspension makes every
+//!   server stop serving the tenant (tenant cache TTL) and is the moment for a final data export. A platform
+//!   tenant, or a tenant whose database is being moved, is never erased.
+//! - Deletes every row with `tenant_id = X` in every tenant-level table in the tenant's database (the outbox
+//!   and the job queue included: nothing keeps running for the tenant), EXCEPT the tables a module declares to
+//!   retain on tenant erasure (`Module::retained_tables`; accounting documents must be kept at least 10 years,
+//!   Accounting Law 88/2015 Article 41, D-190; declared in step 36).
+//! - Deletes every file under `tenants/<id>/` in the shared storage and the placement's own storage (data
+//!   exports included), and the tenant's domains and exports on the control plane.
+//! - Keeps the `kernel_tenants` row with status `deleted` (a tombstone): control-plane tables of other modules
+//!   (e.g. the billing periods of `plans`, the operator's books) can still point to the tenant; the slug cannot
+//!   be reused. Requests to an erased tenant receive `tenant_not_found`.
+//! - The event `kernel.tenant_deleted` is recorded at the platform tenant (the erased tenant's outbox is gone).
 //!
-//! Chạy lại được: hỏng giữa chừng (file, mạng) thì khách vẫn `suspended`, gọi lại xoá tiếp.
+//! Re-runnable: if it fails midway (files, network), the tenant stays `suspended` and calling erase again
+//! continues.
 
 use crate::time::Timestamp;
 use sea_orm::sea_query::{Alias, Expr, ExprTrait as _, Query};
@@ -34,7 +35,7 @@ use crate::event::{Actor, Event, EventInfo};
 use crate::response::{Data, Problem};
 use crate::storage::Storage;
 
-/// Xoá hẳn khách: tách khỏi `kernel.tenants.manage` vì không hoàn tác được.
+/// Permanently erases a tenant: separate from `kernel.tenants.manage` because it cannot be undone.
 pub const TENANTS_DELETE: Permission = Permission::new(
     "kernel.tenants.delete",
     "Delete a suspended tenant and its data for good (platform staff only). Cannot be undone.",
@@ -89,7 +90,7 @@ pub(crate) fn tenant_not_suspended() -> Error {
     )
 }
 
-/// Xoá mọi file dưới `prefix` ở `store`; trả số file.
+/// Deletes every file under `prefix` in `store`; returns the file count.
 async fn delete_files(store: &dyn Storage, prefix: &str) -> Result<u64, Error> {
     let keys = store.keys_with_prefix(prefix).await?;
     for key in &keys {
@@ -99,8 +100,8 @@ async fn delete_files(store: &dyn Storage, prefix: &str) -> Result<u64, Error> {
 }
 
 impl TenantAdmin {
-    /// Xoá hẳn khách `id_or_slug` (đang `suspended`) và dữ liệu của nó. `reason`: 1–500 ký tự, vào
-    /// event `kernel.tenant_deleted`. Không hoàn tác được.
+    /// Permanently erases the tenant `id_or_slug` (currently `suspended`) and its data. `reason`: 1-500
+    /// characters, goes into the event `kernel.tenant_deleted`. Cannot be undone.
     pub async fn erase(
         &self,
         actor: Actor,

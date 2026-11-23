@@ -1,16 +1,16 @@
-//! Placement — nơi giữ dữ liệu của khách (đặc tả 33 "Sổ kết nối, job, event, migration trên nhiều
-//! database", D-261): thêm (URL kết nối lưu mã hoá), liệt kê, kiểm migration (`schema_state`),
-//! migrate mọi placement.
+//! Placement: where a tenant's data lives (spec 33 "Connection registry, jobs, events, migrations across
+//! many databases", D-261): add (the connection URL is stored encrypted), list, check migrations
+//! (`schema_state`), migrate every placement.
 //!
-//! - Mọi database có cùng schema (D-253 mục 2): placement chạy đúng bộ migration của database điều
-//!   khiển. Upgrade dữ liệu trên placement dùng khoá gốc của database điều khiển
-//!   ([`Migrator::keyed_on`]) — module mã hoá secret của mọi khách bằng khoá đó.
-//! - `schema_state`: `ready` (đủ migration), `behind` (còn migration chưa áp dụng — khách trên đó
-//!   nhận `tenant_maintenance`, job của nó đợi), `migrating` (`migrate up --all` đang chạy). Kiểm
-//!   lại không đè `migrating`; mọi lệnh đổi trạng thái chỉ ghi khi trạng thái chưa bị bên khác
-//!   đổi (so với giá trị vừa đọc).
-//! - Placement `main` (database điều khiển) không có trạng thái riêng: `serve` đòi nó đủ migration
-//!   trước khi khởi động.
+//! - Every database has the same schema (D-253 item 2): a placement runs exactly the migration set of the
+//!   control database. Data upgrades on a placement use the root key of the control database
+//!   ([`Migrator::keyed_on`]); the module encrypts the secrets of every tenant with that key.
+//! - `schema_state`: `ready` (all migrations applied), `behind` (migrations still pending; tenants on it get
+//!   `tenant_maintenance` and their jobs wait), `migrating` (`migrate up --all` is running). A re-check does
+//!   not overwrite `migrating`; every state-changing command writes only when the state has not been changed
+//!   by another party (compared with the value just read).
+//! - The `main` placement (the control database) has no state of its own: `serve` requires it to have all
+//!   migrations before starting.
 
 use crate::time::Timestamp;
 use sea_orm::sea_query::Expr;
@@ -30,14 +30,14 @@ use crate::error::{Error, FieldError};
 use crate::migration::{MigrationState, Migrator};
 use crate::storage::StorageLocation;
 
-/// Trạng thái schema của một placement.
+/// Schema state of a placement.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SchemaState {
-    /// Đủ migration.
+    /// All migrations applied.
     Ready,
-    /// Còn migration chưa áp dụng (hay không kết nối được): khách trên đó nhận `503`.
+    /// Migrations still pending (or cannot connect): tenants on it receive `503`.
     Behind,
-    /// `autoxide migrate up --all` đang chạy trên nó.
+    /// `autoxide migrate up --all` is running on it.
     Migrating,
 }
 
@@ -60,8 +60,8 @@ impl SchemaState {
     }
 }
 
-/// Một placement mới. URL có mật khẩu: chỉ lưu mã hoá, không bao giờ in ra (`Debug` của
-/// [`DatabaseUrl`] che mật khẩu).
+/// A new placement. The URL contains a password: stored encrypted only, never printed (the `Debug` of
+/// [`DatabaseUrl`] masks the password).
 #[derive(Clone, Debug)]
 pub struct NewPlacement {
     name: String,
@@ -71,12 +71,12 @@ pub struct NewPlacement {
 }
 
 impl NewPlacement {
-    /// Placement tên `name` (chữ thường, số, `-`; tối đa 63 ký tự), loại `kind`, ở `url`.
+    /// Placement named `name` (lowercase, digits, `-`; at most 63 characters), kind `kind`, at `url`.
     pub fn new(name: impl Into<String>, kind: PlacementKind, url: DatabaseUrl) -> Self {
         NewPlacement { name: name.into(), kind, url, read_url: None }
     }
 
-    /// Read replica (Postgres) cho lệnh đọc.
+    /// Read replica (Postgres) for read commands.
     #[must_use]
     pub fn read_url(mut self, url: DatabaseUrl) -> Self {
         self.read_url = Some(url);
@@ -84,27 +84,27 @@ impl NewPlacement {
     }
 }
 
-/// Kết quả kiểm migration của một placement.
+/// Result of checking the migrations of one placement.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PlacementCheck {
     pub id: PlacementId,
     pub name: String,
     pub state: SchemaState,
-    /// Số migration chưa áp dụng.
+    /// Number of migrations not yet applied.
     pub pending: usize,
-    /// Không kết nối hay không đọc được trạng thái migration (khi đó `state` là `behind`).
+    /// Could not connect or could not read the migration state (then `state` is `behind`).
     pub error: Option<String>,
 }
 
-/// Migration của một database: `main` (database điều khiển) hay một placement.
+/// Migration of one database: `main` (the control database) or a placement.
 #[derive(Clone, Debug)]
 pub struct PlacementMigrations {
     pub name: String,
     pub migrations: Vec<MigrationState>,
 }
 
-/// Quản lý placement (lệnh `autoxide placement`, `autoxide migrate --all`, kiểm định kỳ của
-/// `serve`). Clone rẻ.
+/// Placement management (the `autoxide placement` command, `autoxide migrate --all`, the periodic check of
+/// `serve`). Cheap to clone.
 #[derive(Clone)]
 pub struct Placements {
     registry: DatabaseRegistry,
@@ -118,7 +118,7 @@ impl std::fmt::Debug for Placements {
 }
 
 impl Placements {
-    /// Migrator của mọi module (backup theo lịch, bước 39).
+    /// Migrator of every module (scheduled backup, step 39).
     pub(crate) fn migrator(&self) -> &Migrator {
         &self.migrator
     }
@@ -129,7 +129,7 @@ fn now() -> Timestamp {
 }
 
 impl Placements {
-    /// `migrator`: migration của mọi module (`Modules::migrator`).
+    /// `migrator`: the migrations of every module (`Modules::migrator`).
     pub fn new(registry: DatabaseRegistry, migrator: Migrator) -> Self {
         let migrator = Arc::new(migrator.keyed_on(registry.control()));
         Placements { registry, migrator }
@@ -147,7 +147,7 @@ impl Placements {
             .await?)
     }
 
-    /// Mọi placement (kể cả `main`), theo tên. Không bao giờ có URL.
+    /// Every placement (`main` included), by name. Never includes the URL.
     pub async fn list(&self) -> Result<Vec<super::Placement>, Error> {
         let rows = placement::Entity::find()
             .order_by_asc(placement::Column::Name)
@@ -160,11 +160,12 @@ impl Placements {
         Ok(all)
     }
 
-    /// Đặt (`Some`) hay bỏ (`None`, file của khách về nơi lưu chung) nơi lưu file riêng của
-    /// placement `name`. Lưu mã hoá (mục đích [`PLACEMENT_STORAGE`]); không bao giờ trả lại khoá bí
-    /// mật. Placement đang có khách thì từ chối (`tenant_placement_storage_in_use`: file của họ nằm
-    /// ở nơi lưu cũ) trừ khi `force` — khi nơi lưu mới đã có đúng các file đó (vd đổi khoá truy cập).
-    /// Không thử kết nối: lỗi cấu hình hiện ra ở lần đọc / ghi file đầu tiên (`autoxide doctor`).
+    /// Sets (`Some`) or removes (`None`, the tenant's files go back to the shared storage) the own file
+    /// storage of placement `name`. Stored encrypted (purpose [`PLACEMENT_STORAGE`]); never returns the secret
+    /// key. A placement that has tenants is refused (`tenant_placement_storage_in_use`: their files are in
+    /// the old storage) unless `force`, for when the new storage already holds exactly those files (e.g. an
+    /// access key change). Does not try to connect: a configuration error appears on the first file read /
+    /// write (`autoxide doctor`).
     pub async fn set_storage(
         &self,
         name: &str,
@@ -223,8 +224,9 @@ impl Placements {
         Ok(super::admin::describe_placement(&self.registry, row).await)
     }
 
-    /// Thêm placement: kiểm tên, thử kết nối, lưu URL mã hoá, rồi kiểm migration (database đã
-    /// migrate sẵn thì `ready` ngay; database trống thì `behind` tới khi `migrate up --all`).
+    /// Adds a placement: checks the name, tries to connect, stores the URL encrypted, then checks migrations
+    /// (an already migrated database is `ready` at once; an empty database is `behind` until
+    /// `migrate up --all`).
     pub async fn add(&self, new: NewPlacement) -> Result<PlacementCheck, Error> {
         let name = new.name.trim().to_owned();
         if !super::admin::is_slug(&name) || name == "main" {
@@ -299,8 +301,8 @@ impl Placements {
         self.check_row(inserted).await
     }
 
-    /// Kiểm migration của mọi placement (trừ `main`), cập nhật `schema_state`. Không kết nối được
-    /// một placement không làm hỏng cả lệnh: placement đó thành `behind`, kèm lỗi.
+    /// Checks the migrations of every placement (except `main`) and updates `schema_state`. Failing to connect
+    /// to one placement does not fail the whole command: that placement becomes `behind`, with the error.
     pub async fn check(&self) -> Result<Vec<PlacementCheck>, Error> {
         let mut checks = Vec::new();
         for row in self.rows().await? {
@@ -333,7 +335,7 @@ impl Placements {
         Ok(PlacementCheck { id, name: row.name, state, pending, error })
     }
 
-    /// Đặt `schema_state` của `id` thành `state` nếu nó vẫn là `seen` (bên khác chưa đổi).
+    /// Sets the `schema_state` of `id` to `state` if it is still `seen` (the other party has not changed it).
     async fn set_state(
         &self,
         id: PlacementId,
@@ -355,7 +357,7 @@ impl Placements {
         Ok(())
     }
 
-    /// Trạng thái migration của database điều khiển (`main`) rồi của từng placement, theo tên.
+    /// Migration state of the control database (`main`) and then of each placement, by name.
     pub async fn status_all(&self) -> Result<Vec<PlacementMigrations>, Error> {
         let control = self.registry.control();
         let mut all = vec![PlacementMigrations {
@@ -373,8 +375,8 @@ impl Placements {
         Ok(all)
     }
 
-    /// Migration còn chờ của từng placement (trừ `main`), hay chỉ của placement `only` — chạy thử,
-    /// không đổi gì. Placement không có: `placement_not_found`.
+    /// Pending migrations of each placement (except `main`), or only of placement `only`; a dry run that
+    /// changes nothing. A placement that does not exist: `placement_not_found`.
     pub async fn pending(&self, only: Option<&str>) -> Result<Vec<PlacementMigrations>, Error> {
         let mut all = Vec::new();
         for row in self.selected(only).await? {
@@ -389,8 +391,8 @@ impl Placements {
         Ok(all)
     }
 
-    /// Áp dụng migration còn thiếu ở từng placement (trừ `main`: `serve` không chạy khi `main` còn
-    /// migration chờ), hay chỉ ở placement `only` — như phần placement của [`up_all`](Self::up_all).
+    /// Applies missing migrations at each placement (except `main`: `serve` does not run while `main` has
+    /// pending migrations), or only at placement `only`; like the placement part of [`up_all`](Self::up_all).
     pub async fn up_placements(
         &self,
         only: Option<&str>,
@@ -417,7 +419,7 @@ impl Placements {
         }
     }
 
-    /// Một placement: `migrating` → migrate + upgrade dữ liệu → `ready`; hỏng thì `behind`.
+    /// One placement: `migrating` → migrate + data upgrade → `ready`; on failure `behind`.
     async fn up_placement(&self, row: placement::Model) -> Result<PlacementMigrations, Error> {
         let id = PlacementId::from_uuid(row.id);
         self.set_state(id, &row.schema_state, SchemaState::Migrating).await?;
@@ -443,9 +445,9 @@ impl Placements {
         }
     }
 
-    /// Áp dụng migration còn thiếu: database điều khiển trước, rồi từng placement theo tên (đặt
-    /// `migrating` → migrate + upgrade dữ liệu → `ready`). Hỏng ở một placement thì dừng, đặt nó
-    /// `behind` và báo tên; chạy lại thì tiếp từ chỗ dừng (mỗi database tự nhớ phần đã xong).
+    /// Applies missing migrations: the control database first, then each placement by name (sets
+    /// `migrating` → migrate + data upgrade → `ready`). If one placement fails, stops, sets it `behind` and
+    /// reports its name; running again continues from where it stopped (each database remembers its done part).
     pub async fn up_all(&self) -> Result<Vec<PlacementMigrations>, Error> {
         let control = self.registry.control();
         let mut all = vec![PlacementMigrations {
@@ -460,9 +462,9 @@ impl Placements {
 }
 
 impl Placements {
-    /// Kiểm mọi placement ngay, rồi mỗi `every` (đặc tả: mỗi phút) cho tới khi `stop` xong —
-    /// placement vừa được migrate ở máy khác thành `ready`, placement mất kết nối thành `behind`.
-    /// Lỗi chỉ ghi log: lần sau thử lại.
+    /// Checks every placement now, then every `every` (spec: every minute) until `stop` completes: a
+    /// placement just migrated on another machine becomes `ready`, a placement that lost its connection becomes
+    /// `behind`. Errors are only logged: the next round retries.
     pub async fn watch(self, every: std::time::Duration, stop: impl Future<Output = ()>) {
         let mut stop = std::pin::pin!(stop);
         let mut ticker = tokio::time::interval(every);

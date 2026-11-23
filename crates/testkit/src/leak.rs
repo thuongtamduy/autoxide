@@ -1,7 +1,7 @@
-//! Bài rò rỉ giữa khách (bước 33, đặc tả "Test bắt buộc"): sau khi gieo dữ liệu ở khách A, gọi
-//! **mọi** endpoint `GET` của app và **mọi** tool MCP chỉ đọc bằng người của khách B (có đủ
-//! permission). Vi phạm là một câu trả lời thành công có chứa dấu hiệu của khách A: chuỗi
-//! `marker` (gieo trong tiêu đề, nội dung, email…) hay một ID của A.
+//! Cross-tenant leak test (step 33, spec "Mandatory tests"): after seeding data in tenant A, call
+//! **every** `GET` endpoint of the app and **every** read-only MCP tool as a user of tenant B (with all
+//! permissions). A violation is a successful answer containing a sign of tenant A: the string
+//! `marker` (seeded in a title, content, email…) or an ID of A.
 //!
 //! ```no_run
 //! # async fn example(app: &autoxide_testkit::TestApp, note_id: String) {
@@ -12,20 +12,21 @@
 //! # }
 //! ```
 //!
-//! Tham số `{tên}` trong đường dẫn được thay lần lượt bằng mọi ID của A khai cùng tên (không có
-//! thì bằng mọi ID của A); tham số tool có tên trong `ids`, hay tên kết thúc `id`, cũng vậy.
+//! A `{name}` parameter in a path is replaced in turn by every A ID declared under the same name (if none,
+//! by every A ID); tool parameters named in `ids`, or whose name ends in `id`, work the same way.
 //!
-//! [`cursor_leak_check`]: con trỏ pagination lấy ở khách A gửi bằng người của khách B không bao giờ
-//! cho thấy dữ liệu của A (mọi truy vấn đã lọc theo khách; con trỏ chỉ là vị trí).
+//! [`cursor_leak_check`]: a pagination cursor obtained in tenant A and sent as a tenant B user never
+//! reveals A's data (every query is already filtered by tenant; a cursor is only a position).
 
 use serde_json::{Map, Value};
 
 use crate::app::{TestApp, TestAppError, tool};
 
-/// Bài rò rỉ giữa hai nhánh anh em của cây tổ chức (bước 34, đặc tả "Test bắt buộc"): cùng một
-/// khách, dữ liệu gieo ở nhánh A (chuỗi `marker`, các ID trong `ids`), gọi mọi `GET` và mọi tool
-/// MCP chỉ đọc bằng `token` của người chỉ có quyền ở nhánh B (vd `.member(token, …, b,
-/// &[("notes.read", Scope::Subtree)])`). Vi phạm là câu trả lời thành công có dấu hiệu của A.
+/// Leak test between two sibling branches of the organization tree (step 34, spec "Mandatory tests"): within
+/// one tenant, data seeded in branch A (the string `marker`, the IDs in `ids`); call every `GET` and every
+/// read-only MCP tool with the `token` of a user who has permission only in branch B (e.g.
+/// `.member(token, …, b, &[("notes.read", Scope::Subtree)])`). A violation is a successful answer containing
+/// a sign of A.
 ///
 /// ```no_run
 /// # async fn example(app: &autoxide_testkit::TestApp, note_in_a: String) {
@@ -45,8 +46,9 @@ pub async fn branch_leak_check(
     leak_check(app, token, marker, ids).await
 }
 
-/// Gọi mọi `GET` và mọi tool MCP chỉ đọc bằng `token` (người của khách B); trả danh sách vi phạm
-/// (rỗng là đạt). `ids`: ID đã gieo ở khách A, theo tên tham số (`("id", …)`, `("form_id", …)`).
+/// Calls every `GET` and every read-only MCP tool with `token` (a user of tenant B); returns the list of
+/// violations (empty means pass). `ids`: IDs seeded in tenant A, by parameter name (`("id", …)`,
+/// `("form_id", …)`).
 pub async fn leak_check(
     app: &TestApp,
     token: &str,
@@ -110,12 +112,12 @@ pub async fn leak_check(
     Ok(violations)
 }
 
-/// Con trỏ pagination của khách A dùng ở khách B (bước 33, D-259 mục 5): với mọi `GET` trả trang
-/// (`pagination.next_cursor`), lấy trang đầu `limit=1` bằng `owner` (người của A) — mỗi giá trị của
-/// tham số `sort` nếu endpoint có, để thử cả con trỏ theo cột — rồi gửi con trỏ đó bằng `other`
-/// (người của B). Vi phạm là câu trả lời thành công chứa dấu hiệu của A (`marker` hay một ID trong
-/// `ids`). Trả (vi phạm, số con trỏ đã thử): bên gọi kiểm số đó > 0 để biết bài thật sự chạy (A
-/// phải có ít nhất hai dòng trong danh sách để có con trỏ).
+/// A pagination cursor from tenant A used in tenant B (step 33, D-259 item 5): for every `GET` that returns a
+/// page (`pagination.next_cursor`), fetch the first page with `limit=1` as `owner` (a user of A) — once per
+/// value of the `sort` parameter if the endpoint has one, to try column-based cursors too — then send that
+/// cursor as `other` (a user of B). A violation is a successful answer containing a sign of A (`marker` or an
+/// ID in `ids`). Returns (violations, number of cursors tried): the caller checks that number is > 0 to know
+/// the test really ran (A needs at least two rows in the list to get a cursor).
 pub async fn cursor_leak_check(
     app: &TestApp,
     owner: &str,
@@ -166,7 +168,7 @@ pub async fn cursor_leak_check(
     Ok((violations, tried))
 }
 
-/// Giá trị của tham số query `sort` của thao tác `operation` (enum, kể cả qua `$ref`).
+/// Values of the `sort` query parameter of operation `operation` (an enum, including via `$ref`).
 fn sort_values(contract: &Value, operation: &Value) -> Vec<String> {
     let Some(parameters) = operation["parameters"].as_array() else { return Vec::new() };
     let Some(sort) = parameters.iter().find(|parameter| parameter["name"] == "sort") else {
@@ -189,7 +191,7 @@ fn sort_values(contract: &Value, operation: &Value) -> Vec<String> {
         .unwrap_or_default()
 }
 
-/// Mọi cách thay `{tham số}` của `path` bằng ID của khách A.
+/// Every way to replace the `{param}` placeholders of `path` with IDs of tenant A.
 fn substitutions(path: &str, ids: &[(&str, String)]) -> Vec<String> {
     let mut uris = vec![String::new()];
     let mut rest = path;
@@ -207,15 +209,15 @@ fn substitutions(path: &str, ids: &[(&str, String)]) -> Vec<String> {
     uris.into_iter().map(|uri| format!("{uri}{rest}")).collect()
 }
 
-/// ID khai cho tham số `name`; không có thì mọi ID (đường dẫn vẫn được thử).
+/// IDs declared for parameter `name`; if none, all IDs (the path is still tried).
 fn candidates(name: &str, ids: &[(&str, String)]) -> Vec<String> {
     let named: Vec<String> =
         ids.iter().filter(|(key, _)| *key == name).map(|(_, id)| id.clone()).collect();
     if named.is_empty() { ids.iter().map(|(_, id)| id.clone()).collect() } else { named }
 }
 
-/// Bộ tham số thử cho một tool: mỗi tham số có tên trong `ids` hay kết thúc bằng `id` nhận lần
-/// lượt các ID của A; tool không có tham số như vậy thì gọi một lần với `{}`.
+/// The parameter sets to try for one tool: each parameter named in `ids` or ending in `id` receives the A IDs
+/// in turn; a tool with no such parameter is called once with `{}`.
 fn tool_arguments(properties: &[String], ids: &[(&str, String)]) -> Vec<Map<String, Value>> {
     let mut sets = vec![Map::new()];
     for property in properties {

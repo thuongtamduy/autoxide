@@ -1,22 +1,22 @@
-//! Ảnh chụp schema của database: bảng, cột (tên, kiểu, nullable, mặc định), index (tên, cột,
-//! unique) — để so schema trước và sau một vòng migration down → up (đặc tả 31 B2).
+//! Snapshot of a database schema: tables, columns (name, type, nullable, default) and indexes (name, columns,
+//! unique) — to compare the schema before and after a migration down → up round trip (spec 31 B2).
 //!
-//! Hai nhánh truy vấn: SQLite (`sqlite_master`, `pragma_table_info`, `pragma_index_list`,
-//! `pragma_index_info`) và Postgres (`information_schema.columns`, `pg_index`). Sắp xếp ổn định để
-//! hai ảnh chụp so được bằng `==` và `Debug` dễ đọc khi khác.
+//! Two query branches: SQLite (`sqlite_master`, `pragma_table_info`, `pragma_index_list`,
+//! `pragma_index_info`) and Postgres (`information_schema.columns`, `pg_index`). Output is sorted
+//! deterministically so two snapshots compare with `==` and `Debug` output is easy to read when they differ.
 
 use sea_orm::{ConnectionTrait, DatabaseConnection, DbBackend, DbErr, QueryResult, Statement};
 
 use crate::TestDatabaseError;
 
-/// Ảnh chụp schema. Lấy bằng [`schema_snapshot`].
+/// Schema snapshot. Obtained with [`schema_snapshot`].
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 #[non_exhaustive]
 pub struct SchemaSnapshot {
     pub tables: Vec<TableSnapshot>,
 }
 
-/// Một bảng.
+/// A table.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct TableSnapshot {
@@ -25,18 +25,18 @@ pub struct TableSnapshot {
     pub indexes: Vec<IndexSnapshot>,
 }
 
-/// Một cột.
+/// A column.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct ColumnSnapshot {
     pub name: String,
-    /// Kiểu như database ghi (chữ thường).
+    /// Type as the database reports it (lowercase).
     pub kind: String,
     pub nullable: bool,
     pub default: Option<String>,
 }
 
-/// Một index (kể cả index ngầm của khoá chính / unique).
+/// An index (including the implicit index of a primary key / unique constraint).
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct IndexSnapshot {
@@ -46,13 +46,13 @@ pub struct IndexSnapshot {
 }
 
 impl SchemaSnapshot {
-    /// Tên các bảng.
+    /// Table names.
     pub fn table_names(&self) -> Vec<&str> {
         self.tables.iter().map(|table| table.name.as_str()).collect()
     }
 }
 
-/// Chụp schema của `connection` (SQLite hay Postgres).
+/// Snapshots the schema of `connection` (SQLite or Postgres).
 pub async fn schema_snapshot(
     connection: &DatabaseConnection,
 ) -> Result<SchemaSnapshot, TestDatabaseError> {
@@ -100,7 +100,7 @@ async fn names(connection: &DatabaseConnection, sql: &str) -> Result<Vec<String>
         .collect()
 }
 
-/// Tên bảng chỉ gồm chữ, số, `_` (bảng của module luôn vậy): đặt thẳng vào câu SQL an toàn.
+/// A table name made only of letters, digits and `_` (module tables always are): safe to put directly into SQL.
 fn checked(table: &str) -> Result<&str, TestDatabaseError> {
     if table.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
         Ok(table)

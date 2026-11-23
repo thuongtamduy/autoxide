@@ -1,9 +1,10 @@
-//! Hàm dựng cột cho migration (`schema::uuid("owner_id")`…). Chép đúng định nghĩa của `sea-orm-migration` 2.0
-//! (MIT OR Apache-2.0) mà module đã dùng, để câu `CREATE TABLE` sinh ra y hệt trước (D-20261121-own-migrations).
+//! Column builders for migrations (`schema::uuid("owner_id")`…). Copies the exact definitions of
+//! `sea-orm-migration` 2.0 (MIT OR Apache-2.0) that modules already used, so the generated `CREATE TABLE`
+//! statements stay identical to before (D-20261121-own-migrations).
 
 use sea_orm::sea_query::{ColumnDef, IntoIden};
 
-/// Khoá chính UUID (không null).
+/// UUID primary key (not null).
 pub fn pk_uuid<T: IntoIden>(name: T) -> ColumnDef {
     uuid(name).primary_key().take()
 }

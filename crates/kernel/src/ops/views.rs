@@ -1,13 +1,14 @@
-//! Schema bộ lọc và view đã lưu (bước 51 P7, D-201).
+//! Filter schema and saved views (step 51 P7, D-201).
 //!
-//! - **Schema bộ lọc.** Mỗi endpoint danh sách (`GET` có tham số `cursor`) được gắn trong OpenAPI
-//!   `x-autoxide-list` (id danh sách, vd `content.list_content_entries`) và `x-autoxide-filters` (tên, kiểu,
-//!   giá trị cho phép của từng bộ lọc) — **sinh từ chính tham số `IntoParams`** của endpoint lúc
-//!   dựng route, nên không viết hai lần và không lệch được. Giao diện và agent dựng chip lọc từ đó.
-//! - **View đã lưu.** `GET/POST /api/v1/me/views`, `PATCH/DELETE /api/v1/me/views/{id}` (bảng
-//!   `kernel_saved_views`, cấp khách hàng): `params` kiểm theo schema trên khi lưu — sai thì 422 nêu
-//!   từng tham số. Phạm vi `personal` (của người lưu), `node` (một nút, kèm `org_id`) hay `tenant`;
-//!   hai phạm vi chung cần `kernel.views.share`.
+//! - **Filter schema.** Each list endpoint (`GET` with a `cursor` parameter) is tagged in OpenAPI with
+//!   `x-autoxide-list` (the list id, e.g. `content.list_content_entries`) and `x-autoxide-filters` (the name,
+//!   type and allowed values of each filter) — **generated from the endpoint's own `IntoParams` parameters**
+//!   when routes are built, so it is not written twice and cannot drift. The UI and agents build filter chips
+//!   from it.
+//! - **Saved views.** `GET/POST /api/v1/me/views`, `PATCH/DELETE /api/v1/me/views/{id}` (table
+//!   `kernel_saved_views`, tenant level): `params` are validated against the schema above when saved — a
+//!   mismatch gives 422 naming each parameter. Scope is `personal` (the saver's), `node` (one node, with
+//!   `org_id`) or `tenant`; the two shared scopes need `kernel.views.share`.
 
 use crate::time::{Date, Timestamp};
 use std::collections::{BTreeMap, HashMap};
@@ -35,17 +36,17 @@ use crate::tenancy::{OrgId, TenantContext};
 
 const TABLE: &str = "kernel_saved_views";
 
-/// Lưu view dùng chung cho một nút hay cả khách.
+/// Saves a view shared with a node or the whole tenant.
 pub const VIEWS_SHARE: Permission = Permission::new(
     "kernel.views.share",
     "Save list views shared with an organization unit or the whole tenant.",
 );
 
-/// Tham số phân trang: không phải bộ lọc, không lưu trong view.
+/// Pagination parameters: not filters, not stored in a view.
 const PAGING: [&str; 2] = ["limit", "cursor"];
-/// Tham số được lưu trong view nhưng không phải bộ lọc (thứ tự, phần đính kèm).
+/// Parameters stored in a view that are not filters (order, attached parts).
 const NOT_FILTERS: [&str; 3] = ["order", "sort", "include"];
-/// Mỗi người tối đa chừng này view.
+/// Each person may have at most this many views.
 const MAX_PER_USER: u64 = 200;
 
 /// One parameter of a list, as a saved view or a filter chip may use it.
@@ -67,7 +68,7 @@ pub(crate) struct ListParameter {
     pub description: Option<String>,
 }
 
-/// Danh sách đã biết: id → tham số (gồm cả `order`, `sort`). Clone rẻ.
+/// Known lists: id → parameters (including `order`, `sort`). Cheap to clone.
 #[derive(Clone, Default)]
 pub(crate) struct ListSchemas(Arc<HashMap<String, Vec<ListParameter>>>);
 
@@ -76,14 +77,14 @@ impl ListSchemas {
         self.0.get(resource)
     }
 
-    /// Tham số của danh sách `resource` (gồm `order`, `sort`).
+    /// Parameters of list `resource` (including `order`, `sort`).
     pub(crate) fn parameters(&self, resource: &str) -> Option<&[ListParameter]> {
         self.0.get(resource).map(Vec::as_slice)
     }
 }
 
-/// Gắn `x-autoxide-list` / `x-autoxide-filters` vào mọi endpoint danh sách của `module` và trả
-/// tham số của từng danh sách (id `<module>.<operation id>`).
+/// Tags every list endpoint of `module` with `x-autoxide-list` / `x-autoxide-filters` and returns
+/// each list's parameters (id `<module>.<operation id>`).
 pub(crate) fn annotate(module: &str, openapi: &mut OpenApi) -> Vec<(String, Vec<ListParameter>)> {
     // Đọc schema qua JSON: kiểu của tham số có thể nằm trực tiếp, trong `oneOf` với `null`, hay
     // là `$ref` tới `components` — JSON gom mọi trường hợp về một cách đọc.
@@ -142,12 +143,12 @@ pub(crate) fn annotate(module: &str, openapi: &mut OpenApi) -> Vec<(String, Vec<
     found
 }
 
-/// Gom danh sách của mọi module thành sổ.
+/// Collects the lists of every module into the registry.
 pub(crate) fn schemas(lists: Vec<(String, Vec<ListParameter>)>) -> ListSchemas {
     ListSchemas(Arc::new(lists.into_iter().collect()))
 }
 
-/// Kiểu và giá trị cho phép của một schema JSON (đã đổi `$ref`, bỏ `null`).
+/// Type and allowed values of a JSON schema (with `$ref` resolved, `null` dropped).
 fn describe(schema: &Value, components: &Value) -> (String, Option<Vec<String>>) {
     let resolved = resolve(schema, components);
     let variants: Vec<&Value> = match resolved.get("oneOf").or_else(|| resolved.get("anyOf")) {
@@ -188,8 +189,8 @@ fn resolve<'a>(schema: &'a Value, components: &'a Value) -> &'a Value {
     }
 }
 
-/// Kiểm `params` của view theo tham số của danh sách; lỗi ghi vào `problems` với tên
-/// `params.<tham số>`.
+/// Validates a view's `params` against the list's parameters; errors go into `problems` under the name
+/// `params.<parameter>`.
 pub(crate) fn check_params(
     parameters: &[ListParameter],
     params: &serde_json::Map<String, Value>,
@@ -398,7 +399,7 @@ fn not_found(id: Uuid) -> Error {
     Error::not_found("kernel.view_not_found", "There is no saved view `{id}`.").with_param("id", id)
 }
 
-/// View người gọi thấy: của mình, của cả khách, và của các nút (giao diện lọc theo nút đang chọn).
+/// Views the caller sees: their own, the whole tenant's, and those of nodes (the UI filters by the selected node).
 async fn find(tenant: &TenantContext, principal: &Principal, id: Uuid) -> Result<SavedView, Error> {
     let mut select = SqlQuery::select();
     select
@@ -415,7 +416,8 @@ async fn find(tenant: &TenantContext, principal: &Principal, id: Uuid) -> Result
         .ok_or_else(|| not_found(id))
 }
 
-/// Người gọi được sửa / xoá view: của mình (riêng), hay có `kernel.views.share` ở nút của view chung.
+/// The caller may edit / delete a view: their own (personal), or has `kernel.views.share` at the node of a
+/// shared view.
 async fn require_manage(
     tenant: &TenantContext,
     principal: &Principal,
@@ -693,7 +695,7 @@ async fn delete_view(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// Route dưới `/api/v1/me`.
+/// Routes under `/api/v1/me`.
 pub(crate) fn routes(state: ViewsState) -> OpenApiRouter {
     OpenApiRouter::new()
         .routes(routes!(list_views, create_view))
@@ -701,7 +703,7 @@ pub(crate) fn routes(state: ViewsState) -> OpenApiRouter {
         .with_state(Arc::new(state))
 }
 
-/// Xoá view riêng của người dùng bị xoá (dữ liệu cá nhân); view chung giữ lại.
+/// Deletes the personal views of a deleted user (personal data); shared views are kept.
 pub(crate) async fn forget_user<C: ConnectionTrait>(
     connection: &C,
     tenant: &TenantContext,
@@ -717,7 +719,7 @@ pub(crate) async fn forget_user<C: ConnectionTrait>(
     Ok(())
 }
 
-/// Bản xuất dữ liệu cá nhân: view người dùng đã lưu.
+/// Personal-data export: the views the user saved.
 pub(crate) async fn export_user(
     tenant: &TenantContext,
     user_id: Uuid,
@@ -745,7 +747,7 @@ pub(crate) async fn export_user(
         .collect()
 }
 
-/// Migration tạo bảng `kernel_saved_views` (cấp khách hàng, mọi database dữ liệu).
+/// Migration that creates the table `kernel_saved_views` (tenant level, every data database).
 pub(crate) struct CreateSavedViews;
 
 impl MigrationName for CreateSavedViews {

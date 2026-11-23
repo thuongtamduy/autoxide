@@ -1,5 +1,5 @@
-//! Cửa hàng ứng dụng giả cho test (bước 69 P4): ký bằng chứng mua và thông báo máy chủ bằng một khoá
-//! của bài test, kiểm lại y như bộ cài đặt thật kiểm chữ ký của Apple / Google.
+//! A fake app store for tests (step 69 P4): signs purchase proofs and server notifications with one key
+//! of the test, and verifies them just as the real implementation verifies Apple / Google signatures.
 
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::secret::sha256;
@@ -9,7 +9,7 @@ use autoxide_kernel::store::{
 use autoxide_kernel::time::Timestamp;
 use serde_json::{Value, json};
 
-/// Cửa hàng giả: `proof` / `notification_body` tạo dữ liệu đã ký; `verify` / `notification` kiểm.
+/// A fake store: `proof` / `notification_body` produce signed data; `verify` / `notification` check it.
 #[derive(Debug, Clone)]
 pub struct FakeStorePurchases {
     store: AppStore,
@@ -25,13 +25,13 @@ impl FakeStorePurchases {
         sha256(&format!("{}:{payload}", self.key))
     }
 
-    /// Bằng chứng mua (như giao dịch đã ký app gửi lên) của `purchase`.
+    /// Purchase proof (like the signed transaction the app sends up) for `purchase`.
     pub fn proof(&self, purchase: &StorePurchase) -> String {
         let payload = payload(purchase).to_string();
         format!("{payload}.{}", self.sign(&payload))
     }
 
-    /// Thân webhook (như thông báo máy chủ của cửa hàng) mang mã `id` và trạng thái `purchase`.
+    /// Webhook body (like the store's server notification) carrying code `id` and the state of `purchase`.
     pub fn notification_body(&self, id: &str, purchase: &StorePurchase) -> Vec<u8> {
         let payload = payload(purchase).to_string();
         let signature = self.sign(&payload);

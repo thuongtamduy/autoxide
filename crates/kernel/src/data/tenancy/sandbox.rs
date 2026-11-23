@@ -1,13 +1,14 @@
-//! Khách thử nghiệm (sandbox, bước 38, D-232, D-20261118-step38-sandbox).
+//! Test tenants (sandbox, step 38, D-232, D-20261118-step38-sandbox).
 //!
-//! Chủ khách tạo một bản thử mang CẤU HÌNH của khách thật (không mang dữ liệu cá nhân): một dòng
-//! `kernel_tenants` loại `sandbox`, `sandbox_of` = khách gốc, `parent_id` NULL (không phải khách con,
-//! không nằm trong `descendants` của ai), cùng placement với khách gốc — dữ liệu không rời vị trí
-//! khách đã chọn; cách ly bằng `tenant_id`. Sandbox tự hết hạn (`AUTOXIDE_TENANCY_SANDBOX_DAYS`),
-//! gia hạn được, xoá theo luồng xoá khách. Nhân viên của khách gốc vào sandbox bằng uỷ quyền (module
-//! `auth` nghe `kernel.sandbox_created`), header `Autoxide-Tenant` như vào khách con.
+//! A tenant owner creates a trial copy carrying the real tenant's CONFIGURATION (no personal data): one
+//! `kernel_tenants` row of kind `sandbox`, `sandbox_of` = the source tenant, `parent_id` NULL (not a child
+//! tenant, not in anyone's `descendants`), on the same placement as the source tenant, so data never leaves
+//! the location the tenant chose; isolation is by `tenant_id`. A sandbox expires by itself
+//! (`AUTOXIDE_TENANCY_SANDBOX_DAYS`), can be extended, and is deleted through the tenant erasure flow. Staff of
+//! the source tenant enter the sandbox by delegation (the `auth` module listens to `kernel.sandbox_created`),
+//! with the `Autoxide-Tenant` header as when entering a child tenant.
 //!
-//! Mọi response của sandbox mang `Autoxide-Sandbox: true` và `X-Robots-Tag: noindex, nofollow`
+//! Every sandbox response carries `Autoxide-Sandbox: true` and `X-Robots-Tag: noindex, nofollow`
 //! (`headers.rs`).
 
 mod copy;
@@ -46,13 +47,13 @@ pub use promote::{
 pub(crate) use service::Wiring;
 pub use service::{NewSandbox, Sandbox, SandboxCreated, TenantSandboxes};
 
-/// Loại khách (cột `kernel_tenants.kind`).
+/// Tenant kind (column `kernel_tenants.kind`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TenantKind {
-    /// Khách thật.
+    /// A real tenant.
     Production,
-    /// Bản thử của một khách thật (`sandbox_of`).
+    /// A trial copy of a real tenant (`sandbox_of`).
     Sandbox,
 }
 
@@ -73,14 +74,14 @@ impl TenantKind {
     }
 }
 
-/// Xem sandbox của khách (và hộp thư giả khi ở trong sandbox).
+/// View a tenant's sandboxes (and the fake mailbox when inside a sandbox).
 pub const SANDBOXES_READ: Permission = Permission::new(
     "kernel.sandboxes.read",
     "See the sandboxes (test copies) of your tenant, the kinds of records you can promote from \
      them and, inside a sandbox, the messages it held back.",
 );
 
-/// Tạo, gia hạn, xoá sandbox và đẩy thứ đã thử sang khách thật.
+/// Create, extend and delete sandboxes, and push what was tried to the real tenant.
 pub const SANDBOXES_MANAGE: Permission = Permission::new(
     "kernel.sandboxes.manage",
     "Create, extend and delete sandboxes of your tenant (test copies with its configuration, no \
@@ -88,8 +89,8 @@ pub const SANDBOXES_MANAGE: Permission = Permission::new(
 )
 .with_risk(crate::access::Risk::Destructive);
 
-/// Số sandbox một khách giữ cùng lúc. Gói không đặt thì 1 — kể cả khách không có thuê bao (mỗi
-/// sandbox tốn tài nguyên, D-232).
+/// Number of sandboxes a tenant holds at once. 1 when the plan sets nothing, including tenants with no
+/// subscription (each sandbox costs resources, D-232).
 pub const SANDBOXES_LIMIT: Limit = Limit::count(
     "kernel.sandboxes",
     "Sandboxes (test copies) a tenant can keep at the same time; 1 when the plan does not say.",
@@ -114,7 +115,7 @@ pub(crate) const SANDBOX_PROMOTED: EventInfo = EventInfo::new(
      were `created_draft`, `updated_draft`, `unchanged`, `conflict`).",
 );
 
-/// Số ngày một sandbox sống nếu không gia hạn.
+/// Number of days a sandbox lives if not extended.
 pub const SANDBOX_DAYS: Setting = Setting::new(
     "AUTOXIDE_TENANCY_SANDBOX_DAYS",
     "Days a sandbox (test copy of a tenant) lives unless extended (1 to 365); extending sets it \
@@ -122,7 +123,7 @@ pub const SANDBOX_DAYS: Setting = Setting::new(
 )
 .with_default("30");
 
-/// Trần của tuỳ chọn `products` khi tạo sandbox.
+/// Cap of the `products` option when creating a sandbox.
 pub const SANDBOX_MAX_PRODUCTS: Setting = Setting::new(
     "AUTOXIDE_TENANCY_SANDBOX_MAX_PRODUCTS",
     "Most products a new sandbox may copy from its tenant (0 to 1000); the `products` asked when \
@@ -130,8 +131,8 @@ pub const SANDBOX_MAX_PRODUCTS: Setting = Setting::new(
 )
 .with_default("50");
 
-/// URL webhook mà sandbox được gửi thật (cài đặt của khách, đặt TRONG sandbox): mỗi dòng (hay dấu
-/// phẩy) một tiền tố. Mặc định rỗng: mọi webhook của sandbox vào hộp thư giả.
+/// Webhook URLs that a sandbox may really send to (a tenant setting, set INSIDE the sandbox): one prefix per
+/// line (or comma). Empty by default: every sandbox webhook goes to the fake mailbox.
 pub const WEBHOOK_URLS: crate::tenancy::TenantSetting = crate::tenancy::TenantSetting::new(
     "kernel.sandbox.webhook_urls",
     "Only in a sandbox: URL prefixes its webhooks may really be sent to, one per line or separated \
@@ -153,8 +154,8 @@ fn check_webhook_urls(raw: &str) -> Result<(), crate::error::FieldError> {
     }
 }
 
-/// Webhook tới `url` của khách `tenant` được gửi thật: khách thật luôn được; sandbox chỉ khi `url`
-/// bắt đầu bằng một tiền tố trong [`WEBHOOK_URLS`]. Module `webhooks` gọi trước khi gửi.
+/// Whether a webhook to `url` of tenant `tenant` is really sent: a real tenant always is; a sandbox only when
+/// `url` starts with a prefix in [`WEBHOOK_URLS`]. The `webhooks` module calls it before sending.
 pub async fn webhook_allowed(
     settings: &dyn crate::tenancy::TenantSettings,
     tenant: &crate::tenancy::TenantContext,
@@ -171,25 +172,25 @@ fn prefixes(raw: &str) -> impl Iterator<Item = &str> {
     raw.split([',', '\n']).map(str::trim).filter(|prefix| !prefix.is_empty())
 }
 
-/// `url` bắt đầu bằng `prefix` và tiền tố kết thúc ở ranh giới (hết chuỗi, `/`, `?`, `#`) — để
-/// `https://a.example` không mở cửa cho `https://a.example.evil.com`.
+/// `url` starts with `prefix` and the prefix ends at a boundary (end of string, `/`, `?`, `#`), so that
+/// `https://a.example` does not open the door for `https://a.example.evil.com`.
 fn url_matches(url: &str, prefix: &str) -> bool {
     let Some(rest) = url.strip_prefix(prefix) else { return false };
     prefix.ends_with('/') || rest.is_empty() || rest.starts_with(['/', '?', '#'])
 }
 
-/// Loại job sao cấu hình rồi kích hoạt sandbox (`unique_key = "sandbox_copy:{sandbox}"`).
+/// Job kind that copies the configuration and then activates the sandbox (`unique_key = "sandbox_copy:{sandbox}"`).
 pub(crate) const SANDBOX_COPY: &str = "kernel.sandbox_copy";
-/// Lịch xoá sandbox hết hạn (mỗi giờ, database điều khiển).
+/// Schedule that deletes expired sandboxes (every hour, control database).
 pub(crate) const EXPIRE_SANDBOXES: &str = "kernel.expire_sandboxes";
 
-/// `tenancy.sandbox_not_found` (404): không có sandbox này của khách người gọi.
+/// `tenancy.sandbox_not_found` (404): the caller's tenant has no such sandbox.
 pub fn sandbox_not_found(id: uuid::Uuid) -> Error {
     Error::not_found("tenancy.sandbox_not_found", "There is no sandbox `{id}` of this tenant.")
         .with_param("id", id)
 }
 
-/// `tenancy.sandbox_nested` (422): tạo sandbox từ một sandbox.
+/// `tenancy.sandbox_nested` (422): creating a sandbox from a sandbox.
 pub fn sandbox_nested() -> Error {
     Error::new(
         ErrorKind::Validation,
@@ -198,8 +199,9 @@ pub fn sandbox_nested() -> Error {
     )
 }
 
-/// `tenancy.sandbox_needs_tenant_access` (403): nhân sự nền tảng tạo sandbox (sao cấu hình, sản
-/// phẩm) của khách khác mà chưa vào khách đó bằng lần cấp quyền vào hỗ trợ (D-20261121-export-entry).
+/// `tenancy.sandbox_needs_tenant_access` (403): platform staff create a sandbox (copying configuration,
+/// products) of another tenant without having entered that tenant through a support-access grant
+/// (D-20261121-export-entry).
 pub fn sandbox_needs_tenant_access(tenant: uuid::Uuid) -> Error {
     Error::forbidden(
         "tenancy.sandbox_needs_tenant_access",
@@ -209,7 +211,7 @@ pub fn sandbox_needs_tenant_access(tenant: uuid::Uuid) -> Error {
     .with_param("tenant", tenant)
 }
 
-/// `tenancy.sandbox_forbidden` (403): việc chỉ làm được ở khách thật.
+/// `tenancy.sandbox_forbidden` (403): an action that can only be done at a real tenant.
 pub fn sandbox_forbidden(action: &str) -> Error {
     Error::forbidden(
         "tenancy.sandbox_forbidden",

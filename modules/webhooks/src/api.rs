@@ -1,2 +1,2 @@
-//! Hợp đồng của module `webhooks` cho module khác: không có gì riêng. Module nhận mọi
-//! event qua `Module::subscriptions` và gửi đi; module khác không cần gọi nó.
+//! Contract of the `webhooks` module for other modules: nothing of its own. The module receives every
+//! event through `Module::subscriptions` and delivers it outward; other modules need not call it.

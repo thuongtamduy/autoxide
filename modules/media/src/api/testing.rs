@@ -1,8 +1,8 @@
-//! Thư viện media giả dùng chung cho test của module khác (feature `testing`, chỉ khai ở
-//! `[dev-dependencies]`; quy ước D-20261122-module-test-fakes).
+//! Shared fake media library for other modules' tests (feature `testing`, declared only in
+//! `[dev-dependencies]`; convention D-20261122-module-test-fakes).
 //!
-//! Giữ item trong bộ nhớ: ID không có (hay đã xoá) thì không trả, như module `media` thật. Mặc định
-//! một item là ảnh `image/jpeg` 800×800, `alt` rỗng, chưa có người tải lên.
+//! Keeps items in memory: an ID that does not exist (or was deleted) is not returned, like the real `media`
+//! module. By default an item is a `image/jpeg` image of 800×800, empty `alt`, no uploader.
 //!
 //! ```ignore
 //! let media = Arc::new(FakeMedia::new());
@@ -23,21 +23,21 @@ use super::{AiImage, Media, MediaRef, MediaVisibility};
 struct Item {
     media: MediaRef,
     uploader: Option<Uuid>,
-    /// `alt` theo ngôn ngữ (`find_many_in`).
+    /// `alt` by language (`find_many_in`).
     alts: HashMap<String, String>,
     ai_image: Option<AiImage>,
 }
 
 #[derive(Default)]
 struct State {
-    /// Theo thứ tự thêm.
+    /// In the order added.
     items: Vec<Item>,
-    /// `find_many_in` trả `alt` là `[<ngôn ngữ>]` khi item không có bản dịch: test thấy ngay ảnh
-    /// được tra theo ngôn ngữ nào.
+    /// `find_many_in` returns `alt` as `[<language>]` when the item has no translation: tests see at once
+    /// which language the image was looked up in.
     tag_locale: bool,
 }
 
-/// Thư viện media giả. Công bố bằng `TestApp::builder(…).provide::<dyn Media>(media.clone())`.
+/// Fake media library. Publish it with `TestApp::builder(…).provide::<dyn Media>(media.clone())`.
 #[derive(Default)]
 pub struct FakeMedia {
     state: Mutex<State>,
@@ -48,7 +48,7 @@ fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
-/// Item mặc định mang ID `id`: ảnh JPEG 800×800, công khai hay riêng tư.
+/// Default item with ID `id`: an 800×800 JPEG image, public or private.
 pub fn image(id: Uuid, public: bool) -> MediaRef {
     MediaRef {
         id,
@@ -68,19 +68,19 @@ impl FakeMedia {
         FakeMedia::default()
     }
 
-    /// Bật: `find_many_in` trả `alt` là `[<ngôn ngữ>]` cho item không có bản dịch ở ngôn ngữ đó.
+    /// When on: `find_many_in` returns `alt` as `[<language>]` for an item with no translation in that language.
     #[must_use]
     pub fn tagging_locale(self) -> Self {
         lock(&self.state).tag_locale = true;
         self
     }
 
-    /// Thêm ảnh mặc định (công khai hay riêng tư); trả ID mới.
+    /// Adds a default image (public or private); returns the new ID.
     pub fn add(&self, public: bool) -> Uuid {
         self.add_with(public, |_| {})
     }
 
-    /// Như [`add`](Self::add), sửa item trước khi thêm (kích thước, `alt`, loại…).
+    /// Like [`add`](Self::add), editing the item before adding it (size, `alt`, type…).
     pub fn add_with(&self, public: bool, edit: impl FnOnce(&mut MediaRef)) -> Uuid {
         let mut media = image(Uuid::now_v7(), public);
         edit(&mut media);
@@ -89,7 +89,7 @@ impl FakeMedia {
         id
     }
 
-    /// Thêm (hay thay) item mang đúng ID của `media`.
+    /// Adds (or replaces) the item carrying the exact ID of `media`.
     pub fn insert(&self, media: MediaRef) {
         let mut state = lock(&self.state);
         if let Some(found) = state.items.iter_mut().find(|item| item.media.id == media.id) {
@@ -99,14 +99,14 @@ impl FakeMedia {
         state.items.push(Item { media, uploader: None, alts: HashMap::new(), ai_image: None });
     }
 
-    /// Ảnh riêng tư mới do người `user` tải lên.
+    /// A new private image uploaded by user `user`.
     pub fn upload(&self, user: Uuid) -> Uuid {
         let id = self.add(false);
         self.edit(id, |item| item.uploader = Some(user));
         id
     }
 
-    /// Đổi công khai / riêng tư của item `id`.
+    /// Changes item `id` between public and private.
     pub fn set_visibility(&self, id: Uuid, public: bool) {
         self.edit(id, |item| {
             item.media.visibility =
@@ -114,19 +114,19 @@ impl FakeMedia {
         });
     }
 
-    /// `alt` của item `id` ở ngôn ngữ `locale` (`find_many_in`).
+    /// `alt` of item `id` in language `locale` (`find_many_in`).
     pub fn set_alt(&self, id: Uuid, locale: &str, alt: &str) {
         self.edit(id, |item| {
             item.alts.insert(locale.to_owned(), alt.to_owned());
         });
     }
 
-    /// Ảnh `ai_image` trả cho item `id` (mặc định `None`, như ảnh không gửi được cho AI).
+    /// The `ai_image` returned for item `id` (default `None`, as for an image that cannot be sent to AI).
     pub fn set_ai_image(&self, id: Uuid, image: AiImage) {
         self.edit(id, |item| item.ai_image = Some(image));
     }
 
-    /// Xoá item `id` (như đưa vào thùng rác).
+    /// Deletes item `id` (as if moved to the trash).
     pub fn remove(&self, id: Uuid) {
         lock(&self.state).items.retain(|item| item.media.id != id);
     }

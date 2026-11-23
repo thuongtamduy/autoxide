@@ -1,14 +1,14 @@
-//! Hộp việc theo người (bước 51 P10, D-201, D-212): hoãn một việc tới lúc nào đó (của riêng người
-//! hoãn) và giao việc cho một người (chung cho mọi người thấy việc). Bảng `kernel_work_states`
-//! (cấp khách hàng): dòng hoãn mang `user_id` của người hoãn; dòng giao mang `user_id` rỗng (UUID
-//! nil) và `assignee_id`.
+//! Per-person work inbox (step 51 P10, D-201, D-212): snooze a task until some time (private to the person
+//! who snoozes) and assign a task to a person (visible to everyone who sees the task). The table
+//! `kernel_work_states` (tenant level): a snooze row carries the `user_id` of the person who snoozed; an
+//! assignment row has an empty `user_id` (the nil UUID) and an `assignee_id`.
 //!
 //! - `POST /api/v1/me/work/{key}/snooze {until}`, `DELETE /api/v1/me/work/{key}/snooze`;
-//! - `POST /api/v1/me/work/{key}/assign {user_id}` (`null` bỏ giao) — người nhận phải có permission
-//!   của nguồn việc (hỏi bộ xác thực, `Authenticator::principal_of`).
+//! - `POST /api/v1/me/work/{key}/assign {user_id}` (`null` unassigns) — the assignee must have the permission
+//!   of the work source (asked of the authenticator, `Authenticator::principal_of`).
 //!
-//! Không có "Đã xử lý": việc tự hết khi dữ liệu không còn khớp (D-212). Dòng hoãn đã hết hạn của
-//! khách được dọn mỗi lần có người hoãn việc (không cần job riêng).
+//! There is no "Done": a task disappears by itself when the data no longer matches (D-212). A tenant's
+//! expired snooze rows are cleaned up each time someone snoozes a task (no separate job needed).
 
 use crate::time::Timestamp;
 use jiff::SignedDuration;
@@ -36,10 +36,10 @@ use crate::response::{Data, Problem};
 use crate::tenancy::TenantContext;
 
 const TABLE: &str = "kernel_work_states";
-/// Hoãn tối đa chừng này ngày.
+/// Snooze for at most this many days.
 const MAX_SNOOZE_DAYS: i64 = 365;
 
-/// Trạng thái của một việc với người gọi.
+/// The state of a task for the caller.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct ItemState {
     pub snoozed_until: Option<Timestamp>,
@@ -50,7 +50,7 @@ fn now() -> Timestamp {
     Timestamp::now()
 }
 
-/// Trạng thái của các việc `keys` với `user_id`: hoãn của chính người đó, giao của ai cũng thấy.
+/// The state of tasks `keys` for `user_id`: their own snoozes, and assignments that anyone sees.
 pub(crate) async fn states(
     tenant: &TenantContext,
     user_id: Uuid,
@@ -175,7 +175,7 @@ pub(crate) struct WorkStatesState {
 }
 
 impl WorkStatesState {
-    /// Khoá `<nguồn>:<id>` của một nguồn người gọi được thấy; không thì 404 như không có việc.
+    /// Key `<source>:<id>` of a source the caller may see; otherwise 404, as if there were no task.
     async fn check_key(
         &self,
         tenant: &TenantContext,
@@ -348,7 +348,7 @@ async fn assign_work(
     Ok(Data { data: state.view(&tenant, &principal, &key).await? })
 }
 
-/// Route dưới `/api/v1/me`.
+/// Routes under `/api/v1/me`.
 pub(crate) fn routes(state: WorkStatesState) -> OpenApiRouter {
     OpenApiRouter::new()
         .routes(routes!(snooze_work, unsnooze_work))
@@ -356,7 +356,7 @@ pub(crate) fn routes(state: WorkStatesState) -> OpenApiRouter {
         .with_state(Arc::new(state))
 }
 
-/// Migration tạo bảng `kernel_work_states` (cấp khách hàng, mọi database dữ liệu).
+/// Migration that creates the table `kernel_work_states` (tenant level, every data database).
 pub(crate) struct CreateWorkStates;
 
 impl MigrationName for CreateWorkStates {

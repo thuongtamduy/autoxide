@@ -1,11 +1,11 @@
-//! Ghi log và số đo cho từng request: một dòng log khi request xong, kèm request id.
+//! Logging and metrics for each request: one log line when the request finishes, with the request id.
 //!
-//! Mọi log phát ra TRONG lúc xử lý request (từ handler, service) tự mang request id
-//! nhờ span `request` — tra một request id là ra toàn bộ dấu vết của request đó.
+//! Every log emitted WHILE handling a request (from a handler or service) carries the request id
+//! automatically via the `request` span - look up one request id to get the whole trace of that request.
 //!
-//! Chỉ ghi MẪU route đã khớp (vd `/api/v1/notes/{id}`), KHÔNG ghi đường dẫn thô, query string hay
-//! thân request: chúng có thể chứa token (link tải file số, trạng thái thanh toán, webhook của đối
-//! tác có khoá trong đường dẫn) hoặc dữ liệu cá nhân. Request không khớp route nào ghi `unmatched`.
+//! Only the matched route PATTERN is recorded (e.g. `/api/v1/notes/{id}`), NOT the raw path, query string
+//! or request body: these may contain a token (digital download links, payment status, partner webhooks
+//! with a key in the path) or personal data. A request that matches no route is recorded as `unmatched`.
 
 use std::sync::Arc;
 use std::time::Instant;
@@ -21,7 +21,7 @@ use crate::error::Error;
 use crate::ops::request_log::{CallerSlot, Finished, RequestLog, header_text};
 use opentelemetry::trace::TraceContextExt;
 
-/// Giá trị `http.route` của request không khớp route nào.
+/// The `http.route` value of a request that matches no route.
 const UNMATCHED: &str = "unmatched";
 
 pub(super) async fn log_requests(
@@ -124,12 +124,13 @@ pub(super) async fn log_requests(
     response
 }
 
-/// Span `request` của lớp log, cất trong extensions để phần tìm khách ghi `tenant_id` lên nó (bước 39 B7).
+/// The `request` span of the log layer, kept in extensions so the tenant lookup can record `tenant_id` on
+/// it (step 39 B7).
 #[derive(Clone)]
 pub(crate) struct RequestSpan(pub(crate) tracing::Span);
 
 impl RequestSpan {
-    /// Ghi khách lên span của request trong `extensions` (nếu có).
+    /// Records the tenant on the request's span in `extensions` (if present).
     pub(crate) fn note_tenant(
         extensions: &axum::http::Extensions,
         tenant: crate::tenancy::TenantId,

@@ -1,5 +1,5 @@
-//! Module nội bộ `antispam` (luôn đăng ký, ngay sau `kernel`): đọc cấu hình chống spam, công bố
-//! [`SpamGuard`] cho module khác, và phục vụ endpoint công khai lấy token form
+//! Internal module `antispam` (always registered, right after `kernel`): reads the anti-spam configuration,
+//! publishes [`SpamGuard`] for other modules, and serves the public form token endpoint
 //! `GET /api/v1/antispam/token`.
 
 use crate::time::Timestamp;
@@ -21,7 +21,7 @@ use crate::module::{Module, StartContext};
 use crate::response::{Data, Problem};
 use crate::secret::SecretKey;
 
-/// Tên của module nội bộ; module khác không được dùng tên này.
+/// Name of the internal module; other modules must not use this name.
 pub(crate) const NAME: &str = "antispam";
 
 #[derive(Default)]

@@ -1,18 +1,19 @@
-//! Token trong link của thư (huỷ đăng ký, xác nhận, xác minh email…) mang khách của nó (bước 33,
-//! D-281). Một cách làm cho mọi module gửi link có token: `newsletter`, `comments`, sau này `auth`.
+//! A token in an email link (unsubscribe, confirm, verify email...) carries its tenant (step 33,
+//! D-281). One way for every module that sends links with tokens: `newsletter`, `comments`, later `auth`.
 //!
-//! Người nhận bấm link từ hộp thư: request có thể tới tên miền chính, không header
-//! `Autoxide-Tenant` — không biết khách nào. Nên token của khách khác khách mặc định ghi ID khách
-//! ngay trong chuỗi: `t<UUID 32 chữ hex>.<phần thô>` ([`link_token`]). Endpoint tìm khách từ token
-//! ([`resolve_link_token`]) TRƯỚC khi tra bản băm của phần thô trong database của khách đó. Token
-//! của khách mặc định giữ nguyên dạng cũ (chỉ phần thô): cài đặt một khách và thư đã gửi không đổi.
+//! The recipient clicks the link from a mailbox: the request may arrive at the main domain, with no
+//! `Autoxide-Tenant` header, so the tenant is unknown. So a token of a tenant other than the default writes
+//! the tenant ID into the string itself: `t<32-hex UUID>.<raw part>` ([`link_token`]). The endpoint finds
+//! the tenant from the token ([`resolve_link_token`]) BEFORE looking up the hash of the raw part in that
+//! tenant's database. The token of the default tenant keeps the old form (the raw part only): a
+//! single-tenant installation and emails already sent do not change.
 //!
-//! Database chỉ lưu bản băm của **phần thô**, tra trong khách đã định tuyến. Ghép ID của khách
-//! khác với phần thô của khách này thì tra ở khách kia, không thấy — như token sai. Phần thô không
-//! được chứa dấu `.` (vd base64url), nên có dấu `.` nghĩa là có tiền tố khách.
+//! The database stores only the hash of the **raw part**, looked up in the routed tenant. Combining another
+//! tenant's ID with this tenant's raw part looks it up in the other tenant and finds nothing, like a wrong
+//! token. The raw part must not contain a `.` (e.g. base64url), so a `.` means there is a tenant prefix.
 //!
-//! Handler nhận token trong link dùng [`OptionalTenant`] thay cho `TenantContext`: khách của
-//! request nếu xác định được, `None` khi không (tên miền chính không header) — thay vì
+//! A handler that accepts a token from a link uses [`OptionalTenant`] instead of `TenantContext`: the request's
+//! tenant if it can be determined, `None` when not (main domain, no header), instead of
 //! `tenant_required`.
 
 use axum::extract::FromRequestParts;
@@ -22,11 +23,11 @@ use uuid::Uuid;
 use super::{DEFAULT_TENANT, DatabaseRegistry, TenantContext, TenantId, ensure_serving};
 use crate::error::{Error, ErrorKind};
 
-/// Token dài hơn mức này coi như sai (không ai cấp token dài thế; khỏi tra gì).
+/// A token longer than this counts as wrong (nobody issues a token that long; nothing to look up).
 const MAX_TOKEN_LEN: usize = 200;
 
-/// Token đặt vào link cho khách `tenant`, từ phần thô `raw` (không chứa `.`): khách mặc định giữ
-/// nguyên `raw`, khách khác thành `t<ID khách, 32 hex>.<raw>`.
+/// The token to put in a link for tenant `tenant`, from the raw part `raw` (containing no `.`): the default
+/// tenant keeps `raw` as is, other tenants become `t<tenant ID, 32 hex>.<raw>`.
 pub fn link_token(tenant: &TenantContext, raw: &str) -> String {
     if tenant.id() == DEFAULT_TENANT {
         raw.to_owned()
@@ -35,7 +36,7 @@ pub fn link_token(tenant: &TenantContext, raw: &str) -> String {
     }
 }
 
-/// Tách token của link: (khách ghi trong token, nếu có; phần thô). Sai dạng: `None`.
+/// Splits a link's token into: (the tenant written in the token, if any; the raw part). Wrong form: `None`.
 pub fn split_link_token(token: &str) -> Option<(Option<TenantId>, &str)> {
     let Some((prefix, raw)) = token.split_once('.') else {
         return Some((None, token));
@@ -45,16 +46,16 @@ pub fn split_link_token(token: &str) -> Option<(Option<TenantId>, &str)> {
     (!raw.is_empty() && !raw.contains('.')).then_some((Some(TenantId::from_uuid(id)), raw))
 }
 
-/// Khách và phần thô của token trong link. `request`: khách của request (`None`: không xác định
-/// được, vd tên miền chính không header).
+/// The tenant and raw part of a token in a link. `request`: the request's tenant (`None`: cannot be determined,
+/// e.g. main domain with no header).
 ///
-/// - Token có tiền tố: khách ghi trong token, tra qua `registry`. Khách không có, không phục vụ
-///   được (tạm khoá, bảo trì) hay token sai dạng → `Ok(None)`, như token sai: không lộ khách nào
-///   tồn tại.
-/// - Token không tiền tố: khách của request, không có thì khách mặc định (token cấp trước bước 33
-///   thuộc khách mặc định).
+/// - Token with a prefix: the tenant written in the token, looked up through `registry`. A tenant that does
+///   not exist, cannot be served (suspended, maintenance) or a malformed token → `Ok(None)`, like a wrong
+///   token: it does not reveal which tenant exists.
+/// - Token without a prefix: the request's tenant, else the default tenant (tokens issued before step 33
+///   belong to the default tenant).
 ///
-/// Lỗi khác của sổ database (vd database điều khiển không trả lời) trả về nguyên.
+/// Other errors of the database registry (e.g. the control database not answering) are returned as they are.
 pub async fn resolve_link_token<'t>(
     registry: &DatabaseRegistry,
     request: Option<&TenantContext>,
@@ -79,16 +80,16 @@ pub async fn resolve_link_token<'t>(
     Ok(Some((tenant, raw)))
 }
 
-/// Khách của request nếu xác định được (tên miền của khách, header `Autoxide-Tenant`,
-/// credential); `None` khi không xác định được (`tenant_required`, vd tên miền chính không
-/// header). Lỗi khác (khách tạm khoá, header trỏ khách khác credential…) vẫn trả về như
-/// `TenantContext`. Cho endpoint nhận token trong link: khách lấy từ token bằng
-/// [`resolve_link_token`].
+/// The request's tenant if it can be determined (the tenant's domain, header `Autoxide-Tenant`,
+/// credential); `None` when it cannot be determined (`tenant_required`, e.g. main domain with no header).
+/// Other errors (tenant suspended, header pointing to a tenant other than the credential's...) are still
+/// returned as for `TenantContext`. For endpoints that accept a token in a link: the tenant is taken from
+/// the token with [`resolve_link_token`].
 #[derive(Clone, Debug, Default)]
 pub struct OptionalTenant(pub Option<TenantContext>);
 
 impl OptionalTenant {
-    /// Khách của request, nếu xác định được.
+    /// The request's tenant, if it can be determined.
     pub fn get(&self) -> Option<&TenantContext> {
         self.0.as_ref()
     }

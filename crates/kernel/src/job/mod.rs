@@ -1,21 +1,21 @@
-//! Job queue: việc chạy nền, lưu trong database (không cần Redis).
+//! Job queue: background work, stored in the database (no Redis needed).
 //!
-//! 1. Module thêm [`jobs_migration`] vào migration của mình: bảng `<module>_jobs`.
-//! 2. Module đưa job vào hàng đợi bằng [`JobQueue::enqueue`] — trong transaction của
-//!    thay đổi dữ liệu nếu có, để job chỉ tồn tại khi thay đổi được lưu.
-//! 3. Module khai bộ chạy cho từng loại job (`Module::jobs`) và lịch định kỳ
+//! 1. A module adds [`jobs_migration`] to its own migrations: the `<module>_jobs` table.
+//! 2. A module puts a job on the queue with [`JobQueue::enqueue`] - inside the transaction of the data
+//!    change if there is one, so the job exists only when the change is saved.
+//! 3. A module declares the runner for each job kind (`Module::jobs`) and the periodic schedules
 //!    (`Module::schedules`).
-//! 4. [`Worker`] của kernel claim job (trait [`Claim`]: Postgres dùng
-//!    `FOR UPDATE SKIP LOCKED`, SQLite dùng một câu `UPDATE … RETURNING` — D-009), chạy
-//!    và ghi kết quả. Lỗi thì thử lại với backoff; quá số lần cho phép thì job nằm lại
-//!    với `failed_at` (dead-letter queue), xem và chạy lại bằng `autoxide jobs`.
+//! 4. The kernel's [`Worker`] claims jobs (the [`Claim`] trait: Postgres uses `FOR UPDATE SKIP LOCKED`,
+//!    SQLite uses a single `UPDATE … RETURNING` statement - D-009), runs them and records the result. On
+//!    failure it retries with backoff; beyond the allowed number of attempts the job stays with `failed_at`
+//!    set (dead-letter queue), to be viewed and re-run with `autoxide jobs`.
 //!
-//! Nhiều khách (bước 33): mỗi job mang khách (`tenant_id`; job của cả database mang
-//! [`NO_TENANT`](crate::tenancy::NO_TENANT)); worker duyệt mọi database được giao và chia lượt
-//! công bằng giữa các khách đang có job tới hạn — một khách không chiếm hết hàng đợi.
+//! Multiple tenants (step 33): each job carries its tenant (`tenant_id`; a job of the whole database
+//! carries [`NO_TENANT`](crate::tenancy::NO_TENANT)); the worker walks every assigned database and shares
+//! turns fairly among tenants that have due jobs - one tenant cannot take over the whole queue.
 //!
-//! Chạy **ít nhất một lần**: tiến trình chết giữa lúc chạy thì job được chạy lại khi
-//! hết hạn giữ. Bộ chạy phải chịu được việc chạy lại.
+//! Runs **at least once**: if a process dies mid-run, the job is run again when its hold expires. Runners
+//! must tolerate being run again.
 
 pub mod backlog;
 pub(crate) mod backlog_api;
@@ -41,7 +41,7 @@ pub use migration::{jobs_migration, tenant_table};
 pub use queue::{EnqueueOptions, JobQueue, JobRecord, JobStatus};
 pub use worker::{DEFAULT_MAX_ATTEMPTS, Worker};
 
-/// Nội dung của một job: kiểu đổi được sang JSON, gắn với loại job.
+/// The content of a job: a type convertible to JSON, tied to a job kind.
 ///
 /// ```
 /// use autoxide_kernel::job::Job;
@@ -57,11 +57,11 @@ pub use worker::{DEFAULT_MAX_ATTEMPTS, Worker};
 /// }
 /// ```
 pub trait Job: Serialize {
-    /// `<module>.<việc>`: module sở hữu job và bộ chạy của nó.
+    /// `<module>.<action>`: the module that owns the job and its runner.
     const KIND: &'static str;
 }
 
-/// Một job đang được chạy. Worker dựng; test dựng bằng [`JobContext::for_tenant`] /
+/// A job being run. Built by the worker; tests build it with [`JobContext::for_tenant`] /
 /// [`JobContext::for_database`].
 #[derive(Debug, Clone)]
 #[non_exhaustive]
@@ -69,11 +69,12 @@ pub struct JobContext {
     pub id: Uuid,
     pub kind: String,
     pub payload: Value,
-    /// Lần chạy thứ mấy (bắt đầu từ 1).
+    /// Which run this is (starting from 1).
     pub attempt: i32,
-    /// Khách của job; `None`: job của cả database (lịch dọn dẹp, [`JobQueue::enqueue_database`]).
+    /// The job's tenant; `None`: a job of the whole database (cleanup schedules,
+    /// [`JobQueue::enqueue_database`]).
     pub tenant: Option<TenantContext>,
-    /// Database chứa job (của khách, hay database job lịch đang quét).
+    /// The database holding the job (the tenant's, or the database a schedule job is sweeping).
     pub database: Database,
 }
 
@@ -122,13 +123,13 @@ impl JobContext {
     }
 }
 
-/// Bộ chạy một loại job. Trả lỗi thì job được chạy lại sau (backoff).
+/// The runner of one job kind. Returning an error makes the job run again later (backoff).
 #[async_trait::async_trait]
 pub trait JobHandler: Send + Sync {
     async fn run(&self, job: &JobContext) -> Result<(), Error>;
 }
 
-/// Bộ chạy cho loại job `kind` (`<module>.<việc>`).
+/// The runner for job kind `kind` (`<module>.<action>`).
 #[derive(Clone)]
 pub struct JobRegistration {
     kind: &'static str,
@@ -141,10 +142,11 @@ impl JobRegistration {
         JobRegistration { kind, handler, timeout: None }
     }
 
-    /// Cho job loại này chạy tối đa `limit` (mặc định: 4 phút 30 giây, dưới hạn giữ 5 phút của
-    /// worker). Dài hơn hạn giữ thì worker gia hạn giữ job định kỳ trong lúc chạy, để worker khác
-    /// không lấy lại nó và chạy chồng; mất quyền giữ (vd bị `autoxide jobs` trả về hàng đợi) thì job
-    /// bị dừng. Cho việc dài như backup (bước 39).
+    /// Lets jobs of this kind run for at most `limit` (default: 4 minutes 30 seconds, under the worker's 5
+    /// minute hold limit). If longer than the hold limit, the worker renews its hold on the job
+    /// periodically while it runs, so other workers do not take it again and run it concurrently; if the
+    /// hold is lost (e.g. returned to the queue by `autoxide jobs`) the job is stopped. For long work such
+    /// as backup (step 39).
     #[must_use]
     pub fn timeout(mut self, limit: Duration) -> Self {
         self.timeout = Some(limit);
@@ -170,18 +172,18 @@ impl std::fmt::Debug for JobRegistration {
     }
 }
 
-/// Lịch định kỳ: cứ mỗi `every`, đưa một job loại `kind` vào hàng đợi. Nhiều worker
-/// chạy cùng lúc vẫn chỉ có một job cho mỗi khoảng.
+/// A periodic schedule: every `every`, puts one job of kind `kind` on the queue. Even with several workers
+/// running at once there is only one job per interval.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct Schedule {
-    /// Tên lịch, duy nhất trong module: `<module>.<tên>`.
+    /// The schedule name, unique within the module: `<module>.<name>`.
     pub name: &'static str,
     pub kind: &'static str,
     pub every: Duration,
     pub payload: Value,
-    /// Chỉ đưa job vào hàng đợi của database điều khiển (placement `main`), không phải mọi
-    /// database: cho việc chỉ chạm bảng mặt điều khiển (vd tra lại tên miền riêng của khách).
+    /// Only puts jobs on the queue of the control database (placement `main`), not every database: for work
+    /// that touches only control-plane tables (e.g. re-checking a tenant's custom domain).
     pub control_only: bool,
 }
 
@@ -190,7 +192,7 @@ impl Schedule {
         Schedule { name, kind, every, payload: Value::Null, control_only: false }
     }
 
-    /// Chỉ chạy trên database điều khiển (xem [`Schedule::control_only`]).
+    /// Runs only on the control database (see [`Schedule::control_only`]).
     #[must_use]
     pub const fn on_control_only(mut self) -> Self {
         self.control_only = true;
@@ -198,17 +200,17 @@ impl Schedule {
     }
 }
 
-/// Tên bảng job của module `module`.
+/// The job table name of module `module`.
 pub(crate) fn table_name(module: &str) -> String {
     format!("{module}_jobs")
 }
 
-/// Module sở hữu loại job `kind` (phần trước dấu chấm đầu tiên).
+/// The module that owns job kind `kind` (the part before the first dot).
 pub(crate) fn module_of(kind: &str) -> Option<&str> {
     kind.split_once('.').map(|(module, _)| module)
 }
 
-/// Lỗi khi một module dùng loại job của module khác.
+/// The error when a module uses a job kind of another module.
 pub(crate) fn foreign_kind(module: &str, kind: &str) -> Error {
     Error::internal(format!(
         "module `{module}` cannot use job kind `{kind}`: job kinds of a module start with \

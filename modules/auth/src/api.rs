@@ -1,98 +1,98 @@
-//! Hợp đồng của module `auth` cho module khác: chỉ những gì ở đây được dùng từ
-//! bên ngoài (`autoxide_auth::api::…`).
+//! Contract of the `auth` module for other modules: only what is here may be used from
+//! outside (`autoxide_auth::api::…`).
 //!
-//! Module khác lấy trait lúc khởi động:
+//! Other modules obtain the trait at startup:
 //!
 //! ```text
 //! let users = context.require::<dyn autoxide_auth::api::Users>()?;
 //! ```
 //!
-//! Module đó phải đăng ký SAU `auth` trong `crates/app/src/modules.rs`.
+//! That module must be registered AFTER `auth` in `crates/app/src/modules.rs`.
 
 use autoxide_kernel::error::Error;
 use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::time::Timestamp;
 use uuid::Uuid;
 
-/// Một tài khoản người dùng. Không bao giờ mang mật khẩu hay hash của nó.
+/// A user account. Never carries a password or its hash.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct User {
     pub id: Uuid,
-    /// Email đã chuẩn hoá (bỏ khoảng trắng hai đầu, chữ thường). Duy nhất.
+    /// Normalized email (surrounding whitespace removed, lowercased). Unique.
     pub email: String,
-    /// Tên hiển thị.
+    /// Display name.
     pub name: String,
-    /// Lúc tài khoản bị khoá; `None` là đang hoạt động.
+    /// When the account was locked; `None` means active.
     pub disabled_at: Option<Timestamp>,
-    /// Lúc chủ tài khoản xác nhận `email` là của mình (qua mail); `None`: chưa xác minh.
+    /// When the account owner confirmed (by mail) that `email` is theirs; `None`: not verified.
     pub email_verified_at: Option<Timestamp>,
     pub created_at: Timestamp,
     pub updated_at: Timestamp,
-    /// Nhân sự (có role) hay người mua của khách (không permission nào) — bước 34, D-309.
+    /// Staff (has roles) or a tenant's buyer (no permissions) — step 34, D-309.
     pub realm: autoxide_kernel::access::Realm,
-    /// Ngôn ngữ ưa thích (`en`, `vi`) cho mail, thông báo gửi chậm; `None`: theo request (D-308).
+    /// Preferred language (`en`, `vi`) for mail and deferred notifications; `None`: follow the request (D-308).
     pub locale: Option<String>,
-    /// Múi giờ IANA ưa thích; `None`: chưa đặt.
+    /// Preferred IANA time zone; `None`: not set.
     pub time_zone: Option<String>,
 }
 
 impl User {
-    /// Tài khoản còn hoạt động (chưa bị khoá).
+    /// The account is still active (not locked).
     pub fn is_active(&self) -> bool {
         self.disabled_at.is_none()
     }
 }
 
-/// Tra người dùng. Module khác dùng trait này để kiểm một ID người dùng có tồn
-/// tại không (không có foreign key xuyên module — D-025) và để hiển thị tên.
+/// Looks up users. Other modules use this trait to check that a user ID exists
+/// (no cross-module foreign key — D-025) and to display names.
 //
 // `#[async_trait]`: Rust chưa cho gọi hàm `async` của trait qua `dyn Trait`; macro
 // này đổi hàm `async` thành hàm trả về `Box<dyn Future>` để gọi được.
 #[async_trait::async_trait]
 pub trait Users: Send + Sync {
-    /// Người dùng có ID `id` của khách `tenant`, hoặc `None` nếu không có.
+    /// The user with ID `id` of tenant `tenant`, or `None` if there is none.
     async fn find(&self, tenant: &TenantContext, id: Uuid) -> Result<Option<User>, Error>;
 }
 
-/// Quản trị viên của một khách: người dùng còn hoạt động có role mang mọi permission (role `admin`).
-/// Module `notifications` dùng để gửi thông báo của nền tảng (thuê bao quá hạn, sắp chạm hạn mức…)
-/// tới người quản trị mọi khách (bước 35, D-348).
+/// A tenant's administrator: an active user with a role carrying every permission (role `admin`).
+/// The `notifications` module uses it to send platform notifications (overdue subscription, nearing a limit…)
+/// to the administrators of every tenant (step 35, D-348).
 #[async_trait::async_trait]
 pub trait TenantAdmins: Send + Sync {
-    /// Quản trị viên còn hoạt động của khách `tenant`, theo thứ tự ID.
+    /// Active administrators of tenant `tenant`, ordered by ID.
     async fn admins(&self, tenant: &TenantContext) -> Result<Vec<User>, Error>;
 }
 
-/// Dữ liệu để tạo một tài khoản.
+/// Data to create an account.
 #[derive(Debug, Clone)]
 pub struct NewAccount {
     pub email: String,
     pub name: String,
-    /// `None`: tài khoản chưa có mật khẩu, chưa đăng nhập bằng mật khẩu được.
+    /// `None`: the account has no password yet and cannot sign in with a password.
     pub password: Option<String>,
-    /// Gán role `admin` (mọi permission).
+    /// Assign the `admin` role (every permission).
     pub admin: bool,
 }
 
-/// Tạo tài khoản. Binary dùng trait này cho lệnh `autoxide user create`; nó không
-/// kiểm permission — bên gọi chịu trách nhiệm (lệnh CLI chạy với quyền của người
-/// vận hành máy chủ).
+/// Creates an account. The binary uses this trait for the `autoxide user create` command; it does not
+/// check permissions — the caller is responsible (the CLI command runs with the authority of the
+/// server operator).
 #[async_trait::async_trait]
 pub trait Accounts: Send + Sync {
-    /// Tạo tài khoản. Lỗi: email sai hoặc đã có (`auth.email_taken`), mật khẩu không
-    /// đạt luật độ dài (`validation_failed`).
+    /// Creates an account. Errors: invalid or already used email (`auth.email_taken`), password that
+    /// fails the length rules (`validation_failed`).
     async fn create(&self, tenant: &TenantContext, account: NewAccount) -> Result<User, Error>;
 }
 
-/// Lời mời mới cho lệnh `autoxide user invite` và việc cấp phát khách (bước 35).
+/// A new invitation for the `autoxide user invite` command and for tenant provisioning (step 35).
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct NewInvitation {
     pub email: String,
     pub name: Option<String>,
-    /// Tên các role của khách gán khi người được mời chấp nhận.
+    /// Names of the tenant's roles assigned when the invitee accepts.
     pub roles: Vec<String>,
-    /// Nút của các role; `None`: nút gốc.
+    /// Branch of the roles; `None`: the root branch.
     pub org_id: Option<Uuid>,
 }
 
@@ -106,14 +106,14 @@ impl NewInvitation {
         self
     }
 
-    /// Tên hiển thị gợi ý cho người được mời.
+    /// Suggested display name for the invitee.
     pub fn named(mut self, name: impl Into<String>) -> Self {
         self.name = Some(name.into());
         self
     }
 }
 
-/// Lời mời vừa tạo; mail đi trong ít phút (job).
+/// The invitation just created; the mail goes out within a few minutes (job).
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct InvitationSummary {
@@ -128,11 +128,11 @@ impl InvitationSummary {
     }
 }
 
-/// Mời người dùng qua email (D-312). Không kiểm permission — bên gọi chịu trách nhiệm (lệnh CLI
-/// chạy với quyền của người vận hành, cấp phát của nền tảng).
+/// Invites a user by email (D-312). Does not check permissions — the caller is responsible (the CLI command
+/// runs with the operator's authority, platform provisioning).
 #[async_trait::async_trait]
 pub trait Invitations: Send + Sync {
-    /// Mời `invitation.email` vào khách `tenant`. Lỗi: email sai, role không có
+    /// Invites `invitation.email` to tenant `tenant`. Errors: invalid email, unknown role
     /// (`validation_failed`).
     async fn invite(
         &self,
@@ -141,19 +141,20 @@ pub trait Invitations: Send + Sync {
     ) -> Result<InvitationSummary, Error>;
 }
 
-/// Việc của người vận hành máy chủ khi không ai đăng nhập được để làm qua API. Binary dùng cho
-/// lệnh `autoxide user reset-mfa`; không kiểm permission — lệnh CLI chạy với quyền của người
-/// vận hành (D-159).
+/// Tasks for the server operator when no one can sign in to do them through the API. The binary uses it for the
+/// `autoxide user reset-mfa` command; does not check permissions — the CLI command runs with the operator's
+/// authority (D-159).
 #[async_trait::async_trait]
 pub trait AccountRecovery: Send + Sync {
-    /// Tắt xác thực hai bước (TOTP và recovery code) của tài khoản có email `email`, như quản
-    /// trị viên làm qua `DELETE /api/v1/auth/users/{id}/mfa`: cho admin duy nhất mất thiết bị.
-    /// Lỗi: không có tài khoản này (`auth.account_not_found`).
+    /// Turns off two-step verification (TOTP and recovery codes) of the account with email `email`, as an
+    /// administrator does through `DELETE /api/v1/auth/users/{id}/mfa`: for the sole admin who lost their
+    /// device. Errors: no such account (`auth.account_not_found`).
     async fn reset_mfa(&self, tenant: &TenantContext, email: &str) -> Result<User, Error>;
 
-    /// Gỡ mọi passkey của tài khoản có email `email`, như quản trị viên làm qua
-    /// `DELETE /api/v1/auth/users/{id}/passkeys`: cho admin duy nhất mất thiết bị (đăng nhập lại
-    /// bằng mật khẩu). Trả tài khoản và số passkey đã gỡ. Lỗi: `auth.account_not_found`.
+    /// Removes every passkey of the account with email `email`, as an administrator does through
+    /// `DELETE /api/v1/auth/users/{id}/passkeys`: for the sole admin who lost their device (then signs in
+    /// again with a password). Returns the account and the number of passkeys removed. Errors:
+    /// `auth.account_not_found`.
     async fn remove_passkeys(
         &self,
         tenant: &TenantContext,
@@ -161,20 +162,20 @@ pub trait AccountRecovery: Send + Sync {
     ) -> Result<(User, u64), Error>;
 }
 
-/// Mã một lần gửi tới số điện thoại đã gửi đi (bước 47, đăng nhập bằng số).
+/// A one-time code was sent to a phone number (step 47, sign-in by phone number).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PhoneCodeSent {
-    /// ID của mã; người dùng gửi lại cùng mã họ nhận được.
+    /// ID of the code; the user submits back the same code they received.
     pub id: Uuid,
     pub expires_at: Timestamp,
 }
 
-/// Gửi và kiểm mã một lần qua SMS cho đăng nhập bằng số điện thoại (bước 47,
-/// D-20261120-phone-accounts). `compliance` cài (giữ quy tắc số được nhận, giới hạn gửi, bên gửi SMS)
-/// và cắm vào bằng [`AuthExtensions::set_phone_codes`] vì đăng ký sau `auth`.
+/// Sends and verifies one-time codes over SMS for phone-number sign-in (step 47, D-20261120-phone-accounts).
+/// `compliance` implements it (holding the rules for accepted numbers, send limits, the SMS sender) and plugs
+/// it in with [`AuthExtensions::set_phone_codes`] because it registers after `auth`.
 #[async_trait::async_trait]
 pub trait PhoneCodes: Send + Sync {
-    /// Gửi mã tới số `phone` (chưa chuẩn hoá). Lỗi khi số không được nhận, gửi quá nhiều, SMS hỏng.
+    /// Sends a code to number `phone` (not normalized). Errors when the number is not accepted, too many sends, or SMS fails.
     async fn send(
         &self,
         tenant: &TenantContext,
@@ -182,7 +183,7 @@ pub trait PhoneCodes: Send + Sync {
         ip: Option<std::net::IpAddr>,
     ) -> Result<PhoneCodeSent, Error>;
 
-    /// Kiểm mã `code` của `id`: đúng, còn hạn, chưa dùng → số đã xác thực (dùng một lần).
+    /// Verifies code `code` of `id`: correct, unexpired, unused → the verified number (single use).
     async fn verify(
         &self,
         tenant: &TenantContext,
@@ -190,8 +191,9 @@ pub trait PhoneCodes: Send + Sync {
         code: &str,
     ) -> Result<autoxide_kernel::sms::PhoneNumber, Error>;
 
-    /// Ghi số vừa xác thực là số của tài khoản `user_id` (cho module khác biết qua
-    /// `AccountVerification`). Bỏ qua, không lỗi, khi quy tắc của khách không cho thêm tài khoản dùng số.
+    /// Records the number just verified as the number of account `user_id` (so other modules learn of it
+    /// through `AccountVerification`). Ignored, without error, when the tenant's rules do not allow adding an
+    /// account that uses the number.
     async fn record(
         &self,
         tenant: &TenantContext,
@@ -200,8 +202,8 @@ pub trait PhoneCodes: Send + Sync {
     ) -> Result<(), Error>;
 }
 
-/// Điểm cắm của `auth` cho module đăng ký sau (giống `OrderExtensions` của `orders`).
+/// Extension point of `auth` for modules registered later (like `OrderExtensions` of `orders`).
 pub trait AuthExtensions: Send + Sync {
-    /// Cắm bộ gửi / kiểm mã cho đăng nhập bằng số. Cắm lần hai: lỗi.
+    /// Plugs in the sender / verifier of codes for phone-number sign-in. Plugging a second time: error.
     fn set_phone_codes(&self, codes: std::sync::Arc<dyn PhoneCodes>) -> Result<(), Error>;
 }

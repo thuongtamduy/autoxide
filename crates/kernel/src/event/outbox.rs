@@ -1,4 +1,4 @@
-//! Ghi event vào bảng event của module, trong transaction của bên gọi.
+//! Records an event into the module's event table, inside the caller's transaction.
 
 use crate::time::Timestamp;
 use sea_orm::ConnectionTrait;
@@ -11,13 +11,13 @@ use super::{Actor, Event, table_name};
 use crate::error::Error;
 use crate::tenancy::TenantContext;
 
-/// Nơi một module ghi event của mình. Lấy bằng `StartContext::outbox()` lúc khởi
-/// động; clone rẻ.
+/// Where a module records its events. Obtained with `StartContext::outbox()` at
+/// startup; cheap to clone.
 #[derive(Debug, Clone)]
 pub struct Outbox {
     module: &'static str,
     table: Arc<str>,
-    /// Đánh thức bộ phát khi có event mới, thay vì chờ tới lượt hỏi kế tiếp.
+    /// Wakes the dispatcher when a new event arrives, instead of waiting for the next polling turn.
     wake: Arc<Notify>,
 }
 
@@ -26,15 +26,15 @@ impl Outbox {
         Outbox { module, table: table_name(module).into(), wake }
     }
 
-    /// `Outbox` đứng riêng, không nối với bộ phát của chương trình — cho test của
-    /// module. Trong chương trình thật, lấy bằng `StartContext::outbox`.
+    /// A standalone `Outbox`, not connected to the program's dispatcher - for a module's
+    /// tests. In the real program, obtain it with `StartContext::outbox`.
     pub fn standalone(module: &'static str) -> Self {
         Outbox::with_wake(module, Arc::new(Notify::new()))
     }
 
-    /// Ghi `event` của khách `tenant` do `actor` gây ra, về bản ghi `subject` (dạng
-    /// `<loại>:<id>`, nếu có). Gọi với transaction đang ghi thay đổi: event chỉ tồn tại khi
-    /// transaction commit.
+    /// Records `event` of tenant `tenant` caused by `actor`, about the record `subject` (in the form
+    /// `<kind>:<id>`, if any). Call it with the transaction that writes the change: the event exists only
+    /// when the transaction commits.
     pub async fn record<C, E>(
         &self,
         connection: &C,

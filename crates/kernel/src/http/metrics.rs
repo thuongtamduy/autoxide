@@ -1,4 +1,4 @@
-//! Endpoint `/metrics` cho Prometheus, và số đo của chính lớp HTTP.
+//! The `/metrics` endpoint for Prometheus, and the HTTP layer's own measurements.
 
 use axum::extract::State;
 use axum::http::header;
@@ -8,10 +8,10 @@ use utoipa_axum::routes;
 
 use crate::metrics::Metrics;
 
-/// Kiểu nội dung của định dạng văn bản Prometheus.
+/// Content type of the Prometheus text format.
 const PROMETHEUS_CONTENT_TYPE: &str = "text/plain; version=0.0.4; charset=utf-8";
 
-/// Route `/metrics`, gắn ở gốc (ngoài `/api/v1`).
+/// The `/metrics` route, mounted at the root (outside `/api/v1`).
 pub fn metrics_routes(metrics: Metrics) -> OpenApiRouter {
     OpenApiRouter::new().routes(routes!(scrape)).with_state(metrics)
 }
@@ -33,9 +33,9 @@ async fn scrape(State(metrics): State<Metrics>) -> impl IntoResponse {
     ([(header::CONTENT_TYPE, PROMETHEUS_CONTENT_TYPE)], metrics.render())
 }
 
-/// Ghi số đo cho một request đã xong. `route` là MẪU route (vd
-/// `/api/v1/notes/{id}`), không phải đường dẫn thô — để số chuỗi số đo không tăng
-/// theo số ID.
+/// Records measurements for a finished request. `route` is the route PATTERN (e.g.
+/// `/api/v1/notes/{id}`), not the raw path - so the number of metric series does not grow
+/// with the number of IDs.
 pub(super) fn record_request(method: &str, route: &str, status: u16, elapsed_seconds: f64) {
     // HTTP nhận method bất kỳ (`FOO`, `M123`…): nhãn chỉ lấy trong tập cố định, không thì mỗi
     // method lạ thêm một chuỗi số đo sống mãi trong bộ nhớ (D-157).

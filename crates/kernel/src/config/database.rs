@@ -1,4 +1,4 @@
-//! Cấu hình database.
+//! Database configuration.
 
 use std::fmt;
 use std::path::PathBuf;
@@ -43,19 +43,18 @@ pub const WAIT_SECONDS: Setting = Setting::new(
 )
 .with_default("10");
 
-/// Hai database Autoxide hỗ trợ. Chỗ nào buộc phải rẽ nhánh theo database thì
-/// `match` trên kiểu này: thêm một database mới là trình biên dịch chỉ ra mọi chỗ
-/// phải xử lý.
+/// The two databases Autoxide supports. Where code must branch on the database, it uses `match` on this
+/// type: adding a new database makes the compiler point out every place that needs handling.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DatabaseBackend {
     Sqlite,
     Postgres,
 }
 
-/// URL kết nối database đã kiểm là thuộc một database được hỗ trợ.
+/// A database connection URL, checked to belong to a supported database.
 ///
-/// `Debug` che mật khẩu, nên kiểu này (và mọi struct chứa nó) in ra log an toàn.
-/// Cần URL thật để kết nối thì gọi [`expose`](Self::expose).
+/// `Debug` masks the password, so this type (and every struct containing it) is safe to print in logs. To
+/// get the real URL for connecting, call [`expose`](Self::expose).
 #[derive(Clone, PartialEq, Eq)]
 pub struct DatabaseUrl {
     url: String,
@@ -67,18 +66,17 @@ impl DatabaseUrl {
         self.backend
     }
 
-    /// URL đầy đủ, CÓ mật khẩu. Chỉ dùng để mở kết nối; không in ra, không ghi log.
+    /// The full URL, WITH the password. Use only to open connections; never print or log it.
     pub fn expose(&self) -> &str {
         &self.url
     }
 
-    /// URL với mật khẩu thay bằng `***`, dùng để in ra.
+    /// The URL with the password replaced by `***`, for printing.
     pub fn redacted(&self) -> String {
         redact_password(&self.url)
     }
 
-    /// Đường dẫn file của một URL SQLite; `None` với Postgres và với SQLite trong
-    /// bộ nhớ.
+    /// The file path of a SQLite URL; `None` for Postgres and for in-memory SQLite.
     pub fn sqlite_path(&self) -> Option<PathBuf> {
         if self.backend != DatabaseBackend::Sqlite || self.is_sqlite_in_memory() {
             return None;
@@ -86,8 +84,7 @@ impl DatabaseUrl {
         Some(PathBuf::from(sqlite_location(&self.url).0))
     }
 
-    /// URL trỏ tới một database SQLite trong bộ nhớ (`sqlite::memory:`,
-    /// `?mode=memory`)?
+    /// Whether the URL points to an in-memory SQLite database (`sqlite::memory:`, `?mode=memory`)?
     fn is_sqlite_in_memory(&self) -> bool {
         let (path, query) = sqlite_location(&self.url);
         self.backend == DatabaseBackend::Sqlite
@@ -121,16 +118,16 @@ impl fmt::Debug for DatabaseUrl {
     }
 }
 
-/// Tách URL SQLite thành (đường dẫn file, chuỗi query). Chấp nhận cả ba dạng
-/// `sqlite:file`, `sqlite://file` và `sqlite:///abs/file`.
+/// Splits a SQLite URL into (file path, query string). Accepts all three forms: `sqlite:file`,
+/// `sqlite://file` and `sqlite:///abs/file`.
 fn sqlite_location(url: &str) -> (&str, &str) {
     let rest = url.strip_prefix("sqlite:").unwrap_or(url);
     let rest = rest.strip_prefix("//").unwrap_or(rest);
     rest.split_once('?').unwrap_or((rest, ""))
 }
 
-/// Thay mật khẩu trong một URL dạng `scheme://user:password@host/...` bằng `***`.
-/// URL không có mật khẩu thì giữ nguyên.
+/// Replaces the password in a URL of the form `scheme://user:password@host/...` with `***`. A URL without a
+/// password is kept as is.
 pub fn redact_password(url: &str) -> String {
     let Some((scheme, rest)) = url.split_once("://") else {
         return url.to_owned();
@@ -150,15 +147,15 @@ pub fn redact_password(url: &str) -> String {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct DatabaseConfig {
-    /// Database chính: mọi lệnh ghi đi vào đây.
+    /// The primary database: every write goes here.
     pub url: DatabaseUrl,
-    /// Read replica của Postgres cho lệnh đọc; `None` thì đọc từ `url`.
+    /// The Postgres read replica for reads; with `None`, reads come from `url`.
     pub read_url: Option<DatabaseUrl>,
-    /// Số kết nối ghi tối đa (Postgres). SQLite luôn dùng một.
+    /// The maximum number of write connections (Postgres). SQLite always uses one.
     pub write_connections: u32,
-    /// Số kết nối đọc tối đa.
+    /// The maximum number of read connections.
     pub read_connections: u32,
-    /// Thời gian chờ một kết nối rảnh, hoặc chờ lock của tiến trình ghi khác.
+    /// How long to wait for an idle connection, or for the lock held by another writer.
     pub wait: Duration,
 }
 

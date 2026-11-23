@@ -1,7 +1,7 @@
-//! "Đang dùng ở đâu" (bước 51, D-267): bản ghi nào của module nào đang trỏ tới một bản ghi (bài
-//! viết dùng ảnh, menu trỏ tới bài…). Module khai [`ReferenceSource`] — chính nó đọc bảng của nó
-//! (luật kiến trúc 1); kernel gom qua `GET /api/v1/kernel/records/{kind}/{id}/usages`, chỉ trả bản
-//! ghi của module mà người gọi có `<module>.read`.
+//! "Where is this used" (step 51, D-267): which records of which module point at a record (a post uses an
+//! image, a menu points at a post…). A module declares a [`ReferenceSource`] — it reads its own tables itself
+//! (architecture rule 1); the kernel gathers them through `GET /api/v1/kernel/records/{kind}/{id}/usages`,
+//! returning only records of modules for which the caller has `<module>.read`.
 
 use std::sync::{Arc, PoisonError, RwLock};
 
@@ -36,13 +36,13 @@ impl Referrer {
     }
 }
 
-/// Nguồn tham chiếu của một module.
+/// A module's reference source.
 //
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
 #[async_trait::async_trait]
 pub trait ReferenceSource: Send + Sync {
-    /// Tối đa `limit` bản ghi của module đang trỏ tới bản ghi `kind` / `id` của khách `tenant`.
-    /// Loại không trỏ tới được thì trả rỗng.
+    /// At most `limit` records of the module that point at record `kind` / `id` of tenant `tenant`.
+    /// Returns empty for a kind that cannot be pointed at.
     async fn referrers(
         &self,
         tenant: &TenantContext,
@@ -54,7 +54,7 @@ pub trait ReferenceSource: Send + Sync {
 
 type Entry = (&'static str, Arc<dyn ReferenceSource>);
 
-/// Sổ nguồn tham chiếu của mọi module. Clone rẻ.
+/// Registry of every module's reference sources. Cheap to clone.
 #[derive(Clone, Default)]
 pub struct ReferenceSources {
     entries: Arc<RwLock<Vec<Entry>>>,

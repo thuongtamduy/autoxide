@@ -1,11 +1,10 @@
-//! Xuất trace (tracing phân tán) tới một OpenTelemetry collector qua OTLP/HTTP.
+//! Exports traces (distributed tracing) to an OpenTelemetry collector through OTLP/HTTP.
 //!
-//! Mỗi span của `tracing` (vd span `request` của lớp HTTP) thành một span
-//! OpenTelemetry. Request mang header `traceparent` (chuẩn W3C Trace Context) thì
-//! span của nó nối vào trace của bên gọi — nhìn được một thao tác đi qua nhiều
-//! dịch vụ.
+//! Each `tracing` span (e.g. the `request` span of the HTTP layer) becomes an OpenTelemetry span. When a
+//! request carries the `traceparent` header (the W3C Trace Context standard), its span joins the caller's
+//! trace, so one operation that passes through many services can be seen.
 //!
-//! Tắt hoàn toàn khi không cấu hình `OTEL_EXPORTER_OTLP_ENDPOINT`.
+//! Fully off when `OTEL_EXPORTER_OTLP_ENDPOINT` is not configured.
 
 use std::fmt;
 
@@ -21,7 +20,7 @@ use opentelemetry_sdk::trace::SdkTracerProvider;
 use crate::config::TraceConfig;
 use crate::logging::BoxedLayer;
 
-/// Lỗi khi bật xuất trace.
+/// Error when turning on trace export.
 #[derive(Debug)]
 pub struct TelemetryError(String);
 
@@ -33,20 +32,20 @@ impl fmt::Display for TelemetryError {
 
 impl std::error::Error for TelemetryError {}
 
-/// Việc xuất trace đang chạy. Gọi [`shutdown`](Self::shutdown) trước khi tiến trình
-/// thoát để đẩy nốt các span còn trong hàng đợi.
+/// The running trace export. Call [`shutdown`](Self::shutdown) before the process exits to flush the spans
+/// still in the queue.
 pub struct TraceExport {
     provider: SdkTracerProvider,
 }
 
 impl TraceExport {
-    /// Bật xuất trace theo `config`. Trả `None` khi không cấu hình collector; ngược
-    /// lại trả về lớp cần đưa vào [`logging::init`](crate::logging::init) cùng tay
-    /// nắm để tắt.
+    /// Turns on trace export according to `config`. Returns `None` when no collector is configured; otherwise
+    /// returns the layer to pass to [`logging::init`](crate::logging::init) together with the handle used to
+    /// shut it down.
     ///
-    /// **Phải gọi NGOÀI runtime tokio** (trước `block_on`), và [`shutdown`] cũng
-    /// vậy: bộ gửi dùng HTTP client kiểu đồng bộ trên một thread riêng, thứ không
-    /// được tạo hay huỷ bên trong code async.
+    /// **Must be called OUTSIDE the tokio runtime** (before `block_on`), and so must [`shutdown`]: the sender
+    /// uses a synchronous-style HTTP client on a thread of its own, which must not be created or dropped inside
+    /// async code.
     ///
     /// [`shutdown`]: Self::shutdown
     pub fn start(
@@ -77,7 +76,7 @@ impl TraceExport {
         Ok(Some((Box::new(layer), TraceExport { provider })))
     }
 
-    /// Gửi nốt các span còn lại rồi dừng. Gọi ngoài runtime tokio.
+    /// Flushes the remaining spans and stops. Call it outside the tokio runtime.
     pub fn shutdown(self) -> Result<(), TelemetryError> {
         self.provider
             .shutdown()
@@ -85,15 +84,15 @@ impl TraceExport {
     }
 }
 
-/// Ngữ cảnh trace của bên gọi, đọc từ header của request (`traceparent`). Khi không
-/// bật xuất trace hoặc request không mang header đó, kết quả là ngữ cảnh rỗng.
+/// The caller's trace context, read from the request's header (`traceparent`). When trace export is off or the
+/// request does not carry that header, the result is an empty context.
 pub fn remote_context(headers: &HeaderMap) -> Context {
     opentelemetry::global::get_text_map_propagator(|propagator| {
         propagator.extract(&HeaderCarrier(headers))
     })
 }
 
-/// Cho thư viện OpenTelemetry đọc header HTTP.
+/// Lets the OpenTelemetry library read HTTP headers.
 struct HeaderCarrier<'a>(&'a HeaderMap);
 
 impl Extractor for HeaderCarrier<'_> {

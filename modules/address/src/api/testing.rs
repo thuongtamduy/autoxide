@@ -1,9 +1,9 @@
-//! Danh mục hành chính giả dùng chung cho test của module khác (feature `testing`, chỉ khai ở
-//! `[dev-dependencies]`; quy ước D-20261122-module-test-fakes).
+//! A shared fake administrative catalog for other modules' tests (feature `testing`, declared only in
+//! `[dev-dependencies]`; convention D-20261122-module-test-fakes).
 //!
-//! Giữ vài tỉnh và xã trong bộ nhớ; `validate` trả lỗi như module `address` thật
-//! (`address.commune_not_in_province`, `address.unit_expired`, gắn tiền tố `field`). Không xét ngày
-//! hiệu lực của `provinces` / `communes` (trả mọi đơn vị còn hiệu lực đã khai).
+//! Keeps a few provinces and communes in memory; `validate` returns errors like the real `address` module
+//! (`address.commune_not_in_province`, `address.unit_expired`, prefixed with `field`). It ignores the effective
+//! dates in `provinces` / `communes` (returns every in-force unit declared).
 //!
 //! ```ignore
 //! let units = Arc::new(FakeAdministrativeUnits::sample());
@@ -14,7 +14,7 @@ use autoxide_kernel::error::{Error, FieldError};
 
 use super::{Address, AddressInput, AdministrativeUnit, AdministrativeUnits};
 
-/// Danh mục hành chính giả. Công bố bằng
+/// A fake administrative catalog. Publish it with
 /// `TestApp::builder(…).provide::<dyn AdministrativeUnits>(Arc::new(units))`.
 #[derive(Debug, Clone, Default)]
 pub struct FakeAdministrativeUnits {
@@ -35,13 +35,14 @@ fn unit(code: &str, name: &str, kind: &str, parent: Option<&str>) -> Administrat
 }
 
 impl FakeAdministrativeUnits {
-    /// Danh mục rỗng: mọi địa chỉ đều sai.
+    /// Empty catalog: every address is invalid.
     pub fn new() -> Self {
         FakeAdministrativeUnits::default()
     }
 
-    /// Mẫu dùng ở test của core: tỉnh 01 (Thanh pho Ha Noi) có xã 00004 (Phuong Ba Dinh) và xã
-    /// 00001 đã hết hiệu lực; tỉnh 79 (Thanh pho Ho Chi Minh) có xã 26734 (Phuong Sai Gon).
+    /// Sample used in the core's tests: province 01 (Thanh pho Ha Noi) has commune 00004 (Phuong Ba Dinh) and
+    /// commune 00001, which is no longer in force; province 79 (Thanh pho Ho Chi Minh) has commune 26734
+    /// (Phuong Sai Gon).
     pub fn sample() -> Self {
         FakeAdministrativeUnits::new()
             .province("01", "Thanh pho Ha Noi")
@@ -51,21 +52,21 @@ impl FakeAdministrativeUnits {
             .commune("26734", "Phuong Sai Gon", "79")
     }
 
-    /// Thêm tỉnh `code`.
+    /// Adds province `code`.
     #[must_use]
     pub fn province(mut self, code: &str, name: &str) -> Self {
         self.provinces.push(unit(code, name, "province", None));
         self
     }
 
-    /// Thêm xã `code` thuộc tỉnh `province`.
+    /// Adds commune `code` belonging to province `province`.
     #[must_use]
     pub fn commune(mut self, code: &str, name: &str, province: &str) -> Self {
         self.communes.push(unit(code, name, "commune", Some(province)));
         self
     }
 
-    /// Thêm xã đã hết hiệu lực (sáp nhập): `validate` trả `address.unit_expired`.
+    /// Adds a commune that is no longer in force (merged away): `validate` returns `address.unit_expired`.
     #[must_use]
     pub fn expired_commune(mut self, code: &str, name: &str, province: &str) -> Self {
         let mut commune = unit(code, name, "commune", Some(province));

@@ -1,5 +1,5 @@
-//! Hợp đồng công khai của bộ nối `einvoice_sepay`: chỉ có tên nhà cung cấp. Mọi việc đi qua trait
-//! `EInvoiceProvider` của kernel; module khác không gọi thẳng vào đây.
+//! Public contract of the `einvoice_sepay` connector: only the provider name. All work goes through the
+//! kernel's `EInvoiceProvider` trait; other modules do not call into here directly.
 
-/// Tên ổn định của nhà cung cấp: giá trị `einvoice_provider` của ký hiệu chứng từ ở `invoices`.
+/// Stable name of the provider: the `einvoice_provider` value of the document series in `invoices`.
 pub const PROVIDER: &str = "sepay";

@@ -1,16 +1,16 @@
-//! Kiểu lỗi chung cho mọi layer.
+//! Common error type for every layer.
 //!
-//! Service, handler REST và tool MCP đều trả [`Error`] này. Nó mang đủ thông tin
-//! cho hai người đọc khác nhau:
+//! Services, REST handlers and MCP tools all return this [`Error`]. It carries enough information
+//! for two different readers:
 //!
-//! - **client** (người hoặc AI agent): `code` ổn định để máy rẽ nhánh, thông báo
-//!   nói rõ phải sửa gì, và danh sách lỗi theo từng trường với lỗi đầu vào;
-//! - **người vận hành**: nguyên nhân gốc (`source`) — chỉ ghi vào log, KHÔNG BAO
-//!   GIỜ gửi cho client.
+//! - **client** (a person or an AI agent): a stable `code` for machines to branch on, a message
+//!   stating what to fix, and a per-field error list for input errors;
+//! - **operator**: the root cause (`source`) - written to the log only, NEVER
+//!   sent to the client.
 //!
-//! `code` là hợp đồng với client: đổi một mã là thay đổi phá vỡ. `code` cũng
-//! chính là i18n key của thông báo; câu tiếng Anh viết ở chỗ tạo lỗi là bản mặc
-//! định, bản dịch tra theo `code` (docs/DECISIONS.md D-039).
+//! `code` is a contract with clients: changing a code is a breaking change. `code` is also
+//! the i18n key of the message; the English sentence written where the error is created is the default
+//! text, and translations are looked up by `code` (docs/DECISIONS.md D-039).
 //!
 //! ```
 //! use autoxide_kernel::error::Error;
@@ -31,46 +31,46 @@ use std::num::NonZeroU32;
 
 use validator::{ValidationErrors, ValidationErrorsKind};
 
-/// Loại lỗi; quyết định mã trạng thái HTTP.
+/// Kind of error; determines the HTTP status code.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ErrorKind {
-    /// Request không đọc được (JSON hỏng, thiếu tham số, sai kiểu). HTTP 400.
+    /// The request cannot be read (broken JSON, missing parameter, wrong type). HTTP 400.
     BadRequest,
-    /// Chưa xác thực, hoặc thông tin xác thực không hợp lệ. HTTP 401.
+    /// Not authenticated, or the credentials are invalid. HTTP 401.
     Unauthenticated,
-    /// Đã xác thực nhưng không có permission. HTTP 403.
+    /// Authenticated but lacking the permission. HTTP 403.
     Forbidden,
-    /// Không có tài nguyên đó. HTTP 404.
+    /// The resource does not exist. HTTP 404.
     NotFound,
-    /// Trái với trạng thái hiện tại (trùng giá trị unique, sửa bản đã cũ). HTTP 409.
+    /// Conflicts with the current state (duplicate unique value, editing a stale version). HTTP 409.
     Conflict,
-    /// Điều kiện của request không còn đúng (`If-Match` cũ: bản ghi đã bị sửa). HTTP 412.
+    /// The request's precondition no longer holds (stale `If-Match`: the record was modified). HTTP 412.
     PreconditionFailed,
-    /// Thân request lớn hơn giới hạn. HTTP 413.
+    /// The request body is larger than the limit. HTTP 413.
     PayloadTooLarge,
-    /// Kiểu nội dung của request không được hỗ trợ. HTTP 415.
+    /// The request's content type is not supported. HTTP 415.
     UnsupportedMediaType,
-    /// Khoảng byte (`Range`) xin đọc nằm ngoài nội dung. HTTP 416.
+    /// The requested byte range (`Range`) lies outside the content. HTTP 416.
     RangeNotSatisfiable,
-    /// Request đọc được nhưng giá trị không qua kiểm tra. HTTP 422.
+    /// The request is readable but a value fails validation. HTTP 422.
     Validation,
-    /// Thứ được hỏi không còn nữa và sẽ không có lại (con trỏ đồng bộ quá cũ). HTTP 410.
+    /// The requested thing is gone and will not come back (sync cursor too old). HTTP 410.
     Gone,
-    /// Endpoint bắt buộc gửi điều kiện (`If-Match`) mà request không gửi. HTTP 428.
+    /// The endpoint requires a precondition (`If-Match`) and the request did not send one. HTTP 428.
     PreconditionRequired,
-    /// Gọi quá nhiều. HTTP 429.
+    /// Too many calls. HTTP 429.
     TooManyRequests,
-    /// Tạm ẩn vì lý do pháp lý (vd vụ việc vi phạm đang xử lý). HTTP 451 (RFC 7725).
+    /// Temporarily hidden for legal reasons (e.g. a violation case under review). HTTP 451 (RFC 7725).
     UnavailableForLegalReasons,
-    /// Lỗi phía máy chủ; chi tiết chỉ nằm trong log. HTTP 500.
+    /// Server-side error; details appear only in the log. HTTP 500.
     Internal,
-    /// Tạm thời chưa phục vụ được (database chưa sẵn sàng, đang tắt). HTTP 503.
+    /// Temporarily unable to serve (database not ready, shutting down). HTTP 503.
     Unavailable,
 }
 
 impl ErrorKind {
-    /// Mã trạng thái HTTP tương ứng.
+    /// The corresponding HTTP status code.
     pub fn status(self) -> u16 {
         match self {
             ErrorKind::BadRequest => 400,
@@ -93,12 +93,13 @@ impl ErrorKind {
     }
 }
 
-/// Lỗi của một trường trong dữ liệu đầu vào.
+/// An error on one field of the input data.
 ///
-/// Câu viết thành **mẫu** tiếng Anh, chỗ thay đổi là `{tên}` điền bằng
-/// [`with_param`](Self::with_param) — không ghép sẵn bằng `format!`: bản dịch tra theo đúng câu
-/// mẫu (khoá `field:<câu mẫu>` trong `locales/vi.json`, như gettext dùng câu gốc làm khoá), rồi
-/// điền giá trị (D-262). `cargo xtask check` chặn câu chưa dịch và câu ghép sẵn.
+/// The message is written as an English **template**, with `{name}` placeholders filled in by
+/// [`with_param`](Self::with_param) - not pre-assembled with `format!`: translations are looked up by the
+/// template itself (key `field:<template>` in `locales/vi.json`, like gettext using the source sentence
+/// as the key), then the values are filled in (D-262). `cargo xtask check` rejects untranslated and
+/// pre-assembled sentences.
 ///
 /// ```
 /// use autoxide_kernel::error::FieldError;
@@ -110,19 +111,19 @@ impl ErrorKind {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct FieldError {
-    /// Đường dẫn tới trường: `name`, `address.city`, `items[2].quantity`.
+    /// Path to the field: `name`, `address.city`, `items[2].quantity`.
     pub field: String,
-    /// Mã ổn định của loại lỗi: `required`, `length`, `range`, `email`…
+    /// Stable code of the error kind: `required`, `length`, `range`, `email`...
     pub code: String,
-    /// Câu tiếng Anh đã điền giá trị: nói rõ giá trị phải như thế nào.
+    /// The English sentence with values filled in: states what the value must look like.
     pub message: String,
-    /// Câu mẫu (khoá dịch) và giá trị điền vào nó.
+    /// The template (translation key) and the values filled into it.
     template: Cow<'static, str>,
     params: Vec<(Cow<'static, str>, String)>,
 }
 
 impl FieldError {
-    /// Lỗi của trường `field`, mã `code`, câu mẫu `message` (có thể chứa `{tên}`).
+    /// An error for field `field`, code `code`, template `message` (may contain `{name}`).
     pub fn new(
         field: impl Into<String>,
         code: impl Into<String>,
@@ -138,7 +139,7 @@ impl FieldError {
         }
     }
 
-    /// Điền `{name}` của câu mẫu bằng `value`.
+    /// Fills `{name}` of the template with `value`.
     #[must_use]
     pub fn with_param(mut self, name: impl Into<Cow<'static, str>>, value: impl ToString) -> Self {
         self.params.push((name.into(), value.to_string()));
@@ -150,69 +151,69 @@ impl FieldError {
         self
     }
 
-    /// Câu mẫu tiếng Anh, chưa điền (khoá dịch).
+    /// The English template, not yet filled in (translation key).
     pub fn template(&self) -> &str {
         &self.template
     }
 
-    /// Các giá trị điền vào câu mẫu, theo thứ tự đã gán.
+    /// The values filled into the template, in the order they were assigned.
     pub fn params(&self) -> impl Iterator<Item = (&str, &str)> {
         self.params.iter().map(|(name, value)| (name.as_ref(), value.as_str()))
     }
 
-    /// Lỗi `required` nếu `value` rỗng (hoặc chỉ có khoảng trắng). Dùng trong service khi
-    /// gom mọi lỗi của một đầu vào để báo một lần.
+    /// A `required` error if `value` is empty (or only whitespace). Used in services when
+    /// collecting every error of an input to report them at once.
     pub fn blank(field: impl Into<String>, value: &str) -> Option<Self> {
         value.trim().is_empty().then(|| FieldError::new(field, "required", "must not be empty"))
     }
 }
 
-/// Nguyên nhân gốc của một lỗi, giữ cho log.
+/// Root cause of an error, kept for the log.
 type Source = Box<dyn std::error::Error + Send + Sync>;
 
-/// Lỗi chung của Autoxide. Xem tài liệu đầu file.
+/// Common Autoxide error. See the module documentation at the top of the file.
 #[derive(Debug)]
 pub struct Error {
     kind: ErrorKind,
     // `Cow<'static, str>`: thường là chuỗi viết sẵn trong code (không tốn bộ nhớ
     // cấp phát), nhưng vẫn nhận được chuỗi dựng lúc chạy khi cần.
     code: Cow<'static, str>,
-    /// Câu tiếng Anh mặc định, có thể chứa chỗ điền `{tên}`.
+    /// The default English sentence, which may contain `{name}` placeholders.
     template: Cow<'static, str>,
     params: Vec<(Cow<'static, str>, String)>,
     fields: Vec<FieldError>,
-    /// Phần ít khi dùng (nguyên nhân gốc, `Retry-After`, `reason`), để trong hộp: giữ `Error` đủ nhỏ để trả về
-    /// trong `Result` mà không phải chép nhiều (clippy `result_large_err`).
+    /// The rarely used parts (root cause, `Retry-After`, `reason`), boxed: keeps `Error` small enough to return
+    /// in a `Result` without copying much (clippy `result_large_err`).
     extra: Option<Box<Extra>>,
 }
 
-/// Phần ít khi dùng của [`Error`].
+/// The rarely used parts of [`Error`].
 #[derive(Debug, Default)]
 struct Extra {
-    /// Nguyên nhân gốc, chỉ cho log.
+    /// Root cause, for the log only.
     source: Option<Source>,
-    /// Số giây client nên chờ trước khi thử lại (header `Retry-After`).
+    /// Number of seconds the client should wait before retrying (`Retry-After` header).
     retry_after: Option<NonZeroU32>,
-    /// Lý do ổn định cho máy, chi tiết hơn `code` (vd `expired` / `used` của token): trường mở
-    /// rộng `reason` của Problem (RFC 9457 cho phép trường mở rộng).
+    /// Stable machine-readable reason, more detailed than `code` (e.g. `expired` / `used` for a token): the
+    /// Problem's `reason` extension field (RFC 9457 allows extension fields).
     reason: Option<&'static str>,
-    /// Bản ghi hiện tại trên máy chủ, kèm phiên bản (lỗi 412 của ghi có điều kiện, bước 69 P2):
-    /// trường mở rộng `current` của Problem và header `ETag`.
+    /// The current record on the server, with its version (the 412 error of a conditional write, step 69 P2):
+    /// the Problem's `current` extension field and the `ETag` header.
     current: Option<(serde_json::Value, Timestamp)>,
-    /// Giá trị header `WWW-Authenticate` của 401 thay cho `Bearer` trần (vd lời mời xác thực lại
-    /// của RFC 9470).
+    /// Value of the 401 `WWW-Authenticate` header in place of a bare `Bearer` (e.g. the re-authentication
+    /// challenge of RFC 9470).
     challenge: Option<String>,
 }
 
-/// Mã và thông báo của lỗi nội bộ. Client chỉ thấy đúng hai thứ này.
+/// Code and message of an internal error. The client sees exactly these two things.
 const INTERNAL_CODE: &str = "internal_error";
 const INTERNAL_MESSAGE: &str =
     "An internal error occurred. Retry later; if it persists, report the request id.";
 
 impl Error {
-    /// Tạo lỗi. `code` là mã ổn định cho máy và là i18n key: `snake_case`, lỗi của
-    /// module mang tiền tố `<module>.` (vd `notes.title_taken`). `message` là câu
-    /// tiếng Anh nói rõ phải sửa gì; chỗ điền viết `{tên}` và gán bằng
+    /// Creates an error. `code` is the stable machine code and the i18n key: `snake_case`, a module's errors
+    /// carry the prefix `<module>.` (e.g. `notes.title_taken`). `message` is the English
+    /// sentence stating what to fix; write placeholders as `{name}` and assign them with
     /// [`with_param`](Self::with_param).
     pub fn new(
         kind: ErrorKind,
@@ -278,7 +279,7 @@ impl Error {
         Error::new(ErrorKind::Unavailable, code, message)
     }
 
-    /// Dữ liệu đầu vào không qua kiểm tra; `fields` nói rõ từng trường sai gì.
+    /// Input data fails validation; `fields` states what is wrong with each field.
     pub fn validation(fields: Vec<FieldError>) -> Self {
         let mut error = Error::new(
             ErrorKind::Validation,
@@ -289,78 +290,77 @@ impl Error {
         error
     }
 
-    /// Lỗi phía máy chủ. `source` là nguyên nhân gốc: ghi vào log, không gửi cho
-    /// client — client chỉ nhận mã `internal_error` và một câu chung.
+    /// Server-side error. `source` is the root cause: written to the log, not sent to
+    /// the client - the client receives only the code `internal_error` and a generic sentence.
     pub fn internal(source: impl Into<Source>) -> Self {
         Error::new(ErrorKind::Internal, INTERNAL_CODE, INTERNAL_MESSAGE).with_source(source)
     }
 
-    /// Gán giá trị cho chỗ điền `{name}` trong thông báo.
+    /// Assigns a value to the `{name}` placeholder in the message.
     pub fn with_param(mut self, name: impl Into<Cow<'static, str>>, value: impl ToString) -> Self {
         self.params.push((name.into(), value.to_string()));
         self
     }
 
-    /// Thêm lỗi của một trường.
+    /// Adds an error for one field.
     pub fn with_field(mut self, field: FieldError) -> Self {
         self.fields.push(field);
         self
     }
 
-    /// Gắn nguyên nhân gốc (cho log).
+    /// Attaches the root cause (for the log).
     pub fn with_source(mut self, source: impl Into<Source>) -> Self {
         self.extra.get_or_insert_default().source = Some(source.into());
         self
     }
 
-    /// Báo client chờ `seconds` giây rồi mới thử lại: response mang header
-    /// `Retry-After` (RFC 9110). Dùng cho 429 và 503.
-    /// Ít nhất 1 giây.
+    /// Tells the client to wait `seconds` seconds before retrying: the response carries the `Retry-After`
+    /// header (RFC 9110). Used for 429 and 503. At least 1 second.
     pub fn with_retry_after(mut self, seconds: u64) -> Self {
         let seconds = u32::try_from(seconds).unwrap_or(u32::MAX).max(1);
         self.extra.get_or_insert_default().retry_after = NonZeroU32::new(seconds);
         self
     }
 
-    /// Gắn lý do ổn định cho máy (trường `reason` của Problem), vd `expired`.
+    /// Attaches a stable machine-readable reason (the Problem's `reason` field), e.g. `expired`.
     #[must_use]
     pub fn with_reason(mut self, reason: &'static str) -> Self {
         self.extra.get_or_insert_default().reason = Some(reason);
         self
     }
 
-    /// Gắn bản ghi hiện tại `record` (dạng như khi đọc nó) và phiên bản `version` của nó: client
-    /// thấy ngay bản trên máy chủ để tự gộp, không phải đọc lại.
+    /// Attaches the current record `record` (in the form it is read) and its version `version`: the client
+    /// sees the server's copy right away to merge by itself, without re-reading.
     #[must_use]
     pub fn with_current(mut self, record: serde_json::Value, version: Timestamp) -> Self {
         self.extra.get_or_insert_default().current = Some((record, version));
         self
     }
 
-    /// Header `WWW-Authenticate` riêng của lỗi 401 (vd `Bearer error="insufficient_user_authentication",
-    /// max_age=900` của RFC 9470).
+    /// The 401 error's own `WWW-Authenticate` header (e.g. `Bearer error="insufficient_user_authentication",
+    /// max_age=900` of RFC 9470).
     #[must_use]
     pub fn with_challenge(mut self, challenge: impl Into<String>) -> Self {
         self.extra.get_or_insert_default().challenge = Some(challenge.into());
         self
     }
 
-    /// Header `WWW-Authenticate` gắn bằng [`with_challenge`](Self::with_challenge), nếu có.
+    /// The `WWW-Authenticate` header attached with [`with_challenge`](Self::with_challenge), if any.
     pub fn challenge(&self) -> Option<&str> {
         self.extra.as_ref().and_then(|extra| extra.challenge.as_deref())
     }
 
-    /// Bản ghi hiện tại gắn bằng [`with_current`](Self::with_current), nếu có.
+    /// The current record attached with [`with_current`](Self::with_current), if any.
     pub fn current(&self) -> Option<&(serde_json::Value, Timestamp)> {
         self.extra.as_ref().and_then(|extra| extra.current.as_ref())
     }
 
-    /// Lý do gắn bằng [`with_reason`](Self::with_reason), nếu có.
+    /// The reason attached with [`with_reason`](Self::with_reason), if any.
     pub fn reason(&self) -> Option<&'static str> {
         self.extra.as_ref().and_then(|extra| extra.reason)
     }
 
-    /// Số giây nên chờ trước khi thử lại, nếu lỗi có nêu.
+    /// Number of seconds to wait before retrying, if the error specifies it.
     pub fn retry_after(&self) -> Option<u64> {
         self.extra
             .as_ref()
@@ -372,33 +372,33 @@ impl Error {
         self.kind
     }
 
-    /// Mã ổn định cho máy; cũng là i18n key của thông báo.
+    /// Stable machine code; also the i18n key of the message.
     pub fn code(&self) -> &str {
         &self.code
     }
 
-    /// Câu tiếng Anh mặc định, chưa điền giá trị.
+    /// The default English sentence, not yet filled in.
     pub fn template(&self) -> &str {
         &self.template
     }
 
-    /// Các giá trị điền vào thông báo, theo thứ tự đã gán.
+    /// The values filled into the message, in the order they were assigned.
     pub fn params(&self) -> impl Iterator<Item = (&str, &str)> {
         self.params.iter().map(|(name, value)| (name.as_ref(), value.as_str()))
     }
 
-    /// Thông báo tiếng Anh đã điền giá trị.
+    /// The English message with values filled in.
     pub fn message(&self) -> String {
         fill(&self.template, &self.params)
     }
 
-    /// Lỗi theo từng trường (với lỗi đầu vào).
+    /// Per-field errors (for input errors).
     pub fn fields(&self) -> &[FieldError] {
         &self.fields
     }
 }
 
-/// Thay từng `{tên}` trong `template` bằng giá trị tương ứng.
+/// Replaces each `{name}` in `template` with the corresponding value.
 fn fill(template: &str, params: &[(Cow<'static, str>, String)]) -> String {
     let mut text = template.to_owned();
     for (name, value) in params {
@@ -447,7 +447,7 @@ impl From<ValidationErrors> for Error {
     }
 }
 
-/// Trải cây lỗi lồng nhau của validator thành danh sách phẳng có đường dẫn trường.
+/// Flattens the validator's nested error tree into a flat list with field paths.
 fn collect_fields(prefix: &str, errors: &ValidationErrors, fields: &mut Vec<FieldError>) {
     for (name, kind) in errors.errors() {
         let path = if prefix.is_empty() { name.to_string() } else { format!("{prefix}.{name}") };
@@ -467,8 +467,8 @@ fn collect_fields(prefix: &str, errors: &ValidationErrors, fields: &mut Vec<Fiel
     }
 }
 
-/// Lỗi của trường `path` từ một lỗi của validator: câu mẫu tiếng Anh dựng từ mã và tham số của
-/// nó (dịch được như mọi câu mẫu).
+/// The error for field `path` from one validator error: an English template built from its code and
+/// parameters (translatable like any template).
 fn field_message(path: String, problem: &validator::ValidationError) -> FieldError {
     let code = problem.code.to_string();
     if let Some(message) = &problem.message {

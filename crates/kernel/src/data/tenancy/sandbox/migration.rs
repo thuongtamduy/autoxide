@@ -1,4 +1,4 @@
-//! Cột sandbox của `kernel_tenants` (mặt điều khiển; mọi database cùng schema, D-253 mục 2).
+//! Sandbox columns of `kernel_tenants` (control plane; every database has the same schema, D-253 item 2).
 
 use crate::migration::prelude::*;
 

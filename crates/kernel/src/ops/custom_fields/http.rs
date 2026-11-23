@@ -1,4 +1,4 @@
-//! REST và MCP của trường tự định nghĩa.
+//! REST and MCP of user-defined custom fields.
 
 use super::*;
 use crate::time::Timestamp;

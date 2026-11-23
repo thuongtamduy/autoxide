@@ -1,26 +1,25 @@
-//! Băm địa chỉ IP để đếm và lưu mà không giữ IP thô (D-115).
+//! Hashes IP addresses so they can be counted and stored without keeping the raw IP (D-115).
 //!
-//! 1. Gộp theo tiền tố: IPv4 theo khối /24, IPv6 theo khối /64 (một nhà, một máy thường giữ cả
-//!    khối và đổi địa chỉ trong khối) — cũng là cách rate limiter gộp IPv6.
-//! 2. HMAC-SHA256 bằng một khoá dẫn từ khoá ký của kernel ([`SecretKey`]), giữ 16 byte đầu,
-//!    mã hoá base64url (22 ký tự). Không có khoá thì không dò ngược được IP từ bản băm (không
-//!    gian IPv4 nhỏ, băm thường thì thử hết được).
+//! 1. Group by prefix: IPv4 by /24 block, IPv6 by /64 block (a household or one machine usually holds the whole
+//!    block and changes address within it) — also how the rate limiter groups IPv6.
+//! 2. HMAC-SHA256 with a key derived from the kernel's signing key ([`SecretKey`]), keeping the first 16 bytes,
+//!    encoded as base64url (22 characters). Without the key, the IP cannot be recovered from the hash (the IPv4
+//!    space is small, and a plain hash can be brute-forced).
 //!
-//! Hai dạng:
+//! Two forms:
 //!
-//! - [`bucket`]: khoá đổi theo ngày (UTC) — cho bộ đếm (vd "bao nhiêu lần gửi từ khối này hôm
-//!   nay"). Bản băm của hai ngày không nối được với nhau.
-//! - [`fingerprint`]: khoá cố định — lưu cùng bản ghi (bình luận, bài gửi form) để cấm hay gom
-//!   theo người gửi; module tự xoá sau thời hạn của mình.
+//! - [`bucket`]: the key changes daily (UTC) — for counters (e.g. "how many submissions from this block
+//!   today"). Hashes from two days cannot be linked.
+//! - [`fingerprint`]: a fixed key — stored with the record (a comment, a form submission) to ban or group
+//!   by sender; the module deletes it itself after its own retention period.
 //!
-//! Cả hai nhận `scope` (tên module, hay phạm vi form): mỗi phạm vi một khoá riêng (D-153), nên
-//! dấu của cùng một người ở `forms` và ở `comments` khác nhau — đọc được database của module
-//! này không nối được người đó sang module kia. Hai bản ghi chỉ so được với nhau khi cùng
-//! phạm vi.
+//! Both take a `scope` (module name, or form scope): each scope has its own key (D-153), so the marks of the
+//! same person in `forms` and in `comments` differ — being able to read one module's database does not let
+//! you link that person to another module. Two records are comparable only within the same scope.
 //!
-//! Giới hạn: khoá gốc nằm trong database (không đặt `AUTOXIDE_SECRET_KEY`) thì ai có bản sao
-//! database cũng tính lại được khoá và thử hết các khối IPv4 (2^24). Máy chủ cảnh báo lúc khởi
-//! động; khi chạy thật hãy đặt khoá ngoài database.
+//! Limit: if the root key lives in the database (`AUTOXIDE_SECRET_KEY` unset), anyone with a copy of the
+//! database can recompute the key and try every IPv4 block (2^24). The server warns at startup;
+//! in production, set a key outside the database.
 
 use crate::time::Timestamp;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
@@ -33,8 +32,8 @@ use sha2::Sha256;
 use crate::error::Error;
 use crate::secret::SecretKey;
 
-/// Khối địa chỉ chứa `ip`: /24 cho IPv4, /64 cho IPv6. Địa chỉ IPv4 viết dạng IPv6
-/// (`::ffff:a.b.c.d`) tính như IPv4.
+/// The address block containing `ip`: /24 for IPv4, /64 for IPv6. An IPv4 address written as IPv6
+/// (`::ffff:a.b.c.d`) is treated as IPv4.
 pub fn prefix(ip: IpAddr) -> IpAddr {
     match ip {
         IpAddr::V4(v4) => IpAddr::V4(v4_block(v4)),
@@ -53,8 +52,8 @@ fn v4_block(v4: Ipv4Addr) -> Ipv4Addr {
     Ipv4Addr::new(a, b, c, 0)
 }
 
-/// Bản băm của khối chứa `ip` trong phạm vi `scope`, khoá đổi theo ngày UTC của `now`. Dùng
-/// cho bộ đếm.
+/// The hash of the block containing `ip` in scope `scope`, with a key that changes daily by the UTC date of
+/// `now`. Used for counters.
 pub async fn bucket(
     secret: &SecretKey,
     scope: &str,
@@ -67,8 +66,8 @@ pub async fn bucket(
     digest(&key, ip)
 }
 
-/// Bản băm cố định của khối chứa `ip` trong phạm vi `scope` (tên module). Lưu cùng bản ghi;
-/// module xoá sau thời hạn của mình.
+/// The fixed hash of the block containing `ip` in scope `scope` (a module name). Stored with the record;
+/// the module deletes it after its own retention period.
 pub async fn fingerprint(secret: &SecretKey, scope: &str, ip: IpAddr) -> Result<String, Error> {
     let key = secret.derive(&format!("autoxide/ip-hash/fingerprint/v2/{scope}")).await?;
     digest(&key, ip)

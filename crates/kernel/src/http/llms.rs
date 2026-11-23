@@ -1,13 +1,14 @@
-//! `/llms.txt` — trang cho AI agent tự khám phá máy chủ (bước 40 P2), theo định dạng
-//! [llmstxt.org](https://llmstxt.org): H1, một câu tóm tắt trong `>`, các mục `##` với danh sách link.
+//! `/llms.txt` - a page for AI agents to discover the server on their own (step 40 P2), in the format of
+//! [llmstxt.org](https://llmstxt.org): an H1, a one-sentence summary in `>`, `##` sections with lists of links.
 //!
-//! Nội dung **sinh lúc dựng router từ code** (module đã đăng ký, mô tả `Module::description`,
-//! resource và prompt MCP, đường dẫn OpenAPI / MCP / trang tài liệu), nên không lệch được; test
-//! `llms_txt_co_moi_module_va_link` và `moi_link_trong_llms_txt_khong_404` giữ điều đó. Cùng nội
-//! dung là resource MCP `autoxide://kernel/llms.txt`.
+//! The content is **generated from code when the router is built** (registered modules, `Module::description`,
+//! MCP resources and prompts, OpenAPI / MCP / documentation page paths), so it cannot drift; the tests
+//! `llms_txt_co_moi_module_va_link` and `moi_link_trong_llms_txt_khong_404` guarantee that. The same
+//! content is the MCP resource `autoxide://kernel/llms.txt`.
 //!
-//! Trang liệt kê module của BẢN CÀI, không theo gói của khách: trang công khai, không biết người
-//! gọi; endpoint và tool của module gói không có vẫn trả `module_not_enabled` lúc gọi.
+//! The page lists the modules of the INSTALLATION, not of a tenant's plan: it is a public page that does not
+//! know the caller; endpoints and tools of a module the plan lacks still return `module_not_enabled` when
+//! called.
 
 use std::fmt::Write as _;
 
@@ -19,31 +20,31 @@ use utoipa_axum::routes;
 
 use crate::mcp::{McpResource, Prompt, Tool};
 
-/// Đường dẫn của trang.
+/// Path of the page.
 pub const LLMS_PATH: &str = "/llms.txt";
 
-/// Những gì trang nói tới.
+/// What the page talks about.
 pub(super) struct LlmsInputs<'a> {
-    /// `AUTOXIDE_HTTP_PUBLIC_URL` (không có `/` cuối); không có thì link tương đối.
+    /// `AUTOXIDE_HTTP_PUBLIC_URL` (without a trailing `/`); when unset, links are relative.
     pub(super) base: &'a str,
     pub(super) api_docs: bool,
-    /// Có endpoint `/mcp` (có module xác thực).
+    /// There is an `/mcp` endpoint (an authentication module exists).
     pub(super) mcp: bool,
-    /// Có route health check (`health_routes`) ở gốc.
+    /// There are health check routes (`health_routes`) at the root.
     pub(super) health: bool,
-    /// Có route sổ module (`GET /api/v1/kernel/modules/{name}`): mỗi module link tới mục của nó.
+    /// There is a module catalog route (`GET /api/v1/kernel/modules/{name}`): each module links to its entry.
     pub(super) catalog: bool,
-    /// Tên và mô tả của mọi module, theo thứ tự đăng ký.
+    /// Name and description of every module, in registration order.
     pub(super) modules: &'a [(&'static str, &'static str)],
-    /// Module có đường dẫn REST, tức có tài liệu OpenAPI riêng.
+    /// Modules that have REST paths, i.e. their own OpenAPI documentation.
     pub(super) documented: &'a [&'static str],
-    /// Tool MCP của mọi module, tên đầy đủ `<module>.<tên>`.
+    /// MCP tools of every module, full name `<module>.<name>`.
     pub(super) tools: &'a [Tool],
     pub(super) resources: &'a [McpResource],
     pub(super) prompts: &'a [Prompt],
 }
 
-/// Dựng nội dung trang.
+/// Builds the page content.
 pub(super) fn render(inputs: &LlmsInputs<'_>) -> String {
     let base = inputs.base;
     let api = super::API_PREFIX;
@@ -151,7 +152,8 @@ pub(super) fn render(inputs: &LlmsInputs<'_>) -> String {
     text
 }
 
-/// Dòng con dưới một module: link tới tài liệu OpenAPI và endpoint MCP riêng, và tên các tool.
+/// Child lines under a module: links to its own OpenAPI documentation and MCP endpoint, and the names of
+/// its tools.
 fn module_links(text: &mut String, inputs: &LlmsInputs<'_>, name: &str) -> std::fmt::Result {
     let base = inputs.base;
     let prefix = format!("{name}.");
@@ -186,11 +188,11 @@ fn module_links(text: &mut String, inputs: &LlmsInputs<'_>, name: &str) -> std::
     writeln!(text)
 }
 
-/// Nội dung đã dựng; `Bytes` clone chỉ tăng bộ đếm tham chiếu.
+/// The built content; cloning `Bytes` only bumps the reference count.
 #[derive(Clone)]
 struct LlmsText(axum::body::Bytes);
 
-/// Route `/llms.txt` với nội dung đã dựng.
+/// The `/llms.txt` route with the built content.
 pub(super) fn routes(text: String) -> OpenApiRouter {
     OpenApiRouter::new().routes(routes!(llms_txt)).with_state(LlmsText(text.into()))
 }

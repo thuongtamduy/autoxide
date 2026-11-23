@@ -1,4 +1,4 @@
-//! Đưa job vào hàng đợi, và các thao tác cho người vận hành (xem, chạy lại job hỏng).
+//! Puts jobs into the queue, and operations for operators (view, rerun a failed job).
 use crate::time::Timestamp;
 use sea_orm::ConnectionTrait;
 use sea_orm::sea_query::{Alias, Expr, ExprTrait as _, OnConflict, Order, Query};
@@ -8,16 +8,16 @@ use super::{Job, foreign_kind, module_of, table_name};
 use crate::error::Error;
 use crate::tenancy::{NO_TENANT, TenantContext, TenantId};
 
-/// Tuỳ chọn khi đưa job vào hàng đợi. Dựng bằng `EnqueueOptions::default()` rồi các hàm đặt
-/// từng trường.
+/// Options when putting a job into the queue. Build with `EnqueueOptions::default()` then the
+/// functions that set each field.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct EnqueueOptions {
-    /// Chạy từ lúc này; `None`: ngay.
+    /// Run from this moment; `None`: immediately.
     pub run_at: Option<Timestamp>,
-    /// Số lần chạy tối đa; `None`: [`DEFAULT_MAX_ATTEMPTS`](super::DEFAULT_MAX_ATTEMPTS).
+    /// Maximum number of runs; `None`: [`DEFAULT_MAX_ATTEMPTS`](super::DEFAULT_MAX_ATTEMPTS).
     pub max_attempts: Option<i32>,
-    /// Khoá chống trùng: đã có job mang khoá này thì không thêm job mới.
+    /// Deduplication key: if a job with this key already exists, no new job is added.
     pub unique_key: Option<String>,
 }
 
@@ -41,7 +41,7 @@ impl EnqueueOptions {
     }
 }
 
-/// Hàng đợi job của một module. Lấy bằng `StartContext::jobs()`; clone rẻ.
+/// A module's job queue. Obtained with `StartContext::jobs()`; cheap to clone.
 #[derive(Debug, Clone)]
 pub struct JobQueue {
     module: &'static str,
@@ -49,15 +49,15 @@ pub struct JobQueue {
 }
 
 impl JobQueue {
-    /// Hàng đợi của module `module`. Trong chương trình, lấy bằng `StartContext::jobs()`;
-    /// hàm này cho test và công cụ.
+    /// The queue of module `module`. In the program, obtain it with `StartContext::jobs()`;
+    /// this function is for tests and tools.
     pub fn new(module: &'static str) -> Self {
         JobQueue { module, table: table_name(module) }
     }
 
-    /// Đưa `job` của khách `tenant` vào hàng đợi, trong `connection` (thường là transaction của
-    /// thay đổi, trên `tenant.database()`). Trả về ID của job, hoặc `None` nếu khách đã có job
-    /// mang cùng `unique_key`.
+    /// Puts `job` of tenant `tenant` into the queue, in `connection` (usually the transaction of the
+    /// change, on `tenant.database()`). Returns the job's ID, or `None` if the tenant already has a job
+    /// with the same `unique_key`.
     pub async fn enqueue<C, J>(
         &self,
         connection: &C,
@@ -79,9 +79,9 @@ impl JobQueue {
         .await
     }
 
-    /// Đưa `job` của cả database (không thuộc khách nào — vd dọn dẹp quét mọi khách) vào hàng
-    /// đợi của database `connection`. Bộ chạy nhận [`JobContext::tenant`](super::JobContext)
-    /// là `None`.
+    /// Puts a database-wide `job` (belonging to no tenant - e.g. a cleanup that sweeps all tenants) into the
+    /// queue of database `connection`. The runner receives [`JobContext::tenant`](super::JobContext) as
+    /// `None`.
     pub async fn enqueue_database<C, J>(
         &self,
         connection: &C,
@@ -154,18 +154,18 @@ impl JobQueue {
     }
 }
 
-/// Trạng thái của một job, cho người vận hành.
+/// The state of a job, for operators.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum JobStatus {
-    /// Chờ chạy hoặc đang chạy.
+    /// Waiting to run or running.
     Pending,
     Completed,
-    /// Hỏng hẳn (dead-letter queue).
+    /// Permanently failed (dead-letter queue).
     Failed,
 }
 
-/// Một job, cho người vận hành xem.
+/// A job, for operators to view.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct JobRecord {
@@ -218,7 +218,7 @@ impl JobRecord {
     }
 }
 
-/// Tối đa `limit` job trạng thái `status` của module `module`, mới nhất trước.
+/// At most `limit` jobs with status `status` of module `module`, newest first.
 pub(crate) async fn list<C: ConnectionTrait>(
     connection: &C,
     module: &str,
@@ -256,8 +256,8 @@ pub(crate) async fn list<C: ConnectionTrait>(
         .collect()
 }
 
-/// Đưa một job hỏng hẳn trở lại hàng đợi, như mới. `false` nếu không có job hỏng mang ID
-/// này trong module.
+/// Puts a permanently failed job back into the queue, as new. `false` if there is no failed job with this
+/// ID in the module.
 pub(crate) async fn retry<C: ConnectionTrait>(
     connection: &C,
     module: &str,

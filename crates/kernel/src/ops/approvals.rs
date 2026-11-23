@@ -1,16 +1,18 @@
-//! Lệnh cần duyệt khi agent gọi (bước 51 P12, D-201, D-213, D-224).
+//! Commands that need approval when an agent calls them (step 51 P12, D-201, D-213, D-224).
 //!
-//! Module đánh dấu lệnh rủi ro bằng phần mở rộng OpenAPI `x-approval: "agent"` trên `#[utoipa::path]`.
-//! Khi người gọi là agent (API key loại `agent`), lớp [`gate`] không cho lệnh chạy: nó ghi một **yêu
-//! cầu duyệt** (`kernel_approval_requests`, cấp khách hàng) và trả `202` kèm yêu cầu đó. Người có
-//! một trong các permission của lệnh duyệt hay từ chối (`POST /api/v1/kernel/approvals/{id}/approve`
-//! | `/reject`, event `kernel.approval_decided`). Được duyệt thì agent gửi lại **đúng** request đó
-//! (cùng method, đường dẫn, thân — và cùng `Idempotency-Key`) kèm header `Autoxide-Approval: <id>`;
-//! mỗi lần duyệt chạy được một lần, trong hạn (mặc định 24 giờ).
+//! A module marks a risky command with the OpenAPI extension `x-approval: "agent"` on `#[utoipa::path]`. When
+//! the caller is an agent (an API key of kind `agent`), the [`gate`] layer does not let the command run: it
+//! records an **approval request** (`kernel_approval_requests`, tenant level) and returns `202` with that
+//! request. A person holding one of the command's permissions approves or rejects it
+//! (`POST /api/v1/kernel/approvals/{id}/approve` | `/reject`, event `kernel.approval_decided`). Once
+//! approved, the agent resends **exactly** the same request (same method, path, body, and the same
+//! `Idempotency-Key`) with the header `Autoxide-Approval: <id>`; each approval lets the command run once,
+//! within the deadline (24 hours by default).
 //!
-//! Lớp idempotency không giữ câu trả lời `202` này (xem [`Pending`]): gửi lại cùng key sau khi duyệt
-//! thì lệnh chạy thật. Tool MCP tương ứng khai `Tool::requires_approval_for_agent`: agent gọi tool đó
-//! thì bị từ chối và được chỉ sang đường REST để xin duyệt (MCP không làm được điều REST cấm).
+//! The idempotency layer does not keep this `202` response (see [`Pending`]): resending the same key after
+//! approval runs the command for real. The corresponding MCP tool declares `Tool::requires_approval_for_agent`:
+//! an agent calling that tool is refused and pointed to the REST path to ask for approval (MCP cannot do what
+//! REST forbids).
 
 use crate::time::Timestamp;
 use jiff::SignedDuration;
@@ -39,14 +41,14 @@ use crate::response::{Data, Problem};
 use crate::tenancy::TenantContext;
 
 const TABLE: &str = "kernel_approval_requests";
-/// Yêu cầu duyệt sống chừng này giờ.
+/// An approval request lives this many hours.
 const LIFETIME_HOURS: i64 = 24;
-/// Thân request lớn hơn thế không xin duyệt được (lệnh rủi ro không cần thân lớn).
+/// A request body larger than this cannot ask for approval (a risky command does not need a large body).
 const MAX_BODY: usize = 1024 * 1024;
-/// Header agent gửi lại kèm lệnh đã được duyệt.
+/// Header the agent sends back with an approved command.
 pub const APPROVAL_HEADER: HeaderName = HeaderName::from_static("autoxide-approval");
 
-/// Event: một yêu cầu duyệt được duyệt hay bị từ chối (agent biết kết quả mà không hỏi lại mãi).
+/// Event: an approval request was approved or rejected (the agent learns the outcome without polling forever).
 pub(crate) const APPROVAL_DECIDED: EventInfo = EventInfo::new(
     "kernel.approval_decided",
     "A person approved or rejected a command an agent asked to run.",
@@ -63,12 +65,12 @@ impl crate::event::Event for ApprovalDecided {
     const NAME: &'static str = "kernel.approval_decided";
 }
 
-/// Đánh dấu trên câu trả lời 202: lớp idempotency không giữ nó, để agent gửi lại cùng key sau khi
-/// được duyệt.
+/// Marker on the 202 response: the idempotency layer does not keep it, so the agent can resend the same key
+/// after approval.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Pending(pub(crate) Uuid);
 
-/// Lệnh của một module cần duyệt khi agent gọi: (method, đường dẫn mẫu đầy đủ) → permission.
+/// A module's command that needs approval when an agent calls it: (method, full path template) -> permission.
 #[derive(Debug, Clone, Default)]
 pub(crate) struct Rules {
     commands: Vec<(Method, String, Vec<String>)>,
@@ -87,8 +89,8 @@ impl Rules {
     }
 }
 
-/// Lệnh có `x-approval: "agent"` trong tài liệu của module `module` (đường dẫn đầy đủ
-/// `/api/v1/<module>…`), và ghi `202` vào tài liệu của chúng.
+/// Commands with `x-approval: "agent"` in the documentation of module `module` (full path
+/// `/api/v1/<module>...`), and writes `202` into their documentation.
 pub(crate) fn rules(module: &str, openapi: &mut OpenApi) -> Rules {
     let mut commands = Vec::new();
     for (path, item) in &mut openapi.paths.paths {
@@ -142,7 +144,7 @@ pub(crate) fn rules(module: &str, openapi: &mut OpenApi) -> Rules {
     Rules { commands }
 }
 
-/// Lớp trước lệnh cần duyệt (xem đầu file). Không phải agent, hay lệnh không đánh dấu: cho qua.
+/// Layer in front of commands that need approval (see the top of the file). Not an agent, or a command that is not marked: passes through.
 pub(crate) async fn gate(rules: Arc<Rules>, request: Request, next: Next) -> Response {
     let Some(permissions) = request
         .extensions()
@@ -240,8 +242,8 @@ async fn checked(
     Ok(response)
 }
 
-/// Dùng lần duyệt `id` cho lệnh có băm `hash` của `user_id`: một lần, trong hạn. `true` khi dùng
-/// được (cập nhật có điều kiện: hai lần gửi đồng thời chỉ một lần qua).
+/// Uses approval `id` for the command with hash `hash` of `user_id`: once, within the deadline. `true` when it
+/// could be used (a conditional update: of two simultaneous sends only one gets through).
 async fn consume(
     tenant: &TenantContext,
     id: Uuid,
@@ -344,7 +346,7 @@ fn not_found(id: Uuid) -> Error {
         .with_param("id", id)
 }
 
-/// Người gọi thấy yêu cầu: của mình, hay có một permission duyệt được nó (và không phải agent).
+/// The caller sees the request: their own, or one they can decide with a permission (and is not an agent).
 fn may_see(principal: &Principal, approval: &ApprovalView) -> bool {
     approval.requested_by == principal.user_id() || may_decide(principal, approval)
 }
@@ -400,7 +402,7 @@ async fn list_approvals(
     Ok(Data { data: list_for(&tenant, &principal, query.status.as_deref()).await? })
 }
 
-/// Yêu cầu người gọi được thấy, mới trước, tối đa 200; `status` lọc theo trạng thái.
+/// Requests the caller may see, newest first, at most 200; `status` filters by status.
 pub(crate) async fn list_for(
     tenant: &TenantContext,
     principal: &Principal,
@@ -441,7 +443,7 @@ pub(crate) async fn list_for(
     Ok(found)
 }
 
-/// Hộp việc (P2): yêu cầu đang chờ mà người gọi quyết được.
+/// Work inbox (P2): pending requests the caller can decide.
 pub(crate) struct ApprovalsWork;
 
 #[async_trait::async_trait]
@@ -743,7 +745,7 @@ pub(crate) fn routes(state: ApprovalsState) -> OpenApiRouter {
         .with_state(Arc::new(state))
 }
 
-/// Migration tạo bảng `kernel_approval_requests` (cấp khách hàng, mọi database dữ liệu).
+/// Migration that creates the table `kernel_approval_requests` (tenant level, every data database).
 pub(crate) struct CreateApprovalRequests;
 
 impl MigrationName for CreateApprovalRequests {

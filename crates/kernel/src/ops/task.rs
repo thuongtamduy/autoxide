@@ -1,10 +1,11 @@
-//! Lệnh quản trị do module khai: `autoxide task <module>.<tên> [khoá=giá trị …]` (D-169, mượn
-//! tasks của Loco và management commands của Django — D-164).
+//! Admin commands declared by modules: `autoxide task <module>.<name> [key=value …]` (D-169, borrowing
+//! Loco's tasks and Django's management commands — D-164).
 //!
-//! Dành cho việc người vận hành chạy tay, thỉnh thoảng: làm lại dữ liệu dẫn xuất sau khi đổi cấu
-//! hình, dọn một lần, kiểm số liệu… Thêm lệnh không phải sửa binary: module khai qua
-//! [`Module::tasks`](crate::module::Module::tasks). Lệnh chạy với quyền của người vận hành máy chủ
-//! (như `autoxide user create`), nên chỉ làm điều REST với quyền quản trị làm được (luật 8).
+//! For things an operator runs by hand, occasionally: rebuilding derived data after a configuration change, a
+//! one-off cleanup, checking figures… Adding a command does not require editing the binary: a module declares
+//! it through [`Module::tasks`](crate::module::Module::tasks). A command runs with the server operator's
+//! authority (like `autoxide user create`), so it may only do what REST can do with admin permission (rule
+//! 8).
 
 use std::collections::BTreeMap;
 use std::fmt;
@@ -12,12 +13,12 @@ use std::sync::Arc;
 
 use crate::error::Error;
 
-/// Một tham số lệnh nhận, dạng `tên=giá trị` trên dòng lệnh.
+/// An argument a command accepts, in the form `name=value` on the command line.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct TaskArgument {
     pub name: &'static str,
-    /// Câu tiếng Anh nói tham số làm gì và nhận giá trị nào.
+    /// English sentence saying what the argument does and which values it accepts.
     pub description: &'static str,
     pub required: bool,
 }
@@ -32,17 +33,17 @@ impl TaskArgument {
     }
 }
 
-/// Tham số đã kiểm: chỉ có tên đã khai, đủ tham số bắt buộc.
+/// Validated arguments: only declared names, with all required arguments present.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct TaskArgs(BTreeMap<String, String>);
 
 impl TaskArgs {
-    /// Giá trị của tham số `name`, nếu người gọi đưa.
+    /// The value of argument `name`, if the caller supplied it.
     pub fn get(&self, name: &str) -> Option<&str> {
         self.0.get(name).map(String::as_str)
     }
 
-    /// Tham số dạng `true` / `false`; không đưa thì `default`.
+    /// A `true` / `false` argument; `default` if not supplied.
     pub fn flag(&self, name: &str, default: bool) -> Result<bool, Error> {
         match self.get(name) {
             None => Ok(default),
@@ -58,7 +59,7 @@ impl TaskArgs {
     }
 }
 
-/// Lỗi về cách gọi lệnh (tên sai, thiếu hay thừa tham số). Lỗi khi chạy là [`Error`].
+/// Error in how the command is invoked (wrong name, missing or extra argument). An error while running is [`Error`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TaskError(String);
 
@@ -70,7 +71,7 @@ impl fmt::Display for TaskError {
 
 impl std::error::Error for TaskError {}
 
-/// Phần chạy của một lệnh. Trả câu báo kết quả (tiếng Anh) để in ra.
+/// The running part of a command. Returns the result message (in English) to print.
 //
 // `#[async_trait]`: Rust chưa cho gọi hàm `async` của trait qua `dyn Trait`.
 #[async_trait::async_trait]
@@ -78,13 +79,13 @@ pub trait TaskRun: Send + Sync {
     async fn run(&self, args: &TaskArgs) -> Result<String, Error>;
 }
 
-/// Một lệnh module khai. Tên khai ngắn, `snake_case` (`refresh_variants`); kernel thêm tiền tố
-/// `<module>.`.
+/// A command a module declares. The declared name is short, `snake_case` (`refresh_variants`); the kernel
+/// adds the prefix `<module>.`.
 #[derive(Clone)]
 #[non_exhaustive]
 pub struct Task {
     pub name: &'static str,
-    /// Câu tiếng Anh nói lệnh làm gì, có thay đổi dữ liệu không.
+    /// English sentence saying what the command does and whether it changes data.
     pub description: &'static str,
     pub arguments: Vec<TaskArgument>,
     runner: Arc<dyn TaskRun>,
@@ -95,13 +96,13 @@ impl Task {
         Task { name, description, arguments: Vec::new(), runner }
     }
 
-    /// Thêm một tham số lệnh nhận.
+    /// Adds an argument the command accepts.
     pub fn argument(mut self, argument: TaskArgument) -> Self {
         self.arguments.push(argument);
         self
     }
 
-    /// Kiểm `raw` (mỗi phần tử `tên=giá trị`) theo các tham số đã khai.
+    /// Validates `raw` (each element `name=value`) against the declared arguments.
     pub fn parse(&self, raw: &[String]) -> Result<TaskArgs, TaskError> {
         let mut args = BTreeMap::new();
         for item in raw {
@@ -130,12 +131,12 @@ impl Task {
         Ok(TaskArgs(args))
     }
 
-    /// Chạy với tham số đã kiểm bằng [`parse`](Self::parse).
+    /// Runs with arguments validated by [`parse`](Self::parse).
     pub async fn run(&self, args: &TaskArgs) -> Result<String, Error> {
         self.runner.run(args).await
     }
 
-    /// `name=<…> [other=<…>]`, hoặc `(no arguments)`.
+    /// `name=<…> [other=<…>]`, or `(no arguments)`.
     pub fn usage(&self) -> String {
         if self.arguments.is_empty() {
             return "(no arguments)".to_owned();
@@ -160,7 +161,7 @@ impl fmt::Debug for Task {
     }
 }
 
-/// Tên lệnh hợp lệ: chữ thường, số, `_`, bắt đầu bằng chữ.
+/// A valid command name: lowercase letters, digits, `_`, starting with a letter.
 pub(crate) fn valid_name(name: &str) -> bool {
     name.chars().next().is_some_and(|c| c.is_ascii_lowercase())
         && name.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')

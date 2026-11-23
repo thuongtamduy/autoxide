@@ -1,6 +1,6 @@
-//! Hợp đồng của module `shipping` cho module khác (`orders`, bộ nối hãng vận chuyển
-//! `shipping-<hãng>`, `support`…): chỉ những gì ở đây được dùng từ bên ngoài
-//! (`autoxide_shipping::api::…`). Module khác lấy trait lúc khởi động:
+//! Contract of the `shipping` module for other modules (`orders`, the carrier connectors
+//! `shipping-<carrier>`, `support`…): only what is here is used from outside
+//! (`autoxide_shipping::api::…`). Other modules get the traits at startup:
 //!
 //! ```text
 //! let rates = context.require::<dyn autoxide_shipping::api::ShippingRates>()?;
@@ -8,12 +8,13 @@
 //! let carriers = context.require::<dyn autoxide_shipping::api::CarrierRegistry>()?;
 //! ```
 //!
-//! Module đó phải đăng ký SAU `shipping` trong `crates/app/src/modules.rs`. Không module nào đọc
-//! bảng `shipping_…` (luật kiến trúc 1). File này không tham chiếu phần bên trong module
-//! (`crate::…`), để bộ giả [`fake::FakeCarrier`] dùng được từ testkit và bước 45.
+//! That module must register AFTER `shipping` in `crates/app/src/modules.rs`. No module reads
+//! the `shipping_…` tables (architecture rule 1). This file does not reference the module's internals
+//! (`crate::…`), so the fake [`fake::FakeCarrier`] can be used from the testkit and step 45.
 //!
-//! `shipping` **không phụ thuộc `orders`**: nhận yêu cầu giao qua event (tên ở [`events`]), payload
-//! `after.shipment` là [`ShipmentRequest`]; báo trạng thái qua event của chính nó.
+//! `shipping` **does not depend on `orders`**: it receives shipping requests through events (names in
+//! [`events`]), with payload `after.shipment` being a [`ShipmentRequest`]; it reports status through its own
+//! events.
 
 use autoxide_kernel::time::{Date, Timestamp};
 use std::fmt;
@@ -26,46 +27,46 @@ use uuid::Uuid;
 
 pub use autoxide_address::api::Address;
 
-/// Tên event: `shipping` nghe của `orders` và phát cho module khác.
+/// Event names: `shipping` listens to those of `orders` and emits those for other modules.
 pub mod events {
-    /// `orders` xin giao một phần / cả đơn: payload `{"after": {"shipment": ShipmentRequest}}`.
+    /// `orders` asks to ship part of / a whole order: payload `{"after": {"shipment": ShipmentRequest}}`.
     pub const ORDERS_FULFILLMENT_REQUESTED: &str = "orders.fulfillment_requested";
-    /// `orders` xin lấy hàng trả từ người mua (`direction = return`), payload như trên.
+    /// `orders` asks to pick up returned goods from the buyer (`direction = return`), payload as above.
     pub const ORDERS_RETURN_PICKUP_REQUESTED: &str = "orders.return_pickup_requested";
-    /// `orders` huỷ đơn: payload `{"after": {"order_id": "<uuid>"}}` — huỷ các vận đơn chưa lấy hàng.
+    /// `orders` cancels an order: payload `{"after": {"order_id": "<uuid>"}}` — cancels shipments not yet picked up.
     pub const ORDERS_ORDER_CANCELLED: &str = "orders.order_cancelled";
 
-    /// Vận đơn vừa tạo (`pending`). Payload `{"after": ShipmentEvent}`.
+    /// A shipment was just created (`pending`). Payload `{"after": ShipmentEvent}`.
     pub const SHIPMENT_CREATED: &str = "shipping.shipment_created";
-    /// Đã đặt với hãng, có mã vận đơn.
+    /// Booked with the carrier, with a tracking number.
     pub const SHIPMENT_BOOKED: &str = "shipping.shipment_booked";
-    /// Mọi lần đổi trạng thái (gồm cả các event riêng bên dưới).
+    /// Every status change (including the dedicated events below).
     pub const SHIPMENT_STATUS_CHANGED: &str = "shipping.shipment_status_changed";
     pub const SHIPMENT_DELIVERED: &str = "shipping.shipment_delivered";
     pub const SHIPMENT_DELIVERY_FAILED: &str = "shipping.shipment_delivery_failed";
     pub const SHIPMENT_RETURNED: &str = "shipping.shipment_returned";
     pub const SHIPMENT_CANCELLED: &str = "shipping.shipment_cancelled";
-    /// Đặt với hãng thất bại hẳn (vận đơn về `pending`).
+    /// Booking with the carrier failed for good (the shipment returns to `pending`).
     pub const BOOKING_FAILED: &str = "shipping.booking_failed";
-    /// Hãng đã thu tiền COD (giao xong) — `orders` ghi nhận đơn đã thu.
+    /// The carrier collected the COD money (delivered) — `orders` records the order as paid.
     pub const COD_COLLECTED: &str = "shipping.cod_collected";
-    /// Bảng kê của hãng khớp: tiền COD đã về người bán / đối tác thu hộ (D-216).
+    /// The carrier's statement matches: the COD money has reached the seller / the collecting partner (D-216).
     pub const COD_SETTLED: &str = "shipping.cod_settled";
-    /// Bảng kê lệch với vận đơn (hay vận đơn quá hạn chưa vào bảng kê).
+    /// The statement disagrees with a shipment (or a shipment is overdue and not yet in a statement).
     pub const COD_MISMATCH: &str = "shipping.cod_mismatch";
-    /// Một chênh lệch COD được giải quyết (mã lý do + ghi chú).
+    /// A COD discrepancy was resolved (reason code + note).
     pub const COD_DISCREPANCY_RESOLVED: &str = "shipping.cod_discrepancy_resolved";
-    /// Tài khoản hãng thêm / sửa / kiểm (không mang thông tin đăng nhập).
+    /// A carrier account was added / changed / checked (carries no credentials).
     pub const CARRIER_ACCOUNT_CHANGED: &str = "shipping.carrier_account_changed";
 }
 
 // ---- Sổ địa chỉ người mua -----------------------------------------------------------------------
 
-/// Một địa chỉ trong sổ của người mua.
+/// An address in a buyer's address book.
 ///
-/// Địa chỉ Việt Nam: `address` theo đơn vị hành chính hai cấp (module `address`). Địa chỉ nước
-/// ngoài dạng chung: `address.province_code` / `province_name` là vùng (bang, tỉnh…),
-/// `address.commune_name` là thành phố, `commune_code` rỗng, kèm `postal_code`.
+/// A Vietnamese address: `address` follows the two-level administrative units (module `address`). A foreign
+/// address is generic: `address.province_code` / `province_name` is the region (state, province…),
+/// `address.commune_name` is the city, `commune_code` is empty, with `postal_code`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct BuyerAddress {
@@ -80,10 +81,10 @@ pub struct BuyerAddress {
     pub updated_at: Timestamp,
 }
 
-/// Sổ địa chỉ của người mua, cho `orders` (giỏ, đặt hàng).
+/// A buyer's address book, for `orders` (cart, checkout).
 #[async_trait::async_trait]
 pub trait AddressBook: Send + Sync {
-    /// Địa chỉ `id` của người mua `buyer_id`; của người khác hay không có →
+    /// Address `id` of buyer `buyer_id`; another person's or missing →
     /// `shipping.address_not_found`.
     async fn get(
         &self,
@@ -91,7 +92,7 @@ pub trait AddressBook: Send + Sync {
         buyer_id: Uuid,
         id: Uuid,
     ) -> Result<BuyerAddress, Error>;
-    /// Địa chỉ mặc định của người mua, nếu có.
+    /// The buyer's default address, if any.
     async fn default_for(
         &self,
         tenant: &TenantContext,
@@ -101,24 +102,24 @@ pub trait AddressBook: Send + Sync {
 
 // ---- Báo giá, cho `orders` ----------------------------------------------------------------------
 
-/// Câu hỏi báo giá: các cách giao một giỏ hàng từ cửa hàng `org_id` tới `destination`.
+/// A quote request: the ways to ship a cart from store `org_id` to `destination`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct QuoteRequest {
-    /// Cửa hàng bán (phương thức kế thừa theo cây tổ chức).
+    /// The selling store (methods inherit down the organization tree).
     pub org_id: OrgId,
-    /// Kho xuất nếu đã biết (từ chỗ giữ của `inventory`).
+    /// The dispatch warehouse if already known (from an `inventory` hold).
     pub origin_org_id: Option<OrgId>,
-    /// `None`: chỉ trả phương thức nhận tại cửa hàng.
+    /// `None`: only the store-pickup method is returned.
     pub destination: Option<Address>,
     pub items: Vec<QuoteItem>,
-    /// Giá trị đơn sau giảm giá, để xét miễn phí vận chuyển.
+    /// Order value after discounts, to evaluate free shipping.
     pub order_value: Money,
-    /// Lúc tính (ngày giao dự kiến, giờ chốt).
+    /// Time of calculation (estimated delivery date, cutoff time).
     pub at: Timestamp,
-    /// Ngôn ngữ của tên phương thức.
+    /// Language of the method names.
     pub locale: String,
-    /// Người nhận (tên, số điện thoại) khi đã biết, chuyển cho hãng lúc báo phí.
+    /// The recipient (name, phone number) when already known, passed to the carrier when quoting the fee.
     #[serde(default)]
     pub recipient: Option<(String, String)>,
 }
@@ -137,7 +138,7 @@ impl QuoteRequest {
         }
     }
 
-    /// Người nhận (tên, số điện thoại), nếu đã biết.
+    /// The recipient (name, phone number), if already known.
     pub fn recipient(mut self, name: impl Into<String>, phone: impl Into<String>) -> Self {
         self.recipient = Some((name.into(), phone.into()));
         self
@@ -159,7 +160,7 @@ impl QuoteRequest {
     }
 }
 
-/// Một dòng của giỏ, số liệu lấy từ `VariantSnapshot` của `catalog` (`shipping` không gọi
+/// A cart line, with figures taken from the `VariantSnapshot` of `catalog` (`shipping` does not call
 /// `catalog`).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
@@ -167,17 +168,17 @@ pub struct QuoteItem {
     pub variant_id: Uuid,
     pub quantity: i64,
     pub requires_shipping: bool,
-    /// Cân nặng một món, gram.
+    /// Weight of one item, in grams.
     pub weight_grams: Option<i64>,
     pub length_mm: Option<i64>,
     pub width_mm: Option<i64>,
     pub height_mm: Option<i64>,
-    /// Mã hàng, để báo `shipping.weight_missing` cho đúng món.
+    /// Item code, so `shipping.weight_missing` names the right item.
     pub sku: String,
 }
 
 impl QuoteItem {
-    /// Món cần giao, chưa có cân nặng / kích thước.
+    /// An item that must be shipped but has no weight / dimensions yet.
     pub fn new(variant_id: Uuid, quantity: i64) -> Self {
         QuoteItem {
             variant_id,
@@ -206,7 +207,7 @@ impl QuoteItem {
         self
     }
 
-    /// Dài × rộng × cao, mm.
+    /// Length × width × height, in mm.
     pub fn dimensions(
         mut self,
         length_mm: Option<i64>,
@@ -226,11 +227,11 @@ impl QuoteItem {
 #[serde(rename_all = "snake_case")]
 #[schema(as = ShippingMethodKind)]
 pub enum MethodKind {
-    /// Bảng phí khách tự đặt (vùng × bậc cân).
+    /// A fee table the tenant sets itself (zone × weight tier).
     TableRate,
-    /// Phí do hãng vận chuyển báo.
+    /// A fee quoted by the carrier.
     Carrier,
-    /// Nhận tại cửa hàng.
+    /// Pick up in store.
     Pickup,
 }
 
@@ -253,15 +254,15 @@ impl MethodKind {
     }
 }
 
-/// Ngày giao dự kiến: ngày tuyệt đối theo múi giờ của lịch giao (D-201).
+/// Estimated delivery date: an absolute date in the time zone of the delivery calendar (D-201).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct Eta {
     pub earliest_date: Date,
     pub latest_date: Date,
-    /// Đặt trước lúc này thì kịp chuyến hôm nay (giờ chốt còn trong ngày), không thì `None`.
+    /// If ordered now it makes today's run (the cutoff time is still within the day), otherwise `None`.
     pub order_by: Option<Timestamp>,
-    /// Múi giờ IANA của hai ngày trên, vd `Asia/Ho_Chi_Minh`.
+    /// IANA time zone of the two dates above, e.g. `Asia/Ho_Chi_Minh`.
     pub time_zone: String,
 }
 
@@ -276,7 +277,7 @@ impl Eta {
     }
 }
 
-/// Một cách giao hợp lệ.
+/// A valid way to ship.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct ShippingOption {
@@ -284,42 +285,42 @@ pub struct ShippingOption {
     pub method_code: String,
     pub name: String,
     pub kind: MethodKind,
-    /// Phí người mua trả (0 khi miễn phí), đã gồm thuế GTGT của phí giao.
+    /// The fee the buyer pays (0 when free), including the VAT on the shipping fee.
     pub amount: Money,
     pub free_shipping_applied: bool,
-    /// Ngưỡng miễn phí của phương thức (để `orders` báo "mua thêm X để miễn phí").
+    /// The method's free-shipping threshold (so `orders` can say "buy X more for free shipping").
     pub free_over: Option<Money>,
-    /// Nhóm thuế của phí giao trong engine thuế (bước 36), vd `vat.standard`; `orders` ghi
-    /// dòng thuế của phí giao lên hoá đơn theo nhóm này (D-208…D-218).
+    /// The tax group of the shipping fee in the tax engine (step 36), e.g. `vat.standard`; `orders` records
+    /// the shipping fee's tax line on the invoice under this group (D-208…D-218).
     pub tax_category: String,
     pub carrier_code: Option<String>,
     pub service_code: Option<String>,
-    /// Cửa hàng nhận hàng, với `Pickup`.
+    /// The store that hands over the goods, for `Pickup`.
     pub pickup_org_id: Option<OrgId>,
     pub chargeable_weight_grams: i64,
-    /// Số ngày giao (ít nhất, nhiều nhất) như phương thức khai.
+    /// Delivery days (minimum, maximum) as the method declares.
     pub estimated_days: Option<(u16, u16)>,
     pub eta: Option<Eta>,
-    /// Nhận tại cửa hàng: lúc hàng sẵn sàng (chuẩn bị + giờ mở cửa).
+    /// Store pickup: when the goods are ready (preparation + opening hours).
     pub ready_at: Option<Timestamp>,
-    /// Nhận tại cửa hàng: số ngày giữ hàng chờ nhận.
+    /// Store pickup: the number of days the goods are held awaiting pickup.
     pub hold_days: Option<u16>,
-    /// Dấu vân tay (phương thức, số tiền, đích) — `orders` gửi lại khi đặt; lệch →
+    /// Fingerprint (method, amount, destination) — `orders` sends it back when placing the order; a mismatch →
     /// `shipping.option_changed`.
     pub option_key: String,
 }
 
-/// Báo giá.
+/// A quote.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct Quote {
-    /// Rẻ trước. Rỗng khi giỏ không có món nào cần giao.
+    /// Cheapest first. Empty when the cart has no item to ship.
     pub options: Vec<ShippingOption>,
-    /// Phương thức không dùng được cho giỏ / đích này, kèm mã lý do.
+    /// Methods unusable for this cart / destination, with a reason code.
     pub unavailable: Vec<UnavailableMethod>,
 }
 
-/// Phương thức không dùng được và lý do (`shipping.weight_missing`, `shipping.carrier_unavailable`…).
+/// A method that is unusable and why (`shipping.weight_missing`, `shipping.carrier_unavailable`…).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct UnavailableMethod {
@@ -333,15 +334,15 @@ impl UnavailableMethod {
     }
 }
 
-/// Báo giá phí giao (module `shipping` công bố).
+/// Quotes shipping fees (published by the `shipping` module).
 #[async_trait::async_trait]
 pub trait ShippingRates: Send + Sync {
-    /// Các cách giao hợp lệ, rẻ trước. Hãng lỗi / quá giờ: phương thức đó vào `unavailable`,
-    /// không làm hỏng cả báo giá. Không gọi trong transaction ghi (có thể gọi hãng).
+    /// The valid ways to ship, cheapest first. A carrier error / timeout: that method goes into `unavailable`,
+    /// without breaking the whole quote. Do not call inside a write transaction (it may call the carrier).
     async fn quote(&self, tenant: &TenantContext, request: &QuoteRequest) -> Result<Quote, Error>;
 
-    /// Kiểm lại một cách giao lúc đặt hàng: tính lại báo giá, trả đúng phương thức có
-    /// `option_key`; phí hay đích đã đổi → `shipping.option_changed` (409).
+    /// Rechecks a shipping option at order time: recomputes the quote and returns exactly the method with
+    /// `option_key`; a changed fee or destination → `shipping.option_changed` (409).
     async fn confirm_option(
         &self,
         tenant: &TenantContext,
@@ -357,9 +358,9 @@ pub trait ShippingRates: Send + Sync {
 #[serde(rename_all = "snake_case")]
 #[schema(as = ShippingDirection)]
 pub enum Direction {
-    /// Giao cho người mua.
+    /// Ship to the buyer.
     Outbound,
-    /// Lấy hàng trả từ người mua về kho.
+    /// Pick up returned goods from the buyer back to the warehouse.
     Return,
 }
 
@@ -380,38 +381,38 @@ impl Direction {
     }
 }
 
-/// Một yêu cầu giao (hay lấy hàng trả). `(order_id, request_key)` là khoá chống trùng: gửi lại
-/// cùng nội dung không tạo vận đơn thứ hai; cùng khoá khác nội dung bị từ chối.
+/// A request to ship (or to pick up returned goods). `(order_id, request_key)` is the deduplication key:
+/// resending the same content creates no second shipment; the same key with different content is rejected.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct ShipmentRequest {
     pub order_id: Uuid,
     pub order_number: String,
-    /// Một đơn có thể giao nhiều lần (giao một phần): mỗi lần một khoá.
+    /// An order may ship several times (partial shipments): one key per time.
     pub request_key: String,
     pub direction: Direction,
-    /// Cửa hàng bán.
+    /// The selling store.
     pub org_id: OrgId,
-    /// Kho xuất / kho nhận hàng trả.
+    /// The dispatch warehouse / the warehouse receiving returned goods.
     pub origin_org_id: OrgId,
     pub method_id: Uuid,
     pub option_key: Option<String>,
-    /// Người mua (chủ đơn) — để trả lời tự động về hành trình chỉ cho chủ đơn (D-230).
+    /// The buyer (the order owner) — so automatic replies about the journey go only to the order owner (D-230).
     pub buyer_id: Option<Uuid>,
     pub recipient_name: String,
     pub recipient_phone: String,
     pub address: Address,
     pub items: Vec<ShipmentItem>,
     pub declared_value: Money,
-    /// Tiền hãng thu hộ khi giao; `None`: không thu hộ.
+    /// The money the carrier collects on delivery; `None`: no collection on behalf.
     pub cod_amount: Option<Money>,
-    /// Phí giao đã báo người mua (từ báo giá).
+    /// The shipping fee quoted to the buyer (from the quote).
     pub quoted_fee: Option<Money>,
     pub note: String,
 }
 
 impl ShipmentRequest {
-    /// Yêu cầu giao đi (`Outbound`), chưa có COD, phí báo giá, ghi chú.
+    /// An outbound shipping request (`Outbound`), with no COD, the quoted fee, a note.
     #[expect(clippy::too_many_arguments, reason = "một yêu cầu giao có chừng đó trường bắt buộc")]
     pub fn new(
         order_id: Uuid,
@@ -477,11 +478,11 @@ impl ShipmentRequest {
     }
 }
 
-/// Một dòng hàng trong yêu cầu giao.
+/// A line of goods in a shipping request.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct ShipmentItem {
-    /// Khoá dòng của đơn (do `orders` đặt).
+    /// Key of the order line (set by `orders`).
     pub order_line_key: String,
     pub variant_id: Uuid,
     pub sku: String,
@@ -537,11 +538,11 @@ impl ShipmentItem {
 #[serde(rename_all = "snake_case")]
 #[schema(as = ShippingStatus)]
 pub enum ShipmentStatus {
-    /// Mới tạo, chưa đặt với hãng.
+    /// Just created, not yet booked with the carrier.
     Pending,
-    /// Đang gọi hãng để đặt.
+    /// Calling the carrier to book.
     Booking,
-    /// Đã có mã vận đơn, chờ hãng lấy hàng.
+    /// Has a tracking number, awaiting pickup by the carrier.
     ReadyToShip,
     PickedUp,
     InTransit,
@@ -550,9 +551,9 @@ pub enum ShipmentStatus {
     DeliveryFailed,
     Returning,
     Returned,
-    /// Nhận tại cửa hàng: hàng đã sẵn sàng.
+    /// Store pickup: the goods are ready.
     ReadyForPickup,
-    /// Nhận tại cửa hàng: người mua đã nhận.
+    /// Store pickup: the buyer has collected them.
     PickedUpByBuyer,
     Cancelled,
     Lost,
@@ -599,7 +600,7 @@ impl ShipmentStatus {
         ShipmentStatus::ALL.into_iter().find(|status| status.as_str() == raw)
     }
 
-    /// Trạng thái cuối: không đi tiếp được nữa.
+    /// Final state: cannot move on.
     pub fn is_final(self) -> bool {
         matches!(
             self,
@@ -618,8 +619,8 @@ impl fmt::Display for ShipmentStatus {
     }
 }
 
-/// Payload `after` của mọi event `shipping.shipment_*`. Không mang dữ liệu cá nhân (tên, số
-/// điện thoại, địa chỉ người nhận).
+/// The `after` payload of every `shipping.shipment_*` event. Carries no personal data (the recipient's name,
+/// phone number, address).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct ShipmentEvent {
@@ -631,18 +632,18 @@ pub struct ShipmentEvent {
     pub status: ShipmentStatus,
     pub tracking_number: Option<String>,
     pub carrier_code: Option<String>,
-    /// Với `shipping.cod_collected` / `cod_settled`: số tiền COD của vận đơn.
+    /// For `shipping.cod_collected` / `cod_settled`: the COD amount of the shipment.
     pub cod_amount: Option<Money>,
     pub at: Timestamp,
 }
 
 pub use carrier::*;
 
-/// Lỗi chung cho bộ nối hãng dùng (`code` là hợp đồng và i18n key, bản dịch ở module `shipping`).
+/// A shared error for the carrier connectors to use (`code` is the contract and i18n key, translations in the `shipping` module).
 pub mod errors {
     use autoxide_kernel::error::{Error, ErrorKind};
 
-    /// `shipping.carrier_error` (422): hãng từ chối yêu cầu.
+    /// `shipping.carrier_error` (422): the carrier rejected the request.
     pub fn carrier_error(message: impl ToString) -> Error {
         Error::new(
             ErrorKind::Validation,
@@ -652,7 +653,7 @@ pub mod errors {
         .with_param("message", message)
     }
 
-    /// `shipping.carrier_unavailable` (503): hãng không trả lời / quá giờ.
+    /// `shipping.carrier_unavailable` (503): the carrier did not respond / timed out.
     pub fn carrier_unavailable() -> Error {
         Error::unavailable(
             "shipping.carrier_unavailable",
@@ -660,7 +661,7 @@ pub mod errors {
         )
     }
 
-    /// `shipping.carrier_unauthorized` (401): hãng từ chối thông tin đăng nhập.
+    /// `shipping.carrier_unauthorized` (401): the carrier rejected the credentials.
     pub fn carrier_unauthorized() -> Error {
         Error::new(
             ErrorKind::Unauthenticated,

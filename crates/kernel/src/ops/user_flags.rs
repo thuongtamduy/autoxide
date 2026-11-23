@@ -1,15 +1,15 @@
-//! Cờ theo người dùng (D-207): giao diện nhớ "đã xem gợi ý này", "đã đọc tới mốc Có gì mới
-//! v0.13" theo **tài khoản** chứ không theo trình duyệt — đổi máy không hiện lại gợi ý cũ.
+//! Per-user flags (D-207): the UI remembers "seen this hint", "read up to the What's new
+//! v0.13 marker" per **account**, not per browser — switching devices does not show old hints again.
 //!
-//! - Bảng `kernel_user_flags` của module nội bộ `kernel`: bảng cấp khách hàng, (`tenant_id`,
-//!   `user_id`, `key`) duy nhất, giá trị là chuỗi ngắn. Mọi truy vấn lọc theo khách (bước 33).
-//! - API dưới `/api/v1/me/flags` (`GET` theo tiền tố, `PUT` ghi đè, `DELETE`), chỉ cờ của chính
-//!   người gọi; không endpoint nào đọc cờ của người khác. Chỉ cần đăng nhập, không cần permission.
-//! - Mỗi người tối đa `AUTOXIDE_USER_FLAGS_MAX` cờ. Hai request tạo cờ MỚI cùng lúc có thể cùng
-//!   lọt qua lần đếm — vượt mức tối đa vài cờ, không sai dữ liệu; chấp nhận vì đây là hạn mức chống
-//!   lạm dụng, không phải số tiền.
-//! - Cờ là dữ liệu cá nhân: có trong bản xuất dữ liệu (`PersonalData`), bị xoá khi tài khoản bị
-//!   xoá (`privacy::USER_DELETED`).
+//! - The table `kernel_user_flags` of the internal `kernel` module: a tenant-level table, (`tenant_id`,
+//!   `user_id`, `key`) unique, the value is a short string. Every query filters by tenant (step 33).
+//! - API under `/api/v1/me/flags` (`GET` by prefix, `PUT` to overwrite, `DELETE`), only the caller's own flags;
+//!   no endpoint reads another person's flags. Login is required, no permission is needed.
+//! - Each person has at most `AUTOXIDE_USER_FLAGS_MAX` flags. Two requests creating NEW flags at the same
+//!   time may both pass the count — exceeding the maximum by a few flags, with no data corruption; accepted
+//!   because this is an anti-abuse limit, not a monetary amount.
+//! - Flags are personal data: included in the data export (`PersonalData`) and deleted when the account is
+//!   deleted (`privacy::USER_DELETED`).
 
 use crate::time::Timestamp;
 use std::sync::{Arc, OnceLock};
@@ -35,10 +35,10 @@ use crate::privacy::{PersonalData, deleted_user};
 use crate::response::{Data, Problem};
 use crate::tenancy::{ScopeExt, TenantContext, TenantScoped};
 
-/// Tiền tố đường dẫn (dưới `/api/v1`) của các endpoint "của tôi" do kernel phục vụ.
+/// Path prefix (under `/api/v1`) of the "mine" endpoints served by the kernel.
 pub(crate) const ME: &str = "me";
 
-/// Độ dài tối đa của khoá và của giá trị.
+/// Maximum length of a key and of a value.
 const KEY_MAX: usize = 100;
 const VALUE_MAX: usize = 200;
 
@@ -54,7 +54,7 @@ pub(crate) fn read_setting(reader: &mut ConfigReader<'_>) -> Result<u64, Invalid
 }
 
 mod entity {
-    //! Bảng `kernel_user_flags`.
+    //! The table `kernel_user_flags`.
     use crate::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
@@ -102,12 +102,12 @@ impl From<entity::Model> for Flag {
     }
 }
 
-/// Service cờ theo người dùng.
+/// The per-user flags service.
 pub(crate) struct UserFlags {
     max: u64,
 }
 
-/// Chỗ giữ service, dùng chung giữa module `kernel` (điền lúc `start`) và `Modules::routes` (đọc).
+/// Holder of the service, shared between the `kernel` module (filled at `start`) and `Modules::routes` (read).
 //
 // `Arc<OnceLock<…>>`: hai bên giữ cùng một ô, ghi đúng một lần rồi chỉ đọc.
 #[derive(Clone, Default)]
@@ -128,7 +128,7 @@ fn now() -> Timestamp {
     Timestamp::now()
 }
 
-/// Khoá đúng dạng: 1–100 ký tự `a-z`, `0-9`, `.`, `_`, `-`.
+/// A well-formed key: 1–100 characters from `a-z`, `0-9`, `.`, `_`, `-`.
 fn is_key(key: &str) -> bool {
     (1..=KEY_MAX).contains(&key.len())
         && key.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b"._-".contains(&b))
@@ -161,8 +161,8 @@ impl UserFlags {
         UserFlags { max }
     }
 
-    /// Cờ của người gọi, theo thứ tự khoá; `prefix` (đúng dạng khoá, có thể rỗng) lọc theo tiền
-    /// tố. Tối đa `max` cờ nên trả hết một lần.
+    /// The caller's flags, ordered by key; `prefix` (well-formed key, may be empty) filters by
+    /// prefix. At most `max` flags, so all are returned at once.
     pub(crate) async fn list(
         &self,
         tenant: &TenantContext,
@@ -185,7 +185,7 @@ impl UserFlags {
         Ok(rows.into_iter().map(Flag::from).collect())
     }
 
-    /// Ghi cờ `key` của người gọi (ghi đè nếu có): gọi lại bao nhiêu lần cũng ra một dòng.
+    /// Writes the caller's flag `key` (overwriting if present): however many times it is called, there is one row.
     pub(crate) async fn put(
         &self,
         tenant: &TenantContext,
@@ -245,7 +245,7 @@ impl UserFlags {
         Ok(Flag { key: key.to_owned(), value: value.to_owned(), updated_at: now })
     }
 
-    /// Xoá cờ `key` của người gọi; không có thì không đổi gì.
+    /// Deletes the caller's flag `key`; changes nothing if absent.
     pub(crate) async fn delete(
         &self,
         tenant: &TenantContext,
@@ -266,7 +266,7 @@ impl UserFlags {
         Ok(())
     }
 
-    /// Xoá mọi cờ của người dùng `user_id` (tài khoản đã bị xoá). Trả số cờ đã xoá.
+    /// Deletes every flag of user `user_id` (the account was deleted). Returns the number of flags deleted.
     pub(crate) async fn forget(&self, tenant: &TenantContext, user_id: Uuid) -> Result<u64, Error> {
         let deleted = Entity::delete_many()
             .filter(Column::UserId.eq(user_id))
@@ -294,7 +294,7 @@ impl PersonalData for UserFlags {
     }
 }
 
-/// Tài khoản bị xoá: xoá cờ của người đó. Nhận lại event thì không còn gì để xoá.
+/// Account deleted: deletes that person's flags. On redelivery of the event there is nothing left to delete.
 #[async_trait::async_trait]
 impl EventHandler for UserFlags {
     async fn handle(&self, event: &Delivered) -> Result<(), Error> {
@@ -411,7 +411,7 @@ async fn delete_flag(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// Route dưới `/api/v1/me`.
+/// Routes under `/api/v1/me`.
 pub(crate) fn routes(service: Arc<UserFlags>) -> OpenApiRouter {
     OpenApiRouter::new()
         .routes(routes!(list_flags))
@@ -421,7 +421,7 @@ pub(crate) fn routes(service: Arc<UserFlags>) -> OpenApiRouter {
 
 // --- Migration ------------------------------------------------------------------------------
 
-/// Bảng `kernel_user_flags`.
+/// The table `kernel_user_flags`.
 pub(crate) struct CreateUserFlags;
 
 impl MigrationName for CreateUserFlags {
@@ -463,7 +463,7 @@ impl MigrationTrait for CreateUserFlags {
     }
 }
 
-/// `kernel_user_flags` theo khách (bước 33): khoá duy nhất `(tenant_id, user_id, key)`.
+/// `kernel_user_flags` per tenant (step 33): unique key `(tenant_id, user_id, key)`.
 pub(crate) fn adopt_tenancy() -> Box<dyn MigrationTrait> {
     crate::tenancy::migration::adopt(
         "m0004_tenancy_user_flags",
@@ -637,8 +637,8 @@ mod tests {
         .unwrap();
     }
 
-    /// Cùng người (cùng `user_id`) và cùng khoá ở hai khách là hai dòng; khách này không thấy, không
-    /// sửa, không xoá được cờ của khách kia.
+    /// The same person (same `user_id`) and the same key in two tenants are two rows; one tenant cannot see,
+    /// edit or delete the other's flags.
     #[tokio::test]
     async fn flag_cua_khach_nay_khong_lo_sang_khach_khac() {
         TestDatabase::run(async |test| {
@@ -668,7 +668,7 @@ mod tests {
         .unwrap();
     }
 
-    /// Nhiều lệnh `PUT` cùng khoá cùng lúc: đúng một dòng, giá trị là của một trong các lệnh.
+    /// Several simultaneous `PUT`s with the same key: exactly one row, the value is that of one of the commands.
     #[tokio::test]
     async fn put_dong_thoi_cung_key_chi_mot_dong() {
         TestDatabase::run(async |test| {

@@ -1,17 +1,17 @@
-//! Health check: hai endpoint cho hệ thống vận hành (Docker, Kubernetes, bộ cân
-//! bằng tải) hỏi tình trạng của tiến trình.
+//! Health checks: two endpoints for operations systems (Docker, Kubernetes, load
+//! balancers) to ask about the process's condition.
 //!
-//! - `/health/live` — tiến trình còn sống không. Không đụng tới thứ gì khác: nếu
-//!   trả lời được là còn sống. Hỏng thì hệ thống vận hành KHỞI ĐỘNG LẠI tiến trình.
-//! - `/health/ready` — có phục vụ được request không: database phải trả lời. Hỏng
-//!   thì hệ thống vận hành NGỪNG GỬI request tới (nhưng không khởi động lại).
+//! - `/health/live` - whether the process is alive. Touches nothing else: if
+//!   it can answer, it is alive. On failure the operations system RESTARTS the process.
+//! - `/health/ready` - whether it can serve requests: the database must answer. On failure
+//!   the operations system STOPS SENDING requests to it (but does not restart it).
 //!
-//! Lúc tắt có một khoảng "rút" (`AUTOXIDE_HTTP_DRAIN_SECONDS`, [`Draining`]): tiến trình vẫn
-//! phục vụ bình thường nhưng `/health/ready` trả 503, để bộ cân bằng tải kịp thôi gửi request
-//! mới tới trước khi tiến trình ngừng nhận kết nối — deploy không làm rơi request nào.
+//! On shutdown there is a "drain" period (`AUTOXIDE_HTTP_DRAIN_SECONDS`, [`Draining`]): the process keeps
+//! serving normally but `/health/ready` returns 503, so the load balancer has time to stop sending new
+//! requests before the process stops accepting connections - a deploy drops no requests.
 //!
-//! Hai endpoint nằm ngoài `/api/v1` vì chúng không thuộc hợp đồng nghiệp vụ và
-//! không đổi theo phiên bản API.
+//! The two endpoints are outside `/api/v1` because they are not part of the business contract and
+//! do not change with the API version.
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -27,32 +27,32 @@ use crate::database::Database;
 use crate::error::Error;
 use crate::response::{Data, Problem};
 
-/// Bộ kiểm tra gọi liên tục, vài giây một lần: không để một lần hỏi treo lâu hơn mức này.
+/// The checker is called continuously, every few seconds: one query must not hang longer than this.
 const READY_TIMEOUT: Duration = Duration::from_secs(2);
-/// Kết quả hỏi database dùng lại trong chừng này: endpoint công khai, không bị rate limit, mà
-/// mỗi lần hỏi chiếm kết nối ghi duy nhất của SQLite — một người gọi dồn dập không được làm
-/// chậm các lệnh ghi thật (D-157).
+/// The result of the database query is reused for this long: a public endpoint, not rate limited, and
+/// each query takes SQLite's single write connection - a caller hammering it must not slow down
+/// real writes (D-157).
 const READY_CACHE: Duration = Duration::from_secs(1);
 
-/// Cờ "tiến trình đang tắt": bật một lần, không tắt lại. Bản sao dùng chung một cờ (`Arc`), nên
-/// nơi nhận tín hiệu dừng bật cờ và route health check thấy ngay.
+/// The "process is shutting down" flag: set once, never cleared. Copies share one flag (`Arc`), so
+/// where the stop signal is received sets the flag and the health check route sees it immediately.
 #[derive(Debug, Clone, Default)]
 pub struct Draining(Arc<AtomicBool>);
 
 impl Draining {
-    /// Bắt đầu rút: từ giờ `/health/ready` trả 503 `shutting_down`.
+    /// Starts draining: from now on `/health/ready` returns 503 `shutting_down`.
     pub fn start(&self) {
         // `Relaxed` đủ: cờ đứng một mình, không kèm dữ liệu nào khác phải thấy cùng lúc.
         self.0.store(true, Ordering::Relaxed);
     }
 
-    /// Đã bắt đầu rút chưa.
+    /// Whether draining has started.
     pub fn is_draining(&self) -> bool {
         self.0.load(Ordering::Relaxed)
     }
 }
 
-/// Database, kèm lần hỏi gần nhất (lúc hỏi, có trả lời không).
+/// The database, with its most recent query (time of query, whether it answered).
 #[derive(Clone)]
 struct Readiness {
     database: Database,
@@ -62,7 +62,7 @@ struct Readiness {
     last: Arc<tokio::sync::Mutex<Option<Checked>>>,
 }
 
-/// Một lần hỏi database: lúc hỏi, và lỗi (nếu có).
+/// One database query: the time of the query, and the error (if any).
 type Checked = (Instant, Result<(), String>);
 
 /// Health of the service.
@@ -80,8 +80,9 @@ impl Health {
     }
 }
 
-/// Hai route health check, gắn ở gốc (ngoài `/api/v1`). `draining` là cờ do nơi chạy máy chủ bật
-/// khi nhận tín hiệu dừng; test và lệnh không phục vụ HTTP truyền `Draining::default()`.
+/// The two health check routes, mounted at the root (outside `/api/v1`). `draining` is the flag set by
+/// whatever runs the server on receiving the stop signal; tests and commands that do not serve HTTP pass
+/// `Draining::default()`.
 pub fn health_routes(database: Database, draining: Draining) -> OpenApiRouter {
     let readiness = Readiness { database, draining, last: Arc::default() };
     OpenApiRouter::new().routes(routes!(live)).routes(routes!(ready)).with_state(readiness)

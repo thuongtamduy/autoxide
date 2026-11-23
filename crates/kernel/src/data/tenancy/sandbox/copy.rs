@@ -1,14 +1,16 @@
-//! Sao cấu hình vào sandbox và đẩy thứ đã thử sang khách thật (bước 38, D-232,
+//! Copying configuration into a sandbox and pushing what was tried to the real tenant (step 38, D-232,
 //! D-20261119-step38-sandbox-copy).
 //!
-//! - Module khai [`SandboxCopy`] qua `Module::sandbox_copy`: job `kernel.sandbox_copy` gọi theo thứ
-//!   tự đăng ký, sau khi gieo dữ liệu khách mới cho sandbox và trước khi nhân viên vào được. Chỉ sao
-//!   CẤU HÌNH — không bao giờ người dùng, người mua, đơn, chứng từ, thông báo, file riêng tư, secret.
-//!   Bản sao có ID mới; nối về bản gốc bằng [`link_copy`] (bảng `kernel_sandbox_links`), nhờ đó chạy
-//!   lại không tạo bản trùng và tham chiếu giữa bản ghi đổi theo bản gốc ([`copied`]).
-//! - Module khai [`Promotable`] qua `Module::promotable`: `POST /kernel/sandboxes/{id}/promote` gọi
-//!   [`PromoteApply::promote`] trong ngữ cảnh khách thật, với quyền của chính người gọi. Bên khách
-//!   thật luôn nhận BẢN NHÁP (không tự đăng, không tự bật), không bao giờ ghi đè bản đang chạy.
+//! - A module declares [`SandboxCopy`] through `Module::sandbox_copy`: the `kernel.sandbox_copy` job calls them
+//!   in registration order, after seeding the new tenant's data for the sandbox and before staff can enter. It
+//!   copies CONFIGURATION only; never users, buyers, orders, accounting documents, notifications, private
+//!   files, or secrets. A copy gets a new ID; it is linked to the original by [`link_copy`] (table
+//!   `kernel_sandbox_links`), so a rerun creates no duplicate and references between records follow the
+//!   original ([`copied`]).
+//! - A module declares [`Promotable`] through `Module::promotable`: `POST /kernel/sandboxes/{id}/promote`
+//!   calls [`PromoteApply::promote`] in the real tenant's context, with the caller's own permissions. The
+//!   real tenant always receives a DRAFT (never auto-published or enabled), and never overwrites the running
+//!   version.
 
 use crate::time::Timestamp;
 use sea_orm::sea_query::{Expr, OnConflict};
@@ -21,7 +23,7 @@ use crate::error::Error;
 use crate::tenancy::{ScopeExt, TenantContext, TenantScoped};
 
 pub(crate) mod entity {
-    //! Bảng `kernel_sandbox_links` (migration `m0038_create_sandbox_tables`).
+    //! The `kernel_sandbox_links` table (migration `m0038_create_sandbox_tables`).
     use crate::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
@@ -31,17 +33,17 @@ pub(crate) mod entity {
     pub struct Model {
         #[sea_orm(primary_key, auto_increment = false)]
         pub id: Uuid,
-        /// Sandbox sở hữu dòng.
+        /// The sandbox that owns the row.
         pub tenant_id: Uuid,
-        /// Loại bản ghi `<module>.<loại>`.
+        /// Record kind `<module>.<kind>`.
         pub kind: String,
-        /// Bản ghi ở sandbox.
+        /// The record in the sandbox.
         pub record_id: Uuid,
-        /// Bản ghi gốc ở khách thật mà nó được sao từ; `None`: tạo mới trong sandbox.
+        /// The original record at the real tenant it was copied from; `None`: created new in the sandbox.
         pub source_id: Option<Uuid>,
-        /// Bản ghi ở khách thật lần đẩy gần nhất tạo / sửa.
+        /// The record at the real tenant that the most recent push created / edited.
         pub promoted_id: Option<Uuid>,
-        /// Dấu vân tay nội dung lần đẩy gần nhất (đẩy lại cùng nội dung → `unchanged`).
+        /// Content fingerprint of the most recent push (pushing the same content again → `unchanged`).
         pub promoted_fingerprint: Option<String>,
         pub created_at: Timestamp,
         pub updated_at: Timestamp,
@@ -56,73 +58,74 @@ impl TenantScoped for entity::Entity {
     }
 }
 
-/// Tuỳ chọn khi tạo sandbox.
+/// Options when creating a sandbox.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct SandboxOptions {
-    /// Số sản phẩm tối đa được sao (0 khi không nêu).
+    /// Maximum number of products to copy (0 when not given).
     pub products: u32,
 }
 
-/// Những gì một lần sao nhận.
+/// What one copy receives.
 #[non_exhaustive]
 pub struct CopyContext<'a> {
-    /// Khách thật (đọc).
+    /// The real tenant (read).
     pub source: &'a TenantContext,
-    /// Sandbox (ghi, qua service của module).
+    /// The sandbox (write, through the module's service).
     pub sandbox: &'a TenantContext,
     pub options: SandboxOptions,
-    /// Bên làm của job sao: mọi permission ở sandbox (sandbox là của chính khách, job do chủ khách
-    /// tạo). Không bao giờ dùng ở khách thật.
+    /// The actor of the copy job: every permission inside the sandbox (the sandbox belongs to the tenant
+    /// itself, and the job was created by the tenant owner). Never used at the real tenant.
     pub principal: &'a Principal,
 }
 
-/// Module sao cấu hình của mình vào sandbox.
+/// A module copies its configuration into the sandbox.
 //
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
 #[async_trait::async_trait]
 pub trait SandboxCopy: Send + Sync {
-    /// Sao cấu hình từ `context.source` sang `context.sandbox`; trả số bản ghi đã sao lần này. Phải
-    /// chạy lại được: bản đã sao ([`copied`]) thì bỏ qua. Không bao giờ sao dữ liệu cá nhân, giao
-    /// dịch hay secret.
+    /// Copies configuration from `context.source` to `context.sandbox`; returns the number of records copied
+    /// this time. Must be re-runnable: a record already copied ([`copied`]) is skipped. Never copies personal
+    /// data, transactions or secrets.
     async fn copy(&self, context: &CopyContext<'_>) -> Result<u64, Error>;
 }
 
-/// Một mục cần đẩy sang khách thật.
+/// One item to push to the real tenant.
 #[non_exhaustive]
 pub struct PromoteRequest<'a> {
     pub sandbox: &'a TenantContext,
-    /// Khách thật (khách gốc của sandbox).
+    /// The real tenant (the sandbox's source tenant).
     pub target: &'a TenantContext,
-    /// Người gọi, ở khách thật: module kiểm quyền của chính module như REST.
+    /// The caller, at the real tenant: the module checks its own permission as REST does.
     pub principal: &'a Principal,
-    /// Bản ghi ở sandbox.
+    /// The record in the sandbox.
     pub id: Uuid,
-    /// Bản ghi ở khách thật nên nhận thay đổi: bản lần đẩy trước tạo, không có thì bản gốc mà bản
-    /// ghi sandbox được sao từ. `None`: tạo bản nháp mới. Module kiểm bản này còn tồn tại.
+    /// The record at the real tenant that should receive the change: the one the previous push created, or
+    /// failing that the original the sandbox record was copied from. `None`: create a new draft. The module
+    /// checks that this record still exists.
     pub existing: Option<Uuid>,
 }
 
-/// Kết quả đẩy một mục.
+/// Result of pushing one item.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Promoted {
-    /// Tạo bản nháp mới ở khách thật.
+    /// Created a new draft at the real tenant.
     CreatedDraft(Uuid),
-    /// Sửa bản nháp / bản sửa đổi chờ đăng của bản ghi ở khách thật (bản đang chạy giữ nguyên).
+    /// Edited the draft / pending revision of the record at the real tenant (the running version stays as is).
     UpdatedDraft(Uuid),
-    /// Không có gì khác bản đã đẩy.
+    /// Nothing differs from what was pushed.
     Unchanged(Uuid),
-    /// Trùng tên / đường dẫn / mã ở khách thật: mục này không đẩy, mục khác vẫn chạy.
+    /// Name / path / code conflict at the real tenant: this item is not pushed, other items still run.
     Conflict { field: String, message: String },
 }
 
-/// Module đẩy một loại bản ghi từ sandbox sang khách thật.
+/// A module pushes one record kind from the sandbox to the real tenant.
 //
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
 #[async_trait::async_trait]
 pub trait PromoteApply: Send + Sync {
-    /// Ghi bản ghi `request.id` của sandbox sang khách thật qua service của module, LUÔN ở dạng nháp
-    /// / tắt. `fingerprint` của nội dung đã đẩy được kernel giữ: module trả `Unchanged` khi nội
-    /// dung bằng `previous` (cùng hàm băm module dùng).
+    /// Writes record `request.id` of the sandbox to the real tenant through the module's service, ALWAYS as a
+    /// draft / disabled. The `fingerprint` of the pushed content is kept by the kernel: the module returns
+    /// `Unchanged` when the content equals `previous` (the same hash function the module uses).
     async fn promote(
         &self,
         request: &PromoteRequest<'_>,
@@ -130,13 +133,13 @@ pub trait PromoteApply: Send + Sync {
     ) -> Result<(Promoted, Option<String>), Error>;
 }
 
-/// Một loại bản ghi đẩy được sang khách thật.
+/// One record kind that can be pushed to the real tenant.
 #[derive(Clone)]
 #[non_exhaustive]
 pub struct Promotable {
-    /// `<module>.<loại>`, vd `content.page`.
+    /// `<module>.<kind>`, vd `content.page`.
     pub kind: &'static str,
-    /// Mô tả tiếng Anh cho người gọi API.
+    /// English description for API callers.
     pub description: &'static str,
     pub apply: Arc<dyn PromoteApply>,
 }
@@ -151,7 +154,7 @@ impl Promotable {
     }
 }
 
-/// Sổ sao / đẩy của mọi module, điền một lần sau khi mọi module khởi động. Clone rẻ.
+/// Registry of copy / push of every module, filled once after every module starts. Cheap to clone.
 #[derive(Clone, Default)]
 pub(crate) struct SandboxCatalog(Arc<OnceLock<CatalogInner>>);
 
@@ -182,8 +185,8 @@ fn now() -> Timestamp {
     Timestamp::now()
 }
 
-/// Ghi bản ghi `record_id` của sandbox là bản sao của `source_id` (loại `kind`). Gọi lại không thêm
-/// dòng thứ hai.
+/// Records that sandbox record `record_id` is a copy of `source_id` (kind `kind`). Calling again adds no
+/// second row.
 pub async fn link_copy(
     sandbox: &TenantContext,
     kind: &str,
@@ -217,7 +220,7 @@ pub async fn link_copy(
     Ok(())
 }
 
-/// Bản sao ở sandbox của bản ghi gốc `source_id` (loại `kind`), nếu đã sao.
+/// The copy in the sandbox of the original record `source_id` (kind `kind`), if already copied.
 pub async fn copied(
     sandbox: &TenantContext,
     kind: &str,
@@ -232,7 +235,7 @@ pub async fn copied(
         .map(|row| row.record_id))
 }
 
-/// Bản ghi gốc ở khách thật của bản ghi `record_id` trong sandbox, hay bản lần đẩy trước tạo.
+/// The original record at the real tenant of record `record_id` in the sandbox, or the one the previous push created.
 pub async fn promoted_target(
     sandbox: &TenantContext,
     kind: &str,
@@ -254,7 +257,7 @@ pub(crate) async fn link_of(
         .await?)
 }
 
-/// Ghi kết quả lần đẩy `record_id` (bản ở khách thật, dấu vân tay nội dung).
+/// Records the result of pushing `record_id` (the record at the real tenant, the content fingerprint).
 pub(crate) async fn record_promotion(
     sandbox: &TenantContext,
     kind: &str,

@@ -1,24 +1,24 @@
-//! Nền đa khách (bước 33, D-185, D-253): một bản cài phục vụ nhiều **khách hàng** (tenant) mà dữ
-//! liệu không bao giờ lẫn nhau.
+//! Multi-tenancy foundation (step 33, D-185, D-253): one installation serves many **customers** (tenants) whose
+//! data never mixes.
 //!
-//! - [`TenantId`]: ID của khách. [`DEFAULT_TENANT`] là khách mặc định — cũng là khách nền tảng,
-//!   nơi tài khoản của nhà vận hành sống; dữ liệu của bản cài cũ thuộc về nó.
-//! - [`TenantContext`]: khách của một request / job / event, kèm database chứa dữ liệu của khách.
-//!   Mọi hàm service chạm dữ liệu cấp khách hàng nhận nó và lấy database qua
-//!   [`TenantContext::database`] — quên khách thì không có database để truy vấn (D-253 mục 1).
-//! - [`DatabaseRegistry`]: sổ database — database điều khiển (`DATABASE_URL`) và các placement
-//!   (vị trí dữ liệu: chung `shared` hay riêng `dedicated`), mở lười, có giới hạn.
-//! - Chế độ ([`TenancyMode`], `AUTOXIDE_TENANCY_MODE`): `single` (mặc định — một khách, không truy
-//!   vấn gì thêm mỗi request) hay `multi`.
-//! - Tên miền riêng của khách ([`TenantDomains`], `domains.rs`): xác minh bằng bản ghi TXT, request
-//!   tới tên miền đã xác minh vào thẳng khách (D-190).
-//! - Dời khách giữa các placement ([`TenantMoves`], `moves.rs`): `shared` ↔ `dedicated`, chạy lại
-//!   được khi hỏng giữa chừng.
-//! - Token trong link của thư mang khách ([`link_token`], [`resolve_link_token`],
-//!   [`OptionalTenant`]): bấm link ở tên miền chính vẫn tới đúng khách (D-281).
+//! - [`TenantId`]: the tenant's ID. [`DEFAULT_TENANT`] is the default tenant, which is also the platform tenant
+//!   where the operator's accounts live; the data of an older installation belongs to it.
+//! - [`TenantContext`]: the tenant of a request / job / event, with the database that holds the tenant's data.
+//!   Every service function that touches tenant-level data takes it and gets the database through
+//!   [`TenantContext::database`], so forgetting the tenant leaves no database to query (D-253 item 1).
+//! - [`DatabaseRegistry`]: the database registry: the control database (`DATABASE_URL`) and the placements
+//!   (data locations: `shared` or `dedicated`), opened lazily, with a limit.
+//! - Mode ([`TenancyMode`], `AUTOXIDE_TENANCY_MODE`): `single` (the default: one tenant, no extra query
+//!   per request) or `multi`.
+//! - A tenant's own domains ([`TenantDomains`], `domains.rs`): verified with a TXT record; a request
+//!   to a verified domain goes straight to the tenant (D-190).
+//! - Moving a tenant between placements ([`TenantMoves`], `moves.rs`): `shared` ↔ `dedicated`, safe to rerun
+//!   after a failure midway.
+//! - The token in an email link that carries the tenant ([`link_token`], [`resolve_link_token`],
+//!   [`OptionalTenant`]): clicking a link on the main domain still reaches the right tenant (D-281).
 //!
-//! Bảng mặt điều khiển (`kernel_tenants`, `kernel_placements`, `kernel_tenant_domains`) do
-//! module nội bộ `kernel` tạo (`schema.rs`); chúng chỉ có dữ liệu ở database điều khiển.
+//! The control-plane tables (`kernel_tenants`, `kernel_placements`, `kernel_tenant_domains`) are created by the
+//! internal `kernel` module (`schema.rs`); they hold data only in the control database.
 
 pub(crate) mod admin;
 mod config;
@@ -97,8 +97,9 @@ pub use site::{SITE_PARAM, Site, SiteQuery, site_not_found};
 
 pub(crate) use config::read_setting;
 
-/// Chỗ module `kernel` nhận thứ của mọi module khi chúng đã khởi động (`Modules::start_in` điền):
-/// bộ gieo dữ liệu cho khách mới, bộ tra DNS, cây tổ chức, thứ việc dời khách cần.
+/// Where the `kernel` module receives what every module provides once they have started (filled by
+/// `Modules::start_in`): the seeders for new tenants, the DNS lookup, the organization tree, and what
+/// moving a tenant needs.
 pub(crate) struct Slots {
     pub(crate) seeds: admin::Seeds,
     pub(crate) dns: domains::DnsSlot,
@@ -106,18 +107,18 @@ pub(crate) struct Slots {
     pub(crate) moves: moves::MoveSetup,
 }
 
-/// ID của một khách hàng.
+/// The ID of a tenant.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct TenantId(Uuid);
 
 impl TenantId {
-    /// Khách có ID `id`.
+    /// The tenant with ID `id`.
     pub const fn from_uuid(id: Uuid) -> Self {
         TenantId(id)
     }
 
-    /// UUID của khách (để ghi vào cột `tenant_id`).
+    /// The tenant's UUID (to write into the `tenant_id` column).
     pub const fn as_uuid(&self) -> Uuid {
         self.0
     }
@@ -135,8 +136,8 @@ impl From<TenantId> for Uuid {
     }
 }
 
-/// ID của một nút trong cây tổ chức của khách (bước 34). Tên miền gắn được với một nút (đối chiếu
-/// thiết kế đợt 2).
+/// The ID of a node in a tenant's organization tree (step 34). A domain can be attached to a node (see
+/// the wave 2 design).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct OrgId(Uuid);
@@ -157,21 +158,22 @@ impl fmt::Display for OrgId {
     }
 }
 
-/// Cây tổ chức của khách, nhìn từ kernel: chỉ hỏi "nút này có thuộc khách không". Module giữ cây
-/// tổ chức (bước 34) công bố `context.provide::<dyn OrgNodes>(…)` trong `Module::start`; chưa
-/// module nào công bố thì kernel coi như khách không có nút nào (vd tên miền chỉ gắn được `null`).
+/// A tenant's organization tree as the kernel sees it: it only asks "does this node belong to the tenant".
+/// The module that holds the organization tree (step 34) publishes `context.provide::<dyn OrgNodes>(…)` in
+/// `Module::start`; until a module publishes it, the kernel treats the tenant as having no nodes (e.g. a
+/// domain can only be attached to `null`).
 ///
-/// Tên khác `OrgDirectory` của module `organizations` (bước 34, hợp đồng đầy đủ của cây tổ chức
-/// cho module khác): đây là phần hẹp kernel cần, kernel không phụ thuộc module nào.
+/// Distinct from `OrgDirectory` of the `organizations` module (step 34, the full contract of the organization
+/// tree for other modules): this is the narrow part the kernel needs, and the kernel depends on no module.
 //
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
 #[async_trait::async_trait]
 pub trait OrgNodes: Send + Sync {
-    /// `org` là một nút (còn dùng được) trong cây tổ chức của khách `tenant`.
+    /// `org` is a node (still usable) in the organization tree of tenant `tenant`.
     async fn has_node(&self, tenant: &TenantContext, org: OrgId) -> Result<bool, Error>;
 }
 
-/// ID của một placement (vị trí dữ liệu: một database).
+/// The ID of a placement (a data location: one database).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct PlacementId(Uuid);
@@ -192,50 +194,52 @@ impl fmt::Display for PlacementId {
     }
 }
 
-/// Khách mặc định — cũng là khách nền tảng. ID cố định đúng dạng UUIDv7: migration của module gán
-/// dữ liệu cũ cho nó mà không phải đọc bảng của `kernel` (ngoại lệ có chủ đích, D-253 mục 3).
+/// The default tenant, which is also the platform tenant. A fixed ID in valid UUIDv7 form: a module's
+/// migration assigns old data to it without reading a table of `kernel` (a deliberate exception, D-253 item
+/// 3).
 pub const DEFAULT_TENANT: TenantId =
     TenantId(Uuid::from_u128(0x0000_0000_0000_7000_8000_0000_0000_0001));
 
-/// "Không khách nào": chỉ cho job của cả database (lịch dọn dẹp) trong bảng `<m>_jobs`. Không dùng
-/// `NULL` vì unique index coi các `NULL` là khác nhau (D-253 mục 4).
+/// "No tenant": only for database-wide jobs (cleanup schedules) in the `<m>_jobs` table. `NULL` is not used
+/// because a unique index treats `NULL`s as different from each other (D-253 item 4).
 pub const NO_TENANT: TenantId = TenantId(Uuid::nil());
 
-/// Placement `main`: database điều khiển (`DATABASE_URL`). Khách mặc định nằm ở đây.
+/// Placement `main`: the control database (`DATABASE_URL`). The default tenant lives here.
 pub const MAIN_PLACEMENT: PlacementId =
     PlacementId(Uuid::from_u128(0x0000_0000_0000_7000_8000_0000_0000_0002));
 
-/// `true` từ khi mọi module đã chuyển sang theo khách (bước 33 B14, D-253 mục 6): bật được chế độ
-/// `multi` bằng `AUTOXIDE_TENANCY_MODE`.
+/// `true` since every module has moved to per-tenant data (step 33 B14, D-253 item 6): the `multi` mode can be
+/// enabled with `AUTOXIDE_TENANCY_MODE`.
 pub const MULTI_TENANT_READY: bool = true;
 
-/// Chế độ của bản cài (`AUTOXIDE_TENANCY_MODE`).
+/// Mode of the installation (`AUTOXIDE_TENANCY_MODE`).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TenancyMode {
-    /// Một khách (khách mặc định); không đọc tên miền hay header, không truy vấn gì thêm.
+    /// One tenant (the default tenant); reads no domain or header, runs no extra query.
     #[default]
     Single,
-    /// Nhiều khách: khách suy từ credential, header, tên miền.
+    /// Many tenants: the tenant is derived from the credential, header, domain.
     Multi,
 }
 
-/// Trạng thái của một khách.
+/// Status of a tenant.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TenantStatus {
-    /// Đang cấp phát (tạo database, gieo dữ liệu ban đầu); chưa phục vụ.
+    /// Being provisioned (database created, initial data seeded); not serving yet.
     Provisioning,
     Active,
-    /// Tạm khoá: mọi route của khách trả `tenant_suspended`.
+    /// Suspended: every route of the tenant returns `tenant_suspended`.
     Suspended,
-    /// Bảo trì: mọi route của khách trả `tenant_maintenance`.
+    /// Maintenance: every route of the tenant returns `tenant_maintenance`.
     Maintenance,
-    /// Đang dời sang database khác: như bảo trì.
+    /// Being moved to another database: treated like maintenance.
     Moving,
-    /// Đã xoá hẳn (dữ liệu đã xoá, chỉ còn dòng trong sổ khách): request nhận `tenant_not_found`.
+    /// Deleted for good (data deleted, only a row left in the tenant registry): requests get
+    /// `tenant_not_found`.
     Deleted,
-    /// Đã gộp vào khách khác (bước 38): dữ liệu đã chuyển sang khách nhận; request nhận
+    /// Merged into another tenant (step 38): the data has moved to the receiving tenant; requests get
     /// `tenant_not_found`.
     Merged,
 }
@@ -253,7 +257,7 @@ impl TenantStatus {
         }
     }
 
-    /// Trạng thái lưu trong cột `status`.
+    /// Status stored in the `status` column.
     pub fn parse(raw: &str) -> Option<Self> {
         match raw {
             "provisioning" => Some(TenantStatus::Provisioning),
@@ -268,13 +272,13 @@ impl TenantStatus {
     }
 }
 
-/// Loại placement.
+/// Kind of placement.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PlacementKind {
-    /// Nhiều khách chung một database (phân biệt bằng `tenant_id`).
+    /// Many tenants share one database (told apart by `tenant_id`).
     Shared,
-    /// Database riêng của một khách.
+    /// A database dedicated to one tenant.
     Dedicated,
 }
 
@@ -295,8 +299,8 @@ impl PlacementKind {
     }
 }
 
-/// Khách của một request, job hay event, kèm database chứa dữ liệu của khách. Clone rẻ (bên trong
-/// là `Arc`); hai ngữ cảnh bằng nhau khi cùng khách.
+/// The tenant of a request, job or event, with the database that holds the tenant's data. Cheap to clone
+/// (inside is an `Arc`); two contexts are equal when they have the same tenant.
 #[derive(Clone)]
 pub struct TenantContext(Arc<Inner>);
 
@@ -308,19 +312,20 @@ struct Inner {
     status: TenantStatus,
     placement: PlacementId,
     database: Database,
-    /// Placement đã áp dụng đủ migration (`schema_state = ready`); chưa thì khách nhận
+    /// Whether the placement has applied all migrations (`schema_state = ready`); if not, the tenant gets
     /// `tenant_maintenance`.
     schema_ready: bool,
-    /// Nơi lưu file riêng của placement (`autoxide placement storage`); `None`: nơi lưu chung.
+    /// The placement's own file store (`autoxide placement storage`); `None`: the shared store.
     storage: Option<Arc<dyn crate::storage::Storage>>,
-    /// Chỉ đọc (`kernel_tenants.read_only`): lệnh ghi bị chặn ở chỗ giải khách của request.
+    /// Read-only (`kernel_tenants.read_only`): writes are blocked where the request's tenant is resolved.
     read_only: bool,
-    /// Sandbox (D-232): khách gốc và hạn; `None` với khách thật.
+    /// Sandbox (D-232): the original tenant and the expiry; `None` for a real tenant.
     sandbox: Option<(TenantId, Option<Timestamp>)>,
 }
 
 impl TenantContext {
-    /// Ngữ cảnh của khách `id` trên `database` (sổ database và testkit dựng; module không tự dựng).
+    /// Context of tenant `id` on `database` (built by the database registry and testkit; modules do not build
+    /// it themselves).
     pub fn new(
         id: TenantId,
         slug: impl Into<String>,
@@ -343,82 +348,84 @@ impl TenantContext {
         }))
     }
 
-    /// Cùng khách, file lưu ở `storage` (nơi lưu riêng của placement của nó) thay cho nơi lưu chung.
-    /// Sổ database dựng; test dựng để thử placement có nơi lưu riêng.
+    /// Same tenant, with files stored at `storage` (the placement's own store) instead of the shared store.
+    /// Built by the database registry; tests build it to try a placement with its own store.
     #[must_use]
     pub fn with_storage(self, storage: Arc<dyn crate::storage::Storage>) -> Self {
         let inner = Arc::unwrap_or_clone(self.0);
         TenantContext(Arc::new(Inner { storage: Some(storage), ..inner }))
     }
 
-    /// Nơi lưu file riêng của placement của khách; `None`: khách dùng nơi lưu chung.
-    /// [`TenantStorage::new`](crate::storage::TenantStorage::new) tự chọn.
+    /// The own file store of the tenant's placement; `None`: the tenant uses the shared store.
+    /// [`TenantStorage::new`](crate::storage::TenantStorage::new) chooses it automatically.
     pub fn own_storage(&self) -> Option<&Arc<dyn crate::storage::Storage>> {
         self.0.storage.as_ref()
     }
 
-    /// Placement có nơi lưu riêng mà khách dùng; `None`: khách dùng nơi lưu chung. Job dọn file
-    /// mồ côi so với [`FileStore::placement`] để chỉ xét khách của nơi lưu đang quét.
+    /// The placement with its own store that the tenant uses; `None`: the tenant uses the shared store. The
+    /// job that cleans up orphan files compares against [`FileStore::placement`] so it only considers
+    /// tenants of the store being scanned.
     pub fn storage_placement(&self) -> Option<PlacementId> {
         self.0.storage.as_ref().map(|_| self.0.placement)
     }
 
-    /// Cùng khách, đánh dấu placement chưa áp dụng đủ migration (sổ database dựng khi
-    /// `schema_state` của placement khác `ready`).
+    /// Same tenant, marked as having a placement that has not applied all migrations (built by the database
+    /// registry when the placement's `schema_state` is not `ready`).
     #[must_use]
     pub fn with_schema_ready(self, ready: bool) -> Self {
         let inner = Arc::unwrap_or_clone(self.0);
         TenantContext(Arc::new(Inner { schema_ready: ready, ..inner }))
     }
 
-    /// Placement của khách đã áp dụng đủ migration.
+    /// Whether the tenant's placement has applied all migrations.
     pub fn schema_ready(&self) -> bool {
         self.0.schema_ready
     }
 
-    /// Cùng khách, đánh dấu chỉ đọc (sổ database dựng từ `kernel_tenants.read_only`; test dựng).
+    /// Same tenant, marked read-only (built by the database registry from `kernel_tenants.read_only`; tests
+    /// build it).
     #[must_use]
     pub fn with_read_only(self, read_only: bool) -> Self {
         let inner = Arc::unwrap_or_clone(self.0);
         TenantContext(Arc::new(Inner { read_only, ..inner }))
     }
 
-    /// Khách chỉ đọc: đọc được, lệnh ghi qua REST / MCP bị chặn (`tenant_read_only`). Job và event
-    /// của khách vẫn chạy (việc đã nhận trước đó, dọn dẹp theo luật).
+    /// Read-only tenant: reads work, writes through REST / MCP are blocked (`tenant_read_only`). The
+    /// tenant's jobs and events still run (work accepted earlier, cleanup as the rules require).
     pub fn read_only(&self) -> bool {
         self.0.read_only
     }
 
-    /// Cùng khách, là sandbox của khách `of`, hết hạn lúc `expires_at` (sổ database dựng từ
-    /// `kernel_tenants`; test dựng).
+    /// Same tenant, as a sandbox of tenant `of`, expiring at `expires_at` (built by the database registry from
+    /// `kernel_tenants`; tests build it).
     #[must_use]
     pub fn with_sandbox_of(self, of: TenantId, expires_at: Option<Timestamp>) -> Self {
         let inner = Arc::unwrap_or_clone(self.0);
         TenantContext(Arc::new(Inner { sandbox: Some((of, expires_at)), ..inner }))
     }
 
-    /// Khách thử nghiệm (sandbox, D-232): đối tác luôn là bộ giả, mail và webhook không ra ngoài.
+    /// A test tenant (sandbox, D-232): partners are always simulated, mail and webhooks do not leave.
     pub fn is_sandbox(&self) -> bool {
         self.0.sandbox.is_some()
     }
 
-    /// Khách gốc của sandbox; `None` với khách thật.
+    /// The original tenant of the sandbox; `None` for a real tenant.
     pub fn sandbox_of(&self) -> Option<TenantId> {
         self.0.sandbox.map(|(of, _)| of)
     }
 
-    /// Hạn của sandbox; `None` với khách thật.
+    /// Expiry of the sandbox; `None` for a real tenant.
     pub fn sandbox_expires_at(&self) -> Option<Timestamp> {
         self.0.sandbox.and_then(|(_, at)| at)
     }
 
-    /// Loại khách.
+    /// Kind of tenant.
     pub fn kind(&self) -> TenantKind {
         if self.is_sandbox() { TenantKind::Sandbox } else { TenantKind::Production }
     }
 
-    /// Khách mặc định trên `database` — chế độ `single`, và đường chuyển tiếp cho code chưa nhận
-    /// ngữ cảnh khách (D-253).
+    /// The default tenant on `database`: `single` mode, and the transition path for code that has not yet
+    /// received a tenant context (D-253).
     pub fn default_on(database: Database) -> Self {
         Self::new(
             DEFAULT_TENANT,
@@ -430,9 +437,9 @@ impl TenantContext {
         )
     }
 
-    /// Đường chuyển tiếp (bước 33 A4): code chưa nhận ngữ cảnh khách (module chưa chuyển ở phần B)
-    /// dùng khách mặc định trên database nó đang giữ. Bị `#[deprecated]` khi phần B xong (không còn
-    /// ai gọi), xoá ở đầu bước 34 (D-253 mục 7).
+    /// Transition path (step 33 A4): code that has not yet received a tenant context (modules not yet
+    /// converted in part B) uses the default tenant on the database it holds. Marked `#[deprecated]` once
+    /// part B is done (nobody left calling it), removed at the start of step 34 (D-253 item 7).
     #[doc(hidden)]
     #[deprecated(
         note = "dùng `TenantContext` của request, job hay event; cần khách mặc định thì `default_on`"
@@ -445,7 +452,7 @@ impl TenantContext {
         self.0.id
     }
 
-    /// Tên rút gọn (chữ thường, số, `-`), duy nhất trên nền tảng.
+    /// Short name (lowercase, digits, `-`), unique across the platform.
     pub fn slug(&self) -> &str {
         &self.0.slug
     }
@@ -462,18 +469,18 @@ impl TenantContext {
         self.0.placement
     }
 
-    /// Database chứa dữ liệu của khách.
+    /// The database that holds the tenant's data.
     pub fn database(&self) -> &Database {
         &self.0.database
     }
 
-    /// Khách nền tảng (khách mặc định): nơi nhân sự của nhà vận hành sống.
+    /// The platform tenant (the default tenant): where the operator's staff live.
     pub fn is_platform(&self) -> bool {
         self.0.id == DEFAULT_TENANT
     }
 
-    /// Tiền tố khoá file lưu trữ của khách: rỗng cho khách mặc định (file cũ không phải dời),
-    /// `tenants/<id>/` cho khách khác.
+    /// Prefix of the tenant's file-store keys: empty for the default tenant (old files need not move),
+    /// `tenants/<id>/` for other tenants.
     pub fn storage_prefix(&self) -> String {
         if self.is_platform() { String::new() } else { format!("tenants/{}/", self.0.id) }
     }
@@ -499,11 +506,11 @@ impl fmt::Debug for TenantContext {
     }
 }
 
-/// Lỗi chung của phần đa khách (mã ổn định, bản dịch ở `crates/kernel/locales/vi.json`).
+/// Shared errors of the multi-tenancy part (stable codes, translations in `crates/kernel/locales/vi.json`).
 pub mod errors {
     use crate::error::Error;
 
-    /// Không xác định được khách của request.
+    /// The request's tenant cannot be determined.
     pub fn tenant_required() -> Error {
         Error::bad_request(
             "tenant_required",
@@ -796,14 +803,14 @@ pub mod errors {
     }
 }
 
-/// Khách mặc định trên một database không nối tới đâu — cho test đơn vị của kernel không truy vấn.
+/// The default tenant on a database that connects nowhere: for kernel unit tests that run no queries.
 #[cfg(test)]
 pub(crate) fn test_tenant() -> TenantContext {
     TenantContext::default_on(Database::detached())
 }
 
-/// Kiểm `tenant` có phục vụ được không: tạm khoá → `tenant_suspended`; bảo trì / đang dời / đang
-/// cấp phát, hay placement của khách chưa áp dụng đủ migration → `tenant_maintenance`.
+/// Checks whether `tenant` can be served: suspended → `tenant_suspended`; maintenance / being moved / being
+/// provisioned, or a placement not fully migrated → `tenant_maintenance`.
 pub fn ensure_serving(tenant: &TenantContext) -> Result<(), Error> {
     if !tenant.schema_ready() && tenant.status() != TenantStatus::Suspended {
         return Err(errors::tenant_maintenance(30));
@@ -820,22 +827,22 @@ pub fn ensure_serving(tenant: &TenantContext) -> Result<(), Error> {
     }
 }
 
-/// Đánh dấu route vẫn ghi được khi khách chỉ đọc: đăng nhập, làm mới / kết thúc phiên, đặt lại mật
-/// khẩu, link trong thư (xác nhận, huỷ đăng ký — rút lại đồng ý luôn phải làm được), xuất dữ liệu.
-/// Gắn bằng [`allowed_while_read_only`] trên router con chứa đúng các route đó.
+/// Marks a route that can still write when the tenant is read-only: login, refresh / end session, password
+/// reset, links in email (confirm, unsubscribe: withdrawing consent must always work), data export. Attach
+/// it with [`allowed_while_read_only`] on the sub-router that holds exactly those routes.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct AllowedWhileReadOnly;
 
-/// Lớp gắn [`AllowedWhileReadOnly`] cho các route đã thêm vào router trước nó:
+/// Layer that attaches [`AllowedWhileReadOnly`] to the routes added to the router before it:
 /// `OpenApiRouter::new().routes(routes!(login)).layer(allowed_while_read_only())`.
 pub fn allowed_while_read_only() -> axum::Extension<AllowedWhileReadOnly> {
     axum::Extension(AllowedWhileReadOnly)
 }
 
-/// Kiểm request (`method`, `extensions`) có được làm với `tenant`: khách chỉ đọc chỉ nhận `GET`,
-/// `HEAD`, `OPTIONS`, và route đánh dấu [`AllowedWhileReadOnly`]; còn lại `tenant_read_only`.
-/// Kernel gọi ở chỗ giải khách của request (extractor `TenantContext`, `OptionalTenant`); tool
-/// MCP kiểm theo cờ `read_only` của tool.
+/// Checks whether a request (`method`, `extensions`) is allowed for `tenant`: a read-only tenant accepts
+/// only `GET`, `HEAD`, `OPTIONS`, and routes marked [`AllowedWhileReadOnly`]; anything else gets
+/// `tenant_read_only`. The kernel calls it where the request's tenant is resolved (extractors
+/// `TenantContext`, `OptionalTenant`); MCP tools check by the tool's `read_only` flag.
 pub fn ensure_writable(
     tenant: &TenantContext,
     method: &axum::http::Method,

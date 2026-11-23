@@ -138,7 +138,8 @@ thật (P7).
   - [ ] Mẫu câu OTP khách tự sửa cho khớp template đã đăng ký với nhà mạng (đang viết cứng ở `compliance`, `orders`,
         `bookings`)
   - [ ] 139 endpoint GET trả `Data<Vec<T>>` không phân trang: endpoint mới trả `Page<T>`, khai deprecation cho cái cũ
-  - [ ] Rustdoc tiếng Anh cho phần công khai của kernel, testkit và `autoxide` (docs.rs)
+  - [x] Rustdoc tiếng Anh cho phần công khai của kernel, testkit, `autoxide` và `api` của module (docs.rs); gate
+        `doc-language` giữ phần viết mới là tiếng Anh (D-20261123-english-rustdoc)
   - [ ] Chạy thử năm bộ nối của P7 bằng tài khoản thử thật; đối chiếu các điểm "(?)" của MoMo với trang tài liệu gốc
 - [x] P10 — Trải nghiệm người viết module (dev và AI agent viết module không phải chép code của core):
   - [x] Bản giả dùng chung của trait module: `autoxide_ledger::api::testing::FakeLedger` (feature `testing`) thay sáu

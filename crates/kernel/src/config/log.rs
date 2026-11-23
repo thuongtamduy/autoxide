@@ -1,4 +1,4 @@
-//! Cấu hình log.
+//! Log configuration.
 
 use super::{ConfigReader, Invalid, Setting};
 
@@ -15,7 +15,7 @@ pub const FORMAT: Setting = Setting::new(
 )
 .with_default("text");
 
-/// Mức log, từ chi tiết nhất tới nghiêm trọng nhất.
+/// Log level, from most detailed to most severe.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LogLevel {
     Trace,
@@ -28,9 +28,9 @@ pub enum LogLevel {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum LogFormat {
-    /// Dòng chữ cho người đọc.
+    /// Human-readable text lines.
     Text,
-    /// Mỗi dòng một đối tượng JSON, cho máy thu gom log.
+    /// One JSON object per line, for machine log collectors.
     Json,
 }
 

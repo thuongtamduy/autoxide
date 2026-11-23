@@ -1,20 +1,20 @@
-//! Nhật ký request theo khách (bước 52 mục 1, D-202): bàn kỹ thuật cho nhà phát triển và nhà vận
-//! hành xem ai (người, API key, agent) đã gọi gì, kết quả ra sao.
+//! Per-tenant request log (step 52 item 1, D-202): a technical desk for developers and operators to see who
+//! (a person, an API key, an agent) called what, and with what result.
 //!
-//! - Bảng `kernel_request_log`, cấp khách hàng. Mỗi dòng: thời điểm, người dùng, API key,
-//!   `actor_kind`, phương thức, **đường dẫn mẫu** (`/api/v1/content/entries/{id}`, không có ID
-//!   thật), status, `code` lỗi, thời gian xử lý, `Idempotency-Key`, `approval_id`, `request_id`,
-//!   `trace_id`. Không lưu thân request, header xác thực hay query (có thể chứa dữ liệu cá nhân).
-//! - Lệnh MCP: một dòng mỗi lần gọi tool, đường dẫn `mcp:<tên tool>`, phương thức `MCP`, không
-//!   ghi tham số. Request `POST /mcp` bao ngoài không ghi riêng (dòng của tool đã đủ).
-//! - Chỉ ghi request đã xác thực: request công khai (trang bán hàng) không phải việc của bàn kỹ
-//!   thuật, ghi thì bảng phình theo lượt xem.
-//! - Ghi **bất đồng bộ**: lớp HTTP đẩy dòng vào hàng đợi trong bộ nhớ có giới hạn
-//!   ([`QUEUE`] dòng), một tác vụ nền gom và ghi theo lô. Hàng đợi đầy thì bỏ dòng (đếm bằng
-//!   `kernel_request_log_dropped_total`) chứ không làm chậm request. Dừng máy chủ thì dòng còn
-//!   trong hàng đợi có thể mất — đây là nhật ký, không phải dữ liệu nghiệp vụ.
-//! - Hạn lưu `AUTOXIDE_REQUEST_LOG_DAYS` (mặc định 14, `0` tắt): mỗi dòng mang `expires_at`;
-//!   tác vụ ghi xoá dòng hết hạn của từng database tối đa mỗi giờ một lần (D-370).
+//! - Table `kernel_request_log`, tenant level. Each row: time, user, API key, `actor_kind`, method, **route
+//!   template** (`/api/v1/content/entries/{id}`, with no real ID), status, error `code`, processing time,
+//!   `Idempotency-Key`, `approval_id`, `request_id`, `trace_id`. It stores no request body, authentication
+//!   header or query string (they may contain personal data).
+//! - MCP commands: one row per tool call, path `mcp:<tool name>`, method `MCP`, with no parameters logged. The
+//!   enclosing `POST /mcp` request is not logged separately (the tool's row is enough).
+//! - Only authenticated requests are logged: public requests (storefront pages) are not the technical desk's
+//!   business, and logging them would make the table grow with page views.
+//! - Writing is **asynchronous**: the HTTP layer pushes rows into a bounded in-memory queue ([`QUEUE`] rows),
+//!   and a background task gathers and writes them in batches. When the queue is full the row is dropped
+//!   (counted by `kernel_request_log_dropped_total`) rather than slowing the request. When the server stops,
+//!   rows still in the queue may be lost; this is a log, not business data.
+//! - Retention `AUTOXIDE_REQUEST_LOG_DAYS` (default 14, `0` turns it off): each row carries `expires_at`; the
+//!   writer task deletes expired rows of each database at most once an hour (D-370).
 
 use crate::time::Timestamp;
 use jiff::SignedDuration;
@@ -40,29 +40,29 @@ use crate::pagination::{Page, PageQuery, PageRequest, fetch_page};
 use crate::response::Problem;
 use crate::tenancy::{DatabaseRegistry, ScopeExt, TenantContext, TenantId, TenantScoped};
 
-/// Đọc bàn kỹ thuật: nhật ký request, event theo bản ghi.
+/// Reading the technical desk: the request log, events by record.
 pub const DEVTOOLS_READ: Permission = Permission::new(
     "kernel.devtools.read",
     "See the developer tools of the tenant: the log of API and MCP calls, the events of a record.",
 );
 
-/// Thao tác trên bàn kỹ thuật: gửi lại lần giao webhook, chạy lại job thất bại.
+/// Actions on the technical desk: resending a webhook delivery, rerunning a failed job.
 pub const DEVTOOLS_MANAGE: Permission = Permission::new(
     "kernel.devtools.manage",
     "Act from the developer tools: redeliver webhooks and run failed jobs again.",
 );
 
-/// Số dòng tối đa chờ ghi trong bộ nhớ.
+/// Maximum rows waiting to be written in memory.
 const QUEUE: usize = 10_000;
-/// Số dòng tối đa một lần ghi.
+/// Maximum rows per write.
 const BATCH: usize = 200;
-/// Mỗi database dọn dòng hết hạn tối đa một lần trong khoảng này.
+/// Each database cleans up expired rows at most once in this interval.
 const PRUNE_EVERY: StdDuration = StdDuration::from_secs(3600);
-/// Phương thức của dòng ghi lệnh MCP.
+/// Method of the row that records an MCP command.
 pub(crate) const MCP_METHOD: &str = "MCP";
 
 mod entity {
-    //! Bảng `kernel_request_log`.
+    //! Table `kernel_request_log`.
     use crate::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
@@ -102,7 +102,7 @@ impl TenantScoped for Entity {
 
 // --- Ghi ------------------------------------------------------------------------------------
 
-/// Bên gọi của một request, do extractor `Principal` / `TenantContext` điền khi giải ra.
+/// The caller of a request, filled in by the `Principal` / `TenantContext` extractor when it resolves.
 #[derive(Default)]
 struct Caller {
     tenant: Option<TenantContext>,
@@ -112,13 +112,14 @@ struct Caller {
     actor_kind: Option<ActorKind>,
 }
 
-/// Ô dùng chung giữa lớp ghi nhật ký (đặt vào request) và extractor (điền vào). `Arc` vì axum chép
-/// extensions của request sang phần đầu handler nhận: bản chép vẫn trỏ cùng một ô.
+/// A cell shared between the logging layer (placed into the request) and the extractor (fills it in). `Arc`
+/// because axum copies the request's extensions into the part the handler receives: the copy still points to
+/// the same cell.
 #[derive(Clone, Default)]
 pub(crate) struct CallerSlot(Arc<Mutex<Caller>>);
 
 impl CallerSlot {
-    /// Ghi người gọi đã xác thực.
+    /// Records the authenticated caller.
     pub(crate) fn note_principal(&self, principal: &Principal) {
         if let Ok(mut caller) = self.0.lock() {
             caller.user_id = Some(principal.user_id());
@@ -128,7 +129,7 @@ impl CallerSlot {
         }
     }
 
-    /// Ghi khách của request.
+    /// Records the request's tenant.
     pub(crate) fn note_tenant(&self, tenant: &TenantContext) {
         if let Ok(mut caller) = self.0.lock() {
             caller.tenant = Some(tenant.clone());
@@ -136,7 +137,7 @@ impl CallerSlot {
     }
 }
 
-/// Một request đã xong, chờ ghi.
+/// A finished request waiting to be written.
 pub(crate) struct Entry {
     tenant: Option<TenantContext>,
     tenant_id: TenantId,
@@ -155,7 +156,7 @@ pub(crate) struct Entry {
     trace_id: Option<String>,
 }
 
-/// Phần của request mà lớp HTTP biết (ngoài người gọi).
+/// The part of the request that the HTTP layer knows (apart from the caller).
 pub(crate) struct Finished {
     pub method: String,
     pub path: String,
@@ -168,14 +169,14 @@ pub(crate) struct Finished {
     pub trace_id: Option<String>,
 }
 
-/// Hàng đợi ghi nhật ký; clone rẻ (chỉ tăng bộ đếm tham chiếu của kênh).
+/// Queue that writes the log; cheap to clone (only increments the channel's reference count).
 #[derive(Clone)]
 pub struct RequestLog {
     sender: mpsc::Sender<Entry>,
 }
 
 impl RequestLog {
-    /// Bật nhật ký: `None` khi `days == 0`. Tác vụ ghi chạy tới khi mọi bản clone bị bỏ.
+    /// Turns the log on: `None` when `days == 0`. The writer task runs until every clone is dropped.
     pub fn start(registry: DatabaseRegistry, days: u16) -> Option<Self> {
         if days == 0 {
             return None;
@@ -189,7 +190,7 @@ impl RequestLog {
         Some(RequestLog { sender })
     }
 
-    /// Đẩy một request đã xong vào hàng đợi; không có người gọi đã xác thực thì bỏ qua.
+    /// Pushes a finished request into the queue; with no authenticated caller it is skipped.
     pub(crate) fn record(&self, slot: &CallerSlot, finished: Finished) {
         let Some(entry) = slot.0.lock().ok().and_then(|caller| {
             Some(Entry {
@@ -221,7 +222,7 @@ impl RequestLog {
         }
     }
 
-    /// Ghi một lệnh MCP (`mcp:<tool>`), cùng hàng đợi với REST.
+    /// Records an MCP command (`mcp:<tool>`), in the same queue as REST.
     pub(crate) fn record_tool(
         &self,
         tenant: &TenantContext,
@@ -251,7 +252,7 @@ impl RequestLog {
     }
 }
 
-/// Giá trị header đáng tin để ghi: ngắn, chỉ ký tự nhìn thấy được.
+/// A trustworthy header value to record: short, visible characters only.
 pub(crate) fn header_text(value: Option<&axum::http::HeaderValue>, max: usize) -> Option<String> {
     let text = value?.to_str().ok()?.trim();
     (!text.is_empty() && text.len() <= max && text.bytes().all(|b| b.is_ascii_graphic()))
@@ -325,7 +326,7 @@ async fn write(
     Ok(())
 }
 
-/// Xoá dòng hết hạn của database của `tenant` (mọi khách trên database đó).
+/// Deletes expired rows of the database of `tenant` (every tenant on that database).
 pub(crate) async fn prune(tenant: &TenantContext, now: Timestamp) -> Result<u64, Error> {
     let deleted = Entity::delete_many()
         .filter(Column::ExpiresAt.lt(now))
@@ -412,7 +413,7 @@ pub(crate) struct RequestFilter {
     pub to: Option<Timestamp>,
 }
 
-/// Danh sách theo bộ lọc, mới trước (hay theo `order`).
+/// List by filter, newest first (or by `order`).
 pub(crate) async fn list(
     tenant: &TenantContext,
     filter: &RequestFilter,
@@ -566,7 +567,7 @@ pub(crate) fn tools() -> Vec<Tool> {
 
 // --- Migration ------------------------------------------------------------------------------
 
-/// Bảng `kernel_request_log`.
+/// Table `kernel_request_log`.
 pub(crate) struct CreateRequestLog;
 
 impl MigrationName for CreateRequestLog {

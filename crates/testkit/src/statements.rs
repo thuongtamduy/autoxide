@@ -1,5 +1,6 @@
-//! Đếm câu SQL một việc chạy (D-20261120-step39-hot-paths): giữ số câu của đường nóng không tăng
-//! lại sau khi đã gộp N+1. Dùng qua [`TestApp::statements`](crate::TestApp::statements).
+//! Counts the SQL statements a piece of work runs (D-20261120-step39-hot-paths): keeps the statement count of
+//! a hot path from rising again after N+1 has been merged away. Used through
+//! [`TestApp::statements`](crate::TestApp::statements).
 //!
 //! ```no_run
 //! # async fn example(app: &autoxide_testkit::TestApp) {
@@ -9,16 +10,16 @@
 //! # }
 //! ```
 //!
-//! App của test không chạy việc nền (bộ phát event, job). Riêng nhật ký request được một tác vụ
-//! nền ghi theo lô, có thể rơi đúng vào lượt đo (đỏ ngẫu nhiên trên Postgres) và không thuộc đường
-//! xử lý của request — câu ghi vào `kernel_request_log` không được đếm.
+//! The test app does not run background work (event dispatcher, jobs). Only the request log is written in
+//! batches by a background task, which can land exactly in a measurement (random red on Postgres) and is not
+//! part of the request's processing path — statements writing to `kernel_request_log` are not counted.
 
 use std::sync::{Arc, Mutex, PoisonError};
 
-/// Câu ghi nhật ký request của tác vụ nền (xem đầu file) — bỏ qua khi đếm.
+/// Statement that the background task writes to the request log (see the top of the file) — skipped when counting.
 const REQUEST_LOG_INSERT: &str = "INSERT INTO \"kernel_request_log\"";
 
-/// Sổ ghi câu SQL: chỉ ghi khi đang có một lượt đo.
+/// SQL statement log: records only while a measurement is active.
 #[derive(Default)]
 pub(crate) struct StatementLog {
     // `Mutex<Option<…>>`: `None` = không đo (callback chỉ khoá rồi bỏ qua). Callback của SeaORM
@@ -27,7 +28,7 @@ pub(crate) struct StatementLog {
 }
 
 impl StatementLog {
-    /// Hàm SeaORM gọi sau mỗi câu SQL.
+    /// Function SeaORM calls after every SQL statement.
     pub(crate) fn observer(self: &Arc<Self>) -> Arc<dyn Fn(&str) + Send + Sync> {
         let log = Arc::clone(self);
         Arc::new(move |sql: &str| {

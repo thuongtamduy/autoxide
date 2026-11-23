@@ -1,19 +1,20 @@
-//! Gửi SMS (bước 37): số điện thoại chuẩn E.164 và trait gửi tin trung lập (SMS brandname, D-190). Bộ
-//! nối nhà cung cấp là module riêng công bố `context.provide::<dyn SmsSender>(…)`. Test dùng
-//! `FakeSmsSender` của testkit.
+//! Sending SMS (step 37): E.164 phone numbers and a neutral sending trait (SMS brandname, D-190). A provider
+//! adapter is its own module that publishes `context.provide::<dyn SmsSender>(...)`. Tests use
+//! `FakeSmsSender` from the testkit.
 
 use std::fmt;
 
 use crate::error::Error;
 use crate::tenancy::TenantId;
 
-/// Số điện thoại dạng E.164 (`+84912345678`). Chỉ dạng che ([`masked`](Self::masked)) được ghi log.
+/// Phone number in E.164 form (`+84912345678`). Only the masked form ([`masked`](Self::masked)) may be logged.
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct PhoneNumber(String);
 
 impl PhoneNumber {
-    /// Chuẩn hoá `raw`: bỏ khoảng trắng, dấu chấm, gạch, ngoặc; `0…` → `+<mã nước mặc định>…`; `00…` →
-    /// `+…`; `84…` (không `+`) với mã nước mặc định `84` → `+84…`. `None` khi không phải 8–15 chữ số.
+    /// Normalizes `raw`: strips spaces, dots, dashes, brackets; `0...` -> `+<default country code>...`;
+    /// `00...` -> `+...`; `84...` (no `+`) with default country code `84` -> `+84...`. `None` when it is not
+    /// 8-15 digits.
     ///
     /// ```
     /// use autoxide_kernel::sms::PhoneNumber;
@@ -44,17 +45,17 @@ impl PhoneNumber {
         Some(PhoneNumber(format!("+{international}")))
     }
 
-    /// Dạng E.164, vd `+84912345678`.
+    /// E.164 form, e.g. `+84912345678`.
     pub fn as_str(&self) -> &str {
         &self.0
     }
 
-    /// Mã nước (không `+`): khớp với `known` nếu số bắt đầu bằng một mã trong đó.
+    /// Country code (without `+`): matches `known` if the number starts with one of the codes in it.
     pub fn calling_code<'a>(&self, known: &[&'a str]) -> Option<&'a str> {
         known.iter().copied().find(|code| self.0[1..].starts_with(code))
     }
 
-    /// Dạng che để ghi log / hiện cho người dùng: `+8491****678`.
+    /// Masked form for logs / showing to users: `+8491****678`.
     pub fn masked(&self) -> String {
         let text = &self.0;
         if text.len() <= 7 {
@@ -70,18 +71,18 @@ impl fmt::Debug for PhoneNumber {
     }
 }
 
-/// Mục đích của tin.
+/// Purpose of the message.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SmsPurpose {
-    /// Mã một lần.
+    /// One-time code.
     Otp,
-    /// Tin giao dịch (đơn hàng, giao hàng…).
+    /// Transactional message (orders, delivery, ...).
     Transactional,
-    /// Tin quảng cáo: chỉ gửi khi đã đồng ý trước, trong khung giờ cho phép (NĐ 91/2020 — cần đối chiếu).
+    /// Advertising message: sent only with prior consent, within the allowed hours (Decree 91/2020; needs verification).
     Marketing,
 }
 
-/// Một tin cần gửi.
+/// A message to send.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct SmsMessage {
@@ -89,7 +90,7 @@ pub struct SmsMessage {
     pub to: PhoneNumber,
     pub text: String,
     pub purpose: SmsPurpose,
-    /// Mã chống gửi trùng ở nhà cung cấp.
+    /// Code that prevents duplicate sends at the provider.
     pub reference: String,
 }
 
@@ -105,7 +106,7 @@ impl SmsMessage {
     }
 }
 
-/// Biên nhận của nhà cung cấp.
+/// Provider's receipt.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct SmsReceipt {
@@ -118,25 +119,25 @@ impl SmsReceipt {
     }
 }
 
-/// Một nhà cung cấp gửi SMS.
+/// An SMS sending provider.
 //
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
 #[async_trait::async_trait]
 pub trait SmsSender: Send + Sync {
     fn provider(&self) -> &'static str;
 
-    /// Lỗi `Unavailable` là tạm thời (thử lại); `Validation` là vĩnh viễn (số sai, bị chặn).
+    /// The `Unavailable` error is temporary (retry); `Validation` is permanent (wrong number, blocked).
     async fn send(&self, message: SmsMessage) -> Result<SmsReceipt, Error>;
 }
 
-/// Token do một module cấp sau khi người dùng đã qua mã một lần gửi tới số điện thoại (vd token xem
-/// đơn vãng lai của `orders`). `auth` hỏi qua trait này để tạo tài khoản từ số đã xác thực
-/// (`POST /api/v1/auth/phone-signups`, D-202) mà không phụ thuộc module cấp token. Module cấp token
-/// công bố bằng `context.provide::<dyn VerifiedPhoneTokens>(…)`; `auth` (đăng ký trước) lấy bằng
-/// `StartContext::later`.
+/// Token issued by a module after the user has passed a one-time code sent to a phone number (e.g. the guest
+/// order lookup token of `orders`). `auth` asks through this trait to create an account from a verified number
+/// (`POST /api/v1/auth/phone-signups`, D-202) without depending on the module that issues the token. The module
+/// that issues tokens publishes it with `context.provide::<dyn VerifiedPhoneTokens>(...)`; `auth` (registered
+/// earlier) gets it with `StartContext::later`.
 #[async_trait::async_trait]
 pub trait VerifiedPhoneTokens: Send + Sync {
-    /// Số đã qua mã một lần của `token`, khi token còn hạn và thuộc khách `tenant`; không thì `None`.
+    /// The number that passed the one-time code for `token`, when the token is still valid and belongs to tenant `tenant`; otherwise `None`.
     async fn verified_phone(
         &self,
         tenant: &crate::tenancy::TenantContext,
@@ -144,7 +145,7 @@ pub trait VerifiedPhoneTokens: Send + Sync {
     ) -> Result<Option<PhoneNumber>, Error>;
 }
 
-/// `sms_disabled` (503): chưa cấu hình gửi SMS.
+/// `sms_disabled` (503): SMS sending is not configured.
 pub fn sms_disabled() -> Error {
     Error::unavailable("sms_disabled", "Sending SMS is not set up on this server.")
 }

@@ -1,11 +1,12 @@
-//! Client MCP cho test (thay client của `rmcp`, D-20261121-mcp-server): gửi request JSON-RPC thẳng vào
-//! router của app (không mở cổng TCP), theo đặc tả MCP mới (`2026-07-28`, mặc định) hay bản cũ
-//! (`initialize`, [`McpClient::legacy`]).
+//! MCP client for tests (replaces the `rmcp` client, D-20261121-mcp-server): sends JSON-RPC requests straight
+//! to the app's router (no TCP port is opened), using either the new MCP spec (`2026-07-28`, the default) or
+//! the old one (`initialize`, [`McpClient::legacy`]).
 //!
-//! Tên hàm và tên trường giống client `rmcp` mà test đã quen (`call_tool`, `list_all_tools`,
-//! `structured_content`, `is_error`…), nên đổi thư viện không phải sửa test của module. Client cũng tự kiểm
-//! máy chủ trả đúng hình dạng đặc tả đòi (`resultType`, thông tin máy chủ trong `_meta` ở bản mới;
-//! không có các trường đó ở bản cũ) — test nào gọi MCP cũng là test tương thích giao thức.
+//! Function and field names match the `rmcp` client that tests are used to (`call_tool`, `list_all_tools`,
+//! `structured_content`, `is_error`…), so switching libraries needs no changes to module tests. The client
+//! also checks that the server returns the shape the spec requires (`resultType`, server info in `_meta` for
+//! the new version; none of those fields for the old one) — so every test that calls MCP is also a
+//! protocol-compatibility test.
 
 use std::borrow::Cow;
 use std::fmt;
@@ -19,19 +20,19 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 use tower::ServiceExt as _;
 
-/// Phiên bản mới nhất của đặc tả: không bắt tay, mỗi request mang `_meta`.
+/// Latest version of the spec: no handshake, every request carries `_meta`.
 pub const MODERN_VERSION: &str = "2026-07-28";
-/// Bản cũ mới nhất (còn `initialize`).
+/// Latest old version (still has `initialize`).
 pub const LEGACY_VERSION: &str = "2025-11-25";
 
-/// Lỗi khi gọi MCP: HTTP không thành công, hay máy chủ trả lỗi JSON-RPC (in ra `message` của nó).
+/// Error when calling MCP: HTTP failure, or the server returned a JSON-RPC error (its `message` is printed).
 #[derive(Debug, Clone)]
 pub struct McpClientError {
-    /// Mã HTTP của response.
+    /// HTTP status code of the response.
     pub status: StatusCode,
-    /// Lỗi JSON-RPC (`code`, `message`, `data`), nếu có.
+    /// JSON-RPC error (`code`, `message`, `data`), if any.
     pub error: Option<Value>,
-    /// Thân response (chữ), để in khi test hỏng.
+    /// Response body (text), printed when a test fails.
     pub body: String,
 }
 
@@ -63,13 +64,13 @@ fn broken(status: StatusCode, body: impl Into<String>) -> McpClientError {
     McpClientError { status, error: None, body: body.into() }
 }
 
-/// Client MCP nối vào `path` (`/mcp`, `/mcp/<module>`) của một router.
+/// MCP client attached to `path` (`/mcp`, `/mcp/<module>`) of a router.
 #[derive(Clone)]
 pub struct McpClient {
     router: Router,
     path: String,
     token: Option<String>,
-    /// `None`: bản mới. `Some(v)`: bản cũ đã bắt tay ở phiên bản `v`.
+    /// `None`: new version. `Some(v)`: old version, handshake done at version `v`.
     legacy: Option<String>,
     next_id: std::sync::Arc<AtomicU64>,
 }
@@ -81,7 +82,7 @@ impl fmt::Debug for McpClient {
 }
 
 impl McpClient {
-    /// Client bản mới (`2026-07-28`) tới `path` của `router`, xác thực bằng `Bearer <token>`.
+    /// New-version client (`2026-07-28`) for `path` of `router`, authenticating with `Bearer <token>`.
     pub fn new(router: Router, path: &str, token: Option<&str>) -> Self {
         McpClient {
             router,
@@ -92,8 +93,9 @@ impl McpClient {
         }
     }
 
-    /// Như [`McpClient::new`] nhưng nói bản cũ `version`: gửi `initialize` (+ `notifications/initialized`)
-    /// rồi mọi request sau mang header `MCP-Protocol-Version: <phiên bản máy chủ chọn>`.
+    /// Like [`McpClient::new`] but speaks the old version `version`: sends `initialize` (+
+    /// `notifications/initialized`), then every later request carries the header
+    /// `MCP-Protocol-Version: <version the server chose>`.
     pub async fn legacy(
         router: Router,
         path: &str,
@@ -118,12 +120,12 @@ impl McpClient {
         Ok(client)
     }
 
-    /// Phiên bản giao thức đang nói.
+    /// The protocol version being spoken.
     pub fn protocol_version(&self) -> &str {
         self.legacy.as_deref().unwrap_or(MODERN_VERSION)
     }
 
-    /// Gửi một request, trả `result` (lỗi HTTP hay JSON-RPC thành [`McpClientError`]).
+    /// Sends one request and returns `result` (an HTTP or JSON-RPC error becomes [`McpClientError`]).
     pub async fn request(&self, method: &str, params: Value) -> Result<Value, McpClientError> {
         let version = self.legacy.clone();
         self.send(method, params, version.as_deref()).await
@@ -218,12 +220,12 @@ impl McpClient {
         Ok((status, String::from_utf8_lossy(&bytes).into_owned()))
     }
 
-    /// `server/discover` (bản mới).
+    /// `server/discover` (new version).
     pub async fn discover(&self) -> Result<Value, McpClientError> {
         self.request("server/discover", json!({})).await
     }
 
-    /// Gọi một tool.
+    /// Calls a tool.
     pub async fn call_tool(
         &self,
         params: CallToolRequestParams,
@@ -232,25 +234,25 @@ impl McpClient {
         parse(result)
     }
 
-    /// Mọi tool người gọi được dùng.
+    /// Every tool the caller may use.
     pub async fn list_all_tools(&self) -> Result<Vec<Tool>, McpClientError> {
         let result = self.request("tools/list", json!({})).await?;
         parse(result["tools"].clone())
     }
 
-    /// Mọi resource người gọi được đọc.
+    /// Every resource the caller may read.
     pub async fn list_all_resources(&self) -> Result<Vec<Resource>, McpClientError> {
         let result = self.request("resources/list", json!({})).await?;
         parse(result["resources"].clone())
     }
 
-    /// Mọi prompt người gọi được dùng.
+    /// Every prompt the caller may use.
     pub async fn list_all_prompts(&self) -> Result<Vec<Prompt>, McpClientError> {
         let result = self.request("prompts/list", json!({})).await?;
         parse(result["prompts"].clone())
     }
 
-    /// Đọc một resource.
+    /// Reads a resource.
     pub async fn read_resource(
         &self,
         params: ReadResourceRequestParams,
@@ -259,7 +261,7 @@ impl McpClient {
         parse(result)
     }
 
-    /// Dựng một prompt.
+    /// Builds a prompt.
     pub async fn get_prompt(
         &self,
         params: GetPromptRequestParams,
@@ -268,13 +270,13 @@ impl McpClient {
         parse(result)
     }
 
-    /// Đóng client. Máy chủ không giữ phiên nên không có gì phải báo; giữ để test viết như với `rmcp`.
+    /// Closes the client. The server keeps no session, so there is nothing to report; kept so tests read as they do with `rmcp`.
     pub async fn cancel(self) -> Result<(), McpClientError> {
         Ok(())
     }
 }
 
-/// Kiểm hình dạng kết quả theo thế hệ, rồi bỏ các trường của bản mới để kết quả hai thế hệ đọc như nhau.
+/// Checks the result shape for its generation, then strips the new version's fields so both generations read alike.
 fn check_shape(method: &str, result: &mut Value, modern: bool) -> Result<(), String> {
     let Value::Object(object) = result else {
         return Err(format!("`result` of `{method}` is not an object: {result}"));
@@ -317,7 +319,7 @@ fn check_shape(method: &str, result: &mut Value, modern: bool) -> Result<(), Str
     Ok(())
 }
 
-/// Giá trị header `Mcp-Name`: chữ ASCII in được giữ nguyên, còn lại mã hoá `=?base64?…?=` (đặc tả).
+/// Value of the `Mcp-Name` header: printable ASCII is kept as is, anything else is encoded as `=?base64?…?=` (per the spec).
 fn header_value(value: &str) -> String {
     use base64::Engine as _;
     let plain = value.bytes().all(|byte| (0x21..=0x7e).contains(&byte))
@@ -339,7 +341,7 @@ fn parse<T: for<'de> Deserialize<'de>>(value: Value) -> Result<T, McpClientError
     })
 }
 
-/// Tham số `tools/call`.
+/// `tools/call` parameters.
 #[derive(Debug, Clone, Serialize)]
 pub struct CallToolRequestParams {
     pub name: Cow<'static, str>,
@@ -358,7 +360,7 @@ impl CallToolRequestParams {
     }
 }
 
-/// Tham số `resources/read`.
+/// `resources/read` parameters.
 #[derive(Debug, Clone, Serialize)]
 pub struct ReadResourceRequestParams {
     pub uri: String,
@@ -370,7 +372,7 @@ impl ReadResourceRequestParams {
     }
 }
 
-/// Tham số `prompts/get`.
+/// `prompts/get` parameters.
 #[derive(Debug, Clone, Serialize)]
 pub struct GetPromptRequestParams {
     pub name: String,
@@ -389,7 +391,7 @@ impl GetPromptRequestParams {
     }
 }
 
-/// Kết quả `tools/call`.
+/// `tools/call` result.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CallToolResult {
@@ -403,11 +405,11 @@ pub struct CallToolResult {
     pub meta: Option<Meta>,
 }
 
-/// `_meta` của một kết quả (`meta.0["autoxide/deprecation"]`).
+/// The `_meta` of a result (`meta.0["autoxide/deprecation"]`).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Meta(pub Map<String, Value>);
 
-/// Một tool trong `tools/list`.
+/// A tool in `tools/list`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Tool {
@@ -418,7 +420,7 @@ pub struct Tool {
     pub annotations: Option<ToolAnnotations>,
 }
 
-/// Gợi ý về tool.
+/// Hints about a tool.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ToolAnnotations {
@@ -426,7 +428,7 @@ pub struct ToolAnnotations {
     pub destructive_hint: Option<bool>,
 }
 
-/// Một resource trong `resources/list`.
+/// A resource in `resources/list`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Resource {
@@ -436,13 +438,13 @@ pub struct Resource {
     pub mime_type: Option<String>,
 }
 
-/// Kết quả `resources/read`.
+/// `resources/read` result.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ReadResourceResult {
     pub contents: Vec<ResourceContents>,
 }
 
-/// Nội dung một resource (chữ hay nhị phân base64).
+/// Content of a resource (text or base64 binary).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum ResourceContents {
@@ -452,7 +454,7 @@ pub enum ResourceContents {
     BlobResourceContents { uri: String, mime_type: Option<String>, blob: String },
 }
 
-/// Một prompt trong `prompts/list`.
+/// A prompt in `prompts/list`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Prompt {
     pub name: String,
@@ -461,7 +463,7 @@ pub struct Prompt {
     pub arguments: Option<Vec<PromptArgument>>,
 }
 
-/// Một đối số của prompt.
+/// An argument of a prompt.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PromptArgument {
     pub name: String,
@@ -469,14 +471,14 @@ pub struct PromptArgument {
     pub required: Option<bool>,
 }
 
-/// Kết quả `prompts/get`.
+/// `prompts/get` result.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct GetPromptResult {
     pub description: Option<String>,
     pub messages: Vec<PromptMessage>,
 }
 
-/// Một lời trong prompt: vai (`user` / `assistant`) và nội dung (`{"type": "text", "text": …}`).
+/// A message in a prompt: the role (`user` / `assistant`) and content (`{"type": "text", "text": …}`).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PromptMessage {
     pub role: String,

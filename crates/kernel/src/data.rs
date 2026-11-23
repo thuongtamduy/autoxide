@@ -1,7 +1,7 @@
-//! Làm việc với database: kết nối đọc / ghi, migration, pagination, khoá dòng, tham chiếu, phiên
-//! bản (ETag), tìm không dấu, chuyển dữ liệu.
+//! Database access: read / write connections, migrations, pagination, row locks, references, versions
+//! (ETag), accent-insensitive search, data transfer.
 //!
-//! Bước 33+ thêm vào đây: `tenancy`; bước 36: `numbering` (đánh số tuần tự không nhảy số).
+//! Step 33+ adds `tenancy` here; step 36 adds `numbering` (gap-free sequential numbering).
 
 pub mod backup;
 pub mod database;

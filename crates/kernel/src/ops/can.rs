@@ -1,14 +1,14 @@
-//! Giải thích quyền (bước 51 P11, D-201): `POST /api/v1/me/can` nhận tối đa 50 cặp
-//! (permission, nút) và trả, cho từng cặp, được hay không và **vì sao không** — để giao diện hiện
-//! lý do nút bị khoá thay vì ẩn nút. Kết quả dùng đúng các hàm kiểm thật (`module_enabled` của gói,
-//! `Principal::require_at`), theo cùng thứ tự với một request thật: module bật trước, permission
-//! sau.
+//! Permission explanations (step 51 P11, D-201): `POST /api/v1/me/can` takes up to 50 pairs (permission,
+//! node) and returns, for each pair, whether it is allowed and **why not** — so the UI can show the reason a
+//! button is locked instead of hiding it. The result uses the real check functions (the plan's
+//! `module_enabled`, `Principal::require_at`), in the same order as a real request: module enabled first,
+//! permission after.
 //!
-//! Lý do: `unknown_permission` (không có permission đó), `module_not_enabled` (gói của khách chưa
-//! có module, kèm `required_module`), `feature_not_in_plan` (việc cần tính năng gói chưa có, kèm
-//! `required_feature`), `quota_exceeded` (hạn mức việc dùng đã hết, kèm `limit`, `used`, `max`),
-//! `missing_permission` (người gọi không có permission ở nút đó). Ba lý do của gói kèm `upgrade_to`:
-//! mã các gói đang bán mở được việc này (module `plans` trả lời).
+//! Reasons: `unknown_permission` (no such permission), `module_not_enabled` (the tenant's plan does not
+//! include the module, with `required_module`), `feature_not_in_plan` (the action needs a plan feature that
+//! is missing, with `required_feature`), `quota_exceeded` (the usage limit is used up, with `limit`, `used`,
+//! `max`), `missing_permission` (the caller has no permission at that node). The three plan reasons come with
+//! `upgrade_to`: codes of the plans on sale that would unlock this action (answered by the `plans` module).
 
 use std::sync::Arc;
 
@@ -26,7 +26,7 @@ use crate::http::ValidJson;
 use crate::response::{Data, Problem};
 use crate::tenancy::{OrgId, TenantContext, root_of};
 
-/// Hỏi tối đa chừng này cặp mỗi lần.
+/// Ask at most this many pairs per call.
 const MAX_CHECKS: usize = 50;
 
 /// One question: may I use `permission` at `org_id`?
@@ -197,7 +197,7 @@ async fn check_my_permissions(
     Ok(Data { data: answers })
 }
 
-/// Route dưới `/api/v1/me`.
+/// Routes under `/api/v1/me`.
 pub(crate) fn routes(state: CanState) -> OpenApiRouter {
     OpenApiRouter::new().routes(routes!(check_my_permissions)).with_state(Arc::new(state))
 }

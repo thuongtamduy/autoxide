@@ -1,10 +1,10 @@
-//! Migration tạo bảng job của một module.
+//! Migration that creates a module's job table.
 
 use crate::migration::prelude::*;
 use crate::migration::schema;
 
-/// Migration tạo bảng `<module>_jobs`. Module dùng job queue thêm nó vào danh sách
-/// migration của mình, như [`outbox_migration`](crate::event::outbox_migration).
+/// Migration that creates the `<module>_jobs` table. A module that uses the job queue adds it to its list of
+/// migrations, like [`outbox_migration`](crate::event::outbox_migration).
 pub fn jobs_migration(name: &'static str, module: &'static str) -> Box<dyn MigrationTrait> {
     Box::new(JobsMigration { name, module })
 }
@@ -79,9 +79,9 @@ impl MigrationTrait for JobsMigration {
     }
 }
 
-/// Bảng `<module>_jobs` sau khi nâng theo khách (bước 33 A4): `tenant_id` đứng đầu; khoá chống
-/// trùng theo khách; index quét của worker (mọi khách) `…_pending_sweep_idx` và index claim theo
-/// khách `…_tenant_pending_idx`. Thêm vào migration của module như
+/// The `<module>_jobs` table after the per-tenant upgrade (step 33 A4): `tenant_id` first; a per-tenant
+/// deduplication key; the worker's scan index (all tenants) `..._pending_sweep_idx` and the per-tenant
+/// claim index `..._tenant_pending_idx`. Add it to the module's migrations like
 /// [`event::tenant_table`](crate::event::tenant_table).
 pub fn tenant_table(module: &str) -> crate::tenancy::migration::TenantTable {
     let table = super::table_name(module);

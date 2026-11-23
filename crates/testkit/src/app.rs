@@ -1,8 +1,8 @@
-//! [`TestApp`]: dựng module như binary dựng (cấu hình → migration → `start` → router của
-//! kernel) trên một [`TestDatabase`], rồi gọi qua REST hoặc client MCP thật.
+//! [`TestApp`]: builds modules the way the binary does (config → migration → `start` → kernel
+//! router) on a [`TestDatabase`], then calls them over real REST or an MCP client.
 //!
-//! Trước đây mỗi module tự viết lại khoảng 60–100 dòng dựng app, bộ xác thực giả và hàm gửi
-//! request (D-164). Giờ chỉ cần:
+//! Previously every module rewrote about 60–100 lines to build the app, a fake authenticator and a request
+//! helper (D-164). Now it takes only:
 //!
 //! ```no_run
 //! # async fn example(test: &autoxide_testkit::TestDatabase, module: impl autoxide_kernel::module::Module + 'static) {
@@ -20,19 +20,19 @@
 //! # }
 //! ```
 //!
-//! Dựng giống `crates/app/src/runtime.rs`: cùng bộ xác thực (module công bố, hoặc bộ giả khi
-//! test khai `user`), cùng idempotency, deprecation, giới hạn thân request, tool MCP, bản dịch.
+//! Built like `crates/app/src/runtime.rs`: same authenticator (published by a module, or a fake one when the
+//! test declares a `user`), same idempotency, deprecation, request body limit, MCP tools and translations.
 //!
-//! Nhiều khách (bước 33): `.tenant("a")` thêm khách trên database của app (placement chung),
-//! `.tenant_dedicated("b")` thêm khách trên database riêng (một database trống nữa cùng loại);
-//! `.placement("p")` thêm placement riêng chưa có khách (đích để dời khách tới);
-//! `.user_in("a", "token-a", 1, &[…])` là người của khách `a`. Khai khách nào thì app chạy chế độ
-//! `multi` (bỏ qua việc chế độ này chưa mở cho người dùng); `app.tenant("a")` cho ngữ cảnh của
-//! khách để gọi service trực tiếp.
+//! Multiple tenants (step 33): `.tenant("a")` adds a tenant on the app's database (shared placement),
+//! `.tenant_dedicated("b")` adds a tenant on its own database (one more empty database of the same kind);
+//! `.placement("p")` adds a dedicated placement with no tenant yet (a target to move a tenant to);
+//! `.user_in("a", "token-a", 1, &[…])` is a user of tenant `a`. Declaring any tenant runs the app in `multi`
+//! mode (bypassing the fact that this mode is not yet open to users); `app.tenant("a")` gives the tenant's
+//! context for calling services directly.
 //!
-//! Tên miền riêng (D-190): `.domain("a", "shop-a.test")` gắn tên miền đã xác minh cho khách `a`;
-//! `app.get(…).host("shop-a.test")` gửi request tới tên miền đó. App không bao giờ hỏi DNS thật:
-//! bản ghi TXT đặt ở `app.dns()` ([`FakeDns`]).
+//! Custom domains (D-190): `.domain("a", "shop-a.test")` attaches a verified domain to tenant `a`;
+//! `app.get(…).host("shop-a.test")` sends a request to that domain. The app never queries real DNS:
+//! the TXT record is set on `app.dns()` ([`FakeDns`]).
 
 use autoxide_kernel::time::Timestamp;
 use jiff::SignedDuration;
@@ -65,7 +65,7 @@ use uuid::Uuid;
 use crate::TestDatabase;
 use crate::dns::FakeDns;
 
-/// Lỗi khi dựng hay gọi [`TestApp`]. Thông báo nói bước nào hỏng.
+/// Error while building or calling a [`TestApp`]. The message says which step failed.
 #[derive(Debug)]
 pub struct TestAppError(String);
 
@@ -87,26 +87,26 @@ fn fail(step: &str, error: impl fmt::Display) -> TestAppError {
     TestAppError(format!("{step}: {error}"))
 }
 
-/// Ứng dụng dựng sẵn cho một bài test. Lấy qua [`TestApp::builder`].
+/// A prebuilt application for one test. Obtained through [`TestApp::builder`].
 pub struct TestApp {
     router: Router,
     openapi: OpenApi,
-    /// `openapi` dạng JSON, cho bộ kiểm response theo hợp đồng.
+    /// `openapi` as JSON, for the contract-based response checker.
     contract: Value,
     // Giữ module sống cùng app: chúng sở hữu service của mình.
     modules: Modules,
     database: Database,
     registry: DatabaseRegistry,
     dns: FakeDns,
-    /// Database đã được chép từ database mẫu thay vì migrate từ đầu.
+    /// The database was copied from the template database instead of migrated from scratch.
     from_template: bool,
     statements: Arc<StatementLog>,
-    /// Thư mục tạm cho file tải lên và mail file của app; xoá khi `TestApp` bị bỏ.
+    /// Temporary directory for uploaded files and the app's mail files; deleted when the `TestApp` is dropped.
     _scratch: Option<ScratchDir>,
 }
 
-/// Thư mục tạm tự xoá khi bị bỏ (`Drop`). Rust gọi `drop` khi giá trị ra khỏi phạm vi — tương tự
-/// `finally` — nên test dù đỏ hay xanh cũng không để file lại.
+/// Temporary directory that deletes itself when dropped (`Drop`). Rust calls `drop` when a value leaves scope —
+/// like `finally` — so a test leaves no files behind whether it passes or fails.
 struct ScratchDir(std::path::PathBuf);
 
 impl Drop for ScratchDir {
@@ -116,25 +116,25 @@ impl Drop for ScratchDir {
     }
 }
 
-/// Cấu hình của [`TestApp`] trước khi dựng.
+/// Configuration of a [`TestApp`] before it is built.
 pub struct TestAppBuilder<'a> {
     test: &'a TestDatabase,
     settings: Vec<(String, String)>,
     modules: Vec<Box<dyn Module>>,
-    /// Module có trong chương trình nhưng tắt ([`TestAppBuilder::module_turned_off`]).
+    /// Modules present in the program but turned off ([`TestAppBuilder::module_turned_off`]).
     turned_off: Vec<Box<dyn Module>>,
     provided: Vec<Provision>,
     users: HashMap<String, Principal>,
     multi: bool,
-    /// Khách khai thêm: (slug, có database riêng không, slug của khách cha).
+    /// Extra tenants declared: (slug, has its own database, slug of the parent tenant).
     tenants: Vec<(String, bool, Option<String>)>,
-    /// Placement riêng chưa có khách nào (đích để dời khách tới).
+    /// Dedicated placements with no tenant yet (a target to move a tenant to).
     placements: Vec<String>,
-    /// Người của khách: (slug, token, bên gọi).
+    /// Tenant users: (slug, token, caller).
     tenant_users: Vec<(String, String, Principal)>,
-    /// Tên miền đã xác minh của khách: (slug, tên miền).
+    /// Verified domains of tenants: (slug, domain).
     domains: Vec<(String, String)>,
-    /// Migrate trên database trống thay vì chép database mẫu ([`TestAppBuilder::empty_database`]).
+    /// Migrate on an empty database instead of copying the template database ([`TestAppBuilder::empty_database`]).
     empty_database: bool,
 }
 
@@ -143,7 +143,7 @@ pub struct TestAppBuilder<'a> {
 type Provision = Box<dyn for<'c> FnOnce(&mut StartContext<'c>) -> Result<(), Error> + Send + Sync>;
 
 impl TestApp {
-    /// Bắt đầu dựng app trên database của bài test.
+    /// Starts building the app on the test's database.
     pub fn builder(test: &TestDatabase) -> TestAppBuilder<'_> {
         TestAppBuilder {
             test,
@@ -161,43 +161,43 @@ impl TestApp {
         }
     }
 
-    /// Database của app được chép từ database mẫu đã migrate (D-20261120-test-db-template) thay vì
-    /// migrate từ đầu. Chỉ để testkit tự kiểm; bài test không cần biết.
+    /// The app's database is copied from the migrated template database (D-20261120-test-db-template) instead
+    /// of being migrated from scratch. Only for the testkit's own self-checks; tests do not need to know.
     pub fn from_template(&self) -> bool {
         self.from_template
     }
 
-    /// Chạy `work` và trả kèm mọi câu SQL app chạy trong lúc đó (D-20261120-step39-hot-paths) —
-    /// để test giữ số câu của một request. Mỗi lúc chỉ đo một việc; đo lồng nhau thì lượt trong
-    /// lấy hết câu.
+    /// Runs `work` and returns every SQL statement the app ran meanwhile (D-20261120-step39-hot-paths) —
+    /// so a test can pin the statement count of a request. Only one measurement at a time; with nested
+    /// measurements the inner one takes all the statements.
     pub async fn statements<T>(&self, work: impl Future<Output = T>) -> (T, Vec<String>) {
         self.statements.start();
         let output = work.await;
         (output, self.statements.stop())
     }
 
-    /// Sổ database của app (chế độ, placement, tra khách).
+    /// The app's database registry (mode, placement, tenant lookup).
     pub fn registry(&self) -> &DatabaseRegistry {
         &self.registry
     }
 
-    /// Khách mặc định (khách nền tảng) trên database của app.
+    /// The default tenant (the platform tenant) on the app's database.
     pub fn default_tenant(&self) -> TenantContext {
         self.registry.default_tenant()
     }
 
-    /// Ngữ cảnh của khách đã khai bằng [`TestAppBuilder::tenant`] /
-    /// [`TestAppBuilder::tenant_dedicated`] (theo slug).
+    /// Context of a tenant declared with [`TestAppBuilder::tenant`] /
+    /// [`TestAppBuilder::tenant_dedicated`] (by slug).
     pub async fn tenant(&self, slug: &str) -> Result<TenantContext, TestAppError> {
         self.registry.tenant_by_slug(slug).await.map_err(|e| fail("tenant", e))
     }
 
-    /// Cho mọi lượt dời khách chưa xong coi như đã qua thời gian chờ máy chủ khác thấy lượt dời
-    /// (TTL cache + thời gian tối đa của một request): bước chép chạy ngay.
+    /// Treats every unfinished tenant move as having passed the wait for other servers to see the move
+    /// (cache TTL + the maximum duration of a request): the copy step runs immediately.
     ///
-    /// Gọi sau `TenantMoves::start`, trước `run` / `step` / worker. Nhờ vậy test không phải hạ
-    /// `AUTOXIDE_HTTP_REQUEST_TIMEOUT_SECONDS` xuống 1 giây chỉ để thời gian chờ ngắn — mức đó
-    /// làm request bình thường của test thỉnh thoảng bị cắt (408) khi máy CI chậm.
+    /// Call after `TenantMoves::start`, before `run` / `step` / the worker. This way a test need not lower
+    /// `AUTOXIDE_HTTP_REQUEST_TIMEOUT_SECONDS` to 1 second just to get a short wait — that value
+    /// makes ordinary test requests occasionally get cut off (408) when the CI machine is slow.
     pub async fn skip_move_wait(&self) -> Result<(), TestAppError> {
         use sea_orm::ConnectionTrait as _;
         use sea_orm::sea_query::{Alias, Expr, ExprTrait as _, Query};
@@ -219,8 +219,8 @@ impl TestApp {
         Ok(())
     }
 
-    /// Như [`skip_move_wait`](Self::skip_move_wait), cho lượt tách / gộp khách: bước đóng băng không
-    /// chờ TTL cache + thời gian tối đa của request. Gọi sau `build`; không cần hạ
+    /// Like [`skip_move_wait`](Self::skip_move_wait), for tenant split / merge moves: the freeze step does not
+    /// wait for the cache TTL + the maximum request duration. Call after `build`; no need to lower
     /// `AUTOXIDE_HTTP_REQUEST_TIMEOUT_SECONDS`.
     pub fn skip_relocation_wait(&self) -> Result<(), TestAppError> {
         let relocations = self
@@ -230,33 +230,33 @@ impl TestApp {
         Ok(())
     }
 
-    /// Bộ tra DNS giả của app: tên miền riêng được xác minh theo bản ghi TXT đặt ở đây
-    /// ([`FakeDns::set_challenge`]); app không bao giờ hỏi DNS thật.
+    /// The app's fake DNS resolver: a custom domain is verified by the TXT record set here
+    /// ([`FakeDns::set_challenge`]); the app never queries real DNS.
     pub fn dns(&self) -> &FakeDns {
         &self.dns
     }
 
-    /// Router đầy đủ (mọi lớp HTTP của kernel), để tự gửi request khi helper không đủ.
+    /// The full router (every HTTP layer of the kernel), for sending requests yourself when the helpers are not enough.
     pub fn router(&self) -> Router {
         self.router.clone()
     }
 
-    /// Tài liệu OpenAPI của app.
+    /// The app's OpenAPI document.
     pub fn openapi(&self) -> &OpenApi {
         &self.openapi
     }
 
-    /// Các module đã khởi động (lấy trait công bố, worker, dispatcher…).
+    /// The started modules (fetch published traits, workers, dispatchers…).
     pub fn modules(&self) -> &Modules {
         &self.modules
     }
 
-    /// Database của app (đọc kiểm kết quả, chạy job).
+    /// The app's database (read to check results, run jobs).
     pub fn database(&self) -> &Database {
         &self.database
     }
 
-    /// Trait một module đã công bố (`context.provide`), vd service của chính module.
+    /// A trait a module has published (`context.provide`), e.g. the module's own service.
     pub fn api<T>(&self) -> Option<Arc<T>>
     where
         T: ?Sized + Send + Sync + 'static,
@@ -264,13 +264,13 @@ impl TestApp {
         self.modules.api::<T>()
     }
 
-    /// Sổ khối của các module trong app (bước 67): test gọi `BlockData` của module như `content`
-    /// gọi lúc đọc công khai.
+    /// The block registry of the modules in the app (step 67): a test calls a module's `BlockData` the way
+    /// `content` does on a public read.
     pub fn blocks(&self) -> autoxide_kernel::blocks::Blocks {
         self.modules.blocks()
     }
 
-    /// Bắt đầu một request. `uri` là đường dẫn đầy đủ, vd `/api/v1/notes/{id}`.
+    /// Starts a request. `uri` is the full path, e.g. `/api/v1/notes/{id}`.
     pub fn request(&self, method: Method, uri: &str) -> TestRequest<'_> {
         TestRequest {
             app: self,
@@ -302,17 +302,18 @@ impl TestApp {
         self.request(Method::DELETE, uri)
     }
 
-    /// Client MCP nối tới `/mcp` của app, xác thực bằng `token` (như [`TestRequest::token`]). Nói bản mới
-    /// của đặc tả (`2026-07-28`); bản cũ (`initialize`) dùng [`McpClient::legacy`] với [`TestApp::router`].
+    /// An MCP client connected to the app's `/mcp`, authenticated with `token` (like [`TestRequest::token`]).
+    /// Speaks the new spec version (`2026-07-28`); for the old one (`initialize`) use [`McpClient::legacy`]
+    /// with [`TestApp::router`].
     pub async fn mcp(&self, token: &str) -> Result<McpClient, TestAppError> {
         self.mcp_at(token, "/mcp").await
     }
 
-    /// Như [`TestApp::mcp`], tới endpoint MCP ở `path` — vd `/mcp/notes`, endpoint riêng của một
-    /// module.
+    /// Like [`TestApp::mcp`], to the MCP endpoint at `path` — e.g. `/mcp/notes`, a module's own
+    /// endpoint.
     ///
-    /// Nối xong thì gọi `server/discover` (như client bắt tay lúc nối): người gọi không vào được endpoint
-    /// (sai token, khách bị khoá…) thì lỗi ngay ở đây.
+    /// After connecting it calls `server/discover` (as a client does in its handshake): a caller that cannot
+    /// reach the endpoint (wrong token, locked tenant…) fails right here.
     pub async fn mcp_at(&self, token: &str, path: &str) -> Result<McpClient, TestAppError> {
         let client = McpClient::new(self.router.clone(), path, Some(token));
         client.discover().await.map_err(|e| fail("mcp", e))?;
@@ -320,43 +321,43 @@ impl TestApp {
     }
 }
 
-/// Tham số gọi một tool MCP: `tool("notes.create", json!({"title": "…"}))`.
+/// Parameters for calling an MCP tool: `tool("notes.create", json!({"title": "…"}))`.
 pub fn tool(name: &str, arguments: Value) -> CallToolRequestParams {
     let arguments = arguments.as_object().cloned().unwrap_or_default();
     CallToolRequestParams::new(name.to_owned()).with_arguments(arguments)
 }
 
 impl<'a> TestAppBuilder<'a> {
-    /// Đặt một biến cấu hình (như biến môi trường). `DATABASE_URL` đã có sẵn.
+    /// Sets a configuration variable (like an environment variable). `DATABASE_URL` is already set.
     pub fn setting(mut self, name: &str, value: &str) -> Self {
         self.settings.push((name.to_owned(), value.to_owned()));
         self
     }
 
-    /// Thêm một module. Thứ tự như `crates/app/src/modules.rs`: bên cung cấp trait trước bên
-    /// dùng.
+    /// Adds a module. Order as in `crates/app/src/modules.rs`: the provider of a trait before the
+    /// consumer.
     pub fn module(mut self, module: impl Module + 'static) -> Self {
         self.modules.push(Box::new(module));
         self
     }
 
-    /// Như [`module`](Self::module), cho module đã đóng hộp — vd cả danh sách module của binary
-    /// (`modules::all()`) trong test đầu-cuối.
+    /// Like [`module`](Self::module), for an already boxed module — e.g. the binary's whole module list
+    /// (`modules::all()`) in an end-to-end test.
     pub fn boxed_module(mut self, module: Box<dyn Module>) -> Self {
         self.modules.push(module);
         self
     }
 
-    /// Một module có trong chương trình nhưng TẮT, như khi `AUTOXIDE_MODULES` không bật nó: không
-    /// được đăng ký, migration của nó không chạy, nhưng chương trình biết nó tồn tại
-    /// (`Modules::inactive`). Để thử việc chương trình làm gì với dữ liệu module đó để lại.
+    /// A module present in the program but OFF, as when `AUTOXIDE_MODULES` does not enable it: it is not
+    /// registered and its migrations do not run, but the program knows it exists
+    /// (`Modules::inactive`). For testing what the program does with the data that module left behind.
     pub fn module_turned_off(mut self, module: impl Module + 'static) -> Self {
         self.turned_off.push(Box::new(module));
         self
     }
 
-    /// Công bố một trait thay cho module thật, vd `provide::<dyn Storage>(Arc::new(fake))`.
-    /// Mọi thứ `provide` được công bố bởi module `testkit`, đứng trước mọi module khác.
+    /// Publishes a trait in place of a real module, e.g. `provide::<dyn Storage>(Arc::new(fake))`.
+    /// Everything published with `provide` comes from the `testkit` module, ahead of every other module.
     pub fn provide<T>(mut self, api: Arc<T>) -> Self
     where
         T: ?Sized + Send + Sync + 'static,
@@ -365,7 +366,8 @@ impl<'a> TestAppBuilder<'a> {
         self
     }
 
-    /// Góp một bộ cài đặt cho trait nhiều bên cùng cung cấp (`StartContext::contribute`), vd
+    /// Contributes an implementation of a trait several parties provide together
+    /// (`StartContext::contribute`), e.g.
     /// `.contribute::<dyn PaymentGateway>(Arc::new(FakePaymentGateway::new()))`.
     pub fn contribute<T>(mut self, api: Arc<T>) -> Self
     where
@@ -375,17 +377,17 @@ impl<'a> TestAppBuilder<'a> {
         self
     }
 
-    /// Thêm một người dùng giả: request mang `Authorization: Bearer <token>` được xác thực
-    /// là `user_id` với đúng các permission này. Khai ít nhất một `user` (hay `principal`) thì
-    /// app dùng bộ xác thực giả thay cho bộ một module công bố.
+    /// Adds a fake user: a request carrying `Authorization: Bearer <token>` is authenticated
+    /// as `user_id` with exactly these permissions. Declaring at least one `user` (or `principal`) makes the
+    /// app use the fake authenticator instead of the one a module publishes.
     pub fn user(self, token: &str, user_id: u128, permissions: &[&str]) -> Self {
         let permissions = permissions.iter().map(|p| (*p).to_owned());
         self.principal(token, Principal::new(Uuid::from_u128(user_id), permissions))
     }
 
-    /// Người dùng giả có quyền theo nút (bước 34): mỗi cặp `(permission, độ sâu)` là một grant ở
-    /// nút `org` của khách mặc định, vd `.member("ann", 1, shop, &[("notes.read", Scope::Unit)])`.
-    /// Cây (nút, nhánh) dựng bằng `autoxide_kernel::tenancy::OrgTree` trong bài test.
+    /// A fake user with per-node permissions (step 34): each `(permission, depth)` pair is a grant at the
+    /// `org` node of the default tenant, e.g. `.member("ann", 1, shop, &[("notes.read", Scope::Unit)])`.
+    /// Build the tree (node, branch) in the test with `autoxide_kernel::tenancy::OrgTree`.
     pub fn member(
         self,
         token: &str,
@@ -399,53 +401,53 @@ impl<'a> TestAppBuilder<'a> {
         self.principal(token, Principal::with_grants(Uuid::from_u128(user_id), grants))
     }
 
-    /// Như [`TestAppBuilder::user`], với `Principal` dựng sẵn — cho bên gọi mà `user` không tả
-    /// được, vd gọi bằng API key: `Principal::new(id, permissions).via_api_key(key_id)`.
+    /// Like [`TestAppBuilder::user`], with a prebuilt `Principal` — for callers `user` cannot describe,
+    /// e.g. an API key call: `Principal::new(id, permissions).via_api_key(key_id)`.
     pub fn principal(mut self, token: &str, principal: Principal) -> Self {
         self.users.insert(token.to_owned(), principal);
         self
     }
 
-    /// Chạy chế độ nhiều khách (`AUTOXIDE_TENANCY_MODE=multi`) dù chưa khai khách nào.
+    /// Runs in multi-tenant mode (`AUTOXIDE_TENANCY_MODE=multi`) even when no tenant is declared.
     pub fn multi_tenant(mut self) -> Self {
         self.multi = true;
         self
     }
 
-    /// Thêm khách `slug` trên database của app (placement chung `main`). Bật chế độ nhiều khách.
+    /// Adds tenant `slug` on the app's database (shared placement `main`). Turns on multi-tenant mode.
     pub fn tenant(mut self, slug: &str) -> Self {
         self.multi = true;
         self.tenants.push((slug.to_owned(), false, None));
         self
     }
 
-    /// Thêm khách `slug` trên database riêng (placement `dedicated` tên `slug`, một database trống
-    /// cùng loại, dọn cùng bài test). Bật chế độ nhiều khách.
+    /// Adds tenant `slug` on its own database (placement `dedicated` named `slug`, one more empty database
+    /// of the same kind, cleaned up with the test). Turns on multi-tenant mode.
     pub fn tenant_dedicated(mut self, slug: &str) -> Self {
         self.multi = true;
         self.tenants.push((slug.to_owned(), true, None));
         self
     }
 
-    /// Thêm khách `slug` là con của khách `parent` (khai trước nó, hay `default`) — cây khách hàng
-    /// của bước 34; `dedicated`: trên database riêng như [`tenant_dedicated`](Self::tenant_dedicated).
-    /// Bật chế độ nhiều khách.
+    /// Adds tenant `slug` as a child of tenant `parent` (declared before it, or `default`) — the tenant tree
+    /// of step 34; `dedicated`: on its own database like [`tenant_dedicated`](Self::tenant_dedicated).
+    /// Turns on multi-tenant mode.
     pub fn child_tenant(mut self, slug: &str, parent: &str, dedicated: bool) -> Self {
         self.multi = true;
         self.tenants.push((slug.to_owned(), dedicated, Some(parent.to_owned())));
         self
     }
 
-    /// Thêm placement `dedicated` tên `name` trên một database trống nữa cùng loại (dọn cùng bài
-    /// test), chưa có khách nào — vd đích để dời khách tới. Bật chế độ nhiều khách.
+    /// Adds a `dedicated` placement named `name` on one more empty database of the same kind (cleaned up with
+    /// the test), with no tenant yet — e.g. a target to move a tenant to. Turns on multi-tenant mode.
     pub fn placement(mut self, name: &str) -> Self {
         self.multi = true;
         self.placements.push(name.to_owned());
         self
     }
 
-    /// Như [`user`](Self::user), cho người của khách `slug` (khai bằng [`tenant`](Self::tenant)
-    /// hay [`tenant_dedicated`](Self::tenant_dedicated)).
+    /// Like [`user`](Self::user), for a user of tenant `slug` (declared with [`tenant`](Self::tenant)
+    /// or [`tenant_dedicated`](Self::tenant_dedicated)).
     pub fn user_in(mut self, slug: &str, token: &str, user_id: u128, permissions: &[&str]) -> Self {
         let permissions = permissions.iter().map(|p| (*p).to_owned());
         let principal = Principal::new(Uuid::from_u128(user_id), permissions);
@@ -453,32 +455,32 @@ impl<'a> TestAppBuilder<'a> {
         self
     }
 
-    /// Như [`principal`](Self::principal), cho người của khách `slug` (vd quyền theo nút của khách
-    /// đó: `Principal::with_grants(…)`).
+    /// Like [`principal`](Self::principal), for a user of tenant `slug` (e.g. that tenant's per-node
+    /// permissions: `Principal::with_grants(…)`).
     pub fn principal_in(mut self, slug: &str, token: &str, principal: Principal) -> Self {
         self.tenant_users.push((slug.to_owned(), token.to_owned(), principal));
         self
     }
 
-    /// Gắn tên miền `domain` (đã xác minh) cho khách `slug` (khai bằng [`tenant`](Self::tenant),
-    /// hay `default` cho khách nền tảng): request mang `Host: <domain>` vào khách đó. Đi đúng đường
-    /// thật — thêm, đặt bản ghi TXT ở [`FakeDns`], xác minh. Bật chế độ nhiều khách.
+    /// Attaches the (verified) domain `domain` to tenant `slug` (declared with [`tenant`](Self::tenant), or
+    /// `default` for the platform tenant): a request carrying `Host: <domain>` reaches that tenant. Goes the
+    /// real way — add, set the TXT record on [`FakeDns`], verify. Turns on multi-tenant mode.
     pub fn domain(mut self, slug: &str, domain: &str) -> Self {
         self.multi = true;
         self.domains.push((slug.to_owned(), domain.to_owned()));
         self
     }
 
-    /// Chạy mọi migration trên database trống của bài test, không chép database mẫu đã migrate
-    /// (D-20261120-test-db-template) — cho bài test cần chính lần migrate đó (vd đo hay kiểm
-    /// migration). Kết quả như nhau; chỉ chậm hơn.
+    /// Runs every migration on the test's empty database, without copying the migrated template database
+    /// (D-20261120-test-db-template) — for tests that need that very migration (e.g. measuring or checking
+    /// migrations). Same result; only slower.
     pub fn empty_database(mut self) -> Self {
         self.empty_database = true;
         self
     }
 
-    /// Đọc cấu hình, chạy mọi migration (chép database mẫu đã migrate khi được), khởi động module,
-    /// ghép router.
+    /// Reads configuration, runs every migration (copying the migrated template database when possible),
+    /// starts the modules, assembles the router.
     pub async fn build(self) -> Result<TestApp, TestAppError> {
         let mut pairs = vec![("DATABASE_URL".to_owned(), self.test.url().to_owned())];
         pairs.extend(self.settings);
@@ -668,7 +670,7 @@ impl<'a> TestAppBuilder<'a> {
     }
 }
 
-/// Module `testkit`: công bố những gì test đưa qua [`TestAppBuilder::provide`].
+/// The `testkit` module: publishes what tests pass through [`TestAppBuilder::provide`].
 struct Provider(Vec<Provision>);
 
 impl Module for Provider {
@@ -684,7 +686,7 @@ impl Module for Provider {
     }
 }
 
-/// Bộ xác thực giả: token → bên gọi khai bằng [`TestAppBuilder::user`] hay
+/// Fake authenticator: token → the caller declared with [`TestAppBuilder::user`] or
 /// [`TestAppBuilder::principal`].
 struct FakeAuthenticator(HashMap<String, Principal>);
 
@@ -720,13 +722,13 @@ impl Authenticator for FakeAuthenticator {
     }
 }
 
-/// Request đang dựng. Gửi bằng [`TestRequest::send`].
+/// A request being built. Sent with [`TestRequest::send`].
 pub struct TestRequest<'a> {
     app: &'a TestApp,
     method: String,
-    /// Đường dẫn, bỏ phần query.
+    /// Path, without the query part.
     path: String,
-    /// Kiểm response theo hợp đồng OpenAPI (mặc định có).
+    /// Check the response against the OpenAPI contract (on by default).
     checked: bool,
     builder: axum::http::request::Builder,
     body: Option<Body>,
@@ -738,48 +740,49 @@ impl TestRequest<'_> {
         self.header(header::AUTHORIZATION.as_str(), &format!("Bearer {token}"))
     }
 
-    /// `Host: <host>` — request tới tên miền riêng của khách (khai bằng
+    /// `Host: <host>` — a request to a tenant's custom domain (declared with
     /// [`TestAppBuilder::domain`]).
     pub fn host(self, host: &str) -> Self {
         self.header(header::HOST.as_str(), host)
     }
 
-    /// Thêm một header.
+    /// Adds a header.
     pub fn header(mut self, name: &str, value: &str) -> Self {
         self.builder = self.builder.header(name, value);
         self
     }
 
-    /// Thân JSON (kèm `Content-Type: application/json`).
+    /// JSON body (with `Content-Type: application/json`).
     pub fn json(self, body: Value) -> Self {
         let mut request = self.header(header::CONTENT_TYPE.as_str(), "application/json");
         request.body = Some(Body::from(body.to_string()));
         request
     }
 
-    /// Thân thô (tự đặt `Content-Type` bằng [`TestRequest::header`]).
+    /// Raw body (set `Content-Type` yourself with [`TestRequest::header`]).
     pub fn bytes(mut self, body: impl Into<Vec<u8>>) -> Self {
         self.body = Some(Body::from(body.into()));
         self
     }
 
-    /// Thân bất kỳ, vd `Body::from_stream(…)` để gửi theo từng đoạn, không có
-    /// `Content-Length` (tự đặt `Content-Type` bằng [`TestRequest::header`]).
+    /// Any body, e.g. `Body::from_stream(…)` to send in chunks, with no
+    /// `Content-Length` (set `Content-Type` yourself with [`TestRequest::header`]).
     pub fn body(mut self, body: Body) -> Self {
         self.body = Some(body);
         self
     }
 
-    /// Không kiểm response theo hợp đồng OpenAPI — chỉ cho test cố ý tạo câu trả lời ngoài hợp
-    /// đồng. Lệch hợp đồng thường là lỗi thật (tài liệu hay code): sửa nó thay vì gọi hàm này.
+    /// Does not check the response against the OpenAPI contract — only for tests that deliberately produce an
+    /// answer outside the contract. A contract mismatch is usually a real bug (in the docs or the code): fix
+    /// it instead of calling this.
     pub fn unchecked(mut self) -> Self {
         self.checked = false;
         self
     }
 
-    /// Gửi qua router (không mở cổng mạng) và đọc hết câu trả lời. Response lệch hợp đồng
-    /// OpenAPI của endpoint (mã trạng thái không khai, media type sai, thân sai schema) là lỗi
-    /// (đặc tả 31 B4) — trừ khi gọi [`unchecked`](Self::unchecked).
+    /// Sends through the router (no network port opened) and reads the whole answer. A response that deviates
+    /// from the endpoint's OpenAPI contract (undeclared status code, wrong media type, wrong body schema) is
+    /// an error (spec 31 B4) — unless [`unchecked`](Self::unchecked) is called.
     pub async fn send(self) -> Result<TestResponse, TestAppError> {
         let request = self
             .builder
@@ -809,7 +812,7 @@ impl TestRequest<'_> {
     }
 }
 
-/// Câu trả lời đã đọc hết thân.
+/// An answer whose body has been fully read.
 #[derive(Debug)]
 pub struct TestResponse {
     status: StatusCode,
@@ -826,7 +829,7 @@ impl TestResponse {
         &self.headers
     }
 
-    /// Giá trị header dạng chuỗi; `""` khi không có hoặc không phải ASCII.
+    /// Header value as a string; `""` when absent or not ASCII.
     pub fn header(&self, name: impl TryInto<HeaderName>) -> &str {
         name.try_into()
             .ok()
@@ -839,12 +842,12 @@ impl TestResponse {
         &self.body
     }
 
-    /// Thân dạng JSON; `Value::Null` khi rỗng hoặc không phải JSON.
+    /// Body as JSON; `Value::Null` when empty or not JSON.
     pub fn json(&self) -> Value {
         serde_json::from_slice(&self.body).unwrap_or(Value::Null)
     }
 
-    /// Thân dạng chữ (UTF-8, ký tự hỏng được thay).
+    /// Body as text (UTF-8, broken characters replaced).
     pub fn text(&self) -> String {
         String::from_utf8_lossy(&self.body).into_owned()
     }

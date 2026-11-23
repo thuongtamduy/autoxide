@@ -1,5 +1,5 @@
-//! Nơi lưu file trong bộ nhớ cho test của module (đặc tả 32 B3): cài `dyn Storage` của kernel
-//! mà không cần ổ đĩa hay S3 (nơi lưu thật được thử ở test đầu-cuối của `crates/app`).
+//! In-memory file storage for module tests (spec 32 B3): implements the kernel's `dyn Storage`
+//! without needing a disk or S3 (real storage is exercised in the end-to-end tests of `crates/app`).
 
 use autoxide_kernel::time::Timestamp;
 use jiff::SignedDuration;
@@ -15,11 +15,11 @@ use autoxide_kernel::storage::{
 use bytes::Bytes;
 use futures_util::{StreamExt as _, TryStreamExt as _};
 
-/// File giữ trong bộ nhớ, theo khoá.
+/// Files kept in memory, by key.
 ///
-/// - `get` trả nội dung thành nhiều khúc 3 byte, để thử code đọc qua nhiều khúc.
-/// - Không cài lại `get_range` / `keys_with_prefix`: dùng luôn cài đặt mặc định của kernel.
-/// - [`MemoryStorage::fail_writes`] làm `put` thất bại, để thử đường lỗi của nơi lưu.
+/// - `get` returns the content in 3-byte chunks, to exercise code that reads across several chunks.
+/// - Does not reimplement `get_range` / `keys_with_prefix`: it uses the kernel's default implementation.
+/// - [`MemoryStorage::fail_writes`] makes `put` fail, to exercise the storage error path.
 #[derive(Debug, Default)]
 pub struct MemoryStorage {
     files: Mutex<BTreeMap<String, Bytes>>,
@@ -28,29 +28,29 @@ pub struct MemoryStorage {
 }
 
 impl MemoryStorage {
-    /// Nơi lưu trống.
+    /// Empty storage.
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// `true`: mọi `put` sau đó trả lỗi (nội dung không được lưu); `false`: chạy lại bình thường.
+    /// `true`: every later `put` returns an error (content is not stored); `false`: back to normal.
     pub fn fail_writes(&self, failing: bool) {
         self.failing.store(failing, Ordering::SeqCst);
     }
 
-    /// `true`: cấp link tải thẳng giả (bước 40 P4) như S3 — `url` là `memory://<khoá thật>`; test
-    /// "PUT" bằng [`MemoryStorage::put_presigned`]. Mặc định `false`: như ổ đĩa, không cấp link.
+    /// `true`: issues fake direct-upload links (step 40 P4) like S3 — `url` is `memory://<real key>`; tests
+    /// "PUT" with [`MemoryStorage::put_presigned`]. Defaults to `false`: like a disk, no link is issued.
     pub fn presign(&self, presigning: bool) {
         self.presigning.store(presigning, Ordering::SeqCst);
     }
 
-    /// Ghi `content` như client PUT lên link `url` đã cấp.
+    /// Writes `content` as a client would PUT it to an issued link `url`.
     pub fn put_presigned(&self, url: &str, content: impl Into<Bytes>) {
         let key = url.strip_prefix("memory://").unwrap_or(url);
         self.lock().insert(key.to_owned(), content.into());
     }
 
-    /// Nội dung của `key`, nếu có.
+    /// Content of `key`, if any.
     pub fn bytes(&self, key: &str) -> Option<Bytes> {
         self.lock().get(key).cloned()
     }
@@ -111,9 +111,9 @@ impl Storage for MemoryStorage {
     }
 }
 
-/// Bộ mở nơi lưu riêng của placement cho test (bước 33): mỗi chỗ (`dir` của nơi lưu cục bộ, `bucket`
-/// của S3) một [`MemoryStorage`], tạo lần đầu được mở. Đưa vào app bằng
-/// `.provide::<dyn StorageOpener>(opener)`; test xem nội dung bằng [`MemoryStorageOpener::store`].
+/// Opener of per-placement storage for tests (step 33): one [`MemoryStorage`] per place (`dir` of local
+/// storage, `bucket` of S3), created the first time it is opened. Pass it to the app with
+/// `.provide::<dyn StorageOpener>(opener)`; tests inspect content with [`MemoryStorageOpener::store`].
 #[derive(Clone, Default)]
 pub struct MemoryStorageOpener {
     stores: std::sync::Arc<Mutex<std::collections::HashMap<String, std::sync::Arc<MemoryStorage>>>>,
@@ -126,19 +126,19 @@ impl std::fmt::Debug for MemoryStorageOpener {
 }
 
 impl MemoryStorageOpener {
-    /// Bộ mở chưa có nơi lưu nào.
+    /// Opener with no storage yet.
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Nơi lưu ở chỗ `place` (tạo nếu chưa có).
+    /// Storage at place `place` (created if missing).
     pub fn store(&self, place: &str) -> std::sync::Arc<MemoryStorage> {
         let mut stores = self.stores.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         stores.entry(place.to_owned()).or_default().clone()
     }
 
-    /// Cho chỗ `place` trỏ tới `store` có sẵn (vd nơi lưu chung của app): hai cấu hình khác nhau mà
-    /// cùng một chỗ.
+    /// Makes place `place` point to an existing `store` (e.g. the app's shared storage): two different
+    /// configurations that resolve to the same place.
     pub fn alias(&self, place: &str, store: std::sync::Arc<MemoryStorage>) {
         let mut stores = self.stores.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         stores.insert(place.to_owned(), store);

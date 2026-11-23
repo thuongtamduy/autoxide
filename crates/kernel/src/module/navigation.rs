@@ -1,19 +1,19 @@
-//! Sổ điều hướng (bước 51 P1, D-200): module khai nhóm phân hệ và mục menu của mình; kernel gom,
-//! kiểm xung đột lúc khởi động và lọc theo khách, gói, permission của người gọi
-//! (`GET /api/v1/kernel/navigation`). Kernel không có danh sách phân hệ viết cứng: nhóm `home` và
-//! `settings` cũng chỉ là nhóm kernel tự khai như mọi module.
+//! The navigation registry (step 51 P1, D-200): a module declares its sub-area groups and menu items; the
+//! kernel collects them, checks for conflicts at startup and filters by the caller's tenant, plan and
+//! permissions (`GET /api/v1/kernel/navigation`). The kernel has no hard-coded list of sub-areas: the
+//! `home` and `settings` groups are just groups the kernel declares itself like any module.
 //!
-//! Nhãn viết tiếng Anh ở chỗ khai; bản dịch tiếng Việt nằm ở `locales/vi.json` của module với khoá
-//! `text:<câu tiếng Anh>`, như mô tả permission (D-264).
+//! Labels are written in English where declared; the Vietnamese translation lives in the module's
+//! `locales/vi.json` under the key `text:<English sentence>`, like permission descriptions (D-264).
 
 use crate::access::Permission;
 
-/// Không gian của một nhóm: khách (trang quản trị của khách) hay nền tảng (nhân sự nền tảng).
+/// The space a group belongs to: tenant (the tenant's admin area) or platform (platform staff).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Space {
     #[default]
     Tenant,
-    /// Chỉ hiện cho nhân sự khách nền tảng, đang làm việc trong chính khách nền tảng.
+    /// Shown only to platform tenant staff, working inside the platform tenant itself.
     Platform,
 }
 
@@ -26,17 +26,17 @@ impl Space {
     }
 }
 
-/// Một nhóm phân hệ trên thanh bên. Hai module khai cùng `id` phải khai giống hệt nhau.
+/// A sub-area group in the sidebar. Two modules that declare the same `id` must declare it identically.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct NavGroup {
-    /// `sales`, `content`… — do module khai, ổn định (giao diện dùng làm khoá).
+    /// `sales`, `content`... - declared by the module, stable (the UI uses it as a key).
     pub id: &'static str,
-    /// Nhãn tiếng Anh (dịch qua `text:` của module).
+    /// The English label (translated through the module's `text:`).
     pub label: &'static str,
-    /// Tên icon trung lập (`cart`, `file`…); giao diện tự ánh xạ.
+    /// A neutral icon name (`cart`, `file`...); the UI maps it itself.
     pub icon: &'static str,
-    /// Thứ tự trên thanh phân hệ, như nhau ở mọi khách.
+    /// The order in the sub-area bar, the same for every tenant.
     pub order: u16,
     pub space: Space,
 }
@@ -51,22 +51,22 @@ impl NavGroup {
         NavGroup { id, label, icon, order, space: Space::Tenant }
     }
 
-    /// Nhóm của không gian nền tảng.
+    /// Groups of the platform space.
     pub const fn platform(mut self) -> Self {
         self.space = Space::Platform;
         self
     }
 }
 
-/// Chỗ của một mục trên điện thoại (bước 52, D-232): giao diện vẽ thanh đáy từ mục `Primary`.
+/// The place of an item on mobile (step 52, D-232): the UI draws the bottom bar from `Primary` items.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum MobilePlacement {
-    /// Thanh đáy; mỗi câu trả lời giữ tối đa 5 mục, phần dư thành `Secondary`.
+    /// The bottom bar; each answer keeps at most 5 items, and the remainder becomes `Secondary`.
     Primary,
-    /// Menu "Thêm".
+    /// The "More" menu.
     #[default]
     Secondary,
-    /// Không hiện trên điện thoại.
+    /// Not shown on mobile.
     Hidden,
 }
 
@@ -80,31 +80,32 @@ impl MobilePlacement {
     }
 }
 
-/// Gợi ý cho điện thoại của một mục: chỗ và thứ tự trong chỗ đó.
+/// A mobile hint for an item: the place and the order within that place.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MobileHint {
     pub placement: MobilePlacement,
     pub order: u16,
 }
 
-/// Một mục menu (một màn) trong một nhóm.
+/// A menu item (one screen) within a group.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct NavItem {
-    /// `content.entries` — cũng là khoá màn hình của giao diện; duy nhất trong cả chương trình.
+    /// `content.entries` - also the UI's screen key; unique across the whole program.
     pub id: &'static str,
     pub group: &'static str,
-    /// Nhãn tiếng Anh của nhóm con trong hàng tab, khi có.
+    /// The English label of the sub-group in the tab row, when there is one.
     pub section: Option<&'static str>,
     pub label: &'static str,
-    /// Có MỘT trong các permission này (ở nút đang chọn) thì mục hiện; rỗng: mọi người đã đăng nhập.
+    /// The item shows if the caller has ONE of these permissions (at the selected node); empty: anyone
+    /// signed in.
     pub permissions: Vec<Permission>,
-    /// Tính năng của gói (bước 35) mục cần: thiếu thì mục hiện ở trạng thái khoá, không ẩn.
+    /// The plan feature (step 35) the item needs: if missing, the item shows as locked, not hidden.
     pub feature: Option<&'static str>,
-    /// Nguồn số đếm của hộp việc (P2) để hiện cạnh tên mục.
+    /// The source of the work inbox count (P2) to show next to the item name.
     pub counter: Option<&'static str>,
     pub order: u16,
-    /// Gợi ý cho điện thoại; không khai thì `Secondary` với `order` của mục.
+    /// The mobile hint; if not declared, `Secondary` with the item's `order`.
     pub mobile: MobileHint,
 }
 
@@ -123,7 +124,7 @@ impl NavItem {
         }
     }
 
-    /// Hiện khi người gọi có một trong `permissions`.
+    /// Shown when the caller has one of `permissions`.
     pub fn permissions(mut self, permissions: &[Permission]) -> Self {
         self.permissions = permissions.to_vec();
         self
@@ -144,14 +145,14 @@ impl NavItem {
         self
     }
 
-    /// Chỗ của mục trên điện thoại và thứ tự trong chỗ đó.
+    /// The item's place on mobile and its order within that place.
     pub fn mobile(mut self, placement: MobilePlacement, order: u16) -> Self {
         self.mobile = MobileHint { placement, order };
         self
     }
 }
 
-/// Phần điều hướng một module khai qua `Module::navigation`.
+/// The navigation part a module declares through `Module::navigation`.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Navigation {
     pub groups: Vec<NavGroup>,
@@ -170,15 +171,16 @@ impl Navigation {
     }
 }
 
-/// Sổ đã gom của mọi module: nhóm (không trùng) và mục kèm tên module khai.
+/// The collected registry of every module: groups (without duplicates) and items with the declaring
+/// module's name.
 #[derive(Debug, Clone, Default)]
 pub(crate) struct NavigationCatalog {
     pub groups: Vec<NavGroup>,
     pub items: Vec<(&'static str, NavItem)>,
 }
 
-/// Gom phần khai của từng module (theo thứ tự đăng ký); lỗi khi hai module khai cùng nhóm khác
-/// nhau, mục trùng `id`, hay mục chỉ tới nhóm không ai khai.
+/// Collects each module's declarations (in registration order); an error when two modules declare the same
+/// group differently, an item has a duplicate `id`, or an item points to a group nobody declared.
 pub(crate) fn collect(
     parts: Vec<(&'static str, Navigation)>,
 ) -> Result<NavigationCatalog, Vec<String>> {

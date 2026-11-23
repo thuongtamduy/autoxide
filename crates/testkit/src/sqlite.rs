@@ -1,5 +1,5 @@
-//! Phần SQLite của [`TestDatabase`](crate::TestDatabase): mỗi database là một
-//! file trong một thư mục tạm riêng.
+//! SQLite part of [`TestDatabase`](crate::TestDatabase): each database is a
+//! file in its own temporary directory.
 
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
@@ -8,14 +8,14 @@ use uuid::Uuid;
 
 use crate::stale::{is_stale, is_stale_scratch};
 
-/// Tiền tố tên thư mục tạm của mỗi database test.
+/// Name prefix of the temporary directory of each test database.
 pub(crate) const DIRECTORY_PREFIX: &str = "autoxide-test-";
 
-/// Tạo thư mục tạm mới dưới `parent`; trả về (thư mục, URL kết nối).
+/// Creates a new temporary directory under `parent`; returns (directory, connection URL).
 ///
-/// Dùng file thật chứ không dùng `sqlite::memory:` vì database trong bộ nhớ là
-/// riêng của từng kết nối: pool nhiều kết nối, hay hai pool đọc / ghi tách nhau,
-/// sẽ mỗi bên thấy một database khác nhau.
+/// Uses a real file rather than `sqlite::memory:` because an in-memory database
+/// is private to each connection: a pool with several connections, or separate read / write pools,
+/// would each see a different database.
 pub(crate) fn create_directory(parent: &Path) -> std::io::Result<(PathBuf, String)> {
     let directory = parent.join(format!("{DIRECTORY_PREFIX}{}", Uuid::now_v7()));
     std::fs::create_dir_all(&directory)?;
@@ -25,9 +25,10 @@ pub(crate) fn create_directory(parent: &Path) -> std::io::Result<(PathBuf, Strin
     Ok((directory, url))
 }
 
-/// Xoá các thư mục test đã quá cũ dưới `parent` — của testkit (`autoxide-test-…`) và thư mục tạm
-/// test tự tạo (`autoxide-<việc>-<UUIDv7>`). Trả về số thư mục đã xoá.
-/// Lỗi (không đọc được thư mục, không xoá được) thì bỏ qua: đây chỉ là dọn rác.
+/// Deletes test directories that are too old under `parent` — the testkit's own (`autoxide-test-…`) and
+/// temporary directories created by tests themselves (`autoxide-<task>-<UUIDv7>`). Returns the number of
+/// directories deleted. Errors (directory unreadable, deletion failed) are ignored: this is only garbage
+/// cleanup.
 pub(crate) fn remove_stale_directories(parent: &Path, now: SystemTime) -> usize {
     let Ok(entries) = std::fs::read_dir(parent) else {
         return 0;
