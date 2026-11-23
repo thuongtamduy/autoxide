@@ -6,6 +6,9 @@
 //! appends `tool <name>` to `<directory>/<process id>.txt`. `cargo xtask coverage-api` sets the variable,
 //! runs the tests and compares the files with `docs/openapi.json` and `docs/mcp-tools.json`.
 //!
+//! Tests that call a router without [`TestRequest`](crate::TestRequest) — the binary's real runtime, a stream,
+//! a WebSocket over a real port — record the same way with [`record_response`].
+//!
 //! Each line is written once per process (a set in memory remembers what was written), so the cost while
 //! recording is one small file append per distinct endpoint; when the variable is unset, the cost is one
 //! lookup of a cached `Option`.
@@ -68,5 +71,23 @@ pub(crate) fn http(method: &str, template: &str) {
 pub(crate) fn tool(name: &str) {
     if recorder().is_some() {
         record(format!("tool {name}"));
+    }
+}
+
+/// Records one answer of a call made without [`TestRequest`](crate::TestRequest) (a real runtime's router, a
+/// stream, a WebSocket over a real port), like `TestRequest::send` does: `path` is the concrete path (no
+/// query); it counts when `status` is below 400 and `path` matches an operation of `openapi`. Does nothing
+/// unless [`TEST_API_COVERAGE`] is set.
+pub fn record_response(openapi: &utoipa::openapi::OpenApi, method: &str, path: &str, status: u16) {
+    if status >= 400 || recorder().is_none() {
+        return;
+    }
+    let path = path.split('?').next().unwrap_or(path);
+    // Đổi hợp đồng sang JSON chỉ khi đang đo: tốn vài mili giây mỗi lần, không ảnh hưởng gate.
+    let Ok(document) = serde_json::to_value(openapi) else {
+        return;
+    };
+    if let Some(template) = crate::contract::template(&document, method, path) {
+        http(method, template);
     }
 }

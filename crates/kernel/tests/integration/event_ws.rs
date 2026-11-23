@@ -186,6 +186,13 @@ impl Server {
             Ok((mut socket, _)) => {
                 let first = next(&mut socket, LONG).await.expect("the subscription");
                 assert_eq!(first["type"], "subscribed", "{first}");
+                // WebSocket qua port thật, không qua `TestRequest`: ghi độ phủ tay (D-20261123-api-coverage).
+                autoxide_testkit::record_response(
+                    self.app.openapi(),
+                    "GET",
+                    "/api/v1/kernel/events/ws",
+                    101,
+                );
                 Ok(socket)
             }
             Err(tokio_tungstenite::tungstenite::Error::Http(response)) => {

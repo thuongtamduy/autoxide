@@ -78,12 +78,23 @@ async fn khach_moi_xuat_du_lieu_migration_va_nhat_ky_request() {
         let export_id = export["id"].as_str().unwrap_or_else(|| panic!("{export}")).to_owned();
         call_tool(app, admin, "kernel.get_tenant_export", json!({"export_id": export_id})).await;
 
+        call_tool(app, admin, "kernel.migrate_placements", json!({"dry_run": true})).await;
         let run =
-            call_tool(app, admin, "kernel.migrate_placements", json!({"dry_run": true})).await;
-        if let Some(run_id) = run["id"].as_str() {
-            call_tool(app, admin, "kernel.get_migration_run", json!({"id": run_id})).await;
-        }
+            call_tool(app, admin, "kernel.migrate_placements", json!({"placement": "spare"})).await;
+        let run_id = run["id"].as_str().unwrap_or_else(|| panic!("{run}")).to_owned();
+        call_tool(app, admin, "kernel.get_migration_run", json!({"id": run_id})).await;
+
+        // Dời khách sang placement khác rồi xem lượt dời.
+        app.skip_move_wait().await.unwrap();
+        let moved = json!({"tenant": "shop-b", "to": "spare", "dry_run": false});
+        let moved = call_tool(app, admin, "kernel.move_tenant", moved).await;
+        let move_id = moved["id"].as_str().unwrap_or_else(|| panic!("{moved}")).to_owned();
+        let read = json!({"tenant": "shop-b", "move_id": move_id});
+        call_tool(app, admin, "kernel.get_tenant_move", read).await;
+
         call_tool(app, admin, "kernel.request_log", json!({})).await;
+        let setting = json!({"name": "mail.connection.smtp.url"});
+        call_tool(app, admin, "kernel.test_connection", setting).await;
     })
     .await
     .unwrap();
