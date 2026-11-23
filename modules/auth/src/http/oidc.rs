@@ -611,7 +611,7 @@ async fn list_oidc_providers(
 
 /// Add a sign-in provider to this tenant.
 ///
-/// Requires `auth.oidc.manage`. Register the application at the provider first and list the
+/// Requires `auth.oidc.manage` and a signed-in session (not an API key). Register the application at the provider first and list the
 /// interface's callback pages in `redirect_uris`. The client secret is stored encrypted and never
 /// shown again.
 #[utoipa::path(
@@ -624,7 +624,7 @@ async fn list_oidc_providers(
     responses(
         (status = 201, description = "The provider was added.", body = Data<ProviderResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "Missing permission `auth.oidc.manage`; code `permission_denied`.", body = Problem),
+        (status = 403, description = "Missing permission `auth.oidc.manage` (code `permission_denied`), or the request used an API key (code `auth.session_required`).", body = Problem),
         (status = 409, description = "Another provider has this slug; code `auth.oidc_slug_taken`.", body = Problem),
         (status = 422, description = "A value is invalid, e.g. an issuer on a private network; see `errors`.", body = Problem),
     )
@@ -671,7 +671,7 @@ async fn get_oidc_provider(
 
 /// Change a sign-in provider of this tenant.
 ///
-/// Requires `auth.oidc.manage`. Fields left out stay as they are; `null` clears `issuer`,
+/// Requires `auth.oidc.manage` and a signed-in session (not an API key). Fields left out stay as they are; `null` clears `issuer`,
 /// `allowed_email_domains`, `default_org_id` or `default_role_id`. `slug`, `kind` and `realm`
 /// cannot change.
 #[utoipa::path(
@@ -685,7 +685,7 @@ async fn get_oidc_provider(
     responses(
         (status = 200, description = "The changed provider.", body = Data<ProviderResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "Missing permission `auth.oidc.manage`; code `permission_denied`.", body = Problem),
+        (status = 403, description = "Missing permission `auth.oidc.manage` (code `permission_denied`), or the request used an API key (code `auth.session_required`).", body = Problem),
         (status = 404, description = "No provider has this id; code `auth.oidc_provider_not_found`.", body = Problem),
         (status = 422, description = "A value is invalid; see `errors`.", body = Problem),
     )

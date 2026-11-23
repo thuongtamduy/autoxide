@@ -24,6 +24,19 @@ use crate::api_key::{self, ApiKeyService};
 use crate::role::RoleService;
 use crate::session::{SessionService, bearer_token};
 
+/// Việc chỉ làm được trong phiên đăng nhập, không bằng API key: key bị lộ không được dùng để chiếm
+/// tài khoản hay tạo credential mới (API key, token SCIM, nhà cung cấp đăng nhập). Kiểm ở service
+/// layer để REST và MCP cùng chặn.
+pub(crate) fn require_session(principal: &Principal) -> Result<(), Error> {
+    if principal.api_key_id().is_some() {
+        return Err(Error::forbidden(
+            "auth.session_required",
+            "This action needs you to be signed in with your password; an API key cannot do it.",
+        ));
+    }
+    Ok(())
+}
+
 pub(crate) struct RequestAuthenticator {
     pub sessions: Arc<SessionService>,
     pub roles: Arc<RoleService>,

@@ -16,6 +16,8 @@ mod bench_seed;
 mod cleanup;
 mod client_config;
 mod config;
+#[cfg(test)]
+mod credential_key_tests;
 mod delegation;
 #[cfg(test)]
 mod delegation_tests;
