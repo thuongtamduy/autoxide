@@ -202,3 +202,42 @@ async fn mo_ta_san_pham_va_tom_tat_danh_gia_bi_tu_choi() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn ai_dung_trang_sua_trang_va_soan_chien_dich_tu_khuyen_mai() {
+    TestDatabase::run(async |test| {
+        let server = FakeProviderServer::start().await.unwrap();
+        let app = app(test, &server, &[]).await;
+        let root = json!(root_of(DEFAULT_TENANT));
+
+        // Nhờ AI dựng bố cục một trang từ mô tả, rồi sửa bằng lời. Cả hai chạy nền, kết quả là bản nháp.
+        let page = json!({"kind": "page", "title": "Trà Tết"});
+        let page = id(&expect(&app, "POST", "/api/v1/content/entries", ADMIN, Some(page), 201).await);
+        let compose = json!({"id": page, "instruction": "Trang giới thiệu bộ quà trà Tết, có ảnh lớn và nút mua."});
+        let layout = json!({"type": "layout", "schema": 1, "sections": [
+            {"id": "hero", "block": "content.hero", "props": {"heading": "Quà trà Tết", "text": "Bộ quà gói sẵn."}}]});
+        ai_answers(&server, json!({"layout_json": layout.to_string()}));
+        let turn = call_tool(&app, ADMIN, "content.compose_page", compose).await;
+        assert!(turn["id"].is_string(), "{turn}");
+        drain(&app).await;
+        let patch = json!([{"op": "replace", "path": "/sections/0/props/heading", "value": "Quà trà Tết đỏ"}]);
+        ai_answers(&server, json!({"patch_json": patch.to_string()}));
+        let edit = json!({"id": page, "instruction": "Đổi màu phần đầu trang sang đỏ."});
+        call_tool(&app, ADMIN, "content.edit_page", edit).await;
+
+        // Soạn nháp chiến dịch (trang đích) từ một khuyến mại; đọc lại yêu cầu.
+        let (starts, ends) = super::kit::promotion_window();
+        let promotion = json!({"org_id": root, "kind": "percent_off", "currency": "VND", "value_bp": 1000,
+            "trigger": "automatic", "locale": "vi", "title": "Giảm 10% trà Tết", "terms": "Áp dụng mọi đơn",
+            "starts_at": starts, "ends_at": ends});
+        let promotion = call_tool(&app, ADMIN, "promotions.create_promotion", json!({"promotion": promotion})).await;
+        let promotion = promotion["id"].as_str().unwrap_or_else(|| panic!("{promotion}")).to_owned();
+        let request = json!({"promotion_id": promotion, "channels": ["page"], "instruction": "Giọng ấm áp."});
+        let drafts = call_tool(&app, ADMIN, "content.create_campaign_drafts", request).await;
+        let drafts = drafts["id"].as_str().unwrap_or_else(|| panic!("{drafts}")).to_owned();
+        let read = call_tool(&app, ADMIN, "content.get_campaign_drafts", json!({"id": drafts})).await;
+        assert_eq!(read["id"], drafts.as_str(), "{read}");
+    })
+    .await
+    .unwrap();
+}
