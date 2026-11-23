@@ -396,3 +396,33 @@ mod tests {
         assert_eq!(problems.len(), 3, "{problems:#?}");
     }
 }
+
+// Thử phá header `Accept-Language` và mã ngôn ngữ (D-20261123-property-fuzzing).
+#[cfg(test)]
+mod properties {
+    use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn header_bat_ky_khong_panic(raw in "\\PC{0,200}|([a-zA-Z-]{0,8}(;q=[0-9.]{0,6})?, ?){0,6}") {
+            let language = Language::negotiate(Some(&raw));
+            // Không nêu `vi` (hay `vi-…`) với q > 0 thì luôn là tiếng Anh.
+            if !raw.to_ascii_lowercase().contains("vi") {
+                prop_assert_eq!(language, Language::En);
+            }
+        }
+
+        #[test]
+        fn chat_luong_nam_trong_0_toi_1000(raw in "\\PC{0,12}|[01](\\.[0-9]{0,5})?") {
+            prop_assert!(parse_quality(&raw) <= 1000);
+        }
+
+        #[test]
+        fn ma_ngon_ngu_chuan_hoa_khong_doi_khi_chuan_hoa_lai(raw in "\\PC{0,20}|[a-zA-Z]{2,3}([-_]([a-zA-Z]{2}|[a-zA-Z]{4}|[0-9]{3})){0,3}") {
+            if let Some(canonical) = canonical_locale(&raw) {
+                prop_assert_eq!(canonical_locale(&canonical), Some(canonical.clone()));
+            }
+        }
+    }
+}

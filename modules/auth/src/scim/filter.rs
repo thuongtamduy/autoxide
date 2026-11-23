@@ -376,3 +376,30 @@ mod tests {
         assert_eq!(like_pattern(Op::Eq, "a"), None);
     }
 }
+
+/// Thử phá bộ lọc SCIM (D-20261123-property-fuzzing): chuỗi do máy chủ danh tính của khách gửi tới.
+#[cfg(test)]
+mod properties {
+    use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn chuoi_bat_ky_khong_panic(
+            raw in "\\PC{0,200}|[()\\[\\] a-zA-Z.\"]{0,120}|(userName|emails\\[type eq \"work\"\\]\\.value) (eq|co|sw|pr|gt) \"[a-z@.]{0,10}\"( (and|or) )?",
+        ) {
+            let _ = parse(&raw);
+        }
+
+        #[test]
+        fn long_ngoac_sau_khong_tran_stack(depth in 0usize..2_000) {
+            let raw = format!("{}userName eq \"a\"{}", "(".repeat(depth), ")".repeat(depth));
+            let parsed = parse(&raw);
+            if depth <= 16 {
+                prop_assert!(parsed.is_ok());
+            } else {
+                prop_assert!(parsed.is_err());
+            }
+        }
+    }
+}
