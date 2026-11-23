@@ -211,14 +211,15 @@ fn thresholds(
     if lines.is_empty() {
         return Err(ReasonDraft::new("promotions.reason.not_applicable"));
     }
-    let quantity: i64 = lines.iter().map(|&line| input.cart.lines[line].quantity).sum();
+    let quantity: i64 =
+        super::saturating_sum(lines.iter().map(|&line| input.cart.lines[line].quantity));
     if let Some(min) = program.min_quantity
         && quantity < i64::from(min)
     {
         return Err(ReasonDraft::new("promotions.reason.min_quantity")
             .with("count", i64::from(min) - quantity));
     }
-    let subtotal: i64 = lines.iter().map(|&line| state.remaining[line]).sum();
+    let subtotal: i64 = super::saturating_sum(lines.iter().map(|&line| state.remaining[line]));
     if let Some(min) = program.min_order_minor
         && subtotal < min
     {
@@ -231,7 +232,7 @@ fn thresholds(
 
 /// Cắt tổng các phần về `max_discount_minor`, chia lại theo tỉ lệ (tổng khớp từng đồng).
 fn cap_total(program: &Program, input: &Input<'_>, parts: &mut Vec<LinePart>) {
-    let total: i64 = parts.iter().map(|part| part.amount).sum();
+    let total: i64 = super::saturating_sum(parts.iter().map(|part| part.amount));
     if let Some(max) = program.max_discount_minor
         && total > max
     {
@@ -292,7 +293,7 @@ fn items_off(program: &Program, input: &Input<'_>, state: &State) -> Result<Outc
 fn order_off(program: &Program, input: &Input<'_>, state: &State) -> Result<Outcome, ReasonDraft> {
     let lines = lines_for(program, input, state, &program.conditions_targets);
     thresholds(program, input, state, &lines)?;
-    let subtotal: i64 = lines.iter().map(|&line| state.remaining[line]).sum();
+    let subtotal: i64 = super::saturating_sum(lines.iter().map(|&line| state.remaining[line]));
     let mut amount = match program.kind {
         Kind::PercentOff => percent_of(subtotal, program.value_bp.unwrap_or(0), input),
         _ => program.value_minor.unwrap_or(0),
@@ -341,8 +342,9 @@ fn tiered(program: &Program, input: &Input<'_>, state: &State) -> Result<Outcome
     if lines.is_empty() {
         return Err(ReasonDraft::new("promotions.reason.not_applicable"));
     }
-    let quantity: i64 = lines.iter().map(|&line| input.cart.lines[line].quantity).sum();
-    let subtotal: i64 = lines.iter().map(|&line| state.remaining[line]).sum();
+    let quantity: i64 =
+        super::saturating_sum(lines.iter().map(|&line| input.cart.lines[line].quantity));
+    let subtotal: i64 = super::saturating_sum(lines.iter().map(|&line| state.remaining[line]));
     // Bậc cao nhất đạt được.
     let reached = program
         .tiers
@@ -498,7 +500,9 @@ fn buy_x_get_y(
             }
         }
         RewardSelection::Specified => {
-            let bought: i64 = condition.iter().map(|&line| input.cart.lines[line].quantity).sum();
+            let bought: i64 = super::saturating_sum(
+                condition.iter().map(|&line| input.cart.lines[line].quantity),
+            );
             let apps = (bought / buy).min(max_apps);
             let mut free = apps * get;
             let rewards = lines_for(program, input, state, &program.reward_targets);
@@ -547,7 +551,7 @@ fn bundle(program: &Program, input: &Input<'_>, state: &State) -> Result<Outcome
     // Món đắt nhất vào combo trước (tất định); mỗi combo chia phần giảm theo giá từng món.
     let mut amounts = Vec::new();
     for group in pool.chunks(size).take(apps) {
-        let total: i64 = group.iter().map(|(_, unit)| unit).sum();
+        let total: i64 = super::saturating_sum(group.iter().map(|(_, unit)| *unit));
         let discount = (total - price).max(0);
         let mut parts: Vec<LinePart> = group.iter().map(|&(line, unit)| part(line, unit)).collect();
         spread(discount, &mut parts, input);

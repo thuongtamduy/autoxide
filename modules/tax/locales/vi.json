@@ -1,5 +1,6 @@
 {
   "field:addresses cannot be checked on this server": "máy chủ này không kiểm được địa chỉ",
+  "field:is lower than the per-unit taxes it includes": "thấp hơn thuế tính theo đơn vị đã gồm trong giá",
   "field:is required: this category has a tax per unit": "là bắt buộc: nhóm này có thuế tính theo đơn vị",
   "field:must be 1 to 200 characters long": "phải dài 1 đến 200 ký tự",
   "field:must be 10, 12 or 13 digits, or 10 digits, `-` and 3 digits": "phải là 10, 12 hay 13 chữ số, hoặc 10 chữ số, `-` và 3 chữ số",
@@ -8,6 +9,7 @@
   "field:must be one of {values}": "phải là một trong {values}",
   "field:must have 1 to 1000 lines": "phải có 1 đến 1000 dòng",
   "field:must not be negative": "không được âm",
+  "field:the quantities or amounts are too large to compute": "số lượng hay số tiền quá lớn, không tính được",
   "field:there is no tax jurisdiction with this code": "không có vùng thuế mang mã này",
   "field:{problem}": "{problem}",
   "tax.category_unknown": "Không có nhóm thuế `{category}` trong vùng `{jurisdiction}`.",

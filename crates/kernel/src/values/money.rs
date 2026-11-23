@@ -555,3 +555,91 @@ mod tests {
         assert_eq!(currency["pattern"], "^[A-Z]{3}$");
     }
 }
+
+// Thử phá phép tính tiền (D-20261123-property-fuzzing): chia không mất đồng nào, không tràn thành panic.
+#[cfg(test)]
+mod properties {
+    use super::*;
+    use proptest::prelude::*;
+
+    fn currency() -> impl Strategy<Value = Currency> {
+        prop_oneof![Just(Currency::VND), Just(Currency::USD), Just(Currency::parse("KWD").unwrap())]
+    }
+
+    proptest! {
+        #[test]
+        fn chia_theo_ti_le_tong_dung_bang_va_cung_dau(
+            minor in any::<i64>(),
+            currency in currency(),
+            ratios in proptest::collection::vec(
+                prop_oneof![Just(0u64), 0u64..1_000, any::<u64>()],
+                1..12,
+            ),
+        ) {
+            let amount = Money::new(minor, currency);
+            let total: u128 = ratios.iter().map(|ratio| u128::from(*ratio)).sum();
+            let Ok(parts) = amount.allocate(&ratios) else {
+                prop_assert_eq!(total, 0);
+                return Ok(());
+            };
+            prop_assert_eq!(parts.len(), ratios.len());
+            prop_assert_eq!(Money::sum(currency, parts.iter().copied()).unwrap(), amount);
+            for (part, ratio) in parts.iter().zip(&ratios) {
+                prop_assert_eq!(part.currency(), currency);
+                // Cùng dấu với số tiền, và phần tỉ lệ 0 luôn bằng 0.
+                prop_assert!(part.minor() == 0 || (part.minor() < 0) == (minor < 0));
+                if *ratio == 0 {
+                    prop_assert!(part.is_zero());
+                }
+                // Mỗi phần cách phần đúng tỉ lệ dưới một đơn vị nhỏ nhất.
+                let exact = i128::from(minor).unsigned_abs() * u128::from(*ratio);
+                let got = u128::from(part.minor().unsigned_abs()) * total;
+                prop_assert!(got.abs_diff(exact) < total, "{part} / {ratio}");
+            }
+        }
+
+        #[test]
+        fn chia_deu_lech_nhau_toi_da_mot_don_vi(
+            minor in any::<i64>(),
+            parts in 1usize..50,
+        ) {
+            let split = Money::new(minor, Currency::VND).split(parts).unwrap();
+            let values: Vec<i64> = split.iter().map(|part| part.minor()).collect();
+            let (low, high) = (values.iter().min().unwrap(), values.iter().max().unwrap());
+            prop_assert!(high.abs_diff(*low) <= 1);
+            prop_assert_eq!(values.iter().map(|value| i128::from(*value)).sum::<i128>(), i128::from(minor));
+        }
+
+        #[test]
+        fn cong_tru_nhan_tran_thi_bao_loi_khong_panic(
+            a in any::<i64>(),
+            b in any::<i64>(),
+        ) {
+            let (left, right) = (Money::new(a, Currency::VND), Money::new(b, Currency::VND));
+            match left.checked_add(right) {
+                Ok(sum) => prop_assert_eq!(sum.checked_sub(right).unwrap(), left),
+                Err(error) => prop_assert_eq!(error.code(), "money.overflow"),
+            }
+            match left.checked_mul(b) {
+                Ok(product) => prop_assert_eq!(i128::from(product.minor()), i128::from(a) * i128::from(b)),
+                Err(error) => prop_assert_eq!(error.code(), "money.overflow"),
+            }
+            prop_assert_eq!(left.checked_neg().is_err(), a == i64::MIN);
+            prop_assert!(left.checked_add(Money::new(b, Currency::USD)).is_err());
+        }
+
+        #[test]
+        fn doc_so_tien_khong_panic_va_doc_lai_nguyen_ven(
+            raw in "-?[0-9]{0,22}|\\PC{0,30}",
+            minor in any::<i64>(),
+            currency in currency(),
+        ) {
+            let _ = Money::parse(&raw, "VND");
+            let money = Money::new(minor, currency);
+            prop_assert_eq!(Money::parse(&minor.to_string(), currency.code()).unwrap(), money);
+            let json = serde_json::to_string(&money).unwrap();
+            prop_assert_eq!(serde_json::from_str::<Money>(&json).unwrap(), money);
+            let _ = money.to_string();
+        }
+    }
+}
