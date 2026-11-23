@@ -1,5 +1,5 @@
-//! Cổng thanh toán giả cho test (như `FakeTextModel`): giữ mọi thứ trong bộ nhớ, ký webhook bằng
-//! một khoá cố định, cho giả lập đối tác không trả lời và dựng sao kê.
+//! A fake payment gateway for tests (like `FakeTextModel`): keeps everything in memory, signs webhooks with
+//! a fixed key, can simulate an unresponsive partner and build statements.
 
 use autoxide_kernel::time::{Date, Timestamp};
 use std::collections::HashMap;
@@ -20,28 +20,28 @@ use axum::http::HeaderMap;
 use serde_json::{Value, json};
 use uuid::Uuid;
 
-/// Tên của cổng giả (đường dẫn webhook `/api/v1/ledger/webhooks/fake`).
+/// Name of the fake gateway (webhook path `/api/v1/ledger/webhooks/fake`).
 pub const FAKE_PROVIDER: &str = "fake";
 const SECRET: &str = "fake-gateway-secret";
 const SIGNATURE: &str = "x-fake-signature";
 const TIMESTAMP: &str = "x-fake-timestamp";
-/// Cửa sổ chống phát lại của chữ ký, giây.
+/// Replay-protection window of the signature, in seconds.
 const WINDOW: i64 = 300;
 
-/// Cổng thanh toán giả. Góp vào app bằng
+/// A fake payment gateway. Contribute it to the app with
 /// `TestApp::builder(…).contribute::<dyn PaymentGateway>(gateway.clone())`.
 #[derive(Default)]
 pub struct FakePaymentGateway {
-    /// Lượt thu đã tạo, theo ID thanh toán: (mã ở đối tác, số tiền).
+    /// Collections created, by payment ID: (code at the partner, amount).
     pub payments: Mutex<HashMap<Uuid, (String, Money)>>,
-    /// Lượt hoàn đã nhận, theo thứ tự.
+    /// Refunds received, in order.
     pub refunds: Mutex<Vec<RefundIntent>>,
-    /// Số lời gọi `create_payment` / `refund` kế tiếp trả `payment.provider_unavailable`.
+    /// Number of upcoming `create_payment` / `refund` calls that return `payment.provider_unavailable`.
     unavailable: AtomicUsize,
-    /// Hoàn tiền trả `Pending` (đối tác báo kết quả sau qua webhook) thay vì xong ngay.
+    /// A refund returns `Pending` (the partner reports the result later via webhook) instead of finishing at once.
     refunds_pending: AtomicBool,
     statement: Mutex<Vec<StatementLine>>,
-    /// Không có `split` và `collection_on_behalf` (thử chế độ dòng tiền không hợp với cổng).
+    /// No `split` and `collection_on_behalf` (to try a cash-flow mode the gateway does not support).
     limited: AtomicBool,
 }
 
@@ -50,29 +50,29 @@ impl FakePaymentGateway {
         FakePaymentGateway::default()
     }
 
-    /// `count` lời gọi kế tiếp tới đối tác lỗi như khi đối tác không trả lời.
+    /// The next `count` calls to the partner fail as if the partner did not respond.
     pub fn fail_next(&self, count: usize) {
         self.unavailable.store(count, Ordering::SeqCst);
     }
 
-    /// Hoàn tiền chờ webhook thay vì xong ngay.
+    /// Refunds wait for a webhook instead of finishing at once.
     pub fn refunds_pending(&self, pending: bool) {
         self.refunds_pending.store(pending, Ordering::SeqCst);
     }
 
-    /// Bỏ khả năng chia tiền tại cổng và thu hộ (mặc định có cả hai).
+    /// Removes the gateway's ability to split money and collect on behalf (both are on by default).
     pub fn limited(&self, limited: bool) {
         self.limited.store(limited, Ordering::SeqCst);
     }
 
-    /// Đặt sao kê đối tác trả.
+    /// Sets the statement the partner returns.
     pub fn set_statement(&self, lines: Vec<StatementLine>) {
         if let Ok(mut slot) = self.statement.lock() {
             *slot = lines;
         }
     }
 
-    /// Mã giao dịch ở đối tác của thanh toán `payment_id` (sau `create_payment`).
+    /// Transaction code at the partner for payment `payment_id` (after `create_payment`).
     pub fn provider_ref(&self, payment_id: Uuid) -> Option<String> {
         self.payments.lock().ok()?.get(&payment_id).map(|(reference, _)| reference.clone())
     }
@@ -92,15 +92,15 @@ impl FakePaymentGateway {
         ))
     }
 
-    /// Webhook đã ký (header, thân) mang thông báo `body` (JSON: `event_id`, `kind`
+    /// A signed webhook (header, body) carrying the notification `body` (JSON: `event_id`, `kind`
     /// (`payment_succeeded` / `payment_failed` / `refund_succeeded` / `refund_failed`),
-    /// `provider_ref`, `payment_id`, `amount` (đơn vị nhỏ nhất), `currency`, `reason`,
+    /// `provider_ref`, `payment_id`, `amount` (smallest unit), `currency`, `reason`,
     /// `refund_provider_ref`).
     pub fn webhook(&self, body: &Value) -> (Vec<(String, String)>, Vec<u8>) {
         Self::signed(body, Timestamp::now().as_unix_seconds())
     }
 
-    /// Như [`webhook`](Self::webhook) với mốc thời gian tự chọn (thử chống phát lại).
+    /// Like [`webhook`](Self::webhook) with a chosen timestamp (to test replay protection).
     pub fn signed(body: &Value, timestamp: i64) -> (Vec<(String, String)>, Vec<u8>) {
         let bytes = body.to_string().into_bytes();
         let headers = vec![
@@ -110,7 +110,7 @@ impl FakePaymentGateway {
         (headers, bytes)
     }
 
-    /// Webhook "đã thu `amount`" cho thanh toán `payment_id`, mã thông báo `event_id`.
+    /// A "collected `amount`" webhook for payment `payment_id`, notification ID `event_id`.
     pub fn paid(
         &self,
         payment_id: Uuid,
@@ -262,24 +262,24 @@ impl PaymentGateway for FakePaymentGateway {
 
 // ---- Chi trả giả --------------------------------------------------------------------------------
 
-/// Kết quả [`FakePayoutGateway`] trả cho lượt chi kế tiếp.
+/// Result [`FakePayoutGateway`] returns for the next payout.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum FakePayoutOutcome {
     #[default]
     Succeed,
     Fail,
-    /// Đối tác nhận lệnh, báo kết quả sau (`payout_status` trả theo [`FakePayoutGateway::settle`]).
+    /// The partner accepts the order and reports the result later (`payout_status` returns per [`FakePayoutGateway::settle`]).
     Pending,
 }
 
-/// Đối tác chi hộ giả. Góp vào app bằng
+/// A fake payout partner. Contribute it to the app with
 /// `TestApp::builder(…).contribute::<dyn PayoutGateway>(payouts.clone())`.
 #[derive(Default)]
 pub struct FakePayoutGateway {
-    /// Lệnh chi đã nhận (mỗi `payout_id` một lần), theo thứ tự.
+    /// Payout orders received (once per `payout_id`), in order.
     pub payouts: Mutex<Vec<PayoutIntent>>,
     outcome: Mutex<FakePayoutOutcome>,
-    /// Kết quả cuối của lệnh đang chờ, theo mã ở đối tác.
+    /// Final result of pending orders, by code at the partner.
     finals: Mutex<HashMap<String, PayoutStatus>>,
     unavailable: AtomicUsize,
 }
@@ -289,19 +289,19 @@ impl FakePayoutGateway {
         FakePayoutGateway::default()
     }
 
-    /// Kết quả của các lượt chi kế tiếp.
+    /// Results of the upcoming payouts.
     pub fn outcome(&self, outcome: FakePayoutOutcome) {
         if let Ok(mut slot) = self.outcome.lock() {
             *slot = outcome;
         }
     }
 
-    /// `count` lời gọi `payout` kế tiếp lỗi như khi đối tác không trả lời.
+    /// The next `count` `payout` calls fail as if the partner did not respond.
     pub fn fail_next(&self, count: usize) {
         self.unavailable.store(count, Ordering::SeqCst);
     }
 
-    /// Kết thúc lệnh đang chờ của lượt chi `payout_id`: thành công hay thất bại.
+    /// Finishes the pending order of payout `payout_id`: success or failure.
     pub fn settle(&self, payout_id: Uuid, succeeded: bool) {
         let status = if succeeded {
             PayoutStatus::Succeeded
@@ -313,7 +313,7 @@ impl FakePayoutGateway {
         }
     }
 
-    /// Số lệnh chi đã nhận.
+    /// Number of payout orders received.
     pub fn count(&self) -> usize {
         self.payouts.lock().map(|payouts| payouts.len()).unwrap_or(0)
     }
@@ -376,13 +376,13 @@ impl PayoutGateway for FakePayoutGateway {
 const BANK_SECRET: &str = "fake-bank-feed-secret";
 const BANK_SIGNATURE: &str = "x-fake-bank-signature";
 
-/// Nguồn biến động số dư giả: kiểu kéo trả các giao dịch đã [`push`](Self::push) theo từng tài
-/// khoản (mã con trỏ là số giao dịch đã đọc); kiểu đẩy ký thân bằng một khoá cố định. Góp vào app
-/// bằng `TestApp::builder(…).contribute::<dyn BankFeed>(feed.clone())`.
+/// A fake source of balance movements: the pull kind returns transactions [`push`](Self::push)ed per account
+/// (the cursor code is the number of transactions already read); the push kind signs the body with a fixed
+/// key. Contribute it to the app with `TestApp::builder(…).contribute::<dyn BankFeed>(feed.clone())`.
 #[derive(Default)]
 pub struct FakeBankFeed {
     transactions: Mutex<Vec<BankTransaction>>,
-    /// Số lời gọi `fetch`.
+    /// Number of `fetch` calls.
     pub fetches: AtomicUsize,
 }
 
@@ -391,14 +391,14 @@ impl FakeBankFeed {
         FakeBankFeed::default()
     }
 
-    /// Thêm một biến động (cho kiểu kéo).
+    /// Adds a movement (for the pull kind).
     pub fn push(&self, transaction: BankTransaction) {
         if let Ok(mut transactions) = self.transactions.lock() {
             transactions.push(transaction);
         }
     }
 
-    /// Một khoản tiền vào tài khoản `account_number`.
+    /// A deposit into account `account_number`.
     pub fn credit(
         txn_id: &str,
         account_number: &str,
@@ -415,7 +415,7 @@ impl FakeBankFeed {
         )
     }
 
-    /// Webhook đã ký (header, thân) mang các biến động `transactions`.
+    /// A signed webhook (header, body) carrying the movements `transactions`.
     pub fn webhook(transactions: &[BankTransaction]) -> (Vec<(String, String)>, Vec<u8>) {
         let items: Vec<Value> = transactions
             .iter()
@@ -506,16 +506,16 @@ impl BankFeed for FakeBankFeed {
     }
 }
 
-/// Tên của nguồn tỉ giá giả (`provider:fake` trong cột nguồn).
+/// Name of the fake exchange-rate source (`provider:fake` in the source column).
 pub const FAKE_RATE_PROVIDER: &str = "fake";
 
-/// Nguồn tỉ giá giả cho test: trả các tỉ giá đã nạp cho đúng `base` (ngày của lời gọi), hay lỗi
-/// `payment.provider_unavailable` khi [`FakeExchangeRateSource::fail`].
+/// A fake exchange-rate source for tests: returns the loaded rates for exactly `base` (the date of the call),
+/// or the error `payment.provider_unavailable` when [`FakeExchangeRateSource::fail`].
 #[derive(Debug, Default)]
 pub struct FakeExchangeRateSource {
     rates: Mutex<Vec<(Currency, Currency, rust_decimal::Decimal)>>,
     failing: AtomicBool,
-    /// Số lời gọi `rates`.
+    /// Number of `rates` calls.
     pub calls: AtomicUsize,
 }
 
@@ -524,7 +524,7 @@ impl FakeExchangeRateSource {
         FakeExchangeRateSource::default()
     }
 
-    /// Nạp tỉ giá 1 `base` = `rate` `quote` (chữ thập phân, vd `"25345.5"`).
+    /// Loads the rate 1 `base` = `rate` `quote` (decimal string, e.g. `"25345.5"`).
     pub fn set(&self, base: Currency, quote: Currency, rate: &str) {
         let Ok(rate) = autoxide_kernel::decimal::parse(rate) else { return };
         if let Ok(mut rates) = self.rates.lock() {
@@ -533,7 +533,7 @@ impl FakeExchangeRateSource {
         }
     }
 
-    /// `true`: mọi lời gọi sau đó trả lỗi đối tác không trả lời.
+    /// `true`: every later call returns the partner-did-not-respond error.
     pub fn fail(&self, failing: bool) {
         self.failing.store(failing, Ordering::SeqCst);
     }

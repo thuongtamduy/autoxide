@@ -1,3 +1,3 @@
-//! Hợp đồng của module `ai`: không có gì riêng. Module công bố trait chung
-//! `autoxide_kernel::ai::TextModel` và `autoxide_kernel::ai::Embedder`; module khác dùng các
-//! trait đó.
+//! Contract of the `ai` module: nothing module-specific. The module publishes the shared traits
+//! `autoxide_kernel::ai::TextModel` and `autoxide_kernel::ai::Embedder`; other modules use those
+//! traits.

@@ -1,9 +1,10 @@
-//! Hợp đồng của module `ledger` cho module khác: ghi bút toán kép, đảo bút toán, mở tài khoản theo
-//! mục đích, đọc số dư. Module khác lấy lúc khởi động: `context.require::<dyn Ledger>()` (đăng ký
-//! SAU `ledger`).
+//! Contract of the `ledger` module for other modules: record double-entry journal entries, reverse entries,
+//! open accounts by purpose, read balances. Other modules obtain it at startup:
+//! `context.require::<dyn Ledger>()` (registered AFTER `ledger`).
 //!
-//! Sổ cái chỉ ghi **nghĩa vụ** (D-187): không có tài khoản ví, không giữ tiền của người mua. Số dư
-//! suy từ bút toán; bút toán chỉ thêm, sửa sai bằng bút toán đảo.
+//! The ledger records only **obligations** (D-187): there are no wallet accounts and it never holds buyers'
+//! money. Balances are derived from entries; entries are append-only, mistakes are corrected with reversing
+//! entries.
 
 use autoxide_kernel::decimal::DecimalString;
 use autoxide_kernel::error::Error;
@@ -16,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-/// Sổ cái giả cho test của module khác (feature `testing`).
+/// Fake ledger for other modules' tests (feature `testing`).
 #[cfg(feature = "testing")]
 pub mod testing;
 
@@ -53,9 +54,9 @@ impl Side {
     }
 }
 
-/// Mục đích cơ bản của tài khoản (chuỗi ổn định — hợp đồng với module khác) và bên thường của nó.
-/// Module khác thêm mục đích riêng có tiền tố `<module>.` (vd `customers.points_liability`) và mở
-/// tài khoản bằng [`Ledger::open_account`] với bên thường tự chọn.
+/// Base purpose of an account (a stable string — a contract with other modules) and its normal side. Other
+/// modules add their own purposes with the prefix `<module>.` (e.g. `customers.points_liability`) and open
+/// accounts with [`Ledger::open_account`] choosing the normal side themselves.
 pub const PURPOSES: [(&str, Side); 22] = [
     ("cash.bank", Side::Debit),
     ("cash.on_hand", Side::Debit),
@@ -82,7 +83,7 @@ pub const PURPOSES: [(&str, Side); 22] = [
     ("rounding", Side::Credit),
 ];
 
-/// Bên thường của một mục đích cơ bản; `None` cho mục đích riêng của module.
+/// Normal side of a base purpose; `None` for a module's own purpose.
 pub fn normal_side_of(purpose: &str) -> Option<Side> {
     PURPOSES.iter().find(|(name, _)| *name == purpose).map(|(_, side)| *side)
 }
@@ -103,7 +104,7 @@ impl Counterparty {
     }
 }
 
-/// Khoá tự nhiên của một tài khoản: sổ (nút), mục đích, đối tượng, loại tiền.
+/// Natural key of an account: ledger (branch), purpose, subject, currency.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct AccountKey {
     pub book: OrgId,
@@ -124,14 +125,14 @@ impl AccountKey {
     }
 }
 
-/// Mở tài khoản với bên thường, sàn và tên tự chọn (mục đích riêng của module, hay tài khoản có sàn).
+/// Opens an account with a chosen normal side, floor and name (a module's own purpose, or an account with a floor).
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct OpenAccount {
     pub key: AccountKey,
-    /// Bỏ trống: theo [`PURPOSES`] (mục đích riêng thì bắt buộc).
+    /// Empty: follow [`PURPOSES`] (a module's own purpose requires it).
     pub normal_side: Option<Side>,
-    /// Số dư (theo bên thường) không được xuống dưới mức này; `None`: không giới hạn.
+    /// The balance (on the normal side) must not fall below this level; `None`: no limit.
     pub floor_minor: Option<i64>,
     pub name: Option<String>,
 }
@@ -160,19 +161,19 @@ impl OpenAccount {
     }
 }
 
-/// Tài khoản của một dòng bút toán: theo ID, hay theo khoá (mở nếu chưa có — chỉ mục đích cơ bản).
+/// Account of an entry line: by ID, or by key (opened if missing — base purposes only).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LineAccount {
     Id(Uuid),
     Key(AccountKey),
 }
 
-/// Một dòng của bút toán mới.
+/// A line of a new entry.
 #[derive(Debug, Clone)]
 pub struct NewLine {
     pub account: LineAccount,
     pub side: Side,
-    /// Lớn hơn 0, cùng loại tiền với mọi dòng khác và với tài khoản.
+    /// Greater than 0, in the same currency as every other line and as the account.
     pub amount: Money,
 }
 
@@ -186,28 +187,29 @@ impl NewLine {
     }
 }
 
-/// Một bút toán mới. `reference` bắt buộc (D-184): duy nhất theo (khách, `source_module`).
+/// A new entry. `reference` is required (D-184): unique per (tenant, `source_module`).
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct NewEntry {
-    /// Nút sở hữu sổ (đơn vị kế toán).
+    /// Branch that owns the ledger (accounting unit).
     pub book: OrgId,
-    /// Ngày hạch toán; bỏ trống: hôm nay theo múi giờ của nút.
+    /// Posting date; empty: today in the branch's time zone.
     pub effective_date: Option<Date>,
-    /// Chữ cố định của module (đi vào chuỗi băm, không xoá được): **không** chứa tên, email, số
-    /// điện thoại — người và khách chỉ nêu bằng ID trong `source_id`.
+    /// Fixed text of the module (goes into the hash chain, cannot be deleted): must **not** contain names,
+    /// email addresses, phone numbers — people and tenants are referred to only by ID in `source_id`.
     pub description: String,
     /// Module ghi (vd `orders`).
     pub source_module: String,
-    /// Loại chứng từ nguồn (vd `order`).
+    /// Kind of the source document (e.g. `order`).
     pub source_kind: String,
-    /// ID chứng từ nguồn.
+    /// ID of the source document.
     pub source_id: Option<String>,
     pub reference: String,
     pub lines: Vec<NewLine>,
-    /// Tỉ giá quy đổi sang tiền hạch toán của sổ (1 tiền của bút toán = `exchange_rate` tiền của sổ),
-    /// khi bút toán khác tiền của sổ. Bỏ trống: lấy tỉ giá hiệu lực ngày hạch toán
-    /// ([`Ledger::exchange_rate`]). Chứng từ ngoại tệ truyền đúng tỉ giá đã chụp trên chứng từ.
+    /// Exchange rate into the ledger's accounting currency (1 unit of the entry's currency = `exchange_rate`
+    /// units of the ledger's currency), when the entry's currency differs from the ledger's. Empty: take the
+    /// rate in effect on the posting date ([`Ledger::exchange_rate`]). A foreign-currency document passes
+    /// exactly the rate captured on the document.
     pub exchange_rate: Option<rust_decimal::Decimal>,
 }
 
@@ -245,7 +247,7 @@ impl NewEntry {
         self
     }
 
-    /// Quy đổi sang tiền của sổ bằng đúng tỉ giá `rate` (ảnh chụp trên chứng từ).
+    /// Converts into the ledger's currency using exactly the rate `rate` (the snapshot on the document).
     #[must_use]
     pub fn exchange_rate(mut self, rate: rust_decimal::Decimal) -> Self {
         self.exchange_rate = Some(rate);
@@ -253,13 +255,13 @@ impl NewEntry {
     }
 }
 
-/// Đảo một bút toán: bút toán mới đổi nợ / có, ở kỳ đang mở.
+/// Reverses an entry: the new entry swaps debit / credit, in the currently open period.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct NewReversal {
     pub source_module: String,
     pub reference: String,
-    /// Bỏ trống: hôm nay theo múi giờ của nút.
+    /// Empty: today in the branch's time zone.
     pub effective_date: Option<Date>,
 }
 
@@ -377,18 +379,18 @@ pub struct Refund {
     pub updated_at: Timestamp,
 }
 
-/// Một lượt thu mới. `reference` bắt buộc (D-184): duy nhất theo (khách, `source_module`); gửi lại
-/// sau lỗi mạng thì gọi lại đối tác với cùng thanh toán.
+/// A new collection. `reference` is required (D-184): unique per (tenant, `source_module`); sending again
+/// after a network error calls the partner again with the same payment.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct NewPayment {
-    /// Nút nhận tiền.
+    /// Branch that receives the money.
     pub org: OrgId,
-    /// Đối tác; bỏ trống khi máy chủ chỉ có một cổng.
+    /// Partner; empty when the server has only one gateway.
     pub provider: Option<String>,
     pub method: String,
     pub amount: Money,
-    /// Chữ ngắn cho người mua (tối đa 140 ký tự), không dữ liệu cá nhân.
+    /// Short text for the buyer (at most 140 characters), no personal data.
     pub description: String,
     pub return_url: Option<String>,
     pub source_module: String,
@@ -437,13 +439,13 @@ impl NewPayment {
     }
 }
 
-/// Một lượt hoàn. `reference` duy nhất theo thanh toán.
+/// A refund. `reference` is unique per payment.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct NewRefund {
     pub payment: Uuid,
     pub amount: Money,
-    /// Chữ ngắn (tối đa 200 ký tự), không dữ liệu cá nhân.
+    /// Short text (at most 200 characters), no personal data.
     pub reason: String,
     pub reference: String,
 }
@@ -546,18 +548,18 @@ pub struct FlowSettings {
     pub updated_at: Option<Timestamp>,
 }
 
-/// Đường tiền của một lượt thu / hoàn.
+/// Money route of a collection / refund.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Collection {
-    /// Qua cổng thanh toán `provider` (tài khoản `clearing.gateway` của đối tác).
+    /// Through payment gateway `provider` (the partner's `clearing.gateway` account).
     Gateway { provider: String },
-    /// Tiền thu hộ khi giao hàng (COD) qua đơn vị vận chuyển `carrier`.
+    /// Cash collected on delivery (COD) through shipping carrier `carrier`.
     Cod { carrier: String },
-    /// Chuyển khoản vào tài khoản ngân hàng của người bán / khách (chế độ tự thu).
+    /// Bank transfer into the seller's / tenant's bank account (self-collect mode).
     BankTransfer { bank_account: Uuid },
 }
 
-/// Số tiền của một lượt bán: `gross` = `net` + `vat` (thuế do `TaxEngine` tính, ngoài sổ).
+/// Amounts of a sale: `gross` = `net` + `vat` (tax computed by `TaxEngine`, outside the ledger).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SaleAmounts {
     pub gross: Money,
@@ -571,40 +573,40 @@ impl SaleAmounts {
     }
 }
 
-/// Một việc của dòng tiền; mỗi việc sinh (tối đa) một bút toán theo chế độ của người bán.
+/// A cash-flow task; each task produces (at most) one entry according to the seller's mode.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum FlowEvent {
-    /// Tiền của một lượt bán đã về. Chế độ chia tại cổng: `operator_share` là phần cổng chia cho
-    /// sàn (bắt buộc).
+    /// Money of a sale has arrived. Split-at-gateway mode: `operator_share` is the portion the gateway splits
+    /// to the marketplace (required).
     Collected { amounts: SaleAmounts, via: Collection, operator_share: Option<Money> },
-    /// Phí sàn `fee` (gồm GTGT `vat` của phí — tách riêng trên sổ và hoá đơn phí).
+    /// Marketplace fee `fee` (including the fee's VAT `vat` — kept separate in the ledger and the fee invoice).
     FeeCharged { fee: Money, vat: Money },
-    /// Khấu trừ, nộp thay thuế của người bán trên doanh thu `revenue` (NĐ 117/2025/NĐ-CP — cần
-    /// đối chiếu): sổ hỏi `TaxEngine`; chỉ hộ / cá nhân kinh doanh bị khấu trừ, doanh nghiệp tự kê
-    /// khai (không sinh bút toán). `business_line`: `goods`, `services`, `production_transport`,
-    /// `other`.
+    /// Withholding and paying tax on the seller's behalf on revenue `revenue` (Decree 117/2025/ND-CP — verify
+    /// against the original text): the ledger asks `TaxEngine`; only household / individual businesses are
+    /// withheld, businesses self-declare (no entry produced). `business_line`: `goods`, `services`,
+    /// `production_transport`, `other`.
     TaxWithheld { revenue: Money, business_line: String },
-    /// Hoàn cho người mua. Trước khi hết hạn đổi trả: giảm khoản tạm giữ. Chế độ chia tại cổng:
-    /// `amounts.gross` là phần trả lại từ phần của sàn.
+    /// Refund to the buyer. Before the return window ends: reduces the held amount. Split-at-gateway mode:
+    /// `amounts.gross` is the portion returned out of the marketplace's share.
     Refunded { amounts: SaleAmounts, via: Collection },
-    /// Phí đối tác thanh toán.
+    /// Payment partner fee.
     GatewayFeeCharged { provider: String, fee: Money },
 }
 
-/// Một việc của dòng tiền gửi [`Ledger::settle`]. `reference` duy nhất theo (khách,
-/// `source_module`) — dùng chung không gian với [`Ledger::post`].
+/// A cash-flow task sent to [`Ledger::settle`]. `reference` is unique per (tenant,
+/// `source_module`) — it shares one namespace with [`Ledger::post`].
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct Settlement {
-    /// Người bán (nút); chế độ đọc theo cài đặt của nút này hay nút trên gần nhất.
+    /// Seller (branch); the mode is read from this branch's settings or the nearest ancestor branch's.
     pub seller: OrgId,
     pub event: FlowEvent,
     pub source_module: String,
-    /// Chứng từ nguồn (đơn hàng…): khoản tạm giữ gắn theo nó.
+    /// Source document (order…): the held amount is attached to it.
     pub source_id: String,
     pub reference: String,
-    /// Bỏ trống: hôm nay theo múi giờ của sổ.
+    /// Empty: today in the ledger's time zone.
     pub effective_date: Option<Date>,
 }
 
@@ -633,15 +635,15 @@ impl Settlement {
     }
 }
 
-/// Kết quả của [`Ledger::settle`].
+/// Result of [`Ledger::settle`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Settled {
     pub mode: FlowMode,
-    /// Nút của sổ nhận bút toán (người bán ở chế độ tự thu, sàn ở hai chế độ kia).
+    /// Branch of the ledger that receives the entry (the seller in self-collect mode, the marketplace in the other two).
     pub book_org: OrgId,
-    /// `None`: việc này không sinh bút toán (vd khấu trừ thay với người bán là doanh nghiệp).
+    /// `None`: this task produces no entry (e.g. withholding on behalf of a business seller).
     pub entry: Option<Entry>,
-    /// Khoản tạm giữ của lượt bán, sau việc này.
+    /// The held amount of the sale, after this task.
     pub hold: Option<Hold>,
 }
 
@@ -694,13 +696,13 @@ pub struct Payout {
     pub updated_at: Timestamp,
 }
 
-/// Một lượt chi trả số dư khả dụng của người bán. `reference` duy nhất theo khách.
+/// A payout of a seller's available balance. `reference` is unique per tenant.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct NewPayout {
     pub payee: OrgId,
     pub amount: Money,
-    /// Chữ ngắn (tối đa 140 ký tự), không dữ liệu cá nhân.
+    /// Short text (at most 140 characters), no personal data.
     pub description: String,
     pub reference: String,
 }
@@ -716,14 +718,14 @@ impl NewPayout {
     }
 }
 
-/// Một lượt thu bằng chuyển khoản VietQR vào tài khoản ngân hàng của nút nhận (chế độ tự thu).
+/// A collection by VietQR bank transfer into the receiving branch's bank account (self-collect mode).
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct NewTransferPayment {
     pub org: OrgId,
-    /// Tài khoản nhận; bỏ trống khi nút chỉ có một tài khoản đang dùng.
+    /// Receiving account; empty when the branch has only one account in use.
     pub bank_account: Option<Uuid>,
-    /// Chỉ VND.
+    /// VND only.
     pub amount: Money,
     pub description: String,
     pub source_module: String,
@@ -781,17 +783,17 @@ pub struct ExchangeRate {
     pub created_at: Timestamp,
 }
 
-/// Dòng sổ nhật ký chung cần đọc (xuất kế toán): một khoảng ngày, một sổ hay mọi sổ.
+/// General journal lines to read (accounting export): a date range, one ledger or all ledgers.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct JournalQuery {
-    /// Chỉ sổ của nút này; bỏ trống: mọi sổ của khách.
+    /// Only this branch's ledger; empty: every ledger of the tenant.
     pub book: Option<OrgId>,
-    /// Ngày hạch toán từ (gồm).
+    /// From posting date (inclusive).
     pub from: Date,
-    /// Ngày hạch toán tới (gồm).
+    /// To posting date (inclusive).
     pub to: Date,
-    /// Trang (theo ID dòng tăng dần).
+    /// Page (by ascending line ID).
     pub page: autoxide_kernel::pagination::PageRequest,
 }
 
@@ -852,13 +854,13 @@ pub struct JournalLine {
     pub exchange_rate: Option<String>,
 }
 
-/// Ghi và đọc sổ cái.
+/// Writes and reads the ledger.
 //
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
 #[async_trait::async_trait]
 pub trait Ledger: Send + Sync {
-    /// Ghi một bút toán. Cùng `reference` + cùng nội dung → `Replayed` (không ghi thêm); cùng
-    /// `reference`, nội dung khác → `reference_reused`.
+    /// Records an entry. The same `reference` + same content → `Replayed` (nothing more is written); the same
+    /// `reference` with different content → `reference_reused`.
     async fn post(
         &self,
         tenant: &TenantContext,
@@ -866,7 +868,7 @@ pub trait Ledger: Send + Sync {
         entry: NewEntry,
     ) -> Result<Submitted<Entry>, Error>;
 
-    /// Đảo bút toán `entry` (một lần): `ledger.already_reversed` khi đã đảo.
+    /// Reverses entry `entry` (once): `ledger.already_reversed` when already reversed.
     async fn reverse(
         &self,
         tenant: &TenantContext,
@@ -875,18 +877,18 @@ pub trait Ledger: Send + Sync {
         reversal: NewReversal,
     ) -> Result<Submitted<Entry>, Error>;
 
-    /// ID tài khoản mang khoá `key`, mở nếu chưa có (chỉ mục đích cơ bản).
+    /// ID of the account with key `key`, opened if missing (base purposes only).
     async fn ensure_account(&self, tenant: &TenantContext, key: AccountKey) -> Result<Uuid, Error>;
 
-    /// Mở (hay trả lại) tài khoản với bên thường / sàn / tên tự chọn.
+    /// Opens (or returns) an account with a chosen normal side / floor / name.
     async fn open_account(
         &self,
         tenant: &TenantContext,
         account: OpenAccount,
     ) -> Result<Uuid, Error>;
 
-    /// Số dư (theo bên thường) của tài khoản mang khoá `key`: hiện tại, hay cuối ngày `as_of`.
-    /// Chưa có tài khoản: 0.
+    /// Balance (on the normal side) of the account with key `key`: current, or at the end of day `as_of`.
+    /// No such account: 0.
     async fn balance(
         &self,
         tenant: &TenantContext,
@@ -894,12 +896,13 @@ pub trait Ledger: Send + Sync {
         as_of: Option<Date>,
     ) -> Result<Money, Error>;
 
-    /// Một bút toán, hoặc `None`.
+    /// An entry, or `None`.
     async fn entry(&self, tenant: &TenantContext, id: Uuid) -> Result<Option<Entry>, Error>;
 
-    /// Tạo lượt thu qua đối tác: trả `checkout_url` / `qr_payload` cho người mua. Đối tác báo đã
-    /// thu (webhook, đối soát) thì sổ ghi bút toán và phát event `ledger.payment_succeeded`
-    /// (`payment_id`, `source_module`, `source_id`, `reference`, `amount`) cho module nguồn.
+    /// Creates a collection through a partner: returns `checkout_url` / `qr_payload` for the buyer. When the
+    /// partner reports it collected (webhook, reconciliation), the ledger records the entry and emits the
+    /// event `ledger.payment_succeeded` (`payment_id`, `source_module`, `source_id`, `reference`, `amount`)
+    /// to the source module.
     async fn create_payment(
         &self,
         tenant: &TenantContext,
@@ -907,7 +910,7 @@ pub trait Ledger: Send + Sync {
         payment: NewPayment,
     ) -> Result<Submitted<Payment>, Error>;
 
-    /// Hoàn (một phần) một thanh toán đã thu; không vượt số còn lại.
+    /// Refunds (part of) a collected payment; not more than what remains.
     async fn refund(
         &self,
         tenant: &TenantContext,
@@ -915,11 +918,11 @@ pub trait Ledger: Send + Sync {
         refund: NewRefund,
     ) -> Result<Submitted<Refund>, Error>;
 
-    /// Một thanh toán, hoặc `None`.
+    /// A payment, or `None`.
     async fn payment(&self, tenant: &TenantContext, id: Uuid) -> Result<Option<Payment>, Error>;
 
-    /// Số dư (theo bên thường) của nhiều tài khoản một lượt (tối đa 500 khoá), cùng thứ tự với
-    /// `keys` — vd công nợ nhà cung cấp (`payable.supplier`, đối tượng `supplier`). Chưa có: 0.
+    /// Balances (on the normal side) of many accounts in one call (at most 500 keys), in the same order as
+    /// `keys` — e.g. supplier payables (`payable.supplier`, subject `supplier`). Not yet existing: 0.
     async fn balances(
         &self,
         tenant: &TenantContext,
@@ -927,17 +930,18 @@ pub trait Ledger: Send + Sync {
         as_of: Option<Date>,
     ) -> Result<Vec<Money>, Error>;
 
-    /// Cài đặt dòng tiền hiệu lực của nút `org` (kế thừa theo cây; chưa đặt: tự thu).
+    /// Effective cash-flow settings of branch `org` (inherited along the tree; not set: self-collect).
     async fn flow_settings(
         &self,
         tenant: &TenantContext,
         org: OrgId,
     ) -> Result<FlowSettings, Error>;
 
-    /// Ghi một việc của dòng tiền theo chế độ của người bán: tiền vào, phí sàn, khấu trừ thay, hoàn,
-    /// phí cổng. Ở chế độ thu hộ, tiền vào tạo khoản tạm giữ tới hết hạn đổi trả (job
-    /// `ledger.release_holds` chuyển sang số dư khả dụng). Việc không hợp với chế độ hay cổng →
-    /// `ledger.flow_mode_unsupported`. Cùng `reference` + cùng nội dung → `Replayed`.
+    /// Records a cash-flow task according to the seller's mode: incoming money, marketplace fee, withholding
+    /// on behalf, refund, gateway fee. In collect-on-behalf mode, incoming money creates a held amount until
+    /// the return window ends (the job `ledger.release_holds` moves it to the available balance). A task not
+    /// suited to the mode or gateway → `ledger.flow_mode_unsupported`. The same `reference` + same content →
+    /// `Replayed`.
     async fn settle(
         &self,
         tenant: &TenantContext,
@@ -945,7 +949,7 @@ pub trait Ledger: Send + Sync {
         settlement: Settlement,
     ) -> Result<Submitted<Settled>, Error>;
 
-    /// Khoản tạm giữ của chứng từ nguồn (`marketplace` hỏi trước khi cho rút tiền).
+    /// The held amount of a source document (`marketplace` asks before allowing a withdrawal).
     async fn hold_status(
         &self,
         tenant: &TenantContext,
@@ -953,9 +957,10 @@ pub trait Ledger: Send + Sync {
         source_id: &str,
     ) -> Result<Option<Hold>, Error>;
 
-    /// Chi trả số dư khả dụng của người bán qua `PayoutGateway` (chế độ thu hộ). Trừ số dư trước,
-    /// gọi đối tác ngoài transaction; đối tác từ chối → ghi lại số dư. Không vượt số dư khả dụng,
-    /// kể cả khi gửi đồng thời (`ledger.insufficient_balance`).
+    /// Pays out the seller's available balance through `PayoutGateway` (collect-on-behalf mode). Deducts the
+    /// balance first, calls the partner outside the transaction; if the partner rejects, the balance is
+    /// recorded back. Never exceeds the available balance, even with concurrent sends
+    /// (`ledger.insufficient_balance`).
     async fn create_payout(
         &self,
         tenant: &TenantContext,
@@ -963,9 +968,10 @@ pub trait Ledger: Send + Sync {
         payout: NewPayout,
     ) -> Result<Submitted<Payout>, Error>;
 
-    /// Tạo lượt thu chuyển khoản VietQR (mã QR mang mã chuyển khoản; tiền vào thẳng tài khoản của
-    /// nút nhận). Biến động số dư (`BankFeed`) khớp mã + số tiền thì ghi đã thu; sai lệch vào hàng
-    /// chờ. Cùng hạn thanh toán với mọi thanh toán (`expires_at`).
+    /// Creates a VietQR bank-transfer collection (the QR code carries the transfer code; money goes straight
+    /// into the receiving branch's account). A balance movement (`BankFeed`) matching the code + amount
+    /// records it as collected; mismatches go into a queue. Same payment deadline as every payment
+    /// (`expires_at`).
     async fn create_transfer_payment(
         &self,
         tenant: &TenantContext,
@@ -973,9 +979,10 @@ pub trait Ledger: Send + Sync {
         payment: NewTransferPayment,
     ) -> Result<Submitted<Payment>, Error>;
 
-    /// Tỉ giá 1 `base` = ? `quote` hiệu lực ngày `on` (D-237): tỉ giá có ngày hiệu lực gần nhất
-    /// ≤ `on`; cùng ngày thì tỉ giá nhập tay trước tỉ giá của nguồn. Chưa có: `None`. Đọc, không
-    /// gọi trong transaction ghi. `invoices`, báo cáo gộp (38) và đa tiền tệ (63) đọc qua đây.
+    /// Exchange rate 1 `base` = ? `quote` in effect on day `on` (D-237): the rate whose effective date is
+    /// nearest ≤ `on`; on the same day a manually entered rate takes precedence over a source's rate. Not yet
+    /// existing: `None`. Reads; do not call inside a write transaction. `invoices`, consolidated reports (38)
+    /// and multi-currency (63) read through here.
     async fn exchange_rate(
         &self,
         tenant: &TenantContext,
@@ -984,10 +991,10 @@ pub trait Ledger: Send + Sync {
         on: Date,
     ) -> Result<Option<ExchangeRate>, Error>;
 
-    /// Tiền hạch toán của sổ của nút `org` (sổ chưa mở: tiền mặc định của nút, hay VND).
+    /// Accounting currency of branch `org`'s ledger (ledger not opened: the branch's default currency, or VND).
     async fn book_currency(&self, tenant: &TenantContext, org: OrgId) -> Result<Currency, Error>;
 
-    /// Một trang sổ nhật ký chung (dòng bút toán kèm bút toán và tài khoản) cho xuất kế toán.
+    /// A page of the general journal (entry lines with entry and account) for accounting export.
     async fn journal(
         &self,
         tenant: &TenantContext,

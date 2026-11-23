@@ -1,13 +1,13 @@
-//! Hợp đồng của module `plans` cho module khác và cho binary.
+//! Contract of the `plans` module for other modules and for the binary.
 //!
-//! Quyền dùng KHÔNG đi qua đây: module khác hỏi `autoxide_kernel::entitlement::EntitlementsHandle`
-//! (lấy bằng `StartContext::entitlements`), module `plans` chỉ là bên cung cấp. Ở đây là phần cấp
-//! phát khách mới theo gói (bước 35 mục 5), cho lệnh `autoxide tenant create … --plan`.
+//! Entitlements do NOT go through here: other modules ask `autoxide_kernel::entitlement::EntitlementsHandle`
+//! (obtained with `StartContext::entitlements`); the `plans` module is only the provider. What is here is the
+//! provisioning of new tenants by plan (step 35 item 5), for the `autoxide tenant create … --plan` command.
 
 use autoxide_kernel::error::Error;
 use uuid::Uuid;
 
-/// Một khách mới cần cấp phát theo gói.
+/// A new tenant to provision by plan.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct ProvisionRequest {
@@ -17,12 +17,12 @@ pub struct ProvisionRequest {
     pub admin_email: String,
     pub price_id: Option<Uuid>,
     pub parent_id: Option<Uuid>,
-    /// Tên placement; `None`: `main` (gói `shared`).
+    /// Placement name; `None`: `main` (plan `shared`).
     pub placement: Option<String>,
     pub admin_name: Option<String>,
-    /// `None`: theo `sample_data` của gói.
+    /// `None`: follow the plan's `sample_data`.
     pub sample_data: Option<bool>,
-    /// Cho dùng thử nếu gói có.
+    /// Grant a trial if the plan has one.
     pub trial: bool,
 }
 
@@ -48,13 +48,13 @@ impl ProvisionRequest {
     }
 }
 
-/// Kết quả một lượt cấp phát.
+/// Result of one provisioning run.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct ProvisioningStatus {
     pub id: Uuid,
     pub tenant_id: Option<Uuid>,
-    /// Bước đã xong gần nhất (`done` khi xong).
+    /// Most recent step completed (`done` when finished).
     pub step: String,
     /// `pending`, `running`, `failed`, `done`.
     pub status: String,
@@ -66,11 +66,13 @@ impl ProvisioningStatus {
     }
 }
 
-/// Cấp phát khách mới theo gói: tạo khách → gán gói → dữ liệu mẫu → mời quản trị viên. Không kiểm
-/// permission — bên gọi chịu trách nhiệm (lệnh CLI chạy với quyền của người vận hành).
+/// Provisions a new tenant by plan: create the tenant → assign the plan → sample data → invite the
+/// administrator. Does not check permissions — the caller is responsible (the CLI command runs with the
+/// operator's authority).
 #[async_trait::async_trait]
 pub trait Provisioning: Send + Sync {
-    /// Chạy hết các bước ngay (không qua job). Bước hỏng: lỗi `plans.provisioning_failed`; lượt đã
-    /// ghi lại, chạy tiếp được bằng `POST /api/v1/plans/provisionings/{id}/retry`.
+    /// Runs all steps immediately (not through the job queue). A failed step: error
+    /// `plans.provisioning_failed`; the run is recorded and can be resumed with
+    /// `POST /api/v1/plans/provisionings/{id}/retry`.
     async fn provision(&self, request: ProvisionRequest) -> Result<ProvisioningStatus, Error>;
 }

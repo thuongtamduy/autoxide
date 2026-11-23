@@ -1,9 +1,9 @@
-//! Hãng vận chuyển giả, cho test (testkit, bước 45) và để thử trên máy dev
-//! (`AUTOXIDE_SHIPPING_FAKE_CARRIER=true`). Không gọi mạng: mọi thứ nằm trong bộ nhớ, trạng thái
-//! điều khiển bằng tay. Webhook ký HMAC-SHA256 trên thân thô bằng trường `webhook_secret` của
-//! thông tin đăng nhập, header [`SIGNATURE_HEADER`] (hex chữ thường).
+//! A fake carrier, for tests (testkit, step 45) and for trying things on a dev machine
+//! (`AUTOXIDE_SHIPPING_FAKE_CARRIER=true`). Makes no network calls: everything lives in memory and the status
+//! is driven by hand. Webhooks are signed with HMAC-SHA256 over the raw body using the `webhook_secret` field
+//! of the credentials, in the [`SIGNATURE_HEADER`] header (lowercase hex).
 //!
-//! Đây cũng là ví dụ cho người viết bộ nối thật (`docs/SHIPPING.md`).
+//! This is also an example for people writing a real connector (`docs/SHIPPING.md`).
 
 use autoxide_kernel::time::{Date, Timestamp};
 use std::collections::HashMap;
@@ -22,15 +22,15 @@ use super::{
     CarrierShipmentRequest, CarrierUpdate, CodStatement, Label, ShipmentStatus, ShippingCarrier,
 };
 
-/// Header mang chữ ký của webhook giả.
+/// Header carrying the signature of the fake webhook.
 pub const SIGNATURE_HEADER: &str = "x-fake-signature";
 
-/// Mã của hãng giả.
+/// Code of the fake carrier.
 pub const CODE: &str = "fake";
 
 type HmacSha256 = Hmac<Sha256>;
 
-/// Chữ ký (hex) của `body` với khoá `secret`, như hãng giả gửi.
+/// Signature (hex) of `body` under key `secret`, as the fake carrier sends it.
 pub fn sign(secret: &str, body: &[u8]) -> String {
     let mut out = String::new();
     // `new_from_slice` chỉ lỗi với độ dài khoá không hợp lệ — HMAC nhận mọi độ dài.
@@ -43,26 +43,26 @@ pub fn sign(secret: &str, body: &[u8]) -> String {
     out
 }
 
-/// Một dòng của thân webhook giả (thân là mảng JSON các dòng này).
+/// A line of the fake webhook body (the body is a JSON array of these lines).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FakeWebhookUpdate {
     pub event_id: String,
     pub tracking_number: String,
-    /// Trạng thái chung (`in_transit`, `delivered`…) — hãng giả dùng luôn trạng thái chung.
+    /// Common status (`in_transit`, `delivered`…) — the fake carrier uses the common status directly.
     pub status: ShipmentStatus,
     pub occurred_at: Timestamp,
     #[serde(default)]
     pub cod_collected: Option<Money>,
 }
 
-/// Hãng giả. Dùng chung qua `Arc`: test giữ một bản để điều khiển, sổ hãng giữ bản kia.
+/// The fake carrier. Shared through `Arc`: the test keeps one handle to drive it, the carrier registry keeps the other.
 #[derive(Default)]
 pub struct FakeCarrier {
-    /// Báo giá / tạo vận đơn trả "hãng không trả lời".
+    /// Quote / create-shipment returns "the carrier does not respond".
     unavailable: AtomicBool,
-    /// Lần tạo vận đơn kế tiếp: hãng tạo xong nhưng trả lỗi (mất kết nối giữa chừng).
+    /// The next shipment creation: the carrier finishes creating it but returns an error (connection lost midway).
     lose_next_create_response: AtomicBool,
-    /// Số lần `create_shipment` thật sự tạo đơn mới.
+    /// Number of times `create_shipment` really created a new shipment.
     created: AtomicU64,
     next_number: AtomicU64,
     state: Mutex<State>,
@@ -70,9 +70,9 @@ pub struct FakeCarrier {
 
 #[derive(Default)]
 struct State {
-    /// Theo `client_reference`.
+    /// By `client_reference`.
     shipments: HashMap<String, CarrierShipment>,
-    /// Hành trình theo mã vận đơn.
+    /// Journey by tracking number.
     tracks: HashMap<String, Vec<CarrierUpdate>>,
     statement: Option<CodStatement>,
 }
@@ -87,22 +87,22 @@ impl FakeCarrier {
         self.state.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
-    /// Bật / tắt "hãng không trả lời".
+    /// Turns "the carrier does not respond" on / off.
     pub fn set_unavailable(&self, unavailable: bool) {
         self.unavailable.store(unavailable, Ordering::SeqCst);
     }
 
-    /// Lần tạo vận đơn kế tiếp tạo xong nhưng trả lỗi `carrier_unavailable`.
+    /// The next shipment creation finishes but returns the error `carrier_unavailable`.
     pub fn lose_next_create_response(&self) {
         self.lose_next_create_response.store(true, Ordering::SeqCst);
     }
 
-    /// Số vận đơn đã tạo thật (gọi lại cùng mã không tính).
+    /// Number of shipments really created (calling again with the same code does not count).
     pub fn created_count(&self) -> u64 {
         self.created.load(Ordering::SeqCst)
     }
 
-    /// Thêm một bước hành trình cho vận đơn `tracking_number` (như hãng tự cập nhật).
+    /// Adds a journey step to shipment `tracking_number` (as if the carrier updated it itself).
     pub fn push_update(&self, update: CarrierUpdate) {
         let mut state = self.state();
         let status = update.status;
@@ -115,12 +115,12 @@ impl FakeCarrier {
         }
     }
 
-    /// Bảng kê COD `cod_statement` sẽ trả.
+    /// The COD statement `cod_statement` will return.
     pub fn set_statement(&self, statement: Option<CodStatement>) {
         self.state().statement = statement;
     }
 
-    /// Phí giả: 15 000 đơn vị nhỏ nhất cho kg đầu, 5 000 mỗi kg (hay phần kg) sau.
+    /// Fake fee: 15 000 in the smallest unit for the first kg, 5 000 for each following kg (or part of a kg).
     fn fee_for(&self, weight_grams: i64, like: &Money) -> Money {
         let extra_kg = (weight_grams.max(1) - 1) / 1000;
         Money::new(15_000 + 5_000 * extra_kg, like.currency())
@@ -294,7 +294,7 @@ impl ShippingCarrier for FakeCarrier {
     }
 }
 
-/// So hai chuỗi byte trong thời gian không phụ thuộc chỗ khác nhau đầu tiên.
+/// Compares two byte strings in time that does not depend on where they first differ.
 fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
     if a.len() != b.len() {
         return false;

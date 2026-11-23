@@ -1,2 +1,2 @@
-//! Hợp đồng của module `audit` cho module khác: hiện chưa có gì. Module khác không
-//! gọi audit — chúng chỉ phát event (`autoxide_kernel::event`), audit tự nhận.
+//! Contract of the `audit` module for other modules: nothing for now. Other modules do not
+//! call audit — they only emit events (`autoxide_kernel::event`), and audit picks them up itself.

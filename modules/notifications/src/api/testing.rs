@@ -1,8 +1,9 @@
-//! Bộ gửi thông báo giả dùng chung cho test của module khác (feature `testing`, chỉ khai ở
-//! `[dev-dependencies]`; quy ước D-20261122-module-test-fakes).
+//! Shared fake notification sender for other modules' tests (feature `testing`, declared only in
+//! `[dev-dependencies]`; convention D-20261122-module-test-fakes).
 //!
-//! Giống `notifications` thật ở chỗ module khác dựa vào: cùng `dedupe_key` thì không tạo tin thứ hai.
-//! Không gửi gì, không kiểm loại đã khai: chỉ nhớ để test đọc lại.
+//! Behaves like the real `notifications` in the way other modules rely on: the same `dedupe_key` does not
+//! create a second message. It sends nothing and does not validate declared kinds: it only remembers, so
+//! tests can read back.
 //!
 //! ```ignore
 //! let notifier = Arc::new(FakeNotifier::new());
@@ -19,15 +20,15 @@ use super::{Notification, NotificationKind, Notifier, Outcome};
 
 #[derive(Default)]
 struct State {
-    /// Khoá các loại đã khai, theo thứ tự.
+    /// Keys of the declared kinds, in order.
     kinds: Vec<String>,
-    /// Tin đã tạo (mỗi `dedupe_key` một tin).
+    /// Messages created (one per `dedupe_key`).
     sent: Vec<Notification>,
-    /// Mọi lời gọi `notify`, kể cả trùng khoá.
+    /// Every `notify` call, including duplicate keys.
     calls: Vec<Notification>,
 }
 
-/// Bộ gửi thông báo giả, giữ mọi thứ trong bộ nhớ. Công bố vào app bằng
+/// Fake notification sender, keeping everything in memory. Publish it into the app with
 /// `TestApp::builder(…).provide::<dyn Notifier>(notifier.clone())`.
 #[derive(Default)]
 pub struct FakeNotifier {
@@ -44,27 +45,27 @@ impl FakeNotifier {
         FakeNotifier::default()
     }
 
-    /// Tin đã tạo, theo thứ tự: lần gọi lại cùng `dedupe_key` không thêm tin, như `notifications`.
+    /// Messages created, in order: calling again with the same `dedupe_key` adds no message, as in `notifications`.
     pub fn sent(&self) -> Vec<Notification> {
         lock(&self.state).sent.clone()
     }
 
-    /// Tin đã tạo thuộc loại `kind`.
+    /// Messages created of kind `kind`.
     pub fn sent_of(&self, kind: &str) -> Vec<Notification> {
         lock(&self.state).sent.iter().filter(|sent| sent.kind == kind).cloned().collect()
     }
 
-    /// Mọi lời gọi `notify`, kể cả trùng `dedupe_key` (đếm số lần module gọi).
+    /// Every `notify` call, including duplicate `dedupe_key` (counts how many times the module called).
     pub fn calls(&self) -> Vec<Notification> {
         lock(&self.state).calls.clone()
     }
 
-    /// Khoá các loại module đã khai (`declare`), theo thứ tự.
+    /// Keys of the kinds the module declared (`declare`), in order.
     pub fn kinds(&self) -> Vec<String> {
         lock(&self.state).kinds.clone()
     }
 
-    /// Quên mọi tin đã nhận (giữ các loại đã khai).
+    /// Forgets every message received (keeps the declared kinds).
     pub fn clear(&self) {
         let mut state = lock(&self.state);
         state.sent.clear();

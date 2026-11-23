@@ -1,9 +1,9 @@
-//! Đồ dùng cho test của Autoxide.
+//! Test helpers for Autoxide.
 //!
-//! Thứ chính là [`TestDatabase`]: mỗi test một database riêng, trống, trên
-//! SQLite hoặc Postgres tuỳ biến môi trường `TEST_DATABASE_URL`. Nhờ vậy cùng
-//! một bài test chạy được trên cả hai database mà không sửa gì (luật số một
-//! trong `CLAUDE.md`), và các test chạy song song không giẫm dữ liệu của nhau.
+//! The main piece is [`TestDatabase`]: one empty database per test, on
+//! SQLite or Postgres depending on the `TEST_DATABASE_URL` environment variable. This way the same
+//! test runs on both databases without changes (rule number one
+//! in `CLAUDE.md`), and tests running in parallel never trample each other's data.
 //!
 //! ```no_run
 //! use autoxide_testkit::TestDatabase;
@@ -12,26 +12,26 @@
 //! async fn ten_bai_test() {
 //!     TestDatabase::run(async |database| {
 //!         let connection = database.connect().await.unwrap();
-//!         // ... dùng `connection` ...
+//!     // ... use `connection` ...
 //!     })
 //!     .await
 //!     .unwrap();
 //! }
 //! ```
 //!
-//! Vì sao là `run(...)` bọc quanh bài test chứ không phải một biến tự dọn khi ra
-//! khỏi scope (`Drop`): xoá database là việc `async`, mà `Drop` không `await`
-//! được. Đứng chờ trong `Drop` thì chặn thread của runtime tokio, trong khi
-//! `DROP DATABASE` của Postgres lại chờ mọi kết nối đang bắt tay dở — do chính
-//! thread bị chặn đó phục vụ — nên hai bên chờ nhau tới 60 giây (đã gặp và đo
-//! ngày 11/11/2026). Còn giao cho thread nền thì tiến trình test thoát trước khi
-//! nó xoá xong, để sót database. `run` thì `await` được việc xoá: chắc chắn
-//! xong, không chặn ai.
+//! Why `run(...)` wraps the test instead of a guard that cleans up when it leaves
+//! scope (`Drop`): deleting the database is `async` work, and `Drop` cannot `await`.
+//! Waiting inside `Drop` blocks a tokio runtime thread, while Postgres's
+//! `DROP DATABASE` waits for every connection still mid-handshake — served by that very
+//! blocked thread — so the two wait on each other for up to 60 seconds (observed and measured
+//! on 11/11/2026). Handing the work to a background thread lets the test process exit before
+//! it finishes deleting, leaving the database behind. `run` can `await` the deletion: it is
+//! certain to finish and blocks nobody.
 //!
-//! [`TestApp`] không migrate từ đầu mỗi database: nó chép một database mẫu đã migrate (module
-//! `template`, D-20261120-test-db-template). Database vẫn riêng của từng bài test.
+//! [`TestApp`] does not migrate every database from scratch: it copies a migrated template database (module
+//! `template`, D-20261120-test-db-template). The database is still private to each test.
 //!
-//! Crate này chỉ được khai ở `[dev-dependencies]` (`cargo xtask check` kiểm).
+//! This crate may only be declared in `[dev-dependencies]` (checked by `cargo xtask check`).
 
 pub mod ai;
 mod app;
@@ -90,14 +90,14 @@ use std::time::SystemTime;
 
 use sea_orm::{ConnectOptions, Database, DatabaseConnection, DbBackend, DbErr};
 
-/// Tên biến môi trường chọn database cho test.
+/// Name of the environment variable that selects the database for tests.
 ///
-/// - Không đặt: SQLite, mỗi test một file trong thư mục tạm.
-/// - `postgres://user:password@host:port/<database bất kỳ>`: Postgres. Người dùng
-///   trong URL phải có quyền `CREATE DATABASE`; mỗi test tạo một database riêng.
+/// - Unset: SQLite, one file per test in a temporary directory.
+/// - `postgres://user:password@host:port/<any database>`: Postgres. The user
+///   in the URL needs the `CREATE DATABASE` permission; each test creates its own database.
 pub const TEST_DATABASE_URL: &str = "TEST_DATABASE_URL";
 
-/// Lỗi khi dựng database cho test.
+/// Error while building a test database.
 #[derive(Debug)]
 pub struct TestDatabaseError(String);
 
@@ -123,16 +123,16 @@ impl From<std::io::Error> for TestDatabaseError {
     }
 }
 
-/// Nơi tạo database test, đọc ra từ [`TEST_DATABASE_URL`].
+/// Where test databases are created, read from [`TEST_DATABASE_URL`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Target<'a> {
     Sqlite,
-    /// Kèm URL quản trị (URL người dùng đặt trong biến môi trường).
+    /// With the admin URL (the URL the user set in the environment variable).
     Postgres(&'a str),
 }
 
 impl<'a> Target<'a> {
-    /// `None` hoặc chuỗi rỗng nghĩa là SQLite.
+    /// `None` or an empty string means SQLite.
     fn parse(configured_url: Option<&'a str>) -> Result<Self, TestDatabaseError> {
         match configured_url.map(str::trim).filter(|url| !url.is_empty()) {
             None => Ok(Target::Sqlite),
@@ -146,35 +146,35 @@ impl<'a> Target<'a> {
     }
 }
 
-/// Một database trống dành riêng cho một test. Lấy qua [`TestDatabase::run`].
+/// An empty database reserved for one test. Obtained through [`TestDatabase::run`].
 #[derive(Debug)]
 pub struct TestDatabase {
     url: String,
     backend: DbBackend,
     cleanup: Cleanup,
-    /// Database thêm của cùng bài test ([`TestDatabase::extra_database`]), dọn cùng lúc.
+    /// Extra databases of the same test ([`TestDatabase::extra_database`]), cleaned up together.
     extras: std::sync::Mutex<Vec<Cleanup>>,
 }
 
-/// Việc phải dọn sau khi bài test chạy xong.
+/// Work to clean up after the test has run.
 #[derive(Debug)]
 enum Cleanup {
-    /// Xoá thư mục tạm chứa file SQLite (kèm file `-wal`, `-shm`).
+    /// Deletes the temporary directory holding the SQLite file (with the `-wal` and `-shm` files).
     SqliteDirectory(PathBuf),
-    /// `DROP DATABASE` qua kết nối quản trị.
+    /// `DROP DATABASE` over the admin connection.
     PostgresDatabase { admin_url: String, name: String },
 }
 
-/// Đã dọn rác của các lần chạy trước trong tiến trình này chưa.
+/// Whether leftovers from earlier runs have been cleaned in this process.
 static STALE_REMOVED: AtomicBool = AtomicBool::new(false);
 
 impl TestDatabase {
-    /// Tạo một database trống theo biến môi trường [`TEST_DATABASE_URL`], chạy
-    /// `test` với nó, xoá database, rồi trả về kết quả của `test`.
+    /// Creates an empty database according to the [`TEST_DATABASE_URL`] environment variable, runs
+    /// `test` with it, deletes the database, then returns the result of `test`.
     ///
-    /// `test` là một async closure: `async |database| { ... }`. Nếu `test` panic
-    /// (bài test hỏng) thì database KHÔNG bị xoá ngay; lần chạy test sau sẽ dọn
-    /// khi nó đã quá cũ (xem module `stale`).
+    /// `test` is an async closure: `async |database| { ... }`. If `test` panics
+    /// (the test fails) the database is NOT deleted immediately; a later test run cleans it up
+    /// once it is old enough (see module `stale`).
     //
     // `AsyncFnOnce(&TestDatabase) -> R`: closure async, gọi đúng một lần, mượn
     // (`&`) database chứ không giữ luôn — nhờ đó `run` còn quyền xoá nó sau khi
@@ -187,9 +187,9 @@ impl TestDatabase {
         Self::run_for(configured.as_deref(), test).await
     }
 
-    /// Như [`run`](Self::run) nhưng nhận URL trực tiếp thay vì đọc môi trường.
-    /// `None` hoặc chuỗi rỗng nghĩa là SQLite. Dùng khi một bài test cần database
-    /// thuộc một loại cụ thể.
+    /// Like [`run`](Self::run) but takes the URL directly instead of reading the environment.
+    /// `None` or an empty string means SQLite. Use when a test needs a database
+    /// of a specific kind.
     pub async fn run_for<R>(
         configured_url: Option<&str>,
         test: impl AsyncFnOnce(&TestDatabase) -> R,
@@ -239,8 +239,8 @@ impl TestDatabase {
         }
     }
 
-    /// Xoá database. Nhận `self` (không phải `&self`): sau lời gọi này giá trị
-    /// không còn dùng được nữa — trình biên dịch chặn việc dùng database đã xoá.
+    /// Deletes the database. Takes `self` (not `&self`): after this call the value
+    /// can no longer be used — the compiler rejects using a deleted database.
     async fn destroy(self) -> Result<(), TestDatabaseError> {
         // Mutex hỏng (một luồng panic khi đang giữ) vẫn lấy được dữ liệu bên trong.
         let extras = self.extras.into_inner().unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -262,18 +262,18 @@ impl TestDatabase {
         }
     }
 
-    /// URL của database này, dùng được như `DATABASE_URL`.
+    /// URL of this database, usable as `DATABASE_URL`.
     pub fn url(&self) -> &str {
         &self.url
     }
 
-    /// Database này là SQLite hay Postgres.
+    /// Whether this database is SQLite or Postgres.
     pub fn backend(&self) -> DbBackend {
         self.backend
     }
 
-    /// Thêm một database trống cùng loại (vd placement riêng của một khách ở chế độ nhiều khách);
-    /// trả URL của nó. Database thêm bị xoá cùng lúc với database chính.
+    /// Adds one more empty database of the same kind (e.g. a tenant's dedicated placement in multi-tenant
+    /// mode); returns its URL. Extra databases are deleted together with the main one.
     pub async fn extra_database(&self) -> Result<String, TestDatabaseError> {
         let target = match &self.cleanup {
             Cleanup::SqliteDirectory(_) => Target::Sqlite,
@@ -285,7 +285,7 @@ impl TestDatabase {
         Ok(url)
     }
 
-    /// Mở một pool kết nối tới database này.
+    /// Opens a connection pool to this database.
     pub async fn connect(&self) -> Result<DatabaseConnection, TestDatabaseError> {
         let mut options = ConnectOptions::new(self.url.clone());
         // Nhiều test chạy song song, mỗi test một pool: giữ pool nhỏ để không
@@ -295,8 +295,9 @@ impl TestDatabase {
     }
 }
 
-/// Xoá database test đã quá cũ (xem module `stale`). Trả về số database đã xoá. SQLite: tìm
-/// dưới `sqlite_parent` (thư mục tạm của hệ thống; test của chính hàm này dùng thư mục riêng).
+/// Deletes test databases that are too old (see module `stale`). Returns the number of databases deleted.
+/// SQLite: looks under `sqlite_parent` (the system temp directory; this function's own tests use a separate
+/// directory).
 async fn remove_stale(
     target: Target<'_>,
     sqlite_parent: &std::path::Path,
@@ -351,8 +352,8 @@ mod tests {
         assert!(!message.contains("secret"), "{message}");
     }
 
-    /// Chạy trên database đang chọn (SQLite hoặc Postgres): đặt sẵn một database
-    /// "cũ" rồi kiểm nó bị dọn, còn database đang dùng thì không.
+    /// Runs on the selected database (SQLite or Postgres): pre-creates an "old"
+    /// database then checks it gets cleaned up while the database in use does not.
     #[tokio::test]
     async fn database_cu_bi_don_database_dang_dung_thi_giu() {
         let configured = std::env::var(TEST_DATABASE_URL).ok();

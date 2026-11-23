@@ -1,25 +1,25 @@
-//! Hợp đồng của module `promotions` cho module khác (`orders` bước 45, `customers` 47,
-//! `support` 53, `automations` 58…): chỉ những gì ở đây được dùng từ bên ngoài
-//! (`autoxide_promotions::api::…`). Module khác lấy trait lúc khởi động:
+//! Contract of the `promotions` module for other modules (`orders` step 45, `customers` 47,
+//! `support` 53, `automations` 58…): only what is here may be used from outside
+//! (`autoxide_promotions::api::…`). Other modules obtain the trait at startup:
 //!
 //! ```text
 //! let promotions = context.require::<dyn autoxide_promotions::api::Promotions>()?;
 //! ```
 //!
-//! Module đó phải đăng ký SAU `promotions` trong `crates/app/src/modules.rs`. Không module nào đọc
-//! bảng `promotions_…` (luật kiến trúc 1). File này không tham chiếu phần bên trong module.
+//! That module must be registered AFTER `promotions` in `crates/app/src/modules.rs`. No module reads
+//! the `promotions_…` tables (architecture rule 1). This file does not reference the module's internals.
 //!
-//! Luồng của `orders` (đặc tả 43 và 45):
+//! Flow of `orders` (spec 43 and 45):
 //!
-//! 1. Giỏ đổi → [`Promotions::evaluate`] (không ghi gì) → hiện từng khoản giảm kèm lý do.
-//! 2. Bộ chọn mã của website → [`Promotions::eligible`] (mã / voucher dùng được, chưa đủ điều kiện
-//!    kèm lý do, tổ hợp lợi nhất).
-//! 3. Đặt hàng → [`Promotions::reserve`] với `order_id` và `fingerprint` đã cho người mua xem:
-//!    giữ MỌI lượt trong một transaction (đủ hết hoặc không giữ gì). Kết quả khác lúc xem →
+//! 1. Cart changed → [`Promotions::evaluate`] (writes nothing) → show each discount with its reason.
+//! 2. The website's code picker → [`Promotions::eligible`] (usable codes / vouchers, those not yet eligible
+//!    with the reason, the most beneficial combination).
+//! 3. Place the order → [`Promotions::reserve`] with `order_id` and the `fingerprint` shown to the buyer:
+//!    holds EVERY redemption in one transaction (all or nothing). A result different from what was shown →
 //!    `promotions.changed`.
-//! 4. Thanh toán xong → [`Promotions::confirm`]; huỷ / thanh toán hỏng → [`Promotions::release`].
-//!    Không gọi thì lượt giữ tự hết hạn ở `expires_at` (job `promotions.expire_holds`).
-//! 5. Trả hàng → [`returns`] (hàm thuần, tính trên ảnh chụp [`Evaluation`] đã lưu vào đơn).
+//! 4. Payment done → [`Promotions::confirm`]; cancel / payment failed → [`Promotions::release`]. If neither
+//!    is called, the held redemptions expire by themselves at `expires_at` (job `promotions.expire_holds`).
+//! 5. Returns → [`returns`] (pure functions, computed on the [`Evaluation`] snapshot stored on the order).
 
 use autoxide_kernel::time::Timestamp;
 use std::collections::BTreeMap;
@@ -32,45 +32,45 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-/// Số dòng tối đa của một giỏ gửi tới [`Promotions::evaluate`].
+/// Maximum number of lines of a cart sent to [`Promotions::evaluate`].
 pub const MAX_CART_LINES: usize = 500;
 
-/// Tên event `promotions` phát mà module khác hay nghe (payload `{"before": …, "after": …}`).
-/// Payload không bao giờ chứa `buyer_keys`.
+/// Names of the events `promotions` emits that other modules often listen to (payload
+/// `{"before": …, "after": …}`). The payload never contains `buyer_keys`.
 pub mod events {
-    /// Chương trình vừa tạo (`draft`).
+    /// A program was just created (`draft`).
     pub const PROMOTION_CREATED: &str = "promotions.promotion_created";
-    /// Chương trình đổi (nội dung, bản dịch, mục tiêu…).
+    /// A program changed (content, translations, targets…).
     pub const PROMOTION_UPDATED: &str = "promotions.promotion_updated";
-    /// Chương trình được bật (`scheduled` hay `active`).
+    /// A program was activated (`scheduled` or `active`).
     pub const PROMOTION_ACTIVATED: &str = "promotions.promotion_activated";
-    /// Chương trình tới giờ bắt đầu.
+    /// A program reached its start time.
     pub const PROMOTION_STARTED: &str = "promotions.promotion_started";
-    /// Chương trình tạm dừng.
+    /// A program was paused.
     pub const PROMOTION_PAUSED: &str = "promotions.promotion_paused";
-    /// Chương trình kết thúc (hết `ends_at` hay kết thúc sớm).
+    /// A program ended (`ends_at` passed or ended early).
     pub const PROMOTION_ENDED: &str = "promotions.promotion_ended";
-    /// Chương trình bị huỷ.
+    /// A program was cancelled.
     pub const PROMOTION_CANCELLED: &str = "promotions.promotion_cancelled";
-    /// Một lô mã vừa sinh.
+    /// A batch of codes was just generated.
     pub const CODES_GENERATED: &str = "promotions.codes_generated";
-    /// Lượt giữ của một đơn đã xác nhận (`after`: `order_id`, `total_discount`, chương trình).
+    /// The redemption hold of an order was confirmed (`after`: `order_id`, `total_discount`, programs).
     pub const REDEMPTION_CONFIRMED: &str = "promotions.redemption_confirmed";
-    /// Lượt giữ của một đơn đã trả lại.
+    /// The redemption hold of an order was released.
     pub const REDEMPTION_RELEASED: &str = "promotions.redemption_released";
-    /// Ghi nhận đã nộp thông báo khuyến mại cho một cơ quan.
+    /// A promotion notice filing with an authority was recorded.
     pub const NOTICE_SUBMITTED: &str = "promotions.notice_submitted";
-    /// Một voucher vừa vào ví người dùng.
+    /// A voucher just entered a user's wallet.
     pub const VOUCHER_ISSUED: &str = "promotions.voucher_issued";
-    /// Một voucher đã được dùng cho đơn.
+    /// A voucher was used for an order.
     pub const VOUCHER_USED: &str = "promotions.voucher_used";
-    /// Chương trình hết ngân sách.
+    /// A program ran out of budget.
     pub const BUDGET_EXHAUSTED: &str = "promotions.budget_exhausted";
-    /// Sàn duyệt / từ chối đăng ký tham gia của người bán.
+    /// The marketplace approved / rejected a seller's registration to participate.
     pub const PARTICIPATION_REVIEWED: &str = "promotions.participation_reviewed";
-    /// Giá sau giảm tự động (lớp `product`, không điều kiện giỏ) của biến thể đổi — cho
-    /// `catalog_storefront_entries`. `after`: `{"org_id", "variant_ids": [...]}`; bên nhận hỏi lại
-    /// giá bằng [`Promotions::automatic_prices`].
+    /// Automatic discounted price (layer `product`, no cart condition) of a changed variant — for
+    /// `catalog_storefront_entries`. `after`: `{"org_id", "variant_ids": [...]}`; the receiver asks again for
+    /// the prices with [`Promotions::automatic_prices`].
     pub const AUTOMATIC_PRICES_CHANGED: &str = "promotions.automatic_prices_changed";
 }
 
@@ -612,58 +612,58 @@ pub struct AutomaticPrice {
     pub ends_at: Timestamp,
 }
 
-/// Khuyến mại cho module khác.
+/// Promotions for other modules.
 //
 // `#[async_trait]`: Rust chưa cho gọi hàm `async` của trait qua `dyn Trait`; macro này đổi hàm
 // `async` thành hàm trả về `Box<dyn Future>` để gọi được.
 #[async_trait::async_trait]
 pub trait Promotions: Send + Sync {
-    /// Tính giảm giá cho giỏ — không giữ gì, không ghi gì. Mã / voucher sai không làm lỗi cả
-    /// giỏ (vào `rejected_codes`). Lỗi: giỏ sai hình dạng (`validation_failed`), quá nhiều mã
-    /// (`promotions.too_many_codes`).
+    /// Computes the discount for a cart — holds nothing, writes nothing. A wrong code / voucher does not fail
+    /// the whole cart (it goes into `rejected_codes`). Errors: a malformed cart (`validation_failed`), too
+    /// many codes (`promotions.too_many_codes`).
     async fn evaluate(&self, tenant: &TenantContext, cart: &Cart) -> Result<Evaluation, Error>;
 
-    /// Mã `public`, voucher trong ví dùng được và chưa đủ điều kiện (kèm lý do) cho giỏ, cùng
-    /// `best_selection` — không ghi gì. `orders` phục vụ ở
+    /// `public` codes, wallet vouchers that are usable and those not yet eligible (with the reason) for the
+    /// cart, along with `best_selection` — writes nothing. `orders` serves it at
     /// `GET /api/v1/orders/carts/{id}/promotions`.
     async fn eligible(&self, tenant: &TenantContext, cart: &Cart) -> Result<Eligibility, Error>;
 
-    /// Tính lại và giữ mọi lượt (chương trình, mã, voucher, ngân sách, ngày, mỗi khoá người mua,
-    /// flash sale, quà) trong MỘT transaction: đủ hết hoặc không giữ gì. Gọi lại cùng `order_id`
-    /// và cùng giỏ → `Replayed`; cùng `order_id` mà giỏ khác → `reference_reused`. Hết lượt →
-    /// `promotions.usage_exhausted`, `promotions.customer_limit_reached`,
-    /// `promotions.flash_sold_out`, `promotions.budget_exhausted`, `promotions.daily_limit_reached`,
-    /// `promotions.gift_out_of_stock`, `promotions.voucher_used`; kết quả khác lúc xem →
-    /// `promotions.changed`.
+    /// Recomputes and holds every redemption (program, code, voucher, budget, day, per-buyer key, flash sale,
+    /// gift) in ONE transaction: all or nothing. Calling again with the same `order_id` and the same cart →
+    /// `Replayed`; the same `order_id` with a different cart → `reference_reused`. Out of redemptions →
+    /// `promotions.usage_exhausted`, `promotions.customer_limit_reached`, `promotions.flash_sold_out`,
+    /// `promotions.budget_exhausted`, `promotions.daily_limit_reached`, `promotions.gift_out_of_stock`,
+    /// `promotions.voucher_used`; a result different from what was shown → `promotions.changed`.
     async fn reserve(
         &self,
         tenant: &TenantContext,
         request: &ReserveRequest,
     ) -> Result<Submitted<Redemption>, Error>;
 
-    /// Giữ → đã dùng. Gọi lại: trả như cũ. Đã hết hạn / đã trả: `promotions.redemption_expired`;
-    /// không có: `promotions.redemption_not_found`.
+    /// Held → used. Calling again: returns as before. Expired / released: `promotions.redemption_expired`;
+    /// none: `promotions.redemption_not_found`.
     async fn confirm(&self, tenant: &TenantContext, order_id: Uuid) -> Result<Redemption, Error>;
 
-    /// Trả lượt (huỷ đơn, thanh toán hỏng). Đã xác nhận thì trả lượt của chương trình cho phép
-    /// (`return_usage_on_cancel`); voucher về ví nếu còn hạn. Gọi lại: trả như cũ, không cộng
-    /// lại lần nữa. Không có lượt giữ cho đơn: `Ok(None)`.
+    /// Releases the redemptions (order cancelled, payment failed). If already confirmed, returns the
+    /// redemptions of the programs that allow it (`return_usage_on_cancel`); the voucher returns to the
+    /// wallet if still valid. Calling again: returns as before, does not add back a second time. No
+    /// redemption hold for the order: `Ok(None)`.
     async fn release(
         &self,
         tenant: &TenantContext,
         order_id: Uuid,
     ) -> Result<Option<Redemption>, Error>;
 
-    /// Lượt giữ của đơn `order_id`, nếu có.
+    /// The redemption hold of order `order_id`, if any.
     async fn redemption(
         &self,
         tenant: &TenantContext,
         order_id: Uuid,
     ) -> Result<Option<Redemption>, Error>;
 
-    /// Cấp voucher vào ví. Gọi lại cùng `source` + `source_ref` → `Replayed` với voucher cũ.
-    /// Lỗi: `promotions.not_found`, `promotions.voucher_quota_exhausted`,
-    /// `promotions.claim_limit_reached`, chương trình không phải `voucher` hay đã kết thúc
+    /// Grants a voucher into a wallet. Calling again with the same `source` + `source_ref` → `Replayed` with
+    /// the old voucher. Errors: `promotions.not_found`, `promotions.voucher_quota_exhausted`,
+    /// `promotions.claim_limit_reached`, a program that is not a `voucher` or has ended
     /// (`promotions.invalid_transition`).
     async fn grant_voucher(
         &self,
@@ -671,7 +671,7 @@ pub trait Promotions: Send + Sync {
         request: &GrantVoucher,
     ) -> Result<Submitted<Voucher>, Error>;
 
-    /// Ví voucher của một tài khoản, hết hạn gần nhất trước.
+    /// The voucher wallet of an account, soonest expiry first.
     async fn vouchers_of(
         &self,
         tenant: &TenantContext,
@@ -679,8 +679,8 @@ pub trait Promotions: Send + Sync {
         status: Option<VoucherStatus>,
     ) -> Result<Vec<Voucher>, Error>;
 
-    /// Giá sau giảm tự động lớp `product` (không điều kiện giỏ) của các biến thể ở cửa hàng
-    /// `org_id` lúc `at`, từ giá niêm yết `prices` của bên gọi. Biến thể không được giảm thì vắng.
+    /// Automatic discounted prices of layer `product` (no cart condition) for the variants at store
+    /// `org_id` at `at`, from the caller's list prices `prices`. A variant that gets no discount is absent.
     async fn automatic_prices(
         &self,
         tenant: &TenantContext,
@@ -690,18 +690,18 @@ pub trait Promotions: Send + Sync {
     ) -> Result<Vec<AutomaticPrice>, Error>;
 }
 
-/// Quy tắc trả hàng và huỷ cho `orders` (D-222): hàm thuần trên ảnh chụp [`Evaluation`] đã lưu
-/// vào đơn — không gọi database.
+/// Return and cancellation rules for `orders` (D-222): pure functions on the [`Evaluation`] snapshot stored
+/// on the order — no database calls.
 pub mod returns {
     use autoxide_kernel::error::Error;
     use autoxide_kernel::money::Money;
 
     use super::{ClawbackMode, Evaluation, PromotionClass};
 
-    /// Tiền hoàn cho `returning` đơn vị của một dòng đã trả `paid` cho `bought` đơn vị, khi trước
-    /// đó đã trả lại `already_returned` đơn vị. Mỗi đơn vị nhận phần nguyên của `paid / bought`,
-    /// đơn vị CUỐI nhận phần dư — nên tổng hoàn qua nhiều lần trả đúng bằng `paid`, không vượt.
-    /// Số lượng sai (âm, vượt số mua) → `promotions.invalid_return`.
+    /// Refund for `returning` units of a line that paid `paid` for `bought` units, when `already_returned`
+    /// units were returned before. Each unit receives the integer part of `paid / bought`, the LAST unit
+    /// receives the remainder — so the total refunded over several returns equals exactly `paid`, never more.
+    /// A wrong quantity (negative, more than bought) → `promotions.invalid_return`.
     pub fn line_refund(
         paid: Money,
         bought: i64,
@@ -724,10 +724,10 @@ pub mod returns {
         Ok(Money::new(refund, paid.currency()))
     }
 
-    /// Tiền giảm lớp `order` phải thu lại khi trả hàng làm đơn còn `kept_subtotal` (giá trị
-    /// hàng còn giữ, trước giảm). [`ClawbackMode::None`] → 0. [`ClawbackMode::Proportional`]:
-    /// với mỗi chương trình lớp `order` có `min_order` mà `kept_subtotal` rớt dưới ngưỡng, thu lại
-    /// phần giảm đã phân cho các dòng còn giữ (`kept_line_keys`).
+    /// Order-layer discount to claw back when a return leaves the order with `kept_subtotal` (value of the
+    /// goods still kept, before discount). [`ClawbackMode::None`] → 0. [`ClawbackMode::Proportional`]: for
+    /// each order-layer program with a `min_order` where `kept_subtotal` falls below the threshold, claws
+    /// back the discount allocated to the lines still kept (`kept_line_keys`).
     pub fn order_clawback(
         evaluation: &Evaluation,
         kept_line_keys: &[&str],

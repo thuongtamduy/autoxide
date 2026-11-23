@@ -1,20 +1,20 @@
-//! Nhận ra "rác" do một lần chạy test đã chết để lại.
+//! Recognizes the "garbage" left behind by a test run that died.
 //!
-//! Database của test được đặt tên `<tiền tố><UUIDv7>`. UUIDv7 chứa thời điểm
-//! tạo, nên chỉ cần nhìn tên là biết nó cũ hay mới — không phải lưu sổ ở đâu.
-//! Bình thường mỗi database tự bị xoá khi bài test xong; chỉ khi tiến trình test
-//! bị giết giữa chừng mới sót lại, và lần chạy sau sẽ dọn những cái đã quá cũ.
+//! Test databases are named `<prefix><UUIDv7>`. A UUIDv7 contains its creation time,
+//! so the name alone tells whether it is old or new — no ledger to keep anywhere.
+//! Normally each database is dropped when its test finishes; only when the test process
+//! is killed midway does one survive, and the next run cleans up those that are too old.
 
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use uuid::Uuid;
 
-/// Cũ hơn ngưỡng này thì coi là rác. Đủ dài để không bao giờ chạm vào database
-/// của một lần chạy test khác còn đang chạy trên cùng máy.
+/// Older than this counts as garbage. Long enough that it never touches the database
+/// of another test run still in progress on the same machine.
 pub(crate) const STALE_AFTER: Duration = Duration::from_secs(60 * 60);
 
-/// `name` có dạng `<prefix><UUIDv7>` và được tạo trước `now` hơn [`STALE_AFTER`]?
-/// Tên không đúng dạng thì KHÔNG phải rác của testkit — không được đụng vào.
+/// Does `name` have the form `<prefix><UUIDv7>` and was it created more than [`STALE_AFTER`] before `now`?
+/// A name of any other form is NOT testkit garbage — it must not be touched.
 pub(crate) fn is_stale(name: &str, prefix: &str, now: SystemTime) -> bool {
     let Some(created_at) = name.strip_prefix(prefix).and_then(created_at) else {
         return false;
@@ -24,17 +24,18 @@ pub(crate) fn is_stale(name: &str, prefix: &str, now: SystemTime) -> bool {
     now.duration_since(created_at).is_ok_and(|age| age > STALE_AFTER)
 }
 
-/// `name` có dạng `<prefix><UUIDv7>` (cũ hay mới đều được): database của testkit.
+/// Does `name` have the form `<prefix><UUIDv7>` (old or new): a testkit database.
 pub(crate) fn has_shape(name: &str, prefix: &str) -> bool {
     name.strip_prefix(prefix).and_then(created_at).is_some()
 }
 
-/// `name` là thư mục tạm của một bài test dạng `autoxide-<việc>-<UUIDv7>` (vd `autoxide-catalog-…`,
-/// `autoxide-plans-…`) và đã cũ hơn [`STALE_AFTER`]?
+/// Is `name` the temporary directory of a test, of the form `autoxide-<task>-<UUIDv7>` (e.g.
+/// `autoxide-catalog-…`, `autoxide-plans-…`), and older than [`STALE_AFTER`]?
 ///
-/// Nhiều test tự tạo thư mục tạm dưới `std::env::temp_dir()` mà không xoá; trước đây chỉ thư mục
-/// `autoxide-test-…` của testkit được dọn nên rác tích lại tới hết đĩa. UUIDv7 ở cuối tên mang thời
-/// điểm tạo, nên nhận ra được mà không cần sổ ghi. Tên không đúng dạng thì không đụng tới.
+/// Many tests create temporary directories under `std::env::temp_dir()` without deleting them; previously
+/// only the testkit's `autoxide-test-…` directories were cleaned, so garbage piled up until the disk filled.
+/// The UUIDv7 at the end of the name carries the creation time, so it is recognizable without a ledger. A
+/// name of any other form is not touched.
 pub(crate) fn is_stale_scratch(name: &str, now: SystemTime) -> bool {
     const UUID_LEN: usize = 36;
     let Some(rest) = name.strip_prefix("autoxide-") else {
@@ -58,7 +59,7 @@ pub(crate) fn is_stale_scratch(name: &str, now: SystemTime) -> bool {
     now.duration_since(created_at).is_ok_and(|age| age > STALE_AFTER)
 }
 
-/// Thời điểm tạo ghi trong một UUIDv7 (viết có hoặc không có dấu gạch).
+/// Creation time recorded in a UUIDv7 (written with or without hyphens).
 fn created_at(uuid_text: &str) -> Option<SystemTime> {
     let uuid = Uuid::parse_str(uuid_text).ok()?;
     // `get_timestamp` trả `None` với UUID không mang thời gian (vd v4).
@@ -71,7 +72,7 @@ pub(crate) mod tests {
     use super::*;
     use uuid::{NoContext, Timestamp};
 
-    /// UUIDv7 mang thời điểm `at`.
+    /// A UUIDv7 carrying the time `at`.
     pub(crate) fn uuid_created_at(at: SystemTime) -> Uuid {
         let since_epoch = at.duration_since(UNIX_EPOCH).unwrap();
         Uuid::new_v7(Timestamp::from_unix(

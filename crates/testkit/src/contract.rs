@@ -1,19 +1,19 @@
-//! Kiểm một response thật có khớp hợp đồng `docs/openapi.json` của chính endpoint đó không (đặc tả
-//! 31 B4, D-241): mã trạng thái có khai, media type đúng, thân JSON đúng schema.
+//! Checks that a real response matches the `docs/openapi.json` contract of that very endpoint (spec
+//! 31 B4, D-241): declared status code, correct media type, JSON body matching the schema.
 //!
-//! [`TestRequest::send`](crate::TestRequest::send) gọi bộ kiểm này cho mọi request: mọi test HTTP
-//! thành test hợp đồng, tài liệu không hứa điều code không làm.
+//! [`TestRequest::send`](crate::TestRequest::send) calls this checker for every request: every HTTP test
+//! becomes a contract test, so the documentation never promises what the code does not do.
 //!
-//! Bộ kiểm JSON Schema tự viết cho đúng tập con mà utoipa sinh ra (`type` / nullable kiểu danh
-//! sách, `properties`, `required`, `additionalProperties`, `items`, `enum`, `const`, `oneOf`,
-//! `anyOf`, `allOf`, `$ref`, giới hạn số và độ dài, `format` `uuid` / `date-time` / `date`) — không
-//! thêm thư viện cho vài trăm dòng. `pattern` không kiểm (cần thư viện regex).
+//! The JSON Schema checker is hand-written for exactly the subset utoipa emits (`type` / nullable type
+//! lists, `properties`, `required`, `additionalProperties`, `items`, `enum`, `const`, `oneOf`,
+//! `anyOf`, `allOf`, `$ref`, numeric and length limits, `format` `uuid` / `date-time` / `date`) — no
+//! library added for a few hundred lines. `pattern` is not checked (it would need a regex library).
 
 use autoxide_kernel::time::Date;
 use serde_json::Value;
 
-/// Tìm operation của `method` + `path` trong tài liệu: đường dẫn mẫu `{…}` khớp một đoạn bất kỳ;
-/// nhiều mẫu khớp thì mẫu có nhiều đoạn cố định hơn thắng (`/public/{key}` trước `/{id}`).
+/// Finds the operation for `method` + `path` in the document: a `{…}` template path matches any one segment;
+/// when several templates match, the one with more fixed segments wins (`/public/{key}` before `/{id}`).
 fn operation<'a>(document: &'a Value, method: &str, path: &str) -> Option<(&'a str, &'a Value)> {
     let paths = document.get("paths")?.as_object()?;
     let segments: Vec<&str> = path.split('/').collect();
@@ -45,8 +45,8 @@ fn operation<'a>(document: &'a Value, method: &str, path: &str) -> Option<(&'a s
     best.map(|(_, template, operation)| (template, operation))
 }
 
-/// Kiểm một response. `Ok(())` cả khi đường dẫn không có trong tài liệu (route lạ → 404 của
-/// router): không có hợp đồng để so.
+/// Checks one response. Returns `Ok(())` even when the path is not in the document (unknown route → the
+/// router's 404): there is no contract to compare against.
 pub fn check(
     document: &Value,
     method: &str,
@@ -122,7 +122,7 @@ fn resolve<'a>(document: &'a Value, reference: &str) -> Option<&'a Value> {
     document.pointer(reference.strip_prefix('#')?)
 }
 
-/// Thêm vào `problems` mọi chỗ `value` lệch `schema` (vị trí kiểu `$.data.items[0].id`).
+/// Appends to `problems` every place where `value` deviates from `schema` (position like `$.data.items[0].id`).
 pub fn validate(
     document: &Value,
     schema: &Value,

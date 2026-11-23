@@ -1,8 +1,8 @@
-//! Hợp đồng của module `tax` cho module khác: tính thuế cho một chứng từ, thuế khấu trừ thay, hồ sơ
-//! thuế (kế thừa theo cây tổ chức) và yêu cầu hoá đơn. Module khác lấy lúc khởi động:
-//! `context.require::<dyn TaxEngine>()` (đăng ký SAU `tax`).
+//! Contract of the `tax` module for other modules: tax calculation for a document, withholding tax, tax
+//! profiles (inherited along the organization tree) and invoice requirements. Other modules obtain it at
+//! startup: `context.require::<dyn TaxEngine>()` (registered AFTER `tax`).
 //!
-//! Mọi hàm chỉ đọc; KHÔNG gọi trong transaction ghi (đọc database điều khiển — SQLite chặn ghi khác).
+//! Every function is read-only; do NOT call in a write transaction (it reads the control database — SQLite blocks other writes).
 
 use autoxide_kernel::decimal::{Decimal, DecimalString};
 use autoxide_kernel::error::Error;
@@ -241,31 +241,31 @@ pub struct InvoiceRequirements {
     pub legal_basis: Option<String>,
 }
 
-/// Engine thuế (module `tax` công bố).
+/// Tax engine (published by the `tax` module).
 //
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
 #[async_trait::async_trait]
 pub trait TaxEngine: Send + Sync {
-    /// Thuế của một chứng từ. Lỗi: `tax.jurisdiction_unknown`, `tax.category_unknown`,
-    /// `tax.rate_missing` (không đoán thuế suất), `validation_failed`.
+    /// Tax of a document. Errors: `tax.jurisdiction_unknown`, `tax.category_unknown`,
+    /// `tax.rate_missing` (a tax rate is never guessed), `validation_failed`.
     async fn quote(
         &self,
         tenant: &TenantContext,
         request: TaxQuoteRequest,
     ) -> Result<TaxQuote, Error>;
-    /// Thuế khấu trừ thay. Người nhận là doanh nghiệp (tự kê khai): không khấu trừ.
+    /// Withholding tax. A business recipient (who self-declares) is not withheld.
     async fn withholding(
         &self,
         tenant: &TenantContext,
         request: WithholdingRequest,
     ) -> Result<WithholdingQuote, Error>;
-    /// Hồ sơ thuế của nút `org` hay của nút cấp trên gần nhất có hồ sơ.
+    /// Tax profile of branch `org` or of the nearest ancestor branch that has one.
     async fn profile(
         &self,
         tenant: &TenantContext,
         org: OrgId,
     ) -> Result<Option<TaxProfile>, Error>;
-    /// Yêu cầu hoá đơn của người bán `org` vào ngày `on`.
+    /// Invoice requirement of seller `org` on date `on`.
     async fn invoice_requirements(
         &self,
         tenant: &TenantContext,
