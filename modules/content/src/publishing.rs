@@ -598,6 +598,16 @@ impl ContentService {
         }
         paths::clear_automatic(transaction, tenant, &version.locale, &path).await?;
         paths::redirect_moved(transaction, tenant, &version.locale, &moved, by, now).await?;
+        if let Some(type_id) = version.type_id {
+            self.write_published_index(
+                transaction,
+                tenant,
+                type_id,
+                version.id,
+                version.custom_fields.as_deref(),
+            )
+            .await?;
+        }
         Ok((path, moved))
     }
 
@@ -637,6 +647,9 @@ impl ContentService {
             .filter(published::Column::EntryId.eq(entry.id))
             .exec(transaction)
             .await?;
+        if old.type_id.is_some() {
+            crate::types::public::remove_published_index(transaction, tenant, entry.id).await?;
+        }
         if gone {
             let row = Generated {
                 locale: &entry.locale,

@@ -545,6 +545,8 @@ never share foreign keys. These rules are checked automatically by the gate.
 - [`CLAUDE.md`](CLAUDE.md) — the rules for contributors, human or AI agent
 - [`CHANGELOG.md`](CHANGELOG.md) — what changed in each release; released Docker images
   are at `ghcr.io/<owner>/autoxide`
+- [`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md) — what stays stable from 1.0 (API, error codes,
+  settings, migrations, the Rust API for modules) and what may change
 - [`docs/guides/`](docs/guides/README.md) — task-by-task guides to the API, with `curl` and
   TypeScript examples that run as tests: a website, signing in, API keys, retries,
   pagination, errors, connecting an AI agent over MCP
