@@ -193,6 +193,8 @@ repo này; giao diện là dự án riêng dùng API.
 | Postgres cho test   | Docker — `gate.sh` tự dựng một container dùng xong bỏ           |
 | Hợp đồng Rust       | `cargo-semver-checks` 0.51.0 (`cargo install cargo-semver-checks --version 0.51.0 --locked`) — `cargo xtask semver` báo thay đổi phá vỡ của kernel, testkit, `autoxide` và module core / official ở job CI `semver` (PR chạm phần công khai và PR phát hành), không trong gate; từ 1.0 thì chặn (D-242, D-20261123-compatibility-policy) |
 | Quét secret         | `gitleaks` (cài sẵn hoặc image Docker ghim) — cấu hình `.gitleaks.toml`, chạy trong gate (D-108) |
+| Kiểm workflow CI    | `zizmor` 1.32.0 (bảo mật GitHub Actions; cấu hình `.github/zizmor.yml`) và `actionlint` 1.7.12 (cú pháp, shellcheck) — job CI `workflows`, không trong gate; trên máy: `pip install zizmor actionlint-py` (D-20261123-supply-chain) |
+| Ký bản phát hành    | Sigstore keyless qua OIDC của GitHub Actions: `actions/attest` (chứng thực SLSA, SBOM) và cosign 3.1.4 (`sigstore/cosign-installer` 4.1.3) — image và `SHA256SUMS` của file đính kèm; cách kiểm ở `docs/VERIFYING.md` (D-20261123-supply-chain) |
 | Gate                | `./gate.sh` — chạy tất cả các mục trên theo thứ tự; `--quick` chỉ test crate bị sửa trên SQLite (D-173) |
 
 ## Deploy

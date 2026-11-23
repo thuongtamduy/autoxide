@@ -1,0 +1,1 @@
+- A patch release for an older release line no longer takes the `latest` image tag or GitHub's "Latest release" mark.

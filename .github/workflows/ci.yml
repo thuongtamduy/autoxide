@@ -66,6 +66,8 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - run: rustup toolchain install
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
@@ -99,6 +101,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           # Cả lịch sử và tag: so với tag phát hành trước hay nhánh gốc của PR.
           fetch-depth: 0
       - name: changed
@@ -192,6 +195,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           # Cả lịch sử và tag: chọn tag phát hành trước HEAD; và để so với nhánh gốc của PR.
           fetch-depth: 0
       # D-20261121-ci-batch-release-faster: ở pull request, test nâng cấp chỉ chạy khi PR đụng thứ có thể
@@ -230,6 +234,40 @@ jobs:
       - run: cargo xtask upgrade-test --database ${{ matrix.database }}
         if: steps.changed.outputs.run == 'true'
 
+  # Kiểm bảo mật và cú pháp của chính các workflow (D-20261123-supply-chain): zizmor (quyền token, action chưa ghim
+  # SHA hay SHA không thuộc repo của action, chèn lệnh từ dữ liệu PR, trigger nguy hiểm, lộ credential qua checkout)
+  # và actionlint (cú pháp, biểu thức, shellcheck cho `run:`). Cấu hình zizmor: .github/zizmor.yml. Chạy trên máy:
+  # `pip install zizmor==<bản ở STACK.md> actionlint-py` rồi `zizmor --offline .github && actionlint`.
+  workflows:
+    name: workflow security (zizmor, actionlint)
+    if: ${{ !github.event.repository.private }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: taiki-e/install-action@25f51f6b1bf4e18876107cece836f4f77ac17c8c # v2.90.7
+        with:
+          tool: zizmor@1.32.0
+      # Không có action cài actionlint được ghim sẵn: tải bản phát hành chính thức, kiểm SHA-256 ghim ở đây.
+      - name: actionlint
+        env:
+          VERSION: 1.7.12
+          SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/actionlint.tar.gz" \
+            "https://github.com/rhysd/actionlint/releases/download/v$VERSION/actionlint_${VERSION}_linux_amd64.tar.gz"
+          echo "$SHA256  $RUNNER_TEMP/actionlint.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP" actionlint
+          "$RUNNER_TEMP/actionlint" -color
+      # Có token thì zizmor kiểm thêm phần cần mạng: SHA ghim có thật thuộc repo của action không, action có lỗ hổng
+      # đã công bố không.
+      - name: zizmor
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: zizmor --format=github .github
+
   secrets:
     name: secret scan (gitleaks)
     if: ${{ !github.event.repository.private }}
@@ -238,6 +276,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           # Toàn bộ lịch sử: secret đã commit rồi xoá vẫn nằm trong git.
           fetch-depth: 0
       - name: gitleaks
