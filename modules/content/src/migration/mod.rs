@@ -24,6 +24,7 @@ mod m0027_site_regions;
 mod m0028_content_types;
 mod m0029_ai_turns;
 mod m0030_site_health;
+mod m0031_type_detail_layout;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 use autoxide_kernel::tenancy::migration::TenantTable;
@@ -185,5 +186,13 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(m0029_ai_turns::Migration),
         // Kiểm tra sức khoẻ website: lần kiểm gần nhất (bước 67).
         Box::new(m0030_site_health::Migration),
+        // Trang chi tiết dựng sẵn của loại nội dung (bước 67, D-235).
+        Box::new(m0031_type_detail_layout::Migration),
+        // Index lọc `cf.<key>` theo giá trị của BẢN ĐĂNG (bảng index của kernel, tên riêng): danh sách
+        // công khai không được lọc theo giá trị nháp (D-20261123-content-types-later).
+        autoxide_kernel::custom_fields::index_migration(
+            "m0032_published_custom_index",
+            "content_published",
+        ),
     ]
 }

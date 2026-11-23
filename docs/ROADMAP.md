@@ -485,8 +485,9 @@ sẵn, không sinh code; kết quả luôn là bản nháp.
 - [x] Loại nội dung tự định nghĩa (D-235), phần chính: khách tạo loại (đội ngũ, dự án, chi nhánh…) với trường riêng
       của bước 51 (đích `content.type.<key>`), mục `kind = custom` dùng lại nháp / lịch sử / bản dịch / SEO, đường dẫn
       theo tiền tố, API công khai của loại (D-20261122-content-types)
-- [ ] Loại nội dung tự định nghĩa, phần sau: trang chi tiết dựng sẵn (`detail_layout`, khối `content.entry_field`),
+- [x] Loại nội dung tự định nghĩa, phần sau: trang chi tiết dựng sẵn (`detail_layout`, khối `content.entry_field`),
       khối `content.type_list`, lọc `cf.<key>` ở danh sách công khai, AI gợi ý bộ trường (bản nháp), hạn mức theo gói
+      (D-20261123-content-types-later)
 - [x] AI tạo trang và sửa tiếp bằng trò chuyện (job, kết quả qua bộ kiểm, thử lại có giới hạn, bản nháp
       `ai_assisted`, lịch sử trò chuyện để hoàn tác) — D-20261122-ai-pages
 - [ ] Bộ nháp chiến dịch từ một chương trình khuyến mại (trang đích, banner, chiến dịch `newsletter`, mỗi thứ là bản

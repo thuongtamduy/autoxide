@@ -24,6 +24,8 @@ pub struct Model {
     pub has_seo: bool,
     pub listable: bool,
     pub active: bool,
+    /// Bố cục mẫu của trang chi tiết (JSON trong `text`), chỉ loại có trang; `NULL`: không có.
+    pub detail_layout: Option<String>,
     pub created_by: Option<Uuid>,
     pub created_at: Timestamp,
     pub updated_at: Timestamp,

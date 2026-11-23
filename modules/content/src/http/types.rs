@@ -47,6 +47,11 @@ pub(crate) struct ContentTypeResponse {
     /// Switched off: entries stop being public (nothing is lost).
     active: bool,
     org_id: Uuid,
+    /// Only for a type with pages: the block layout every entry page of the type uses (blocks
+    /// `content.entry_field` show the entry's own fields). `null`: none; the website draws entries
+    /// from their own body.
+    #[schema(value_type = Option<Object>)]
+    detail_layout: Option<Value>,
     #[schema(value_type = String, format = DateTime)]
     updated_at: Timestamp,
 }
@@ -54,6 +59,10 @@ pub(crate) struct ContentTypeResponse {
 fn response(row: ContentType) -> ContentTypeResponse {
     ContentTypeResponse {
         labels: serde_json::from_str(&row.labels).unwrap_or(Value::Null),
+        detail_layout: row
+            .detail_layout
+            .as_deref()
+            .and_then(|text| serde_json::from_str(text).ok()),
         id: row.id,
         key: row.key,
         icon: row.icon,
@@ -90,6 +99,21 @@ pub(crate) struct ContentTypeRequest {
     active: Option<bool>,
     /// The website (organization unit), create only; left out: the whole tenant.
     org_id: Option<Uuid>,
+    /// Only with `routable`: the block layout (`{"type": "layout", "schema": 1, "sections": […]}`)
+    /// of every entry page of the type, checked like a page layout; blocks
+    /// `content.entry_field {"field": …}` show a field of the entry being viewed. `null` removes it.
+    #[serde(default, deserialize_with = "present")]
+    #[schema(value_type = Option<Object>)]
+    detail_layout: Option<Option<Value>>,
+}
+
+/// Trường có gửi lên hay không: thiếu → `None`, `null` → `Some(None)` (bỏ giá trị).
+fn present<'de, D, T>(deserializer: D) -> Result<Option<Option<T>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    Option::<T>::deserialize(deserializer).map(Some)
 }
 
 impl From<ContentTypeRequest> for TypeInput {
@@ -105,6 +129,7 @@ impl From<ContentTypeRequest> for TypeInput {
             listable: input.listable,
             active: input.active,
             org_id: input.org_id,
+            detail_layout: input.detail_layout,
         }
     }
 }
@@ -150,8 +175,8 @@ pub(crate) async fn list_types(
     responses(
         (status = 201, description = "Created.", body = autoxide_kernel::response::Data<ContentTypeResponse>, headers(("Location" = String, description = "Address of the new type."))),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "Missing permission `content.types.manage`; code `permission_denied`.", body = Problem),
-        (status = 409, description = "The key or address prefix is taken (`content.type_key_taken`, `content.path_prefix_taken`), or the tenant has the most types allowed (`content.types_limit`).", body = Problem),
+        (status = 403, description = "Missing permission `content.types.manage` (code `permission_denied`), or the plan has no `content.custom_types` (code `feature_not_enabled`).", body = Problem),
+        (status = 409, description = "The key or address prefix is taken (`content.type_key_taken`, `content.path_prefix_taken`), or the tenant has the most types allowed (`content.types_limit` for the server's ceiling, `limit_exceeded` for the plan's).", body = Problem),
         (status = 422, description = "A value is invalid; see `errors`.", body = Problem),
     )
 )]
@@ -270,7 +295,9 @@ pub(crate) struct TypeEntriesQuery {
 /// List the published entries of a content type (public).
 ///
 /// No sign-in needed. Only types switched on with `listable`; newest first. Each entry is like
-/// `GET /public/resolve` gives it (with the type's `public` custom fields). `Cache-Control: no-cache`.
+/// `GET /public/resolve` gives it (with the type's `public` custom fields). Filter on the published
+/// values of filterable public fields with `cf.<key>=<eq|in|gte|lte|prefix>:<value>`.
+/// `Cache-Control: no-cache`.
 #[utoipa::path(
     get,
     path = "/public/types/{key}/entries",
@@ -281,7 +308,7 @@ pub(crate) struct TypeEntriesQuery {
     responses(
         (status = 200, description = "A page of published entries.", body = Page<PublicEntryResponse>),
         (status = 404, description = "No listable content type has this key; code `content.type_not_found`.", body = Problem),
-        (status = 422, description = "The language or a paging value is invalid; see `errors`.", body = Problem),
+        (status = 422, description = "The language, a paging value or a `cf.<key>` filter is invalid (unknown or not public: `unknown`; not filterable: code `kernel.custom_field_not_filterable`); see `errors`.", body = Problem),
     )
 )]
 pub(crate) async fn public_type_entries(
@@ -291,12 +318,86 @@ pub(crate) async fn public_type_entries(
     Path(key): Path<String>,
     Query(query): Query<TypeEntriesQuery>,
     Query(paging): Query<PageQuery>,
+    Query(raw): Query<std::collections::HashMap<String, String>>,
 ) -> Result<Response, Error> {
     let mut problems = Vec::new();
     let languages = service.site_languages(&tenant, &site).await?;
     let locale = service.check_locale(&languages, query.locale.as_deref(), "locale", &mut problems);
     let page = page_request(paging, problems)?;
-    let (_, found) = service.public_type_entries(&tenant, &site, &key, &locale, &page).await?;
+    let mut filters: Vec<(String, String)> = raw
+        .into_iter()
+        .filter_map(|(name, value)| name.strip_prefix("cf.").map(|key| (key.to_owned(), value)))
+        .collect();
+    filters.sort();
+    let (_, found) =
+        service.public_type_entries(&tenant, &site, &key, &locale, &filters, &page).await?;
     let page = views(&service, &tenant, found).await?;
     Ok(public_cache(page.into_response()))
+}
+
+/// What the new content type is for.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct SuggestTypeRequest {
+    /// Required: in the owner's words, 1 to 2000 characters, e.g. "a page introducing our team,
+    /// one card per person".
+    #[serde(default)]
+    description: String,
+    /// Required: language of the labels, e.g. `vi`.
+    #[serde(default)]
+    locale: String,
+}
+
+/// A draft definition of a content type. Nothing is saved: review it, then create it.
+#[derive(Debug, Serialize, ToSchema)]
+pub(crate) struct TypeSuggestionResponse {
+    /// Body for `POST /types`.
+    #[schema(value_type = Object)]
+    content_type: Value,
+    /// Bodies for `POST /api/v1/kernel/custom-fields`, one per field (target
+    /// `content.type.<key>`), after the type is created.
+    #[schema(value_type = Vec<Object>)]
+    fields: Vec<Value>,
+    /// The model that wrote the draft.
+    model: String,
+    /// Always `true`: a person reviews the draft before creating anything.
+    draft: bool,
+}
+
+/// Suggest a content type with AI.
+///
+/// Requires `content.types.manage`, the plan feature `content.ai_suggestions` and AI switched on
+/// for the server. From a description, the model drafts the key, labels, icon, pages and fields of
+/// a new content type. Nothing is saved; each call uses AI tokens.
+#[utoipa::path(
+    post,
+    path = "/types/ai/suggest",
+    extensions(("x-permissions" = json!(["content.types.manage"]))),
+    operation_id = "suggest_content_type",
+    security(("bearer" = [])),
+    request_body = SuggestTypeRequest,
+    responses(
+        (status = 200, description = "A draft definition.", body = autoxide_kernel::response::Data<TypeSuggestionResponse>),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Missing permission `content.types.manage` (code `permission_denied`), or the plan has no `content.ai_suggestions` (code `feature_not_enabled`).", body = Problem),
+        (status = 422, description = "A value is invalid; see `errors`.", body = Problem),
+        (status = 503, description = "AI is off (code `ai.disabled`), misconfigured (code `ai.misconfigured`), the provider is busy (code `ai.provider_unavailable`, maybe with `Retry-After`), or its answer had the wrong shape twice (code `ai.output_invalid`).", body = Problem),
+    )
+)]
+pub(crate) async fn suggest_type(
+    State(service): State<Arc<ContentService>>,
+    tenant: TenantContext,
+    principal: Principal,
+    ValidJson(input): ValidJson<SuggestTypeRequest>,
+) -> Result<autoxide_kernel::response::Data<TypeSuggestionResponse>, Error> {
+    let found =
+        service.suggest_type(&tenant, &principal, &input.description, &input.locale).await?;
+    Ok(autoxide_kernel::response::Data {
+        data: TypeSuggestionResponse {
+            content_type: found.content_type,
+            fields: found.fields,
+            model: found.model,
+            draft: true,
+        },
+    })
 }

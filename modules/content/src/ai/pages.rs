@@ -30,7 +30,7 @@ pub(crate) const MAX_RETRIES: i32 = 2;
 const INSTRUCTION_MAX: usize = 2000;
 const SELECTION_MAX: usize = 50;
 /// Khối không bao giờ gửi cho mô hình (tự gắn, hay không cho AI đụng tới).
-const HIDDEN_FROM_AI: [&str; 1] = ["compliance.legal_footer"];
+const HIDDEN_FROM_AI: [&str; 2] = ["compliance.legal_footer", "content.entry_field"];
 
 pub(crate) type AiTurn = ai_turn::Model;
 
@@ -222,7 +222,7 @@ impl ContentService {
             self.get(tenant, principal, turn.entry_id).await.map_err(|error| (0, error))?;
         let body: Value = serde_json::from_str(&current.body).unwrap_or_else(|_| body::empty());
         let usable = self.usable_blocks(tenant).await.map_err(|error| (0, error))?;
-        let catalog: Vec<Value> = usable
+        let mut catalog: Vec<Value> = usable
             .values()
             .filter(|info| !HIDDEN_FROM_AI.contains(&info.block.name))
             .map(|info| {
@@ -234,6 +234,13 @@ impl ContentService {
                 })
             })
             .collect();
+        // Khối danh sách của loại nội dung: mô hình cần biết loại nào có và trường nào dùng được (D-235).
+        if let Some(entry) =
+            catalog.iter_mut().find(|entry| entry["name"] == crate::blocks::TYPE_LIST.name)
+        {
+            entry["content_types"] =
+                Value::Array(self.types_for_ai(tenant).await.map_err(|error| (0, error))?);
+        }
         let edit = turn.kind == "edit";
         let mut errors: Vec<FieldError> = Vec::new();
         let mut tries = 0;
