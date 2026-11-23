@@ -293,3 +293,40 @@ async fn doan_ma_dong_thoi_van_bi_chan_sau_nam_lan() {
     .await
     .unwrap();
 }
+
+/// Pentest 2026-11: một địa chỉ client xin mã cho hàng loạt số khác nhau (mỗi tin tốn tiền SMS
+/// của cửa hàng) bị chặn sau 20 mã một giờ; địa chỉ khác vẫn xin được.
+#[tokio::test]
+async fn mot_dia_chi_khong_xin_ma_cho_hang_loat_so() {
+    TestDatabase::run(async |test| {
+        let sms = Arc::new(FakeSmsSender::new());
+        let shop = app_with(test, |builder| {
+            builder
+                .setting("AUTOXIDE_HTTP_CLIENT_IP_HEADER", "X-Forwarded-For")
+                .provide::<dyn SmsSender>(sms.clone())
+        })
+        .await;
+        let ask = async |client: &str, number: u32| {
+            let answer = shop
+                .post("/api/v1/bookings/public/phone-codes")
+                .header("x-forwarded-for", client)
+                .json(json!({"phone": format!("09123{number:05}")}))
+                .send()
+                .await
+                .unwrap();
+            let body = if answer.body().is_empty() { Value::Null } else { answer.json() };
+            (answer.status(), body)
+        };
+        for number in 0..20 {
+            let (status, sent) = ask("203.0.113.7", number).await;
+            assert_eq!(status, StatusCode::OK, "{sent}");
+        }
+        let (status, problem) = ask("203.0.113.7", 20).await;
+        assert_eq!(status, StatusCode::TOO_MANY_REQUESTS, "{problem}");
+        assert_eq!(problem["code"], "bookings.too_many_codes");
+        let (status, sent) = ask("198.51.100.9", 21).await;
+        assert_eq!(status, StatusCode::OK, "{sent}");
+    })
+    .await
+    .unwrap();
+}

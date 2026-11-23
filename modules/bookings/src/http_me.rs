@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
-use autoxide_kernel::http::ValidJson;
+use autoxide_kernel::http::{ClientInfo, ValidJson};
 use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Data, Problem};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
@@ -213,7 +213,8 @@ async fn booking_calendar(
 /// Send a booking code by SMS (public).
 ///
 /// Guests book and cancel with a code sent to their phone number. A code works once, for 10
-/// minutes, and allows 5 tries; a number gets at most 5 codes an hour.
+/// minutes, and allows 5 tries; a number gets at most 5 codes an hour, and one client address at
+/// most 20 (all numbers together).
 #[utoipa::path(
     post,
     path = "/public/phone-codes",
@@ -224,16 +225,17 @@ async fn booking_calendar(
     responses(
         (status = 200, description = "Sent.", body = Data<BookingCodeSent>),
         (status = 422, description = "Not a phone number; see `errors`.", body = Problem),
-        (status = 429, description = "Too many codes for this number; code `bookings.too_many_codes`.", body = Problem),
+        (status = 429, description = "Too many codes for this number or from this client address; code `bookings.too_many_codes`, see `Retry-After`.", body = Problem),
         (status = 503, description = "The server cannot send SMS; code `sms_disabled`.", body = Problem),
     )
 )]
 async fn send_phone_code(
     State(service): State<Arc<BookingsService>>,
     tenant: TenantContext,
+    client: ClientInfo,
     ValidJson(input): ValidJson<SendBookingCodeRequest>,
 ) -> Result<Data<BookingCodeSent>, Error> {
-    let sent = service.send_code(&tenant, &input.phone).await?;
+    let sent = service.send_code(&tenant, &input.phone, client.ip).await?;
     Ok(Data { data: BookingCodeSent { challenge_id: sent.id, expires_at: sent.expires_at } })
 }
 
