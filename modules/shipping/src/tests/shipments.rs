@@ -469,3 +469,33 @@ async fn token_cua_khach_a_o_khach_b() {
     .await
     .unwrap();
 }
+
+/// Rà soát bảo mật 2026-11: webhook của tài khoản hãng thứ hai (cùng hãng, chữ ký đúng của chính nó)
+/// không đổi được trạng thái vận đơn đặt qua tài khoản khác dù biết mã vận đơn.
+#[tokio::test]
+async fn webhook_tai_khoan_khac_khong_doi_van_don() {
+    TestDatabase::run(async |test| {
+        let (app, tree, _fake, method, _token) = carrier_shop(test, false).await;
+        let id = create(&app, request(&tree, &method, Uuid::now_v7(), "k")).await["id"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        let tracking = book(&app, &id).await["tracking_number"].as_str().unwrap().to_owned();
+        let body = json!({
+            "org_id": tree.a.as_uuid(), "carrier_code": "fake", "name": "Other shop",
+            "credentials": {"token": "other-token", "webhook_secret": "other-secret"},
+        });
+        let (status, other) = call(&app, "POST", "/carrier-accounts", "boss", Some(body)).await;
+        assert_eq!(status, StatusCode::CREATED, "{other}");
+        let other_token =
+            other["data"]["webhook_path"].as_str().unwrap().rsplit('/').next().unwrap().to_owned();
+        let line = json!([{"event_id": "x1", "tracking_number": tracking, "status": "delivered",
+                           "occurred_at": Timestamp::now()}]);
+        assert_eq!(webhook(&app, &other_token, "other-secret", line).await, StatusCode::ACCEPTED);
+        drain(&app).await;
+        let (_, detail) = call(&app, "GET", &format!("/shipments/{id}"), "boss", None).await;
+        assert_ne!(detail["data"]["status"], "delivered", "{detail}");
+    })
+    .await
+    .unwrap();
+}
