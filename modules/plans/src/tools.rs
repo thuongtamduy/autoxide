@@ -232,6 +232,9 @@ pub(crate) fn all(service: &Arc<PlansService>) -> Vec<Tool> {
                         addons: None,
                         billing_email: input.billing_email,
                     };
+                    // Như REST (luật kiến trúc 8; rà soát bảo mật 2026-11): gói mua qua kho ứng
+                    // dụng chỉ đổi ở kho, không đổi ở đây.
+                    service.ensure_not_store_billed(tenant.id()).await?;
                     service.change(Actor::from(&principal), tenant.id(), change).await?;
                     let row = service
                         .subscription(tenant.id())
