@@ -16,6 +16,8 @@ pub(crate) fn relocation() -> Relocation {
             "content_site_regions",
             "content_types",
             "content_site_health",
+            "content_campaign_drafts",
+            "content_not_found_paths",
         ])
         .follow("content_published", "entry_id", "content_entries")
         .follow("content_revisions", "entry_id", "content_entries")

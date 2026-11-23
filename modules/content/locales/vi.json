@@ -348,6 +348,9 @@
   "field:must be {\"one\": {language: text}, \"many\": {language: text}} with texts of 1 to 80 characters": "phải có dạng {\"one\": {ngôn ngữ: chữ}, \"many\": {ngôn ngữ: chữ}}, mỗi chữ dài 1 đến 80 ký tự",
   "content.ai_result_invalid": "AI chưa tạo được bố cục hợp lệ sau {tries} lần; hãy mô tả cụ thể hơn.",
   "content.ai_conflict": "Có người sửa trang trong lúc AI làm; hãy yêu cầu lại trên bản hiện tại.",
+  "content.campaign_copy_invalid": "AI chưa viết được chữ hợp lệ cho banner hay thư sau {tries} lần; hãy bổ sung thông tin cho chương trình hoặc lời yêu cầu.",
+  "content.campaign_module_unavailable": "Máy chủ này chưa cài module `{module}`.",
+  "content.campaign_draft_not_found": "Không có bộ nháp chiến dịch mã `{id}`.",
   "text:An AI request on a page finished: its result is a new draft (never published); `revision_id` holds it.": "Một yêu cầu AI cho trang đã xong: kết quả là bản nháp mới (không bao giờ tự đăng), nằm ở `revision_id`.",
   "field:only pages have a block layout": "chỉ trang mới có bố cục khối",
   "field:the page has no block layout yet; compose one first": "trang chưa có bố cục khối; hãy tạo bố cục trước",
@@ -364,5 +367,15 @@
   "text:Entry field": "Trường của mục",
   "text:Only in the detail layout of a custom content type: shows one field of the entry being viewed.": "Chỉ trong bố cục trang chi tiết của loại nội dung tự định nghĩa: hiện một trường của mục đang xem.",
   "text:Use to show the published entries of a custom content type (team, projects, branches…) as cards; filter on its filterable public fields.": "Dùng để hiện các mục đã đăng của một loại nội dung tự định nghĩa (đội ngũ, dự án, chi nhánh…) thành thẻ; lọc theo trường công khai lọc được.",
-  "field:must be a BCP 47 language code such as `vi`": "phải là mã ngôn ngữ BCP 47, vd `vi`"
+  "field:must be a BCP 47 language code such as `vi`": "phải là mã ngôn ngữ BCP 47, vd `vi`",
+  "field:must be `page`, `banner` or `newsletter`": "phải là `page`, `banner` hay `newsletter`",
+  "field:must be one line": "phải nằm trên một dòng",
+  "field:must be plain text without links": "phải là chữ thường, không có link",
+  "field:must be {min} to {max} characters": "phải dài {min} đến {max} ký tự",
+  "field:name at least one channel": "hãy chọn ít nhất một kênh",
+  "field:the `banner` channel needs the key of a banner placement": "kênh `banner` cần mã của một vị trí banner",
+  "field:the `newsletter` channel needs the list to write the campaign for": "kênh `newsletter` cần danh sách nhận tin của chiến dịch",
+  "field:the number {number} is not in the promotion facts": "số {number} không có trong dữ liệu của chương trình",
+  "field:send exactly one of `layout` and `operations`": "gửi đúng một trong hai: `layout` hoặc `operations`",
+  "field:is not valid: {error}": "chưa hợp lệ: {error}"
 }

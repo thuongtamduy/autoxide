@@ -58,6 +58,9 @@ pub(crate) struct ContentService {
     pub(crate) site_cache: crate::site::SiteCache,
     /// Phần của module khác trong khung website (`api::SiteExtensions`).
     pub(crate) site_extensions: Arc<crate::site::ExtensionRegistry>,
+    /// Sổ tool MCP của mọi module (kernel điền sau khi mọi module khởi động): bộ nháp chiến dịch đọc
+    /// chương trình khuyến mại và tạo nháp `newsletter` qua tool, với quyền của người yêu cầu.
+    pub(crate) tools: autoxide_kernel::automation::AutomationDirectory,
 }
 
 /// Tính năng theo gói (bước 35): gợi ý và bản nháp do AI soạn (SEO, dịch).
@@ -108,7 +111,16 @@ impl ContentService {
             blocks: Default::default(),
             site_cache: Default::default(),
             site_extensions: Default::default(),
+            tools: Default::default(),
         }
+    }
+
+    pub(crate) fn with_tools(
+        mut self,
+        tools: autoxide_kernel::automation::AutomationDirectory,
+    ) -> Self {
+        self.tools = tools;
+        self
     }
 
     pub(crate) fn with_templates(

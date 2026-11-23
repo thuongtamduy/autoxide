@@ -160,6 +160,9 @@ mod fixtures {
 
     pub(crate) const SHOP_WRITE: Permission = Permission::new("shop.write", "Change the shop.");
     pub(crate) const SHOP_READ: Permission = Permission::new("shop.read", "See the shop.");
+    /// Đụng tới tiền: REST đòi xác nhận lại (step-up) khi phiên đã cũ.
+    pub(crate) const SHOP_REFUND: Permission = Permission::new("shop.refund", "Refund an order.")
+        .with_risk(autoxide_kernel::access::Risk::Money);
     pub(crate) const REVENUE: FactKind =
         FactKind::new("shop.revenue", "Money from orders.", Measure::Amount, &[]);
 
@@ -257,11 +260,14 @@ mod fixtures {
         }
 
         fn permissions(&self) -> Vec<Permission> {
-            vec![SHOP_WRITE, SHOP_READ]
+            vec![SHOP_WRITE, SHOP_READ, SHOP_REFUND]
         }
 
         fn events(&self) -> Vec<EventInfo> {
-            vec![EventInfo::new("shop.order_placed", "An order was placed (`total`, `code`).")]
+            vec![
+                EventInfo::new("shop.order_placed", "An order was placed (`total`, `code`).")
+                    .streamable(SHOP_READ),
+            ]
         }
 
         fn facts(&self) -> Vec<FactSource> {
@@ -328,6 +334,15 @@ mod fixtures {
                     },
                 )
                 .requires(SHOP_WRITE)
+                .destructive(),
+                Tool::new(
+                    "refund",
+                    "Refund an order.",
+                    move |_: TenantContext, _: Principal, _: Nothing| async move {
+                        Ok::<_, Error>(json!({"refunded": true}))
+                    },
+                )
+                .requires(SHOP_REFUND)
                 .destructive(),
             ]
         }

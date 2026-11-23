@@ -426,6 +426,14 @@ impl SupportService {
         let access = AccessPath::Support(grant.id);
         let granted = crate::role::role_grants(&platform, &[grant.role_id]).await?;
         let Some((all, rules)) = granted.get(&grant.role_id) else { return Ok(None) };
+        // Role đòi MFA mà nhân sự chưa bật MFA: không vào được bằng lần cấp này, như role đó không
+        // có hiệu lực ở khách nền tảng (rà soát bảo mật 2026-11).
+        let blocked =
+            crate::role::roles_blocked_by_mfa(&platform, principal.user_id(), &[grant.role_id])
+                .await?;
+        if !blocked.is_empty() {
+            return Ok(None);
+        }
         let entered = if *all {
             Principal::with_all_permissions(principal.user_id())
         } else {

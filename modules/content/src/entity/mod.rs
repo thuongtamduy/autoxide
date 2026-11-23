@@ -3,6 +3,7 @@
 pub(crate) mod ai_turn;
 pub(crate) mod author;
 pub(crate) mod banner;
+pub(crate) mod campaign_draft;
 pub(crate) mod content_type;
 pub(crate) mod edit_lock;
 pub(crate) mod embedding;
@@ -12,6 +13,7 @@ pub(crate) mod entry_author;
 pub(crate) mod entry_term;
 pub(crate) mod menu;
 pub(crate) mod menu_item;
+pub(crate) mod not_found_path;
 pub(crate) mod page_template;
 pub(crate) mod placement;
 pub(crate) mod published;

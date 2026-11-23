@@ -3,14 +3,15 @@
 //! đăng ký qua `routes!` để có tài liệu OpenAPI (luật kiến trúc 6).
 
 mod actions;
-mod ai_pages;
+pub(crate) mod ai_pages;
 mod assist;
 mod banners;
+pub(crate) mod campaign_drafts;
 mod edit_lock;
 pub(crate) mod entries;
-mod health;
+pub(crate) mod health;
 mod history;
-mod layout;
+pub(crate) mod layout;
 mod library;
 mod links;
 mod menus;
@@ -32,9 +33,9 @@ mod tests_compliance;
 mod tests_tenancy;
 #[cfg(test)]
 mod tests_web;
-mod theme_variants;
+pub(crate) mod theme_variants;
 mod themes;
-mod types;
+pub(crate) mod types;
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -70,6 +71,8 @@ pub(crate) fn routes(service: Arc<ContentService>) -> OpenApiRouter {
         .routes(routes!(ai_pages::compose_page))
         .routes(routes!(ai_pages::edit_page))
         .routes(routes!(ai_pages::ai_thread))
+        .routes(routes!(campaign_drafts::create_campaign_drafts))
+        .routes(routes!(campaign_drafts::get_campaign_drafts))
         .routes(routes!(actions::publish_entry))
         .routes(routes!(actions::unpublish_entry))
         .routes(routes!(actions::archive_entry))

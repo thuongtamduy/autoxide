@@ -284,15 +284,21 @@ impl DelegationService {
         let access = AccessPath::Delegation(first.id);
         let roles: Vec<Uuid> = delegations.iter().map(|row| row.role_id).collect();
         let granted = crate::role::role_grants(&home, &roles).await?;
+        // Role đòi MFA mà người này chưa bật MFA: không cấp ở khách con, như ở khách nhà (cấm vẫn
+        // giữ).
+        let blocked = crate::role::roles_blocked_by_mfa(&home, principal.user_id(), &roles).await?;
         let mut grants = Vec::new();
         let mut denied = Vec::new();
         let mut everything = false;
         for delegation in &delegations {
             let org = OrgId::from_uuid(delegation.org_id);
             let Some((all, rules)) = granted.get(&delegation.role_id) else { continue };
+            denied.extend(rules.denies.iter().cloned());
+            if blocked.contains(&delegation.role_id) {
+                continue;
+            }
             // Role toàn quyền của khách cha chỉ uỷ quyền được ở nút gốc của khách con (`grant`).
             everything |= *all;
-            denied.extend(rules.denies.iter().cloned());
             for (permission, scope) in &rules.grants {
                 grants.push((permission.clone(), Grant::new(org, *scope)));
             }

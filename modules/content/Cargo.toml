@@ -17,6 +17,7 @@ bench-seed = []
 
 [dependencies]
 jiff.workspace = true
+metrics.workspace = true
 async-trait.workspace = true
 autoxide-compliance.workspace = true
 autoxide-kernel.workspace = true

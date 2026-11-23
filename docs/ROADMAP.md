@@ -498,13 +498,13 @@ sẵn, không sinh code; kết quả luôn là bản nháp.
       (D-20261123-content-types-later)
 - [x] AI tạo trang và sửa tiếp bằng trò chuyện (job, kết quả qua bộ kiểm, thử lại có giới hạn, bản nháp
       `ai_assisted`, lịch sử trò chuyện để hoàn tác) — D-20261122-ai-pages
-- [ ] Bộ nháp chiến dịch từ một chương trình khuyến mại (trang đích, banner, chiến dịch `newsletter`, mỗi thứ là bản
-      nháp ở module của nó); hạn mức `content.ai_page_generations` theo gói
+- [x] Bộ nháp chiến dịch từ một chương trình khuyến mại (trang đích, banner, chiến dịch `newsletter`, mỗi thứ là bản
+      nháp ở module của nó); hạn mức `content.ai_page_generations` theo gói — D-20261123-campaign-drafts
 - [x] Kiểm tra sức khoẻ website vào hộp việc, chạy theo yêu cầu: thiếu mô tả SEO / alt, tiêu đề trùng, link gãy,
       bản ghi nhúng đã ẩn, đếm ngược đã qua (D-20261122-site-health)
-- [ ] Kiểm tra sức khoẻ website, phần sau: job hằng ngày mọi website, đếm đường dẫn 404 (bảng
+- [x] Kiểm tra sức khoẻ website, phần sau: job hằng ngày mọi website, đếm đường dẫn 404 (bảng
       `content_not_found_paths`, không lưu IP) → gợi ý chuyển hướng; tool MCP như REST cho khối, bố cục, giao diện,
-      loại nội dung, AI trang, sức khoẻ
+      loại nội dung, AI trang, sức khoẻ — D-20261123-site-health-daily
 - [x] Hướng dẫn EN + VI cho người viết module khai khối (`docs/guides/page-blocks.md`, mục 9b của MODULE_GUIDE)
 - [ ] Thử A/B hai phiên bản trang (D-231, sau bước 57), **sau 1.0** — D-20261122-step67-after-1-0): chia cố định theo người xem (F5 không đổi), bot thấy bản
       gốc, chỉ thử bố cục và nội dung (không thử giá), số liệu và độ tin cậy, người chọn bản thắng

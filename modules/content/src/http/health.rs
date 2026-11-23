@@ -26,7 +26,7 @@ pub(crate) struct HealthResponse {
     findings: Vec<Finding>,
 }
 
-fn response(row: HealthReport) -> HealthResponse {
+pub(crate) fn response(row: HealthReport) -> HealthResponse {
     HealthResponse {
         findings: serde_json::from_str(&row.findings).unwrap_or_default(),
         org_id: row.org_id,

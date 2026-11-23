@@ -25,6 +25,8 @@ mod m0028_content_types;
 mod m0029_ai_turns;
 mod m0030_site_health;
 mod m0031_type_detail_layout;
+mod m0033_campaign_drafts;
+mod m0034_not_found_paths;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 use autoxide_kernel::tenancy::migration::TenantTable;
@@ -194,5 +196,9 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
             "m0032_published_custom_index",
             "content_published",
         ),
+        // Bộ nháp chiến dịch từ một chương trình khuyến mại (bước 67).
+        Box::new(m0033_campaign_drafts::Migration),
+        // Đếm đường dẫn 404 của website, gợi ý chuyển hướng (bước 67).
+        Box::new(m0034_not_found_paths::Migration),
     ]
 }

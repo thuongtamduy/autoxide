@@ -16,6 +16,7 @@ mod banners;
 #[cfg(any(test, feature = "bench-seed"))]
 mod bench_seed;
 mod blocks;
+mod builder_tools;
 mod client_config;
 mod config;
 mod entity;
@@ -27,7 +28,9 @@ mod health;
 mod http;
 mod mcp;
 mod migration;
+mod not_found;
 mod page_templates;
+mod page_tools;
 mod permissions;
 mod privacy;
 mod publishing;
@@ -218,7 +221,7 @@ impl Module for ContentModule {
     }
 
     fn limits(&self) -> Vec<autoxide_kernel::entitlement::Limit> {
-        vec![types::CUSTOM_TYPES_LIMIT]
+        vec![types::CUSTOM_TYPES_LIMIT, crate::ai::campaign::AI_PAGE_GENERATIONS]
     }
 
     fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
@@ -247,6 +250,7 @@ impl Module for ContentModule {
             .with_resources(context.resources())
             .with_custom_fields(context.custom_fields())
             .with_blocks(context.blocks())
+            .with_tools(context.automation_directory())
             // Mẫu trang bắt buộc (D-359): biến từ hồ sơ pháp lý của `compliance` khi app có module đó.
             .with_templates(
                 (*context.require::<autoxide_kernel::template::TemplateEngine>()?).clone(),
@@ -329,6 +333,14 @@ impl Module for ContentModule {
                     crate::ai::pages::AI_PAGE,
                     Arc::new(crate::ai::pages::AiPages(service.clone())),
                 ),
+                JobRegistration::new(
+                    crate::ai::campaign::CAMPAIGN_DRAFTS,
+                    Arc::new(crate::ai::campaign::CampaignDrafts(service.clone())),
+                ),
+                JobRegistration::new(
+                    not_found::SITE_HEALTH_DAILY,
+                    Arc::new(not_found::DailyHealth(service.clone())),
+                ),
                 JobRegistration::new(semantic::INDEX, Arc::new(semantic::Indexer(service.clone()))),
                 JobRegistration::new(semantic::CATCH_UP, Arc::new(semantic::CatchUp(service))),
             ]
@@ -339,6 +351,8 @@ impl Module for ContentModule {
         let day = std::time::Duration::from_secs(24 * 3600);
         vec![
             Schedule::new(revisions::PRUNE, revisions::PRUNE, day),
+            // Kiểm sức khoẻ mọi website mỗi ngày, xoá dòng đếm 404 cũ (bước 67).
+            Schedule::new(not_found::SITE_HEALTH_DAILY, not_found::SITE_HEALTH_DAILY, day),
             // Lập index tìm kiếm cho mục còn thiếu (vừa bật embedding, đổi mô hình): mỗi giờ.
             Schedule::new(
                 semantic::CATCH_UP,

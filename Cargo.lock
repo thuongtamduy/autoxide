@@ -552,6 +552,7 @@ dependencies = [
  "base64 0.23.1",
  "hmac 0.13.0",
  "jiff",
+ "metrics",
  "proptest",
  "sea-orm",
  "serde",

@@ -222,6 +222,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261119-step53-auto-reply](D-20261119-step53-auto-reply.md)** `support`: trả lời tự động — mô hình chỉ phân loại, luật quyết trong Rust, duyệt bằng chính lệnh bật — 2026-11-19
 - **[D-20261121-mcp-server](D-20261121-mcp-server.md)** MCP server tự viết trong kernel thay `rmcp`, phục vụ cả bản `2026-07-28` lẫn bản cũ — 2026-11-21
 - **[D-20261122-ai-pages](D-20261122-ai-pages.md)** AI tạo và sửa trang: job theo lượt, bố cục trả dưới dạng chuỗi JSON, kiểm như người, ghi nháp bằng quyền đã chụp — 2026-11-22
+- **[D-20261123-campaign-drafts](D-20261123-campaign-drafts.md)** Bộ nháp chiến dịch gọi `promotions` / `newsletter` qua sổ tool MCP; hạn mức AI trang theo gói — 2026-11-23
 
 ## Xác thực, phân quyền, bảo mật
 
@@ -488,6 +489,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261122-theme-tokens](D-20261122-theme-tokens.md)** Bộ giao diện website: token phẳng theo nút, ghi đè kế thừa, danh sách font cho phép, tương phản chỉ cảnh báo — 2026-11-22
 - **[D-20261122-theme-variants](D-20261122-theme-variants.md)** Chủ đề theo lịch: lịch JSON ba loại theo múi IANA của website, chọn đúng một bản, mẫu nhúng binary — 2026-11-22
 - **[D-20261123-content-types-later](D-20261123-content-types-later.md)** Loại nội dung, phần sau: trang chi tiết do `content` điền, lọc công khai theo index của bản đăng, hạn mức theo gói — 2026-11-23
+- **[D-20261123-site-health-daily](D-20261123-site-health-daily.md)** Sức khoẻ website phần sau: job hằng ngày, đếm 404 theo ngày không lưu người xem, tool MCP của trang dựng từ khối — 2026-11-23
 
 ## Tiền, thuế, chứng từ
 
