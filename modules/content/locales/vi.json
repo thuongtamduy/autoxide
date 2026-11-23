@@ -367,5 +367,13 @@
   "text:Entry field": "Trường của mục",
   "text:Only in the detail layout of a custom content type: shows one field of the entry being viewed.": "Chỉ trong bố cục trang chi tiết của loại nội dung tự định nghĩa: hiện một trường của mục đang xem.",
   "text:Use to show the published entries of a custom content type (team, projects, branches…) as cards; filter on its filterable public fields.": "Dùng để hiện các mục đã đăng của một loại nội dung tự định nghĩa (đội ngũ, dự án, chi nhánh…) thành thẻ; lọc theo trường công khai lọc được.",
-  "field:must be a BCP 47 language code such as `vi`": "phải là mã ngôn ngữ BCP 47, vd `vi`"
+  "field:must be a BCP 47 language code such as `vi`": "phải là mã ngôn ngữ BCP 47, vd `vi`",
+  "field:must be `page`, `banner` or `newsletter`": "phải là `page`, `banner` hay `newsletter`",
+  "field:must be one line": "phải nằm trên một dòng",
+  "field:must be plain text without links": "phải là chữ thường, không có link",
+  "field:must be {min} to {max} characters": "phải dài {min} đến {max} ký tự",
+  "field:name at least one channel": "hãy chọn ít nhất một kênh",
+  "field:the `banner` channel needs the key of a banner placement": "kênh `banner` cần mã của một vị trí banner",
+  "field:the `newsletter` channel needs the list to write the campaign for": "kênh `newsletter` cần danh sách nhận tin của chiến dịch",
+  "field:the number {number} is not in the promotion facts": "số {number} không có trong dữ liệu của chương trình"
 }

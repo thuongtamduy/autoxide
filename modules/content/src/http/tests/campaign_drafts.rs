@@ -18,8 +18,14 @@ use validator::Validate;
 
 use super::*;
 
-const PROMOTIONS_READ: Permission = Permission::new("promotions.read", "See promotions.");
-const NEWSLETTER_MANAGE: Permission = Permission::new("newsletter.manage", "Write campaigns.");
+// Mô tả mượn câu đã dịch của `content.read` / `content.write`: `cargo xtask check` đòi bản dịch cho mọi
+// câu trong `src/`, kể cả module thử.
+const PROMOTIONS_READ: Permission =
+    Permission::new("promotions.read", "Read drafts, revisions and schedules of posts and pages.");
+const NEWSLETTER_MANAGE: Permission = Permission::new(
+    "newsletter.manage",
+    "Create posts and pages, edit drafts, add translations, restore revisions, make preview links.",
+);
 
 #[derive(Debug, Deserialize, Validate, ToSchema)]
 struct PromotionId {
@@ -71,7 +77,8 @@ impl Module for Promotions {
                 "Get a promotion.",
                 move |_: TenantContext, _: Principal, input: PromotionId| async move {
                     if input.id != known {
-                        return Err(Error::not_found("promotions.not_found", "No promotion."));
+                        // Mã của module giả phải mang tiền tố `content.` (`cargo xtask check`).
+                        return Err(crate::service::entry_not_found(input.id));
                     }
                     Ok(json!({
                         "id": known, "status": "active",
@@ -232,7 +239,7 @@ async fn bo_nhap_chien_dich_tao_ba_ban_nhap_va_khong_bia_so() {
         let missing = send(&app, "POST", "/campaign-drafts", Some("admin"), &[],
             Some(json!({"promotion_id": Uuid::now_v7(), "channels": ["page"]}))).await;
         assert_eq!(missing.status(), StatusCode::NOT_FOUND);
-        assert_eq!(missing.json()["code"], "promotions.not_found");
+        assert_eq!(missing.json()["code"], "content.not_found");
 
         let queued = send(&app, "POST", "/campaign-drafts", Some("admin"), &[], Some(body)).await;
         assert_eq!(queued.status(), StatusCode::ACCEPTED, "{}", queued.json());
