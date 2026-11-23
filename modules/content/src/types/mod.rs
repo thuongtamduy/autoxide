@@ -4,7 +4,9 @@
 //! `kind = custom` và `type_id` — dùng nguyên nháp, lịch sử, duyệt, hẹn giờ, bản dịch, SEO, chuyển
 //! hướng của `content`. Loại có trang thì mục công khai ở `/<path_prefix>/<slug>`.
 
+pub(crate) mod detail;
 pub(crate) mod public;
+pub(crate) mod suggest;
 
 use std::collections::BTreeMap;
 
@@ -68,6 +70,38 @@ pub(crate) struct TypeInput {
     pub listable: Option<bool>,
     pub active: Option<bool>,
     pub org_id: Option<Uuid>,
+    /// Bố cục mẫu của trang chi tiết: `Some(None)` bỏ, `None` giữ nguyên.
+    pub detail_layout: Option<Option<Value>>,
+}
+
+/// Tính năng của gói: tạo loại nội dung tự định nghĩa.
+pub(crate) const CUSTOM_TYPES: autoxide_kernel::entitlement::Feature =
+    autoxide_kernel::entitlement::Feature::new(
+        "content.custom_types",
+        "Custom content types (team, projects, branches…) with their own fields and pages.",
+    );
+
+/// Hạn mức của gói: số loại nội dung tự định nghĩa mỗi khách (trong trần máy chủ [`TYPES_MAX`]).
+pub(crate) const CUSTOM_TYPES_LIMIT: autoxide_kernel::entitlement::Limit =
+    autoxide_kernel::entitlement::Limit::count(
+        "content.custom_types",
+        "Custom content types a tenant can keep.",
+    );
+
+fn type_reference(id: Uuid) -> String {
+    format!("content_type:{id}")
+}
+
+/// Bộ đếm thật cho job đối soát hạn mức [`CUSTOM_TYPES_LIMIT`].
+pub(crate) struct TypeCounter;
+
+#[async_trait::async_trait]
+impl autoxide_kernel::entitlement::UsageCounter for TypeCounter {
+    async fn count(&self, tenant: &TenantContext) -> Result<i64, Error> {
+        let found =
+            content_type::Entity::find().scoped(tenant).count(tenant.database().read()).await?;
+        Ok(i64::try_from(found).unwrap_or(i64::MAX))
+    }
 }
 
 pub(crate) fn type_not_found(key: &str) -> Error {
@@ -157,6 +191,7 @@ impl ContentService {
         input: TypeInput,
     ) -> Result<ContentType, Error> {
         principal.require(&CONTENT_TYPES)?;
+        self.entitlements.require_feature(tenant.id(), &CUSTOM_TYPES).await?;
         let org = input.org_id.map_or(root_of(tenant.id()), OrgId::from_uuid);
         let at = now();
         let mut row = ContentType {
@@ -172,11 +207,33 @@ impl ContentService {
             has_seo: true,
             listable: true,
             active: true,
+            detail_layout: None,
             created_by: Some(principal.user_id()),
             created_at: at,
             updated_at: at,
         };
-        apply(&mut row, input, true)?;
+        self.apply_checked(tenant, &mut row, input, true).await?;
+        let reference = type_reference(row.id);
+        self.entitlements.reserve(tenant.id(), &CUSTOM_TYPES_LIMIT, 1, &reference).await?;
+        let created = self.insert_type(tenant, principal, org, row).await;
+        match &created {
+            Ok(_) => {
+                self.entitlements.confirm(tenant.id(), &CUSTOM_TYPES_LIMIT, &reference).await?
+            }
+            Err(_) => {
+                self.entitlements.release(tenant.id(), &CUSTOM_TYPES_LIMIT, &reference).await?
+            }
+        }
+        created
+    }
+
+    async fn insert_type(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+        org: OrgId,
+        row: ContentType,
+    ) -> Result<ContentType, Error> {
         let transaction = tenant.database().begin_write().await?;
         principal.require_write_at(&transaction, &CONTENT_TYPES, OrgTarget::new(org, None)).await?;
         let count = content_type::Entity::find().scoped(tenant).count(&transaction).await?;
@@ -223,7 +280,7 @@ impl ContentService {
             return Err(autoxide_kernel::version::changed());
         }
         let mut row = before.clone();
-        apply(&mut row, input, false)?;
+        self.apply_checked(tenant, &mut row, input, false).await?;
         if row.key != before.key && entries_of(&transaction, tenant, before.id).await? > 0 {
             return Err(Error::conflict(
                 "content.type_key_locked",
@@ -242,6 +299,7 @@ impl ContentService {
         active.has_seo = Set(row.has_seo);
         active.listable = Set(row.listable);
         active.active = Set(row.active);
+        active.detail_layout = Set(row.detail_layout.clone());
         active.updated_at = Set(row.updated_at);
         let saved = active.update(&transaction).await.map_err(|error| unique(error, &row))?;
         self.record_type(&transaction, tenant, principal, Some(&before), Some(&saved)).await?;
@@ -287,6 +345,9 @@ impl ContentService {
             .await?;
         self.record_type(&transaction, tenant, principal, Some(&before), None).await?;
         transaction.commit().await?;
+        self.entitlements
+            .release(tenant.id(), &CUSTOM_TYPES_LIMIT, &type_reference(before.id))
+            .await?;
         Ok(())
     }
 
@@ -338,8 +399,35 @@ fn unique(error: sea_orm::DbErr, row: &ContentType) -> Error {
     }
 }
 
-/// Áp `input` lên `row` và kiểm, mọi lỗi một lần.
-fn apply(row: &mut ContentType, input: TypeInput, creating: bool) -> Result<(), Error> {
+impl ContentService {
+    /// Áp `input` lên `row` và kiểm, kể cả bố cục trang chi tiết; mọi lỗi một lần.
+    async fn apply_checked(
+        &self,
+        tenant: &TenantContext,
+        row: &mut ContentType,
+        mut input: TypeInput,
+        creating: bool,
+    ) -> Result<(), Error> {
+        let detail = input.detail_layout.take();
+        let mut problems = apply(row, input, creating);
+        match detail {
+            Some(Some(value)) => {
+                row.detail_layout =
+                    self.check_detail_layout(tenant, row, &value, &mut problems).await?;
+            }
+            Some(None) => row.detail_layout = None,
+            None => {}
+        }
+        // Loại không còn trang thì không còn trang chi tiết.
+        if !row.routable {
+            row.detail_layout = None;
+        }
+        if problems.is_empty() { Ok(()) } else { Err(Error::validation(problems)) }
+    }
+}
+
+/// Áp `input` lên `row` (trừ bố cục trang chi tiết) và trả mọi lỗi.
+fn apply(row: &mut ContentType, input: TypeInput, creating: bool) -> Vec<FieldError> {
     let mut problems = Vec::new();
     match input.key {
         Some(key) if is_key(&key) => row.key = key,
@@ -410,7 +498,7 @@ fn apply(row: &mut ContentType, input: TypeInput, creating: bool) -> Result<(), 
             *field = value;
         }
     }
-    if problems.is_empty() { Ok(()) } else { Err(Error::validation(problems)) }
+    problems
 }
 
 fn is_key(key: &str) -> bool {

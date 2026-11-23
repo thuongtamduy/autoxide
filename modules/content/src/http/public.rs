@@ -190,6 +190,22 @@ pub(crate) struct PublicEntryResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schema(value_type = Option<Object>)]
     legal_footer: Option<Value>,
+    /// Only in `GET /public/resolve`, for an entry of a custom content type with a detail layout:
+    /// draw the page from this layout instead of `body`. Absent otherwise.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    detail: Option<PublicDetail>,
+}
+
+/// The detail layout of a custom content type, filled for one entry.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub(crate) struct PublicDetail {
+    /// The layout (`{"type": "layout", …}`), blocks of switched-off modules left out.
+    #[schema(value_type = Object)]
+    layout: Value,
+    /// Data of the blocks that carry data, by block `id`. A block `content.entry_field` gets
+    /// `{"field": …, "value": …}`: the entry's value of that field (`null`: empty).
+    #[schema(value_type = Object)]
+    blocks_data: std::collections::BTreeMap<String, Value>,
 }
 
 /// A record of another module embedded in an entry.
@@ -221,6 +237,7 @@ pub(crate) fn public_entry(view: PublicView) -> PublicEntryResponse {
     PublicEntryResponse {
         blocks_data: std::collections::BTreeMap::new(),
         legal_footer: None,
+        detail: None,
         custom_fields,
         embeds: embeds
             .into_iter()
@@ -337,6 +354,7 @@ pub(crate) async fn resolution(
     Ok(match service.resolve(tenant, site, locale, path).await? {
         Resolved::Entry(mut row) => {
             let version = row.updated_at;
+            let type_id = row.type_id;
             let layout = service.public_layout(tenant, site, &row.locale, &row.body).await?;
             // Ảnh của khu dùng chung đã mở rộng cũng vào `body_media`.
             if let Some(layout) = &layout {
@@ -350,6 +368,19 @@ pub(crate) async fn resolution(
                 entry.body = layout.body;
                 entry.blocks_data = layout.data;
                 entry.legal_footer = layout.legal_footer;
+            }
+            if let Some(detail) = service.type_detail(tenant, type_id).await? {
+                let view = serde_json::to_value(&entry).map_err(|error| {
+                    Error::internal(format!("cannot serialize the entry: {error}"))
+                })?;
+                if let Some(page) =
+                    service.detail_page(tenant, site, locale, &detail, &view).await?
+                {
+                    if entry.legal_footer.is_none() {
+                        entry.legal_footer = page.legal_footer;
+                    }
+                    entry.detail = Some(PublicDetail { layout: page.body, blocks_data: page.data });
+                }
             }
             (Resolution::Entry { entry: Box::new(entry) }, Some(version))
         }

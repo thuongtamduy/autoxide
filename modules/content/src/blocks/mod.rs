@@ -380,6 +380,56 @@ pub(crate) const SHARED_SECTION: BlockType = BlockType::new(
     }"#,
 );
 
+/// Một trường của mục đang xem — chỉ trong bố cục trang chi tiết của loại nội dung tự định nghĩa
+/// (`detail_layout`, D-235); `content` điền dữ liệu lúc đọc công khai.
+pub(crate) const ENTRY_FIELD: BlockType = BlockType::new(
+    "content.entry_field",
+    BlockCategory::Text,
+    "Entry field",
+    "Only in the detail layout of a custom content type: shows one field of the entry being viewed.",
+    r#"{
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["field"],
+        "properties": {
+            "field": {"type": "string", "minLength": 1, "maxLength": 64, "description": "`title`, `excerpt`, `body`, `featured_media`, `published_at`, `authors`, or the key of a public custom field of the type."},
+            "label": {"type": "string", "maxLength": 80, "description": "Text shown before the value; left out: none."},
+            "style": {"enum": ["heading", "text", "badge", "image", "link"], "description": "How to draw the value."}
+        }
+    }"#,
+);
+
+/// Danh sách mục của một loại nội dung tự định nghĩa (D-235): dữ liệu là các mục đã đăng.
+pub(crate) const TYPE_LIST: BlockType = BlockType::new(
+    "content.type_list",
+    BlockCategory::Embed,
+    "Content type list",
+    "Use to show the published entries of a custom content type (team, projects, branches…) as cards; filter on its filterable public fields.",
+    r#"{
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type"],
+        "properties": {
+            "type": {"type": "string", "minLength": 1, "maxLength": 64, "description": "Key of a listable content type of `GET /api/v1/content/types`."},
+            "title": {"type": "string", "maxLength": 200},
+            "filters": {"type": "array", "maxItems": 5, "description": "Only entries matching every filter; only filterable public custom fields.", "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["field", "value"],
+                "properties": {
+                    "field": {"type": "string", "minLength": 1, "maxLength": 64, "description": "Key of the custom field."},
+                    "value": {"type": "string", "minLength": 1, "maxLength": 200, "description": "`<eq|in|gte|lte|prefix>:<value>`, as `cf.<key>` of `GET /public/types/{key}/entries`."}
+                }
+            }},
+            "sort": {"enum": ["newest", "oldest"]},
+            "limit": {"type": "integer", "minimum": 1, "maximum": 24},
+            "card_fields": {"type": "array", "maxItems": 6, "items": {"type": "string", "minLength": 1, "maxLength": 64}, "description": "Public custom fields shown on each card."},
+            "layout": {"enum": ["grid", "list", "carousel"]}
+        }
+    }"#,
+)
+.with_data();
+
 pub(crate) fn all() -> Vec<BlockType> {
     vec![
         SECTION,
@@ -401,5 +451,7 @@ pub(crate) fn all() -> Vec<BlockType> {
         SEARCH_BOX,
         PLACEMENT,
         SHARED_SECTION,
+        ENTRY_FIELD,
+        TYPE_LIST,
     ]
 }

@@ -183,6 +183,19 @@ impl ContentService {
                 ));
                 return Ok(body::BodyInfo::default());
             }
+            // Khối "trường của mục đang xem" chỉ có nghĩa trong trang chi tiết của loại nội dung.
+            for (name, id, _) in layout::blocks_of(body) {
+                if name == crate::blocks::ENTRY_FIELD.name {
+                    problems.push(
+                        FieldError::new(
+                            "body",
+                            "block_not_allowed",
+                            "block `{id}`: `content.entry_field` is only for the detail layout of a content type (`detail_layout` of `PATCH /types/<key>`)",
+                        )
+                        .with_param("id", id),
+                    );
+                }
+            }
             let usable = self.usable_blocks(tenant).await?;
             layout::check(body, &self.blocks, &usable, &self.config.embed_hosts)
         } else {

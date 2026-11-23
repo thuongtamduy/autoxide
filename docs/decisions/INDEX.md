@@ -484,6 +484,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261122-site-health](D-20261122-site-health.md)** Kiểm tra sức khoẻ website: chạy theo yêu cầu, một dòng kết quả mỗi website, nguồn hộp việc — 2026-11-22
 - **[D-20261122-theme-tokens](D-20261122-theme-tokens.md)** Bộ giao diện website: token phẳng theo nút, ghi đè kế thừa, danh sách font cho phép, tương phản chỉ cảnh báo — 2026-11-22
 - **[D-20261122-theme-variants](D-20261122-theme-variants.md)** Chủ đề theo lịch: lịch JSON ba loại theo múi IANA của website, chọn đúng một bản, mẫu nhúng binary — 2026-11-22
+- **[D-20261123-content-types-later](D-20261123-content-types-later.md)** Loại nội dung, phần sau: trang chi tiết do `content` điền, lọc công khai theo index của bản đăng, hạn mức theo gói — 2026-11-23
 
 ## Tiền, thuế, chứng từ
 

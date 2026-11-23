@@ -26,6 +26,7 @@ pub(crate) fn relocation() -> Relocation {
         .follow("content_embeddings", "entry_id", "content_entries")
         .follow("content_ai_turns", "entry_id", "content_entries")
         .follow("content_custom_index", "record_id", "content_entries")
+        .follow("content_published_custom_index", "record_id", "content_entries")
         .copy_on_split(&[
             "content_terms",
             "content_term_translations",
