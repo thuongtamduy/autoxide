@@ -1,7 +1,7 @@
-//! Số liệu cho báo cáo gộp (bước 38, D-20261118-step38-report-facts): module khai "event nào của
-//! mình sinh số liệu gì" bằng [`FactSource`] (`Module::facts`); module `reporting` nghe các event
-//! đó, rút [`Fact`] và đổ về kho báo cáo của cây khách hàng. Kernel không biết nghĩa nghiệp vụ của
-//! số liệu: chỉ giữ hợp đồng và kiểm khai báo lúc khởi động.
+//! Facts for consolidated reports (step 38, D-20261118-step38-report-facts): a module declares "which of its
+//! events produce which facts" with [`FactSource`] (`Module::facts`); the `reporting` module listens to those
+//! events, extracts [`Fact`]s and pours them into the report store of the tenant tree. The kernel does not
+//! know the business meaning of the facts: it only holds the contract and validates declarations at startup.
 //!
 //! ```
 //! use autoxide_kernel::report::{Fact, FactKind, FactSource, Measure, money_field, org_field};
@@ -33,17 +33,17 @@ use crate::event::{Delivered, EventCatalog};
 use crate::money::Money;
 use crate::tenancy::OrgId;
 
-/// Đơn vị của một loại số liệu.
+/// Unit of a kind of fact.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Measure {
-    /// Số tiền (tiền gốc của giao dịch; báo cáo cộng theo từng loại tiền).
+    /// An amount (the transaction's original money; reports sum per currency).
     Amount,
-    /// Số đếm / số lượng nguyên.
+    /// A count / whole quantity.
     Quantity,
 }
 
 impl Measure {
-    /// Tên ổn định trong API: `amount`, `quantity`.
+    /// Stable name in the API: `amount`, `quantity`.
     pub const fn as_str(self) -> &'static str {
         match self {
             Measure::Amount => "amount",
@@ -52,15 +52,15 @@ impl Measure {
     }
 }
 
-/// Một loại số liệu module khai (`GET /api/v1/reporting/kinds`).
+/// A kind of fact a module declares (`GET /api/v1/reporting/kinds`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FactKind {
-    /// `<module>.<số liệu>`, vd `invoices.issued_total`.
+    /// `<module>.<metric>`, vd `invoices.issued_total`.
     pub kind: &'static str,
-    /// Câu tiếng Anh cho người gọi API.
+    /// English sentence for API callers.
     pub description: &'static str,
     pub measure: Measure,
-    /// Các chiều (dimension) được phép — tập nhỏ cố định, giá trị là mã (không phải tên người).
+    /// Allowed dimensions — a small fixed set; values are codes (not people's names).
     pub dimensions: &'static [&'static str],
 }
 
@@ -75,26 +75,27 @@ impl FactKind {
     }
 }
 
-/// Một số liệu báo cáo, rút từ một event. KHÔNG chứa dữ liệu cá nhân (tên, email, số điện thoại,
-/// địa chỉ, `user_id`): kho báo cáo gộp nằm ở database của khách gốc và không bị xoá theo người.
+/// A report fact, extracted from an event. Contains NO personal data (name, email, phone number,
+/// address, `user_id`): the consolidated report store lives in the root tenant's database and is not erased
+/// per person.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct Fact {
-    /// Một loại khai trong [`FactSource::kinds`] của chính nguồn.
+    /// A kind declared in the source's own [`FactSource::kinds`].
     pub kind: &'static str,
-    /// Nút sở hữu ở khách nguồn; `None`: nút gốc của khách.
+    /// Owning node in the source tenant; `None`: the tenant's root node.
     pub org_id: Option<OrgId>,
     pub occurred_at: Timestamp,
-    /// Số tiền — có khi loại là [`Measure::Amount`].
+    /// The amount — present when the kind is [`Measure::Amount`].
     pub amount: Option<Money>,
-    /// Số đếm — có khi loại là [`Measure::Quantity`].
+    /// The count — present when the kind is [`Measure::Quantity`].
     pub quantity: Option<i64>,
-    /// Giá trị theo chiều; khoá phải nằm trong [`FactKind::dimensions`].
+    /// Value per dimension; the key must be in [`FactKind::dimensions`].
     pub dimensions: BTreeMap<&'static str, String>,
 }
 
 impl Fact {
-    /// Số liệu loại `kind` xảy ra lúc `occurred_at`, chưa có số tiền, số đếm hay chiều nào.
+    /// A fact of kind `kind` that occurred at `occurred_at`, with no amount, count or dimension yet.
     pub fn new(kind: &'static str, occurred_at: Timestamp) -> Self {
         Fact {
             kind,
@@ -131,10 +132,10 @@ impl Fact {
     }
 }
 
-/// Hàm rút số liệu từ một event: thuần, không I/O (chạy trong bộ nhận event của `reporting`).
+/// Function that extracts facts from an event: pure, no I/O (runs inside `reporting`'s event receiver).
 pub type Extract = fn(&Delivered) -> Result<Vec<Fact>, Error>;
 
-/// Một event của module sinh số liệu nào (`Module::facts`).
+/// Which facts an event of a module produces (`Module::facts`).
 #[derive(Clone)]
 pub struct FactSource {
     event: &'static str,
@@ -143,7 +144,7 @@ pub struct FactSource {
 }
 
 impl FactSource {
-    /// `event`: tên event của CHÍNH module (`<module>.<việc>`, đã khai ở `Module::events`).
+    /// `event`: name of the module's OWN event (`<module>.<action>`, declared in `Module::events`).
     pub fn new(event: &'static str, kinds: Vec<FactKind>, extract: Extract) -> Self {
         FactSource { event, kinds, extract }
     }
@@ -156,8 +157,9 @@ impl FactSource {
         &self.kinds
     }
 
-    /// Rút số liệu từ `event` rồi kiểm từng số liệu khớp khai báo (loại, đơn vị, chiều). Sai khai
-    /// báo là lỗi của người viết module: lỗi nội bộ, event được giao lại (và hiện trong log).
+    /// Extracts facts from `event`, then checks each fact matches the declaration (kind, unit, dimensions). A
+    /// wrong declaration is the module author's error: an internal error, the event is redelivered (and shows
+    /// up in the log).
     pub fn extract(&self, event: &Delivered) -> Result<Vec<Fact>, Error> {
         let facts = (self.extract)(event)?;
         for fact in &facts {
@@ -200,16 +202,16 @@ impl std::fmt::Debug for FactSource {
     }
 }
 
-/// Độ dài tối đa của giá trị một chiều (mã ngắn, không phải văn bản tự do).
+/// Maximum length of a dimension value (a short code, not free text).
 pub const DIMENSION_VALUE_MAX: usize = 100;
 
-/// Mọi nguồn số liệu của mọi module đã đăng ký: `(module, nguồn)`, theo thứ tự đăng ký.
+/// Every fact source of every registered module: `(module, source)`, in registration order.
 #[derive(Debug, Clone, Default)]
 pub struct FactCatalog(std::sync::Arc<Vec<(&'static str, FactSource)>>);
 
 impl FactCatalog {
-    /// Kiểm và gom nguồn của các module. `events`: mọi event đã khai — nguồn chỉ được nghe event
-    /// của chính module (như `Outbox::record`). Trả mọi vấn đề cùng lúc.
+    /// Validates and collects the modules' sources. `events`: every declared event — a source may only listen
+    /// to events of its own module (like `Outbox::record`). Returns all problems at once.
     pub fn new(
         modules: Vec<(&'static str, Vec<FactSource>)>,
         events: &EventCatalog,
@@ -238,7 +240,7 @@ impl FactCatalog {
         }
     }
 
-    /// `(module, nguồn)` theo thứ tự đăng ký.
+    /// `(module, source)` in registration order.
     pub fn sources(&self) -> Vec<(&'static str, FactSource)> {
         self.0.as_ref().clone()
     }
@@ -306,7 +308,7 @@ fn source_problems(
     problems
 }
 
-/// Nút `org_id` trong payload của event (`None` khi thiếu hay không phải UUID).
+/// The `org_id` node in an event payload (`None` when missing or not a UUID).
 pub fn org_field(payload: &Value) -> Option<OrgId> {
     payload
         .get("org_id")
@@ -315,8 +317,8 @@ pub fn org_field(payload: &Value) -> Option<OrgId> {
         .map(OrgId::from_uuid)
 }
 
-/// Số tiền ở trường `field` của payload (`{"amount": "1999", "currency": "VND"}`); `None` khi
-/// trường vắng hay `null`. Sai dạng là lỗi nội bộ (event của chính module).
+/// The amount in payload field `field` (`{"amount": "1999", "currency": "VND"}`); `None` when
+/// the field is absent or `null`. A malformed value is an internal error (the module's own event).
 pub fn money_field(payload: &Value, field: &str) -> Result<Option<Money>, Error> {
     match payload.get(field) {
         None | Some(Value::Null) => Ok(None),

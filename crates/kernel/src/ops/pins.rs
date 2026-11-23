@@ -1,15 +1,16 @@
-//! Ghim của người dùng (bước 52 mục 4): mỗi người ghim tối đa 20 màn hình (mục của sổ điều hướng)
-//! hay bản ghi, theo khách, để giao diện hiện ở chỗ dễ với tới (đầu thanh bên, màn hình chính của
-//! điện thoại).
+//! User pins (step 52 item 4): each person pins at most 20 screens (navigation entries)
+//! or records per tenant, so the UI can show them where they are easy to reach (top of the sidebar, the phone's
+//! home screen).
 //!
-//! - Bảng `kernel_pins`, cấp khách hàng; (`tenant_id`, `user_id`, `target`) duy nhất nên ghim lại
-//!   cùng đích không ra hai dòng.
-//! - Đích là `id` của mục điều hướng (kiểm với sổ điều hướng đã gom) hay `<loại>:<uuid>` của bản
-//!   ghi kèm nhãn do giao diện gửi (kernel không biết tiêu đề bản ghi của module). Kernel không kiểm
-//!   người ghim còn quyền xem đích: ghim chỉ là lối tắt, mở ra thì endpoint của module kiểm quyền.
-//! - Hai request ghim MỚI cùng lúc có thể cùng lọt qua lần đếm và vượt 20 một chút — như cờ theo
-//!   người dùng (D-207), đây là giới hạn giao diện, không phải số tiền.
-//! - Là dữ liệu cá nhân: có trong bản xuất, xoá khi tài khoản bị xoá (cùng chỗ với cờ).
+//! - Table `kernel_pins`, tenant level; (`tenant_id`, `user_id`, `target`) is unique so pinning
+//!   the same target again does not produce two rows.
+//! - The target is the `id` of a navigation entry (validated against the collected navigation registry) or
+//!   `<kind>:<uuid>` of a record with a label sent by the UI (the kernel does not know the module's record
+//!   titles). The kernel does not check that the pinner may still view the target: a pin is only a shortcut,
+//!   and when it is opened the module's endpoint checks permission.
+//! - Two NEW pin requests at the same time may both pass the count and exceed 20 slightly — like the per-user
+//!   flags (D-207), this is a UI limit, not an amount of money.
+//! - Personal data: included in the export, deleted when the account is deleted (same place as the flags).
 
 use crate::time::Timestamp;
 use std::sync::Arc;
@@ -35,14 +36,14 @@ use crate::ops::module_catalog::ModuleCatalog;
 use crate::response::{Created, Data, Problem};
 use crate::tenancy::{ScopeExt, TenantContext, TenantScoped};
 
-/// Số ghim tối đa của một người ở một khách.
+/// Maximum number of pins of one person in one tenant.
 pub(crate) const MAX_PINS: usize = 20;
 const TARGET_MAX: usize = 200;
 const LABEL_MAX: usize = 200;
 const TABLE: &str = "kernel_pins";
 
 mod entity {
-    //! Bảng `kernel_pins`.
+    //! Table `kernel_pins`.
     use crate::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
@@ -125,7 +126,7 @@ fn now() -> Timestamp {
     Timestamp::now()
 }
 
-/// Khoá dạng `a-z0-9._-`, 1–100 ký tự (loại bản ghi, như ở nhãn và ghi chú bản ghi).
+/// Key of the form `a-z0-9._-`, 1–100 characters (record kind, as in tags and record notes).
 fn is_kind(kind: &str) -> bool {
     (1..=100).contains(&kind.len())
         && kind.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b"._-".contains(&b))
@@ -166,7 +167,7 @@ impl PinsState {
             .await?)
     }
 
-    /// Dòng thành ghim; mục điều hướng không còn trong sổ (module đã gỡ) thì bỏ.
+    /// Row to pin; a navigation entry no longer in the registry (module removed) is dropped.
     fn view(&self, row: entity::Model, language: Language) -> Option<Pin> {
         let label = if row.kind == "navigation" {
             self.label_of_screen(&row.target, language)?
@@ -193,7 +194,7 @@ impl PinsState {
         Ok(rows.into_iter().filter_map(|row| self.view(row, language)).collect())
     }
 
-    /// Ghim; trả `(ghim, true)` khi mới tạo, `(ghim, false)` khi đích đã được ghim từ trước.
+    /// Pins; returns `(pin, true)` when newly created, `(pin, false)` when the target was already pinned.
     pub(crate) async fn pin(
         &self,
         tenant: &TenantContext,
@@ -305,7 +306,7 @@ impl PinsState {
         Ok(())
     }
 
-    /// Xếp lại: `ids` phải đúng là mọi ghim của người gọi, mỗi cái một lần.
+    /// Reorders: `ids` must be exactly all of the caller's pins, each once.
     pub(crate) async fn reorder(
         &self,
         tenant: &TenantContext,
@@ -343,7 +344,7 @@ impl PinsState {
     }
 }
 
-/// Bản xuất dữ liệu cá nhân: ghim của người dùng.
+/// Personal data export: the user's pins.
 pub(crate) async fn export_user(tenant: &TenantContext, user_id: Uuid) -> Result<Value, Error> {
     let rows = Entity::find()
         .filter(Column::UserId.eq(user_id))
@@ -365,7 +366,7 @@ pub(crate) async fn export_user(tenant: &TenantContext, user_id: Uuid) -> Result
     Ok(Value::Array(pins))
 }
 
-/// Tài khoản bị xoá: xoá ghim của người đó.
+/// Account deleted: deletes that person's pins.
 pub(crate) async fn forget_user(tenant: &TenantContext, user_id: Uuid) -> Result<u64, Error> {
     let deleted = Entity::delete_many()
         .filter(Column::UserId.eq(user_id))
@@ -488,7 +489,7 @@ async fn delete_pin(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// Route dưới `/api/v1/me`.
+/// Routes under `/api/v1/me`.
 pub(crate) fn routes(state: PinsState) -> OpenApiRouter {
     OpenApiRouter::new()
         .routes(routes!(list_pins, create_pin))
@@ -499,7 +500,7 @@ pub(crate) fn routes(state: PinsState) -> OpenApiRouter {
 
 // --- Migration ------------------------------------------------------------------------------
 
-/// Bảng `kernel_pins`.
+/// Table `kernel_pins`.
 pub(crate) struct CreatePins;
 
 impl MigrationName for CreatePins {

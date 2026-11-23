@@ -1,9 +1,9 @@
-//! Chuẩn hoá giá trị theo kiểu dữ liệu của trường và tách giá trị để đánh chỉ mục.
+//! Normalizes values by the field's data type and extracts values for indexing.
 
 use super::*;
 use crate::time::{Date, Timestamp};
 
-/// Giá trị đã kiểm theo kiểu của `field`.
+/// A value validated against the type of `field`.
 pub(super) fn normalize(field: &CustomFieldView, value: &Value) -> Result<Value, FieldError> {
     let text_bounds = |text: &str| -> Result<(), FieldError> {
         let length = <i64 as TryFrom<usize>>::try_from(text.chars().count()).unwrap_or(i64::MAX);
@@ -150,14 +150,15 @@ pub(super) fn normalize(field: &CustomFieldView, value: &Value) -> Result<Value,
     }
 }
 
-/// Số thực đã làm tròn thành số nguyên (giá trị thập phân đã nhân theo `scale`, luôn trong khoảng
-/// của `i64` với trường hợp thường gặp; vượt khoảng thì bão hoà).
+/// A float rounded to an integer (a decimal value multiplied by `scale`; for common cases always within the
+/// range of `i64`; beyond the range it saturates).
 #[allow(clippy::cast_possible_truncation)]
 pub(super) fn whole(number: f64) -> i64 {
     number as i64
 }
 
-/// Dòng index của một giá trị: (chữ thường bỏ dấu, số nguyên). Ngày, số, boolean về `value_int`.
+/// Index row of a value: (lowercase with diacritics stripped, integer). Dates, numbers and booleans go to
+/// `value_int`.
 pub(super) fn index_values(
     field: &CustomFieldView,
     value: &Value,

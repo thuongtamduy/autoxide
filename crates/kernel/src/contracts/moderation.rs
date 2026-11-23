@@ -1,36 +1,36 @@
-//! Ẩn tạm một đối tượng vì vụ việc pháp lý (bước 37, D-363): báo vi phạm sở hữu trí tuệ, hàng giả,
-//! khiếu nại, yêu cầu của cơ quan có thẩm quyền.
+//! Temporarily hiding a target because of a legal case (step 37, D-363): intellectual property infringement
+//! reports, counterfeit goods, complaints, requests from competent authorities.
 //!
-//! Module xử lý vụ việc (`compliance`) **không** đụng bảng của module khác (luật kiến trúc 1): nó
-//! phát event [`TARGET_RESTRICTED`] / [`TARGET_RESTORED`] với payload [`Restriction`] (đích dạng
-//! `<module>.<loại>:<id>` của sổ đối tượng, D-123). Module sở hữu đích nghe hai event đó qua
-//! `Module::subscriptions` rồi tự ẩn / hiện lại (vd `content` trả 451, `comments` ẩn bình luận) — lấy
-//! dữ liệu bằng [`restriction`]. Event được giao lại tới khi bên nhận xong, nên bên nhận phải
-//! idempotent (ẩn hai lần như ẩn một lần).
+//! The case-handling module (`compliance`) does **not** touch another module's tables (architecture rule 1):
+//! it emits the events [`TARGET_RESTRICTED`] / [`TARGET_RESTORED`] with a [`Restriction`] payload (a target
+//! of the form `<module>.<kind>:<id>` from the target registry, D-123). The module that owns the target
+//! listens to these two events through `Module::subscriptions` and hides / restores it itself (e.g. `content`
+//! returns 451, `comments` hides the comment); it reads the data with [`restriction`]. Events are redelivered
+//! until the receiver finishes, so the receiver must be idempotent (hiding twice behaves like hiding once).
 //!
-//! Như [`USER_DELETED`](crate::privacy::USER_DELETED), đây là hợp đồng của kernel: module sở hữu
-//! đích được đăng ký nhận hai event này kể cả khi chưa cài module xử lý vụ việc.
+//! Like [`USER_DELETED`](crate::privacy::USER_DELETED), this is a kernel contract: the module that owns the
+//! target is subscribed to these two events even when the case-handling module is not installed.
 
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::event::Delivered;
 
-/// Đích bị ẩn tạm (chờ xử lý vụ việc, hay vụ việc kết luận có vi phạm).
+/// Target is temporarily hidden (pending case handling, or the case concluded there is a violation).
 pub const TARGET_RESTRICTED: &str = "compliance.target_restricted";
 
-/// Đích được hiện lại (vụ việc bác, rút, hay người xử lý bỏ ẩn).
+/// Target is restored (case dismissed, withdrawn, or a handler unhid it).
 pub const TARGET_RESTORED: &str = "compliance.target_restored";
 
-/// Payload của [`TARGET_RESTRICTED`] / [`TARGET_RESTORED`]: chỉ ID và loại, không tên người báo.
+/// Payload of [`TARGET_RESTRICTED`] / [`TARGET_RESTORED`]: only IDs and kinds, never the reporter's name.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct Restriction {
-    /// Vụ việc gây ra thay đổi.
+    /// The case that caused the change.
     pub case_id: Uuid,
-    /// Đích, dạng `<module>.<loại>:<id>` (vd `content.entry:0190…`).
+    /// Target, in the form `<module>.<kind>:<id>` (e.g. `content.entry:0190...`).
     pub target: String,
-    /// Loại vụ việc (`ip_infringement`, `counterfeit`, `prohibited_goods`, `consumer_complaint`,
+    /// Kind of case (`ip_infringement`, `counterfeit`, `prohibited_goods`, `consumer_complaint`,
     /// `other`).
     pub case_kind: String,
 }
@@ -41,7 +41,7 @@ impl Restriction {
         Restriction { case_id, target: target.into(), case_kind: case_kind.into() }
     }
 
-    /// ID của đích khi nó thuộc loại `kind` (vd `content.entry`); `None` khi khác loại.
+    /// ID of the target when it is of kind `kind` (e.g. `content.entry`); `None` for any other kind.
     pub fn id_in(&self, kind: &str) -> Option<&str> {
         self.target
             .strip_prefix(kind)
@@ -50,18 +50,18 @@ impl Restriction {
     }
 }
 
-/// Thay đổi một event mang tới.
+/// A change an event carries.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum RestrictionChange {
-    /// Ẩn đích.
+    /// Hide the target.
     Restricted,
-    /// Hiện lại đích.
+    /// Restore the target.
     Restored,
 }
 
-/// Thay đổi và payload của một event [`TARGET_RESTRICTED`] / [`TARGET_RESTORED`]; `None` khi event
-/// khác hay payload sai hình dạng.
+/// The change and payload of a [`TARGET_RESTRICTED`] / [`TARGET_RESTORED`] event; `None` when the event is
+/// different or the payload has the wrong shape.
 pub fn restriction(event: &Delivered) -> Option<(RestrictionChange, Restriction)> {
     let change = match event.name.as_str() {
         TARGET_RESTRICTED => RestrictionChange::Restricted,

@@ -1,13 +1,13 @@
-//! Cài đặt có nối ra ngoài (bước 51, A-c10, A-c11): máy chủ mail, nhà cung cấp AI, cổng thanh toán…
-//! của riêng khách — nhóm cấu hình `connection`, tên `<module>.connection.<loại>.<trường>`.
+//! Settings that connect to external services (step 51, A-c10, A-c11): a tenant's own mail server, AI provider,
+//! payment gateway, ... - the `connection` settings group, named `<module>.connection.<kind>.<field>`.
 //!
-//! - Module báo mỗi lần dùng kết nối bằng [`ConnectionStatus::record`] (lần dùng cuối, lỗi cuối);
-//!   `GET /api/v1/kernel/settings` trả `last_used_at`, `last_error` cho từng cài đặt của kết nối.
-//! - Module khai cách thử bằng [`StartContext::connection_probe`](crate::module::StartContext);
-//!   `POST /api/v1/kernel/settings/{name}/test` gọi thử ngay (không trong transaction ghi, có hạn
-//!   giờ) và ghi kết quả như một lần dùng.
+//! - A module reports each use of a connection with [`ConnectionStatus::record`] (last use, last error);
+//!   `GET /api/v1/kernel/settings` returns `last_used_at` and `last_error` for each setting of a connection.
+//! - A module declares how to test with [`StartContext::connection_probe`](crate::module::StartContext);
+//!   `POST /api/v1/kernel/settings/{name}/test` tries it right away (not inside a write transaction, with a
+//!   timeout) and records the result like a use.
 //!
-//! Bảng `kernel_connection_status` (cấp khách hàng): một dòng mỗi (khách, kết nối).
+//! Table `kernel_connection_status` (tenant level): one row per (tenant, connection).
 
 use crate::time::Timestamp;
 use std::collections::HashMap;
@@ -29,24 +29,24 @@ use crate::response::{Data, Problem};
 use crate::tenancy::TenantContext;
 
 const TABLE: &str = "kernel_connection_status";
-/// Thử kết nối chờ tối đa chừng này.
+/// A connection test waits at most this long.
 const TEST_TIMEOUT: Duration = Duration::from_secs(15);
-/// Lỗi cuối giữ tối đa chừng này ký tự.
+/// The last error is kept to at most this many characters.
 const ERROR_MAX: usize = 500;
 
-/// Cách thử một kết nối của module.
+/// How to test one of a module's connections.
 //
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
 #[async_trait::async_trait]
 pub trait ConnectionProbe: Send + Sync {
-    /// Kết nối, `<module>.connection.<loại>`, vd `mail.connection.smtp`.
+    /// Connection, `<module>.connection.<kind>`, e.g. `mail.connection.smtp`.
     fn connection(&self) -> &'static str;
-    /// Thử kết nối của khách `tenant` (cài đặt của khách, hay của máy chủ khi khách chưa đặt).
-    /// Lỗi: câu cho người quản trị đọc, không chứa secret.
+    /// Tests the connection of tenant `tenant` (the tenant's settings, or the server's when the tenant has
+    /// not set them). Error: a sentence for the administrator to read, containing no secrets.
     async fn test(&self, tenant: &TenantContext) -> Result<(), Error>;
 }
 
-/// Sổ cách thử kết nối của mọi module. Clone rẻ.
+/// Registry of every module's connection tests. Cheap to clone.
 #[derive(Clone, Default)]
 pub struct ConnectionProbes {
     entries: Arc<RwLock<Vec<Arc<dyn ConnectionProbe>>>>,
@@ -85,7 +85,7 @@ impl ConnectionProbes {
     }
 }
 
-/// Kết nối của một cài đặt: `<module>.connection.<loại>` từ `<module>.connection.<loại>.<trường>`.
+/// Connection of a setting: `<module>.connection.<kind>` from `<module>.connection.<kind>.<field>`.
 pub(crate) fn connection_of(setting: &str) -> Option<&str> {
     let mut dots = setting.match_indices('.').map(|(index, _)| index);
     let (_, second, third) = (dots.next()?, dots.next()?, dots.next()?);
@@ -93,20 +93,21 @@ pub(crate) fn connection_of(setting: &str) -> Option<&str> {
     (setting[..second].ends_with(".connection")).then_some(connection)
 }
 
-/// Lần dùng / lỗi cuối của một kết nối.
+/// Last use / error of a connection.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct Status {
     pub last_used_at: Option<Timestamp>,
     pub last_error: Option<String>,
 }
 
-/// Ghi lần dùng của kết nối (module gọi sau mỗi lần dùng). Clone rẻ.
+/// Records the use of a connection (modules call it after each use). Cheap to clone.
 #[derive(Clone, Copy, Default)]
 pub struct ConnectionStatus;
 
 impl ConnectionStatus {
-    /// Kết nối `connection` của khách `tenant` vừa được dùng; `error`: lỗi (không chứa secret),
-    /// `None` khi thành công (xoá lỗi cũ). Không bao giờ làm hỏng việc đang làm: ghi lỗi thì chỉ log.
+    /// Connection `connection` of tenant `tenant` was just used; `error`: the error (containing no secrets),
+    /// `None` on success (clears the old error). Never breaks the work in progress: if recording fails it
+    /// only logs.
     pub async fn record(&self, tenant: &TenantContext, connection: &str, error: Option<&str>) {
         if let Err(failure) = write(tenant, connection, error).await {
             tracing::warn!(connection, error = %failure, "cannot record a connection's status");
@@ -142,7 +143,7 @@ async fn write(tenant: &TenantContext, connection: &str, error: Option<&str>) ->
     Ok(())
 }
 
-/// Trạng thái mọi kết nối của khách `tenant`.
+/// Status of every connection of tenant `tenant`.
 pub(crate) async fn statuses(tenant: &TenantContext) -> Result<HashMap<String, Status>, Error> {
     let select = SqlQuery::select()
         .columns(["connection", "last_used_at", "last_error"])
@@ -209,8 +210,8 @@ async fn test_tenant_connection(
     Ok(Data { data: test(&state.probes, &tenant, &name).await? })
 }
 
-/// Thử kết nối mà cài đặt `name` thuộc về, với cài đặt của khách `tenant`; ghi kết quả như một lần
-/// dùng. REST và tool MCP dùng chung.
+/// Tests the connection that setting `name` belongs to, with the settings of tenant `tenant`; records the
+/// result like a use. REST and the MCP tool share it.
 async fn test(
     probes: &ConnectionProbes,
     tenant: &TenantContext,
@@ -267,7 +268,7 @@ pub(crate) fn routes(state: ConnectionsState) -> OpenApiRouter {
     OpenApiRouter::new().routes(routes!(test_tenant_connection)).with_state(Arc::new(state))
 }
 
-/// Migration tạo bảng `kernel_connection_status` (cấp khách hàng, mọi database dữ liệu).
+/// Migration that creates the table `kernel_connection_status` (tenant level, every data database).
 pub(crate) struct CreateConnectionStatus;
 
 impl MigrationName for CreateConnectionStatus {

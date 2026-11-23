@@ -1,5 +1,5 @@
-//! An ninh: permission, khoá ký, token một lần, giới hạn lượt, băm IP, lọc địa chỉ gọi ra ngoài,
-//! idempotency, TLS, chống spam.
+//! Security: permissions, signing keys, one-time tokens, rate limits, IP hashing, filtering of outbound
+//! addresses, idempotency, TLS, anti-spam.
 
 pub mod access;
 pub mod antispam;

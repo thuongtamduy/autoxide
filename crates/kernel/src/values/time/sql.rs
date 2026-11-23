@@ -1,18 +1,20 @@
-//! Cắm [`Timestamp`] và [`Date`] vào SeaORM / sqlx trên CẢ SQLite và Postgres, giữ nguyên dạng lưu cũ.
+//! Plugs [`Timestamp`] and [`Date`] into SeaORM / sqlx on BOTH SQLite and Postgres, keeping the old storage form.
 //!
-//! **Ghi** (giá trị trong `INSERT`, `UPDATE`, `WHERE`…): SeaORM đổi trường thành `sea_query::Value`. Kiểu của
-//! thư viện thời gian nào cũng có một biến thể `Value` riêng, nhưng cách mã hoá của biến thể đó là cố định — và
-//! với `time` / `jiff` thì khác dạng `chrono` đã lưu trên SQLite. Biến thể duy nhất cho mỗi database một cách
-//! khác nhau là `Value::Enum` (dành cho kiểu enum của Postgres): SQLite nhận đúng chuỗi ta viết, Postgres nhận
-//! `$1::"timestamptz"` — Postgres tự đọc chuỗi RFC 3339 thành `timestamptz`. Vì vậy giá trị đi dưới dạng
-//! `Value::Enum { type_name: "timestamptz" | "date", value: <chuỗi đúng dạng cũ> }`.
+//! **Writing** (values in `INSERT`, `UPDATE`, `WHERE`…): SeaORM turns a field into a `sea_query::Value`. The
+//! type from any time library has its own `Value` variant, but that variant's encoding is fixed — and for
+//! `time` / `jiff` it differs from the `chrono` form already stored in SQLite. The only variant that behaves
+//! differently on each database is `Value::Enum` (meant for Postgres enum types): SQLite receives exactly the
+//! string we write, Postgres receives `$1::"timestamptz"` — Postgres itself reads the RFC 3339 string as
+//! `timestamptz`. So values travel as
+//! `Value::Enum { type_name: "timestamptz" | "date", value: <string in the old form> }`.
 //!
-//! Cột KHÔNG khai là enum (`ValueType::enum_type_name` = `None`, `column_type` là kiểu thời gian), nên SeaORM
-//! không ép kiểu cột khi đọc.
+//! The column is NOT declared as an enum (`ValueType::enum_type_name` = `None`, `column_type` is a time
+//! type), so SeaORM does not cast the column when reading.
 //!
-//! **Đọc**: SeaORM gọi `TryGetable`; ta lấy dòng sqlx bên dưới (`try_as_pg_row` / `try_as_sqlite_row`) và
-//! giải mã bằng `sqlx::Decode` tự viết: Postgres gửi `timestamptz` dạng nhị phân (micro giây từ 2000-01-01
-//! UTC), SQLite trả chuỗi (hay số) như `sqlx` + `chrono` đã nhận.
+//! **Reading**: SeaORM calls `TryGetable`; we take the underlying sqlx row (`try_as_pg_row` /
+//! `try_as_sqlite_row`) and decode it with a hand-written `sqlx::Decode`: Postgres sends `timestamptz` in
+//! binary (microseconds since 2000-01-01 UTC), SQLite returns a string (or a number) as `sqlx` + `chrono`
+//! accepted.
 
 use std::borrow::Cow;
 use std::sync::Arc;
@@ -37,9 +39,9 @@ const TIMESTAMPTZ_OID: Oid = Oid(1184);
 const DATE_OID: Oid = Oid(1082);
 const DATE: &str = "date";
 
-/// 2000-01-01T00:00:00Z — mốc của kiểu thời gian nhị phân Postgres — tính bằng giây Unix.
+/// 2000-01-01T00:00:00Z — the epoch of Postgres's binary time type — in Unix seconds.
 const POSTGRES_EPOCH_UNIX_SECONDS: i64 = 946_684_800;
-/// 2000-01-01 tính bằng ngày từ 1970-01-01.
+/// 2000-01-01 in days since 1970-01-01.
 const POSTGRES_EPOCH_UNIX_DAYS: i64 = 10_957;
 const MICROS_PER_SECOND: i64 = 1_000_000;
 const SECONDS_PER_DAY: i64 = 86_400;
@@ -54,7 +56,7 @@ fn enum_value(type_name: &'static str, text: Option<String>) -> Value {
     }
 }
 
-/// Chuỗi trong `Value` mang tên kiểu `type_name` (hay `Value::String`, cho giá trị dựng tay).
+/// The string in a `Value` carrying the type name `type_name` (or `Value::String`, for hand-built values).
 fn text_of(value: &Value, type_name: &str) -> Option<String> {
     match value {
         Value::Enum(OptionEnum::Some(inner)) if &*inner.type_name == type_name => {
@@ -65,8 +67,9 @@ fn text_of(value: &Value, type_name: &str) -> Option<String> {
     }
 }
 
-/// Chuỗi trong `Value::Enum` mang đúng tên kiểu `type_name` (không nhận `Value::String`): để code chung (chép dữ
-/// liệu giữa hai database) phân biệt cột thời gian với cột chữ.
+/// The string in a `Value::Enum` carrying exactly the type name `type_name` (`Value::String` is not
+/// accepted): so generic code (copying data between the two databases) can tell time columns from text
+/// columns.
 fn enum_text<'v>(value: &'v Value, type_name: &str) -> Option<&'v str> {
     match value {
         Value::Enum(OptionEnum::Some(inner)) if &*inner.type_name == type_name => {
@@ -77,7 +80,7 @@ fn enum_text<'v>(value: &'v Value, type_name: &str) -> Option<&'v str> {
 }
 
 impl Timestamp {
-    /// Thời điểm trong một `Value` do [`Timestamp`] tạo (`None`: NULL hay không phải thời điểm).
+    /// The point in time in a `Value` created by [`Timestamp`] (`None`: NULL or not a point in time).
     pub fn from_sql_value(value: &Value) -> Option<Timestamp> {
         enum_text(value, TIMESTAMPTZ)
             .and_then(format::parse_lenient_timestamp)
@@ -86,7 +89,7 @@ impl Timestamp {
 }
 
 impl Date {
-    /// Ngày trong một `Value` do [`Date`] tạo (`None`: NULL hay không phải ngày).
+    /// The date in a `Value` created by [`Date`] (`None`: NULL or not a date).
     pub fn from_sql_value(value: &Value) -> Option<Date> {
         enum_text(value, DATE).and_then(format::parse_date).map(Date::from)
     }
@@ -208,7 +211,7 @@ impl<'r> Decode<'r, Sqlite> for Timestamp {
     }
 }
 
-/// Ngày Julian (số thực SQLite trả từ `julianday()`) → thời điểm, như `sqlx` + `chrono` đã đọc.
+/// Julian day (the float SQLite returns from `julianday()`) → point in time, as `sqlx` + `chrono` read it.
 fn from_julian_day(julian_day: f64) -> Option<Timestamp> {
     const UNIX_EPOCH_JULIAN_DAY: f64 = 2_440_587.5;
     let seconds = (julian_day - UNIX_EPOCH_JULIAN_DAY) * 86_400.0;
@@ -324,8 +327,8 @@ impl<'r> Decode<'r, Sqlite> for Date {
 
 // --- Dùng chung ----------------------------------------------------------------------------------------
 
-/// Kết quả `try_get::<Option<T>>` của sqlx → kết quả SeaORM chờ: lỗi sqlx thành `DbErr`, NULL thành
-/// `TryGetError::Null` (SeaORM đổi tiếp thành `None` cho trường `Option<T>`).
+/// Result of sqlx's `try_get::<Option<T>>` → the result SeaORM expects: an sqlx error becomes `DbErr`, NULL
+/// becomes `TryGetError::Null` (SeaORM then turns it into `None` for an `Option<T>` field).
 fn present<T, I: ColIdx>(
     result: Result<Option<T>, sea_orm::sqlx::Error>,
     index: I,

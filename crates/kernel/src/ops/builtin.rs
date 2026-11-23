@@ -1,9 +1,9 @@
-//! Module nội bộ `kernel`: luôn được đăng ký đầu tiên (trong [`crate::module::Modules::new`]),
-//! giữ những bảng mà cả chương trình dùng chung, không thuộc module nghiệp vụ nào — hiện là
-//! `kernel_secrets` (khoá ký, [`crate::secret`]). Nó cũng đọc và công bố URL công khai của API
-//! ([`crate::public_url`]), phục vụ sổ module đã cài ([`crate::module_catalog`], D-155) và cờ
-//! theo người dùng dưới `/api/v1/me` ([`crate::user_flags`], D-207). Là
-//! một module như mọi module khác nên luật sở hữu bảng, `autoxide backup` / `copy` và `migrate` áp cho nó y như vậy.
+//! The internal `kernel` module: always registered first (in [`crate::module::Modules::new`]), it holds the
+//! tables the whole program shares that belong to no business module — currently `kernel_secrets` (signing
+//! keys, [`crate::secret`]). It also reads and publishes the API's public URL ([`crate::public_url`]), serves
+//! the registry of installed modules ([`crate::module_catalog`], D-155) and the per-user flags under
+//! `/api/v1/me` ([`crate::user_flags`], D-207). Being a module like any other, the table ownership rule,
+//! `autoxide backup` / `copy` and `migrate` apply to it just the same.
 
 use std::sync::Arc;
 
@@ -19,93 +19,93 @@ use crate::public_url::PublicUrl;
 use crate::secret::SecretKey;
 use crate::user_flags::{self, UserFlags};
 
-/// Tên của module nội bộ; module khác không được dùng tên này.
+/// Name of the internal module; other modules must not use this name.
 pub(crate) const NAME: &str = "kernel";
 
 pub(crate) struct KernelModule {
-    /// Giá trị `AUTOXIDE_SECRET_KEY` và `AUTOXIDE_SECRET_KEY_PREVIOUS`; điền lúc `configure`, dùng
-    /// chung với `Migrator`.
+    /// Values of `AUTOXIDE_SECRET_KEY` and `AUTOXIDE_SECRET_KEY_PREVIOUS`; filled at `configure`, shared
+    /// with `Migrator`.
     keys: crate::secret::KeyConfig,
-    /// Giá trị `AUTOXIDE_HTTP_PUBLIC_URL`; có sau `configure`.
+    /// Value of `AUTOXIDE_HTTP_PUBLIC_URL`; available after `configure`.
     public_url: PublicUrl,
-    /// Sổ module, do `Modules::start` điền sau khi mọi module khởi động.
+    /// Module registry, filled by `Modules::start` after all modules have started.
     catalog: ModuleCatalog,
-    /// Outbox của kernel; có sau `start` (event `kernel.job_retried`).
+    /// The kernel's outbox; available after `start` (event `kernel.job_retried`).
     outbox: Option<crate::event::Outbox>,
-    /// Quyền dùng theo gói (bước 35); có sau `start` (sổ điều hướng lọc theo đó).
+    /// Plan-based entitlements (step 35); available after `start` (the navigation registry filters by it).
     entitlements: Option<crate::entitlement::EntitlementsHandle>,
-    /// Cảnh báo vận hành (bước kiểm của mọi module, giữ kết quả một phút).
+    /// Operational alerts (the checks of all modules, results kept for one minute).
     alerts: Arc<crate::ops::alerts::Alerts>,
-    /// Cấu hình cho giao diện của mọi module (D-271), điền cùng lúc với sổ module.
+    /// Configuration for the UI of all modules (D-271), filled together with the module registry.
     client_configs: crate::ops::client_config::ClientConfigs,
-    /// Database của chương trình; có sau `start` (để đọc trạng thái migration).
+    /// The program's database; available after `start` (to read migration status).
     database: Option<crate::database::Database>,
-    /// `AUTOXIDE_USER_FLAGS_MAX`; có sau `configure`.
+    /// `AUTOXIDE_USER_FLAGS_MAX`; available after `configure`.
     max_flags: u64,
-    /// Bộ dựng mẫu dùng chung (`AUTOXIDE_TEMPLATE_MAX_BYTES`, D-351); công bố lúc `start`.
+    /// Shared template builder (`AUTOXIDE_TEMPLATE_MAX_BYTES`, D-351); published at `start`.
     templates: crate::template::TemplateEngine,
-    /// Service cờ theo người dùng, dùng chung với `Modules::routes`; điền lúc `start`.
+    /// Per-user flags service, shared with `Modules::routes`; filled at `start`.
     flags: user_flags::Handle,
-    /// Sổ cấu hình theo khách của mọi module (điền khi dựng `Modules`).
+    /// Registry of per-tenant settings of all modules (filled when `Modules` is built).
     tenant_settings: crate::tenancy::settings::Catalog,
-    /// Service cấu hình theo khách; có sau `start`.
+    /// Per-tenant settings service; available after `start`.
     settings: Option<Arc<crate::tenancy::settings::SettingsService>>,
-    /// Sổ database; có sau `start` (nhân sự nền tảng đặt cấu hình của khách khác).
+    /// Database registry; available after `start` (platform staff set the settings of other tenants).
     registry: Option<crate::tenancy::DatabaseRegistry>,
-    /// Tài khoản nhà cung cấp theo khách (bước 70 P7): đọc cấu hình kết nối, định tuyến webhook.
+    /// Per-tenant provider accounts (step 70 P7): read connection settings, route webhooks.
     accounts: Option<crate::provider::ProviderAccounts>,
-    /// Bộ gieo dữ liệu cho khách mới của mọi module.
+    /// Seeder for new tenants, covering all modules.
     seeds: crate::tenancy::admin::Seeds,
-    /// Service quản lý khách; có sau `start`.
+    /// Tenant management service; available after `start`.
     admin: Option<Arc<crate::tenancy::TenantAdmin>>,
-    /// Bộ tra DNS cho tên miền riêng (điền sau khi mọi module khởi động).
+    /// DNS resolver for custom domains (filled after all modules have started).
     dns: crate::tenancy::domains::DnsSlot,
-    /// Cây tổ chức (bước 34) để gắn tên miền với nút (điền sau khi mọi module khởi động).
+    /// Organization tree (step 34) for attaching domains to nodes (filled after all modules have started).
     orgs: crate::tenancy::domains::OrgSlot,
-    /// Service tên miền riêng của khách; có sau `start`.
+    /// Service for a tenant's custom domains; available after `start`.
     domains: Option<Arc<crate::tenancy::TenantDomains>>,
-    /// Thứ việc dời khách cần từ mọi module (điền sau khi mọi module khởi động).
+    /// What moving a tenant needs from all modules (filled after all modules have started).
     move_setup: crate::tenancy::moves::MoveSetup,
-    /// Service dời khách giữa các placement; có sau `start`.
+    /// Service that moves tenants between placements; available after `start`.
     moves: Option<Arc<crate::tenancy::TenantMoves>>,
-    /// Tách / gộp khách (bước 38): cấu hình, service, route, job.
+    /// Split / merge tenants (step 38): settings, service, routes, jobs.
     relocations: crate::tenancy::relocate::Wiring,
-    /// Khách thử nghiệm (sandbox, bước 38, D-232).
+    /// Test tenants (sandbox, step 38, D-232).
     sandboxes: crate::tenancy::sandbox::Wiring,
-    /// Xuất dữ liệu khách (bước 35, D-328); có sau `start`.
+    /// Tenant data export (step 35, D-328); available after `start`.
     exports: Option<Arc<crate::tenancy::TenantExports>>,
-    /// Migrate placement bằng API (D-334); có sau `start`.
+    /// Placement migration through the API (D-334); available after `start`.
     migration_runs: Option<Arc<crate::tenancy::migration_runs::MigrationRuns>>,
     /// `AUTOXIDE_TENANCY_EXPORT_RETENTION_DAYS`.
     export_days: i64,
-    /// `AUTOXIDE_JOBS_FILE_RETENTION_DAYS` (bước 51 P16).
+    /// `AUTOXIDE_JOBS_FILE_RETENTION_DAYS` (step 51 P16).
     job_file_days: u32,
-    /// Hàng đợi job của kernel (xuất danh sách); có sau `start`.
+    /// The kernel's job queue (list export); available after `start`.
     jobs: Option<crate::job::JobQueue>,
-    /// Cấu hình stream event (bước 40 P5); điền lúc `configure`.
+    /// Event stream settings (step 40 P5); filled at `configure`.
     stream_config: crate::event::stream::StreamConfig,
-    /// Hub stream event SSE; có sau `start`.
+    /// SSE event stream hub; available after `start`.
     stream: Option<crate::event::StreamHub>,
-    /// `AUTOXIDE_SEARCH_BACKEND` (bước 40 P7); điền lúc `configure`.
+    /// `AUTOXIDE_SEARCH_BACKEND` (step 40 P7); filled at `configure`.
     search_backend: String,
-    /// Sổ loại tài liệu tìm được và bộ máy tìm; có sau `start`.
+    /// Registry of searchable document types and the search engine; available after `start`.
     search: Option<crate::search::SearchIndex>,
-    /// Sổ đối tượng và sổ permission (ghi chú trên bản ghi, bước 51 P13); có sau `start`.
+    /// Object registry and permission registry (notes on records, step 51 P13); available after `start`.
     resources: Option<(crate::resource::ResourceDirectory, crate::access::PermissionCatalog)>,
-    /// `AUTOXIDE_HTTP_REQUEST_TIMEOUT_SECONDS` (đọc ở cấu hình kernel): dời khách chờ request đang
-    /// chạy xong trong chừng này.
+    /// `AUTOXIDE_HTTP_REQUEST_TIMEOUT_SECONDS` (read in the kernel settings): moving a tenant waits this long
+    /// for running requests to finish.
     request_timeout: std::time::Duration,
-    /// Bản dịch của mọi module (dịch mô tả permission, event trong sổ module); có sau `start`.
+    /// Translations of all modules (translating permission and event descriptions in the module registry); available after `start`.
     translations: crate::i18n::Translations,
-    /// Backup theo lịch (bước 39): cấu hình, và bộ chạy có sau `start`.
+    /// Scheduled backup (step 39): settings, and the runner available after `start`.
     backup_config: crate::backup::scheduled::BackupConfig,
     backups: Option<Arc<crate::backup::scheduled::ScheduledBackups>>,
-    /// Module có bảng job / event, cho `GET /kernel/ops/backlog` (bước 39).
+    /// Modules that have job / event tables, for `GET /kernel/ops/backlog` (step 39).
     backlog: crate::job::backlog::BacklogModules,
 }
 
 impl KernelModule {
-    /// Thứ `GET /kernel/ops/backlog` cần; có sau `start`.
+    /// What `GET /kernel/ops/backlog` needs; available after `start`.
     fn backlog_state(&self) -> Option<crate::job::backlog_api::BacklogState> {
         let registry = self.registry.clone()?;
         Some(crate::job::backlog_api::BacklogState { registry, modules: self.backlog.clone() })
@@ -164,8 +164,8 @@ impl KernelModule {
         }
     }
 
-    /// Xuất dữ liệu khách, chỉ khi có nơi lưu file (module `files`): không có nơi để ghi bản xuất
-    /// thì không có route, tool, job hay lịch nào của nó.
+    /// Tenant data export, only when there is a file storage (module `files`): with no place to write the
+    /// export there is no route, tool, job or schedule for it.
     fn live_exports(&self) -> Option<&Arc<crate::tenancy::TenantExports>> {
         let storage =
             self.registry.as_ref().is_some_and(|registry| registry.shared_storage().is_some());
@@ -181,7 +181,7 @@ impl KernelModule {
         })
     }
 
-    /// Có sau `start` (cần quyền dùng theo gói).
+    /// Available after `start` (needs plan entitlements).
     fn navigation_state(&self) -> Option<crate::ops::navigation::NavigationState> {
         Some(crate::ops::navigation::NavigationState {
             catalog: self.catalog.clone(),
@@ -916,8 +916,8 @@ impl Module for KernelModule {
     }
 }
 
-/// Nhân sự của khách nền tảng vào khách khác bằng header `Autoxide-Tenant` (bước 33). Quyền
-/// giữ nguyên tên permission đã có trong khách đích.
+/// Staff of the platform tenant enter another tenant with the `Autoxide-Tenant` header (step 33). Permissions
+/// keep the same permission names they already have in the target tenant.
 pub(crate) const TENANTS_OPERATE: Permission = Permission::new(
     "kernel.tenants.operate",
     "Act inside another tenant with the header `Autoxide-Tenant` (platform staff only: it works \
@@ -925,7 +925,7 @@ pub(crate) const TENANTS_OPERATE: Permission = Permission::new(
 )
 .with_risk(crate::access::Risk::SensitiveData);
 
-/// Bảng `kernel_secrets`: mỗi dòng một khoá chương trình tự sinh (tên → giá trị).
+/// Table `kernel_secrets`: one row per key the program generates itself (name → value).
 struct CreateSecrets;
 
 impl MigrationName for CreateSecrets {
@@ -954,7 +954,7 @@ impl MigrationTrait for CreateSecrets {
     }
 }
 
-/// `AUTOXIDE_HTTP_REQUEST_TIMEOUT_SECONDS` mà cấu hình kernel (đọc trước module) đã đọc.
+/// `AUTOXIDE_HTTP_REQUEST_TIMEOUT_SECONDS`, already read by the kernel settings (read before modules).
 fn request_timeout(reader: &ConfigReader<'_>) -> Option<u64> {
     reader
         .values()
@@ -963,7 +963,7 @@ fn request_timeout(reader: &ConfigReader<'_>) -> Option<u64> {
         .and_then(|value| value.display_value().trim().parse().ok())
 }
 
-/// Cấu hình kernel (đọc trước module) đặt `AUTOXIDE_TENANCY_MODE=multi`.
+/// The kernel settings (read before modules) set `AUTOXIDE_TENANCY_MODE=multi`.
 fn multi_tenant(reader: &ConfigReader<'_>) -> bool {
     reader.values().iter().any(|value| {
         value.setting.name == "AUTOXIDE_TENANCY_MODE" && value.display_value().trim() == "multi"

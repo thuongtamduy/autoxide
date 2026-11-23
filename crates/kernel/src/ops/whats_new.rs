@@ -1,8 +1,8 @@
-//! "Có gì mới" (đề bài giao diện, nút "?"): các mục của `CHANGELOG.md` theo phiên bản, đọc từ bản
-//! nhúng lúc biên dịch — đúng những gì máy chủ đang chạy có, không phải bản trên mạng.
+//! "What's new" (requested by the UI, the "?" button): the entries of `CHANGELOG.md` by version, read from
+//! the copy embedded at compile time — exactly what the running server has, not the version online.
 //!
-//! Mọi module là crate của cùng một workspace, phát hành cùng nhau, nên một CHANGELOG là đủ.
-//! Mục `Unreleased` là thay đổi đã có trong bản build nhưng chưa gắn số phiên bản.
+//! Every module is a crate of the same workspace, released together, so one CHANGELOG is enough.
+//! The `Unreleased` entry is changes already in the build but not yet given a version number.
 
 use axum::extract::Query;
 use serde::{Deserialize, Serialize};
@@ -13,10 +13,10 @@ use utoipa_axum::routes;
 use crate::error::{Error, FieldError};
 use crate::response::{Data, Problem};
 
-/// CHANGELOG của workspace, nhúng lúc biên dịch.
+/// The workspace's CHANGELOG, embedded at compile time.
 const CHANGELOG: &str = include_str!("../../CHANGELOG.md");
 
-/// Tối đa số phiên bản trả về khi không nêu `since`.
+/// Maximum number of versions returned when `since` is not given.
 const DEFAULT_RELEASES: usize = 5;
 
 /// The changes of one version.
@@ -53,7 +53,7 @@ pub(crate) struct WhatsNewQuery {
     since: Option<String>,
 }
 
-/// Đọc CHANGELOG thành danh sách phiên bản, mới nhất trước (đúng thứ tự trong file).
+/// Reads the CHANGELOG into a list of versions, newest first (the same order as in the file).
 pub(crate) fn parse(text: &str) -> Vec<Release> {
     let mut releases: Vec<Release> = Vec::new();
     let mut in_item = false;
@@ -97,7 +97,7 @@ pub(crate) fn parse(text: &str) -> Vec<Release> {
     releases
 }
 
-/// `1.2.3` thành bộ số để so; `None` khi sai dạng.
+/// `1.2.3` into a tuple of numbers for comparison; `None` when the form is wrong.
 fn version_key(version: &str) -> Option<(u64, u64, u64)> {
     let mut parts = version.trim().trim_start_matches('v').split('.');
     let mut next = || parts.next()?.parse::<u64>().ok();
@@ -105,7 +105,7 @@ fn version_key(version: &str) -> Option<(u64, u64, u64)> {
     Some(key)
 }
 
-/// Các phiên bản mới hơn `since` (kèm `unreleased`); không nêu `since`: năm bản mới nhất.
+/// Versions newer than `since` (with `unreleased`); when `since` is not given: the five newest.
 pub(crate) fn select(releases: Vec<Release>, since: Option<&str>) -> Result<Vec<Release>, Error> {
     let Some(since) = since.map(str::trim).filter(|since| !since.is_empty()) else {
         return Ok(releases.into_iter().take(DEFAULT_RELEASES).collect());

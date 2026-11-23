@@ -1,13 +1,13 @@
-//! Xuất danh sách theo bộ lọc (bước 51 P16, D-213).
+//! Export a list by filter (step 51 P16, D-213).
 //!
-//! Module khai danh sách xuất được bằng [`StartContext::export_source`](crate::module::StartContext)
-//! — `resource` trùng id danh sách của P7 (`x-autoxide-list`), cột, permission, hàm đọc theo trang.
-//! `POST /api/v1/kernel/exports {resource, params, columns}` kiểm `params` theo schema bộ lọc của
-//! P7, xếp job `kernel.export_list` (theo dõi qua job API của P15) và trả 201 trỏ tới job. Job đọc
-//! từng trang **với quyền của người yêu cầu** (bản chụp `PrincipalSnapshot`), ghi CSV chống CSV
-//! injection ([`crate::csv`]) vào nơi lưu của khách (`jobs/<id>.csv`). Tải bằng
-//! `GET /api/v1/kernel/jobs/{id}/file`; file giữ `AUTOXIDE_JOBS_FILE_RETENTION_DAYS` ngày rồi job dọn
-//! hằng ngày xoá.
+//! A module declares an exportable list with [`StartContext::export_source`](crate::module::StartContext) —
+//! `resource` equals the P7 list id (`x-autoxide-list`), the columns, the permission, and a paged read
+//! function. `POST /api/v1/kernel/exports {resource, params, columns}` validates `params` against the P7
+//! filter schema, enqueues the job `kernel.export_list` (followed through the P15 job API) and returns 201
+//! pointing to the job. The job reads page by page **with the requester's permissions** (a
+//! `PrincipalSnapshot`), and writes CSV that is safe against CSV injection ([`crate::csv`]) into the tenant's
+//! storage (`jobs/<id>.csv`). Download with `GET /api/v1/kernel/jobs/{id}/file`; the file is kept for
+//! `AUTOXIDE_JOBS_FILE_RETENTION_DAYS` days and then a daily job deletes it.
 
 use crate::time::Timestamp;
 use jiff::SignedDuration;
@@ -37,11 +37,11 @@ use crate::response::{Created, Problem};
 use crate::storage::{Storage, TenantStorage};
 use crate::tenancy::{DatabaseRegistry, TenantContext, TenantId};
 
-/// Loại job ghi file xuất.
+/// Job type that writes the export file.
 pub(crate) const EXPORT_LIST: &str = "kernel.export_list";
-/// Loại job dọn file xuất hết hạn (hằng ngày, mỗi database dữ liệu).
+/// Job type that cleans up expired export files (daily, per data database).
 pub(crate) const CLEAN_FILES: &str = "kernel.clean_job_files";
-/// Tối đa chừng này dòng mỗi bản xuất; dài hơn thì cắt và ghi `truncated`.
+/// At most this many rows per export; longer ones are cut and marked `truncated`.
 const MAX_ROWS: u64 = 100_000;
 
 pub const FILE_RETENTION_DAYS: Setting = Setting::new(
@@ -50,18 +50,18 @@ pub const FILE_RETENTION_DAYS: Setting = Setting::new(
 )
 .with_default("7");
 
-/// Phần khai của một danh sách xuất được.
+/// Declaration of one exportable list.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct ExportInfo {
-    /// Id danh sách, như `x-autoxide-list` của endpoint (`<module>.<operation id>`).
+    /// List id, as the endpoint's `x-autoxide-list` (`<module>.<operation id>`).
     pub resource: &'static str,
-    /// Tên file (không đuôi), vd `content-entries`.
+    /// File name (without extension), e.g. `content-entries`.
     pub file_name: &'static str,
-    /// Mọi cột theo thứ tự mặc định; [`ExportPage::rows`] theo đúng thứ tự này.
+    /// All columns in default order; [`ExportPage::rows`] follows exactly this order.
     pub columns: Vec<&'static str>,
-    /// Loại bản ghi có trường tự định nghĩa (P19): xuất thêm được cột `cf.<khoá>` của các trường
-    /// đang bật, giá trị lấy từ [`ExportPage::custom`].
+    /// Record type that has custom fields (P19): the export can add `cf.<key>` columns for the enabled fields,
+    /// with values taken from [`ExportPage::custom`].
     pub custom_fields: Option<&'static str>,
 }
 
@@ -74,14 +74,14 @@ impl ExportInfo {
         ExportInfo { resource, file_name, columns, custom_fields: None }
     }
 
-    /// Bản ghi của danh sách mang trường tự định nghĩa của loại `target` (vd `content.entry`).
+    /// Records of the list that carry custom fields of type `target` (e.g. `content.entry`).
     pub fn with_custom_fields(mut self, target: &'static str) -> Self {
         self.custom_fields = Some(target);
         self
     }
 }
 
-/// Bộ lọc người dùng gửi (đã kiểm theo schema của P7), đọc thành kiểu `IntoParams` của danh sách.
+/// Filters the user sent (validated against the P7 schema), read into the list's `IntoParams` type.
 #[derive(Debug, Clone, Default)]
 pub struct ExportQuery {
     params: serde_json::Map<String, Value>,
@@ -92,15 +92,15 @@ impl ExportQuery {
         ExportQuery { params }
     }
 
-    /// Bản có thêm (hay thay) tham số `name` — vd `limit`, `cursor` khi đọc từng trang.
+    /// A copy with the parameter `name` added (or replaced) — e.g. `limit`, `cursor` when reading page by page.
     pub fn with(&self, name: &str, value: impl Into<String>) -> Self {
         let mut params = self.params.clone();
         params.insert(name.to_owned(), Value::String(value.into()));
         ExportQuery { params }
     }
 
-    /// Đọc bộ lọc thành `T` như axum đọc query string của chính endpoint danh sách — cùng kiểu
-    /// `IntoParams`, cùng cách hiểu giá trị.
+    /// Reads the filters into `T` the way axum reads the query string of the list endpoint itself — the same
+    /// `IntoParams` type, the same interpretation of values.
     pub fn parse<T: DeserializeOwned>(&self) -> Result<T, Error> {
         let query: Vec<String> = self
             .params
@@ -122,8 +122,8 @@ impl ExportQuery {
     }
 }
 
-/// Mã hoá phần trăm cho query string: giữ chữ số, chữ ASCII và `-._~`, còn lại `%XX` từng byte
-/// UTF-8 (RFC 3986).
+/// Percent-encoding for a query string: keeps digits, ASCII letters and `-._~`, and writes every other UTF-8
+/// byte as `%XX` (RFC 3986).
 fn encode(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     for byte in text.bytes() {
@@ -136,21 +136,22 @@ fn encode(text: &str) -> String {
     out
 }
 
-/// Một trang của bản xuất.
+/// One page of the export.
 #[derive(Debug, Clone, Default)]
 pub struct ExportPage {
-    /// Mỗi dòng đủ mọi cột của [`ExportInfo::columns`], đúng thứ tự.
+    /// Each row has every column of [`ExportInfo::columns`], in the same order.
     pub rows: Vec<Vec<String>>,
-    /// Trường tự định nghĩa của từng dòng (cùng thứ tự với `rows`), khi danh sách có.
+    /// Custom fields of each row (same order as `rows`), when the list has them.
     pub custom: Vec<serde_json::Map<String, Value>>,
-    /// Con trỏ trang sau; `None`: hết.
+    /// Cursor of the next page; `None`: no more.
     pub next: Option<String>,
 }
 
 impl ExportPage {
-    /// Trang từ các bản ghi đã đổi thành JSON như endpoint danh sách trả: mỗi cột là một trường cấp
-    /// trên cùng cùng tên (chuỗi giữ nguyên, `null` / thiếu thành ô trống, còn lại viết JSON).
-    /// Trường `custom_fields` (object) của bản ghi, nếu có, thành [`custom`](Self::custom).
+    /// A page built from records already converted to JSON as the list endpoint returns them: each column is
+    /// a top-level field of the same name (strings kept as is, `null` / missing become an empty cell,
+    /// anything else is written as JSON). The record's `custom_fields` field (an object), if present, becomes
+    /// [`custom`](Self::custom).
     pub fn from_json<T: Serialize>(
         items: &[T],
         columns: &[&str],
@@ -169,7 +170,7 @@ impl ExportPage {
     }
 }
 
-/// Ô CSV của một giá trị JSON: chuỗi giữ nguyên, `null` / thiếu thành ô trống, còn lại viết JSON.
+/// CSV cell for a JSON value: strings kept as is, `null` / missing become an empty cell, anything else is written as JSON.
 fn cell(value: Option<&Value>) -> String {
     match value {
         None | Some(Value::Null) => String::new(),
@@ -178,16 +179,16 @@ fn cell(value: Option<&Value>) -> String {
     }
 }
 
-/// Một danh sách xuất được.
+/// An exportable list.
 //
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
 #[async_trait::async_trait]
 pub trait ExportSource: Send + Sync {
     fn info(&self) -> ExportInfo;
-    /// Permission cần để xuất (thường là permission đọc danh sách).
+    /// Permission required to export (usually the permission that reads the list).
     fn permission(&self) -> Permission;
-    /// Trang sau `cursor` (`None`: trang đầu), đọc với quyền của `principal` như endpoint danh
-    /// sách.
+    /// The page after `cursor` (`None`: first page), read with `principal`'s permissions like the list
+    /// endpoint.
     async fn page(
         &self,
         tenant: &TenantContext,
@@ -199,7 +200,7 @@ pub trait ExportSource: Send + Sync {
 
 type Entry = (&'static str, Arc<dyn ExportSource>);
 
-/// Sổ danh sách xuất được của mọi module. Clone rẻ.
+/// Registry of exportable lists of all modules. Cheap to clone.
 #[derive(Clone, Default)]
 pub struct ExportSources {
     entries: Arc<RwLock<Vec<Entry>>>,
@@ -239,7 +240,7 @@ impl ExportSources {
     }
 }
 
-/// Chỗ giữ sổ schema danh sách: `Modules::routes` điền sau khi dựng route của mọi module.
+/// Holder of the list schema registry: `Modules::routes` fills it after building the routes of all modules.
 #[derive(Clone, Default)]
 pub(crate) struct ListsHandle(Arc<OnceLock<ListSchemas>>);
 
@@ -253,7 +254,7 @@ impl ListsHandle {
     }
 }
 
-/// Payload của job: bộ lọc và bản chụp người yêu cầu (không có dữ liệu của danh sách).
+/// Job payload: the filters and a snapshot of the requester (no list data).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct ExportJob {
     resource: String,
@@ -464,7 +465,7 @@ pub(crate) fn routes(state: ExportsState) -> OpenApiRouter {
         .with_state(Arc::new(state))
 }
 
-/// Bộ chạy job `kernel.export_list`.
+/// Runner of the job `kernel.export_list`.
 pub(crate) struct ExportRunner {
     pub sources: ExportSources,
     pub registry: DatabaseRegistry,
@@ -561,7 +562,7 @@ impl JobHandler for ExportRunner {
     }
 }
 
-/// Bộ chạy job dọn file hết hạn của một database dữ liệu.
+/// Runner of the job that cleans up expired files of one data database.
 pub(crate) struct CleanRunner {
     pub registry: DatabaseRegistry,
 }
@@ -582,7 +583,7 @@ impl JobHandler for CleanRunner {
     }
 }
 
-/// Lịch dọn file hằng ngày, ở mọi database dữ liệu.
+/// Daily cleanup schedule, on every data database.
 pub(crate) fn schedule() -> crate::job::Schedule {
     crate::job::Schedule::new(CLEAN_FILES, CLEAN_FILES, std::time::Duration::from_secs(86_400))
 }

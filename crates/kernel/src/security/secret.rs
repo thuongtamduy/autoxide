@@ -1,20 +1,22 @@
-//! Khoá ký dùng chung của kernel (D-113): một khoá gốc, dẫn ra khoá riêng cho từng mục đích.
+//! The kernel's shared signing key (D-113): one master key, from which a separate key is derived for each
+//! purpose.
 //!
-//! - Đặt `AUTOXIDE_SECRET_KEY` thì khoá gốc là giá trị đó.
-//! - Không đặt thì kernel **sinh một lần và lưu trong database** (bảng `kernel_secrets` của
-//!   module nội bộ `kernel`): khởi động lại hay chạy nhiều máy chủ chung một database vẫn
-//!   dùng cùng một khoá, người cài không phải cấu hình gì. Khoá đi theo `autoxide backup`.
-//! - Module không dùng thẳng khoá gốc: [`SecretKey::derive`] với một nhãn mục đích (vd
-//!   `autoxide/antispam/form-token/v1`) cho ra một khoá 32 byte riêng — lộ khoá của một mục
-//!   đích không lộ khoá khác.
-//! - Không thứ gì sống lâu được phụ thuộc khoá này (đổi khoá là mọi token ký bằng nó hết
-//!   dùng được): link huỷ đăng ký trong email dùng token ngẫu nhiên lưu bản băm.
+//! - If `AUTOXIDE_SECRET_KEY` is set, the master key is that value.
+//! - If not set, the kernel **generates one once and stores it in the database** (table `kernel_secrets` of the
+//!   internal module `kernel`): after a restart, or when several servers share one database, the same key is
+//!   still used, and the installer has nothing to configure. The key travels with `autoxide backup`.
+//! - Modules do not use the master key directly: [`SecretKey::derive`] with a purpose label (e.g.
+//!   `autoxide/antispam/form-token/v1`) yields a separate 32-byte key; leaking the key of one purpose does not
+//!   leak another.
+//! - Nothing long-lived may depend on this key (changing the key makes every token signed with it unusable):
+//!   unsubscribe links in emails use a random token whose hash is stored.
 //!
-//! - Secret module cần đọc lại (secret TOTP, secret ký webhook…) được mã hoá khi lưu bằng
-//!   [`Sealer`] ([`SecretKey::sealer`], D-257). Xoay khoá: khoá mới vào `AUTOXIDE_SECRET_KEY`, khoá
-//!   cũ vào `AUTOXIDE_SECRET_KEY_PREVIOUS`, chạy `autoxide secrets reseal`, rồi bỏ khoá cũ.
+//! - Secrets a module needs to read back (TOTP secrets, webhook signing secrets, ...) are encrypted at rest
+//!   with a [`Sealer`] ([`SecretKey::sealer`], D-257). Key rotation: put the new key in
+//!   `AUTOXIDE_SECRET_KEY`, the old key in `AUTOXIDE_SECRET_KEY_PREVIOUS`, run `autoxide secrets reseal`,
+//!   then drop the old key.
 //!
-//! Module lấy khoá lúc khởi động: `let key = context.require::<SecretKey>()?;`.
+//! A module gets the key at startup: `let key = context.require::<SecretKey>()?;`.
 
 use crate::time::Timestamp;
 use std::sync::Arc;
@@ -33,13 +35,13 @@ use crate::error::Error;
 
 pub use super::seal::{Sealer, is_sealed};
 
-/// Độ dài tối thiểu của `AUTOXIDE_SECRET_KEY`.
+/// Minimum length of `AUTOXIDE_SECRET_KEY`.
 const MIN_LENGTH: usize = 32;
 
-/// Nhãn dẫn khoá của [`SecretKey::phone_key`] / [`SecretKey::email_key`].
+/// Derivation label of [`SecretKey::phone_key`] / [`SecretKey::email_key`].
 const CONTACT_KEY_PURPOSE: &str = "autoxide/contact-key/v1";
 
-/// Tên dòng giữ khoá gốc trong `kernel_secrets`.
+/// Name of the row that holds the master key in `kernel_secrets`.
 const SIGNING_KEY: &str = "signing_key";
 
 pub(crate) const SECRET_KEY: Setting = Setting::new(
@@ -60,7 +62,7 @@ pub(crate) const SECRET_KEY_PREVIOUS: Setting = Setting::new(
 )
 .secret();
 
-/// Đọc `AUTOXIDE_SECRET_KEY_PREVIOUS` (không bắt buộc): danh sách, cách nhau dấu phẩy.
+/// Reads `AUTOXIDE_SECRET_KEY_PREVIOUS` (optional): a comma-separated list.
 pub(crate) fn read_previous(reader: &mut ConfigReader<'_>) -> Result<Vec<Vec<u8>>, Invalid> {
     let raw = reader.optional_with(&SECRET_KEY_PREVIOUS, |raw| {
         let keys: Vec<Vec<u8>> = raw
@@ -78,11 +80,11 @@ pub(crate) fn read_previous(reader: &mut ConfigReader<'_>) -> Result<Vec<Vec<u8>
     Ok(raw.unwrap_or_default())
 }
 
-/// Giá trị mẫu của `.env.example` (và mọi giá trị bắt đầu như nó): chép nguyên mẫu là chưa đặt
-/// khoá thật — ai đọc repo cũng biết nó.
+/// Sample value of `.env.example` (and any value that starts like it): copying the sample as is means no real
+/// key is set, since anyone reading the repo knows it.
 const PLACEHOLDER_PREFIX: &str = "change-me";
 
-/// Đọc `AUTOXIDE_SECRET_KEY` (không bắt buộc).
+/// Reads `AUTOXIDE_SECRET_KEY` (optional).
 pub(crate) fn read_setting(reader: &mut ConfigReader<'_>) -> Result<Option<Vec<u8>>, Invalid> {
     reader.optional_with(&SECRET_KEY, |raw| {
         if raw.trim().to_ascii_lowercase().starts_with(PLACEHOLDER_PREFIX) {
@@ -98,13 +100,13 @@ pub(crate) fn read_setting(reader: &mut ConfigReader<'_>) -> Result<Option<Vec<u
     })
 }
 
-/// Khoá ký dùng chung. Clone rẻ: mọi bản clone dùng chung một khoá gốc (đọc database nhiều
-/// nhất một lần).
+/// Shared signing key. Cheap to clone: every clone shares one master key (the database is read at most
+/// once).
 #[derive(Clone)]
 pub struct SecretKey {
     database: Database,
     configured: Option<Arc<Vec<u8>>>,
-    /// Khoá gốc cũ (`AUTOXIDE_SECRET_KEY_PREVIOUS`): chỉ để mở secret đã mã hoá bằng chúng.
+    /// Old master keys (`AUTOXIDE_SECRET_KEY_PREVIOUS`): only to open secrets encrypted with them.
     previous: Arc<Vec<Vec<u8>>>,
     sealer: Arc<OnceCell<Sealer>>,
     // `OnceCell` của tokio: lần gọi đầu đọc (hoặc sinh) khoá gốc, các lần sau và các lời gọi
@@ -122,8 +124,8 @@ impl std::fmt::Debug for SecretKey {
 }
 
 impl SecretKey {
-    /// Khoá của chương trình: `configured` (giá trị `AUTOXIDE_SECRET_KEY`), hoặc khoá lưu trong
-    /// database. Database phải đã chạy migration của module `kernel`.
+    /// The program's key: `configured` (the value of `AUTOXIDE_SECRET_KEY`), or the key stored in the
+    /// database. The database must already have run the `kernel` module's migrations.
     pub fn new(database: Database, configured: Option<Vec<u8>>) -> Self {
         SecretKey {
             database,
@@ -134,15 +136,16 @@ impl SecretKey {
         }
     }
 
-    /// Thêm khoá gốc cũ (`AUTOXIDE_SECRET_KEY_PREVIOUS`) để mở secret đã mã hoá bằng chúng.
+    /// Adds old master keys (`AUTOXIDE_SECRET_KEY_PREVIOUS`) to open secrets encrypted with them.
     pub fn with_previous(mut self, previous: Vec<Vec<u8>>) -> Self {
         self.previous = Arc::new(previous);
         self
     }
 
-    /// Bộ mã hoá secret: khoá hiện tại dẫn từ khoá gốc; khoá cũ dẫn từ
-    /// `AUTOXIDE_SECRET_KEY_PREVIOUS` và — khi `AUTOXIDE_SECRET_KEY` đã đặt — từ khoá gốc kernel đã
-    /// sinh trong database trước đó, để lần đầu đặt biến môi trường không làm mất secret nào.
+    /// Secret encryptor: the current key is derived from the master key; old keys are derived from
+    /// `AUTOXIDE_SECRET_KEY_PREVIOUS` and, when `AUTOXIDE_SECRET_KEY` is set, from the master key the kernel
+    /// generated earlier in the database, so setting the environment variable for the first time does not
+    /// lose any secret.
     pub async fn sealer(&self) -> Result<Sealer, Error> {
         let sealer = self
             .sealer
@@ -163,21 +166,21 @@ impl SecretKey {
         Ok(sealer.clone())
     }
 
-    /// `true` khi khoá gốc đến từ `AUTOXIDE_SECRET_KEY`; `false` khi kernel tự sinh và giữ nó
-    /// trong database (ai có bản sao database cũng có khoá).
+    /// `true` when the master key comes from `AUTOXIDE_SECRET_KEY`; `false` when the kernel generated it
+    /// itself and keeps it in the database (anyone with a copy of the database has the key).
     pub fn is_configured(&self) -> bool {
         self.configured.is_some()
     }
 
-    /// Khoá 32 byte riêng cho mục đích `purpose`: HMAC-SHA256 của nhãn trên khoá gốc. Cùng
-    /// khoá gốc và cùng nhãn thì luôn ra cùng khoá.
+    /// A separate 32-byte key for purpose `purpose`: the HMAC-SHA256 of the label under the master key. The
+    /// same master key and the same label always give the same key.
     pub async fn derive(&self, purpose: &str) -> Result<[u8; 32], Error> {
         derive_from(self.master().await?, purpose)
     }
 
-    /// Khoá 32 byte riêng cho mục đích `purpose` **của khách `tenant`** (bước 33): token ký bằng
-    /// khoá của khách này mang sang khách khác thì không mở được. Khách mặc định dùng đúng khoá
-    /// của [`derive`](Self::derive) — bản cài một khách không đổi khoá nào khi nâng cấp.
+    /// A separate 32-byte key for purpose `purpose` **of tenant `tenant`** (step 33): a token signed with this
+    /// tenant's key and carried to another tenant cannot be opened. The default tenant uses exactly the key of
+    /// [`derive`](Self::derive), so a single-tenant installation changes no key on upgrade.
     pub async fn derive_for(
         &self,
         tenant: crate::tenancy::TenantId,
@@ -190,11 +193,11 @@ impl SecretKey {
         derive_from(self.master().await?, &format!("{purpose}\0tenant\0{tenant}"))
     }
 
-    /// Khoá liên hệ của số điện thoại `phone` trong khách `tenant` (D-194, đặc tả 45 "Chống bom
-    /// hàng"): HMAC-SHA256 của số dạng E.164 bằng khoá riêng của khách, mã hoá base64url (43 ký tự).
-    /// Cùng số trong cùng khách luôn ra cùng khoá (gom đơn, thống kê giao hàng); hai khách ra hai
-    /// khoá khác nhau, nên không so được dữ liệu giữa các khách. Module lưu khoá này thay vì lưu số
-    /// để tra, không bao giờ để hiện cho người dùng.
+    /// Contact key of phone number `phone` within tenant `tenant` (D-194, spec 45 "anti fake orders"): the
+    /// HMAC-SHA256 of the E.164 number under the tenant's own key, encoded as base64url (43 characters). The
+    /// same number in the same tenant always gives the same key (grouping orders, delivery statistics); two
+    /// tenants give different keys, so data cannot be compared across tenants. Modules store this key instead
+    /// of the number for lookups, and never show it to users.
     pub async fn phone_key(
         &self,
         tenant: crate::tenancy::TenantId,
@@ -203,8 +206,8 @@ impl SecretKey {
         self.contact_key(tenant, "phone", phone.as_str()).await
     }
 
-    /// Như [`phone_key`](Self::phone_key) cho email: so không phân biệt hoa thường, bỏ khoảng trắng
-    /// đầu cuối.
+    /// Like [`phone_key`](Self::phone_key) for email: compared case-insensitively, with leading and trailing
+    /// whitespace stripped.
     pub async fn email_key(
         &self,
         tenant: crate::tenancy::TenantId,
@@ -238,13 +241,13 @@ impl SecretKey {
     }
 }
 
-/// Cấu hình khoá đã đọc (`AUTOXIDE_SECRET_KEY`, `AUTOXIDE_SECRET_KEY_PREVIOUS`), dùng chung giữa
-/// module `kernel` (đọc lúc `configure`) và `Migrator` (upgrade dữ liệu cần đúng khoá của chương
-/// trình). Clone rẻ.
+/// Key configuration as read (`AUTOXIDE_SECRET_KEY`, `AUTOXIDE_SECRET_KEY_PREVIOUS`), shared between the
+/// `kernel` module (reads it at `configure`) and `Migrator` (data upgrades need the program's exact key).
+/// Cheap to clone.
 #[derive(Clone, Default)]
 pub(crate) struct KeyConfig(Arc<std::sync::RwLock<Keys>>);
 
-/// Khoá gốc đã cấu hình (nếu có) và các khoá gốc cũ.
+/// The configured master key (if any) and the old master keys.
 #[derive(Default)]
 struct Keys {
     configured: Option<Vec<u8>>,
@@ -265,13 +268,13 @@ impl KeyConfig {
         *keys = Keys { configured, previous };
     }
 
-    /// `AUTOXIDE_SECRET_KEY` có đặt không (không thì khoá gốc sinh ra và lưu trong database).
+    /// Whether `AUTOXIDE_SECRET_KEY` is set (if not, the master key is generated and stored in the database).
     pub(crate) fn is_configured(&self) -> bool {
         let keys = self.0.read().unwrap_or_else(std::sync::PoisonError::into_inner);
         keys.configured.is_some()
     }
 
-    /// `SecretKey` của chương trình trên `database`.
+    /// The program's `SecretKey` on `database`.
     pub(crate) fn key_for(&self, database: &Database) -> SecretKey {
         let keys = self.0.read().unwrap_or_else(std::sync::PoisonError::into_inner);
         SecretKey::new(database.clone(), keys.configured.clone())
@@ -279,7 +282,7 @@ impl KeyConfig {
     }
 }
 
-/// HMAC-SHA256 của nhãn `purpose` trên khoá gốc `master`.
+/// HMAC-SHA256 of label `purpose` under the master key `master`.
 fn derive_from(master: &[u8], purpose: &str) -> Result<[u8; 32], Error> {
     let mut mac = <Hmac<Sha256> as KeyInit>::new_from_slice(master)
         .map_err(|error| Error::internal(format!("hmac key: {error}")))?;
@@ -287,8 +290,9 @@ fn derive_from(master: &[u8], purpose: &str) -> Result<[u8; 32], Error> {
     Ok(mac.finalize().into_bytes().into())
 }
 
-/// Khoá gốc lưu trong database; chưa có thì sinh rồi lưu. Hai máy chủ cùng sinh lúc khởi động
-/// lần đầu: `ON CONFLICT DO NOTHING` giữ khoá của bên ghi trước, cả hai đọc lại cùng một khoá.
+/// The master key stored in the database; if absent, generates it and stores it. Two servers generating at the
+/// first startup at the same time: `ON CONFLICT DO NOTHING` keeps the earlier writer's key, and both read back
+/// the same key.
 async fn stored_key(database: &Database) -> Result<Vec<u8>, Error> {
     if let Some(found) = read_key(database.write()).await? {
         return Ok(found);
@@ -323,7 +327,7 @@ async fn read_key<C: ConnectionTrait>(connection: &C) -> Result<Option<Vec<u8>>,
     }
 }
 
-/// `bytes` byte ngẫu nhiên từ bộ sinh số ngẫu nhiên của hệ điều hành, mã hoá base64url.
+/// `bytes` random bytes from the operating system's random number generator, encoded as base64url.
 pub fn random_token(bytes: usize) -> Result<String, Error> {
     let mut buffer = vec![0u8; bytes];
     getrandom::fill(&mut buffer)
@@ -331,9 +335,9 @@ pub fn random_token(bytes: usize) -> Result<String, Error> {
     Ok(URL_SAFE_NO_PAD.encode(buffer))
 }
 
-/// SHA-256 của `text`, mã hoá base64url (43 ký tự). Để lưu token ngẫu nhiên: database chỉ giữ
-/// bản băm, lộ bảng cũng không dùng được token. Không cần Argon2 — token ngẫu nhiên 256 bit
-/// không đoán thử được như mật khẩu.
+/// SHA-256 of `text`, encoded as base64url (43 characters). For storing random tokens: the database keeps only
+/// the hash, so a leaked table cannot use the tokens. Argon2 is not needed: a 256-bit random token cannot be
+/// guessed the way a password can.
 pub fn sha256(text: &str) -> String {
     URL_SAFE_NO_PAD.encode(Sha256::digest(text.as_bytes()))
 }

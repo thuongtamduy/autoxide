@@ -1,11 +1,13 @@
-//! Thanh toán qua đối tác có giấy phép (bước 36, D-187): trait chung để module `ledger` gọi cổng
-//! thanh toán mà không phụ thuộc đối tác nào. **Core không bao giờ tự giữ tiền**: tiền đi từ người
-//! mua tới đối tác (VNPay, MoMo, ngân hàng…), sổ cái chỉ ghi nghĩa vụ và đối soát với sao kê.
+//! Payments through a licensed partner (step 36, D-187): a shared trait so the `ledger` module can call a
+//! payment gateway without depending on any one partner. **The core never holds money itself**: money flows
+//! from the buyer to the partner (VNPay, MoMo, banks…); the ledger only records obligations and reconciles
+//! against statements.
 //!
-//! Bộ nối của một đối tác là một module riêng, chỉ phụ thuộc kernel, đăng ký TRƯỚC `ledger`, góp
-//! bằng `context.contribute::<dyn PaymentGateway>(…)` — nhiều đối tác cùng chạy được. Mọi hàm nhận
-//! khách (`TenantId`): bộ nối tự đọc thông tin kết nối của khách đó (kho secret theo khách), không
-//! đọc biến môi trường cho thứ thuộc về khách. Test dùng `FakePaymentGateway` của testkit.
+//! A partner's connector is a separate module that depends only on the kernel, registers BEFORE `ledger`, and
+//! contributes through `context.contribute::<dyn PaymentGateway>(…)` — several partners can run at once.
+//! Every function takes the tenant (`TenantId`): the connector reads that tenant's connection details itself
+//! (per-tenant secret store) and never reads environment variables for anything that belongs to a tenant.
+//! Tests use the testkit's `FakePaymentGateway`.
 use crate::time::{Date, Timestamp};
 use uuid::Uuid;
 
@@ -13,19 +15,19 @@ use crate::error::{Error, ErrorKind};
 use crate::money::{Currency, Money};
 use crate::tenancy::TenantId;
 
-/// Những gì một cổng làm được.
+/// What a gateway can do.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct GatewayCapabilities {
-    /// Phương thức nhận được (`card`, `wallet`, `bank_transfer`, `vietqr`…).
+    /// Accepted methods (`card`, `wallet`, `bank_transfer`, `vietqr`…).
     pub methods: Vec<String>,
     pub refunds: bool,
     pub partial_refunds: bool,
-    /// Chia tiền ngay tại cổng cho nhiều bên nhận.
+    /// Splits money at the gateway among several recipients.
     pub split: bool,
-    /// Đối tác thu hộ, chi hộ (có giấy phép) cho sàn.
+    /// The partner collects and disburses on behalf of the marketplace (licensed).
     pub collection_on_behalf: bool,
-    /// Có sao kê để đối soát.
+    /// Provides statements for reconciliation.
     pub statements: bool,
 }
 
@@ -63,26 +65,26 @@ impl GatewayCapabilities {
     }
 }
 
-/// Phần tiền chia cho một bên nhận ngay tại cổng (chỉ khi cổng có `split`).
+/// The share of money paid to one recipient at the gateway (only when the gateway has `split`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Split {
-    /// Mã bên nhận ở đối tác.
+    /// Recipient code at the partner.
     pub payee: String,
     pub amount: Money,
 }
 
-/// Một lượt thu tiền cần tạo ở đối tác.
+/// A collection to create at the partner.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct PaymentIntent {
-    /// ID thanh toán trong sổ, gửi làm mã đơn của merchant: đối tác chống trùng theo mã này, nên
-    /// gọi lại cùng ID không tạo hai giao dịch.
+    /// Payment ID in the ledger, sent as the merchant's order code: the partner deduplicates on this code, so
+    /// calling again with the same ID does not create two transactions.
     pub payment_id: Uuid,
     pub amount: Money,
     pub method: String,
-    /// Chữ ngắn hiện cho người mua; không chứa dữ liệu cá nhân.
+    /// Short text shown to the buyer; contains no personal data.
     pub description: String,
-    /// Trang người mua quay về sau khi trả.
+    /// Page the buyer returns to after paying.
     pub return_url: Option<String>,
     pub expires_at: Timestamp,
     pub splits: Vec<Split>,
@@ -114,15 +116,15 @@ impl PaymentIntent {
     }
 }
 
-/// Lượt thu đối tác vừa tạo.
+/// A collection the partner has just created.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct GatewayPayment {
-    /// Mã giao dịch ở đối tác.
+    /// Transaction code at the partner.
     pub provider_ref: String,
-    /// Trang thanh toán của đối tác, nếu có.
+    /// The partner's payment page, if any.
     pub checkout_url: Option<String>,
-    /// Chuỗi QR, nếu đối tác trả.
+    /// QR string, if the partner returns one.
     pub qr_payload: Option<String>,
 }
 
@@ -138,13 +140,13 @@ impl GatewayPayment {
     }
 }
 
-/// Một lượt hoàn tiền cần gửi đối tác.
+/// A refund to send to the partner.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct RefundIntent {
-    /// ID lượt hoàn trong sổ (đối tác chống trùng theo mã này).
+    /// Refund ID in the ledger (the partner deduplicates on this code).
     pub refund_id: Uuid,
-    /// Mã giao dịch thu ở đối tác.
+    /// Transaction code of the collection at the partner.
     pub payment_provider_ref: String,
     pub amount: Money,
     pub reason: String,
@@ -166,7 +168,7 @@ impl RefundIntent {
     }
 }
 
-/// Trạng thái một lượt hoàn ở đối tác.
+/// Status of a refund at the partner.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RefundStatus {
     Pending,
@@ -174,7 +176,7 @@ pub enum RefundStatus {
     Failed,
 }
 
-/// Kết quả gửi lượt hoàn.
+/// Result of sending a refund.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct GatewayRefund {
@@ -188,11 +190,11 @@ impl GatewayRefund {
     }
 }
 
-/// Trạng thái một lượt thu ở đối tác.
+/// Status of a collection at the partner.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum GatewayPaymentStatus {
     Pending,
-    /// Đã thu `amount` (có thể khác số yêu cầu).
+    /// `amount` collected (may differ from the amount requested).
     Succeeded {
         amount: Money,
     },
@@ -202,14 +204,14 @@ pub enum GatewayPaymentStatus {
     Expired,
 }
 
-/// Loại thông báo đối tác gửi qua webhook.
+/// Kind of notification the partner sends through a webhook.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NotificationKind {
     PaymentSucceeded,
     PaymentFailed {
         reason: String,
     },
-    /// Lượt hoàn (mã ở đối tác) đã xong.
+    /// A refund (code at the partner) has completed.
     RefundSucceeded {
         refund_provider_ref: String,
     },
@@ -218,16 +220,16 @@ pub enum NotificationKind {
     },
 }
 
-/// Một thông báo đã kiểm chữ ký.
+/// A notification whose signature has been verified.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct GatewayNotification {
-    /// Mã thông báo ở đối tác: gửi lại nhiều lần cùng mã thì chỉ xử lý một lần.
+    /// Notification code at the partner: if redelivered several times with the same code, it is processed once.
     pub event_id: String,
     pub kind: NotificationKind,
-    /// Mã giao dịch thu ở đối tác.
+    /// Transaction code of the collection at the partner.
     pub provider_ref: String,
-    /// ID thanh toán trong sổ (mã đơn của merchant), nếu đối tác gửi kèm.
+    /// Payment ID in the ledger (the merchant's order code), if the partner sent it along.
     pub payment_id: Option<Uuid>,
     pub amount: Money,
     pub occurred_at: Timestamp,
@@ -258,7 +260,7 @@ impl GatewayNotification {
     }
 }
 
-/// Loại dòng sao kê của đối tác.
+/// Kind of a partner's statement line.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StatementKind {
     Payment,
@@ -278,18 +280,18 @@ impl StatementKind {
     }
 }
 
-/// Một dòng sao kê.
+/// One statement line.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct StatementLine {
-    /// Mã dòng ở đối tác (duy nhất).
+    /// Line code at the partner (unique).
     pub line_id: String,
-    /// Mã giao dịch liên quan (thu, hoàn…).
+    /// Related transaction code (collection, refund…).
     pub provider_ref: String,
     pub kind: StatementKind,
-    /// Số tiền của giao dịch (luôn dương).
+    /// Transaction amount (always positive).
     pub amount: Money,
-    /// Phí đối tác thu trên dòng này (0 nếu không có).
+    /// Fee the partner charges on this line (0 if none).
     pub fee: Money,
     pub booked_on: Date,
 }
@@ -319,12 +321,12 @@ impl StatementLine {
     }
 }
 
-/// Một trang sao kê.
+/// One page of a statement.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct StatementPage {
     pub lines: Vec<StatementLine>,
-    /// Còn trang sau thì gửi lại mã này.
+    /// If there is a next page, pass this code back.
     pub next_cursor: Option<String>,
 }
 
@@ -334,17 +336,18 @@ impl StatementPage {
     }
 }
 
-/// Một cổng thanh toán.
+/// A payment gateway.
 //
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
 #[async_trait::async_trait]
 pub trait PaymentGateway: Send + Sync {
-    /// Tên ổn định (`vnpay`, `fake`…): nằm trong đường dẫn webhook và trên mỗi thanh toán.
+    /// Stable name (`vnpay`, `fake`…): appears in the webhook path and on every payment.
     fn provider(&self) -> &'static str;
 
     fn capabilities(&self) -> GatewayCapabilities;
 
-    /// Tạo lượt thu. Gọi lại cùng `payment_id` phải trả cùng giao dịch (không tạo thêm).
+    /// Creates a collection. Calling again with the same `payment_id` must return the same transaction (no
+    /// new one is created).
     async fn create_payment(
         &self,
         tenant: TenantId,
@@ -360,9 +363,10 @@ pub trait PaymentGateway: Send + Sync {
         provider_ref: &str,
     ) -> Result<GatewayPaymentStatus, Error>;
 
-    /// Kiểm chữ ký trên **thân thô** (so sánh thời gian hằng) và cửa sổ thời gian chống phát lại,
-    /// rồi mới đọc nội dung. Sai → [`signature_invalid`]. `async` để bộ nối đọc secret của khách
-    /// `tenant` (kho cấu hình theo khách) — không bao giờ kiểm bằng secret của khách khác.
+    /// Verifies the signature over the **raw body** (constant-time comparison) and the replay-protection time
+    /// window, and only then reads the content. Failure → [`signature_invalid`]. `async` so the connector can
+    /// read the secret of tenant `tenant` (per-tenant config store) — never verify with another tenant's
+    /// secret.
     async fn verify_webhook(
         &self,
         tenant: TenantId,
@@ -370,12 +374,12 @@ pub trait PaymentGateway: Send + Sync {
         body: &[u8],
     ) -> Result<GatewayNotification, Error>;
 
-    /// Câu trả lời đối tác chờ khi webhook đã nhận xong; `None`: envelope chuẩn `{"data": …}`.
+    /// The response the partner expects once the webhook is received; `None`: the standard `{"data": …}` envelope.
     fn webhook_ack(&self) -> Option<crate::provider::WebhookAck> {
         None
     }
 
-    /// Sao kê các ngày `[from, to]`.
+    /// Statement for the days `[from, to]`.
     async fn statement(
         &self,
         tenant: TenantId,
@@ -387,16 +391,17 @@ pub trait PaymentGateway: Send + Sync {
 
 // ---- Chi trả ----------------------------------------------------------------------------------
 
-/// Một lượt chi trả cần gửi đối tác (sàn trả tiền người bán từ tài khoản thu hộ của đối tác).
+/// A payout to send to the partner (the marketplace pays a seller from the partner's collection account).
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct PayoutIntent {
-    /// ID lượt chi trong sổ, gửi làm mã của merchant: gọi lại cùng ID không chi hai lần.
+    /// Payout ID in the ledger, sent as the merchant's code: calling again with the same ID does not pay out twice.
     pub payout_id: Uuid,
-    /// Bên nhận (ID nút của người bán); bộ nối tự tra tài khoản nhận đã đăng ký ở đối tác.
+    /// Recipient (the seller's node ID); the connector looks up the receiving account registered at the
+    /// partner itself.
     pub payee: String,
     pub amount: Money,
-    /// Chữ ngắn, không chứa dữ liệu cá nhân.
+    /// Short text; contains no personal data.
     pub description: String,
 }
 
@@ -411,10 +416,10 @@ impl PayoutIntent {
     }
 }
 
-/// Trạng thái một lượt chi ở đối tác.
+/// Status of a payout at the partner.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PayoutStatus {
-    /// Đối tác đã nhận lệnh, chưa xong (hỏi lại bằng [`PayoutGateway::payout_status`]).
+    /// The partner has accepted the order but it is not finished (ask again with [`PayoutGateway::payout_status`]).
     Pending,
     Succeeded,
     Failed {
@@ -422,7 +427,7 @@ pub enum PayoutStatus {
     },
 }
 
-/// Kết quả gửi lượt chi.
+/// Result of sending a payout.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct GatewayPayout {
@@ -436,20 +441,22 @@ impl GatewayPayout {
     }
 }
 
-/// Đối tác chi hộ (có giấy phép): trả tiền người bán từ tài khoản thu hộ — core không giữ tiền.
-/// Bộ nối góp bằng `context.contribute::<dyn PayoutGateway>(…)`; test dùng `FakePayoutGateway`.
+/// A partner that disburses on behalf of others (licensed): pays sellers from the collection account — the
+/// core holds no money. Connectors contribute through `context.contribute::<dyn PayoutGateway>(…)`; tests use
+/// `FakePayoutGateway`.
 //
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
 #[async_trait::async_trait]
 pub trait PayoutGateway: Send + Sync {
-    /// Tên ổn định (`fake`…), ghi trên mỗi lượt chi.
+    /// Stable name (`fake`…), recorded on every payout.
     fn provider(&self) -> &'static str;
 
-    /// Gửi lệnh chi. Gọi lại cùng `payout_id` phải trả cùng lệnh (không chi thêm).
+    /// Sends a payout order. Calling again with the same `payout_id` must return the same order (no
+    /// additional payout).
     async fn payout(&self, tenant: TenantId, intent: &PayoutIntent)
     -> Result<GatewayPayout, Error>;
 
-    /// Trạng thái lệnh chi `provider_ref`.
+    /// Status of payout order `provider_ref`.
     async fn payout_status(
         &self,
         tenant: TenantId,
@@ -459,12 +466,12 @@ pub trait PayoutGateway: Send + Sync {
 
 // ---- Biến động số dư ngân hàng (VietQR tự khớp) -------------------------------------------------
 
-/// Chiều của một biến động số dư.
+/// Direction of a balance movement.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BankDirection {
-    /// Tiền vào tài khoản.
+    /// Money into the account.
     Credit,
-    /// Tiền ra.
+    /// Money out.
     Debit,
 }
 
@@ -477,18 +484,19 @@ impl BankDirection {
     }
 }
 
-/// Một biến động số dư của tài khoản ngân hàng của người bán / khách.
+/// A balance movement on a seller's / tenant's bank account.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct BankTransaction {
-    /// Mã giao dịch ở nhà cung cấp (duy nhất): gửi lại không ghi hai lần.
+    /// Transaction code at the provider (unique): redelivery is not recorded twice.
     pub provider_txn_id: String,
-    /// Số tài khoản nhận / chi.
+    /// Receiving / paying account number.
     pub account_number: String,
     pub direction: BankDirection,
-    /// Luôn dương.
+    /// Always positive.
     pub amount: Money,
-    /// Nội dung chuyển khoản như ngân hàng ghi (có thể bị bỏ dấu, cắt ngắn, chèn khoảng trắng).
+    /// Transfer description as the bank wrote it (may be stripped of diacritics, truncated, or padded with
+    /// whitespace).
     pub memo: String,
     pub booked_at: Timestamp,
 }
@@ -513,11 +521,11 @@ impl BankTransaction {
     }
 }
 
-/// Tài khoản ngân hàng cần đọc biến động.
+/// A bank account whose movements are to be read.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct BankAccountRef {
-    /// Mã BIN của ngân hàng (NAPAS), vd `970436`.
+    /// Bank BIN code (NAPAS), e.g. `970436`.
     pub bank_bin: String,
     pub account_number: String,
 }
@@ -528,14 +536,14 @@ impl BankAccountRef {
     }
 }
 
-/// Một lượt kéo biến động.
+/// One pull of movements.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct BankBatch {
     pub transactions: Vec<BankTransaction>,
-    /// Lần sau gửi lại mã này (lưu ở tài khoản), kể cả khi trang rỗng.
+    /// Pass this code back next time (store it on the account), even when the page is empty.
     pub next_cursor: Option<String>,
-    /// Còn dữ liệu ngay sau trang này.
+    /// More data remains right after this page.
     pub has_more: bool,
 }
 
@@ -551,18 +559,18 @@ impl BankBatch {
     }
 }
 
-/// Nguồn biến động số dư: ngân hàng hay dịch vụ đọc sao kê (D-194). Tiền vào thẳng tài khoản của
-/// người bán / khách — nền tảng chỉ đọc biến động để khớp thanh toán, không giữ tiền (D-187). Bộ
-/// nối góp bằng `context.contribute::<dyn BankFeed>(…)`; test dùng `FakeBankFeed`.
+/// A balance-movement source: a bank or a statement-reading service (D-194). Money goes straight into the
+/// seller's / tenant's account — the platform only reads movements to match payments and never holds money
+/// (D-187). Connectors contribute through `context.contribute::<dyn BankFeed>(…)`; tests use `FakeBankFeed`.
 //
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
 #[async_trait::async_trait]
 pub trait BankFeed: Send + Sync {
-    /// Tên ổn định, nằm trong đường dẫn webhook `/api/v1/ledger/bank-feeds/{provider}/{hook}`.
+    /// Stable name, appears in the webhook path `/api/v1/ledger/bank-feeds/{provider}/{hook}`.
     fn provider(&self) -> &'static str;
 
-    /// Kiểu đẩy: kiểm chữ ký trên **thân thô** rồi mới đọc. Sai → [`signature_invalid`]. `async`
-    /// để bộ nối đọc secret của khách `tenant`.
+    /// Push style: verifies the signature over the **raw body** and only then reads it. Failure →
+    /// [`signature_invalid`]. `async` so the connector can read the secret of tenant `tenant`.
     async fn verify_webhook(
         &self,
         tenant: TenantId,
@@ -570,12 +578,12 @@ pub trait BankFeed: Send + Sync {
         body: &[u8],
     ) -> Result<Vec<BankTransaction>, Error>;
 
-    /// Câu trả lời nguồn biến động chờ khi webhook đã nhận xong; `None`: envelope chuẩn.
+    /// The response the movement source expects once the webhook is received; `None`: the standard envelope.
     fn webhook_ack(&self) -> Option<crate::provider::WebhookAck> {
         None
     }
 
-    /// Kiểu kéo: biến động sau `cursor` (lần đầu `None`).
+    /// Pull style: movements after `cursor` (`None` the first time).
     async fn fetch(
         &self,
         tenant: TenantId,
@@ -584,14 +592,14 @@ pub trait BankFeed: Send + Sync {
     ) -> Result<BankBatch, Error>;
 }
 
-/// Một tỉ giá đối tác báo: 1 `base` = `rate` `quote` vào ngày `on`.
+/// An exchange rate reported by a partner: 1 `base` = `rate` `quote` on date `on`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct QuotedRate {
     pub base: Currency,
     pub quote: Currency,
-    /// Số đơn vị chính của `quote` cho 1 đơn vị chính của `base` (vd 1 USD = 25345.5 VND). Không bao giờ
-    /// là số thực: đọc từ chữ, giữ dạng thập phân chính xác.
+    /// Number of major units of `quote` per 1 major unit of `base` (e.g. 1 USD = 25345.5 VND). Never
+    /// a floating-point number: read from text, kept as an exact decimal.
     pub rate: rust_decimal::Decimal,
     pub on: Date,
 }
@@ -602,17 +610,17 @@ impl QuotedRate {
     }
 }
 
-/// Nguồn tỉ giá (ngân hàng, dịch vụ dữ liệu — D-237): `ledger` lưu tỉ giá nhận được vào bảng tỉ giá
-/// của khách (nguồn `provider:<tên>`), cạnh tỉ giá nhập tay. Bộ nối góp bằng
-/// `context.contribute::<dyn ExchangeRateSource>(…)`; test dùng `FakeExchangeRateSource`.
+/// An exchange-rate source (bank, data service — D-237): `ledger` stores the received rates in the tenant's
+/// rate table (source `provider:<name>`), next to manually entered rates. Connectors contribute through
+/// `context.contribute::<dyn ExchangeRateSource>(…)`; tests use `FakeExchangeRateSource`.
 //
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
 #[async_trait::async_trait]
 pub trait ExchangeRateSource: Send + Sync {
-    /// Tên ổn định (`provider:<tên>` trong cột nguồn của tỉ giá).
+    /// Stable name (`provider:<name>` in the rate's source column).
     fn provider(&self) -> &'static str;
 
-    /// Tỉ giá của `base` sang mọi loại tiền nguồn này có, ngày `on`. Không gọi trong transaction ghi.
+    /// Rates of `base` to every currency this source has, on date `on`. Not to be called inside a write transaction.
     async fn rates(
         &self,
         tenant: TenantId,
@@ -621,7 +629,7 @@ pub trait ExchangeRateSource: Send + Sync {
     ) -> Result<Vec<QuotedRate>, Error>;
 }
 
-/// `payment.signature_invalid` (401): chữ ký của thông báo không hợp lệ.
+/// `payment.signature_invalid` (401): the notification's signature is invalid.
 pub fn signature_invalid() -> Error {
     Error::new(
         ErrorKind::Unauthenticated,
@@ -630,7 +638,7 @@ pub fn signature_invalid() -> Error {
     )
 }
 
-/// `payment.provider_unavailable` (503): đối tác không trả lời.
+/// `payment.provider_unavailable` (503): the partner did not answer.
 pub fn provider_unavailable() -> Error {
     Error::unavailable(
         "payment.provider_unavailable",
@@ -638,7 +646,7 @@ pub fn provider_unavailable() -> Error {
     )
 }
 
-/// `payment.provider_rejected` (422): đối tác từ chối.
+/// `payment.provider_rejected` (422): the partner rejected it.
 pub fn provider_rejected(reason: impl ToString) -> Error {
     Error::new(
         ErrorKind::Validation,
@@ -648,7 +656,7 @@ pub fn provider_rejected(reason: impl ToString) -> Error {
     .with_param("reason", reason)
 }
 
-/// `payment.not_supported` (422): đối tác không làm việc này.
+/// `payment.not_supported` (422): the partner does not support this.
 pub fn not_supported(provider: &str) -> Error {
     Error::new(
         ErrorKind::Validation,

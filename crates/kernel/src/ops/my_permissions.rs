@@ -1,6 +1,6 @@
-//! `GET /api/v1/me/permissions` (đề bài giao diện A5, D-264): permission của chính người gọi, kèm
-//! mô tả theo `Accept-Language` và mức rủi ro. Người tạo API key chọn permission từ đây — không
-//! cần `auth.roles.read` để đọc sổ permission của cả hệ thống.
+//! `GET /api/v1/me/permissions` (UI brief A5, D-264): the caller's own permissions, with descriptions per
+//! `Accept-Language` and a risk level. A person creating an API key picks permissions from here — without
+//! needing `auth.roles.read` to read the whole system's permission registry.
 
 use std::sync::Arc;
 

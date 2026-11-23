@@ -1,21 +1,23 @@
-//! Bộ dựng mẫu dùng chung `autoxide_kernel::template` (bước 37 mục 2, D-206, D-351): MỘT ngôn ngữ mẫu
-//! cho cả dự án (cú pháp Jinja qua `minijinja`), cho mẫu do khách tự soạn — mẫu in chứng từ (bước 36),
-//! mẫu mail và thông báo (bước 37, sau).
+//! The shared template engine `autoxide_kernel::template` (step 37 item 2, D-206, D-351): ONE template
+//! language for the whole project (Jinja syntax via `minijinja`), for templates written by tenants themselves
+//! — document print templates (step 36), mail and notification templates (step 37, later).
 //!
-//! Mẫu là dữ liệu KHÔNG tin cậy (khách sửa được), nên bộ dựng là một hộp cát:
+//! Templates are UNTRUSTED data (tenants can edit them), so the engine is a sandbox:
 //!
-//! - Không đọc file, không gọi mạng, không nạp mẫu khác: bật `minijinja` không có `multi_template`
-//!   (`include` / `extends` / `import` là lỗi cú pháp), không có loader; chỉ có hàm và bộ lọc dựng sẵn
-//!   của `minijinja` (thuần tính toán) cùng ba bộ lọc của kernel (`money`, `number`, `date`).
-//! - Giới hạn: độ dài mẫu (`AUTOXIDE_TEMPLATE_MAX_BYTES`, mặc định 64 KiB), số bước chạy ("fuel" của
-//!   `minijinja`, cũng chặn bộ nhớ), độ sâu lồng nhau, độ dài kết quả. Vượt → `template.limit_exceeded`
-//!   (422), không treo worker.
-//! - Bản HTML: mọi giá trị chèn vào đều được thoát HTML; bộ lọc `safe` bị gỡ — dữ liệu người dùng
-//!   không bao giờ thành HTML. Phần HTML là chữ của chính mẫu.
-//! - Lưu mẫu thì kiểm với **schema biến** của loại mẫu ([`TemplateSchema`]): cú pháp, chỉ dùng biến
-//!   có trong schema, đủ biến bắt buộc — gom mọi lỗi báo một lần (D-083) với dòng, cột.
+//! - No reading files, no network calls, no loading other templates: `minijinja` is enabled without
+//!   `multi_template` (`include` / `extends` / `import` are syntax errors), with no loader; only
+//!   `minijinja`'s built-in functions and filters (pure computation) plus the kernel's three filters
+//!   (`money`, `number`, `date`).
+//! - Limits: template length (`AUTOXIDE_TEMPLATE_MAX_BYTES`, default 64 KiB), number of execution steps
+//!   (`minijinja`'s "fuel", which also bounds memory), nesting depth, output length. Exceeding →
+//!   `template.limit_exceeded` (422), never hanging a worker.
+//! - HTML output: every inserted value is HTML-escaped; the `safe` filter is removed — user data
+//!   never becomes HTML. The HTML parts are the template's own text.
+//! - Saving a template validates it against the template kind's **variable schema** ([`TemplateSchema`]):
+//!   syntax, only variables in the schema, all required variables present — every error is collected and
+//!   reported at once (D-083) with line and column.
 //!
-//! Kernel chỉ dựng chữ, không biết khái niệm chứng từ hay đơn hàng: dữ liệu do module đưa vào.
+//! The kernel only builds text and knows no document or order concepts: the data comes from modules.
 
 use crate::time::Date;
 use std::collections::BTreeSet;
@@ -28,7 +30,7 @@ use crate::config::{ConfigReader, Invalid, Setting};
 use crate::error::{Error, ErrorKind, FieldError};
 use crate::money::Currency;
 
-/// Độ dài tối đa của một mẫu, tính bằng byte.
+/// Maximum length of one template, in bytes.
 pub const MAX_BYTES: Setting = Setting::new(
     "AUTOXIDE_TEMPLATE_MAX_BYTES",
     "Largest template (print layouts, mail and notification templates written by tenants), in bytes \
@@ -36,36 +38,36 @@ pub const MAX_BYTES: Setting = Setting::new(
 )
 .with_default("65536");
 
-/// Số bước chạy tối đa của một lần dựng (fuel của `minijinja`: khoảng một lệnh máy ảo mỗi đơn vị,
-/// và khoảng 64 byte bộ nhớ). Đủ cho chứng từ vài nghìn dòng.
+/// Maximum number of execution steps for one render (`minijinja`'s fuel: roughly one VM instruction per unit,
+/// and about 64 bytes of memory). Enough for a document of a few thousand lines.
 const FUEL: u64 = 2_000_000;
-/// Độ sâu lồng nhau tối đa (`for` trong `for`, `if` trong `if`…).
+/// Maximum nesting depth (`for` in `for`, `if` in `if`…).
 const MAX_DEPTH: usize = 50;
-/// Kết quả lớn hơn chừng này byte → `template.limit_exceeded`.
+/// A result larger than this many bytes → `template.limit_exceeded`.
 const MAX_OUTPUT: usize = 4 * 1024 * 1024;
 
-/// Đọc `AUTOXIDE_TEMPLATE_MAX_BYTES` (module `kernel` gọi một lần lúc cấu hình).
+/// Reads `AUTOXIDE_TEMPLATE_MAX_BYTES` (the `kernel` module calls it once during configuration).
 pub(crate) fn read_setting(reader: &mut ConfigReader<'_>) -> Result<usize, Invalid> {
     reader.get_with(&MAX_BYTES, |raw| crate::config::parse_in_range(raw, 1024usize, 1_048_576))
 }
 
-/// Cách thoát giá trị chèn vào mẫu.
+/// How values inserted into a template are escaped.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Output {
-    /// Bản HTML: mọi giá trị được thoát HTML.
+    /// HTML output: every value is HTML-escaped.
     Html,
-    /// Bản chữ thuần (mail dạng chữ, SMS): không thoát.
+    /// Plain-text output (text mail, SMS): no escaping.
     Text,
 }
 
-/// Một biến mẫu được dùng: đường dẫn chấm (`document.number`, `lines`), bắt buộc hay không.
+/// A template variable that may be used: a dotted path (`document.number`, `lines`), required or not.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Variable {
-    /// Đường dẫn: `buyer.name`. Khai một nút cha (`document`) cho phép mọi thuộc tính con của nó.
+    /// Path: `buyer.name`. Declaring a parent node (`document`) allows all of its child properties.
     pub path: &'static str,
-    /// Mẫu phải dùng biến này (vd link đặt lại mật khẩu của mail).
+    /// The template must use this variable (e.g. the password-reset link of a mail).
     pub required: bool,
-    /// Ý nghĩa, tiếng Anh, cho người soạn mẫu (API trả kèm schema).
+    /// Meaning, in English, for the template author (the API returns it with the schema).
     pub description: &'static str,
 }
 
@@ -79,7 +81,7 @@ impl Variable {
     }
 }
 
-/// Hợp đồng biến của một loại mẫu: những biến mẫu được dùng.
+/// Variable contract of a template kind: the variables a template may use.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct TemplateSchema {
     pub variables: Vec<Variable>,
@@ -90,9 +92,9 @@ impl TemplateSchema {
         TemplateSchema { variables }
     }
 
-    /// `used` (đường dẫn chấm) có được phép không: đúng một biến đã khai, nằm dưới một biến đã khai,
-    /// hay là cha của một biến đã khai (vd `lines` khi `lines` được khai, `document` khi chỉ khai
-    /// `document.number`).
+    /// Whether `used` (a dotted path) is allowed: exactly a declared variable, under a declared variable,
+    /// or a parent of a declared variable (e.g. `lines` when `lines` is declared, `document` when only
+    /// `document.number` is declared).
     fn allows(&self, used: &str) -> bool {
         self.variables.iter().any(|variable| {
             let declared = variable.path;
@@ -102,7 +104,7 @@ impl TemplateSchema {
         })
     }
 
-    /// Biến bắt buộc `path` có được dùng không (chính nó hay một thuộc tính bên dưới).
+    /// Whether the required variable `path` is used (itself or a property beneath it).
     fn satisfied(path: &str, used: &BTreeSet<String>) -> bool {
         used.iter().any(|item| {
             item == path || item.strip_prefix(path).is_some_and(|rest| rest.starts_with('.'))
@@ -110,7 +112,7 @@ impl TemplateSchema {
     }
 }
 
-/// Bộ dựng mẫu có giới hạn. Rẻ để clone; module lấy bằng `context.require::<TemplateEngine>()`.
+/// A template engine with limits. Cheap to clone; modules get it with `context.require::<TemplateEngine>()`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TemplateEngine {
     max_bytes: usize,
@@ -132,7 +134,7 @@ fn limit_exceeded(what: &'static str, limit: usize) -> Error {
     .with_param("limit", limit)
 }
 
-/// Dòng, cột (từ 1) của byte `offset` trong `source`.
+/// Line and column (from 1) of byte `offset` in `source`.
 fn position(source: &str, offset: usize) -> (usize, usize) {
     let before = source.get(..offset).unwrap_or(source);
     let line = before.matches('\n').count() + 1;
@@ -140,7 +142,7 @@ fn position(source: &str, offset: usize) -> (usize, usize) {
     (line, column)
 }
 
-/// Vị trí lần đầu `path` xuất hiện như một từ trong mẫu (gần đúng: để chỉ chỗ cho người soạn).
+/// Position where `path` first appears as a word in the template (approximate: to point the author to the spot).
 fn first_use(source: &str, path: &str) -> (usize, usize) {
     let is_word = |c: char| c.is_alphanumeric() || c == '_' || c == '.';
     let mut start = 0;
@@ -156,7 +158,7 @@ fn first_use(source: &str, path: &str) -> (usize, usize) {
     (1, 1)
 }
 
-/// Bộ ghi dừng khi kết quả vượt `MAX_OUTPUT`.
+/// The writer stops when the output exceeds `MAX_OUTPUT`.
 struct Capped {
     out: Vec<u8>,
     over: bool,
@@ -177,7 +179,7 @@ impl Write for Capped {
     }
 }
 
-/// Nhóm hàng nghìn của phần nguyên `digits` bằng `separator`.
+/// Groups the thousands of the integer part `digits` with `separator`.
 fn group(digits: &str, separator: char) -> String {
     let mut out = String::with_capacity(digits.len() + digits.len() / 3);
     for (index, digit) in digits.chars().enumerate() {
@@ -189,8 +191,8 @@ fn group(digits: &str, separator: char) -> String {
     out
 }
 
-/// Số thập phân dạng chữ (`-1234567.5`) theo ngôn ngữ: `vi` → `-1.234.567,5`, khác → `-1,234,567.5`.
-/// Chữ không phải số thì trả nguyên.
+/// A decimal number as text (`-1234567.5`) by language: `vi` → `-1.234.567,5`, other → `-1,234,567.5`.
+/// Text that is not a number is returned unchanged.
 pub fn format_number(text: &str, locale: &str) -> String {
     let (sign, body) = text.strip_prefix('-').map_or(("", text), |rest| ("-", rest));
     let (whole, fraction) = body.split_once('.').unwrap_or((body, ""));
@@ -207,8 +209,8 @@ pub fn format_number(text: &str, locale: &str) -> String {
     out
 }
 
-/// Tiền (số nguyên đơn vị nhỏ nhất + mã tiền) theo ngôn ngữ: `1000000 VND` → `1.000.000 ₫` (`vi`),
-/// `1,000,000 VND` (khác); `1999 USD` → `19.99 USD`.
+/// Money (integer in the smallest unit + currency code) by language: `1000000 VND` → `1.000.000 ₫` (`vi`),
+/// `1,000,000 VND` (other); `1999 USD` → `19.99 USD`.
 pub fn format_money(minor: i64, currency: Currency, locale: &str) -> String {
     let digits = u32::from(currency.minor_units());
     let magnitude = minor.unsigned_abs();
@@ -228,7 +230,7 @@ pub fn format_money(minor: i64, currency: Currency, locale: &str) -> String {
     }
 }
 
-/// Ngày `YYYY-MM-DD` (hay thời điểm RFC 3339) theo ngôn ngữ: `vi` → `dd/mm/yyyy`, khác giữ ISO.
+/// A `YYYY-MM-DD` date (or RFC 3339 instant) by language: `vi` → `dd/mm/yyyy`, other keeps ISO.
 pub fn format_date(text: &str, locale: &str) -> String {
     let day = text.get(..10).unwrap_or(text);
     match Date::parse_from_str(day, "%Y-%m-%d") {
@@ -239,17 +241,17 @@ pub fn format_date(text: &str, locale: &str) -> String {
 }
 
 impl TemplateEngine {
-    /// Bộ dựng với độ dài mẫu tối đa `max_bytes`.
+    /// An engine with maximum template length `max_bytes`.
     pub fn new(max_bytes: usize) -> Self {
         TemplateEngine { max_bytes }
     }
 
-    /// Độ dài mẫu tối đa (byte).
+    /// Maximum template length (bytes).
     pub fn max_bytes(&self) -> usize {
         self.max_bytes
     }
 
-    /// Môi trường hộp cát cho một lần dựng: bộ lọc của kernel theo `locale`, không có `safe`.
+    /// The sandbox environment for one render: the kernel's filters per `locale`, without `safe`.
     fn environment(output: Output, locale: &str) -> Environment<'static> {
         let mut env = Environment::new();
         env.set_fuel(Some(FUEL));
@@ -294,8 +296,9 @@ impl TemplateEngine {
         Ok(())
     }
 
-    /// Mẫu của khách không được tắt thoát HTML: minijinja không cho bỏ thẻ `{% autoescape %}` khỏi
-    /// cú pháp, nên chặn mọi khối mở bằng nó (kể cả `{%-` / `{%+`), lúc kiểm và lúc dựng.
+    /// A tenant's template must not turn off HTML escaping: minijinja does not allow removing the
+    /// `{% autoescape %}` tag from the syntax, so every block opened with it is rejected (including `{%-` /
+    /// `{%+`), both when validating and when rendering.
     fn check_autoescape(field: &str, source: &str) -> Result<(), Error> {
         let Some(offset) = autoescape_block(source) else { return Ok(()) };
         let (line, column) = position(source, offset);
@@ -311,9 +314,10 @@ impl TemplateEngine {
         ]))
     }
 
-    /// Kiểm mẫu `source` (của trường `field`) với `schema`: độ dài, cú pháp, biến lạ, biến bắt buộc.
-    /// Mọi lỗi gom vào một `validation_failed`; mỗi lỗi có `code` `template.syntax_error`,
-    /// `template.unknown_variable` hay `template.required_variable_missing` và vị trí dòng, cột.
+    /// Validates template `source` (of field `field`) against `schema`: length, syntax, unknown variables,
+    /// required variables. Every error is collected into one `validation_failed`; each error has `code`
+    /// `template.syntax_error`, `template.unknown_variable` or `template.required_variable_missing` and the
+    /// line and column position.
     pub fn validate(
         &self,
         field: &str,
@@ -381,8 +385,8 @@ impl TemplateEngine {
         if problems.is_empty() { Ok(()) } else { Err(Error::validation(problems)) }
     }
 
-    /// Dựng `source` với dữ liệu `context` (JSON), thoát theo `output`, định dạng số / tiền / ngày
-    /// theo `locale` (`vi`, `en`…). Lỗi lúc chạy (sai kiểu, vượt giới hạn) là lỗi của mẫu: 422.
+    /// Renders `source` with data `context` (JSON), escaping per `output`, formatting numbers / money / dates
+    /// per `locale` (`vi`, `en`…). A runtime error (wrong type, limit exceeded) is the template's fault: 422.
     pub fn render(
         &self,
         source: &str,
@@ -412,7 +416,7 @@ impl TemplateEngine {
     }
 }
 
-/// Vị trí (byte) của khối `{% autoescape … %}` đầu tiên trong `source`, nếu có.
+/// Position (byte) of the first `{% autoescape … %}` block in `source`, if any.
 fn autoescape_block(source: &str) -> Option<usize> {
     source.match_indices("{%").find_map(|(start, _)| {
         let rest = source[start + 2..].trim_start_matches(['-', '+']).trim_start();
@@ -421,7 +425,7 @@ fn autoescape_block(source: &str) -> Option<usize> {
     })
 }
 
-/// Mẫu không chạy được (sai kiểu, bộ lọc lạ…): 422, kèm dòng và lý do.
+/// A template that cannot run (wrong type, unknown filter…): 422, with line and reason.
 fn render_failed(error: &minijinja::Error) -> Error {
     Error::new(
         ErrorKind::Validation,

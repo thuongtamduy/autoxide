@@ -1,31 +1,31 @@
-//! Thông báo đẩy (bước 37, D-348): trait trung lập cho web push (trình duyệt, RFC 8030) và đẩy tới ứng
-//! dụng di động (D-220). Bộ cài đặt thật — web push (VAPID RFC 8292, mã hoá nội dung RFC 8291),
-//! Firebase Cloud Messaging, Apple Push Notification service — là module riêng cần khoá của nhà cung
-//! cấp, công bố `context.provide::<dyn WebPushSender>(…)` / `dyn MobilePushSender` và đăng ký TRƯỚC
-//! module `notifications`. Test dùng `FakeWebPushSender` / `FakeMobilePushSender` của testkit.
+//! Push notifications (step 37, D-348): neutral traits for web push (browsers, RFC 8030) and push to mobile
+//! apps (D-220). The real implementations — web push (VAPID RFC 8292, payload encryption RFC 8291),
+//! Firebase Cloud Messaging, Apple Push Notification service — are separate modules that need the provider's
+//! keys, publish `context.provide::<dyn WebPushSender>(…)` / `dyn MobilePushSender`, and register BEFORE the
+//! `notifications` module. Tests use `FakeWebPushSender` / `FakeMobilePushSender` from the testkit.
 
 use crate::error::Error;
 use crate::tenancy::TenantId;
 
-/// Kết quả một lần đẩy.
+/// Result of one push.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PushDelivery {
-    /// Nhà cung cấp đã nhận; kèm mã tin của họ.
+    /// The provider accepted it; carries the provider's message id.
     Sent { provider_reference: String },
-    /// Đăng ký / token không còn dùng được (web push trả 404 / 410, token di động hết hiệu lực): bên
-    /// gọi xoá nó, không gửi lại.
+    /// The subscription / token is no longer usable (web push returned 404 / 410, or the mobile token
+    /// expired): the caller deletes it and does not resend.
     Gone,
 }
 
-/// Nội dung hiển thị của một thông báo đẩy.
+/// Display content of a push notification.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct PushContent {
     pub title: String,
     pub body: String,
-    /// Link mở khi bấm vào thông báo.
+    /// Link opened when the notification is clicked.
     pub link: Option<String>,
-    /// Mã chống gửi trùng ở nhà cung cấp.
+    /// Id that prevents duplicate delivery at the provider.
     pub reference: String,
 }
 
@@ -40,14 +40,14 @@ impl PushContent {
     }
 }
 
-/// Đăng ký web push của một trình duyệt (`PushSubscription` của trình duyệt).
+/// A web push subscription of one browser (the browser's `PushSubscription`).
 #[derive(Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct WebPushSubscription {
     pub endpoint: String,
-    /// Khoá công khai P-256 của trình duyệt (base64url).
+    /// The browser's P-256 public key (base64url).
     pub p256dh: String,
-    /// Secret xác thực 16 byte (base64url).
+    /// 16-byte authentication secret (base64url).
     pub auth: String,
 }
 
@@ -70,17 +70,17 @@ impl std::fmt::Debug for WebPushSubscription {
     }
 }
 
-/// Bên gửi web push.
+/// Sender of web push.
 //
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
 #[async_trait::async_trait]
 pub trait WebPushSender: Send + Sync {
     fn provider(&self) -> &'static str;
 
-    /// Khoá công khai VAPID (base64url) cho trình duyệt đăng ký nhận.
+    /// VAPID public key (base64url) for browsers to subscribe with.
     fn public_key(&self) -> String;
 
-    /// Lỗi `Unavailable` là tạm thời (thử lại); `Validation` là vĩnh viễn.
+    /// The `Unavailable` error is temporary (retry); `Validation` is permanent.
     async fn send(
         &self,
         tenant: TenantId,
@@ -89,14 +89,14 @@ pub trait WebPushSender: Send + Sync {
     ) -> Result<PushDelivery, Error>;
 }
 
-/// Token của một thiết bị di động.
+/// Token of one mobile device.
 #[derive(Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct DeviceToken {
-    /// `ios` hay `android`.
+    /// `ios` or `android`.
     pub platform: String,
     pub token: String,
-    /// Mã ứng dụng (bundle id / package name).
+    /// Application id (bundle id / package name).
     pub app_id: String,
 }
 
@@ -120,12 +120,12 @@ impl std::fmt::Debug for DeviceToken {
     }
 }
 
-/// Bên đẩy thông báo tới ứng dụng di động (FCM, APNs…).
+/// Sender of push notifications to mobile apps (FCM, APNs…).
 #[async_trait::async_trait]
 pub trait MobilePushSender: Send + Sync {
     fn provider(&self) -> &'static str;
 
-    /// Lỗi `Unavailable` là tạm thời (thử lại); `Validation` là vĩnh viễn.
+    /// The `Unavailable` error is temporary (retry); `Validation` is permanent.
     async fn send(
         &self,
         tenant: TenantId,
@@ -134,12 +134,12 @@ pub trait MobilePushSender: Send + Sync {
     ) -> Result<PushDelivery, Error>;
 }
 
-/// `web_push_disabled` (503): chưa cấu hình web push.
+/// `web_push_disabled` (503): web push is not configured.
 pub fn web_push_disabled() -> Error {
     Error::unavailable("web_push_disabled", "Web push notifications are not set up on this server.")
 }
 
-/// `mobile_push_disabled` (503): chưa cấu hình đẩy tới ứng dụng di động.
+/// `mobile_push_disabled` (503): push to mobile apps is not configured.
 pub fn mobile_push_disabled() -> Error {
     Error::unavailable(
         "mobile_push_disabled",

@@ -1,13 +1,13 @@
-//! Hộp việc và số đếm menu (bước 51 P2, D-212): module khai **nguồn việc** tính từ dữ liệu của
-//! mình (bình luận chờ duyệt, bài nộp mới, bài chờ duyệt…) — không có bảng việc, không có "đã xử
-//! lý": xử lý xong bản ghi thì việc tự biến mất.
+//! Work inbox and menu counters (step 51 P2, D-212): a module declares **work sources** computed from its own
+//! data (comments awaiting approval, new submissions, posts awaiting review…) — there is no work table and no
+//! "handled" state: once the record is handled, the work disappears by itself.
 //!
-//! - `GET /api/v1/kernel/work` gom việc từ các nguồn người gọi có permission, sắp theo mức gấp rồi
-//!   hạn. Mỗi nguồn có hạn giờ ([`SOURCE_TIMEOUT`]); nguồn chậm hay lỗi bị bỏ qua và ghi vào
-//!   `incomplete`, không làm hỏng cả hộp.
-//! - `GET /api/v1/kernel/work/counts` trả `{nguồn: số}` cho số đếm trên menu (`NavItem::counter`),
-//!   giữ trong bộ nhớ [`COUNT_CACHE`] với khoá gồm khách, người gọi, nút.
-//! - Khác hộp thư của `notifications` (tin đã gửi cho một người).
+//! - `GET /api/v1/kernel/work` collects work from the sources the caller has permission for, ordered by
+//!   urgency and then due date. Each source has a timeout ([`SOURCE_TIMEOUT`]); a slow or failing source is
+//!   skipped and recorded in `incomplete`, without breaking the whole inbox.
+//! - `GET /api/v1/kernel/work/counts` returns `{source: count}` for the menu counters (`NavItem::counter`),
+//!   cached in memory ([`COUNT_CACHE`]) under a key made of tenant, caller and node.
+//! - Different from the `notifications` inbox (messages already sent to one person).
 
 use crate::time::Timestamp;
 use std::collections::{BTreeMap, HashMap};
@@ -28,18 +28,18 @@ use crate::i18n::{Language, Translations};
 use crate::response::{Data, Problem};
 use crate::tenancy::{OrgId, TenantContext, root_of};
 
-/// Hạn giờ của một nguồn việc trong một lần gom (dùng chung cho hộp việc, tìm chung, tóm tắt,
-/// bước thiết lập, mở thẳng theo mã).
+/// Timeout of one work source in one collection (shared by the work inbox, global search, summary,
+/// setup steps, open-by-code).
 ///
-/// Bản release: 300 ms. Bản debug (test, `cargo run`) chậm hơn nhiều lần và test chạy song song
-/// trên máy CI bận, nên 300 ms làm nguồn bình thường thỉnh thoảng rơi vào `incomplete` — test hộp
-/// việc, tìm chung đỏ ngẫu nhiên trên Postgres. Bản debug cho 1,5 s: vẫn ngắn hơn nguồn chậm giả
-/// lập trong test (ngủ 2 s), nên hành vi "bỏ nguồn chậm" vẫn được kiểm.
+/// Release build: 300 ms. Debug builds (tests, `cargo run`) are many times slower and tests run in parallel
+/// on busy CI machines, so 300 ms occasionally put a normal source into `incomplete` — the work inbox and
+/// global search tests failed randomly on Postgres. Debug builds get 1.5 s: still shorter than the simulated
+/// slow source in tests (sleeping 2 s), so the "drop a slow source" behavior is still verified.
 pub const SOURCE_TIMEOUT: Duration =
     if cfg!(debug_assertions) { Duration::from_millis(1500) } else { Duration::from_millis(300) };
-/// Giữ số đếm trong bộ nhớ bao lâu.
+/// How long counters are kept in memory.
 const COUNT_CACHE: Duration = Duration::from_secs(10);
-/// Tối đa số việc mỗi nguồn trả trong một lần gom.
+/// Maximum number of work items one source returns in one collection.
 const PER_SOURCE: u16 = 50;
 
 /// How urgent a piece of work is.
@@ -54,19 +54,19 @@ pub enum Severity {
     Info,
 }
 
-/// Một việc tính từ dữ liệu của module. Câu viết tiếng Anh (có `{tên}`); kernel dịch qua bản dịch
-/// `text:` của module như mô tả permission (D-264).
+/// One piece of work computed from a module's data. The sentence is written in English (with `{name}`); the
+/// kernel translates it through the module's `text:` translations like permission descriptions (D-264).
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct WorkItem {
-    /// ID bản ghi trong nguồn: khoá ổn định của việc là `<nguồn>:<record_id>`.
+    /// Record ID within the source: the stable key of the work is `<source>:<record_id>`.
     pub record_id: String,
     pub severity: Severity,
     pub title: &'static str,
-    /// Giá trị điền vào `{tên}` của `title` (dữ liệu, không dịch).
+    /// Value filled into `{name}` of `title` (data, not translated).
     pub params: Vec<(&'static str, String)>,
     pub due_at: Option<Timestamp>,
-    /// Màn của sổ điều hướng mở việc này (`NavItem::id`).
+    /// The navigation screen that opens this work (`NavItem::id`).
     pub screen: &'static str,
 }
 
@@ -98,19 +98,19 @@ impl WorkItem {
     }
 }
 
-/// Một nguồn việc module khai bằng [`StartContext::work_source`](crate::module::StartContext).
+/// A work source a module declares with [`StartContext::work_source`](crate::module::StartContext).
 ///
-/// Câu đếm phải chạy trên index. Nguồn tự áp phạm vi của người gọi (`principal`) ở nút `target`.
+/// The count statement must run on an index. The source applies the caller's (`principal`) scope at the node `target` itself.
 //
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
 #[async_trait::async_trait]
 pub trait WorkSource: Send + Sync {
-    /// `<module>.<việc>`, vd `comments.pending`; cũng là `counter` của mục menu.
+    /// `<module>.<work>`, e.g. `comments.pending`; also the `counter` of the menu item.
     fn id(&self) -> &'static str;
-    /// Người gọi cần permission này (ở nút đang chọn) mới thấy nguồn.
+    /// The caller needs this permission (at the selected node) to see the source.
     fn permission(&self) -> Permission;
-    /// Mọi người đã đăng nhập đều thấy nguồn (bỏ qua [`permission`](Self::permission)); nguồn tự
-    /// chỉ trả việc của người gọi — vd yêu cầu duyệt mà người gọi quyết được.
+    /// Every signed-in user sees the source (ignoring [`permission`](Self::permission)); the source
+    /// returns only the caller's own work — e.g. approval requests the caller can decide.
     fn for_any_signed_in(&self) -> bool {
         false
     }
@@ -131,7 +131,7 @@ pub trait WorkSource: Send + Sync {
 
 type Entry = (&'static str, Arc<dyn WorkSource>);
 
-/// Sổ nguồn việc của mọi module. Clone rẻ: mọi bản clone thấy cùng một sổ.
+/// Registry of work sources of all modules. Cheap to clone: all clones see the same registry.
 #[derive(Clone, Default)]
 pub struct WorkSources {
     // Ghi chỉ lúc khởi động; đọc mỗi lần gom. Không giữ khoá qua `await`.
@@ -139,7 +139,7 @@ pub struct WorkSources {
 }
 
 impl WorkSources {
-    /// Đăng ký `source` của `module`: id phải là `<module>.<…>` và chưa ai dùng.
+    /// Registers `source` of `module`: the id must be `<module>.<…>` and not yet used.
     pub(crate) fn register(
         &self,
         module: &'static str,
@@ -163,7 +163,7 @@ impl WorkSources {
         self.entries.read().unwrap_or_else(PoisonError::into_inner).clone()
     }
 
-    /// Nguồn có id `id`, kèm module của nó.
+    /// The source with id `id`, with its module.
     pub(crate) fn find(&self, id: &str) -> Option<Entry> {
         self.all().into_iter().find(|(_, source)| source.id() == id)
     }
@@ -237,7 +237,7 @@ pub(crate) struct WorkState {
     counts: Arc<Mutex<CountCache>>,
 }
 
-/// Số đếm đã tính theo (khách, người gọi, nút), kèm lúc tính.
+/// Counters already computed per (tenant, caller, node), with the time of computation.
 type CountCache = HashMap<(Uuid, Uuid, Uuid), (Instant, WorkCounts)>;
 
 impl WorkState {
@@ -249,7 +249,7 @@ impl WorkState {
         WorkState { sources, entitlements, translations, counts: Arc::default() }
     }
 
-    /// Nguồn người gọi được thấy ở `target`: module bật cho khách, có permission của nguồn.
+    /// Sources the caller may see at `target`: the module is enabled for the tenant and the caller has the source's permission.
     async fn allowed(
         &self,
         tenant: &TenantContext,

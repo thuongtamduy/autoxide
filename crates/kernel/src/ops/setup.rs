@@ -1,8 +1,8 @@
-//! Việc thiết lập (bước 51 P10, D-201): module khai **bước thiết lập** (tạo trang giới thiệu, nối
-//! cổng thanh toán, khai thông tin người bán…) bằng
-//! [`StartContext::setup_step`](crate::module::StartContext). Bước nào xong tính từ dữ liệu
-//! (`done`), không có nút "đánh dấu xong". `GET /api/v1/kernel/setup` trả các bước người gọi có
-//! permission, hợp với mô hình kinh doanh của khách (`kernel.business_model`), kèm tiến độ.
+//! Setup tasks (step 51 P10, D-201): a module declares **setup steps** (create an about page, connect a
+//! payment gateway, fill in seller information…) with
+//! [`StartContext::setup_step`](crate::module::StartContext). Whether a step is done is computed from data
+//! (`done`); there is no "mark as done" button. `GET /api/v1/kernel/setup` returns the steps the caller has
+//! permission for, matching the tenant's business model (`kernel.business_model`), with progress.
 
 use std::sync::{Arc, PoisonError, RwLock};
 
@@ -20,22 +20,22 @@ use crate::response::{Data, Problem};
 use crate::tenancy::TenantContext;
 use crate::tenancy::settings::{BUSINESS_MODEL, TenantSettings};
 
-/// Phần khai của một bước thiết lập.
+/// Declaration part of a setup step.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct SetupInfo {
-    /// `<module>.<bước>`, vd `content.about_page`.
+    /// `<module>.<step>`, vd `content.about_page`.
     pub id: &'static str,
-    /// Câu tiếng Anh (dịch qua `text:` của module).
+    /// English sentence (translated through the module's `text:`).
     pub label: &'static str,
-    /// Màn của sổ điều hướng làm bước này (`NavItem::id`).
+    /// The navigation-registry screen where this step is done (`NavItem::id`).
     pub screen: &'static str,
-    /// Mô hình kinh doanh áp dụng (`independent`, `multi_store`, `chain`, `marketplace`, `saas`);
-    /// rỗng: mọi mô hình.
+    /// Business models it applies to (`independent`, `multi_store`, `chain`, `marketplace`, `saas`);
+    /// empty: every model.
     pub models: &'static [&'static str],
-    /// Chưa xong thì chưa bán được.
+    /// Until it is done, selling is not possible.
     pub blocking: bool,
-    /// Thứ tự hiện (nhỏ trước).
+    /// Display order (smaller first).
     pub order: u16,
 }
 
@@ -60,21 +60,21 @@ impl SetupInfo {
     }
 }
 
-/// Một bước thiết lập.
+/// A setup step.
 //
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
 #[async_trait::async_trait]
 pub trait SetupStep: Send + Sync {
     fn info(&self) -> SetupInfo;
-    /// Permission cần để thấy (và làm) bước này.
+    /// Permission needed to see (and do) this step.
     fn permission(&self) -> Permission;
-    /// Đã xong chưa, tính từ dữ liệu của khách.
+    /// Whether it is done, computed from the tenant's data.
     async fn done(&self, tenant: &TenantContext) -> Result<bool, Error>;
 }
 
 type Entry = (&'static str, Arc<dyn SetupStep>);
 
-/// Sổ bước thiết lập của mọi module. Clone rẻ.
+/// Registry of every module's setup steps. Cheap to clone.
 #[derive(Clone, Default)]
 pub struct SetupSteps {
     entries: Arc<RwLock<Vec<Entry>>>,

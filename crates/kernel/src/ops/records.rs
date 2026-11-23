@@ -1,14 +1,15 @@
-//! Ghi chú và dòng hoạt động trên mọi bản ghi (bước 51 P13, D-201): một chỗ dùng chung thay cho mỗi
-//! module tự làm ghi chú.
+//! Notes and the activity feed on every record (step 51 P13, D-201): one shared place instead of each
+//! module building its own notes.
 //!
-//! - `GET /api/v1/kernel/records/{kind}/{id}/activity` — ghi chú nội bộ và lịch sử event của bản ghi
-//!   (do module nhật ký công bố `RecordHistory`), mới trước.
-//! - `GET` / `POST /api/v1/kernel/records/{kind}/{id}/notes`, `DELETE …/notes/{note_id}` (chỉ người
-//!   viết) — bảng `kernel_record_notes` (cấp khách hàng). `mentions` nhắc người khác: mỗi người phải
-//!   đọc được bản ghi; event `kernel.record_note_added` mang danh sách để module thông báo gửi.
+//! - `GET /api/v1/kernel/records/{kind}/{id}/activity` — the record's internal notes and event history
+//!   (published by the audit module as `RecordHistory`), newest first.
+//! - `GET` / `POST /api/v1/kernel/records/{kind}/{id}/notes`, `DELETE …/notes/{note_id}` (author only) —
+//!   table `kernel_record_notes` (tenant level). `mentions` mention other people: each must be able to read
+//!   the record; the event `kernel.record_note_added` carries the list for the notifications module to send.
 //!
-//! "Đọc được bản ghi": bộ tra của sổ đối tượng (D-123) thấy bản ghi, và người gọi có permission
-//! `<module>.read` của module sở hữu loại đó. Không thì 404 như không có (không lộ sự tồn tại).
+//! "Able to read the record": the object registry's lookup (D-123) sees the record, and the caller has the
+//! permission `<module>.read` of the module that owns that kind. Otherwise 404 as if it did not exist
+//! (existence is not disclosed).
 
 use crate::time::Timestamp;
 use std::sync::{Arc, OnceLock};
@@ -35,12 +36,12 @@ use crate::response::{Created, Data, Problem};
 use crate::tenancy::TenantContext;
 
 const TABLE: &str = "kernel_record_notes";
-/// Ghi chú dài tối đa chừng này ký tự.
+/// A note is at most this many characters long.
 const MAX_BODY: usize = 5_000;
-/// Nhắc tối đa chừng này người mỗi ghi chú.
+/// At most this many people mentioned per note.
 const MAX_MENTIONS: usize = 20;
 
-/// Event: ai đó viết ghi chú trên một bản ghi (mang người được nhắc, để module thông báo gửi).
+/// Event: someone wrote a note on a record (carries the mentioned people, for the notifications module to send).
 pub(crate) const RECORD_NOTE_ADDED: EventInfo =
     EventInfo::new("kernel.record_note_added", "An internal note was written on a record.");
 
@@ -56,7 +57,7 @@ impl crate::event::Event for RecordNoteAdded {
     const NAME: &'static str = "kernel.record_note_added";
 }
 
-/// Chỗ giữ bộ lịch sử theo bản ghi: `Modules::start` điền sau khi mọi module khởi động.
+/// Holder of the per-record history provider: `Modules::start` fills it after all modules have started.
 #[derive(Clone, Default)]
 pub(crate) struct HistorySlot(Arc<OnceLock<Option<Arc<dyn RecordHistory>>>>);
 
@@ -141,7 +142,7 @@ fn not_found(kind: &str, id: &str) -> Error {
 }
 
 impl RecordsState {
-    /// `principal` đọc được bản ghi `kind` / `id` không (xem đầu file).
+    /// Whether `principal` can read the record `kind` / `id` (see the top of the file).
     async fn can_read(
         &self,
         tenant: &TenantContext,
@@ -706,7 +707,7 @@ pub(crate) fn routes(state: RecordsState) -> OpenApiRouter {
         .with_state(Arc::new(state))
 }
 
-/// Migration tạo bảng `kernel_record_notes` (cấp khách hàng, mọi database dữ liệu).
+/// Migration that creates the table `kernel_record_notes` (tenant level, every data database).
 pub(crate) struct CreateRecordNotes;
 
 impl MigrationName for CreateRecordNotes {

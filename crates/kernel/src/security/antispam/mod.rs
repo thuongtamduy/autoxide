@@ -1,23 +1,24 @@
-//! Chống spam cho dữ liệu người lạ gửi lên (form, đăng ký bản tin, bình luận) — D-119.
+//! Anti-spam for data submitted by strangers (forms, newsletter sign-ups, comments) — D-119.
 //!
-//! Module lấy [`SpamGuard`] lúc khởi động (`context.require::<SpamGuard>()`) và chạy **hai pha**:
+//! A module gets the [`SpamGuard`] at startup (`context.require::<SpamGuard>()`) and runs **two phases**:
 //!
-//! 1. **Trước** transaction ghi: [`SpamGuard::check`] — trường bẫy, token form do máy chủ ký
-//!    (tuổi tối thiểu / tối đa), đề (`ChallengeVerifier`, mặc định không có), giới hạn theo IP
-//!    băm, theo email, theo người dùng ([`Limits`], bảng `<module>_throttle`), trùng nội dung
-//!    (module tự dò, báo qua [`Submission::duplicate`]), bộ phân loại nội dung
-//!    (`ContentClassifier`, mặc định không có). Mọi việc gọi mạng nằm ở pha này.
-//! 2. **Trong** transaction của module, sau khi tạo bản ghi: [`Checked::claim`] chèn nonce của
-//!    token vào `<module>_antispam_nonces`. [`Claim::Replay`] nghĩa là bài này đã gửi rồi:
-//!    rollback và trả lại kết quả lần đầu.
+//! 1. **Before** the write transaction: [`SpamGuard::check`] — honeypot field, server-signed form token
+//!    (minimum / maximum age), challenge (`ChallengeVerifier`, none by default), limits per hashed
+//!    IP, per email, per user ([`Limits`], table `<module>_throttle`), duplicate content
+//!    (the module detects it itself and reports via [`Submission::duplicate`]), content classifier
+//!    (`ContentClassifier`, none by default). Every network call happens in this phase.
+//! 2. **Inside** the module's transaction, after creating the record: [`Checked::claim`] inserts the token's
+//!    nonce into `<module>_antispam_nonces`. [`Claim::Replay`] means this submission was already sent:
+//!    roll back and return the result of the first time.
 //!
-//! Kết luận ([`Verdict`]) cho người lạ không bao giờ lộ cho bot: bẫy, quá nhiều lần → `Discard`
-//! (trả lời như đã nhận, không lưu gì); quá nhanh, trùng, bị phân loại là spam → `Quarantine`
-//! (lưu, giữ lại chờ duyệt, người gửi không biết). Chỉ token hỏng (người thật tải lại form là
-//! xong), đề sai, và nhà cung cấp đề lỗi khi `AUTOXIDE_ANTISPAM_FAIL_MODE=reject` mới là lỗi.
+//! The conclusion ([`Verdict`]) for a stranger is never revealed to a bot: honeypot, too many attempts →
+//! `Discard` (answer as if received, store nothing); too fast, duplicate, classified as spam → `Quarantine`
+//! (stored, held for review, the sender does not know). Only a broken token (a real person reloads the form
+//! and is done), a wrong challenge, and a challenge provider failing when
+//! `AUTOXIDE_ANTISPAM_FAIL_MODE=reject` are errors.
 //!
-//! Request có `Principal` (website gọi bằng API key, MCP) bỏ qua bẫy, token và đề, nhưng vẫn
-//! bị giới hạn theo người dùng (vượt thì 429 `antispam.rate_limited`).
+//! A request with a `Principal` (the website calling with an API key, MCP) skips the honeypot, token and
+//! challenge, but is still limited per user (beyond the limit: 429 `antispam.rate_limited`).
 
 mod altcha;
 mod nonce;
@@ -79,7 +80,7 @@ pub(crate) const FAIL_MODE: Setting = Setting::new(
 )
 .with_default("quarantine");
 
-/// Khi nhà cung cấp đề hay bộ phân loại lỗi.
+/// When the challenge provider or the classifier fails.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum FailMode {
@@ -87,18 +88,18 @@ pub enum FailMode {
     Reject,
 }
 
-/// Loại đề chống bot.
+/// Kind of anti-bot challenge.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ChallengeKind {
     None,
-    /// ALTCHA v2, `cost` vòng SHA-256 mỗi lần thử.
+    /// ALTCHA v2, `cost` SHA-256 rounds per attempt.
     Altcha {
         cost: u32,
     },
 }
 
-/// Cấu hình chống spam. Dựng bằng `AntispamConfig::default()` rồi các hàm đặt từng trường.
+/// Anti-spam configuration. Built with `AntispamConfig::default()` followed by the per-field setters.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct AntispamConfig {
@@ -172,32 +173,32 @@ impl AntispamConfig {
     }
 }
 
-/// Kết quả của một đề (proof-of-work, CAPTCHA…).
+/// Result of a challenge (proof-of-work, CAPTCHA…).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ChallengeOutcome {
     Passed,
-    /// Không gửi lời giải mà đề là bắt buộc.
+    /// No solution was sent although the challenge is required.
     Missing,
     Failed,
-    /// Nhà cung cấp không trả lời được.
+    /// The provider could not be reached.
     Unavailable,
 }
 
-/// Chỗ cắm đề chống bot. Mặc định không có đề ([`NoChallenge`]).
+/// Plug-in point for an anti-bot challenge. There is no challenge by default ([`NoChallenge`]).
 //
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
 #[async_trait::async_trait]
 pub trait ChallengeVerifier: Send + Sync {
-    /// Tham số đề gửi cho trình duyệt cùng token form; `None` khi không có đề.
-    /// `binding` (nonce của token form) gắn đề với đúng token đó, để một lời giải không dùng lại
-    /// được.
+    /// Challenge parameters sent to the browser along with the form token; `None` when there is no challenge.
+    /// `binding` (the form token's nonce) ties the challenge to exactly that token, so one solution cannot be
+    /// reused.
     async fn challenge(
         &self,
         scope: &str,
         binding: &str,
     ) -> Result<Option<serde_json::Value>, Error>;
-    /// Kiểm lời giải `solution` của đề cho `scope` và token form có nonce `binding`.
+    /// Verifies the challenge `solution` for `scope` and the form token with nonce `binding`.
     async fn verify(
         &self,
         scope: &str,
@@ -206,7 +207,7 @@ pub trait ChallengeVerifier: Send + Sync {
     ) -> Result<ChallengeOutcome, Error>;
 }
 
-/// Không có đề: mọi bài đều qua bước này.
+/// No challenge: every submission passes this step.
 pub struct NoChallenge;
 
 #[async_trait::async_trait]
@@ -225,17 +226,17 @@ impl ChallengeVerifier for NoChallenge {
     }
 }
 
-/// Kết luận của bộ phân loại nội dung.
+/// Conclusion of the content classifier.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Classification {
     Ham,
     Spam,
-    /// Bộ phân loại không trả lời được.
+    /// The classifier could not be reached.
     Unavailable,
 }
 
-/// Chỗ cắm bộ phân loại nội dung (vd Akismet). Mặc định không có ([`NoClassifier`]).
+/// Plug-in point for a content classifier (e.g. Akismet). None by default ([`NoClassifier`]).
 #[async_trait::async_trait]
 pub trait ContentClassifier: Send + Sync {
     async fn classify(
@@ -247,7 +248,7 @@ pub trait ContentClassifier: Send + Sync {
     ) -> Result<Classification, Error>;
 }
 
-/// Không phân loại: mọi nội dung là "không phải spam".
+/// No classification: all content is "not spam".
 pub struct NoClassifier;
 
 #[async_trait::async_trait]
@@ -263,26 +264,26 @@ impl ContentClassifier for NoClassifier {
     }
 }
 
-/// Một bài gửi cần xét. Dựng bằng [`Submission::new`].
+/// A submission to evaluate. Built with [`Submission::new`].
 #[derive(Debug, Clone, Copy)]
 #[non_exhaustive]
 pub struct Submission<'a> {
-    /// Phạm vi: form nào (vd `forms:contact`, `newsletter:subscribe`); khớp với phạm vi của
-    /// token form.
+    /// Scope: which form (e.g. `forms:contact`, `newsletter:subscribe`); matches the scope of the
+    /// form token.
     pub scope: &'a str,
-    /// Người gọi đã đăng nhập (API key của website, MCP), nếu có.
+    /// The signed-in caller (the website's API key, MCP), if any.
     pub principal: Option<&'a Principal>,
     pub client: &'a ClientInfo,
-    /// Giá trị trường bẫy (người không thấy nên để trống).
+    /// Value of the honeypot field (people do not see it, so it should stay empty).
     pub honeypot: Option<&'a str>,
     pub form_token: Option<&'a str>,
-    /// Lời giải đề, nếu có đề.
+    /// The challenge solution, if there is a challenge.
     pub challenge: Option<&'a str>,
-    /// Email người gửi tự khai (giới hạn theo email).
+    /// Email the sender gave themselves (limit per email).
     pub email: Option<&'a str>,
-    /// Nội dung chữ (cho bộ phân loại).
+    /// Text content (for the classifier).
     pub content: Option<&'a str>,
-    /// Module đã thấy cùng nội dung này gần đây (tự dò trên bảng của mình bằng
+    /// The module has seen this same content recently (it detects this itself on its own table with
     /// [`content_hash`]).
     pub duplicate: bool,
 }
@@ -346,16 +347,16 @@ impl<'a> Submission<'a> {
     }
 }
 
-/// Giới hạn số lần, trên bảng `<module>_throttle` của module. Thiếu thì không giới hạn kiểu đó.
-/// Dựng bằng `Limits::default()` rồi các hàm đặt từng trường.
+/// Rate limits, on the module's table `<module>_throttle`. If missing, that kind of limit does not apply.
+/// Built with `Limits::default()` followed by the per-field setters.
 #[derive(Debug, Clone, Default)]
 #[non_exhaustive]
 pub struct Limits {
-    /// Theo khối IP băm (của người lạ).
+    /// Per hashed IP block (of a stranger).
     pub ip: Option<Throttle>,
-    /// Theo email người gửi tự khai.
+    /// Per email the sender gave themselves.
     pub email: Option<Throttle>,
-    /// Theo người dùng đã đăng nhập.
+    /// Per signed-in user.
     pub user: Option<Throttle>,
 }
 
@@ -379,18 +380,18 @@ impl Limits {
     }
 }
 
-/// Kết luận cho một bài.
+/// Conclusion for a submission.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Verdict {
-    /// Nhận.
+    /// Accept.
     Accept,
-    /// Nhận nhưng giữ lại chờ duyệt; người gửi được trả lời như bài thường.
+    /// Accept but hold for review; the sender is answered as with a normal submission.
     Quarantine { reasons: Vec<&'static str> },
-    /// Bỏ đi, không lưu gì; người gửi vẫn được trả lời như bài thường.
+    /// Drop, store nothing; the sender is still answered as with a normal submission.
     Discard { reason: &'static str },
 }
 
-/// Kết quả pha một: kết luận, và nonce để chèn ở pha hai.
+/// Result of phase one: the conclusion, and the nonce to insert in phase two.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Checked {
     pub verdict: Verdict,
@@ -399,9 +400,9 @@ pub struct Checked {
 }
 
 impl Checked {
-    /// Pha hai, TRONG transaction của module (sau khi tạo bản ghi): chèn nonce kèm `result` (vd
-    /// ID bản ghi vừa tạo). Không có nonce (người gọi đã đăng nhập — họ dùng
-    /// `Idempotency-Key`) thì luôn [`Claim::New`].
+    /// Phase two, INSIDE the module's transaction (after creating the record): inserts the nonce with
+    /// `result` (e.g. the ID of the record just created). With no nonce (a signed-in caller — they use
+    /// `Idempotency-Key`) it is always [`Claim::New`].
     pub async fn claim<C: ConnectionTrait>(
         &self,
         connection: &C,
@@ -418,7 +419,7 @@ impl Checked {
     }
 }
 
-/// Bộ chống spam dùng chung. Clone rẻ.
+/// The shared anti-spam guard. Cheap to clone.
 #[derive(Clone)]
 pub struct SpamGuard {
     secret: SecretKey,
@@ -433,15 +434,15 @@ impl std::fmt::Debug for SpamGuard {
     }
 }
 
-/// Token form vừa phát cho website.
+/// A form token just issued to the website.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct IssuedToken {
     pub token: String,
     pub expires_at: Timestamp,
-    /// Gửi sớm hơn lúc này thì bài bị giữ lại.
+    /// A submission sent earlier than this is held back.
     pub submit_after: Timestamp,
-    /// Tham số đề, nếu có đề.
+    /// Challenge parameters, if there is a challenge.
     pub challenge: Option<serde_json::Value>,
 }
 
@@ -455,20 +456,20 @@ impl SpamGuard {
         SpamGuard { secret, config, challenge, classifier: Arc::new(NoClassifier) }
     }
 
-    /// Thay bộ đề.
+    /// Replaces the challenge.
     pub fn with_challenge(mut self, challenge: Arc<dyn ChallengeVerifier>) -> Self {
         self.challenge = challenge;
         self
     }
 
-    /// Thay bộ phân loại nội dung.
+    /// Replaces the content classifier.
     pub fn with_classifier(mut self, classifier: Arc<dyn ContentClassifier>) -> Self {
         self.classifier = classifier;
         self
     }
 
-    /// Phát token form cho `scope` của khách `tenant` (ký bằng khoá của khách: dùng ở khách khác
-    /// thì như token sai).
+    /// Issues a form token for `scope` of tenant `tenant` (signed with the tenant's key: used with another
+    /// tenant it is like a wrong token).
     pub async fn issue(&self, tenant: &TenantContext, scope: &str) -> Result<IssuedToken, Error> {
         check_scope(scope)?;
         let now = Timestamp::now().truncate(jiff::Unit::Second);
@@ -485,7 +486,7 @@ impl SpamGuard {
         })
     }
 
-    /// Pha một: xét `submission` gửi tới khách `tenant`, trước transaction ghi.
+    /// Phase one: evaluates `submission` sent to tenant `tenant`, before the write transaction.
     pub async fn check(
         &self,
         tenant: &TenantContext,
@@ -603,7 +604,7 @@ impl SpamGuard {
         Ok(Checked { verdict, nonce, expires_at })
     }
 
-    /// Xoá nonce đã hết hạn của `module` (job dọn dẹp của module). Trả số dòng đã xoá.
+    /// Deletes expired nonces of `module` (the module's cleanup job). Returns the number of rows deleted.
     pub async fn purge_nonces<C: ConnectionTrait>(
         &self,
         connection: &C,
@@ -627,14 +628,14 @@ fn discard(reason: &'static str, now: Timestamp) -> Checked {
     Checked { verdict: Verdict::Discard { reason }, nonce: None, expires_at: now }
 }
 
-/// Băm nội dung để module dò trùng trên bảng của mình: bỏ khoảng trắng thừa, viết thường, rồi
+/// Hashes content so a module can detect duplicates on its own table: strips extra whitespace, lowercases, then
 /// SHA-256.
 pub fn content_hash(text: &str) -> String {
     let normalized: Vec<String> = text.split_whitespace().map(str::to_lowercase).collect();
     crate::secret::sha256(&normalized.join(" "))
 }
 
-/// Phạm vi: 1–64 ký tự chữ thường, số, `_`, `-`, `.`, `:`.
+/// Scope: 1–64 characters of lowercase letters, digits, `_`, `-`, `.`, `:`.
 fn check_scope(scope: &str) -> Result<(), Error> {
     let valid = (1..=64).contains(&scope.len())
         && scope.chars().all(|c| {

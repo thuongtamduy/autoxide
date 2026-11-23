@@ -1,9 +1,10 @@
-//! Cảnh báo vận hành cho nhân sự nền tảng (đề bài giao diện, màn Sức khoẻ): chạy lại các bước
-//! kiểm của `autoxide doctor` mà module khai (`Module::checks`) và trả những bước chưa đạt, mỗi
-//! bước kèm câu "làm gì" (`hint`). Không có bảng cảnh báo riêng: sự thật là kết quả kiểm lúc này.
+//! Operational alerts for platform staff (requested by the UI, Health screen): re-runs the `autoxide doctor`
+//! checks that modules declare (`Module::checks`) and returns the ones that are not passing, each with a
+//! "what to do" sentence (`hint`). There is no alert table of its own: the truth is the result of the checks
+//! right now.
 //!
-//! Bước kiểm có thể gọi mạng (máy chủ mail, nơi lưu file) nên kết quả giữ trong bộ nhớ 60 giây;
-//! `refresh=true` kiểm lại ngay. Các bước chạy song song, mỗi bước có hạn giờ của doctor.
+//! A check may call the network (mail server, file storage), so results are kept in memory for 60 seconds;
+//! `refresh=true` re-checks immediately. Checks run in parallel, each with the doctor's timeout.
 
 use crate::time::Timestamp;
 use std::sync::{Arc, Mutex, PoisonError};
@@ -21,7 +22,7 @@ use crate::error::Error;
 use crate::ops::module_catalog::ModuleCatalog;
 use crate::response::{Data, Problem};
 
-/// Giữ kết quả kiểm bao lâu.
+/// How long check results are kept.
 const CACHE_FOR: Duration = Duration::from_secs(60);
 
 /// Something about the server that needs attention.
@@ -59,7 +60,7 @@ pub(crate) struct AlertsQuery {
     refresh: Option<bool>,
 }
 
-/// Bộ chạy kiểm dùng chung cho mọi request, kèm kết quả lần gần nhất.
+/// Check runner shared by all requests, with the most recent result.
 pub(crate) struct Alerts {
     catalog: ModuleCatalog,
     last: Mutex<Option<(Instant, AlertsResponse)>>,
