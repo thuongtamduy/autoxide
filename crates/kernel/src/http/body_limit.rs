@@ -1,9 +1,9 @@
-//! Giới hạn kích thước thân request: mặc định `AUTOXIDE_HTTP_BODY_LIMIT_BYTES` cho mọi
-//! route; route cần thân lớn hơn (vd tải file lên) được module khai riêng qua
+//! Request body size limit: the default `AUTOXIDE_HTTP_BODY_LIMIT_BYTES` for every
+//! route; a route that needs a larger body (e.g. file upload) is declared separately by the module through
 //! `Module::body_limits` (D-066).
 //!
-//! Lớp này nằm trong `Router::layer`, tức chạy SAU khi axum chọn route: biết route nào
-//! qua `MatchedPath`, như lớp đánh dấu deprecated.
+//! This layer sits inside `Router::layer`, i.e. it runs AFTER axum picks the route: it learns which route
+//! through `MatchedPath`, like the deprecated-marking layer.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -18,22 +18,22 @@ use http_body_util::Limited;
 use super::API_PREFIX;
 use crate::error::{Error, ErrorKind};
 
-/// Giới hạn thân request riêng cho một route của module.
+/// A request body limit specific to one module route.
 ///
 /// ```
 /// use autoxide_kernel::http::BodyLimit;
 /// use axum::http::Method;
 ///
-/// // `POST /api/v1/files` nhận tới 25 MiB.
+/// // `POST /api/v1/files` accepts up to 25 MiB.
 /// let limit = BodyLimit::new(Method::POST, "/", 25 * 1024 * 1024);
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct BodyLimit {
     pub method: Method,
-    /// Đường dẫn trong module, như khi khai route (`/`, `/{id}`).
+    /// Path within the module, as when declaring the route (`/`, `/{id}`).
     pub path: &'static str,
-    /// Số byte tối đa của thân request.
+    /// Maximum number of bytes of the request body.
     pub max_bytes: usize,
 }
 
@@ -43,7 +43,7 @@ impl BodyLimit {
     }
 }
 
-/// Bảng tra (method, mẫu đường dẫn đầy đủ) → giới hạn; route không khai dùng mặc định.
+/// Lookup table (method, full path pattern) -> limit; a route without a declaration uses the default.
 #[derive(Debug)]
 pub(super) struct BodyLimits {
     default: usize,
@@ -62,12 +62,12 @@ impl BodyLimits {
         BodyLimits { default, routes }
     }
 
-    /// Giới hạn mặc định (`AUTOXIDE_HTTP_BODY_LIMIT_BYTES`).
+    /// The default limit (`AUTOXIDE_HTTP_BODY_LIMIT_BYTES`).
     pub(super) fn default_limit(&self) -> usize {
         self.default
     }
 
-    /// Giới hạn cho `request`.
+    /// The limit for `request`.
     pub(super) fn for_request(&self, request: &Request) -> usize {
         request
             .extensions()
@@ -80,7 +80,7 @@ impl BodyLimits {
     }
 }
 
-/// Lỗi 413 khi thân request vượt giới hạn.
+/// The 413 error when the request body exceeds the limit.
 pub(crate) fn too_large(limit: usize) -> Error {
     Error::new(
         ErrorKind::PayloadTooLarge,
@@ -90,8 +90,8 @@ pub(crate) fn too_large(limit: usize) -> Error {
     .with_param("limit", limit)
 }
 
-/// Lớp HTTP: `Content-Length` quá giới hạn thì trả 413 ngay; không có thì đếm byte
-/// trong lúc đọc và dừng khi vượt.
+/// HTTP layer: a `Content-Length` over the limit gets 413 immediately; without one, bytes are counted
+/// while reading and it stops when the limit is exceeded.
 pub(super) async fn limit(limits: Arc<BodyLimits>, request: Request, next: Next) -> Response {
     let limit = limits.for_request(&request);
     let declared = request
@@ -105,7 +105,7 @@ pub(super) async fn limit(limits: Arc<BodyLimits>, request: Request, next: Next)
     next.run(request.map(|body| Body::new(Limited::new(body, limit)))).await
 }
 
-/// `error` (lỗi khi đọc thân request) có phải do vượt giới hạn không.
+/// Whether `error` (an error while reading the request body) was caused by exceeding the limit.
 pub fn is_too_large(error: &axum::Error) -> bool {
     let mut source: Option<&(dyn std::error::Error + 'static)> = Some(error);
     while let Some(current) = source {

@@ -1,13 +1,13 @@
-//! Hình dạng của mọi response: envelope cho kết quả, và thân lỗi theo chuẩn.
+//! The shape of every response: the envelope for results, and the standard error body.
 //!
-//! - Thành công, một đối tượng: `{"data": {…}}` — kiểu [`Data`].
-//! - Thành công, một danh sách: `{"data": […], "pagination": {…}}` — kiểu
-//!   [`Page`](crate::pagination::Page).
-//! - Lỗi: thân **RFC 9457 Problem Details** (`application/problem+json`) — kiểu
-//!   [`Problem`], thêm hai trường mở rộng `code` và `errors`.
+//! - Success, one object: `{"data": {...}}` - the [`Data`] type.
+//! - Success, a list: `{"data": [...], "pagination": {...}}` - the
+//!   [`Page`](crate::pagination::Page) type.
+//! - Error: an **RFC 9457 Problem Details** body (`application/problem+json`) - the
+//!   [`Problem`] type, with two extension fields `code` and `errors`.
 //!
-//! Mọi endpoint dùng đúng ba hình dạng này: client (người hay AI agent) học một
-//! endpoint là đọc được mọi endpoint.
+//! Every endpoint uses exactly these three shapes: a client (a person or an AI agent) that learns one
+//! endpoint can read every endpoint.
 
 use crate::time::Timestamp;
 use std::sync::Arc;
@@ -39,17 +39,17 @@ impl<T: Serialize> IntoResponse for Data<T> {
     }
 }
 
-/// Kết quả của một lệnh tạo mới: 201, header `Location` trỏ tới bản ghi vừa tạo, thân
-/// `{"data": …}`. `path` tính từ gốc API, vd `/auth/users/<id>` thành
-/// `Location: /api/v1/auth/users/<id>`. Tài liệu OpenAPI khai header này cho mọi
-/// response 201 (`http::build`).
+/// The result of a create command: 201, a `Location` header pointing to the just-created record, body
+/// `{"data": ...}`. `path` is relative to the API root, e.g. `/auth/users/<id>` becomes
+/// `Location: /api/v1/auth/users/<id>`. The OpenAPI document declares this header for every
+/// 201 response (`http::build`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct Created<T> {
     pub path: String,
     pub data: T,
-    /// Phiên bản của bản ghi vừa tạo: có thì response mang `ETag` như `GET` (client sửa tiếp
-    /// với `If-Match` mà không phải đọc lại).
+    /// Version of the just-created record: when present the response carries `ETag` like `GET` (the client
+    /// can continue editing with `If-Match` without re-reading).
     pub version: Option<Timestamp>,
 }
 
@@ -58,7 +58,7 @@ impl<T> Created<T> {
         Created { path: path.into(), data, version: None }
     }
 
-    /// Kèm `ETag` của phiên bản `version` (cột `updated_at` của bản ghi).
+    /// Also attaches the `ETag` of version `version` (the record's `updated_at` column).
     #[must_use]
     pub fn tagged(mut self, version: Timestamp) -> Self {
         self.version = Some(version);
@@ -140,7 +140,7 @@ pub struct ProblemField {
     pub detail: String,
 }
 
-/// Kiểu nội dung của thân lỗi theo RFC 9457.
+/// Content type of an RFC 9457 error body.
 pub const PROBLEM_CONTENT_TYPE: &str = "application/problem+json";
 
 impl From<&Error> for Problem {

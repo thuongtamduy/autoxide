@@ -1,5 +1,5 @@
-//! Lớp HTTP chọn ngôn ngữ: đọc `Accept-Language`, dịch `detail` của lỗi (và của từng ô), ghi
-//! `Content-Language` (D-057).
+//! The HTTP language-selection layer: reads `Accept-Language`, translates the error `detail` (and each
+//! cell's), and writes `Content-Language` (D-057).
 
 use std::sync::Arc;
 

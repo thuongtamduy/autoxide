@@ -1,6 +1,6 @@
-//! Phần của bộ đăng ký gom khai báo của mọi module cho chương trình chạy: endpoint deprecated, tool,
-//! resource và prompt MCP, worker, bộ phát event, task, route, migrator… (tách khỏi `mod.rs` theo
-//! trách nhiệm, chỉ di chuyển code).
+//! The part of the registry that collects every module's declarations for the running program: deprecated
+//! endpoints, MCP tools, resources and prompts, worker, event dispatcher, tasks, routes, migrator... (split
+//! out of `mod.rs` by responsibility, code moved only).
 
 use std::collections::{BTreeSet, HashMap};
 use std::sync::Arc;
@@ -15,8 +15,8 @@ use crate::migration::{MigrationError, Migrator, ModuleMigrations};
 use super::{ModuleError, Modules};
 
 impl Modules {
-    /// Endpoint deprecated của mọi module: `(tên module, khai báo)`. Không gồm tool deprecated
-    /// (chúng đi theo tool, xem [`tools`](Self::tools)).
+    /// Deprecated endpoints of every module: `(module name, declaration)`. Does not include deprecated tools
+    /// (they go with the tool, see [`tools`](Self::tools)).
     pub fn deprecations(&self) -> Vec<(&'static str, crate::http::Deprecation)> {
         self.modules
             .iter()
@@ -31,9 +31,9 @@ impl Modules {
             .collect()
     }
 
-    /// Tool MCP của mọi module, tên đầy đủ `<module>.<tên>`. Gọi sau
-    /// [`start`](Self::start). Khai báo sai (tên sai dạng hay trùng, đầu vào không phải
-    /// object, permission không ai khai) là lỗi khởi động.
+    /// MCP tools of every module, full name `<module>.<name>`. Call after
+    /// [`start`](Self::start). A wrong declaration (a badly formed or duplicate name, an input that is not an
+    /// object, a permission nobody declares) is a startup error.
     pub fn tools(&self) -> Result<Vec<crate::mcp::Tool>, ModuleError> {
         let mut tools = Vec::new();
         let mut problems = Vec::new();
@@ -95,9 +95,9 @@ impl Modules {
         if problems.is_empty() { Ok(tools) } else { Err(ModuleError(problems.join("; "))) }
     }
 
-    /// Resource MCP của mọi module, URI đầy đủ `autoxide://<module>/<path>` (bước 40 P2). Gọi sau
-    /// [`start`](Self::start). Khai báo sai (path sai dạng hay trùng, thiếu khai quyền, permission
-    /// không ai khai) là lỗi khởi động.
+    /// MCP resources of every module, full URI `autoxide://<module>/<path>` (step 40 P2). Call after
+    /// [`start`](Self::start). A wrong declaration (a badly formed or duplicate path, a missing permission
+    /// declaration, a permission nobody declares) is a startup error.
     pub fn mcp_resources(&self) -> Result<Vec<crate::mcp::McpResource>, ModuleError> {
         let mut resources = Vec::new();
         let mut problems = Vec::new();
@@ -125,9 +125,9 @@ impl Modules {
         if problems.is_empty() { Ok(resources) } else { Err(ModuleError(problems.join("; "))) }
     }
 
-    /// Prompt MCP của mọi module, tên đầy đủ `<module>.<tên>` (bước 40 P2). Gọi sau
-    /// [`start`](Self::start). Khai báo sai (tên sai dạng hay trùng, `uses` trỏ tới tool không có
-    /// trong `Module::tools` của cùng module) là lỗi khởi động.
+    /// MCP prompts of every module, full name `<module>.<name>` (step 40 P2). Call after
+    /// [`start`](Self::start). A wrong declaration (a badly formed or duplicate name, `uses` pointing to a
+    /// tool not present in the same module's `Module::tools`) is a startup error.
     pub fn prompts(&self) -> Result<Vec<crate::mcp::Prompt>, ModuleError> {
         let mut prompts = Vec::new();
         let mut problems = Vec::new();
@@ -162,7 +162,7 @@ impl Modules {
         if problems.is_empty() { Ok(prompts) } else { Err(ModuleError(problems.join("; "))) }
     }
 
-    /// Tên các module hạng thử nghiệm đang chạy — cho lớp HTTP đánh dấu operation của chúng.
+    /// Names of the experimental-tier modules that are running - for the HTTP layer to mark their operations.
     pub fn experimental(&self) -> Vec<&'static str> {
         self.modules
             .iter()
@@ -171,18 +171,18 @@ impl Modules {
             .collect()
     }
 
-    /// Tên và mô tả một câu (`Module::description`) của mọi module, theo thứ tự đăng ký — cho
+    /// Name and one-sentence description (`Module::description`) of every module, in registration order - for
     /// `/llms.txt`.
     pub fn descriptions(&self) -> Vec<(&'static str, &'static str)> {
         self.modules.iter().map(|module| (module.name(), module.description())).collect()
     }
 
-    /// Bảng mặt điều khiển của mọi module (kể cả `kernel`), theo thứ tự đăng ký.
+    /// Control-plane tables of every module (including `kernel`), in registration order.
     pub fn control_plane_tables(&self) -> Vec<&'static str> {
         self.modules.iter().flat_map(|module| module.control_plane_tables()).collect()
     }
 
-    /// Giới hạn thân request riêng của mọi module: `(tên module, khai báo)`.
+    /// Request body limits specific to every module: `(module name, declaration)`.
     pub fn body_limits(&self) -> Vec<(&'static str, crate::http::BodyLimit)> {
         self.modules
             .iter()
@@ -193,19 +193,20 @@ impl Modules {
             .collect()
     }
 
-    /// Bản dịch thông báo lỗi của kernel và mọi module.
+    /// Error message translations of the kernel and every module.
     pub fn translations(&self) -> &Translations {
         &self.translations
     }
 
-    /// Mọi loại event của các module đã đăng ký.
+    /// Every kind of event of the registered modules.
     pub fn events(&self) -> &EventCatalog {
         &self.events
     }
 
-    /// Worker chạy job của mọi module trên mọi database của sổ database, `concurrency` job cùng
-    /// lúc mỗi module. Gọi sau [`start`](Self::start). Khai báo sai (loại job không thuộc module
-    /// khai, hai bộ chạy cho một loại, lịch cho loại job không ai chạy) là lỗi khởi động.
+    /// A worker that runs the jobs of every module on every database of the database registry, `concurrency`
+    /// jobs at once per module. Call after [`start`](Self::start). A wrong declaration (a job kind not
+    /// belonging to the declaring module, two runners for one kind, a schedule for a job kind nobody runs) is
+    /// a startup error.
     pub fn worker(&self, concurrency: u64) -> Result<Worker, ModuleError> {
         let databases = self.started()?;
         let mut handlers: HashMap<&'static str, Arc<dyn JobHandler>> = HashMap::new();
@@ -268,23 +269,23 @@ impl Modules {
             .with_entitlements(self.entitlements.clone()))
     }
 
-    /// Bộ cập nhật gauge tồn đọng (bước 39): bảng job và bảng event của mọi module, trên mọi
-    /// database của sổ database. Gọi sau [`start`](Self::start).
+    /// The backlog gauge updater (step 39): the job tables and event tables of every module, on every
+    /// database of the database registry. Call after [`start`](Self::start).
     pub fn backlog_monitor(&self) -> Result<crate::job::backlog::BacklogMonitor, ModuleError> {
         let databases = self.started()?;
         let (jobs, events) = (self.job_modules(), self.events.modules());
         Ok(crate::job::backlog::BacklogMonitor::new(databases, jobs, events))
     }
 
-    /// Module có job (và bảng job), theo thứ tự đăng ký.
+    /// Modules that have jobs (and a job table), in registration order.
     pub(super) fn job_modules(&self) -> Vec<&'static str> {
         let with_jobs = self.modules.iter().filter(|module| !module.jobs().is_empty());
         with_jobs.map(|module| module.name()).collect()
     }
 
-    /// Bộ phát event: đọc bảng event của mọi module phát event trên mọi database của sổ
-    /// database, giao cho các đăng ký nhận của mọi module. Gọi sau [`start`](Self::start). Đăng
-    /// ký nhận một event không ai khai là lỗi khởi động.
+    /// The event dispatcher: reads the event tables of every module that emits events on every database of
+    /// the database registry, delivering to the subscriptions of every module. Call after
+    /// [`start`](Self::start). Subscribing to an event nobody declares is a startup error.
     pub fn dispatcher(&self) -> Result<Dispatcher, ModuleError> {
         let databases = self.started()?;
         let mut subscriptions = Vec::new();
@@ -323,8 +324,8 @@ impl Modules {
             .with_entitlements(self.entitlements.clone()))
     }
 
-    /// Bước kiểm của từng module kèm tên module, theo thứ tự đăng ký (`autoxide doctor`). Gọi
-    /// sau [`start`](Self::start).
+    /// Each module's checks with the module name, in registration order (`autoxide doctor`). Call
+    /// after [`start`](Self::start).
     pub fn checks(&self) -> Vec<(&'static str, crate::doctor::Check)> {
         self.modules
             .iter()
@@ -332,8 +333,9 @@ impl Modules {
             .collect()
     }
 
-    /// Lệnh quản trị của mọi module, tên đầy đủ `<module>.<lệnh>`, theo thứ tự đăng ký. Gọi sau
-    /// [`start`](Self::start). Tên sai dạng, trùng, thiếu mô tả hay tham số trùng tên là lỗi.
+    /// Admin commands of every module, full name `<module>.<command>`, in registration order. Call after
+    /// [`start`](Self::start). A badly formed or duplicate name, a missing description or a duplicate
+    /// parameter name is an error.
     pub fn tasks(&self) -> Result<Vec<(String, crate::task::Task)>, ModuleError> {
         let mut found = Vec::new();
         let mut problems = Vec::new();
@@ -370,16 +372,15 @@ impl Modules {
         Ok(found)
     }
 
-    /// Loại bản ghi đồng bộ được của mọi module (bước 69 P2): `(tên module, khai báo)`, theo thứ
-    /// tự đăng ký.
+    /// Syncable record kinds of every module (step 69 P2): `(module name, declaration)`, in
+    /// registration order.
     pub fn sync_resources(&self) -> Vec<(&'static str, crate::sync::SyncResource)> {
         crate::sync::declared(&self.modules)
     }
 
-    /// Route của từng module kèm tên module, theo thứ tự đăng ký. Gọi sau
-    /// [`start`](Self::start).
-    /// Ngoài route của từng module còn có `("me", …)`: endpoint "của tôi" do kernel phục vụ dưới
-    /// `/api/v1/me` (cờ theo người dùng, D-207) — `me` là tên dành riêng, không module nào dùng.
+    /// Routes of each module with the module name, in registration order. Call after [`start`](Self::start).
+    /// Besides each module's routes there is also `("me", ...)`: the "mine" endpoint served by the kernel
+    /// under `/api/v1/me` (per-user flags, D-207) - `me` is a reserved name, no module uses it.
     pub fn routes(&self) -> Vec<(&'static str, OpenApiRouter)> {
         let mut routes: Vec<(&'static str, OpenApiRouter)> =
             self.modules.iter().map(|module| (module.name(), module.routes())).collect();
@@ -417,10 +418,9 @@ impl Modules {
         routes
     }
 
-    /// Migrator chạy migration của mọi module.
-    /// Quản lý placement trên `registry` (lệnh `autoxide placement`, `migrate --all`, kiểm định kỳ
-    /// của `serve`): đưa khoá gốc của chương trình vào sổ (mở URL placement đã mã hoá) và dùng
-    /// migration của mọi module.
+    /// The migrator that runs the migrations of every module. Manages placements on `registry` (the
+    /// `autoxide placement` command, `migrate --all`, the periodic check of `serve`): puts the program's root
+    /// key into the registry (to open encrypted placement URLs) and uses the migrations of every module.
     pub fn placements(
         &self,
         registry: &crate::tenancy::DatabaseRegistry,

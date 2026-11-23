@@ -1,9 +1,10 @@
-//! `GET /api/v1/kernel/events/stream` (bước 40 P5, D-378): Server-Sent Events của các event người
-//! gọi được xem. Logic ở [`StreamHub`](crate::event::StreamHub); handler chỉ lấy dữ liệu vào, gọi
-//! hub và dựng response.
+//! `GET /api/v1/kernel/events/stream` (step 40 P5, D-378): Server-Sent Events of the events the caller may
+//! see. The logic is in [`StreamHub`](crate::event::StreamHub); the handler only takes input, calls the hub
+//! and builds the response.
 //!
-//! Lớp timeout chung không cắt stream: nó chỉ chờ tới khi handler trả response (header); thân
-//! stream chảy sau đó. Graceful shutdown đóng stream qua `StreamHub::close`.
+//! The shared timeout layer does not cut the stream: it only waits until the handler returns the response
+//! (headers); the stream body flows afterwards. Graceful shutdown closes streams through
+//! `StreamHub::close`.
 
 use std::convert::Infallible;
 use std::time::Duration;
@@ -24,9 +25,10 @@ use crate::event::StreamHub;
 use crate::event::stream::{Frame, disabled, parse_last_event_id};
 use crate::tenancy::TenantContext;
 
-/// Gửi `: ping` mỗi chừng này: proxy không đóng kết nối "im lặng", client biết kết nối còn sống.
+/// Sends `: ping` this often: so proxies do not close a "silent" connection and the client knows the
+/// connection is alive.
 const PING: Duration = Duration::from_secs(15);
-/// Client nối lại sau chừng này khi mất kết nối (`retry:` của SSE).
+/// The client reconnects after this long when the connection is lost (SSE `retry:`).
 const RETRY: Duration = Duration::from_secs(3);
 
 pub(crate) fn routes(hub: StreamHub) -> OpenApiRouter {

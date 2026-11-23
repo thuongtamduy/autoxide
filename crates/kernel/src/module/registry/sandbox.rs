@@ -1,12 +1,12 @@
-//! Điền sổ sao / đẩy sandbox (bước 38, D-232) sau khi mọi module khởi động.
+//! Fills the sandbox copy / push registry (step 38, D-232) after every module has started.
 
 use std::sync::Arc;
 
 use super::{ModuleError, Modules};
 
 impl Modules {
-    /// Mọi bộ cài đặt các module đã góp cho `T` (`StartContext::contribute`), theo thứ tự đăng ký —
-    /// đã qua bộ bọc đối tác của sandbox (D-232).
+    /// Every implementation the modules contributed for `T` (`StartContext::contribute`), in registration
+    /// order - already passed through the sandbox's partner wrapper (D-232).
     pub fn contributions<T>(&self) -> Vec<Arc<T>>
     where
         T: ?Sized + Send + Sync + 'static,
@@ -14,8 +14,8 @@ impl Modules {
         self.apis.contributions()
     }
 
-    /// Gom `Module::sandbox_copy` / `Module::promotable` theo thứ tự đăng ký. Loại đẩy được phải
-    /// tên `<module>.<loại>` và khai một lần.
+    /// Collects `Module::sandbox_copy` / `Module::promotable` in registration order. A promotable kind must
+    /// be named `<module>.<kind>` and declared once.
     pub(super) fn fill_sandbox(&self) -> Result<(), ModuleError> {
         let mut copies = Vec::new();
         let mut promotables: Vec<(&'static str, crate::tenancy::sandbox::Promotable)> = Vec::new();

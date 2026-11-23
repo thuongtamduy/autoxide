@@ -1,29 +1,29 @@
-//! i18n: thông báo lỗi theo ngôn ngữ của client (D-057).
+//! i18n: error messages in the client's language (D-057).
 //!
-//! - `code` của lỗi là i18n key (D-039). Câu tiếng Anh nằm ở chỗ tạo lỗi; các ngôn ngữ
-//!   khác nằm trong `locales/<ngôn ngữ>.json` của từng crate (`{"code": "câu"}`), cùng
-//!   chỗ điền `{tên}` như câu tiếng Anh.
-//! - Client chọn ngôn ngữ bằng header `Accept-Language`; không nêu, hoặc nêu ngôn ngữ
-//!   chưa có, thì nhận tiếng Anh. Response mang `Content-Language`.
-//! - `cargo xtask check` bảo đảm mọi `code` trong code đều có bản dịch.
+//! - The error `code` is the i18n key (D-039). The English sentence lives where the error is created; other
+//!   languages live in each crate's `locales/<language>.json` (`{"code": "sentence"}`), with the same
+//!   `{name}` placeholders as the English sentence.
+//! - The client picks a language with the `Accept-Language` header; if none is given, or the language is
+//!   not available, it gets English. The response carries `Content-Language`.
+//! - `cargo xtask check` guarantees every `code` in the code has a translation.
 
 use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::error::{Error, FieldError};
 
-/// Một ngôn ngữ được hỗ trợ.
+/// A supported language.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum Language {
-    /// Tiếng Anh: mặc định, câu nằm ngay trong code.
+    /// English: the default, the sentence is right in the code.
     En,
-    /// Tiếng Việt.
+    /// Vietnamese.
     Vi,
 }
 
 impl Language {
-    /// Mã ngôn ngữ theo BCP 47, như trong `Content-Language`.
+    /// The language tag per BCP 47, as in `Content-Language`.
     pub fn tag(self) -> &'static str {
         match self {
             Language::En => "en",
@@ -31,7 +31,8 @@ impl Language {
         }
     }
 
-    /// Ngôn ngữ có bản dịch ứng với mã `tag` (chỉ xét phần chính: `vi-VN` → `vi`).
+    /// The language with a translation matching the tag `tag` (only the primary part is considered:
+    /// `vi-VN` → `vi`).
     pub fn from_tag(tag: &str) -> Option<Self> {
         // Chỉ xét phần ngôn ngữ chính: `vi-VN` → `vi`.
         let primary = tag.split(['-', '_']).next().unwrap_or_default();
@@ -42,8 +43,8 @@ impl Language {
         }
     }
 
-    /// Ngôn ngữ client muốn nhất trong số được hỗ trợ, theo header `Accept-Language`
-    /// (RFC 9110, mục 12.5.4). Không có header, hoặc không ngôn ngữ nào khớp: tiếng Anh.
+    /// The language the client prefers most among the supported ones, per the `Accept-Language` header (RFC
+    /// 9110, section 12.5.4). No header, or no language matches: English.
     pub fn negotiate(accept_language: Option<&str>) -> Self {
         let Some(header) = accept_language else {
             return Language::En;
@@ -66,7 +67,7 @@ impl Language {
     }
 }
 
-/// `q` của `Accept-Language` thành phần nghìn: `0.8` → 800. Sai dạng thì 0 (bỏ qua).
+/// The `q` of `Accept-Language` in thousandths: `0.8` → 800. A malformed value gives 0 (ignored).
 fn parse_quality(raw: &str) -> u16 {
     let (whole, fraction) = raw.trim().split_once('.').unwrap_or((raw.trim(), ""));
     let whole: u16 = match whole {
@@ -82,14 +83,15 @@ fn parse_quality(raw: &str) -> u16 {
     std::cmp::min(whole + padded.parse::<u16>().unwrap_or(0), 1000)
 }
 
-/// Tiền tố khoá bản dịch của câu mẫu lỗi từng ô (D-262): `field:must not be empty`.
+/// The translation-key prefix for the template sentence of a per-field error (D-262):
+/// `field:must not be empty`.
 pub const FIELD_PREFIX: &str = "field:";
 
-/// Tiền tố khoá bản dịch của câu mô tả cho người dùng (mô tả permission, event — D-264):
-/// `text:<câu tiếng Anh>`.
+/// The translation-key prefix for a user-facing description (permission and event descriptions - D-264):
+/// `text:<English sentence>`.
 pub const TEXT_PREFIX: &str = "text:";
 
-/// Mọi bản dịch của chương trình: kernel và các module.
+/// All translations of the program: the kernel and the modules.
 #[derive(Debug, Clone, Default)]
 pub struct Translations {
     // `Arc`: dựng một lần lúc khởi động, mọi request dùng chung.
@@ -97,9 +99,9 @@ pub struct Translations {
 }
 
 impl Translations {
-    /// Bản dịch của kernel, cộng của các module (`(tên module, [(ngôn ngữ, JSON)])`).
-    /// File sai dạng, ngôn ngữ chưa hỗ trợ, hay module dịch `code` không phải của mình
-    /// là lỗi khởi động.
+    /// The kernel's translations, plus those of the modules (`(module name, [(language, JSON)])`). A
+    /// malformed file, an unsupported language, or a module translating a `code` that is not its own is a
+    /// startup error.
     pub fn new(
         modules: Vec<(&'static str, Vec<(&'static str, &'static str)>)>,
     ) -> Result<Self, Vec<String>> {
@@ -154,8 +156,8 @@ impl Translations {
         if problems.is_empty() { Ok(Translations { vi: Arc::new(vi) }) } else { Err(problems) }
     }
 
-    /// Thông báo của `error` bằng `language`. Chưa có bản dịch, hoặc bản dịch dùng chỗ
-    /// điền mà lỗi không có giá trị, thì dùng câu tiếng Anh.
+    /// The message of `error` in `language`. If there is no translation, or the translation uses a
+    /// placeholder that the error has no value for, the English sentence is used.
     pub fn message(&self, error: &Error, language: Language) -> String {
         let template = match language {
             Language::En => None,
@@ -168,8 +170,8 @@ impl Translations {
         fill_all(template, &params).unwrap_or_else(|| error.message())
     }
 
-    /// Câu mô tả `english` (mô tả permission, event…) bằng `language`: bản dịch của khoá
-    /// `text:<english>`; chưa có thì nguyên câu tiếng Anh.
+    /// The description `english` (a permission or event description...) in `language`: the translation
+    /// under key `text:<english>`; if none, the English sentence unchanged.
     pub fn describe(&self, english: &str, language: Language) -> String {
         match language {
             Language::En => english.to_owned(),
@@ -181,8 +183,9 @@ impl Translations {
         }
     }
 
-    /// Như [`describe`](Self::describe), cho câu mẫu `template` có chỗ điền `{tên}`: dịch câu
-    /// mẫu (khoá `text:<câu mẫu>`) rồi điền `params` một lượt; chưa dịch thì câu tiếng Anh đã điền.
+    /// Like [`describe`](Self::describe), for a template sentence `template` with `{name}` placeholders:
+    /// translates the template (key `text:<template>`) then fills `params` in one pass; if untranslated,
+    /// the filled English sentence.
     pub fn describe_with(
         &self,
         template: &str,
@@ -199,8 +202,8 @@ impl Translations {
         }
     }
 
-    /// Câu của lỗi từng ô `field` bằng `language`: bản dịch của câu mẫu (khoá `field:<câu mẫu>`),
-    /// điền giá trị; chưa có bản dịch thì câu tiếng Anh.
+    /// The sentence of a per-field error `field` in `language`: the translation of the template (key
+    /// `field:<template>`), with values filled in; if there is no translation, the English sentence.
     pub fn field_message(&self, field: &FieldError, language: Language) -> String {
         let template = match language {
             Language::En => None,
@@ -213,8 +216,8 @@ impl Translations {
         fill_all(template, &params).unwrap_or_else(|| field.message.clone())
     }
 
-    /// Câu đã dịch của khoá `key` bằng `language`, nếu có (tiếng Anh: luôn `None`, câu
-    /// nằm trong code).
+    /// The translated sentence for key `key` in `language`, if any (English: always `None`, the sentence is
+    /// in the code).
     pub fn text(&self, key: &str, language: Language) -> Option<&str> {
         match language {
             Language::En => None,
@@ -222,16 +225,16 @@ impl Translations {
         }
     }
 
-    /// Có bản dịch tiếng Việt cho `code` không.
+    /// Whether there is a Vietnamese translation for `code`.
     pub fn has(&self, code: &str) -> bool {
         self.vi.contains_key(code)
     }
 }
 
-/// Điền mọi `{tên}` của `template` bằng `params`; `None` nếu còn chỗ điền không có giá trị.
+/// Fills every `{name}` of `template` with `params`; `None` if any placeholder has no value.
 ///
-/// Một lượt, từ trái sang phải: giá trị đã điền không bị đọc lại, nên chữ người dùng gõ (vd câu
-/// trả lời của form chứa `{x}` hay `{id}`) không làm hỏng mẫu hay bị thay tiếp (D-150).
+/// One pass, left to right: an already-filled value is not read again, so text typed by a user (e.g. a
+/// form's reply containing `{x}` or `{id}`) cannot break the template or be substituted again (D-150).
 pub(crate) fn fill_all(template: &str, params: &[(&str, &str)]) -> Option<String> {
     let mut text = String::with_capacity(template.len());
     let mut rest = template;
@@ -257,9 +260,10 @@ pub(crate) fn fill_all(template: &str, params: &[(&str, &str)]) -> Option<String
     Some(text)
 }
 
-/// Mã ngôn ngữ BCP 47 dạng chuẩn: phần đầu chữ thường (2–3 chữ cái), phần vùng 2 chữ hoa hoặc 3
-/// số, phần chữ viết 4 chữ cái viết hoa chữ đầu (`vi`, `pt-BR`, `zh-Hant-TW`). `None` nếu sai dạng.
-/// Một luật cho mọi module (`content`, `menus`, ngôn ngữ của website ở `organizations`).
+/// A BCP 47 language tag in canonical form: a lowercase primary part (2-3 letters), a region part of 2
+/// uppercase letters or 3 digits, a script part of 4 letters with the first capitalized (`vi`, `pt-BR`,
+/// `zh-Hant-TW`). `None` if malformed. One rule for every module (`content`, `menus`, the website language
+/// in `organizations`).
 pub fn canonical_locale(raw: &str) -> Option<String> {
     let mut parts = raw.split(['-', '_']);
     let language = parts.next()?.to_ascii_lowercase();

@@ -1,33 +1,35 @@
-//! Người gọi là ai, theo mạng: địa chỉ IP thật (kể cả sau reverse proxy), user agent,
-//! `Origin`, `Referer`. Một cách tính duy nhất, dùng chung cho rate limiting và cho handler
-//! (extractor [`ClientInfo`]).
+//! Who the caller is, at the network level: the real IP address (even behind a reverse proxy), user agent,
+//! `Origin`, `Referer`. A single computation, shared by rate limiting and by handlers
+//! (the [`ClientInfo`] extractor).
 //!
-//! Sau proxy, địa chỉ nằm trong header cấu hình ở `AUTOXIDE_HTTP_CLIENT_IP_HEADER` (thường là
-//! `X-Forwarded-For`). Mỗi proxy THÊM địa chỉ của bên vừa kết nối tới nó vào cuối danh sách;
-//! phần đầu danh sách là do client tự gửi, giả được. Với `N` proxy tin cậy
-//! (`AUTOXIDE_HTTP_TRUSTED_PROXY_COUNT`), địa chỉ thật là phần tử thứ `N` tính từ phải:
+//! Behind a proxy, the address is in the header configured in `AUTOXIDE_HTTP_CLIENT_IP_HEADER` (usually
+//! `X-Forwarded-For`). Each proxy APPENDS the address of whoever just connected to it to the end of the list;
+//! the start of the list is sent by the client itself and can be forged. With `N` trusted proxies
+//! (`AUTOXIDE_HTTP_TRUSTED_PROXY_COUNT`), the real address is the `N`th element counted from the right:
 //!
 //! ```text
-//! trình duyệt ─▶ CDN ─▶ Next.js ─▶ API        X-Forwarded-For: <giả>, <trình duyệt>, <CDN>
-//!                                              N = 2 ─────────────────────▲
+//! browser ─▶ CDN ─▶ Next.js ─▶ API        X-Forwarded-For: <fake>, <browser>, <CDN>
+//!                                              N = 2 ──────────────────▲
 //! ```
 //!
-//! Địa chỉ trả ra luôn ở dạng chuẩn: IPv4 viết dạng IPv6 (`::ffff:a.b.c.d`) thành IPv4 (D-157).
+//! The returned address is always in canonical form: an IPv4 address written in IPv6 form
+//! (`::ffff:a.b.c.d`) becomes IPv4 (D-157).
 //!
-//! Nhiều dòng header được gộp thành một danh sách theo thứ tự (RFC 9110). Danh sách ngắn hơn
-//! `N` (request không đi qua đủ proxy) thì lấy phần tử đầu. Giá trị không phải địa chỉ IP thì
-//! dùng địa chỉ kết nối.
+//! Multiple header lines are merged into one list in order (RFC 9110). If the list is shorter than `N` (the
+//! request did not pass through enough proxies), the first element is used. If the value is not an IP
+//! address, the connection address is used.
 //!
-//! Đếm proxy chỉ đúng khi mọi request đi qua đủ `N` proxy: client gọi thẳng vào proxy cuối thì
-//! tự chọn được địa chỉ. Khai dải địa chỉ của proxy (`AUTOXIDE_HTTP_TRUSTED_PROXIES`, D-152) thì
-//! thay cho cách đếm: header chỉ được đọc khi KẾT NỐI đến từ một proxy tin cậy, rồi đi từ phải
-//! sang trái, bỏ qua địa chỉ của proxy tin cậy; địa chỉ đầu tiên không thuộc dải là client.
+//! Counting proxies is only correct when every request passes through all `N` proxies: a client calling the
+//! last proxy directly can choose its own address. Declaring the proxies' address ranges
+//! (`AUTOXIDE_HTTP_TRUSTED_PROXIES`, D-152) replaces counting: the header is read only when the CONNECTION
+//! comes from a trusted proxy, then walked from right to left, skipping trusted proxy addresses; the first
+//! address outside the ranges is the client.
 //!
 //! ```text
-//! trình duyệt ─▶ CDN ─▶ Next.js ─▶ API     X-Forwarded-For: <giả>, <trình duyệt>, <CDN>
-//! dải: CDN, Next.js                         bỏ qua <CDN> ──────────────▲  (kết nối: Next.js)
-//! trình duyệt ─────────▶ Next.js ─▶ API     X-Forwarded-For: <giả>, <trình duyệt>
-//!                                           ──────────────────────────▲
+//! browser ─▶ CDN ─▶ Next.js ─▶ API     X-Forwarded-For: <fake>, <browser>, <CDN>
+//! ranges: CDN, Next.js                      skip <CDN> ─────────────▲  (connection: Next.js)
+//! browser ─────────▶ Next.js ─▶ API     X-Forwarded-For: <fake>, <browser>
+//!                                           ─────────────────────────▲
 //! ```
 
 use std::net::{IpAddr, SocketAddr};
@@ -41,25 +43,26 @@ use axum::response::Response;
 
 use crate::config::IpRange;
 
-/// Độ dài tối đa giữ lại của user agent, `Origin`, `Referer` (phần dài hơn bị cắt).
+/// Maximum retained length of the user agent, `Origin`, `Referer` (longer parts are truncated).
 const MAX_TEXT: usize = 1024;
 
-/// Cách tìm địa chỉ client, theo cấu hình.
+/// How to find the client address, per configuration.
 #[derive(Debug, Clone)]
 pub(super) struct ClientAddress {
     header: Option<HeaderName>,
     trusted_proxies: usize,
-    /// Dải địa chỉ của proxy tin cậy; không rỗng thì dùng thay cho `trusted_proxies`.
+    /// Address ranges of trusted proxies; when non-empty, used in place of `trusted_proxies`.
     trusted_ranges: Vec<IpRange>,
 }
 
-/// Địa chỉ client đã giải, gắn vào extensions của request (lớp [`attach`]).
+/// The resolved client address, attached to the request's extensions (the [`attach`] layer).
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct ClientIp(pub(crate) Option<IpAddr>);
 
-/// Tên miền client gõ, theo `Forwarded: host=…` / `X-Forwarded-Host` của proxy tin cậy (lớp
-/// [`attach`]). Chỉ có khi kết nối đến từ một dải `AUTOXIDE_HTTP_TRUSTED_PROXIES`: client gọi thẳng
-/// thì header đó do nó tự viết. Không có thì dùng `Host` (proxy như Caddy chuyển nguyên `Host`).
+/// The domain name the client typed, per the trusted proxy's `Forwarded: host=...` / `X-Forwarded-Host` (the
+/// [`attach`] layer). Present only when the connection comes from an `AUTOXIDE_HTTP_TRUSTED_PROXIES` range: a
+/// client calling directly writes that header itself. When absent, `Host` is used (proxies like Caddy pass
+/// `Host` through unchanged).
 #[derive(Debug, Clone)]
 pub(crate) struct ForwardedHost(pub(crate) String);
 
@@ -78,9 +81,9 @@ impl ClientAddress {
         self.trusted_ranges.iter().any(|range| range.contains(address))
     }
 
-    /// Tên miền proxy tin cậy chuyển tới (`Forwarded: host=…`, rồi `X-Forwarded-Host`); `None` khi
-    /// kết nối không đến từ dải proxy tin cậy hay không có header. Lấy giá trị cuối: do proxy gần
-    /// nhất (tin cậy) ghi.
+    /// The domain name the trusted proxy forwarded (`Forwarded: host=...`, then `X-Forwarded-Host`); `None`
+    /// when the connection does not come from a trusted proxy range or there is no header. Takes the last
+    /// value: written by the nearest (trusted) proxy.
     pub(super) fn forwarded_host(
         &self,
         headers: &HeaderMap,
@@ -109,7 +112,7 @@ impl ClientAddress {
         forwarded.or_else(|| last(&X_FORWARDED_HOST)).filter(|host| !host.is_empty())
     }
 
-    /// Địa chỉ client của request có `headers`, đến từ kết nối `connection`.
+    /// The client address of a request with `headers`, arriving on connection `connection`.
     pub(super) fn resolve(
         &self,
         headers: &HeaderMap,
@@ -163,15 +166,15 @@ impl ClientAddress {
     }
 }
 
-/// Địa chỉ IP trong header của proxy: `203.0.113.9`, `203.0.113.9:4711`, `2001:db8::1`
-/// hoặc `[2001:db8::1]:4711` (vài load balancer ghi kèm port).
+/// An IP address in a proxy header: `203.0.113.9`, `203.0.113.9:4711`, `2001:db8::1`
+/// or `[2001:db8::1]:4711` (some load balancers append the port).
 pub(super) fn parse_address(text: &str) -> Option<IpAddr> {
     text.parse::<IpAddr>()
         .ok()
         .or_else(|| text.parse::<SocketAddr>().ok().map(|address| address.ip()))
 }
 
-/// Lớp HTTP: giải địa chỉ client một lần cho mỗi request, gắn vào extensions.
+/// HTTP layer: resolves the client address once per request and attaches it to the extensions.
 pub(super) async fn attach(
     resolver: Arc<ClientAddress>,
     mut request: Request,
@@ -186,17 +189,17 @@ pub(super) async fn attach(
     next.run(request).await
 }
 
-/// Thông tin mạng của người gọi. Handler khai `client: ClientInfo` là có; không bao giờ lỗi.
+/// Network information about the caller. A handler gets it by declaring `client: ClientInfo`; it never fails.
 ///
-/// Đừng lưu `ip` thô: băm nó trước (xem `autoxide_kernel::http::ip_hash` khi có).
+/// Do not store the raw `ip`: hash it first (see `autoxide_kernel::http::ip_hash` when available).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct ClientInfo {
-    /// Địa chỉ đã giải theo số proxy tin cậy; `None` khi không biết (vd request không qua
-    /// socket, trong test).
+    /// The address resolved according to the number of trusted proxies; `None` when unknown (e.g. a request
+    /// that did not come through a socket, in tests).
     pub ip: Option<IpAddr>,
     pub user_agent: Option<String>,
-    /// Header `Origin` (trình duyệt gửi khi gọi từ trang khác hoặc gửi form).
+    /// The `Origin` header (sent by browsers when calling from another page or submitting a form).
     pub origin: Option<String>,
     pub referer: Option<String>,
 }

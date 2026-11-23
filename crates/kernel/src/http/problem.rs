@@ -1,9 +1,9 @@
-//! Bảo đảm MỌI response lỗi là Problem Details (RFC 9457).
+//! Guarantees EVERY error response is Problem Details (RFC 9457).
 //!
-//! Lỗi do code của Autoxide tạo (`Error`) vốn đã đúng dạng. Nhưng thư viện cũng
-//! tự trả lỗi: không có route (404), sai method (405), body quá lớn (413), query
-//! sai kiểu (400)… với thân rỗng hoặc chữ thường. Lớp này đổi chúng về cùng một
-//! dạng, để client chỉ phải biết đúng một kiểu lỗi.
+//! Errors created by Autoxide's own code (`Error`) already have the right shape. But libraries
+//! also return errors on their own: no route (404), wrong method (405), body too large (413), a query
+//! of the wrong type (400)... with an empty body or plain text. This layer converts them to the same
+//! shape, so that clients only need to know one kind of error.
 
 use std::any::Any;
 use std::sync::Arc;
@@ -16,7 +16,7 @@ use tower_http::catch_panic::ResponseForPanic;
 use crate::error::{Error, ErrorKind, FieldError};
 use crate::response::{PROBLEM_CONTENT_TYPE, Problem};
 
-/// Thân lỗi dạng chữ dài hơn mức này thì không chép vào `detail`.
+/// A text error body longer than this is not copied into `detail`.
 const MAX_DETAIL_BYTES: usize = 4096;
 
 /// Marker for an error response whose body follows another standard on purpose (e.g. SCIM
@@ -28,7 +28,7 @@ const MAX_DETAIL_BYTES: usize = 4096;
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct StandardErrorBody;
 
-/// Đổi response lỗi chưa phải Problem Details thành Problem Details.
+/// Converts an error response that is not yet Problem Details into Problem Details.
 pub(super) async fn normalize(response: Response) -> Response {
     let status = response.status();
     if !(status.is_client_error() || status.is_server_error())
@@ -78,11 +78,11 @@ pub(super) async fn normalize(response: Response) -> Response {
     Response::from_parts(parts, Body::from(body))
 }
 
-/// Đầu câu `Query` của axum viết khi không đọc được query string.
+/// The beginning of the sentence axum's `Query` writes when it cannot read the query string.
 const QUERY_REJECTION: &str = "Failed to deserialize query string: ";
 
-/// Ô sai từ câu của thư viện: "missing field `locale`" → `locale` bắt buộc; "limit: invalid digit…"
-/// → `limit` sai; không rõ ô nào → `query`.
+/// The offending field from a library sentence: "missing field `locale`" -> `locale` is required; "limit:
+/// invalid digit..." -> `limit` is wrong; if no field is identifiable -> `query`.
 fn query_problem(text: &str) -> FieldError {
     if let Some(name) = text
         .split("missing field `")
@@ -111,8 +111,8 @@ fn is_problem(response: &Response) -> bool {
     content_type(response).is_some_and(|value| value.starts_with(PROBLEM_CONTENT_TYPE))
 }
 
-/// Mã lỗi ổn định cho một mã trạng thái HTTP do thư viện trả.
-/// Mã cho trạng thái lỗi không có trong bảng dưới.
+/// Stable error code for an HTTP status returned by a library.
+/// The code for an error status not in the table below.
 const FALLBACK_CODE: &str = "http_error";
 
 fn code_for(status: StatusCode) -> &'static str {
@@ -153,8 +153,8 @@ fn default_detail(status: StatusCode) -> &'static str {
     }
 }
 
-/// Đổi một panic trong handler thành lỗi 500 đúng dạng. Nội dung panic đi vào lỗi
-/// (cho log), không ra tới client.
+/// Converts a panic in a handler into a properly shaped 500 error. The panic content goes into the error
+/// (for the log), and does not reach the client.
 #[derive(Debug, Clone, Copy)]
 pub(super) struct PanicToProblem;
 

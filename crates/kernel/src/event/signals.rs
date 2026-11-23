@@ -1,11 +1,11 @@
-//! Tín hiệu tạm qua WebSocket (bước 69 P3, D-20261119-step69-ws): "đang gõ", "đang online" trong
-//! một chủ đề (vd một cuộc trò chuyện). KHÔNG lưu: chỉ chuyển giữa các kết nối đang mở ở cùng tiến
-//! trình — mất tín hiệu thì chỉ mất một dấu "đang gõ", không mất dữ liệu (dữ liệu đi qua REST và
-//! event).
+//! Ephemeral signals over WebSocket (step 69 P3, D-20261119-step69-ws): "typing", "online" within
+//! a topic (e.g. a conversation). NOT stored: relayed only between connections open in the same
+//! process - a lost signal only loses a "typing" indicator, not data (data goes through REST and
+//! events).
 //!
-//! Kernel không biết chủ đề nào tồn tại hay ai được vào: module sở hữu loại chủ đề góp một
-//! [`SignalTopics`] (`context.contribute::<dyn SignalTopics>(…)`) trả lời "người này có được gửi
-//! và nhận tín hiệu ở chủ đề `<loại>:<id>` không". Chưa module nào góp loại đó thì không ai vào được.
+//! The kernel does not know which topics exist or who may join them: the module that owns a topic kind
+//! contributes a [`SignalTopics`] (`context.contribute::<dyn SignalTopics>(...)`) answering "may this person
+//! send and receive signals on topic `<kind>:<id>`". If no module contributes that kind, nobody can join.
 
 use std::sync::{Arc, OnceLock};
 
@@ -13,14 +13,14 @@ use crate::access::Principal;
 use crate::error::Error;
 use crate::tenancy::TenantContext;
 
-/// Module góp để mở chủ đề tín hiệu của mình (vd `conversations.thread`).
+/// Contributed by a module to open its own signal topics (e.g. `conversations.thread`).
 #[async_trait::async_trait]
 pub trait SignalTopics: Send + Sync {
-    /// Loại chủ đề, `<module>.<loại>`; chủ đề là `<loại>:<id>`.
+    /// Topic kind, `<module>.<kind>`; a topic is `<kind>:<id>`.
     fn kind(&self) -> &'static str;
 
-    /// `principal` có được gửi và nhận tín hiệu ở chủ đề `<kind>:<id>` của khách `tenant` không —
-    /// thường: có đọc được bản ghi `id` không.
+    /// Whether `principal` may send and receive signals on topic `<kind>:<id>` of tenant `tenant` -
+    /// usually: whether it can read record `id`.
     async fn allows(
         &self,
         tenant: &TenantContext,
@@ -29,7 +29,7 @@ pub trait SignalTopics: Send + Sync {
     ) -> Result<bool, Error>;
 }
 
-/// Các [`SignalTopics`] module đã góp; điền sau khi mọi module khởi động. Clone rẻ.
+/// The [`SignalTopics`] contributed by modules; filled in after every module has started. Cheap to clone.
 #[derive(Clone, Default)]
 pub(crate) struct SignalTopicsSlot(Arc<OnceLock<Vec<Arc<dyn SignalTopics>>>>);
 
@@ -38,7 +38,7 @@ impl SignalTopicsSlot {
         let _ = self.0.set(topics);
     }
 
-    /// Bên trả lời cho loại `kind`.
+    /// The responder for kind `kind`.
     pub(crate) fn find(&self, kind: &str) -> Option<Arc<dyn SignalTopics>> {
         self.0.get()?.iter().find(|topics| topics.kind() == kind).cloned()
     }

@@ -1,13 +1,13 @@
-//! Tài liệu OpenAPI của từng module: `GET /api/v1/openapi/<module>.json`
-//! (D-20261118-module-contracts).
+//! The OpenAPI document of each module: `GET /api/v1/openapi/<module>.json`
 //!
-//! Tài liệu chung hơn một trăm nghìn dòng: agent chỉ cần làm việc với `notes` không nên phải nạp cả
-//! hợp đồng của mọi module. Bản của một module giữ đúng các đường dẫn dưới `/api/v1/<module>` và
-//! các schema chúng dùng (đi hết `$ref` lồng nhau), cùng phần đầu (quy ước chung, cách xác thực)
-//! của tài liệu chung — đọc một mình là đủ để gọi đúng, và mọi `$ref` trỏ tới mục có thật.
+//! The shared document is over a hundred thousand lines: an agent that only needs to work with `notes`
+//! should not have to load the whole contract of every module. A module's copy keeps exactly the paths
+//! under `/api/v1/<module>` and the schemas they use (following nested `$ref`s all the way), plus the top
+//! of the shared document (shared conventions, authentication) - it is enough on its own to call correctly,
+//! and every `$ref` points to an entry that exists.
 //!
-//! Tách một lần lúc dựng router, sau khi tài liệu chung đã hoàn tất (`finish`, deprecation), nên
-//! bản của module luôn khớp từng chữ với phần tương ứng của bản chung.
+//! Split once when the router is built, after the shared document is finished (`finish`, deprecation), so a
+//! module's copy always matches the corresponding part of the shared copy word for word.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, OnceLock};
@@ -23,10 +23,10 @@ use utoipa_axum::routes;
 use crate::error::Error;
 use crate::response::Problem;
 
-/// Tài liệu của từng module (tên module → JSON), điền sau khi dựng xong tài liệu chung.
+/// The document of each module (module name to JSON), filled in after the shared document has been built.
 pub(super) type ModuleDocuments = Arc<OnceLock<BTreeMap<String, Bytes>>>;
 
-/// Đường dẫn tài liệu của module `module`.
+/// The document path of module `module`.
 pub(super) fn module_openapi_path(module: &str) -> String {
     format!("{}/openapi/{module}.json", super::API_PREFIX)
 }
@@ -36,8 +36,8 @@ pub(super) fn routes(documents: ModuleDocuments) -> OpenApiRouter {
     OpenApiRouter::new().routes(routes!(module_openapi)).with_state(documents)
 }
 
-/// Tách tài liệu chung thành tài liệu của từng module trong `modules` (module không có đường dẫn
-/// nào thì không có tài liệu).
+/// Splits the shared document into the document of each module in `modules` (a module with no paths has no
+/// document).
 pub(super) fn split(document: &Value, modules: &[&str]) -> BTreeMap<String, Bytes> {
     modules
         .iter()
@@ -49,7 +49,7 @@ pub(super) fn split(document: &Value, modules: &[&str]) -> BTreeMap<String, Byte
         .collect()
 }
 
-/// Tài liệu của một module; `None` khi module không có đường dẫn nào.
+/// The document of one module; `None` when the module has no paths.
 fn module_document(document: &Value, module: &str) -> Option<Value> {
     let prefix = format!("{}/{module}", super::API_PREFIX);
     let paths: Map<String, Value> = document
@@ -127,7 +127,7 @@ fn module_document(document: &Value, module: &str) -> Option<Value> {
     Some(Value::Object(part))
 }
 
-/// Tên schema của mọi `$ref` `#/components/schemas/<tên>` trong `node`.
+/// The schema names of every `$ref` `#/components/schemas/<name>` in `node`.
 fn collect_schema_refs(node: &Value, names: &mut Vec<String>) {
     match node {
         Value::Object(map) => {
@@ -147,7 +147,7 @@ fn collect_schema_refs(node: &Value, names: &mut Vec<String>) {
     }
 }
 
-/// Tag của mọi operation trong `paths`.
+/// The tags of every operation in `paths`.
 fn used_tags(paths: &Map<String, Value>) -> BTreeSet<String> {
     paths
         .values()
@@ -160,7 +160,7 @@ fn used_tags(paths: &Map<String, Value>) -> BTreeSet<String> {
         .collect()
 }
 
-/// Lỗi khi không có module (có đường dẫn) tên đó.
+/// The error when no module (with paths) has that name.
 fn not_found(module: &str) -> Error {
     Error::not_found(
         "openapi_module_not_found",
