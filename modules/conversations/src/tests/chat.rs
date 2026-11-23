@@ -291,6 +291,55 @@ async fn tin_chua_doc_gui_thong_bao_mot_lan() {
     .unwrap();
 }
 
+/// Dời đầu khung báo người mua của cuộc `id` về `ago` trước (thay cho chờ thật).
+async fn window_started(h: &super::Harness, id: &str, ago: SignedDuration) {
+    use crate::entity::thread;
+    let tenant = h.app.default_tenant();
+    thread::Entity::update_many()
+        .col_expr(thread::Column::NotifyCustomerFrom, Expr::value(Timestamp::now() - ago))
+        .filter(thread::Column::Id.eq(id.parse::<Uuid>().unwrap()))
+        .scoped(&tenant)
+        .exec(h.app.database().write())
+        .await
+        .unwrap();
+}
+
+fn shop_replied(h: &super::Harness) -> usize {
+    h.notifier.sent().iter().filter(|sent| sent.kind == "conversations.shop_replied").count()
+}
+
+#[tokio::test]
+async fn khung_bao_bat_dau_tu_tin_chua_doc_dau_tien() {
+    TestDatabase::run(async |test| {
+        let h = harness(test).await;
+        let id = start(&h.app, "buyer", "Hỏi").await;
+        // Tin đầu mở khung; tin sau rơi sát cuối khung (khung 5 phút, đã qua 4 phút 59 giây) vẫn chung
+        // khung — trước đây khung theo giờ đồng hồ nên hai tin sát ranh giới thành hai thông báo.
+        reply(&h.app, "agent", &id, "Một").await;
+        window_started(&h, &id, SignedDuration::from_secs(299)).await;
+        reply(&h.app, "agent", &id, "Hai").await;
+        reply(&h.app, "agent", &id, "Ba").await;
+        due_now(&h.app).await;
+        run_jobs(&h.app).await;
+        assert_eq!(shop_replied(&h), 1);
+        // Hết khung mà người mua vẫn chưa đọc: tin kế mở khung mới, một thông báo nữa.
+        window_started(&h, &id, SignedDuration::from_secs(301)).await;
+        reply(&h.app, "agent", &id, "Bốn").await;
+        reply(&h.app, "agent", &id, "Năm").await;
+        due_now(&h.app).await;
+        run_jobs(&h.app).await;
+        assert_eq!(shop_replied(&h), 2);
+        // Người mua đọc hết thì khung đóng: tin ngay sau đó mở khung mới dù chưa hết 5 phút.
+        call(&h.app, "POST", &format!("/me/threads/{id}/read"), "buyer", Some(json!({}))).await;
+        reply(&h.app, "agent", &id, "Sáu").await;
+        due_now(&h.app).await;
+        run_jobs(&h.app).await;
+        assert_eq!(shop_replied(&h), 3);
+    })
+    .await
+    .unwrap();
+}
+
 /// Mở phiếu giả: đứng chỗ `SupportIntake` của `support` (bài đầu-cuối với `support` thật ở
 /// `crates/app/src/e2e/conversations.rs`).
 #[derive(Default)]

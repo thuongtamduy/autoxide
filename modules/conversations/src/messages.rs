@@ -11,7 +11,7 @@ use autoxide_kernel::job::EnqueueOptions;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext};
 use autoxide_kernel::throttle::Throttle;
-use sea_orm::sea_query::{Expr, ExprTrait as _, OnConflict};
+use sea_orm::sea_query::{Condition, Expr, ExprTrait as _, OnConflict};
 use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter};
 use serde_json::json;
 use uuid::Uuid;
@@ -262,14 +262,33 @@ impl ConversationsService {
             let options = EnqueueOptions::default().unique_key(format!("auto:{}", message.id));
             self.parts.jobs.enqueue(connection, tenant, &job, options).await?;
         }
-        let side = if customer_wrote { "staff" } else { "customer" };
-        let minutes = i64::from(self.config.notify_after_minutes);
-        let window = minutes * 60;
-        let bucket = message.created_at.as_unix_seconds().div_euclid(window);
+        // Báo phía kia sau một khung: khung bắt đầu từ tin chưa đọc đầu tiên. Đổi có điều kiện cột
+        // đầu khung của cuộc (khoá dòng cuộc như mọi lệnh ghi khác trên nó), nên hai tin cùng lúc chỉ
+        // một tin mở khung; tin rơi vào khung đang mở thì job của khung đó báo chung.
+        let (side, window_column) = if customer_wrote {
+            ("staff", thread::Column::NotifyStaffFrom)
+        } else {
+            ("customer", thread::Column::NotifyCustomerFrom)
+        };
+        let window = SignedDuration::from_mins(i64::from(self.config.notify_after_minutes));
+        let opened = thread::Entity::update_many()
+            .col_expr(window_column, Expr::value(message.created_at))
+            .filter(thread::Column::Id.eq(thread.id))
+            .filter(
+                Condition::any()
+                    .add(window_column.is_null())
+                    .add(window_column.lte(message.created_at - window)),
+            )
+            .scoped(tenant)
+            .exec(connection)
+            .await?;
+        if opened.rows_affected == 0 {
+            return Ok(());
+        }
         let job = NotifyJob { thread_id: thread.id, side: side.to_owned(), message_id: message.id };
         let options = EnqueueOptions::default()
-            .run_at(message.created_at + SignedDuration::from_mins(minutes))
-            .unique_key(format!("notify:{}:{side}:{bucket}", thread.id));
+            .run_at(message.created_at + window)
+            .unique_key(format!("notify:{}:{side}:{}", thread.id, message.id));
         self.parts.jobs.enqueue(connection, tenant, &job, options).await?;
         Ok(())
     }

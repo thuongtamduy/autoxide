@@ -3,6 +3,7 @@
 
 mod m0001_create_conversations;
 mod m0007_voice;
+mod m0008_notify_window;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 
@@ -25,5 +26,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         autoxide_kernel::event::outbox_access_migration("k0001_event_access", "conversations"),
         // Gọi điện trong chat (D-232): đường dây, yêu cầu gọi lại, cuộc gọi, event webhook.
         Box::new(m0007_voice::Migration),
+        // Khung báo tin chưa đọc bắt đầu từ tin chưa đọc đầu tiên.
+        Box::new(m0008_notify_window::Migration),
     ]
 }
