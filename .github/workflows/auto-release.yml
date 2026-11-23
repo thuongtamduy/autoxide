@@ -10,7 +10,10 @@
 name: Auto release
 
 on:
-  workflow_run:
+  # `workflow_run` chạy với quyền của repo gốc kể cả khi CI chạy cho PR từ fork, nên zizmor coi là nguy hiểm.
+  # Ở đây an toàn: job chỉ chạy khi lần CI là `push` vào `main` của CHÍNH repo này (điều kiện `if:` của job), và chỉ
+  # đọc `Cargo.toml` / `CHANGELOG.md` của commit đã vào `main` — không có dữ liệu nào từ PR.
+  workflow_run: # zizmor: ignore[dangerous-triggers]
     workflows: ["CI"]
     types: [completed]
     branches: [main]
@@ -29,7 +32,8 @@ jobs:
       ${{ !github.event.repository.private
       && github.event.workflow_run.conclusion == 'success'
       && github.event.workflow_run.event == 'push'
-      && github.event.workflow_run.head_branch == 'main' }}
+      && github.event.workflow_run.head_branch == 'main'
+      && github.event.workflow_run.head_repository.full_name == github.repository }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -40,6 +44,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           ref: ${{ github.event.workflow_run.head_sha }}
       - name: Tag the release commit and start Release
         env:

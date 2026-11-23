@@ -1,0 +1,6 @@
+# Cấu hình của zizmor (kiểm bảo mật workflow GitHub Actions, job `workflows` của ci.yml — D-20261123-supply-chain).
+rules:
+  # Gợi ý đổi `uses: ./.github/workflows/gate.yml` sang cú pháp `$/…` mới của GitHub: chỉ là kiểu viết, không phải
+  # lỗ hổng; test của xtask và tài liệu dựa vào đường dẫn `./`. Xem lại khi cú pháp mới phổ biến.
+  self-repository:
+    disable: true

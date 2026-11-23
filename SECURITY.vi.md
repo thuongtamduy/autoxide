@@ -65,6 +65,28 @@ Autoxide do một nhóm nhỏ duy trì, nên đây là mục tiêu, không phả
 Chúng tôi ghi công người báo trong advisory và changelog, trừ khi bạn không muốn. Không có
 chương trình thưởng (bug bounty).
 
+## Chính sách công bố
+
+Chúng tôi công bố có phối hợp:
+
+- Bản sửa làm trong fork riêng tư của GitHub security advisory; bạn được mời vào nếu muốn.
+- Báo cáo được nhận mà ảnh hưởng một bản đã phát hành thì chúng tôi xin GitHub cấp mã CVE.
+- Advisory, CVE và bản phát hành có bản sửa được công bố cùng lúc. Dòng changelog của bản sửa nằm ở mục
+  **Security** của `CHANGELOG.md`.
+- Sau 90 ngày mà chưa có bản sửa thì chúng tôi vẫn công bố advisory kèm cách giảm thiểu đã biết, trừ khi đã thống
+  nhất với bạn một ngày muộn hơn (vd bản sửa cần thay đổi ở thư viện phụ thuộc).
+- Lỗ hổng đã bị khai thác hay đã công khai thì công bố ngay khi có bản sửa hay cách giảm thiểu, không chờ.
+- Xin đừng công bố chi tiết trước advisory. Nếu thấy chúng tôi không phản hồi, hãy nói trong báo cáo riêng trước khi
+  công khai.
+
+Bản sửa cho các dòng cũ còn được hỗ trợ (bảng ở trên) ra cùng lúc khi có thể.
+
+## Kiểm một bản phát hành
+
+Bản phát hành được ký không cần khoá dài hạn (Sigstore, qua GitHub Actions) và kèm chứng thực nguồn gốc build:
+[`docs/VERIFYING.vi.md`](docs/VERIFYING.vi.md) hướng dẫn kiểm image Docker và file đính kèm trước khi chạy. Kiểm thất
+bại là một báo cáo bảo mật.
+
 ## Những gì không tính là lỗ hổng
 
 Đây là hành vi đã biết hoặc nằm ngoài dự án, không phải lỗi bảo mật:

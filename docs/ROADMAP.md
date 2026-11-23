@@ -164,6 +164,13 @@ thật (P7).
       `docs/guides/` làm theo được đúng như viết; chỗ hỏng tìm ra thì sửa tận gốc kèm test (D-20261123-api-coverage)
   - [x] Công cụ đo: testkit ghi endpoint / tool gọi thành công khi đặt `TEST_API_COVERAGE`; `cargo xtask coverage-api
         --run` báo phần chưa phủ theo module
+- [x] P13 — Chuỗi cung ứng và phát hành (D-20261123-supply-chain): ký không khoá (Sigstore qua OIDC của GitHub Actions)
+      image và mọi file đính kèm — binary Linux amd64 / arm64 (chép từ image), gói SDK, SBOM — kèm chứng thực nguồn gốc
+      build (SLSA) cho từng thứ, `SHA256SUMS` ký bằng cosign; hướng dẫn kiểm `docs/VERIFYING.md` + `.vi.md`; workflow
+      tối thiểu quyền, mọi checkout `persist-credentials: false`, job CI `workflows` (zizmor + actionlint); Dependabot
+      cho cargo, npm, github-actions, docker có nhóm và `cooldown`; giai đoạn bản thử `X.0.0-rc.N` (pre-release, image
+      không `latest` / `X.Y`, bản vá dòng cũ không giành `latest`) và tiêu chí từ RC lên 1.0 ở `docs/RELEASING.md`;
+      `SECURITY.md` + `.vi.md` thêm chính sách công bố phối hợp
 
 ## Giai đoạn B — Lớp cho giao diện và phân quyền
 

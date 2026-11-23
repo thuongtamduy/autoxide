@@ -65,6 +65,29 @@ Autoxide is maintained by a small team, so these are targets, not guarantees:
 We credit reporters in the advisory and the changelog unless you ask us not to. There is
 no bug bounty.
 
+## Disclosure policy
+
+We follow coordinated disclosure:
+
+- We work on the fix in a private fork of the GitHub security advisory, and invite you to it if you want.
+- We ask GitHub to assign a CVE for accepted reports that affect a released version.
+- The advisory, the CVE and the fixed release are published together. The changelog entry for the fix is in the
+  **Security** section of `CHANGELOG.md`.
+- If no fix is ready after 90 days, we publish the advisory anyway with the workarounds we know, unless we agree a
+  later date with you (for example because the fix needs a change in a dependency).
+- If a vulnerability is already being exploited or is already public, we publish as soon as a fix or a workaround
+  is ready, without waiting.
+- Please do not publish details before the advisory. If you think we are not responding, say so in the private
+  report before going public.
+
+Fixes for supported older lines (see the table above) are released at the same time when possible.
+
+## Verifying a release
+
+Releases are signed without long-lived keys (Sigstore, through GitHub Actions) and carry build provenance:
+[`docs/VERIFYING.md`](docs/VERIFYING.md) shows how to check the Docker image and the release files before you run
+them. A failed check is a security report.
+
 ## What is not a vulnerability
 
 These are known behaviours or outside the project, not security bugs:
