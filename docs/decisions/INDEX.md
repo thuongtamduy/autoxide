@@ -111,6 +111,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261122-gitleaks-8-30-1](D-20261122-gitleaks-8-30-1.md)** Ghim gitleaks 8.30.1, image lấy từ `ghcr.io/gitleaks/gitleaks` ở cả gate và CI — 2026-11-22
 - **[D-20261122-step67-after-1-0](D-20261122-step67-after-1-0.md)** Ba mục cuối của bước 67 làm sau bản 1.0 — 2026-11-22 · **chủ dự án quyết**
 - **[D-20261122-toolchain-sync](D-20261122-toolchain-sync.md)** Ví dụ module ngoài dùng đúng toolchain của core; `cargo xtask check` chặn khi lệch — 2026-11-22
+- **[D-20261123-api-coverage](D-20261123-api-coverage.md)** Đo độ phủ endpoint và tool MCP bằng test, mục tiêu 100% trước 1.0 — 2026-11-23
 - **[D-20261123-compatibility-policy](D-20261123-compatibility-policy.md)** Bản 1.0 có cam kết: chính sách tương thích, `cargo-semver-checks` trên PR, dòng hỗ trợ dài hạn — 2026-11-23
 - **[D-20261123-english-rustdoc](D-20261123-english-rustdoc.md)** Doc comment của phần công khai viết tiếng Anh, gate `doc-language` — 2026-11-23 · **chủ dự án quyết**
 
