@@ -123627,7 +123627,7 @@
     },
     "/api/v1/bookings/public/phone-codes": {
       "post": {
-        "description": "Guests book and cancel with a code sent to their phone number. A code works once, for 10\nminutes, and allows 5 tries; a number gets at most 5 codes an hour.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
+        "description": "Guests book and cancel with a code sent to their phone number. A code works once, for 10\nminutes, and allows 5 tries; a number gets at most 5 codes an hour, and one client address at\nmost 20 (all numbers together).\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "bookings_send_booking_phone_code",
         "parameters": [
           {
@@ -123705,7 +123705,7 @@
                 }
               }
             },
-            "description": "Too many codes for this number; code `bookings.too_many_codes`."
+            "description": "Too many codes for this number or from this client address; code `bookings.too_many_codes`, see `Retry-After`."
           },
           "503": {
             "content": {

@@ -22,5 +22,11 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
             "m0006_tenancy_jobs",
             vec![autoxide_kernel::job::tenant_table("bookings")],
         ),
+        // Bảng `bookings_throttle`: giới hạn xin mã SMS theo địa chỉ client (pentest 2026-11).
+        autoxide_kernel::throttle::throttle_migration("m0007_create_throttle", "bookings"),
+        autoxide_kernel::tenancy::migration::adopt(
+            "m0008_tenancy_throttle",
+            vec![autoxide_kernel::throttle::tenant_table("bookings")],
+        ),
     ]
 }

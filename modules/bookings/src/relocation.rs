@@ -12,5 +12,5 @@ pub(crate) fn relocation() -> Relocation {
         .follow("bookings_exceptions", "resource_id", "bookings_resources")
         .follow("bookings_sessions", "service_id", "bookings_services")
         .follow("bookings_slots", "resource_id", "bookings_resources")
-        .ephemeral(&["bookings_guest_challenges"])
+        .ephemeral(&["bookings_guest_challenges", "bookings_throttle"])
 }

@@ -8,10 +8,12 @@ use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::secret::sha256;
 use autoxide_kernel::sms::{PhoneNumber, SmsMessage, SmsPurpose, sms_disabled};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
+use autoxide_kernel::throttle::{Outcome, Throttle};
 use autoxide_kernel::time::Timestamp;
 use jiff::SignedDuration;
 use sea_orm::sea_query::{Expr, ExprTrait as _};
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, Set};
+use std::net::IpAddr;
 use uuid::Uuid;
 
 use crate::booking::DEFAULT_COUNTRY;
@@ -26,6 +28,9 @@ const TTL_MINUTES: i64 = 10;
 const MAX_ATTEMPTS: i32 = 5;
 /// Tối đa chừng này mã cho một số điện thoại mỗi giờ.
 const PER_PHONE_PER_HOUR: u64 = 5;
+/// Tối đa chừng này mã từ một địa chỉ client mỗi giờ (mọi số cộng lại): chặn một máy xin mã cho
+/// hàng loạt số khác nhau, mỗi tin tốn tiền SMS của cửa hàng (pentest 2026-11; như tra đơn vãng lai).
+const PER_CLIENT_PER_HOUR: u32 = 20;
 
 /// Mã vừa gửi.
 #[derive(Debug, Clone)]
@@ -42,12 +47,13 @@ pub(crate) fn code_invalid() -> Error {
     )
 }
 
-fn too_many_codes() -> Error {
+fn too_many_codes(retry_after: u64) -> Error {
     Error::too_many_requests(
         "bookings.too_many_codes",
-        "Too many codes were asked for this number. Try again in an hour.",
+        "Too many codes were asked for. Wait {seconds} seconds, then try again.",
     )
-    .with_retry_after(3600)
+    .with_param("seconds", retry_after)
+    .with_retry_after(retry_after)
 }
 
 fn phone_invalid() -> Error {
@@ -93,11 +99,21 @@ impl BookingsService {
         &self,
         tenant: &TenantContext,
         raw: &str,
+        client: Option<IpAddr>,
     ) -> Result<Challenge, Error> {
         let phone = PhoneNumber::parse(raw, DEFAULT_COUNTRY).ok_or_else(phone_invalid)?;
         let Some(sender) = self.sms.clone() else {
             return Err(sms_disabled());
         };
+        if let Some(ip) = client {
+            let hour = std::time::Duration::from_secs(3600);
+            let by_client = Throttle::new("bookings", PER_CLIENT_PER_HOUR, hour)?;
+            if let Outcome::Limited { retry_after } =
+                by_client.hit(tenant, &format!("otp-ip:{ip}")).await?
+            {
+                return Err(too_many_codes(retry_after));
+            }
+        }
         let at = now();
         let recent = guest_challenge::Entity::find()
             .filter(guest_challenge::Column::Phone.eq(phone.as_str()))
@@ -106,7 +122,7 @@ impl BookingsService {
             .count(tenant.database().read())
             .await?;
         if recent >= PER_PHONE_PER_HOUR {
-            return Err(too_many_codes());
+            return Err(too_many_codes(3600));
         }
         let code = random_code()?;
         let id = Uuid::now_v7();
