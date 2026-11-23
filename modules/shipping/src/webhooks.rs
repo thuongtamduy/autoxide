@@ -158,9 +158,8 @@ impl ShippingService {
         let updates =
             carrier.parse_webhook(&account, &headers_of(&row.headers), row.body.as_bytes())?;
         for update in updates {
-            let Some(shipment_id) = self
-                .shipment_by_tracking(tenant, &account_row.carrier_code, &update.tracking_number)
-                .await?
+            let Some(shipment_id) =
+                self.shipment_by_tracking(tenant, account_row.id, &update.tracking_number).await?
             else {
                 tracing::warn!(carrier = %account_row.carrier_code, "webhook update for an unknown tracking number");
                 continue;
@@ -183,18 +182,22 @@ impl ShippingService {
         Ok(())
     }
 
-    /// Vận đơn có mã `tracking` (của vận đơn hay của một kiện) ở hãng `carrier_code`.
+    /// Vận đơn có mã `tracking` (của vận đơn hay của một kiện) đặt qua tài khoản hãng `account_id`.
+    ///
+    // Chỉ vận đơn của đúng tài khoản nhận webhook: tài khoản hãng thuộc từng tổ chức, chủ tài khoản A
+    // biết token và chữ ký của chính mình nên không được đổi trạng thái vận đơn của tổ chức B chỉ vì
+    // biết mã vận đơn in trên nhãn (rà soát bảo mật 2026-11).
     pub(crate) async fn shipment_by_tracking(
         &self,
         tenant: &TenantContext,
-        carrier_code: &str,
+        account_id: Uuid,
         tracking: &str,
     ) -> Result<Option<Uuid>, Error> {
         let read = tenant.database().read();
         let direct = shipment::Entity::find()
             .filter(
                 Condition::all()
-                    .add(shipment::Column::CarrierCode.eq(carrier_code))
+                    .add(shipment::Column::CarrierAccountId.eq(account_id))
                     .add(shipment::Column::TrackingNumber.eq(tracking)),
             )
             .scoped(tenant)
@@ -203,11 +206,23 @@ impl ShippingService {
         if let Some(row) = direct {
             return Ok(Some(row.id));
         }
-        let by_parcel = parcel::Entity::find()
+        let parcels = parcel::Entity::find()
             .filter(parcel::Column::TrackingNumber.eq(tracking))
+            .scoped(tenant)
+            .all(read)
+            .await?;
+        if parcels.is_empty() {
+            return Ok(None);
+        }
+        let owner = shipment::Entity::find()
+            .filter(
+                Condition::all()
+                    .add(shipment::Column::CarrierAccountId.eq(account_id))
+                    .add(shipment::Column::Id.is_in(parcels.iter().map(|row| row.shipment_id))),
+            )
             .scoped(tenant)
             .one(read)
             .await?;
-        Ok(by_parcel.map(|row| row.shipment_id))
+        Ok(owner.map(|row| row.id))
     }
 }
