@@ -5098,6 +5098,53 @@
         "returns_secret": false
       },
       "deprecation": null,
+      "description": "Ask the AI to build a page's block layout from a description. Runs in the background and ends as a draft marked `ai_assisted`, never published; follow it with `get_page_layout` or REST `GET /entries/{id}/ai/thread`. Counts toward the plan's monthly AI page builds.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A request to the AI page builder.",
+        "properties": {
+          "id": {
+            "description": "Id of the page.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "instruction": {
+            "description": "What the page should be, or what to change, in plain words (1 to 2000 characters).",
+            "type": "string"
+          },
+          "selection": {
+            "description": "`edit_page` only: block ids to limit the change to.",
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "instruction"
+        ],
+        "type": "object"
+      },
+      "name": "content.compose_page",
+      "output_schema": null,
+      "permissions": [
+        "content.write",
+        "content.write_own"
+      ],
+      "stability": "official"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
       "description": "Create a post or page as a draft (not visible to readers until published). The slug is made from the title unless given.",
       "input_schema": {
         "additionalProperties": false,
@@ -5240,6 +5287,53 @@
     {
       "annotations": {
         "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Ask the AI to change a page's block layout in words (\"make the hero red\"); `selection` limits it to some blocks. Runs in the background; the result is a new draft and the turn keeps the revision before it to undo.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A request to the AI page builder.",
+        "properties": {
+          "id": {
+            "description": "Id of the page.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "instruction": {
+            "description": "What the page should be, or what to change, in plain words (1 to 2000 characters).",
+            "type": "string"
+          },
+          "selection": {
+            "description": "`edit_page` only: block ids to limit the change to.",
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "instruction"
+        ],
+        "type": "object"
+      },
+      "name": "content.edit_page",
+      "output_schema": null,
+      "permissions": [
+        "content.write",
+        "content.write_own"
+      ],
+      "stability": "official"
+    },
+    {
+      "annotations": {
+        "destructive": false,
         "read_only": true,
         "requires_approval_for_agent": false,
         "returns_secret": false
@@ -5262,6 +5356,37 @@
         "type": "object"
       },
       "name": "content.get",
+      "output_schema": null,
+      "permissions": [
+        "content.read"
+      ],
+      "stability": "official"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Get the draft body of a page (its block layout) with the `version` to pass to `update_page_layout`.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A page to read.",
+        "properties": {
+          "id": {
+            "description": "Id of the page.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "content.get_page_layout",
       "output_schema": null,
       "permissions": [
         "content.read"
@@ -5504,6 +5629,27 @@
         "returns_secret": false
       },
       "deprecation": null,
+      "description": "List the block types this tenant can use in page layouts, with when to use each and its props JSON Schema. Only these blocks are accepted.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "No arguments.",
+        "type": "object"
+      },
+      "name": "content.list_blocks",
+      "output_schema": null,
+      "permissions": [
+        "content.read"
+      ],
+      "stability": "official"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
       "description": "List the saved revisions of an entry, newest first (without their fields).",
       "input_schema": {
         "additionalProperties": false,
@@ -5538,6 +5684,100 @@
         "type": "object"
       },
       "name": "content.list_revisions",
+      "output_schema": null,
+      "permissions": [
+        "content.read"
+      ],
+      "stability": "official"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List the scheduled theme variants (seasons, holidays, hours) of a website.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Paging, optionally for one website.",
+        "properties": {
+          "cursor": {
+            "description": "Where to continue: the `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of items, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "org_id": {
+            "description": "The website (organization unit); left out: the whole tenant.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "content.list_theme_variants",
+      "output_schema": null,
+      "permissions": [
+        "content.themes.manage"
+      ],
+      "stability": "official"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List the tenant's custom content types (team, projects, branches…).",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Paging, optionally for one website.",
+        "properties": {
+          "cursor": {
+            "description": "Where to continue: the `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of items, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "org_id": {
+            "description": "The website (organization unit); left out: the whole tenant.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "content.list_types",
       "output_schema": null,
       "permissions": [
         "content.read"
@@ -5939,6 +6179,95 @@
     {
       "annotations": {
         "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Create a theme variant as a draft, or replace one (pass `id` and `version`). It is never switched on by this tool: a person activates it.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A theme variant to create (as a draft) or replace.",
+        "properties": {
+          "fields": {
+            "description": "The same body as `POST /api/v1/content/theme-variants`: `org_id`, `name`, `overrides`,\n`effect`, `effect_intensity`, `schedule`, `priority`, `preset_key`, `year`.",
+            "type": "object"
+          },
+          "id": {
+            "description": "Id of the variant to replace; left out: create a new draft variant.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "version": {
+            "description": "Replace only: the `version` you read, or `*`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "fields"
+        ],
+        "type": "object"
+      },
+      "name": "content.save_theme_variant",
+      "output_schema": null,
+      "permissions": [
+        "content.themes.manage"
+      ],
+      "stability": "official"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Create a custom content type, or change one (pass `key` and `version`). Its own fields are custom fields of target `content.type.<key>`.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A custom content type to create or change.",
+        "properties": {
+          "fields": {
+            "description": "The same body as `POST /api/v1/content/types` (create) or `PATCH /types/{key}` (change):\n`key`, `labels`, `icon`, `routable`, `path_prefix`, `body`, `has_seo`, `listable`, `active`,\n`org_id`, `detail_layout`.",
+            "type": "object"
+          },
+          "key": {
+            "description": "Key of the type to change; left out: create a new type.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "version": {
+            "description": "Change only: the `version` you read, or `*`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "fields"
+        ],
+        "type": "object"
+      },
+      "name": "content.save_type",
+      "output_schema": null,
+      "permissions": [
+        "content.types.manage"
+      ],
+      "stability": "official"
+    },
+    {
+      "annotations": {
+        "destructive": false,
         "read_only": true,
         "requires_approval_for_agent": false,
         "returns_secret": false
@@ -6007,6 +6336,37 @@
         "type": "object"
       },
       "name": "content.seo_check",
+      "output_schema": null,
+      "permissions": [
+        "content.read"
+      ],
+      "stability": "official"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Get the last health check of a website: missing SEO descriptions or image alt texts, duplicate titles, broken links, hidden embedded records, finished countdowns and missing addresses asked for often, each with how to fix it. Checked every day; `null` before the first check.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Which website.",
+        "properties": {
+          "org_id": {
+            "description": "The website (organization unit).",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "org_id"
+        ],
+        "type": "object"
+      },
+      "name": "content.site_health",
       "output_schema": null,
       "permissions": [
         "content.read"
@@ -6224,6 +6584,64 @@
         "type": "object"
       },
       "name": "content.update",
+      "output_schema": null,
+      "permissions": [
+        "content.write",
+        "content.write_own"
+      ],
+      "stability": "official"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Change the draft block layout of a page: send the whole `layout`, or JSON Patch `operations` (at most 200, all or nothing). The result is checked like a person's edit and stays a draft until published. Pass the `version` you read.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A change to a page's block layout: either the whole `layout` or JSON Patch `operations`.",
+        "properties": {
+          "id": {
+            "description": "Id of the page.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "layout": {
+            "description": "The whole layout `{\"type\": \"layout\", \"schema\": 1, \"sections\": [block…]}`; blocks come from\n`list_blocks`.",
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "operations": {
+            "description": "JSON Patch operations (RFC 6902) on the layout, e.g.\n`[{\"op\": \"replace\", \"path\": \"/sections/0/props/text\", \"value\": \"Sale\"}]`.",
+            "items": {
+              "type": "object"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "save_revision": {
+            "description": "Keep this version in the history now.",
+            "type": "boolean"
+          },
+          "version": {
+            "description": "The `version` you read (`get_page_layout`), or `*`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "version"
+        ],
+        "type": "object"
+      },
+      "name": "content.update_page_layout",
       "output_schema": null,
       "permissions": [
         "content.write",

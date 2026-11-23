@@ -53040,7 +53040,7 @@
             "type": "string"
           },
           "kind": {
-            "description": "`seo_description_missing`, `title_duplicate`, `image_alt_missing`, `link_broken`,\n`record_not_public` or `countdown_over`.",
+            "description": "`seo_description_missing`, `title_duplicate`, `image_alt_missing`, `link_broken`,\n`record_not_public`, `countdown_over` or `not_found_path` (a missing address asked for often:\n`path` is that address, `entry_id` the suggested redirect target).",
             "type": "string"
           },
           "locale": {

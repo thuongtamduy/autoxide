@@ -366,7 +366,7 @@ mod tests {
         assert_eq!(distance("ao-thun-nam", "ao-thun"), 4);
         assert_eq!(distance("", "abc"), 3);
         assert_eq!(last_segment("/san-pham/ao-thun/"), "ao-thun");
-        assert_eq!(day_of(Timestamp::from_second(0).unwrap()), "1970-01-01");
+        assert_eq!(day_of(Timestamp::parse_rfc3339("1970-01-01T05:00:00Z").unwrap()), "1970-01-01");
         assert_eq!(path_hash("vi", "/a").len(), 64);
     }
 }

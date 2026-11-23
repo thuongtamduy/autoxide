@@ -17260,7 +17260,8 @@ export type Finding = {
   fix: string;
   /**
    * `seo_description_missing`, `title_duplicate`, `image_alt_missing`, `link_broken`,
-   * `record_not_public` or `countdown_over`.
+   * `record_not_public`, `countdown_over` or `not_found_path` (a missing address asked for often:
+   * `path` is that address, `entry_id` the suggested redirect target).
    */
   kind: string;
   locale: string;

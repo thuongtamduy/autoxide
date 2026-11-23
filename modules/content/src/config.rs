@@ -180,8 +180,8 @@ impl ContentConfig {
             reader.get_with(&PUBLIC_SEARCH_PER_MINUTE, |raw| parse_in_range(raw, 1u32, 10_000));
         let theme_variants_max =
             reader.get_with(&THEME_VARIANTS_MAX, |raw| parse_in_range(raw, 1u32, 500));
-        let not_found_min_hits =
-            reader.get_with(&SITE_HEALTH_NOT_FOUND_MIN_HITS, |raw| parse_in_range(raw, 1i64, 100_000));
+        let not_found_min_hits = reader
+            .get_with(&SITE_HEALTH_NOT_FOUND_MIN_HITS, |raw| parse_in_range(raw, 1i64, 100_000));
         let (locales, default_locale) = (locales?, default_locale?);
         if !locales.contains(&default_locale) {
             return reader.reject(

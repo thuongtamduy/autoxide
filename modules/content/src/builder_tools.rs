@@ -44,7 +44,8 @@ fn expected(version: &str) -> Result<Option<autoxide_kernel::time::Timestamp>, E
 fn fields<T: DeserializeOwned + Validate>(value: Value) -> Result<T, Error> {
     let parsed: T = serde_json::from_value(value).map_err(|error| {
         Error::validation(vec![
-            FieldError::new("fields", "invalid", "{error}").with_param("error", error.to_string()),
+            FieldError::new("fields", "invalid", "is not valid: {error}")
+                .with_param("error", error.to_string()),
         ])
     })?;
     parsed.validate()?;
@@ -195,6 +196,7 @@ fn layout_tools(service: &Arc<ContentService>) -> Vec<Tool> {
     let (blocks, get, update) = (service.clone(), service.clone(), service.clone());
     let (compose, edit) = (service.clone(), service.clone());
     vec![
+        // mcp-principal: danh sách khối là của cả khách, không theo nút (REST trả cho mọi người đã đăng nhập).
         Tool::new(
             "list_blocks",
             "List the block types this tenant can use in page layouts, with when to use each and \
@@ -268,7 +270,7 @@ fn layout_tools(service: &Arc<ContentService>) -> Vec<Tool> {
                             let operations: Vec<Operation> = serde_json::from_value(operations)
                                 .map_err(|error| {
                                     Error::validation(vec![
-                                        FieldError::new("operations", "invalid", "{error}")
+                                        FieldError::new("operations", "invalid", "is not valid: {error}")
                                             .with_param("error", error.to_string()),
                                     ])
                                 })?;

@@ -93,24 +93,49 @@ async fn duong_dan_404_goi_y_chuyen_huong_qua_job_hang_ngay() {
     TestDatabase::run(async |test| {
         let app = app(test).await;
         let root = autoxide_kernel::tenancy::root_of(app.default_tenant().id()).as_uuid();
-        let page = publish(&app, json!({"kind": "page", "title": "Ao thun", "slug": "ao-thun", "meta_description": "x"}), None).await;
+        let page = publish(
+            &app,
+            json!({"kind": "page", "title": "Ao thun", "slug": "ao-thun", "meta_description": "x"}),
+            None,
+        )
+        .await;
         for path in ["/ao-thunn", "/ao-thunn/", "/zzzzzzzzzzzz", "/ao-thun-cu"] {
-            let hits = match path { "/ao-thun-cu" => 2, "/zzzzzzzzzzzz" => 6, _ => 3 };
+            let hits = match path {
+                "/ao-thun-cu" => 2,
+                "/zzzzzzzzzzzz" => 6,
+                _ => 3,
+            };
             for _ in 0..hits {
-                let missing = send(&app, "GET", &format!("/public/resolve?locale=en&path={path}"), None, &[], None).await;
+                let missing = send(
+                    &app,
+                    "GET",
+                    &format!("/public/resolve?locale=en&path={path}"),
+                    None,
+                    &[],
+                    None,
+                )
+                .await;
                 assert_eq!(missing.status(), StatusCode::NOT_FOUND);
             }
         }
         // Trang có thật không bị đếm.
-        let found = send(&app, "GET", "/public/resolve?locale=en&path=/ao-thun", None, &[], None).await;
+        let found =
+            send(&app, "GET", "/public/resolve?locale=en&path=/ao-thun", None, &[], None).await;
         assert_eq!(found.status(), StatusCode::OK);
 
         let worker = app.modules().worker(4).unwrap();
         while worker.run_once().await.unwrap() > 0 {}
-        let report = send(&app, "GET", &format!("/site-health?org_id={root}"), Some("reader"), &[], None).await;
+        let report =
+            send(&app, "GET", &format!("/site-health?org_id={root}"), Some("reader"), &[], None)
+                .await;
         assert_eq!(report.status(), StatusCode::OK, "{}", report.json());
-        let findings: Vec<Value> = report.json()["data"]["findings"].as_array().unwrap().iter()
-            .filter(|item| item["kind"] == "not_found_path").cloned().collect();
+        let findings: Vec<Value> = report.json()["data"]["findings"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|item| item["kind"] == "not_found_path")
+            .cloned()
+            .collect();
         // `/ao-thunn` và `/ao-thunn/` là một đường dẫn: 6 lượt ≥ 5; `/ao-thun-cu` 2 lượt (chưa đủ);
         // `/zzz…` không giống trang nào.
         assert_eq!(findings.len(), 1, "{findings:#?}");
@@ -121,7 +146,8 @@ async fn duong_dan_404_goi_y_chuyen_huong_qua_job_hang_ngay() {
 
         // Tool MCP: cùng kết quả, cùng quyền như REST.
         let reader = app.mcp("reader").await.unwrap();
-        let result = reader.call_tool(tool("content.site_health", json!({"org_id": root}))).await.unwrap();
+        let result =
+            reader.call_tool(tool("content.site_health", json!({"org_id": root}))).await.unwrap();
         assert_ne!(result.is_error, Some(true), "{result:?}");
         let data = result.structured_content.unwrap();
         assert!(data.to_string().contains("not_found_path"), "{data}");

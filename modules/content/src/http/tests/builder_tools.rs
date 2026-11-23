@@ -72,19 +72,19 @@ async fn tool_dung_trang_tu_khoi_nhu_rest() {
         let labels = json!({"one": {"vi": "Dự án"}, "many": {"vi": "Dự án"}});
         let (failed, kind) = call("content.save_type", json!({"fields": {"key": "du_an", "labels": labels}})).await;
         assert!(!failed, "{kind}");
-        let version = kind["data"]["version"].as_str().unwrap().to_owned();
+        let version = kind["data"]["version"].as_str().expect(&kind.to_string()).to_owned();
         let (failed, changed) = call("content.save_type", json!({"key": "du_an", "version": version, "fields": {"icon": "star"}})).await;
         assert!(!failed, "{changed}");
         assert_eq!(changed["data"]["icon"], "star");
         let (_, listed) = call("content.list_types", json!({})).await;
-        assert_eq!(listed["data"]["data"].as_array().unwrap().len(), 1, "{listed}");
+        assert_eq!(listed["data"].as_array().unwrap().len(), 1, "{listed}");
 
         let golden = json!({"name": "Giờ vàng", "overrides": {"color.primary": "#065f46"}, "schedule": {"kind": "daily", "start": "20:00", "end": "22:00"}});
         let (failed, variant) = call("content.save_theme_variant", json!({"fields": golden})).await;
         assert!(!failed, "{variant}");
         assert_eq!(variant["data"]["status"], "draft", "a tool never switches a variant on");
         let (_, variants) = call("content.list_theme_variants", json!({})).await;
-        assert_eq!(variants["data"]["data"].as_array().unwrap().len(), 1, "{variants}");
+        assert_eq!(variants["data"].as_array().unwrap().len(), 1, "{variants}");
         admin.cancel().await.unwrap();
     })
     .await

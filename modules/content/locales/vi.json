@@ -364,5 +364,7 @@
   "text:Entry field": "Trường của mục",
   "text:Only in the detail layout of a custom content type: shows one field of the entry being viewed.": "Chỉ trong bố cục trang chi tiết của loại nội dung tự định nghĩa: hiện một trường của mục đang xem.",
   "text:Use to show the published entries of a custom content type (team, projects, branches…) as cards; filter on its filterable public fields.": "Dùng để hiện các mục đã đăng của một loại nội dung tự định nghĩa (đội ngũ, dự án, chi nhánh…) thành thẻ; lọc theo trường công khai lọc được.",
-  "field:must be a BCP 47 language code such as `vi`": "phải là mã ngôn ngữ BCP 47, vd `vi`"
+  "field:must be a BCP 47 language code such as `vi`": "phải là mã ngôn ngữ BCP 47, vd `vi`",
+  "field:send exactly one of `layout` and `operations`": "gửi đúng một trong hai: `layout` hoặc `operations`",
+  "field:is not valid: {error}": "chưa hợp lệ: {error}"
 }
