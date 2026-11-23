@@ -44277,6 +44277,7 @@ export interface paths {
       responses: {
         200: Data_Vec_TagView;
         401: Problem;
+        403: Problem;
         default: Problem;
       };
     };
