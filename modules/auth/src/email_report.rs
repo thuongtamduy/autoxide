@@ -264,6 +264,7 @@ mod tests {
     use crate::passkey::testing::SoftAuthenticator;
     use crate::testing::{Services, take_jobs};
     use crate::user::NewUser;
+    use autoxide_kernel::tokens::OneTimeTokens;
 
     const PASSWORD: &str = "correct horse battery staple";
 
@@ -383,9 +384,37 @@ mod tests {
             let unix = u64::try_from(Timestamp::now().as_unix_seconds()).unwrap();
             let code = crate::mfa::service::tests::code_at(&setup.secret, unix);
             services.mfa.confirm_totp(&tenant, ada, &code).await.unwrap();
+            // Kẻ chiếm còn gắn tài khoản ngoài của nó, và giữ link đăng nhập / token xác nhận lại
+            // chưa dùng (rà soát bảo mật 2026-11): khoá tài khoản phải gỡ cả hai cửa này.
+            let external = crate::oidc::identity::External {
+                subject: "thief-sub".to_owned(),
+                email: Some("thief@evil.example".to_owned()),
+                email_verified: true,
+                name: None,
+            };
+            let write = tenant.database().write();
+            crate::oidc::identity::insert(write, &tenant, ada, Uuid::now_v7(), &external)
+                .await
+                .unwrap();
+            let one_time = OneTimeTokens::new("auth");
+            let mut pending = Vec::new();
+            for purpose in ["login_link", "reauth"] {
+                let ttl = jiff::SignedDuration::from_mins(10);
+                let issued = one_time
+                    .issue(write, &tenant, purpose, &ada.to_string(), None, ttl)
+                    .await
+                    .unwrap();
+                pending.push((purpose, issued.token));
+            }
             let report = change(&services, ada, "thief@evil.example").await;
 
             services.verifications.report(Some(&tenant), &report, Language::En).await.unwrap();
+            let linked = crate::oidc::identity::for_user(&tenant, ada).await.unwrap();
+            assert!(linked.is_empty(), "external sign-in links removed");
+            for (purpose, token) in pending {
+                let used = one_time.consume(write, &tenant, purpose, &token).await.unwrap();
+                assert!(used.is_none(), "{purpose} token revoked");
+            }
             let user = services.users.get(&tenant, ada).await.unwrap().unwrap();
             assert_eq!(user.email, "ada@example.com");
             assert!(services.sessions.refresh(Some(&tenant), &tokens.refresh_token).await.is_err());

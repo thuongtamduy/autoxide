@@ -259,10 +259,22 @@ pub(crate) struct PasskeyConfig {
     pub origins: Vec<String>,
 }
 
+/// Giá trị mẫu của `.env.example` (`change-me…`): ai đọc repo cũng biết, dùng nó làm key ký token là
+/// ai cũng ký được token cho mọi tài khoản. Từ chối lúc khởi động như `AUTOXIDE_SECRET_KEY`
+/// (D-20261121-hardening-batch mục 7; rà soát bảo mật 2026-11).
+fn is_placeholder(raw: &str) -> bool {
+    raw.trim().to_ascii_lowercase().starts_with("change-me")
+}
+
+const PLACEHOLDER_MESSAGE: &str =
+    "is still the example value; generate a key with `openssl rand -base64 48`";
+
 impl AuthConfig {
     pub(crate) fn read(reader: &mut ConfigReader<'_>) -> Result<Self, Invalid> {
         let token_secret = reader.optional_with(&TOKEN_SECRET, |raw| {
-            if raw.len() < MIN_SECRET_LENGTH {
+            if is_placeholder(raw) {
+                Err(PLACEHOLDER_MESSAGE.to_owned())
+            } else if raw.len() < MIN_SECRET_LENGTH {
                 Err(format!(
                     "must be at least {MIN_SECRET_LENGTH} characters long; generate one with \
                      `openssl rand -base64 48`"
@@ -276,7 +288,9 @@ impl AuthConfig {
                 .map(str::trim)
                 .filter(|key| !key.is_empty())
                 .map(|key| {
-                    if key.len() < MIN_SECRET_LENGTH {
+                    if is_placeholder(key) {
+                        Err(PLACEHOLDER_MESSAGE.to_owned())
+                    } else if key.len() < MIN_SECRET_LENGTH {
                         Err(format!(
                             "every key must be at least {MIN_SECRET_LENGTH} characters long, like \
                              AUTOXIDE_AUTH_TOKEN_SECRET"
@@ -454,6 +468,21 @@ mod tests {
         let mut reader = ConfigReader::new(&source);
         let config = AuthConfig::read(&mut reader);
         reader.finish(config).map(|(config, _)| config).map_err(|errors| errors.to_string())
+    }
+
+    #[test]
+    fn tu_choi_gia_tri_mau_cua_key_ky_token() {
+        let sample = "change-me-to-a-long-random-value-from-openssl-rand";
+        let error = read(&[("AUTOXIDE_AUTH_TOKEN_SECRET", sample)]).unwrap_err();
+        assert!(error.contains("example value"), "{error}");
+        let real = "x".repeat(MIN_SECRET_LENGTH);
+        let error = read(&[
+            ("AUTOXIDE_AUTH_TOKEN_SECRET", real.as_str()),
+            ("AUTOXIDE_AUTH_TOKEN_SECRET_PREVIOUS", sample),
+        ])
+        .unwrap_err();
+        assert!(error.contains("example value"), "{error}");
+        assert!(read(&[("AUTOXIDE_AUTH_TOKEN_SECRET", real.as_str())]).is_ok());
     }
 
     #[test]

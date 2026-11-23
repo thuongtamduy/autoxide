@@ -202,6 +202,11 @@ impl SessionService {
                 expires_in: challenge::CHALLENGE_TTL_SECONDS.unsigned_abs(),
             });
         }
+        if crate::role::passkey_required(tenant, user.id).await? {
+            // Mật khẩu đúng nhưng chưa đủ: như MFA, trả lại lượt vừa xin.
+            self.throttle.refund_login(tenant, email, ip).await?;
+            return Err(crate::role::passkey_required_error());
+        }
         self.throttle.clear_login(tenant, email, ip).await?;
         let proof = Proof::Password(hash);
         let tokens = self.start_session(tenant, user.id, "password", user_agent, proof).await?;
@@ -287,6 +292,9 @@ impl SessionService {
                 mfa_token: link_token(tenant, &raw),
                 expires_in: challenge::CHALLENGE_TTL_SECONDS.unsigned_abs(),
             });
+        }
+        if crate::role::passkey_required(tenant, user.id).await? {
+            return Err(crate::role::passkey_required_error());
         }
         let tokens = self.start_session(tenant, user.id, method, user_agent, Proof::Active).await?;
         Ok(LoginOutcome::Tokens(tokens))

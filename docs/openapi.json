@@ -108144,7 +108144,7 @@
                 }
               }
             },
-            "description": "The account is disabled; code `auth.user_disabled`."
+            "description": "The account is disabled (code `auth.user_disabled`), or it holds a role that requires two-step sign-in and its only second step is a passkey, so it must sign in with the passkey (code `auth.passkey_required`)."
           },
           "422": {
             "content": {
@@ -108328,7 +108328,7 @@
                 }
               }
             },
-            "description": "The account is disabled; code `auth.user_disabled`."
+            "description": "The account is disabled (code `auth.user_disabled`), or it must sign in with its passkey (code `auth.passkey_required`, see `POST /api/v1/auth/login`)."
           },
           "404": {
             "content": {
@@ -112456,7 +112456,7 @@
                 }
               }
             },
-            "description": "The provider has not verified the email (code `auth.oidc_email_unverified`), its domain is not allowed (code `auth.oidc_email_domain_not_allowed`), nobody may create an account this way (code `auth.oidc_signup_closed`), or the account is disabled (code `auth.user_disabled`)."
+            "description": "The provider has not verified the email (code `auth.oidc_email_unverified`), its domain is not allowed (code `auth.oidc_email_domain_not_allowed`), nobody may create an account this way (code `auth.oidc_signup_closed`), the account is disabled (code `auth.user_disabled`), or it must sign in with its passkey (code `auth.passkey_required`, see `POST /api/v1/auth/login`)."
           },
           "404": {
             "content": {
