@@ -24,6 +24,9 @@ use crate::tenancy::{OrgId, TenantContext, root_of};
 
 /// At least this many characters (after trimming whitespace at both ends).
 const MIN_QUERY: usize = 2;
+// Câu tìm dài vô hạn thành mẫu `LIKE '%…%'` chạy trên mọi nguồn (SQLite từ chối mẫu quá dài): giới
+// hạn như ô tìm của các module (rà soát bảo mật 2026-11).
+const MAX_QUERY: usize = 200;
 
 /// A record found.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -450,7 +453,7 @@ pub(crate) fn routes(state: FindState) -> OpenApiRouter {
     responses(
         (status = 200, description = "The records found.", body = Data<FindView>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 422, description = "`q` is shorter than 2 characters, or `limit` is not between 1 and 20; see `errors`.", body = Problem),
+        (status = 422, description = "`q` is shorter than 2 or longer than 200 characters, or `limit` is not between 1 and 20; see `errors`.", body = Problem),
     )
 )]
 async fn find(
@@ -468,6 +471,12 @@ async fn find(
         problems.push(
             FieldError::new("q", "too_short", "must be at least {min} characters")
                 .with_param("min", MIN_QUERY),
+        );
+    }
+    if text.chars().count() > MAX_QUERY {
+        problems.push(
+            FieldError::new("q", "length", "must be at most {max} characters")
+                .with_param("max", MAX_QUERY),
         );
     }
     if !(1..=20).contains(&limit) {

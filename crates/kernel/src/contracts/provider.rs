@@ -337,7 +337,9 @@ pub fn http_client(timeout: Duration, target: Target) -> Result<reqwest::Client,
         .redirect(reqwest::redirect::Policy::none())
         .user_agent(concat!("Autoxide/", env!("CARGO_PKG_VERSION")));
     if target == (Target::TenantChosen { allow_private: false }) {
-        builder = builder.dns_resolver(crate::net::PublicOnly);
+        // Proxy của hệ thống (`HTTPS_PROXY`) tự phân giải tên, vượt qua bộ lọc IP: tắt cho địa chỉ khách
+        // chọn, như webhook và OIDC (rà soát bảo mật 2026-11).
+        builder = builder.dns_resolver(crate::net::PublicOnly).no_proxy();
     }
     builder.build().map_err(|error| Error::internal(format!("provider HTTP client: {error}")))
 }

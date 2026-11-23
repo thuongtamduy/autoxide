@@ -196,6 +196,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261119-step69-ws](D-20261119-step69-ws.md)** WebSocket `GET /api/v1/kernel/events/ws`: dùng chung hub SSE, một vé kết nối cho cả phiên, lệnh điều khiển JSON, tín hiệu tạm trong tiến trình — 2026-11-19
 - **[D-20261121-api-shape](D-20261121-api-shape.md)** Thân request đóng ở mọi endpoint, gate kiểm hình dạng API trên openapi.json — 2026-11-21
 - **[D-20261121-stability-marks](D-20261121-stability-marks.md)** Hạng module trong hợp đồng: `x-stability` chỉ gắn cho thử nghiệm — 2026-11-21
+- **[D-20261123-http-header-timeout](D-20261123-http-header-timeout.md)** Máy chủ HTTP tự phục vụ kết nối bằng `hyper-util` có timer: timeout đọc header 30 giây, ping HTTP/2 — 2026-11-23
 
 ## MCP, AI, agent dùng API
 
