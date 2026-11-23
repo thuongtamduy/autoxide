@@ -280,6 +280,9 @@ pub(crate) mod payment {
         pub transfer_code: Option<String>,
         /// VietQR: tài khoản ngân hàng nhận (của người bán / khách — nền tảng không giữ tiền).
         pub bank_account_id: Option<Uuid>,
+        /// Số thực thu lúc ghi thu (đơn vị nhỏ nhất, tiền tệ của `amount_currency`); `None`: chưa thu,
+        /// hay thu trước m0012.
+        pub captured_minor: Option<i64>,
     }
 
     impl ActiveModelBehavior for ActiveModel {}

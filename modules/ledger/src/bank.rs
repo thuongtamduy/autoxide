@@ -21,7 +21,7 @@ use autoxide_kernel::reference::{self, Reference, Submitted};
 use autoxide_kernel::rows;
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext, TenantId};
 use sea_orm::sea_query::OnConflict;
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QuerySelect, Set};
+use sea_orm::{ColumnTrait, Condition, EntityTrait, QueryFilter, QuerySelect, Set};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use uuid::Uuid;
@@ -469,6 +469,7 @@ impl LedgerService {
                 updated_at: Set(at),
                 transfer_code: Set(Some(code)),
                 bank_account_id: Set(Some(account.id)),
+                captured_minor: Set(None),
             })
             .exec_with_returning(&transaction)
             .await?;
@@ -679,9 +680,17 @@ impl LedgerService {
             let found = if codes.is_empty() {
                 None
             } else {
+                // Chỉ thanh toán chờ tiền vào đúng tài khoản nhận biến động này: mã của người bán B
+                // trong nội dung một khoản vào tài khoản của người bán A không làm B "đã nhận tiền"
+                // (tiền nằm ở A) — khoản đó vào hàng chờ đối soát (rà soát bảo mật 2026-11).
                 payment::Entity::find()
                     .scoped(tenant)
                     .filter(payment::Column::TransferCode.is_in(codes))
+                    .filter(
+                        Condition::any()
+                            .add(payment::Column::BankAccountId.eq(txn.bank_account_id))
+                            .add(payment::Column::BankAccountId.is_null()),
+                    )
                     .one(database.write())
                     .await?
             };
