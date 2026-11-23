@@ -377,3 +377,101 @@ mod tests {
         assert!(offenders.is_empty(), "order status assigned outside lifecycle.rs: {offenders:?}");
     }
 }
+
+/// Thử phá state machine của đơn (D-20261123-property-fuzzing). Bảng nhỏ nên kiểm vét cạn các tính chất
+/// của đồ thị; dãy lệnh ngẫu nhiên (đúng như người mua, nhân viên, hãng và cổng thanh toán gửi lệch thứ tự)
+/// thì sinh bằng proptest.
+#[cfg(test)]
+mod properties {
+    use super::*;
+    use crate::policy::Policy;
+    use proptest::prelude::*;
+
+    const TERMINAL: [OrderStatus; 2] = [Cancelled, Completed];
+
+    /// Các trạng thái đi tới được từ `start` qua các chuyển hợp lệ.
+    fn reachable(start: OrderStatus) -> Vec<OrderStatus> {
+        let mut seen = vec![start];
+        let mut index = 0;
+        while let Some(&from) = seen.get(index) {
+            for (source, to) in TRANSITIONS {
+                if source == from && !seen.contains(&to) {
+                    seen.push(to);
+                }
+            }
+            index += 1;
+        }
+        seen
+    }
+
+    #[test]
+    fn do_thi_trang_thai_dung_hinh() {
+        for (from, to) in TRANSITIONS {
+            assert_ne!(from, to, "vòng về chính nó: {from}");
+            assert!(!TERMINAL.contains(&from), "đi ra từ trạng thái cuối: {from} -> {to}");
+        }
+        // Mọi trạng thái đi tới được từ lúc tạo đơn (chờ thanh toán hay đã xác nhận).
+        let from_start = reachable(PendingPayment);
+        for status in OrderStatus::ALL {
+            assert!(from_start.contains(&status), "không tới được {status}");
+            // Không đơn nào kẹt mãi: từ mọi trạng thái đều tới được một trạng thái cuối.
+            assert!(
+                reachable(status).iter().any(|status| TERMINAL.contains(status)),
+                "{status} không tới được trạng thái cuối"
+            );
+        }
+        // Đã giao thì không còn huỷ (đơn đã giao đi qua trả hàng, không qua huỷ).
+        for status in [Delivered, Completed] {
+            assert!(!reachable(status).contains(&Cancelled), "{status} -> cancelled");
+        }
+    }
+
+    #[test]
+    fn nguoi_mua_chi_huy_duoc_khi_chuyen_huy_hop_le() {
+        for until in OrderStatus::ALL {
+            let policy = Policy {
+                buyer_cancel_until: until,
+                acceptance_hours: 24,
+                return_window_days: 7,
+                cod_enabled: true,
+                allowed_return_reasons: Vec::new(),
+                return_photo_reasons: Vec::new(),
+                pickup_cancel_on_expiry: false,
+            };
+            for status in OrderStatus::ALL {
+                if policy.buyer_may_cancel(status) {
+                    assert!(allowed(status, Cancelled), "{until}: {status}");
+                    assert!(!matches!(status, Shipping | Delivered | DeliveryFailed | Completed));
+                }
+            }
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn day_lenh_bat_ky_khong_ra_khoi_trang_thai_cuoi(
+            first in prop_oneof![Just(PendingPayment), Just(Confirmed)],
+            commands in proptest::collection::vec(proptest::sample::select(OrderStatus::ALL.to_vec()), 0..40),
+        ) {
+            // Mô hình của `apply`: cùng trạng thái thì không làm gì; chuyển không hợp lệ bị từ chối.
+            let mut status = first;
+            let mut history = vec![status];
+            for to in commands {
+                if to != status && allowed(status, to) {
+                    prop_assert!(!TERMINAL.contains(&status));
+                    status = to;
+                    history.push(status);
+                }
+            }
+            // Đã thu tiền (rời `pending_payment`) thì không quay lại chờ thanh toán.
+            let left = history.iter().position(|status| *status != PendingPayment);
+            if let Some(left) = left {
+                prop_assert!(!history[left..].contains(&PendingPayment));
+            }
+            // Mỗi bước kế tiếp đều nằm trong bảng.
+            for pair in history.windows(2) {
+                prop_assert!(TRANSITIONS.contains(&(pair[0], pair[1])));
+            }
+        }
+    }
+}

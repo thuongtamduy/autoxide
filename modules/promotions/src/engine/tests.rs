@@ -606,3 +606,118 @@ fn ma_sai_khong_chan_ca_gio_va_ngan_sach_khong_ap_mot_phan() {
     assert_eq!(draft.applied.len(), 1);
     assert_eq!(draft.rejected[0].reason.code, "promotions.reason.budget_exhausted");
 }
+
+/// Thử phá bộ tính khuyến mại (D-20261123-property-fuzzing): giảm không âm, không vượt tiền của dòng
+/// hay của giỏ, với tổ hợp chương trình ngẫu nhiên.
+mod properties {
+    use super::*;
+    use proptest::prelude::*;
+
+    /// (loại, phạm vi đơn, giá trị, trần giảm, độ ưu tiên, độc quyền).
+    type Shape = (u8, bool, i64, Option<i64>, i32, u8);
+
+    fn shape() -> impl Strategy<Value = Shape> {
+        (
+            0u8..4,
+            any::<bool>(),
+            1i64..2_000_000,
+            proptest::option::of(1i64..1_000_000),
+            -5i32..5,
+            0u8..3,
+        )
+    }
+
+    fn build(fixture: &Fixture, (kind, order, value, cap, priority, exclusive): Shape) -> Program {
+        let mut promo = program(fixture.store);
+        promo.priority = priority;
+        promo.max_discount_minor = cap;
+        promo.exclusivity = match exclusive {
+            0 => Exclusivity::None,
+            1 => Exclusivity::Class,
+            _ => Exclusivity::Global,
+        };
+        match kind {
+            0 => promo.value_bp = Some(i32::try_from(value % 10_000 + 1).unwrap()),
+            1 => {
+                promo.kind = Kind::AmountOff;
+                promo.value_bp = None;
+                promo.value_minor = Some(value);
+                if order {
+                    promo.scope = Scope::Order;
+                }
+            }
+            2 => {
+                promo.kind = Kind::FixedPrice;
+                promo.value_bp = None;
+                promo.value_minor = Some(value);
+            }
+            _ => {
+                promo.kind = Kind::BuyXGetY;
+                promo.value_bp = None;
+                promo.buy_quantity = Some(i32::try_from(value % 3 + 1).unwrap());
+                promo.get_quantity = Some(i32::try_from(value % 2 + 1).unwrap());
+            }
+        }
+        promo
+    }
+
+    fn check(fixture: &Fixture, draft: &Draft) -> Result<(), TestCaseError> {
+        let mut per_line = vec![0i128; fixture.cart.lines.len()];
+        for applied in &draft.applied {
+            prop_assert!(applied.shipping >= 0);
+            for part in &applied.lines {
+                prop_assert!(part.amount >= 0, "giảm âm: {:?}", part);
+                per_line[part.line] += i128::from(part.amount);
+            }
+        }
+        for (line, discount) in fixture.cart.lines.iter().zip(&per_line) {
+            let worth = i128::from(line.unit_price.minor()) * i128::from(line.quantity);
+            prop_assert!(*discount <= worth, "giảm {discount} > tiền dòng {worth}");
+        }
+        Ok(())
+    }
+
+    proptest! {
+        #[test]
+        fn giam_khong_am_khong_vuot_tien_dong(
+            lines in proptest::collection::vec((0i64..5_000_000, 1i64..20), 1..6),
+            shapes in proptest::collection::vec(shape(), 1..5),
+            best in any::<bool>(),
+        ) {
+            let keys: Vec<String> = (0..lines.len()).map(|index| format!("l{index}")).collect();
+            let rows: Vec<(&str, i64, i64)> =
+                keys.iter().zip(&lines).map(|(key, (price, quantity))| (key.as_str(), *price, *quantity)).collect();
+            let mut fixture = Fixture::new(&rows);
+            fixture.best = best;
+            let programs: Vec<Program> = shapes.into_iter().map(|shape| build(&fixture, shape)).collect();
+            let refs: Vec<&Program> = programs.iter().collect();
+            check(&fixture, &fixture.run(&refs))?;
+        }
+
+        #[test]
+        fn gia_va_so_luong_bien_khong_panic(
+            lines in proptest::collection::vec((0i64..=i64::MAX, 1i64..=i64::MAX), 1..4),
+            shapes in proptest::collection::vec(shape(), 1..4),
+        ) {
+            // Số lượng do người mua gửi: tiền dòng bão hoà ở `i64::MAX`; cộng nhiều dòng không được tràn.
+            let keys: Vec<String> = (0..lines.len()).map(|index| format!("l{index}")).collect();
+            let rows: Vec<(&str, i64, i64)> =
+                keys.iter().zip(&lines).map(|(key, (price, quantity))| (key.as_str(), *price, *quantity)).collect();
+            let fixture = Fixture::new(&rows);
+            let programs: Vec<Program> = shapes.into_iter().map(|shape| build(&fixture, shape)).collect();
+            let refs: Vec<&Program> = programs.iter().collect();
+            let _ = fixture.run(&refs);
+        }
+    }
+}
+
+#[test]
+fn tien_dong_bao_hoa_khong_lam_tran_khi_cong_nhieu_dong() {
+    // Ca tái hiện: dòng thứ hai có `giá × số lượng` bão hoà ở `i64::MAX`; cộng tổng giỏ để xét ngưỡng
+    // tràn `i64` và panic trước khi sửa.
+    let fixture = Fixture::new(&[("a", 1, 1), ("b", 3, 3_074_457_345_618_258_603)]);
+    let mut promo = program(fixture.store);
+    promo.value_bp = Some(2);
+    let draft = fixture.run(&[&promo]);
+    assert!(draft.applied.iter().all(|applied| applied.total() >= 0));
+}
