@@ -296,8 +296,11 @@ async fn moi_endpoint_khong_cong_khai_tra_401_va_403() {
         // `kernel.domains.manage` (đặc tả 33), xem là một phần của quản lý; `auth.list_invitations` —
         // lời mời chỉ có một permission `auth.invitations.manage` (đặc tả 34, D-312);
         // `webhooks.list_deliveries` — lần giao chứa dữ liệu event gửi ra ngoài, chỉ người quản lý
-        // webhook xem (`webhooks.manage`, như REST), D-371.
-        const READ_ONLY_EXCEPTIONS: [&str; 4] = [
+        // webhook xem (`webhooks.manage`, như REST), D-371; `content.list_theme_variants` — bản chủ đề chỉ
+        // người quản lý giao diện xem (`content.themes.manage`, như `GET /theme-variants`),
+        // D-20261123-site-health-daily.
+        const READ_ONLY_EXCEPTIONS: [&str; 5] = [
+            "content.list_theme_variants",
             "files.list_files",
             "kernel.list_domains",
             "auth.list_invitations",
