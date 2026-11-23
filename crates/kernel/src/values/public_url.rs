@@ -1,6 +1,6 @@
-//! URL công khai của API (`AUTOXIDE_HTTP_PUBLIC_URL`, D-124): cần cho link tuyệt đối trỏ về API
-//! mà người nhận mở từ nơi khác — vd header `List-Unsubscribe` của bản tin (RFC 8058 đòi URL
-//! `https` tuyệt đối). Module lấy bằng `context.require::<PublicUrl>()`.
+//! The API's public URL (`AUTOXIDE_HTTP_PUBLIC_URL`, D-124): needed for absolute links that point back to the
+//! API and that the recipient opens from elsewhere — e.g. the newsletter's `List-Unsubscribe` header (RFC
+//! 8058 requires an absolute `https` URL). Modules obtain it with `context.require::<PublicUrl>()`.
 
 use crate::config::{ConfigReader, Invalid, Setting};
 use crate::error::Error;
@@ -13,7 +13,7 @@ pub(crate) const PUBLIC_URL: Setting = Setting::new(
 )
 .with_example("https://api.example.com");
 
-/// URL công khai của API, nếu đã cấu hình.
+/// The API's public URL, if configured.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct PublicUrl(Option<String>);
 
@@ -22,7 +22,7 @@ impl PublicUrl {
         PublicUrl(url)
     }
 
-    /// URL gốc (không có `/` cuối), hoặc lỗi nói rõ phải đặt biến nào.
+    /// The base URL (no trailing `/`), or an error that says which variable to set.
     pub fn base(&self) -> Result<&str, Error> {
         self.0.as_deref().ok_or_else(|| {
             Error::unavailable(
@@ -33,7 +33,7 @@ impl PublicUrl {
         })
     }
 
-    /// Link tuyệt đối tới `path` (bắt đầu bằng `/`, vd `/api/v1/newsletter/unsubscribe`).
+    /// Absolute link to `path` (starting with `/`, e.g. `/api/v1/newsletter/unsubscribe`).
     pub fn link(&self, path: &str) -> Result<String, Error> {
         Ok(format!("{}{path}", self.base()?))
     }

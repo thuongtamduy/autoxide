@@ -1,7 +1,7 @@
-//! Hợp đồng giữa các module: trait mà một module cung cấp qua `StartContext::provide` và module
-//! khác lấy qua `require` (AI, gửi mail, nơi lưu file, dữ liệu cá nhân, sổ đối tượng).
+//! Contracts between modules: traits that one module provides through `StartContext::provide` and other
+//! modules obtain through `require` (AI, mail sending, file storage, personal data, the object registry).
 //!
-//! Bước 33+ thêm vào đây: `payment`, `einvoice`, `identity`, `sms`, `entitlement`.
+//! Step 33+ adds more here: `payment`, `einvoice`, `identity`, `sms`, `entitlement`.
 
 pub mod ai;
 pub mod analytics;

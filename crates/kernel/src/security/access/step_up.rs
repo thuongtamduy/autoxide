@@ -1,40 +1,41 @@
-//! Xác nhận lại danh tính cho việc nhạy cảm (bước 54 P5, "sudo mode" như GitHub; RFC 9470;
+//! Re-confirming identity for sensitive actions (step 54 P5, "sudo mode" like GitHub; RFC 9470;
 //! D-20261119-step54-step-up).
 //!
-//! Permission có `risk` `destructive` hay `money` (việc GHI rủi ro cao, D-20261119-step-up-writes) chỉ dùng được khi lần xác thực
-//! gần nhất của phiên (đăng nhập, hay `POST /api/v1/auth/me/reauth`) còn trong cửa sổ. Bộ xác thực
-//! (module `auth`) gắn thời điểm đó và cửa sổ vào `Principal` bằng [`Principal::with_step_up`];
-//! người gọi không gắn (API key, job, test, bộ xác thực khác) thì không bị đòi.
+//! A permission with `risk` of `destructive` or `money` (high-risk WRITE actions, D-20261119-step-up-writes)
+//! can be used only when the session's most recent authentication (sign-in, or `POST /api/v1/auth/me/reauth`)
+//! is still within the window. The authenticator (module `auth`) attaches that time and the window to the
+//! `Principal` with [`Principal::with_step_up`]; a caller without it (API key, job, test, another
+//! authenticator) is not asked.
 
 use super::{Permission, Principal, Risk};
 use crate::error::Error;
 use crate::time::Timestamp;
 use jiff::SignedDuration;
 
-/// Thời điểm xác thực gần nhất của phiên và cửa sổ cho việc nhạy cảm.
+/// Time of the session's most recent authentication and the window for sensitive actions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct StepUp {
-    /// Lần đăng nhập hay xác nhận lại gần nhất; `None`: không biết (token cũ) — coi như đã cũ.
+    /// Most recent sign-in or re-confirmation; `None`: unknown (an old token), treated as stale.
     pub authenticated_at: Option<Timestamp>,
-    /// Bao lâu sau lần đó thì việc nhạy cảm còn làm được.
+    /// How long after that time sensitive actions can still be done.
     pub window: SignedDuration,
 }
 
 impl Principal {
-    /// Đòi xác nhận lại cho việc nhạy cảm theo `step_up`.
+    /// Requires re-confirmation for sensitive actions according to `step_up`.
     #[must_use]
     pub fn with_step_up(mut self, step_up: StepUp) -> Self {
         self.step_up = Some(step_up);
         self
     }
 
-    /// Thời điểm xác thực và cửa sổ đã gắn, nếu có.
+    /// The attached authentication time and window, if any.
     pub fn step_up(&self) -> Option<StepUp> {
         self.step_up
     }
 
-    /// `Ok` khi `permission` không cần xác nhận lại, hay lần xác thực gần nhất còn trong cửa sổ;
-    /// không thì 401 `step_up_required` kèm `WWW-Authenticate` của RFC 9470.
+    /// `Ok` when `permission` does not need re-confirmation, or the most recent authentication is still
+    /// within the window; otherwise 401 `step_up_required` with a `WWW-Authenticate` header per RFC 9470.
     pub(super) fn fresh_for(&self, permission: &Permission) -> Result<(), Error> {
         if !matches!(permission.risk(), Risk::Destructive | Risk::Money) {
             return Ok(());
@@ -42,10 +43,10 @@ impl Principal {
         self.require_fresh(permission)
     }
 
-    /// Đòi xác nhận lại cho MỘT việc cụ thể dù `permission` của nó không thuộc loại rủi ro cao —
-    /// vd đặt tài khoản nhà cung cấp (đổi nơi tiền về) dưới `kernel.settings.manage`
-    /// (D-20261122-provider-environments). Người gọi không gắn [`StepUp`] (API key, job) không bị đòi,
-    /// như [`require`](Self::require).
+    /// Requires re-confirmation for ONE specific action even though its `permission` is not high-risk, e.g.
+    /// setting a provider account (changes where money goes) under `kernel.settings.manage`
+    /// (D-20261122-provider-environments). A caller without [`StepUp`] attached (API key, job) is not asked,
+    /// like [`require`](Self::require).
     pub fn require_fresh(&self, permission: &Permission) -> Result<(), Error> {
         let Some(step_up) = self.step_up else { return Ok(()) };
         let fresh =

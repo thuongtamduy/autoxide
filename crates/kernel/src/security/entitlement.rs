@@ -1,18 +1,18 @@
-//! Quyền dùng theo khách (bước 35, D-323): module khai **tính năng** ([`Feature`]) và **hạn mức**
-//! ([`Limit`]); một module (`plans`) công bố [`Entitlements`] — quyền dùng hiện tại của mỗi khách
-//! (gói, gói thêm, ghi đè); mọi module hỏi qua [`EntitlementsHandle`].
+//! Per-tenant entitlements (step 35, D-323): modules declare **features** ([`Feature`]) and **limits**
+//! ([`Limit`]); one module (`plans`) publishes [`Entitlements`], the current entitlements of each tenant (plan,
+//! add-on plans, overrides); every module asks through [`EntitlementsHandle`].
 //!
-//! Cách nghĩ mượn Stripe Entitlements: ứng dụng chỉ hỏi "khách này đang được dùng gì", không suy từ
-//! hoá đơn.
+//! The model is borrowed from Stripe Entitlements: the application only asks "what is this tenant allowed to
+//! use", and does not infer it from invoices.
 //!
-//! - **Không có bên cung cấp** (không cài `plans`) hay khách **không có thuê bao và không có gói
-//!   mặc định**: không giới hạn gì — mô hình một khách (chế độ `single`) không đổi.
-//! - **Khách nền tảng** (khách vận hành) luôn không giới hạn: nhà vận hành không tự khoá mình.
-//! - Module [`always_enabled`](crate::module::Module::always_enabled) (nền: `auth`, `files`…) không
-//!   bao giờ bị gói chặn.
+//! - **No provider** (`plans` not installed), or a tenant with **no subscription and no default plan**: no
+//!   limits at all, so the single-tenant model (mode `single`) is unchanged.
+//! - The **platform tenant** (the operator's tenant) is always unlimited: operators do not lock themselves out.
+//! - A module that is [`always_enabled`](crate::module::Module::always_enabled) (foundation: `auth`, `files`,
+//!   ...) is never blocked by a plan.
 //!
-//! Tay cầm có trước khi bên cung cấp khởi động (module đăng ký trước `plans` vẫn giữ được nó): kernel
-//! gắn bên cung cấp vào sau khi mọi module đã khởi động.
+//! The handle exists before the provider starts (a module registered before `plans` can still hold it): the
+//! kernel attaches the provider after every module has started.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, OnceLock};
@@ -20,7 +20,7 @@ use std::sync::{Arc, OnceLock};
 use crate::error::Error;
 use crate::tenancy::{DEFAULT_TENANT, TenantContext, TenantId};
 
-/// Một tính năng bật / tắt theo gói, khoá `<module>.<tên>` (vd `content.ai_suggestions`).
+/// A feature switched on / off by plan, key `<module>.<name>` (e.g. `content.ai_suggestions`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Feature {
     key: &'static str,
@@ -28,7 +28,7 @@ pub struct Feature {
 }
 
 impl Feature {
-    /// Tính năng `key` (`<module>.<tên>`), mô tả bằng tiếng Anh cho nhà vận hành soạn gói.
+    /// Feature `key` (`<module>.<name>`), described in English for the operator who composes plans.
     pub const fn new(key: &'static str, description: &'static str) -> Self {
         Feature { key, description }
     }
@@ -42,26 +42,26 @@ impl Feature {
     }
 }
 
-/// Kỳ tính lượng dùng của hạn mức [`LimitKind::Metered`].
+/// Usage period of a [`LimitKind::Metered`] limit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Period {
-    /// Tháng dương lịch theo UTC.
+    /// Calendar month in UTC.
     Month,
 }
 
-/// Loại hạn mức.
+/// Kind of limit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum LimitKind {
-    /// Số bản ghi đang có (nút tổ chức, nhân sự, sản phẩm).
+    /// Number of existing records (organization nodes, staff, products).
     Count,
-    /// Lượng đang dùng, theo `unit` (vd `bytes`).
+    /// Amount currently in use, in `unit` (e.g. `bytes`).
     Amount { unit: &'static str },
-    /// Lượng dùng trong kỳ, về 0 đầu kỳ (request, token AI).
+    /// Usage within a period, resetting to 0 at the start of the period (requests, AI tokens).
     Metered { period: Period },
 }
 
 impl LimitKind {
-    /// Tên loại cho API: `count`, `amount`, `metered`.
+    /// Kind name for the API: `count`, `amount`, `metered`.
     pub const fn as_str(&self) -> &'static str {
         match self {
             LimitKind::Count => "count",
@@ -71,7 +71,7 @@ impl LimitKind {
     }
 }
 
-/// Một hạn mức theo gói, khoá `<module>.<tên>` (vd `files.storage_bytes`).
+/// A limit by plan, key `<module>.<name>` (e.g. `files.storage_bytes`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Limit {
     key: &'static str,
@@ -81,17 +81,17 @@ pub struct Limit {
 }
 
 impl Limit {
-    /// Hạn mức đếm số bản ghi đang có.
+    /// A limit that counts existing records.
     pub const fn count(key: &'static str, description: &'static str) -> Self {
         Limit { key, description, kind: LimitKind::Count, parts: None }
     }
 
-    /// Hạn mức theo lượng đang dùng, đơn vị `unit` (vd `bytes`).
+    /// A limit on the amount currently in use, in unit `unit` (e.g. `bytes`).
     pub const fn amount(key: &'static str, description: &'static str, unit: &'static str) -> Self {
         Limit { key, description, kind: LimitKind::Amount { unit }, parts: None }
     }
 
-    /// Hạn mức lượng dùng trong kỳ `period`.
+    /// A limit on usage within period `period`.
     pub const fn metered(key: &'static str, description: &'static str, period: Period) -> Self {
         Limit { key, description, kind: LimitKind::Metered { period }, parts: None }
     }
@@ -108,71 +108,70 @@ impl Limit {
         self.kind
     }
 
-    /// Hạn mức có thêm mức riêng theo từng phần (vd theo loại nút): gói đặt được cả khoá
-    /// `<key>.<phần>` (`organizations.units.store`) bên cạnh mức chung `<key>`. `parts` mô tả phần là
-    /// gì (vd `"unit type"`), hiện cho người soạn gói. Phần không có mức riêng thì không bị giới hạn
-    /// riêng — chỉ tính vào mức chung. Module giữ chỗ phần bằng
-    /// [`EntitlementsHandle::reserve_part`] cùng lúc với chỗ chung.
+    /// A limit that also has a separate level per part (e.g. per node type): a plan can set the key
+    /// `<key>.<part>` (`organizations.units.store`) in addition to the general level `<key>`. `parts` describes
+    /// what a part is (e.g. `"unit type"`), shown to whoever composes plans. A part with no separate level is
+    /// not limited separately, only counted toward the general level. The module reserves a part's slot with
+    /// [`EntitlementsHandle::reserve_part`] at the same time as the general slot.
     pub const fn per(self, parts: &'static str) -> Self {
         Limit { parts: Some(parts), ..self }
     }
 
-    /// Mô tả phần, khi hạn mức có mức riêng theo phần.
+    /// Description of the part, when the limit has a separate level per part.
     pub const fn parts(&self) -> Option<&'static str> {
         self.parts
     }
 
-    /// Khoá mức riêng của phần `part`: `<key>.<part>`.
+    /// Key of the separate level of part `part`: `<key>.<part>`.
     pub fn part_key(&self, part: &str) -> String {
         format!("{}.{part}", self.key)
     }
 }
 
-/// Bộ đếm thật trong database của module cho một hạn mức `Count` / `Amount`: job đối soát dùng nó
-/// để sửa số đang dùng bị lệch (tiến trình chết giữa lúc giữ chỗ và lúc ghi). Module đăng ký trong
-/// `start` bằng [`StartContext::usage_counter`](crate::module::StartContext::usage_counter).
+/// The real counter in a module's database for a `Count` / `Amount` limit: the reconciliation job uses it to
+/// fix a drifted in-use figure (a process died between reserving and writing). A module registers it in
+/// `start` with [`StartContext::usage_counter`](crate::module::StartContext::usage_counter).
 #[async_trait::async_trait]
 pub trait UsageCounter: Send + Sync {
-    /// Lượng đang dùng thật của khách `tenant`.
+    /// The real amount in use by tenant `tenant`.
     async fn count(&self, tenant: &TenantContext) -> Result<i64, Error>;
 
-    /// Lượng đang dùng thật theo từng phần (hạn mức khai [`Limit::per`]): phần → lượng. Mặc định
-    /// rỗng (hạn mức không chia phần).
+    /// The real amount in use per part (a limit that declares [`Limit::per`]): part -> amount. Empty by default
+    /// (a limit without parts).
     async fn count_parts(&self, _tenant: &TenantContext) -> Result<BTreeMap<String, i64>, Error> {
         Ok(BTreeMap::new())
     }
 }
 
-/// Khách được làm gì với dữ liệu của mình.
+/// What a tenant may do with its own data.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum TenantAccess {
     #[default]
     Full,
-    /// Thuê bao tạm khoá hay đã huỷ: chỉ xem, không ghi.
+    /// Subscription temporarily locked or cancelled: read only, no writes.
     ReadOnly,
 }
 
-/// Quyền dùng hiện tại của một khách (đã gộp gói, gói thêm, ghi đè).
+/// Current entitlements of a tenant (plans, add-on plans and overrides merged).
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct TenantEntitlements {
-    /// Không giới hạn gì: không thuê bao và không có gói mặc định, hay khách nền tảng.
+    /// No limits at all: no subscription and no default plan, or the platform tenant.
     pub unrestricted: bool,
     pub access: TenantAccess,
-    /// Module được bật (chưa gồm module `always_enabled` — chúng luôn bật).
+    /// Enabled modules (not yet including `always_enabled` modules, which are always on).
     pub modules: BTreeSet<String>,
     pub features: BTreeSet<String>,
-    /// Hạn mức theo khoá; `None` = không giới hạn. Khoá vắng mặt = 0 (không được dùng), trừ khi
-    /// `unrestricted`.
+    /// Limits by key; `None` = unlimited. An absent key = 0 (not allowed), unless `unrestricted`.
     pub limits: BTreeMap<String, Option<i64>>,
 }
 
 impl TenantEntitlements {
-    /// Không giới hạn, ghi đầy đủ.
+    /// Unlimited, with everything written out.
     pub fn unrestricted() -> Self {
         TenantEntitlements { unrestricted: true, ..TenantEntitlements::default() }
     }
 
-    /// Module `module` có được bật không (chưa xét `always_enabled`).
+    /// Whether module `module` is enabled (`always_enabled` not yet considered).
     pub fn has_module(&self, module: &str) -> bool {
         self.unrestricted || self.modules.contains(module)
     }
@@ -181,29 +180,30 @@ impl TenantEntitlements {
         self.unrestricted || self.features.contains(feature)
     }
 
-    /// Mức tối đa riêng của một phần (`<key>.<phần>`, xem [`Limit::per`]): `None` = không giới hạn
-    /// riêng — khác [`limit`](Self::limit), khoá vắng mặt nghĩa là không đặt mức riêng.
+    /// Separate maximum of a part (`<key>.<part>`, see [`Limit::per`]): `None` = no separate limit. Unlike
+    /// [`limit`](Self::limit), an absent key means no separate level is set.
     pub fn part_limit(&self, key: &str) -> Option<i64> {
         if self.unrestricted { None } else { self.limits.get(key).copied().flatten() }
     }
 
-    /// Mức tối đa của hạn mức `limit`: `None` = không giới hạn.
+    /// Maximum of limit `limit`: `None` = unlimited.
     pub fn limit(&self, limit: &str) -> Option<i64> {
         if self.unrestricted { None } else { self.limits.get(limit).copied().unwrap_or(Some(0)) }
     }
 }
 
-/// Bên cung cấp quyền dùng (module `plans` công bố `dyn Entitlements`). Mọi hàm nhận ID khách:
-/// sổ gói và thuê bao ở mặt điều khiển.
+/// The provider of entitlements (module `plans` publishes `dyn Entitlements`). Every function takes the tenant
+/// ID: the registry of plans and subscriptions lives at the control plane.
 #[async_trait::async_trait]
 pub trait Entitlements: Send + Sync {
-    /// Quyền dùng hiện tại của khách `tenant` — có thể lấy từ bộ nhớ đệm ngắn hạn.
+    /// Current entitlements of tenant `tenant`; may come from a short-lived cache.
     async fn snapshot(&self, tenant: TenantId) -> Result<Arc<TenantEntitlements>, Error>;
 
-    /// Giữ chỗ `amount` (> 0) của hạn mức `limit` theo `reference` (vd `catalog.product:<id>`),
-    /// có hạn giữ. Gọi lại cùng `reference` + cùng `amount` → không giữ thêm; khác `amount` →
-    /// `reference_reused`. Vượt hạn mức → `limit_exceeded`. Không gọi bên trong transaction ghi
-    /// của module (SQLite một bên ghi: tự khoá mình).
+    /// Reserves `amount` (> 0) of limit `limit` under `reference` (e.g. `catalog.product:<id>`), with an
+    /// expiry on the reservation. Calling again with the same `reference` and the same `amount` does not
+    /// reserve more; with a different `amount` it returns `reference_reused`. Exceeding the limit returns
+    /// `limit_exceeded`. Do not call it inside a module's write transaction (SQLite has a single writer: it
+    /// would lock itself).
     async fn reserve(
         &self,
         tenant: TenantId,
@@ -212,15 +212,15 @@ pub trait Entitlements: Send + Sync {
         reference: &str,
     ) -> Result<(), Error>;
 
-    /// Chỗ đã giữ thành vĩnh viễn (bản ghi của module đã commit).
+    /// The reserved slot becomes permanent (the module's record has been committed).
     async fn confirm(&self, tenant: TenantId, limit: &Limit, reference: &str) -> Result<(), Error>;
 
-    /// Trả lại chỗ đã giữ hay đã xác nhận; gọi nhiều lần hay với `reference` lạ đều `Ok`.
+    /// Gives back a reserved or confirmed slot; calling it many times or with an unknown `reference` is always `Ok`.
     async fn release(&self, tenant: TenantId, limit: &Limit, reference: &str) -> Result<(), Error>;
 
-    /// Như [`reserve`](Self::reserve) cho mức riêng của phần `part` (khoá `<key>.<part>`, xem
-    /// [`Limit::per`]); phần không có mức riêng chỉ được ghi lượng dùng, không bao giờ bị từ chối.
-    /// Mặc định: không giới hạn.
+    /// Like [`reserve`](Self::reserve) for the separate level of part `part` (key `<key>.<part>`, see
+    /// [`Limit::per`]); a part with no separate level only records usage and is never refused.
+    /// Default: unlimited.
     async fn reserve_part(
         &self,
         _tenant: TenantId,
@@ -232,7 +232,7 @@ pub trait Entitlements: Send + Sync {
         Ok(())
     }
 
-    /// Như [`confirm`](Self::confirm) cho phần `part`. Mặc định: `Ok`.
+    /// Like [`confirm`](Self::confirm) for part `part`. Default: `Ok`.
     async fn confirm_part(
         &self,
         _tenant: TenantId,
@@ -243,7 +243,7 @@ pub trait Entitlements: Send + Sync {
         Ok(())
     }
 
-    /// Như [`release`](Self::release) cho phần `part`. Mặc định: `Ok`.
+    /// Like [`release`](Self::release) for part `part`. Default: `Ok`.
     async fn release_part(
         &self,
         _tenant: TenantId,
@@ -254,8 +254,8 @@ pub trait Entitlements: Send + Sync {
         Ok(())
     }
 
-    /// Ghi lượng dùng `quantity` của hạn mức `Metered`; trùng `reference` thì bỏ qua. Vượt mức
-    /// của kỳ → `quota_exhausted`.
+    /// Records usage `quantity` of a `Metered` limit; a duplicate `reference` is ignored. Exceeding the
+    /// period's limit returns `quota_exhausted`.
     async fn record_usage(
         &self,
         tenant: TenantId,
@@ -264,27 +264,27 @@ pub trait Entitlements: Send + Sync {
         reference: &str,
     ) -> Result<(), Error>;
 
-    /// Mã các gói đang bán có `module` / `feature` / mức của hạn mức `limit` lớn hơn `above`
-    /// (`None`: không giới hạn) — để giao diện chỉ "nâng lên gói nào thì mở" (bước 51 P11). Mặc
-    /// định: không biết gói nào.
+    /// Codes of the plans on sale that have `module` / `feature` / a level of limit `limit` greater than
+    /// `above` (`None`: unlimited), so the interface can show "which plan to upgrade to in order to unlock"
+    /// (step 51 P11). Default: no known plan.
     async fn plans_offering(&self, need: &PlanNeed) -> Result<Vec<String>, Error> {
         let _ = need;
         Ok(Vec::new())
     }
 
-    /// Khách có thuê bao ở trạng thái `status` (bộ lọc của danh sách khách). Mặc định: không ai.
+    /// Tenants whose subscription has status `status` (a filter of the tenant list). Default: none.
     async fn tenants_with_status(&self, status: &str) -> Result<Vec<TenantId>, Error> {
         let _ = status;
         Ok(Vec::new())
     }
 
-    /// Khách đã dùng từ 80% một hạn mức trở lên (bộ lọc `near_limit`). Mặc định: không ai.
+    /// Tenants that have used 80% or more of a limit (the `near_limit` filter). Default: none.
     async fn tenants_near_limit(&self) -> Result<Vec<TenantId>, Error> {
         Ok(Vec::new())
     }
 
-    /// Thuê bao (`subscription`) và lượng dùng (`usage`) của các khách `tenants`, cho `expand` của
-    /// danh sách khách — cả trang một lần. Khách không có thì không có trong kết quả. Mặc định: rỗng.
+    /// Subscription (`subscription`) and usage (`usage`) of tenants `tenants`, for the `expand` of the tenant
+    /// list, the whole page at once. A tenant that has none is absent from the result. Default: empty.
     async fn describe_tenants(
         &self,
         tenants: &[TenantId],
@@ -296,13 +296,13 @@ pub trait Entitlements: Send + Sync {
     }
 }
 
-/// Điều cần có ở gói (xem [`Entitlements::plans_offering`]).
+/// What a plan must have (see [`Entitlements::plans_offering`]).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct PlanNeed {
     pub module: Option<String>,
     pub feature: Option<String>,
-    /// Hạn mức và mức hiện tại: gói phải cho nhiều hơn mức này.
+    /// Limit and its current level: the plan must give more than this level.
     pub limit: Option<(String, i64)>,
 }
 
@@ -320,8 +320,8 @@ impl PlanNeed {
     }
 }
 
-/// Thuê bao và lượng dùng của một khách, ở dạng JSON của module cung cấp (kernel không biết
-/// hình dạng cụ thể — chỉ chuyển cho `expand` của `GET /api/v1/kernel/tenants`).
+/// Subscription and usage of a tenant, in the JSON shape of the providing module (the kernel does not know
+/// the exact shape; it only passes it to the `expand` of `GET /api/v1/kernel/tenants`).
 #[derive(Debug, Clone, Default, PartialEq)]
 #[non_exhaustive]
 pub struct TenantPlanView {
@@ -335,8 +335,8 @@ impl TenantPlanView {
     }
 }
 
-/// Tay cầm kernel đưa cho MỌI module lúc `start`. Trỏ tới `dyn Entitlements` khi có module công
-/// bố; không có thì "không giới hạn". Clone rẻ (một `Arc`).
+/// Handle the kernel gives to EVERY module at `start`. Points to `dyn Entitlements` when a module publishes
+/// one; otherwise it means "unlimited". Cheap to clone (an `Arc`).
 #[derive(Clone, Default)]
 pub struct EntitlementsHandle {
     // `Arc<OnceLock<…>>`: mọi bản clone dùng chung một ô, kernel ghi đúng một lần sau khi mọi
@@ -346,20 +346,21 @@ pub struct EntitlementsHandle {
     meter: Arc<Meter>,
 }
 
-/// Hạn mức số request API theo tháng của mỗi khách (kernel khai, đếm ở lớp HTTP).
+/// Monthly API request limit of each tenant (declared by the kernel, counted at the HTTP layer).
 pub const API_REQUESTS: Limit = Limit::metered(
     "kernel.api_requests",
     "API requests (REST and MCP) a tenant can make each month.",
     Period::Month,
 );
 
-/// Đếm request API theo khách trong bộ nhớ của tiến trình; [`EntitlementsHandle::flush_usage`]
-/// ghi gộp vào sổ lượng dùng (mỗi 60 giây). Tiến trình chết thì mất tối đa chừng ấy số đếm.
+/// Counts API requests per tenant in the process's memory; [`EntitlementsHandle::flush_usage`] writes them
+/// merged into the usage ledger (every 60 seconds). If the process dies, at most that much of the count is
+/// lost.
 #[derive(Default)]
 struct Meter {
     // `Mutex` chuẩn: chỉ giữ trong vài phép tính, không qua `.await`.
     counts: std::sync::Mutex<BTreeMap<TenantId, i64>>,
-    /// Khách đã hết lượng request của kỳ: tới mốc này thì thôi chặn.
+    /// Tenant has used up the period's requests: blocking stops at this point.
     exhausted: std::sync::Mutex<BTreeMap<TenantId, std::time::Instant>>,
 }
 
@@ -368,8 +369,8 @@ impl EntitlementsHandle {
         EntitlementsHandle { provider: Arc::default(), catalog, meter: Arc::default() }
     }
 
-    /// Đếm một request API của khách `tenant` (lớp HTTP gọi). Không có bên cung cấp hay khách nền
-    /// tảng: không đếm.
+    /// Counts one API request of tenant `tenant` (the HTTP layer calls it). With no provider, or the platform
+    /// tenant: no counting.
     pub fn count_request(&self, tenant: TenantId) {
         if self.provider_for(tenant).is_none() {
             return;
@@ -379,7 +380,7 @@ impl EntitlementsHandle {
         }
     }
 
-    /// Khách `tenant` đã hết lượng request của kỳ: số giây tới kỳ sau, để trả 429.
+    /// Tenant `tenant` has used up the period's requests: the number of seconds until the next period, to return 429.
     pub fn request_quota_wait(&self, tenant: TenantId) -> Option<u64> {
         let mut exhausted = self.meter.exhausted.lock().ok()?;
         let until = *exhausted.get(&tenant)?;
@@ -391,9 +392,10 @@ impl EntitlementsHandle {
         Some((until - now).as_secs().max(1))
     }
 
-    /// Ghi số request đã đếm vào sổ lượng dùng, mỗi khách một dòng, `reference` = `node` + mốc
-    /// `slot` (vd phút) — gọi lại cùng mốc không ghi trùng. Khách hết lượng: lần sau bị chặn tới
-    /// đầu kỳ sau. Lỗi khác: ghi log, số đếm của lượt đó bỏ đi (đếm để tính tiền, không giữ tiền).
+    /// Writes the counted requests into the usage ledger, one row per tenant, `reference` = `node` + time
+    /// slot `slot` (e.g. a minute); calling again with the same slot does not write a duplicate. A tenant
+    /// that is out of quota: blocked from now until the start of the next period. Other errors: logged, and
+    /// that round's count is dropped (the count is for billing, not for holding money).
     pub async fn flush_usage(&self, node: &str, slot: i64) {
         let counts = match self.meter.counts.lock() {
             Ok(mut counts) => std::mem::take(&mut *counts),
@@ -417,29 +419,29 @@ impl EntitlementsHandle {
         }
     }
 
-    /// Gắn bên cung cấp; lần gọi sau bị bỏ qua.
+    /// Attaches the provider; later calls are ignored.
     pub(crate) fn fill(&self, provider: Option<Arc<dyn Entitlements>>) {
         if let Some(provider) = provider {
             let _ = self.provider.set(provider);
         }
     }
 
-    /// Có bên cung cấp quyền dùng không (đã cài `plans`).
+    /// Whether there is an entitlement provider (`plans` is installed).
     pub fn is_enforced(&self) -> bool {
         self.provider.get().is_some()
     }
 
-    /// Sổ tính năng và hạn mức của mọi module.
+    /// Registry of every module's features and limits.
     pub fn catalog(&self) -> &EntitlementCatalog {
         &self.catalog
     }
 
-    /// Bên cung cấp, trừ khi khách được miễn (khách nền tảng) hay chưa có bên cung cấp.
+    /// The provider, unless the tenant is exempt (the platform tenant) or there is no provider yet.
     fn provider_for(&self, tenant: TenantId) -> Option<&Arc<dyn Entitlements>> {
         if tenant == DEFAULT_TENANT { None } else { self.provider.get() }
     }
 
-    /// Quyền dùng hiện tại của khách `tenant`.
+    /// Current entitlements of tenant `tenant`.
     pub async fn snapshot(&self, tenant: TenantId) -> Result<Arc<TenantEntitlements>, Error> {
         match self.provider_for(tenant) {
             Some(provider) => provider.snapshot(tenant).await,
@@ -447,7 +449,7 @@ impl EntitlementsHandle {
         }
     }
 
-    /// Gói đang bán đáp ứng `need` (rỗng khi không có module gói).
+    /// Plans on sale that satisfy `need` (empty when there is no plans module).
     pub async fn plans_offering(
         &self,
         tenant: TenantId,
@@ -459,7 +461,7 @@ impl EntitlementsHandle {
         }
     }
 
-    /// Module `module` có được bật cho khách `tenant` không (module `always_enabled` luôn bật).
+    /// Whether module `module` is enabled for tenant `tenant` (`always_enabled` modules are always on).
     pub async fn module_enabled(&self, tenant: TenantId, module: &str) -> Result<bool, Error> {
         if self.catalog.is_always_enabled(module) {
             return Ok(true);
@@ -467,7 +469,7 @@ impl EntitlementsHandle {
         Ok(self.snapshot(tenant).await?.has_module(module))
     }
 
-    /// Như [`module_enabled`](Self::module_enabled), lỗi `module_not_enabled` khi chưa bật.
+    /// Like [`module_enabled`](Self::module_enabled), with error `module_not_enabled` when it is not enabled.
     pub async fn require_module(&self, tenant: TenantId, module: &str) -> Result<(), Error> {
         if self.module_enabled(tenant, module).await? {
             Ok(())
@@ -480,7 +482,7 @@ impl EntitlementsHandle {
         Ok(self.snapshot(tenant).await?.has_feature(feature.key()))
     }
 
-    /// Lỗi `feature_not_enabled` khi khách chưa có tính năng `feature`.
+    /// Error `feature_not_enabled` when the tenant does not have feature `feature`.
     pub async fn require_feature(&self, tenant: TenantId, feature: &Feature) -> Result<(), Error> {
         if self.has_feature(tenant, feature).await? {
             Ok(())
@@ -490,7 +492,7 @@ impl EntitlementsHandle {
         }
     }
 
-    /// Xem [`Entitlements::tenants_with_status`]; không có bên cung cấp: không ai.
+    /// See [`Entitlements::tenants_with_status`]; with no provider: none.
     pub async fn tenants_with_status(&self, status: &str) -> Result<Vec<TenantId>, Error> {
         match self.provider.get() {
             Some(provider) => provider.tenants_with_status(status).await,
@@ -498,7 +500,7 @@ impl EntitlementsHandle {
         }
     }
 
-    /// Xem [`Entitlements::describe_tenants`]; không có bên cung cấp: rỗng.
+    /// See [`Entitlements::describe_tenants`]; with no provider: empty.
     pub async fn describe_tenants(
         &self,
         tenants: &[TenantId],
@@ -513,7 +515,7 @@ impl EntitlementsHandle {
         }
     }
 
-    /// Xem [`Entitlements::tenants_near_limit`]; không có bên cung cấp: không ai.
+    /// See [`Entitlements::tenants_near_limit`]; with no provider: none.
     pub async fn tenants_near_limit(&self) -> Result<Vec<TenantId>, Error> {
         match self.provider.get() {
             Some(provider) => provider.tenants_near_limit().await,
@@ -521,7 +523,7 @@ impl EntitlementsHandle {
         }
     }
 
-    /// Xem [`Entitlements::reserve`]; không có bên cung cấp thì `Ok`.
+    /// See [`Entitlements::reserve`]; with no provider it is `Ok`.
     pub async fn reserve(
         &self,
         tenant: TenantId,
@@ -535,7 +537,7 @@ impl EntitlementsHandle {
         }
     }
 
-    /// Xem [`Entitlements::confirm`]; không có bên cung cấp thì `Ok`.
+    /// See [`Entitlements::confirm`]; with no provider it is `Ok`.
     pub async fn confirm(
         &self,
         tenant: TenantId,
@@ -548,7 +550,7 @@ impl EntitlementsHandle {
         }
     }
 
-    /// Xem [`Entitlements::release`]; không có bên cung cấp thì `Ok`.
+    /// See [`Entitlements::release`]; with no provider it is `Ok`.
     pub async fn release(
         &self,
         tenant: TenantId,
@@ -561,8 +563,9 @@ impl EntitlementsHandle {
         }
     }
 
-    /// Xem [`Entitlements::reserve_part`]; không có bên cung cấp thì `Ok`. Module giữ chỗ chung
-    /// ([`reserve`](Self::reserve)) trước, rồi chỗ của phần; phần bị từ chối thì trả lại chỗ chung.
+    /// See [`Entitlements::reserve_part`]; with no provider it is `Ok`. A module reserves the general slot
+    /// ([`reserve`](Self::reserve)) first, then the part's slot; if the part is refused the general slot is
+    /// released.
     pub async fn reserve_part(
         &self,
         tenant: TenantId,
@@ -577,7 +580,7 @@ impl EntitlementsHandle {
         }
     }
 
-    /// Xem [`Entitlements::confirm_part`]; không có bên cung cấp thì `Ok`.
+    /// See [`Entitlements::confirm_part`]; with no provider it is `Ok`.
     pub async fn confirm_part(
         &self,
         tenant: TenantId,
@@ -591,7 +594,7 @@ impl EntitlementsHandle {
         }
     }
 
-    /// Xem [`Entitlements::release_part`]; không có bên cung cấp thì `Ok`.
+    /// See [`Entitlements::release_part`]; with no provider it is `Ok`.
     pub async fn release_part(
         &self,
         tenant: TenantId,
@@ -605,7 +608,7 @@ impl EntitlementsHandle {
         }
     }
 
-    /// Xem [`Entitlements::record_usage`]; không có bên cung cấp thì `Ok`.
+    /// See [`Entitlements::record_usage`]; with no provider it is `Ok`.
     pub async fn record_usage(
         &self,
         tenant: TenantId,
@@ -620,14 +623,14 @@ impl EntitlementsHandle {
     }
 }
 
-/// Một hạn mức trong sổ, kèm module khai nó.
+/// A limit in the registry, with the module that declared it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CatalogLimit {
     pub module: &'static str,
     pub limit: Limit,
 }
 
-/// Một tính năng trong sổ, kèm module khai nó.
+/// A feature in the registry, with the module that declared it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CatalogFeature {
     pub module: &'static str,
@@ -642,8 +645,9 @@ struct CatalogData {
     limits: BTreeMap<&'static str, CatalogLimit>,
 }
 
-/// Sổ tính năng, hạn mức, module bật được của mọi module — dựng lúc đăng ký (khai báo tĩnh), phần
-/// `requires` và bộ đếm điền sau khi mọi module khởi động. Clone rẻ.
+/// Registry of features, limits and enableable modules of every module: built at registration (static
+/// declarations), with the `requires` part and the counters filled in after every module has started.
+/// Cheap to clone.
 #[derive(Clone, Default)]
 pub struct EntitlementCatalog {
     data: Arc<CatalogData>,
@@ -653,14 +657,14 @@ pub struct EntitlementCatalog {
 
 #[derive(Default)]
 struct Late {
-    /// `(module, module nó cần)`: ghi lúc module gọi `StartContext::require`.
+    /// `(module, module it needs)`: recorded when a module calls `StartContext::require`.
     requires: BTreeSet<(&'static str, &'static str)>,
     counters: BTreeMap<&'static str, Arc<dyn UsageCounter>>,
 }
 
 impl EntitlementCatalog {
-    /// Dựng sổ từ khai báo của các module; trả kèm các lỗi khai báo (khoá không mang tiền tố của
-    /// module, trùng khoá, khoá sai dạng).
+    /// Builds the registry from the modules' declarations; also returns the declaration errors (a key that
+    /// does not carry the module's prefix, a duplicate key, a malformed key).
     pub(crate) fn build(
         declared: Vec<(&'static str, bool, Vec<Feature>, Vec<Limit>)>,
     ) -> (Self, Vec<String>) {
@@ -698,12 +702,12 @@ impl EntitlementCatalog {
         let _ = self.late.set(Late { requires, counters });
     }
 
-    /// Mọi module đã đăng ký, theo thứ tự.
+    /// Every registered module, in order.
     pub fn modules(&self) -> &[&'static str] {
         &self.data.modules
     }
 
-    /// Module không bao giờ bị gói chặn.
+    /// Modules that are never blocked by a plan.
     pub fn is_always_enabled(&self, module: &str) -> bool {
         self.data.always_enabled.contains(module)
     }
@@ -720,8 +724,8 @@ impl EntitlementCatalog {
         self.data.limits.values()
     }
 
-    /// Hạn mức mang khoá `key` — kể cả khoá mức riêng của một phần (`<key>.<phần>`) của hạn mức khai
-    /// [`Limit::per`]; phần phải là tên dạng định danh (chữ thường, số, `_`).
+    /// Limit with key `key`, including the key of a part's separate level (`<key>.<part>`) of a limit that
+    /// declares [`Limit::per`]; the part must be an identifier-shaped name (lowercase letters, digits, `_`).
     pub fn limit(&self, key: &str) -> Option<&CatalogLimit> {
         if let Some(found) = self.data.limits.get(key) {
             return Some(found);
@@ -732,8 +736,8 @@ impl EntitlementCatalog {
         valid.then_some(found)
     }
 
-    /// Module mà `module` cần (đã `require` trait của chúng lúc khởi động). Rỗng trước khi mọi
-    /// module khởi động.
+    /// Modules that `module` needs (it did `require` their traits at startup). Empty before every module has
+    /// started.
     pub fn requires(&self, module: &str) -> Vec<&'static str> {
         self.late
             .get()
@@ -747,13 +751,13 @@ impl EntitlementCatalog {
             .unwrap_or_default()
     }
 
-    /// Bộ đếm thật của hạn mức `key`, nếu module đã đăng ký.
+    /// The real counter of limit `key`, if the module registered one.
     pub fn counter(&self, key: &str) -> Option<Arc<dyn UsageCounter>> {
         self.late.get().and_then(|late| late.counters.get(key).cloned())
     }
 }
 
-/// Lỗi khai báo khi `key` không có dạng `<module>.<tên>`.
+/// Declaration error when `key` does not have the form `<module>.<name>`.
 fn key_problem(module: &str, key: &str, what: &str) -> Option<String> {
     let owned = key.strip_prefix(module).and_then(|rest| rest.strip_prefix('.'));
     let well_formed = owned
@@ -766,7 +770,7 @@ fn key_problem(module: &str, key: &str, what: &str) -> Option<String> {
     })
 }
 
-/// `module_not_enabled` (403): gói của khách chưa có module này.
+/// `module_not_enabled` (403): the tenant's plan does not include this module.
 pub fn module_not_enabled(module: &str) -> Error {
     Error::forbidden(
         "module_not_enabled",
@@ -775,7 +779,7 @@ pub fn module_not_enabled(module: &str) -> Error {
     .with_param("module", module.to_owned())
 }
 
-/// `feature_not_enabled` (403): gói của khách chưa có tính năng này.
+/// `feature_not_enabled` (403): the tenant's plan does not include this feature.
 pub fn feature_not_enabled(feature: &str) -> Error {
     Error::forbidden(
         "feature_not_enabled",
@@ -784,7 +788,7 @@ pub fn feature_not_enabled(feature: &str) -> Error {
     .with_param("feature", feature.to_owned())
 }
 
-/// `limit_exceeded` (403): đã dùng hết hạn mức.
+/// `limit_exceeded` (403): the limit has been used up.
 pub fn limit_exceeded(limit: &str, used: i64, max: i64) -> Error {
     metrics::counter!("entitlement_denials_total", "kind" => "limit").increment(1);
     Error::forbidden(
@@ -796,7 +800,7 @@ pub fn limit_exceeded(limit: &str, used: i64, max: i64) -> Error {
     .with_param("max", max)
 }
 
-/// `quota_exhausted` (429): đã dùng hết lượng của kỳ này; kỳ mới sau `retry_after` giây.
+/// `quota_exhausted` (429): this period's quota has been used up; a new period starts after `retry_after` seconds.
 pub fn quota_exhausted(limit: &str, retry_after: u64) -> Error {
     metrics::counter!("entitlement_denials_total", "kind" => "quota").increment(1);
     Error::too_many_requests(
@@ -808,7 +812,7 @@ pub fn quota_exhausted(limit: &str, retry_after: u64) -> Error {
     .with_retry_after(retry_after)
 }
 
-/// `reference_reused` (409): cùng mã tham chiếu đã giữ chỗ cho một lượng khác.
+/// `reference_reused` (409): the same reference already reserved a slot for a different amount.
 pub fn reference_reused(reference: &str, limit: &str) -> Error {
     Error::conflict(
         "reference_reused",

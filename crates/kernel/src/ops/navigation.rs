@@ -1,8 +1,8 @@
-//! `GET /api/v1/kernel/navigation` (bước 51 P1): sổ điều hướng đã lọc cho người gọi ở khách và
-//! nút đang chọn. Mục ẩn khi module chưa bật cho khách hay người gọi không có permission nào của
-//! mục ở nút; mục **khoá** (vẫn hiện, kèm `required_feature`) khi module bật mà gói thiếu tính
-//! năng. Nhóm không còn mục nào thì bỏ. Nhóm của không gian nền tảng chỉ hiện cho nhân sự khách
-//! nền tảng.
+//! `GET /api/v1/kernel/navigation` (step 51 P1): the navigation registry filtered for the caller in the
+//! tenant and the selected node. An item is hidden when its module is not enabled for the tenant or the
+//! caller has none of the item's permissions at the node; an item is **locked** (still shown, with
+//! `required_feature`) when the module is enabled but the plan lacks the feature. A group left with no items
+//! is dropped. Groups of the platform space are shown only to staff of the platform tenant.
 
 use std::sync::Arc;
 
@@ -95,10 +95,10 @@ pub(crate) struct NavigationQuery {
     device: Option<String>,
 }
 
-/// Số mục tối đa trên thanh đáy của điện thoại (D-232).
+/// Maximum number of items on the phone's bottom bar (D-232).
 const MOBILE_PRIMARY_MAX: usize = 5;
 
-/// `device` của query hay tool: `true` khi là điện thoại.
+/// `device` of the query or tool: `true` for a phone.
 fn is_mobile(device: Option<&str>) -> Result<bool, Error> {
     match device {
         None | Some("desktop") => Ok(false),
@@ -119,7 +119,7 @@ pub(crate) struct NavigationState {
 }
 
 impl NavigationState {
-    /// Sổ đã lọc cho `principal` ở khách `tenant`, nút `org_id`.
+    /// The registry filtered for `principal` in tenant `tenant`, node `org_id`.
     pub(crate) async fn view(
         &self,
         tenant: &TenantContext,
@@ -188,9 +188,9 @@ impl NavigationState {
     }
 }
 
-/// Giữ tối đa 5 mục `primary` (thứ tự nhỏ nhất, chỉ mục `available`), phần còn lại thành
-/// `secondary`; rồi sắp mục trong nhóm theo chỗ, thứ tự. Không lỗi lúc khởi động vì tập module bật
-/// khác nhau theo khách.
+/// Keeps at most 5 `primary` items (lowest order, only `available` items); the rest become `secondary`; then
+/// sorts items within a group by slot, then order. No error at startup because the set of enabled modules
+/// differs per tenant.
 fn limit_primary(groups: &mut [NavGroupView]) {
     let mut primary: Vec<(u16, String)> = groups
         .iter()

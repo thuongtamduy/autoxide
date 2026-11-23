@@ -1,11 +1,11 @@
-//! Ghi và lọc theo chỉ mục giá trị trường tự định nghĩa (`write_index`, `condition`).
+//! Writing and filtering by the index of custom field values (`write_index`, `condition`).
 
 use super::values::{index_values, normalize};
 use super::*;
 
 impl CustomFields {
-    /// Ghi index lọc của bản ghi `record` (module `module`) theo giá trị đã lưu: gọi cùng
-    /// transaction với bản ghi. Chỉ trường `filterable`.
+    /// Writes the filter index of record `record` (module `module`) from the stored values: call it in the same
+    /// transaction as the record. Only `filterable` fields.
     pub async fn write_index<C: ConnectionTrait>(
         &self,
         connection: &C,
@@ -51,8 +51,8 @@ impl CustomFields {
         Ok(())
     }
 
-    /// Điều kiện lọc `cf.<key>=<toán tử>:<giá trị>` trên cột ID bản ghi `column` của module
-    /// `module`. Lỗi khi trường không có, không lọc được, hay giá trị sai.
+    /// Filter condition `cf.<key>=<operator>:<value>` on the record ID column `column` of module
+    /// `module`. Errors when the field does not exist, cannot be filtered, or the value is wrong.
     #[allow(clippy::too_many_arguments)]
     pub async fn condition<Col: ColumnTrait>(
         &self,

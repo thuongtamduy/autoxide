@@ -1,5 +1,5 @@
-//! `GET /api/v1/kernel/blocks`: khối khách đang dùng được, kèm schema props — giao diện dựng bảng
-//! thuộc tính từ đây, AI tạo trang cũng đọc đúng danh sách này.
+//! `GET /api/v1/kernel/blocks`: the blocks a tenant can use, with their props schema — the UI builds the
+//! property form from here, and AI page builders read the same list.
 
 use axum::extract::State;
 use serde::Serialize;

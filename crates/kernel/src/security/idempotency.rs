@@ -1,25 +1,25 @@
-//! Idempotency key: gửi lại một lệnh ghi (vì mạng chập chờn, vì AI agent retry) không
-//! làm hai lần (D-058).
+//! Idempotency key: resending a write command (because of a flaky network, or an AI agent retrying) does not
+//! make it happen twice (D-058).
 //!
-//! Client gửi header `Idempotency-Key: <chuỗi do client chọn>` kèm `POST`, `PUT`,
-//! `PATCH` hay `DELETE` (theo bản nháp IETF "The Idempotency-Key HTTP Header Field").
-//! Lần đầu: request chạy bình thường, response được lưu. Gửi lại cùng key (cùng người
-//! gọi, cùng request): nhận lại đúng response đã lưu, kèm `Idempotent-Replayed: true`,
-//! handler không chạy lại. Cùng key mà request khác: 422. Lần đầu chưa xong: 409.
+//! A client sends the header `Idempotency-Key: <string chosen by the client>` with a `POST`, `PUT`, `PATCH`
+//! or `DELETE` (per the IETF draft "The Idempotency-Key HTTP Header Field"). First time: the request runs
+//! normally and the response is stored. Resending the same key (same caller, same request): receives exactly
+//! the stored response, with `Idempotent-Replayed: true`, and the handler does not run again. The same key
+//! with a different request: 422. The first run not finished yet: 409.
 //!
-//! Lưu trữ nằm sau trait [`IdempotencyStore`], do một module cung cấp (kernel không có
-//! bảng); lớp HTTP ở `http::idempotency`.
+//! Storage sits behind the [`IdempotencyStore`] trait, provided by a module (the kernel has no table); the HTTP
+//! layer is in `http::idempotency`.
 
 use crate::error::Error;
 use crate::tenancy::TenantContext;
 use crate::time::Timestamp;
 
-/// Response đã lưu của một lệnh ghi.
+/// Stored response of a write command.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct StoredResponse {
     pub status: u16,
-    /// Các header cần trả lại y hệt (`content-type`, `location`…).
+    /// Headers to send back exactly as they were (`content-type`, `location`, ...).
     pub headers: Vec<(String, String)>,
     pub body: Vec<u8>,
 }
@@ -31,25 +31,25 @@ impl StoredResponse {
     }
 }
 
-/// Kết quả khi bắt đầu một request mang idempotency key.
+/// Result of starting a request that carries an idempotency key.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Begin {
-    /// Lần đầu: chạy request, rồi gọi [`IdempotencyStore::complete`] (hay `abandon`)
-    /// với `id` này.
+    /// First time: run the request, then call [`IdempotencyStore::complete`] (or `abandon`)
+    /// with this `id`.
     Started { id: uuid::Uuid },
-    /// Đã có kết quả: trả lại nó.
+    /// A result already exists: return it.
     Replay(StoredResponse),
-    /// Lần đầu vẫn đang chạy.
+    /// The first run is still in progress.
     InProgress,
-    /// Cùng key, nhưng request khác lần đầu.
+    /// The same key, but the request differs from the first one.
     Mismatch,
 }
 
-/// Nơi lưu idempotency key. `scope` là người gọi (băm), `fingerprint` là request (băm).
+/// Where idempotency keys are stored. `scope` is the caller (hashed), `fingerprint` is the request (hashed).
 #[async_trait::async_trait]
 pub trait IdempotencyStore: Send + Sync {
-    /// Ghi nhận request; giữ quyền chạy tới `locked_until`.
+    /// Registers the request; holds the right to run until `locked_until`.
     async fn begin(
         &self,
         tenant: &TenantContext,
@@ -59,7 +59,7 @@ pub trait IdempotencyStore: Send + Sync {
         locked_until: Timestamp,
     ) -> Result<Begin, Error>;
 
-    /// Lưu response của lần chạy `id`.
+    /// Stores the response of run `id`.
     async fn complete(
         &self,
         tenant: &TenantContext,
@@ -67,6 +67,6 @@ pub trait IdempotencyStore: Send + Sync {
         response: StoredResponse,
     ) -> Result<(), Error>;
 
-    /// Lần chạy `id` hỏng phía máy chủ: bỏ ghi nhận, để client gửi lại được.
+    /// Run `id` failed on the server side: removes the registration so the client can resend.
     async fn abandon(&self, tenant: &TenantContext, id: uuid::Uuid) -> Result<(), Error>;
 }

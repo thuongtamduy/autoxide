@@ -1,16 +1,18 @@
-//! Chỗ nối cho tự động hoá quy trình (bước 58, module `automations`): sổ tool MCP của mọi module và
-//! mẫu luật do module khai.
+//! Hook point for workflow automation (step 58, module `automations`): the registry of every module's MCP
+//! tools and the rule templates modules declare.
 //!
-//! Luật "khi … thì …" chỉ được làm đúng điều tool MCP làm được (luật kiến trúc 8): module
-//! `automations` không gọi service của module khác, mà gọi tool qua [`AutomationDirectory::call`] —
-//! cùng kiểm permission, gói của khách, khách chỉ đọc như endpoint `/mcp`. Sổ được điền SAU khi mọi
-//! module khởi động (tool chỉ có từ lúc đó), như `ResourceDirectory`; module lấy tay cầm bằng
-//! [`StartContext::automation_directory`](crate::module::StartContext::automation_directory) lúc
-//! `start` và chỉ dùng khi phục vụ.
+//! A "when … then …" rule may only do what an MCP tool can do (architecture rule 8): the `automations` module
+//! does not call other modules' services but calls tools through [`AutomationDirectory::call`] — with the
+//! same permission check, tenant plan and read-only-tenant handling as the `/mcp` endpoint. The registry is
+//! filled AFTER every module has started (tools exist only from then on), like `ResourceDirectory`; a module
+//! takes the handle with
+//! [`StartContext::automation_directory`](crate::module::StartContext::automation_directory) in `start` and
+//! only uses it while serving.
 //!
-//! Mẫu luật ([`AutomationTemplate`]) do module khai qua `Module::automation_templates`: thân luật
-//! dạng JSON theo định dạng của module `automations` (`trigger`, `conditions`, `actions`); module
-//! đó kiểm mẫu như kiểm luật người dùng gửi lên, và chỉ đưa vào danh mục mẫu dùng được.
+//! Rule templates ([`AutomationTemplate`]) are declared by modules through `Module::automation_templates`:
+//! the rule body is JSON in the format of the `automations` module (`trigger`, `conditions`, `actions`); that
+//! module validates a template as it validates a rule submitted by a user, and only admits usable ones to the
+//! template catalog.
 
 use std::sync::{Arc, OnceLock};
 
@@ -22,17 +24,17 @@ use crate::error::Error;
 use crate::mcp::Tool;
 use crate::tenancy::TenantContext;
 
-/// Một mẫu luật dựng sẵn do module khai (vd "đơn trên 5 triệu thì gắn nhãn VIP").
+/// A ready-made rule template declared by a module (e.g. "orders over 5 million get a VIP label").
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct AutomationTemplate {
-    /// `<module>.<tên>`, vd `orders.tag_big_orders`.
+    /// `<module>.<name>`, vd `orders.tag_big_orders`.
     pub id: &'static str,
-    /// Tên ngắn tiếng Anh, cho người chọn mẫu.
+    /// Short English name, for the person choosing a template.
     pub title: &'static str,
-    /// Mẫu làm gì, tiếng Anh.
+    /// What the template does, in English.
     pub description: &'static str,
-    /// Thân luật: `{"trigger": …, "conditions": …, "actions": […]}` (đặc tả bước 58).
+    /// Rule body: `{"trigger": …, "conditions": …, "actions": […]}` (step 58 spec).
     pub rule: Value,
 }
 
@@ -52,7 +54,7 @@ struct Filled {
     templates: Vec<AutomationTemplate>,
 }
 
-/// Sổ tool MCP và mẫu luật của mọi module. Clone rẻ; rỗng tới khi mọi module đã khởi động.
+/// Registry of every module's MCP tools and rule templates. Cheap to clone; empty until every module has started.
 //
 // `Arc<OnceLock<…>>`: bên điền (`Modules::start`) và bên đọc (module `automations`) giữ cùng một ô;
 // ô ghi đúng một lần rồi chỉ đọc, nên đọc từ nhiều thread không cần lock.
@@ -73,35 +75,35 @@ impl AutomationDirectory {
         AutomationDirectory { filled: Arc::default(), entitlements }
     }
 
-    /// Điền sổ (một lần, sau khi mọi module khởi động); lần sau bị bỏ qua.
+    /// Fills the registry (once, after every module has started); later calls are ignored.
     pub(crate) fn fill(&self, tools: Vec<Tool>, templates: Vec<AutomationTemplate>) {
         let _ = self.filled.set(Filled { tools, templates });
     }
 
-    /// Sổ đã điền sẵn: cho test của module dựng bộ chạy luật mà không khởi động chương trình.
+    /// A pre-filled registry: lets a module's tests build a rule runner without starting the program.
     pub fn with(tools: Vec<Tool>, templates: Vec<AutomationTemplate>) -> Self {
         let directory = AutomationDirectory::default();
         directory.fill(tools, templates);
         directory
     }
 
-    /// Mọi tool, tên đầy đủ `<module>.<tên>`.
+    /// Every tool, with its full name `<module>.<name>`.
     pub fn tools(&self) -> &[Tool] {
         self.filled.get().map_or(&[], |filled| filled.tools.as_slice())
     }
 
-    /// Tool tên `name` (đầy đủ), nếu có.
+    /// The tool named `name` (full name), if any.
     pub fn tool(&self, name: &str) -> Option<&Tool> {
         self.tools().iter().find(|tool| tool.name() == name)
     }
 
-    /// Mọi mẫu luật, theo thứ tự đăng ký module.
+    /// Every rule template, in module registration order.
     pub fn templates(&self) -> &[AutomationTemplate] {
         self.filled.get().map_or(&[], |filled| filled.templates.as_slice())
     }
 
-    /// Module `module` có bật cho khách `tenant` không (gói, bước 35): event của module chưa bật
-    /// không làm kích hoạt được.
+    /// Whether module `module` is enabled for tenant `tenant` (plan, step 35): events of a module that is not
+    /// enabled cannot trigger anything.
     pub async fn module_enabled(
         &self,
         module: &str,
@@ -110,14 +112,14 @@ impl AutomationDirectory {
         Ok(crate::http::mcp_module_allowed(&self.entitlements, module, tenant.id()).await?.0)
     }
 
-    /// Module của tool có bật cho khách `tenant` không (gói, bước 35).
+    /// Whether the tool's module is enabled for tenant `tenant` (plan, step 35).
     pub async fn tool_enabled(&self, tool: &Tool, tenant: &TenantContext) -> Result<bool, Error> {
         Ok(crate::http::mcp_tool_allowed(&self.entitlements, tool, tenant.id()).await?.0)
     }
 
-    /// Gọi tool `tool` cho `principal` ở khách `tenant`, đúng như endpoint `/mcp` gọi: người gọi
-    /// thiếu permission thì `forbidden`, module chưa bật cho khách hay khách chỉ đọc thì cùng lỗi
-    /// như REST.
+    /// Calls tool `tool` for `principal` in tenant `tenant`, exactly as the `/mcp` endpoint does: a caller
+    /// without the permission gets `forbidden`; a module not enabled for the tenant or a read-only tenant
+    /// gives the same error as REST.
     pub async fn call(
         &self,
         tool: &Tool,

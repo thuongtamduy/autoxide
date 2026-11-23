@@ -1,4 +1,4 @@
-//! [`Date`]: một ngày theo lịch, không giờ, không múi giờ.
+//! [`Date`]: a calendar date, with no time and no time zone.
 
 use std::fmt;
 use std::str::FromStr;
@@ -9,15 +9,15 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use super::ParseError;
 use super::format;
 
-/// Một ngày theo lịch (`2026-11-21`). Thay `chrono::NaiveDate` (D-20261121-time-library).
+/// A calendar date (`2026-11-21`). Replaces `chrono::NaiveDate` (D-20261121-time-library).
 ///
-/// JSON và cột database (`schema::date`): `YYYY-MM-DD`, như trước. Tính lịch (thêm ngày, thứ, đầu tháng…)
-/// qua [`Date::to_jiff`] rồi bọc lại bằng `From`.
+/// JSON and database column (`schema::date`): `YYYY-MM-DD`, as before. Calendar arithmetic (add days,
+/// weekday, start of month…) goes through [`Date::to_jiff`] and wraps back with `From`.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Date(civil::Date);
 
 impl Date {
-    /// Ngày từ năm, tháng (1–12), ngày (1–31); `None` khi không có ngày đó.
+    /// A date from year, month (1–12), day (1–31); `None` when no such date exists.
     pub fn new(year: i16, month: i8, day: i8) -> Option<Self> {
         civil::Date::new(year, month, day).ok().map(Date)
     }
@@ -38,72 +38,72 @@ impl Date {
         self.0.day()
     }
 
-    /// Đọc theo mẫu `strptime` (`%Y-%m-%d`, `%d/%m/%Y`…) như `chrono::NaiveDate::parse_from_str`.
+    /// Parses with a `strptime` pattern (`%Y-%m-%d`, `%d/%m/%Y`…) like `chrono::NaiveDate::parse_from_str`.
     pub fn parse_from_str(input: &str, pattern: &str) -> Result<Self, ParseError> {
         civil::Date::strptime(pattern, input)
             .map(Date)
             .map_err(|_| ParseError::new(input, "a date in the expected format"))
     }
 
-    /// Hôm nay theo UTC.
+    /// Today in UTC.
     pub fn today_utc() -> Self {
         super::Timestamp::now().date_utc()
     }
 
-    /// Thứ trong tuần.
+    /// Day of the week.
     pub fn weekday(self) -> jiff::civil::Weekday {
         self.0.weekday()
     }
 
-    /// Ngày thứ mấy trong năm (1–366).
+    /// Day of the year (1–366).
     pub fn ordinal(self) -> i16 {
         self.0.day_of_year()
     }
 
-    /// Cộng `days` ngày (âm: lùi); `None` khi ra ngoài năm ±9999.
+    /// Adds `days` days (negative: subtract); `None` when it falls outside year ±9999.
     pub fn checked_add_days(self, days: i64) -> Option<Self> {
         self.0.checked_add(jiff::Span::new().try_days(days).ok()?).ok().map(Date)
     }
 
-    /// Lùi `days` ngày.
+    /// Subtracts `days` days.
     pub fn checked_sub_days(self, days: i64) -> Option<Self> {
         self.checked_add_days(days.checked_neg()?)
     }
 
-    /// Cộng `months` tháng (âm: lùi). Ngày không có ở tháng đích thì lấy ngày cuối tháng (31/1 + 1 tháng =
-    /// 28 hay 29/2), như `chrono::NaiveDate::checked_add_months`.
+    /// Adds `months` months (negative: subtract). A day that does not exist in the target month becomes the
+    /// last day of the month (31/1 + 1 month = 28 or 29/2), like `chrono::NaiveDate::checked_add_months`.
     pub fn checked_add_months(self, months: i32) -> Option<Self> {
         self.0.checked_add(jiff::Span::new().try_months(months).ok()?).ok().map(Date)
     }
 
-    /// Ngày hôm sau.
+    /// The next day.
     pub fn succ(self) -> Option<Self> {
         self.0.tomorrow().ok().map(Date)
     }
 
-    /// Ngày hôm trước.
+    /// The previous day.
     pub fn pred(self) -> Option<Self> {
         self.0.yesterday().ok().map(Date)
     }
 
-    /// Số ngày từ `earlier` tới `self` (âm khi `earlier` muộn hơn).
+    /// Number of days from `earlier` to `self` (negative when `earlier` is later).
     pub fn days_since(self, earlier: Date) -> i64 {
         self.0.duration_since(earlier.0).as_secs() / 86_400
     }
 
-    /// Ngày đầu tháng.
+    /// First day of the month.
     pub fn first_of_month(self) -> Self {
         Date(self.0.first_of_month())
     }
 
-    /// Ngày cuối tháng.
+    /// Last day of the month.
     pub fn last_of_month(self) -> Self {
         Date(self.0.last_of_month())
     }
 
-    /// 00:00 của ngày này theo UTC. Ngày sát giới hạn lịch (9999-12-31, -9999-01-01) không có thời điểm biểu diễn
-    /// được: kẹp về [`Timestamp::MAX`](super::Timestamp::MAX) / [`MIN`](super::Timestamp::MIN), để so sánh "trước /
-    /// sau ngày này" vẫn đúng chiều.
+    /// 00:00 of this date in UTC. Dates at the calendar limits (9999-12-31, -9999-01-01) have no
+    /// representable instant: clamped to [`Timestamp::MAX`](super::Timestamp::MAX) /
+    /// [`MIN`](super::Timestamp::MIN), so "before / after this date" comparisons still go the right way.
     pub fn start_of_day_utc(self) -> super::Timestamp {
         match self.0.to_zoned_datetime(jiff::tz::TimeZone::UTC) {
             Ok(zoned) => super::Timestamp::exact(zoned.timestamp()),
@@ -112,19 +112,21 @@ impl Date {
         }
     }
 
-    /// Thời điểm bắt đầu ngày này ở múi giờ `zone` (ngày đổi giờ mùa hè bắt đầu lúc 01:00 thì lấy lúc đó).
+    /// The instant this date starts in time zone `zone` (a day where daylight saving starts at 01:00 gives
+    /// that time).
     pub fn start_of_day_in(self, zone: &jiff::tz::TimeZone) -> Option<super::Timestamp> {
         let zoned = self.0.to_zoned_datetime(zone.clone()).ok()?;
         zoned.start_of_day().ok().map(|start| super::Timestamp::exact(start.timestamp()))
     }
 
-    /// Định dạng theo mẫu `strftime` (`%d/%m/%Y`, `%Y%m%d`…). Mẫu sai (lỗi của người viết code) cho chuỗi rỗng.
+    /// Formats with a `strftime` pattern (`%d/%m/%Y`, `%Y%m%d`…). A bad pattern (a coding error) gives an
+    /// empty string.
     pub fn format(self, pattern: &str) -> String {
         jiff::fmt::strtime::format(pattern, self.0).unwrap_or_default()
     }
 }
 
-/// Mặc định 1970-01-01, như `chrono::NaiveDate`.
+/// Defaults to 1970-01-01, like `chrono::NaiveDate`.
 impl Default for Date {
     fn default() -> Self {
         Date(civil::Date::constant(1970, 1, 1))

@@ -1,7 +1,8 @@
-//! Pha hai của chống spam: nonce của token form chèn vào `<module>_antispam_nonces` TRONG
-//! transaction của module. Đụng unique nghĩa là bài này đã gửi rồi (trình duyệt bấm hai lần,
-//! mạng di động gửi lại): module trả lại kết quả cũ thay vì tạo bản ghi thứ hai — idempotency
-//! cho người lạ, vì `Idempotency-Key` chỉ áp cho request đã xác thực.
+//! Phase two of anti-spam: the form token's nonce is inserted into `<module>_antispam_nonces` INSIDE the
+//! module's transaction. Hitting the unique constraint means this submission was already sent (the browser was
+//! clicked twice, a mobile network resent it): the module returns the earlier result instead of creating a
+//! second record. This is idempotency for strangers, since `Idempotency-Key` applies only to authenticated
+//! requests.
 
 use crate::migration::prelude::{
     DbErr, Index, MigrationName, MigrationTrait, SchemaManager, Table,
@@ -15,12 +16,12 @@ use crate::error::Error;
 use crate::secret::sha256;
 use crate::tenancy::TenantContext;
 
-/// Kết quả chèn nonce.
+/// Result of inserting a nonce.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Claim {
-    /// Lần đầu: bài gửi mới.
+    /// First time: a new submission.
     New,
-    /// Đã gửi rồi; kèm `result` lần đầu đã lưu (vd ID bản ghi) để trả lại.
+    /// Already submitted; carries the `result` stored the first time (e.g. a record ID) to return.
     Replay { result: Option<String> },
 }
 
@@ -28,7 +29,7 @@ pub(crate) fn table_name(module: &str) -> String {
     format!("{module}_antispam_nonces")
 }
 
-/// `nonce` đã được nhận (bài đã gửi rồi) chưa — đọc, không ghi.
+/// Whether `nonce` has already been accepted (the submission was sent before); a read, no write.
 pub(crate) async fn exists<C: ConnectionTrait>(
     connection: &C,
     tenant: &TenantContext,
@@ -44,7 +45,7 @@ pub(crate) async fn exists<C: ConnectionTrait>(
     Ok(connection.query_one(&select).await?.is_some())
 }
 
-/// Chèn `nonce` (đã băm) kèm `result` của lần gửi này; giữ tới `expires_at`.
+/// Inserts `nonce` (hashed) with the `result` of this submission; kept until `expires_at`.
 pub(crate) async fn claim<C: ConnectionTrait>(
     connection: &C,
     tenant: &TenantContext,
@@ -87,7 +88,7 @@ pub(crate) async fn claim<C: ConnectionTrait>(
     Ok(Claim::Replay { result })
 }
 
-/// Xoá nonce (mọi khách) đã hết hạn trước `before`.
+/// Deletes nonces (of every tenant) that expired before `before`.
 pub(crate) async fn purge<C: ConnectionTrait>(
     connection: &C,
     module: &str,
@@ -100,8 +101,8 @@ pub(crate) async fn purge<C: ConnectionTrait>(
     Ok(connection.execute(&delete).await?.rows_affected())
 }
 
-/// Migration tạo bảng `<module>_antispam_nonces`. Module nhận bài gửi công khai qua
-/// [`super::SpamGuard`] thêm nó vào danh sách migration của mình.
+/// Migration that creates the table `<module>_antispam_nonces`. A module that receives public submissions
+/// through [`super::SpamGuard`] adds it to its migration list.
 pub fn antispam_migration(name: &'static str, module: &'static str) -> Box<dyn MigrationTrait> {
     Box::new(NoncesMigration { name, module })
 }
@@ -149,9 +150,9 @@ impl MigrationTrait for NoncesMigration {
     }
 }
 
-/// Bảng `<module>_antispam_nonces` sau khi nâng theo khách (bước 33 A4): khoá chính `(tenant_id,
-/// nonce_hash)`; index dọn dẹp (mọi khách) `…_expires_sweep_idx`. Thêm vào migration của module
-/// như [`event::tenant_table`](crate::event::tenant_table).
+/// The table `<module>_antispam_nonces` after the per-tenant upgrade (step 33 A4): primary key `(tenant_id,
+/// nonce_hash)`; cleanup index (all tenants) `..._expires_sweep_idx`. Add it to the module's migration
+/// like [`event::tenant_table`](crate::event::tenant_table).
 pub fn tenant_table(module: &str) -> crate::tenancy::migration::TenantTable {
     let table = table_name(module);
     crate::tenancy::migration::TenantTable::new(&table)

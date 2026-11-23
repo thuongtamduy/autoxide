@@ -1,12 +1,12 @@
-//! TLS của chương trình: rustls với provider mật mã `ring` (D-043, D-066).
+//! The program's TLS: rustls with the `ring` crypto provider (D-043, D-066).
 //!
-//! HTTP client (`reqwest`, dùng bởi exporter OTLP và bởi kho file S3) được build với
-//! rustls KHÔNG kèm provider, để không kéo thêm thư viện mật mã thứ hai (aws-lc-rs).
-//! Vì vậy provider phải được cài cho cả tiến trình trước khi dựng client đầu tiên —
-//! chỗ nào dựng client thì gọi [`install_crypto_provider`] trước.
+//! The HTTP client (`reqwest`, used by the OTLP exporter and the S3 file store) is built with rustls WITHOUT a
+//! provider, so that a second crypto library (aws-lc-rs) is not pulled in. Therefore the provider must be
+//! installed for the whole process before the first client is built; wherever a client is built, call
+//! [`install_crypto_provider`] first.
 
-/// Cài `ring` làm provider mặc định của rustls cho tiến trình. Gọi nhiều lần, từ nhiều
-/// thread, đều an toàn; đã có provider thì giữ nguyên.
+/// Installs `ring` as rustls's default provider for the process. Safe to call many times, from many
+/// threads; when a provider already exists it is left unchanged.
 pub fn install_crypto_provider() {
     if rustls::crypto::CryptoProvider::get_default().is_none() {
         // Lỗi chỉ khi một thread khác vừa cài trước: kết quả vẫn là điều ta cần.

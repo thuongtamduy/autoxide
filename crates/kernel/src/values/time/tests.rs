@@ -1,13 +1,14 @@
-//! So kiểu thời gian với `chrono` (thư viện cũ, đã gỡ): chuỗi lưu SQLite, JSON, cách đọc phải y hệt, để dữ liệu và
-//! client cũ không thấy khác (D-20261121-time-library). Giá trị của `chrono` nằm ở `golden.json`, sinh MỘT lần bằng
-//! chrono 0.4.45 + chrono-tz 0.10.4 + utoipa 6 (feature `chrono`) lúc còn dùng song song — không sửa tay.
+//! Compares the time types with `chrono` (the old library, removed): the SQLite storage string, JSON and
+//! parsing must be identical, so old data and clients see no difference (D-20261121-time-library). The
+//! `chrono` values live in `golden.json`, generated ONCE with chrono 0.4.45 + chrono-tz 0.10.4 + utoipa 6
+//! (feature `chrono`) while both were still used side by side — do not edit by hand.
 
 use jiff::{SignedDuration, Unit};
 use serde_json::Value;
 
 use super::{Date, Precision, Timestamp};
 
-/// Bảng đối chiếu sinh từ `chrono`.
+/// Reference table generated from `chrono`.
 fn golden() -> Value {
     serde_json::from_str(include_str!("golden.json")).unwrap()
 }
@@ -16,8 +17,8 @@ fn rows(key: &str) -> Vec<Value> {
     golden()[key].as_array().unwrap().clone()
 }
 
-/// Thời điểm của một dòng `timestamps`: đúng giây, phần lẻ 1–9 chữ số, sát nửa đêm, năm nhuận, trước 1970, sát
-/// giới hạn trên của `jiff` (9999-12-30T22:00Z).
+/// The instant of one `timestamps` row: whole seconds, 1–9 fractional digits, near midnight, leap years,
+/// before 1970, near the upper limit of `jiff` (9999-12-30T22:00Z).
 fn timestamp_of(row: &Value) -> Timestamp {
     let nanos = u32::try_from(row["nanos"].as_u64().unwrap()).unwrap();
     Timestamp::from_unix(row["seconds"].as_i64().unwrap(), nanos).unwrap()
@@ -34,13 +35,14 @@ fn date_of(row: &Value) -> Date {
     .unwrap()
 }
 
-/// Chuỗi hay `null` của bảng → `Option<&str>`.
+/// A string or `null` from the table → `Option<&str>`.
 fn text(value: &Value) -> Option<&str> {
     value.as_str()
 }
 
-/// Như [`text`], nhưng ngày sau năm 9999 (`+10000-…`, `chrono` biểu diễn được) là `None`: ngoài khoảng của
-/// `jiff`, các hàm cộng ngày / tháng trả `None` thay vì một giá trị không lưu được.
+/// Like [`text`], but a date after year 9999 (`+10000-…`, which `chrono` can represent) becomes `None`:
+/// outside the range of `jiff`, the add-days / add-months functions return `None` instead of a value that
+/// cannot be stored.
 fn date_text(value: &Value) -> Option<&str> {
     value.as_str().filter(|day| !day.starts_with('+'))
 }

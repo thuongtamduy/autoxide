@@ -1,39 +1,39 @@
-//! Kiểm bản cài đặt: lệnh `autoxide doctor` (D-166, mượn `cargo loco doctor` và system checks
-//! của Django — D-164).
+//! Installation checks: the `autoxide doctor` command (D-166, borrowed from `cargo loco doctor` and Django's
+//! system checks — D-164).
 //!
-//! Module khai các bước kiểm của mình qua [`Module::checks`](crate::module::Module::checks):
-//! nơi lưu file có ghi được không, máy chủ mail có trả lời không, đã có quản trị viên chưa…
-//! Mỗi bước trả một [`Finding`] kèm gợi ý sửa — người lạ tự cài và AI agent đều đọc được
-//! (`autoxide doctor --json`).
+//! A module declares its checks through [`Module::checks`](crate::module::Module::checks): whether the file
+//! storage is writable, whether the mail server answers, whether an administrator exists yet… Each check
+//! returns a [`Finding`] with a hint on how to fix it — a stranger installing by themselves and an AI agent
+//! can both read it (`autoxide doctor --json`).
 
 use std::sync::Arc;
 use std::time::Duration;
 
 use serde::Serialize;
 
-/// Mỗi bước kiểm có tối đa chừng này thời gian (gọi mạng tới máy chủ không trả lời).
+/// Each check gets at most this much time (a network call to a server that does not answer).
 pub const CHECK_TIMEOUT: Duration = Duration::from_secs(10);
 
-/// Kết quả một bước kiểm.
+/// Result of one check.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Status {
-    /// Đạt.
+    /// Passed.
     Ok,
-    /// Chạy được nhưng nên sửa trước khi chạy thật (vd chưa đặt khoá ký).
+    /// Works but should be fixed before running for real (e.g. no signing key set).
     Warning,
-    /// Hỏng: tính năng phụ thuộc vào nó sẽ không chạy.
+    /// Broken: features that depend on it will not work.
     Failed,
 }
 
-/// Điều một bước kiểm tìm thấy.
+/// What a check found.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[non_exhaustive]
 pub struct Finding {
     pub status: Status,
-    /// Câu tiếng Anh nói điều đã thấy.
+    /// English sentence stating what was seen.
     pub message: String,
-    /// Việc cần làm để sửa (lệnh, biến cấu hình), khi không đạt.
+    /// What to do to fix it (command, setting), when the check does not pass.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hint: Option<String>,
 }
@@ -51,15 +51,15 @@ impl Finding {
         Finding { status: Status::Failed, message: message.into(), hint: None }
     }
 
-    /// Thêm gợi ý sửa.
+    /// Adds a fix hint.
     pub fn with_hint(mut self, hint: impl Into<String>) -> Self {
         self.hint = Some(hint.into());
         self
     }
 }
 
-/// Phần chạy của một bước kiểm. Không được thay đổi dữ liệu thật; thứ phải ghi thử (vd một file
-/// thử trong nơi lưu) thì dọn trước khi trả.
+/// The running part of a check. It must not change real data; anything it has to write as a trial (e.g. a
+/// trial file in the storage) is cleaned up before it returns.
 //
 // `#[async_trait]`: Rust chưa cho gọi hàm `async` của trait qua `dyn Trait`.
 #[async_trait::async_trait]
@@ -67,12 +67,12 @@ pub trait Probe: Send + Sync {
     async fn probe(&self) -> Finding;
 }
 
-/// Một bước kiểm module khai. Tên khai ngắn (`storage`); kernel thêm tiền tố `<module>.`.
+/// A check declared by a module. The declared name is short (`storage`); the kernel adds the prefix `<module>.`.
 #[derive(Clone)]
 #[non_exhaustive]
 pub struct Check {
     pub name: &'static str,
-    /// Câu tiếng Anh nói bước này kiểm gì.
+    /// English sentence stating what this check verifies.
     pub description: &'static str,
     probe: Arc<dyn Probe>,
     timeout: Duration,
@@ -83,13 +83,13 @@ impl Check {
         Check { name, description, probe, timeout: CHECK_TIMEOUT }
     }
 
-    /// Cho bước kiểm nhiều thời gian hơn [`CHECK_TIMEOUT`] (vd đọc lại cả một bảng lớn).
+    /// Gives the check more time than [`CHECK_TIMEOUT`] (e.g. re-reading a whole large table).
     pub fn with_timeout(mut self, limit: Duration) -> Self {
         self.timeout = limit;
         self
     }
 
-    /// Chạy bước kiểm, tối đa [`CHECK_TIMEOUT`] (hoặc thời gian đặt bằng
+    /// Runs the check, for at most [`CHECK_TIMEOUT`] (or the time set with
     /// [`with_timeout`](Self::with_timeout)).
     pub async fn run(&self) -> Finding {
         self.run_within(self.timeout).await

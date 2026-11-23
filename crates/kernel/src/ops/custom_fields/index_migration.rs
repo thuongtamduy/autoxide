@@ -1,9 +1,9 @@
-//! Migration tạo bảng index lọc trường tự định nghĩa của một module (tách khỏi `custom_fields.rs`
-//! cho file không dài thêm — D-20261118-file-length).
+//! Migration that creates the custom field filter index table of a module (split out of `custom_fields.rs`
+//! so the file does not grow longer - D-20261118-file-length).
 
 use crate::migration::prelude::*;
 
-/// Migration tạo bảng index lọc `<module>_custom_index` của module `module` (như `outbox_migration`).
+/// Migration that creates the filter index table `<module>_custom_index` of module `module` (like `outbox_migration`).
 pub fn index_migration(name: &'static str, module: &'static str) -> Box<dyn MigrationTrait> {
     Box::new(IndexMigration { name, module })
 }

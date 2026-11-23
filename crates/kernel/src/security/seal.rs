@@ -1,17 +1,17 @@
-//! Mã hoá secret khi lưu (bước 33, D-257): secret module cần đọc lại được (secret TOTP, secret ký
-//! webhook, khoá kết nối đối tác của từng khách) lưu dạng
+//! Encrypts secrets at rest (step 33, D-257): secrets a module must be able to read back (TOTP secrets, webhook
+//! signing secrets, each tenant's partner connection keys) are stored as
 //! `sealed:v1:<key_id>:<base64url(nonce || ciphertext || tag)>`.
 //!
-//! - Thuật toán: AES-256-GCM (AEAD) của `ring`; nonce 96 bit ngẫu nhiên mỗi lần mã hoá.
-//! - Khoá: `SecretKey::derive("autoxide/kernel/seal/v1")` của khoá gốc — không bao giờ nằm cạnh dữ
-//!   liệu khi `AUTOXIDE_SECRET_KEY` đã đặt. `key_id` = 8 ký tự hex đầu của SHA-256 khoá: biết giá
-//!   trị được mã hoá bằng khoá nào mà không lộ khoá.
-//! - Dữ liệu đi kèm (AAD) = mục đích + khách + định danh dòng: chép giá trị đã mã hoá sang dòng
-//!   khác, khách khác hay mục đích khác thì không mở được.
-//! - Xoay khoá: khoá cũ vẫn mở được; [`Sealer::needs_reseal`] cho biết giá trị nào cần mã hoá lại
-//!   bằng khoá hiện tại (`autoxide secrets reseal`).
-//! - Giá trị không có tiền tố `sealed:` là chữ thường của bản cũ: [`Sealer::open`] trả nguyên văn
-//!   (chỉ trong lúc chuyển tiếp), [`Sealer::needs_reseal`] là `true`.
+//! - Algorithm: AES-256-GCM (AEAD) from `ring`; a random 96-bit nonce for each encryption.
+//! - Key: `SecretKey::derive("autoxide/kernel/seal/v1")` of the root key — never stored next to the data when
+//!   `AUTOXIDE_SECRET_KEY` is set. `key_id` = the first 8 hex characters of the key's SHA-256: it tells which
+//!   key encrypted a value without revealing the key.
+//! - Associated data (AAD) = purpose + tenant + row identifier: copying an encrypted value to another
+//!   row, another tenant or another purpose cannot be opened.
+//! - Key rotation: old keys can still open values; [`Sealer::needs_reseal`] tells which values need
+//!   re-encrypting with the current key (`autoxide secrets reseal`).
+//! - A value without the `sealed:` prefix is plaintext from an older version: [`Sealer::open`] returns it
+//!   verbatim (only during the transition) and [`Sealer::needs_reseal`] is `true`.
 
 use std::sync::Arc;
 
@@ -24,12 +24,12 @@ use zeroize::Zeroizing;
 use crate::error::Error;
 use crate::tenancy::TenantId;
 
-/// Nhãn dẫn khoá mã hoá từ khoá gốc.
+/// Label for deriving the encryption key from the root key.
 pub(crate) const PURPOSE: &str = "autoxide/kernel/seal/v1";
 
 const PREFIX: &str = "sealed:v1:";
 
-/// Bộ mã hoá secret: khoá hiện tại và các khoá cũ (theo `key_id`). Clone rẻ.
+/// Secret encryptor: the current key and old keys (by `key_id`). Cheap to clone.
 #[derive(Clone)]
 pub struct Sealer {
     // Khoá đầu tiên là khoá hiện tại.
@@ -45,7 +45,7 @@ impl std::fmt::Debug for Sealer {
 }
 
 impl Sealer {
-    /// Bộ mã hoá với khoá hiện tại `current` và các khoá cũ `previous` (mỗi khoá 32 byte).
+    /// An encryptor with the current key `current` and old keys `previous` (each key 32 bytes).
     pub(crate) fn new(current: [u8; 32], previous: Vec<[u8; 32]>) -> Result<Self, Error> {
         let mut keys: Vec<(String, LessSafeKey)> = Vec::new();
         for key in std::iter::once(current).chain(previous) {
@@ -61,13 +61,13 @@ impl Sealer {
         Ok(Sealer { keys: Arc::new(keys) })
     }
 
-    /// `key_id` của khoá hiện tại.
+    /// `key_id` of the current key.
     pub fn current_key_id(&self) -> &str {
         self.keys.first().map_or("", |(id, _)| id.as_str())
     }
 
-    /// Mã hoá `plaintext` của khách `tenant`, cho mục đích `purpose` (vd `webhooks.endpoint_secret`),
-    /// gắn với dòng `row` (vd ID của dòng).
+    /// Encrypts `plaintext` of tenant `tenant`, for purpose `purpose` (e.g. `webhooks.endpoint_secret`),
+    /// bound to row `row` (e.g. the row's ID).
     pub fn seal(
         &self,
         tenant: TenantId,
@@ -92,8 +92,8 @@ impl Sealer {
         Ok(format!("{PREFIX}{id}:{}", URL_SAFE_NO_PAD.encode(packed)))
     }
 
-    /// Mở giá trị `sealed` đã mã hoá bằng [`seal`](Self::seal) với cùng khách, mục đích và dòng.
-    /// Giá trị chữ thường của bản cũ (không tiền tố `sealed:`) trả nguyên văn.
+    /// Opens a value `sealed` encrypted with [`seal`](Self::seal) with the same tenant, purpose and row.
+    /// A plaintext value from an older version (no `sealed:` prefix) is returned verbatim.
     pub fn open(
         &self,
         tenant: TenantId,
@@ -128,14 +128,14 @@ impl Sealer {
         Ok(data)
     }
 
-    /// Giá trị cần mã hoá lại bằng khoá hiện tại: chữ thường cũ, hay mã hoá bằng khoá cũ.
+    /// A value that needs re-encrypting with the current key: old plaintext, or encrypted with an old key.
     pub fn needs_reseal(&self, sealed: &str) -> bool {
         let current = format!("{PREFIX}{}:", self.current_key_id());
         !sealed.starts_with(&current)
     }
 }
 
-/// Giá trị đã được mã hoá (có tiền tố `sealed:`), dù bằng khoá nào.
+/// A value that is already encrypted (has the `sealed:` prefix), whichever key was used.
 pub fn is_sealed(value: &str) -> bool {
     value.starts_with("sealed:")
 }
@@ -145,7 +145,7 @@ fn aad(tenant: TenantId, purpose: &str, row: &str) -> Vec<u8> {
     format!("{purpose}\0{tenant}\0{row}").into_bytes()
 }
 
-/// 8 ký tự hex đầu của SHA-256 khoá.
+/// The first 8 hex characters of the key's SHA-256.
 fn key_id(key: &[u8]) -> String {
     Sha256::digest(key).iter().take(4).map(|byte| format!("{byte:02x}")).collect()
 }

@@ -1,5 +1,5 @@
-//! Viết và đọc chuỗi thời gian đúng dạng `chrono` đã dùng (JSON và cột SQLite), để đổi thư viện mà dữ liệu cũ,
-//! dữ liệu mới và client không thấy khác.
+//! Writing and reading time strings in exactly the form `chrono` used (JSON and SQLite columns), so that
+//! after switching libraries old data, new data and clients see no difference.
 
 use std::fmt::Write as _;
 
@@ -9,7 +9,7 @@ use jiff::tz::TimeZone;
 
 use super::Precision;
 
-/// Đuôi của giờ UTC: JSON dùng `Z`, cột SQLite dùng `+00:00` (như `chrono` qua `sqlx` đã ghi).
+/// Suffix of UTC time: JSON uses `Z`, SQLite columns use `+00:00` (as `chrono` through `sqlx` wrote).
 #[derive(Clone, Copy)]
 pub(super) enum UtcSuffix {
     Z,
@@ -19,16 +19,16 @@ pub(super) enum UtcSuffix {
 // Bộ đọc dùng chung. `const fn new` nên dựng sẵn được lúc biên dịch, không tốn gì mỗi lần đọc.
 static PARSER: DateTimeParser = DateTimeParser::new();
 
-/// RFC 3339 theo UTC, phần lẻ của giây 0, 3, 6 hoặc 9 chữ số tuỳ giá trị (`SecondsFormat::AutoSi` của
-/// `chrono`): `2026-11-21T10:00:00Z`, `…:00.120Z`, `…:00.123456Z`.
+/// RFC 3339 in UTC, fractional seconds of 0, 3, 6 or 9 digits depending on the value (`SecondsFormat::AutoSi`
+/// of `chrono`): `2026-11-21T10:00:00Z`, `…:00.120Z`, `…:00.123456Z`.
 ///
-/// Vì sao không dùng `Display` của `jiff`: nó cắt số 0 cuối (`.12Z`), mà chuỗi như vậy so sánh sai thứ tự
-/// (`.12Z` > `.125Z` vì `Z` > `5`) và khác chuỗi đã lưu.
+/// Why `jiff`'s `Display` is not used: it cuts trailing zeros (`.12Z`), and such strings compare in the wrong
+/// order (`.12Z` > `.125Z` because `Z` > `5`) and differ from the stored strings.
 pub(super) fn write_timestamp(timestamp: jiff::Timestamp, suffix: UtcSuffix) -> String {
     write_timestamp_with(timestamp, Precision::Auto, suffix)
 }
 
-/// Như [`write_timestamp`] với số chữ số lẻ chọn trước (`chrono::SecondsFormat`).
+/// Like [`write_timestamp`] with the number of fractional digits chosen in advance (`chrono::SecondsFormat`).
 pub(super) fn write_timestamp_with(
     timestamp: jiff::Timestamp,
     precision: Precision,
@@ -48,8 +48,9 @@ pub(super) fn write_timestamp_with(
     out
 }
 
-/// RFC 3339 theo giờ địa phương của `zone`, kèm độ lệch: `2026-11-23T09:00:00+07:00` — đúng chuỗi
-/// `chrono::DateTime<Tz>::to_rfc3339()` (UTC cũng viết `+00:00`; độ lệch làm tròn tới phút như `chrono`).
+/// RFC 3339 in `zone`'s local time, with the offset: `2026-11-23T09:00:00+07:00` — exactly the string of
+/// `chrono::DateTime<Tz>::to_rfc3339()` (UTC is also written `+00:00`; the offset is rounded to minutes like
+/// `chrono`).
 pub(super) fn write_zoned(timestamp: jiff::Timestamp, zone: &TimeZone) -> String {
     let offset = zone.to_offset(timestamp);
     let datetime = offset.to_datetime(timestamp);
@@ -65,7 +66,7 @@ pub(super) fn write_zoned(timestamp: jiff::Timestamp, zone: &TimeZone) -> String
     out
 }
 
-/// Phần lẻ của giây: `Auto` như `chrono` (`SecondsFormat::AutoSi`) — không có, hay 3, 6, 9 chữ số.
+/// Fractional seconds: `Auto` like `chrono` (`SecondsFormat::AutoSi`) — none, or 3, 6, 9 digits.
 fn write_fraction(out: &mut String, nanos: i32, precision: Precision) {
     match precision {
         Precision::Seconds => {}
@@ -91,7 +92,7 @@ fn write_fraction(out: &mut String, nanos: i32, precision: Precision) {
     }
 }
 
-/// `2026-11-21 10:00:00.123456 UTC` — `Display` của `chrono::DateTime<Utc>`.
+/// `2026-11-21 10:00:00.123456 UTC` — `Display` of `chrono::DateTime<Utc>`.
 pub(super) fn write_display(timestamp: jiff::Timestamp) -> String {
     let datetime = timestamp.to_zoned_datetime(TimeZone::UTC).datetime();
     let mut out = String::with_capacity(32);
@@ -103,7 +104,7 @@ pub(super) fn write_display(timestamp: jiff::Timestamp) -> String {
     out
 }
 
-/// `YYYY-MM-DD` (năm ngoài 0…9999 có dấu, như `chrono`).
+/// `YYYY-MM-DD` (a year outside 0…9999 is signed, like `chrono`).
 pub(super) fn write_date(date: civil::Date) -> String {
     let mut out = String::with_capacity(10);
     write_date_parts(&mut out, date.year(), date.month(), date.day());
@@ -118,14 +119,14 @@ fn write_date_parts(out: &mut String, year: i16, month: i8, day: i8) {
     }
 }
 
-/// Thời điểm có độ lệch giờ (`Z`, `+07:00`, `+07`) theo RFC 3339 / ISO 8601 — dạng client gửi lên.
+/// A point in time with a UTC offset (`Z`, `+07:00`, `+07`) per RFC 3339 / ISO 8601 — the form clients send.
 pub(super) fn parse_timestamp(input: &str) -> Option<jiff::Timestamp> {
     PARSER.parse_timestamp(input).ok()
 }
 
-/// Như [`parse_timestamp`], và nhận cả chuỗi KHÔNG có độ lệch (hiểu là UTC): những dạng `sqlx` + `chrono` đã
-/// đọc được từ cột SQLite (`2026-11-21 10:00:00`, `2026-11-21T10:00`, …), kể cả giá trị do chính SQLite ghi
-/// (`CURRENT_TIMESTAMP`).
+/// Like [`parse_timestamp`], and also accepts strings WITHOUT an offset (taken as UTC): the forms `sqlx` +
+/// `chrono` could read from SQLite columns (`2026-11-21 10:00:00`, `2026-11-21T10:00`, …), including values
+/// written by SQLite itself (`CURRENT_TIMESTAMP`).
 pub(super) fn parse_lenient_timestamp(input: &str) -> Option<jiff::Timestamp> {
     if let Some(timestamp) = parse_timestamp(input) {
         return Some(timestamp);
@@ -134,7 +135,7 @@ pub(super) fn parse_lenient_timestamp(input: &str) -> Option<jiff::Timestamp> {
     datetime.to_zoned_datetime(TimeZone::UTC).ok().map(|zoned| zoned.timestamp())
 }
 
-/// Đúng `YYYY-MM-DD` — không nhận chuỗi có giờ (`chrono::NaiveDate` cũng không nhận).
+/// Exactly `YYYY-MM-DD` — strings with a time are not accepted (`chrono::NaiveDate` does not accept them either).
 pub(super) fn parse_date(input: &str) -> Option<civil::Date> {
     let bytes = input.as_bytes();
     let shaped = bytes.len() == 10
@@ -147,8 +148,8 @@ pub(super) fn parse_date(input: &str) -> Option<civil::Date> {
     PARSER.parse_date(input).ok()
 }
 
-/// Đúng dạng `chrono::DateTime::parse_from_rfc3339` nhận: `YYYY-MM-DD` + `T`/`t`/dấu cách + `HH:MM:SS`, phần lẻ
-/// tuỳ chọn (ít nhất 1 chữ số), rồi `Z`/`z` hay `±HH:MM`.
+/// Exactly the form `chrono::DateTime::parse_from_rfc3339` accepts: `YYYY-MM-DD` + `T`/`t`/space +
+/// `HH:MM:SS`, an optional fraction (at least 1 digit), then `Z`/`z` or `±HH:MM`.
 pub(super) fn is_rfc3339(input: &str) -> bool {
     let bytes = input.as_bytes();
     let digits = |range: std::ops::Range<usize>| {

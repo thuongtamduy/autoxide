@@ -1,25 +1,26 @@
-//! Nền chung cho bộ nối nhà cung cấp thật (bước 70 P7, D-20261121-provider-accounts): một cách
-//! làm cho mọi bộ nối thanh toán, vận chuyển, SMS, hoá đơn điện tử…
+//! Shared foundation for connectors to real providers (step 70 P7, D-20261121-provider-accounts): one way
+//! to build every payment, shipping, SMS and e-invoice connector…
 //!
-//! - **Tài khoản nhà cung cấp là của từng khách.** Bộ nối khai từng trường của tài khoản là một
-//!   cấu hình theo khách thuộc nhóm `connection` (`<module>.connection.<loại>.<trường>`, trường bí
-//!   mật `.secret()` — xem [`crate::tenancy::settings`]). Khách đặt / bỏ qua
-//!   `PUT` / `DELETE /api/v1/kernel/settings/{name}`, thử bằng `POST …/settings/{name}/test`
-//!   ([`ConnectionProbe`](crate::connections::ConnectionProbe)). Không có biến môi trường nào cho
-//!   thứ thuộc về khách.
-//! - **Đọc tài khoản lúc chạy** bằng [`ProviderAccounts`] (`context.require::<ProviderAccounts>()`):
-//!   trường bắt buộc mà khách chưa đặt → [`not_configured`] (`provider.not_configured`), không bao
-//!   giờ rơi về tài khoản của khách khác hay của máy chủ.
-//! - **Webhook về**: bộ nối khai [`WebhookEndpoint`]; mỗi khách có một URL riêng kết thúc bằng một
-//!   định danh không đoán được ([`ProviderAccounts::webhook_token`]). Module nhận webhook tìm khách
-//!   từ định danh ([`ProviderAccounts::resolve_webhook`]) TRƯỚC, rồi bộ nối kiểm chữ ký bằng secret
-//!   của đúng khách đó. Khách xem URL của mình ở `GET /api/v1/kernel/connections/webhooks`.
-//! - **Gọi ra ngoài** bằng [`http_client`] (không theo chuyển hướng, có hạn giờ; địa chỉ do khách
-//!   chọn thì chỉ IP public — D-20261121-ssrf-targets) và [`send`] (log không chứa secret, số đo).
-//!   Không gọi trong transaction ghi.
-//! - **Chữ ký**: [`hmac_sha256`], [`hex`], [`constant_time_eq`].
+//! - **A provider account belongs to each tenant.** A connector declares each account field as a
+//!   per-tenant setting in the `connection` group (`<module>.connection.<kind>.<field>`, secret fields
+//!   with `.secret()` — see [`crate::tenancy::settings`]). A tenant sets / clears them with
+//!   `PUT` / `DELETE /api/v1/kernel/settings/{name}` and tests them with `POST …/settings/{name}/test`
+//!   ([`ConnectionProbe`](crate::connections::ConnectionProbe)). No environment variable exists for
+//!   anything that belongs to a tenant.
+//! - **Read the account at runtime** with [`ProviderAccounts`] (`context.require::<ProviderAccounts>()`):
+//!   a required field the tenant has not set → [`not_configured`] (`provider.not_configured`); it never
+//!   falls back to another tenant's account or the server's.
+//! - **Incoming webhooks**: a connector declares a [`WebhookEndpoint`]; each tenant has its own URL ending in
+//!   an unguessable identifier ([`ProviderAccounts::webhook_token`]). The module receiving the webhook finds
+//!   the tenant from the identifier ([`ProviderAccounts::resolve_webhook`]) FIRST, then the connector
+//!   verifies the signature with that tenant's secret. A tenant sees its URLs at
+//!   `GET /api/v1/kernel/connections/webhooks`.
+//! - **Outgoing calls** use [`http_client`] (no redirects, with a timeout; a tenant-chosen address
+//!   may only be a public IP — D-20261121-ssrf-targets) and [`send`] (logs contain no secrets, plus metrics).
+//!   Not to be called inside a write transaction.
+//! - **Signatures**: [`hmac_sha256`], [`hex`], [`constant_time_eq`].
 //!
-//! Hướng dẫn viết một bộ nối: `docs/guides/provider-adapters.md`.
+//! Guide to writing a connector: `docs/guides/provider-adapters.md`.
 
 use std::sync::{Arc, PoisonError, RwLock};
 use std::time::Duration;
@@ -46,12 +47,12 @@ use crate::tenancy::{
     TenantSettings, link_token, resolve_link_token,
 };
 
-/// Mục đích của khoá dẫn xuất cho định danh webhook.
+/// Purpose of the derived key for webhook identifiers.
 const WEBHOOK_PURPOSE: &str = "kernel.provider_webhook";
-/// Số ký tự base64url của phần thô trong định danh webhook (32 ký tự = 192 bit).
+/// Number of base64url characters in the raw part of a webhook identifier (32 characters = 192 bits).
 const WEBHOOK_TOKEN_LEN: usize = 32;
 
-/// Một đường webhook của một bộ nối: khách dán URL của nó vào trang quản trị của nhà cung cấp.
+/// One webhook path of a connector: the tenant pastes its URL into the provider's admin page.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct WebhookEndpoint {
     connection: &'static str,
@@ -60,9 +61,9 @@ pub struct WebhookEndpoint {
 }
 
 impl WebhookEndpoint {
-    /// Webhook của kết nối `connection` (`<module>.connection.<loại>`) tới `path` — đường dẫn đầy
-    /// đủ của route nhận, KHÔNG có định danh cuối (vd `/api/v1/ledger/bank-feeds/sepay`);
-    /// `description` (tiếng Anh) nói khách dán URL vào đâu ở nhà cung cấp.
+    /// Webhook of connection `connection` (`<module>.connection.<kind>`) to `path` — the full path
+    /// of the receiving route, WITHOUT the trailing identifier (e.g. `/api/v1/ledger/bank-feeds/sepay`);
+    /// `description` (English) tells the tenant where to paste the URL at the provider.
     pub const fn new(
         connection: &'static str,
         path: &'static str,
@@ -80,24 +81,25 @@ impl WebhookEndpoint {
     }
 }
 
-/// Câu trả lời nhà cung cấp chờ khi webhook được nhận xong (vd SePay cần `{"success": true}`).
-/// Bộ nối trả qua `webhook_ack` của trait; không khai thì module nhận trả envelope chuẩn.
+/// The response the provider expects once the webhook is received (e.g. SePay needs `{"success": true}`).
+/// A connector returns it through the trait's `webhook_ack`; if not declared, the receiving module returns
+/// the standard envelope.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct WebhookAck {
-    /// Mã HTTP (200…299).
+    /// HTTP status (200…299).
     pub status: u16,
     pub content_type: &'static str,
     pub body: String,
 }
 
 impl WebhookAck {
-    /// Trả `status` với thân JSON `body`.
+    /// Returns `status` with JSON body `body`.
     pub fn json(status: u16, body: impl Into<String>) -> Self {
         WebhookAck { status, content_type: "application/json", body: body.into() }
     }
 
-    /// Trả `204 No Content`.
+    /// Returns `204 No Content`.
     pub fn no_content() -> Self {
         WebhookAck { status: 204, content_type: "text/plain", body: String::new() }
     }
@@ -124,8 +126,9 @@ struct Inner {
     webhooks: RwLock<Vec<WebhookEndpoint>>,
 }
 
-/// Tài khoản nhà cung cấp theo khách: đọc cấu hình kết nối của một khách và định tuyến webhook
-/// về đúng khách. Kernel công bố; bộ nối lấy bằng `context.require::<ProviderAccounts>()`. Clone rẻ.
+/// Per-tenant provider accounts: reads a tenant's connection settings and routes webhooks
+/// back to the right tenant. Published by the kernel; connectors get it with
+/// `context.require::<ProviderAccounts>()`. Cheap to clone.
 #[derive(Clone)]
 pub struct ProviderAccounts(Arc<Inner>);
 
@@ -145,12 +148,12 @@ impl ProviderAccounts {
         }))
     }
 
-    /// Ngữ cảnh của khách `id` — trait của bộ nối nhận `TenantId`, cấu hình đọc theo ngữ cảnh.
+    /// Context of tenant `id` — a connector's trait receives `TenantId`, and settings are read in that context.
     pub async fn tenant(&self, id: TenantId) -> Result<TenantContext, Error> {
         self.0.registry.tenant(id).await
     }
 
-    /// Giá trị `setting` của khách; `None` khi khách chưa đặt (trường không bắt buộc).
+    /// The tenant's value of `setting`; `None` when the tenant has not set it (optional field).
     pub async fn get(
         &self,
         tenant: &TenantContext,
@@ -159,8 +162,8 @@ impl ProviderAccounts {
         self.0.settings.get(tenant, setting).await
     }
 
-    /// Giá trị `setting` của khách; khách chưa đặt → [`not_configured`]. Không bao giờ thay bằng
-    /// giá trị của khách khác hay của máy chủ.
+    /// The tenant's value of `setting`; the tenant has not set it → [`not_configured`]. Never replaced by
+    /// another tenant's value or the server's.
     pub async fn require(
         &self,
         tenant: &TenantContext,
@@ -169,7 +172,7 @@ impl ProviderAccounts {
         self.get(tenant, setting).await?.ok_or_else(|| not_configured(setting.name()))
     }
 
-    /// Khai một đường webhook (gọi trong `Module::start` của bộ nối). Khai lại cùng đường thì bỏ qua.
+    /// Declares a webhook path (call in the connector's `Module::start`). Declaring the same path again is ignored.
     pub fn register_webhook(&self, endpoint: WebhookEndpoint) {
         let mut known = self.0.webhooks.write().unwrap_or_else(PoisonError::into_inner);
         if !known.iter().any(|found| found.path == endpoint.path) {
@@ -181,8 +184,8 @@ impl ProviderAccounts {
         self.0.webhooks.read().unwrap_or_else(PoisonError::into_inner).clone()
     }
 
-    /// Phần thô của định danh: HMAC-SHA256 của `path` bằng khoá dẫn xuất riêng của khách. Không lưu
-    /// ở đâu; cùng khách và cùng đường luôn ra cùng định danh.
+    /// Raw part of the identifier: HMAC-SHA256 of `path` with the tenant's own derived key. Stored
+    /// nowhere; the same tenant and path always yield the same identifier.
     async fn raw_token(&self, tenant: TenantId, path: &str) -> Result<String, Error> {
         let key = self.0.secret.derive_for(tenant, WEBHOOK_PURPOSE).await?;
         let mut encoded = URL_SAFE_NO_PAD.encode(hmac_sha256(&key, path.as_bytes()));
@@ -190,24 +193,25 @@ impl ProviderAccounts {
         Ok(encoded)
     }
 
-    /// Định danh webhook của khách `tenant` cho đường `path` (xem [`WebhookEndpoint::new`]): đoạn
-    /// cuối của URL khách dán vào trang của nhà cung cấp. Mang ID khách (trừ khách mặc định) theo
-    /// dạng của [`link_token`], nên tìm được khách mà không cần tra bảng nào.
+    /// Webhook identifier of tenant `tenant` for path `path` (see [`WebhookEndpoint::new`]): the last segment
+    /// of the URL the tenant pastes into the provider's page. Carries the tenant ID (except for the default
+    /// tenant) in the form of [`link_token`], so the tenant can be found without any table lookup.
     pub async fn webhook_token(&self, tenant: &TenantContext, path: &str) -> Result<String, Error> {
         Ok(link_token(tenant, &self.raw_token(tenant.id(), path).await?))
     }
 
-    /// URL webhook đầy đủ của khách `tenant` cho đường `path` — cho bộ nối phải gửi URL nhận thông
-    /// báo trong từng request (vd `ipnUrl`, `CallbackUrl`). Ghép từ `AUTOXIDE_HTTP_PUBLIC_URL`;
-    /// chưa đặt → `public_url_missing` (503). Không bao giờ đoán từ header `Host` của request.
+    /// Full webhook URL of tenant `tenant` for path `path` — for connectors that must send the notification URL
+    /// in each request (e.g. `ipnUrl`, `CallbackUrl`). Built from `AUTOXIDE_HTTP_PUBLIC_URL`;
+    /// if unset → `public_url_missing` (503). Never guessed from the request's `Host` header.
     pub async fn webhook_url(&self, tenant: &TenantContext, path: &str) -> Result<String, Error> {
         let token = self.webhook_token(tenant, path).await?;
         self.0.public_url.link(&format!("{path}/{token}"))
     }
 
-    /// Khách của webhook tới đường `path` với định danh `token`. Định danh sai, khách không có hay
-    /// không phục vụ được → [`webhook_unknown`] (cùng một lỗi cho mọi trường hợp). Sau bước này bộ
-    /// nối vẫn PHẢI kiểm chữ ký bằng secret của khách tìm được: định danh chỉ để định tuyến.
+    /// The tenant of a webhook to path `path` with identifier `token`. A wrong identifier, a missing tenant
+    /// or one that cannot be served → [`webhook_unknown`] (the same error in every case). After this step the
+    /// connector MUST still verify the signature with the secret of the tenant it found: the identifier is
+    /// only for routing.
     pub async fn resolve_webhook(&self, path: &str, token: &str) -> Result<TenantContext, Error> {
         let Some((tenant, raw)) = resolve_link_token(&self.0.registry, None, token).await? else {
             return Err(webhook_unknown());
@@ -223,7 +227,7 @@ impl ProviderAccounts {
         Ok(tenant)
     }
 
-    /// Mọi đường webhook đã khai, kèm URL của khách `tenant`.
+    /// Every declared webhook path, with the URL of tenant `tenant`.
     async fn webhooks_of(&self, tenant: &TenantContext) -> Result<Vec<ConnectionWebhook>, Error> {
         let mut found = Vec::new();
         for endpoint in self.endpoints() {
@@ -243,21 +247,21 @@ impl ProviderAccounts {
 
 // ---- Môi trường thử theo khách ----------------------------------------------------------------------
 
-/// Môi trường của tài khoản nhà cung cấp của một khách (D-20261122-provider-environments): tài
-/// khoản thử chỉ chạy với host sandbox của nhà cung cấp. Bộ nối có host sandbox khai cấu hình
-/// khách `<module>.connection.<loại>.environment` với `.checked(Environment::check)`, đọc bằng
-/// [`Environment::parse`], rồi chọn giữa HAI địa chỉ cố định của người vận hành
-/// (`AUTOXIDE_<TÊN>_API_URL`, `AUTOXIDE_<TÊN>_SANDBOX_API_URL`) — khách không bao giờ tự nhập địa chỉ.
+/// Environment of a tenant's provider account (D-20261122-provider-environments): a test account only runs
+/// against the provider's sandbox host. A connector with a sandbox host declares the tenant setting
+/// `<module>.connection.<kind>.environment` with `.checked(Environment::check)`, reads it with
+/// [`Environment::parse`], then chooses between TWO fixed operator-set addresses (`AUTOXIDE_<NAME>_API_URL`,
+/// `AUTOXIDE_<NAME>_SANDBOX_API_URL`) — a tenant never types an address itself.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Environment {
-    /// Mặc định khi khách không đặt.
+    /// Default when the tenant does not set one.
     #[default]
     Production,
     Sandbox,
 }
 
 impl Environment {
-    /// Giá trị khách đặt: `production` hay `sandbox`; không đặt là `Production`. Giá trị lạ → `None`.
+    /// The value the tenant sets: `production` or `sandbox`; unset is `Production`. Any other value → `None`.
     pub fn parse(raw: Option<&str>) -> Option<Self> {
         match raw.map(str::trim) {
             None | Some("production") => Some(Environment::Production),
@@ -266,7 +270,7 @@ impl Environment {
         }
     }
 
-    /// Bộ kiểm cho `TenantSetting::checked`.
+    /// Validator for `TenantSetting::checked`.
     pub fn check(raw: &str) -> Result<(), crate::error::FieldError> {
         Environment::parse(Some(raw)).map(|_| ()).ok_or_else(|| {
             crate::error::FieldError::new("value", "invalid", "must be `production` or `sandbox`")
@@ -280,7 +284,7 @@ impl Environment {
         }
     }
 
-    /// Chọn địa chỉ theo môi trường.
+    /// Picks the address by environment.
     pub fn pick<'a>(self, production: &'a str, sandbox: &'a str) -> &'a str {
         match self {
             Environment::Production => production,
@@ -291,7 +295,7 @@ impl Environment {
 
 // ---- Lỗi -----------------------------------------------------------------------------------------
 
-/// `provider.not_configured` (422): khách chưa đặt trường `setting` của tài khoản nhà cung cấp.
+/// `provider.not_configured` (422): the tenant has not set field `setting` of the provider account.
 pub fn not_configured(setting: &str) -> Error {
     Error::new(
         ErrorKind::Validation,
@@ -302,7 +306,7 @@ pub fn not_configured(setting: &str) -> Error {
     .with_param("setting", setting)
 }
 
-/// `provider.webhook_unknown` (404): định danh trong URL webhook không thuộc khách nào.
+/// `provider.webhook_unknown` (404): the identifier in the webhook URL belongs to no tenant.
 pub fn webhook_unknown() -> Error {
     Error::not_found(
         "provider.webhook_unknown",
@@ -313,19 +317,19 @@ pub fn webhook_unknown() -> Error {
 
 // ---- Gọi ra ngoài --------------------------------------------------------------------------------
 
-/// Địa chỉ mà HTTP client của bộ nối gọi tới.
+/// The address the connector's HTTP client calls.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Target {
-    /// Địa chỉ của nhà cung cấp do bộ nối / người vận hành đặt (không phải khách chọn).
+    /// A provider address set by the connector / operator (not chosen by the tenant).
     Fixed,
-    /// Địa chỉ do khách chọn (cấu hình của khách): chỉ kết nối tới IP public, trừ khi người vận
-    /// hành cho dùng mạng riêng (`allow_private`). Cấu hình đó còn phải `.checked(…)` bằng
-    /// [`check_target_url`](crate::net::check_target_url) lúc lưu.
+    /// An address chosen by the tenant (tenant setting): connects only to public IPs, unless the operator
+    /// allows private networks (`allow_private`). That setting must also be `.checked(…)` with
+    /// [`check_target_url`](crate::net::check_target_url) when saved.
     TenantChosen { allow_private: bool },
 }
 
-/// HTTP client cho bộ nối: có hạn giờ, không theo chuyển hướng (gửi secret tới địa chỉ khác địa chỉ
-/// đã cấu hình là rủi ro), `User-Agent` của Autoxide.
+/// HTTP client for connectors: has a timeout and does not follow redirects (sending a secret to an address
+/// other than the configured one is a risk), with Autoxide's `User-Agent`.
 pub fn http_client(timeout: Duration, target: Target) -> Result<reqwest::Client, Error> {
     crate::tls::install_crypto_provider();
     let mut builder = reqwest::Client::builder()
@@ -338,7 +342,7 @@ pub fn http_client(timeout: Duration, target: Target) -> Result<reqwest::Client,
     builder.build().map_err(|error| Error::internal(format!("provider HTTP client: {error}")))
 }
 
-/// Câu trả lời của nhà cung cấp: mã HTTP và thân thô.
+/// The provider's response: HTTP status and raw body.
 #[derive(Debug, Clone)]
 pub struct ProviderReply {
     pub status: u16,
@@ -350,21 +354,21 @@ impl ProviderReply {
         (200..300).contains(&self.status)
     }
 
-    /// Thân đọc thành JSON; `None` khi không phải JSON.
+    /// Body read as JSON; `None` when it is not JSON.
     pub fn json(&self) -> Option<serde_json::Value> {
         serde_json::from_slice(&self.body).ok()
     }
 }
 
-/// Không tới được nhà cung cấp (lỗi mạng, hết giờ, thân bị cắt): tạm thời, thử lại được. Bộ nối
-/// đổi thành lỗi `…provider_unavailable` của hợp đồng nó cài.
+/// The provider could not be reached (network error, timeout, truncated body): temporary, can be retried. A
+/// connector converts it to the `…provider_unavailable` error of the contract it implements.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Unreachable;
 
-/// Gửi `request` tới nhà cung cấp `provider` (tên ổn định của bộ nối) cho việc `purpose` (nhãn cố
-/// định, vd `create_payment`). Ghi log (không URL có tham số, không header, không thân — chỉ việc,
-/// mã HTTP) và số đo `kernel_provider_calls_total`. Mã ngoài 2xx vẫn là `Ok`: bộ nối tự đọc lỗi
-/// theo tài liệu của nhà cung cấp.
+/// Sends `request` to provider `provider` (the connector's stable name) for task `purpose` (a fixed label,
+/// e.g. `create_payment`). Logs (no URL with parameters, no headers, no body — only the purpose and HTTP
+/// status) and records the metric `kernel_provider_calls_total`. A status outside 2xx is still `Ok`: the
+/// connector reads the error itself according to the provider's documentation.
 pub async fn send(
     request: reqwest::RequestBuilder,
     provider: &'static str,
@@ -398,7 +402,7 @@ pub async fn send(
 
 // ---- Chữ ký --------------------------------------------------------------------------------------
 
-/// HMAC-SHA256 của `data` bằng `key`.
+/// HMAC-SHA256 of `data` with `key`.
 pub fn hmac_sha256(key: &[u8], data: &[u8]) -> [u8; 32] {
     // HMAC nhận khoá dài bất kỳ: `new_from_slice` không lỗi được; nhánh lỗi trả chữ ký của khoá rỗng
     // để không cần `unwrap`.
@@ -408,7 +412,7 @@ pub fn hmac_sha256(key: &[u8], data: &[u8]) -> [u8; 32] {
     mac.finalize().into_bytes().into()
 }
 
-/// `bytes` dạng hex chữ thường.
+/// `bytes` as lowercase hex.
 pub fn hex(bytes: &[u8]) -> String {
     use std::fmt::Write as _;
     bytes.iter().fold(String::with_capacity(bytes.len() * 2), |mut text, byte| {
@@ -417,7 +421,7 @@ pub fn hex(bytes: &[u8]) -> String {
     })
 }
 
-/// So hai chuỗi byte trong thời gian không phụ thuộc vị trí khác nhau đầu tiên (so chữ ký, API key).
+/// Compares two byte strings in time independent of the position of the first difference (for signatures, API keys).
 pub fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
     a.len() == b.len() && a.iter().zip(b).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
 }

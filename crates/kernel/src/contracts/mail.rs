@@ -1,43 +1,44 @@
-//! Gửi mail: trait chung để module nào cũng gửi được mà không phụ thuộc cách gửi.
+//! Sending mail: a shared trait so any module can send mail without depending on how it is sent.
 //!
-//! Một module (`mail`) công bố `dyn Mailer`; module cần gửi mail lấy nó bằng
-//! `context.require::<dyn Mailer>()` (đăng ký SAU module `mail`). `send` chỉ đưa mail vào
-//! hàng đợi rồi trả về ngay: việc gửi chạy nền, lỗi tạm thời thì thử lại (D-061). Máy chủ nhận
-//! từ chối hẳn CHÍNH ĐỊA CHỈ NGƯỜI NHẬN (SMTP 5xx với mã mở rộng `5.1.x` / `5.2.x`: không có hộp
-//! thư…) thì không thử lại mà phát event [`DELIVERY_FAILED`] (D-121, D-158). Lỗi vĩnh viễn khác
-//! là lỗi bên gửi: thử lại rồi vào dead-letter queue.
+//! One module (`mail`) publishes `dyn Mailer`; a module that needs to send mail gets it with
+//! `context.require::<dyn Mailer>()` (registered AFTER module `mail`). `send` only puts the mail into the
+//! queue and returns at once: sending runs in the background, and temporary errors are retried (D-061). When
+//! the receiving server flatly rejects the RECIPIENT ADDRESS ITSELF (SMTP 5xx with extended code `5.1.x` /
+//! `5.2.x`: no mailbox …) the mail is not retried and the event [`DELIVERY_FAILED`] is emitted (D-121,
+//! D-158). Any other permanent error is a sender-side error: it is retried and then goes to the dead-letter
+//! queue.
 
 use crate::error::{Error, FieldError};
 use crate::i18n::{Language, Translations};
 use crate::tenancy::TenantContext;
 
-/// Event phát khi một mail bị máy chủ nhận từ chối hẳn. Payload:
-/// `{"to": "<địa chỉ>", "dedupe_key": "<khoá của bên gửi>" | null, "code": "<mã SMTP>"}`. Module
-/// quản lý danh sách gửi (vd bản tin) nghe nó để ngừng gửi tới địa chỉ đó.
+/// Event emitted when the receiving server flatly rejects a mail. Payload:
+/// `{"to": "<address>", "dedupe_key": "<sender key>" | null, "code": "<SMTP code>"}`.
+/// A module that manages mailing lists (e.g. newsletters) listens to it to stop sending to that address.
 pub const DELIVERY_FAILED: &str = "mail.delivery_failed";
 
-/// Header riêng được phép đặt (so sánh không phân biệt hoa thường). Header khác do bên gửi
-/// mail tự đặt (`From`, `To`, `Subject`, `Message-ID`…).
+/// Extra headers that may be set (compared case-insensitively). Other headers are set by the
+/// mail sender itself (`From`, `To`, `Subject`, `Message-ID`…).
 pub const ALLOWED_HEADERS: [&str; 4] =
     ["List-Unsubscribe", "List-Unsubscribe-Post", "List-Id", "Auto-Submitted"];
 
-/// Một mail cần gửi. Dựng bằng [`Mail::new`] rồi các hàm đặt từng trường.
+/// A mail to send. Built with [`Mail::new`] followed by the setters for each field.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 #[non_exhaustive]
 pub struct Mail {
-    /// Địa chỉ người nhận (`ada@example.com` hoặc `Ada <ada@example.com>`).
+    /// Recipient address (`ada@example.com` or `Ada <ada@example.com>`).
     pub to: String,
     pub subject: String,
-    /// Nội dung dạng chữ (luôn có: mọi ứng dụng mail đọc được).
+    /// Plain-text body (always present: every mail app can read it).
     pub text: String,
-    /// Nội dung HTML, nếu có.
+    /// HTML body, if any.
     pub html: Option<String>,
-    /// Trả lời thì tới địa chỉ này (vd người gửi form), thay vì địa chỉ gửi.
+    /// Replies go to this address (e.g. the form submitter) instead of the sending address.
     pub reply_to: Option<String>,
-    /// Header riêng, chỉ trong [`ALLOWED_HEADERS`] (vd `List-Unsubscribe` của bản tin).
+    /// Extra headers, only those in [`ALLOWED_HEADERS`] (e.g. `List-Unsubscribe` of a newsletter).
     pub headers: Vec<(String, String)>,
-    /// Khoá chống gửi trùng: mail cùng khoá đã vào hàng đợi thì mail sau bị bỏ qua (vd ID của
-    /// lượt gửi bản tin, để chạy lại không gửi hai lần). Có trong event [`DELIVERY_FAILED`].
+    /// Dedupe key: a later mail with the same key as one already queued is dropped (e.g. the ID of a
+    /// newsletter send, so a rerun does not send twice). Included in the [`DELIVERY_FAILED`] event.
     pub dedupe_key: Option<String>,
 }
 
@@ -79,8 +80,8 @@ impl Mail {
         self
     }
 
-    /// Lỗi của các header riêng: tên ngoài [`ALLOWED_HEADERS`], giá trị có ký tự xuống dòng
-    /// (chèn header giả) hay dài quá 998 ký tự (giới hạn một dòng của RFC 5322).
+    /// Errors of extra headers: a name outside [`ALLOWED_HEADERS`], a value containing a line break
+    /// (header injection) or longer than 998 characters (the RFC 5322 single-line limit).
     pub fn header_problems(&self) -> Vec<FieldError> {
         let mut problems = Vec::new();
         for (index, (name, value)) in self.headers.iter().enumerate() {
@@ -106,18 +107,18 @@ impl Mail {
     }
 }
 
-/// Bên gửi mail của chương trình.
+/// The program's mail sender.
 #[async_trait::async_trait]
 pub trait Mailer: Send + Sync {
-    /// Đưa `mail` của khách `tenant` vào hàng đợi gửi (máy chủ gửi mail theo cấu hình của khách).
-    /// Lỗi khi địa chỉ người nhận sai dạng (`validation_failed`, trường `to`) hay không ghi được
-    /// hàng đợi.
+    /// Queues `mail` of tenant `tenant` for sending (the mail server is chosen by the tenant's configuration).
+    /// Errors when the recipient address is malformed (`validation_failed`, field `to`) or the
+    /// queue cannot be written.
     async fn send(&self, tenant: &TenantContext, mail: Mail) -> Result<(), Error>;
 }
 
-/// Mẫu mail: tiêu đề và nội dung tiếng Anh nằm trong code (có chỗ điền `{tên}`), bản
-/// dịch nằm trong `locales/<ngôn ngữ>.json` của crate với khoá `<key>.subject` và
-/// `<key>.text` (`cargo xtask check` kiểm đủ).
+/// Mail template: the English subject and body live in code (with `{name}` placeholders), the
+/// translations live in the crate's `locales/<language>.json` under the keys `<key>.subject` and
+/// `<key>.text` (`cargo xtask check` verifies they are complete).
 ///
 /// ```
 /// use autoxide_kernel::mail::MailTemplate;
@@ -135,7 +136,7 @@ pub struct MailTemplate {
     text: &'static str,
 }
 
-/// Tiêu đề và nội dung đã điền, bằng một ngôn ngữ.
+/// Subject and body after filling in, in one language.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct Rendered {
@@ -144,7 +145,7 @@ pub struct Rendered {
 }
 
 impl MailTemplate {
-    /// `key`: `<module>.mail.<tên>`.
+    /// `key`: `<module>.mail.<name>`.
     pub const fn new(key: &'static str, subject: &'static str, text: &'static str) -> Self {
         MailTemplate { key, subject, text }
     }
@@ -153,8 +154,8 @@ impl MailTemplate {
         self.key
     }
 
-    /// Điền `params` vào mẫu bằng `language`. Phần nào chưa có bản dịch (hay bản dịch
-    /// dùng chỗ điền không có giá trị) thì dùng tiếng Anh.
+    /// Fills `params` into the template using `language`. Any part without a translation (or whose translation
+    /// uses a placeholder with no value) falls back to English.
     pub fn render(
         &self,
         translations: &Translations,
@@ -172,7 +173,7 @@ impl MailTemplate {
         Rendered { subject: pick("subject", self.subject), text: pick("text", self.text) }
     }
 
-    /// Dựng [`Mail`] gửi tới `to`.
+    /// Builds a [`Mail`] addressed to `to`.
     pub fn mail(
         &self,
         to: &str,

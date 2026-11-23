@@ -1,15 +1,17 @@
-//! Nhãn nội bộ gắn bản ghi (bước 51 P20, D-235): "VIP", "cần gọi lại"… cho mọi loại bản ghi module
-//! cho phép (`StartContext::taggable`). Nhãn là dữ liệu nội bộ của khách, không có trong đọc công
-//! khai — khác thẻ công khai của `content` và nhãn của `media` (giữ nguyên).
+//! Internal tags attached to records (step 51 P20, D-235): "VIP", "needs a call back"… for every record type
+//! a module allows (`StartContext::taggable`). Tags are the tenant's internal data and are not in public
+//! reads — unlike the public tags of `content` and the labels of `media` (kept as they are).
 //!
-//! - `kernel_tags` (tên, tên đã chuẩn hoá — chữ thường, bỏ dấu, duy nhất trong khách —, màu trong
-//!   bảng cố định, mô tả) và `kernel_record_tags` (loại, ID bản ghi, nhãn). Bảng của kernel vì lọc
-//!   danh sách cần subquery trong câu SQL của module ([`TagIndex::condition`]).
+//! - `kernel_tags` (name, normalized name — lowercase, diacritics removed, unique within the tenant —, a
+//!   color from the fixed palette, description) and `kernel_record_tags` (kind, record ID, tag). Tables of
+//!   the kernel because filtering a list needs a subquery in the module's SQL statement
+//!   ([`TagIndex::condition`]).
 //! - `GET/POST /api/v1/kernel/tags`, `PATCH/DELETE /api/v1/kernel/tags/{id}`, `POST …/{id}/merge`
-//!   (`kernel.tags.manage`; đọc danh sách thì ai đăng nhập cũng được).
-//! - `PUT /api/v1/kernel/records/{kind}/{id}/tags {tag_ids, new_tags}` — cần quyền GHI bản ghi
-//!   (permission loại đó khai); tạo nhãn mới lúc gắn được, trừ khi khách bật `kernel.tags.restricted`
-//!   (khi đó cần `kernel.tags.manage`). Tối đa 50 nhãn mỗi bản ghi. Event `kernel.record_tags_changed`.
+//!   (`kernel.tags.manage`; any signed-in user can read the list).
+//! - `PUT /api/v1/kernel/records/{kind}/{id}/tags {tag_ids, new_tags}` — requires permission to WRITE the
+//!   record (the permission that kind declares); new tags can be created while attaching, unless the tenant
+//!   turns on `kernel.tags.restricted` (then `kernel.tags.manage` is needed). At most 50 tags per record.
+//!   Event `kernel.record_tags_changed`.
 
 use crate::time::Timestamp;
 use std::collections::{BTreeSet, HashMap};
@@ -37,25 +39,25 @@ use crate::tenancy::settings::{TenantSetting, TenantSettings};
 
 const TAGS: &str = "kernel_tags";
 const RECORD_TAGS: &str = "kernel_record_tags";
-/// Tối đa chừng này nhãn trên một bản ghi.
+/// At most this many tags on one record.
 const MAX_PER_RECORD: usize = 50;
-/// Màu nhãn được dùng.
+/// Tag colors that can be used.
 pub const COLORS: [&str; 9] =
     ["gray", "red", "orange", "yellow", "green", "teal", "blue", "purple", "pink"];
 
-/// Quản lý nhãn của khách.
+/// Managing the tenant's tags.
 pub const TAGS_MANAGE: Permission = Permission::new(
     "kernel.tags.manage",
     "Create, rename, merge and delete the tenant's internal tags.",
 );
 
-/// Cài đặt khách: `true` thì chỉ người có `kernel.tags.manage` tạo nhãn mới.
+/// Tenant setting: `true` means only people with `kernel.tags.manage` can create new tags.
 pub const TAGS_RESTRICTED: TenantSetting = TenantSetting::new(
     "kernel.tags.restricted",
     "`true`: only people with `kernel.tags.manage` create new tags; others pick existing ones.",
 );
 
-/// Event: nhãn của một bản ghi đổi (tự động hoá, bước 58).
+/// Event: a record's tags changed (automations, step 58).
 pub(crate) const RECORD_TAGS_CHANGED: EventInfo =
     EventInfo::new("kernel.record_tags_changed", "The internal tags of a record changed.");
 
@@ -71,7 +73,7 @@ impl crate::event::Event for RecordTagsChanged {
     const NAME: &'static str = "kernel.record_tags_changed";
 }
 
-/// Sổ loại bản ghi gắn nhãn được: loại → permission ghi. Clone rẻ.
+/// Registry of taggable record kinds: kind → write permission. Cheap to clone.
 #[derive(Clone, Default)]
 pub struct Taggables {
     entries: Arc<RwLock<Vec<(&'static str, Permission)>>>,
@@ -116,12 +118,12 @@ pub struct TagRef {
     pub color: String,
 }
 
-/// Nhãn của bản ghi và điều kiện lọc theo nhãn, cho module dùng trong danh sách của mình.
+/// Tags of records and the tag filter condition, for modules to use in their own lists.
 #[derive(Clone, Copy, Default)]
 pub struct TagIndex;
 
 impl TagIndex {
-    /// Nhãn của các bản ghi `ids` loại `kind`, theo lô (một câu cho cả trang): ID → nhãn.
+    /// Tags of the records `ids` of kind `kind`, in batch (one statement for the whole page): ID → tags.
     pub async fn of_records(
         &self,
         tenant: &TenantContext,
@@ -167,8 +169,8 @@ impl TagIndex {
         Ok(found)
     }
 
-    /// Điều kiện "cột `column` (ID bản ghi, kiểu UUID) có một trong nhãn `any` và mọi nhãn `all`",
-    /// bằng subquery trên bảng nhãn của kernel — câu SQL thường, như nhau trên hai database.
+    /// Condition "column `column` (record ID, UUID type) has any of the tags `any` and all the tags `all`",
+    /// as a subquery on the kernel's tag tables — a plain SQL statement, identical on both databases.
     pub fn condition<Col: ColumnTrait>(
         &self,
         tenant: &TenantContext,
@@ -334,8 +336,8 @@ async fn find_view(tenant: &TenantContext, id: Uuid) -> Result<TagView, Error> {
     list_views(tenant).await?.into_iter().find(|tag| tag.id == id).ok_or_else(|| tag_not_found(id))
 }
 
-/// Tạo nhãn `name` (hay trả nhãn có sẵn cùng tên chuẩn hoá khi `reuse`). Chạy được trên kết nối
-/// của transaction.
+/// Creates the tag `name` (or returns the existing tag with the same normalized name when `reuse`). Runs on
+/// the connection of a transaction.
 async fn create<C: ConnectionTrait>(
     connection: &C,
     tenant: &TenantContext,
@@ -812,7 +814,7 @@ pub(crate) struct ApplyTagResult {
     pub skipped: Vec<String>,
 }
 
-/// Bản ghi tối đa của một lần gắn hàng loạt.
+/// At most this many records per bulk tagging call.
 const MAX_APPLY: usize = 500;
 
 /// Tag or untag many records at once.
@@ -971,7 +973,7 @@ pub(crate) fn routes(state: TagsState) -> OpenApiRouter {
         .with_state(Arc::new(state))
 }
 
-/// Migration tạo `kernel_tags` và `kernel_record_tags` (cấp khách hàng, mọi database dữ liệu).
+/// Migration that creates `kernel_tags` and `kernel_record_tags` (tenant level, every data database).
 pub(crate) struct CreateTags;
 
 impl MigrationName for CreateTags {

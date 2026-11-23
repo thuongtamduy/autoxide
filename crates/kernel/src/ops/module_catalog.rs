@@ -1,22 +1,22 @@
-//! Sổ module đã cài: cho người quản trị (và AI agent) xem chương trình đang chạy gồm những
-//! module nào và mỗi module khai gì — permission, event, job, lịch, tool MCP, endpoint
-//! deprecated, migration. Đây là phần API mà một màn hình "quản lý module" ở dự án giao diện
-//! dùng (D-155).
+//! Installed-module registry: lets administrators (and AI agents) see which modules the running program
+//! contains and what each module declares — permissions, events, jobs, schedules, MCP tools, deprecated
+//! endpoints, migrations. This is the API part that a "manage modules" screen in the UI project
+//! uses (D-155).
 //!
-//! Sổ chỉ ĐỌC. Module đăng ký lúc biên dịch (`crates/app/src/modules.rs`), nên không có bật /
-//! tắt module lúc chạy.
+//! The registry is READ-ONLY. Modules are registered at compile time (`crates/app/src/modules.rs`), so there
+//! is no enabling / disabling modules at runtime.
 //!
-//! Cách dựng: [`Modules::new`](crate::module::Modules::new) tạo một [`ModuleCatalog`] rỗng và
-//! đưa một bản cho module nội bộ `kernel`; [`Modules::start`](crate::module::Modules::start)
-//! điền sổ sau khi MỌI module đã khởi động (tool, job, lịch chỉ có sau `start`). Route của
-//! `kernel` đọc sổ lúc phục vụ request:
+//! How it is built: [`Modules::new`](crate::module::Modules::new) creates an empty [`ModuleCatalog`] and
+//! gives a copy to the internal `kernel` module; [`Modules::start`](crate::module::Modules::start)
+//! fills the registry after EVERY module has started (tools, jobs and schedules exist only after `start`). The
+//! `kernel` routes read the registry while serving requests:
 //!
-//! - `GET /api/v1/kernel/modules` — mọi module, theo thứ tự đăng ký; không chạm database;
-//! - `GET /api/v1/kernel/modules/{name}` — một module, kèm trạng thái từng migration (đọc
-//!   bảng `<tên>_migrations` của riêng module đó).
+//! - `GET /api/v1/kernel/modules` — every module, in registration order; does not touch the database;
+//! - `GET /api/v1/kernel/modules/{name}` — one module, with the status of each migration (read from
+//!   that module's own `<name>_migrations` table).
 //!
-//! Cả hai cần permission `kernel.modules.read`. Tool MCP `kernel.list_modules` và
-//! `kernel.get_module` gọi cùng hàm.
+//! Both need the permission `kernel.modules.read`. The MCP tools `kernel.list_modules` and
+//! `kernel.get_module` call the same functions.
 
 use std::sync::{Arc, OnceLock};
 
@@ -36,77 +36,77 @@ use crate::migration::{Migrator, ModuleMigrations};
 use crate::module::Module;
 use crate::response::{Data, Problem};
 
-/// Permission xem sổ module.
+/// Permission to view the module registry.
 pub(crate) const MODULES_READ: Permission = Permission::new(
     "kernel.modules.read",
     "See the installed modules and what each declares: permissions, events, jobs, schedules, \
      MCP tools, deprecated endpoints and migration status.",
 );
 
-/// Hai module nội bộ kernel luôn cài (không do binary đăng ký).
+/// The two internal kernel modules that are always installed (not registered by the binary).
 const INTERNAL: [&str; 2] = [crate::builtin::NAME, crate::antispam::module::NAME];
 
-/// Sổ module, dùng chung giữa `Modules` (bên điền) và module `kernel` (bên đọc).
+/// The module registry, shared between `Modules` (the filler) and the `kernel` module (the reader).
 //
 // `Arc<OnceLock<…>>`: hai bên giữ cùng một ô; ô được ghi đúng một lần (sau `start`) rồi chỉ
 // đọc, nên đọc từ nhiều thread không cần lock.
 #[derive(Clone, Default)]
 pub(crate) struct ModuleCatalog {
     entries: Arc<OnceLock<Vec<Entry>>>,
-    /// Bước kiểm (`autoxide doctor`) của mọi module, kèm tên module: cảnh báo vận hành
-    /// (`GET /kernel/ops/alerts`) chạy lại chúng.
+    /// Check steps (`autoxide doctor`) of every module, with the module name: operational alerts
+    /// (`GET /kernel/ops/alerts`) rerun them.
     checks: Arc<OnceLock<Vec<(&'static str, crate::doctor::Check)>>>,
-    /// Sổ nguồn việc của hộp việc (bước 51 P2): module đăng ký lúc khởi động.
+    /// Registry of work-inbox sources (step 51 P2): modules register at startup.
     work: crate::ops::work::WorkSources,
-    /// Sổ nguồn tìm xuyên phân hệ (bước 51 P3).
+    /// Registry of cross-module search sources (step 51 P3).
     finders: crate::ops::find::FinderSources,
-    /// Sổ nguồn gợi ý tìm cho website (D-201).
+    /// Registry of search-suggestion sources for the website (D-201).
     suggestions: crate::ops::suggest::SuggestSources,
-    /// Sổ số liệu tóm tắt (bước 51 P4).
+    /// Registry of summary metrics (step 51 P4).
     metrics: crate::ops::summary::SummaryMetrics,
-    /// Sổ danh sách xuất được (bước 51 P16).
+    /// Registry of exportable lists (step 51 P16).
     exports: crate::ops::list_exports::ExportSources,
-    /// Sổ hành động hàng loạt (bước 51 P8).
+    /// Registry of bulk actions (step 51 P8).
     bulk: crate::ops::bulk::BulkActions,
-    /// Sổ bộ nhận dạng mã (bước 51 P9).
+    /// Registry of code recognizers (step 51 P9).
     resolvers: crate::ops::resolve::CodeResolvers,
-    /// Sổ bước thiết lập (bước 51 P10).
+    /// Registry of setup steps (step 51 P10).
     setup: crate::ops::setup::SetupSteps,
-    /// Danh sách lý do (bước 51 P18).
+    /// List of reasons (step 51 P18).
     reasons: crate::ops::reasons::ReasonCodes,
-    /// Sổ khối của trang dựng từ khối (bước 67).
+    /// Registry of blocks for block-built pages (step 67).
     blocks: crate::blocks::Blocks,
-    /// Cách thử kết nối ra ngoài (bước 51).
+    /// How to test outgoing connections (step 51).
     probes: crate::ops::connections::ConnectionProbes,
-    /// Loại bản ghi gắn nhãn được (bước 51 P20).
+    /// Record kinds that can be labeled (step 51 P20).
     taggables: crate::ops::tags::Taggables,
-    /// Câu khách đổi được và câu khách đã đổi (bước 51 P21).
+    /// Phrases a tenant can change and phrases a tenant has changed (step 51 P21).
     texts: crate::ops::texts::TextOverrides,
-    /// Trường tự định nghĩa (bước 51 P19).
+    /// Custom fields (step 51 P19).
     custom_fields: crate::ops::custom_fields::CustomFields,
-    /// Nguồn "đang dùng ở đâu" (bước 51, D-267).
+    /// Source for "where is this used" (step 51, D-267).
     references: crate::ops::usages::ReferenceSources,
-    /// Lịch sử theo bản ghi (bước 51 P13), module nhật ký công bố; điền sau khi mọi module khởi động.
+    /// Per-record history (step 51 P13), published by the audit-log module; filled after every module has started.
     history: crate::ops::records::HistorySlot,
-    /// Mô hình AI (module `ai` công bố), điền sau khi mọi module khởi động (bước 52).
+    /// The AI model (published by the `ai` module), filled after every module has started (step 52).
     model: crate::ops::filter_parse::TextModelSlot,
-    /// Chủ đề tín hiệu WebSocket các module góp (bước 69 P3), điền sau khi mọi module khởi động.
+    /// WebSocket signal topics that modules contribute (step 69 P3), filled after every module has started.
     signal_topics: crate::event::signals::SignalTopicsSlot,
-    /// Schema bộ lọc của mọi danh sách (P7), điền khi dựng route.
+    /// Filter schema of every list (P7), filled when routes are built.
     lists: crate::ops::list_exports::ListsHandle,
-    /// Sổ điều hướng đã gom (bước 51 P1).
+    /// The gathered navigation registry (step 51 P1).
     navigation: Arc<OnceLock<crate::module::navigation::NavigationCatalog>>,
 }
 
-/// Một module trong sổ: phần khai báo (không đổi lúc chạy) và migrator riêng của nó để đọc
-/// trạng thái migration.
+/// A module in the registry: its declaration (unchanged at runtime) and its own migrator, used to read
+/// migration status.
 struct Entry {
     info: ModuleInfo,
     migrator: Option<Migrator>,
 }
 
 impl ModuleCatalog {
-    /// Điền sổ từ các module đã khởi động. Gọi một lần; lần sau bị bỏ qua.
+    /// Fills the registry from the modules that have started. Call once; later calls are ignored.
     pub(crate) fn fill(
         &self,
         modules: &[Box<dyn Module>],
@@ -222,12 +222,12 @@ impl ModuleCatalog {
         let _ = self.navigation.set(navigation);
     }
 
-    /// Sổ điều hướng (rỗng trước khi mọi module khởi động).
+    /// The navigation registry (empty before every module has started).
     pub(crate) fn navigation(&self) -> Option<&crate::module::navigation::NavigationCatalog> {
         self.navigation.get()
     }
 
-    /// Bước kiểm của mọi module (rỗng trước khi mọi module khởi động).
+    /// The check steps of every module (empty before every module has started).
     pub(crate) fn checks(&self) -> &[(&'static str, crate::doctor::Check)] {
         self.checks.get().map_or(&[], Vec::as_slice)
     }
@@ -238,12 +238,12 @@ impl ModuleCatalog {
         })
     }
 
-    /// Mọi module, theo thứ tự đăng ký. `applied` của migration để `null`.
+    /// Every module, in registration order. The `applied` field of migrations is left `null`.
     pub(crate) fn list(&self) -> Result<Vec<ModuleInfo>, Error> {
         Ok(self.entries()?.iter().map(|entry| entry.info.clone()).collect())
     }
 
-    /// Một module theo tên, kèm trạng thái migration đọc từ database.
+    /// One module by name, with migration status read from the database.
     pub(crate) async fn get(&self, database: &Database, name: &str) -> Result<ModuleInfo, Error> {
         let entry =
             self.entries()?.iter().find(|entry| entry.info.name == name).ok_or_else(|| {
@@ -647,7 +647,7 @@ pub(crate) struct ModuleMigration {
     applied: Option<bool>,
 }
 
-/// Những gì route và tool của sổ cần.
+/// What the registry's routes and tools need.
 #[derive(Clone)]
 pub(crate) struct CatalogState {
     pub(crate) catalog: ModuleCatalog,
@@ -656,7 +656,7 @@ pub(crate) struct CatalogState {
 }
 
 impl ModuleInfo {
-    /// Mô tả permission và event theo `language` (D-264).
+    /// Describes permissions and events in `language` (D-264).
     fn localized(mut self, translations: &crate::i18n::Translations, language: Language) -> Self {
         for permission in &mut self.permissions {
             permission.description = translations.describe(&permission.description, language);
@@ -668,7 +668,7 @@ impl ModuleInfo {
     }
 }
 
-/// Route của sổ, gắn dưới `/api/v1/kernel`.
+/// The registry's routes, mounted under `/api/v1/kernel`.
 pub(crate) fn routes(state: CatalogState) -> OpenApiRouter {
     OpenApiRouter::new()
         .routes(routes!(list_modules))
@@ -744,7 +744,7 @@ pub(crate) struct ModuleNameInput {
     name: String,
 }
 
-/// Resource MCP của sổ: `autoxide://kernel/modules`, cùng nội dung với `GET /kernel/modules`.
+/// The registry's MCP resource: `autoxide://kernel/modules`, with the same content as `GET /kernel/modules`.
 pub(crate) fn resources(state: CatalogState) -> Vec<crate::mcp::McpResource> {
     vec![
         crate::mcp::McpResource::new(
@@ -766,7 +766,7 @@ pub(crate) fn resources(state: CatalogState) -> Vec<crate::mcp::McpResource> {
     ]
 }
 
-/// Tool MCP của sổ — gọi đúng các hàm REST dùng.
+/// The registry's MCP tools — they call exactly the functions REST uses.
 pub(crate) fn tools(state: CatalogState) -> Vec<Tool> {
     let list = state.clone();
     let get = state;

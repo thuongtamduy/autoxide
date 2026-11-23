@@ -1,11 +1,12 @@
-//! Quyết định quyền trên bản ghi: MỘT mô tả luật cho cả hai cách dùng (bước 54 mục 1, D-20261118-step54-one-decision).
+//! Permission decision on a record: ONE description of the rule for both uses (step 54 item 1,
+//! D-20261118-step54-one-decision).
 //!
-//! Danh sách lọc bằng điều kiện SQL ([`Principal::scope_condition`]), một bản ghi kiểm bằng
-//! [`Principal::check`] / [`Principal::require_at`]. Hai đường này trước đây viết luật hai lần
-//! nên có thể lệch nhau: danh sách cho thấy một bản ghi mà mở ra lại bị 403, hay ngược lại. Giờ cả
-//! hai đọc cùng một [`Reach`] — phần mà `permission` cho phép, rút một lần từ grant của người gọi —
-//! và test `access_check` (sinh ngẫu nhiên cây, grant, bản ghi) chứng minh hai đường cho cùng kết quả
-//! trên cả SQLite và Postgres.
+//! A list is filtered with an SQL condition ([`Principal::scope_condition`]); one record is checked with
+//! [`Principal::check`] / [`Principal::require_at`]. These two paths used to write the rule twice, so they
+//! could disagree: a list showed a record that then returned 403 when opened, or the reverse. Now both read
+//! the same [`Reach`] (the part that `permission` allows, derived once from the caller's grants), and the
+//! `access_check` test (randomly generated trees, grants and records) proves both paths give the same result
+//! on SQLite and Postgres.
 
 use sea_orm::sea_query::Condition;
 use sea_orm::{ColumnTrait, ConnectionTrait};
@@ -15,39 +16,38 @@ use super::{OrgTarget, Permission, Principal, Scope, org_out_of_scope};
 use crate::error::Error;
 use crate::tenancy::{OrgId, OrgTree, TenantId};
 
-/// Kết quả của một lần quyết định quyền trên một bản ghi.
+/// Outcome of one permission decision on a record.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Decision {
-    /// Được làm.
+    /// Allowed.
     Allow,
-    /// Không có `permission` ở nút nào (403 `permission_denied`).
+    /// No `permission` at any node (403 `permission_denied`).
     Missing,
-    /// Có `permission` nhưng bản ghi nằm ngoài phạm vi (403 `org_out_of_scope`; đọc thì service trả
-    /// 404 để không lộ bản ghi tồn tại).
+    /// Has `permission` but the record is outside the scope (403 `org_out_of_scope`; for reads the service
+    /// returns 404 so the record's existence is not revealed).
     OutOfScope,
 }
 
-/// Phần một permission cho phép: rút từ grant của người gọi, dùng chung cho điều kiện SQL và kiểm
-/// từng bản ghi.
+/// The part a permission allows: derived from the caller's grants, shared by the SQL condition and the
+/// per-record check.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct Reach {
-    /// Có độ sâu `tenant`: mọi nút.
+    /// Has depth `tenant`: every node.
     everywhere: bool,
-    /// Độ sâu `unit`: đúng các nút này.
+    /// Depth `unit`: exactly these nodes.
     units: Vec<OrgId>,
-    /// Độ sâu `subtree`: các nút này và mọi con cháu.
+    /// Depth `subtree`: these nodes and all their descendants.
     subtrees: Vec<OrgId>,
-    /// Độ sâu `own`: bản ghi của chính người gọi; bản ghi không có người sở hữu thì như `unit` ở
-    /// các nút này.
+    /// Depth `own`: the caller's own records; a record with no owner behaves like `unit` at these nodes.
     owns: Vec<OrgId>,
-    /// Hàng rào của API key gắn nút: mọi grant chỉ có hiệu lực trong nhánh này.
+    /// Fence of an API key attached to a node: every grant is effective only within this branch.
     fence: Option<OrgId>,
     tenant: TenantId,
     user: Uuid,
 }
 
 impl Reach {
-    /// Điều kiện SQL: bản ghi có nút ở cột `org`, người sở hữu ở cột `owner` (nếu có).
+    /// SQL condition: the record has its node in column `org` and its owner in column `owner` (if any).
     pub(super) fn condition<C: ColumnTrait>(&self, org: C, owner: Option<C>) -> Condition {
         let mut condition = Condition::all();
         if !self.everywhere {
@@ -71,7 +71,7 @@ impl Reach {
         condition
     }
 
-    /// Bản ghi `target` có nằm trong phần này không — cùng nghĩa với [`condition`](Self::condition).
+    /// Whether record `target` is inside this part, with the same meaning as [`condition`](Self::condition).
     pub(super) async fn covers<D: ConnectionTrait>(
         &self,
         db: &D,
@@ -93,7 +93,7 @@ impl Reach {
 }
 
 impl Principal {
-    /// Phần `permission` cho phép; `None` khi không có grant nào.
+    /// The part `permission` allows; `None` when there is no grant.
     pub(super) fn reach(&self, permission: &Permission) -> Option<Reach> {
         let grants = self.grants(permission);
         if grants.is_empty() {
@@ -113,9 +113,9 @@ impl Principal {
         })
     }
 
-    /// Hàm quyết định duy nhất cho một bản ghi: người gọi có được dùng `permission` trên `target`
-    /// không. [`require_at`](Self::require_at) đổi kết quả thành lỗi; danh sách dùng
-    /// [`scope_condition`](Self::scope_condition), sinh từ cùng luật.
+    /// The single decision function for one record: whether the caller may use `permission` on `target`.
+    /// [`require_at`](Self::require_at) turns the result into an error; lists use
+    /// [`scope_condition`](Self::scope_condition), generated from the same rule.
     pub async fn check<D: ConnectionTrait>(
         &self,
         db: &D,
@@ -127,10 +127,10 @@ impl Principal {
         Ok(if reach.covers(db, target).await? { Decision::Allow } else { Decision::OutOfScope })
     }
 
-    /// Điều kiện SeaORM giới hạn một danh sách vào phần `permission` cho phép: cột `org` là nút
-    /// của bản ghi, `owner` là cột người sở hữu (nếu có; không có thì `own` hiểu như `unit`).
-    /// `Condition::all()` (không giới hạn) khi có độ sâu `tenant` và không có hàng rào; lỗi
-    /// `permission_denied` khi không có grant nào. Dùng cùng `.scoped(&tenant)`.
+    /// SeaORM condition that restricts a list to the part `permission` allows: column `org` is the record's
+    /// node, `owner` is the owner column (if any; without it `own` is read as `unit`).
+    /// `Condition::all()` (no restriction) when depth `tenant` is held and there is no fence; the error
+    /// `permission_denied` when there is no grant. Use it together with `.scoped(&tenant)`.
     pub fn scope_condition<C: ColumnTrait>(
         &self,
         permission: &Permission,
@@ -142,9 +142,9 @@ impl Principal {
         Ok(reach.condition(org, owner))
     }
 
-    /// Kiểm `permission` trên một bản ghi (đọc / sửa / xoá) hay nút đích của lệnh tạo / dời:
-    /// thiếu permission → `permission_denied`; ngoài phạm vi → `org_out_of_scope`. Đọc ngoài phạm
-    /// vi thì service trả 404 thay vì lỗi này (không lộ bản ghi tồn tại).
+    /// Checks `permission` on a record (read / edit / delete) or the target node of a create / move command:
+    /// missing permission -> `permission_denied`; outside the scope -> `org_out_of_scope`. For a read outside
+    /// the scope the service returns 404 instead of this error (the record's existence is not revealed).
     pub async fn require_at<D: ConnectionTrait>(
         &self,
         db: &D,
@@ -158,8 +158,8 @@ impl Principal {
         }
     }
 
-    /// Như [`require_at`](Self::require_at), thêm: nút đích và mọi tổ tiên đang hoạt động (không
-    /// thì `org_frozen`). Gọi TRONG transaction ghi của module.
+    /// Like [`require_at`](Self::require_at), plus: the target node and all its ancestors must be active
+    /// (otherwise `org_frozen`). Call it INSIDE the module's write transaction.
     pub async fn require_write_at<D: ConnectionTrait>(
         &self,
         transaction: &D,

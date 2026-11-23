@@ -1,21 +1,22 @@
-//! AI: trait chung để module dùng mô hình ngôn ngữ và embedding mà không phụ thuộc nhà cung cấp
-//! nào (D-109).
+//! AI: shared traits that let modules use language models and embeddings without depending on any specific
+//! provider (D-109).
 //!
-//! Một module (`ai`) công bố `dyn TextModel` và `dyn Embedder`; module cần AI lấy bằng
-//! `context.require::<dyn TextModel>()` (đăng ký SAU module `ai`). Khi người cài chưa bật AI,
-//! module `ai` vẫn công bố bản "đã tắt": mọi lời gọi trả lỗi `ai.disabled`, nên module dùng nó
-//! không phải rẽ nhánh — chỉ hỏi [`TextModel::capabilities`] để biết có nên mời người dùng không.
+//! One module (`ai`) publishes `dyn TextModel` and `dyn Embedder`; a module that needs AI gets them with
+//! `context.require::<dyn TextModel>()` (register AFTER the `ai` module). When the installer has not enabled
+//! AI, the `ai` module still publishes a "disabled" implementation: every call returns the `ai.disabled`
+//! error, so a module using it does not have to branch; it only asks [`TextModel::capabilities`] to learn
+//! whether to offer the feature to users.
 //!
-//! Khái niệm của nhà cung cấp (tên tham số, `stop_reason`…) không ra khỏi module `ai`; khái niệm
-//! nghiệp vụ (bài viết, SEO…) không vào đây.
+//! Provider concepts (parameter names, `stop_reason`, ...) never leave the `ai` module; business concepts
+//! (articles, SEO, ...) do not enter here.
 
 use serde_json::Value;
 
 use crate::error::Error;
 use crate::tenancy::TenantContext;
 
-/// Mức độ kỹ khi mô hình suy nghĩ: đổi lấy chi phí và thời gian. Mỗi nhà cung cấp tự đổi sang
-/// tham số của mình (hay bỏ qua nếu không có).
+/// How hard the model thinks: trades cost and latency for quality. Each provider maps this to its own parameter
+/// (or ignores it if it has none).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Effort {
@@ -34,31 +35,31 @@ impl Effort {
     }
 }
 
-/// Một phần dữ liệu đưa cho mô hình.
+/// One piece of data passed to the model.
 #[derive(Debug, Clone, PartialEq, Eq)]
 // Cố ý KHÔNG `#[non_exhaustive]` (D-167): thêm một loại dữ liệu mới phải buộc bên cài
 // `TextModel` xử lý nó; nhánh `_` sẽ lặng lẽ bỏ dữ liệu khỏi yêu cầu.
 pub enum Part {
     Text(String),
-    /// Ảnh raster (`image/jpeg`, `image/png`, `image/gif`, `image/webp`).
+    /// Raster image (`image/jpeg`, `image/png`, `image/gif`, `image/webp`).
     Image {
         media_type: String,
         bytes: Vec<u8>,
     },
 }
 
-/// Một yêu cầu sinh kết quả có cấu trúc. Dựng bằng [`Prompt::new`].
+/// A request for structured output. Build it with [`Prompt::new`].
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct Prompt {
-    /// `<module>.<việc>` (vd `content.translate`): dùng cho hạn mức, log và metrics — là một
-    /// tập nhỏ cố định do code khai, không bao giờ là dữ liệu người dùng.
+    /// `<module>.<action>` (e.g. `content.translate`): used for quotas, logs and metrics. It is a small fixed
+    /// set declared in code and is never user data.
     pub purpose: &'static str,
-    /// Luật cho mô hình (system prompt). Chỉ do code viết; dữ liệu người dùng không vào đây.
+    /// Rules for the model (system prompt). Written by code only; user data never goes here.
     pub instructions: String,
-    /// Dữ liệu cần xử lý — có thể chứa chữ người dùng viết, nên coi là không tin được.
+    /// Data to process. It may contain user-written text, so treat it as untrusted.
     pub input: Vec<Part>,
-    /// JSON Schema kết quả phải theo, trong phần con mà mọi nhà cung cấp nhận (xem
+    /// JSON Schema the output must follow, restricted to the subset every provider accepts (see
     /// [`schema`]).
     pub output_schema: Value,
     pub effort: Effort,
@@ -101,7 +102,7 @@ impl Prompt {
     }
 }
 
-/// Số token một lời gọi đã dùng (để tính hạn mức và chi phí).
+/// Tokens used by one call (for quota and cost accounting).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct Usage {
@@ -116,14 +117,14 @@ impl Usage {
     }
 }
 
-/// Kết quả của [`TextModel::generate`].
+/// Result of [`TextModel::generate`].
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct Generation {
-    /// Đã khớp `output_schema` (đã được kiểm lại, không tin nhà cung cấp).
+    /// Matches `output_schema` (re-validated; the provider is not trusted).
     pub output: Value,
     pub usage: Usage,
-    /// Mô hình đã trả lời (có thể khác mô hình cấu hình khi nhà cung cấp tự chuyển).
+    /// The model that answered (may differ from the configured model when the provider switches by itself).
     pub model: String,
 }
 
@@ -134,17 +135,17 @@ impl Generation {
     }
 }
 
-/// Mô hình đang dùng làm được gì. Dựng bằng [`Capabilities::disabled`] hay
+/// What the current model can do. Build it with [`Capabilities::disabled`] or
 /// [`Capabilities::enabled`].
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 #[non_exhaustive]
 pub struct Capabilities {
-    /// AI đã được bật và cấu hình.
+    /// AI is enabled and configured.
     pub enabled: bool,
-    /// Tên nhà cung cấp (`anthropic`, `openai`) — để hiển thị, không để rẽ nhánh.
+    /// Provider name (`anthropic`, `openai`): for display, not for branching.
     pub provider: String,
     pub model: String,
-    /// Nhận ảnh làm đầu vào (cho gợi ý alt text).
+    /// Accepts images as input (for alt text suggestions).
     pub images: bool,
 }
 
@@ -172,7 +173,7 @@ impl Capabilities {
     }
 }
 
-/// Mô hình sinh chữ.
+/// A text-generating model.
 //
 // `Send + Sync`: một đối tượng dùng chung giữa mọi request (qua `Arc`), có thể ở nhiều thread
 // cùng lúc. `#[async_trait]`: Rust chưa cho gọi hàm `async` của trait qua `dyn Trait`.
@@ -180,40 +181,40 @@ impl Capabilities {
 pub trait TextModel: Send + Sync {
     fn capabilities(&self) -> Capabilities;
 
-    /// `Ok` khi đã bật; không thì đúng lỗi mà [`generate`](Self::generate) sẽ trả
-    /// (`ai.disabled`). Gọi trước khi làm việc tốn kém (đọc ảnh, xếp job) để báo lỗi sớm.
+    /// `Ok` when enabled; otherwise exactly the error [`generate`](Self::generate) would return
+    /// (`ai.disabled`). Call it before expensive work (reading images, queueing jobs) to fail early.
     fn ready(&self) -> Result<(), Error>;
 
-    /// Sinh một kết quả khớp `prompt.output_schema`. Lỗi có `code` ổn định (`ai.disabled`,
+    /// Generates one result matching `prompt.output_schema`. Errors carry a stable `code` (`ai.disabled`,
     /// `ai.quota_exceeded`, `ai.provider_unavailable`, `ai.refused`, `ai.output_truncated`,
     /// `ai.output_invalid`, `ai.unsupported_input`, `ai.misconfigured`).
     ///
-    /// `tenant`: khách mà việc này làm cho — khoá, hạn mức và số đếm theo khách.
+    /// `tenant`: the tenant this work is done for; keys, quotas and counters are per tenant.
     async fn generate(&self, tenant: &TenantContext, prompt: Prompt) -> Result<Generation, Error>;
 }
 
-/// Đoạn chữ được tính embedding để làm gì (một số mô hình cần biết; mô hình khác bỏ qua).
+/// What a piece of text is embedded for (some models need to know; others ignore it).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum EmbedKind {
-    /// Nội dung được lập index.
+    /// Content being indexed.
     Document,
-    /// Câu tìm kiếm.
+    /// A search query.
     Query,
 }
 
-/// Mô hình tính embedding (dãy số biểu diễn ý nghĩa của đoạn chữ).
+/// A model that computes embeddings (numeric vectors representing the meaning of a text).
 #[async_trait::async_trait]
 pub trait Embedder: Send + Sync {
-    /// Đã bật và cấu hình.
+    /// Enabled and configured.
     fn enabled(&self) -> bool;
-    /// `Ok` khi đã bật; không thì lỗi `ai.embedding_disabled`.
+    /// `Ok` when enabled; otherwise the `ai.embedding_disabled` error.
     fn ready(&self) -> Result<(), Error>;
-    /// Tên mô hình — lưu cùng vector để biết khi nào phải lập lại index.
+    /// Model name, stored with the vector to know when the index must be rebuilt.
     fn model_id(&self) -> &str;
-    /// Số chiều của mỗi vector.
+    /// Number of dimensions of each vector.
     fn dimensions(&self) -> usize;
-    /// Một vector cho mỗi phần tử của `texts`, cùng thứ tự. `purpose`: như [`Prompt::purpose`].
+    /// One vector per element of `texts`, in the same order. `purpose`: same as [`Prompt::purpose`].
     async fn embed(
         &self,
         tenant: &TenantContext,
@@ -223,15 +224,15 @@ pub trait Embedder: Send + Sync {
     ) -> Result<Vec<Vec<f32>>, Error>;
 }
 
-/// Kiểm một giá trị JSON theo phần con của JSON Schema mà Autoxide dùng — phần mọi nhà cung cấp
-/// đều nhận: `type` (`object`, `array`, `string`, `integer`, `number`, `boolean`, `null`, hay
-/// danh sách các kiểu), `properties`, `required`, `additionalProperties: false`, `items`,
-/// `enum`, `description`. Độ dài chuỗi và số phần tử nhà cung cấp **không** bảo đảm (Anthropic
-/// ghi rõ không ép), nên không dùng trong schema gửi đi — code của tính năng tự kiểm.
+/// Validates a JSON value against the JSON Schema subset Autoxide uses, which every provider accepts: `type`
+/// (`object`, `array`, `string`, `integer`, `number`, `boolean`, `null`, or a list of types), `properties`,
+/// `required`, `additionalProperties: false`, `items`, `enum`, `description`. Providers do **not** guarantee
+/// string length or item count limits (Anthropic states it does not enforce them), so they are not used in
+/// schemas sent out; feature code checks them itself.
 pub mod schema {
     use serde_json::Value;
 
-    /// Mọi chỗ sai, mỗi chỗ một câu có vị trí (`$.items[2].id: …`). Rỗng: hợp lệ.
+    /// Every violation, one sentence each with its location (`$.items[2].id: ...`). Empty: valid.
     pub fn problems(schema: &Value, value: &Value) -> Vec<String> {
         let mut found = Vec::new();
         check(schema, value, "$", &mut found);
@@ -334,15 +335,15 @@ pub mod schema {
     }
 }
 
-/// Vector embedding: mã hoá để lưu trong database (cột nhị phân, như nhau trên SQLite và
-/// Postgres), chuẩn hoá, so sánh. Tính trong Rust để hai database cho cùng kết quả (D-109).
+/// Embedding vector: encoding for storage in the database (a binary column, identical on SQLite and
+/// Postgres), normalization and comparison. Computed in Rust so both databases give the same result (D-109).
 pub mod vector {
-    /// `f32` little-endian nối nhau — 4 byte mỗi chiều, thứ tự byte cố định trên mọi máy.
+    /// `f32` little-endian values concatenated: 4 bytes per dimension, with a fixed byte order on every machine.
     pub fn encode(vector: &[f32]) -> Vec<u8> {
         vector.iter().flat_map(|value| value.to_le_bytes()).collect()
     }
 
-    /// Ngược của [`encode`]. `None` khi số byte không chia hết cho 4.
+    /// Inverse of [`encode`]. `None` when the byte count is not divisible by 4.
     pub fn decode(bytes: &[u8]) -> Option<Vec<f32>> {
         if !bytes.len().is_multiple_of(4) {
             return None;
@@ -351,8 +352,8 @@ pub mod vector {
         Some(bytes.as_chunks::<4>().0.iter().map(|chunk| f32::from_le_bytes(*chunk)).collect())
     }
 
-    /// Chia cho độ dài để vector dài 1: khi đó cosine chỉ còn là tích vô hướng ([`dot`]).
-    /// Vector toàn số 0 giữ nguyên.
+    /// Divides by the length so the vector has length 1; cosine then reduces to the dot product ([`dot`]).
+    /// An all-zero vector is left unchanged.
     pub fn normalize(vector: &mut [f32]) {
         let length = vector.iter().map(|value| value * value).sum::<f32>().sqrt();
         if length > 0.0 {
@@ -362,8 +363,8 @@ pub mod vector {
         }
     }
 
-    /// Tích vô hướng; với hai vector đã [`normalize`] thì là cosine (−1 … 1). Hai vector khác
-    /// độ dài: tính trên phần chung.
+    /// Dot product; for two [`normalize`]d vectors it is the cosine (-1 ... 1). Two vectors of different
+    /// length: computed over the common part.
     //
     // Cộng vào 8 tổng riêng rồi gộp (bước 39 B6, `docs/BENCHMARKS.md` "Tìm theo ý nghĩa"): cộng
     // số thực tuần tự vào MỘT tổng thì trình biên dịch không được đổi thứ tự (kết quả số thực phụ

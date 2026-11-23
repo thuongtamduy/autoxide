@@ -1,20 +1,21 @@
-//! Đọc và ghi CSV (RFC 4180) có chặn CSV injection — tự viết, không cần thư viện
-//! (D-20261118-step41-kernel-prep). Dùng chung cho mọi bản xuất / nhập: `forms`, danh sách của
-//! kernel (bước 51 P16), `catalog` và các module thương mại (bước 41–49).
+//! Reading and writing CSV (RFC 4180) with protection against CSV injection — written in-house, no library
+//! needed (D-20261118-step41-kernel-prep). Shared by every export / import: `forms`, the kernel's lists (step
+//! 51 P16), `catalog` and the commerce modules (steps 41–49).
 //!
-//! Ghi:
-//! - ô bắt đầu bằng `=`, `+`, `-`, `@`, tab hay CR thì thêm `'` vào đầu (theo OWASP: Excel /
-//!   LibreOffice không coi là công thức nữa);
-//! - mọi ô nằm trong ngoặc kép, ngoặc kép bên trong viết đôi;
-//! - đầu file có BOM UTF-8 để Excel đọc đúng chữ tiếng Việt; xuống dòng là CRLF.
+//! Writing:
+//! - a cell starting with `=`, `+`, `-`, `@`, tab or CR gets a `'` prepended (per OWASP: Excel /
+//!   LibreOffice then no longer treat it as a formula);
+//! - every cell is quoted, and quotes inside are doubled;
+//! - the file starts with a UTF-8 BOM so Excel reads Vietnamese text correctly; line breaks are CRLF.
 //!
-//! Đọc: bỏ BOM, nhận CRLF lẫn LF, ô có hoặc không ngoặc kép, `""` trong ngoặc là một ngoặc kép,
-//! xuống dòng nằm trong ô ngoặc kép; lỗi nêu số dòng (đếm từ 1, theo dòng của file).
+//! Reading: strips the BOM, accepts mixed CRLF and LF, cells with or without quotes, `""` inside quotes as
+//! one quote, and line breaks inside quoted cells; errors give the line number (counted from 1, by the file's
+//! lines).
 
-/// Đầu file: BOM UTF-8.
+/// Start of file: the UTF-8 BOM.
 pub const BOM: &str = "\u{feff}";
 
-/// Một dòng CSV (kèm CRLF).
+/// One CSV row (with CRLF).
 pub fn line(row: &[String]) -> String {
     let cells: Vec<String> = row.iter().map(|cell| cell_text(cell)).collect();
     let mut out = cells.join(",");
@@ -22,7 +23,7 @@ pub fn line(row: &[String]) -> String {
     out
 }
 
-/// Nội dung CSV đầy đủ: BOM, dòng tiêu đề, rồi từng dòng.
+/// The full CSV content: BOM, header row, then each row.
 pub fn write(header: &[String], rows: &[Vec<String>]) -> String {
     let mut out = String::from(BOM);
     for row in std::iter::once(header).chain(rows.iter().map(Vec::as_slice)) {
@@ -40,14 +41,14 @@ fn cell_text(value: &str) -> String {
     format!("\"{}\"", guarded.replace('"', "\"\""))
 }
 
-/// Lỗi khi đọc CSV. `line` là số dòng của file (đếm từ 1) nơi gặp lỗi.
+/// Error when reading CSV. `line` is the file's line number (counted from 1) where the error occurred.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CsvError {
-    /// Ngoặc kép mở mà tới cuối file không đóng.
+    /// An opening quote that is not closed by the end of the file.
     UnterminatedQuote { line: usize },
-    /// Có ký tự ngay sau ngoặc kép đóng mà không phải `,` hay xuống dòng.
+    /// A character right after the closing quote that is not `,` or a line break.
     UnexpectedCharacter { line: usize },
-    /// Quá `max` bản ghi (kể cả dòng tiêu đề).
+    /// More than `max` records (including the header row).
     TooManyRows { max: usize },
 }
 
@@ -67,9 +68,9 @@ impl std::fmt::Display for CsvError {
 
 impl std::error::Error for CsvError {}
 
-/// Đọc cả `text` thành các bản ghi (dòng tiêu đề là bản ghi đầu). Dòng trống bị bỏ. Quá
-/// `max_rows` bản ghi thì dừng và báo [`CsvError::TooManyRows`] — người gọi đặt giới hạn để một
-/// file lớn không chiếm hết bộ nhớ.
+/// Reads the whole `text` into records (the header row is the first record). Blank lines are skipped. Past
+/// `max_rows` records it stops and reports [`CsvError::TooManyRows`] — the caller sets the limit so one
+/// large file cannot take up all the memory.
 pub fn read(text: &str, max_rows: usize) -> Result<Vec<Vec<String>>, CsvError> {
     let text = text.strip_prefix(BOM).unwrap_or(text);
     let mut rows: Vec<Vec<String>> = Vec::new();

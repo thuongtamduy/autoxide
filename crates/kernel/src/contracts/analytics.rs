@@ -1,9 +1,10 @@
-//! Loại sự kiện phân tích truy cập và phễu do module khai (bước 57, D-220): module nói "website /
-//! máy chủ của tôi sinh sự kiện gì" bằng [`AnalyticsEvent`] (`Module::analytics_events`) và "phễu nào
-//! đáng đo" bằng [`Funnel`] (`Module::funnels`). Module `analytics` đọc [`AnalyticsCatalog`] lúc khởi
-//! động: nhận sự kiện từ website chỉ khi loại đã khai (loại lạ bị bỏ, không lỗi), và nghe event của
-//! module cho sự kiện phía máy chủ (không tin số đơn do trình duyệt gửi). Kernel không biết nghĩa
-//! nghiệp vụ của sự kiện: chỉ giữ hợp đồng và kiểm khai báo lúc khởi động.
+//! Analytics event types and funnels declared by modules (step 57, D-220): a module says "which events my
+//! website / server produces" with [`AnalyticsEvent`] (`Module::analytics_events`) and "which funnels are
+//! worth measuring" with [`Funnel`] (`Module::funnels`). The `analytics` module reads the
+//! [`AnalyticsCatalog`] at startup: it accepts website events only for declared types (unknown types are
+//! dropped, not an error), and listens to the module's events for server-side analytics events (it does not
+//! trust order counts sent by the browser). The kernel does not know what an event means for the business: it
+//! only holds the contract and validates the declarations at startup.
 //!
 //! ```
 //! use autoxide_kernel::analytics::{AnalyticsEvent, Funnel, Prop, PropKind};
@@ -34,24 +35,24 @@ use crate::error::Error;
 use crate::event::{Delivered, EventCatalog};
 use crate::tenancy::OrgId;
 
-/// Số thuộc tính (`props`) tối đa của một loại sự kiện.
+/// Maximum number of properties (`props`) of one event type.
 pub const PROPS_MAX: usize = 10;
 
-/// Số bước tối đa của một phễu.
+/// Maximum number of steps of one funnel.
 pub const FUNNEL_STEPS_MAX: usize = 10;
 
-/// Kiểu giá trị của một thuộc tính.
+/// Value type of a property.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PropKind {
-    /// Chuỗi, tối đa 100 ký tự.
+    /// String, at most 100 characters.
     Text,
-    /// Số (nguyên hay thực).
+    /// Number (integer or floating point).
     Number,
     Boolean,
 }
 
 impl PropKind {
-    /// Tên ổn định trong API: `text`, `number`, `boolean`.
+    /// Stable name in the API: `text`, `number`, `boolean`.
     pub const fn as_str(self) -> &'static str {
         match self {
             PropKind::Text => "text",
@@ -60,7 +61,7 @@ impl PropKind {
         }
     }
 
-    /// `value` có đúng kiểu không (chuỗi quá 100 ký tự là sai).
+    /// Whether `value` has the right type (a string longer than 100 characters is wrong).
     pub fn accepts(self, value: &Value) -> bool {
         match (self, value) {
             (PropKind::Text, Value::String(text)) => text.chars().count() <= PROP_TEXT_MAX,
@@ -70,10 +71,10 @@ impl PropKind {
     }
 }
 
-/// Độ dài tối đa của thuộc tính kiểu chữ.
+/// Maximum length of a text property.
 pub const PROP_TEXT_MAX: usize = 100;
 
-/// Một thuộc tính được phép của loại sự kiện.
+/// A property allowed on an event type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Prop {
     pub name: &'static str,
@@ -86,16 +87,16 @@ impl Prop {
     }
 }
 
-/// Một sự kiện phía máy chủ rút từ event của module: không có phiên của trình duyệt.
+/// A server-side event derived from a module event: it has no browser session.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct ServerHit {
-    /// Website (nút) của sự kiện; `None`: nút gốc của khách.
+    /// Website (node) of the event; `None`: the tenant's root node.
     pub org_id: Option<OrgId>,
     pub occurred_at: Timestamp,
-    /// Đối tượng, dạng `<loại>:<id>` (vd `catalog.product:0190…`).
+    /// Object, in the form `<kind>:<id>` (e.g. `catalog.product:0190…`).
     pub object: Option<String>,
-    /// Người làm. Module `analytics` chỉ giữ khi người đó đồng ý theo dõi theo người.
+    /// The actor. The `analytics` module keeps it only if the person consented to per-person tracking.
     pub user_id: Option<Uuid>,
 }
 
@@ -123,15 +124,15 @@ impl ServerHit {
     }
 }
 
-/// Hàm rút sự kiện từ một event của module: thuần, không I/O. `None`: event này không tính.
+/// Function that derives an analytics event from a module event: pure, no I/O. `None`: this event does not count.
 pub type ExtractHit = fn(&Delivered) -> Result<Option<ServerHit>, Error>;
 
-/// Nguồn của một loại sự kiện.
+/// Source of an event type.
 #[derive(Clone, Copy)]
 pub enum Source {
-    /// Website gửi qua endpoint công khai.
+    /// The website sends it through the public endpoint.
     Browser,
-    /// Rút từ event `event` của chính module; website không gửi được loại này.
+    /// Derived from the module's own event `event`; the website cannot send this type.
     Server { event: &'static str, extract: ExtractHit },
 }
 
@@ -144,28 +145,28 @@ impl std::fmt::Debug for Source {
     }
 }
 
-/// Một loại sự kiện module khai.
+/// An event type declared by a module.
 #[derive(Debug, Clone, Copy)]
 pub struct AnalyticsEvent {
-    /// `<module>.<sự kiện>`, vd `catalog.product_viewed`.
+    /// `<module>.<event>`, e.g. `catalog.product_viewed`.
     pub key: &'static str,
-    /// Câu tiếng Anh cho người gọi API.
+    /// English sentence for API callers.
     pub description: &'static str,
-    /// Loại đối tượng sự kiện nói tới (vd `catalog.product`): `object` của sự kiện phải là
-    /// `<loại này>:<id>`. `None`: sự kiện không có đối tượng.
+    /// Kind of object the event refers to (e.g. `catalog.product`): the event's `object` must be
+    /// `<this kind>:<id>`. `None`: the event has no object.
     pub object_kind: Option<&'static str>,
-    /// Thuộc tính được phép; thuộc tính lạ hay sai kiểu làm sự kiện bị bỏ.
+    /// Allowed properties; an unknown property or one of the wrong type causes the event to be dropped.
     pub props: &'static [Prop],
     pub source: Source,
 }
 
 impl AnalyticsEvent {
-    /// Loại sự kiện website gửi.
+    /// An event type the website sends.
     pub const fn browser(key: &'static str, description: &'static str) -> Self {
         AnalyticsEvent { key, description, object_kind: None, props: &[], source: Source::Browser }
     }
 
-    /// Loại sự kiện rút từ event `event` của chính module (vd `orders.order_confirmed` →
+    /// An event type derived from the module's own event `event` (e.g. `orders.order_confirmed` →
     /// `orders.purchased`).
     pub const fn server(
         key: &'static str,
@@ -194,16 +195,16 @@ impl AnalyticsEvent {
         self
     }
 
-    /// Website gửi được loại này.
+    /// The website can send this type.
     pub fn from_browser(&self) -> bool {
         matches!(self.source, Source::Browser)
     }
 }
 
-/// Một phễu module khai: các bước là loại sự kiện (của bất kỳ module nào), theo thứ tự.
+/// A funnel declared by a module: the steps are event types (of any module), in order.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Funnel {
-    /// `<module>.<phễu>`, vd `orders.checkout`.
+    /// `<module>.<funnel>`, e.g. `orders.checkout`.
     pub key: &'static str,
     pub description: &'static str,
     pub steps: &'static [&'static str],
@@ -225,16 +226,16 @@ struct Inner {
     funnels: Vec<(&'static str, Funnel)>,
 }
 
-/// Mọi loại sự kiện và phễu của mọi module đã đăng ký, đã kiểm. Clone rẻ.
+/// All event types and funnels of all registered modules, validated. Cheap to clone.
 #[derive(Debug, Clone, Default)]
 pub struct AnalyticsCatalog(Arc<Inner>);
 
-/// Khai báo của một module: `(module, loại sự kiện, phễu)`.
+/// Declarations of one module: `(module, event types, funnels)`.
 pub type Declared = (&'static str, Vec<AnalyticsEvent>, Vec<Funnel>);
 
 impl AnalyticsCatalog {
-    /// Kiểm và gom khai báo của các module. `events`: mọi event đã khai — sự kiện phía máy chủ
-    /// chỉ nghe event của chính module. Trả mọi vấn đề cùng lúc.
+    /// Validates and collects the modules' declarations. `events`: every declared event — server-side events
+    /// only listen to the module's own events. Returns all problems at once.
     pub fn new(modules: Vec<Declared>, events: &EventCatalog) -> Result<Self, Vec<String>> {
         let mut problems = Vec::new();
         let mut inner = Inner::default();
@@ -284,22 +285,22 @@ impl AnalyticsCatalog {
         if problems.is_empty() { Ok(AnalyticsCatalog(Arc::new(inner))) } else { Err(problems) }
     }
 
-    /// Mọi loại sự kiện, theo thứ tự đăng ký module.
+    /// All event types, in module registration order.
     pub fn events(&self) -> impl Iterator<Item = &AnalyticsEvent> {
         self.0.events.iter().map(|(_, event)| event)
     }
 
-    /// Loại sự kiện `key`, nếu có.
+    /// The event type `key`, if any.
     pub fn event(&self, key: &str) -> Option<&AnalyticsEvent> {
         self.events().find(|event| event.key == key)
     }
 
-    /// Mọi phễu, theo thứ tự đăng ký module.
+    /// All funnels, in module registration order.
     pub fn funnels(&self) -> impl Iterator<Item = &Funnel> {
         self.0.funnels.iter().map(|(_, funnel)| funnel)
     }
 
-    /// Phễu `key`, nếu có.
+    /// The funnel `key`, if any.
     pub fn funnel(&self, key: &str) -> Option<&Funnel> {
         self.funnels().find(|funnel| funnel.key == key)
     }

@@ -1,14 +1,14 @@
-//! Cấu hình cho giao diện (đề bài giao diện C, D-271): `GET /api/v1/kernel/client-config` gom
-//! phần mỗi module khai qua [`Module::client_config`](crate::module::Module::client_config) — chỉ
-//! giá trị không phải secret mà giao diện cần để khỏi đoán mặc định của core (ngôn ngữ, giới hạn
-//! tải lên, địa chỉ công khai…).
+//! Configuration for the UI (UI brief C, D-271): `GET /api/v1/kernel/client-config` gathers the
+//! section each module declares through [`Module::client_config`](crate::module::Module::client_config) — only
+//! non-secret values the UI needs so it does not have to guess the core's defaults (language, upload
+//! limits, public address…).
 //!
-//! Giá trị đọc một lần lúc khởi động (cấu hình không đổi khi chương trình đang chạy). Module nhận
-//! cấu hình theo khách (vd ngôn ngữ của `content`, đối chiếu thiết kế 2 A-b7) gắn thêm
-//! [`TenantClientSection`]: request xác định được khách thì các trường khách đã đặt thay giá trị
-//! chung. Lược đồ
-//! OpenAPI của câu trả lời ghép từ lược đồ của từng phần (`T: ToSchema` của module), nên tài liệu
-//! mô tả đủ từng trường mà kernel không cần biết module nào.
+//! Values are read once at startup (configuration does not change while the program runs). A module with
+//! per-tenant settings (e.g. the language of `content`, cross-checked with design 2 A-b7) attaches an extra
+//! [`TenantClientSection`]: when the request identifies the tenant, the fields the tenant has set replace the
+//! shared values. The OpenAPI schema of the response is assembled from each section's schema (the module's
+//! `T: ToSchema`), so the documentation describes every field fully without the kernel knowing which modules
+//! exist.
 
 use std::collections::BTreeMap;
 use std::sync::{Arc, OnceLock};
@@ -25,20 +25,20 @@ use crate::error::Error;
 use crate::module::Module;
 use crate::response::{Data, Problem};
 
-/// Giá trị theo khách của một phần cấu hình cho giao diện.
+/// Per-tenant values of a UI configuration section.
 //
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
 #[async_trait::async_trait]
 pub trait TenantClientSection: Send + Sync {
-    /// Các trường (mức đầu của phần) mà khách `tenant` đặt khác cấu hình chung, cùng tên và kiểu
-    /// như trong phần; trường vắng giữ giá trị chung.
+    /// The fields (top level of the section) that tenant `tenant` sets differently from the shared
+    /// configuration, with the same names and types as in the section; absent fields keep the shared value.
     async fn overrides(
         &self,
         tenant: &crate::tenancy::TenantContext,
     ) -> Result<serde_json::Map<String, Value>, Error>;
 }
 
-/// Phần cấu hình cho giao diện của một module: giá trị và lược đồ OpenAPI của nó.
+/// A module's UI configuration section: its value and OpenAPI schema.
 #[derive(Clone)]
 pub struct ClientSection {
     value: Value,
@@ -54,9 +54,9 @@ impl std::fmt::Debug for ClientSection {
 }
 
 impl ClientSection {
-    /// Phần từ `value`. `T` chỉ nên có trường đơn giản (chuỗi, số, cờ, danh sách của chúng):
-    /// lược đồ của nó được chép nguyên vào tài liệu OpenAPI. Mỗi trường mang `///` mô tả (tiếng
-    /// Anh) và chỉ giữ giá trị ai xem cũng được — endpoint không cần đăng nhập.
+    /// A section from `value`. `T` should only have simple fields (strings, numbers, flags, lists of them):
+    /// its schema is copied verbatim into the OpenAPI documentation. Each field carries a `///` description (in
+    /// English) and holds only values anyone may see — the endpoint needs no login.
     pub fn new<T: Serialize + ToSchema>(value: &T) -> Result<Self, Error> {
         let value = serde_json::to_value(value).map_err(|error| {
             Error::internal(format!("client config does not serialize: {error}"))
@@ -64,14 +64,15 @@ impl ClientSection {
         Ok(ClientSection { value, schema: T::schema(), tenant: None })
     }
 
-    /// Cùng phần, các trường khách đặt riêng lấy từ `tenant` (request xác định được khách).
+    /// The same section, with the fields the tenant sets itself taken from `tenant` (the request identifies
+    /// the tenant).
     #[must_use]
     pub fn per_tenant(mut self, tenant: Arc<dyn TenantClientSection>) -> Self {
         self.tenant = Some(tenant);
         self
     }
 
-    /// Giá trị của phần cho khách `tenant` (`None`: giá trị chung).
+    /// The section's value for tenant `tenant` (`None`: the shared value).
     async fn value_for(
         &self,
         tenant: Option<&crate::tenancy::TenantContext>,
@@ -86,12 +87,13 @@ impl ClientSection {
     }
 }
 
-/// Phần cấu hình của mọi module, điền một lần sau khi mọi module khởi động.
+/// The configuration sections of every module, filled once after every module has started.
 #[derive(Clone, Default)]
 pub(crate) struct ClientConfigs(Arc<OnceLock<Vec<(&'static str, ClientSection)>>>);
 
 impl ClientConfigs {
-    /// Điền từ các module đã khởi động. Module trả lỗi thì phần của nó vắng (lỗi được ghi log).
+    /// Filled from the modules that have started. A module that returns an error has no section (the error is
+    /// logged).
     pub(crate) fn fill(&self, modules: &[Box<dyn Module>]) {
         let sections = modules
             .iter()

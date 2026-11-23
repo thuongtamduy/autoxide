@@ -1,9 +1,9 @@
-//! Lưu file: trait chung để module nào cũng lưu và đọc được file mà không phụ thuộc
-//! nơi lưu (ổ đĩa cục bộ, S3 hay dịch vụ tương thích S3).
+//! File storage: a shared trait so any module can store and read files without depending on
+//! where they are kept (local disk, S3 or an S3-compatible service).
 //!
-//! Một module (`files`) công bố `dyn Storage`; module cần lưu file lấy nó bằng
-//! `context.require::<dyn Storage>()` (đăng ký SAU module `files`). Nội dung đi dưới
-//! dạng luồng byte ([`ByteStream`]): file lớn không bao giờ nằm trọn trong bộ nhớ.
+//! One module (`files`) publishes `dyn Storage`; a module that needs to store files obtains it with
+//! `context.require::<dyn Storage>()` (registered AFTER the `files` module). Content travels as a
+//! byte stream ([`ByteStream`]): a large file is never held in memory in full.
 
 use crate::time::Timestamp;
 use std::ops::Range;
@@ -15,17 +15,17 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::Error;
 
-/// Luồng byte của một file, đọc dần từng đoạn.
+/// Byte stream of a file, read incrementally in chunks.
 //
 // `Pin<Box<dyn Stream…>>`: kiểu cụ thể của luồng khác nhau theo nơi lưu; đóng hộp để
 // mọi cài đặt trả cùng một kiểu. `Pin`: luồng async có thể tự trỏ vào mình, nên không
 // được di chuyển sau khi bắt đầu đọc.
 pub type ByteStream = Pin<Box<dyn Stream<Item = Result<Bytes, Error>> + Send>>;
 
-/// Một file đọc ra: kích thước và nội dung.
+/// A file that was read: its size and content.
 #[non_exhaustive]
 pub struct StoredFile {
-    /// Số byte.
+    /// Number of bytes.
     pub size: u64,
     pub content: ByteStream,
 }
@@ -37,16 +37,16 @@ impl StoredFile {
     }
 }
 
-/// Ràng buộc của một lần tải thẳng lên nơi lưu (bước 40 P4): nơi lưu ký chúng vào link, nên client
-/// không gửi được file khác cỡ, khác loại khai hay (với S3) khác hash.
+/// Constraints of one direct upload to the storage (step 40 P4): the storage signs them into the link, so the
+/// client cannot send a file of a different size, a different declared type or (with S3) a different hash.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct UploadConstraints {
-    /// Số byte chính xác.
+    /// Exact number of bytes.
     pub size: u64,
-    /// Loại nội dung (`Content-Type`) client phải gửi.
+    /// Content type (`Content-Type`) the client must send.
     pub content_type: String,
-    /// SHA-256 của nội dung.
+    /// SHA-256 of the content.
     pub sha256: [u8; 32],
 }
 
@@ -56,8 +56,8 @@ impl UploadConstraints {
     }
 }
 
-/// Link tải thẳng lên nơi lưu: client gửi `method` tới `url` kèm ĐÚNG các `headers` (đã ký), thân
-/// là nội dung file, trước `expires_at`.
+/// Direct upload link to the storage: the client sends `method` to `url` with EXACTLY the (signed) `headers`,
+/// the body being the file content, before `expires_at`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct PresignedUpload {
@@ -78,11 +78,11 @@ impl PresignedUpload {
     }
 }
 
-/// Thông tin một file đang lưu, không đọc nội dung.
+/// Information about a stored file, without reading its content.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct ObjectInfo {
-    /// Số byte.
+    /// Number of bytes.
     pub size: u64,
 }
 
@@ -92,29 +92,29 @@ impl ObjectInfo {
     }
 }
 
-/// Nơi lưu file của chương trình. Khoá (`key`) là đường dẫn tương đối gồm chữ, số,
-/// `-`, `_`, `.` và `/` (vd `notes/0193…`); module nên đặt tên module của mình ở đầu.
+/// The program's file storage. The key (`key`) is a relative path made of letters, digits,
+/// `-`, `_`, `.` and `/` (e.g. `notes/0193…`); a module should put its own module name at the start.
 #[async_trait::async_trait]
 pub trait Storage: Send + Sync {
-    /// Ghi `content` vào `key` (đè nếu đã có) và trả số byte đã ghi. Luồng báo lỗi giữa
-    /// chừng thì không có gì được ghi và lỗi đó được trả lại nguyên vẹn.
+    /// Writes `content` to `key` (overwriting if present) and returns the number of bytes written. If the
+    /// stream fails midway, nothing is written and that error is returned unchanged.
     async fn put(&self, key: &str, content: ByteStream) -> Result<u64, Error>;
 
-    /// File ở `key`, hoặc `None` nếu không có.
+    /// The file at `key`, or `None` if there is none.
     async fn get(&self, key: &str) -> Result<Option<StoredFile>, Error>;
 
-    /// Xoá file ở `key`. Không có file thì coi như xong.
+    /// Deletes the file at `key`. If there is no file, it counts as done.
     async fn delete(&self, key: &str) -> Result<(), Error>;
 
-    /// Khoá của mọi file đang lưu, theo thứ tự tên (dùng cho backup).
+    /// Keys of all stored files, in name order (used for backup).
     async fn keys(&self) -> Result<Vec<String>, Error>;
 
-    /// Đoạn byte `range` (`start..end`, không gồm `end`) của file ở `key`, hoặc `None` nếu
-    /// không có file. `size` của kết quả là số byte của đoạn. Bên gọi bảo đảm
-    /// `start < end <= kích thước file` (vd từ header `Range` đã kiểm).
+    /// The byte range `range` (`start..end`, `end` excluded) of the file at `key`, or `None` if
+    /// there is no file. The `size` of the result is the number of bytes of the range. The caller guarantees
+    /// `start < end <= file size` (e.g. from a validated `Range` header).
     ///
-    /// Cài đặt mặc định đọc từ đầu file rồi bỏ phần ngoài đoạn — đúng nhưng tốn; nơi lưu
-    /// đọc được từng đoạn (ổ đĩa, S3) nên cài lại.
+    /// The default implementation reads from the start of the file and discards what is outside the range —
+    /// correct but costly; storages that can read ranges (disk, S3) should override it.
     async fn get_range(&self, key: &str, range: Range<u64>) -> Result<Option<StoredFile>, Error> {
         let Some(file) = self.get(key).await? else {
             return Ok(None);
@@ -123,21 +123,22 @@ pub trait Storage: Send + Sync {
         Ok(Some(StoredFile { size, content: slice(file.content, range) }))
     }
 
-    /// Khoá bắt đầu bằng `prefix` (vd `media/`), theo thứ tự tên. Module dùng để dọn file
-    /// của riêng mình mà không phải đọc khoá của module khác.
+    /// Keys starting with `prefix` (e.g. `media/`), in name order. Modules use it to clean up their own files
+    /// without having to read other modules' keys.
     ///
-    /// Cài đặt mặc định lọc từ [`keys`](Self::keys); nơi lưu liệt kê được theo tiền tố nên
-    /// cài lại.
+    /// The default implementation filters [`keys`](Self::keys); storages that can list by prefix should
+    /// override it.
     async fn keys_with_prefix(&self, prefix: &str) -> Result<Vec<String>, Error> {
         let mut keys = self.keys().await?;
         keys.retain(|key| key.starts_with(prefix));
         Ok(keys)
     }
 
-    /// Link để client tải file thẳng lên `key` (bước 40 P4), hết hạn sau `ttl`, ký kèm
-    /// `constraints`. `None`: nơi lưu không cấp được link (ổ đĩa) — client tải qua máy chủ như cũ.
+    /// Link for the client to upload a file directly to `key` (step 40 P4), expiring after `ttl`, signed with
+    /// `constraints`. `None`: the storage cannot issue a link (disk) — the client uploads through the server
+    /// as before.
     ///
-    /// Cài đặt mặc định trả `None`; nơi lưu như S3 cài lại.
+    /// The default implementation returns `None`; storages such as S3 override it.
     async fn presign_upload(
         &self,
         key: &str,
@@ -148,16 +149,16 @@ pub trait Storage: Send + Sync {
         Ok(None)
     }
 
-    /// Thông tin file ở `key` (không đọc nội dung), hoặc `None` nếu không có.
+    /// Information about the file at `key` (without reading content), or `None` if there is none.
     ///
-    /// Cài đặt mặc định mở file qua [`get`](Self::get) rồi bỏ luồng; nơi lưu hỏi được thông tin
-    /// riêng (S3 `HEAD`) nên cài lại.
+    /// The default implementation opens the file through [`get`](Self::get) and drops the stream; storages
+    /// that can answer for information alone (S3 `HEAD`) should override it.
     async fn head(&self, key: &str) -> Result<Option<ObjectInfo>, Error> {
         Ok(self.get(key).await?.map(|file| ObjectInfo::new(file.size)))
     }
 }
 
-/// Chỉ giữ các byte trong `range` của luồng `content` (đọc từ đầu file).
+/// Keeps only the bytes in `range` of the stream `content` (read from the start of the file).
 pub fn slice(content: ByteStream, range: Range<u64>) -> ByteStream {
     let Range { start, end } = range;
     content
@@ -186,30 +187,30 @@ pub fn slice(content: ByteStream, range: Range<u64>) -> ByteStream {
         .boxed()
 }
 
-/// Nơi lưu file của **một khách** (bước 33, D-259): bọc [`Storage`] chung, thêm tiền tố
-/// [`TenantContext::storage_prefix`](crate::tenancy::TenantContext::storage_prefix) vào mọi khoá
-/// (khách mặc định không có tiền tố — file cũ không phải dời; khách khác `tenants/<id>/`) và từ chối
-/// khoá có `..`, bắt đầu bằng `/` hay có đoạn rỗng: một khách không với tới file của khách khác.
-/// Liệt kê chỉ trả file của khách, khoá đã bỏ tiền tố.
+/// File storage of **one tenant** (step 33, D-259): wraps the shared [`Storage`], adding the prefix
+/// [`TenantContext::storage_prefix`](crate::tenancy::TenantContext::storage_prefix) to every key (the default
+/// tenant has no prefix — old files need not move; other tenants use `tenants/<id>/`) and rejects keys
+/// containing `..`, starting with `/` or having an empty segment: one tenant cannot reach another tenant's
+/// files. Listing returns only the tenant's files, with the prefix stripped from keys.
 ///
-/// Khách trên placement có nơi lưu riêng ([`StorageLocation`], `autoxide placement storage`) dùng
-/// nơi lưu đó thay cho nơi lưu chung (sổ database gắn nó vào ngữ cảnh khách,
-/// [`TenantContext::own_storage`](crate::tenancy::TenantContext::own_storage)) — module vẫn chỉ gọi
-/// `TenantStorage::new(nơi_lưu_chung, khách)`.
+/// A tenant on a placement with its own storage ([`StorageLocation`], `autoxide placement storage`) uses
+/// that storage instead of the shared one (the database registry attaches it to the tenant context,
+/// [`TenantContext::own_storage`](crate::tenancy::TenantContext::own_storage)) — modules still only call
+/// `TenantStorage::new(shared_storage, tenant)`.
 pub struct TenantStorage {
     inner: std::sync::Arc<dyn Storage>,
     prefix: String,
 }
 
 impl TenantStorage {
-    /// Nơi lưu của khách `tenant`: nơi lưu riêng của placement của nó nếu có, không thì `inner`
-    /// (nơi lưu chung).
+    /// Storage of the tenant `tenant`: the placement's own storage if it has one, otherwise `inner`
+    /// (the shared storage).
     pub fn new(inner: std::sync::Arc<dyn Storage>, tenant: &crate::tenancy::TenantContext) -> Self {
         let inner = tenant.own_storage().cloned().unwrap_or(inner);
         TenantStorage { inner, prefix: tenant.storage_prefix() }
     }
 
-    /// Khoá thật của `key` (đã kiểm).
+    /// The real key of `key` (validated).
     fn key(&self, key: &str) -> Result<String, Error> {
         let bad = key.is_empty()
             || key.starts_with('/')
@@ -278,27 +279,27 @@ impl Storage for TenantStorage {
     }
 }
 
-/// Nơi lưu file riêng của một placement (bước 33): một thư mục trên máy chủ hay một bucket S3 (hay
-/// dịch vụ tương thích S3). Lưu mã hoá trong `kernel_placements.storage_sealed` (mục đích
-/// [`PLACEMENT_STORAGE`](crate::tenancy::PLACEMENT_STORAGE)); không API nào trả lại khoá bí mật.
+/// The own file storage of one placement (step 33): a directory on the server or an S3 bucket (or an
+/// S3-compatible service). Stored encrypted in `kernel_placements.storage_sealed` (purpose
+/// [`PLACEMENT_STORAGE`](crate::tenancy::PLACEMENT_STORAGE)); no API returns the secret key back.
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum StorageLocation {
-    /// Thư mục trên ổ đĩa của máy chủ (tạo khi ghi file đầu tiên).
+    /// A directory on the server's disk (created when the first file is written).
     Local { dir: String },
-    /// Bucket S3.
+    /// An S3 bucket.
     S3(S3Location),
 }
 
-/// Bucket S3 của một placement — cùng các thông số với `AUTOXIDE_FILES_S3_*` / `AWS_*` của module
-/// `files`.
+/// The S3 bucket of a placement — the same parameters as `AUTOXIDE_FILES_S3_*` / `AWS_*` of the
+/// `files` module.
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct S3Location {
     pub bucket: String,
-    /// Thư mục trong bucket; `None`: gốc bucket.
+    /// Directory inside the bucket; `None`: the bucket root.
     pub prefix: Option<String>,
     pub region: String,
-    /// Địa chỉ dịch vụ tương thích S3; `None`: Amazon S3.
+    /// Address of the S3-compatible service; `None`: Amazon S3.
     pub endpoint: Option<String>,
     pub access_key_id: Option<String>,
     pub secret_access_key: Option<String>,
@@ -328,8 +329,9 @@ impl std::fmt::Debug for StorageLocation {
 }
 
 impl StorageLocation {
-    /// Chuẩn hoá (bỏ khoảng trắng, `/` ở hai đầu tiền tố, `/` cuối địa chỉ) rồi kiểm; mọi trường sai
-    /// báo cùng lúc (lỗi `validation`, tên trường như cờ của `autoxide placement storage`).
+    /// Normalizes (trims whitespace, `/` at both ends of the prefix, trailing `/` of the address) and then
+    /// validates; all invalid fields are reported at once (error `validation`, field names like the flags of
+    /// `autoxide placement storage`).
     pub fn checked(self) -> Result<Self, Error> {
         use crate::error::FieldError;
         let mut problems = Vec::new();
@@ -404,8 +406,8 @@ impl StorageLocation {
         if problems.is_empty() { Ok(location) } else { Err(Error::validation(problems)) }
     }
 
-    /// Hai nơi lưu chỉ cùng một chỗ (cùng thư mục; cùng địa chỉ, bucket và thư mục trong bucket —
-    /// khoá truy cập khác nhau vẫn là cùng chỗ).
+    /// Whether two storages point to the same place (same directory; same address, bucket and directory in
+    /// the bucket — different access keys are still the same place).
     pub fn same_place(&self, other: &StorageLocation) -> bool {
         match (self, other) {
             (StorageLocation::Local { dir: a }, StorageLocation::Local { dir: b }) => {
@@ -419,16 +421,18 @@ impl StorageLocation {
     }
 }
 
-/// Mở nơi lưu theo [`StorageLocation`] — module cài nơi lưu thật (`files`) công bố
-/// (`context.provide::<dyn StorageOpener>(…)`); sổ database dùng để mở nơi lưu riêng của placement.
+/// Opens a storage for a [`StorageLocation`] — the module that implements the real storage (`files`)
+/// publishes it (`context.provide::<dyn StorageOpener>(…)`); the database registry uses it to open a
+/// placement's own storage.
 pub trait StorageOpener: Send + Sync {
-    /// Nơi lưu ở `location`. Không gọi mạng (dựng client là đủ): lỗi cấu hình hiện ra ở lần đọc / ghi
-    /// đầu tiên.
+    /// The storage at `location`. Makes no network call (building the client is enough): configuration errors
+    /// surface on the first read / write.
     fn open(&self, location: &StorageLocation) -> Result<std::sync::Arc<dyn Storage>, Error>;
 }
 
-/// Nơi lưu không mở được (cấu hình hỏng, không module nào mở nơi lưu): mọi thao tác trả lỗi nêu
-/// lý do. Khách trên placement đó vẫn phục vụ được phần không chạm file.
+/// A storage that cannot be opened (broken configuration, no module opens storage): every operation returns
+/// an error giving the reason. Tenants on that placement can still be served for everything that does not
+/// touch files.
 pub(crate) struct UnavailableStorage(pub(crate) String);
 
 impl UnavailableStorage {

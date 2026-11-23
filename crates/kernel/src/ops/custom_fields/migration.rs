@@ -1,8 +1,8 @@
-//! Migration tạo `kernel_custom_fields`.
+//! Migration that creates `kernel_custom_fields`.
 
 use super::*;
 
-/// Migration tạo `kernel_custom_fields` (cấp khách hàng, mọi database dữ liệu).
+/// Migration that creates `kernel_custom_fields` (tenant level, every data database).
 pub(crate) struct CreateCustomFields;
 
 impl MigrationName for CreateCustomFields {
