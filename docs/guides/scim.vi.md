@@ -8,7 +8,7 @@ Endpoint SCIM là `/api/v1/auth/scim/v2` (`Users`, `Groups`, `ServiceProviderCon
 
 ## 1. Tạo token SCIM
 
-Cần permission `auth.scim.manage` và gói có tính năng `auth.scim`. Token thuộc về khách (không thuộc một người), chỉ dùng được ở endpoint SCIM, và chỉ hiện một lần.
+Cần permission `auth.scim.manage`, gói có tính năng `auth.scim`, và một phiên đăng nhập: API key không tạo được (`auth.session_required`). Token thuộc về khách (không thuộc một người), chỉ dùng được ở endpoint SCIM, và chỉ hiện một lần.
 
 <!-- example: sign-in -->
 ```bash

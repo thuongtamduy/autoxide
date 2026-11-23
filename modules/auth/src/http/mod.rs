@@ -125,13 +125,7 @@ async fn no_store(mut response: axum::response::Response) -> axum::response::Res
 fn require_session(
     principal: &autoxide_kernel::access::Principal,
 ) -> Result<(), autoxide_kernel::error::Error> {
-    if principal.api_key_id().is_some() {
-        return Err(autoxide_kernel::error::Error::forbidden(
-            "auth.session_required",
-            "This action needs you to be signed in with your password; an API key cannot do it.",
-        ));
-    }
-    Ok(())
+    crate::access::require_session(principal)
 }
 
 /// Header `User-Agent` của request, để người dùng nhận ra thiết bị trong danh sách phiên.

@@ -241,6 +241,9 @@ impl ProviderService {
         client: &OidcClient,
         input: NewProvider,
     ) -> Result<Provider, Error> {
+        // Nhà cung cấp tự liên kết tài khoản theo quyền của người cấu hình (D-20261121-oidc-link-covers),
+        // không theo phạm vi key: API key không được thêm hay sửa nó (pentest 2026-11).
+        crate::access::require_session(principal)?;
         let mut problems = Vec::new();
         let slug = input.slug.trim().to_ascii_lowercase();
         problems.extend(check_slug(&slug));
@@ -331,6 +334,7 @@ impl ProviderService {
         id: Uuid,
         changes: ProviderChanges,
     ) -> Result<Provider, Error> {
+        crate::access::require_session(principal)?;
         let before = self.get(tenant, id).await?;
         let mut row = before.clone();
         if let Some(name) = changes.name {

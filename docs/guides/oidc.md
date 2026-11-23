@@ -17,7 +17,7 @@ Register a web application at the provider and note its client id and client sec
 
 ## 2. Add the provider to the tenant
 
-Needs the permission `auth.oidc.manage` (`auth.oidc.read` to only list them). The client secret is stored encrypted and never shown again (`has_secret` tells whether one is stored).
+Needs the permission `auth.oidc.manage` (`auth.oidc.read` to only list them) and, to add or change a provider, a signed-in session: an API key cannot (`auth.session_required`). The client secret is stored encrypted and never shown again (`has_secret` tells whether one is stored).
 
 <!-- example: sign-in -->
 ```bash
