@@ -200,7 +200,7 @@ printf 'AUTOXIDE_AUTH_TOKEN_SECRET=%s\nAUTOXIDE_SECRET_KEY=%s\n' \
   "$(openssl rand -base64 48 | tr -d '\n')" "$(openssl rand -base64 48 | tr -d '\n')" > autoxide.env
 chmod 600 autoxide.env
 
-IMAGE=ghcr.io/thuongtamduy/autoxide:0.18.0   # a release from the GitHub Releases page
+IMAGE=ghcr.io/thuongtamduy/autoxide:0.19.0   # a release from the GitHub Releases page
 RUN="docker run --rm --env-file autoxide.env -v autoxide-data:/var/lib/autoxide/data"
 
 # 1. Create the tables (the server will not start before this, and again after every update)

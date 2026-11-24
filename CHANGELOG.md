@@ -9,6 +9,187 @@ endpoints are marked deprecated with a sunset date first.
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-11-24
+
+### Added
+
+- `cargo xtask coverage-api [--run]` lists every endpoint in `docs/openapi.json` and every MCP tool in
+  `docs/mcp-tools.json` that no test calls successfully; the testkit records calls when `TEST_API_COVERAGE`
+  names a directory.
+- Compatibility policy for 1.0 (`docs/COMPATIBILITY.md`, with a Vietnamese copy): what stays stable across releases — the REST API and OpenAPI, error codes, settings, migrations, MCP tools, events, the documented CLI, the TypeScript SDK and the Rust API for modules — and how each one may change; experimental modules and other unstable parts are listed as not covered.
+- Long-term support: `SECURITY.md` now says which releases get security fixes after 1.0 (the latest minor; the previous minor for 3 months after a new minor; the last minor of the previous major for 6 months after a new major).
+- `cargo xtask semver` checks the public Rust API of the `autoxide` crate and of every core and official module, not only `autoxide-kernel` and `autoxide-testkit`; `--changed <rev>` limits it to the crates whose public files changed. CI runs it on pull requests that touch a public Rust API (a warning before 1.0, a failure from 1.0).
+- `content`: AI page builder — `POST /api/v1/content/entries/{id}/ai/compose` builds a page's block layout from a
+  description and `…/ai/edit` changes it in words; both run in the background, go through the same layout checks as
+  a person's (retried at most twice with the errors), and end as a draft marked `ai_assisted`, never published.
+  `GET …/ai/thread` keeps the conversation with the revision before each change to undo it.
+- `content`: campaign drafts from a promotion — `POST /api/v1/content/campaign-drafts` (and MCP tool
+  `content.create_campaign_drafts`) drafts, in the background, a landing page built from blocks, a text banner linking
+  to the promotion and an advertising `newsletter` campaign; each is a draft in its own module, never published or sent.
+  Numbers in the copy must come from the promotion. New plan limit `content.ai_page_generations` (monthly) counts every
+  AI page compose / edit and every campaign draft set.
+- `content`: custom content types (team, projects, branches…) — `/api/v1/content/types` (permission
+  `content.types.manage`); their fields are custom fields of target `content.type.<key>`; entries are created with
+  `POST /entries` (`kind: "custom"`, `type_id`) and keep drafts, history, translations and SEO; types with pages
+  publish at `/<path_prefix>/<slug>`; `GET /public/types/{key}/entries` lists them publicly. Switching a type off
+  takes its entries off the website.
+- Kernel: `CustomFieldTarget::with_subtypes()` lets a module accept custom fields on record types it creates at run
+  time (`<target>.<key>`).
+- `content`: website header and footer as block layouts with draft and publish (`/api/v1/content/site-regions`),
+  per language, inherited down the organization tree, optionally per theme variant; and
+  `GET /api/v1/content/public/site` — one public call for what every page shares (theme tokens with the running
+  variant, decoration, header, footer, legal footer, other modules' parts), cached until the theme changes next.
+  Modules plug their part in through `content::api::SiteExtensions`.
+- `content`: website health checks now run every day for every website, and count missing addresses asked through
+  `GET /public/resolve` (per day, nothing stored about the visitor) to suggest redirects (`not_found_path`, setting
+  `AUTOXIDE_CONTENT_SITE_HEALTH_NOT_FOUND_MIN_HITS`). New MCP tools for the page builder: `content.list_blocks`,
+  `get_page_layout`, `update_page_layout`, `list_theme_variants`, `save_theme_variant` (always a draft),
+  `list_types`, `save_type`, `compose_page`, `edit_page`, `site_health`.
+- `content`: website health check — `POST /api/v1/content/site-health/{org_id}/run` finds missing SEO
+  descriptions, duplicate titles, images without `alt`, broken links inside the site, embedded records that are no
+  longer public and pages whose countdown is over, each with how to fix it; `GET /site-health` reads the last check,
+  and the work inbox counts the problems (`content.site_health`).
+- `content`: custom content types, second part — a routable type can have a ready-made entry page
+  (`detail_layout`, with block `content.entry_field` showing a field of the entry being viewed; `GET /public/resolve`
+  returns it as `detail`); block `content.type_list` lists a type's published entries as cards on any page;
+  `GET /public/types/{key}/entries` filters on published values of public filterable fields with
+  `cf.<key>=<op>:<value>`; `POST /api/v1/content/types/ai/suggest` drafts a type and its fields with AI (nothing is
+  saved); plan feature and limit `content.custom_types`.
+- Module `orders`: a buyer can start the payment of an order again without the shop's staff, when it
+  could not be started at checkout or its link expired — a guest with the `Order-Token` header
+  (`POST /api/v1/orders/public/orders/{id}/payment-link`) or a signed-in buyer
+  (`POST /api/v1/orders/me/orders/{id}/payment-link`). Only for an order still waiting for payment
+  (or whose balance was asked), with an optional new `return_url`, safe to retry with the same
+  `Idempotency-Key`, and at most 10 times an hour per order (`orders.payment_retry_too_many`).
+- Module `orders`: when the payment partner refuses to start a payment at checkout, the payment action
+  (`kind = none`) now carries `error` with a stable `code` and a `message` saying what to fix, in the
+  caller's language. The checkout still answers `201` as before.
+- Guide for module developers: adding blocks for pages built from blocks (`docs/guides/page-blocks.md`, also in
+  Vietnamese) — declaring a block, the props schema, data at read time, what the AI sees, tests.
+- `docs/security/review-2026-11.md` has a "Black-box test" section: the running server (SQLite and
+  PostgreSQL, two tenants, every module) attacked from the outside — what was tried, what held, and
+  the findings with their fixes.
+- `docs/security/review-2026-11.md`: the report of the pre-1.0 security review (an internal review
+  with AI assistance, not a third-party audit) — scope, method, findings and their fixes, and what is
+  still open. `SECURITY.md` links to it.
+- Linux binaries for x86_64 and aarch64 (`autoxide-X.Y.Z-<target>.tar.gz`, the same program as in the Docker image)
+  attached to every GitHub release.
+- Release candidates `X.0.0-rc.N` before a major release: marked as pre-releases on GitHub, and their image is tagged
+  `X.0.0-rc.N` only — never `latest` or `X.Y`.
+- `autoxide_testkit::record_response` records, for `cargo xtask coverage-api`, a call a test made without
+  `TestRequest` (the binary's real runtime, an SSE stream, a WebSocket over a real port).
+
+### Changed
+
+- Every REST endpoint and MCP tool is now called successfully by at least one end-to-end test on both SQLite and
+  PostgreSQL (`cargo xtask coverage-api --run` reports 100%).
+- For module authors: the Rust API docs of the public contract (`autoxide-kernel`, `autoxide-testkit`, the
+  `autoxide` library and each module's `api`) are now in English, so they read on docs.rs and in `cargo doc`.
+  `cargo xtask check` keeps new doc comments there in English (rule `doc-language`).
+- Property tests compare the safe-link and embed-address rules of page blocks and post bodies against a WHATWG URL
+  parser, and check `If-None-Match` handling.
+- A patch release for an older release line no longer takes the `latest` image tag or GitHub's "Latest release" mark.
+
+### Fixed
+
+- Module `conversations`: a burst of unread chat messages now gives one notification per window, with the window
+  starting at the first unread message. Before, windows followed the wall clock, so messages sent just across a
+  window boundary sent two notifications. A recipient who reads everything closes the window, and the next message
+  opens a new one.
+- Module `orders`: a delivered order no longer gets stuck when its invoice cannot be issued automatically (e.g. the
+  shop has no document series yet): warranties, points and the other work on delivery still happen, the invoice
+  stays a draft, and asking again with `POST /api/v1/orders/{id}/invoice` once the series exists issues it (it
+  answered 500 before). Warranties are no longer opened twice nor block the event when a delivery event is
+  delivered again.
+- Module `organizations`: on a single-tenant install the root unit is created the first time another module asks for
+  it, so e.g. opening the ledger book of the shop (`POST /api/v1/ledger/books`) no longer fails with "there is no
+  organization unit with this id" until someone has used the organizations API.
+- Module `promotions`: buyers (customer accounts, which hold no permission) can use their voucher wallet, enter claim
+  codes, save vouchers and ask for flash-sale reminders; these endpoints refused them because they asked for
+  `promotions.use`. A staff account still needs `promotions.use`.
+- Module `promotions`: releasing the promotion usage held for an order by hand (`POST
+  /api/v1/promotions/redemptions/{id}/release`) answered 500 on PostgreSQL, because the write permission was checked
+  on a read-only connection.
+- A SePay webhook whose `X-SePay-Timestamp` header is an extreme number (e.g. `-9223372036854775808`) is rejected as
+  an invalid signature instead of failing with a 500 error.
+- Property tests now try to break webhook signatures and bodies (SePay, MoMo, GHN, Standard Webhooks), form tokens
+  and the private-network filter for outbound calls; a nightly workflow runs them with 20,000 cases each.
+- Module `tax`: with prices that include tax, a tax chain ending in an exempt rate no longer puts the rounding
+  remainder (e.g. `-1 VND`) on the exempt rate; it goes to the last taxed rate, so exempt lines always show zero tax.
+- Module `tax`: a quantity too large to compute (up to 28 digits are accepted) is a `validation_failed` error instead
+  of a 500, a negative quantity is rejected, and a tax-inclusive price lower than the per-unit taxes it includes is
+  rejected instead of producing a negative net price.
+- Module `promotions`: carts whose line totals reach the `i64` limit no longer crash the discount calculation.
+- Sign-in with an OpenID Connect provider: an `id_token` whose `exp`, `iat` or `nbf` claim is an extreme number no
+  longer crashes the request (500); the time checks saturate instead of overflowing.
+- Property tests now try to break access tokens, API keys, the `Authorization` header, OIDC `id_token` parsing, SCIM
+  filters, ALTCHA solutions, `Accept-Language` and the media `Range` header.
+- Module `support`: buyers and guests can rate an automatic answer on a ticket with the id of the message they see
+  (`auto_reply: true`) in `POST …/tickets/{id}/auto-replies/{reply_id}/feedback`. Before, the endpoint only accepted
+  the id from the staff-only log, so buyers could not call it.
+
+### Security
+
+- Module `auth`: reporting "this wasn't me" after an email change now also removes linked external
+  sign-ins and revokes pending sign-in links and re-confirmation tokens, so an attacker who changed
+  the email cannot get back in that way.
+- Module `auth`: `AUTOXIDE_AUTH_TOKEN_SECRET` and `AUTOXIDE_AUTH_TOKEN_SECRET_PREVIOUS` refuse the
+  example value from `.env.example` at startup, like `AUTOXIDE_SECRET_KEY`.
+- Module `auth`: a role that requires two-step sign-in (`requires_mfa`) no longer grants its
+  permissions in another tenant, through a delegation or a support access grant, to a user who has
+  not turned two-step sign-in on — the same rule as in their own tenant.
+- Module `auth`: an account that holds a role requiring two-step sign-in and whose only second step
+  is a passkey must sign in with the passkey; password, sign-in link and external sign-in are refused
+  with `403 auth.passkey_required` (before, a password alone opened a session with the role's
+  permissions).
+- Module `automations`: saving, editing or enabling a rule whose steps need a `money` or
+  `destructive` permission now requires a recent re-confirmation (`step_up_required`), and so does
+  approving such a step; a rule triggered by an event requires the permission to stream that event,
+  like webhooks.
+- The HTTP server closes a connection whose request headers are not complete within 30 seconds, and
+  pings idle HTTP/2 connections, so slow clients cannot hold connections open forever.
+- `GET /api/v1/kernel/find` rejects a `q` longer than 200 characters (`422`, field `q`, code
+  `length`).
+- The server logs a warning at startup when rate limiting is off, when `AUTOXIDE_HTTP_CORS_ORIGINS`
+  is `*`, and when `/metrics` is served on the public port.
+- Connector HTTP clients for tenant-chosen addresses ignore the system proxy, so the public-address
+  filter cannot be bypassed through it.
+- The printable invoice HTML (`GET /api/v1/invoices/documents/{id}/render`) carries its own sandbox
+  `Content-Security-Policy`, even when `AUTOXIDE_HTTP_SECURITY_HEADERS` is off.
+- The startup log names the first administrator by user ID instead of email.
+- Module `ledger`: a bank credit only settles a VietQR payment when it arrived in the bank account
+  that payment expects; otherwise it goes to the reconciliation queue. Two concurrent `match`
+  resolutions of one queue item can no longer settle two payments with one credit.
+- Module `ledger`: a payment stores the amount actually collected (`captured_minor`, new column in
+  migration `m0012_add_captured_amount`), and refunds are limited to it, so a short payment accepted
+  as received cannot be refunded up to the expected amount. A refund notification only completes a
+  refund of a payment made through the same provider.
+- Module `bookings`: one client address can ask for at most 20 guest booking codes an hour (all
+  phone numbers together), besides 5 per number, so a script cannot spend a shop's SMS credit by
+  asking codes for many numbers. Found in the black-box test of November 2026.
+- Module `auth`: an API key can no longer create a SCIM token or add or change a sign-in provider
+  (REST and MCP answer `403 auth.session_required`). Both decide whose accounts can be taken over
+  or signed into by the permissions of the person, not the key, so a key limited to
+  `auth.scim.manage` or `auth.oidc.manage` could reach accounts with more rights than the key.
+  Sign in to do these. Found in the black-box test of November 2026.
+- Kernel: customer accounts can no longer list the tenant's internal tags
+  (`GET /api/v1/kernel/tags` answers `403 kernel.tags_staff_only`); staff accounts still can. Found
+  in the black-box test of November 2026.
+- Module `plans`: the MCP tool `change_subscription` refuses a subscription bought through an app
+  store (`plans.store_billed`), like the REST endpoint.
+- Modules `bookings`, `inventory` and `orders`: the personal data export
+  (`GET /api/v1/auth/me/export`) now includes a user's bookings, restock alerts and orders (with the
+  contact and delivery details given at checkout). Deleting an account removes the name, phone, email
+  and note from the user's bookings (the booking itself stays as a deposit record) and deletes their
+  restock alerts; orders are kept as accounting records.
+- Module `shipping`: a carrier webhook now only updates shipments booked through the carrier
+  account that received it; before, a seller who knew another seller's tracking number could change
+  that shipment's status with their own account's webhook.
+- Releases are signed without long-lived keys (Sigstore, through GitHub Actions OIDC): the Docker image has a cosign
+  signature besides its build provenance and SBOM attestations, and every release file has a build provenance
+  attestation plus a cosign-signed `SHA256SUMS`. How to check them: `docs/VERIFYING.md`.
+- `SECURITY.md` describes the coordinated disclosure policy (GitHub Security Advisory, CVE, 90 days).
+
 ## [0.18.0] - 2026-11-22
 
 ### Breaking (Rust)
@@ -2607,7 +2788,8 @@ First release: the complete core.
 - Tooling: `autoxide copy` between SQLite and PostgreSQL, `autoxide backup` and
   `autoxide restore`, benchmarks and a load test, Docker image and Compose file, CI.
 
-[Unreleased]: https://github.com/thuongtamduy/autoxide/compare/v0.18.0...HEAD
+[Unreleased]: https://github.com/thuongtamduy/autoxide/compare/v0.19.0...HEAD
+[0.19.0]: https://github.com/thuongtamduy/autoxide/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/thuongtamduy/autoxide/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/thuongtamduy/autoxide/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/thuongtamduy/autoxide/compare/v0.15.0...v0.16.0
