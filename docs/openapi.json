@@ -65105,7 +65105,7 @@
             "type": "string"
           },
           "return_url": {
-            "description": "Where the payment partner sends the buyer back.",
+            "description": "Where the payment partner sends the buyer back: an `https://` address on one of the shop's\nverified domains, or on an origin listed in `ledger.payments.return_origins`; any other address\nleaves the payment unstarted with `payment_actions[].error.code` `orders.return_url_not_allowed`.",
             "type": [
               "string",
               "null"
@@ -66202,7 +66202,7 @@
         "description": "Where to send the buyer back after paying.",
         "properties": {
           "return_url": {
-            "description": "Where the payment partner sends the buyer back (some partners need it, e.g. MoMo); omitted:\nthe shop's default.",
+            "description": "Where the payment partner sends the buyer back (some partners need it, e.g. MoMo); omitted:\nthe shop's default. Must be on one of the shop's addresses (a verified domain, or an origin in\n`ledger.payments.return_origins`), otherwise 422 `orders.return_url_not_allowed`.",
             "type": [
               "string",
               "null"
@@ -226346,7 +226346,7 @@
                 }
               }
             },
-            "description": "The payment partner refused the payment (its code, e.g. `momo.return_url_required`), the payment method is not usable (`orders.payment_method_unavailable`), the same `Idempotency-Key` with another body (`orders.idempotency_key_reused`), or invalid values (see `errors`)."
+            "description": "The payment partner refused the payment (its code, e.g. `momo.return_url_required`), the payment method is not usable (`orders.payment_method_unavailable`), `return_url` is not one of the shop's addresses (`orders.return_url_not_allowed`), the same `Idempotency-Key` with another body (`orders.idempotency_key_reused`), or invalid values (see `errors`)."
           },
           "429": {
             "content": {
@@ -228871,7 +228871,7 @@
                 }
               }
             },
-            "description": "The payment partner refused the payment (its code, e.g. `momo.return_url_required`), the payment method is not usable (`orders.payment_method_unavailable`), the same `Idempotency-Key` with another body (`orders.idempotency_key_reused`), or invalid values (see `errors`)."
+            "description": "The payment partner refused the payment (its code, e.g. `momo.return_url_required`), the payment method is not usable (`orders.payment_method_unavailable`), `return_url` is not one of the shop's addresses (`orders.return_url_not_allowed`), the same `Idempotency-Key` with another body (`orders.idempotency_key_reused`), or invalid values (see `errors`)."
           },
           "429": {
             "content": {

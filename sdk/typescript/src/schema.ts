@@ -21341,7 +21341,11 @@ export type OrdersCheckoutRequest = {
   payment_method: string;
   /** `quote_token` of the cart you showed the buyer. */
   quote_token: string;
-  /** Where the payment partner sends the buyer back. */
+  /**
+   * Where the payment partner sends the buyer back: an `https://` address on one of the shop's
+   * verified domains, or on an origin listed in `ledger.payments.return_origins`; any other address
+   * leaves the payment unstarted with `payment_actions[].error.code` `orders.return_url_not_allowed`.
+   */
   return_url?: string | null;
   /**
    * Pay part (or all) of the order with points, a gift card or store credit, in this order;
@@ -21692,7 +21696,8 @@ export type OrdersPaymentAction = {
 export type OrdersPaymentLinkRequest = {
   /**
    * Where the payment partner sends the buyer back (some partners need it, e.g. MoMo); omitted:
-   * the shop's default.
+   * the shop's default. Must be on one of the shop's addresses (a verified domain, or an origin in
+   * `ledger.payments.return_origins`), otherwise 422 `orders.return_url_not_allowed`.
    */
   return_url?: string | null;
 };
