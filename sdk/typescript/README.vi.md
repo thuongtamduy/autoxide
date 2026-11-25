@@ -54,3 +54,5 @@ Hướng dẫn theo tình huống, có ví dụ `curl` và SDK: [`docs/guides/`]
 
 `src/schema.ts` là file sinh ra: đổi API, sinh lại `docs/openapi.json`, rồi chạy `cargo xtask sdk`. Gate chạy
 `cargo xtask sdk --check`; CI kiểm kiểu SDK và ví dụ của hướng dẫn bằng `npm ci && npx tsc --noEmit`.
+
+<!-- PR thử cho D-20261125-ci-skip-rust: không merge. -->

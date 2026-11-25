@@ -55,3 +55,5 @@ Task-by-task guides with `curl` and SDK examples: [`docs/guides/`](../../docs/gu
 `src/schema.ts` is generated: change the API, regenerate `docs/openapi.json`, then run `cargo xtask sdk`.
 The gate runs `cargo xtask sdk --check`; CI type-checks the SDK and the guide examples with
 `npm ci && npx tsc --noEmit`.
+
+<!-- Trial PR for D-20261125-ci-skip-rust: do not merge. -->
