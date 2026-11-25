@@ -197,8 +197,7 @@ mod tests {
         let pr_460 = ["sdk/typescript/package-lock.json", "sdk/typescript/package.json"];
         let pr_497_without_workflow = [
             "changelog.d/sdk-typescript-7.changed.md",
-            // Tên file quyết định của #497 thay bằng một file có thật (gate chặn tham chiếu tới ID không có).
-            "docs/decisions/D-20261125-ci-skip-rust.md",
+            "docs/decisions/D-20261125-typescript-range.md",
             "docs/decisions/INDEX.md",
             "sdk/typescript/README.md",
             "sdk/typescript/README.vi.md",

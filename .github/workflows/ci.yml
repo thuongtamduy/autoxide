@@ -80,6 +80,11 @@ jobs:
       - name: tsc --noEmit
         working-directory: sdk/typescript
         run: npm ci && npx tsc --noEmit
+      # SDK phát hành dạng mã nguồn `.ts`, người dùng biên dịch bằng TypeScript của họ: kiểm thêm bản thấp nhất cam kết
+      # hỗ trợ (D-20261125-typescript-range), không chỉ bản 7 dùng để phát triển.
+      - name: tsc --noEmit (lowest supported TypeScript)
+        working-directory: sdk/typescript
+        run: npx --yes --package typescript@5.0.4 -- tsc --noEmit
 
   # Hợp đồng Rust (bước 70 P4, docs/COMPATIBILITY.md): `cargo semver-checks` so phần công khai của
   # autoxide-kernel, autoxide-testkit, `autoxide` (thư viện) và crate của module core / official.
