@@ -69,6 +69,11 @@ this gate is green.
 
 When the gate is red, fix the code. Do not loosen the gate, turn off a lint or skip a test.
 
+A change that only touches files listed in [`scripts/rust-free-paths.txt`](scripts/rust-free-paths.txt)
+(documentation, the TypeScript SDK, changelog fragments, decisions) cannot change any Rust result: `--quick` skips
+Clippy for it, and on a pull request CI skips the Rust build and tests (the jobs still report success). Anything not
+in that list runs everything.
+
 ## The rules that matter most
 
 - **Both databases.** Everything that touches the database — migrations, queries,
