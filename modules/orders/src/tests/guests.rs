@@ -624,3 +624,42 @@ async fn doan_ma_tra_don_dong_thoi_van_bi_chan_sau_nam_lan() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn khach_tu_sua_mau_sms_ma_tra_don() {
+    TestDatabase::run(async |test| {
+        let guests = guests(test, false).await;
+        let (_, number) = guest_order(&guests.shop).await;
+        let set = |name: &str, value: &str| {
+            guests
+                .shop
+                .request(axum::http::Method::PUT, &format!("/api/v1/kernel/settings/{name}"))
+                .token("boss")
+                .json(json!({"value": value}))
+                .send()
+        };
+        // Mẫu thiếu chỗ đặt mã: bị từ chối.
+        let answer = set("orders.sms_template.order_lookup", "[SHOP] Don {number}").await.unwrap();
+        assert_eq!(answer.status(), StatusCode::UNPROCESSABLE_ENTITY, "{:?}", answer.text());
+        assert_eq!(answer.json()["errors"][0]["code"], "placeholder_code");
+        let answer = set(
+            "orders.sms_template.order_lookup",
+            "[SHOP] Ma {code} xem don {number}, het han sau {minutes} phut",
+        )
+        .await
+        .unwrap();
+        assert_eq!(answer.status(), StatusCode::OK, "{:?}", answer.text());
+
+        let body = json!({"number": number, "phone": "0901234567"});
+        let (status, sent) =
+            public(&guests.shop, "POST", "/public/orders/lookup", None, None, Some(body)).await;
+        assert_eq!(status, StatusCode::OK, "{sent}");
+        let code = last_code(&guests.sms);
+        assert_eq!(
+            guests.sms.last_text(PHONE).unwrap(),
+            format!("[SHOP] Ma {code} xem don {number}, het han sau 10 phut")
+        );
+    })
+    .await
+    .unwrap();
+}

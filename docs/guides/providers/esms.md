@@ -48,15 +48,29 @@ set one gets the error `provider.not_configured` where an SMS would be sent.
 4. If eSMS restricts your account by IP address, give them the address of your Autoxide server
    (otherwise: `esms.ip_not_allowed`).
 
-Templates to register for the codes Autoxide sends today (replace the parts in braces by the
-variable syntax eSMS asks for):
+Every SMS that carries a one-time code has a default text, and a tenant setting that replaces it so it
+matches the template you registered (group `sms_template`, list them with
+`GET /api/v1/kernel/settings?group=sms_template`). Register either the default text (replace the parts in
+braces by the variable syntax eSMS asks for) or your own text, then set your text in the setting:
 
-| Used for | Text |
-| --- | --- |
-| Phone verification | `Ma xac thuc cua ban: {code}. Het han sau {minutes} phut. Khong chia se ma nay.` |
-| Sign-in by phone | `Ma dang nhap cua ban: {code}. Het han sau {minutes} phut. Khong chia se ma nay.` |
-| Booking code (`bookings`) | `Your booking code is {code}. It expires in {minutes} minutes.` |
-| Order codes (`orders`) and notices (`notifications`) | the texts of your own templates in those modules |
+| Used for | Setting | Default text | Placeholders |
+| --- | --- | --- | --- |
+| Phone verification | `compliance.sms_template.phone_verification` | `Ma xac thuc cua ban: {code}. Het han sau {minutes} phut. Khong chia se ma nay.` | `{code}`, `{minutes}` |
+| Sign-in by phone | `compliance.sms_template.sign_in` | `Ma dang nhap cua ban: {code}. Het han sau {minutes} phut. Khong chia se ma nay.` | `{code}`, `{minutes}` |
+| Booking code (`bookings`) | `bookings.sms_template.guest_code` | `Your booking code is {code}. It expires in {minutes} minutes.` | `{code}`, `{minutes}` |
+| Guest order lookup (`orders`) | `orders.sms_template.order_lookup` | `Your code to view order {number} is {code}. It expires in {minutes} minutes.` (translated to the order's language) | `{code}`, `{number}`, `{minutes}` |
+| Guest address change (`orders`) | `orders.sms_template.address_change` | `Your code to change the delivery address of order {number} is {code}. It expires in {minutes} minutes.` (translated) | `{code}`, `{number}`, `{minutes}` |
+| Notices (`notifications`) | — | the texts of your own templates in that module | — |
+
+```bash
+curl -X PUT https://your-server/api/v1/kernel/settings/compliance.sms_template.sign_in \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"value": "[MYSHOP] {code} la ma dang nhap cua ban, hieu luc {minutes} phut"}'
+```
+
+A template must contain `{code}` exactly once and only the placeholders of its message (otherwise 422,
+error on `value`). Your text is sent as is, whatever the buyer's language. `DELETE` the setting to go
+back to the default text.
 
 ## 3. For the tenant: enter the account
 

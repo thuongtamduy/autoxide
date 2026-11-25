@@ -4,7 +4,7 @@
 
 use std::fmt;
 
-use crate::error::Error;
+use crate::error::{Error, FieldError};
 use crate::tenancy::TenantId;
 
 /// Phone number in E.164 form (`+84912345678`). Only the masked form ([`masked`](Self::masked)) may be logged.
@@ -145,6 +145,100 @@ pub trait VerifiedPhoneTokens: Send + Sync {
     ) -> Result<Option<PhoneNumber>, Error>;
 }
 
+/// Group of the tenant settings that hold SMS text templates (`GET /api/v1/kernel/settings?group=sms_template`).
+///
+/// A tenant whose SMS brandname is registered with the carriers can only send texts that match the template it
+/// registered; a module that sends a one-time code declares one setting per message in this group, so the tenant
+/// can make the text match. Name the setting `<module>.sms_template.<message>`.
+pub const SMS_TEMPLATE_GROUP: &str = "sms_template";
+
+/// Longest SMS template a tenant may set, in characters (a few concatenated SMS).
+pub const SMS_TEMPLATE_MAX: usize = 480;
+
+/// Checks an SMS template a tenant sets: 1 to [`SMS_TEMPLATE_MAX`] characters, placeholders `{name}` only from
+/// `allowed`, and `{code}` exactly once (a template without the code would send a useless message). The error is
+/// on the field `value`, as a tenant setting checker expects.
+///
+/// ```
+/// use autoxide_kernel::sms::check_sms_template;
+/// assert!(check_sms_template("Ma {code}, het han sau {minutes} phut", &["code", "minutes"]).is_ok());
+/// assert!(check_sms_template("Ma cua ban", &["code"]).is_err());
+/// assert!(check_sms_template("Ma {code} cho {name}", &["code"]).is_err());
+/// ```
+pub fn check_sms_template(raw: &str, allowed: &[&str]) -> Result<(), FieldError> {
+    let length = raw.trim().chars().count();
+    if length == 0 || raw.chars().count() > SMS_TEMPLATE_MAX {
+        return Err(FieldError::new("value", "length", "must be 1 to {max} characters long")
+            .with_param("max", SMS_TEMPLATE_MAX));
+    }
+    let mut codes = 0;
+    for name in placeholders(raw) {
+        if !allowed.contains(&name) {
+            let list =
+                allowed.iter().map(|name| format!("{{{name}}}")).collect::<Vec<_>>().join(", ");
+            return Err(FieldError::new(
+                "value",
+                "placeholder_unknown",
+                "can only use the placeholders {allowed}; {placeholder} is not one of them",
+            )
+            .with_param("allowed", list)
+            .with_param("placeholder", format!("{{{name}}}")));
+        }
+        if name == "code" {
+            codes += 1;
+        }
+    }
+    if codes != 1 {
+        return Err(FieldError::new(
+            "value",
+            "placeholder_code",
+            "must contain {placeholder} exactly once, where the one-time code goes",
+        )
+        .with_param("placeholder", "{code}"));
+    }
+    Ok(())
+}
+
+/// Fills the placeholders of an SMS template with `values`, in one pass (a value is never read again). `None` when
+/// a placeholder has no value: the template was not checked with [`check_sms_template`] against these names.
+///
+/// ```
+/// use autoxide_kernel::sms::fill_sms_template;
+/// let text = fill_sms_template("Ma {code}", &[("code", "123456")]);
+/// assert_eq!(text.as_deref(), Some("Ma 123456"));
+/// ```
+pub fn fill_sms_template(template: &str, values: &[(&str, &str)]) -> Option<String> {
+    crate::i18n::fill_all(template, values)
+}
+
+/// The text of an SMS from the template the tenant set in `setting` (a setting of [`SMS_TEMPLATE_GROUP`] whose
+/// checker is [`check_sms_template`] with the same `allowed`), filled with `values`. `None` when the tenant has
+/// not set the template, or the stored one is no longer valid (a warning is logged): the module sends its default
+/// text.
+pub async fn tenant_sms_text(
+    settings: &dyn crate::tenancy::TenantSettings,
+    tenant: &crate::tenancy::TenantContext,
+    setting: &crate::tenancy::TenantSetting,
+    allowed: &[&str],
+    values: &[(&str, &str)],
+) -> Result<Option<String>, Error> {
+    let template = crate::tenancy::parsed_setting(settings, tenant, setting, |raw| {
+        check_sms_template(raw, allowed).map(|()| raw.to_owned())
+    })
+    .await?;
+    Ok(template.and_then(|template| fill_sms_template(&template, values)))
+}
+
+/// The placeholder names in `template`, by the same rule as [`fill_sms_template`]: `{` + letters, digits, `_` +
+/// `}`; any other brace is plain text.
+fn placeholders(template: &str) -> impl Iterator<Item = &str> {
+    template.split('{').skip(1).filter_map(|part| {
+        part.split_once('}').map(|(name, _)| name).filter(|name| {
+            !name.is_empty() && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+        })
+    })
+}
+
 /// `sms_disabled` (503): SMS sending is not configured.
 pub fn sms_disabled() -> Error {
     Error::unavailable("sms_disabled", "Sending SMS is not set up on this server.")
@@ -174,5 +268,31 @@ mod tests {
         assert_eq!(number.masked(), "+8491****678");
         assert_eq!(number.calling_code(&["1", "84"]), Some("84"));
         assert!(!format!("{number:?}").contains("345"));
+    }
+
+    #[test]
+    fn mau_sms_phai_co_ma_dung_mot_lan_va_chi_dung_cho_dien_da_biet() {
+        let allowed = ["code", "minutes"];
+        assert!(
+            check_sms_template("[SHOP] Ma OTP {code}, hieu luc {minutes} phut", &allowed).is_ok()
+        );
+        // Ngoặc không phải chỗ điền thì là chữ thường.
+        assert!(check_sms_template("Ma {code} {} { x }", &allowed).is_ok());
+        let error = check_sms_template("Ma OTP cua ban", &allowed).unwrap_err();
+        assert_eq!((error.field.as_str(), error.code.as_str()), ("value", "placeholder_code"));
+        assert!(error.message.contains("{code}"), "{}", error.message);
+        let twice = check_sms_template("{code} {code}", &allowed).unwrap_err();
+        assert_eq!(twice.code, "placeholder_code");
+        let unknown = check_sms_template("Ma {code} don {number}", &allowed).unwrap_err();
+        assert_eq!(unknown.code, "placeholder_unknown");
+        assert!(unknown.message.contains("{number}"), "{}", unknown.message);
+        assert_eq!(check_sms_template("  ", &allowed).unwrap_err().code, "length");
+        let long = format!("{{code}}{}", "a".repeat(SMS_TEMPLATE_MAX));
+        assert_eq!(check_sms_template(&long, &allowed).unwrap_err().code, "length");
+
+        let text =
+            fill_sms_template("Ma {code} ({minutes}p)", &[("code", "{minutes}"), ("minutes", "5")]);
+        assert_eq!(text.as_deref(), Some("Ma {minutes} (5p)"));
+        assert_eq!(fill_sms_template("Ma {code} {x}", &[("code", "1")]), None);
     }
 }

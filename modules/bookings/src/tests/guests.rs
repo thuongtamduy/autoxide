@@ -330,3 +330,50 @@ async fn mot_dia_chi_khong_xin_ma_cho_hang_loat_so() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn khach_tu_sua_mau_sms_ma_dat_lich() {
+    TestDatabase::run(async |test| {
+        let sms = Arc::new(FakeSmsSender::new());
+        let shop = app_with(test, |builder| {
+            builder
+                .user("owner", 0x0e, &["kernel.settings.manage"])
+                .provide::<dyn SmsSender>(sms.clone())
+        })
+        .await;
+        let ask = || {
+            call(
+                &shop,
+                "POST",
+                "/bookings/public/phone-codes",
+                None,
+                Some(json!({"phone": "0912345678"})),
+            )
+        };
+        // Chưa đặt: câu mặc định.
+        let (status, sent) = ask().await;
+        assert_eq!(status, StatusCode::OK, "{sent}");
+        let code = code_in(&sms, "+84912345678");
+        assert_eq!(
+            sms.last_text("+84912345678").unwrap(),
+            format!("Your booking code is {code}. It expires in 10 minutes.")
+        );
+        let setting = "/kernel/settings/bookings.sms_template.guest_code";
+        let (status, problem) =
+            call(&shop, "PUT", setting, Some("owner"), Some(json!({"value": "Ma {otp}"}))).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{problem}");
+        assert_eq!(problem["errors"][0]["code"], "placeholder_unknown");
+        let value = json!({"value": "[SPA] Ma dat lich {code} ({minutes} phut)"});
+        let (status, saved) = call(&shop, "PUT", setting, Some("owner"), Some(value)).await;
+        assert_eq!(status, StatusCode::OK, "{saved}");
+        let (status, sent) = ask().await;
+        assert_eq!(status, StatusCode::OK, "{sent}");
+        let code = code_in(&sms, "+84912345678");
+        assert_eq!(
+            sms.last_text("+84912345678").unwrap(),
+            format!("[SPA] Ma dat lich {code} (10 phut)")
+        );
+    })
+    .await
+    .unwrap();
+}

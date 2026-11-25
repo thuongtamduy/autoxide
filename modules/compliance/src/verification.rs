@@ -345,9 +345,8 @@ impl ComplianceService {
         let message = SmsMessage::new(
             tenant.id(),
             phone.clone(),
-            format!(
-                "Ma xac thuc cua ban: {code}. Het han sau {minutes} phut. Khong chia se ma nay."
-            ),
+            self.otp_text(tenant, &crate::sms_templates::PHONE_VERIFICATION, &code, minutes)
+                .await?,
             SmsPurpose::Otp,
             id.to_string(),
         );
