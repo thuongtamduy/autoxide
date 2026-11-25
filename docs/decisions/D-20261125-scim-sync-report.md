@@ -32,7 +32,9 @@ Quyết định:
    log, không làm hỏng request không liên quan. Hệ quả nối với rủi ro "nhóm chưa có luật" (D-20261125-scim-grant-cover
    mục 5): người chờ của nhóm có luật được cấp ở lần ghi nhóm kế tiếp bằng token cấp được role đó (vd token của
    admin), dù request đó không nêu họ — họ là thành viên mà luật đã áp cho, không phải ý định mới. `granted_user_ids` chỉ gồm người thật sự giữ role ở nút sau khi đồng
-   bộ (đọc qua kết nối ghi). Log của người lỗi ghi lỗi đầy đủ; ra ngoài lỗi nội bộ chỉ là "Internal error.".
+   bộ (đọc qua kết nối ghi). Log của người lỗi ghi lỗi đầy đủ; ra ngoài lỗi nội bộ chỉ là "Internal error.". "Người
+   chờ" tính theo người chịu trách nhiệm của lần ghi: chỉ các (nút, role) người đó cấp được — người chỉ thiếu role
+   token không cấp được không chiếm chỗ trong 100 người, người sau không bị bỏ đói.
 3. **Khoá nhóm cả khi bỏ luật:** `delete_mapping` khoá dòng nhóm như `create_mapping` và `update_group`, để mọi lần
    đổi luật hay thành viên của một nhóm nối đuôi nhau (thứ tự khoá: nhóm trước).
 4. **Test ép thứ tự:** `dat_luat_cho_khoa_nhom_cua_lan_ghi_thanh_vien` giữ một transaction đóng vai lần ghi thành
@@ -50,15 +52,34 @@ Quyết định:
    `pending_members`, `granted_user_ids`) dùng kết nối ghi: với `DATABASE_READ_URL` (read replica) trễ, đọc ở kết nối
    đọc thì người vừa bị gỡ khỏi nhóm có luật admin vẫn giữ admin. Còn lại (chưa đổi, ghi nhận): principal của mỗi
    request và `require_covers` / quyền người tạo token đọc qua kết nối đọc — sau khi hạ quyền, quyền cũ còn hiệu lực
-   trong khoảng replica trễ; thuộc thiết kế chung của D-20261121-access-token-revocation.
+   trong khoảng replica trễ; thuộc thiết kế chung của D-20261121-access-token-revocation. Token SCIM vừa thu hồi cũng
+   còn dùng được trong khoảng đó (`authenticate` đọc bảng token qua kết nối đọc).
 7. **SCIM đổi email của tài khoản đã liên kết thì khoá mọi cách vào cũ** (`UserService::lock_out_in`, cùng
    transaction): mật khẩu, phiên, refresh token, API key, passkey, TOTP, link đăng nhập / đặt lại đang chờ, liên kết
-   đăng nhập ngoài; mỗi thứ có event của nó. Lý do: token quyền thấp tạo trước một `User` mang `userName` mà hệ thống
+   đăng nhập ngoài, **token SCIM tài khoản đó tạo**. Event: API key, passkey, TOTP, liên kết ngoài và token SCIM mỗi thứ
+   có event thu hồi riêng; thu hồi phiên / refresh token, bỏ mật khẩu và link đang chờ không có event riêng — chúng đi
+   cùng event `auth.user_updated` (email đổi) trong cùng transaction. Lý do: token quyền thấp tạo trước một `User` mang `userName` mà hệ thống
    danh tính sẽ dùng cho người khác, với email của kẻ tấn công, đặt mật khẩu qua email đó; khi hệ thống danh tính (token
    của admin) khớp theo `userName`, đổi email về người thật và cấp role, kẻ tấn công vẫn giữ phiên và mật khẩu. Chủ mới
    đăng nhập bằng nhà cung cấp danh tính hay đặt lại mật khẩu qua email mới. Còn mở (mục `[ ]` dưới P16): khi đồng bộ
    đưa một tài khoản lên role cao hơn người đã tạo liên kết SCIM của nó, cũng thu hồi như vậy — cần ghi người tạo liên
    kết (migration).
+   - **Token SCIM** do tài khoản tạo bị thu hồi trong `lock_out_in` (nên cả đường "không phải tôi" của báo cáo email
+     cũng thu hồi), vì token mạnh đúng bằng quyền SAU NÀY của tài khoản: tài khoản cắm sẵn tạo token khi tạm có
+     `auth.scim.manage`, sau khi được trao quyền admin thì token đó mạnh bằng admin. Và `authority()` đòi người tạo
+     CÒN `auth.scim.manage` lúc dùng — mất quyền đó thì token không cấp, giữ hay gỡ được gì (khớp `creator_status =
+     missing_permission`).
+   - Rà các loại credential / uỷ quyền gắn với một tài khoản: thu hồi — mật khẩu, phiên, refresh token, API key,
+     passkey, TOTP + recovery code, link đăng nhập / đặt lại / xác minh / xác nhận lại đang chờ, liên kết OIDC, token
+     SCIM. Không thu hồi — uỷ quyền cho khách con (D-310) và lần cấp truy cập hỗ trợ (D-313): cấp theo role / cho nhân
+     sự nền tảng, không phải credential của tài khoản; webhook: của khách, không của người tạo; kết nối event stream /
+     WebSocket đang mở: xác thực bằng access token lúc mở, phiên bị thu hồi thì access token mất hiệu lực ở lần kiểm
+     sau (D-20261121-access-token-revocation). Chưa có module `apps` nên chưa có token ứng dụng để thu hồi.
+   - Hai biến thể còn hở (mức thấp — cần hệ thống danh tính khớp theo khoá đã bị cắm trước và token của admin):
+     (i) hệ thống danh tính không quản lý email (không bao giờ PATCH email) thì không có lần đổi email để khoá — tài
+     khoản cắm sẵn giữ email và mật khẩu của kẻ tấn công rồi được cấp role theo nhóm; (ii) hệ thống danh tính thêm vào
+     nhóm admin TRƯỚC khi PATCH `User` — trong khoảng giữa hai request kẻ tấn công giữ mật khẩu và quyền admin. Cách
+     đóng là mục `[ ]` dưới P16 (thu hồi khi đồng bộ đưa tài khoản lên cao hơn người tạo liên kết).
 
 Đính chính D-20261125-scim-grant-cover (không sửa file đó):
 

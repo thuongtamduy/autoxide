@@ -626,6 +626,8 @@ impl UserService {
             OneTimeTokens::new("auth").revoke(transaction, tenant, purpose, &subject).await?;
         }
         self.forget_identities(transaction, tenant, actor, id).await?;
+        // Token SCIM tài khoản này tạo cũng là một cửa (mạnh bằng quyền SAU NÀY của tài khoản).
+        crate::scim::revoke_created_by_in(transaction, tenant, &self.outbox, actor, id).await?;
         Ok(())
     }
 }

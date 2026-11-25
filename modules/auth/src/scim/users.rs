@@ -367,7 +367,15 @@ impl ScimService {
     ) -> Result<autoxide_kernel::access::Principal, ScimError> {
         let tenant = &caller.tenant;
         Ok(match self.roles.user_principal(tenant, caller.created_by).await? {
-            Some((user, principal)) if user.is_active() && user.realm == Realm::Staff => principal,
+            // Người tạo còn hoạt động, là nhân sự và CÒN `auth.scim.manage`: mất quyền quản lý SCIM
+            // thì token của họ không cấp, giữ hay gỡ được gì (`creator_status = missing_permission`).
+            Some((user, principal))
+                if user.is_active()
+                    && user.realm == Realm::Staff
+                    && principal.has(&crate::permissions::SCIM_MANAGE) =>
+            {
+                principal
+            }
             _ => autoxide_kernel::access::Principal::new(caller.created_by, [])
                 .in_tenant(tenant.id()),
         })

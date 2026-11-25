@@ -23,6 +23,7 @@ pub(crate) mod error;
 pub(crate) mod filter;
 #[cfg(test)]
 mod grant_cover_tests;
+mod group_sync;
 mod groups;
 #[cfg(test)]
 mod groups_tests;
@@ -45,7 +46,7 @@ use sea_orm::{ColumnTrait as _, ConnectionTrait, EntityTrait as _, QueryFilter a
 use uuid::Uuid;
 
 pub(crate) use self::mappings::{GroupMapping, GroupSummary, UnmappedGroups};
-pub(crate) use self::token::{CreatedScimToken, CreatorStatus, ScimToken};
+pub(crate) use self::token::{CreatedScimToken, CreatorStatus, ScimToken, revoke_created_by_in};
 use crate::user::UserService;
 
 /// Đường dẫn gốc của endpoint SCIM (cho `meta.location`, tài liệu).

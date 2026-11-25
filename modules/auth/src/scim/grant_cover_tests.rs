@@ -561,6 +561,23 @@ async fn chiem_truoc_user_name_khong_giu_duoc_tai_khoan_khi_email_doi() {
             .unwrap();
         let attacker = bearer(&app, "attacker@evil.example", PASSWORD).await;
         assert_eq!(call(&app, "GET", "/me", Some(&attacker), None).await.0, StatusCode::OK);
+        // Tạm cấp cho tài khoản cắm sẵn quyền quản lý SCIM, tạo token SCIM T2, rồi gỡ quyền.
+        let input = crate::role::RoleInput {
+            denies: Vec::new(),
+            requires_mfa: false,
+            name: "sync2".to_owned(),
+            description: String::new(),
+            permissions: vec!["auth.scim.manage".to_owned()],
+            grants: Vec::new(),
+        };
+        let sync2 = services.roles.create(&services.tenant, Actor::system(), input).await.unwrap();
+        services
+            .roles
+            .set_user_roles(&services.tenant, Actor::system(), user_id, vec![sync2.id])
+            .await
+            .unwrap();
+        let planted_token = scim_token(&app, &attacker, None).await;
+        services.roles.set_user_roles(&services.tenant, Actor::system(), user_id, vec![]).await.unwrap();
 
         // Hệ thống danh tính khớp theo `userName`, đổi email về người thật, đưa vào nhóm admin.
         let email = patch(json!([
@@ -575,6 +592,9 @@ async fn chiem_truoc_user_name_khong_giu_duoc_tai_khoan_khi_email_doi() {
         assert_eq!(status, StatusCode::OK, "{body}");
         assert!(is_admin(&services, &id).await);
 
+        // Token SCIM tài khoản đó tạo đã bị thu hồi cùng lúc đổi email (không thì nay nó mạnh bằng admin).
+        let (status, _) = scim(&app, "GET", "/Users", &planted_token, None).await;
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
         // Phiên cũ chết; mật khẩu kẻ tấn công đặt không còn dùng được với email nào.
         assert_eq!(call(&app, "GET", "/me", Some(&attacker), None).await.0, StatusCode::UNAUTHORIZED);
         for email in ["attacker@evil.example", "chief@corp.example"] {
@@ -582,6 +602,62 @@ async fn chiem_truoc_user_name_khong_giu_duoc_tai_khoan_khi_email_doi() {
             let (status, _, body) = call(&app, "POST", "/login", None, Some(login)).await;
             assert_eq!(status, StatusCode::UNAUTHORIZED, "{email}: {body}");
         }
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn nguoi_tao_mat_quyen_quan_ly_scim_thi_token_khong_cap_duoc_gi() {
+    // Người tạo còn role `editor` nhưng mất `auth.scim.manage`: token không cấp được cả `editor`.
+    TestDatabase::run(async |test| {
+        let (app, services, admin, admin_token) = setup(test).await;
+        let tenant = &services.tenant;
+        let editor = crate::role::RoleInput {
+            denies: Vec::new(),
+            requires_mfa: false,
+            name: "editor".to_owned(),
+            description: String::new(),
+            permissions: vec!["notes.write".to_owned()],
+            grants: Vec::new(),
+        };
+        let editor = services.roles.create(tenant, Actor::system(), editor).await.unwrap();
+        let (_, low_token) = sync_operator(&app, &services, "it@example.com").await;
+        let it = services.users.find_by_email(tenant, "it@example.com").await.unwrap().unwrap();
+        let mut roles: Vec<uuid::Uuid> = services
+            .roles
+            .user_roles(tenant, it.id)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|role| role.id)
+            .collect();
+        roles.push(editor.id);
+        services.roles.set_user_roles(tenant, Actor::system(), it.id, roles).await.unwrap();
+        let group = json!({"schemas": [GROUP_SCHEMA], "displayName": "Editors"});
+        let (_, group) = scim(&app, "POST", "/Groups", &admin_token, Some(group)).await;
+        let group_id = group["id"].as_str().unwrap().to_owned();
+        let body =
+            json!({"group_id": group_id, "org_id": tenant.id().as_uuid(), "role_id": editor.id});
+        let (status, _, mapped) =
+            call(&app, "POST", "/scim/group-mappings", Some(&admin), Some(body)).await;
+        assert_eq!(status, StatusCode::CREATED, "{mapped}");
+        let path = format!("/Groups/{group_id}");
+        let first = scim_user(&app, &low_token, "first@example.com").await;
+        let add = patch(json!([{"op": "add", "path": "members", "value": [{"value": first}]}]));
+        let (status, body) = scim(&app, "PATCH", &path, &low_token, Some(add)).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+
+        // Mất `auth.scim.manage`, còn `editor`.
+        services
+            .roles
+            .set_user_roles(tenant, Actor::system(), it.id, vec![editor.id])
+            .await
+            .unwrap();
+        let second = scim_user(&app, &low_token, "second@example.com").await;
+        let add = patch(json!([{"op": "add", "path": "members", "value": [{"value": second}]}]));
+        let (status, body) = scim(&app, "PATCH", &path, &low_token, Some(add)).await;
+        assert_forbidden(status, &body);
     })
     .await
     .unwrap();

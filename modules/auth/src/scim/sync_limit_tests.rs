@@ -348,3 +348,42 @@ async fn nguoi_cho_cu_loi_khong_lam_hong_request_khong_lien_quan() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn nguoi_cho_thu_101_tro_di_khong_bi_doi() {
+    // Nhóm có hai luật: `admin` (token quyền thấp không cấp được) và `sync` (cấp được). Hơn 100
+    // người chờ cả hai. Mỗi lần token quyền thấp ghi nhóm, người chờ được chọn theo phần token đó
+    // cấp được — người đã có `sync` không còn chờ đối với nó, nên sau vài lần ai cũng có `sync`.
+    TestDatabase::run(async |test| {
+        let setup = setup(test).await;
+        let mut ids = Vec::new();
+        for index in 0..105 {
+            ids.push(user(&setup, &setup.admin_token, &format!("p{index}@alpha.example")).await);
+        }
+        let refs: Vec<&str> = ids.iter().map(String::as_str).collect();
+        let crowd = group(&setup, "Crowd", &refs).await;
+        setup.plan.set_max(setup.plan.used().len());
+        for role in ["admin", "sync"] {
+            let (status, mapped) = map(&setup, &crowd, role).await;
+            assert_eq!(status, StatusCode::CREATED, "{mapped}");
+            assert_eq!(mapped["data"]["granted_user_ids"], json!([]), "{mapped}");
+        }
+        setup.plan.set_max(10_000);
+        let path = format!("/Groups/{crowd}");
+        for name in ["Crowd 1", "Crowd 2"] {
+            let rename = json!({"schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+                "Operations": [{"op": "replace", "path": "displayName", "value": name}]});
+            let (status, body) =
+                scim(&setup.app, "PATCH", &path, &setup.low_token, Some(rename)).await;
+            assert_eq!(status, StatusCode::OK, "{body}");
+        }
+        for id in &ids {
+            let user_id = uuid::Uuid::parse_str(id).unwrap();
+            let principal = setup.services.roles.principal(&setup.tenant, user_id).await.unwrap();
+            assert!(principal.has(&crate::permissions::SCIM_MANAGE), "{id} chưa có role `sync`");
+            assert!(!principal.has_all_permissions(), "{id} không được thành admin");
+        }
+    })
+    .await
+    .unwrap();
+}

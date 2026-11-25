@@ -23,7 +23,8 @@ use uuid::Uuid;
 
 use super::ScimService;
 use super::entity::{group, mapping, member};
-use super::groups::{SyncReport, group_subject};
+use super::group_sync::SyncReport;
+use super::groups::group_subject;
 use crate::events;
 use crate::permissions::SCIM_MANAGE;
 
