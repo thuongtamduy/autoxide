@@ -176,8 +176,9 @@ Hai mức (D-173), các bước và biến môi trường ghi ở đầu `gate.s
 
 Trong các test đó có ba bài giữ tài liệu khớp code: `.env.example` (cấu hình),
 `docs/openapi.json` (hợp đồng API, kèm kiểm mỗi endpoint đủ mô tả) và luật sở hữu
-bảng. Đổi cấu hình hay API thì sinh lại file tương ứng — thông báo của test ghi
-sẵn lệnh.
+bảng. Đổi cấu hình hay API thì chạy `cargo xtask regen` (sinh lại một lượt openapi.json, mcp-tools.json, `.env.example`,
+SDK, mục lục quyết định); gate kiểm sớm bằng `cargo xtask regen --check` và ghi sẵn lệnh. Thứ tự chạy của gate: kiểm rẻ
+(fmt, `xtask check`, SDK) đầu tiên, rồi clippy, file sinh, api-diff… — lỗi rẻ lộ ra ngay.
 
 - Lời nhắc "có thay đổi chưa commit" / "có commit chưa push" lúc dừng lượt **không** đến từ hook của repo này (`.claude/settings.json`
   không có hook `Stop`) mà từ nền tảng, và không vượt luật gate: chưa chạy `./gate.sh --quick` xanh thì chưa push (commit cục bộ thì được).

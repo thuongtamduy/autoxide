@@ -53,7 +53,8 @@
 #
 # Cả hai chạy ở mức ưu tiên CPU thấp (`renice`) để máy vẫn dùng được trong lúc build.
 #
-# Theo thứ tự (dừng ở bước đỏ đầu tiên):
+# Theo thứ tự (dừng ở bước đỏ đầu tiên). Số là nhóm; thứ tự chạy thật: các kiểm rẻ 1, 3 (ranh giới) và SDK của 4 chạy ĐẦU
+# TIÊN (fail nhanh), rồi AVIF / ví dụ module khi cần, rồi clippy, kiểm file sinh (`cargo xtask regen --check`), api-diff, 5, 6, 7, 8.
 #   1. định dạng            cargo fmt --check
 #   2. lint                 cargo clippy, cảnh báo tính là lỗi (`--pr`/`--quick` bỏ khi thay đổi không chạm Rust)
 #      avif                 clippy + test AVIF của `media` với `--features avif` (feature không bật mặc
@@ -239,6 +240,29 @@ if [ "$TARGET_MAX_GB" != 0 ] && [ -d target ] && [ "$(target_gb)" -gt "$TARGET_M
   fi
 fi
 
+# --- Kiểm rẻ chạy ĐẦU TIÊN (fail nhanh, D-20261125-regen-and-gate-order) ---------------------------------
+# Định dạng, ranh giới workspace và SDK chỉ mất vài giây: lỗi ở đây phải lộ ra ngay, không sau ~10 phút
+# clippy / AVIF / ví dụ module. Thuộc nhóm `lint`; số thứ tự ở chú thích đầu file là nhóm, không phải thứ tự chạy.
+# `--pr` / `--quick`: thay đổi không chạm Rust (mọi file nằm trong scripts/rust-free-paths.txt) thì clippy và kiểm file
+# sinh cho đúng kết quả như ở base — bỏ, vì trên máy mới nó là cả một lần biên dịch workspace (D-20261125-ci-skip-rust).
+RUST_CHANGED=true
+if runs lint && { [ "$QUICK" = 1 ] || [ "$PR" = 1 ]; }; then
+  RUST_CHANGED="$(scripts/rust-changed.sh "${GATE_BASE:-origin/main}")"
+fi
+CLIPPY="clippy"
+[ "$RUST_CHANGED" = true ] || CLIPPY="clippy skipped (no Rust-relevant change)"
+if runs lint; then
+  step "format (cargo fmt)"
+  cargo fmt --all --check
+
+  step "workspace boundaries (cargo xtask check)"
+  cargo xtask check
+
+  # Kiểu TypeScript của SDK sinh từ docs/openapi.json; không cần Node (D-243).
+  step "TypeScript SDK matches the contract (cargo xtask sdk --check)"
+  cargo xtask sdk --check
+fi
+
 # --- AVIF: phần riêng (`--only avif`), không nằm trong lint ------------------------------------------
 # Feature `avif` của `media` không bật mặc định (D-20261121-avif-feature) nên clippy và test thường không
 # biên dịch phần AVIF: lint và chạy riêng test của `media` với feature đó (SQLite), để nó không mục. Tách
@@ -304,36 +328,26 @@ fi
 
 if runs lint; then
 
-# --- 1-5: kiểm tĩnh, nhanh, không cần database ---------------------------------
+# --- Phần còn lại của lint: lâu hơn (biên dịch) hoặc cần mạng ---------------------------------------------
 
-step "format (cargo fmt)"
-cargo fmt --all --check
-
-# `--pr` / `--quick`: thay đổi không chạm Rust (mọi file nằm trong scripts/rust-free-paths.txt) thì clippy cho đúng kết
-# quả như ở base — bỏ, vì trên máy mới nó là cả một lần biên dịch workspace (D-20261125-ci-skip-rust).
-RUST_CHANGED=true
-if [ "$QUICK" = 1 ] || [ "$PR" = 1 ]; then
-  RUST_CHANGED="$(scripts/rust-changed.sh "${GATE_BASE:-origin/main}")"
-fi
-CLIPPY="clippy"
 if [ "$RUST_CHANGED" = true ]; then
   step "lint (cargo clippy)"
   cargo clippy --workspace --all-targets --locked -- -D warnings
 else
-  CLIPPY="clippy skipped (no Rust-relevant change)"
   step "lint (cargo clippy): skipped, no Rust-relevant change since ${GATE_BASE:-origin/main} (scripts/rust-free-paths.txt)"
 fi
 
-step "workspace boundaries (cargo xtask check)"
-cargo xtask check
+# File sinh tự động khớp code (openapi.json, mcp-tools.json, .env.example): trước đây chỉ lộ ra ở bài test, sau cả
+# vòng gate. Cần dựng binary `autoxide`, cùng bản dựng mà bước test dùng sau đó, nên chỉ chạy khi có Rust đổi, và đứng
+# sau clippy để lỗi biên dịch hiện ra bằng thông báo của clippy trước. Lệch thì thông báo ghi `cargo xtask regen`.
+if [ "$RUST_CHANGED" = true ]; then
+  step "generated files match the code (cargo xtask regen --check)"
+  cargo xtask regen --check
+fi
 
 # So với tag phát hành gần nhất (tổ tiên của HEAD); cần lịch sử và tag (D-059, đặc tả 31 A1).
 step "api contract (cargo xtask api-diff)"
 cargo xtask api-diff
-
-# Kiểu TypeScript của SDK sinh từ docs/openapi.json; không cần Node (D-243).
-step "TypeScript SDK matches the contract (cargo xtask sdk --check)"
-cargo xtask sdk --check
 
 step "dependencies (cargo deny)"
 # -D ...-not-detected / -not-encountered: ngoại lệ trong deny.toml không còn cần

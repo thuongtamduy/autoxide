@@ -62,6 +62,7 @@ mod lengths;
 mod mcp_principal;
 mod metric_labels;
 mod publish;
+mod regen;
 mod rust_free;
 mod scaffold;
 mod sdk;
@@ -79,6 +80,7 @@ const USAGE: &str = "usage: cargo xtask check
        cargo xtask check-module <dir>            the module rules of `check`, on a crate outside this repository
        cargo xtask coverage-api [--run]          endpoints and MCP tools no test calls successfully
        cargo xtask decisions                     regenerate docs/decisions/INDEX.md
+       cargo xtask regen [--check]               regenerate every generated file (openapi, mcp-tools, .env.example, SDK, decisions index)
        cargo xtask changelog                     fold changelog.d/ fragments into CHANGELOG.md (at release)
        cargo xtask api-diff [--base <ref>]       default base: the last release tag before HEAD
        cargo xtask semver [--base <rev>] [--changed <rev>] [--deny] [--markdown] [--shard <k>/<n>]
@@ -125,6 +127,8 @@ fn main() -> ExitCode {
         ["coverage-api"] => coverage_api(false),
         ["coverage-api", "--run"] => coverage_api(true),
         ["decisions"] => decisions(),
+        ["regen"] => regen(false),
+        ["regen", "--check"] => regen(true),
         ["changelog"] => changelog(),
         ["api-diff"] => api_diff(None),
         ["api-diff", "--base", base] => api_diff(Some(base)),
@@ -224,6 +228,38 @@ fn publish_check(args: &[&str]) -> ExitCode {
         }
         Err(error) => {
             eprintln!("xtask publish-check: {error}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+/// `cargo xtask regen [--check]` (xem `regen.rs`).
+fn regen(check: bool) -> ExitCode {
+    let result = workspace::load().map_err(|error| error.to_string()).and_then(|workspace| {
+        let stale = regen::outputs(&workspace.root, check)?;
+        if check {
+            for file in &stale {
+                eprintln!(
+                    "[generated-file] {file}: out of date — run `{}` and commit the result",
+                    regen::FIX_COMMAND
+                );
+            }
+            return Ok(stale.is_empty());
+        }
+        for file in &stale {
+            println!("regen: rewrote {file}");
+        }
+        // SDK đọc `docs/openapi.json` vừa ghi; mục lục quyết định không nằm trong git.
+        let version = semver::workspace_version(&workspace.root)?;
+        let sdk_ok = sdk::run(&workspace.root, false, &version)?;
+        decisions::write_index(&workspace.root)?;
+        Ok(sdk_ok)
+    });
+    match result {
+        Ok(true) => ExitCode::SUCCESS,
+        Ok(false) => ExitCode::FAILURE,
+        Err(error) => {
+            eprintln!("xtask regen: {error}");
             ExitCode::FAILURE
         }
     }

@@ -292,6 +292,73 @@ mod tests {
         assert!(bad.is_empty(), "descriptions with repeated spaces: {bad:?}");
     }
 
+    /// Số thứ tự migration (`m0038_…`) là danh sách viết tay: hai nhánh song song dễ chọn trùng số. Tên trùng đã bị
+    /// `Migrator::new` chặn; ở đây chặn thêm trùng SỐ khác tên và số đứng sai thứ tự trong cùng một module (số cách
+    /// quãng thì được: nhánh đã bỏ số đó). Thông báo nói rõ số nào, ở module nào.
+    #[test]
+    fn so_thu_tu_migration_khong_trung_va_tang_dan() {
+        let source = ConfigSource::from_pairs([("DATABASE_URL", "sqlite://data/autoxide.sqlite")]);
+        let settings = crate::settings::read(&source).unwrap();
+        let names = settings.modules.migrator().unwrap().names();
+        let problems = migration_number_problems(&names);
+        assert!(
+            problems.is_empty(),
+            "migration numbers must be unique and increasing within a module (rename the newer migration to the \
+             next free number — a migration already committed is never renamed):\n{}",
+            problems.join("\n")
+        );
+    }
+
+    /// `names`: `<module>/<name>` theo thứ tự chạy. Chỉ xét tên dạng `m` + bốn chữ số + `_…` (migration schema).
+    fn migration_number_problems(names: &[String]) -> Vec<String> {
+        let mut problems = Vec::new();
+        let mut last: Option<(&str, u32, &str)> = None;
+        for full in names {
+            let Some((module, name)) = full.split_once('/') else { continue };
+            let number = name
+                .strip_prefix('m')
+                .and_then(|rest| rest.get(..4))
+                .filter(|digits| digits.bytes().all(|byte| byte.is_ascii_digit()))
+                .and_then(|digits| digits.parse::<u32>().ok());
+            let Some(number) = number else { continue };
+            if let Some((last_module, last_number, last_name)) = last
+                && last_module == module
+            {
+                if number == last_number {
+                    problems.push(format!(
+                        "module `{module}`: number m{number:04} is used by both `{last_name}` and `{name}`"
+                    ));
+                } else if number < last_number {
+                    problems.push(format!(
+                        "module `{module}`: `{name}` (m{number:04}) is declared after `{last_name}` (m{last_number:04})"
+                    ));
+                }
+            }
+            last = Some((module, number, name));
+        }
+        problems
+    }
+
+    #[test]
+    fn bat_so_migration_trung_va_sai_thu_tu() {
+        let names: Vec<String> = [
+            "kernel/m0001_a",
+            "kernel/m0002_b",
+            "kernel/m0002_c",
+            "kernel/m0001_d",
+            "kernel/m0009_gap",
+            "notes/m0001_x",
+            "notes/u0001_upgrade",
+            "notes/m0002_y",
+        ]
+        .map(str::to_owned)
+        .to_vec();
+        let problems = migration_number_problems(&names);
+        assert_eq!(problems.len(), 2, "{problems:#?}");
+        assert!(problems[0].contains("m0002") && problems[0].contains("`m0002_b` and `m0002_c`"));
+        assert!(problems[1].contains("`m0001_d`") && problems[1].contains("after `m0002_c`"));
+    }
+
     /// Chạy mọi migration của chương trình trên một database trống rồi hỏi chính
     /// database: mỗi bảng có thuộc đúng một module không, có foreign key nào xuyên
     /// module không, bảng cấp khách hàng có `tenant_id` đúng luật không. Gate chạy bài này

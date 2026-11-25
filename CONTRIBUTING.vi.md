@@ -84,8 +84,10 @@ bỏ phần biên dịch và test Rust (các job vẫn báo xanh). File không c
   mã viết `snake_case` (lỗi của module bắt đầu bằng `<module>.`) và thông báo nói rõ phải sửa
   gì. Mã là hợp đồng với client: đổi mã là thay đổi phá vỡ. Mỗi mã mới cần bản dịch tiếng
   Việt trong `locales/vi.json` của crate.
-- **Hợp đồng API luôn khớp.** Mọi route có tài liệu OpenAPI. Đổi API hay cấu hình thì sinh
-  lại các file test đem ra so (test hỏng in sẵn lệnh): `docs/openapi.json` và `.env.example`.
+- **Hợp đồng API luôn khớp.** Mọi route có tài liệu OpenAPI. Đổi API hay cấu hình thì chạy
+  `cargo xtask regen`: một lệnh sinh lại mọi file tự động (`docs/openapi.json`, `docs/mcp-tools.json`,
+  `.env.example`, schema SDK TypeScript). Gate kiểm chúng sớm (`cargo xtask regen --check`) và in
+  đúng lệnh này khi có file lệch.
   Không đổi hành vi của endpoint `/api/v1` đã có theo cách phá vỡ; làm endpoint mới và đánh
   dấu endpoint cũ là deprecated.
 - **Test.** Code mới đi kèm test. Test chạm database dùng `autoxide_testkit::TestDatabase`,
