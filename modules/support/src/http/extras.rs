@@ -7,7 +7,7 @@ use std::sync::Arc;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
-use autoxide_kernel::pagination::{Page, PageRequest, SortedPageQuery};
+use autoxide_kernel::pagination::{NaturalOrderPageQuery, Page, PageRequest};
 use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, Query, State};
@@ -258,7 +258,7 @@ pub(crate) struct MacroQuery {
 
 /// List the saved replies usable at a unit.
 ///
-/// Requires `support.tickets.read` at the unit; includes the saved replies of the units above it
+/// Requires `support.tickets.read` at the unit; includes the saved replies of the units above it.
 /// By name (in the database's text order), then creation, unless `order=desc`; paged with `limit` /
 /// `cursor`.
 #[utoipa::path(
@@ -267,7 +267,7 @@ pub(crate) struct MacroQuery {
     extensions(("x-permissions" = json!(["support.tickets.read"]))),
     operation_id = "list_support_macros",
     security(("bearer" = [])),
-    params(MacroQuery, SortedPageQuery),
+    params(MacroQuery, NaturalOrderPageQuery),
     responses(
         (status = 200, description = "One page of the saved replies, by name.", body = Page<MacroResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
@@ -280,7 +280,7 @@ pub(crate) async fn list_macros(
     tenant: TenantContext,
     principal: Principal,
     Query(query): Query<MacroQuery>,
-    Query(page): Query<SortedPageQuery>,
+    Query(page): Query<NaturalOrderPageQuery>,
 ) -> Result<Page<MacroResponse>, Error> {
     principal.require(&TICKETS_READ)?;
     let page = PageRequest::try_from(page)?;

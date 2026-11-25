@@ -1,76 +1,20 @@
-//! Lists in a natural order, and lists held in memory (step 70 P9, one list shape for every endpoint).
-//!
-//! - [`SortedPageQuery`]: the query parameters of a list whose natural order is not creation time (a
-//!   position, a name, a code): the same `limit` / `cursor` / `order` / `count` as [`PageQuery`], but `order`
-//!   defaults to `asc` (the natural order); `desc` reverses it.
-//! - [`page_of`]: one page of a list that is already in memory — built from code (the module registry, a
-//!   catalog), from platform reference data, or from a query with a hard cap. Items are ordered by a unique
-//!   text key, compared byte by byte, so the order (and the cursor) is the same on SQLite and Postgres.
+//! One page of a list that is not in the database (step 70 P9, one list shape for every endpoint): built from
+//! code (the module registry, a catalog compiled into the program) or fixed reference data. A list from the
+//! database never uses this: it pages with a keyset in the database (`fetch_page`, `fetch_page_by`) and has
+//! no read cap (D-20261125-list-pages). Items are ordered by a unique text key compared byte by byte, so the
+//! order (and the cursor) is the same everywhere.
 
-use serde::Deserialize;
-use utoipa::IntoParams;
 use uuid::Uuid;
 
-use super::{
-    KeyCursor, Order, Page, PageQuery, PageRequest, Pagination, Position, SortValue, wrong_cursor,
-};
+use super::{KeyCursor, Order, Page, PageRequest, Pagination, Position, SortValue, wrong_cursor};
 use crate::error::Error;
 
 /// Column name the cursor of [`page_of`] carries.
 const KEY: &str = "key";
 
-// Như `PageQuery`, chỉ khác mặc định của `order` (danh sách theo thứ tự tự nhiên: vị trí, tên, mã).
-/// Query parameters of a list in a natural order (position, name, code).
-#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, IntoParams)]
-#[into_params(parameter_in = Query)]
-#[non_exhaustive]
-pub struct SortedPageQuery {
-    /// Maximum number of items to return, 1 to 200. Defaults to 50.
-    #[param(value_type = Option<u32>, minimum = 1, maximum = 200, example = 50)]
-    pub limit: Option<String>,
-    /// Where to continue: the `next_cursor` of the previous page. Omit for the
-    /// first page. Treat the value as opaque.
-    #[param(value_type = Option<String>)]
-    pub cursor: Option<String>,
-    /// `asc` (the list's natural order, the default; the endpoint says what it is) or `desc`
-    /// (reversed). Text is ordered by the database's collation. Keep the same order while
-    /// following `next_cursor`: changing it midway only changes where the next page starts.
-    #[param(value_type = Option<Order>, inline)]
-    pub order: Option<String>,
-    /// `true` to also get `pagination.total`, the number of items matching the filters, on the
-    /// first page (without `cursor`). Costs one more query; leave it out when not needed.
-    #[param(value_type = Option<bool>, example = true)]
-    pub count: Option<String>,
-}
-
-impl SortedPageQuery {
-    /// The query parameters exactly as a client sends them (all text, each optional).
-    pub const fn new(limit: Option<String>, cursor: Option<String>, order: Option<String>) -> Self {
-        SortedPageQuery { limit, cursor, order, count: None }
-    }
-}
-
-// `TryFrom`: như `PageQuery`, tham số sai thành lỗi 422 có tên từng tham số.
-impl TryFrom<SortedPageQuery> for PageRequest {
-    type Error = Error;
-
-    fn try_from(query: SortedPageQuery) -> Result<Self, Self::Error> {
-        let natural = query.order.as_deref().is_none_or(|order| order.trim().is_empty());
-        let mut request = PageRequest::try_from(PageQuery {
-            limit: query.limit,
-            cursor: query.cursor,
-            order: query.order,
-            count: query.count,
-        })?;
-        if natural {
-            request.order = Order::Asc;
-        }
-        Ok(request)
-    }
-}
-
-/// One page of `items`, a list already in memory, ordered by `key` (unique per item; compared byte by byte)
-/// in the request's order. The cursor carries the key of the last item, so the next page starts right after
+/// One page of `items`, a list not in the database, ordered by `key` (unique per item; compared byte by byte)
+/// in the request's order. Two items with the same key are a programming error (one of them could never be
+/// reached): an internal error. The cursor carries the key of the last item, so the next page starts right after
 /// it even if items were added or removed in between. `pagination.total` (with `count=true`) is the number of
 /// items.
 pub fn page_of<T>(
@@ -82,6 +26,12 @@ pub fn page_of<T>(
     // Khoá tính một lần mỗi phần tử; sắp theo byte nên hai database (và mọi máy) ra cùng thứ tự.
     let mut keyed: Vec<(String, T)> = items.drain(..).map(|item| (key(&item), item)).collect();
     keyed.sort_by(|(a, _), (b, _)| a.as_bytes().cmp(b.as_bytes()));
+    if let Some(pair) = keyed.windows(2).find(|pair| pair[0].0 == pair[1].0) {
+        return Err(Error::internal(format!(
+            "a paged list has two items with the key `{}`: the key must be unique",
+            pair[0].0
+        )));
+    }
     if request.order == Order::Desc {
         keyed.reverse();
     }
@@ -117,14 +67,12 @@ pub fn page_of<T>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::pagination::{NaturalOrderPageQuery, PageQuery};
 
     fn request(limit: &str, cursor: Option<String>, order: Option<&str>) -> PageRequest {
-        let query = SortedPageQuery {
-            limit: Some(limit.to_owned()),
-            cursor,
-            order: order.map(str::to_owned),
-            count: Some("true".to_owned()),
-        };
+        let query =
+            NaturalOrderPageQuery::new(Some(limit.to_owned()), cursor, order.map(str::to_owned))
+                .with_count(true);
         PageRequest::try_from(query).unwrap()
     }
 
@@ -161,13 +109,20 @@ mod tests {
     }
 
     #[test]
+    fn khoa_trung_la_loi_khong_mat_phan_tu_trong_im_lang() {
+        let items = vec!["a", "b", "b", "c"];
+        let error = page_of(items, |item| (*item).to_owned(), &request("2", None, None));
+        assert!(error.is_err());
+    }
+
+    #[test]
     fn con_tro_la_bi_tu_choi_va_mac_dinh_tang_dan() {
         let id_cursor = Some(Uuid::now_v7().to_string());
         let error = page_of(vec!["a"], |item| (*item).to_owned(), &request("2", id_cursor, None));
         assert!(error.is_err());
         assert_eq!(request("2", None, None).order(), Order::Asc);
         assert_eq!(PageRequest::try_from(PageQuery::default()).unwrap().order(), Order::Desc);
-        let too_many = SortedPageQuery::new(Some("201".to_owned()), None, None);
+        let too_many = NaturalOrderPageQuery::new(Some("201".to_owned()), None, None);
         assert!(PageRequest::try_from(too_many).is_err());
     }
 }

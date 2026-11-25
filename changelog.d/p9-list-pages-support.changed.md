@@ -4,5 +4,3 @@
   /api/v1/support/routing-rules` (order: as tried, `position` then creation; `order=desc` reverses),
   `GET /api/v1/support/tickets/{id}/reply-drafts` (newest first), `GET /api/v1/support/macros` (by name;
   no longer capped at 500).
-- Kernel: `autoxide_kernel::pagination::SortedPageQuery` (lists in a natural order: `order` defaults to
-  `asc`) and `page_of` (one page of a list that is not in the database).

@@ -190,7 +190,9 @@ async fn mau_cau_phan_trang_theo_ten_va_con_tro_sai() {
         let (harness, _) = app(test).await;
         let app = &harness.app;
         let root = app.default_tenant().id().as_uuid();
-        for name in ["Đổi hàng", "an", "Ánh", "Zeta", "bánh", "Ẩn", "đơn", "Bánh"] {
+        // Tên trùng (hai "Ánh", hai "an") để có hoà; các cỡ trang khác nhau cắt qua nhiều ranh giới.
+        for name in ["Đổi hàng", "an", "Ánh", "Zeta", "bánh", "Ẩn", "đơn", "Bánh", "Ánh", "an"]
+        {
             let body = json!({"org_id": root, "name": name, "bodies": {"vi": "Chào bạn"}});
             let (status, saved) = call(app, "POST", "/macros", "agent", Some(body)).await;
             assert_eq!(status, StatusCode::CREATED, "{saved}");
@@ -206,29 +208,43 @@ async fn mau_cau_phan_trang_theo_ten_va_con_tro_sai() {
         let (_, whole) =
             call(app, "GET", &format!("/macros?org_id={root}&limit=200&count=true"), "agent", None)
                 .await;
-        assert_eq!(whole["pagination"]["total"], 8, "{whole}");
+        assert_eq!(whole["pagination"]["total"], 10, "{whole}");
         let expected = names(&whole);
-        for order in ["asc", "desc"] {
+        let ids = |page: &serde_json::Value| -> Vec<String> {
+            page["data"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|row| row["id"].as_str().unwrap().to_owned())
+                .collect()
+        };
+        let whole_ids = ids(&whole);
+        for (order, limit) in [("asc", 3), ("desc", 3), ("asc", 2), ("desc", 2), ("asc", 1)] {
             let mut seen = Vec::new();
+            let mut seen_ids = Vec::new();
             let mut cursor: Option<String> = None;
             loop {
-                let mut uri = format!("/macros?org_id={root}&limit=3&order={order}");
+                let mut uri = format!("/macros?org_id={root}&limit={limit}&order={order}");
                 if let Some(cursor) = &cursor {
                     uri.push_str(&format!("&cursor={cursor}"));
                 }
                 let (status, page) = call(app, "GET", &uri, "agent", None).await;
                 assert_eq!(status, StatusCode::OK, "{page}");
                 seen.extend(names(&page));
+                seen_ids.extend(ids(&page));
                 match page["pagination"]["next_cursor"].as_str() {
                     Some(next) => cursor = Some(next.to_owned()),
                     None => break,
                 }
             }
             let mut wanted = expected.clone();
+            let mut wanted_ids = whole_ids.clone();
             if order == "desc" {
                 wanted.reverse();
+                wanted_ids.reverse();
             }
-            assert_eq!(seen, wanted, "order={order}");
+            assert_eq!(seen, wanted, "order={order} limit={limit}");
+            assert_eq!(seen_ids, wanted_ids, "order={order} limit={limit}: ties ordered by id");
         }
 
         // Cursor của danh sách khác (cột sắp khác) và cursor bị sửa: lỗi rõ ở ô `cursor`, không 500.

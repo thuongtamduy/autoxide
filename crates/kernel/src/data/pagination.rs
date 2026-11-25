@@ -45,21 +45,23 @@ use axum::response::{IntoResponse, Response};
 use crate::error::{Error, FieldError};
 
 mod memory;
-pub use memory::{SortedPageQuery, page_of};
+mod natural;
+pub use memory::page_of;
+pub use natural::NaturalOrderPageQuery;
 
 /// Number of rows per page when the client gives no `limit`.
 pub const DEFAULT_LIMIT: u32 = 50;
 /// Maximum number of rows per page.
 pub const MAX_LIMIT: u32 = 200;
 
-/// Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers
-/// a `sort` parameter to order by something else.
+/// Direction of a list's order: ascending or descending. What the list is ordered by (creation time,
+/// position, name…) is said by each endpoint.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum Order {
-    /// Oldest first.
+    /// Ascending (for creation time: oldest first).
     Asc,
-    /// Newest first.
+    /// Descending (for creation time: newest first).
     #[default]
     Desc,
 }
@@ -82,7 +84,7 @@ pub struct PageQuery {
     /// `desc` (newest first, the default) or `asc` (oldest first). Keep the same
     /// order (and `sort`, where offered) while following `next_cursor`: changing it midway only
     /// changes where the next page starts.
-    #[param(value_type = Option<Order>, inline)]
+    #[param(value_type = Option<Order>, inline, default = "desc")]
     pub order: Option<String>,
     /// `true` to also get `pagination.total`, the number of items matching the filters, on the
     /// first page (without `cursor`). Costs one more query; leave it out when not needed.
@@ -388,11 +390,13 @@ where
 /// Like [`fetch_page`], but ordered by column `sort_column` first, then by ID (so two rows with the same
 /// value still have a fixed order).
 ///
-/// - `sort_value`: that column's value for a row, to compute the next page's cursor. A column that can be
-///   `NULL` cannot be used here.
-/// - Needs an index on `(sort_column, id)` to be fast.
-/// - Both databases must compare the column values the same way: a text column should be stored in a
-///   byte-comparable form (e.g. lowercase, collation `C` on Postgres) so the order is identical.
+/// - `sort_value`: that column's value for a row, to compute the next page's cursor.
+/// - `sort_column` must be `NOT NULL` (a `NULL` would make rows disappear from the pages, and the two
+///   databases place `NULL` differently): a nullable column is refused with an internal error.
+/// - Needs an index on the filter columns + `(sort_column, id)` to be fast.
+/// - Text is ordered by the database's collation, so SQLite and Postgres may order names differently;
+///   within one database the order is stable and paging neither repeats nor skips a row
+///   (D-20261125-list-pages).
 pub async fn fetch_page_by<E, C>(
     select: Select<E>,
     sort_column: E::Column,
@@ -406,6 +410,12 @@ where
     E: EntityTrait,
     C: ConnectionTrait,
 {
+    if sort_column.def().is_null() {
+        return Err(Error::internal(format!(
+            "list sorted by nullable column `{}`: a sort column must be NOT NULL",
+            sort_column.as_str()
+        )));
+    }
     let total = total_of(&select, request, connection).await?;
     let column_name = sort_column.as_str();
     let select = match &request.position {
@@ -414,15 +424,18 @@ where
             if cursor.column == column_name && fits(&sort_column, &cursor.value) =>
         {
             let value = sea_orm::Value::from(cursor.value.clone());
-            let (after, tie) = match request.order {
-                Order::Asc => (sort_column.gt(value.clone()), id_column.gt(cursor.id)),
-                Order::Desc => (sort_column.lt(value.clone()), id_column.lt(cursor.id)),
+            // `col >= v AND (col > v OR id > id0)`: cận `col >= v` cho database nhảy thẳng tới điểm trong
+            // index (cột lọc, col, id); chỉ `col > v OR (col = v AND id > id0)` thì database quét từ đầu
+            // phần lọc và lọc từng dòng — trang sâu chậm như OFFSET (đo bằng EXPLAIN, D-20261125-list-pages).
+            let (bound, after, tie) = match request.order {
+                Order::Asc => {
+                    (sort_column.gte(value.clone()), sort_column.gt(value), id_column.gt(cursor.id))
+                }
+                Order::Desc => {
+                    (sort_column.lte(value.clone()), sort_column.lt(value), id_column.lt(cursor.id))
+                }
             };
-            select.filter(
-                Condition::any()
-                    .add(after)
-                    .add(Condition::all().add(sort_column.eq(value)).add(tie)),
-            )
+            select.filter(bound).filter(Condition::any().add(after).add(tie))
         }
         Some(_) => return Err(wrong_cursor()),
     };

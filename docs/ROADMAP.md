@@ -173,7 +173,7 @@ thật (P7).
         `bookings`) — D-20261125-sms-templates: cấu hình theo khách nhóm `sms_template`, kiểm `{code}` đúng một lần
   - [ ] 139 endpoint GET trả `Data<Vec<T>>` không phân trang: endpoint mới trả `Page<T>`, khai deprecation cho cái cũ —
         chủ dự án quyết sửa tại chỗ cả 140 (đo lại 25/11), D-20261125-list-pages; làm theo cụm module, mỗi cụm một PR:
-    - [x] Kernel (`SortedPageQuery`, `page_of`) + `support`
+    - [x] Kernel (`NaturalOrderPageQuery`, `page_of`) + `support`
     - [ ] Các module còn lại (theo cụm)
     - [ ] Luật gate chặn danh sách không phân trang, hướng dẫn nâng cấp EN + VI, danh sách ngoại lệ
   - [x] Rustdoc tiếng Anh cho phần công khai của kernel, testkit, `autoxide` và `api` của module (docs.rs); gate

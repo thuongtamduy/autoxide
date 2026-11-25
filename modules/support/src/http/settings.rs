@@ -7,7 +7,7 @@ use std::sync::Arc;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
-use autoxide_kernel::pagination::{Page, PageQuery, PageRequest, SortedPageQuery};
+use autoxide_kernel::pagination::{NaturalOrderPageQuery, Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, Query, State};
@@ -325,7 +325,7 @@ pub(crate) struct RuleQuery {
     extensions(("x-permissions" = json!(["support.settings.manage"]))),
     operation_id = "list_support_routing_rules",
     security(("bearer" = [])),
-    params(RuleQuery, SortedPageQuery),
+    params(RuleQuery, NaturalOrderPageQuery),
     responses(
         (status = 200, description = "One page of the rules, in the order they are tried.", body = Page<RuleResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
@@ -338,7 +338,7 @@ pub(crate) async fn list_rules(
     tenant: TenantContext,
     principal: Principal,
     Query(query): Query<RuleQuery>,
-    Query(page): Query<SortedPageQuery>,
+    Query(page): Query<NaturalOrderPageQuery>,
 ) -> Result<Page<RuleResponse>, Error> {
     principal.require(&SETTINGS_MANAGE)?;
     let page = PageRequest::try_from(page)?;

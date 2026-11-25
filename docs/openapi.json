@@ -103444,12 +103444,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -105192,12 +105200,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -105558,12 +105574,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -105927,12 +105951,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -106459,12 +106491,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -107398,12 +107438,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -107836,12 +107884,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -110759,12 +110815,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -111593,12 +111657,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -111929,12 +112001,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -113771,12 +113851,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -114799,12 +114887,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -117469,12 +117565,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -118669,12 +118773,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -119469,12 +119581,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -120672,12 +120792,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -121406,12 +121534,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -123018,12 +123154,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -123868,12 +124012,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -124564,12 +124716,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -126506,12 +126666,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -127518,12 +127686,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -128641,12 +128817,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -129003,12 +129187,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -129948,12 +130140,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -130308,12 +130508,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -133540,12 +133748,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -134047,12 +134263,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -134984,12 +135208,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -137104,12 +137336,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -137299,12 +137539,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -138559,12 +138807,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -139135,12 +139391,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -139514,12 +139778,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -140353,12 +140625,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -140548,12 +140828,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -142123,12 +142411,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -142786,12 +143082,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -143098,12 +143402,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -143965,12 +144277,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -145119,12 +145439,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -148627,12 +148955,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -149064,12 +149400,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -149798,12 +150142,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -150403,12 +150755,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -151539,12 +151899,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -152208,12 +152576,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -153320,12 +153696,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -154546,12 +154930,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -156388,12 +156780,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -157582,12 +157982,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -158528,12 +158936,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -160426,12 +160842,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -161074,12 +161498,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -161243,12 +161675,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -161525,12 +161965,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -161702,12 +162150,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -162356,12 +162812,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -162748,12 +163212,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -164452,12 +164924,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -165104,12 +165584,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -165253,12 +165741,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -166735,12 +167231,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -167532,12 +168036,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -168153,12 +168665,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -169202,12 +169722,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -170109,12 +170637,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -170418,12 +170954,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -171393,12 +171937,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -172824,12 +173376,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -173559,12 +174119,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -174480,12 +175048,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -174732,12 +175308,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -174994,12 +175578,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -175725,12 +176317,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -175934,12 +176534,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -177888,12 +178496,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -178278,12 +178894,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -178564,12 +179188,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -179451,12 +180083,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -181369,12 +182009,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -182092,12 +182740,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -182995,12 +183651,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -183408,12 +184072,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -183644,12 +184316,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -184289,12 +184969,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -185154,12 +185842,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -185776,12 +186472,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -186429,12 +187133,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -186828,12 +187540,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -187355,12 +188075,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -188211,12 +188939,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -188496,12 +189232,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -190160,12 +190904,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -190760,12 +191512,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -191119,12 +191879,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -191582,12 +192350,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -193835,12 +194611,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -194086,12 +194870,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -198086,12 +198878,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -200305,12 +201105,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -201917,12 +202725,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -203227,12 +204043,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -203866,12 +204690,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -204015,12 +204847,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -204747,12 +205587,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -205349,12 +206197,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -205919,12 +206775,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -206219,12 +207083,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -206978,12 +207850,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -207315,12 +208195,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -208036,12 +208924,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -208434,12 +209330,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -208706,12 +209610,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -210948,12 +211860,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -211352,12 +212272,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -212099,12 +213027,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -214576,12 +215512,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -215591,12 +216535,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -217509,12 +218461,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -218938,12 +219898,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -219589,12 +220557,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -220532,12 +221508,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -221278,12 +222262,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -223518,12 +224510,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -223713,12 +224713,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -225306,12 +226314,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -229208,12 +230224,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -229775,12 +230799,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -230361,12 +231393,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -232914,12 +233954,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -233557,12 +234605,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -234707,12 +235763,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -237101,12 +238165,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -237254,12 +238326,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -238131,12 +239211,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -238629,12 +239717,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -240110,12 +241206,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -241689,12 +242793,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -242127,12 +243239,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -242454,12 +243574,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -243310,12 +244438,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -245820,12 +246956,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -245998,12 +247142,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -246661,12 +247813,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -246984,12 +248144,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -247655,12 +248823,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -247793,12 +248969,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -248512,12 +249696,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -249015,12 +250207,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -249414,12 +250614,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -249801,12 +251009,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -250484,12 +251700,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -251628,12 +252852,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -253105,12 +254337,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -253804,12 +255044,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -254021,7 +255269,7 @@
     },
     "/api/v1/support/macros": {
       "get": {
-        "description": "Requires `support.tickets.read` at the unit; includes the saved replies of the units above it\nBy name (in the database's text order), then creation, unless `order=desc`; paged with `limit` /\n`cursor`.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
+        "description": "Requires `support.tickets.read` at the unit; includes the saved replies of the units above it.\nBy name (in the database's text order), then creation, unless `order=desc`; paged with `limit` /\n`cursor`.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "support_list_support_macros",
         "parameters": [
           {
@@ -254061,12 +255309,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "asc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -254781,12 +256037,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -256798,12 +258062,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "asc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -257158,12 +258430,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -257942,12 +259222,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -259333,12 +260621,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -259986,12 +261282,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -260936,12 +262240,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -261198,12 +262510,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {
@@ -261925,12 +263245,20 @@
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
+              "allOf": [
+                {
+                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "default": "desc",
+                  "type": "object"
+                }
+              ]
             }
           },
           {

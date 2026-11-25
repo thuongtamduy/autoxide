@@ -13,19 +13,35 @@ khỏi làm lại và vướng phần này nữa". Phần diễn giải dưới 
 2. **Chọn tham số trang** (luật, để phiên sau không chọn tuỳ ý):
    - `PageQuery` (mặc định `order=desc`, mới nhất trước): danh sách không có thứ tự tự nhiên nào khác ngoài thời điểm tạo.
      Database: `fetch_page` (khoá UUIDv7).
-   - `SortedPageQuery` (mặc định `order=asc`): danh sách có thứ tự tự nhiên — vị trí, tên, mã. Database: `fetch_page_by`
+   - `NaturalOrderPageQuery` (mặc định `order=asc`): danh sách có thứ tự tự nhiên — vị trí, tên, mã. Database: `fetch_page_by`
      theo cột đó + id. Mô tả endpoint nói thứ tự là gì.
    - Thứ tự theo cột chữ (tên) do collation của database quyết; chỉ cam kết ổn định và không trùng / sót trong một lần
      duyệt (khoá phụ id; so sánh cursor và `ORDER BY` cùng collation). Không module nào tự sắp chữ trong bộ nhớ để thay.
    - Đổi `order` giữa chừng chỉ đổi điểm bắt đầu trang sau (cursor không mang `order`); cursor của danh sách khác cột
      sắp hay bị sửa → 422 ở ô `cursor`. Cursor chỉ mang (cột, giá trị, id) và mọi truy vấn lọc theo khách, nên cursor của
      khách khác không lộ gì.
+2b. **Tên kiểu chốt**: `NaturalOrderPageQuery` (không đổi nữa; tên cũ `SortedPageQuery` chỉ có trong bản nháp) — `PageQuery`
+   cũng có thứ tự nên tên phải nói đúng chỗ khác: thứ tự tự nhiên. Có `with_count` như `PageQuery`. Tham số `order` của
+   cả hai khai `default` máy đọc được trong OpenAPI (`desc` / `asc`); enum `Order` mô tả trung lập (tăng / giảm dần).
 3. **Danh sách trong database phân trang bằng keyset trong database**, không trần đọc: một `.limit(N)` cứng trước khi trả
    danh sách là mất dữ liệu trong im lặng. Giới hạn nghiệp vụ thật (chặn lúc tạo, có mã lỗi) giữ ở chỗ ghi. Mỗi danh sách
-   có index khớp: cột lọc (`tenant_id`, `org_id`…) + cột sắp + id; thiếu thì thêm migration.
+   có index khớp: cột lọc (`tenant_id`, `org_id`…) + cột sắp + id; thiếu thì thêm migration. Index mới bao index cũ (index
+   cũ là tiền tố của nó) thì xoá index cũ trong cùng migration (`down` tạo lại).
+   - Cột sắp phải `NOT NULL` (NULL làm sót dòng, và hai database xếp NULL khác nhau): `fetch_page_by` từ chối cột
+     nullable bằng lỗi nội bộ; cột tuỳ chọn không dùng làm cột sắp.
+   - Điều kiện keyset của `fetch_page_by` có cận trước: `col >= v AND (col > v OR id > id0)` (giảm dần: `<=`, `<`), để
+     database nhảy thẳng tới điểm trong index. Đo bằng EXPLAIN ngày 25/11/2026 trên bảng (tenant_id, org_id, name, id),
+     index cùng cột: dạng cũ `col > v OR (col = v AND id > id0)` — SQLite `SEARCH … (tenant_id=? AND org_id=?)` (lọc từng
+     dòng), Postgres `Index Cond` chỉ có tenant / org, phần còn lại là `Filter`; dạng mới — SQLite `SEARCH … (tenant_id=?
+     AND org_id=? AND name>?)`, Postgres `Index Cond … AND name >= …`. `fetch_page` (chỉ theo id) đã là một điều kiện
+     phạm vi nên không đổi.
+   - Giới hạn đã biết: danh sách lọc theo CHUỖI nút (`org_id IN (…)`, vd câu trả lời mẫu của `support`) không có thứ tự
+     sẵn trong index trên cả chuỗi — database gộp rồi sắp (SQLite `TEMP B-TREE`); đúng, nhưng chi phí theo số dòng của
+     chuỗi nút chứ không chỉ cỡ trang.
 4. **`page_of` (phân trang trong bộ nhớ) chỉ cho danh sách không nằm trong database**: dựng từ code (sổ module,
    permission, kind), dữ liệu nền cố định trong bản build, kết quả gộp từ nhà cung cấp. Khoá chữ duy nhất, so theo byte.
-   Mọi chỗ dùng được liệt kê ở cuối mục này (cập nhật theo từng PR).
+   Hai phần tử trùng khoá là lỗi lập trình: lỗi nội bộ (không mất phần tử trong im lặng). Mọi chỗ dùng được liệt kê ở
+   cuối mục này (cập nhật theo từng PR).
 5. **Không tái diễn**: gate chặn endpoint GET mới trả `{"data": [...]}` không có `pagination`, trừ danh sách ngoại lệ có
    tên + lý do ở mục này (PR cuối của đợt). `CLAUDE.md` ("Luật code") nói "mọi danh sách là `Page<T>`" (phiên điều phối
    đưa vào cùng PR cuối).

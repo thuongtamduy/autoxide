@@ -295,7 +295,8 @@ async fn quy_tac_phan_luong_phan_trang_theo_thu_tu_thu() {
         .await;
         assert_eq!(status, StatusCode::CREATED, "{team}");
         let team = team["data"]["id"].as_str().unwrap().to_owned();
-        for position in [3, 1, 2] {
+        // Hai quy tắc cùng vị trí 2 rơi đúng ranh giới trang (limit 2): thứ tự hoà theo ID.
+        for position in [3, 1, 2, 2] {
             let rule = json!({"org_id": tree.a.as_uuid(), "team_id": team, "position": position});
             let (status, body) = call(app, "POST", "/routing-rules", "boss", Some(rule)).await;
             assert_eq!(status, StatusCode::CREATED, "{body}");
@@ -319,7 +320,7 @@ async fn quy_tac_phan_luong_phan_trang_theo_thu_tu_thu() {
         .await;
         assert_eq!(status, StatusCode::OK, "{first}");
         assert_eq!(positions(&first), [1, 2]);
-        assert_eq!(first["pagination"]["total"], 3);
+        assert_eq!(first["pagination"]["total"], 4);
         let cursor = first["pagination"]["next_cursor"].as_str().unwrap().to_owned();
         let (_, second) = call(
             app,
@@ -329,12 +330,26 @@ async fn quy_tac_phan_luong_phan_trang_theo_thu_tu_thu() {
             None,
         )
         .await;
-        assert_eq!(positions(&second), [3]);
+        assert_eq!(positions(&second), [2, 3]);
         assert!(second["pagination"]["next_cursor"].is_null());
+        // Hai quy tắc vị trí 2 là hai dòng khác nhau, không trùng / sót qua ranh giới trang.
+        let ids = |page: &Value| -> Vec<String> {
+            page["data"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|rule| rule["id"].as_str().unwrap().to_owned())
+                .collect()
+        };
+        let mut all = ids(&first);
+        all.extend(ids(&second));
+        let (_, whole) =
+            call(app, "GET", &format!("/routing-rules?org_id={org}"), "boss", None).await;
+        assert_eq!(all, ids(&whole));
         let (_, reversed) =
             call(app, "GET", &format!("/routing-rules?org_id={org}&order=desc"), "boss", None)
                 .await;
-        assert_eq!(positions(&reversed), [3, 2, 1]);
+        assert_eq!(positions(&reversed), [3, 2, 2, 1]);
         let (status, problem) =
             call(app, "GET", &format!("/routing-rules?org_id={org}&limit=201"), "boss", None).await;
         assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{problem}");
