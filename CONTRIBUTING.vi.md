@@ -86,7 +86,7 @@ bỏ phần biên dịch và test Rust (các job vẫn báo xanh). File không c
   Việt trong `locales/vi.json` của crate.
 - **Hợp đồng API luôn khớp.** Mọi route có tài liệu OpenAPI. Đổi API hay cấu hình thì chạy
   `cargo xtask regen`: một lệnh sinh lại mọi file tự động (`docs/openapi.json`, `docs/mcp-tools.json`,
-  `.env.example`, schema SDK TypeScript). Gate kiểm chúng sớm (`cargo xtask regen --check`) và in
+  `.env.example`, schema SDK TypeScript). Gate trên máy kiểm chúng sớm (`cargo xtask regen --check`, chỉ chạy trên máy; CI do các test giữ tài liệu khớp code kiểm) và in
   đúng lệnh này khi có file lệch.
   Không đổi hành vi của endpoint `/api/v1` đã có theo cách phá vỡ; làm endpoint mới và đánh
   dấu endpoint cũ là deprecated.

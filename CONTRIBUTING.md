@@ -93,7 +93,7 @@ in that list runs everything.
 - **The API contract stays in sync.** Every route is documented in OpenAPI. When you change
   the API or a setting, run `cargo xtask regen`: it regenerates every generated file in one go
   (`docs/openapi.json`, `docs/mcp-tools.json`, `.env.example`, the TypeScript SDK schema). The
-  gate checks them early (`cargo xtask regen --check`) and prints this command when one is stale. Never change the behaviour
+  the gate on your machine checks them early (`cargo xtask regen --check`) and prints this command when one is stale (this step runs only locally; on CI the tests that keep the documents in sync with the code check them). Never change the behaviour
   of an existing `/api/v1` endpoint in a breaking way; add a new one and deprecate the old.
 - **Tests.** New code comes with tests. Tests that touch the database use
   `autoxide_testkit::TestDatabase`, which gives each test an empty database on whichever
