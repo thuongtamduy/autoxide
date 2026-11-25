@@ -319,7 +319,7 @@ mod tests {
         assert!(link_template(&format!("https://shop.example/{}", "a".repeat(2000))).is_err());
     }
 
-    /// Bản dịch tiếng Việt của mọi lỗi ô ở đây điền được (không còn `{…}` thiếu giá trị).
+    // Bản dịch tiếng Việt của mọi lỗi ô ở đây điền được (không còn `{…}` thiếu giá trị).
     #[test]
     fn loi_o_co_ban_dich_tieng_viet() {
         let translations = crate::i18n::Translations::new(Vec::new()).unwrap();
