@@ -328,7 +328,8 @@ impl ScimService {
     }
 
     /// `DELETE /Users/{id}`: quy trình xoá tài khoản sẵn có (event `auth.user_deleted` để module
-    /// khác xoá phần của họ; không xoá được admin cuối cùng).
+    /// khác xoá phần của họ; không xoá được admin cuối cùng). Người tạo token phải bao trùm quyền
+    /// của tài khoản (như khi khoá — xoá còn nặng hơn khoá).
     pub(crate) async fn delete_user(&self, caller: &ScimCaller, id: &str) -> Result<(), ScimError> {
         let tenant = &caller.tenant;
         let user_id = Uuid::try_parse(id).map_err(|_| user_not_found(id))?;
@@ -336,6 +337,7 @@ impl ScimService {
             .one(tenant.database().read())
             .await?
             .ok_or_else(|| user_not_found(id))?;
+        self.require_creator_covers(caller, user_id).await?;
         self.users.delete(tenant, caller.actor(), user_id).await.map_err(|error| {
             if error.code() == "auth.user_not_found" { user_not_found(id) } else { error.into() }
         })?;
@@ -351,14 +353,24 @@ impl ScimService {
         caller: &ScimCaller,
         target: Uuid,
     ) -> Result<(), ScimError> {
+        let creator = self.authority(caller).await?;
+        self.roles.require_covers(&caller.tenant, &creator, target).await?;
+        Ok(())
+    }
+
+    /// Quyền mà token SCIM của `caller` được dùng: quyền của người tạo token **lúc này** (không
+    /// phải lúc tạo token) — người tạo bị hạ quyền thì token hạ theo; bị khoá, bị xoá hay không còn
+    /// là nhân sự thì token không cấp, giữ hay gỡ được gì (D-20261125-scim-grant-cover).
+    pub(super) async fn authority(
+        &self,
+        caller: &ScimCaller,
+    ) -> Result<autoxide_kernel::access::Principal, ScimError> {
         let tenant = &caller.tenant;
-        let creator = match self.roles.user_principal(tenant, caller.created_by).await? {
+        Ok(match self.roles.user_principal(tenant, caller.created_by).await? {
             Some((user, principal)) if user.is_active() && user.realm == Realm::Staff => principal,
             _ => autoxide_kernel::access::Principal::new(caller.created_by, [])
                 .in_tenant(tenant.id()),
-        };
-        self.roles.require_covers(tenant, &creator, target).await?;
-        Ok(())
+        })
     }
 
     /// Ghi `input` cho tài khoản `existing` (đã khoá dòng; `None`: tạo / nhận tài khoản) trong

@@ -5473,6 +5473,15 @@ export type CreatedEndpointResponse = EndpointResponse & {
   secret: string;
 };
 
+/** A mapping rule just created, with the people it gave the role to. */
+export type CreatedScimGroupMappingResponse = ScimGroupMappingResponse & {
+  /**
+   * Every current member of the group, who now holds the role through this rule. Members of a
+   * group without rules may have been added by anyone holding a SCIM token: check this list.
+   */
+  granted_user_ids: string[];
+};
+
 /** A SCIM token just created: the only time its secret is shown. */
 export type CreatedScimTokenResponse = ScimTokenResponse & {
   /**
@@ -8221,6 +8230,18 @@ export type Data_CreatedEndpointResponse = {
      * Webhooks). Store it now: it cannot be shown again, only replaced.
      */
     secret: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_CreatedScimGroupMappingResponse = {
+  /** A mapping rule just created, with the people it gave the role to. */
+  data: ScimGroupMappingResponse & {
+    /**
+     * Every current member of the group, who now holds the role through this rule. Members of a
+     * group without rules may have been added by anyone holding a SCIM token: check this list.
+     */
+    granted_user_ids: string[];
   };
 };
 
@@ -12544,20 +12565,6 @@ export type Data_ScheduleResponse = {
 };
 
 /** Envelope of a single result. */
-export type Data_ScimGroupMappingResponse = {
-  /** A mapping rule: members of the group hold the role at the unit. */
-  data: {
-    created_at: string;
-    created_by: string;
-    group_id: string;
-    id: string;
-    /** Organization unit; the tenant's id is the root unit. */
-    org_id: string;
-    role_id: string;
-  };
-};
-
-/** Envelope of a single result. */
 export type Data_SecretResponse = {
   /** A new signing secret, shown only once. */
   data: {
@@ -16217,6 +16224,12 @@ export type Data_Vec_ScimTokenResponse = {
     created_at: string;
     /** The user who created it. */
     created_by: string;
+    /**
+     * Whether the token still works fully. A SCIM token can do only what its creator can do now:
+     * anything other than `active` means syncs that give, take away or disable will be refused —
+     * create a new token from an account with the needed roles and revoke this one.
+     */
+    creator_status: ScimTokenCreatorStatus;
     id: string;
     /** Last time the identity provider used it (to within 5 minutes); `null`: never. */
     last_used_at?: string | null;
@@ -30077,11 +30090,20 @@ export type ScimPatch = {
   schemas: string[];
 };
 
+/** State of the person who created a SCIM token. */
+export type ScimTokenCreatorStatus = "active" | "disabled" | "deleted" | "missing_permission";
+
 /** A SCIM token of the tenant, without its secret. */
 export type ScimTokenResponse = {
   created_at: string;
   /** The user who created it. */
   created_by: string;
+  /**
+   * Whether the token still works fully. A SCIM token can do only what its creator can do now:
+   * anything other than `active` means syncs that give, take away or disable will be refused —
+   * create a new token from an account with the needed roles and revoke this one.
+   */
+  creator_status: ScimTokenCreatorStatus;
   id: string;
   /** Last time the identity provider used it (to within 5 minutes); `null`: never. */
   last_used_at?: string | null;
@@ -34933,7 +34955,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
       requestBody: CreateScimGroupMappingRequest;
       responses: {
-        201: Data_ScimGroupMappingResponse;
+        201: Data_CreatedScimGroupMappingResponse;
         401: Problem;
         403: Problem;
         404: Problem;
