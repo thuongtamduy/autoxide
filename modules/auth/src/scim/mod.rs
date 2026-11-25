@@ -29,6 +29,8 @@ mod groups_tests;
 mod mappings;
 pub(crate) mod patch;
 #[cfg(test)]
+mod sync_limit_tests;
+#[cfg(test)]
 mod tests;
 mod token;
 mod users;

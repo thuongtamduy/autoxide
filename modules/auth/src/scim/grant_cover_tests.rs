@@ -425,3 +425,66 @@ async fn them_thanh_vien_dong_thoi_voi_dat_luat_khong_de_lai_thanh_vien_cho() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn dat_luat_cho_khoa_nhom_cua_lan_ghi_thanh_vien() {
+    // Ép đúng thứ tự xen kẽ: một transaction đóng vai `update_group` của token quyền thấp (khoá dòng
+    // nhóm, thấy nhóm chưa có luật, ghi thành viên X) và CHƯA commit; trong lúc đó admin đặt luật
+    // "nhóm → admin". Đặt luật phải chờ khoá nhóm, rồi thấy X và cấp cho X (có tên trong
+    // `granted_user_ids`). Không chờ thì luật commit trước, không thấy X, X thành thành viên chờ.
+    use sea_orm::{ActiveModelTrait as _, EntityTrait as _, Set};
+    TestDatabase::run(async |test| {
+        let (app, services, admin, admin_token) = setup(test).await;
+        let (_, low_token) = sync_operator(&app, &services, "it@example.com").await;
+        let tenant = &services.tenant;
+        let group = json!({"schemas": [GROUP_SCHEMA], "displayName": "Late"});
+        let (_, group) = scim(&app, "POST", "/Groups", &admin_token, Some(group)).await;
+        let group_id = uuid::Uuid::parse_str(group["id"].as_str().unwrap()).unwrap();
+        let stranger = scim_user(&app, &low_token, "stranger@example.com").await;
+        let stranger_id = uuid::Uuid::parse_str(&stranger).unwrap();
+
+        let transaction = tenant.database().begin_write().await.unwrap();
+        autoxide_kernel::rows::lock_one(
+            &transaction,
+            super::entity::group::Entity::find_by_id((tenant.id().as_uuid(), group_id)),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        super::entity::member::ActiveModel {
+            tenant_id: Set(tenant.id().as_uuid()),
+            id: Set(uuid::Uuid::now_v7()),
+            group_id: Set(group_id),
+            user_id: Set(stranger_id),
+            created_at: Set(autoxide_kernel::time::Timestamp::now()),
+        }
+        .insert(&transaction)
+        .await
+        .unwrap();
+
+        let body = json!({"group_id": group_id, "org_id": tenant.id().as_uuid(), "role_id": admin_role(&app, &admin).await});
+        let mapping = call(&app, "POST", "/scim/group-mappings", Some(&admin), Some(body));
+        let finished = std::sync::atomic::AtomicBool::new(false);
+        let (mapped, ()) = tokio::join!(
+            async {
+                let result = mapping.await;
+                finished.store(true, std::sync::atomic::Ordering::SeqCst);
+                result
+            },
+            async {
+                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                assert!(
+                    !finished.load(std::sync::atomic::Ordering::SeqCst),
+                    "đặt luật không chờ khoá nhóm của lần ghi thành viên"
+                );
+                transaction.commit().await.unwrap();
+            },
+        );
+        let (status, _, mapped) = mapped;
+        assert_eq!(status, StatusCode::CREATED, "{mapped}");
+        assert_eq!(mapped["data"]["granted_user_ids"], json!([stranger]), "{mapped}");
+        assert!(is_admin(&services, &stranger).await);
+    })
+    .await
+    .unwrap();
+}

@@ -50,9 +50,12 @@ pub(crate) struct ScimTokenResponse {
     created_at: Timestamp,
     /// Last time the identity provider used it (to within 5 minutes); `null`: never.
     last_used_at: Option<Timestamp>,
-    /// Whether the token still works fully. A SCIM token can do only what its creator can do now:
-    /// anything other than `active` means syncs that give, take away or disable will be refused —
-    /// create a new token from an account with the needed roles and revoke this one.
+    /// State of the token's creator. A SCIM token can do only what its creator can do now. `disabled`
+    /// or `deleted`: the token can no longer give, take away, disable or delete anything that needs a
+    /// permission; `missing_permission`: the creator lost `auth.scim.manage` but the token keeps the
+    /// creator's other roles. In every case other than `active`, create a new token from an account
+    /// with the needed roles and revoke this one. `active` does not mean the creator still holds every
+    /// role your group mappings give.
     creator_status: ScimTokenCreatorStatus,
 }
 
@@ -278,14 +281,29 @@ impl From<GroupMapping> for ScimGroupMappingResponse {
     }
 }
 
-/// A mapping rule just created, with the people it gave the role to.
+/// A mapping rule just created, with what happened to each member of the group.
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub(crate) struct CreatedScimGroupMappingResponse {
     #[serde(flatten)]
     mapping: ScimGroupMappingResponse,
-    /// Every current member of the group, who now holds the role through this rule. Members of a
-    /// group without rules may have been added by anyone holding a SCIM token: check this list.
+    /// Members of the group whose roles were brought in line with the rule: they hold the role at
+    /// the unit now — through this rule, or because they already had it (by hand, or from another
+    /// group). Members of a group without rules may have been added by anyone holding a SCIM token:
+    /// check this list.
     granted_user_ids: Vec<Uuid>,
+    /// Members who could not be given the role (e.g. the plan's staff limit is reached), with the
+    /// error code. The rule stays; they get the role on the next sync that succeeds for them.
+    failed: Vec<ScimSyncFailure>,
+}
+
+/// A member a SCIM sync could not update.
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub(crate) struct ScimSyncFailure {
+    user_id: Uuid,
+    /// Stable error code, e.g. `limit_exceeded`.
+    code: String,
+    /// What went wrong, in English.
+    message: String,
 }
 
 /// A new mapping rule.
@@ -370,7 +388,7 @@ async fn list_scim_group_mappings(
     security(("bearer" = [])),
     request_body = CreateScimGroupMappingRequest,
     responses(
-        (status = 201, description = "The rule was created and applied to the group's members, listed in `granted_user_ids`.", body = Data<CreatedScimGroupMappingResponse>),
+        (status = 201, description = "The rule was created and applied to the group's members: those who hold the role now are in `granted_user_ids`, those who could not be given it (e.g. the plan's staff limit) are in `failed`.", body = Data<CreatedScimGroupMappingResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `auth.scim.manage` (code `permission_denied`), or the plan's staff limit is reached.", body = Problem),
         (status = 404, description = "No SCIM group has this id; code `auth.scim_group_not_found`.", body = Problem),
@@ -385,14 +403,28 @@ async fn create_scim_group_mapping(
     ValidJson(input): ValidJson<CreateScimGroupMappingRequest>,
 ) -> Result<Created<CreatedScimGroupMappingResponse>, Error> {
     principal.require(&SCIM_MANAGE)?;
-    let (row, members) = state
+    let (row, report) = state
         .scim
         .create_mapping(&tenant, &principal, input.group_id, input.org_id, input.role_id)
         .await?;
     let location = format!("/auth/scim/group-mappings/{}", row.id);
+    let failed = report
+        .failed
+        .into_iter()
+        .map(|(user_id, error)| {
+            // Lỗi nội bộ không lộ chi tiết ra ngoài (đã ghi log ở chỗ đồng bộ).
+            let message = if error.kind() == autoxide_kernel::error::ErrorKind::Internal {
+                "Internal error.".to_owned()
+            } else {
+                error.message()
+            };
+            ScimSyncFailure { user_id, code: error.code().to_owned(), message }
+        })
+        .collect();
     let body = CreatedScimGroupMappingResponse {
         mapping: row.into(),
-        granted_user_ids: members.into_iter().collect(),
+        granted_user_ids: report.synced,
+        failed,
     };
     Ok(Created::new(location, body))
 }

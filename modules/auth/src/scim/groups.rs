@@ -577,26 +577,49 @@ impl ScimService {
             return Ok(());
         }
         let authority = self.authority(caller).await?;
-        self.sync_in(&caller.tenant, caller.actor(), &authority, users)
-            .await
-            .map_err(ScimError::from)
+        let report = self.sync_in(&caller.tenant, caller.actor(), &authority, users).await;
+        // Đã đồng bộ mọi người được; còn lỗi thì báo lỗi đầu để hệ thống danh tính gửi lại (gửi lại
+        // chỉ đồng bộ lại, kết quả cuối như nhau).
+        match report.failed.into_iter().next() {
+            Some((_, error)) => Err(ScimError::from(error)),
+            None => Ok(()),
+        }
     }
 
     /// Như [`sync_users`](Self::sync_users), cho bên gọi ngoài SCIM (đổi luật ánh xạ).
-    /// `authority`: người chịu trách nhiệm — mọi role thêm / gỡ phải là thứ người đó cấp được.
+    /// `authority`: người chịu trách nhiệm — chỉ role người đó cấp / gỡ được mới được thêm / gỡ.
+    /// Đồng bộ MỌI người dù có người lỗi (vd vượt hạn mức số nhân sự): một người lỗi không để những
+    /// người sau thành "chờ"; trả ai đã đồng bộ xong và ai lỗi (D-20261125-scim-sync-report).
     pub(crate) async fn sync_in(
         &self,
         tenant: &TenantContext,
         actor: autoxide_kernel::event::Actor,
         authority: &autoxide_kernel::access::Principal,
         users: &BTreeSet<Uuid>,
-    ) -> Result<(), autoxide_kernel::error::Error> {
+    ) -> SyncReport {
+        let mut report = SyncReport::default();
         for user_id in users {
-            let wanted = wanted_grants(tenant, *user_id).await?;
-            self.roles.sync_scim_grants(tenant, actor, authority, *user_id, wanted).await?;
+            let synced = async {
+                let wanted = wanted_grants(tenant, *user_id).await?;
+                self.roles.sync_scim_grants(tenant, actor, authority, *user_id, wanted).await
+            };
+            match synced.await {
+                Ok(_) => report.synced.push(*user_id),
+                Err(error) => {
+                    tracing::warn!(user_id = %user_id, code = error.code(), "SCIM membership sync failed for a user");
+                    report.failed.push((*user_id, error));
+                }
+            }
         }
-        Ok(())
+        report
     }
+}
+
+/// Kết quả đồng bộ membership của một nhóm người: ai xong, ai lỗi (kèm lỗi).
+#[derive(Debug, Default)]
+pub(crate) struct SyncReport {
+    pub synced: Vec<Uuid>,
+    pub failed: Vec<(Uuid, autoxide_kernel::error::Error)>,
 }
 
 /// (Nút, role) người `user_id` phải giữ theo các nhóm của họ và luật ánh xạ.

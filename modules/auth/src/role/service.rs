@@ -207,9 +207,11 @@ impl RoleService {
         &self.entitlements
     }
 
-    /// Bọc một lần đổi role của `user_id` bằng hạn mức số nhân sự: người chưa giữ role nào mà sắp
-    /// có → giữ chỗ TRƯỚC (ngoài transaction của module), lỗi thì trả lại; người sắp không còn role
-    /// nào → trả lại sau khi đổi xong.
+    /// Bọc một lần đổi role của `user_id` bằng hạn mức số nhân sự: người chưa giữ role nào mà có thể
+    /// sắp có (`will_hold`) → giữ chỗ TRƯỚC (ngoài transaction của module). Sau khi đổi, đối chiếu
+    /// với trạng thái THẬT (người đó còn giữ role nào không), không với ý định: lần đồng bộ SCIM chỉ
+    /// áp phần mình được phép (D-20261125-scim-grant-cover), nên "muốn giữ" và "đang giữ" có thể khác
+    /// — giữ role thì xác nhận chỗ, không giữ thì trả chỗ.
     async fn with_member_limit<T, F>(
         &self,
         tenant: &TenantContext,
@@ -227,15 +229,22 @@ impl RoleService {
             self.entitlements.reserve(tenant.id(), &MEMBERS_LIMIT, 1, &reference).await?;
         }
         let done = change.await;
-        match (&done, joining) {
-            (Ok(_), true) => {
+        if done.is_err() {
+            if joining {
+                self.entitlements.release(tenant.id(), &MEMBERS_LIMIT, &reference).await?;
+            }
+            return done;
+        }
+        let holds = has_membership(tenant, user_id).await?;
+        match (joining, holds) {
+            (true, true) => {
                 self.entitlements.confirm(tenant.id(), &MEMBERS_LIMIT, &reference).await?
             }
-            (Err(_), true) => {
+            (true, false) => {
                 self.entitlements.release(tenant.id(), &MEMBERS_LIMIT, &reference).await?
             }
-            (Ok(_), false) if held && !will_hold => {
-                self.entitlements.release(tenant.id(), &MEMBERS_LIMIT, &reference).await?;
+            (false, false) if held => {
+                self.entitlements.release(tenant.id(), &MEMBERS_LIMIT, &reference).await?
             }
             _ => {}
         }
