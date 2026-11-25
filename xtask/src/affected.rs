@@ -299,7 +299,15 @@ pub fn run(
         }
     };
 
-    let jobs: Vec<Job> = build_tests(&workspace.root)?
+    // Chỉ crate công cụ bị ảnh hưởng (xtask: không phụ thuộc kernel hay module nào, thư viện ngoài
+    // chỉ jiff/serde/serde_json) thì dựng riêng chúng: hợp feature khác với cả workspace chỉ làm
+    // build lại vài crate nhỏ, còn dựng cả workspace trên máy lạnh mất ~13 phút cho một chương
+    // trình test chạy dưới một giây. Có crate khác bị ảnh hưởng thì giữ cách dựng cả workspace.
+    let only = match &selected {
+        Affected::Crates(crates) => tools_only(workspace, crates),
+        Affected::All => None,
+    };
+    let jobs: Vec<Job> = build_tests(&workspace.root, only.as_deref())?
         .into_iter()
         .filter_map(|test| {
             let (name, dir) = dirs.iter().find(|(_, dir)| *dir == test.dir)?;
@@ -340,7 +348,7 @@ pub fn run(
 pub fn run_all(workspace: &Workspace, doc: bool, shard: Shard) -> Result<(), String> {
     let workers = workers();
     let mode = Mode::from_env();
-    let jobs: Vec<Job> = build_tests(&workspace.root)?
+    let jobs: Vec<Job> = build_tests(&workspace.root, None)?
         .into_iter()
         .filter_map(|test| {
             let package = workspace
@@ -760,13 +768,27 @@ struct Profile {
     test: bool,
 }
 
-/// Build mọi file test của workspace (như gate đầy đủ, để dùng chung cache) và trả danh sách.
-fn build_tests(root: &Path) -> Result<Vec<TestBinary>, String> {
+/// Tên các crate được chọn nếu TẤT CẢ đều là crate công cụ (`Role::Tool`); không thì `None`.
+fn tools_only(workspace: &Workspace, crates: &BTreeSet<String>) -> Option<Vec<String>> {
+    let selected: Vec<&crate::workspace::Package> =
+        workspace.packages.iter().filter(|package| crates.contains(&package.name)).collect();
+    let all_tools = !selected.is_empty()
+        && selected.iter().all(|package| matches!(package.role, crate::workspace::Role::Tool));
+    all_tools.then(|| selected.iter().map(|package| package.name.clone()).collect())
+}
+
+/// Build file test của workspace (như gate đầy đủ, để dùng chung cache) hay chỉ của `only` (xem
+/// [`tools_only`]) và trả danh sách.
+fn build_tests(root: &Path, only: Option<&[String]>) -> Result<Vec<TestBinary>, String> {
     let cargo = std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_owned());
+    let mut scope: Vec<&str> = vec!["--workspace"];
+    if let Some(names) = only {
+        scope = names.iter().flat_map(|name| ["-p", name.as_str()]).collect();
+    }
     let output = without_cargo_run_env(&mut Command::new(&cargo))
+        .args(["test"])
+        .args(&scope)
         .args([
-            "test",
-            "--workspace",
             "--locked",
             "--no-run",
             // Lỗi biên dịch vẫn in ra stderr như thường; stdout chỉ còn JSON để đọc.
@@ -809,6 +831,16 @@ mod tests {
         assert_eq!(postgres_threads(0, 2000), 1);
         // Không vượt trần, kể cả khi chỉ có một chương trình.
         assert_eq!(postgres_threads(500, 500), POSTGRES_CONCURRENT_TESTS);
+    }
+
+    #[test]
+    fn chi_crate_cong_cu_thi_dung_rieng() {
+        let ws = workspace();
+        let set = |names: &[&str]| names.iter().map(|name| (*name).to_owned()).collect();
+        assert_eq!(tools_only(&ws, &set(&["xtask"])), Some(vec!["xtask".to_owned()]));
+        assert_eq!(tools_only(&ws, &set(&["xtask", "autoxide-notes"])), None);
+        assert_eq!(tools_only(&ws, &set(&["autoxide-kernel"])), None);
+        assert_eq!(tools_only(&ws, &set(&[])), None);
     }
 
     #[test]

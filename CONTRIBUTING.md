@@ -118,8 +118,8 @@ run `cargo xtask decisions` to create it.
   `<name>.<section>.md` (`added`, `changed`, `deprecated`, `removed`, `fixed` or `security`) and write
   the English bullet points as they will appear in the changelog. They are folded into `CHANGELOG.md`
   at release time, so parallel pull requests never conflict there.
-- In the pull request, say what you changed, why, and confirm that the full `./gate.sh` is
-  green.
+- In the pull request, say what you changed, why, and confirm that `./gate.sh --quick` is
+  green (CI runs the rest, including PostgreSQL; the full `./gate.sh` is required before a release).
 
 ## License of your contribution
 

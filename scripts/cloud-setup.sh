@@ -2,8 +2,10 @@
 # Chuẩn bị máy mới (phiên agent trên cloud, container dùng xong bỏ) để chạy được `./gate.sh --quick`
 # ngay: toolchain Rust đúng bản ghim và các công cụ ngoài mà gate cần. Xem docs/CLOUD-SESSIONS.md.
 #
-#   scripts/cloud-setup.sh           toolchain + công cụ (cargo-deny, gitleaks, cargo-nextest) + lịch sử git đầy đủ + mục lục quyết định
-#   scripts/cloud-setup.sh --warm    thêm `cargo fetch` và build sẵn `xtask` (làm nóng cache)
+#   scripts/cloud-setup.sh           toolchain + công cụ (cargo-deny, gitleaks, cargo-nextest, cargo-semver-checks) + lịch sử git đầy đủ + mục lục quyết định
+#   scripts/cloud-setup.sh --warm    thêm `cargo fetch` và build sẵn `xtask` (làm nóng cache; vài chục giây)
+#   scripts/cloud-setup.sh --prebuild  thêm build sẵn test của cả workspace (~13 phút, ~12 GB): KHÔNG đặt trong setup script
+#                                    của môi trường (có giới hạn thời gian), chạy nền sau khi phiên mở
 #
 # Chạy lại nhiều lần được: thứ đã có đúng phiên bản thì bỏ qua. Không cần secret, chỉ cần mạng tới
 # static.rust-lang.org và github.com. Hỏng bước nào thì thoát với thông báo nói rõ bước đó.
@@ -18,11 +20,13 @@
 set -euo pipefail
 
 WARM=0
+PREBUILD=0
 for arg in "$@"; do
   case "$arg" in
     --warm) WARM=1 ;;
+    --prebuild) PREBUILD=1 ;;
     *)
-      echo "usage: scripts/cloud-setup.sh [--warm]" >&2
+      echo "usage: scripts/cloud-setup.sh [--warm] [--prebuild]" >&2
       exit 2
       ;;
   esac
@@ -43,6 +47,10 @@ GITLEAKS_SHA256="551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470e
 NEXTEST_VERSION="0.9.152"
 NEXTEST_URL="https://github.com/nextest-rs/nextest/releases/download/cargo-nextest-${NEXTEST_VERSION}/cargo-nextest-${NEXTEST_VERSION}-x86_64-unknown-linux-gnu.tar.gz"
 NEXTEST_SHA256="d039b43c3e0958441b6ad0a39c8884d018b3d2e8fb9928f209074b1100b5e17a" # nhà phát hành không công bố checksum: giá trị đo lúc ghim
+
+SEMVER_CHECKS_VERSION="0.51.0" # khớp `.github/workflows/ci.yml` và STACK.md
+SEMVER_CHECKS_URL="https://github.com/obi1kenobi/cargo-semver-checks/releases/download/v${SEMVER_CHECKS_VERSION}/cargo-semver-checks-x86_64-unknown-linux-musl.tar.gz"
+SEMVER_CHECKS_SHA256="396c8508d973c83de52660943a057e971b586f7511c3ba695762373452b43d5b" # nhà phát hành không công bố checksum: giá trị đo lúc ghim
 
 # Nơi đặt binary: `~/.cargo/bin` đã nằm trong PATH cùng cargo, không cần quyền root.
 BIN_DIR="${CARGO_HOME:-$HOME/.cargo}/bin"
@@ -99,6 +107,7 @@ install_tool() {
 install_tool cargo-deny "$CARGO_DENY_VERSION" "$CARGO_DENY_URL" "$CARGO_DENY_SHA256" '*/cargo-deny'
 install_tool gitleaks "$GITLEAKS_VERSION" "$GITLEAKS_URL" "$GITLEAKS_SHA256" 'gitleaks'
 install_tool cargo-nextest "$NEXTEST_VERSION" "$NEXTEST_URL" "$NEXTEST_SHA256" 'cargo-nextest'
+install_tool cargo-semver-checks "$SEMVER_CHECKS_VERSION" "$SEMVER_CHECKS_URL" "$SEMVER_CHECKS_SHA256" 'cargo-semver-checks'
 
 # --- 3. Lịch sử git đầy đủ và tag ------------------------------------------------------------------------
 # Máy cloud clone nông (shallow); `cargo xtask api-diff` (bước của gate) cần tag phát hành gần nhất và
@@ -125,6 +134,44 @@ if cargo xtask decisions >/dev/null 2>&1; then
   log "mục lục quyết định: đã sinh docs/decisions/INDEX.md"
 else
   log "mục lục quyết định: chưa sinh được (chạy 'cargo xtask decisions' sau)"
+fi
+
+# --- 6. PostgreSQL cục bộ cho test (chỉ máy cloud) ------------------------------------------------------
+# Máy cloud có sẵn PostgreSQL nhưng tắt, và không có Docker daemon. Bật cụm có sẵn, đặt mật khẩu cho role
+# `postgres` (chỉ nghe loopback trong container dùng xong bỏ), để chạy bài test trên Postgres ngay
+# (D-263, D-20261125-cloud-dev-friction). Thiếu binary hay không đủ quyền thì bỏ qua, không làm hỏng script.
+POSTGRES_TEST_URL="postgres://postgres:autoxide@127.0.0.1:5432/postgres"
+if [ "${CLAUDE_CODE_REMOTE:-}" = true ] && command -v pg_lsclusters >/dev/null 2>&1 && command -v pg_ctlcluster >/dev/null 2>&1; then
+  pg_version="$(pg_lsclusters --no-header 2>/dev/null | awk '$2 == "main" {print $1; exit}' || true)"
+  if [ -z "$pg_version" ]; then
+    log "postgres: không có cụm 'main', bỏ qua"
+  elif { pg_lsclusters --no-header | awk -v v="$pg_version" '$1 == v && $2 == "main" && $4 == "online" {found=1} END {exit !found}'; } ||
+    pg_ctlcluster "$pg_version" main start >/dev/null 2>&1; then
+    # `su` chạy được khi script chạy bằng root (máy cloud); không thì chỉ báo.
+    if su postgres -c "psql -qtAc \"alter user postgres password 'autoxide'\"" >/dev/null 2>&1 &&
+      PGPASSWORD=autoxide psql -h 127.0.0.1 -U postgres -qtAc 'select 1' >/dev/null 2>&1; then
+      log "postgres $pg_version: đang chạy. Chạy test trên Postgres: export TEST_DATABASE_URL=$POSTGRES_TEST_URL"
+    else
+      log "postgres $pg_version: đã bật nhưng không đặt được mật khẩu / kết nối qua 127.0.0.1 (xem docs/CLOUD-SESSIONS.md)"
+    fi
+  else
+    log "postgres $pg_version: không bật được cụm (xem docs/CLOUD-SESSIONS.md)"
+  fi
+fi
+
+# --- 7. Build trước test (chỉ khi có --prebuild; để cuối vì lâu) -------------------------------------------
+if [ "$PREBUILD" = 1 ]; then
+  # Build trước test của cả workspace: đúng lệnh và đúng cấu hình (CARGO_INCREMENTAL=0) mà
+  # `./gate.sh --quick` dùng, nên lần gate đầu chỉ còn dựng phần đã sửa (D-20261125-cloud-dev-friction).
+  # Tốn ~13 phút (máy 4 CPU) và ~12 GB đĩa: bỏ qua khi đĩa trống dưới 25 GB, không làm hỏng script.
+  free_gb="$(df -Pk . 2>/dev/null | awk 'NR==2 {print int($4 / 1048576)}' || true)"
+  if [ "${free_gb:-0}" -lt 25 ]; then
+    log "bỏ qua build test trước: đĩa trống ${free_gb} GB (< 25 GB)"
+  else
+    log "build trước test của workspace (~13 phút trên máy 4 CPU, ~12 GB đĩa)"
+    CARGO_INCREMENTAL=0 cargo test --workspace --locked --no-run ||
+      log "build test trước lỗi, bỏ qua (gate sẽ dựng lại khi chạy)"
+  fi
 fi
 
 log "xong. Chạy ./gate.sh --quick"

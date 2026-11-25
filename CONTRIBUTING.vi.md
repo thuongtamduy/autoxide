@@ -111,7 +111,7 @@ chạy `cargo xtask decisions` để tạo.
   `<tên>.<mục>.md` (`added`, `changed`, `deprecated`, `removed`, `fixed` hay `security`) và viết các
   gạch đầu dòng tiếng Anh đúng như sẽ nằm trong changelog. Chúng được gộp vào `CHANGELOG.md` lúc
   phát hành, nên các pull request song song không bao giờ xung đột ở đó.
-- Trong pull request, nói bạn đã đổi gì, vì sao, và xác nhận `./gate.sh` đầy đủ đã xanh.
+- Trong pull request, nói bạn đã đổi gì, vì sao, và xác nhận `./gate.sh --quick` đã xanh (CI chạy phần còn lại, kể cả PostgreSQL; `./gate.sh` đầy đủ bắt buộc trước khi phát hành).
 
 ## License của phần đóng góp
 
