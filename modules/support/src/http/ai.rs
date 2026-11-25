@@ -5,9 +5,10 @@ use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
+use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -74,19 +75,21 @@ pub(crate) async fn suggest_reply(
 
 /// List the drafts of a ticket.
 ///
-/// Requires `support.tickets.reply` covering the ticket. Newest first.
+/// Requires `support.tickets.reply` covering the ticket. Newest first unless `order=asc`; paged with
+/// `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/tickets/{id}/reply-drafts",
     extensions(("x-permissions" = json!(["support.tickets.reply"]))),
     operation_id = "list_support_reply_drafts",
     security(("bearer" = [])),
-    params(("id" = Uuid, Path, description = "Id of the ticket.")),
+    params(("id" = Uuid, Path, description = "Id of the ticket."), PageQuery),
     responses(
-        (status = 200, description = "The drafts.", body = Data<Vec<DraftResponse>>),
+        (status = 200, description = "One page of the drafts.", body = Page<DraftResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `support.tickets.reply`; code `permission_denied`.", body = Problem),
         (status = 404, description = "No ticket with this id in your scope; code `support.ticket_not_found`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 pub(crate) async fn list_drafts(
@@ -94,8 +97,9 @@ pub(crate) async fn list_drafts(
     tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
-) -> Result<Data<Vec<DraftResponse>>, Error> {
+    Query(page): Query<PageQuery>,
+) -> Result<Page<DraftResponse>, Error> {
     principal.require(&TICKETS_REPLY)?;
-    let drafts = service.drafts(&tenant, &principal, id).await?;
-    Ok(Data { data: drafts.into_iter().map(DraftResponse::from).collect() })
+    let drafts = service.drafts(&tenant, &principal, id, &PageRequest::try_from(page)?).await?;
+    Ok(drafts.map(DraftResponse::from))
 }

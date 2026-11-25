@@ -148,9 +148,6 @@ api-unpaged-list GET /api/v1/promotions/promotions/{id}/versions # có trước 
 api-unpaged-list GET /api/v1/promotions/public/promotions/for-product/{product_id} # có trước luật
 api-unpaged-list GET /api/v1/reporting/kinds # có trước luật
 api-unpaged-list GET /api/v1/reporting/lag # có trước luật
-api-unpaged-list GET /api/v1/support/macros # có trước luật
-api-unpaged-list GET /api/v1/support/routing-rules # có trước luật
-api-unpaged-list GET /api/v1/support/tickets/{id}/reply-drafts # có trước luật
 api-unpaged-list GET /api/v1/tax/categories # có trước luật
 api-unpaged-list GET /api/v1/tax/jurisdictions # có trước luật
 api-unpaged-list GET /api/v1/tax/packs # có trước luật
