@@ -1165,6 +1165,8 @@ biến chung vẫn là mặc định. Mỗi PR một cụm.
 - [x] Địa chỉ người gửi thư quảng cáo theo khách: cấu hình khách → hồ sơ pháp lý (`compliance`) → biến chung
       (D-20261125-tenant-postal-address)
 - [x] `content.embed_hosts`, `analytics.allowed_hosts` theo khách (analytics vốn đã nhận tên miền đã xác minh)
+- [ ] `content.embed_hosts` chặn hậu tố công cộng (`com.vn`, `github.io`): repo chưa có danh sách hậu tố công cộng
+      (Public Suffix List); hiện chỉ cảnh báo trong mô tả setting
 - [x] Link bài mới của newsletter mở trên tên miền của khách (`kernel.public_url`), như comments
 - [ ] P16: ràng `kernel.public_url` vào tên miền đã xác minh ở chế độ nhiều khách, hoặc cảnh báo — hiện nhận host bất
       kỳ (giữ để không phá khách đang đặt), nên link mẫu chỉ khớp nhờ `kernel.public_url` tự đặt cũng chịu rủi ro đó

@@ -2,7 +2,7 @@
 //! ý, chỉ trên host khách sở hữu; khách A đặt không ảnh hưởng khách B; khách B không mượn được tên miền của A.
 
 use autoxide_kernel::module::Module;
-use autoxide_kernel::tenancy::{SiteLinks, TenantSetting};
+use autoxide_kernel::tenancy::{SiteLinks, TenantDomains, TenantSetting};
 use autoxide_testkit::{TestApp, TestDatabase};
 use axum::http::StatusCode;
 use serde_json::{Value, json};
@@ -104,7 +104,6 @@ async fn link_rieng_chi_tren_host_cua_khach() {
         assert_eq!(links.link(&b, &PAGE, Some(SERVER)).await.unwrap().as_deref(), Some(page_b));
         assert_eq!(links.link(&a, &PAGE, Some(SERVER)).await.unwrap().as_deref(), Some(own));
 
-        // Host của link máy chủ luôn được tin (người vận hành đặt).
         let (status, body) = put(&app, "owner-b", "kernel.public_url", "https://b2.example").await;
         assert_eq!(status, StatusCode::OK, "{body}");
         // Giá trị cũ của B giờ trỏ host B không còn khai: không dùng nữa, quay về link máy chủ (đổi host).
@@ -112,6 +111,70 @@ async fn link_rieng_chi_tren_host_cua_khach() {
             links.link(&b, &PAGE, Some(SERVER)).await.unwrap().as_deref(),
             Some("https://b2.example/confirm?token={token}")
         );
+    })
+    .await
+    .unwrap();
+}
+
+/// Kịch bản rà soát #516: (a) tên miền của A bị thu hồi rồi khách C xác minh lại → link và `kernel.public_url`
+/// của A không còn trỏ tới đó (token của người dùng A không tới tay C); (b) B đặt `kernel.public_url` bằng tên
+/// miền đã xác minh của A → không mượn được; (c) host đúng mà port khác → không nhận.
+#[tokio::test]
+async fn ten_mien_cua_khach_khac_khong_bao_gio_duoc_tin() {
+    TestDatabase::run(async |test| {
+        let app = TestApp::builder(test)
+            .tenant("a")
+            .tenant("b")
+            .tenant("c")
+            .domain("a", "shop-a.test")
+            .user_in("a", "owner-a", 1, &["kernel.settings.manage"])
+            .user_in("b", "owner-b", 2, &["kernel.settings.manage"])
+            .module(Linker)
+            .build()
+            .await
+            .unwrap();
+        let links = app.api::<SiteLinks>().unwrap();
+        let (a, b, c) = (
+            app.tenant("a").await.unwrap(),
+            app.tenant("b").await.unwrap(),
+            app.tenant("c").await.unwrap(),
+        );
+        let name = PAGE.name();
+
+        // (b) B trỏ `kernel.public_url` vào tên miền của A: link mẫu trên đó bị từ chối, link máy chủ không đổi host.
+        let (status, body) = put(&app, "owner-b", "kernel.public_url", "https://shop-a.test").await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        let (status, body) = put(&app, "owner-b", name, "https://shop-a.test/r?t={token}").await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{body}");
+        assert_eq!(codes(&body), ["kernel.link_host_not_allowed"]);
+        assert_eq!(links.link(&b, &PAGE, Some(SERVER)).await.unwrap().as_deref(), Some(SERVER));
+
+        // (c) Port khác trên tên miền của chính A: không nhận.
+        let (status, body) =
+            put(&app, "owner-a", name, "https://shop-a.test:9090/r?t={token}").await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{body}");
+        assert_eq!(codes(&body), ["kernel.link_host_not_allowed"]);
+
+        // (a) A đặt `kernel.public_url` + link mẫu trên tên miền của mình; rồi tên miền chuyển sang C.
+        let (status, body) = put(&app, "owner-a", "kernel.public_url", "https://shop-a.test").await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        let own = "https://shop-a.test/dat-lai?t={token}";
+        let (status, body) = put(&app, "owner-a", name, own).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        assert_eq!(links.link(&a, &PAGE, Some(SERVER)).await.unwrap().as_deref(), Some(own));
+
+        let domains = app.api::<TenantDomains>().unwrap();
+        let system = autoxide_kernel::event::Actor::system;
+        let page = autoxide_kernel::pagination::PageRequest::default();
+        let listed = domains.list(&a, &page).await.unwrap().data;
+        domains.revoke(system(), &a, listed[0].id).await.unwrap();
+        let added = domains.add(system(), &c, "shop-a.test").await.unwrap();
+        app.dns().set_txt(&added.record.name, &[&added.record.value]);
+        assert_eq!(domains.verify(system(), &c, added.id).await.unwrap().status, "verified");
+
+        // Thư đặt lại mật khẩu của người dùng A không còn tới `shop-a.test` (của C): về link của máy chủ.
+        assert_eq!(links.link(&a, &PAGE, Some(SERVER)).await.unwrap().as_deref(), Some(SERVER));
+        assert_eq!(links.rewrite(&a, SERVER).await.unwrap(), SERVER);
     })
     .await
     .unwrap();

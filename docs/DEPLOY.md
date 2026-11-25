@@ -485,13 +485,15 @@ Mail sent for a tenant links to pages of that tenant's website or app. Two layer
 
 A link setting is accepted only when it is an `https://` address that contains every placeholder
 its description names (`{token}`, `{id}`…), with no user name and no placeholder in the host part,
-on a host the tenant controls: one of its verified domains (see "Custom domains of tenants"), the
-host of its `kernel.public_url`, the host of `AUTOXIDE_HTTP_PUBLIC_URL`, or the host of the
-server's own address for that link. Otherwise `PUT` answers `422` with code
+on a host the tenant controls: one of its verified domains (see "Custom domains of tenants") on the
+default port, the address (host and port) of its `kernel.public_url`, or the host of
+`AUTOXIDE_HTTP_PUBLIC_URL` on the default port. Otherwise `PUT` answers `422` with code
 `kernel.link_host_not_allowed`, `kernel.link_placeholder_missing` or `kernel.link_template_invalid`.
-The host is checked again every time a mail is sent: when the domain is revoked later, mail falls
-back to the server's address (with a warning in the log) rather than sending a token to a host the
-tenant no longer controls. A tenant can never use another tenant's domain.
+The host is checked again every time a mail is sent: when the domain is revoked or moves to another
+tenant, mail falls back to the server's address (with a warning in the log) rather than sending a
+token to a host the tenant no longer controls. A verified domain of another tenant is never trusted,
+not even through `kernel.public_url`. One gap remains: a `kernel.public_url` host that nobody has
+verified is trusted for that tenant's own links, so verify the domain you put there.
 
 The connection settings of mail and AI were renamed to this pattern. Their former names
 (`mail.smtp_url`, `mail.from`, `ai.api_key`, `ai.model`) still work: a value a tenant set under a

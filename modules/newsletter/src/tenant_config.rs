@@ -62,6 +62,14 @@ fn check_address(raw: &str) -> Result<(), FieldError> {
     }
 }
 
+/// Phần của thư chiến dịch theo khách, tính một lần cho cả lô.
+pub(crate) struct CampaignPages {
+    /// Mẫu trang lựa chọn (có `{token}`).
+    pub preferences: String,
+    /// Địa chỉ người gửi; trống khi không có (thư không quảng cáo).
+    pub address: String,
+}
+
 /// Mọi cấu hình theo khách của module.
 pub(crate) fn all() -> Vec<TenantSetting> {
     vec![CONFIRM_LINK, PREFERENCES_LINK, POSTAL_ADDRESS]
@@ -125,12 +133,23 @@ impl NewsletterService {
         tenant: &TenantContext,
         row: &campaign::Model,
     ) -> Result<(), Error> {
+        self.campaign_pages(tenant, row).await.map(|_| ())
+    }
+
+    /// Trang lựa chọn và địa chỉ người gửi của khách cho chiến dịch `row`, hay lỗi nói rõ còn thiếu gì. Bên gửi
+    /// tính một lần cho cả lô rồi truyền vào từng thư (không đọc cấu hình theo từng người nhận).
+    pub(crate) async fn campaign_pages(
+        &self,
+        tenant: &TenantContext,
+        row: &campaign::Model,
+    ) -> Result<CampaignPages, Error> {
         self.public_url.base()?;
-        self.preferences_page(tenant).await?;
-        if row.advertising && self.postal_address(tenant).await?.is_none() {
+        let preferences = self.preferences_page(tenant).await?;
+        let address = self.postal_address(tenant).await?;
+        if row.advertising && address.is_none() {
             return Err(postal_address_missing());
         }
-        Ok(())
+        Ok(CampaignPages { preferences, address: address.unwrap_or_default() })
     }
 }
 

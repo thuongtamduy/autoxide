@@ -10,16 +10,20 @@
 //!
 //! A link setting is untrusted input (any tenant administrator sets it), so it is accepted only when the
 //! address is `https`, has no user name, no placeholder in the host part, every placeholder the module fills,
-//! and its host is one the tenant is known to control: the host of its `kernel.public_url`, one of its
-//! verified domains, the platform host (`AUTOXIDE_HTTP_PUBLIC_URL`) or the host of the server's own link.
-//! The check runs when the value is set (422) and again on every use: a domain revoked later makes the link
-//! fall back to the server's link instead of sending mail to a host the tenant no longer controls.
+//! and its host is one the tenant is known to control: one of its verified domains (default port), the host
+//! and port of its `kernel.public_url`, or the platform host (`AUTOXIDE_HTTP_PUBLIC_URL`, default port). A
+//! host that is a verified domain of ANOTHER tenant is never trusted — neither for a link setting nor for
+//! `kernel.public_url` itself ([`SiteLinks::rewrite`]): a tenant cannot borrow another tenant's domain, and
+//! a domain that changes owner stops receiving the former owner's links at once. The check runs when the value
+//! is set (422) and again on every use; it reads the domain owners through the registry's cache (no query
+//! per mail while cached). Residual risk (ROADMAP P16): a `kernel.public_url` host nobody has verified is
+//! still trusted for that tenant's own links.
 
 use std::sync::Arc;
 
 use super::{PUBLIC_URL, TenantSetting, TenantSettings, parsed_setting, site_origin};
 use crate::error::{Error, FieldError};
-use crate::tenancy::{TenantContext, TenantDomains};
+use crate::tenancy::{DatabaseRegistry, TenantContext, TenantId};
 
 /// Group of the per-tenant link settings ([`TenantSetting::link`]).
 pub const LINK_GROUP: &str = "link";
@@ -27,42 +31,72 @@ pub const LINK_GROUP: &str = "link";
 /// Longest accepted link template.
 const LINK_MAX: usize = 2000;
 
-/// What a tenant's link host is checked against: its verified domains and the platform host.
+/// What a tenant's link host is checked against: owners of verified domains and the platform host.
 #[derive(Clone, Default)]
 pub(crate) struct LinkTrust {
-    domains: Option<Arc<TenantDomains>>,
+    registry: Option<DatabaseRegistry>,
     platform_host: Option<String>,
 }
 
 impl LinkTrust {
-    pub(crate) fn new(domains: Option<Arc<TenantDomains>>, platform_host: Option<String>) -> Self {
-        LinkTrust { domains, platform_host }
+    pub(crate) fn new(registry: Option<DatabaseRegistry>, platform_host: Option<String>) -> Self {
+        LinkTrust { registry, platform_host }
     }
 
-    /// Whether `host` belongs to tenant `tenant` (see the module documentation); `server_host`: the host of
-    /// the server's own link, when known.
-    pub(crate) async fn trusts(
+    /// The tenant that has verified domain `host`, if any (through the registry's cache).
+    async fn owner(&self, host: &str) -> Result<Option<TenantId>, Error> {
+        match &self.registry {
+            Some(registry) => Ok(registry.domain_site(host).await?.map(|(owner, _)| owner)),
+            None => Ok(None),
+        }
+    }
+
+    /// The tenant's `kernel.public_url`, unless its host is a verified domain of another tenant (then a
+    /// warning, and `None`: links keep the server's address).
+    pub(crate) async fn public_site(
         &self,
         settings: &dyn TenantSettings,
         tenant: &TenantContext,
-        host: &str,
-        server_host: Option<&str>,
-    ) -> Result<bool, Error> {
-        if self.platform_host.as_deref() == Some(host) || server_host == Some(host) {
-            return Ok(true);
-        }
+    ) -> Result<Option<String>, Error> {
         let site = parsed_setting(settings, tenant, &PUBLIC_URL, |raw| {
             site_origin(raw).map(|()| raw.trim().to_owned())
         })
         .await?;
-        if site.as_deref().and_then(parse).is_some_and(|url| host_of(&url) == host) {
-            return Ok(true);
+        let Some(site) = site else { return Ok(None) };
+        let host = parse(&site).map(|url| host_of(&url)).unwrap_or_default();
+        match self.owner(&host).await? {
+            Some(owner) if owner != tenant.id() => {
+                tracing::warn!(
+                    tenant_id = %tenant.id(),
+                    "kernel.public_url is a verified domain of another tenant; the server's links are used"
+                );
+                Ok(None)
+            }
+            _ => Ok(Some(site)),
         }
-        match &self.domains {
-            // Truy vấn database điều khiển, chỉ khi khách có đặt link riêng (gửi mail, không phải đường nóng).
-            Some(domains) => Ok(domains.verified_hosts(tenant).await?.iter().any(|d| d == host)),
-            None => Ok(false),
+    }
+
+    /// Whether the address `url` belongs to tenant `tenant` (see the module documentation).
+    pub(crate) async fn trusts(
+        &self,
+        settings: &dyn TenantSettings,
+        tenant: &TenantContext,
+        url: &url::Url,
+    ) -> Result<bool, Error> {
+        let host = host_of(url);
+        let default_port = url.port().is_none();
+        match self.owner(&host).await? {
+            Some(owner) if owner == tenant.id() => return Ok(default_port),
+            Some(_) => return Ok(false),
+            None => {}
         }
+        if self.platform_host.as_deref() == Some(host.as_str()) {
+            return Ok(default_port);
+        }
+        let site = self.public_site(settings, tenant).await?;
+        Ok(site.as_deref().and_then(parse).is_some_and(|site| {
+            host_of(&site) == host && site.port_or_known_default() == url.port_or_known_default()
+        }))
     }
 }
 
@@ -109,8 +143,8 @@ fn invalid_template() -> FieldError {
         "value",
         "kernel.link_template_invalid",
         "must be an `https://` address of at most 2000 characters on one of this tenant's hosts, \
-         such as `https://shop.example/reset-password?token={token}`; no user name, spaces or \
-         placeholders in the host part",
+         with the path and placeholders of your page; no user name, spaces or placeholders in the \
+         host part",
     )
 }
 
@@ -144,7 +178,6 @@ pub(crate) async fn check_link(
     tenant: &TenantContext,
     setting: &TenantSetting,
     raw: &str,
-    server_host: Option<&str>,
 ) -> Result<Result<(), FieldError>, Error> {
     let raw = raw.trim();
     if let Err(problem) = link_template(raw) {
@@ -159,13 +192,15 @@ pub(crate) async fn check_link(
         )
         .with_param("placeholders", missing.join(", "))));
     }
-    let host = parse(raw).map(|url| host_of(&url)).unwrap_or_default();
-    if !trust.trusts(settings, tenant, &host, server_host).await? {
+    let Some(url) = parse(raw) else { return Ok(Err(invalid_template())) };
+    let host = host_of(&url);
+    if !trust.trusts(settings, tenant, &url).await? {
         return Ok(Err(FieldError::new(
             "value",
             "kernel.link_host_not_allowed",
-            "the host `{host}` is not one of this tenant's verified domains nor the host of the \
-             setting `kernel.public_url`: verify the domain first (`POST /api/v1/kernel/domains`)",
+            "the host `{host}` (with its port) is not one of this tenant's verified domains nor the \
+             address of the setting `kernel.public_url`: verify the domain first \
+             (`POST /api/v1/kernel/domains`)",
         )
         .with_param("host", host)));
     }
@@ -182,8 +217,8 @@ pub struct SiteLinks {
 }
 
 impl SiteLinks {
-    /// Links that follow `kernel.public_url` and the link settings; a link setting is trusted only on the
-    /// host of `kernel.public_url` or of the server's link (no verified domains).
+    /// Links that follow `kernel.public_url` and the link settings, without the domain registry: a link setting
+    /// is trusted only on the address of `kernel.public_url`.
     pub fn new(settings: Arc<dyn TenantSettings>) -> Self {
         SiteLinks { settings: Some(settings), trust: LinkTrust::default() }
     }
@@ -197,11 +232,8 @@ impl SiteLinks {
     /// replaced by the tenant's `kernel.public_url`, when set.
     pub async fn rewrite(&self, tenant: &TenantContext, template: &str) -> Result<String, Error> {
         let Some(settings) = &self.settings else { return Ok(template.to_owned()) };
-        // Giá trị cũ đặt trước khi có bộ kiểm mà sai dạng: dùng địa chỉ của máy chủ.
-        let site = parsed_setting(settings.as_ref(), tenant, &PUBLIC_URL, |raw| {
-            site_origin(raw).map(|()| raw.trim().to_owned())
-        })
-        .await?;
+        // Giá trị sai dạng, hay host là tên miền đã xác minh của khách KHÁC: dùng địa chỉ của máy chủ.
+        let site = self.trust.public_site(settings.as_ref(), tenant).await?;
         Ok(site.map_or_else(|| template.to_owned(), |site| rebase(template, &site)))
     }
 
@@ -218,18 +250,8 @@ impl SiteLinks {
         if let Some(settings) = &self.settings
             && let Some(value) = settings.get(tenant, setting).await?
         {
-            let server_host = server.and_then(parse).map(|url| host_of(&url));
             let raw = value.as_str().trim();
-            match check_link(
-                &self.trust,
-                settings.as_ref(),
-                tenant,
-                setting,
-                raw,
-                server_host.as_deref(),
-            )
-            .await?
-            {
+            match check_link(&self.trust, settings.as_ref(), tenant, setting, raw).await? {
                 Ok(()) => return Ok(Some(raw.to_owned())),
                 Err(problem) => tracing::warn!(
                     setting = setting.name(),
@@ -295,6 +317,17 @@ mod tests {
             assert!(link_template(bad).is_err(), "{bad}");
         }
         assert!(link_template(&format!("https://shop.example/{}", "a".repeat(2000))).is_err());
+    }
+
+    /// Bản dịch tiếng Việt của mọi lỗi ô ở đây điền được (không còn `{…}` thiếu giá trị).
+    #[test]
+    fn loi_o_co_ban_dich_tieng_viet() {
+        let translations = crate::i18n::Translations::new(Vec::new()).unwrap();
+        for problem in [invalid_template(), link_template("http://x.example/{token}").unwrap_err()]
+        {
+            let vi = translations.field_message(&problem, crate::i18n::Language::Vi);
+            assert_ne!(vi, problem.message, "{}", problem.message);
+        }
     }
 
     #[test]

@@ -477,12 +477,14 @@ Mail gửi cho một khách có link tới trang của website hay app của kh�
 
 Cấu hình link chỉ được nhận khi là địa chỉ `https://` có đủ mọi placeholder mà mô tả của nó nêu
 (`{token}`, `{id}`…), không có tên người dùng, không có placeholder trong phần host, và nằm trên host
-khách sở hữu: một tên miền đã xác minh của khách (xem "Tên miền riêng của khách hàng"), host của
-`kernel.public_url` của khách, host của `AUTOXIDE_HTTP_PUBLIC_URL`, hay host của địa chỉ máy chủ cho
-link đó. Không thì `PUT` trả `422` với mã `kernel.link_host_not_allowed`,
+khách sở hữu: một tên miền đã xác minh của khách (xem "Tên miền riêng của khách hàng") ở port mặc định,
+địa chỉ (host và port) của `kernel.public_url` của khách, hay host của `AUTOXIDE_HTTP_PUBLIC_URL` ở port
+mặc định. Không thì `PUT` trả `422` với mã `kernel.link_host_not_allowed`,
 `kernel.link_placeholder_missing` hay `kernel.link_template_invalid`. Host được kiểm lại mỗi lần gửi
-mail: tên miền bị thu hồi sau đó thì mail quay về địa chỉ của máy chủ (ghi cảnh báo vào log), không gửi
-token tới host khách không còn giữ. Một khách không bao giờ dùng được tên miền của khách khác.
+mail: tên miền bị thu hồi hay chuyển sang khách khác thì mail quay về địa chỉ của máy chủ (ghi cảnh báo
+vào log), không gửi token tới host khách không còn giữ. Tên miền đã xác minh của khách khác không bao giờ
+được tin, kể cả qua `kernel.public_url`. Còn một lỗ: host của `kernel.public_url` mà chưa ai xác minh vẫn
+được tin cho link của chính khách đó, nên hãy xác minh tên miền bạn đặt vào đó.
 
 Cấu hình kết nối của mail và AI đã đổi tên theo dạng này. Tên cũ (`mail.smtp_url`, `mail.from`,
 `ai.api_key`, `ai.model`) vẫn dùng được: giá trị khách đã đặt dưới tên cũ tiếp tục có hiệu lực, và

@@ -4,6 +4,9 @@
 //! hoặc nằm trong [`NOT_SITE_LINKS`] (địa chỉ API đối tác, trang của nền tảng, gốc website đã đổi host qua
 //! `SiteLinks::rewrite`), hoặc được nêu tên trong mô tả của một `TenantSetting::link(` cùng crate — tức khách
 //! đặt được trang riêng thay nó. Thiếu là email của khách B có thể trỏ về tên miền chung.
+//!
+//! Giới hạn: luật đoán theo hậu tố `_URL` của tên biến; một biến trỏ trang giao diện đặt tên khác (`…_PAGE`)
+//! không bị bắt — người viết module vẫn phải tự dùng `SiteLinks`.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -14,7 +17,6 @@ use crate::boundaries::Violation;
 /// Biến `*_URL` không phải trang giao diện của từng khách, kèm lý do.
 const NOT_SITE_LINKS: &[(&str, &str)] = &[
     ("AUTOXIDE_HTTP_PUBLIC_URL", "địa chỉ của máy chủ API; khách thay bằng `kernel.public_url`"),
-    ("AUTOXIDE_HTTP_CORS_ORIGINS", "không phải link trong thư"),
     ("AUTOXIDE_MAIL_SMTP_URL", "máy chủ gửi thư; khách thay bằng `mail.connection.smtp.url`"),
     ("AUTOXIDE_AI_BASE_URL", "API đối tác"),
     ("AUTOXIDE_EMBEDDING_BASE_URL", "API đối tác"),

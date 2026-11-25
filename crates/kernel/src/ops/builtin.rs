@@ -875,7 +875,10 @@ impl Module for KernelModule {
         ));
         self.domains = Some(domains.clone());
         // Link riêng của khách trong mail chỉ trỏ được tới host khách sở hữu (D-20261125-tenant-link-templates).
-        let trust = crate::tenancy::settings::LinkTrust::new(Some(domains.clone()), platform_host);
+        let trust = crate::tenancy::settings::LinkTrust::new(
+            Some(context.tenancy().clone()),
+            platform_host,
+        );
         settings.use_link_trust(trust.clone());
         let links = crate::tenancy::SiteLinks::new(settings.clone()).with_trust(trust);
         context.provide::<crate::tenancy::SiteLinks>(Arc::new(links))?;

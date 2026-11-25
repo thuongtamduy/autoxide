@@ -664,7 +664,7 @@ impl SettingsService {
         }
         if setting.group == Some(LINK_GROUP) {
             let trust = self.links.get().cloned().unwrap_or_default();
-            links::check_link(&trust, self, tenant, &setting, value, None)
+            links::check_link(&trust, self, tenant, &setting, value)
                 .await?
                 .map_err(|problem| Error::validation(vec![problem]))?;
         }

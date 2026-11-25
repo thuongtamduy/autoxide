@@ -231,8 +231,9 @@ pub(crate) const TENANT_EMBED_HOSTS: TenantSetting = TenantSetting::new(
     "content.embed_hosts",
     "Hosts whose addresses this tenant's content may embed (`embed` blocks), comma-separated \
      domain names such as `youtube.com,vimeo.com,maps.google.com` (at most 50; a host also allows \
-     its subdomains), instead of the server's AUTOXIDE_CONTENT_EMBED_HOSTS. Entries already saved \
-     keep their embeds.",
+     its subdomains, so never list a public suffix such as `com.vn` or `github.io`: that would \
+     allow every site under it), instead of the server's AUTOXIDE_CONTENT_EMBED_HOSTS. Entries \
+     already saved keep their embeds.",
 )
 .checked(|raw| tenant_embed_hosts(raw).map(|_| ()));
 

@@ -13,8 +13,11 @@ qua `context.require::<SiteLinks>()` (có tập tên miền đã xác minh); `Si
 
 Kiểm (setting là đầu vào không tin cậy): chỉ `https`, không user/mật khẩu, không khoảng trắng / ký tự điều khiển /
 `\`, không placeholder trong phần host, đủ mọi placeholder module điền, tối đa 2000 ký tự, host đọc như trình duyệt
-(crate `url`, WHATWG) phải là host của `kernel.public_url` của khách, một tên miền đã xác minh của khách, host
-`AUTOXIDE_HTTP_PUBLIC_URL` hay host của mẫu máy chủ. Kiểm lúc ĐẶT (422 `kernel.link_template_invalid`,
+(crate `url`, WHATWG) phải là một tên miền đã xác minh của khách (port mặc định), địa chỉ (host + port) của
+`kernel.public_url` của khách, hay host `AUTOXIDE_HTTP_PUBLIC_URL` (port mặc định). Host là tên miền đã xác minh của
+khách KHÁC không bao giờ được tin — kể cả qua `kernel.public_url` và đường đổi host cũ (`SiteLinks::rewrite`): khách
+không mượn được tên miền của khách khác, và tên miền đổi chủ thì thư của chủ cũ thôi trỏ tới đó ngay. Chủ tên miền
+đọc qua cache của sổ database (`domain_site`), không thêm truy vấn mỗi thư. Kiểm lúc ĐẶT (422 `kernel.link_template_invalid`,
 `kernel.link_placeholder_missing`, `kernel.link_host_not_allowed`) và lại lúc DÙNG: tên miền bị thu hồi hay
 `kernel.public_url` đổi thì link quay về mẫu máy chủ (ghi warn), không gửi token tới host khách không còn giữ.
 Luật gate `site-links` (`cargo xtask check`): mỗi biến `AUTOXIDE_…_URL` hoặc được nêu trong mô tả của một
@@ -28,11 +31,11 @@ thì admin của khách đặt link sang trang ngoài để lấy token của ng
 lạ bị từ chối, mô tả hiện trong `GET /kernel/settings?group=link`, đặt / gỡ từng cái), kiểm placeholder đúng của
 từng link ngay lúc đặt.
 
-Rủi ro còn lại: `kernel.public_url` hiện nhận host BẤT KỲ (không đòi tên miền đã xác minh), nên một link mẫu có host
-chỉ khớp nhờ `kernel.public_url` do chính admin của khách tự đặt cũng không được ràng chặt hơn `kernel.public_url`:
-admin của khách A trỏ được thư của người dùng khách A tới host tuỳ ý (không chạm được người dùng khách khác, vì
-mỗi khách chỉ đọc cấu hình của mình). Đóng lỗ này là việc `[ ]` P16 ở lộ trình: ràng `kernel.public_url` vào tên
-miền đã xác minh ở chế độ nhiều khách, hoặc cảnh báo.
+Rủi ro còn lại: `kernel.public_url` nhận host mà CHƯA AI xác minh (không đòi tên miền đã xác minh), nên link mẫu có
+host chỉ khớp nhờ `kernel.public_url` tự đặt chịu cùng rủi ro: admin của khách A trỏ được thư của người dùng khách A
+tới host tuỳ ý chưa ai xác minh (không chạm được người dùng khách khác, và không dùng được tên miền khách khác đã
+xác minh). Đóng hẳn là việc `[ ]` P16 ở lộ trình. Luật gate `site-links` đoán theo hậu tố `_URL` của tên biến: biến
+trỏ trang giao diện đặt tên khác không bị bắt.
 
 Đã cân nhắc: một setting JSON `kernel.links` (tên link → mẫu) — phải tự kiểm tên, mô tả không hiện cho admin, một
 lỗi làm hỏng mọi link. Chỉ kiểm lúc dùng — admin không biết link mình bị bỏ. Ràng `kernel.public_url` vào tên miền

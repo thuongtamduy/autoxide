@@ -65,23 +65,19 @@ impl NewsletterService {
     /// riêng cho người nhận này bằng bộ dựng mẫu của kernel.
     pub(crate) async fn campaign_mail(
         &self,
-        tenant: &autoxide_kernel::tenancy::TenantContext,
         row: &campaign::Model,
         list: &List,
         (to, name): (&str, Option<&str>),
+        pages: &crate::tenant_config::CampaignPages,
         token: &str,
         delivery_id: Option<uuid::Uuid>,
     ) -> Result<Mail, Error> {
-        self.check_ready(tenant, row).await?;
         let unsubscribe = self.public_url.link(&format!("{UNSUBSCRIBE_PATH}?token={token}"))?;
-        let preferences = token_link(&self.preferences_page(tenant).await?, token);
+        let preferences = token_link(&pages.preferences, token);
         let locale = Locale::stored(&row.locale);
-        let address = self.postal_address(tenant).await?.unwrap_or_default();
-        let params = [
-            ("list", list.name.get(locale)),
-            ("link", preferences.as_str()),
-            ("address", address.as_str()),
-        ];
+        let address = pages.address.as_str();
+        let params =
+            [("list", list.name.get(locale)), ("link", preferences.as_str()), ("address", address)];
         let footer = FOOTER.render(&self.translations, locale.language(), &params).text;
         let footer = footer.trim_end();
         let (subject, body_text, body_html) = match CampaignFormat::stored(&row.format) {
@@ -210,12 +206,13 @@ impl NewsletterService {
         principal.require(&crate::permissions::NEWSLETTER_READ)?;
         let campaign = self.find_campaign(tenant, id).await?;
         let list = self.find_list(tenant, campaign.row.list_id).await?;
+        let pages = self.campaign_pages(tenant, &campaign.row).await?;
         let mail = self
             .campaign_mail(
-                tenant,
                 &campaign.row,
                 &list,
                 ("subscriber@example.invalid", Some("Subscriber")),
+                &pages,
                 PREVIEW_TOKEN,
                 None,
             )
@@ -235,9 +232,18 @@ impl NewsletterService {
             advertising_max_per_day: self.config.advertising_max_per_day,
             postal_address: self.postal_address(tenant).await?,
             public_url_set: self.public_url.base().is_ok(),
-            preferences_url_set: self.preferences_page(tenant).await.is_ok(),
-            confirm_url_set: self.confirm_page(tenant).await.is_ok(),
+            preferences_url_set: is_set(self.preferences_page(tenant).await)?,
+            confirm_url_set: is_set(self.confirm_page(tenant).await)?,
             send_rate_per_minute: self.config.send_rate_per_minute,
         })
+    }
+}
+
+/// Trang đã đặt chưa: lỗi "chưa đặt" (503) là `false`; lỗi khác (database…) truyền lên, không đọc thành "chưa đặt".
+fn is_set(page: Result<String, Error>) -> Result<bool, Error> {
+    match page {
+        Ok(_) => Ok(true),
+        Err(error) if error.kind() == autoxide_kernel::error::ErrorKind::Unavailable => Ok(false),
+        Err(error) => Err(error),
     }
 }
