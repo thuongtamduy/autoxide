@@ -18,7 +18,8 @@ Quyết định: (bước 70 P9 mục 2, chủ dự án mở lại ở D-2026112
    của module bật CỘNG module tắt (`retained_tables`, `control_plane_tables`, `relocation` của module tắt được gom như
    module bật). Trước khi chép (dời, tách, gộp — cả dry run), migration của **chính module tắt** được áp ở database
    nguồn và đích nếu nguồn đã có bảng của nó; không chạm database chưa từng có bảng đó. Bỏ chốt chặn
-   `409 tenant_move_modules_off` (mã không còn phát ra).
+   `409 tenant_move_modules_off` (mã không còn phát ra) — phá vỡ hợp đồng mã lỗi trước 1.0, được phép theo
+   D-20261125-api-break-before-1-0; ghi ở changelog mục Removed.
 4. **Gate**: test `module_tat_van_xuat_va_xoa_du_lieu_ca_nhan_nhu_khi_bat` (crate `app`, cả hai database) so tập module
    góp phần xuất / nghe `USER_DELETED` khi mọi module bật với khi chỉ module core bật — module quên cài `dormant` là
    đỏ. `Modules::user_deleted_receivers()` và `PersonalDataExport::modules()` công khai cho việc đó.
