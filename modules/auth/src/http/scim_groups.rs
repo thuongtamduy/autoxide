@@ -101,7 +101,7 @@ async fn scim_list_groups(
         (status = 201, description = "The Group was created; `Location` is its address.", body = ScimGroup, content_type = "application/scim+json"),
         (status = 400, description = "The body is not JSON (`invalidSyntax`) or a value is wrong, e.g. no `displayName` or an unknown member (`invalidValue`).", body = ScimErrorBody, content_type = "application/scim+json"),
         (status = 401, description = "No SCIM token, or it is unknown or revoked.", body = ScimErrorBody, content_type = "application/scim+json"),
-        (status = 403, description = "The tenant's plan does not include SCIM (`auth.scim`), or giving the roles would exceed the plan's staff limit.", body = ScimErrorBody, content_type = "application/scim+json"),
+        (status = 403, description = "The tenant's plan does not include SCIM (`auth.scim`), or giving the roles would exceed the plan's staff limit, or the SCIM token's creator cannot give or take away, with their permissions now, a role this change gives or takes away (the body names no `scimType`).", body = ScimErrorBody, content_type = "application/scim+json"),
         (status = 409, description = "`displayName` or `externalId` is used by another Group (`uniqueness`), or a change would leave the tenant without an active administrator.", body = ScimErrorBody, content_type = "application/scim+json"),
     )
 )]
@@ -163,7 +163,7 @@ async fn scim_get_group(
         (status = 200, description = "The Group after the change.", body = ScimGroup, content_type = "application/scim+json"),
         (status = 400, description = "The body is not JSON (`invalidSyntax`) or a value is wrong (`invalidValue`).", body = ScimErrorBody, content_type = "application/scim+json"),
         (status = 401, description = "No SCIM token, or it is unknown or revoked.", body = ScimErrorBody, content_type = "application/scim+json"),
-        (status = 403, description = "The tenant's plan does not include SCIM (`auth.scim`), or giving the roles would exceed the plan's staff limit.", body = ScimErrorBody, content_type = "application/scim+json"),
+        (status = 403, description = "The tenant's plan does not include SCIM (`auth.scim`), or giving the roles would exceed the plan's staff limit, or the SCIM token's creator cannot give or take away, with their permissions now, a role this change gives or takes away (the body names no `scimType`).", body = ScimErrorBody, content_type = "application/scim+json"),
         (status = 404, description = "No Group of this tenant has this id.", body = ScimErrorBody, content_type = "application/scim+json"),
         (status = 409, description = "A value is used by another Group (`uniqueness`), or a change would leave the tenant without an active administrator.", body = ScimErrorBody, content_type = "application/scim+json"),
     )
@@ -184,7 +184,8 @@ async fn scim_replace_group(
 /// Change a SCIM Group with PATCH operations.
 ///
 /// RFC 7644 §3.5.2, e.g. `add` / `remove` `members`, `remove` `members[value eq "…"]`, `replace`
-/// `displayName`. Membership changes reach the members' roles at once.
+/// `displayName`. Membership changes reach the members' roles at once; the token's creator must be
+/// able to give (adding) or take away (removing) every role the Group's mapping rules give.
 #[utoipa::path(
     patch,
     path = "/scim/v2/Groups/{id}",
@@ -198,7 +199,7 @@ async fn scim_replace_group(
         (status = 200, description = "The Group after the change.", body = ScimGroup, content_type = "application/scim+json"),
         (status = 400, description = "The operations cannot be applied: `invalidSyntax`, `invalidPath`, `noTarget`, `mutability` or `invalidValue`.", body = ScimErrorBody, content_type = "application/scim+json"),
         (status = 401, description = "No SCIM token, or it is unknown or revoked.", body = ScimErrorBody, content_type = "application/scim+json"),
-        (status = 403, description = "The tenant's plan does not include SCIM (`auth.scim`), or giving the roles would exceed the plan's staff limit.", body = ScimErrorBody, content_type = "application/scim+json"),
+        (status = 403, description = "The tenant's plan does not include SCIM (`auth.scim`), or giving the roles would exceed the plan's staff limit, or the SCIM token's creator cannot give or take away, with their permissions now, a role this change gives or takes away (the body names no `scimType`).", body = ScimErrorBody, content_type = "application/scim+json"),
         (status = 404, description = "No Group of this tenant has this id.", body = ScimErrorBody, content_type = "application/scim+json"),
         (status = 409, description = "A value is used by another Group (`uniqueness`), or a change would leave the tenant without an active administrator.", body = ScimErrorBody, content_type = "application/scim+json"),
     )
@@ -218,7 +219,8 @@ async fn scim_patch_group(
 
 /// Delete a SCIM Group.
 ///
-/// Its mapping rules go with it; its members lose the roles it gave them.
+/// Its mapping rules go with it; its members lose the roles it gave them. The token's creator must be
+/// able to take away every role the Group's mapping rules give.
 #[utoipa::path(
     delete,
     path = "/scim/v2/Groups/{id}",
@@ -230,7 +232,7 @@ async fn scim_patch_group(
     responses(
         (status = 204, description = "The Group was deleted."),
         (status = 401, description = "No SCIM token, or it is unknown or revoked.", body = ScimErrorBody, content_type = "application/scim+json"),
-        (status = 403, description = "The tenant's plan does not include SCIM (`auth.scim`).", body = ScimErrorBody, content_type = "application/scim+json"),
+        (status = 403, description = "The tenant's plan does not include SCIM (`auth.scim`), or the SCIM token's creator cannot take away, with their permissions now, every role the Group's mapping rules give (the body names no `scimType`).", body = ScimErrorBody, content_type = "application/scim+json"),
         (status = 404, description = "No Group of this tenant has this id.", body = ScimErrorBody, content_type = "application/scim+json"),
         (status = 409, description = "Removing the roles would leave the tenant without an active administrator.", body = ScimErrorBody, content_type = "application/scim+json"),
     )

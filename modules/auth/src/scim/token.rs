@@ -20,6 +20,7 @@ use super::entity::token as entity;
 use super::error::ScimError;
 use super::{SCIM_FEATURE, ScimCaller, ScimService};
 use crate::events;
+use crate::permissions::SCIM_MANAGE;
 
 /// Phần đầu của mọi token SCIM; sau nó là ID khách (32 chữ hex), `_`, phần ngẫu nhiên.
 pub(crate) const TOKEN_PREFIX: &str = "axscim1_";
@@ -49,7 +50,56 @@ pub(crate) fn token_not_found(id: Uuid) -> Error {
         .with_param("id", id)
 }
 
+/// Người tạo token còn làm token có hiệu lực không (token mạnh đúng bằng người tạo LÚC DÙNG,
+/// D-20261125-scim-grant-cover): khác `Active` thì đồng bộ sẽ bị từ chối — phải xoay token.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum CreatorStatus {
+    /// Người tạo còn hoạt động và còn `auth.scim.manage`.
+    Active,
+    /// Người tạo bị khoá (hay không còn là nhân sự).
+    Disabled,
+    /// Người tạo đã bị xoá.
+    Deleted,
+    /// Người tạo còn hoạt động nhưng không còn `auth.scim.manage`.
+    MissingPermission,
+}
+
 impl ScimService {
+    /// Tình trạng người tạo của từng token (`id` token → tình trạng). Khách có tối đa
+    /// [`MAX_TOKENS`] token nên đọc từng người tạo một.
+    pub(crate) async fn creator_statuses(
+        &self,
+        tenant: &TenantContext,
+        tokens: &[ScimToken],
+    ) -> Result<std::collections::HashMap<Uuid, CreatorStatus>, Error> {
+        let mut by_creator = std::collections::HashMap::new();
+        let mut statuses = std::collections::HashMap::new();
+        for token in tokens {
+            let status = match by_creator.get(&token.created_by) {
+                Some(status) => *status,
+                None => {
+                    let status = match self.roles.user_principal(tenant, token.created_by).await? {
+                        None => CreatorStatus::Deleted,
+                        Some((user, _))
+                            if !user.is_active()
+                                || user.realm != autoxide_kernel::access::Realm::Staff =>
+                        {
+                            CreatorStatus::Disabled
+                        }
+                        Some((_, principal)) if !principal.has(&SCIM_MANAGE) => {
+                            CreatorStatus::MissingPermission
+                        }
+                        Some(_) => CreatorStatus::Active,
+                    };
+                    by_creator.insert(token.created_by, status);
+                    status
+                }
+            };
+            statuses.insert(token.id, status);
+        }
+        Ok(statuses)
+    }
+
     /// Các token của khách, mới nhất trước.
     pub(crate) async fn tokens(&self, tenant: &TenantContext) -> Result<Vec<ScimToken>, Error> {
         Ok(entity::Entity::find()
