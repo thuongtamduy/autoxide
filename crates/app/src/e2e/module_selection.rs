@@ -365,10 +365,21 @@ async fn module_tat_van_xuat_va_xoa_du_lieu_ca_nhan_nhu_khi_bat() {
             sorted(every.modules.user_deleted_receivers()),
             "account deletion: a module subscribes to it in `start` but not in `dormant`"
         );
-        // Module tắt vẫn không có route, tool hay job.
-        assert!(
-            core.modules.tools().unwrap().iter().all(|tool| !tool.name().starts_with("orders."))
-        );
+        // Module tắt vẫn không có route, tool hay job — phần "nghỉ" chỉ xuất / xoá dữ liệu cá nhân. Module tắt
+        // không vào sổ module đang chạy, nên không có job hay lịch.
+        let tools = core.modules.tools().unwrap();
+        let paths: Vec<&String> = core.api.openapi.paths.paths.keys().collect();
+        let running = core.modules.names();
+        for module in ["files", "conversations", "orders", "customers", "content"] {
+            let prefix = format!("{module}.");
+            assert!(
+                tools.iter().all(|tool| !tool.name().starts_with(&prefix)),
+                "{module} has tools"
+            );
+            let route = format!("/api/v1/{module}");
+            assert!(paths.iter().all(|path| !path.starts_with(&route)), "{module} has routes");
+            assert!(!running.contains(&module), "{module} is running");
+        }
         every.database.close().await.unwrap();
         core.database.close().await.unwrap();
     })

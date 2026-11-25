@@ -347,6 +347,21 @@ impl Modules {
                 result = Err(Invalid);
             }
         }
+        // Module đang tắt (chế độ "nghỉ") cũng đọc cấu hình của nó — vd `files` cần biết kho để xoá nội dung file
+        // khi tài khoản bị xoá. Đọc ở reader riêng: cấu hình sai của module tắt chỉ là cảnh báo, không chặn khởi
+        // động; phần "nghỉ" của nó tự xử lý khi thiếu cấu hình.
+        for module in &mut self.dormant {
+            let mut side = reader.sibling();
+            if module.configure(&mut side).is_err() {
+                let problems: Vec<String> =
+                    side.problems().iter().map(ToString::to_string).collect();
+                tracing::warn!(
+                    module = module.name(),
+                    problems = %problems.join("; "),
+                    "a turned-off module cannot read its configuration; its dormant part may not run"
+                );
+            }
+        }
         result
     }
 
@@ -446,7 +461,7 @@ impl Modules {
         apis.fill_later();
         // Module đang tắt (chế độ "nghỉ", bước 70 P9): chỉ phần dữ liệu cá nhân, sau khi mọi module bật
         // đã khởi động — chúng chỉ thấy thứ module bật công bố.
-        self.dormant_subscriptions = super::dormant::start(
+        let (subscriptions, shared_storage) = super::dormant::start(
             &self.dormant,
             &apis,
             registry,
@@ -454,6 +469,7 @@ impl Modules {
             &self.personal_data,
             self.sync_keep,
         )?;
+        self.dormant_subscriptions = subscriptions;
         self.dns.fill(apis.get::<dyn crate::tenancy::DnsTxtLookup>());
         partners.fill(apis.get::<dyn crate::tenancy::sandbox::SandboxRecipients>());
         self.orgs.fill(apis.get::<dyn crate::tenancy::OrgNodes>());
@@ -463,10 +479,15 @@ impl Modules {
         self.entitlements.fill(apis.get::<dyn crate::entitlement::Entitlements>());
         self.entitlements.catalog().fill(apis.required(), counters);
         // Nơi lưu chung và bộ mở nơi lưu riêng của placement (module `files` công bố).
-        registry.use_storage(
-            apis.get::<dyn crate::storage::Storage>(),
-            apis.get::<dyn crate::storage::StorageOpener>(),
-        );
+        // Không module bật nào công bố kho: kho mà module tắt (`files` "nghỉ") tự mở để xoá dữ liệu cá nhân
+        // cũng là kho của kernel (xoá khách, bản xuất của khách) — không để file của khách nằm lại.
+        let (storage, opener) = match apis.get::<dyn crate::storage::Storage>() {
+            Some(storage) => (Some(storage), apis.get::<dyn crate::storage::StorageOpener>()),
+            None => {
+                shared_storage.map_or((None, None), |(storage, opener)| (Some(storage), opener))
+            }
+        };
+        registry.use_storage(storage, opener);
         self.apis = apis;
         self.tenancy = Some(registry.clone());
         // Sổ điều hướng (bước 51 P1): nhóm trùng phải khai giống hệt, mục không trùng.

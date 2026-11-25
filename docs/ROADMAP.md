@@ -156,7 +156,11 @@ thật (P7).
       trừ mục chạy thử bằng tài khoản thật):
   - [x] Chế độ "nghỉ": module tắt vẫn tham gia dữ liệu cá nhân và vòng đời khách (xuất, xoá, dời khách) —
         D-20261125-dormant-modules: hook `Module::dormant`, xoá / xuất / dời / tách / gộp khách gom cả bảng của module
-        tắt; còn lại khi tắt: dọn theo thời hạn lưu, `copy` / `backup`
+        tắt; `files` tắt vẫn mở kho từ cấu hình để xoá nội dung file, `conversations` tắt xoá ghi âm qua kho và bộ nối
+        thoại đang bật
+    - [ ] Module tắt: dọn dữ liệu theo thời hạn lưu (job của module chưa chạy khi tắt)
+    - [ ] Module tắt: gieo dữ liệu khởi đầu cho khách tạo trong lúc module tắt
+    - [ ] `copy` / `backup create` / `backup restore` gồm cả bảng của module tắt (hiện từ chối khi còn dữ liệu)
   - [x] Mẫu câu OTP khách tự sửa cho khớp template đã đăng ký với nhà mạng (đang viết cứng ở `compliance`, `orders`,
         `bookings`) — D-20261125-sms-templates: cấu hình theo khách nhóm `sms_template`, kiểm `{code}` đúng một lần
   - [ ] 139 endpoint GET trả `Data<Vec<T>>` không phân trang: endpoint mới trả `Page<T>`, khai deprecation cho cái cũ

@@ -23,13 +23,20 @@ Quyết định: (bước 70 P9 mục 2, chủ dự án mở lại ở D-2026112
    góp phần xuất / nghe `USER_DELETED` khi mọi module bật với khi chỉ module core bật — module quên cài `dormant` là
    đỏ. `Modules::user_deleted_receivers()` và `PersonalDataExport::modules()` công khai cho việc đó.
 5. **Event của module tắt không được ghi**: phần xoá dùng chung nhận `Option<&Outbox>`, khi tắt là `None` — không ai
-   giao event của module tắt, ghi vào thì về sau bật lại sẽ bắn webhook / audit cũ. Dữ liệu vẫn được xoá / ẩn danh đủ.
-6. **Còn chưa làm khi tắt** (ghi ở `docs/MODULES.md`): dọn theo thời hạn lưu (là job của module), gieo dữ liệu cho
-   khách mới, giao bù event khác; `copy` / `backup` vẫn từ chối khi còn dữ liệu của module tắt. Hai chỗ chỉ xoá được
-   phần database: `files` tắt thì không ai công bố nơi lưu, nên dòng file bị xoá còn nội dung file nằm lại (log
-   `warn` kèm khoá để người vận hành xoá tay); `conversations` tắt thì bản ghi âm cuộc gọi chưa xoá được (cần nơi lưu
-   và bộ nối nhà cung cấp thoại) — mọi thứ khác của người đó được ẩn danh ngay, bản ghi âm bị job dọn theo thời hạn
-   lưu xoá khi bật lại module.
+   giao event của module tắt, ghi vào thì về sau bật lại sẽ bắn webhook / audit cũ. Ba event bị bỏ:
+   `content.schedule_canceled`, `content.author_changed`, `comments.comments_erased`; `conversations.recording_deleted`
+   cũng không ghi. Bỏ là đúng vì bên nhận không lệch trạng thái: các event này là thông báo phụ (audit, webhook, tin
+   nhắn) chứ không phải nguồn dữ liệu của module khác — trạng thái thật (lịch đã huỷ, tác giả đã gỡ, bình luận đã xoá,
+   bản ghi đã xoá) nằm trong bảng của chính module, đúng như khi bật; audit vẫn có event `auth.user_deleted` gốc.
+6. **Không xoá dở**: `files` tắt vẫn đọc cấu hình của nó (module tắt đọc cấu hình ở reader riêng, lỗi chỉ cảnh báo),
+   tự mở kho và chia cho kernel (`DormantContext::share_storage`; kernel dùng khi không module bật nào công bố kho —
+   xoá khách, bản xuất của khách cũng xoá / ghi được file) nên xoá tài khoản xoá cả nội dung file; `conversations` tắt
+   xoá bản ghi âm qua kho đó và bộ nối thoại của module đang bật (`DormantContext::contributions`). Không mở được kho
+   hay thiếu bộ nối thì bên nghe trả lỗi — event `USER_DELETED` được thử lại mãi (dispatcher không bỏ event này), dòng dữ liệu còn nguyên để
+   lần sau xoá trọn; không bao giờ báo xong khi nội dung còn nằm lại.
+7. **Còn chưa làm khi tắt** (mục con `[ ]` dưới P9 ở `docs/ROADMAP.md`, ghi ở `docs/MODULES.md`): dọn theo thời hạn
+   lưu (là job của module), gieo dữ liệu cho khách mới, giao bù event khác; `copy` / `backup` vẫn từ chối khi còn dữ
+   liệu của module tắt.
 
 Căn cứ: Luật Bảo vệ dữ liệu cá nhân 91/2025/QH15 (hiệu lực 01/01/2026) — quyền của chủ thể được truy cập, nhận bản sao
 và yêu cầu xoá dữ liệu; Nghị định 13/2023/NĐ-CP (Điều 9 quyền của chủ thể dữ liệu, Điều 14–16 rút lại sự đồng ý, xoá,

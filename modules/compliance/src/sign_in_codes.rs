@@ -107,7 +107,7 @@ impl ComplianceService {
         let message = SmsMessage::new(
             tenant.id(),
             phone.clone(),
-            self.otp_text(tenant, &crate::sms_templates::SIGN_IN, &code, minutes).await?,
+            self.otp_text(tenant, &crate::sms_templates::SIGN_IN, &code, minutes).await,
             SmsPurpose::Otp,
             id.to_string(),
         );

@@ -2,7 +2,7 @@
 //! template với nhà mạng thì chỉ gửi được đúng câu đã đăng ký, nên câu mặc định phải đổi được theo khách.
 //! Cấu hình theo khách của kernel (`PUT /api/v1/kernel/settings/{name}`), nhóm `sms_template`.
 
-use autoxide_kernel::error::{Error, FieldError};
+use autoxide_kernel::error::FieldError;
 use autoxide_kernel::sms::{
     SMS_TEMPLATE_GROUP, check_sms_template, fill_sms_template, tenant_sms_text,
 };
@@ -50,23 +50,24 @@ pub(crate) fn all() -> Vec<TenantSetting> {
 }
 
 impl ComplianceService {
-    /// Câu SMS theo mẫu `setting` của khách, không có thì câu mặc định.
+    /// Câu SMS theo mẫu `setting` của khách, không có (hay chưa đọc được) thì câu mặc định. Không lỗi: gọi
+    /// sau khi đã lưu mã mà không để lại mã không bao giờ gửi.
     pub(crate) async fn otp_text(
         &self,
         tenant: &TenantContext,
         setting: &TenantSetting,
         code: &str,
         minutes: i64,
-    ) -> Result<String, Error> {
+    ) -> String {
         let minutes = minutes.to_string();
         let values = [("code", code), ("minutes", minutes.as_str())];
         if let Some(text) =
-            tenant_sms_text(self.settings.as_ref(), tenant, setting, PLACEHOLDERS, &values).await?
+            tenant_sms_text(self.settings.as_ref(), tenant, setting, PLACEHOLDERS, &values).await
         {
-            return Ok(text);
+            return text;
         }
         let default =
             if setting == &SIGN_IN { SIGN_IN_DEFAULT } else { PHONE_VERIFICATION_DEFAULT };
-        Ok(fill_sms_template(default, &values).unwrap_or_else(|| default.to_owned()))
+        fill_sms_template(default, &values).unwrap_or_else(|| default.to_owned())
     }
 }

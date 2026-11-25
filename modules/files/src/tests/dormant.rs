@@ -4,6 +4,7 @@
 use autoxide_kernel::event::{Delivered, EventHandler};
 use autoxide_kernel::module::Modules;
 use autoxide_kernel::privacy::USER_DELETED;
+use autoxide_kernel::storage::Storage as _;
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use autoxide_kernel::time::Timestamp;
 use autoxide_testkit::{TestApp, TestDatabase};
@@ -55,11 +56,23 @@ async fn module_tat_van_xuat_va_xoa_du_lieu_ca_nhan() {
         let exported = app.modules().personal_data().export(&tenant, user).await.unwrap();
         assert_eq!(exported["files"][0]["name"], "notes.txt", "{exported:?}");
 
-        // Xoá tài khoản khi `files` tắt: không có nơi lưu (`dyn Storage` do chính `files` công bố),
-        // nên chỉ xoá dòng; nhận lại event cũng không lỗi.
-        assert!(app.api::<dyn autoxide_kernel::storage::Storage>().is_none());
+        // Không có kho (module tắt không mở được kho): không xoá dở — lỗi để event được thử lại, dòng còn.
         let deleted = user_deleted(&tenant, user);
-        let privacy = crate::service::DormantPrivacy { storage: None };
+        let blind = crate::service::DormantPrivacy { storage: None };
+        assert!(blind.handle(&deleted).await.is_err());
+        let left =
+            crate::entity::Entity::find_by_id(id).scoped(&tenant).one(app.database().read()).await;
+        assert!(left.unwrap().is_some());
+
+        // `files` tắt vẫn mở kho từ cấu hình của nó và chia cho kernel: xoá tài khoản xoá cả nội dung file.
+        assert!(app.api::<dyn autoxide_kernel::storage::Storage>().is_none());
+        let storage = app.registry().shared_storage().expect("dormant `files` shares its storage");
+        let store = autoxide_kernel::storage::TenantStorage::new(storage.clone(), &tenant);
+        let key = crate::entity::storage_key(id);
+        let body = futures_util::stream::iter([Ok(bytes::Bytes::from_static(b"abc"))]);
+        store.put(&key, Box::pin(body)).await.unwrap();
+        assert!(store.get(&key).await.unwrap().is_some());
+        let privacy = crate::service::DormantPrivacy { storage: Some(storage) };
         privacy.handle(&deleted).await.unwrap();
         privacy.handle(&deleted).await.unwrap();
         let left = crate::entity::Entity::find_by_id(id)
@@ -68,6 +81,7 @@ async fn module_tat_van_xuat_va_xoa_du_lieu_ca_nhan() {
             .await
             .unwrap();
         assert!(left.is_none());
+        assert!(store.get(&key).await.unwrap().is_none(), "the stored content is deleted too");
         let exported = app.modules().personal_data().export(&tenant, user).await.unwrap();
         assert_eq!(exported["files"], json!([]));
     })

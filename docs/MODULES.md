@@ -156,16 +156,17 @@ While it is off, the module still takes part in personal data and in the tenant 
   and deleting an account deletes or anonymizes that person's data in it, as when it is on;
 - deleting a tenant for good deletes its rows of the tenant (except tables kept by law), a tenant data
   export includes them, and moving, splitting or merging a tenant takes them along (the module's own
-  migrations are applied to its tables on both databases first, and only where it already has tables).
+  migrations are applied to its tables on both databases first, and only where it already has tables);
+- `files` still reads its own configuration while off and opens its storage, so deleting an account
+  deletes the stored content too, and `conversations` deletes call recordings through that storage and the
+  enabled voice connector; when the storage cannot be opened, the deletion is retried (nothing is reported
+  done while content remains).
 
 This is an obligation of personal data protection law (Vietnam: Law 91/2025/QH15, Decree
 13/2023/ND-CP), so it does not depend on whether you use the module any more. What it still does not
 do while off:
 
 - retention clean-up of its data does not run (the module's jobs do not run);
-- with `files` off, deleting an account deletes the file records but not the stored content (a warning
-  names each storage key to remove by hand); with `conversations` off, call recordings stay until the
-  module is turned on again (its retention clean-up then removes them);
 - tenants created in the meantime do not get the module's starting data;
 - events other modules publish in the meantime are not delivered to it later.
 

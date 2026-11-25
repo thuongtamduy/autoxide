@@ -141,6 +141,17 @@ impl<'a> ConfigReader<'a> {
         ConfigReader { source, errors: Vec::new(), values: Vec::new() }
     }
 
+    /// A fresh reader on the same source (turned-off modules read their configuration on the side: their
+    /// errors are warnings, not startup failures).
+    pub(crate) fn sibling(&self) -> ConfigReader<'a> {
+        ConfigReader::new(self.source)
+    }
+
+    /// The problems found so far by this reader.
+    pub(crate) fn problems(&self) -> &[ConfigError] {
+        &self.errors
+    }
+
     /// Reads a variable that has a default or is required, converting it to type `T` with `FromStr`
     /// (a number, `bool`, `SocketAddr`, or a custom type).
     pub fn get<T>(&mut self, setting: &Setting) -> Result<T, Invalid>

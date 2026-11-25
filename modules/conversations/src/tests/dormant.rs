@@ -1,9 +1,12 @@
 //! Chế độ nghỉ (bước 70 P9): `conversations` có trong chương trình nhưng đang tắt vẫn góp phần vào bản xuất dữ
 //! liệu cá nhân và vẫn ẩn danh hoá phía người mua khi tài khoản bị xoá — bảng của nó còn từ hồi module chạy.
 
+use std::sync::Arc;
+
 use autoxide_kernel::event::{Delivered, EventHandler};
 use autoxide_kernel::module::Modules;
 use autoxide_kernel::privacy::USER_DELETED;
+use autoxide_kernel::storage::{Storage, TenantStorage};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use autoxide_kernel::time::Timestamp;
 use autoxide_testkit::{TestApp, TestDatabase};
@@ -70,10 +73,66 @@ async fn module_tat_van_xuat_va_xoa_du_lieu_ca_nhan() {
         let exported = app.modules().personal_data().export(&tenant, user).await.unwrap();
         assert_eq!(exported["conversations"][0]["subject"], "Size question", "{exported:?}");
 
-        // Xoá tài khoản: cuộc trò chuyện bỏ liên kết với người mua và đóng lại; nhận lại event cũng vậy.
+        // Một cuộc gọi có bản ghi âm trong kho.
+        let call_id = Uuid::now_v7();
+        let key = format!("conversations/recordings/{call_id}");
+        crate::entity::call::Model {
+            id: call_id,
+            tenant_id: tenant.id().as_uuid(),
+            org_id: tenant.id().as_uuid(),
+            thread_id: id,
+            callback_id: None,
+            direction: "inbound".into(),
+            status: "completed".into(),
+            provider: "fake".into(),
+            provider_call_id: None,
+            agent_user_id: None,
+            caller_user_id: Some(user),
+            started_at: Some(now),
+            answered_at: Some(now),
+            ended_at: Some(now),
+            duration_seconds: Some(30),
+            recording_enabled: true,
+            recording_ack_at: Some(now),
+            provider_recording_id: None,
+            recording_ref: Some(key.clone()),
+            recording_expires_at: None,
+            created_at: now,
+            updated_at: now,
+        }
+        .into_active_model()
+        .insert(app.database().write())
+        .await
+        .unwrap();
+        let storage: Arc<dyn Storage> = Arc::new(autoxide_testkit::MemoryStorage::default());
+        let store = TenantStorage::new(storage.clone(), &tenant);
+        let body = futures_util::stream::iter([Ok(bytes::Bytes::from_static(b"audio"))]);
+        store.put(&key, Box::pin(body)).await.unwrap();
+
+        // Không có kho: không báo xong — lỗi để event được thử lại, bản ghi còn nguyên.
         let deleted = user_deleted(&tenant, user);
-        crate::privacy::DormantPrivacy.handle(&deleted).await.unwrap();
-        crate::privacy::DormantPrivacy.handle(&deleted).await.unwrap();
+        let blind =
+            crate::privacy::DormantPrivacy { tenancy: app.registry().clone(), voice: Vec::new() };
+        assert!(app.registry().shared_storage().is_none());
+        assert!(blind.handle(&deleted).await.is_err());
+        assert!(store.get(&key).await.unwrap().is_some());
+
+        // Có kho (của `files` đang bật hay `files` "nghỉ"): xoá cả bản ghi; cuộc trò chuyện bỏ liên kết với
+        // người mua và đóng lại; nhận lại event cũng vậy.
+        let eraser = crate::voice::recordings::RecordingEraser::Dormant {
+            storage: Some(storage.clone()),
+            voice: &[],
+        };
+        crate::privacy::forget_for_test(&eraser, &tenant, user).await.unwrap();
+        crate::privacy::forget_for_test(&eraser, &tenant, user).await.unwrap();
+        assert!(store.get(&key).await.unwrap().is_none(), "the recording is deleted");
+        let call = crate::entity::call::Entity::find_by_id(call_id)
+            .scoped(&tenant)
+            .one(app.database().read())
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(call.recording_ref, None);
         let thread = crate::entity::thread::Entity::find_by_id(id)
             .scoped(&tenant)
             .one(app.database().read())

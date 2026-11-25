@@ -152,18 +152,33 @@ impl BookmarkService {
 #[async_trait::async_trait]
 impl EventHandler for BookmarkService {
     async fn handle(&self, event: &Delivered) -> Result<(), Error> {
-        let Some(user_id) = deleted_user(event) else {
-            return Ok(());
-        };
-        let tenant = &event.tenant;
-        let deleted = Entity::delete_many()
-            .filter(Column::OwnerId.eq(user_id))
-            .scoped(tenant)
-            .exec(tenant.database().write())
-            .await?;
-        tracing::info!(user_id = %user_id, bookmarks = deleted.rows_affected, "bookmarks of a deleted user removed");
-        Ok(())
+        forget_user(event).await
     }
+}
+
+/// The same deletion while the module is turned off (dormant mode, `Module::dormant`): it needs only the
+/// tenant's database, so it works without the service.
+pub(crate) struct DormantBookmarks;
+
+#[async_trait::async_trait]
+impl EventHandler for DormantBookmarks {
+    async fn handle(&self, event: &Delivered) -> Result<(), Error> {
+        forget_user(event).await
+    }
+}
+
+async fn forget_user(event: &Delivered) -> Result<(), Error> {
+    let Some(user_id) = deleted_user(event) else {
+        return Ok(());
+    };
+    let tenant = &event.tenant;
+    let deleted = Entity::delete_many()
+        .filter(Column::OwnerId.eq(user_id))
+        .scoped(tenant)
+        .exec(tenant.database().write())
+        .await?;
+    tracing::info!(user_id = %user_id, bookmarks = deleted.rows_affected, "bookmarks of a deleted user removed");
+    Ok(())
 }
 
 #[async_trait::async_trait]

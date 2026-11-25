@@ -174,7 +174,7 @@ impl BookingsService {
             SMS_PLACEHOLDERS,
             &values,
         )
-        .await?;
+        .await;
         let text = custom.unwrap_or_else(|| {
             fill_sms_template(CODE_SMS_DEFAULT, &values)
                 .unwrap_or_else(|| CODE_SMS_DEFAULT.to_owned())

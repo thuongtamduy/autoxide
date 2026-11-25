@@ -25,6 +25,12 @@ use crate::privacy::{PersonalData, PersonalDataExport, USER_DELETED};
 use crate::tenancy::{DatabaseRegistry, TenantContext};
 
 /// What a turned-off module can use and register in [`Module::dormant`](super::Module::dormant).
+///
+/// Boundary: a turned-off module reads its configuration and may open its own resources (e.g. its file store)
+/// only to export, delete and move personal data. Nothing registered here serves requests: no routes, MCP
+/// tools, jobs, schedules or events other than [`USER_DELETED`](crate::privacy::USER_DELETED), and no trait for
+/// other modules (except the file store offered with [`share_storage`](Self::share_storage), used by the
+/// kernel's tenant lifecycle and other dormant parts).
 pub struct DormantContext<'a> {
     pub(super) module: &'static str,
     pub(super) apis: &'a Apis,
@@ -33,7 +39,16 @@ pub struct DormantContext<'a> {
     pub(super) personal_data: &'a PersonalDataExport,
     pub(super) subscriptions: &'a mut Vec<(&'static str, Subscription)>,
     pub(super) sync_keep: jiff::SignedDuration,
+    pub(super) storage: &'a mut Option<SharedStorage>,
 }
+
+/// What setting up the turned-off modules gives back: their account-deletion subscriptions and the file store
+/// one of them opened, if any.
+pub(super) type Started = (Vec<(&'static str, Subscription)>, Option<SharedStorage>);
+
+/// The file store a turned-off module opened itself, with its opener of placement stores.
+pub(super) type SharedStorage =
+    (Arc<dyn crate::storage::Storage>, Option<Arc<dyn crate::storage::StorageOpener>>);
 
 impl DormantContext<'_> {
     /// The name of the module being set up.
@@ -68,6 +83,29 @@ impl DormantContext<'_> {
         crate::sync::SyncLog::new(self.module, self.sync_keep)
     }
 
+    /// Traits that the kernel or ENABLED modules contribute to (`StartContext::contribute`), e.g. provider
+    /// connectors a dormant part must call to delete a person's data held at the provider.
+    pub fn contributions<T>(&self) -> Vec<Arc<T>>
+    where
+        T: ?Sized + Send + Sync + 'static,
+    {
+        self.apis.contributions::<T>()
+    }
+
+    /// Offers the file store the turned-off module opened from its own configuration (the `files` module
+    /// does this): when no enabled module publishes `dyn Storage`, the kernel uses it for the tenant
+    /// lifecycle and other dormant parts reach it through `tenancy().shared_storage()`, so stored content is
+    /// deleted too. Only the first offer is kept.
+    pub fn share_storage(
+        &mut self,
+        storage: Arc<dyn crate::storage::Storage>,
+        opener: Option<Arc<dyn crate::storage::StorageOpener>>,
+    ) {
+        if self.storage.is_none() {
+            *self.storage = Some((storage, opener));
+        }
+    }
+
     /// Registers the module's part of a person's data export (the same [`PersonalData`] it registers in
     /// `start`). Called only for tenants whose database has the module's tables.
     pub fn personal_data(&mut self, exporter: Arc<dyn PersonalData>) -> Result<(), Error> {
@@ -99,8 +137,9 @@ pub(super) fn start(
     translations: &Translations,
     personal_data: &PersonalDataExport,
     sync_keep: jiff::SignedDuration,
-) -> Result<Vec<(&'static str, Subscription)>, ModuleError> {
+) -> Result<Started, ModuleError> {
     let mut subscriptions = Vec::new();
+    let mut storage = None;
     for module in dormant {
         let name = module.name();
         let mut context = DormantContext {
@@ -111,14 +150,22 @@ pub(super) fn start(
             personal_data,
             subscriptions: &mut subscriptions,
             sync_keep,
+            storage: &mut storage,
         };
         module.dormant(&mut context).map_err(|error| {
             ModuleError::new(format!(
                 "turned-off module `{name}` failed to set up its dormant part: {error}"
             ))
         })?;
+        // Kho module tắt vừa mở thì module tắt đăng ký sau thấy được ngay (vd `conversations` sau `files`).
+        if let Some((shared, opener)) = &storage
+            && apis.get::<dyn crate::storage::Storage>().is_none()
+            && tenancy.shared_storage().is_none()
+        {
+            tenancy.use_storage(Some(shared.clone()), opener.clone());
+        }
     }
-    Ok(subscriptions)
+    Ok((subscriptions, storage))
 }
 
 /// One migrator per turned-off module (its own migrations only), keyed on the control database like the

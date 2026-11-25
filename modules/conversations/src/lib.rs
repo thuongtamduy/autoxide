@@ -188,8 +188,12 @@ impl Module for ConversationsModule {
         &self,
         context: &mut autoxide_kernel::module::DormantContext<'_>,
     ) -> Result<(), Error> {
-        context.personal_data(Arc::new(privacy::DormantPrivacy))?;
-        context.on_user_deleted(Arc::new(privacy::DormantPrivacy))
+        let part = Arc::new(privacy::DormantPrivacy {
+            tenancy: context.tenancy(),
+            voice: context.contributions::<dyn autoxide_kernel::voice::VoiceProvider>(),
+        });
+        context.personal_data(part.clone())?;
+        context.on_user_deleted(part)
     }
 
     fn subscriptions(&self) -> Vec<Subscription> {

@@ -253,8 +253,76 @@ impl ConversationsService {
 
 /// Tài khoản `user` bị xoá: xoá bản ghi các cuộc gọi của người đó, xoá số trong yêu cầu gọi lại.
 /// `service` là `None` khi module đang tắt: bản ghi giữ lại tới khi bật lại (xem trong hàm).
+/// Ai xoá bản ghi cuộc gọi khi tài khoản bị xoá: service (module đang bật, ghi cả event), hay phần "nghỉ" của
+/// module đang tắt (bước 70 P9) với kho dùng chung và bộ nối thoại của module đang bật.
+pub(crate) enum RecordingEraser<'a> {
+    Service(&'a ConversationsService),
+    Dormant {
+        storage: Option<Arc<dyn Storage>>,
+        voice: &'a [Arc<dyn autoxide_kernel::voice::VoiceProvider>],
+    },
+}
+
+impl RecordingEraser<'_> {
+    async fn erase(&self, tenant: &TenantContext, row: &Call) -> Result<(), Error> {
+        match self {
+            RecordingEraser::Service(service) => {
+                service.erase_recording(tenant, Actor::system(), row, "account_deleted").await?;
+            }
+            RecordingEraser::Dormant { storage, voice } => {
+                if row.recording_ref.is_none() && row.provider_recording_id.is_none() {
+                    return Ok(());
+                }
+                // Thiếu kho hay bộ nối thì báo lỗi: event xoá tài khoản được thử lại, không báo xong khi bản
+                // ghi còn nằm lại.
+                if let Some(key) = &row.recording_ref {
+                    let storage = storage.clone().ok_or_else(|| {
+                        Error::internal(
+                            "module `conversations` is turned off and no file storage is available \
+                             (module `files` and AUTOXIDE_FILES_*): a call recording of a deleted \
+                             account cannot be deleted yet",
+                        )
+                    })?;
+                    TenantStorage::new(storage, tenant).delete(key).await?;
+                }
+                if let Some(id) = &row.provider_recording_id {
+                    let provider = voice
+                        .iter()
+                        .find(|found| found.provider() == row.provider)
+                        .ok_or_else(|| {
+                            Error::internal(format!(
+                                "module `conversations` is turned off and the voice provider \
+                                     `{}` is not on: a call recording of a deleted account cannot \
+                                     be deleted at the provider yet",
+                                row.provider
+                            ))
+                        })?;
+                    provider.delete_recording(tenant.id(), id).await?;
+                }
+                // Không ghi event `recording_deleted`: không ai giao event của module đang tắt.
+                call::Entity::update_many()
+                    .col_expr(call::Column::RecordingRef, Expr::value(Option::<String>::None))
+                    .col_expr(
+                        call::Column::ProviderRecordingId,
+                        Expr::value(Option::<String>::None),
+                    )
+                    .col_expr(
+                        call::Column::RecordingExpiresAt,
+                        Expr::value(Option::<Timestamp>::None),
+                    )
+                    .col_expr(call::Column::UpdatedAt, Expr::value(now()))
+                    .filter(call::Column::Id.eq(row.id))
+                    .scoped(tenant)
+                    .exec(tenant.database().write())
+                    .await?;
+            }
+        }
+        Ok(())
+    }
+}
+
 pub(crate) async fn forget_calls(
-    service: Option<&ConversationsService>,
+    eraser: &RecordingEraser<'_>,
     tenant: &TenantContext,
     user: Uuid,
     threads: &[Uuid],
@@ -269,14 +337,7 @@ pub(crate) async fn forget_calls(
         .all(tenant.database().read())
         .await?;
     for row in calls {
-        if let Some(service) = service {
-            service.erase_recording(tenant, Actor::system(), &row, "account_deleted").await?;
-        } else if row.recording_ref.is_some() || row.provider_recording_id.is_some() {
-            // Module đang tắt (chế độ nghỉ, bước 70 P9): không có nơi lưu của nó lẫn bộ nối nhà cung
-            // cấp thoại, nên bản ghi giữ nguyên (cột không đổi) để job hạn lưu xoá khi bật lại; phần
-            // còn lại (người gọi, số gọi lại) vẫn gỡ ngay bên dưới.
-            tracing::warn!(call_id = %row.id, "call recording kept: module `conversations` is turned off");
-        }
+        eraser.erase(tenant, &row).await?;
     }
     let at = now();
     // Yêu cầu còn mở của người đó: huỷ (không ai gọi tới số đã xoá).

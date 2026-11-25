@@ -155,15 +155,15 @@ không tool MCP, không job, không nhận event khác, nhưng:
   của nó, và xoá tài khoản thì xoá / ẩn danh dữ liệu của người đó trong nó, như khi bật;
 - xoá hẳn một khách thì xoá dòng của khách đó trong bảng của nó (trừ bảng luật buộc giữ), bản xuất dữ
   liệu của khách có các dòng đó, và dời / tách / gộp khách mang chúng theo (migration của chính module
-  được áp cho bảng của nó ở cả hai database trước, và chỉ ở nơi nó đã có bảng).
+  được áp cho bảng của nó ở cả hai database trước, và chỉ ở nơi nó đã có bảng);
+- `files` tắt vẫn đọc cấu hình của nó và mở kho, nên xoá tài khoản xoá cả nội dung file, và `conversations`
+  xoá bản ghi âm qua kho đó và bộ nối thoại đang bật; không mở được kho thì việc xoá được thử lại (không báo
+  xong khi nội dung còn nằm lại).
 
 Đây là nghĩa vụ của pháp luật bảo vệ dữ liệu cá nhân (Việt Nam: Luật 91/2025/QH15, Nghị định
 13/2023/NĐ-CP), nên không phụ thuộc bạn còn dùng module hay không. Những việc vẫn chưa làm khi tắt:
 
 - dọn dữ liệu của nó theo thời hạn lưu không chạy (job của module không chạy);
-- `files` tắt thì xoá tài khoản xoá dòng file nhưng không xoá nội dung đã lưu (log cảnh báo nêu từng khoá để
-  xoá tay); `conversations` tắt thì bản ghi âm cuộc gọi còn lại tới khi bật lại module (job dọn theo thời hạn
-  lưu sẽ xoá);
 - khách tạo trong lúc đó không có dữ liệu khởi đầu của module;
 - event module khác phát trong lúc đó không được giao bù về sau.
 

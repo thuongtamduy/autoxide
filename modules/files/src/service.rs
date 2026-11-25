@@ -470,7 +470,15 @@ async fn erase_deleted_user(
         return Ok(());
     };
     let tenant = &event.tenant;
-    let store = storage.map(|storage| TenantStorage::new(storage.clone(), tenant));
+    // Không có kho (module tắt mà không mở được kho từ cấu hình): không xoá dở — báo lỗi để event được thử
+    // lại khi kho dùng được; dòng file còn nguyên nên lần sau xoá được cả nội dung.
+    let Some(storage) = storage else {
+        return Err(Error::internal(
+            "module `files` is turned off and cannot open its storage (check AUTOXIDE_FILES_*): the files \
+             of a deleted account are kept until it can delete their content too",
+        ));
+    };
+    let store = TenantStorage::new(storage.clone(), tenant);
     let mut removed: u64 = 0;
     loop {
         let files = Entity::find()
@@ -490,14 +498,6 @@ async fn erase_deleted_user(
             .exec(tenant.database().write())
             .await?;
         for file in &files {
-            let Some(store) = &store else {
-                tracing::warn!(
-                    file_id = %file.id,
-                    storage_key = %file.storage_key(),
-                    "file deleted while module `files` is turned off; its content remains in storage"
-                );
-                continue;
-            };
             if let Err(error) = store.delete(&file.storage_key()).await {
                 tracing::warn!(file_id = %file.id, error = %error, "file deleted but its content remains");
             }

@@ -103,6 +103,13 @@ impl Module for BookmarksModule {
         })
     }
 
+    // Dormant mode: when an installer turns this module off (AUTOXIDE_MODULES), a deleted account's bookmarks
+    // must still be deleted (personal data law). A module that holds personal data registers the same
+    // handler here; this one does not export personal data, so it registers only the deletion.
+    fn dormant(&self, context: &mut autoxide_kernel::module::DormantContext<'_>) -> Result<(), Error> {
+        context.on_user_deleted(Arc::new(service::DormantBookmarks))
+    }
+
     fn jobs(&self) -> Vec<JobRegistration> {
         self.service.clone().map_or_else(Vec::new, |service| {
             vec![JobRegistration::new(

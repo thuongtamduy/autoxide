@@ -26,6 +26,7 @@ use uuid::Uuid;
 
 use crate::entity::{block, message, read, report, thread};
 use crate::service::{AuthorKind, CLOSED, ConversationsService, MODULE, now};
+use crate::voice::recordings::RecordingEraser;
 
 pub(crate) const PURGE: &str = "conversations.purge";
 
@@ -45,15 +46,19 @@ impl EventHandler for ConversationsService {
         let Some(user_id) = deleted_user(event) else {
             return Ok(());
         };
-        forget(Some(self), &event.tenant, user_id).await
+        forget(&RecordingEraser::Service(self), &event.tenant, user_id).await
     }
 }
 
 /// Phần dữ liệu cá nhân của `conversations` khi module đang tắt (chế độ nghỉ, bước 70 P9): cùng hàm
-/// với lúc bật, không cần service. Bản ghi âm cuộc gọi không xoá được lúc này (cần nơi lưu và bộ nối
-/// nhà cung cấp của service): giữ lại để job hạn lưu xoá khi module bật lại; mọi phần khác ẩn danh
-/// hoá ngay.
-pub(crate) struct DormantPrivacy;
+/// với lúc bật, không cần service. Bản ghi âm xoá bằng kho dùng chung và bộ nối thoại đang bật; thiếu thì
+/// báo lỗi để event được thử lại (không báo xong khi bản ghi còn nằm lại).
+pub(crate) struct DormantPrivacy {
+    /// Kho dùng chung (của `files` đang bật, hay `files` "nghỉ" tự mở) — đọc lúc xử lý.
+    pub tenancy: autoxide_kernel::tenancy::DatabaseRegistry,
+    /// Bộ nối thoại của module đang bật, để xoá bản ghi ở nhà cung cấp.
+    pub voice: Vec<Arc<dyn autoxide_kernel::voice::VoiceProvider>>,
+}
 
 #[async_trait::async_trait]
 impl PersonalData for DormantPrivacy {
@@ -68,7 +73,9 @@ impl EventHandler for DormantPrivacy {
         let Some(user_id) = deleted_user(event) else {
             return Ok(());
         };
-        forget(None, &event.tenant, user_id).await
+        let eraser =
+            RecordingEraser::Dormant { storage: self.tenancy.shared_storage(), voice: &self.voice };
+        forget(&eraser, &event.tenant, user_id).await
     }
 }
 
@@ -107,9 +114,19 @@ async fn export(tenant: &TenantContext, user_id: Uuid) -> Result<Value, Error> {
     Ok(Value::Array(out))
 }
 
-/// Ẩn danh hoá người mua `user_id` (xem đầu file). `service` là `None` khi module đang tắt.
+/// Ẩn danh hoá người mua `user_id` (xem đầu file); `eraser` xoá bản ghi âm.
+/// Như [`forget`], cho test của phần "nghỉ" (truyền kho thẳng vào).
+#[cfg(test)]
+pub(crate) async fn forget_for_test(
+    eraser: &RecordingEraser<'_>,
+    tenant: &TenantContext,
+    user_id: Uuid,
+) -> Result<(), Error> {
+    forget(eraser, tenant, user_id).await
+}
+
 async fn forget(
-    service: Option<&ConversationsService>,
+    eraser: &RecordingEraser<'_>,
     tenant: &TenantContext,
     user_id: Uuid,
 ) -> Result<(), Error> {
@@ -122,7 +139,7 @@ async fn forget(
         .all(tenant.database().read())
         .await?;
     // Bản ghi âm và số trong yêu cầu gọi lại (gọi nơi lưu / nhà cung cấp: ngoài transaction).
-    crate::voice::recordings::forget_calls(service, tenant, user_id, &threads).await?;
+    crate::voice::recordings::forget_calls(eraser, tenant, user_id, &threads).await?;
     let transaction = tenant.database().begin_write().await?;
     let ids: Vec<Uuid> = thread::Entity::find()
         .select_only()
