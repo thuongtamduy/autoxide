@@ -62,6 +62,7 @@ mod lengths;
 mod mcp_principal;
 mod metric_labels;
 mod publish;
+mod rust_free;
 mod scaffold;
 mod sdk;
 mod semver;
@@ -317,6 +318,8 @@ fn check() -> ExitCode {
         violations.extend(metric_labels::check(&workspace.root)?);
         violations.extend(deploy_metrics::check(&workspace.root)?);
         violations.extend(toolchain::check(&workspace.root)?);
+        // Danh sách file mà PR chỉ đổi chúng thì CI bỏ phần Rust (D-20261125-ci-skip-rust).
+        violations.extend(rust_free::check(&workspace)?);
         // Hình dạng thống nhất của API trên docs/openapi.json (D-20261121-api-shape).
         let shape = api_shape::check(&workspace.root)?;
         for warning in &shape.warnings {

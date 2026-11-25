@@ -65,6 +65,10 @@ Trước khi mở pull request: mọi thứ ở trên, và mọi test trên **c�
 
 Gate đỏ thì sửa code. Đừng nới gate, tắt lint hay bỏ qua test.
 
+Thay đổi chỉ chạm file có trong [`scripts/rust-free-paths.txt`](scripts/rust-free-paths.txt) (tài liệu, SDK
+TypeScript, file mảnh changelog, quyết định) không thể đổi kết quả Rust nào: `--quick` bỏ Clippy, và ở pull request CI
+bỏ phần biên dịch và test Rust (các job vẫn báo xanh). File không có trong danh sách thì chạy đủ.
+
 ## Những luật quan trọng nhất
 
 - **Cả hai database.** Mọi thứ chạm tới database — migration, query, transaction, index,

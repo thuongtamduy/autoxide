@@ -1,0 +1,51 @@
+# Danh sách CHO PHÉP: file mà đổi thì không thể làm đổi kết quả biên dịch, clippy hay test Rust của workspace
+# (D-20261125-ci-skip-rust). Pull request chỉ đổi file khớp danh sách này thì CI bỏ phần biên dịch và test nặng
+# (clippy, build tests, các shard test, external module example); kiểm rẻ vẫn chạy (fmt, `cargo xtask check`,
+# api-diff, `cargo xtask sdk --check`, cargo-deny, gitleaks, tsc của SDK, zizmor/actionlint). File KHÔNG khớp dòng nào
+# thì coi là chạm Rust: nghi ngờ thì chạy. Đọc bởi `scripts/rust-changed.sh` và `xtask/src/rust_free.rs`.
+#
+# Cú pháp: mỗi dòng một mẫu đường dẫn (tính từ gốc repo), `*` khớp mọi chuỗi kể cả `/`, không có ký tự đại diện
+# nào khác. Dòng bắt đầu bằng `!` là ngoại lệ: file khớp nó thì coi là chạm Rust. Dòng đầu tiên khớp quyết định.
+# Test `xtask rust_free` chặn: mọi file trong repo khớp danh sách phải không kéo test của crate nào (theo
+# `cargo xtask test-filter`: không nằm trong crate, không bị `include_str!`, không bị test đọc lúc chạy).
+#
+# Thêm mục thì ghi lý do ngay trên nó; bớt mục luôn an toàn.
+
+# SDK TypeScript: kiểm bằng job `sdk` (tsc) và `cargo xtask sdk --check` (lint); không crate nào đọc.
+sdk/typescript/*
+
+# File mảnh changelog và quyết định: `cargo xtask check` (lint) kiểm; không crate nào đọc.
+changelog.d/*
+docs/decisions/*
+docs/DECISIONS.md
+
+# Lộ trình, đặc tả bước, nghiên cứu: tài liệu nội bộ, không crate nào đọc.
+docs/ROADMAP.md
+docs/steps/*
+docs/research/*
+
+# Tài liệu ở gốc repo. CHANGELOG.md KHÔNG có ở đây: kernel nhúng nó (`include_str!`, "what's new").
+# Cặp tiếng Anh / tiếng Việt và file bắt buộc do `cargo xtask check` (lint) kiểm.
+README.md
+README.vi.md
+CONTRIBUTING.md
+CONTRIBUTING.vi.md
+SECURITY.md
+SECURITY.vi.md
+CODE_OF_CONDUCT.md
+CODE_OF_CONDUCT.vi.md
+STACK.md
+CLAUDE.md
+
+# Tài liệu trong docs/: hướng dẫn (test `e2e::guides` chạy ví dụ của chúng) và bảng module (nhúng vào test) thì chạy.
+!docs/guides/*
+!docs/MODULES*
+docs/*.md
+
+# Cấu hình và skill của agent (Claude Code): không crate nào đọc.
+.claude/*
+
+# Mẫu issue / PR và cấu hình Dependabot: GitHub đọc, không phải Rust. Workflow (.github/workflows/) thì chạy.
+.github/ISSUE_TEMPLATE/*
+.github/pull_request_template.md
+.github/dependabot.yml
