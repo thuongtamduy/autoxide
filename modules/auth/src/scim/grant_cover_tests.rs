@@ -491,3 +491,41 @@ async fn dat_luat_cho_khoa_nhom_cua_lan_ghi_thanh_vien() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn token_quyen_thap_khong_doi_user_name_tai_khoan_quyen_cao() {
+    // PT-19: `userName` / `externalId` là khoá hệ thống danh tính dùng để khớp người.
+    TestDatabase::run(async |test| {
+        let (app, services, _, admin_token) = setup(test).await;
+        let (_, low_token) = sync_operator(&app, &services, "it@example.com").await;
+        let target = scim_user(&app, &admin_token, "chief@example.com").await;
+        let id = uuid::Uuid::parse_str(&target).unwrap();
+        crate::role::grant_admin(services.database.write(), &services.tenant, id).await.unwrap();
+        let path = format!("/Users/{target}");
+        for operation in [
+            json!({"op": "replace", "path": "userName", "value": "attacker@example.com"}),
+            json!({"op": "replace", "path": "externalId", "value": "attacker"}),
+            json!({"op": "replace", "path": "displayName", "value": "Someone else"}),
+        ] {
+            let (status, body) =
+                scim(&app, "PATCH", &path, &low_token, Some(patch(json!([operation])))).await;
+            assert_forbidden(status, &body);
+        }
+        let (_, user) = scim(&app, "GET", &path, &admin_token, None).await;
+        assert_eq!(user["userName"], "chief@example.com", "{user}");
+        assert_eq!(user["externalId"], "chief@example.com", "{user}");
+        // PUT gửi lại đúng hồ sơ hiện có (không đổi gì): không bị chặn.
+        let same = user_body("chief@example.com", "chief@example.com");
+        let (status, body) = scim(&app, "PUT", &path, &low_token, Some(same)).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        // Tài khoản thường: token quyền thấp đổi được.
+        let plain = scim_user(&app, &low_token, "plain@example.com").await;
+        let rename =
+            patch(json!([{"op": "replace", "path": "userName", "value": "plain2@example.com"}]));
+        let (status, body) =
+            scim(&app, "PATCH", &format!("/Users/{plain}"), &low_token, Some(rename)).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+    })
+    .await
+    .unwrap();
+}

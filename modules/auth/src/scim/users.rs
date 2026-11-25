@@ -484,7 +484,21 @@ impl ScimService {
             0
         };
         let email_changed = account.email != input.email;
-        if link_before.is_some() && (email_changed || was_active != input.active) {
+        // Mọi thay đổi trên tài khoản đã liên kết — không chỉ email và `active` — cần người tạo token
+        // bao trùm quyền của tài khoản: `userName` / `externalId` là khoá hệ thống danh tính dùng để
+        // khớp người; đổi chúng trên tài khoản quyền cao thì lần đẩy sau (bằng token của người quyền
+        // cao) có thể ghi hồ sơ của người khác, kể cả email, vào tài khoản đó (PT-19,
+        // D-20261125-scim-sync-report). PUT / PATCH không đổi gì thì không kiểm.
+        let changed = link_before.as_ref().is_some_and(|link| {
+            email_changed
+                || was_active != input.active
+                || account.name != input.name
+                || link.user_name != input.user_name
+                || link.external_id != input.external_id
+                || link.given_name != input.given_name
+                || link.family_name != input.family_name
+        });
+        if changed {
             self.require_creator_covers(caller, id).await?;
         }
         let mut update = user::Entity::update_many()

@@ -35,6 +35,12 @@ Quyết định:
    viên (khoá nhóm, ghi thành viên, chưa commit) rồi đặt luật song song: đặt luật phải chờ. Bỏ khoá trong
    `create_mapping` thì test này đỏ chắc chắn trên Postgres (đã chạy thử; SQLite một bên ghi nên luôn xanh).
 
+5. **Mọi thay đổi trên `User` đã liên kết cần bao trùm (PT-19):** PUT / PATCH `User` đổi bất kỳ thuộc tính nào
+   (`userName`, `externalId`, tên, email, `active`) của tài khoản mà người tạo token không bao trùm quyền → 403
+   (`require_creator_covers`); gửi lại hồ sơ không đổi gì thì không kiểm. `userName` không dùng để đăng nhập, nhưng
+   nó và `externalId` là khoá hệ thống danh tính dùng để khớp người: đổi chúng trên tài khoản quyền cao thì lần đẩy
+   sau bằng token của người quyền cao có thể ghi hồ sơ của người khác (kể cả email) vào tài khoản đó.
+
 Đính chính D-20261125-scim-grant-cover (không sửa file đó):
 
 - Mục 2, "sau cả hai không có thành viên của nhóm có luật mà không có role của luật": đúng khi lần đồng bộ sau khi

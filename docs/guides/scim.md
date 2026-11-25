@@ -50,7 +50,7 @@ curl -sS "$API/api/v1/auth/scim/v2/ServiceProviderConfig"
 | --- | --- |
 | `GET /Users?filter=userName eq "…"` | Finds the linked account (`userName` without case; `externalId` with case). |
 | `POST /Users` | Creates a staff account without a password — the person signs in with your sign-in provider or sets a password by reset. An existing staff account with the same email, not yet linked, is taken over instead of duplicated. |
-| `PUT` / `PATCH /Users/{id}` | Changes `userName`, `externalId`, the name and the work email (treated as verified). Never the password or two-step sign-in. |
+| `PUT` / `PATCH /Users/{id}` | Changes `userName`, `externalId`, the name and the work email (treated as verified). Never the password or two-step sign-in. Any change to an account with permissions the token's creator lacks is refused (`403`). |
 | `active: false` | Disables the account and, in the same transaction, revokes every session, refresh token and API key. Turning it back on does not bring the API keys back. The last active administrator cannot be disabled (409). |
 | `DELETE /Users/{id}` | Deletes the account like any account deletion; other modules delete what they keep about the person. |
 

@@ -50,7 +50,7 @@ curl -sS "$API/api/v1/auth/scim/v2/ServiceProviderConfig"
 | --- | --- |
 | `GET /Users?filter=userName eq "…"` | Tìm tài khoản đã liên kết (`userName` không phân biệt hoa thường; `externalId` có phân biệt). |
 | `POST /Users` | Tạo tài khoản nhân sự không mật khẩu — người đó đăng nhập qua nhà cung cấp đăng nhập của bạn hay đặt mật khẩu bằng link đặt lại. Tài khoản nhân sự có sẵn cùng email, chưa liên kết, thì được nhận về thay vì tạo bản trùng. |
-| `PUT` / `PATCH /Users/{id}` | Đổi `userName`, `externalId`, tên và email công việc (coi là đã xác minh). Không bao giờ đổi mật khẩu hay đăng nhập hai bước. |
+| `PUT` / `PATCH /Users/{id}` | Đổi `userName`, `externalId`, tên và email công việc (coi là đã xác minh). Không bao giờ đổi mật khẩu hay đăng nhập hai bước. Mọi thay đổi trên tài khoản có permission mà người tạo token không có đều bị từ chối (`403`). |
 | `active: false` | Khoá tài khoản và, trong cùng transaction, thu hồi mọi phiên, refresh token và API key. Bật lại không làm API key sống lại. Không khoá được quản trị viên cuối cùng còn hoạt động (409). |
 | `DELETE /Users/{id}` | Xoá tài khoản như mọi lần xoá tài khoản; các module khác xoá phần dữ liệu họ giữ về người đó. |
 
