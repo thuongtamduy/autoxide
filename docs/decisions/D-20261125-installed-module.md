@@ -3,7 +3,7 @@
 Chủ đề: Kiến trúc module và kernel
 
 Quyết định: module "đã cài" ở một database nghĩa là bảng lịch sử migration của nó (`<module>_migrations`) có **ít nhất
-một dòng**, kiểm ở một chỗ duy nhất `autoxide_kernel::migration::installed`. Bảng có mà rỗng (sau `migrate down` hết) thì
+một dòng**, kiểm ở một chỗ duy nhất: hàm nội bộ `crate::migration::module_installed` của kernel (`pub(crate)`). Bảng có mà rỗng (sau `migrate down` hết) thì
 coi như chưa cài: chế độ nghỉ không migrate, không xuất, không xoá, không dời dữ liệu của module đó ở database ấy.
 Đính chính D-20261125-dormant-modules (mục 2 và 3b ghi "có `<module>_migrations`").
 

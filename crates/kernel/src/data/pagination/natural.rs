@@ -22,10 +22,9 @@ pub struct NaturalOrderPageQuery {
     /// first page. Treat the value as opaque.
     #[param(value_type = Option<String>)]
     pub cursor: Option<String>,
-    /// `asc` (the list's natural order, the default; the endpoint says what it is) or `desc`
-    /// (reversed). Text is ordered by the database's collation. Keep the same order while
-    /// following `next_cursor`: changing it midway only changes where the next page starts.
-    #[param(schema_with = super::order_schema_asc)]
+    // Mô tả cho OpenAPI ở `order_param.rs` (`schema_with` bỏ qua doc comment).
+    /// `asc` (the list's natural order, the default) or `desc` (reversed).
+    #[param(schema_with = super::order_param::natural)]
     pub order: Option<String>,
     /// `true` to also get `pagination.total`, the number of items matching the filters, on the
     /// first page (without `cursor`). Costs one more query; leave it out when not needed.
@@ -52,12 +51,14 @@ impl TryFrom<NaturalOrderPageQuery> for PageRequest {
     type Error = Error;
 
     fn try_from(query: NaturalOrderPageQuery) -> Result<Self, Self::Error> {
-        let request = PageRequest::try_from(PageQuery {
-            limit: query.limit,
-            cursor: query.cursor,
-            order: query.order,
-            count: query.count,
-        })?;
-        Ok(request.default_order(Order::Asc))
+        PageRequest::parse(
+            PageQuery {
+                limit: query.limit,
+                cursor: query.cursor,
+                order: query.order,
+                count: query.count,
+            },
+            Order::Asc,
+        )
     }
 }

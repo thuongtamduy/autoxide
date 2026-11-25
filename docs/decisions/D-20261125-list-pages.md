@@ -22,15 +22,24 @@ khỏi làm lại và vướng phần này nữa". Phần diễn giải dưới 
      khách khác không lộ gì.
    - Danh sách có tham số `sort` (vd theo thời gian tạo hoặc theo tên): `SortChoicePageQuery` — `order` không có mặc định
      cố định mà theo cột đang chọn: thời gian (tạo, sửa) → `desc` (mới nhất trước); tên, vị trí, mã, kích thước → `asc`
-     (A→Z, nhỏ trước). Handler áp bằng `PageRequest::default_order(…)` sau khi đọc `sort` (`order` client gửi thì giữ);
-     mô tả `sort` của endpoint nêu mặc định của từng giá trị. Các endpoint `sort` đang dùng `PageQuery` (vd `media`
+     (A→Z, nhỏ trước). Kiểu này không có `TryFrom`: handler đọc `sort` rồi gọi `into_request(mặc định)` — không nêu mặc
+     định thì không có `PageRequest`, không thể lặng lẽ ra `desc` trái tài liệu (`order` client gửi thì giữ). Mô tả
+     `sort` của endpoint nêu mặc định của từng giá trị.
+   - Khoá keyset của từng giá trị `sort`: `created_at` → `fetch_page` theo id (UUIDv7 sinh trong ứng dụng lúc tạo nên
+     thứ tự id là thứ tự tạo; một khoá, index (cột lọc…, id) đã có) — không dùng `fetch_page_by(created_at)`. `updated_at`
+     → `fetch_page_by(updated_at)` (`SortValue::Time`; cột `NOT NULL`, index (cột lọc…, updated_at, id)); dòng được sửa
+     trong lúc duyệt có thể nhảy sang trang khác — chấp nhận, như mọi danh sách sắp theo giá trị đổi được. Tên, mã, vị
+     trí, kích thước → `fetch_page_by` theo cột đó, index (cột lọc…, cột, id). Các endpoint `sort` đang dùng `PageQuery` (vd `media`
      items, `newsletter` subscribers: `sort=name` đang mặc định Z→A, mô tả "newest first" sai) sửa trong PR đại trà của
      module đó.
 2b. **Tên kiểu chốt**: `NaturalOrderPageQuery` (không đổi nữa; tên cũ `SortedPageQuery` chỉ có trong bản nháp) — `PageQuery`
-   cũng có thứ tự nên tên phải nói đúng chỗ khác: thứ tự tự nhiên. Có `with_count` như `PageQuery`. Tham số `order` của
-   cả hai khai `default` máy đọc được trong OpenAPI (`desc` / `asc`), dạng enum chuỗi thuần `{"type": "string", "enum":
-   […], "default": …}` (khai tay bằng `schema_with`: `inline` + `default` của utoipa ra `allOf` mà SDK TypeScript dịch
-   thành `("asc" | "desc") & Record<string, unknown>`; test của kernel giữ dạng này); enum `Order` mô tả trung lập.
+   cũng có thứ tự nên tên phải nói đúng chỗ khác: thứ tự tự nhiên. Có `with_count` như `PageQuery`. Ba kiểu query
+   (`PageQuery`, `NaturalOrderPageQuery`, `SortChoicePageQuery`) khai tham số `order` trong OpenAPI dạng enum chuỗi
+   thuần có mô tả: `{"type": "string", "enum": […], "description": …}`, cộng `"default"` (`desc` / `asc`) ở hai kiểu đầu;
+   `SortChoicePageQuery` không có `default` (theo `sort`), mô tả nói rõ. Khai tay bằng `schema_with` (file
+   `pagination/order_param.rs`): `inline` + `default` của utoipa ra `allOf` mà SDK TypeScript dịch thành `("asc" | "desc")
+   & Record<string, unknown>`, còn `schema_with` thì bỏ qua doc comment của trường nên mô tả đặt trong schema. Test của
+   kernel giữ dạng này (kể cả mô tả); enum `Order` mô tả trung lập.
 3. **Danh sách trong database phân trang bằng keyset trong database**, không trần đọc: một `.limit(N)` cứng trước khi trả
    danh sách là mất dữ liệu trong im lặng. Giới hạn nghiệp vụ thật (chặn lúc tạo, có mã lỗi) giữ ở chỗ ghi. Mỗi danh sách
    có index khớp: cột lọc (`tenant_id`, `org_id`…) + cột sắp + id; thiếu thì thêm migration. Index mới bao index cũ (index

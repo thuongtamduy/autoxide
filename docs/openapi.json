@@ -103444,6 +103444,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -105191,6 +105192,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -105556,6 +105558,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -105924,6 +105927,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -106455,6 +106459,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -107393,6 +107398,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -107830,6 +107836,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -110752,6 +110759,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -111585,6 +111593,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -111920,6 +111929,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -113761,6 +113771,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -114788,6 +114799,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -117457,6 +117469,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -118656,6 +118669,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -119455,6 +119469,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -120657,6 +120672,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -121390,6 +121406,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -123001,6 +123018,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -123850,6 +123868,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -124545,6 +124564,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -126486,6 +126506,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -127497,6 +127518,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -128619,6 +128641,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -128980,6 +129003,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -129924,6 +129948,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -130283,6 +130308,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -133514,6 +133540,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -134020,6 +134047,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -134956,6 +134984,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -137075,6 +137104,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -137269,6 +137299,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -138528,6 +138559,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -139103,6 +139135,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -139481,6 +139514,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -140319,6 +140353,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -140513,6 +140548,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -142087,6 +142123,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -142749,6 +142786,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -143060,6 +143098,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -143926,6 +143965,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -145079,6 +145119,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -148586,6 +148627,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -149022,6 +149064,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -149755,6 +149798,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -150359,6 +150403,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -151494,6 +151539,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -152162,6 +152208,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -153273,6 +153320,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -154498,6 +154546,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -156339,6 +156388,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -157532,6 +157582,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -158477,6 +158528,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -160374,6 +160426,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -161021,6 +161074,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -161189,6 +161243,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -161470,6 +161525,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -161646,6 +161702,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -162299,6 +162356,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -162690,6 +162748,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -164393,6 +164452,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -165044,6 +165104,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -165192,6 +165253,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -166673,6 +166735,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -167469,6 +167532,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -168089,6 +168153,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -169137,6 +169202,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -170043,6 +170109,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -170351,6 +170418,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -171325,6 +171393,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -172755,6 +172824,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -173489,6 +173559,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -174409,6 +174480,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -174660,6 +174732,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -174921,6 +174994,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -175651,6 +175725,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -175859,6 +175934,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -177812,6 +177888,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -178201,6 +178278,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -178486,6 +178564,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -179372,6 +179451,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -181289,6 +181369,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -182011,6 +182092,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -182913,6 +182995,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -183325,6 +183408,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -183560,6 +183644,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -184204,6 +184289,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -185068,6 +185154,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -185689,6 +185776,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -186341,6 +186429,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -186739,6 +186828,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -187265,6 +187355,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -188120,6 +188211,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -188404,6 +188496,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -190067,6 +190160,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -190666,6 +190760,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -191024,6 +191119,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -191486,6 +191582,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -193738,6 +193835,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -193988,6 +194086,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -197987,6 +198086,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -200205,6 +200305,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -201816,6 +201917,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -203125,6 +203227,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -203763,6 +203866,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -203911,6 +204015,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -204642,6 +204747,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -205243,6 +205349,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -205812,6 +205919,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -206111,6 +206219,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -206869,6 +206978,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -207205,6 +207315,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -207925,6 +208036,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -208322,6 +208434,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -208593,6 +208706,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -210834,6 +210948,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -211237,6 +211352,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -211983,6 +212099,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -214459,6 +214576,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -215473,6 +215591,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -217390,6 +217509,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -218818,6 +218938,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -219468,6 +219589,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -220410,6 +220532,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -221155,6 +221278,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -223394,6 +223518,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -223588,6 +223713,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -225180,6 +225306,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -229081,6 +229208,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -229647,6 +229775,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -230232,6 +230361,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -232784,6 +232914,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -233426,6 +233557,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -234575,6 +234707,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -236968,6 +237101,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -237120,6 +237254,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -237996,6 +238131,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -238493,6 +238629,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -239973,6 +240110,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -241551,6 +241689,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -241988,6 +242127,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -242314,6 +242454,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -243169,6 +243310,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -245678,6 +245820,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -245855,6 +245998,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -246517,6 +246661,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -246839,6 +246984,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -247509,6 +247655,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -247646,6 +247793,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -248364,6 +248512,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -248866,6 +249015,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -249264,6 +249414,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -249650,6 +249801,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -250332,6 +250484,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -251475,6 +251628,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -252951,6 +253105,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -253649,6 +253804,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -253905,6 +254061,7 @@
             "required": false,
             "schema": {
               "default": "asc",
+              "description": "`asc` (the list's natural order, the default; the endpoint says what it is) or `desc` (reversed). Text is ordered by the database's collation. Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -254624,6 +254781,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -256640,6 +256798,7 @@
             "required": false,
             "schema": {
               "default": "asc",
+              "description": "`asc` (the list's natural order, the default; the endpoint says what it is) or `desc` (reversed). Text is ordered by the database's collation. Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -256999,6 +257158,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -257782,6 +257942,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -259172,6 +259333,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -259824,6 +259986,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -260773,6 +260936,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -261034,6 +261198,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -261760,6 +261925,7 @@
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
