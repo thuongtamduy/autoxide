@@ -159,7 +159,31 @@ if [ "${CLAUDE_CODE_REMOTE:-}" = true ] && command -v pg_lsclusters >/dev/null 2
   fi
 fi
 
-# --- 7. Build trước test (chỉ khi có --prebuild; để cuối vì lâu) -------------------------------------------
+# --- 7. CARGO_INCREMENTAL=0 và đĩa (chỉ máy cloud) ----------------------------------------------------------
+# `./gate.sh` đặt CARGO_INCREMENTAL=0 (như CI), nhưng lệnh cargo gõ tay thì không: cache incremental thêm ~11 GB
+# (đo: target/ 12 GB → 23 GB sau một lần `cargo test` mặc định) và không dùng chung được với bản build của gate;
+# máy cloud có đĩa hạn chế (D-20261125-regen-and-gate-order). Hook SessionStart được nền tảng cho `CLAUDE_ENV_FILE`:
+# ghi biến vào đó thì mọi lệnh Bash sau đó có nó. Chưa kiểm chứng trên nền tảng thật (ở phiên viết script biến này
+# không đặt ngoài hook); không có thì chỉ nhắc.
+if [ "${CLAUDE_CODE_REMOTE:-}" = true ]; then
+  if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
+    if grep -qs 'CARGO_INCREMENTAL' "$CLAUDE_ENV_FILE" 2>/dev/null; then
+      log "CARGO_INCREMENTAL=0: CLAUDE_ENV_FILE đã có"
+    elif echo 'export CARGO_INCREMENTAL=0' >>"$CLAUDE_ENV_FILE" 2>/dev/null; then
+      log "CARGO_INCREMENTAL=0: đã ghi vào CLAUDE_ENV_FILE cho các lệnh sau"
+    else
+      log "không ghi được CLAUDE_ENV_FILE: tự đặt 'export CARGO_INCREMENTAL=0' trước khi gõ cargo"
+    fi
+  else
+    log "nhắc: chạy cargo tay thì đặt 'export CARGO_INCREMENTAL=0' (cache incremental thêm ~11 GB đĩa, xem docs/CLOUD-SESSIONS.md)"
+  fi
+  disk_free_gb="$(df -Pk . 2>/dev/null | awk 'NR==2 {print int($4 / 1048576)}' || true)"
+  if [ -n "$disk_free_gb" ] && [ "$disk_free_gb" -lt 20 ]; then
+    log "CẢNH BÁO: đĩa trống chỉ ${disk_free_gb} GB (< 20 GB); bản build đầy đủ cần ~12 GB, thêm incremental ~11 GB. Dọn target/ trước khi build (rm -rf target/debug/incremental)."
+  fi
+fi
+
+# --- 8. Build trước test (chỉ khi có --prebuild; để cuối vì lâu) -------------------------------------------
 if [ "$PREBUILD" = 1 ]; then
   # Build trước test của cả workspace: đúng lệnh và đúng cấu hình (CARGO_INCREMENTAL=0) mà
   # `./gate.sh --quick` dùng, nên lần gate đầu chỉ còn dựng phần đã sửa (D-20261125-cloud-dev-friction).

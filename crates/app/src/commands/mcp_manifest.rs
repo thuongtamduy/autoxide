@@ -108,7 +108,7 @@ mod tests {
     use autoxide_testkit::TestDatabase;
 
     /// `docs/mcp-tools.json` là hợp đồng tool MCP; phải luôn khớp code. Lệch thì sinh lại:
-    ///   cargo run -p autoxide -- mcp-manifest > docs/mcp-tools.json
+    ///   cargo xtask regen
     #[tokio::test]
     async fn file_mcp_tools_trong_repo_khop_voi_code() {
         TestDatabase::run(async |database| {
@@ -121,7 +121,7 @@ mod tests {
             assert_eq!(
                 committed, generated,
                 "`docs/mcp-tools.json` is out of date; regenerate it with \
-                 `cargo run -p autoxide -- mcp-manifest > docs/mcp-tools.json`"
+                 `cargo xtask regen`"
             );
         })
         .await
