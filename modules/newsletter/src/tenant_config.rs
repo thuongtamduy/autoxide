@@ -18,7 +18,7 @@ pub(crate) const CONFIRM_LINK: TenantSetting = TenantSetting::link(
     "newsletter.link.confirm",
     "Page of this tenant's website that confirms a newsletter sign-up (double opt-in), such as \
      `https://shop.example/xac-nhan-dang-ky?token={token}`. Must be on this tenant's own host \
-     (verified domain or `kernel.public_url`). When unset, the server's \
+     (a verified domain of this tenant). When unset, the server's \
      AUTOXIDE_NEWSLETTER_CONFIRM_URL is used.",
     &["{token}"],
 );

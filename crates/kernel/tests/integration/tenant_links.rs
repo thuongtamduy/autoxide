@@ -91,26 +91,18 @@ async fn link_rieng_chi_tren_host_cua_khach() {
         assert_eq!(links.link(&a, &PAGE, None).await.unwrap().as_deref(), Some(own));
         assert_eq!(links.link(&b, &PAGE, None).await.unwrap(), None);
 
-        // B đặt `kernel.public_url` rồi trỏ link về host đó: nhận; link máy chủ đổi host theo B.
-        let (status, body) = put(&app, "owner-b", "kernel.public_url", "https://b.example").await;
+        // Nhiều khách: `kernel.public_url` chỉ nhận tên miền đã xác minh của chính khách (D-20261125-tenant-site-verified).
+        for (value, why) in
+            [("https://b.example", "host chưa ai khai"), ("http://shop-a.test", "http")]
+        {
+            let (status, body) = put(&app, "owner-b", "kernel.public_url", value).await;
+            assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{why}: {body}");
+            assert_eq!(codes(&body), ["kernel.public_url_not_allowed"], "{why}");
+        }
+        let (status, body) = put(&app, "owner-a", "kernel.public_url", "https://shop-a.test").await;
         assert_eq!(status, StatusCode::OK, "{body}");
-        assert_eq!(
-            links.link(&b, &PAGE, Some(SERVER)).await.unwrap().as_deref(),
-            Some("https://b.example/confirm?token={token}")
-        );
-        let page_b = "https://b.example/xac-nhan/{token}";
-        let (status, body) = put(&app, "owner-b", name, page_b).await;
-        assert_eq!(status, StatusCode::OK, "{body}");
-        assert_eq!(links.link(&b, &PAGE, Some(SERVER)).await.unwrap().as_deref(), Some(page_b));
-        assert_eq!(links.link(&a, &PAGE, Some(SERVER)).await.unwrap().as_deref(), Some(own));
-
-        let (status, body) = put(&app, "owner-b", "kernel.public_url", "https://b2.example").await;
-        assert_eq!(status, StatusCode::OK, "{body}");
-        // Giá trị cũ của B giờ trỏ host B không còn khai: không dùng nữa, quay về link máy chủ (đổi host).
-        assert_eq!(
-            links.link(&b, &PAGE, Some(SERVER)).await.unwrap().as_deref(),
-            Some("https://b2.example/confirm?token={token}")
-        );
+        let (status, body) = put(&app, "owner-a", "kernel.public_url", "http://shop-a.test").await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "http: {body}");
     })
     .await
     .unwrap();
@@ -200,11 +192,12 @@ async fn set_domain_status(app: &TestApp, domain: &str, status: &str) {
     database.write().execute_raw(statement).await.unwrap();
 }
 
-/// Rà soát #516 lần hai: tên miền khách A đã mất (thu hồi, hay hỏng DNS — có thể người khác đã mua lại) mà CHƯA
-/// ai xác minh lại: link mẫu, `kernel.public_url` và đường đổi host không còn trỏ tới đó; đặt lại bị 422.
+/// Rà soát #516 lần hai và ba: tên miền KHÔNG đang `verified` của chính khách (thu hồi, hỏng DNS, chờ xác minh —
+/// kể cả sau khi xác minh lại thất bại hay khai lại) không được tin: link mẫu, `kernel.public_url` và đường đổi
+/// host không trỏ tới đó; đặt lại bị 422; giá trị đã lưu được báo trong `GET /kernel/settings`.
 #[tokio::test]
-async fn ten_mien_da_mat_khong_con_duoc_tin() {
-    for lost in ["revoked", "failed"] {
+async fn ten_mien_khong_dang_xac_minh_khong_duoc_tin() {
+    for state in ["revoked", "failed", "pending", "re-added"] {
         TestDatabase::run(async |test| {
             let app = TestApp::builder(test)
                 .tenant("a")
@@ -224,21 +217,76 @@ async fn ten_mien_da_mat_khong_con_duoc_tin() {
             assert_eq!(status, StatusCode::OK, "{body}");
             assert_eq!(links.link(&a, &PAGE, Some(SERVER)).await.unwrap().as_deref(), Some(own));
 
-            set_domain_status(&app, "shop-a.test", lost).await;
-            // Kiểm lại DNS thật xoá cache tên miền của máy này; test đổi thẳng dòng nên tự xoá.
-            app.registry().invalidate_domain("shop-a.test");
+            if state == "re-added" {
+                // Thu hồi rồi khai lại (dòng về `pending`, chưa xác minh lại được).
+                let domains = app.api::<TenantDomains>().unwrap();
+                let system = autoxide_kernel::event::Actor::system;
+                let page = autoxide_kernel::pagination::PageRequest::default();
+                let listed = domains.list(&a, &page).await.unwrap().data;
+                domains.revoke(system(), &a, listed[0].id).await.unwrap();
+                let again = domains.add(system(), &a, "shop-a.test").await.unwrap();
+                assert_eq!(again.status, "pending");
+            } else {
+                set_domain_status(&app, "shop-a.test", state).await;
+                // Kiểm lại DNS thật xoá ảnh chụp tên miền của máy này; test đổi thẳng dòng nên tự xoá.
+                app.registry().invalidate_domain("shop-a.test");
+            }
             assert_eq!(
                 links.link(&a, &PAGE, Some(SERVER)).await.unwrap().as_deref(),
                 Some(SERVER),
-                "{lost}"
+                "{state}"
             );
-            assert_eq!(links.rewrite(&a, SERVER).await.unwrap(), SERVER, "{lost}");
+            assert_eq!(links.rewrite(&a, SERVER).await.unwrap(), SERVER, "{state}");
             let (status, body) =
                 put(&app, "owner-a", "kernel.public_url", "https://shop-a.test").await;
-            assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{lost}: {body}");
+            assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{state}: {body}");
             assert_eq!(codes(&body), ["kernel.public_url_not_allowed"]);
+            // Giá trị cũ vẫn lưu, được báo là không dùng.
+            let listed =
+                app.get("/api/v1/kernel/settings").token("owner-a").send().await.unwrap().json();
+            let problem = |name: &str| {
+                listed["data"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .find(|row| row["name"] == name)
+                    .unwrap()["problem"]
+                    .clone()
+            };
+            assert_eq!(problem("kernel.public_url"), "kernel.public_url_unverified", "{state}");
+            assert_eq!(problem(PAGE.name()), "kernel.link_unverified", "{state}");
         })
         .await
         .unwrap();
     }
+}
+
+/// Chế độ một khách (không có bảng tên miền): như cũ — link trên địa chỉ của `kernel.public_url`; `kernel.public_url`
+/// phải `https` trừ `localhost` / `127.0.0.1`.
+#[tokio::test]
+async fn mot_khach_nhu_cu() {
+    TestDatabase::run(async |test| {
+        let app = TestApp::builder(test)
+            .user("owner", 1, &["kernel.settings.manage"])
+            .module(Linker)
+            .build()
+            .await
+            .unwrap();
+        let links = app.api::<SiteLinks>().unwrap();
+        let tenant = app.default_tenant();
+        let (status, body) = put(&app, "owner", "kernel.public_url", "http://shop.example").await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{body}");
+        let (status, body) = put(&app, "owner", "kernel.public_url", "http://localhost:3400").await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        let (status, body) = put(&app, "owner", "kernel.public_url", "https://shop.example").await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        let page = "https://shop.example/dat-lai?t={token}";
+        let (status, body) = put(&app, "owner", PAGE.name(), page).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        assert_eq!(links.link(&tenant, &PAGE, Some(SERVER)).await.unwrap().as_deref(), Some(page));
+        let (status, body) = put(&app, "owner", PAGE.name(), "https://evil.example/{token}").await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{body}");
+    })
+    .await
+    .unwrap();
 }

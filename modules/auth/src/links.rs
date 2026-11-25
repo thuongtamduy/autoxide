@@ -8,7 +8,7 @@ pub(crate) const PASSWORD_RESET: TenantSetting = TenantSetting::link(
     "auth.link.password_reset",
     "Page of this tenant's app where people choose a new password, such as \
      `https://shop.example/dat-lai-mat-khau?token={token}`. Must be on this tenant's own host \
-     (verified domain or `kernel.public_url`). When unset, the server's \
+     (a verified domain of this tenant). When unset, the server's \
      AUTOXIDE_AUTH_PASSWORD_RESET_URL is used.",
     &["{token}"],
 );

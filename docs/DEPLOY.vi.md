@@ -475,19 +475,26 @@ Mail gửi cho một khách có link tới trang của website hay app của kh�
    `auth.link.password_reset` = `https://shop.example/dat-lai-mat-khau?token={token}`. Khách cũng bật
    được một link mà máy chủ chưa có địa chỉ.
 
-Cấu hình link chỉ được nhận khi là địa chỉ `https://` có đủ mọi placeholder mà mô tả của nó nêu
-(`{token}`, `{id}`…), không có tên người dùng, không có placeholder trong phần host, và nằm trên host
-khách sở hữu: một tên miền đã xác minh của khách (xem "Tên miền riêng của khách hàng") ở port mặc định,
-địa chỉ (host và port) của `kernel.public_url` của khách, hay host của `AUTOXIDE_HTTP_PUBLIC_URL` ở port
-mặc định. Không thì `PUT` trả `422` với mã `kernel.link_host_not_allowed`,
-`kernel.link_placeholder_missing` hay `kernel.link_template_invalid`. Host được kiểm lại mỗi lần gửi
-mail: tên miền bị thu hồi, hỏng bản ghi DNS hay chuyển sang khách khác thì mail quay về địa chỉ của máy
-chủ (ghi cảnh báo vào log), không gửi token tới host khách không còn giữ — ngay trên máy chủ thấy thay
-đổi, trong vòng `AUTOXIDE_TENANCY_CACHE_SECONDS` (mặc định 10 giây) trên máy chủ khác. Tên miền đã xác minh
-của khách khác không bao giờ được tin, tên miền khách đã mất không được tin tới khi xác minh lại — kể cả
-với `kernel.public_url`, khi đó trả `422` `kernel.public_url_not_allowed`. Còn một lỗ: host của
-`kernel.public_url` mà chưa ai từng xác minh vẫn được tin cho link của chính khách đó, nên hãy xác minh
-tên miền bạn đặt vào đó.
+Cả `kernel.public_url` lẫn cấu hình link đều đưa mail tới một host, nên host được kiểm
+(D-20261125-tenant-site-verified):
+
+- **Nhiều khách** (`AUTOXIDE_TENANCY_MODE=multi`): địa chỉ phải là `https://`, port mặc định, trên một tên
+  miền khách **đang xác minh** (xem "Tên miền riêng của khách hàng") hay trên host của chính nền tảng
+  (`AUTOXIDE_HTTP_PUBLIC_URL`). Tên miền đang chờ (kể cả sau khi xác minh lại thất bại hay khai lại tên miền
+  đã thu hồi), hỏng bản ghi DNS, bị thu hồi, chưa từng khai, hay do khách khác xác minh đều bị từ chối: `PUT`
+  trả `422` (`kernel.public_url_not_allowed`, `kernel.link_host_not_allowed`). **Hãy xác minh tên miền trước
+  khi đặt `kernel.public_url`.**
+- **Một khách** (chế độ mặc định, không có danh sách tên miền): cấu hình link phải trên host của nền tảng hay
+  địa chỉ của `kernel.public_url`; `kernel.public_url` mới phải là `https://` trừ `localhost` hay `127.0.0.1`.
+
+Cấu hình link còn phải có đủ mọi placeholder mà mô tả của nó nêu (`{token}`, `{id}`…), không có tên người
+dùng, không có placeholder trong phần host (`kernel.link_placeholder_missing`,
+`kernel.link_template_invalid`). Host được kiểm lại mỗi lần gửi mail: tên miền bị thu hồi, hỏng bản ghi DNS
+hay chuyển sang khách khác thì mail quay về địa chỉ của máy chủ (ghi cảnh báo vào log) — ngay trên máy chủ
+thấy thay đổi, trong vòng `AUTOXIDE_TENANCY_CACHE_SECONDS` (mặc định 10 giây) trên máy chủ khác. Giá trị đã
+lưu trước các luật này mà không thoả thì được giữ nhưng không dùng; `GET /api/v1/kernel/settings` hiện nó kèm
+`problem: kernel.public_url_unverified` hay `kernel.link_unverified`, và nó chạy lại khi tên miền được xác
+minh.
 
 Cấu hình kết nối của mail và AI đã đổi tên theo dạng này. Tên cũ (`mail.smtp_url`, `mail.from`,
 `ai.api_key`, `ai.model`) vẫn dùng được: giá trị khách đã đặt dưới tên cũ tiếp tục có hiệu lực, và

@@ -8,22 +8,26 @@
 //!    tenant gives the whole address, path included (`https://shop.example/dat-lai-mat-khau?t={token}`)
 //!    ([`SiteLinks::link`]). A tenant may enable a mail link the server has not configured.
 //!
-//! A link setting is untrusted input (any tenant administrator sets it), so it is accepted only when the
-//! address is `https`, has no user name, no placeholder in the host part, every placeholder the module fills,
-//! and its host is one the tenant is known to control: one of its verified domains (default port), the host
-//! and port of its `kernel.public_url`, or the platform host (`AUTOXIDE_HTTP_PUBLIC_URL`, default port). A
-//! host that is a verified domain of ANOTHER tenant is never trusted — neither for a link setting nor for
-//! `kernel.public_url` itself ([`SiteLinks::rewrite`]): a tenant cannot borrow another tenant's domain, and
-//! a domain that changes owner stops receiving the former owner's links at once. The check runs when the value
-//! is set (422) and again on every use; it reads the domain owners from the registry's snapshot of verified
-//! domains (shared with CORS; no query per mail). Residual risk (ROADMAP P16): a `kernel.public_url` host nobody has verified is
-//! still trusted for that tenant's own links.
+//! A link setting and `kernel.public_url` are untrusted input (any tenant administrator sets them)
+//! (D-20261125-tenant-site-verified):
+//!
+//! - **Multi-tenant mode:** the host must be a domain this tenant has `verified` right now, or the platform host
+//!   (`AUTOXIDE_HTTP_PUBLIC_URL`); `https` only, default port only. Pending, failed, revoked, never added, or
+//!   another tenant's domain: refused when set (422), ignored with a warning when used (the server's link is
+//!   used). A value stored before this rule is kept but ignored, and `GET /api/v1/kernel/settings` flags it.
+//! - **Single-tenant mode** (no domain table to check against): a link setting must be on the platform host
+//!   or on the address of `kernel.public_url`; `kernel.public_url` must be `https` unless the host is
+//!   `localhost` / `127.0.0.1` (development).
+//!
+//! A link setting also needs `https`, no user name, no placeholder in the host part, every placeholder the
+//! module fills. Domain owners come from the registry's snapshot of verified domains (shared with CORS; no
+//! query per mail); a domain beyond the snapshot's cap is not in it, so it is not trusted (fail closed).
 
 use std::sync::Arc;
 
 use super::{PUBLIC_URL, TenantSetting, TenantSettings, parsed_setting, site_origin};
 use crate::error::{Error, FieldError};
-use crate::tenancy::{DatabaseRegistry, TenantContext, TenantId};
+use crate::tenancy::{DatabaseRegistry, TenancyMode, TenantContext, TenantId};
 
 /// Group of the per-tenant link settings ([`TenantSetting::link`]).
 pub const LINK_GROUP: &str = "link";
@@ -38,9 +42,17 @@ pub(crate) struct LinkTrust {
     platform_host: Option<String>,
 }
 
+/// Code of every refusal of a `kernel.public_url` value.
+const PUBLIC_URL_CODE: &str = "kernel.public_url_not_allowed";
+
 impl LinkTrust {
     pub(crate) fn new(registry: Option<DatabaseRegistry>, platform_host: Option<String>) -> Self {
         LinkTrust { registry, platform_host }
+    }
+
+    /// The installation runs in multi-tenant mode (the strict rule applies).
+    fn multi(&self) -> bool {
+        self.registry.as_ref().is_some_and(|registry| registry.mode() == TenancyMode::Multi)
     }
 
     /// The tenant that has verified domain `host`, if any: the in-memory snapshot of every verified domain that
@@ -52,61 +64,64 @@ impl LinkTrust {
         }
     }
 
-    /// Why address `url` cannot be the `kernel.public_url` of tenant `tenant`, if it cannot: a verified domain of
-    /// another tenant, a domain the tenant lost (revoked, or failed its DNS recheck — someone else may hold the
-    /// name now), or the tenant's own verified domain or the platform host on a port other than the default.
-    pub(crate) async fn site_problem(
+    /// Why `url` may not be an address of tenant `tenant` in multi-tenant mode (see the module documentation);
+    /// `None` when it may, and always `None` in single-tenant mode.
+    async fn multi_problem(
         &self,
         tenant: &TenantContext,
         url: &url::Url,
     ) -> Result<Option<FieldError>, Error> {
+        if !self.multi() {
+            return Ok(None);
+        }
         let host = host_of(url);
-        let default_port = url.port().is_none();
-        const CODE: &str = "kernel.public_url_not_allowed";
-        let port_problem = || {
-            FieldError::new(
-                "value",
-                CODE,
-                "use `{host}` without a port: a verified domain is trusted on its default port only",
-            )
-            .with_param("host", host.clone())
-        };
-        match self.owner(&host).await? {
-            Some(owner) if owner != tenant.id() => {
-                return Ok(Some(
-                    FieldError::new(
-                        "value",
-                        CODE,
-                        "`{host}` is a verified domain of another tenant",
-                    )
-                    .with_param("host", host.clone()),
-                ));
-            }
-            Some(_) => return Ok((!default_port).then(port_problem)),
-            None => {}
+        if url.scheme() != "https" {
+            return Ok(Some(
+                FieldError::new("value", PUBLIC_URL_CODE, "must start with `https://`")
+                    .with_param("host", host),
+            ));
         }
-        if self.platform_host.as_deref() == Some(host.as_str()) {
-            return Ok((!default_port).then(port_problem));
-        }
-        // Truy vấn database điều khiển chỉ cho host chưa ai xác minh (rủi ro P16), không cho tên miền đã xác minh.
-        if let Some(registry) = &self.registry
-            && crate::tenancy::domains::lost_by(registry, tenant.id(), &host).await?
+        let owner = self.owner(&host).await?;
+        let own = owner == Some(tenant.id());
+        let platform = owner.is_none() && self.platform_host.as_deref() == Some(host.as_str());
+        if let Some(owner) = owner
+            && owner != tenant.id()
         {
             return Ok(Some(
                 FieldError::new(
                     "value",
-                    CODE,
-                    "`{host}` was a domain of this tenant that is revoked or failed its DNS check: \
-                     verify it again first",
+                    PUBLIC_URL_CODE,
+                    "`{host}` is a verified domain of another tenant",
                 )
-                .with_param("host", host.clone()),
+                .with_param("host", host),
+            ));
+        }
+        if !own && !platform {
+            return Ok(Some(
+                FieldError::new(
+                    "value",
+                    PUBLIC_URL_CODE,
+                    "`{host}` is not a verified domain of this tenant: add it with `POST \
+                     /api/v1/kernel/domains` and verify it first",
+                )
+                .with_param("host", host),
+            ));
+        }
+        if url.port().is_some() {
+            return Ok(Some(
+                FieldError::new(
+                    "value",
+                    PUBLIC_URL_CODE,
+                    "use `{host}` without a port: a verified domain is trusted on its default port only",
+                )
+                .with_param("host", host),
             ));
         }
         Ok(None)
     }
 
-    /// The tenant's `kernel.public_url`, unless [`site_problem`](Self::site_problem) refuses it now (then a
-    /// warning, and `None`: links keep the server's address).
+    /// The tenant's `kernel.public_url`, unless it is not allowed now (then a warning, and `None`: links keep
+    /// the server's address).
     pub(crate) async fn public_site(
         &self,
         settings: &dyn TenantSettings,
@@ -118,12 +133,12 @@ impl LinkTrust {
         .await?;
         let Some(site) = site else { return Ok(None) };
         let Some(url) = parse(&site) else { return Ok(None) };
-        match self.site_problem(tenant, &url).await? {
+        match self.multi_problem(tenant, &url).await? {
             Some(problem) => {
                 tracing::warn!(
                     tenant_id = %tenant.id(),
                     problem = %problem.template(),
-                    "kernel.public_url is not accepted any more; the server's links are used"
+                    "kernel.public_url is not allowed; the server's links are used"
                 );
                 Ok(None)
             }
@@ -138,15 +153,12 @@ impl LinkTrust {
         tenant: &TenantContext,
         url: &url::Url,
     ) -> Result<bool, Error> {
-        let host = host_of(url);
-        let default_port = url.port().is_none();
-        match self.owner(&host).await? {
-            Some(owner) if owner == tenant.id() => return Ok(default_port),
-            Some(_) => return Ok(false),
-            None => {}
+        if self.multi() {
+            return Ok(self.multi_problem(tenant, url).await?.is_none());
         }
-        if self.platform_host.as_deref() == Some(host.as_str()) {
-            return Ok(default_port);
+        let host = host_of(url);
+        if self.platform_host.as_deref() == Some(host.as_str()) && url.port().is_none() {
+            return Ok(true);
         }
         let site = self.public_site(settings, tenant).await?;
         Ok(site.as_deref().and_then(parse).is_some_and(|site| {
@@ -220,16 +232,49 @@ pub(crate) fn link_template(raw: &str) -> Result<(), FieldError> {
     if clean && parsed.is_some() { Ok(()) } else { Err(invalid_template()) }
 }
 
-/// Check of a new `kernel.public_url` value for tenant `tenant` ([`LinkTrust::site_problem`]).
+/// Check of a new `kernel.public_url` value for tenant `tenant`: the multi-tenant rule, or in single-tenant mode
+/// `https` unless the host is `localhost` / `127.0.0.1`.
 pub(crate) async fn check_public_url(
     trust: &LinkTrust,
     tenant: &TenantContext,
     raw: &str,
 ) -> Result<Result<(), FieldError>, Error> {
-    match parse(raw.trim()) {
-        Some(url) => Ok(trust.site_problem(tenant, &url).await?.map_or(Ok(()), Err)),
-        None => Ok(Ok(())),
+    let Some(url) = parse(raw.trim()) else { return Ok(Ok(())) };
+    if !trust.multi() {
+        let local = matches!(url.host_str(), Some("localhost" | "127.0.0.1"));
+        if url.scheme() != "https" && !local {
+            return Ok(Err(FieldError::new(
+                "value",
+                PUBLIC_URL_CODE,
+                "must start with `https://` (`http://` only for `localhost` or `127.0.0.1`)",
+            )));
+        }
+        return Ok(Ok(()));
     }
+    Ok(trust.multi_problem(tenant, &url).await?.map_or(Ok(()), Err))
+}
+
+/// The code to show next to a stored value of `setting` that is not used any more (`GET /kernel/settings`):
+/// `kernel.public_url_unverified` or `kernel.link_unverified`; `None` when the value is used.
+pub(crate) async fn stored_problem(
+    trust: &LinkTrust,
+    settings: &dyn TenantSettings,
+    tenant: &TenantContext,
+    setting: &TenantSetting,
+    raw: &str,
+) -> Result<Option<&'static str>, Error> {
+    if setting.name() == PUBLIC_URL.name() {
+        let refused = match parse(raw.trim()) {
+            Some(url) => trust.multi_problem(tenant, &url).await?.is_some(),
+            None => false,
+        };
+        return Ok(refused.then_some("kernel.public_url_unverified"));
+    }
+    if setting.group_name() == Some(LINK_GROUP) {
+        let refused = check_link(trust, settings, tenant, setting, raw).await?.is_err();
+        return Ok(refused.then_some("kernel.link_unverified"));
+    }
+    Ok(None)
 }
 
 /// The placeholders of `setting` missing from `raw`.
@@ -265,9 +310,9 @@ pub(crate) async fn check_link(
         return Ok(Err(FieldError::new(
             "value",
             "kernel.link_host_not_allowed",
-            "the host `{host}` (with its port) is not one of this tenant's verified domains nor the \
-             address of the setting `kernel.public_url`: verify the domain first \
-             (`POST /api/v1/kernel/domains`)",
+            "the host `{host}` (with its port) is not allowed: use a verified domain of this tenant \
+             on its default port (verify it first with `POST /api/v1/kernel/domains`), or the \
+             platform's own host",
         )
         .with_param("host", host)));
     }

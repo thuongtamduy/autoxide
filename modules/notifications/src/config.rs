@@ -33,7 +33,7 @@ pub(crate) const UNSUBSCRIBE_LINK: autoxide_kernel::tenancy::TenantSetting =
         "Page of this tenant's website that withdraws a consent to advertising, such as \
          `https://shop.example/huy-nhan-tin?token={token}`: `{token}` is filled in, and the page \
          sends it to `POST /api/v1/notifications/public/unsubscribe`. Must be on this tenant's own \
-         host (verified domain or `kernel.public_url`). When unset, the server's \
+         host (a verified domain of this tenant). When unset, the server's \
          AUTOXIDE_NOTIFICATIONS_UNSUBSCRIBE_URL is used; with neither, advertising emails are not sent.",
         &["{token}"],
     );

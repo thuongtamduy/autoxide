@@ -73,7 +73,7 @@ pub(crate) const CASE_TRACKING_LINK: autoxide_kernel::tenancy::TenantSetting =
         "compliance.link.case_tracking",
         "Page of this tenant's website where a reporter follows a report or complaint, such as \
          `https://shop.example/khieu-nai?case={case}&token={token}`: `{case}` and `{token}` are \
-         filled in. Must be on this tenant's own host (verified domain or `kernel.public_url`). When \
+         filled in. Must be on this tenant's own host (a verified domain of this tenant). When \
          unset, the server's AUTOXIDE_COMPLIANCE_CASE_TRACKING_URL is used.",
         &["{case}", "{token}"],
     );

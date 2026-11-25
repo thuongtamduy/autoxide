@@ -67,9 +67,9 @@ pub const PUBLIC_URL: TenantSetting = TenantSetting::new(
      Links in mails sent for this tenant (sign-in links, invitations, password resets, email \
      checks, newsletter and comment confirmations) open on it: the server's link addresses keep \
      their path, only the start changes. When unset, the server's addresses are used as set. \
-     Refused (and ignored if set before): another tenant's verified domain, a domain this tenant \
-     lost (revoked or failed its DNS check) until verified again, a port other than the default \
-     on a verified domain.",
+     With several tenants it must be `https`, on the default port, on a domain this tenant has \
+     verified (or the platform's own host); a value stored before that no longer meets this is \
+     ignored and flagged with `problem`. With one tenant, `https` except on `localhost`.",
 )
 .checked(site_origin);
 
@@ -511,6 +511,12 @@ pub(crate) struct SettingState {
     /// For a setting of a partner connection: why its last use failed; omitted when it worked.
     #[serde(skip_serializing_if = "Option::is_none")]
     last_error: Option<String>,
+    /// The stored value is not used any more, and why: `kernel.public_url_unverified` /
+    /// `kernel.link_unverified` (its host is not a verified domain of this tenant — verify the domain or
+    /// change the value). Omitted when the value is used.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(example = "kernel.public_url_unverified")]
+    problem: Option<String>,
 }
 
 /// Payload of `kernel.setting_changed`: the name only.
@@ -559,6 +565,7 @@ fn state(setting: &TenantSetting, row: Option<&entity::Model>) -> SettingState {
         updated_at: row.map(|row| row.updated_at),
         last_used_at: None,
         last_error: None,
+        problem: None,
     }
 }
 
@@ -629,6 +636,15 @@ impl SettingsService {
             {
                 state.last_used_at = status.last_used_at;
                 state.last_error = status.last_error.clone();
+            }
+        }
+        // Giá trị đã lưu mà nay không dùng được (tên miền chưa / không còn xác minh): báo cho quản trị.
+        let trust = self.links.get().cloned().unwrap_or_default();
+        for state in &mut states {
+            if let (Some(value), Ok(setting)) = (&state.value, self.catalog.find(&state.name)) {
+                state.problem = links::stored_problem(&trust, self, tenant, &setting, value)
+                    .await?
+                    .map(str::to_owned);
             }
         }
         states.sort_by(|a, b| a.name.cmp(&b.name));

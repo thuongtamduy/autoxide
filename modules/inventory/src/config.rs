@@ -44,7 +44,7 @@ pub(crate) const RESTOCK_CONFIRM_LINK: autoxide_kernel::tenancy::TenantSetting =
         "Page of this tenant's website that confirms or stops a back-in-stock alert, such as \
          `https://shop.example/bao-co-hang?token={token}`: `{token}` is filled in, and the page \
          sends it to `POST /api/v1/inventory/public/restock-alerts/confirm` (or `/stop`). Must be on \
-         this tenant's own host (verified domain or `kernel.public_url`). When unset, the server's \
+         this tenant's own host (a verified domain of this tenant). When unset, the server's \
          AUTOXIDE_INVENTORY_RESTOCK_CONFIRM_URL is used.",
         &["{token}"],
     );

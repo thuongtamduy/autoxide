@@ -483,20 +483,29 @@ Mail sent for a tenant links to pages of that tenant's website or app. Two layer
    e.g. `auth.link.password_reset` = `https://shop.example/dat-lai-mat-khau?token={token}`. A
    tenant can also turn on a mail link the server has no address for.
 
-A link setting is accepted only when it is an `https://` address that contains every placeholder
-its description names (`{token}`, `{id}`…), with no user name and no placeholder in the host part,
-on a host the tenant controls: one of its verified domains (see "Custom domains of tenants") on the
-default port, the address (host and port) of its `kernel.public_url`, or the host of
-`AUTOXIDE_HTTP_PUBLIC_URL` on the default port. Otherwise `PUT` answers `422` with code
-`kernel.link_host_not_allowed`, `kernel.link_placeholder_missing` or `kernel.link_template_invalid`.
-The host is checked again every time a mail is sent: when the domain is revoked, fails its DNS
-recheck or moves to another tenant, mail falls back to the server's address (with a warning in the
-log) rather than sending a token to a host the tenant no longer controls — at once on the server
-that saw the change, within `AUTOXIDE_TENANCY_CACHE_SECONDS` (default 10 seconds) on the others. A
-verified domain of another tenant is never trusted, and a domain the tenant lost is not trusted
-until it is verified again — also for `kernel.public_url`, which then answers `422`
-`kernel.public_url_not_allowed`. One gap remains: a `kernel.public_url` host that nobody has ever
-verified is trusted for that tenant's own links, so verify the domain you put there.
+Both `kernel.public_url` and a link setting point mail at a host, so the host is checked
+(D-20261125-tenant-site-verified):
+
+- **Several tenants** (`AUTOXIDE_TENANCY_MODE=multi`): the address must be `https://`, on the default
+  port, on a domain the tenant has **verified** right now (see "Custom domains of tenants") or on the
+  platform's own host (`AUTOXIDE_HTTP_PUBLIC_URL`). A domain that is pending (also after a failed
+  re-verification or after adding a revoked domain again), failed its DNS recheck, revoked, never
+  added, or verified by another tenant is refused: `PUT` answers `422`
+  (`kernel.public_url_not_allowed`, `kernel.link_host_not_allowed`). **Verify the domain before
+  setting `kernel.public_url`.**
+- **One tenant** (the default mode, no domain list): a link setting must be on the platform's host
+  or on the address of `kernel.public_url`; a new `kernel.public_url` must be `https://` except on
+  `localhost` or `127.0.0.1`.
+
+A link setting also needs every placeholder its description names (`{token}`, `{id}`…), no user
+name and no placeholder in the host part (`kernel.link_placeholder_missing`,
+`kernel.link_template_invalid`). Hosts are checked again every time a mail is sent: when a domain is
+revoked, fails its DNS recheck or moves to another tenant, mail falls back to the server's address
+(with a warning in the log) — at once on the server that saw the change, within
+`AUTOXIDE_TENANCY_CACHE_SECONDS` (default 10 seconds) on the others. A value stored before these
+rules that does not meet them is kept but not used; `GET /api/v1/kernel/settings` shows it with
+`problem: kernel.public_url_unverified` or `kernel.link_unverified`, and it works again once the
+domain is verified.
 
 The connection settings of mail and AI were renamed to this pattern. Their former names
 (`mail.smtp_url`, `mail.from`, `ai.api_key`, `ai.model`) still work: a value a tenant set under a

@@ -237,7 +237,7 @@ pub(crate) const VERIFY_LINK: TenantSetting = TenantSetting::link(
     "comments.link.verify",
     "Page of this tenant's website that confirms a guest's comment, such as \
      `https://shop.example/xac-nhan-binh-luan?token={token}`. Must be on this tenant's own host \
-     (verified domain or `kernel.public_url`). When unset, the server's AUTOXIDE_COMMENTS_VERIFY_URL \
+     (a verified domain of this tenant). When unset, the server's AUTOXIDE_COMMENTS_VERIFY_URL \
      is used.",
     &["{token}"],
 );
