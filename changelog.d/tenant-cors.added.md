@@ -1,6 +1,6 @@
 - CORS follows tenants' domains: in multi-tenant mode a page at `https://<domain>` of a tenant's
   verified domain may call the API from a browser without listing it in
   `AUTOXIDE_HTTP_CORS_ORIGINS` and without a restart, but only for that tenant (otherwise
-  `403 tenant_origin_mismatch`; a refresh token, email link or export link of another tenant counts
-  as wrong); the MCP endpoint's `Origin` check uses the same rule. A removed domain loses it at once
+  `403 tenant_origin_mismatch`; from such a page a refresh token, email link or export link of
+  another tenant counts as wrong); the MCP endpoint's `Origin` check uses the same rule. A removed domain loses it at once
   on the server that removed it and within `AUTOXIDE_TENANCY_CACHE_SECONDS` on the others.

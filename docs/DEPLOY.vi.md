@@ -525,7 +525,8 @@ DNS của tên miền; tên miền đã gỡ trả `409 tenant_domain_revoked`. 
 **Gọi từ trình duyệt (CORS).** Trang ở `https://<tên miền>` của một tên miền đã xác minh gọi được API
 từ trình duyệt mà không phải thêm vào `AUTOXIDE_HTTP_CORS_ORIGINS` hay khởi động lại — nhưng chỉ cho
 chính khách đó: request từ trang đó mà token, header `Autoxide-Tenant` hay `Host` trỏ tới khách khác
-nhận `403 tenant_origin_mismatch`, và refresh token hay link trong mail của khách khác bị coi là sai.
+nhận `403 tenant_origin_mismatch`, và khi request đó không nêu khách nào thì refresh token hay link
+trong mail của khách khác bị coi là sai.
 Đây là lớp bảo vệ thêm trong trình duyệt, không phải ranh giới bảo mật: token gửi trong header, không
 bao giờ là cookie, nên trang chỉ dùng được bí mật nó đã có, còn chương trình ngoài trình duyệt gửi
 `Origin` tuỳ ý hay không gửi. Chỉ đúng origin `https://<tên miền>` được tính (không `http`, không

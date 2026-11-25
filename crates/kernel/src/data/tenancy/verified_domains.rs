@@ -7,6 +7,7 @@
 //! - [`VerifiedDomains::invalidate`] (a domain was verified, revoked, failed or moved on this server) drops
 //!   the snapshot at once and bumps a generation number: a read that started before the change does not
 //!   store its now-stale result.
+//! - A read that takes longer than [`READ_TIMEOUT`] (a hung control database) counts as failed.
 //! - A failed read is remembered for [`FAILURE_PAUSE`]: while the control database does not answer, waiting
 //!   requests fail at once (CORS refused, fail closed) instead of each one querying again in turn.
 
@@ -29,6 +30,10 @@ pub(crate) const MAX_VERIFIED_DOMAINS: u64 = 100_000;
 
 /// How long a failed read is remembered before the next request may try again.
 pub(crate) const FAILURE_PAUSE: Duration = Duration::from_secs(1);
+
+/// A read of the snapshot taking longer than this fails: requests from tenant pages do not queue up to the
+/// pool's own timeout behind a hung control database.
+pub(crate) const READ_TIMEOUT: Duration = Duration::from_secs(3);
 
 type Snapshot = Arc<HashMap<String, TenantId>>;
 
@@ -71,7 +76,10 @@ impl VerifiedDomains {
         // Bên vừa đọc trước mình lỗi: trả lỗi ngay, không xếp hàng hỏi lại database đang hỏng.
         self.check_failure()?;
         let generation = self.generation.load(Ordering::SeqCst);
-        let map = match read(control).await {
+        let outcome = tokio::time::timeout(READ_TIMEOUT, read(control))
+            .await
+            .unwrap_or_else(|_| Err(unavailable()));
+        let map = match outcome {
             Ok(map) => Arc::new(map),
             Err(error) => {
                 *lock(&self.failed_at) = Some(Instant::now());
@@ -114,13 +122,17 @@ impl VerifiedDomains {
 
     fn check_failure(&self) -> Result<(), Error> {
         match *lock(&self.failed_at) {
-            Some(at) if at.elapsed() < FAILURE_PAUSE => Err(Error::unavailable(
-                "tenant_domains_unavailable",
-                "The tenants' domains could not be read just now. Retry in a moment.",
-            )),
+            Some(at) if at.elapsed() < FAILURE_PAUSE => Err(unavailable()),
             _ => Ok(()),
         }
     }
+}
+
+fn unavailable() -> Error {
+    Error::unavailable(
+        "tenant_domains_unavailable",
+        "The tenants' domains could not be read just now. Retry in a moment.",
+    )
 }
 
 async fn read(control: &Database) -> Result<HashMap<String, TenantId>, Error> {

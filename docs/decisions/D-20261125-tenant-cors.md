@@ -13,11 +13,15 @@ Gắn với khách:
 - Preflight không có credential nên chỉ biết "origin thuộc một khách đã xác minh". Request thật mang origin của
   khách A mà khách giải được (credential, `Autoxide-Tenant`, `Host`) là B → `403 tenant_origin_mismatch`, trong
   extractor `TenantContext` / `Principal` / `OptionalTenant`, trước khi handler chạy.
-- Request không nêu khách nào mà mang origin của A: khách của request là A (`by_hint`). Nhờ vậy endpoint lấy khách
-  từ token trong thân hay query (`OptionalTenant` + `resolve_link_token`: `/auth/refresh`, `/auth/login/mfa`,
-  link trong mail, lời mời, đặt lại mật khẩu, endpoint công khai của comments / newsletter / notifications /
-  inventory) cũng gắn với A: `resolve_link_token` trả "không có" khi request đã có khách mà token ghi khách khác —
-  như token sai. Tải bản xuất bằng link (`/kernel/exports/download`) kiểm `OriginGrant` sau khi giải token.
+- Request không nêu khách nào (không `Autoxide-Tenant`, `Host` không thuộc khách nào — thường là `api.<nền tảng>`)
+  mà mang origin của A: khách của request là A (`by_hint`), và `TenantContext` được đánh dấu "đến từ trang của
+  khách" (`from_page_origin`). Nhờ vậy endpoint lấy khách từ token trong thân hay query (`OptionalTenant` +
+  `resolve_link_token`: `/auth/refresh`, `/auth/login/mfa`, link trong mail, lời mời, đặt lại mật khẩu, endpoint
+  công khai của comments / newsletter / notifications / inventory) cũng gắn với A: `resolve_link_token` trả "không
+  có" cho token của khách khác **chỉ khi** khách của request được đánh dấu như vậy. Khách đến từ credential, header
+  hay `Host` thì token vẫn thắng như trước — người đang đăng nhập ở khách X (hay giữ `Autoxide-Tenant: X` trên sàn)
+  mở link huỷ nhận thư của khách Y vẫn được. Tải bản xuất bằng link (`/kernel/exports/download`) kiểm `OriginGrant`
+  sau khi giải token.
 - Tài khoản nền tảng (người vận hành có `kernel.tenants.operate`) gọi từ origin của khách A: chỉ làm được cho A
   (vào bằng `Autoxide-Tenant: A`); làm cho khách nền tảng hay vào B từ trang đó → `tenant_origin_mismatch`.
 
@@ -46,7 +50,8 @@ bị từ chối theo).
 - Gỡ / xác minh / hỏng / dời khách (`move_domains`) gọi `invalidate_domain` → xoá ảnh chụp ngay trên máy đó và
   tăng số thế hệ: lượt đọc bắt đầu trước thay đổi không lưu kết quả cũ. Sửa khách (`invalidate(tenant)`) không
   đụng ảnh chụp. Máy khác mất quyền chậm nhất sau TTL.
-- Không đọc được database: từ chối origin của khách (fail-closed); lỗi được nhớ 1 giây để các request đang chờ
+- Không đọc được database, hay lượt đọc quá 3 giây (`READ_TIMEOUT`, database treo): từ chối origin của khách
+  (fail-closed); lỗi được nhớ 1 giây để các request đang chờ
   trả ngay thay vì lần lượt hỏi lại database đang hỏng (lớp phân loại đứng ngoài rate limiting).
 - Ngưỡng 100 000 tên miền (`MAX_VERIFIED_DOMAINS`, khoảng vài MB); vượt thì tên miền mới nhất không có CORS và log
   lỗi — phương án dự phòng khi tới gần ngưỡng: tra từng origin qua cache `domain_site` có giới hạn tần suất theo

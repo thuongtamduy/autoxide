@@ -25,6 +25,10 @@ use utoipa_axum::routes;
 
 const MANAGE: &str = "kernel.domains.manage";
 
+/// `Host` của API như ở bản thật (`api.<nền tảng>`, không thuộc khách nào): mọi request HTTP/1.1 và qua reverse proxy
+/// đều có `Host`, nên test cũng gửi để không xanh nhờ thiếu nó.
+const API: &str = "api.platform.test";
+
 /// Module thử: route công khai trả khách của request.
 struct Probe;
 
@@ -103,6 +107,7 @@ async fn app(test: &TestDatabase, settings: &[(&str, &str)]) -> TestApp {
 /// Preflight của trình duyệt từ `origin` cho một `POST`.
 async fn preflight(app: &TestApp, origin: &str) -> TestResponse {
     app.request(Method::OPTIONS, "/api/v1/probe")
+        .host(API)
         .header("origin", origin)
         .header("access-control-request-method", "POST")
         .header("access-control-request-headers", "authorization, content-type")
@@ -140,8 +145,8 @@ async fn ten_mien_da_xac_minh_duoc_cors_va_gan_voi_dung_khach() {
 
         // Request thật đúng khách (token, header, Host): 200 kèm header CORS.
         for request in [
-            app.get("/api/v1/probe").token("user-a"),
-            app.get("/api/v1/probe").header("autoxide-tenant", "a"),
+            app.get("/api/v1/probe").host(API).token("user-a"),
+            app.get("/api/v1/probe").host(API).header("autoxide-tenant", "a"),
             app.get("/api/v1/probe").host("shop-a.test"),
         ] {
             let answer = request.header("origin", "https://shop-a.test").send().await.unwrap();
@@ -154,8 +159,8 @@ async fn ten_mien_da_xac_minh_duoc_cors_va_gan_voi_dung_khach() {
         // Origin của khách `a`, request cho khách `b` (token, header, Host): từ chối trước handler. Header CORS
         // vẫn có để trang đọc được lỗi rõ ràng.
         for request in [
-            app.get("/api/v1/probe").token("user-b"),
-            app.get("/api/v1/probe").header("autoxide-tenant", "b"),
+            app.get("/api/v1/probe").host(API).token("user-b"),
+            app.get("/api/v1/probe").host(API).header("autoxide-tenant", "b"),
             app.get("/api/v1/probe").host("shop-b.test"),
         ] {
             let answer = request.header("origin", "https://shop-a.test").send().await.unwrap();
@@ -170,6 +175,7 @@ async fn ten_mien_da_xac_minh_duoc_cors_va_gan_voi_dung_khach() {
         // Ghi cũng bị chặn trước khi chạy: khách `b` không có tên miền mới.
         let write = app
             .post("/api/v1/kernel/domains")
+            .host(API)
             .token("user-b")
             .header("origin", "https://shop-a.test")
             .json(json!({"domain": "sneaky-b.test"}))
@@ -179,7 +185,7 @@ async fn ten_mien_da_xac_minh_duoc_cors_va_gan_voi_dung_khach() {
         assert_eq!(write.json()["code"], "tenant_origin_mismatch");
 
         // Không có Origin (máy gọi máy): không đổi gì.
-        let answer = app.get("/api/v1/probe").token("user-b").send().await.unwrap();
+        let answer = app.get("/api/v1/probe").host(API).token("user-b").send().await.unwrap();
         assert_eq!(answer.json()["data"]["tenant"], "b");
         assert!(allow_origin(&answer).is_empty());
     })
@@ -210,6 +216,7 @@ async fn origin_gan_dung_khong_duoc_chap_nhan() {
             assert!(allow_origin(&response).is_empty(), "{origin}: {:?}", response.headers());
             let answer = app
                 .get("/api/v1/probe")
+                .host(API)
                 .token("user-a")
                 .header("origin", origin)
                 .send()
@@ -243,6 +250,7 @@ async fn pending_failed_va_thu_hoi_khong_con_cors() {
         // `pending`: chưa chứng minh sở hữu → không cấp CORS.
         let added = app
             .post("/api/v1/kernel/domains")
+            .host(API)
             .token("user-a")
             .json(json!({"domain": "pending-a.test"}))
             .send()
@@ -282,6 +290,7 @@ async fn pending_failed_va_thu_hoi_khong_con_cors() {
             .to_owned();
         let gone = app
             .delete(&format!("/api/v1/kernel/domains/{id}"))
+            .host(API)
             .token("user-a")
             .send()
             .await
@@ -290,6 +299,7 @@ async fn pending_failed_va_thu_hoi_khong_con_cors() {
         assert!(allow_origin(&preflight(&app, "https://shop-a.test").await).is_empty());
         let answer = app
             .get("/api/v1/probe")
+            .host(API)
             .token("user-a")
             .header("origin", "https://shop-a.test")
             .send()
@@ -313,6 +323,7 @@ async fn danh_sach_chung_giu_hanh_vi_cu() {
         for token in ["user-a", "user-b"] {
             let answer = app
                 .get("/api/v1/probe")
+                .host(API)
                 .token(token)
                 .header("origin", "https://admin.platform.test")
                 .send()
@@ -340,6 +351,7 @@ async fn dau_sao_giu_hanh_vi_cu() {
         assert_eq!(allow_origin(&preflight(&app, "https://anything.test").await), "*");
         let answer = app
             .get("/api/v1/probe")
+            .host(API)
             .token("user-b")
             .header("origin", "https://shop-a.test")
             .send()
@@ -379,8 +391,11 @@ async fn tai_khoan_nen_tang_tu_origin_cua_khach() {
     TestDatabase::run(async |test| {
         let app = app(test, &[]).await;
         let call = |tenant: Option<&'static str>| {
-            let request =
-                app.get("/api/v1/probe").token("ops").header("origin", "https://shop-a.test");
+            let request = app
+                .get("/api/v1/probe")
+                .host(API)
+                .token("ops")
+                .header("origin", "https://shop-a.test");
             match tenant {
                 Some(tenant) => request.header("autoxide-tenant", tenant),
                 None => request,
@@ -394,7 +409,7 @@ async fn tai_khoan_nen_tang_tu_origin_cua_khach() {
             assert_eq!(answer.json()["code"], "tenant_origin_mismatch", "{tenant:?}");
         }
         // Từ giao diện nền tảng (không có Origin, hay origin trong danh sách chung) thì như cũ.
-        let answer = app.get("/api/v1/probe").token("ops").send().await.unwrap();
+        let answer = app.get("/api/v1/probe").host(API).token("ops").send().await.unwrap();
         assert_eq!(answer.status(), StatusCode::OK, "{}", answer.json());
     })
     .await
@@ -427,6 +442,7 @@ async fn doi_origin_la_khong_chan_origin_hop_le() {
 /// Gửi `tools/list` tới `/mcp` từ `origin` bằng token `token`.
 async fn mcp(app: &TestApp, origin: &str, token: &str) -> TestResponse {
     app.post("/mcp")
+        .host(API)
         .token(token)
         .header("origin", origin)
         .header("accept", "application/json, text/event-stream")
@@ -470,7 +486,7 @@ async fn token_cua_khach_khac_tu_origin_cua_khach() {
         let a = app.tenant("a").await.unwrap();
         let b = app.tenant("b").await.unwrap();
         let redeem = |token: String, origin: Option<&'static str>| {
-            let request = app.get(&format!("/api/v1/probe/redeem?token={token}"));
+            let request = app.get(&format!("/api/v1/probe/redeem?token={token}")).host(API);
             match origin {
                 Some(origin) => request.header("origin", origin),
                 None => request,
@@ -491,10 +507,11 @@ async fn token_cua_khach_khac_tu_origin_cua_khach() {
             "{}",
             answer.json()
         );
-        // Trực tiếp: request đã có khách `a`, token ghi khách `b` → không có.
+        // Trực tiếp: request có khách `a` nhưng không đến từ trang của `a` (header, `Host`, credential) → token
+        // vẫn thắng; chỉ khách giải từ origin của trang mới chặn (unit test ở `link_token`).
         let token = link_token(&b, "raw");
-        let found = resolve_link_token(app.registry(), Some(&a), &token).await;
-        assert!(found.unwrap().is_none());
+        let found = resolve_link_token(app.registry(), Some(&a), &token).await.unwrap();
+        assert_eq!(found.map(|(tenant, _)| tenant.id()), Some(b.id()));
     })
     .await
     .unwrap();
@@ -528,6 +545,41 @@ async fn database_loi_thi_tu_choi_origin_cua_khach() {
             allow_origin(&preflight(&app, "https://shop-a.test").await),
             "https://shop-a.test"
         );
+    })
+    .await
+    .unwrap();
+}
+
+/// Thu hẹp (D-20261125-tenant-cors): khách của request đến từ credential, header hay `Host` (không phải từ trang trên
+/// tên miền của khách) thì token có khách vẫn thắng — người đang đăng nhập ở khách `a` mở link huỷ nhận thư của
+/// khách `b` vẫn được.
+#[tokio::test]
+async fn token_cua_khach_khac_van_duoc_khi_khong_den_tu_trang_cua_khach() {
+    TestDatabase::run(async |test| {
+        let app = app(test, &[]).await;
+        let b = app.tenant("b").await.unwrap();
+        let uri = format!("/api/v1/probe/redeem?token={}", link_token(&b, "raw"));
+        for request in [
+            app.get(&uri).host(API).token("user-a"),
+            app.get(&uri).host(API).header("autoxide-tenant", "a"),
+            app.get(&uri).host("shop-a.test"),
+            // Origin trong danh sách chung hay origin lạ: không gắn khách.
+            app.get(&uri).host(API).token("user-a").header("origin", "https://evil.test"),
+        ] {
+            let answer = request.send().await.unwrap();
+            assert_eq!(answer.status(), StatusCode::OK, "{}", answer.json());
+            assert_eq!(answer.json()["data"]["tenant"], "b");
+        }
+        // Từ trang của `a` (kể cả khi đăng nhập ở `a`): như token sai.
+        let answer = app
+            .get(&uri)
+            .host(API)
+            .token("user-a")
+            .header("origin", "https://shop-a.test")
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(answer.json()["code"], "probe.token_invalid", "{}", answer.json());
     })
     .await
     .unwrap();
