@@ -397,6 +397,7 @@ into a new database.
 | `AUTOXIDE_HTTP_CLIENT_IP_HEADER` | Behind a reverse proxy: the header with the client address |
 | `AUTOXIDE_HTTP_TRUSTED_PROXY_COUNT` | How many of your proxies a request passes (default `1`) |
 | `AUTOXIDE_HTTP_TRUSTED_PROXIES` | Instead of a count: the addresses and ranges of your proxies, e.g. `10.0.0.0/8, 192.0.2.7` |
+| `AUTOXIDE_HTTP_MAX_CONNECTIONS` | Most open connections at once (default `4096`, `0`: no limit); over it new connections wait. Keep it below `ulimit -n`; your reverse proxy should still limit connections per client |
 | `AUTOXIDE_HTTP_PUBLIC_URL` | The address the internet reaches the API at, e.g. `https://api.example.com`; needed for links back to the API in mail (newsletter unsubscribe) |
 | `AUTOXIDE_HTTP_CORS_ORIGINS` | Web pages on other origins allowed to call the API |
 | `AUTOXIDE_HTTP_HSTS_SECONDS` | Once every client reaches the API over HTTPS: send `Strict-Transport-Security` (e.g. `31536000`, one year); `autoxide doctor` reminds you when the public URL is `https://` and this is `0`. Every response already carries `nosniff`, `Referrer-Policy`, `X-Frame-Options` and a strict `Content-Security-Policy` (`AUTOXIDE_HTTP_SECURITY_HEADERS`, `AUTOXIDE_HTTP_REFERRER_POLICY`) |

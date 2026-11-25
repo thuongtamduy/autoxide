@@ -29,9 +29,9 @@ updates:
     groups:
       npm:
         patterns: ["*"]
-  # Image nền của Dockerfile (ghim theo digest).
+  # Image nền của Dockerfile và image gitleaks của secret scan (.github/gitleaks/Dockerfile), đều ghim theo digest.
   - package-ecosystem: docker
-    directory: /
+    directories: ["/", "/.github/gitleaks"]
     schedule:
       interval: weekly
     cooldown:
