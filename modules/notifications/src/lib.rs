@@ -140,6 +140,10 @@ impl Module for NotificationsModule {
         migration::all()
     }
 
+    fn tenant_settings(&self) -> Vec<autoxide_kernel::tenancy::TenantSetting> {
+        vec![config::UNSUBSCRIBE_LINK]
+    }
+
     fn configure(&mut self, reader: &mut ConfigReader<'_>) -> Result<(), Invalid> {
         self.config = config::read(reader)?;
         Ok(())
@@ -222,6 +226,10 @@ impl Module for NotificationsModule {
                 TEST_SENDS_PER_HOUR,
                 Duration::from_secs(3_600),
             )?,
+            links: context
+                .require::<autoxide_kernel::tenancy::SiteLinks>()
+                .map(|links| (*links).clone())
+                .unwrap_or_default(),
         });
         self.listen_consents = service.consents.is_some()
             && context.events().contains(autoxide_compliance::api::CONSENT_WITHDRAWN);

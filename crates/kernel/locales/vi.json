@@ -444,5 +444,14 @@
   "field:must be an http(s), mailto: or tel: link, or a path on the site starting with /": "phải là link http(s), mailto: hay tel:, hoặc đường dẫn trong site bắt đầu bằng /",
   "field:block `{block}` is not available": "khối `{block}` không dùng được",
   "field:can only use the placeholders {allowed}; {placeholder} is not one of them": "chỉ được dùng các chỗ điền {allowed}; {placeholder} không thuộc số đó",
-  "field:must contain {placeholder} exactly once, where the one-time code goes": "phải có {placeholder} đúng một lần, ở chỗ đặt mã một lần"
+  "field:must contain {placeholder} exactly once, where the one-time code goes": "phải có {placeholder} đúng một lần, ở chỗ đặt mã một lần",
+  "field:must be an `https://` address of at most 2000 characters on one of this tenant's hosts, with the path and placeholders of your page; no user name, spaces or placeholders in the host part": "phải là địa chỉ `https://` dài tối đa 2000 ký tự trên một host của khách này, kèm đường dẫn và placeholder của trang; không có tên người dùng, khoảng trắng hay placeholder trong phần host",
+  "field:must contain {placeholders}, where the server puts the value of the link": "phải có {placeholders}, chỗ máy chủ điền giá trị của link",
+  "field:the host `{host}` (with its port) is not allowed: use a verified domain of this tenant on its default port (verify it first with `POST /api/v1/kernel/domains`), or the platform's own host": "host `{host}` (kèm port) không được dùng: hãy dùng một tên miền đã xác minh của khách này ở port mặc định (xác minh trước bằng `POST /api/v1/kernel/domains`), hay host của chính nền tảng",
+  "field:`{host}` is a verified domain of another tenant": "`{host}` là tên miền đã xác minh của khách khác",
+  "field:use `{host}` without a port: a verified domain is trusted on its default port only": "dùng `{host}` không kèm port: tên miền đã xác minh chỉ được tin ở port mặc định",
+  "field:`{host}` is not a verified domain of this tenant: add it with `POST /api/v1/kernel/domains` and verify it first": "`{host}` không phải tên miền đã xác minh của khách này: thêm bằng `POST /api/v1/kernel/domains` rồi xác minh trước",
+  "field:must start with `https://`": "phải bắt đầu bằng `https://`",
+  "field:must start with `https://` (`http://` only for `localhost` or `127.0.0.1`)": "phải bắt đầu bằng `https://` (`http://` chỉ cho `localhost` hay `127.0.0.1`)",
+  "kernel.public_url_not_allowed": "Địa chỉ này không dùng được làm `kernel.public_url` của khách."
 }

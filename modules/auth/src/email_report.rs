@@ -133,9 +133,13 @@ impl EmailVerifications {
         let new_email = mask(&job.new_email);
         let at = job.changed_at.format("%Y-%m-%d %H:%M").to_string();
         let days = REPORT_DAYS.to_string();
-        let mail = match &self.report_url {
+        let page = self
+            .links
+            .link(tenant, &crate::links::EMAIL_CHANGE_REPORT, self.report_url.as_deref())
+            .await?;
+        let mail = match &page {
             Some(url) => {
-                let link = self.links.rewrite(tenant, url).await?.replace("{token}", &token);
+                let link = url.replace("{token}", &token);
                 let params = [
                     ("old_email", job.old_email.as_str()),
                     ("new_email", &new_email),

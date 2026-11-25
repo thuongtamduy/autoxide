@@ -237,6 +237,19 @@ impl ContentService {
         Ok(Languages::resolve(&self.config, locales, default))
     }
 
+    /// Host được nhúng của khách `tenant`: cấu hình `content.embed_hosts`, thiếu thì
+    /// `AUTOXIDE_CONTENT_EMBED_HOSTS`. Đọc qua cache của kernel.
+    pub(crate) async fn embed_hosts(&self, tenant: &TenantContext) -> Result<Vec<String>, Error> {
+        let own = parsed_setting(
+            self.settings.as_ref(),
+            tenant,
+            &config::TENANT_EMBED_HOSTS,
+            config::tenant_embed_hosts,
+        )
+        .await?;
+        Ok(own.unwrap_or_else(|| self.config.embed_hosts.clone()))
+    }
+
     /// `locale` đã chuẩn hoá nếu nằm trong `languages`; không thì thêm lỗi `field` (và trả ngôn
     /// ngữ mặc định để kiểm tiếp các ô khác). Không gửi: ngôn ngữ mặc định.
     pub(crate) fn check_locale(

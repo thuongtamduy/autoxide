@@ -37,30 +37,6 @@ pub(crate) const NEW_POST: MailTemplate =
 pub(crate) const UNSUBSCRIBE_PATH: &str = "/api/v1/newsletter/public/unsubscribe";
 
 impl NewsletterService {
-    /// URL trang lựa chọn của website (có `{token}`), hoặc lỗi nói rõ phải đặt biến nào.
-    pub(crate) fn preferences_url(&self) -> Result<&str, Error> {
-        self.config.preferences_url.as_deref().ok_or_else(|| {
-            Error::unavailable(
-                "newsletter.preferences_url_missing",
-                "Campaign mails link to your website's newsletter preferences page: set \
-                 AUTOXIDE_NEWSLETTER_PREFERENCES_URL (for example \
-                 `https://www.example.com/newsletter/preferences?token={token}`) and restart.",
-            )
-        })
-    }
-
-    /// URL trang xác nhận của website (có `{token}`), hoặc lỗi nói rõ phải đặt biến nào.
-    pub(crate) fn confirm_url(&self) -> Result<&str, Error> {
-        self.config.confirm_url.as_deref().ok_or_else(|| {
-            Error::unavailable(
-                "newsletter.confirm_url_missing",
-                "Lists with double opt-in send a confirmation link to your website: set \
-                 AUTOXIDE_NEWSLETTER_CONFIRM_URL (for example \
-                 `https://www.example.com/newsletter/confirm?token={token}`) and restart.",
-            )
-        })
-    }
-
     /// Mail xác nhận gửi tới `to`: tên các danh sách (do quản trị viên đặt) và link — không có
     /// chữ nào do người đăng ký gõ.
     pub(crate) async fn confirmation_mail(
@@ -72,7 +48,7 @@ impl NewsletterService {
         token: &str,
         token_id: uuid::Uuid,
     ) -> Result<Mail, Error> {
-        let link = token_link(&self.links.rewrite(tenant, self.confirm_url()?).await?, token);
+        let link = token_link(&self.confirm_page(tenant).await?, token);
         let names: Vec<String> =
             lists.iter().map(|list| format!("- {}", list.name.get(locale))).collect();
         let names = names.join("\n");
@@ -89,24 +65,19 @@ impl NewsletterService {
     /// riêng cho người nhận này bằng bộ dựng mẫu của kernel.
     pub(crate) async fn campaign_mail(
         &self,
-        tenant: &autoxide_kernel::tenancy::TenantContext,
         row: &campaign::Model,
         list: &List,
         (to, name): (&str, Option<&str>),
+        pages: &crate::tenant_config::CampaignPages,
         token: &str,
         delivery_id: Option<uuid::Uuid>,
     ) -> Result<Mail, Error> {
-        self.check_ready(row)?;
         let unsubscribe = self.public_url.link(&format!("{UNSUBSCRIBE_PATH}?token={token}"))?;
-        let preferences =
-            token_link(&self.links.rewrite(tenant, self.preferences_url()?).await?, token);
+        let preferences = token_link(&pages.preferences, token);
         let locale = Locale::stored(&row.locale);
-        let address = self.config.postal_address.clone().unwrap_or_default();
-        let params = [
-            ("list", list.name.get(locale)),
-            ("link", preferences.as_str()),
-            ("address", address.as_str()),
-        ];
+        let address = pages.address.as_str();
+        let params =
+            [("list", list.name.get(locale)), ("link", preferences.as_str()), ("address", address)];
         let footer = FOOTER.render(&self.translations, locale.language(), &params).text;
         let footer = footer.trim_end();
         let (subject, body_text, body_html) = match CampaignFormat::stored(&row.format) {
@@ -235,12 +206,13 @@ impl NewsletterService {
         principal.require(&crate::permissions::NEWSLETTER_READ)?;
         let campaign = self.find_campaign(tenant, id).await?;
         let list = self.find_list(tenant, campaign.row.list_id).await?;
+        let pages = self.campaign_pages(tenant, &campaign.row).await?;
         let mail = self
             .campaign_mail(
-                tenant,
                 &campaign.row,
                 &list,
                 ("subscriber@example.invalid", Some("Subscriber")),
+                &pages,
                 PREVIEW_TOKEN,
                 None,
             )
@@ -248,20 +220,30 @@ impl NewsletterService {
         Ok(Preview { subject: mail.subject, text: mail.text, html: mail.html })
     }
 
-    /// Cấu hình đang dùng. Cần `newsletter.read`.
-    pub(crate) fn settings(
+    /// Cấu hình đang dùng ở khách `tenant` (cấu hình khách thay biến chung). Cần `newsletter.read`.
+    pub(crate) async fn settings(
         &self,
+        tenant: &autoxide_kernel::tenancy::TenantContext,
         principal: &autoxide_kernel::access::Principal,
     ) -> Result<Settings, Error> {
         principal.require(&crate::permissions::NEWSLETTER_READ)?;
         Ok(Settings {
             advertising_label: self.config.advertising_label.clone(),
             advertising_max_per_day: self.config.advertising_max_per_day,
-            postal_address: self.config.postal_address.clone(),
+            postal_address: self.postal_address(tenant).await?,
             public_url_set: self.public_url.base().is_ok(),
-            preferences_url_set: self.config.preferences_url.is_some(),
-            confirm_url_set: self.config.confirm_url.is_some(),
+            preferences_url_set: is_set(self.preferences_page(tenant).await)?,
+            confirm_url_set: is_set(self.confirm_page(tenant).await)?,
             send_rate_per_minute: self.config.send_rate_per_minute,
         })
+    }
+}
+
+/// Trang đã đặt chưa: lỗi "chưa đặt" (503) là `false`; lỗi khác (database…) truyền lên, không đọc thành "chưa đặt".
+fn is_set(page: Result<String, Error>) -> Result<bool, Error> {
+    match page {
+        Ok(_) => Ok(true),
+        Err(error) if error.code().ends_with("_url_missing") => Ok(false),
+        Err(error) => Err(error),
     }
 }

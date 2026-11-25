@@ -86,8 +86,12 @@ impl NewsletterService {
             .all(tenant.database().read())
             .await?;
         let post_locale = resource.locale.as_deref().and_then(Locale::parse);
+        // Bài mở trên tên miền của khách (`kernel.public_url`), như link trong thư của comments.
         let url = match (&self.config.site_url, &resource.url) {
-            (Some(site), Some(path)) => Some(format!("{site}{path}")),
+            (Some(site), Some(path)) => {
+                let site = self.links.rewrite(tenant, site).await?;
+                Some(format!("{}{path}", site.trim_end_matches('/')))
+            }
             _ => None,
         };
         let mut created = 0;
@@ -114,7 +118,7 @@ impl NewsletterService {
             // Gửi ngay chỉ khi đủ cấu hình (link tới bài, URL công khai, trang lựa chọn).
             let send = list.new_posts() == NewPosts::Send
                 && url.is_some()
-                && self.check_ready(&row).is_ok();
+                && self.check_ready(tenant, &row).await.is_ok();
             if list.new_posts() == NewPosts::Send && !send {
                 tracing::warn!(list_id = %list.row.id, "new-post campaign kept as a draft: set AUTOXIDE_NEWSLETTER_SITE_URL, AUTOXIDE_HTTP_PUBLIC_URL and AUTOXIDE_NEWSLETTER_PREFERENCES_URL to send it at once");
             }

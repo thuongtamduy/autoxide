@@ -70,6 +70,17 @@ pub(crate) const CASE_TRACKING_URL: Setting = Setting::new(
      carries the API path `GET /api/v1/compliance/public/cases/{id}?token=…`.",
 );
 
+/// Trang theo dõi vụ việc theo từng khách (D-20261125-tenant-link-templates).
+pub(crate) const CASE_TRACKING_LINK: autoxide_kernel::tenancy::TenantSetting =
+    autoxide_kernel::tenancy::TenantSetting::link(
+        "compliance.link.case_tracking",
+        "Page of this tenant's website where a reporter follows a report or complaint, such as \
+         `https://shop.example/khieu-nai?case={case}&token={token}`: `{case}` and `{token}` are \
+         filled in. Must be on this tenant's own host (a verified domain of this tenant). When \
+         unset, the server's AUTOXIDE_COMPLIANCE_CASE_TRACKING_URL is used.",
+        &["{case}", "{token}"],
+    );
+
 fn tracking_url(raw: &str) -> Result<String, String> {
     let url = raw.trim();
     if (url.starts_with("https://") || url.starts_with("http://"))

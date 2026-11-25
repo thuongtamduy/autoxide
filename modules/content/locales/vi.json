@@ -377,5 +377,6 @@
   "field:the `newsletter` channel needs the list to write the campaign for": "kênh `newsletter` cần danh sách nhận tin của chiến dịch",
   "field:the number {number} is not in the promotion facts": "số {number} không có trong dữ liệu của chương trình",
   "field:send exactly one of `layout` and `operations`": "gửi đúng một trong hai: `layout` hoặc `operations`",
-  "field:is not valid: {error}": "chưa hợp lệ: {error}"
+  "field:is not valid: {error}": "chưa hợp lệ: {error}",
+  "field:must be 1 to {max} domain names separated by commas, such as `youtube.com,vimeo.com`; not valid: {items}": "phải là 1 tới {max} tên miền cách nhau bằng dấu phẩy, vd `youtube.com,vimeo.com`; không hợp lệ: {items}"
 }

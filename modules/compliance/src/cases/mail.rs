@@ -3,8 +3,23 @@
 use super::*;
 
 impl ComplianceService {
-    pub(super) fn tracking_link(&self, id: Uuid, token: &str) -> String {
-        match self.case_tracking_url.as_deref() {
+    /// Link theo dõi vụ việc: trang riêng của khách (`compliance.link.case_tracking`), không có thì biến chung
+    /// (đổi host theo `kernel.public_url`), không có nữa thì đường dẫn API.
+    pub(super) async fn tracking_link(
+        &self,
+        tenant: &TenantContext,
+        id: Uuid,
+        token: &str,
+    ) -> String {
+        let page = self
+            .links
+            .link(tenant, &crate::config::CASE_TRACKING_LINK, self.case_tracking_url.as_deref())
+            .await
+            .unwrap_or_else(|error| {
+                tracing::warn!(%error, "cannot read the tenant's case tracking page; using the server's");
+                self.case_tracking_url.clone()
+            });
+        match page {
             Some(url) => url.replace("{case}", &id.to_string()).replace("{token}", token),
             None => format!("/api/v1/compliance/public/cases/{id}?token={token}"),
         }
@@ -39,7 +54,7 @@ impl ComplianceService {
             row.id.to_string(),
         );
         if let Some(email) = row.reporter_email.as_deref() {
-            let link = self.tracking_link(row.id, &opened.token);
+            let link = self.tracking_link(tenant, row.id, &opened.token).await;
             let mut mail = RECEIVED_MAIL.mail(
                 email,
                 &self.translations,

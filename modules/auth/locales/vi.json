@@ -75,6 +75,7 @@
   "auth.oidc_provider_unavailable": "Không liên lạc được với nhà cung cấp đăng nhập. Hãy thử lại sau.",
   "auth.oidc_redirect_not_allowed": "Địa chỉ quay về `{redirect_uri}` không có trong danh sách của nhà cung cấp này.",
   "auth.oidc_signup_closed": "Chưa có tài khoản cho danh tính này và không được tự đăng ký.",
+  "auth.oidc_default_role_unavailable": "Nhà cung cấp đăng nhập này cấp cho tài khoản mới một role mà người cấu hình nó hiện không trao được. Hãy nhờ quản trị viên lưu lại cài đặt của nhà cung cấp đăng nhập.",
   "auth.oidc_slug_taken": "Đã có nhà cung cấp mang tên `{slug}`.",
   "auth.oidc_state_invalid": "Lượt đăng nhập đã hết hạn hoặc đã dùng. Hãy bắt đầu lại.",
   "auth.oidc_token_invalid": "Nhà cung cấp trả về thông tin đăng nhập không hợp lệ ({reason}). Hãy thử lại.",

@@ -376,9 +376,10 @@ impl ProviderService {
             row.enabled = enabled;
         }
         let mut problems = check(&row, client, &redirect_uris, allowed.as_deref());
-        if changes.default_org_id.is_some() || changes.default_role_id.is_some() {
-            problems.extend(self.check_defaults(tenant, principal, &row).await?);
-        }
+        // Mọi lần sửa, không chỉ khi đổi trường mặc định: người sửa nhà cung cấp còn role mặc định
+        // (issuer, client, tự đăng ký, tên miền…) quyết định ai nhận role đó, nên phải tự trao được nó
+        // (D-20261125-durable-grants).
+        problems.extend(self.check_defaults(tenant, principal, &row).await?);
         let secret_changed = changes.client_secret.is_some();
         if let Some(secret) = changes.client_secret {
             if row.kind() != Kind::Oidc && secret.trim().is_empty() {
@@ -647,6 +648,40 @@ fn normalize_scopes(raw: &str) -> String {
 
 fn domains(list: &[String]) -> Vec<String> {
     list.iter().map(|domain| domain.trim().to_ascii_lowercase()).collect()
+}
+
+/// Bỏ "người cấu hình" (`configured_by = NULL`) của mọi nhà cung cấp do người `user_id` cấu hình,
+/// trong `connection` (transaction khoá tài khoản), mỗi nhà cung cấp một event
+/// `auth.oidc_provider_updated`. Sức mạnh tự liên kết danh tính ngoài vào tài khoản có sẵn đo bằng
+/// quyền HIỆN TẠI của người cấu hình: tài khoản bị khoá (hay được trao quyền cao sau này) mà vẫn là
+/// người cấu hình thì nhà cung cấp kẻ tấn công dựng sẵn gộp được vào tài khoản quyền cao. Liên kết sẵn
+/// có vẫn đăng nhập được; chỉ ngừng tự liên kết cho tới khi người quản lý lưu lại nhà cung cấp
+/// (D-20261125-durable-grants).
+pub(crate) async fn forget_configurer_in<C: sea_orm::ConnectionTrait>(
+    connection: &C,
+    tenant: &TenantContext,
+    outbox: &Outbox,
+    actor: Actor,
+    user_id: Uuid,
+) -> Result<(), Error> {
+    let rows = entity::Entity::find()
+        .filter(entity::Column::ConfiguredBy.eq(user_id))
+        .scoped(tenant)
+        .all(connection)
+        .await?;
+    for row in rows {
+        let before = describe(&row);
+        let mut active = row.clone().into_active_model();
+        active.configured_by = Set(None);
+        active.update(connection).await?;
+        let mut after = before.clone();
+        after["configured_by"] = serde_json::Value::Null;
+        after["secret_changed"] = json!(false);
+        let event = events::OidcProviderUpdated { before: Some(before), after: Some(after) };
+        outbox.record(connection, tenant, actor, subject(row.id), &event).await?;
+        tracing::info!(provider_id = %row.id, %user_id, "sign-in provider lost its configurer");
+    }
+    Ok(())
 }
 
 fn subject(id: Uuid) -> Option<String> {

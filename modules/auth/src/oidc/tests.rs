@@ -36,7 +36,7 @@ struct Pending {
 
 /// Máy chủ OIDC giả.
 #[derive(Default)]
-struct Fake {
+pub(super) struct Fake {
     base: OnceLock<String>,
     /// Khoá công bố trong JWKS.
     published: Mutex<Vec<(String, SigningKey)>>,
@@ -201,7 +201,7 @@ async fn answer(
     json_response(StatusCode::NOT_FOUND, json!({"error": "not_found"}))
 }
 
-async fn fake_server() -> Arc<Fake> {
+pub(super) async fn fake_server() -> Arc<Fake> {
     let fake = Arc::new(Fake::default());
     fake.rotate("k1", true);
     let service = axum::handler::Handler::with_state(answer, fake.clone());
@@ -214,7 +214,7 @@ async fn fake_server() -> Arc<Fake> {
 
 /// App có OIDC bật (mạng riêng cho phép, vì máy chủ giả ở 127.0.0.1), một quản trị viên
 /// `root@example.com` và `ada@example.com` (email chưa xác minh).
-async fn app(test: &TestDatabase, private: bool) -> (TestApp, Services, String) {
+pub(super) async fn app(test: &TestDatabase, private: bool) -> (TestApp, Services, String) {
     let services = crate::testing::services(test).await;
     let mailer: Arc<dyn Mailer> = services.mails.clone();
     let app = TestApp::builder(test)
@@ -243,7 +243,7 @@ async fn app(test: &TestDatabase, private: bool) -> (TestApp, Services, String) 
     (app, services, admin)
 }
 
-async fn token(app: &TestApp, email: &str) -> String {
+pub(super) async fn token(app: &TestApp, email: &str) -> String {
     let body = json!({"email": email, "password": PASSWORD});
     let response = app.post("/api/v1/auth/login").json(body).send().await.unwrap();
     assert_eq!(response.status(), StatusCode::OK, "{}", response.json());
@@ -251,14 +251,14 @@ async fn token(app: &TestApp, email: &str) -> String {
 }
 
 /// Tạo nhà cung cấp qua REST; trả thân response.
-async fn provider(app: &TestApp, admin: &str, body: Value) -> Value {
+pub(super) async fn provider(app: &TestApp, admin: &str, body: Value) -> Value {
     let response = app.post("/api/v1/auth/oidc-providers").token(admin).json(body).send().await;
     let response = response.unwrap();
     assert_eq!(response.status(), StatusCode::CREATED, "{}", response.json());
     response.json()["data"].clone()
 }
 
-fn oidc_body(fake: &Fake, slug: &str, signup: bool) -> Value {
+pub(super) fn oidc_body(fake: &Fake, slug: &str, signup: bool) -> Value {
     json!({
         "slug": slug, "kind": "oidc", "name": "Test ID", "issuer": format!("{}/{slug}", fake.base()),
         "client_id": CLIENT_ID, "client_secret": "s3cret", "redirect_uris": [REDIRECT],
@@ -266,7 +266,7 @@ fn oidc_body(fake: &Fake, slug: &str, signup: bool) -> Value {
     })
 }
 
-fn claims(fake: &Fake, slug: &str, subject: &str, email: &str, verified: bool) -> Value {
+pub(super) fn claims(fake: &Fake, slug: &str, subject: &str, email: &str, verified: bool) -> Value {
     let now = Timestamp::now().as_unix_seconds();
     json!({
         "iss": format!("{}/{slug}", fake.base()), "aud": CLIENT_ID, "sub": subject,
@@ -311,13 +311,18 @@ async fn callback(app: &TestApp, slug: &str, code: &str, state: &str) -> (Status
 }
 
 /// Cả lượt đăng nhập với `claims`.
-async fn sign_in(app: &TestApp, fake: &Fake, slug: &str, claims: Value) -> (StatusCode, Value) {
+pub(super) async fn sign_in(
+    app: &TestApp,
+    fake: &Fake,
+    slug: &str,
+    claims: Value,
+) -> (StatusCode, Value) {
     let query = start(app, slug, None).await;
     let code = approve(fake, &query, claims);
     callback(app, slug, &code, &query["state"]).await
 }
 
-async fn me(app: &TestApp, access: &str) -> Value {
+pub(super) async fn me(app: &TestApp, access: &str) -> Value {
     let response = app.get("/api/v1/auth/me").token(access).send().await.unwrap();
     assert_eq!(response.status(), StatusCode::OK, "{}", response.json());
     response.json()["data"].clone()

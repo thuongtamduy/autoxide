@@ -62,6 +62,8 @@ async fn app(test: &TestDatabase) -> TestApp {
     TestApp::builder(test)
         .tenant("acme")
         .tenant("beta")
+        // `kernel.public_url` của khách nhiều-khách phải là tên miền đã xác minh (D-20261125-tenant-site-verified).
+        .domain("acme", "acme.example")
         .user("platform", 1, &["kernel.tenants.manage", "kernel.tenants.read"])
         .user_in("acme", "acme", 2, &STAFF)
         .user_in("beta", "beta", 3, &STAFF)

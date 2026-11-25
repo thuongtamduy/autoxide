@@ -344,9 +344,11 @@ impl EmailVerifications {
         transaction.commit().await?;
 
         let hours = TOKEN_HOURS.to_string();
-        let mail = match &self.url {
+        let page =
+            self.links.link(tenant, &crate::links::EMAIL_VERIFICATION, self.url.as_deref()).await?;
+        let mail = match &page {
             Some(url) => {
-                let link = self.links.rewrite(tenant, url).await?.replace("{token}", &token);
+                let link = url.replace("{token}", &token);
                 let params = [("email", email), ("hours", &hours), ("link", &link)];
                 VERIFY_LINK.mail(email, &self.translations, language, &params)
             }

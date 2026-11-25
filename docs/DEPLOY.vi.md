@@ -447,6 +447,10 @@ hành vi của module còn đặt được theo từng khách, thay giá trị c
 | `forms.retention_days` | `AUTOXIDE_FORMS_RETENTION_DAYS` ([form](FORMS.vi.md)) |
 | `content.locales`, `content.default_locale` | `AUTOXIDE_CONTENT_LOCALES`, `AUTOXIDE_CONTENT_DEFAULT_LOCALE` ([nội dung](CONTENT.vi.md#ngôn-ngữ)) |
 | `media.alt_locales` | `AUTOXIDE_MEDIA_ALT_LOCALES` ([media](MEDIA.vi.md)) |
+| `content.embed_hosts` | `AUTOXIDE_CONTENT_EMBED_HOSTS` |
+| `analytics.allowed_hosts` | `AUTOXIDE_ANALYTICS_ALLOWED_HOSTS` (tên miền đã xác minh của khách luôn được nhận) |
+| `newsletter.postal_address` | `AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS`; chưa đặt thì tên và địa chỉ chủ sở hữu trong hồ sơ pháp lý của khách (module `compliance`) được dùng trước |
+| `<module>.link.<trang>` (nhóm `link`, xem dưới) | địa chỉ trang `AUTOXIDE_…_URL` trong mail: `auth.link.password_reset`, `auth.link.email_verification`, `auth.link.invitation`, `auth.link.login`, `auth.link.email_change_report`, `support.link.guest_ticket`, `compliance.link.case_tracking`, `inventory.link.restock_confirm`, `notifications.link.unsubscribe`, `comments.link.verify`, `comments.link.unsubscribe`, `newsletter.link.confirm`, `newsletter.link.preferences` |
 
 `GET /api/v1/kernel/settings` liệt kê chúng kèm giá trị khách hiện tại đã đặt. Quản trị của khách
 (permission `kernel.settings.manage`) đặt một cấu hình bằng `PUT /api/v1/kernel/settings/{name}` với
@@ -459,6 +463,38 @@ Cấu hình nối khách với một dịch vụ của đối tác (máy chủ m
 của khách…) thuộc nhóm `connection` và mang tên dạng `<module>.connection.<loại>.<trường>`:
 `GET /api/v1/kernel/settings?group=connection` chỉ liệt kê các cấu hình đó — đúng thứ màn "Kết nối
 đối tác" cần. Mỗi cấu hình trong danh sách mang `group` của nó (`null` khi không thuộc nhóm nào).
+
+### Link trong mail, theo từng khách
+
+Mail gửi cho một khách có link tới trang của website hay app của khách đó. Hai lớp, lớp sau thắng:
+
+1. `kernel.public_url` (vd `https://shop.example`) thay scheme và host của mọi địa chỉ trang mà máy
+   chủ có (`AUTOXIDE_AUTH_PASSWORD_RESET_URL`…), giữ đường dẫn.
+2. Một cấu hình link (nhóm `link`, `GET /api/v1/kernel/settings?group=link`) cho cả địa chỉ trang của
+   một link, kể cả đường dẫn, cho website có trang ở chỗ khác với máy chủ — vd
+   `auth.link.password_reset` = `https://shop.example/dat-lai-mat-khau?token={token}`. Khách cũng bật
+   được một link mà máy chủ chưa có địa chỉ.
+
+Cả `kernel.public_url` lẫn cấu hình link đều đưa mail tới một host, nên host được kiểm
+(D-20261125-tenant-site-verified):
+
+- **Nhiều khách** (`AUTOXIDE_TENANCY_MODE=multi`): địa chỉ phải là `https://`, port mặc định, trên một tên
+  miền khách **đang xác minh** (xem "Tên miền riêng của khách hàng") hay trên host của chính nền tảng
+  (`AUTOXIDE_HTTP_PUBLIC_URL`). Tên miền đang chờ (kể cả sau khi xác minh lại thất bại hay khai lại tên miền
+  đã thu hồi), hỏng bản ghi DNS, bị thu hồi, chưa từng khai, hay do khách khác xác minh đều bị từ chối: `PUT`
+  trả `422` (`kernel.public_url_not_allowed`, `kernel.link_host_not_allowed`). **Hãy xác minh tên miền trước
+  khi đặt `kernel.public_url`.**
+- **Một khách** (chế độ mặc định, không có danh sách tên miền): cấu hình link phải trên host của nền tảng hay
+  địa chỉ của `kernel.public_url`; `kernel.public_url` mới phải là `https://` trừ `localhost` hay `127.0.0.1`.
+
+Cấu hình link còn phải có đủ mọi placeholder mà mô tả của nó nêu (`{token}`, `{id}`…), không có tên người
+dùng, không có placeholder trong phần host (`kernel.link_placeholder_missing`,
+`kernel.link_template_invalid`). Host được kiểm lại mỗi lần gửi mail: tên miền bị thu hồi, hỏng bản ghi DNS
+hay chuyển sang khách khác thì mail quay về địa chỉ của máy chủ (ghi cảnh báo vào log) — ngay trên máy chủ
+thấy thay đổi, trong vòng `AUTOXIDE_TENANCY_CACHE_SECONDS` (mặc định 10 giây) trên máy chủ khác. Giá trị đã
+lưu trước các luật này mà không thoả thì được giữ nhưng không dùng; `GET /api/v1/kernel/settings` hiện nó kèm
+`problem: kernel.public_url_unverified` hay `kernel.link_unverified`, và nó chạy lại khi tên miền được xác
+minh.
 
 Cấu hình kết nối của mail và AI đã đổi tên theo dạng này. Tên cũ (`mail.smtp_url`, `mail.from`,
 `ai.api_key`, `ai.model`) vẫn dùng được: giá trị khách đã đặt dưới tên cũ tiếp tục có hiệu lực, và

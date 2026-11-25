@@ -23,6 +23,7 @@ mod public;
 mod retention;
 mod service;
 mod summary;
+mod tenant_config;
 mod text;
 mod tools;
 
@@ -155,6 +156,10 @@ impl Module for NewsletterModule {
         events::all()
     }
 
+    fn tenant_settings(&self) -> Vec<autoxide_kernel::tenancy::TenantSetting> {
+        tenant_config::all()
+    }
+
     fn configure(&mut self, reader: &mut ConfigReader<'_>) -> Result<(), Invalid> {
         self.config = Some(NewsletterConfig::read(reader)?);
         Ok(())
@@ -183,11 +188,13 @@ impl Module for NewsletterModule {
         // nhận một event không ai khai là lỗi khởi động).
         self.listens_published = context.events().contains(campaigns::new_posts::ENTRY_PUBLISHED);
         self.listens_failures = context.events().contains(autoxide_kernel::mail::DELIVERY_FAILED);
-        // Link trong thư mở trên tên miền của khách khi khách đã đặt `kernel.public_url`.
+        // Link trong thư theo khách: `kernel.public_url` và trang riêng `newsletter.link.*` (kernel kiểm host).
         let links = context
-            .require::<dyn autoxide_kernel::tenancy::TenantSettings>()
-            .map(autoxide_kernel::tenancy::SiteLinks::new)
+            .require::<autoxide_kernel::tenancy::SiteLinks>()
+            .map(|links| (*links).clone())
             .unwrap_or_default();
+        let settings = context.require::<dyn autoxide_kernel::tenancy::TenantSettings>().ok();
+        let legal = context.require::<dyn autoxide_compliance::api::LegalProfiles>().ok();
         // Sổ đồng ý chung (bước 37 C3, D-367): `newsletter` đăng ký SAU `compliance`.
         let consents = context.require::<dyn autoxide_compliance::api::ConsentLedger>().ok();
         self.listens_consents = consents.is_some()
@@ -200,7 +207,8 @@ impl Module for NewsletterModule {
             NewsletterService::new(parts, config)
                 .with_links(links)
                 .with_consents(consents)
-                .with_templates(templates),
+                .with_templates(templates)
+                .with_tenant_config(settings, legal),
         );
         context.personal_data(service.clone())?;
         context.summary_metric(Arc::new(summary::Subscribers))?;

@@ -168,6 +168,13 @@ Dùng API chưa từng dùng trong repo thì tra đúng phiên bản đang ghim 
 
 Hai mức (D-173), các bước và biến môi trường ghi ở đầu `gate.sh`:
 
+> **Công tắc gate nhanh** (chủ dự án quyết, D-20261125-local-gate-switch): biến môi trường `GATE_LOCAL` = `on` (mặc
+> định) | `off`. Chủ dự án chọn — đặt biến ở cấu hình môi trường cloud, hoặc nói "tắt gate" / "bật gate" trong phiên
+> (phiên điều phối chuyển lời cho phiên con); agent không tự tắt. Lệnh vẫn là một: `./gate.sh --quick`. Khi `off` nó chỉ
+> chạy kiểm rẻ (fmt, `xtask check`, SDK, api-diff, deny, gitleaks), không clippy, không test; agent chạy thêm các bài test
+> vừa viết hay sửa (bài chạm database thêm trên Postgres) rồi push. Khi `off`, **CI xanh trên pull request thay "gate
+> nhanh xanh"** ở mọi luật bên dưới: không merge khi CI chưa xanh, không push thẳng `main`. Gate đầy đủ trước phát hành không đổi.
+
 - **`./gate.sh --quick`** — trước mỗi commit, và đủ để đánh dấu một bước xong và merge vào
   `main`: test của crate bị sửa và crate phụ thuộc vào chúng, chỉ trên SQLite (D-300).
 - **`./gate.sh`** — gate đầy đủ, cả SQLite và Postgres. **Bắt buộc xanh trước khi phát hành**
@@ -315,10 +322,15 @@ SDK, mục lục quyết định); gate trên máy kiểm sớm bằng `cargo xt
   `Module::translations` (D-039, D-057). Thêm `code` mới thì thêm bản dịch —
   `cargo xtask check` chặn `code` thiếu bản dịch. Client không nêu ngôn ngữ thì trả
   **tiếng Anh**.
-- Response chỉ có ba hình dạng: `Data<T>` (`{"data": …}`), `Page<T>`
-  (`{"data": […], "pagination": {…}}`) và lỗi `Problem` (RFC 9457). Danh sách lấy
-  bằng `fetch_page` với tham số `limit` / `cursor` / `order`; không tự viết
-  `OFFSET`.
+- Response chỉ có ba hình dạng: `Data<T>` (`{"data": …}`, một đối tượng), `Page<T>`
+  (`{"data": […], "pagination": {…}}`) và lỗi `Problem` (RFC 9457). **Mọi danh sách là `Page<T>`**, không trả
+  `Data<Vec<T>>` (D-20261125-list-pages, chủ dự án quyết): gate `api-unpaged-list` chặn danh sách mới thiếu
+  pagination; `xtask/api-shape-allow.txt` chỉ còn các danh sách cũ chờ chuyển, không thêm dòng mới. Danh sách trong
+  database chia trang bằng keyset, tham số `limit` / `cursor` / `order`: `fetch_page` + `PageQuery` (mới nhất
+  trước); `fetch_page_by` + `NaturalOrderPageQuery` khi danh sách có thứ tự tự nhiên (vị trí, tên, mã — mặc định
+  `asc`); endpoint có tham số `sort` thì `SortChoicePageQuery::into_request(mặc định theo cột đang chọn)`. Cột sắp
+  phải NOT NULL và có index khớp (cột lọc + cột sắp + id); không trần đọc ngầm, không tự viết `OFFSET`. `page_of`
+  chỉ cho danh sách không nằm trong database. Tool MCP danh sách dùng cùng tham số và trả `pagination` như REST.
 - Doc comment `///` trên kiểu có `ToSchema` / `IntoParams` và trên handler có
   `#[utoipa::path]` được chép vào tài liệu OpenAPI: viết **tiếng Anh**, cho người
   gọi API. Giải thích cho người đọc code thì dùng `//`.

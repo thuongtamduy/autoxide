@@ -24,6 +24,8 @@ pub(crate) struct AnalyticsService {
     pub consents: Option<Arc<dyn ConsentLedger>>,
     /// Sổ database: tên miền đã xác minh của khách, ngữ cảnh khách cho job.
     pub registry: DatabaseRegistry,
+    /// Cấu hình theo khách (`analytics.allowed_hosts`); `None` trong test dựng tay.
+    pub settings: Option<Arc<dyn autoxide_kernel::tenancy::TenantSettings>>,
 }
 
 impl AnalyticsService {

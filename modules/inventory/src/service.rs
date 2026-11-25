@@ -75,6 +75,8 @@ pub(crate) struct Parts {
     pub notifier: Option<Arc<dyn autoxide_notifications::api::Notifier>>,
     /// Chống spam cho form công khai (đăng ký báo có hàng lại).
     pub guard: Arc<autoxide_kernel::antispam::SpamGuard>,
+    /// Link trong thư theo khách (`kernel.public_url`, `inventory.link.restock_confirm`).
+    pub links: autoxide_kernel::tenancy::SiteLinks,
 }
 
 /// Mọi việc của module. Không giữ database: database là của khách, đi theo `TenantContext` của
@@ -89,6 +91,7 @@ pub(crate) struct InventoryService {
     pub(crate) ledger: Option<Arc<dyn autoxide_ledger::api::Ledger>>,
     pub(crate) notifier: Option<Arc<dyn autoxide_notifications::api::Notifier>>,
     pub(crate) guard: Arc<autoxide_kernel::antispam::SpamGuard>,
+    pub(crate) links: autoxide_kernel::tenancy::SiteLinks,
     pub(crate) config: InventoryConfig,
 }
 
@@ -104,6 +107,7 @@ impl InventoryService {
             ledger: parts.ledger,
             notifier: parts.notifier,
             guard: parts.guard,
+            links: parts.links,
             config,
         }
     }

@@ -46,7 +46,8 @@ impl ContentService {
         }
         let before = problems.len();
         let usable = self.usable_blocks(tenant).await?;
-        if let Err(errors) = layout::check(value, &self.blocks, &usable, &self.config.embed_hosts) {
+        let embed_hosts = self.embed_hosts(tenant).await?;
+        if let Err(errors) = layout::check(value, &self.blocks, &usable, &embed_hosts) {
             problems.extend(errors.into_iter().map(|mut error| {
                 error.field = error.field.replacen("body", "detail_layout", 1);
                 error

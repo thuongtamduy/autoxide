@@ -453,6 +453,10 @@ tenant only:
 | `forms.retention_days` | `AUTOXIDE_FORMS_RETENTION_DAYS` ([forms](FORMS.md#settings)) |
 | `content.locales`, `content.default_locale` | `AUTOXIDE_CONTENT_LOCALES`, `AUTOXIDE_CONTENT_DEFAULT_LOCALE` ([content](CONTENT.md#languages)) |
 | `media.alt_locales` | `AUTOXIDE_MEDIA_ALT_LOCALES` ([media](MEDIA.md)) |
+| `content.embed_hosts` | `AUTOXIDE_CONTENT_EMBED_HOSTS` |
+| `analytics.allowed_hosts` | `AUTOXIDE_ANALYTICS_ALLOWED_HOSTS` (the tenant's verified domains are always accepted) |
+| `newsletter.postal_address` | `AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS`; when unset, the owner's name and address in the tenant's legal profile (module `compliance`) come first |
+| `<module>.link.<page>` (group `link`, see below) | the `AUTOXIDE_…_URL` page addresses in mail: `auth.link.password_reset`, `auth.link.email_verification`, `auth.link.invitation`, `auth.link.login`, `auth.link.email_change_report`, `support.link.guest_ticket`, `compliance.link.case_tracking`, `inventory.link.restock_confirm`, `notifications.link.unsubscribe`, `comments.link.verify`, `comments.link.unsubscribe`, `newsletter.link.confirm`, `newsletter.link.preferences` |
 
 `GET /api/v1/kernel/settings` lists them with what the current tenant set. A tenant's
 administrator (permission `kernel.settings.manage`) sets one with
@@ -467,6 +471,41 @@ are in the group `connection` and are named `<module>.connection.<kind>.<field>`
 `GET /api/v1/kernel/settings?group=connection` lists only those, which is what a "partner
 connections" screen needs. Every setting in the list carries its `group` (`null` when it has
 none).
+
+### Links in mail, per tenant
+
+Mail sent for a tenant links to pages of that tenant's website or app. Two layers, the second wins:
+
+1. `kernel.public_url` (e.g. `https://shop.example`) replaces the scheme and host of every page
+   address the server has (`AUTOXIDE_AUTH_PASSWORD_RESET_URL`…), keeping its path.
+2. A link setting (group `link`, `GET /api/v1/kernel/settings?group=link`) gives the whole page
+   address of one link, path included, for a site whose pages are not where the server's are —
+   e.g. `auth.link.password_reset` = `https://shop.example/dat-lai-mat-khau?token={token}`. A
+   tenant can also turn on a mail link the server has no address for.
+
+Both `kernel.public_url` and a link setting point mail at a host, so the host is checked
+(D-20261125-tenant-site-verified):
+
+- **Several tenants** (`AUTOXIDE_TENANCY_MODE=multi`): the address must be `https://`, on the default
+  port, on a domain the tenant has **verified** right now (see "Custom domains of tenants") or on the
+  platform's own host (`AUTOXIDE_HTTP_PUBLIC_URL`). A domain that is pending (also after a failed
+  re-verification or after adding a revoked domain again), failed its DNS recheck, revoked, never
+  added, or verified by another tenant is refused: `PUT` answers `422`
+  (`kernel.public_url_not_allowed`, `kernel.link_host_not_allowed`). **Verify the domain before
+  setting `kernel.public_url`.**
+- **One tenant** (the default mode, no domain list): a link setting must be on the platform's host
+  or on the address of `kernel.public_url`; a new `kernel.public_url` must be `https://` except on
+  `localhost` or `127.0.0.1`.
+
+A link setting also needs every placeholder its description names (`{token}`, `{id}`…), no user
+name and no placeholder in the host part (`kernel.link_placeholder_missing`,
+`kernel.link_template_invalid`). Hosts are checked again every time a mail is sent: when a domain is
+revoked, fails its DNS recheck or moves to another tenant, mail falls back to the server's address
+(with a warning in the log) — at once on the server that saw the change, within
+`AUTOXIDE_TENANCY_CACHE_SECONDS` (default 10 seconds) on the others. A value stored before these
+rules that does not meet them is kept but not used; `GET /api/v1/kernel/settings` shows it with
+`problem: kernel.public_url_unverified` or `kernel.link_unverified`, and it works again once the
+domain is verified.
 
 The connection settings of mail and AI were renamed to this pattern. Their former names
 (`mail.smtp_url`, `mail.from`, `ai.api_key`, `ai.model`) still work: a value a tenant set under a

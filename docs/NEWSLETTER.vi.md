@@ -30,6 +30,12 @@ module `mail` (máy chủ SMTP của bạn).
 5. **`AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS`** — tên và địa chỉ bưu chính của người gửi, in ở chân
    thư; bắt buộc với chiến dịch quảng cáo.
 
+Mỗi khách thay được các giá trị này cho riêng mình bằng cấu hình khách (`PUT /api/v1/kernel/settings/{name}`,
+xem "Cấu hình và trạng thái của từng khách" ở [DEPLOY.vi.md](DEPLOY.vi.md)): `newsletter.link.confirm`,
+`newsletter.link.preferences` (trang trên một host của chính khách) và `newsletter.postal_address`. Khách
+chưa đặt địa chỉ thì tên và địa chỉ chủ sở hữu trong hồ sơ pháp lý của khách (module `compliance`) được
+dùng trước địa chỉ của máy chủ.
+
 Không biến nào ở trên cần để khởi động máy chủ: chức năng nào cần một biến còn thiếu thì trả
 `503` với mã nêu tên nó (`public_url_missing`, `newsletter.confirm_url_missing`,
 `newsletter.preferences_url_missing`, `newsletter.postal_address_missing`).

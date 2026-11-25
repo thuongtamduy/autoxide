@@ -53,6 +53,8 @@ pub(crate) struct CommentsService {
     pub(crate) config: CommentsConfig,
     /// Cấu hình theo khách (từ cấm, chế độ duyệt…) của kernel.
     pub(crate) settings: Arc<dyn TenantSettings>,
+    /// Link trong thư theo khách (`kernel.public_url`, `comments.link.*`).
+    pub(crate) links: autoxide_kernel::tenancy::SiteLinks,
 }
 
 /// Thứ service cần từ kernel và module khác.
@@ -66,6 +68,7 @@ pub(crate) struct Parts {
     pub resources: ResourceDirectory,
     pub verification: PostingVerification,
     pub settings: Arc<dyn TenantSettings>,
+    pub links: autoxide_kernel::tenancy::SiteLinks,
 }
 
 impl CommentsService {
@@ -82,6 +85,7 @@ impl CommentsService {
             tokens: OneTimeTokens::new(MODULE),
             config,
             settings: parts.settings,
+            links: parts.links,
         }
     }
 

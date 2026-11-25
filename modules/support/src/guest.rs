@@ -266,7 +266,12 @@ impl SupportService {
             json!({"code": code, "number": ticket.number}),
             format!("support.otp:{}:{}", ticket.id, Uuid::now_v7()),
         );
-        if let (Some(url), Some(token)) = (&self.config.guest_url, token) {
+        let page = self
+            .parts
+            .links
+            .link(tenant, &crate::config::GUEST_LINK, self.config.guest_url.as_deref())
+            .await?;
+        if let (Some(url), Some(token)) = (page, token) {
             notification = notification
                 .link(url.replace("{id}", &ticket.id.to_string()).replace("{token}", token));
         }

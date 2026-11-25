@@ -416,3 +416,43 @@ async fn cau_hinh_module_theo_khach_ghi_de_bien_moi_truong() {
     .await
     .unwrap();
 }
+
+/// Host được nhúng theo khách (`content.embed_hosts`): khách `b` đặt thì thay danh sách chung cho
+/// riêng `b`, `a` vẫn dùng `AUTOXIDE_CONTENT_EMBED_HOSTS`; giá trị quá rộng (`com`) bị từ chối.
+#[tokio::test]
+async fn host_nhung_theo_khach() {
+    TestDatabase::run(async |test| {
+        let media: Arc<dyn Media> = Arc::new(FakeMedia::new().tagging_locale());
+        let text: Arc<dyn TextModel> = Arc::new(FakeTextModel::disabled());
+        let embedder: Arc<dyn Embedder> = Arc::new(FakeEmbedder::disabled());
+        let app = TestApp::builder(test)
+            .tenant("a")
+            .tenant("b")
+            .user("platform", 1, &["kernel.tenants.manage", "kernel.tenants.read"])
+            .provide::<dyn Media>(media)
+            .provide::<dyn TextModel>(text.clone())
+            .provide::<dyn Embedder>(embedder.clone())
+            .module(crate::module())
+            .build()
+            .await
+            .unwrap();
+        let (content, _, _) = service_in(test, config(&[]), text, embedder, &app).await;
+        let (a, b) = (app.tenant("a").await.unwrap(), app.tenant("b").await.unwrap());
+        let set = |value: &'static str| {
+            app.put("/api/v1/kernel/tenants/b/settings/content.embed_hosts")
+                .token("platform")
+                .json(json!({ "value": value }))
+        };
+        for wide in ["com", "maps.example.com, 10.0.0.1", "localhost"] {
+            let refused = set(wide).send().await.unwrap();
+            assert_eq!(refused.status(), 422, "{wide}: {}", refused.text());
+            assert_eq!(refused.json()["errors"][0]["code"], "content.embed_hosts_invalid");
+        }
+        let response = set("Maps.Example.com, maps.example.com").send().await.unwrap();
+        assert_eq!(response.status(), 200, "{}", response.text());
+        assert_eq!(content.embed_hosts(&b).await.unwrap(), ["maps.example.com"]);
+        assert!(content.embed_hosts(&a).await.unwrap().contains(&"youtube.com".to_owned()));
+    })
+    .await
+    .unwrap();
+}
