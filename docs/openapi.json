@@ -8080,6 +8080,10 @@
           "new_password": {
             "description": "12 to 128 characters.",
             "type": "string"
+          },
+          "revoke_other_credentials": {
+            "description": "`true`: also remove every API key, passkey and external sign-in link of the account, as a\npassword recovery does - use it after a suspected compromise. Default `false`: they keep\nworking.",
+            "type": "boolean"
           }
         },
         "required": [
@@ -65101,7 +65105,7 @@
             "type": "string"
           },
           "return_url": {
-            "description": "Where the payment partner sends the buyer back.",
+            "description": "Where the payment partner sends the buyer back: an `https://` address on one of the shop's\nverified domains, or on an origin listed in `ledger.payments.return_origins`; any other address\nleaves the payment unstarted with `payment_actions[].error.code` `orders.return_url_not_allowed`.",
             "type": [
               "string",
               "null"
@@ -66198,7 +66202,7 @@
         "description": "Where to send the buyer back after paying.",
         "properties": {
           "return_url": {
-            "description": "Where the payment partner sends the buyer back (some partners need it, e.g. MoMo); omitted:\nthe shop's default.",
+            "description": "Where the payment partner sends the buyer back (some partners need it, e.g. MoMo); omitted:\nthe shop's default. Must be on one of the shop's addresses (a verified domain, or an origin in\n`ledger.payments.return_origins`), otherwise 422 `orders.return_url_not_allowed`.",
             "type": [
               "string",
               "null"
@@ -111180,7 +111184,7 @@
     },
     "/api/v1/auth/me/password": {
       "post": {
-        "description": "Needs the current password and a session signed in with a password (an API key\ncannot do this). Every session of the account ends, including this one; the\nresponse carries the tokens of a new session, so this client stays signed in.\nWrong current passwords count towards the sign-in lock of the account.",
+        "description": "Needs the current password and a session signed in with a password (an API key\ncannot do this). Every session of the account ends, including this one; the\nresponse carries the tokens of a new session, so this client stays signed in.\nWrong current passwords count towards the sign-in lock of the account.\n\nAPI keys, passkeys and external sign-in links keep working unless\n`revoke_other_credentials` is `true`; after a suspected compromise set it (or recover the\npassword by email, which removes them too).",
         "operationId": "auth_change_password",
         "parameters": [
           {
@@ -226342,7 +226346,7 @@
                 }
               }
             },
-            "description": "The payment partner refused the payment (its code, e.g. `momo.return_url_required`), the payment method is not usable (`orders.payment_method_unavailable`), the same `Idempotency-Key` with another body (`orders.idempotency_key_reused`), or invalid values (see `errors`)."
+            "description": "The payment partner refused the payment (its code, e.g. `momo.return_url_required`), the payment method is not usable (`orders.payment_method_unavailable`), `return_url` is not one of the shop's addresses (`orders.return_url_not_allowed`), the same `Idempotency-Key` with another body (`orders.idempotency_key_reused`), or invalid values (see `errors`)."
           },
           "429": {
             "content": {
@@ -228867,7 +228871,7 @@
                 }
               }
             },
-            "description": "The payment partner refused the payment (its code, e.g. `momo.return_url_required`), the payment method is not usable (`orders.payment_method_unavailable`), the same `Idempotency-Key` with another body (`orders.idempotency_key_reused`), or invalid values (see `errors`)."
+            "description": "The payment partner refused the payment (its code, e.g. `momo.return_url_required`), the payment method is not usable (`orders.payment_method_unavailable`), `return_url` is not one of the shop's addresses (`orders.return_url_not_allowed`), the same `Idempotency-Key` with another body (`orders.idempotency_key_reused`), or invalid values (see `errors`)."
           },
           "429": {
             "content": {

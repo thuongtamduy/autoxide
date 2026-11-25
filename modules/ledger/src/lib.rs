@@ -26,6 +26,7 @@ mod permissions;
 mod posting;
 mod provider;
 mod reconcile;
+mod return_url;
 mod service;
 mod tools;
 mod tools_flows;
@@ -221,7 +222,7 @@ impl Module for LedgerModule {
     }
 
     fn tenant_settings(&self) -> Vec<autoxide_kernel::tenancy::TenantSetting> {
-        vec![service::DEFAULT_PROVIDER]
+        vec![service::DEFAULT_PROVIDER, return_url::RETURN_ORIGINS]
     }
 
     fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
@@ -242,6 +243,7 @@ impl Module for LedgerModule {
                 .ok()
                 .map(|accounts| (*accounts).clone()),
             settings: context.require::<dyn autoxide_kernel::tenancy::TenantSettings>().ok(),
+            domains: context.require::<autoxide_kernel::tenancy::TenantDomains>().ok(),
         });
         self.service = Some(service.clone());
         context.provide::<dyn api::Ledger>(Arc::new(provider::Provider(service)))

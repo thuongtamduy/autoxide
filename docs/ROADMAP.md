@@ -119,8 +119,9 @@ thật (P7).
       của bên thứ ba — báo cáo `docs/security/review-2026-11.md`, D-20261123-security-review-2026-11; 3 mức cao, 8 mức
       trung bình và các mức thấp rẻ đã sửa (PR #444, #450, #452, #454, #456, #461, #464, #473). Nợ bảo mật sau rà
       soát 2026-11 (mức thấp, lý do để sau ghi trong báo cáo):
-  - [ ] L-7: đổi mật khẩu (không phải khôi phục) giữ API key, passkey, liên kết đăng nhập ngoài — thêm lựa chọn "thu
-        hồi mọi thông tin đăng nhập" hay liệt kê chúng trong câu trả lời
+  - [x] L-7: đổi mật khẩu (không phải khôi phục) giữ API key, passkey, liên kết đăng nhập ngoài — thêm lựa chọn "thu
+        hồi mọi thông tin đăng nhập" hay liệt kê chúng trong câu trả lời — xong (#508, D-20261125-password-change-revoke):
+        `revoke_other_credentials`
   - [ ] L-8: luật tự động hoá theo event nhận event của mọi tổ chức trong khách — cần event mang tổ chức thống nhất
   - [x] L-9: CSP của trang tài liệu API chỉ cho đúng gói Scalar đã ghim (cần thử lại trên trình duyệt, D-320) — xong
         (#505, D-20261125-docs-csp-pinned): đã thử trên Chromium
@@ -215,8 +216,9 @@ thật (P7).
       được nhãn nội bộ (#489). Nợ mức thấp:
   - [ ] P-4: tên miền khách khai mà không xác minh chặn khách khác 7 ngày — cho nhiều khách cùng chờ, ai xác minh
         trước được (đổi unique index), hoặc endpoint cho nhân sự nền tảng thu hồi
-  - [ ] P-5: `return_url` của thanh toán nhận mọi địa chỉ http(s) — chỉ nhận tên miền đã xác minh của khách (cần
-        quyết danh sách địa chỉ hợp lệ)
+  - [x] P-5: `return_url` của thanh toán nhận mọi địa chỉ http(s) — chỉ nhận tên miền đã xác minh của khách (cần
+        quyết danh sách địa chỉ hợp lệ) — xong (#508, D-20261125-return-url-allowlist): tên miền đã xác minh (https)
+        hoặc origin khai ở `ledger.payments.return_origins`
 - [x] P15 — Job `semver` của CI chạy xong trong giới hạn trước `1.0.0-rc.1`: ở PR phát hành `v0.19.0` (#495) job so
       mọi crate hợp đồng với tag trước và bị huỷ sau 90 phút (`timeout-minutes`), nên `CHANGELOG.md` của 0.19.0 thiếu
       mục `### Breaking (Rust)`. Từ rc.2 job này chặn phát hành (`docs/RELEASING.md`), nên phải đo thời gian từng
