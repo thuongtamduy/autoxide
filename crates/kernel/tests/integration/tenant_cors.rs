@@ -8,13 +8,18 @@
 
 use autoxide_kernel::error::Error;
 use autoxide_kernel::module::Module;
-use autoxide_kernel::response::Data;
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::response::{Data, Problem};
+use autoxide_kernel::tenancy::{
+    DatabaseRegistry, OptionalTenant, TenantContext, link_token, resolve_link_token,
+};
 use autoxide_testkit::{TestApp, TestDatabase, TestResponse};
+use axum::Extension;
 use axum::http::{Method, StatusCode, header};
 use sea_orm::ConnectionTrait;
 use sea_orm::sea_query::{Alias, Expr, ExprTrait as _, Query};
+use serde::Deserialize;
 use serde_json::{Value, json};
+use utoipa::IntoParams;
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 
@@ -34,13 +39,45 @@ async fn whoami(tenant: TenantContext) -> Result<Data<Value>, Error> {
     Ok(Data { data: json!({"tenant": tenant.slug()}) })
 }
 
+#[derive(Debug, Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
+struct RedeemQuery {
+    /// The link token.
+    token: String,
+}
+
+/// Tell which tenant a link token belongs to.
+///
+/// Like `/auth/refresh`: the tenant comes from the token, the request may not name one.
+#[utoipa::path(
+    get,
+    path = "/redeem",
+    extensions(("x-public" = json!(true))),
+    params(RedeemQuery),
+    responses(
+        (status = 200, description = "The tenant of the token.", body = Data<Value>),
+        (status = 403, description = "The page is on another tenant's domain.", body = Problem),
+        (status = 404, description = "The token is wrong.", body = Problem),
+    )
+)]
+async fn redeem(
+    Extension(registry): Extension<DatabaseRegistry>,
+    OptionalTenant(tenant): OptionalTenant,
+    axum::extract::Query(query): axum::extract::Query<RedeemQuery>,
+) -> Result<Data<Value>, Error> {
+    match resolve_link_token(&registry, tenant.as_ref(), &query.token).await? {
+        Some((tenant, _)) => Ok(Data { data: json!({"tenant": tenant.slug()}) }),
+        None => Err(Error::not_found("probe.token_invalid", "The token is wrong.")),
+    }
+}
+
 impl Module for Probe {
     fn name(&self) -> &'static str {
         "probe"
     }
 
     fn routes(&self) -> OpenApiRouter {
-        OpenApiRouter::new().routes(routes!(whoami))
+        OpenApiRouter::new().routes(routes!(whoami)).routes(routes!(redeem))
     }
 }
 
@@ -128,6 +165,7 @@ async fn ten_mien_da_xac_minh_duoc_cors_va_gan_voi_dung_khach() {
                 "{}",
                 answer.json()
             );
+            assert_eq!(allow_origin(&answer), "https://shop-a.test");
         }
         // Ghi cũng bị chặn trước khi chạy: khách `b` không có tên miền mới.
         let write = app
@@ -417,6 +455,78 @@ async fn mcp_dung_cung_nguon_origin() {
             (StatusCode::FORBIDDEN, Some("tenant_origin_mismatch")),
             "{}",
             answer.text()
+        );
+    })
+    .await
+    .unwrap();
+}
+
+/// Endpoint lấy khách từ token (như `/auth/refresh`, link trong mail): trang trên tên miền của khách `a` không dùng
+/// được token của khách `b` — khách của request suy từ origin, token của khách khác như token sai.
+#[tokio::test]
+async fn token_cua_khach_khac_tu_origin_cua_khach() {
+    TestDatabase::run(async |test| {
+        let app = app(test, &[]).await;
+        let a = app.tenant("a").await.unwrap();
+        let b = app.tenant("b").await.unwrap();
+        let redeem = |token: String, origin: Option<&'static str>| {
+            let request = app.get(&format!("/api/v1/probe/redeem?token={token}"));
+            match origin {
+                Some(origin) => request.header("origin", origin),
+                None => request,
+            }
+        };
+        // Không có Origin (máy gọi máy, trang ở tên miền chính): token tự nêu khách như trước.
+        let answer = redeem(link_token(&b, "raw"), None).send().await.unwrap();
+        assert_eq!(answer.json()["data"]["tenant"], "b", "{}", answer.json());
+        // Từ trang của `a`: token của `a` được, token của `b` như token sai.
+        let answer =
+            redeem(link_token(&a, "raw"), Some("https://shop-a.test")).send().await.unwrap();
+        assert_eq!(answer.json()["data"]["tenant"], "a", "{}", answer.json());
+        let answer =
+            redeem(link_token(&b, "raw"), Some("https://shop-a.test")).send().await.unwrap();
+        assert_eq!(
+            (answer.status(), answer.json()["code"].as_str()),
+            (StatusCode::NOT_FOUND, Some("probe.token_invalid")),
+            "{}",
+            answer.json()
+        );
+        // Trực tiếp: request đã có khách `a`, token ghi khách `b` → không có.
+        let token = link_token(&b, "raw");
+        let found = resolve_link_token(app.registry(), Some(&a), &token).await;
+        assert!(found.unwrap().is_none());
+    })
+    .await
+    .unwrap();
+}
+
+/// Database điều khiển không đọc được: origin của khách bị từ chối (fail-closed), nhanh, không treo request;
+/// đọc lại được thì cho lại.
+#[tokio::test]
+async fn database_loi_thi_tu_choi_origin_cua_khach() {
+    TestDatabase::run(async |test| {
+        let app = app(test, &[]).await;
+        let rename = |from: &str, to: &str| format!("ALTER TABLE {from} RENAME TO {to}");
+        let write = app.database().write();
+        write
+            .execute_unprepared(&rename("kernel_tenant_domains", "kernel_tenant_domains_off"))
+            .await
+            .unwrap();
+        app.registry().invalidate_domain("shop-a.test");
+        let started = std::time::Instant::now();
+        for _ in 0..20 {
+            assert!(allow_origin(&preflight(&app, "https://shop-a.test").await).is_empty());
+        }
+        assert!(started.elapsed() < std::time::Duration::from_secs(5), "{:?}", started.elapsed());
+        write
+            .execute_unprepared(&rename("kernel_tenant_domains_off", "kernel_tenant_domains"))
+            .await
+            .unwrap();
+        // Lỗi được nhớ tối đa 1 giây rồi đọc lại.
+        tokio::time::sleep(std::time::Duration::from_millis(1100)).await;
+        assert_eq!(
+            allow_origin(&preflight(&app, "https://shop-a.test").await),
+            "https://shop-a.test"
         );
     })
     .await

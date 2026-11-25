@@ -258,7 +258,13 @@ async fn by_hint(registry: &DatabaseRegistry, parts: &Parts) -> Result<TenantCon
         (None, Some(host)) => {
             registry.tenant_by_domain(host).await?.ok_or_else(errors::tenant_required)
         }
-        (None, None) => Err(errors::tenant_required()),
+        // Không nêu khách nào nhưng đến từ trang trên tên miền của khách A: khách là A. Nhờ vậy endpoint lấy khách
+        // từ token trong thân (`OptionalTenant` + `resolve_link_token`, vd `/auth/refresh`) cũng gắn với A — token
+        // của khách khác bị từ chối như token sai (D-20261125-tenant-cors).
+        (None, None) => match parts.extensions.get::<crate::http::OriginGrant>() {
+            Some(crate::http::OriginGrant::Tenant(owner)) => registry.tenant(*owner).await,
+            _ => Err(errors::tenant_required()),
+        },
     }
 }
 

@@ -50,8 +50,8 @@ pub fn split_link_token(token: &str) -> Option<(Option<TenantId>, &str)> {
 /// e.g. main domain with no header).
 ///
 /// - Token with a prefix: the tenant written in the token, looked up through `registry`. A tenant that does
-///   not exist, cannot be served (suspended, maintenance) or a malformed token → `Ok(None)`, like a wrong
-///   token: it does not reveal which tenant exists.
+///   not exist, cannot be served (suspended, maintenance), a tenant other than the request's (when `request`
+///   is known) or a malformed token → `Ok(None)`, like a wrong token: it does not reveal which tenant exists.
 /// - Token without a prefix: the request's tenant, else the default tenant (tokens issued before step 33
 ///   belong to the default tenant).
 ///
@@ -70,6 +70,8 @@ pub async fn resolve_link_token<'t>(
     };
     let tenant = match id {
         None => request.cloned().unwrap_or_else(|| registry.default_tenant()),
+        // Request đã biết khách (header, tên miền, origin của trang) mà token ghi khách khác: như token sai.
+        Some(id) if request.is_some_and(|request| request.id() != id) => return Ok(None),
         Some(id) => match registry.tenant(id).await {
             Ok(tenant) if ensure_serving(&tenant).is_ok() => tenant,
             Ok(_) => return Ok(None),

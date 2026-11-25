@@ -249,6 +249,11 @@ thật (P7).
         địa chỉ hợp lệ như thanh toán (P-5) — phát hiện khi sửa P-5, để cho lượt rà soát luồng xác minh danh tính
   - [ ] Test chắc chắn đi qua nhánh "trùng unique index" khi xác minh tên miền (`check_on` → `lost_race`): hiện chỉ
         test đồng thời đi qua nhánh đó khi hai lượt tình cờ xen kẽ
+  - [ ] Cache `domain_site` (theo `Host`, giới hạn 10 000 mục, D-20261125-tenant-cors) bị dội `Host` ngẫu nhiên
+        thì bị xoá sạch liên tục, tên miền thật phải đọc lại database mỗi lần — cần cách bỏ mục tốt hơn (LRU hay
+        ảnh chụp như CORS)
+  - [ ] `http/ws.rs` không kiểm `Origin` (mức thấp: xác thực bằng header `Authorization`, trình duyệt không gửi
+        được khi mở WebSocket) — kiểm cùng nguồn `OriginGrant` như MCP
 
 ## Giai đoạn B — Lớp cho giao diện và phân quyền
 

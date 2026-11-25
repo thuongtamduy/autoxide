@@ -43,6 +43,7 @@ pub(crate) mod schema;
 mod scope;
 pub(crate) mod settings;
 mod site;
+mod verified_domains;
 
 use crate::time::Timestamp;
 use std::fmt;
