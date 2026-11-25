@@ -42,6 +42,7 @@ mod cache;
 mod client;
 mod compression;
 mod conditional;
+mod cors;
 mod deprecation;
 mod disposition;
 mod entitlement;
@@ -71,12 +72,11 @@ use std::time::Duration;
 use std::sync::Arc;
 
 use axum::extract::{DefaultBodyLimit, Request};
-use axum::http::{HeaderName, HeaderValue, Method, header};
+use axum::http::{HeaderValue, header};
 use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response};
 use axum::{Extension, Router};
 use tower_http::catch_panic::CatchPanicLayer;
-use tower_http::cors::{AllowOrigin, CorsLayer};
 use tower_http::request_id::{PropagateRequestIdLayer, SetRequestIdLayer};
 use utoipa::openapi::OpenApi;
 use utoipa_axum::router::OpenApiRouter;
@@ -120,6 +120,7 @@ pub use body_limit::{BodyLimit, is_too_large};
 pub use client::ClientInfo;
 pub(crate) use client::ClientIp;
 pub(crate) use client::ForwardedHost;
+pub(crate) use cors::OriginGrant;
 pub use deprecation::Deprecation;
 pub use disposition::{Disposition, content_disposition};
 pub use extract::ValidJson;
@@ -417,11 +418,14 @@ pub fn build(
         resources,
         prompts: std::mem::take(&mut extras.prompts),
     };
+    // Một nguồn sự thật cho origin (D-20261125-tenant-cors): header CORS, kiểm `Origin` của MCP và kiểm khách
+    // đều đọc `OriginGrant` lớp `cors::classify` để lại.
+    let cors_policy =
+        Arc::new(cors::CorsPolicy::new(config.cors_origins.clone(), extras.tenancy.clone()));
     if let Some(mcp) = mcp::router(
         catalog,
         translations.clone(),
         limited.clone(),
-        &config.cors_origins,
         extras.entitlements.clone(),
         request_log.clone(),
     ) {
@@ -537,7 +541,11 @@ pub fn build(
         .layer(middleware::from_fn(move |request: Request, next: Next| {
             rate_limit::limit(limiter.clone(), request, next)
         }))
-        .layer(cors(&config.cors_origins))
+        .layer(cors::layer(&cors_policy))
+        // NGOÀI lớp CORS: quyết origin một lần (có thể tra tên miền của khách), lớp CORS chỉ đọc kết quả.
+        .layer(middleware::from_fn(move |request: Request, next: Next| {
+            cors::classify(cors_policy.clone(), request, next)
+        }))
         // NGOÀI rate limiting: giải địa chỉ client một lần, mọi lớp sau và handler dùng chung.
         .layer(middleware::from_fn(move |request: Request, next: Next| {
             client::attach(client_address.clone(), request, next)
@@ -663,58 +671,4 @@ fn timed_out(limit: Duration) -> Error {
 async fn vary_tenant(mut response: Response) -> Response {
     response.headers_mut().append(header::VARY, HeaderValue::from_static("autoxide-tenant"));
     response
-}
-
-fn cors(origins: &CorsOrigins) -> CorsLayer {
-    let layer = CorsLayer::new()
-        .allow_methods([
-            Method::GET,
-            Method::POST,
-            Method::PUT,
-            Method::PATCH,
-            Method::DELETE,
-            Method::OPTIONS,
-        ])
-        .allow_headers([
-            header::ACCEPT,
-            header::ACCEPT_LANGUAGE,
-            header::AUTHORIZATION,
-            header::CONTENT_TYPE,
-            header::IF_MATCH,
-            header::IF_NONE_MATCH,
-            header::IF_RANGE,
-            header::RANGE,
-            idempotency::IDEMPOTENCY_KEY,
-            REQUEST_ID_HEADER,
-            crate::tenancy::TENANT_HEADER,
-            // Header của giao thức MCP (endpoint `/mcp`).
-            HeaderName::from_static("mcp-protocol-version"),
-            HeaderName::from_static("mcp-session-id"),
-            HeaderName::from_static("last-event-id"),
-        ])
-        // Header trình duyệt mặc định giấu khỏi JavaScript mà client cần đọc.
-        .expose_headers([
-            header::ETAG,
-            header::LOCATION,
-            header::CONTENT_DISPOSITION,
-            header::CONTENT_RANGE,
-            header::ACCEPT_RANGES,
-            header::RETRY_AFTER,
-            header::LINK,
-            HeaderName::from_static("deprecation"),
-            HeaderName::from_static("sunset"),
-            REQUEST_ID_HEADER,
-            idempotency::IDEMPOTENT_REPLAYED,
-            HeaderName::from_static("mcp-session-id"),
-        ])
-        .max_age(Duration::from_secs(3600));
-    match origins {
-        // Không khai origin nào: không thêm header CORS, trình duyệt tự chặn.
-        CorsOrigins::None => layer,
-        CorsOrigins::Any => layer.allow_origin(AllowOrigin::any()),
-        CorsOrigins::List(list) => layer.allow_origin(AllowOrigin::list(
-            // Cấu hình đã kiểm origin là ASCII hợp lệ; `filter_map` chỉ để khỏi `unwrap`.
-            list.iter().filter_map(|origin| HeaderValue::from_str(origin).ok()),
-        )),
-    }
 }

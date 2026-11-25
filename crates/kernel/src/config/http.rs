@@ -29,7 +29,9 @@ pub const BODY_LIMIT_BYTES: Setting = Setting::new(
 pub const CORS_ORIGINS: Setting = Setting::new(
     "AUTOXIDE_HTTP_CORS_ORIGINS",
     "Web origins allowed to call the API from a browser, separated by commas, or `*` for any \
-     origin. When unset, browsers on other origins are refused.",
+     origin. When unset, browsers on other origins are refused. In multi-tenant mode a page at \
+     `https://<domain>` of a tenant's verified domain is also allowed, without listing it here, \
+     but only for requests to that tenant; origins listed here may call for any tenant.",
 )
 .with_example("https://app.example.com,https://admin.example.com");
 
