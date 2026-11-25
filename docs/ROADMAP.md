@@ -268,6 +268,31 @@ thật (P7).
         D-20261125-scim-grant-cover). Chặt hơn: ghi người đưa vào (`added_by`) ở thành viên nhóm và chỉ cấp cho
         thành viên mà người đưa vào cấp được role, còn lại chờ duyệt — cần migration, để sau
 
+- [ ] P17 — Sửa lỗi đợt test bảo mật + hiệu năng độc lập 2026-11 (29.584 case, cả hai database; PT-1..3 ở #515,
+      PT-9 ở P16, PT-19 phiên khác):
+  - [x] PT-4: giới hạn theo địa chỉ đếm theo khối /24 · /64 qua `throttle::address_key`, luật gate `address-key`
+        (D-20261125-address-keys)
+  - [x] PT-5: số tiền / số lượng của client không làm tràn `i64` (POS, kho, điểm thưởng, COD, chia kiện, nhận hàng
+        trả, cân nặng, bậc phí, GHN)
+  - [x] PT-6: tiền khác tiền tệ của bản ghi không bị ghi như tiền của nó (thu và đếm két POS, tín dụng cửa hàng, dòng
+        bảng kê COD, khoản thanh toán của đơn)
+  - [x] PT-7: mã đăng nhập SMS nhập sai đếm theo số + khối người xin mã, trần chung 5× (D-20261125-otp-wrong-by-block)
+  - [x] PT-8: quyết định quyền theo đơn vị đòi đơn vị có trong cây của khách; `OrgTree::contains` / `ensure_exists`
+        (D-20261125-org-must-exist)
+  - [x] PT-10: push subscription chỉ nhận máy chủ công khai; hợp đồng `WebPushSender` đòi bộ gửi chỉ nối IP công khai
+  - [ ] Nợ của rà soát PT-5/6/8 (mức thấp, cần dữ liệu cực đoan do quản trị đặt hay chưa có đường khai thác):
+        `orders/invoicing.rs` giảm giá × số lượng, `promotions/compliance.rs` giá × bp với giá rất lớn — cần trần giá
+        chung của catalog; điều khoản trả trước (`orders/advance.rs`) không so tiền tệ với đơn; phiếu nhập kho theo đơn
+        mua không so tiền tệ với đơn mua; tiền tệ của ca POS lấy từ `opening_cash` thay vì tiền của cửa hàng;
+        sandbox nhận `role_id` không có mà vẫn 201 (kernel không biết role — nay chỉ không uỷ quyền, cần trait vai trò
+        để báo 422 lúc tạo)
+  - [ ] PT-13, PT-14: `x-permissions` khớp chỗ kiểm; kiểm permission trước validation / ETag / tra bản ghi; test quét
+        mọi operation bằng token không quyền (PR 2)
+  - [ ] PT-15, PT-16, PT-17, poll outbox: tìm công khai không làm nghẽn server, slug theo khoảng dùng index, tắt
+        nhanh khi có tải trên Postgres, giảm câu SQL nền khi rảnh (PR 3)
+  - [ ] PT-11, PT-12, PT-18 và chỗ vướng cho việc test (bộ mồi dữ liệu thương mại, tool MCP trỏ operationId REST,
+        đếm câu SQL theo request) (PR 4, sau #516)
+
 ## Giai đoạn B — Lớp cho giao diện và phân quyền
 
 ## 51. Hợp đồng cho khung quản trị và mặt tiền (thiết kế giao diện 2, D-200)
