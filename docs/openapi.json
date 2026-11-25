@@ -41828,6 +41828,14 @@
                 "example": "kernel.public_url",
                 "type": "string"
               },
+              "problem": {
+                "description": "The stored value is not used any more, and why: `kernel.public_url_unverified` /\n`kernel.link_unverified` (its host is not a verified domain of this tenant — verify the domain or\nchange the value). Omitted when the value is used.",
+                "example": "kernel.public_url_unverified",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
               "secret": {
                 "description": "Secret settings are stored encrypted and never returned: `value` is always `null`.",
                 "type": "boolean"
@@ -50843,6 +50851,14 @@
                   "description": "`<module>.<key>`, e.g. `kernel.public_url`; a partner connection is named\n`<module>.connection.<kind>.<field>`, e.g. `mail.connection.smtp.url`.",
                   "example": "kernel.public_url",
                   "type": "string"
+                },
+                "problem": {
+                  "description": "The stored value is not used any more, and why: `kernel.public_url_unverified` /\n`kernel.link_unverified` (its host is not a verified domain of this tenant — verify the domain or\nchange the value). Omitted when the value is used.",
+                  "example": "kernel.public_url_unverified",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 },
                 "secret": {
                   "description": "Secret settings are stored encrypted and never returned: `value` is always `null`.",
@@ -100367,6 +100383,14 @@
             "description": "`<module>.<key>`, e.g. `kernel.public_url`; a partner connection is named\n`<module>.connection.<kind>.<field>`, e.g. `mail.connection.smtp.url`.",
             "example": "kernel.public_url",
             "type": "string"
+          },
+          "problem": {
+            "description": "The stored value is not used any more, and why: `kernel.public_url_unverified` /\n`kernel.link_unverified` (its host is not a verified domain of this tenant — verify the domain or\nchange the value). Omitted when the value is used.",
+            "example": "kernel.public_url_unverified",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "secret": {
             "description": "Secret settings are stored encrypted and never returned: `value` is always `null`.",

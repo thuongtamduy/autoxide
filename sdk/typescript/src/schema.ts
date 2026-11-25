@@ -13738,6 +13738,12 @@ export type Data_TenantSettingState = {
      * `<module>.connection.<kind>.<field>`, e.g. `mail.connection.smtp.url`.
      */
     name: string;
+    /**
+     * The stored value is not used any more, and why: `kernel.public_url_unverified` /
+     * `kernel.link_unverified` (its host is not a verified domain of this tenant — verify the domain or
+     * change the value). Omitted when the value is used.
+     */
+    problem?: string | null;
     /** Secret settings are stored encrypted and never returned: `value` is always `null`. */
     secret: boolean;
     updated_at?: string | null;
@@ -16525,6 +16531,12 @@ export type Data_Vec_TenantSettingState = {
      * `<module>.connection.<kind>.<field>`, e.g. `mail.connection.smtp.url`.
      */
     name: string;
+    /**
+     * The stored value is not used any more, and why: `kernel.public_url_unverified` /
+     * `kernel.link_unverified` (its host is not a verified domain of this tenant — verify the domain or
+     * change the value). Omitted when the value is used.
+     */
+    problem?: string | null;
     /** Secret settings are stored encrypted and never returned: `value` is always `null`. */
     secret: boolean;
     updated_at?: string | null;
@@ -32623,6 +32635,12 @@ export type TenantSettingState = {
    * `<module>.connection.<kind>.<field>`, e.g. `mail.connection.smtp.url`.
    */
   name: string;
+  /**
+   * The stored value is not used any more, and why: `kernel.public_url_unverified` /
+   * `kernel.link_unverified` (its host is not a verified domain of this tenant — verify the domain or
+   * change the value). Omitted when the value is used.
+   */
+  problem?: string | null;
   /** Secret settings are stored encrypted and never returned: `value` is always `null`. */
   secret: boolean;
   updated_at?: string | null;
