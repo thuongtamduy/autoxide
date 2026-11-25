@@ -56,7 +56,7 @@ mod tests {
 
     /// `docs/openapi.json` là hợp đồng của API, nằm trong repo để mọi thay đổi API
     /// hiện ra khi xem lại thay đổi. Nó phải luôn khớp code; lệch thì sinh lại:
-    ///   cargo run -p autoxide -- openapi > docs/openapi.json
+    ///   cargo xtask regen
     #[tokio::test]
     async fn file_openapi_trong_repo_khop_voi_code() {
         TestDatabase::run(async |database| {
@@ -69,7 +69,7 @@ mod tests {
             assert_eq!(
                 committed, generated,
                 "`docs/openapi.json` is out of date; regenerate it with \
-                 `cargo run -p autoxide -- openapi > docs/openapi.json`"
+                 `cargo xtask regen`"
             );
         })
         .await

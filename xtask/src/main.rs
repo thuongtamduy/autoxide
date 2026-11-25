@@ -239,10 +239,7 @@ fn regen(check: bool) -> ExitCode {
         let stale = regen::outputs(&workspace.root, check)?;
         if check {
             for file in &stale {
-                eprintln!(
-                    "[generated-file] {file}: out of date — run `{}` and commit the result",
-                    regen::FIX_COMMAND
-                );
+                eprintln!("{}", regen::stale_message(file));
             }
             return Ok(stale.is_empty());
         }

@@ -489,3 +489,29 @@ async fn copy_chep_du_lieu_sang_database_khac() {
     .await
     .unwrap();
 }
+
+/// `cargo xtask regen` sinh file tự động từ các lệnh này: kết quả không được đổi theo `.env` ở thư mục hiện tại hay
+/// biến `AUTOXIDE_*` của người chạy (regen còn chạy chúng trong thư mục tạm, môi trường trống).
+#[test]
+fn lenh_sinh_file_tu_dong_khong_phu_thuoc_env_va_dotenv() {
+    for arguments in [&["openapi"][..], &["mcp-manifest"][..], &["config", "--env-example"][..]] {
+        let clean = WorkDir::new("regen-clean");
+        let dirty = WorkDir::new("regen-dirty");
+        std::fs::write(
+            dirty.path().join(".env"),
+            "AUTOXIDE_HTTP_PORT=9999\nAUTOXIDE_MODULES=notes\nAUTOXIDE_LOG_LEVEL=trace\n",
+        )
+        .unwrap();
+
+        let expected = autoxide(clean.path(), arguments, &[]);
+        let actual = autoxide(dirty.path(), arguments, &[("AUTOXIDE_HTTP_PORT", "1234")]);
+
+        assert_eq!(expected.status.code(), Some(0), "{}", stderr(&expected));
+        assert_eq!(actual.status.code(), Some(0), "{}", stderr(&actual));
+        assert_eq!(
+            stdout(&expected),
+            stdout(&actual),
+            "{arguments:?} depends on `.env` or the environment"
+        );
+    }
+}

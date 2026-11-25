@@ -167,10 +167,13 @@ fi
 # không đặt ngoài hook); không có thì chỉ nhắc.
 if [ "${CLAUDE_CODE_REMOTE:-}" = true ]; then
   if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
-    if ! grep -qs 'CARGO_INCREMENTAL' "$CLAUDE_ENV_FILE" 2>/dev/null; then
-      echo 'export CARGO_INCREMENTAL=0' >>"$CLAUDE_ENV_FILE" || log "không ghi được CLAUDE_ENV_FILE"
+    if grep -qs 'CARGO_INCREMENTAL' "$CLAUDE_ENV_FILE" 2>/dev/null; then
+      log "CARGO_INCREMENTAL=0: CLAUDE_ENV_FILE đã có"
+    elif echo 'export CARGO_INCREMENTAL=0' >>"$CLAUDE_ENV_FILE" 2>/dev/null; then
+      log "CARGO_INCREMENTAL=0: đã ghi vào CLAUDE_ENV_FILE cho các lệnh sau"
+    else
+      log "không ghi được CLAUDE_ENV_FILE: tự đặt 'export CARGO_INCREMENTAL=0' trước khi gõ cargo"
     fi
-    log "CARGO_INCREMENTAL=0: đã ghi vào CLAUDE_ENV_FILE cho các lệnh sau"
   else
     log "nhắc: chạy cargo tay thì đặt 'export CARGO_INCREMENTAL=0' (cache incremental thêm ~11 GB đĩa, xem docs/CLOUD-SESSIONS.md)"
   fi

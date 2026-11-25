@@ -6,11 +6,11 @@ Quyết định:
 
 1. **`cargo xtask regen [--check]`** sinh lại một lượt, theo thứ tự phụ thuộc: `docs/openapi.json` (`autoxide openapi`),
    `docs/mcp-tools.json` (`mcp-manifest`), `.env.example` (`config --env-example`), rồi SDK (`cargo xtask sdk`, đọc openapi.json vừa
-   ghi) và mục lục quyết định. Chạy với cấu hình mặc định (bỏ biến `AUTOXIDE_*` của người chạy). `--check` chỉ so ba file đầu và in
+   ghi) và mục lục quyết định. Binary chạy cô lập: thư mục tạm rỗng và môi trường trống (đo: `.env` có `DATABASE_URL` làm `autoxide openapi` tạo file database ở đường dẫn ấy; nội dung sinh ra thì không đổi — có test chứng minh). `--check` chỉ so ba file đầu và in
    `cargo xtask regen` khi lệch; SDK vẫn có `sdk --check` riêng.
 2. **Thứ tự bước của `gate.sh`**: fmt, `cargo xtask check`, `sdk --check` (vài giây) chạy ĐẦU TIÊN, trước AVIF, ví dụ module và clippy;
    sau clippy là `regen --check` (chỉ khi có Rust đổi: nó dựng binary `autoxide`, cùng bản dựng bước test dùng sau đó — đo 8 phút
-   lần đầu, không tốn thêm khi test dựng lại), rồi api-diff, deny, gitleaks. Không đổi tập bước, không đổi `--only`.
+   lần đầu, không tốn thêm khi test dựng lại), rồi api-diff, deny, gitleaks. Trên CI (`GITHUB_ACTIONS`) bước này bị bỏ: job lint chỉ có cache của clippy nên nó dựng thêm cả workspace vào job dài nhất; các bài test giữ tài liệu khớp code vẫn chạy ở shard test và in cùng lệnh `cargo xtask regen`. Không đổi tập bước, không đổi `--only`.
 3. **Số thứ tự migration** (`m0038_…` viết tay): trước đây chỉ bắt tên trùng hệt nhau (`Migrator::new`), không bắt hai nhánh chọn cùng số
    với tên khác. Thêm bài test `modules::tests::so_thu_tu_migration_khong_trung_va_tang_dan` (chạy trong gate, mọi module và kernel): trong
    một module, số không được trùng và không được nhỏ hơn số đứng trước; số cách quãng thì được. Thông báo nêu số và module. Không đổi

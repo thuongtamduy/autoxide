@@ -79,13 +79,13 @@ mod tests {
     fn file_env_example_trong_repo_khop_voi_code() {
         // `.env.example` là tài liệu cấu hình cho người cài đặt; nó phải luôn khớp
         // các biến khai trong code. Lệch thì sinh lại:
-        //   cargo run -p autoxide -- config --env-example > .env.example
+        //   cargo xtask regen
         let committed = include_str!("../../../../.env.example");
         assert_eq!(
             committed,
             render_env_example(&settings::describe()),
             "`.env.example` is out of date; regenerate it with \
-             `cargo run -p autoxide -- config --env-example > .env.example`"
+             `cargo xtask regen`"
         );
     }
 }

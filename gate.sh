@@ -340,7 +340,9 @@ fi
 # File sinh tự động khớp code (openapi.json, mcp-tools.json, .env.example): trước đây chỉ lộ ra ở bài test, sau cả
 # vòng gate. Cần dựng binary `autoxide`, cùng bản dựng mà bước test dùng sau đó, nên chỉ chạy khi có Rust đổi, và đứng
 # sau clippy để lỗi biên dịch hiện ra bằng thông báo của clippy trước. Lệch thì thông báo ghi `cargo xtask regen`.
-if [ "$RUST_CHANGED" = true ]; then
+# Trên CI bỏ qua: job lint chỉ có cache của clippy, nên bước này dựng thêm cả workspace (~8 phút trên máy 4 nhân) vào
+# job dài nhất; các bài test giữ tài liệu khớp code vẫn chạy ở các shard test và in cùng lệnh `cargo xtask regen`.
+if [ "$RUST_CHANGED" = true ] && [ -z "${GITHUB_ACTIONS:-}" ]; then
   step "generated files match the code (cargo xtask regen --check)"
   cargo xtask regen --check
 fi
