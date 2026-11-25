@@ -249,9 +249,13 @@ const SPARE_FILES: usize = 64;
 // đó hết file descriptor vẫn xảy ra trước, giới hạn của Autoxide không có tác dụng (L-10). Chỉ Linux có
 // `/proc/self/limits`; nơi khác bỏ qua.
 fn warn_if_over_open_files(max_connections: usize) {
+    // `0`: người vận hành tắt giới hạn (để reverse proxy lo) — không có gì để so.
+    if max_connections == 0 {
+        return;
+    }
     let Ok(limits) = std::fs::read_to_string("/proc/self/limits") else { return };
     if let Some(open_files) = soft_open_files(&limits)
-        && (max_connections == 0 || max_connections + SPARE_FILES > open_files)
+        && over_open_files(max_connections, open_files)
     {
         tracing::warn!(
             max_connections,
@@ -261,6 +265,11 @@ fn warn_if_over_open_files(max_connections: usize) {
              instead of failing"
         );
     }
+}
+
+// Giới hạn kết nối cộng chỗ dự phòng không thấp hơn giới hạn file mở.
+fn over_open_files(max_connections: usize, open_files: usize) -> bool {
+    max_connections.saturating_add(SPARE_FILES) > open_files
 }
 
 // Giới hạn mềm "Max open files" trong nội dung của `/proc/self/limits` (`unlimited` hay không đọc được: `None`).
@@ -281,6 +290,9 @@ mod tests {
             "Max open files            unlimited            unlimited            files\n";
         assert_eq!(super::soft_open_files(unlimited), None);
         assert_eq!(super::soft_open_files(""), None);
+        assert!(super::over_open_files(4096, 1024));
+        assert!(!super::over_open_files(4096, 8192));
+        assert!(super::over_open_files(usize::MAX, 8192), "không tràn số");
     }
 
     use super::*;

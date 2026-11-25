@@ -65,7 +65,9 @@ impl MigrationTrait for ShareClaims {
         let statement = connection.get_database_backend().build(&shared);
         if connection.query_one_raw(statement).await?.is_some() {
             return Err(DbErr::Migration(format!(
-                "{TABLE}: a domain is claimed by several tenants; revoke the extra claims before going back"
+                "{TABLE}: a domain has rows of several tenants (claims in any status, revoked ones \
+                 included); going back allows one row per domain, so delete the extra rows first - this \
+                 migration does not delete tenants' claims itself"
             )));
         }
         manager

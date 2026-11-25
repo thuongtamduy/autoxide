@@ -436,10 +436,72 @@ async fn split_then_merge_roundtrip_restores_original_data() {
         assert_eq!(plan["ready"], json!(true), "{plan}");
         // Bản cài đặt đã chép khi tách: cùng khoá chính ở khách nhận, bỏ qua.
         assert_eq!(table(&plan, "shop_settings")["existing"], json!(1));
+        // Cả hai khách cùng có dòng cho một tên miền (P-4: mỗi khách một dòng): gộp giữ dòng mạnh hơn
+        // (verified > pending > failed / revoked) thay vì vi phạm unique `(domain, tenant_id)` và lặp lỗi mãi.
+        let claims = [
+            ("shared.test", north.id(), "verified"),
+            ("shared.test", a.id(), "revoked"),
+            ("waiting.test", north.id(), "failed"),
+            ("waiting.test", a.id(), "pending"),
+            ("north-only.test", north.id(), "pending"),
+        ];
+        for (domain, owner, status) in claims {
+            let now = autoxide_kernel::time::Timestamp::now();
+            let columns = [
+                "id",
+                "tenant_id",
+                "domain",
+                "status",
+                "verification_token",
+                "check_failures",
+                "created_at",
+                "updated_at",
+            ];
+            let values = vec![
+                Uuid::now_v7().into(),
+                owner.as_uuid().into(),
+                domain.into(),
+                status.into(),
+                Uuid::now_v7().simple().to_string().into(),
+                0i32.into(),
+                now.into(),
+                now.into(),
+            ];
+            insert(app.database(), "kernel_tenant_domains", &columns, values).await;
+        }
         let started = service.start(Actor::system(), &merge(root), None, false).await.unwrap();
         let done = service.run(started.id, "test").await.unwrap();
         assert_eq!(done.state, "done", "{done:?}");
         assert_eq!(dump(&main, a.id()).await, before);
+        let select = Query::select()
+            .columns([Alias::new("domain"), Alias::new("status"), Alias::new("tenant_id")])
+            .from(Alias::new("kernel_tenant_domains"))
+            .order_by(Alias::new("domain"), sea_orm::sea_query::Order::Asc)
+            .to_owned();
+        let rows: Vec<(String, String, Uuid)> = app
+            .database()
+            .write()
+            .query_all(&select)
+            .await
+            .unwrap()
+            .iter()
+            .map(|row| {
+                (
+                    row.try_get("", "domain").unwrap(),
+                    row.try_get("", "status").unwrap(),
+                    row.try_get("", "tenant_id").unwrap(),
+                )
+            })
+            .collect();
+        let a_id = a.id().as_uuid();
+        assert_eq!(
+            rows,
+            vec![
+                ("north-only.test".to_owned(), "pending".to_owned(), a_id),
+                ("shared.test".to_owned(), "verified".to_owned(), a_id),
+                ("waiting.test".to_owned(), "pending".to_owned(), a_id),
+            ]
+        );
         assert_eq!(count(&spare, "shop_items", north.id()).await, 0);
         let gone = app.tenant("a-north").await;
         assert!(gone.is_err() || gone.unwrap().status().as_str() == "merged");

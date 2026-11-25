@@ -129,7 +129,8 @@ async fn add_domain(
 /// Requires `kernel.domains.manage`. Looks up the domain's TXT record right away and returns the
 /// new status: `verified` when the record holds the expected value, otherwise still `pending`
 /// with the reason in `check_error`. A `failed` domain can be verified again this way. When another
-/// tenant verified the same domain first, the answer is `failed` with that reason in `check_error`.
+/// tenant has verified the same domain, the answer is `failed` with that reason in `check_error` at
+/// once, whether or not your record is set.
 #[utoipa::path(
     post,
     path = "/domains/{id}/verify",

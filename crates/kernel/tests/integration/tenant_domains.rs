@@ -767,3 +767,67 @@ async fn chua_co_cay_to_chuc_thi_chi_nhan_null() {
     .await
     .unwrap();
 }
+
+/// P-4 (kiểm độc lập #512): hai khách cùng chờ một tên miền và cùng xác minh ĐỒNG THỜI (cả hai bản ghi TXT có
+/// thật): đúng một bên `verified`, bên kia nhận kết quả thua (`failed`, lý do rõ), không lỗi 500. Khách thứ ba
+/// không có bản ghi nào xác minh sau đó cũng thua ngay, không phải chờ thêm.
+#[tokio::test]
+async fn hai_khach_xac_minh_dong_thoi_chi_mot_ben_duoc() {
+    TestDatabase::run(async |test| {
+        let app = TestApp::builder(test)
+            .tenant("a")
+            .tenant("b")
+            .tenant("c")
+            .user_in("a", "admin-a", 1, &[MANAGE])
+            .user_in("b", "admin-b", 2, &[MANAGE])
+            .user_in("c", "admin-c", 3, &[MANAGE])
+            .build()
+            .await
+            .unwrap();
+        let mut claims = Vec::new();
+        for token in ["admin-a", "admin-b", "admin-c"] {
+            let (status, body) = add(&app, token, "race.test").await;
+            assert_eq!(status, StatusCode::CREATED, "{body}");
+            claims.push((
+                token,
+                body["data"]["id"].as_str().unwrap().to_owned(),
+                body["data"]["record"].clone(),
+            ));
+        }
+        let name = claims[0].2["name"].as_str().unwrap().to_owned();
+        let values: Vec<String> = claims[..2]
+            .iter()
+            .map(|(_, _, record)| record["value"].as_str().unwrap().to_owned())
+            .collect();
+        app.dns().set_txt(&name, &values.iter().map(String::as_str).collect::<Vec<_>>());
+
+        let (first, second) = tokio::join!(
+            verify(&app, claims[0].0, &claims[0].1),
+            verify(&app, claims[1].0, &claims[1].1)
+        );
+        let mut statuses = Vec::new();
+        for (status, body) in [first, second] {
+            assert_eq!(status, StatusCode::OK, "{body}");
+            statuses.push(body["data"]["status"].as_str().unwrap().to_owned());
+            if body["data"]["status"] == "failed" {
+                assert!(
+                    body["data"]["check_error"].as_str().unwrap().contains("Another tenant"),
+                    "{body}"
+                );
+            }
+        }
+        statuses.sort();
+        assert_eq!(statuses, ["failed", "verified"], "đúng một khách thắng");
+
+        // Khách `c` không có bản ghi TXT: thua ngay (`failed` kèm lý do), không còn `pending` chờ vô ích.
+        let (status, body) = verify(&app, claims[2].0, &claims[2].1).await;
+        assert_eq!(
+            (status, body["data"]["status"].as_str()),
+            (StatusCode::OK, Some("failed")),
+            "{body}"
+        );
+        assert!(body["data"]["check_error"].as_str().unwrap().contains("Another tenant"), "{body}");
+    })
+    .await
+    .unwrap();
+}

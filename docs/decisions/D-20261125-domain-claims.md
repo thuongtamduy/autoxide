@@ -7,8 +7,12 @@ thay bằng hai index: unique `(domain, tenant_id)` (mỗi khách tối đa mộ
 `(domain) WHERE status = 'verified'` (mỗi tên miền tối đa một khách đã xác minh; cú pháp chạy trên cả SQLite và
 PostgreSQL). `TenantDomains::add` chỉ từ chối (`tenant_domain_taken`) khi khách khác đã **xác minh**; khách khác đang chờ
 không chặn. Lúc xác minh, nếu khách khác đã xác minh trước (unique index báo trùng) thì lượt chờ của khách này thành
-`failed` với `check_error` "Another tenant verified this domain first." Dòng `failed` / `revoked` của một khách chỉ khách
-đó nhận lại; không còn chuyển dòng của khách này sang khách khác. `down` từ chối khi một tên miền có nhiều dòng (không xoá
+`failed` với `check_error` "Another tenant verified this domain first." Khi đã có khách khác xác minh thì lượt xác minh
+của khách còn lại thua ngay (không cần tra DNS), nên họ không phải chờ vô ích. Dòng `failed` / `revoked` của một khách
+chỉ khách đó nhận lại; không còn chuyển dòng của khách này sang khách khác. Gộp khách (relocation `merge`): khi cả hai
+khách cùng có dòng cho một tên miền, giữ dòng mạnh hơn (verified > pending > failed / revoked), xoá dòng kia trong cùng
+transaction — không thì unique `(domain, tenant_id)` làm lượt gộp lặp lỗi mãi. Có test hai khách xác minh đồng thời
+(đúng một bên thắng) trên cả hai database. `down` từ chối khi một tên miền có nhiều dòng (không xoá
 lượt chờ của khách). Sửa P-4 của `docs/security/review-2026-11.md`.
 
 Lý do: trước đây một khách khai tên miền của người khác mà không xác minh thì chặn chủ thật 7 ngày, lặp lại được mãi.

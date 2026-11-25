@@ -118,6 +118,62 @@ async fn luat_cua_nut_con_chi_nhan_event_cua_nut_do() {
     .unwrap();
 }
 
+/// L-8 với cây tổ chức thật (module `organizations`): luật của nút `north` chạy với event của chính nó và của nút
+/// con `north-shop`, không chạy với event của nút anh em `south` hay của nút cha (gốc).
+#[tokio::test]
+async fn luat_cua_nut_con_theo_cay_to_chuc() {
+    TestDatabase::run(async |test| {
+        use autoxide_kernel::event::EventHandler;
+        use autoxide_kernel::tenancy::{OrgId, OrgTree, ScopeExt};
+        use sea_orm::sea_query::Expr;
+        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+
+        let harness = Harness::with_orgs(test).await;
+        let tenant = harness.tenant.id();
+        let (north, north_shop, south) = (Uuid::now_v7(), Uuid::now_v7(), Uuid::now_v7());
+        let write = harness.tenant.database().begin_write().await.unwrap();
+        let root = OrgTree::insert_root(&write, tenant).await.unwrap();
+        OrgTree::insert(&write, tenant, OrgId::from_uuid(north), root, 8).await.unwrap();
+        OrgTree::insert(&write, tenant, OrgId::from_uuid(north_shop), OrgId::from_uuid(north), 8)
+            .await
+            .unwrap();
+        OrgTree::insert(&write, tenant, OrgId::from_uuid(south), root, 8).await.unwrap();
+        write.commit().await.unwrap();
+
+        let rule = harness.rule(on_order(), json!(null), tag_action()).await;
+        crate::entity::rule::Entity::update_many()
+            .col_expr(crate::entity::rule::Column::OrgId, Expr::value(north))
+            .filter(crate::entity::rule::Column::Id.eq(rule.id))
+            .scoped(&harness.tenant)
+            .exec(harness.tenant.database().write())
+            .await
+            .unwrap();
+        let trigger = EventTrigger(harness.service.clone());
+        for (code, org) in
+            [("north", north), ("shop", north_shop), ("south", south), ("root", root.as_uuid())]
+        {
+            let payload = json!({"code": code, "org_id": org.to_string()});
+            let event =
+                Delivered::new(harness.tenant.clone(), "shop", "shop.order_placed", payload);
+            trigger.handle(&event).await.unwrap();
+        }
+        let runs = harness.runs(rule.id).await;
+        let mut codes: Vec<String> = runs
+            .iter()
+            .map(|run| {
+                serde_json::from_str::<serde_json::Value>(&run.context).unwrap()["event"]["code"]
+                    .as_str()
+                    .unwrap()
+                    .to_owned()
+            })
+            .collect();
+        codes.sort();
+        assert_eq!(codes, ["north", "shop"], "chỉ nút của luật và nhánh con");
+    })
+    .await
+    .unwrap();
+}
+
 #[tokio::test]
 async fn hanh_dong_rui_ro_cho_duyet() {
     TestDatabase::run(async |test| {

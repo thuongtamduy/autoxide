@@ -844,6 +844,10 @@ impl TenantDomains {
         actor: Actor,
         row: Model,
     ) -> Result<Model, Error> {
+        // Khách khác đã xác minh tên miền này: lượt chờ của khách này thua ngay, khỏi chờ bản ghi DNS vô ích (P-4).
+        if self.verified_elsewhere(database, &row).await? {
+            return self.lost_race(database, row, now()).await;
+        }
         // Tra DNS NGOÀI mọi transaction: gọi mạng có thể chậm.
         let probe = self.probe(&row.domain, &row.verification_token).await;
         let now = now();
@@ -933,6 +937,18 @@ impl TenantDomains {
     // tenant-scope: một tên miền thuộc cả nền tảng; phải thấy dòng của mọi khách để biết đã có ai xác minh chưa.
     async fn claims(&self, domain: &str) -> Result<Vec<Model>, Error> {
         Ok(Entity::find().filter(Column::Domain.eq(domain)).all(self.control().write()).await?)
+    }
+
+    /// Whether another tenant holds `row`'s domain as `verified`.
+    // tenant-scope: tên miền thuộc cả nền tảng; hỏi dòng `verified` của khách KHÁC.
+    async fn verified_elsewhere(&self, database: &Database, row: &Model) -> Result<bool, Error> {
+        let other = Entity::find()
+            .filter(Column::Domain.eq(row.domain.as_str()))
+            .filter(Column::Status.eq(VERIFIED))
+            .filter(Column::TenantId.ne(row.tenant_id))
+            .one(database.write())
+            .await?;
+        Ok(other.is_some())
     }
 
     /// The tenant's own row for `domain` after a concurrent `add` of the same tenant won the race.

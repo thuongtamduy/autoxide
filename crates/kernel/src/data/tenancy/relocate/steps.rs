@@ -487,7 +487,39 @@ impl TenantRelocations {
             select = select.filter(domain::Column::OrgId.is_in(branch.iter().copied()));
         }
         let found = select.all(connection).await?;
-        let ids: Vec<Uuid> = found.iter().map(|row| row.id).collect();
+        // Khách nhận có thể đã có dòng cho cùng tên miền (mỗi khách tối đa một dòng một tên miền, P-4): giữ dòng
+        // "mạnh" hơn (verified > pending > failed / revoked), xoá dòng kia — dòng thừa của cùng một khách không mang
+        // nghĩa gì, còn để lại thì UPDATE vi phạm unique `(domain, tenant_id)` và lượt gộp lặp lỗi mãi.
+        let names: Vec<String> = found.iter().map(|row| row.domain.clone()).collect();
+        let mut existing = std::collections::HashMap::new();
+        for chunk in names.chunks(500) {
+            let rows = domain::Entity::find()
+                .filter(domain::Column::TenantId.eq(to))
+                .filter(domain::Column::Domain.is_in(chunk.iter().cloned()))
+                .all(connection)
+                .await?;
+            existing.extend(rows.into_iter().map(|row| (row.domain.clone(), row)));
+        }
+        let mut ids = Vec::new();
+        let mut dropped = Vec::new();
+        for row in &found {
+            match existing.get(&row.domain) {
+                Some(kept) if claim_rank(&kept.status) >= claim_rank(&row.status) => {
+                    dropped.push(row.id)
+                }
+                Some(kept) => {
+                    dropped.push(kept.id);
+                    ids.push(row.id);
+                }
+                None => ids.push(row.id),
+            }
+        }
+        for chunk in dropped.chunks(500) {
+            domain::Entity::delete_many()
+                .filter(domain::Column::Id.is_in(chunk.iter().copied()))
+                .exec(connection)
+                .await?;
+        }
         for chunk in ids.chunks(500) {
             domain::Entity::update_many()
                 .col_expr(domain::Column::TenantId, Expr::value(to))
@@ -692,5 +724,14 @@ impl Entity {
             .exec(connection)
             .await?;
         Ok(())
+    }
+}
+
+// Độ "mạnh" của một dòng tên miền khi hai khách gộp cùng có tên miền đó.
+fn claim_rank(status: &str) -> u8 {
+    match status {
+        "verified" => 3,
+        "pending" => 2,
+        _ => 1,
     }
 }
