@@ -505,20 +505,29 @@ impl TenantRelocations {
         for row in &found {
             match existing.get(&row.domain) {
                 Some(kept) if claim_rank(&kept.status) >= claim_rank(&row.status) => {
-                    dropped.push(row.id)
+                    dropped.push((row.id, row.status.clone()));
                 }
                 Some(kept) => {
-                    dropped.push(kept.id);
+                    dropped.push((kept.id, kept.status.clone()));
                     ids.push(row.id);
                 }
                 None => ids.push(row.id),
             }
         }
-        for chunk in dropped.chunks(500) {
-            domain::Entity::delete_many()
-                .filter(domain::Column::Id.is_in(chunk.iter().copied()))
+        // Xoá kèm đúng trạng thái đã đọc: trên Postgres (read committed) job `kernel.verify_domains` hay một lượt
+        // xác minh có thể vừa đổi dòng `pending` / `failed` thành `verified` giữa lúc đọc và lúc xoá — không được xoá
+        // mất dòng đó. Lệch thì báo lỗi; transaction huỷ và lượt dời chạy lại từ bước này với dữ liệu mới.
+        for (id, status) in dropped {
+            let deleted = domain::Entity::delete_many()
+                .filter(domain::Column::Id.eq(id))
+                .filter(domain::Column::Status.eq(status.as_str()))
                 .exec(connection)
                 .await?;
+            if deleted.rows_affected != 1 {
+                return Err(Error::internal(format!(
+                    "tenant domain {id} changed during the relocation; run the relocation again"
+                )));
+            }
         }
         for chunk in ids.chunks(500) {
             domain::Entity::update_many()

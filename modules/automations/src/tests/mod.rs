@@ -38,7 +38,8 @@ use crate::service::validate::RawBody;
 
 pub(crate) use fixtures::*;
 
-/// `OrgDirectory` của test: `is_within` hỏi cây tổ chức của kernel (`OrgTree`), như module `organizations`.
+/// Bản giả của `OrgDirectory` cho test: chỉ `is_within` có thật — đọc cây tổ chức của kernel (`OrgTree::is_within`,
+/// cùng hàm module `organizations` dùng); các hàm khác trả rỗng.
 pub(crate) struct TreeOrgs;
 
 #[async_trait::async_trait]
@@ -114,7 +115,7 @@ impl Harness {
         Harness::build(test, settings, false).await
     }
 
-    /// Như [`Harness::new`] kèm một `OrgDirectory` đọc cây tổ chức thật của kernel (`TreeOrgs`).
+    /// Như [`Harness::new`] kèm bản giả `TreeOrgs` của `OrgDirectory` (đọc cây tổ chức của kernel).
     pub(crate) async fn with_orgs(test: &TestDatabase) -> Harness {
         Harness::build(test, &[], true).await
     }

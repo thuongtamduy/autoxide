@@ -20,7 +20,28 @@ coi như ngoài nhánh — cùng nguyên tắc luồng event (SSE) đang dùng (
 module, mà giá trị vẫn phải lấy từ cùng chỗ; cho luật nút con nhận cả event không rõ nhánh — giữ nguyên lỗ hổng cho mọi
 event chưa ghi `org_id`; chặn hẳn luật theo event ở nút con — mất tính năng cho chuỗi nhiều chi nhánh.
 
-Hệ quả (rà 2026-11-25, đổi hành vi có chủ đích): event về dữ liệu thuộc một đơn vị nhưng CHƯA ghi `org_id` ở ba chỗ đọc
-— luật của nút con gắn vào chúng ngừng chạy cho tới khi module bổ sung `org_id` (thêm vào ảnh chụp, hay đổi tên khoá như
-`selling_org_id` / `from_org_id` / `warehouse_org_id` / `seller_org_id` / `respondent_org_id` sang `org_id`): `notes`, `menus`, `forms` and `organizations` (every event); `promotions` (every event: `org_id` sits under `after.promotion`); `content` (`entry_*`, `review_*`, `type_changed`); `media` (`item_*`); `bookings` (`booking_*`, `schedule_replaced`, `exception_*`); `conversations` (`message_*`, `typing`, `recording_*`); `support` (`message_added`, `message_hidden`, `ticket_linked`, `satisfaction_recorded`, `auto_repl*`, `tickets_claimed`); `catalog` (`variant_*`, `preorder_date_changed`, `price_effective`, `downloads_*`); `customers` (`profile_updated`, `profile_linked`, `contact_revealed`, `group_*`); `inventory` (`reservation_*`, `transfer_*`, `preorder_allocated`: the unit is under another key); `orders` (`payment_recorded`); `invoices` (`document_accepted`, `_rejected`, `_cancelled`, `_corrected`); `ledger` (`payment_refunded`); `shipping` (`cod_discrepancy_resolved`); `compliance` (`website_updated`, `website_status_changed`); `automations` (`run_failed`); `auth` (`api_key_revoked`, `api_key_approved`, `memberships_changed`, `user_roles_changed`). Luật đặt ở nút gốc vẫn chạy như cũ. Việc bổ sung `org_id` cho từng module là việc riêng (không làm trong
-PR này, nhiều module đang có phiên khác sửa).
+Hệ quả (rà 2026-11-25, đổi hành vi có chủ đích): các event dưới đây là về dữ liệu thuộc một đơn vị nhưng CHƯA ghi
+`org_id` ở ba chỗ đọc; luật của nút con gắn vào chúng ngừng chạy cho tới khi module bổ sung `org_id` (thêm vào ảnh
+chụp, hay đổi khoá mang tên khác sang `org_id`). Luật đặt ở nút gốc vẫn chạy như cũ.
+
+- `notes`, `menus`, `forms`, `organizations`: mọi event.
+- `promotions`: mọi event (`org_id` nằm trong `after.promotion`, không ở `after`; `participation_reviewed` chỉ có
+  `seller_org_id`).
+- `content`: `entry_*`, `review_*`, `type_changed`.
+- `media`: `item_*`.
+- `bookings`: `booking_*`, `schedule_replaced`, `exception_*`.
+- `conversations`: `message_*`, `typing`, `recording_*`.
+- `support`: `message_added`, `message_hidden`, `ticket_linked`, `satisfaction_recorded`, `auto_replied`,
+  `auto_reply_disabled`, `tickets_claimed`.
+- `catalog`: `variant_*`, `preorder_date_changed`, `price_effective`, `downloads_*`.
+- `customers`: `profile_updated`, `profile_linked`, `contact_revealed`, `group_changed`, `group_membership_changed`.
+- `inventory`: `reservation_*` (khoá `selling_org_id`), `transfer_*` (`from_org_id` / `to_org_id`),
+  `preorder_allocated` (`warehouse_org_id`).
+- `orders`: `payment_recorded`. `invoices`: `document_accepted`, `document_rejected`, `document_cancelled`,
+  `document_corrected`. `ledger`: `payment_refunded`. `shipping`: `cod_discrepancy_resolved`.
+- `compliance`: `website_updated`, `website_status_changed` (`case_*` chỉ có `respondent_org_id`).
+- `automations`: `run_failed`. `auth`: `api_key_revoked`, `api_key_approved`, `memberships_changed`,
+  `user_roles_changed`.
+
+Bổ sung `org_id` cho từng module là việc riêng (mục P16 của lộ trình), không làm trong PR này vì nhiều module đang có
+phiên khác sửa.

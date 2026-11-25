@@ -131,10 +131,6 @@ thật (P7).
   - [x] I-2: giới hạn kích thước câu trả lời của nhà cung cấp do người vận hành cấu hình (AI, cổng kết nối) — xong
         (#505, D-20261125-provider-response-cap): `AUTOXIDE_PROVIDER_MAX_RESPONSE_BYTES`
   - [x] I-5: ghim image `gitleaks` của CI bằng digest — xong (#505, D-20261125-gitleaks-digest)
-  - [ ] Event mang `org_id` ở mọi module có dữ liệu theo đơn vị (hệ quả của L-8, danh sách trong
-        D-20261125-event-org): tới lúc đó luật tự động hoá của nút con không chạy với các event đó
-  - [ ] L-11: `return_url` của xác minh danh tính (`compliance`, `POST /api/v1/compliance/kyc`) chưa qua danh sách
-        địa chỉ hợp lệ như thanh toán (P-5) — phát hiện khi sửa P-5, để cho lượt rà soát luồng xác minh danh tính
   - [ ] Phần chưa rà: SCIM, xác minh số điện thoại, định dạng file xuất / nhập / chuyển khách, đối chiếu đủ mọi tool
         MCP với REST, điểm thưởng / giới thiệu / chia thanh toán POS, `content` / `media` / `newsletter` / `analytics`
         ngoài các điểm đã thử
@@ -233,6 +229,14 @@ thật (P7).
       bước dựng rustdoc JSON (công cụ dựng mỗi crate trong target dir riêng); nay một target dir chung cho mọi crate và
       chia 4 máy (`--shard k/4`), job gộp giữ tên check cũ; `v0.18.0` → `v0.19.0` không có phá vỡ phía Rust
       (D-20261125-semver-job-time)
+- [ ] P16 — Nợ còn mở sau khi trả nợ bảo mật mức thấp của rà soát 2026-11 (#505, #508, #512;
+      D-20261125-security-debt-followups):
+  - [ ] Event mang `org_id` ở mọi module có dữ liệu theo đơn vị (hệ quả của L-8, danh sách trong
+        D-20261125-event-org): tới lúc đó luật tự động hoá của nút con không chạy với các event đó
+  - [ ] L-11: `return_url` của xác minh danh tính (`compliance`, `POST /api/v1/compliance/kyc`) chưa qua danh sách
+        địa chỉ hợp lệ như thanh toán (P-5) — phát hiện khi sửa P-5, để cho lượt rà soát luồng xác minh danh tính
+  - [ ] Test chắc chắn đi qua nhánh "trùng unique index" khi xác minh tên miền (`check_on` → `lost_race`): hiện chỉ
+        test đồng thời đi qua nhánh đó khi hai lượt tình cờ xen kẽ
 
 ## Giai đoạn B — Lớp cho giao diện và phân quyền
 
