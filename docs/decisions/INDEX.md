@@ -109,7 +109,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261121-security-lints](D-20261121-security-lints.md)** Hai luật gate chặn lỗi phân quyền tái phát: `tenant-scope` và `mcp-principal`, kèm danh sách chỗ cũ chờ sửa — 2026-11-21
 - **[D-20261121-shop-first-order](D-20261121-shop-first-order.md)** Thứ tự sau bước 70 P1–P3 xếp theo kịch bản "cửa hàng bán online chạy thật" — 2026-11-21
 - **[D-20261121-sqlx-091](D-20261121-sqlx-091.md)** Nâng sqlx 0.9.1, gỡ ngoại lệ RUSTSEC-2026-0459 — 2026-11-21
-- **[D-20261122-gitleaks-8-30-1](D-20261122-gitleaks-8-30-1.md)** Ghim gitleaks 8.30.1, image lấy từ `ghcr.io/gitleaks/gitleaks` ở cả gate và CI — 2026-11-22
+- **[D-20261122-gitleaks-8-30-1](D-20261122-gitleaks-8-30-1.md)** Ghim gitleaks 8.30.1, image lấy từ `ghcr.io/gitleaks/gitleaks` ở cả gate và CI — 2026-11-22 · *thay một phần bởi D-20261125-gitleaks-digest*
 - **[D-20261122-step67-after-1-0](D-20261122-step67-after-1-0.md)** Ba mục cuối của bước 67 làm sau bản 1.0 — 2026-11-22 · **chủ dự án quyết**
 - **[D-20261122-toolchain-sync](D-20261122-toolchain-sync.md)** Ví dụ module ngoài dùng đúng toolchain của core; `cargo xtask check` chặn khi lệch — 2026-11-22
 - **[D-20261123-api-coverage](D-20261123-api-coverage.md)** Đo độ phủ endpoint và tool MCP bằng test, mục tiêu 100% trước 1.0 — 2026-11-23
@@ -119,6 +119,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261123-supply-chain](D-20261123-supply-chain.md)** Chuỗi cung ứng và phát hành: ký không khoá, provenance cho mọi file, Actions tối thiểu quyền, Dependabot có cooldown, bản thử `X.Y.Z-rc.N` — 2026-11-23
 - **[D-20261125-ci-skip-rust](D-20261125-ci-skip-rust.md)** Pull request không chạm Rust bỏ phần biên dịch và test nặng theo danh sách cho phép — 2026-11-25
 - **[D-20261125-cloud-session-setup](D-20261125-cloud-session-setup.md)** Phiên agent trên cloud: một script cài đặt trong repo, gọi từ setup script của môi trường và SessionStart hook — 2026-11-25
+- **[D-20261125-gitleaks-digest](D-20261125-gitleaks-digest.md)** Image gitleaks ghim theo digest ở `.github/gitleaks/Dockerfile`, gate và CI đọc cùng dòng — 2026-11-25
 - **[D-20261125-p9-reopened](D-20261125-p9-reopened.md)** Mở lại P9 của bước 70: mẫu OTP theo khách, chế độ "nghỉ", danh sách có phân trang — 2026-11-25 · **chủ dự án quyết**
 - **[D-20261125-typescript-range](D-20261125-typescript-range.md)** Dải TypeScript hỗ trợ cho SDK: 5.0 trở lên, phát triển trên 7 — 2026-11-25
 
@@ -201,7 +202,8 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261119-step69-ws](D-20261119-step69-ws.md)** WebSocket `GET /api/v1/kernel/events/ws`: dùng chung hub SSE, một vé kết nối cho cả phiên, lệnh điều khiển JSON, tín hiệu tạm trong tiến trình — 2026-11-19
 - **[D-20261121-api-shape](D-20261121-api-shape.md)** Thân request đóng ở mọi endpoint, gate kiểm hình dạng API trên openapi.json — 2026-11-21
 - **[D-20261121-stability-marks](D-20261121-stability-marks.md)** Hạng module trong hợp đồng: `x-stability` chỉ gắn cho thử nghiệm — 2026-11-21
-- **[D-20261123-http-header-timeout](D-20261123-http-header-timeout.md)** Máy chủ HTTP tự phục vụ kết nối bằng `hyper-util` có timer: timeout đọc header 30 giây, ping HTTP/2 — 2026-11-23
+- **[D-20261123-http-header-timeout](D-20261123-http-header-timeout.md)** Máy chủ HTTP tự phục vụ kết nối bằng `hyper-util` có timer: timeout đọc header 30 giây, ping HTTP/2 — 2026-11-23 · *thay một phần bởi D-20261125-max-connections*
+- **[D-20261125-max-connections](D-20261125-max-connections.md)** Máy chủ HTTP giới hạn số kết nối mở (`AUTOXIDE_HTTP_MAX_CONNECTIONS`, mặc định 4096) và đóng kết nối không gửi byte nào — 2026-11-25
 
 ## MCP, AI, agent dùng API
 
@@ -278,7 +280,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-312** Mời người dùng qua email (bước 34 mục 12) — 2026-11-16
 - **D-313** Quyền vào hỗ trợ của nhân sự nền tảng (bước 34 mục 13) — 2026-11-16
 - **D-319** Đường đã đăng nhập đọc người dùng cùng quyền trong một câu; `GET /me` còn ba câu — 2026-11-16 · **chủ dự án quyết**
-- **D-320** Header bảo mật chung cho mọi response (bước 40 P1) — 2026-11-16 · **chủ dự án quyết**
+- **D-320** Header bảo mật chung cho mọi response (bước 40 P1) — 2026-11-16 · **chủ dự án quyết** · *thay một phần bởi D-20261125-docs-csp-pinned*
 - **D-321** Bộ đếm login throttling: một câu "chèn hoặc cộng" trả số đếm; số 232 req/s của D-302 là bài đo lẫn — 2026-11-16 · **chủ dự án quyết**
 - **D-339** `GET /auth/me` ở khách đang vào — 2026-11-17
 - **D-375** Rate limit theo API key đếm chung qua database, theo lô; `memory` vẫn mặc định (bước 40 P6, D-109, D-116) — 2026-11-18
@@ -309,6 +311,8 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261121-scim](D-20261121-scim.md)** Bước 66: SCIM 2.0 trong `auth` — token riêng của khách, endpoint theo chuẩn SCIM thay cho envelope chung, mức lọc và PATCH, không Bulk — 2026-11-21 · *thay một phần bởi D-20261121-scim-claim-covers*
 - **[D-20261121-ssrf-targets](D-20261121-ssrf-targets.md)** Địa chỉ máy chủ do khách chọn: kiểm lúc lưu, lọc IP lúc kết nối, lỗi chung — 2026-11-21
 - **[D-20261123-security-review-2026-11](D-20261123-security-review-2026-11.md)** Rà soát bảo mật trước 1.0: báo cáo công khai, sửa hết mức cao/trung bình, role đòi MFA chặn ở cửa đăng nhập — 2026-11-23
+- **[D-20261125-docs-csp-pinned](D-20261125-docs-csp-pinned.md)** CSP của `/api/docs` chỉ cho đúng file Scalar đã ghim, bỏ jsdelivr khỏi style và font — 2026-11-25
+- **[D-20261125-provider-response-cap](D-20261125-provider-response-cap.md)** Câu trả lời của nhà cung cấp ngoài đọc tối đa `AUTOXIDE_PROVIDER_MAX_RESPONSE_BYTES` (mặc định 16 MiB) — 2026-11-25
 
 ## Đa khách, tổ chức, gói
 

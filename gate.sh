@@ -85,7 +85,8 @@
 #                        TEST_S3_BUCKET) và nhận TEST_S3_ACCESS_KEY_ID /
 #                        TEST_S3_SECRET_ACCESS_KEY (mặc định `test` / `test`).
 #   GATE_S3_IMAGE        image cho container S3 giả lập (mặc định motoserver/moto).
-#   GATE_GITLEAKS_IMAGE  image gitleaks khi máy không cài gitleaks.
+#   GATE_GITLEAKS_IMAGE  image gitleaks khi máy không cài gitleaks (mặc định: dòng `FROM` của
+#                        .github/gitleaks/Dockerfile, ghim theo digest, cùng image với CI).
 #   GATE_BASE            với --pr: so với ref này để biết crate nào bị sửa (mặc định origin/main); với --pr và
 #                        --quick: thay đổi kể từ chỗ rẽ nhánh với ref này có chạm Rust không (bỏ clippy).
 #   GATE_ARCHIVE_DIR     với --only build: thư mục ghi archive test và file filter (mặc định
@@ -161,7 +162,8 @@ renice -n 10 -p $$ >/dev/null 2>&1 || true
 
 POSTGRES_IMAGE="${GATE_POSTGRES_IMAGE:-postgres:16-alpine}"
 S3_IMAGE="${GATE_S3_IMAGE:-motoserver/moto:5.2.5}"
-GITLEAKS_IMAGE="${GATE_GITLEAKS_IMAGE:-ghcr.io/gitleaks/gitleaks:v8.30.1}"
+# Image gitleaks ghim theo digest ở một chỗ, CI đọc cùng dòng này (I-5, D-20261125-gitleaks-digest).
+GITLEAKS_IMAGE="${GATE_GITLEAKS_IMAGE:-$(sed -n 's/^FROM //p' .github/gitleaks/Dockerfile)}"
 CONTAINER=""
 S3_CONTAINER=""
 

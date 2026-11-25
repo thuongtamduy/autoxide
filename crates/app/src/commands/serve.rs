@@ -212,7 +212,14 @@ where
             tokio::time::sleep(drain).await;
         }
     };
-    let outcome = http::serve(listener, api.router, shutdown, config.http.shutdown_grace).await;
+    let outcome = http::serve_with_limit(
+        listener,
+        api.router,
+        shutdown,
+        config.http.shutdown_grace,
+        config.http.max_connections,
+    )
+    .await;
     match outcome {
         Ok(Shutdown::Graceful) => tracing::info!("stopped"),
         Ok(Shutdown::TimedOut) => tracing::warn!(

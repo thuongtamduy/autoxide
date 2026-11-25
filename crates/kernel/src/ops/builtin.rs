@@ -379,10 +379,12 @@ impl Module for KernelModule {
                 crate::config::parse_in_range(raw, 1u32, 365)
             });
         let backup_config = crate::backup::scheduled::BackupConfig::read(reader);
+        let provider_bytes = crate::contracts::provider::read_setting(reader);
         if let Some(seconds) = request_timeout(reader) {
             self.request_timeout = std::time::Duration::from_secs(seconds);
         }
         self.backup_config = backup_config?;
+        crate::contracts::provider::set_max_response_bytes(provider_bytes?);
         self.keys.set(secret?, previous?);
         self.public_url = public_url?;
         self.max_flags = max_flags?;

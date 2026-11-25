@@ -19,15 +19,19 @@ use crate::config::SecurityHeaders;
 pub const API_CSP: &str =
     "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'; sandbox";
 
-/// CSP of the API documentation page (`/api/docs`): the Scalar page loads scripts and styles from jsdelivr,
-/// fonts from jsdelivr and `fonts.scalar.com` (checked in Chromium: without this source the fonts are
-/// blocked, D-320), and calls `openapi.json` on the same origin. The `<script type="application/json">` block
-/// is only data, and CSP does not block it.
+/// CSP of the API documentation page (`/api/docs`): only the one pinned Scalar script file may run (not
+/// every file on the CDN - L-9 of the 2026-11 security review), styles are the page's own, fonts come from
+/// `fonts.scalar.com`, and the page calls `openapi.json` on the same origin. Checked in Chromium (D-320,
+/// D-20261125-docs-csp-pinned): the page renders with no CSP error; the only blocked requests are optional
+/// features that would call Scalar's own servers (`api.scalar.com`) and an `eval` probe, both blocked on
+/// purpose. The `<script type="application/json">` block is only data, and CSP does not block it.
 pub const DOCS_CSP: &str = concat!(
     "default-src 'none'; ",
-    "script-src https://cdn.jsdelivr.net; ",
-    "style-src 'unsafe-inline' https://cdn.jsdelivr.net; ",
-    "font-src https://cdn.jsdelivr.net https://fonts.scalar.com data:; ",
+    "script-src ",
+    scalar_script_url!(),
+    "; ",
+    "style-src 'unsafe-inline'; ",
+    "font-src https://fonts.scalar.com data:; ",
     "img-src 'self' data: https:; ",
     "connect-src 'self'; ",
     "frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
