@@ -2,7 +2,7 @@
 # Chuẩn bị máy mới (phiên agent trên cloud, container dùng xong bỏ) để chạy được `./gate.sh --quick`
 # ngay: toolchain Rust đúng bản ghim và các công cụ ngoài mà gate cần. Xem docs/CLOUD-SESSIONS.md.
 #
-#   scripts/cloud-setup.sh           toolchain + công cụ (cargo-deny, gitleaks, cargo-nextest) + lịch sử git đầy đủ
+#   scripts/cloud-setup.sh           toolchain + công cụ (cargo-deny, gitleaks, cargo-nextest) + lịch sử git đầy đủ + mục lục quyết định
 #   scripts/cloud-setup.sh --warm    thêm `cargo fetch` và build sẵn `xtask` (làm nóng cache)
 #
 # Chạy lại nhiều lần được: thứ đã có đúng phiên bản thì bỏ qua. Không cần secret, chỉ cần mạng tới
@@ -116,6 +116,15 @@ if [ "$WARM" = 1 ]; then
   cargo fetch --locked || die "cargo fetch hỏng (kiểm tra mạng tới crates.io)."
   log "build trước xtask"
   cargo build -p xtask --locked || die "build xtask hỏng."
+fi
+
+# --- 5. Mục lục quyết định ----------------------------------------------------------------------------
+# `docs/decisions/INDEX.md` không nằm trong git (D-20261125-decision-index-untracked); CLAUDE.md dặn đọc nó
+# trước khi tìm quyết định. Không làm hỏng script khi lỗi: chỉ là tiện cho agent.
+if cargo xtask decisions >/dev/null 2>&1; then
+  log "mục lục quyết định: đã sinh docs/decisions/INDEX.md"
+else
+  log "mục lục quyết định: chưa sinh được (chạy 'cargo xtask decisions' sau)"
 fi
 
 log "xong. Chạy ./gate.sh --quick"

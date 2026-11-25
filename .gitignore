@@ -18,3 +18,4 @@
 .claude/worktrees/
 
 /sdk/node_modules/
+/docs/decisions/INDEX.md
