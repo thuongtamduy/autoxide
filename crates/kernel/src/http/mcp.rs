@@ -109,10 +109,9 @@ pub(super) fn router(
         let only = server.only(&module);
         router = router.route_service(&module_path(&module), endpoint(only));
     }
-    let router =
-        router.route_service(MCP_PATH, endpoint(server)).route_layer(middleware::from_fn(
-            move |request: Request, next: Next| authenticate(authenticator.clone(), request, next),
-        ));
+    let router = router.route_service(MCP_PATH, endpoint(server)).route_layer(middleware::from_fn(
+        move |request: Request, next: Next| authenticate(authenticator.clone(), request, next),
+    ));
     Some(router)
 }
 

@@ -420,7 +420,8 @@ pub fn build(
     };
     // Một nguồn sự thật cho origin (D-20261125-tenant-cors): header CORS, kiểm `Origin` của MCP và kiểm khách
     // đều đọc `OriginGrant` lớp `cors::classify` để lại.
-    let cors_policy = Arc::new(cors::CorsPolicy::new(config.cors_origins.clone(), extras.tenancy.clone()));
+    let cors_policy =
+        Arc::new(cors::CorsPolicy::new(config.cors_origins.clone(), extras.tenancy.clone()));
     if let Some(mcp) = mcp::router(
         catalog,
         translations.clone(),

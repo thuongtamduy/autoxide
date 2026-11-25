@@ -379,7 +379,10 @@ impl DatabaseRegistry {
     /// (CORS, `http::cors`): a domain nobody verified costs no query. The snapshot is re-read at most once per
     /// `AUTOXIDE_TENANCY_CACHE_SECONDS`, and at once after a domain or tenant changes on this server.
     /// `single` mode: always `None`.
-    pub(crate) async fn verified_domain_owner(&self, domain: &str) -> Result<Option<TenantId>, Error> {
+    pub(crate) async fn verified_domain_owner(
+        &self,
+        domain: &str,
+    ) -> Result<Option<TenantId>, Error> {
         if self.0.mode == TenancyMode::Single {
             return Ok(None);
         }

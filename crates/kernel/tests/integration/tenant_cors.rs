@@ -373,8 +373,14 @@ async fn doi_origin_la_khong_chan_origin_hop_le() {
             let origin = format!("https://random-{index}.test");
             assert!(allow_origin(&preflight(&app, &origin).await).is_empty(), "{origin}");
         }
-        assert_eq!(allow_origin(&preflight(&app, "https://shop-a.test").await), "https://shop-a.test");
-        assert_eq!(allow_origin(&preflight(&app, "https://shop-b.test").await), "https://shop-b.test");
+        assert_eq!(
+            allow_origin(&preflight(&app, "https://shop-a.test").await),
+            "https://shop-a.test"
+        );
+        assert_eq!(
+            allow_origin(&preflight(&app, "https://shop-b.test").await),
+            "https://shop-b.test"
+        );
     })
     .await
     .unwrap();
