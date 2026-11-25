@@ -376,9 +376,10 @@ impl ProviderService {
             row.enabled = enabled;
         }
         let mut problems = check(&row, client, &redirect_uris, allowed.as_deref());
-        if changes.default_org_id.is_some() || changes.default_role_id.is_some() {
-            problems.extend(self.check_defaults(tenant, principal, &row).await?);
-        }
+        // Mọi lần sửa, không chỉ khi đổi trường mặc định: người sửa nhà cung cấp còn role mặc định
+        // (issuer, client, tự đăng ký, tên miền…) quyết định ai nhận role đó, nên phải tự trao được nó
+        // (D-20261125-durable-grants).
+        problems.extend(self.check_defaults(tenant, principal, &row).await?);
         let secret_changed = changes.client_secret.is_some();
         if let Some(secret) = changes.client_secret {
             if row.kind() != Kind::Oidc && secret.trim().is_empty() {

@@ -626,6 +626,46 @@ impl OidcService {
         })
     }
 
+    /// Người cấu hình nhà cung cấp `provider` hiện tại còn trao được role mặc định của nó không; không
+    /// thì 403 `auth.oidc_default_role_unavailable`.
+    async fn require_configurer_grants_default(
+        &self,
+        tenant: &TenantContext,
+        provider: &Provider,
+    ) -> Result<(), Error> {
+        let refused = || {
+            Error::forbidden(
+                "auth.oidc_default_role_unavailable",
+                "This sign-in provider gives new accounts a role that the person who configured it \
+                 cannot give now. Ask an administrator to save the sign-in provider's settings again.",
+            )
+        };
+        let (Some(role), Some(configured_by)) = (provider.default_role_id, provider.configured_by)
+        else {
+            return Err(refused());
+        };
+        let Some((by, actor)) = self.roles.user_principal(tenant, configured_by).await? else {
+            return Err(refused());
+        };
+        if !by.is_active()
+            || by.realm != Realm::Staff
+            || !actor.has(&crate::permissions::OIDC_MANAGE)
+        {
+            return Err(refused());
+        }
+        let org = provider
+            .default_org_id
+            .unwrap_or_else(|| autoxide_kernel::tenancy::root_of(tenant.id()).as_uuid());
+        let roles = std::collections::BTreeSet::from([role]);
+        let read = tenant.database().read();
+        let problems = crate::role::grant_problems(read, tenant, &actor, "", org, &roles).await?;
+        if !problems.is_empty() {
+            tracing::info!(provider_id = %provider.id, "sign-up refused: configurer cannot give the default role");
+            return Err(refused());
+        }
+        Ok(())
+    }
+
     /// Thêm liên kết cho người dùng `user_id` và ghi event.
     async fn link(
         &self,
@@ -692,6 +732,12 @@ impl OidcService {
                 "auth.oidc_signup_closed",
                 "There is no account for this sign-in, and creating one yourself is not allowed.",
             ));
+        }
+        // Role mặc định: kiểm lại người cấu hình LÚC DÙNG, như người mời khi nhận lời mời — còn tồn
+        // tại, còn hoạt động, còn `auth.oidc.manage` và hiện tại tự trao được role đó ở nút đó. Không
+        // đạt (kể cả nhà cung cấp chưa có người cấu hình) thì không tạo tài khoản (D-20261125-durable-grants).
+        if realm == Realm::Staff && provider.default_role_id.is_some() {
+            self.require_configurer_grants_default(tenant, provider).await?;
         }
         let fallback = email.split('@').next().unwrap_or_default().to_owned();
         let name: String = external

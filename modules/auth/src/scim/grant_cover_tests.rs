@@ -361,7 +361,10 @@ async fn token_cua_nguoi_tao_bi_khoa_hay_bi_xoa() {
             .exec(services.database.write())
             .await
             .unwrap();
-        assert_eq!(creator_status(&app, &admin, gone).await, "deleted");
+        // Xoá tài khoản thu hồi luôn token SCIM nó tạo (D-20261125-durable-grants); khoá thẳng trong
+        // database (không qua service) thì token còn, nhưng người tạo bị khoá nên token không làm được gì.
+        let (status, _) = scim(&app, "GET", "/Users", &gone_token, None).await;
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
         assert_eq!(creator_status(&app, &admin, locked).await, "disabled");
 
         // Liên kết tài khoản `it` (có permission) với SCIM bằng token của admin, để thử khoá.
@@ -369,7 +372,8 @@ async fn token_cua_nguoi_tao_bi_khoa_hay_bi_xoa() {
             scim(&app, "POST", "/Users", &admin_token, Some(user_body("it@example.com", "it")))
                 .await;
         assert_eq!(status, StatusCode::CREATED, "{linked}");
-        for (label, token) in [("deleted", &gone_token), ("disabled", &locked_token)] {
+        {
+            let (label, token) = ("disabled", &locked_token);
             let stranger = scim_user(&app, token, &format!("{label}@example.com")).await;
             let add =
                 patch(json!([{"op": "add", "path": "members", "value": [{"value": stranger}]}]));
@@ -710,6 +714,48 @@ async fn khoa_tai_khoan_thu_hoi_token_scim_no_tao() {
             scim(&app, "GET", "/Users", &rest_disabled, None).await.0,
             StatusCode::UNAUTHORIZED
         );
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn lay_lai_tai_khoan_hay_xoa_tai_khoan_thu_hoi_token_scim_no_tao() {
+    TestDatabase::run(async |test| {
+        let (app, services, _, _) = setup(test).await;
+        let tenant = &services.tenant;
+        // Lấy lại tài khoản bằng mail (đặt lại mật khẩu kiểu `Recovery`): token SCIM mất.
+        let (_, recovered_token) = sync_operator(&app, &services, "it@example.com").await;
+        let it = services.users.find_by_email(tenant, "it@example.com").await.unwrap().unwrap();
+        services
+            .users
+            .write_password(
+                tenant,
+                Actor::user(it.id),
+                it.id,
+                "password",
+                "a brand new long password".to_owned(),
+                crate::user::PasswordWrite::Recovery,
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            scim(&app, "GET", "/Users", &recovered_token, None).await.0,
+            StatusCode::UNAUTHORIZED
+        );
+
+        // Xoá tài khoản: token SCIM không ở lại mồ côi.
+        let ops = NewUser {
+            email: "ops@example.com".to_owned(),
+            name: "Ops".to_owned(),
+            password: Some(PASSWORD.to_owned()),
+        };
+        let ops =
+            services.users.create_with_roles(tenant, Actor::system(), ops, true).await.unwrap();
+        let ops_token =
+            scim_token(&app, &bearer(&app, "ops@example.com", PASSWORD).await, None).await;
+        services.users.delete(tenant, Actor::system(), ops.id).await.unwrap();
+        assert_eq!(scim(&app, "GET", "/Users", &ops_token, None).await.0, StatusCode::UNAUTHORIZED);
     })
     .await
     .unwrap();

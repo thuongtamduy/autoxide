@@ -138,3 +138,96 @@ async fn nguoi_cau_hinh_mat_quyen_quan_ly_oidc_thi_nha_cung_cap_khong_tu_gop() {
     .await
     .unwrap();
 }
+
+/// Role `admin` của khách (id dạng JSON).
+async fn admin_role(app: &autoxide_testkit::TestApp, admin: &str) -> serde_json::Value {
+    let roles = app.get("/api/v1/auth/roles").token(admin).send().await.unwrap().json();
+    roles["data"].as_array().unwrap().iter().find(|role| role["name"] == "admin").unwrap()["id"]
+        .clone()
+}
+
+#[tokio::test]
+async fn sua_nha_cung_cap_co_role_mac_dinh_phai_trao_duoc_role_do() {
+    // Mọi lần sửa nhà cung cấp còn role mặc định, không chỉ khi đổi trường mặc định.
+    TestDatabase::run(async |test| {
+        let fake = fake_server().await;
+        let (app, services, admin) = app(test, true).await;
+        let tenant = services.tenant.clone();
+        let mut body = oidc_body(&fake, "staff", true);
+        body["default_role_id"] = admin_role(&app, &admin).await;
+        let created = provider(&app, &admin, body).await;
+        let input = crate::role::RoleInput {
+            denies: Vec::new(),
+            requires_mfa: false,
+            name: "sso".to_owned(),
+            description: String::new(),
+            permissions: vec!["auth.oidc.manage".to_owned()],
+            grants: Vec::new(),
+        };
+        let sso = services.roles.create(&tenant, Actor::system(), input).await.unwrap();
+        let manager = NewUser {
+            email: "sso@example.com".to_owned(),
+            name: "SSO".to_owned(),
+            password: Some(PASSWORD.to_owned()),
+        };
+        let manager = services.users.create(&tenant, Actor::system(), manager).await.unwrap();
+        services
+            .roles
+            .set_user_roles(&tenant, Actor::system(), manager.id, vec![sso.id])
+            .await
+            .unwrap();
+        let manager_token = token(&app, "sso@example.com").await;
+        let path = format!("/api/v1/auth/oidc-providers/{}", created["id"].as_str().unwrap());
+        let response = app
+            .patch(&path)
+            .token(&manager_token)
+            .json(serde_json::json!({"allowed_email_domains": ["example.com"]}))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY, "{}", response.json());
+        assert_eq!(
+            response.json()["errors"][0]["code"],
+            "more_than_you_have",
+            "{}",
+            response.json()
+        );
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn tu_dang_ky_voi_role_mac_dinh_kiem_lai_nguoi_cau_hinh() {
+    // Người cấu hình (admin thứ hai) bị hạ quyền: tự đăng ký không còn cấp role mặc định — từ chối.
+    TestDatabase::run(async |test| {
+        let fake = fake_server().await;
+        let (app, services, admin) = app(test, true).await;
+        let tenant = services.tenant.clone();
+        let second = NewUser {
+            email: "second@example.com".to_owned(),
+            name: "Second".to_owned(),
+            password: Some(PASSWORD.to_owned()),
+        };
+        let second =
+            services.users.create_with_roles(&tenant, Actor::system(), second, true).await.unwrap();
+        let second_token = token(&app, "second@example.com").await;
+        let mut body = oidc_body(&fake, "staff", true);
+        body["default_role_id"] = admin_role(&app, &admin).await;
+        provider(&app, &second_token, body).await;
+        let (status, body) =
+            sign_in(&app, &fake, "staff", claims(&fake, "staff", "s-1", "new1@example.com", true))
+                .await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+
+        services.roles.set_user_roles(&tenant, Actor::system(), second.id, vec![]).await.unwrap();
+        let (status, body) =
+            sign_in(&app, &fake, "staff", claims(&fake, "staff", "s-2", "new2@example.com", true))
+                .await;
+        assert_eq!(status, StatusCode::FORBIDDEN, "{body}");
+        assert_eq!(body["code"], "auth.oidc_default_role_unavailable", "{body}");
+        assert!(services.users.find_by_email(&tenant, "new2@example.com").await.unwrap().is_none());
+    })
+    .await
+    .unwrap();
+}
