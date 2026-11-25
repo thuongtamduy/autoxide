@@ -122,6 +122,16 @@ pub(crate) fn return_url_not_allowed() -> Error {
     )
 }
 
+/// `return_url` không phải URL http(s) dùng được (ledger báo ô `return_url` mã `format`).
+pub(crate) fn return_url_invalid() -> Error {
+    Error::new(
+        ErrorKind::Validation,
+        "orders.return_url_invalid",
+        "return_url must be an http(s) URL of at most 2000 characters, such as \
+         https://shop.example.com/thank-you.",
+    )
+}
+
 pub(crate) fn promotion_unavailable() -> Error {
     Error::conflict(
         "orders.promotion_unavailable",

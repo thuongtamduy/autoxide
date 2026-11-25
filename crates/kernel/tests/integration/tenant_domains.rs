@@ -225,17 +225,18 @@ async fn ten_mien_sai_hay_cua_khach_khac() {
         let (status, body) = add(&app, "admin-a", "shared.test").await;
         assert_eq!(status, StatusCode::CREATED, "{body}");
         let id = body["data"]["id"].as_str().unwrap().to_owned();
-        // Đang chờ ở khách `a`: khách `b` không lấy được.
+        let record_a = body["data"]["record"].clone();
+        // P-4 (pentest 2026-11): `a` mới chờ, chưa chứng minh gì — không chặn `b`; mỗi khách một mã riêng.
         let (status, body) = add(&app, "admin-b", "SHARED.test").await;
-        assert_eq!(
-            (status, body["code"].as_str()),
-            (StatusCode::CONFLICT, Some("tenant_domain_taken")),
-            "{body}"
-        );
+        assert_eq!(status, StatusCode::CREATED, "{body}");
+        assert_eq!(body["data"]["status"], "pending");
+        let id_b = body["data"]["id"].as_str().unwrap().to_owned();
+        let record_b = body["data"]["record"].clone();
+        assert_ne!(record_a["value"], record_b["value"]);
 
         // Khách `b` không thấy, không xác minh, không xoá được tên miền của `a`.
         let list = app.get("/api/v1/kernel/domains").token("admin-b").send().await.unwrap();
-        assert_eq!(list.json()["data"], json!([]));
+        assert_eq!(list.json()["data"].as_array().unwrap().len(), 1, "chỉ dòng của chính b");
         let (status, body) = verify(&app, "admin-b", &id).await;
         assert_eq!(
             (status, body["code"].as_str()),
@@ -251,7 +252,28 @@ async fn ten_mien_sai_hay_cua_khach_khac() {
         let list = app.get("/api/v1/kernel/domains").token("admin-a").send().await.unwrap();
         assert_eq!(list.json()["data"].as_array().unwrap().len(), 1);
 
-        // `a` bỏ tên miền: `b` nhận lại được, với token mới.
+        // Ai xác minh trước được: `a` chứng minh trước; `b` (dù cũng có bản ghi đúng) thua, lượt chờ hỏng kèm lý do.
+        let txt = |record: &Value| record["value"].as_str().unwrap().to_owned();
+        let name = record_a["name"].as_str().unwrap().to_owned();
+        app.dns().set_txt(&name, &[&txt(&record_a), &txt(&record_b)]);
+        let (status, body) = verify(&app, "admin-a", &id).await;
+        assert_eq!((status, body["data"]["status"].as_str()), (StatusCode::OK, Some("verified")));
+        let (status, body) = verify(&app, "admin-b", &id_b).await;
+        assert_eq!(
+            (status, body["data"]["status"].as_str()),
+            (StatusCode::OK, Some("failed")),
+            "{body}"
+        );
+        assert!(body["data"]["check_error"].as_str().unwrap().contains("Another tenant"), "{body}");
+        let (status, body) = add(&app, "admin-b", "shared.test").await;
+        assert_eq!(
+            (status, body["code"].as_str()),
+            (StatusCode::CONFLICT, Some("tenant_domain_taken")),
+            "đã có khách xác minh thì khách khác không nhận được: {body}"
+        );
+        assert_eq!(allowed(&app, "shared.test").await, StatusCode::OK);
+
+        // `a` bỏ tên miền: `b` nhận lại được (dòng của chính b), với token mới.
         let gone = app
             .delete(&format!("/api/v1/kernel/domains/{id}"))
             .token("admin-a")
@@ -262,6 +284,7 @@ async fn ten_mien_sai_hay_cua_khach_khac() {
         let (status, body) = add(&app, "admin-b", "shared.test").await;
         assert_eq!(status, StatusCode::CREATED, "{body}");
         assert_eq!(body["data"]["status"], "pending");
+        assert_ne!(body["data"]["record"]["value"], record_b["value"]);
         let (status, _) = verify(&app, "admin-a", &id).await;
         assert_eq!(status, StatusCode::NOT_FOUND, "the old owner lost it");
     })

@@ -122,7 +122,8 @@ thật (P7).
   - [x] L-7: đổi mật khẩu (không phải khôi phục) giữ API key, passkey, liên kết đăng nhập ngoài — thêm lựa chọn "thu
         hồi mọi thông tin đăng nhập" hay liệt kê chúng trong câu trả lời — xong (#508, D-20261125-password-change-revoke):
         `revoke_other_credentials`
-  - [ ] L-8: luật tự động hoá theo event nhận event của mọi tổ chức trong khách — cần event mang tổ chức thống nhất
+  - [x] L-8: luật tự động hoá theo event nhận event của mọi tổ chức trong khách — cần event mang tổ chức thống nhất
+        — xong (#PR3, D-20261125-event-org): `Delivered::org_id()`, luật nút con chỉ nhận event của nhánh mình
   - [x] L-9: CSP của trang tài liệu API chỉ cho đúng gói Scalar đã ghim (cần thử lại trên trình duyệt, D-320) — xong
         (#505, D-20261125-docs-csp-pinned): đã thử trên Chromium
   - [x] L-10: giới hạn số kết nối mở (hiện để reverse proxy làm) — xong (#505, D-20261125-max-connections):
@@ -214,8 +215,9 @@ thật (P7).
       "Black-box test" của `docs/security/review-2026-11.md`. Không lỗ vượt khách hay mất tiền; đã sửa: API key tạo
       token SCIM / nhà cung cấp đăng nhập (#483), mã SMS đặt lịch không giới hạn theo địa chỉ (#487), người mua đọc
       được nhãn nội bộ (#489). Nợ mức thấp:
-  - [ ] P-4: tên miền khách khai mà không xác minh chặn khách khác 7 ngày — cho nhiều khách cùng chờ, ai xác minh
-        trước được (đổi unique index), hoặc endpoint cho nhân sự nền tảng thu hồi
+  - [x] P-4: tên miền khách khai mà không xác minh chặn khách khác 7 ngày — cho nhiều khách cùng chờ, ai xác minh
+        trước được (đổi unique index), hoặc endpoint cho nhân sự nền tảng thu hồi — xong (#PR3, D-20261125-domain-claims):
+        nhiều khách cùng chờ, unique index chỉ trên dòng `verified` (migration `m0040_domain_shared_claims`)
   - [x] P-5: `return_url` của thanh toán nhận mọi địa chỉ http(s) — chỉ nhận tên miền đã xác minh của khách (cần
         quyết danh sách địa chỉ hợp lệ) — xong (#508, D-20261125-return-url-allowlist): tên miền đã xác minh (https)
         hoặc origin khai ở `ledger.payments.return_origins`

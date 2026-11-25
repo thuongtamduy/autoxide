@@ -194177,7 +194177,7 @@
         ]
       },
       "post": {
-        "description": "Requires `kernel.domains.manage`. The domain starts `pending`: set the returned DNS `record`\n(TXT `_autoxide-challenge.<domain>`) at your DNS provider, then call\n`POST /domains/{id}/verify` (pending domains are also checked every 10 minutes for 7 days).\nPoint the domain itself (A/AAAA or CNAME) at the platform's server. Adding a domain the tenant\nalready has returns it unchanged; retry safely with an `Idempotency-Key` header.",
+        "description": "Requires `kernel.domains.manage`. The domain starts `pending`: set the returned DNS `record`\n(TXT `_autoxide-challenge.<domain>`) at your DNS provider, then call\n`POST /domains/{id}/verify` (pending domains are also checked every 10 minutes for 7 days).\nPoint the domain itself (A/AAAA or CNAME) at the platform's server. Adding a domain the tenant\nalready has returns it unchanged; retry safely with an `Idempotency-Key` header. Other tenants\nwaiting on the same domain do not block it: the first tenant to verify gets the domain, and the\nothers' claims turn `failed` when they verify.",
         "operationId": "kernel_add_tenant_domain",
         "parameters": [
           {
@@ -194263,7 +194263,7 @@
                 }
               }
             },
-            "description": "Another tenant has the domain (`tenant_domain_taken`), or the installation runs one tenant (`tenant_single_mode`)."
+            "description": "Another tenant has verified the domain (`tenant_domain_taken`), or the installation runs one tenant (`tenant_single_mode`)."
           },
           "422": {
             "content": {
@@ -194623,7 +194623,7 @@
     },
     "/api/v1/kernel/domains/{id}/verify": {
       "post": {
-        "description": "Requires `kernel.domains.manage`. Looks up the domain's TXT record right away and returns the\nnew status: `verified` when the record holds the expected value, otherwise still `pending`\nwith the reason in `check_error`. A `failed` domain can be verified again this way.",
+        "description": "Requires `kernel.domains.manage`. Looks up the domain's TXT record right away and returns the\nnew status: `verified` when the record holds the expected value, otherwise still `pending`\nwith the reason in `check_error`. A `failed` domain can be verified again this way. When another\ntenant verified the same domain first, the answer is `failed` with that reason in `check_error`.",
         "operationId": "kernel_verify_tenant_domain",
         "parameters": [
           {
@@ -226346,7 +226346,7 @@
                 }
               }
             },
-            "description": "The payment partner refused the payment (its code, e.g. `momo.return_url_required`), the payment method is not usable (`orders.payment_method_unavailable`), `return_url` is not one of the shop's addresses (`orders.return_url_not_allowed`), the same `Idempotency-Key` with another body (`orders.idempotency_key_reused`), or invalid values (see `errors`)."
+            "description": "The payment partner refused the payment (its code, e.g. `momo.return_url_required`), the payment method is not usable (`orders.payment_method_unavailable`), `return_url` is not one of the shop's addresses (`orders.return_url_not_allowed`) or not an http(s) URL (`orders.return_url_invalid`), the same `Idempotency-Key` with another body (`orders.idempotency_key_reused`), or invalid values (see `errors`)."
           },
           "429": {
             "content": {
@@ -228871,7 +228871,7 @@
                 }
               }
             },
-            "description": "The payment partner refused the payment (its code, e.g. `momo.return_url_required`), the payment method is not usable (`orders.payment_method_unavailable`), `return_url` is not one of the shop's addresses (`orders.return_url_not_allowed`), the same `Idempotency-Key` with another body (`orders.idempotency_key_reused`), or invalid values (see `errors`)."
+            "description": "The payment partner refused the payment (its code, e.g. `momo.return_url_required`), the payment method is not usable (`orders.payment_method_unavailable`), `return_url` is not one of the shop's addresses (`orders.return_url_not_allowed`) or not an http(s) URL (`orders.return_url_invalid`), the same `Idempotency-Key` with another body (`orders.idempotency_key_reused`), or invalid values (see `errors`)."
           },
           "429": {
             "content": {

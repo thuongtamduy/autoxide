@@ -314,6 +314,8 @@ impl Module for KernelModule {
             Box::new(crate::tenancy::sandbox::CreateSandboxMessages),
             // Mỗi lúc một lượt migrate placement: unique `active_key` (rà đồng thời mục 31).
             Box::new(crate::tenancy::migration_runs::AddMigrationRunActiveKey),
+            // Nhiều khách cùng chờ một tên miền, ai xác minh trước được (P-4, D-20261125-domain-claims).
+            Box::new(crate::tenancy::domains::ShareClaims),
         ]
     }
 

@@ -95,7 +95,9 @@ async fn list_domains(
 /// (TXT `_autoxide-challenge.<domain>`) at your DNS provider, then call
 /// `POST /domains/{id}/verify` (pending domains are also checked every 10 minutes for 7 days).
 /// Point the domain itself (A/AAAA or CNAME) at the platform's server. Adding a domain the tenant
-/// already has returns it unchanged; retry safely with an `Idempotency-Key` header.
+/// already has returns it unchanged; retry safely with an `Idempotency-Key` header. Other tenants
+/// waiting on the same domain do not block it: the first tenant to verify gets the domain, and the
+/// others' claims turn `failed` when they verify.
 #[utoipa::path(
     post,
     path = "/domains",
@@ -107,7 +109,7 @@ async fn list_domains(
         (status = 201, description = "The domain, with the DNS record to set.", body = Data<TenantDomain>),
         (status = 401, description = "Not signed in; code `unauthorized` or the code of the authentication module.", body = Problem),
         (status = 403, description = "Missing permission `kernel.domains.manage`; code `permission_denied`.", body = Problem),
-        (status = 409, description = "Another tenant has the domain (`tenant_domain_taken`), or the installation runs one tenant (`tenant_single_mode`).", body = Problem),
+        (status = 409, description = "Another tenant has verified the domain (`tenant_domain_taken`), or the installation runs one tenant (`tenant_single_mode`).", body = Problem),
         (status = 422, description = "Not a usable domain; code `tenant_domain_invalid`.", body = Problem),
     )
 )]
@@ -126,7 +128,8 @@ async fn add_domain(
 ///
 /// Requires `kernel.domains.manage`. Looks up the domain's TXT record right away and returns the
 /// new status: `verified` when the record holds the expected value, otherwise still `pending`
-/// with the reason in `check_error`. A `failed` domain can be verified again this way.
+/// with the reason in `check_error`. A `failed` domain can be verified again this way. When another
+/// tenant verified the same domain first, the answer is `failed` with that reason in `check_error`.
 #[utoipa::path(
     post,
     path = "/domains/{id}/verify",

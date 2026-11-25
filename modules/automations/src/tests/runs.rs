@@ -73,6 +73,51 @@ async fn nhan_lai_event_khong_chay_hai_lan() {
     .unwrap();
 }
 
+/// L-8 (rà soát bảo mật 2026-11): luật của một nút con chỉ chạy với event thuộc nút đó — event của nút
+/// khác hay event không nêu nút thì không; luật của nút gốc vẫn nhận mọi event của khách.
+#[tokio::test]
+async fn luat_cua_nut_con_chi_nhan_event_cua_nut_do() {
+    TestDatabase::run(async |test| {
+        use autoxide_kernel::event::EventHandler;
+        use autoxide_kernel::tenancy::ScopeExt;
+        use sea_orm::sea_query::Expr;
+        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+
+        let harness = Harness::new(test).await;
+        let root_rule = harness.rule(on_order(), json!(null), tag_action()).await;
+        let branch_rule = harness.rule(on_order(), json!(null), tag_action()).await;
+        let branch = Uuid::now_v7();
+        crate::entity::rule::Entity::update_many()
+            .col_expr(crate::entity::rule::Column::OrgId, Expr::value(branch))
+            .filter(crate::entity::rule::Column::Id.eq(branch_rule.id))
+            .scoped(&harness.tenant)
+            .exec(harness.tenant.database().write())
+            .await
+            .unwrap();
+
+        let trigger = EventTrigger(harness.service.clone());
+        let other = Uuid::now_v7().to_string();
+        for (code, payload) in [
+            ("own", json!({"code": "1", "org_id": branch.to_string()})),
+            ("own-after", json!({"code": "2", "after": {"org_id": branch.to_string()}})),
+            ("other", json!({"code": "3", "org_id": other})),
+            ("none", json!({"code": "4"})),
+        ] {
+            let event =
+                Delivered::new(harness.tenant.clone(), "shop", "shop.order_placed", payload);
+            trigger.handle(&event).await.unwrap_or_else(|error| panic!("{code}: {error}"));
+        }
+        assert_eq!(harness.runs(root_rule.id).await.len(), 4, "luật nút gốc nhận mọi event");
+        assert_eq!(
+            harness.runs(branch_rule.id).await.len(),
+            2,
+            "luật nút con chỉ nhận event của nút đó"
+        );
+    })
+    .await
+    .unwrap();
+}
+
 #[tokio::test]
 async fn hanh_dong_rui_ro_cho_duyet() {
     TestDatabase::run(async |test| {

@@ -2,6 +2,8 @@
 
 use std::convert::Infallible;
 use std::future::Future;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 use std::time::Duration;
 
 use axum::Router;
@@ -10,8 +12,9 @@ use axum::extract::ConnectInfo;
 use axum::http::Request;
 use hyper_util::rt::{TokioExecutor, TokioIo, TokioTimer};
 use hyper_util::server::conn::auto::Builder;
+use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::{Semaphore, watch};
+use tokio::sync::{OwnedSemaphorePermit, Semaphore, watch};
 use tower::ServiceExt as _;
 
 /// How the server stopped.
@@ -150,15 +153,21 @@ where
                 let stop_tx = stop_tx.clone();
                 let alive_rx = alive_rx.clone();
                 tokio::spawn(async move {
-                    // Vé giữ tới khi task của kết nối kết thúc (biến bị bỏ ở cuối block).
-                    let _permit = permit;
                     // Kết nối chưa gửi byte nào: hyper-util còn chờ byte đầu để biết HTTP/1 hay HTTP/2, và
                     // timeout đọc header của hyper chưa chạy, nên kết nối im lặng nằm đó mãi (L-10). Chờ byte
-                    // đầu tối đa `header_timeout`; không có (hay client đã đóng) thì bỏ kết nối.
-                    if !first_bytes_arrive(&stream, header_timeout).await {
+                    // đầu tối đa `header_timeout`; không có (hay client đã đóng), hoặc máy chủ bắt đầu tắt, thì
+                    // bỏ kết nối — không để kết nối im lặng giữ graceful shutdown.
+                    let arrived = tokio::select! {
+                        arrived = first_bytes_arrive(&stream, header_timeout) => arrived,
+                        () = stop_tx.closed() => false,
+                    };
+                    if !arrived {
                         drop(alive_rx);
                         return;
                     }
+                    // Vé đi cùng socket (`Counted`), không cùng task này: nâng cấp lên WebSocket thì hyper trao
+                    // chính socket cho task của WebSocket, vé vẫn giữ tới khi socket đóng.
+                    let stream = Counted { stream, _permit: permit };
                     let connection =
                         builder.serve_connection_with_upgrades(TokioIo::new(stream), service);
                     let mut connection = std::pin::pin!(connection);
@@ -191,6 +200,54 @@ where
     tokio::select! {
         () = alive_tx.closed() => Ok(Shutdown::Graceful),
         () = tokio::time::sleep(grace) => Ok(Shutdown::TimedOut),
+    }
+}
+
+// Socket kèm vé của giới hạn số kết nối (L-10): vé trả lại khi đối tượng này bị bỏ, tức khi socket đóng — kể cả
+// socket đã nâng cấp lên WebSocket, vì hyper chuyển chính đối tượng này sang task của WebSocket. Các hàm đọc /
+// ghi chỉ chuyển tiếp cho `TcpStream` (nó là `Unpin`, nên lấy `&mut` qua `Pin::get_mut` là an toàn, không `unsafe`).
+struct Counted {
+    stream: TcpStream,
+    _permit: Option<OwnedSemaphorePermit>,
+}
+
+impl AsyncRead for Counted {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<std::io::Result<()>> {
+        Pin::new(&mut self.get_mut().stream).poll_read(cx, buf)
+    }
+}
+
+impl AsyncWrite for Counted {
+    fn poll_write(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<std::io::Result<usize>> {
+        Pin::new(&mut self.get_mut().stream).poll_write(cx, buf)
+    }
+
+    fn poll_write_vectored(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        bufs: &[std::io::IoSlice<'_>],
+    ) -> Poll<std::io::Result<usize>> {
+        Pin::new(&mut self.get_mut().stream).poll_write_vectored(cx, bufs)
+    }
+
+    fn is_write_vectored(&self) -> bool {
+        self.stream.is_write_vectored()
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+        Pin::new(&mut self.get_mut().stream).poll_flush(cx)
+    }
+
+    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+        Pin::new(&mut self.get_mut().stream).poll_shutdown(cx)
     }
 }
 
@@ -356,5 +413,90 @@ mod tests {
 
         stop.send(()).unwrap();
         assert_eq!(server.await.unwrap().unwrap(), Shutdown::Graceful);
+    }
+
+    // L-10 (kiểm độc lập #505): WebSocket cũng tính vào giới hạn — vé đi cùng socket đã nâng cấp, nên khi một
+    // WebSocket đang mở chiếm chỗ duy nhất thì kết nối khác phải chờ tới khi WebSocket đóng.
+    #[tokio::test]
+    async fn websocket_van_giu_cho_trong_gioi_han_ket_noi() {
+        use axum::extract::ws::WebSocketUpgrade;
+        use uuid::Uuid;
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let router = Router::new().route("/", axum::routing::get(|| async { "ok" })).route(
+            "/ws",
+            axum::routing::get(|upgrade: WebSocketUpgrade| async move {
+                upgrade.on_upgrade(|mut socket| async move {
+                    // Giữ WebSocket tới khi client đóng.
+                    while let Some(Ok(_)) = socket.recv().await {}
+                })
+            }),
+        );
+        let (stop, stopped) = tokio::sync::oneshot::channel::<()>();
+        let server = tokio::spawn(serve_with(
+            listener,
+            router,
+            async move {
+                let _ = stopped.await;
+            },
+            Duration::from_secs(5),
+            Duration::from_secs(30),
+            1,
+        ));
+
+        let mut socket = TcpStream::connect(address).await.unwrap();
+        // Khoá bắt tay WebSocket: 16 byte bất kỳ, mã hoá base64 (RFC 6455); sinh lúc chạy.
+        use base64::Engine as _;
+        let nonce = base64::engine::general_purpose::STANDARD.encode(Uuid::now_v7().as_bytes());
+        let handshake = format!(
+            "GET /ws HTTP/1.1\r\nHost: x\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\
+             Sec-WebSocket-Version: 13\r\nSec-WebSocket-Key: {nonce}\r\n\r\n"
+        );
+        socket.write_all(handshake.as_bytes()).await.unwrap();
+        let mut head = [0u8; 12];
+        socket.read_exact(&mut head).await.unwrap();
+        assert_eq!(&head, b"HTTP/1.1 101");
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        let mut waiting = TcpStream::connect(address).await.unwrap();
+        let early = tokio::time::timeout(Duration::from_millis(500), ask(&mut waiting)).await;
+        assert!(early.is_err(), "an open WebSocket still holds its connection slot");
+
+        drop(socket);
+        let mut answer = String::new();
+        tokio::time::timeout(Duration::from_secs(5), waiting.read_to_string(&mut answer))
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(answer.starts_with("HTTP/1.1 200") && answer.ends_with("ok"), "{answer}");
+
+        stop.send(()).unwrap();
+        assert_eq!(server.await.unwrap().unwrap(), Shutdown::Graceful);
+    }
+
+    // L-10 (kiểm độc lập #505): kết nối mới mở mà im lặng không giữ graceful shutdown tới hết timeout đọc header.
+    #[tokio::test]
+    async fn ket_noi_im_lang_khong_lam_cham_tat_may_chu() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let router = Router::new().route("/", axum::routing::get(|| async { "ok" }));
+        let (stop, stopped) = tokio::sync::oneshot::channel::<()>();
+        let server = tokio::spawn(serve_with(
+            listener,
+            router,
+            async move {
+                let _ = stopped.await;
+            },
+            Duration::from_secs(10),
+            Duration::from_secs(30),
+            0,
+        ));
+        let _silent = TcpStream::connect(address).await.unwrap();
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        let started = std::time::Instant::now();
+        stop.send(()).unwrap();
+        assert_eq!(server.await.unwrap().unwrap(), Shutdown::Graceful);
+        assert!(started.elapsed() < Duration::from_secs(2), "stopped in {:?}", started.elapsed());
     }
 }

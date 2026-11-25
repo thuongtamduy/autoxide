@@ -274,6 +274,8 @@ Restart=on-failure
 NoNewPrivileges=true
 ProtectSystem=strict
 ReadWritePaths=/var/lib/autoxide
+# Cao hơn AUTOXIDE_HTTP_MAX_CONNECTIONS (4096) cộng chỗ cho file và kết nối database.
+LimitNOFILE=8192
 
 [Install]
 WantedBy=multi-user.target
@@ -393,7 +395,7 @@ database mới.
 | `AUTOXIDE_HTTP_CLIENT_IP_HEADER` | Sau reverse proxy: header chứa địa chỉ client |
 | `AUTOXIDE_HTTP_TRUSTED_PROXY_COUNT` | Số proxy của bạn mà một request đi qua (mặc định `1`) |
 | `AUTOXIDE_HTTP_TRUSTED_PROXIES` | Thay cho số proxy: địa chỉ và dải địa chỉ của proxy, vd `10.0.0.0/8, 192.0.2.7` |
-| `AUTOXIDE_HTTP_MAX_CONNECTIONS` | Số kết nối mở cùng lúc tối đa (mặc định `4096`, `0`: không giới hạn); quá số này thì kết nối mới phải chờ. Đặt thấp hơn `ulimit -n`; reverse proxy vẫn nên giới hạn số kết nối theo từng client |
+| `AUTOXIDE_HTTP_MAX_CONNECTIONS` | Số kết nối mở cùng lúc tối đa, tính cả WebSocket (mặc định `4096`, `0`: không giới hạn); quá số này thì kết nối mới phải chờ. Đặt thấp hơn giới hạn file mở (`ulimit -n`, thường 1024; systemd `LimitNOFILE`, `docker run --ulimit nofile=…`) và chừa chỗ cho kết nối database và file — máy chủ cảnh báo lúc khởi động khi không như vậy. Reverse proxy vẫn nên giới hạn số kết nối theo từng client |
 | `AUTOXIDE_HTTP_PUBLIC_URL` | Địa chỉ internet dùng để gọi API, vd `https://api.example.com`; cần cho link trỏ về API trong mail (huỷ đăng ký bản tin) |
 | `AUTOXIDE_HTTP_CORS_ORIGINS` | Trang web ở origin khác được gọi API |
 | `AUTOXIDE_HTTP_HSTS_SECONDS` | Khi mọi client đã gọi API qua HTTPS: gửi `Strict-Transport-Security` (vd `31536000`, một năm); `autoxide doctor` nhắc khi URL công khai là `https://` mà biến này là `0`. Mọi response đã có sẵn `nosniff`, `Referrer-Policy`, `X-Frame-Options` và `Content-Security-Policy` chặt (`AUTOXIDE_HTTP_SECURITY_HEADERS`, `AUTOXIDE_HTTP_REFERRER_POLICY`) |
@@ -1062,6 +1064,18 @@ Mỗi tình huống: dấu hiệu, cách kiểm, cách sửa.
 - **Sửa:** sửa nguyên nhân trước (sai mật khẩu SMTP, dịch vụ ngoài hỏng), rồi
   `autoxide jobs retry <module> <id>` cho từng job. Chạy lại trước khi sửa thì job chỉ vào hàng đợi để
   lỗi lần nữa.
+
+### Quá nhiều kết nối
+
+- **Dấu hiệu:** request phải chờ trước khi có byte trả lời nào; `/health/ready` chậm hay hết giờ, trong khi
+  process vẫn khoẻ.
+- **Kiểm:** số kết nối đang mở (`ss -tn state established '( sport = :8080 )' | wc -l`) so với
+  `AUTOXIDE_HTTP_MAX_CONNECTIONS`; chạm giới hạn thì kết nối mới — kể cả health check cùng port — chờ tới khi
+  một kết nối đóng.
+- **Sửa:** giới hạn số kết nối theo từng client ở reverse proxy (phần lớn một đợt tràn đến từ ít client), rồi
+  nâng setting cùng giới hạn file mở. Đặt timeout và ngưỡng lỗi của liveness probe đủ chịu một lúc quá tải ngắn
+  (`/health/live`, vd 5 giây × 3): khởi động lại làm rơi mọi kết nối; readiness probe chậm chỉ đưa máy ra khỏi
+  vòng phân tải, đúng điều mong muốn khi máy đang đầy.
 
 ### Kết nối database
 

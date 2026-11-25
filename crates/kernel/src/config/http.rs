@@ -52,10 +52,11 @@ pub const DRAIN_SECONDS: Setting = Setting::new(
 
 pub const MAX_CONNECTIONS: Setting = Setting::new(
     "AUTOXIDE_HTTP_MAX_CONNECTIONS",
-    "Most connections the API port keeps open at once. At the limit the server stops accepting \
-     until one closes: new connections wait in the operating system's queue instead of being \
-     refused, so a flood of idle connections cannot use up the process's file descriptors. Keep it \
-     below the open file limit (`ulimit -n`). `0`: no limit (a reverse proxy in front limits \
+    "Most connections the API port keeps open at once, WebSockets included. At the limit the server \
+     stops accepting until one closes: new connections wait in the operating system's queue instead \
+     of being refused, so a flood of idle connections cannot use up the process's file descriptors. \
+     Keep it below the open file limit (`ulimit -n`) with room for database connections and files; \
+     the server warns at startup when it is not. `0`: no limit (a reverse proxy in front limits \
      connections per client better; this is the last line).",
 )
 .with_default("4096");

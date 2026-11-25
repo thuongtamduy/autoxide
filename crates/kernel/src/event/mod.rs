@@ -278,6 +278,19 @@ impl Delivered {
         self.occurred_at = occurred_at;
         self
     }
+
+    /// The organization node the event is about, read the one uniform way (D-20261125-event-org): the
+    /// payload's top-level `org_id`, else `after.org_id`, else `before.org_id` (the `{"before", "after"}`
+    /// snapshot modules record). `None`: the event names no node - it concerns the whole tenant, or its
+    /// module does not record one; a consumer limited to one branch must then treat it as outside that
+    /// branch.
+    pub fn org_id(&self) -> Option<crate::tenancy::OrgId> {
+        ["/org_id", "/after/org_id", "/before/org_id"]
+            .iter()
+            .find_map(|pointer| self.payload.pointer(pointer).and_then(serde_json::Value::as_str))
+            .and_then(|raw| raw.parse::<Uuid>().ok())
+            .map(crate::tenancy::OrgId::from_uuid)
+    }
 }
 
 /// An event receiver. When it returns an error the event is delivered again later.

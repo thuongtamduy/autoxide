@@ -248,5 +248,6 @@
   "text:Use in the header for a link to the cart with the number of items.": "Dùng ở đầu trang cho link tới giỏ hàng kèm số món.",
   "text:Reviews": "Đánh giá",
   "text:Use to show what verified buyers say about a product: star counts and the latest reviews.": "Dùng để hiện người mua đã nhận hàng nói gì về sản phẩm: số sao và các đánh giá mới nhất.",
-  "orders.return_url_not_allowed": "return_url không phải địa chỉ của cửa hàng: dùng địa chỉ https trên tên miền đã xác minh, hoặc khai origin của nó ở cấu hình ledger.payments.return_origins."
+  "orders.return_url_not_allowed": "return_url không phải địa chỉ của cửa hàng: dùng địa chỉ https trên tên miền đã xác minh, hoặc khai origin của nó ở cấu hình ledger.payments.return_origins.",
+  "orders.return_url_invalid": "return_url phải là URL http(s) dài tối đa 2000 ký tự, vd https://shop.example.com/thank-you."
 }

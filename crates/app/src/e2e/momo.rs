@@ -356,6 +356,15 @@ async fn trang_quay_ve_phai_thuoc_cua_hang() {
             "https://shop.example@evil.example/done",
             "http://shop.example:8080/done",
             "https://two.example/done",
+            // Lớp lách (kiểm độc lập #508): IDN giống mặt chữ, host mã hoá `%`, IPv6, khoảng trắng / ký tự điều
+            // khiển, thiếu scheme, scheme khác.
+            "https://shöp.example/done",
+            "https://evil%2eexample/done",
+            "https://[::1]/done",
+            " https://shop.example/done",
+            "https://shop.example/do\nne",
+            "//shop.example/done",
+            "ftp://shop.example/done",
         ] {
             let refused = attempt("one", url, "P-1").await.unwrap_err();
             assert_eq!(refused.code(), "validation_failed", "{url}");
@@ -369,6 +378,16 @@ async fn trang_quay_ve_phai_thuoc_cua_hang() {
         }
         assert!(momo.take_requests().is_empty(), "không gọi MoMo với địa chỉ lạ");
         attempt("one", "https://SHOP.example:443/thanks?order=1", "P-2").await.unwrap();
+        // Cùng máy chủ viết khác (dấu chấm cuối, `%2e`): nhận, và đối tác nhận chuỗi đã chuẩn hoá.
+        attempt("one", "https://shop.example./thanks", "P-6").await.unwrap();
+        attempt("one", "https://shop%2eexample/thanks", "P-7").await.unwrap();
+        let sent: Vec<String> = momo
+            .take_requests()
+            .iter()
+            .filter_map(|request| request.json()["redirectUrl"].as_str().map(str::to_owned))
+            .collect();
+        assert!(sent.contains(&"https://shop.example/thanks?order=1".to_owned()), "{sent:?}");
+        assert!(sent.contains(&"https://shop.example/thanks".to_owned()), "{sent:?}");
 
         // Khách hai không khai origin nào: tên miền đã xác minh của mình (https) vẫn được nhận.
         let path = "/api/v1/kernel/settings/ledger.payments.return_origins";

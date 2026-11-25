@@ -186,10 +186,16 @@ impl OrdersService {
                 Method::Cod => return Ok(()),
             }
             .map_err(|error| {
+                // Ô `return_url` bị ledger từ chối: giữ đúng lý do — sai định dạng hay không thuộc cửa hàng.
+                let return_url = error.fields().iter().find(|field| field.field == "return_url");
                 if error.code() == "validation_failed"
-                    && error.fields().iter().any(|field| field.field == "return_url")
+                    && let Some(field) = return_url
                 {
-                    errors::return_url_not_allowed()
+                    if field.code == "format" {
+                        errors::return_url_invalid()
+                    } else {
+                        errors::return_url_not_allowed()
+                    }
                 } else if error.code() == "validation_failed" {
                     errors::payment_method_unavailable(&row.method)
                 } else {

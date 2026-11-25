@@ -278,6 +278,8 @@ Restart=on-failure
 NoNewPrivileges=true
 ProtectSystem=strict
 ReadWritePaths=/var/lib/autoxide
+# Above AUTOXIDE_HTTP_MAX_CONNECTIONS (4096) plus room for files and database connections.
+LimitNOFILE=8192
 
 [Install]
 WantedBy=multi-user.target
@@ -397,7 +399,7 @@ into a new database.
 | `AUTOXIDE_HTTP_CLIENT_IP_HEADER` | Behind a reverse proxy: the header with the client address |
 | `AUTOXIDE_HTTP_TRUSTED_PROXY_COUNT` | How many of your proxies a request passes (default `1`) |
 | `AUTOXIDE_HTTP_TRUSTED_PROXIES` | Instead of a count: the addresses and ranges of your proxies, e.g. `10.0.0.0/8, 192.0.2.7` |
-| `AUTOXIDE_HTTP_MAX_CONNECTIONS` | Most open connections at once (default `4096`, `0`: no limit); over it new connections wait. Keep it below `ulimit -n`; your reverse proxy should still limit connections per client |
+| `AUTOXIDE_HTTP_MAX_CONNECTIONS` | Most open connections at once, WebSockets included (default `4096`, `0`: no limit); over it new connections wait. Keep it below the open file limit (`ulimit -n`, often 1024; systemd `LimitNOFILE`, `docker run --ulimit nofile=…`) with some room for database connections and files — the server warns at startup when it is not. Your reverse proxy should still limit connections per client |
 | `AUTOXIDE_HTTP_PUBLIC_URL` | The address the internet reaches the API at, e.g. `https://api.example.com`; needed for links back to the API in mail (newsletter unsubscribe) |
 | `AUTOXIDE_HTTP_CORS_ORIGINS` | Web pages on other origins allowed to call the API |
 | `AUTOXIDE_HTTP_HSTS_SECONDS` | Once every client reaches the API over HTTPS: send `Strict-Transport-Security` (e.g. `31536000`, one year); `autoxide doctor` reminds you when the public URL is `https://` and this is `0`. Every response already carries `nosniff`, `Referrer-Policy`, `X-Frame-Options` and a strict `Content-Security-Policy` (`AUTOXIDE_HTTP_SECURITY_HEADERS`, `AUTOXIDE_HTTP_REFERRER_POLICY`) |
@@ -1100,6 +1102,19 @@ Each case: what you see, how to check, how to fix it.
 - **Fix:** fix the cause first (a wrong SMTP password, an outside service down), then
   `autoxide jobs retry <module> <id>` for each job. A job retried before the fix goes back to the
   queue only to fail again.
+
+### Too many connections
+
+- **Sign:** requests wait before any byte is answered; `/health/ready` is slow or times out, while the
+  process is otherwise healthy.
+- **Check:** open connections (`ss -tn state established '( sport = :8080 )' | wc -l`) against
+  `AUTOXIDE_HTTP_MAX_CONNECTIONS`; at the limit, new connections — health checks on the same port
+  included — wait until one closes.
+- **Fix:** limit connections per client in the reverse proxy (most of a flood comes from few clients),
+  then raise the setting together with the open file limit. Give the liveness probe a timeout and a
+  failure threshold that ride out a short saturation (`/health/live`, for example 5 seconds × 3): a
+  restart drops every connection; a slow readiness probe only takes the instance out of rotation, which
+  is what you want while it is full.
 
 ### Database connections
 
