@@ -273,14 +273,16 @@ impl LedgerService {
                 "must be 1 to 100 visible ASCII characters",
             ));
         }
-        if input.return_url.as_deref().is_some_and(|url| {
-            !(url.starts_with("https://") || url.starts_with("http://")) || url.len() > 2000
-        }) {
-            problems.push(FieldError::new(
-                "return_url",
-                "format",
-                "must be an http(s) URL of at most 2000 characters",
-            ));
+        if let Some(url) = input.return_url.as_deref()
+            && let Some(problem) = crate::return_url::check(
+                tenant,
+                url,
+                self.domains.as_deref(),
+                self.settings.as_deref(),
+            )
+            .await?
+        {
+            problems.push(problem);
         }
         let gateway = match self.gateway_for(tenant, input.provider.as_deref()).await {
             Ok(gateway) => Some(gateway),

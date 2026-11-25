@@ -62,6 +62,10 @@ async fn shop(
         200,
     )
     .await;
+    // Trang quay về sau khi trả phải thuộc cửa hàng (P-5, D-20261125-return-url-allowlist).
+    let origins = json!({"value": "https://shop.example"});
+    let path = "/api/v1/kernel/settings/ledger.payments.return_origins";
+    expect(&app, "PUT", path, ADMIN, Some(origins), 200).await;
     let root = json!(root_of(DEFAULT_TENANT));
     let zone = json!({"org_id": root, "name": "Toàn quốc", "regions": [{"country": "VN"}]});
     let zone = id(&expect(&app, "POST", "/api/v1/shipping/zones", ADMIN, Some(zone), 201).await);

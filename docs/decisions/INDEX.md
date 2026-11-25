@@ -312,6 +312,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261121-ssrf-targets](D-20261121-ssrf-targets.md)** Địa chỉ máy chủ do khách chọn: kiểm lúc lưu, lọc IP lúc kết nối, lỗi chung — 2026-11-21
 - **[D-20261123-security-review-2026-11](D-20261123-security-review-2026-11.md)** Rà soát bảo mật trước 1.0: báo cáo công khai, sửa hết mức cao/trung bình, role đòi MFA chặn ở cửa đăng nhập — 2026-11-23
 - **[D-20261125-docs-csp-pinned](D-20261125-docs-csp-pinned.md)** CSP của `/api/docs` chỉ cho đúng file Scalar đã ghim, bỏ jsdelivr khỏi style và font — 2026-11-25
+- **[D-20261125-password-change-revoke](D-20261125-password-change-revoke.md)** Đổi mật khẩu có lựa chọn `revoke_other_credentials` gỡ API key, passkey, liên kết đăng nhập ngoài — 2026-11-25
 - **[D-20261125-provider-response-cap](D-20261125-provider-response-cap.md)** Câu trả lời của nhà cung cấp ngoài đọc tối đa `AUTOXIDE_PROVIDER_MAX_RESPONSE_BYTES` (mặc định 16 MiB) — 2026-11-25
 
 ## Đa khách, tổ chức, gói
@@ -528,6 +529,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261119-step69-store](D-20261119-step69-store.md)** Mua trong ứng dụng: trait `StorePurchases` của kernel, `plans` nối giao dịch của cửa hàng vào thuê bao, cửa hàng thu tiền — 2026-11-19
 - **[D-20261121-reconcile-accept](D-20261121-reconcile-accept.md)** Đối soát: `match` chỉ khi đúng số, số lệch cần `accept_received`; event mang số thực thu — 2026-11-21
 - **[D-20261122-einvoice-provider-number](D-20261122-einvoice-provider-number.md)** Trạng thái "đã chấp nhận" của hoá đơn điện tử mang số do nhà cung cấp cấp — 2026-11-22
+- **[D-20261125-return-url-allowlist](D-20261125-return-url-allowlist.md)** `return_url` của thanh toán chỉ nhận địa chỉ của chính khách: tên miền đã xác minh (https) hoặc origin khai ở `ledger.payments.return_origins` — 2026-11-25
 
 ## Pháp luật và tuân thủ
 

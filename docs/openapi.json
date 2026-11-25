@@ -8080,6 +8080,10 @@
           "new_password": {
             "description": "12 to 128 characters.",
             "type": "string"
+          },
+          "revoke_other_credentials": {
+            "description": "`true`: also remove every API key, passkey and external sign-in link of the account, as a\npassword recovery does - use it after a suspected compromise. Default `false`: they keep\nworking.",
+            "type": "boolean"
           }
         },
         "required": [
@@ -111180,7 +111184,7 @@
     },
     "/api/v1/auth/me/password": {
       "post": {
-        "description": "Needs the current password and a session signed in with a password (an API key\ncannot do this). Every session of the account ends, including this one; the\nresponse carries the tokens of a new session, so this client stays signed in.\nWrong current passwords count towards the sign-in lock of the account.",
+        "description": "Needs the current password and a session signed in with a password (an API key\ncannot do this). Every session of the account ends, including this one; the\nresponse carries the tokens of a new session, so this client stays signed in.\nWrong current passwords count towards the sign-in lock of the account.\n\nAPI keys, passkeys and external sign-in links keep working unless\n`revoke_other_credentials` is `true`; after a suspected compromise set it (or recover the\npassword by email, which removes them too).",
         "operationId": "auth_change_password",
         "parameters": [
           {

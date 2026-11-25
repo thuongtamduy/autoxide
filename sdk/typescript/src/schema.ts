@@ -2721,6 +2721,12 @@ export type ChangePasswordRequest = {
   current_password: string;
   /** 12 to 128 characters. */
   new_password: string;
+  /**
+   * `true`: also remove every API key, passkey and external sign-in link of the account, as a
+   * password recovery does - use it after a suspected compromise. Default `false`: they keep
+   * working.
+   */
+  revoke_other_credentials?: boolean;
 };
 
 /** Move your tenant to another plan. */

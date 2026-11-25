@@ -37,6 +37,9 @@ const NAME_MAX_LENGTH: usize = 200;
 pub(crate) enum PasswordWrite {
     /// Người dùng tự đổi, hay hệ thống đặt.
     Change,
+    /// Người dùng tự đổi và chọn thu hồi mọi thông tin đăng nhập khác: xoá thêm passkey, API key,
+    /// liên kết đăng nhập ngoài, như `Recovery` (L-7).
+    ChangeRevokingAll,
     /// Quản trị viên đặt mật khẩu đầu cho tài khoản chưa có.
     Initial,
     /// Lấy lại tài khoản bằng mail: xoá thêm passkey, API key, token đặt lại khác.

@@ -218,13 +218,15 @@ impl SessionService {
     /// Mỗi lần nhập sai mật khẩu hiện tại được tính vào login throttling của email như
     /// một lần đăng nhập sai: ai cầm được access token cũng không đoán mãi được mật
     /// khẩu. Đổi xong thì mọi phiên cũ kết thúc; trả cặp token của một phiên mới để
-    /// client đang dùng không phải đăng nhập lại.
+    /// client đang dùng không phải đăng nhập lại. `revoke_other`: gỡ luôn API key, passkey, liên kết
+    /// đăng nhập ngoài như khi khôi phục mật khẩu (L-7 của rà soát bảo mật 2026-11).
     pub(crate) async fn change_password(
         &self,
         tenant: &TenantContext,
         user_id: Uuid,
         current: &str,
         new: String,
+        revoke_other: bool,
         user_agent: Option<&str>,
     ) -> Result<Tokens, Error> {
         // Mọi lỗi của đầu vào báo một lần.
@@ -243,7 +245,11 @@ impl SessionService {
                 user_id,
                 "new_password",
                 new,
-                crate::user::PasswordWrite::Change,
+                if revoke_other {
+                    crate::user::PasswordWrite::ChangeRevokingAll
+                } else {
+                    crate::user::PasswordWrite::Change
+                },
             )
             .await?;
         self.start_session(tenant, user_id, "password_change", user_agent, Proof::Active).await

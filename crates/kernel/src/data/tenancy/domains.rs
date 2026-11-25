@@ -425,6 +425,20 @@ impl TenantDomains {
         Ok(rows.map(describe))
     }
 
+    /// Host names of tenant `tenant`'s verified domains (e.g. `shop.example`), at most 1,000 - for checking
+    /// addresses a buyer's browser is sent back to (`return_url` of a payment). Always empty in
+    /// single-tenant mode, where a tenant cannot add domains.
+    pub async fn verified_hosts(&self, tenant: &TenantContext) -> Result<Vec<String>, Error> {
+        let rows = Entity::find()
+            .filter(Column::TenantId.eq(tenant.id().as_uuid()))
+            .filter(Column::Status.eq(VERIFIED))
+            .order_by_asc(Column::Id)
+            .limit(1000)
+            .all(self.control().read())
+            .await?;
+        Ok(rows.into_iter().map(|row| row.domain).collect())
+    }
+
     /// Adds domain `raw` for tenant `tenant` (status `pending`, new verification token). Resubmitting
     /// a domain the tenant already has (`pending` / `verified`) returns it unchanged.
     pub async fn add(
