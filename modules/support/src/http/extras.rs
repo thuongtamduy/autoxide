@@ -7,6 +7,7 @@ use std::sync::Arc;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
+use autoxide_kernel::pagination::{Page, PageRequest, SortedPageQuery, page_of};
 use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, Query, State};
@@ -257,18 +258,20 @@ pub(crate) struct MacroQuery {
 
 /// List the saved replies usable at a unit.
 ///
-/// Requires `support.tickets.read` at the unit; includes the saved replies of the units above it.
+/// Requires `support.tickets.read` at the unit; includes the saved replies of the units above it
+/// (at most 500 in all). By name unless `order=desc`; paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/macros",
     extensions(("x-permissions" = json!(["support.tickets.read"]))),
     operation_id = "list_support_macros",
     security(("bearer" = [])),
-    params(MacroQuery),
+    params(MacroQuery, SortedPageQuery),
     responses(
-        (status = 200, description = "The saved replies, by name.", body = Data<Vec<MacroResponse>>),
+        (status = 200, description = "One page of the saved replies, by name.", body = Page<MacroResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `support.tickets.read` (`permission_denied`), or it does not cover the unit (`org_out_of_scope`).", body = Problem),
+        (status = 422, description = "`org_id` is missing or a paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 pub(crate) async fn list_macros(
@@ -276,10 +279,14 @@ pub(crate) async fn list_macros(
     tenant: TenantContext,
     principal: Principal,
     Query(query): Query<MacroQuery>,
-) -> Result<Data<Vec<MacroResponse>>, Error> {
+    Query(page): Query<SortedPageQuery>,
+) -> Result<Page<MacroResponse>, Error> {
     principal.require(&TICKETS_READ)?;
+    let page = PageRequest::try_from(page)?;
     let rows = service.saved_replies(&tenant, &principal, query.org_id).await?;
-    Ok(Data { data: rows.into_iter().map(MacroResponse::from).collect() })
+    // Tối đa 500 câu (đã kẹp trong truy vấn): phân trang trong bộ nhớ theo tên rồi ID, như mọi danh sách.
+    let page = page_of(rows, |row| format!("{}\u{0}{}", row.name, row.id), &page)?;
+    Ok(page.map(MacroResponse::from))
 }
 
 /// A saved reply to write.

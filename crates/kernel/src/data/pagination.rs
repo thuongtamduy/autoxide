@@ -44,6 +44,9 @@ use axum::response::{IntoResponse, Response};
 
 use crate::error::{Error, FieldError};
 
+mod memory;
+pub use memory::{SortedPageQuery, page_of};
+
 /// Number of rows per page when the client gives no `limit`.
 pub const DEFAULT_LIMIT: u32 = 50;
 /// Maximum number of rows per page.
