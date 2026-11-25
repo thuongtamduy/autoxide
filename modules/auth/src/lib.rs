@@ -32,6 +32,7 @@ mod guardrail_tests;
 mod hardening_tests;
 mod http;
 mod invitation;
+mod links;
 mod login_link;
 mod mfa;
 mod migration;
@@ -268,10 +269,10 @@ impl Module for AuthModule {
             outbox.clone(),
             config.passkey.as_ref(),
         )?);
-        // Link trong thư mở trên tên miền của khách khi khách đã đặt `kernel.public_url`.
+        // Link trong thư theo khách: `kernel.public_url` và trang riêng `auth.link.*` (kernel kiểm host).
         let links = context
-            .require::<dyn autoxide_kernel::tenancy::TenantSettings>()
-            .map(autoxide_kernel::tenancy::SiteLinks::new)
+            .require::<autoxide_kernel::tenancy::SiteLinks>()
+            .map(|links| (*links).clone())
             .unwrap_or_default();
         let verifications = Arc::new(verify::EmailVerifications {
             users: users.clone(),
@@ -496,7 +497,9 @@ impl Module for AuthModule {
     }
 
     fn tenant_settings(&self) -> Vec<autoxide_kernel::tenancy::TenantSetting> {
-        vec![api_key::REQUIRE_APPROVAL, step_up::STEP_UP]
+        let mut settings = vec![api_key::REQUIRE_APPROVAL, step_up::STEP_UP];
+        settings.extend(links::ALL);
+        settings
     }
 
     fn events(&self) -> Vec<EventInfo> {

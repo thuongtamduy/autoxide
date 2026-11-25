@@ -200,7 +200,7 @@ impl Module for ContentModule {
     }
 
     fn tenant_settings(&self) -> Vec<autoxide_kernel::tenancy::TenantSetting> {
-        vec![config::TENANT_LOCALES, config::TENANT_DEFAULT_LOCALE]
+        vec![config::TENANT_LOCALES, config::TENANT_DEFAULT_LOCALE, config::TENANT_EMBED_HOSTS]
     }
 
     fn configure(&mut self, reader: &mut ConfigReader<'_>) -> Result<(), Invalid> {

@@ -57,6 +57,8 @@ impl TenantClientSection for TenantLanguages {
         let mut fields = serde_json::Map::new();
         fields.insert("locales".to_owned(), serde_json::json!(languages.locales));
         fields.insert("default_locale".to_owned(), serde_json::json!(languages.default));
+        let embed_hosts = self.0.embed_hosts(tenant).await?;
+        fields.insert("embed_hosts".to_owned(), serde_json::json!(embed_hosts));
         Ok(fields)
     }
 }

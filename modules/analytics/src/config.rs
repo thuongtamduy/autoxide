@@ -40,6 +40,43 @@ pub(crate) const ALLOWED_HOSTS: Setting = Setting::new(
 )
 .with_default("");
 
+/// Host website gửi sự kiện theo khách (mục 6 của đợt cấu hình theo khách); tên miền đã xác minh của khách
+/// luôn được nhận, không cần khai.
+pub(crate) const TENANT_ALLOWED_HOSTS: autoxide_kernel::tenancy::TenantSetting =
+    autoxide_kernel::tenancy::TenantSetting::new(
+        "analytics.allowed_hosts",
+        "Website hosts, comma-separated (e.g. `shop.example,www.shop.example`, at most 50), whose \
+         pages may send this tenant's visit events, besides the host the API is called on and this \
+         tenant's verified domains (always accepted), instead of the server's \
+         AUTOXIDE_ANALYTICS_ALLOWED_HOSTS. Events from other pages are dropped.",
+    )
+    .checked(|raw| tenant_allowed_hosts(raw).map(|_| ()));
+
+/// Danh sách host (`analytics.allowed_hosts`): tên miền hợp lệ, chữ thường, không trùng, tối đa 50.
+pub(crate) fn tenant_allowed_hosts(
+    raw: &str,
+) -> Result<Vec<String>, autoxide_kernel::error::FieldError> {
+    let mut hosts = Vec::new();
+    let mut bad = Vec::new();
+    for item in raw.split(',').map(str::trim).filter(|item| !item.is_empty()) {
+        match autoxide_kernel::tenancy::normalize_domain(item) {
+            Some(host) if !hosts.contains(&host) => hosts.push(host),
+            Some(_) => {}
+            None => bad.push(item.to_owned()),
+        }
+    }
+    if !bad.is_empty() || hosts.is_empty() || hosts.len() > 50 {
+        return Err(autoxide_kernel::error::FieldError::new(
+            "value",
+            "analytics.allowed_hosts_invalid",
+            "must be 1 to 50 host names separated by commas, such as `shop.example`; not valid: \
+             {items}",
+        )
+        .with_param("items", bad.join(", ")));
+    }
+    Ok(hosts)
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct AnalyticsConfig {
     pub enabled: bool,

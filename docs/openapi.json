@@ -31123,7 +31123,7 @@
         "description": "Envelope of a single result.",
         "properties": {
           "data": {
-            "description": "The newsletter settings in use (set by the server's operator; no secrets).",
+            "description": "The newsletter settings in use for this tenant (the tenant's own settings, otherwise the\nserver's; no secrets).",
             "properties": {
               "advertising_label": {
                 "description": "Put at the start of the subject of advertising campaigns\n(`AUTOXIDE_NEWSLETTER_ADVERTISING_LABEL`); empty: no label.",
@@ -31138,11 +31138,11 @@
                 "type": "integer"
               },
               "confirm_url_set": {
-                "description": "The website's confirmation page is set (`AUTOXIDE_NEWSLETTER_CONFIRM_URL`); needed by\nlists with double opt-in.",
+                "description": "The website's confirmation page is set (tenant setting `newsletter.link.confirm` or\n`AUTOXIDE_NEWSLETTER_CONFIRM_URL`); needed by lists with double opt-in.",
                 "type": "boolean"
               },
               "missing": {
-                "description": "Settings still to set before campaigns can be sent: names of environment variables,\nempty when everything needed is set (`AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS` is listed:\nonly advertising campaigns need it).",
+                "description": "Settings still to set before campaigns can be sent: names of the server's environment\nvariables, empty when everything needed is set (`AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS` is\nlisted: only advertising campaigns need it). Each can instead be set for this tenant\nalone with the tenant setting named in its field above.",
                 "example": [
                   "AUTOXIDE_NEWSLETTER_PREFERENCES_URL"
                 ],
@@ -31152,14 +31152,14 @@
                 "type": "array"
               },
               "postal_address": {
-                "description": "The sender's postal address shown in every mail footer\n(`AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS`); `null`: not set — advertising campaigns cannot\nbe sent until it is.",
+                "description": "The sender's postal address shown in every mail footer: the tenant setting\n`newsletter.postal_address`, otherwise the owner's name and address from the tenant's\nlegal profile, otherwise `AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS`; `null`: none — advertising\ncampaigns cannot be sent until one is set.",
                 "type": [
                   "string",
                   "null"
                 ]
               },
               "preferences_url_set": {
-                "description": "The website's preferences page is set (`AUTOXIDE_NEWSLETTER_PREFERENCES_URL`); needed to\nsend any campaign (the footer link).",
+                "description": "The website's preferences page is set (tenant setting `newsletter.link.preferences` or\n`AUTOXIDE_NEWSLETTER_PREFERENCES_URL`); needed to send any campaign (the footer link).",
                 "type": "boolean"
               },
               "public_url_set": {
@@ -41844,6 +41844,14 @@
                 "example": "kernel.public_url",
                 "type": "string"
               },
+              "problem": {
+                "description": "The stored value is not used any more, and why: `kernel.public_url_unverified` /\n`kernel.link_unverified` (its host is not a verified domain of this tenant — verify the domain or\nchange the value). Omitted when the value is used.",
+                "example": "kernel.public_url_unverified",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
               "secret": {
                 "description": "Secret settings are stored encrypted and never returned: `value` is always `null`.",
                 "type": "boolean"
@@ -50859,6 +50867,14 @@
                   "description": "`<module>.<key>`, e.g. `kernel.public_url`; a partner connection is named\n`<module>.connection.<kind>.<field>`, e.g. `mail.connection.smtp.url`.",
                   "example": "kernel.public_url",
                   "type": "string"
+                },
+                "problem": {
+                  "description": "The stored value is not used any more, and why: `kernel.public_url_unverified` /\n`kernel.link_unverified` (its host is not a verified domain of this tenant — verify the domain or\nchange the value). Omitted when the value is used.",
+                  "example": "kernel.public_url_unverified",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 },
                 "secret": {
                   "description": "Secret settings are stored encrypted and never returned: `value` is always `null`.",
@@ -62913,7 +62929,7 @@
         "type": "object"
       },
       "NewsletterSettingsResponse": {
-        "description": "The newsletter settings in use (set by the server's operator; no secrets).",
+        "description": "The newsletter settings in use for this tenant (the tenant's own settings, otherwise the\nserver's; no secrets).",
         "properties": {
           "advertising_label": {
             "description": "Put at the start of the subject of advertising campaigns\n(`AUTOXIDE_NEWSLETTER_ADVERTISING_LABEL`); empty: no label.",
@@ -62928,11 +62944,11 @@
             "type": "integer"
           },
           "confirm_url_set": {
-            "description": "The website's confirmation page is set (`AUTOXIDE_NEWSLETTER_CONFIRM_URL`); needed by\nlists with double opt-in.",
+            "description": "The website's confirmation page is set (tenant setting `newsletter.link.confirm` or\n`AUTOXIDE_NEWSLETTER_CONFIRM_URL`); needed by lists with double opt-in.",
             "type": "boolean"
           },
           "missing": {
-            "description": "Settings still to set before campaigns can be sent: names of environment variables,\nempty when everything needed is set (`AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS` is listed:\nonly advertising campaigns need it).",
+            "description": "Settings still to set before campaigns can be sent: names of the server's environment\nvariables, empty when everything needed is set (`AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS` is\nlisted: only advertising campaigns need it). Each can instead be set for this tenant\nalone with the tenant setting named in its field above.",
             "example": [
               "AUTOXIDE_NEWSLETTER_PREFERENCES_URL"
             ],
@@ -62942,14 +62958,14 @@
             "type": "array"
           },
           "postal_address": {
-            "description": "The sender's postal address shown in every mail footer\n(`AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS`); `null`: not set — advertising campaigns cannot\nbe sent until it is.",
+            "description": "The sender's postal address shown in every mail footer: the tenant setting\n`newsletter.postal_address`, otherwise the owner's name and address from the tenant's\nlegal profile, otherwise `AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS`; `null`: none — advertising\ncampaigns cannot be sent until one is set.",
             "type": [
               "string",
               "null"
             ]
           },
           "preferences_url_set": {
-            "description": "The website's preferences page is set (`AUTOXIDE_NEWSLETTER_PREFERENCES_URL`); needed to\nsend any campaign (the footer link).",
+            "description": "The website's preferences page is set (tenant setting `newsletter.link.preferences` or\n`AUTOXIDE_NEWSLETTER_PREFERENCES_URL`); needed to send any campaign (the footer link).",
             "type": "boolean"
           },
           "public_url_set": {
@@ -100406,6 +100422,14 @@
             "description": "`<module>.<key>`, e.g. `kernel.public_url`; a partner connection is named\n`<module>.connection.<kind>.<field>`, e.g. `mail.connection.smtp.url`.",
             "example": "kernel.public_url",
             "type": "string"
+          },
+          "problem": {
+            "description": "The stored value is not used any more, and why: `kernel.public_url_unverified` /\n`kernel.link_unverified` (its host is not a verified domain of this tenant — verify the domain or\nchange the value). Omitted when the value is used.",
+            "example": "kernel.public_url_unverified",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "secret": {
             "description": "Secret settings are stored encrypted and never returned: `value` is always `null`.",
@@ -218842,7 +218866,7 @@
     },
     "/api/v1/newsletter/settings": {
       "get": {
-        "description": "Requires `newsletter.read`. The advertising label and daily limit, the sender's postal\naddress, and whether the addresses campaign mails need are set — so an interface can say\nwhat to set before sending. The operator changes them in the server's environment.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
+        "description": "Requires `newsletter.read`. The advertising label and daily limit, the sender's postal\naddress, and whether the addresses campaign mails need are set — so an interface can say\nwhat to set before sending. The tenant changes its own with `PUT /api/v1/kernel/settings/{name}`\n(`newsletter.postal_address`, `newsletter.link.*`); the operator sets the defaults in the\nserver's environment.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "newsletter_get_newsletter_settings",
         "parameters": [
           {

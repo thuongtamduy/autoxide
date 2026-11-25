@@ -149,9 +149,11 @@ impl PasswordResets {
         transaction.commit().await?;
 
         let minutes = TOKEN_MINUTES.to_string();
-        let mail = match &self.url {
+        let page =
+            self.links.link(tenant, &crate::links::PASSWORD_RESET, self.url.as_deref()).await?;
+        let mail = match &page {
             Some(url) => {
-                let link = self.links.rewrite(tenant, url).await?.replace("{token}", &token);
+                let link = url.replace("{token}", &token);
                 let params =
                     [("email", user.email.as_str()), ("minutes", &minutes), ("link", &link)];
                 RESET_LINK.mail(&user.email, &self.translations, language, &params)
@@ -463,6 +465,30 @@ mod tests {
             time_passes(&services, 2).await;
             resets.send(&tenant, &job("ada@example.com")).await.unwrap();
             let text = services.mails.sent().last().unwrap().text.clone();
+            assert!(text.contains("https://shop.acme.vn/reset?token="), "{text}");
+
+            // Trang riêng của khách (đường dẫn khác) trên host của khách: dùng nguyên mẫu đó.
+            settings.set(
+                tenant.id(),
+                "auth.link.password_reset",
+                "https://shop.acme.vn/dat-lai-mat-khau?t={token}",
+            );
+            time_passes(&services, 2).await;
+            resets.send(&tenant, &job("ada@example.com")).await.unwrap();
+            let text = services.mails.sent().last().unwrap().text.clone();
+            assert!(text.contains("https://shop.acme.vn/dat-lai-mat-khau?t="), "{text}");
+
+            // Giá trị trỏ host khách không sở hữu (lọt qua bộ kiểm lúc đặt, hay tên miền đã bị thu hồi):
+            // không gửi token tới đó, quay về link của máy chủ đổi host.
+            settings.set(
+                tenant.id(),
+                "auth.link.password_reset",
+                "https://evil.example/r?t={token}",
+            );
+            time_passes(&services, 2).await;
+            resets.send(&tenant, &job("ada@example.com")).await.unwrap();
+            let text = services.mails.sent().last().unwrap().text.clone();
+            assert!(!text.contains("evil.example"), "{text}");
             assert!(text.contains("https://shop.acme.vn/reset?token="), "{text}");
         })
         .await

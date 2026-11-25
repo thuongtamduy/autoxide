@@ -69,6 +69,8 @@ pub(crate) struct ComplianceService {
     pub public_reports_per_hour: u32,
     /// `AUTOXIDE_COMPLIANCE_CASE_TRACKING_URL`.
     pub case_tracking_url: Option<String>,
+    /// Link trong thư theo khách (`kernel.public_url`, `compliance.link.case_tracking`).
+    pub links: autoxide_kernel::tenancy::SiteLinks,
 }
 
 /// Duyệt hay quyết định cần phiên đăng nhập của người, không nhận API key.

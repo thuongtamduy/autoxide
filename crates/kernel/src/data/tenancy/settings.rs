@@ -66,7 +66,10 @@ pub const PUBLIC_URL: TenantSetting = TenantSetting::new(
     "Public address of this tenant's site, e.g. `https://shop.example` (scheme and host only). \
      Links in mails sent for this tenant (sign-in links, invitations, password resets, email \
      checks, newsletter and comment confirmations) open on it: the server's link addresses keep \
-     their path, only the start changes. When unset, the server's addresses are used as set.",
+     their path, only the start changes. When unset, the server's addresses are used as set. \
+     With several tenants it must be `https`, on the default port, on a domain this tenant has \
+     verified (or the platform's own host); a value stored before that no longer meets this is \
+     ignored and flagged with `problem`. With one tenant, `https` except on `localhost`.",
 )
 .checked(site_origin);
 
@@ -90,38 +93,6 @@ fn origin_of(url: &str) -> Option<&str> {
         return None;
     }
     Some(&url[..url.len() - rest.len() + host_len])
-}
-
-/// Per-tenant links in mail (UI brief): when a tenant has set `kernel.public_url`, the link opens on the
-/// tenant's domain, keeping the path of the server address and replacing only the head. Cheap to clone; the
-/// default (no per-tenant configuration, e.g. hand-built tests) returns the address unchanged.
-#[derive(Clone, Default)]
-pub struct SiteLinks(Option<Arc<dyn TenantSettings>>);
-
-impl SiteLinks {
-    pub fn new(settings: Arc<dyn TenantSettings>) -> Self {
-        SiteLinks(Some(settings))
-    }
-
-    /// `template` (the server's configured address, may contain `{token}`) for tenant `tenant`.
-    pub async fn rewrite(&self, tenant: &TenantContext, template: &str) -> Result<String, Error> {
-        let Some(settings) = &self.0 else { return Ok(template.to_owned()) };
-        // Giá trị cũ đặt trước khi có bộ kiểm mà sai dạng: dùng địa chỉ của máy chủ.
-        let site = parsed_setting(settings.as_ref(), tenant, &PUBLIC_URL, |raw| {
-            site_origin(raw).map(|()| raw.trim().to_owned())
-        })
-        .await?;
-        Ok(site.map_or_else(|| template.to_owned(), |site| rebase(template, &site)))
-    }
-}
-
-/// Replaces the head of `template` with `site`; a `template` that is not an http(s) address stays unchanged.
-fn rebase(template: &str, site: &str) -> String {
-    let site = site.trim().trim_end_matches('/');
-    match (origin_of(template), origin_of(site)) {
-        (Some(origin), Some(_)) => format!("{site}{}", &template[origin.len()..]),
-        _ => template.to_owned(),
-    }
 }
 
 /// Business model of a tenant (D-185): the UI picks the setup steps and default screen accordingly.
@@ -177,6 +148,8 @@ pub struct TenantSetting {
     check: Option<SettingCheck>,
     group: Option<&'static str>,
     former_name: Option<&'static str>,
+    /// Placeholders a link setting must contain ([`TenantSetting::link`]).
+    placeholders: &'static [&'static str],
 }
 
 // So theo tên (tên là duy nhất trong sổ); không so con trỏ hàm của bộ kiểm.
@@ -199,7 +172,22 @@ impl TenantSetting {
             check: None,
             group: None,
             former_name: None,
+            placeholders: &[],
         }
+    }
+
+    /// A link in mail the tenant may point at its own page (group [`LINK_GROUP`], see [`SiteLinks::link`]):
+    /// the value is a whole `https://` address on one of the tenant's hosts that contains every one of
+    /// `placeholders` (e.g. `{token}`). Name it `<module>.link.<key>`.
+    pub const fn link(
+        name: &'static str,
+        description: &'static str,
+        placeholders: &'static [&'static str],
+    ) -> Self {
+        let mut setting = TenantSetting::new(name, description).checked(links::link_template);
+        setting.group = Some(LINK_GROUP);
+        setting.placeholders = placeholders;
+        setting
     }
 
     /// The value is a secret: stored encrypted, never returned.
@@ -523,6 +511,12 @@ pub(crate) struct SettingState {
     /// For a setting of a partner connection: why its last use failed; omitted when it worked.
     #[serde(skip_serializing_if = "Option::is_none")]
     last_error: Option<String>,
+    /// The stored value is not used any more, and why: `kernel.public_url_unverified` /
+    /// `kernel.link_unverified` (its host is not a verified domain of this tenant — verify the domain or
+    /// change the value). Omitted when the value is used.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(example = "kernel.public_url_unverified")]
+    problem: Option<String>,
 }
 
 /// Payload of `kernel.setting_changed`: the name only.
@@ -551,6 +545,8 @@ pub(crate) struct SettingsService {
     /// How long the cache is kept (`AUTOXIDE_TENANCY_CACHE_SECONDS`).
     ttl: Duration,
     cache: Mutex<HashMap<TenantId, (Instant, Stored)>>,
+    /// What a link setting's host is checked against (filled once the domains service exists).
+    links: OnceLock<LinkTrust>,
 }
 
 /// Purpose (AAD) when encrypting a secret value. The row name is also in the AAD: a secret set under the old
@@ -569,12 +565,25 @@ fn state(setting: &TenantSetting, row: Option<&entity::Model>) -> SettingState {
         updated_at: row.map(|row| row.updated_at),
         last_used_at: None,
         last_error: None,
+        problem: None,
     }
 }
 
 impl SettingsService {
     pub(crate) fn new(catalog: Catalog, secret: SecretKey, outbox: Outbox, ttl: Duration) -> Self {
-        SettingsService { catalog, secret, outbox, ttl, cache: Mutex::default() }
+        SettingsService {
+            catalog,
+            secret,
+            outbox,
+            ttl,
+            cache: Mutex::default(),
+            links: OnceLock::new(),
+        }
+    }
+
+    /// Sets what link settings are checked against when set (once, at start).
+    pub(crate) fn use_link_trust(&self, trust: LinkTrust) {
+        let _ = self.links.set(trust);
     }
 
     /// Every stored setting of tenant `tenant`, through the cache. The `mutex` lock is held only within each
@@ -629,6 +638,15 @@ impl SettingsService {
                 state.last_error = status.last_error.clone();
             }
         }
+        // Giá trị đã lưu mà nay không dùng được (tên miền chưa / không còn xác minh): báo cho quản trị.
+        let trust = self.links.get().cloned().unwrap_or_default();
+        for state in &mut states {
+            if let (Some(value), Ok(setting)) = (&state.value, self.catalog.find(&state.name)) {
+                state.problem = links::stored_problem(&trust, self, tenant, &setting, value)
+                    .await?
+                    .map(str::to_owned);
+            }
+        }
         states.sort_by(|a, b| a.name.cmp(&b.name));
         Ok(states)
     }
@@ -662,6 +680,17 @@ impl SettingsService {
         {
             problem.field = "value".to_owned();
             return Err(Error::validation(vec![problem]));
+        }
+        let trust = self.links.get().cloned().unwrap_or_default();
+        if setting.group == Some(LINK_GROUP) {
+            links::check_link(&trust, self, tenant, &setting, value)
+                .await?
+                .map_err(|problem| Error::validation(vec![problem]))?;
+        }
+        if setting.name == PUBLIC_URL.name {
+            links::check_public_url(&trust, tenant, value)
+                .await?
+                .map_err(|problem| Error::validation(vec![problem]))?;
         }
         let stored = if setting.secret {
             // Mã hoá TRƯỚC transaction: dẫn khoá có thể đọc database (khoá gốc giữ trong đó).
@@ -1058,7 +1087,10 @@ pub(crate) fn routes(service: Arc<SettingsService>, registry: DatabaseRegistry) 
         )
 }
 
+mod links;
 mod tools;
+pub(crate) use links::LinkTrust;
+pub use links::{LINK_GROUP, SiteLinks};
 pub(crate) use tools::tools;
 
 /// The `kernel_tenant_settings` table (tenant level, has `tenant_id` from the start).
@@ -1091,27 +1123,5 @@ impl MigrationTrait for CreateTenantSettings {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager.drop_table(Table::drop().table("kernel_tenant_settings").to_owned()).await
-    }
-}
-
-#[cfg(test)]
-mod site_link_tests {
-    use super::*;
-
-    #[test]
-    fn doi_phan_dau_giu_duong_dan() {
-        assert_eq!(
-            rebase("https://www.example.com/confirm?token={token}", "https://shop.acme.vn/"),
-            "https://shop.acme.vn/confirm?token={token}"
-        );
-        assert_eq!(
-            rebase("https://api.example.com", "http://localhost:3400"),
-            "http://localhost:3400"
-        );
-        assert_eq!(rebase("not a url {token}", "https://shop.acme.vn"), "not a url {token}");
-        assert!(site_origin("https://shop.acme.vn").is_ok());
-        assert!(site_origin("https://shop.acme.vn/").is_ok());
-        assert!(site_origin("https://shop.acme.vn/vi").is_err());
-        assert!(site_origin("ftp://shop").is_err());
     }
 }

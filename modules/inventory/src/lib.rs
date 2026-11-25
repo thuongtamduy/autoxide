@@ -119,6 +119,10 @@ impl Module for InventoryModule {
         levels::reason_lists()
     }
 
+    fn tenant_settings(&self) -> Vec<autoxide_kernel::tenancy::TenantSetting> {
+        vec![config::RESTOCK_CONFIRM_LINK]
+    }
+
     fn configure(&mut self, reader: &mut ConfigReader<'_>) -> Result<(), Invalid> {
         self.config = Some(config::read(reader)?);
         Ok(())
@@ -141,6 +145,10 @@ impl Module for InventoryModule {
             // `notifications` không bắt buộc: thiếu thì không có báo khi có hàng lại.
             notifier: context.require::<dyn autoxide_notifications::api::Notifier>().ok(),
             guard: context.require::<autoxide_kernel::antispam::SpamGuard>()?,
+            links: context
+                .require::<autoxide_kernel::tenancy::SiteLinks>()
+                .map(|links| (*links).clone())
+                .unwrap_or_default(),
         };
         if let Some(notifier) = &parts.notifier {
             alerts::declare(notifier.as_ref())?;

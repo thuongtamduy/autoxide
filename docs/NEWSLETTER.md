@@ -30,6 +30,12 @@ mail goes through the `mail` module (your SMTP relay).
 5. **`AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS`** — the sender's name and postal address, printed in
    the footer; required for advertising campaigns.
 
+Each tenant can replace these for itself with tenant settings (`PUT /api/v1/kernel/settings/{name}`,
+see "Settings and state of each tenant" in [DEPLOY.md](DEPLOY.md)): `newsletter.link.confirm`,
+`newsletter.link.preferences` (a page on one of the tenant's own hosts) and
+`newsletter.postal_address`. When a tenant has not set its postal address, the owner's name and
+address from its legal profile (module `compliance`) are used before the server's.
+
 Nothing here is needed to start the server: a feature that needs a missing setting answers
 `503` with a code naming it (`public_url_missing`, `newsletter.confirm_url_missing`,
 `newsletter.preferences_url_missing`, `newsletter.postal_address_missing`).

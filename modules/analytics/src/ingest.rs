@@ -199,9 +199,24 @@ impl AnalyticsService {
         page_host: &str,
         request: Option<&str>,
     ) -> Result<bool, Error> {
-        if request.is_some_and(|host| request_host(host) == page_host)
-            || self.config.allowed_hosts.iter().any(|host| host == page_host)
-        {
+        if request.is_some_and(|host| request_host(host) == page_host) {
+            return Ok(true);
+        }
+        // Danh sách riêng của khách thay danh sách chung (đọc qua cache của kernel).
+        let own = match &self.settings {
+            Some(settings) => {
+                autoxide_kernel::tenancy::parsed_setting(
+                    settings.as_ref(),
+                    tenant,
+                    &crate::config::TENANT_ALLOWED_HOSTS,
+                    crate::config::tenant_allowed_hosts,
+                )
+                .await?
+            }
+            None => None,
+        };
+        let listed = own.as_ref().unwrap_or(&self.config.allowed_hosts);
+        if listed.iter().any(|host| host == page_host) {
             return Ok(true);
         }
         Ok(matches!(

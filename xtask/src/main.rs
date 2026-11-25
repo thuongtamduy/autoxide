@@ -67,6 +67,7 @@ mod rust_free;
 mod scaffold;
 mod sdk;
 mod semver;
+mod site_links;
 mod source;
 mod tenancy;
 mod tenant_scope;
@@ -353,6 +354,8 @@ fn check() -> ExitCode {
         violations.extend(decisions::check(&workspace.root)?);
         violations.extend(changelog::check(&workspace.root)?);
         violations.extend(metric_labels::check(&workspace.root)?);
+        // Link giao diện trong thư theo khách (D-20261125-tenant-link-templates).
+        violations.extend(site_links::check(&workspace.root)?);
         violations.extend(deploy_metrics::check(&workspace.root)?);
         violations.extend(toolchain::check(&workspace.root)?);
         // Danh sách file mà PR chỉ đổi chúng thì CI bỏ phần Rust (D-20261125-ci-skip-rust).

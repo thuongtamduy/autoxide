@@ -46,6 +46,10 @@ pub(crate) struct NewsletterService {
     pub(crate) consents: Option<Arc<dyn autoxide_compliance::api::ConsentLedger>>,
     /// Bộ dựng mẫu của kernel (chiến dịch `format = template`).
     pub(crate) templates: autoxide_kernel::template::TemplateEngine,
+    /// Cấu hình theo khách (`newsletter.postal_address`); `None` trong test dựng tay.
+    pub(crate) settings: Option<Arc<dyn autoxide_kernel::tenancy::TenantSettings>>,
+    /// Hồ sơ pháp lý của `compliance` (địa chỉ người gửi mặc định của khách); `None` khi không cài.
+    pub(crate) legal: Option<Arc<dyn autoxide_compliance::api::LegalProfiles>>,
 }
 
 /// Thứ service cần từ kernel và module khác.
@@ -78,6 +82,8 @@ impl NewsletterService {
             links: Default::default(),
             consents: None,
             templates: Default::default(),
+            settings: None,
+            legal: None,
         }
     }
 
@@ -96,6 +102,17 @@ impl NewsletterService {
         templates: autoxide_kernel::template::TemplateEngine,
     ) -> Self {
         self.templates = templates;
+        self
+    }
+
+    /// Cấu hình theo khách và hồ sơ pháp lý (địa chỉ người gửi).
+    pub(crate) fn with_tenant_config(
+        mut self,
+        settings: Option<Arc<dyn autoxide_kernel::tenancy::TenantSettings>>,
+        legal: Option<Arc<dyn autoxide_compliance::api::LegalProfiles>>,
+    ) -> Self {
+        self.settings = settings;
+        self.legal = legal;
         self
     }
 

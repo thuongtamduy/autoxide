@@ -331,6 +331,8 @@ impl NewsletterService {
                 (true, _) => {}
             }
         }
+        // Trang lựa chọn và địa chỉ người gửi của khách: tính MỘT lần cho cả lô, không theo từng người nhận.
+        let pages = self.campaign_pages(tenant, &row).await?;
         let checks = self.recipient_checks(tenant, &row, &list, &fresh, now).await?;
         let mut ads = checks.ads;
         for item in fresh {
@@ -368,7 +370,7 @@ impl NewsletterService {
                 continue;
             }
             let to = (person.email.as_str(), person.name.as_deref());
-            match self.deliver(tenant, &row, &list, &item, to).await? {
+            match self.deliver(tenant, (&row, &list, &pages), &item, to).await? {
                 Some(DeliveryStatus::Sent) => {
                     batch.sent += 1;
                     if row.advertising {
@@ -400,15 +402,14 @@ impl NewsletterService {
     async fn deliver(
         &self,
         tenant: &TenantContext,
-        row: &campaign::Model,
-        list: &List,
+        (row, list, pages): (&campaign::Model, &List, &crate::tenant_config::CampaignPages),
         item: &delivery::Model,
         to: (&str, Option<&str>),
     ) -> Result<Option<DeliveryStatus>, Error> {
         // Database giữ bản băm của phần thô; link mang khách (`autoxide_kernel::tenancy::link_token`).
         let token = autoxide_kernel::secret::random_token(32)?;
         let link = autoxide_kernel::tenancy::link_token(tenant, &token);
-        let mail = match self.campaign_mail(tenant, row, list, to, &link, Some(item.id)).await {
+        let mail = match self.campaign_mail(row, list, to, pages, &link, Some(item.id)).await {
             Ok(mail) => mail,
             // Mẫu không dựng được với người nhận này (chiến dịch `template`): không thử lại.
             Err(error) if error.kind() == ErrorKind::Validation => {
