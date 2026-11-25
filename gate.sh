@@ -312,10 +312,12 @@ RUST_CHANGED=true
 if [ "$QUICK" = 1 ] || [ "$PR" = 1 ]; then
   RUST_CHANGED="$(scripts/rust-changed.sh "${GATE_BASE:-origin/main}")"
 fi
+CLIPPY="clippy"
 if [ "$RUST_CHANGED" = true ]; then
   step "lint (cargo clippy)"
   cargo clippy --workspace --all-targets --locked -- -D warnings
 else
+  CLIPPY="clippy skipped (no Rust-relevant change)"
   step "lint (cargo clippy): skipped, no Rust-relevant change since ${GATE_BASE:-origin/main} (scripts/rust-free-paths.txt)"
 fi
 
@@ -360,7 +362,7 @@ fi
 
 if [ "$ONLY" = lint ]; then
   tree_unchanged
-  printf '\n\033[32mgate%s --only lint: green — fmt, clippy, boundaries, api contract, dependencies, secrets\033[0m\n' "$([ "$PR" = 1 ] && echo ' --pr')"
+  printf '\n\033[32mgate%s --only lint: green — fmt, %s, boundaries, api contract, dependencies, secrets\033[0m\n' "$([ "$PR" = 1 ] && echo ' --pr')" "$CLIPPY"
   exit 0
 fi
 
@@ -421,7 +423,7 @@ if [ "$QUICK" = 1 ]; then
   step "tests on SQLite, changed crates only (cargo xtask test-affected)"
   cargo xtask test-affected
   tree_unchanged
-  printf '\n\033[32mgate --quick: green — fmt, clippy, boundaries, api contract, dependencies, secrets, tests of changed crates on SQLite\033[0m\n'
+  printf '\n\033[32mgate --quick: green — fmt, %s, boundaries, api contract, dependencies, secrets, tests of changed crates on SQLite\033[0m\n' "$CLIPPY"
   printf 'Not checked: PostgreSQL, S3, crates you did not touch. Run ./gate.sh before merging into main.\n'
   exit 0
 fi
