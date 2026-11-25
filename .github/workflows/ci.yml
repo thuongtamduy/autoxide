@@ -133,7 +133,7 @@ jobs:
     needs: semver-plan
     if: ${{ needs.semver-plan.outputs.mode != 'skip' }}
     runs-on: ubuntu-24.04
-    # Đo trên máy 4 nhân: mỗi phần ~10–15 phút; giới hạn chỉ để chặn job treo.
+    # Đo ở #506 (đủ 28 crate): các phần 12–22 phút, cả job ~23 phút; giới hạn chỉ để chặn job treo.
     timeout-minutes: 45
     strategy:
       fail-fast: false

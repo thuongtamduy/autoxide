@@ -46,7 +46,8 @@ Theo Semantic Versioning, một số cho cả workspace (`[workspace.package] ve
 - Crate chia ra 4 máy (`semver 1/4` … `4/4`, `cargo xtask semver --shard k/4`); job **"Rust API compatibility
   (cargo-semver-checks)"** gộp kết quả thành một mục và là tên check ổn định. Mỗi máy dựng mọi crate của nó trong
   một target dir chung (`target/semver-checks`) thay vì mỗi crate một thư mục riêng như công cụ tự làm
-  (D-20261125-semver-job-time). PR phát hành: mỗi phần khoảng 10–15 phút.
+  (D-20261125-semver-job-time). Đủ 28 crate: khoảng 23 phút thời gian chờ thực, phần chậm nhất 22 phút (đo ở
+  #506); giới hạn mỗi phần 45 phút.
 
 Chặn hay chỉ cảnh báo do `version` của workspace quyết, không cần sửa workflow:
 

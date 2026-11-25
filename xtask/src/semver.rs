@@ -195,6 +195,13 @@ pub fn parse(krate: &str, output: &str) -> Vec<Failure> {
     failures
 }
 
+/// stdout (các khối `--- failure …`) rồi stderr (dòng tiến độ `Cloning`, `Built [ … ]`), cách nhau một dòng trống: khối
+/// lỗi cuối cùng của stdout không có dòng trống sau `Failed in:` nên thiếu dòng này thì `parse` nhận nhầm dòng tiến độ
+/// của stderr làm chỗ vi phạm (và chúng lọt vào mục CHANGELOG).
+fn combined(stdout: &[u8], stderr: &[u8]) -> String {
+    format!("{}\n{}", String::from_utf8_lossy(stdout), String::from_utf8_lossy(stderr))
+}
+
 /// Bỏ phần đường dẫn trên máy build (`…/target/semver-checks/git-v0_13_0/<hash>/crates/…`) trong
 /// `previously in file …`: repo công khai, CHANGELOG không ghi đường dẫn riêng.
 fn relative(place: &str) -> String {
@@ -314,11 +321,7 @@ pub fn run(
             .map_err(|error| format!("cannot run cargo semver-checks: {error}"))?;
         // stderr: CI đọc thời gian từng crate để chia shard (stdout của `--markdown` chỉ chứa mục CHANGELOG).
         eprintln!("semver: {krate} checked in {}s", started.elapsed().as_secs());
-        let text = format!(
-            "{}{}",
-            String::from_utf8_lossy(&output.stdout),
-            String::from_utf8_lossy(&output.stderr)
-        );
+        let text = combined(&output.stdout, &output.stderr);
         let found = parse(krate, &text);
         if !output.status.success() && found.is_empty() {
             return Err(format!("cargo semver-checks failed for {krate}:\n{text}"));
@@ -537,6 +540,16 @@ Failed in:
             }]
         );
         assert!(parse("autoxide-kernel", "     Summary no semver update required").is_empty());
+    }
+
+    #[test]
+    fn semver_khong_lay_dong_tien_do_cua_stderr_lam_cho_vi_pham() {
+        let stdout = "--- failure enum_missing: pub enum removed or renamed ---\n\nFailed in:\n  enum x::Y, \
+                      previously in file /b/target/semver-checks/git-v0_14_0/0a/crates/kernel/src/y.rs:3\n";
+        let stderr = "     Cloning v0.14.0\n       Built [  13.189s] (baseline)\n";
+        let failures = parse("autoxide-kernel", &combined(stdout.as_bytes(), stderr.as_bytes()));
+        assert_eq!(failures.len(), 1);
+        assert_eq!(failures[0].places, ["enum x::Y, previously in file crates/kernel/src/y.rs:3"]);
     }
 
     #[test]
