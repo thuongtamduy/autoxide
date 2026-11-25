@@ -4,7 +4,8 @@
 #   ./gate.sh --quick   gate nhanh, trước mỗi commit lúc đang làm một bước: như dưới đây
 #                       nhưng chỉ chạy test của crate bị sửa (kể từ lần gate nhanh xanh gần
 #                       nhất, chưa có thì so với origin/main) và crate phụ thuộc vào chúng, chỉ
-#                       trên SQLite, không cần Docker.
+#                       trên SQLite, không cần Docker. Test chạy bằng nextest khi có (từ 0.9.85; cài mà cũ
+#                       hơn thì đỏ), không thì bộ chạy `cargo xtask`.
 #   ./gate.sh           gate đầy đủ: bắt buộc trước khi merge vào main và trước khi phát hành.
 #   ./gate.sh --pr      gate của pull request trên CI (D-20261118-ci-pr-affected-tests): như gate đầy đủ nhưng chỉ chạy test
 #                       của crate bị sửa so với GATE_BASE (mặc định origin/main) và crate phụ thuộc

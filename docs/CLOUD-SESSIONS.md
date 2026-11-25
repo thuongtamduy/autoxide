@@ -10,7 +10,7 @@ Quyết định: D-20261125-cloud-session-setup.
 | toolchain Rust | mọi thứ                                  | chỉ `stable`; bản ghim phải tải | `rust-toolchain.toml` |
 | `cargo-deny`   | `./gate.sh --quick` và gate đầy đủ (lint) | không                  | 0.22.0              |
 | `gitleaks`     | gate (binary; không có thì gate cần Docker, mà daemon không chạy sẵn) | không                  | 8.30.1              |
-| `cargo-nextest`| `--only build`, `--archive` (CI)         | không                  | 0.9.152             |
+| `cargo-nextest`| `--only build`, `--archive` (CI); bước test của gate nhanh (tự dùng khi có, từ 0.9.85; nhanh hơn ~7 phút khi sửa kernel) | không | 0.9.152 |
 | `cargo-semver-checks` | `cargo xtask semver` (hợp đồng Rust của kernel) | không | 0.51.0 |
 | Docker         | Postgres/S3 của gate đầy đủ              | có CLI, nhưng daemon không chạy sẵn (`docker info` lỗi) | —  |
 | PostgreSQL 16  | test trên Postgres lúc làm việc (D-263)  | có sẵn (`pg_ctlcluster`), nhưng tắt; script bật | 16 (của máy) |

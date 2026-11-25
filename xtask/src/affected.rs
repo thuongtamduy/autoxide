@@ -18,6 +18,13 @@
 //! crate, có `CARGO_MANIFEST_DIR`. Các file test chạy **song song** (D-299): `cargo test` chạy
 //! chúng lần lượt, nên một file test chậm làm cả máy ngồi chờ.
 //!
+//! Chạy test: khi là gate nhanh trên SQLite (không `--keep-env`, không `--shard`) và có `cargo-nextest`
+//! (từ 0.9.85; cài mà cũ hơn thì báo lỗi, không lặng lẽ rơi về bộ chạy cũ) thì cả bước build lẫn chạy giao
+//! cho `cargo nextest run --filterset …` — cùng bộ test và cùng cách chọn crate, nhưng mỗi test một tiến
+//! trình, nhanh hơn nhiều với chương trình test lớn (`autoxide`: 674 s → 203 s, D-20261125-ci-cancelled-not-failed).
+//! Không có nextest thì dùng bộ chạy nêu ở trên. Gate Postgres (`--keep-env`), `--shard` và CI (archive của
+//! nextest do `gate.sh` dựng) không đổi.
+//!
 //! Doc-test không chạy ở đây (cần `rustdoc`); gate đầy đủ chạy chúng.
 
 use std::collections::{BTreeSet, VecDeque};
@@ -311,7 +318,7 @@ pub fn run(
     // `autoxide` (217 test): libtest 674 s, nextest 203 s — nextest mỗi test một tiến trình nên không dính chung
     // trạng thái của cả chương trình, và chia việc theo từng test thay vì theo từng chương trình. Cùng bộ test
     // với đường dưới (CI cũng chạy bằng nextest, D-20261120-ci-nextest-archive); không có nextest thì dùng đường dưới.
-    if !keep_env && shard.is_whole() && nextest_available() {
+    if !keep_env && shard.is_whole() && nextest_available()? {
         let started = Instant::now();
         run_nextest(&workspace.root, &selected, only.as_deref())?;
         git(&workspace.root, &["update-ref", GREEN_REF, &current])?;
@@ -779,13 +786,40 @@ struct Profile {
     test: bool,
 }
 
-fn nextest_available() -> bool {
-    Command::new("cargo-nextest")
-        .arg("--version")
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .is_ok_and(|status| status.success())
+/// Bản nextest thấp nhất hiểu `--filterset` và `--no-tests` (bản ghim ở `scripts/cloud-setup.sh` cao hơn nhiều).
+const NEXTEST_MIN: (u64, u64, u64) = (0, 9, 85);
+
+/// `Ok(true)`: có nextest đủ mới; `Ok(false)`: không cài (dùng bộ chạy cũ); `Err`: cài nhưng quá cũ — đỏ,
+/// không lặng lẽ rơi về bộ cũ để gate trên máy này khác gate ở chỗ khác.
+fn nextest_available() -> Result<bool, String> {
+    let Ok(output) = Command::new("cargo-nextest").arg("--version").stdin(Stdio::null()).output()
+    else {
+        return Ok(false);
+    };
+    if !output.status.success() {
+        return Ok(false);
+    }
+    let text = String::from_utf8_lossy(&output.stdout);
+    match parse_nextest_version(&text) {
+        Some(version) if version >= NEXTEST_MIN => Ok(true),
+        _ => Err(format!(
+            "cargo-nextest is too old or its version is unreadable (`{}`); `test-affected` needs \
+             {}.{}.{} or newer — upgrade it (`scripts/cloud-setup.sh` installs the pinned one, or \
+             `cargo install cargo-nextest --locked`)",
+            text.trim(),
+            NEXTEST_MIN.0,
+            NEXTEST_MIN.1,
+            NEXTEST_MIN.2
+        )),
+    }
+}
+
+/// `cargo-nextest 0.9.152 (…)` → `(0, 9, 152)`.
+fn parse_nextest_version(text: &str) -> Option<(u64, u64, u64)> {
+    let word =
+        text.split_whitespace().find(|word| word.starts_with(|c: char| c.is_ascii_digit()))?;
+    let mut parts = word.split(|c: char| !c.is_ascii_digit()).map(|part| part.parse::<u64>().ok());
+    Some((parts.next()??, parts.next()??, parts.next()??))
 }
 
 /// Build và chạy test của các crate đã chọn bằng nextest, chỉ SQLite (bỏ biến Postgres và S3 của người chạy).
@@ -882,6 +916,17 @@ mod tests {
         assert_eq!(postgres_threads(0, 2000), 1);
         // Không vượt trần, kể cả khi chỉ có một chương trình.
         assert_eq!(postgres_threads(500, 500), POSTGRES_CONCURRENT_TESTS);
+    }
+
+    #[test]
+    fn doc_phien_ban_nextest() {
+        assert_eq!(parse_nextest_version("cargo-nextest 0.9.152"), Some((0, 9, 152)));
+        assert_eq!(
+            parse_nextest_version("cargo-nextest 0.9.152 (abc 2026-01-01)"),
+            Some((0, 9, 152))
+        );
+        assert!(parse_nextest_version("cargo-nextest 0.9.64").is_some_and(|v| v < NEXTEST_MIN));
+        assert_eq!(parse_nextest_version("không phải số"), None);
     }
 
     #[test]
