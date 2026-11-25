@@ -54,4 +54,6 @@ Task-by-task guides with `curl` and SDK examples: [`docs/guides/`](../../docs/gu
 
 `src/schema.ts` is generated: change the API, regenerate `docs/openapi.json`, then run `cargo xtask sdk`.
 The gate runs `cargo xtask sdk --check`; CI type-checks the SDK and the guide examples with
-`npm ci && npx tsc --noEmit`.
+`npm ci && npx tsc --noEmit` (TypeScript 7, the development version) and again with TypeScript 5.0.4.
+
+Supported TypeScript for projects that import the SDK: **5.0 or newer** (checked at 5.0.4, 5.9.3, 6.0.3 and 7.0.2). `moduleResolution: "Bundler"` needs 5.0.
