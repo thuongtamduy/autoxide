@@ -10,7 +10,7 @@
 use autoxide_kernel::access::{OrgTarget, Principal};
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
-use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
+use autoxide_kernel::pagination::{Page, PageRequest, SortValue, fetch_page, fetch_page_by};
 use autoxide_kernel::tenancy::{OrgId, OrgTree, ScopeExt, TenantContext};
 use sea_orm::sea_query::Expr;
 use sea_orm::{
@@ -415,17 +415,25 @@ impl SupportService {
         tenant: &TenantContext,
         principal: &Principal,
         org_id: Uuid,
-    ) -> Result<Vec<Rule>, Error> {
+        page: &PageRequest,
+    ) -> Result<Page<Rule>, Error> {
         let read = tenant.database().read();
         let target = OrgTarget::new(OrgId::from_uuid(org_id), None);
         principal.require_at(read, &SETTINGS_MANAGE, target).await?;
-        Ok(routing_rule::Entity::find()
+        // Thứ tự tự nhiên: vị trí rồi ID (quy tắc khớp trước đứng trước); `order=desc` đảo lại.
+        let select = routing_rule::Entity::find()
             .filter(routing_rule::Column::OrgId.eq(org_id))
-            .scoped(tenant)
-            .order_by_asc(routing_rule::Column::Position)
-            .order_by_asc(routing_rule::Column::Id)
-            .all(read)
-            .await?)
+            .scoped(tenant);
+        fetch_page_by(
+            select,
+            routing_rule::Column::Position,
+            |row| SortValue::Integer(i64::from(row.position)),
+            routing_rule::Column::Id,
+            |row| row.id,
+            page,
+            read,
+        )
+        .await
     }
 
     /// Thêm quy tắc; nhóm phải phủ nút của quy tắc, loại phải có.

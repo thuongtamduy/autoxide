@@ -7,7 +7,7 @@ use std::sync::Arc;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
-use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
+use autoxide_kernel::pagination::{NaturalOrderPageQuery, Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, Query, State};
@@ -317,18 +317,20 @@ pub(crate) struct RuleQuery {
 /// List the routing rules of a unit.
 ///
 /// Requires `support.settings.manage` at the unit. Rules of the units above apply too when none of
-/// the unit's own rules match.
+/// the unit's own rules match. In the order they are tried (`position`, then creation) unless
+/// `order=desc`; paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/routing-rules",
     extensions(("x-permissions" = json!(["support.settings.manage"]))),
     operation_id = "list_support_routing_rules",
     security(("bearer" = [])),
-    params(RuleQuery),
+    params(RuleQuery, NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "The rules, in order.", body = Data<Vec<RuleResponse>>),
+        (status = 200, description = "One page of the rules, in the order they are tried.", body = Page<RuleResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `support.settings.manage` (`permission_denied`), or it does not cover the unit (`org_out_of_scope`).", body = Problem),
+        (status = 422, description = "`org_id` is missing or a paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 pub(crate) async fn list_rules(
@@ -336,10 +338,12 @@ pub(crate) async fn list_rules(
     tenant: TenantContext,
     principal: Principal,
     Query(query): Query<RuleQuery>,
-) -> Result<Data<Vec<RuleResponse>>, Error> {
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<RuleResponse>, Error> {
     principal.require(&SETTINGS_MANAGE)?;
-    let rules = service.rules(&tenant, &principal, query.org_id).await?;
-    Ok(Data { data: rules.into_iter().map(RuleResponse::from).collect() })
+    let page = PageRequest::try_from(page)?;
+    let rules = service.rules(&tenant, &principal, query.org_id, &page).await?;
+    Ok(rules.map(RuleResponse::from))
 }
 
 /// A new routing rule.

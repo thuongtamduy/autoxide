@@ -5,8 +5,9 @@
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::ai::{Part, Prompt};
 use autoxide_kernel::error::Error;
+use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 use serde_json::json;
 use uuid::Uuid;
 
@@ -61,10 +62,9 @@ impl SupportService {
             .iter()
             .map(|message| json!({"from": message.author_kind, "text": redact(&message.body)}))
             .collect();
-        let replies = self.replies_at(tenant, ticket.org_id).await?;
+        let replies = self.first_replies_at(tenant, ticket.org_id, 20).await?;
         let saved: Vec<_> = replies
             .iter()
-            .take(20)
             .map(|reply| json!({"name": reply.name, "text": fill(reply, ticket)}))
             .collect();
         let input = json!({
@@ -105,14 +105,11 @@ impl SupportService {
         tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
-    ) -> Result<Vec<Draft>, Error> {
+        page: &PageRequest,
+    ) -> Result<Page<Draft>, Error> {
         self.get(tenant, Viewer::Staff(principal), id).await?;
-        Ok(draft::Entity::find()
-            .filter(draft::Column::TicketId.eq(id))
-            .scoped(tenant)
-            .order_by_desc(draft::Column::Id)
-            .all(tenant.database().read())
-            .await?)
+        let select = draft::Entity::find().filter(draft::Column::TicketId.eq(id)).scoped(tenant);
+        fetch_page(select, draft::Column::Id, |row| row.id, page, tenant.database().read()).await
     }
 }
 

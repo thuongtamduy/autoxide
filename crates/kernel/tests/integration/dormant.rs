@@ -504,7 +504,10 @@ async fn go_han_module_nghi_bang_migrate_down() {
                     .collect::<Vec<_>>()
             }
         };
-        assert!(!tables(&app).await.contains(&"legacy_notes".to_owned()));
+        let left = tables(&app).await;
+        assert!(!left.contains(&"legacy_notes".to_owned()));
+        // Bảng lịch sử còn, rỗng: chính trạng thái mà định nghĩa "đã cài" phải coi là chưa cài.
+        assert!(left.contains(&"legacy_migrations".to_owned()), "{left:?}");
         let pending = migrator.pending(app.database()).await.unwrap();
         assert!(pending.iter().all(|state| state.module != "legacy"), "{pending:?}");
         migrator.up(app.database()).await.unwrap();

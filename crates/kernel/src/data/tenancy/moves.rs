@@ -361,7 +361,8 @@ impl MoveSetup {
     }
 }
 
-/// The module's migration history table exists at `database` (the module once ran there).
+/// The module is installed at `database`: its history table records at least one migration (the module ran
+/// there and was not migrated all the way down).
 async fn installed_on(module: &str, database: &Database) -> Result<bool, Error> {
     Ok(crate::migration::module_installed(database.read(), &format!("{module}_migrations")).await?)
 }

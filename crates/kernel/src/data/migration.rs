@@ -114,8 +114,9 @@ pub struct ModuleMigrations {
     // được. Với `Arc`, "sao chép" chỉ là thêm một tham chiếu tới cùng migration.
     migrations: Vec<Arc<dyn MigrationTrait>>,
     upgrades: Vec<Arc<dyn DataUpgrade>>,
-    /// Applied only to a database that already has the module's history table (a turned-off module, dormant
-    /// mode): its tables stay up to date where it ran, and a new database never gets them.
+    /// Applied only to a database where the module is installed — its history table records at least one
+    /// migration (a turned-off module, dormant mode): its tables stay up to date where it ran, and a new
+    /// database never gets them.
     where_installed: bool,
 }
 
@@ -131,9 +132,10 @@ impl ModuleMigrations {
         }
     }
 
-    /// Applies these migrations only to a database that already has the module's history table (the
-    /// module once ran there); elsewhere the module counts as having nothing pending. Used for modules that
-    /// are in the program but turned off (dormant mode).
+    /// Applies these migrations only to a database where the module is installed: its history table records
+    /// at least one migration (the module ran there and was not migrated all the way down); elsewhere the
+    /// module counts as having nothing pending. Used for modules that are in the program but turned off
+    /// (dormant mode).
     #[must_use]
     pub fn where_installed(mut self) -> Self {
         self.where_installed = true;
