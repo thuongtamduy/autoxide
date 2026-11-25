@@ -16092,8 +16092,15 @@
           },
           {
             "properties": {
+              "failed": {
+                "description": "Members who could not be given the role (e.g. the plan's staff limit is reached), with the\nerror code. The rule stays; they get the role on the next sync that succeeds for them.",
+                "items": {
+                  "$ref": "#/components/schemas/ScimSyncFailure"
+                },
+                "type": "array"
+              },
               "granted_user_ids": {
-                "description": "Every current member of the group, who now holds the role through this rule. Members of a\ngroup without rules may have been added by anyone holding a SCIM token: check this list.",
+                "description": "Members of the group whose roles were brought in line with the rule: they hold the role at\nthe unit now — through this rule, or because they already had it (by hand, or from another\ngroup). Members of a group without rules may have been added by anyone holding a SCIM token:\ncheck this list.",
                 "items": {
                   "format": "uuid",
                   "type": "string"
@@ -16102,12 +16109,13 @@
               }
             },
             "required": [
-              "granted_user_ids"
+              "granted_user_ids",
+              "failed"
             ],
             "type": "object"
           }
         ],
-        "description": "A mapping rule just created, with the people it gave the role to."
+        "description": "A mapping rule just created, with what happened to each member of the group."
       },
       "CreatedScimTokenResponse": {
         "allOf": [
@@ -24668,8 +24676,15 @@
               },
               {
                 "properties": {
+                  "failed": {
+                    "description": "Members who could not be given the role (e.g. the plan's staff limit is reached), with the\nerror code. The rule stays; they get the role on the next sync that succeeds for them.",
+                    "items": {
+                      "$ref": "#/components/schemas/ScimSyncFailure"
+                    },
+                    "type": "array"
+                  },
                   "granted_user_ids": {
-                    "description": "Every current member of the group, who now holds the role through this rule. Members of a\ngroup without rules may have been added by anyone holding a SCIM token: check this list.",
+                    "description": "Members of the group whose roles were brought in line with the rule: they hold the role at\nthe unit now — through this rule, or because they already had it (by hand, or from another\ngroup). Members of a group without rules may have been added by anyone holding a SCIM token:\ncheck this list.",
                     "items": {
                       "format": "uuid",
                       "type": "string"
@@ -24678,12 +24693,13 @@
                   }
                 },
                 "required": [
-                  "granted_user_ids"
+                  "granted_user_ids",
+                  "failed"
                 ],
                 "type": "object"
               }
             ],
-            "description": "A mapping rule just created, with the people it gave the role to."
+            "description": "A mapping rule just created, with what happened to each member of the group."
           }
         },
         "required": [
@@ -49876,7 +49892,7 @@
                 },
                 "creator_status": {
                   "$ref": "#/components/schemas/ScimTokenCreatorStatus",
-                  "description": "Whether the token still works fully. A SCIM token can do only what its creator can do now:\nanything other than `active` means syncs that give, take away or disable will be refused —\ncreate a new token from an account with the needed roles and revoke this one."
+                  "description": "State of the token's creator. A SCIM token can do only what its creator can do now. `disabled`\nor `deleted`: the token can no longer give, take away, disable or delete anything that needs a\npermission; `missing_permission`: the creator lost `auth.scim.manage` but the token keeps the\ncreator's other roles. In every case other than `active`, create a new token from an account\nwith the needed roles and revoke this one. `active` does not mean the creator still holds every\nrole your group mappings give."
                 },
                 "id": {
                   "format": "uuid",
@@ -50175,185 +50191,6 @@
                 "expires_at",
                 "revoked_by_tenant",
                 "created_at"
-              ],
-              "type": "object"
-            },
-            "type": "array"
-          }
-        },
-        "required": [
-          "data"
-        ],
-        "type": "object"
-      },
-      "Data_Vec_SupportMacro": {
-        "description": "Envelope of a single result.",
-        "properties": {
-          "data": {
-            "items": {
-              "description": "A saved reply staff insert into answers.",
-              "properties": {
-                "approved_at": {
-                  "format": "date-time",
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "approved_by": {
-                  "format": "uuid",
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "auto_reply": {
-                  "description": "Approved for automatic answers.",
-                  "type": "boolean"
-                },
-                "bodies": {
-                  "description": "Text per language (`vi`, `en`…), with `{customer_name}`, `{ticket_number}`, `{subject}`.",
-                  "type": "object"
-                },
-                "id": {
-                  "format": "uuid",
-                  "type": "string"
-                },
-                "name": {
-                  "type": "string"
-                },
-                "org_id": {
-                  "description": "The unit it belongs to; units below use it too.",
-                  "format": "uuid",
-                  "type": "string"
-                },
-                "questions": {
-                  "description": "Ways customers ask the question, per language (automatic answers).",
-                  "type": "object"
-                },
-                "review_due_on": {
-                  "description": "Automatic use stops after this day unless reviewed again (`YYYY-MM-DD`).",
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "updated_at": {
-                  "format": "date-time",
-                  "type": "string"
-                }
-              },
-              "required": [
-                "id",
-                "org_id",
-                "name",
-                "bodies",
-                "auto_reply",
-                "questions",
-                "updated_at"
-              ],
-              "type": "object"
-            },
-            "type": "array"
-          }
-        },
-        "required": [
-          "data"
-        ],
-        "type": "object"
-      },
-      "Data_Vec_SupportReplyDraft": {
-        "description": "Envelope of a single result.",
-        "properties": {
-          "data": {
-            "items": {
-              "description": "A draft answer staff review before sending. Never sent by itself.",
-              "properties": {
-                "ai_assisted": {
-                  "description": "Written by AI: send it with `ai_assisted: true` so it is labelled.",
-                  "type": "boolean"
-                },
-                "body": {
-                  "type": "string"
-                },
-                "created_at": {
-                  "format": "date-time",
-                  "type": "string"
-                },
-                "id": {
-                  "format": "uuid",
-                  "type": "string"
-                },
-                "ticket_id": {
-                  "format": "uuid",
-                  "type": "string"
-                }
-              },
-              "required": [
-                "id",
-                "ticket_id",
-                "body",
-                "ai_assisted",
-                "created_at"
-              ],
-              "type": "object"
-            },
-            "type": "array"
-          }
-        },
-        "required": [
-          "data"
-        ],
-        "type": "object"
-      },
-      "Data_Vec_SupportRoutingRule": {
-        "description": "Envelope of a single result.",
-        "properties": {
-          "data": {
-            "items": {
-              "description": "A routing rule: new tickets of the unit (and the units below) that match go to the team.",
-              "properties": {
-                "category": {
-                  "description": "Only tickets of this category; empty: any.",
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "channel": {
-                  "oneOf": [
-                    {
-                      "$ref": "#/components/schemas/SupportChannel",
-                      "description": "Only tickets from this channel; empty: any."
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "id": {
-                  "format": "uuid",
-                  "type": "string"
-                },
-                "org_id": {
-                  "format": "uuid",
-                  "type": "string"
-                },
-                "position": {
-                  "description": "Rules of one unit are tried in this order; rules of nearer units first.",
-                  "format": "int32",
-                  "type": "integer"
-                },
-                "team_id": {
-                  "format": "uuid",
-                  "type": "string"
-                }
-              },
-              "required": [
-                "id",
-                "org_id",
-                "team_id",
-                "position"
               ],
               "type": "object"
             },
@@ -81243,6 +81080,200 @@
         ],
         "type": "object"
       },
+      "Page_SupportMacro": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "A saved reply staff insert into answers.",
+              "properties": {
+                "approved_at": {
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "approved_by": {
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "auto_reply": {
+                  "description": "Approved for automatic answers.",
+                  "type": "boolean"
+                },
+                "bodies": {
+                  "description": "Text per language (`vi`, `en`…), with `{customer_name}`, `{ticket_number}`, `{subject}`.",
+                  "type": "object"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "org_id": {
+                  "description": "The unit it belongs to; units below use it too.",
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "questions": {
+                  "description": "Ways customers ask the question, per language (automatic answers).",
+                  "type": "object"
+                },
+                "review_due_on": {
+                  "description": "Automatic use stops after this day unless reviewed again (`YYYY-MM-DD`).",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "updated_at": {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "org_id",
+                "name",
+                "bodies",
+                "auto_reply",
+                "questions",
+                "updated_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
+      "Page_SupportReplyDraft": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "A draft answer staff review before sending. Never sent by itself.",
+              "properties": {
+                "ai_assisted": {
+                  "description": "Written by AI: send it with `ai_assisted: true` so it is labelled.",
+                  "type": "boolean"
+                },
+                "body": {
+                  "type": "string"
+                },
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "ticket_id": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "ticket_id",
+                "body",
+                "ai_assisted",
+                "created_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
+      "Page_SupportRoutingRule": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "A routing rule: new tickets of the unit (and the units below) that match go to the team.",
+              "properties": {
+                "category": {
+                  "description": "Only tickets of this category; empty: any.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "channel": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/SupportChannel",
+                      "description": "Only tickets from this channel; empty: any."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "org_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "position": {
+                  "description": "Rules of one unit are tried in this order; rules of nearer units first.",
+                  "format": "int32",
+                  "type": "integer"
+                },
+                "team_id": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "org_id",
+                "team_id",
+                "position"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
       "Page_SupportTeam": {
         "description": "One page of a list.",
         "properties": {
@@ -92764,6 +92795,29 @@
         ],
         "type": "object"
       },
+      "ScimSyncFailure": {
+        "description": "A member a SCIM sync could not update.",
+        "properties": {
+          "code": {
+            "description": "Stable error code, e.g. `limit_exceeded`.",
+            "type": "string"
+          },
+          "message": {
+            "description": "What went wrong, in English.",
+            "type": "string"
+          },
+          "user_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id",
+          "code",
+          "message"
+        ],
+        "type": "object"
+      },
       "ScimTokenCreatorStatus": {
         "description": "State of the person who created a SCIM token.",
         "enum": [
@@ -92788,7 +92842,7 @@
           },
           "creator_status": {
             "$ref": "#/components/schemas/ScimTokenCreatorStatus",
-            "description": "Whether the token still works fully. A SCIM token can do only what its creator can do now:\nanything other than `active` means syncs that give, take away or disable will be refused —\ncreate a new token from an account with the needed roles and revoke this one."
+            "description": "State of the token's creator. A SCIM token can do only what its creator can do now. `disabled`\nor `deleted`: the token can no longer give, take away, disable or delete anything that needs a\npermission; `missing_permission`: the creator lost `auth.scim.manage` but the token keeps the\ncreator's other roles. In every case other than `active`, create a new token from an account\nwith the needed roles and revoke this one. `active` does not mean the creator still holds every\nrole your group mappings give."
           },
           "id": {
             "format": "uuid",
@@ -103453,12 +103507,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -105201,12 +105255,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -105567,12 +105621,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -105936,12 +105990,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -106468,12 +106522,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -107407,12 +107461,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -107845,12 +107899,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -110768,12 +110822,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -111602,12 +111656,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -111938,12 +111992,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -113780,12 +113834,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -114585,7 +114639,7 @@
                 }
               }
             },
-            "description": "The rule was created and applied to the group's members, listed in `granted_user_ids`.",
+            "description": "The rule was created and applied to the group's members: those who hold the role now are in `granted_user_ids`, those who could not be given it (e.g. the plan's staff limit) are in `failed`.",
             "headers": {
               "Location": {
                 "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`.",
@@ -114613,7 +114667,7 @@
                 }
               }
             },
-            "description": "Missing permission `auth.scim.manage` (code `permission_denied`), or the plan's staff limit is reached."
+            "description": "Missing permission `auth.scim.manage` (code `permission_denied`)."
           },
           "404": {
             "content": {
@@ -114808,12 +114862,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -117478,12 +117532,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -118678,12 +118732,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -119478,12 +119532,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -120681,12 +120735,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -121415,12 +121469,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -123027,12 +123081,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -123877,12 +123931,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -124573,12 +124627,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -126515,12 +126569,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -127527,12 +127581,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -128670,12 +128724,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -129032,12 +129086,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -129977,12 +130031,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -130337,12 +130391,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -133569,12 +133623,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -134076,12 +134130,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -135013,12 +135067,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -137133,12 +137187,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -137328,12 +137382,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -138588,12 +138642,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -139164,12 +139218,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -139543,12 +139597,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -140382,12 +140436,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -140577,12 +140631,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -142152,12 +142206,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -142815,12 +142869,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -143127,12 +143181,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -143994,12 +144048,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -145148,12 +145202,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -148656,12 +148710,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -149093,12 +149147,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -149827,12 +149881,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -150432,12 +150486,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -151568,12 +151622,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -152237,12 +152291,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -153349,12 +153403,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -154575,12 +154629,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -156417,12 +156471,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -157611,12 +157665,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -158557,12 +158611,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -160455,12 +160509,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -161103,12 +161157,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -161272,12 +161326,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -161554,12 +161608,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -161731,12 +161785,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -162385,12 +162439,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -162777,12 +162831,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -164481,12 +164535,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -165133,12 +165187,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -165282,12 +165336,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -166764,12 +166818,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -167561,12 +167615,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -168182,12 +168236,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -169231,12 +169285,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -170138,12 +170192,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -170447,12 +170501,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -171422,12 +171476,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -172853,12 +172907,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -173588,12 +173642,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -174509,12 +174563,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -174761,12 +174815,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -175023,12 +175077,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -175754,12 +175808,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -175963,12 +176017,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -177917,12 +177971,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -178307,12 +178361,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -178593,12 +178647,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -179480,12 +179534,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -181398,12 +181452,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -182121,12 +182175,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -183024,12 +183078,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -183437,12 +183491,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -183673,12 +183727,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -184328,12 +184382,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -185193,12 +185247,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -185815,12 +185869,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -186468,12 +186522,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -186867,12 +186921,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -187394,12 +187448,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -188250,12 +188304,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -188535,12 +188589,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -190199,12 +190253,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -190799,12 +190853,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -191158,12 +191212,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -191621,12 +191675,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -193874,12 +193928,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -194125,12 +194179,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -198125,12 +198179,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -200344,12 +200398,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -201956,12 +202010,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -203266,12 +203320,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -203905,12 +203959,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -204054,12 +204108,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -204786,12 +204840,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -205388,12 +205442,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -205958,12 +206012,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -206258,12 +206312,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -207017,12 +207071,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -207354,12 +207408,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -208075,12 +208129,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -208473,12 +208527,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -208745,12 +208799,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -210987,12 +211041,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -211391,12 +211445,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -212138,12 +212192,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -214615,12 +214669,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -215630,12 +215684,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -217548,12 +217602,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -218977,12 +219031,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -219628,12 +219682,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -220571,12 +220625,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -221317,12 +221371,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -223557,12 +223611,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -223752,12 +223806,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -225355,12 +225409,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -229257,12 +229311,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -229824,12 +229878,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -230410,12 +230464,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -232963,12 +233017,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -233606,12 +233660,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -234756,12 +234810,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -237150,12 +237204,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -237303,12 +237357,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -238180,12 +238234,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -238678,12 +238732,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -240159,12 +240213,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -241738,12 +241792,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -242176,12 +242230,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -242503,12 +242557,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -243359,12 +243413,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -245869,12 +245923,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -246047,12 +246101,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -246710,12 +246764,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -247033,12 +247087,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -247704,12 +247758,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -247842,12 +247896,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -248561,12 +248615,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -249064,12 +249118,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -249463,12 +249517,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -249850,12 +249904,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -250533,12 +250587,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -251677,12 +251731,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -253154,12 +253208,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -253853,12 +253907,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -254075,7 +254129,7 @@
     },
     "/api/v1/support/macros": {
       "get": {
-        "description": "Requires `support.tickets.read` at the unit; includes the saved replies of the units above it.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
+        "description": "Requires `support.tickets.read` at the unit; includes the saved replies of the units above it.\nBy name (in the database's text order), then creation, unless `order=desc`; paged with `limit` /\n`cursor`.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "support_list_support_macros",
         "parameters": [
           {
@@ -254085,6 +254139,52 @@
             "schema": {
               "format": "uuid",
               "type": "string"
+            }
+          },
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "default": "asc",
+              "description": "`asc` (the list's natural order, the default; the endpoint says what it is) or `desc` (reversed). Text is ordered by the database's collation. Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
             }
           },
           {
@@ -254105,11 +254205,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Data_Vec_SupportMacro"
+                  "$ref": "#/components/schemas/Page_SupportMacro"
                 }
               }
             },
-            "description": "The saved replies, by name."
+            "description": "One page of the saved replies, by name."
           },
           "401": {
             "content": {
@@ -254131,6 +254231,16 @@
             },
             "description": "Missing permission `support.tickets.read` (`permission_denied`), or it does not cover the unit (`org_out_of_scope`). The tenant's plan does not include this module (`module_not_enabled`)."
           },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "`org_id` is missing or a paging parameter is invalid; see `errors`."
+          },
           "default": {
             "content": {
               "application/problem+json": {
@@ -254151,6 +254261,20 @@
         "tags": [
           "support"
         ],
+        "x-autoxide-filters": [
+          {
+            "kind": "uuid",
+            "name": "org_id",
+            "operator": "eq"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "support.list_support_macros",
         "x-permissions": [
           "support.tickets.read"
         ],
@@ -254760,12 +254884,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -256742,7 +256866,7 @@
     },
     "/api/v1/support/routing-rules": {
       "get": {
-        "description": "Requires `support.settings.manage` at the unit. Rules of the units above apply too when none of\nthe unit's own rules match.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
+        "description": "Requires `support.settings.manage` at the unit. Rules of the units above apply too when none of\nthe unit's own rules match. In the order they are tried (`position`, then creation) unless\n`order=desc`; paged with `limit` / `cursor`.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "support_list_support_routing_rules",
         "parameters": [
           {
@@ -256752,6 +256876,52 @@
             "schema": {
               "format": "uuid",
               "type": "string"
+            }
+          },
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "default": "asc",
+              "description": "`asc` (the list's natural order, the default; the endpoint says what it is) or `desc` (reversed). Text is ordered by the database's collation. Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
             }
           },
           {
@@ -256772,11 +256942,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Data_Vec_SupportRoutingRule"
+                  "$ref": "#/components/schemas/Page_SupportRoutingRule"
                 }
               }
             },
-            "description": "The rules, in order."
+            "description": "One page of the rules, in the order they are tried."
           },
           "401": {
             "content": {
@@ -256798,6 +256968,16 @@
             },
             "description": "Missing permission `support.settings.manage` (`permission_denied`), or it does not cover the unit (`org_out_of_scope`). The tenant's plan does not include this module (`module_not_enabled`)."
           },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "`org_id` is missing or a paging parameter is invalid; see `errors`."
+          },
           "default": {
             "content": {
               "application/problem+json": {
@@ -256818,6 +256998,20 @@
         "tags": [
           "support"
         ],
+        "x-autoxide-filters": [
+          {
+            "kind": "uuid",
+            "name": "org_id",
+            "operator": "eq"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "support.list_support_routing_rules",
         "x-permissions": [
           "support.settings.manage"
         ],
@@ -257067,12 +257261,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -257851,12 +258045,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -259206,7 +259400,7 @@
     },
     "/api/v1/support/tickets/{id}/reply-drafts": {
       "get": {
-        "description": "Requires `support.tickets.reply` covering the ticket. Newest first.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
+        "description": "Requires `support.tickets.reply` covering the ticket. Newest first unless `order=asc`; paged with\n`limit` / `cursor`.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "support_list_support_reply_drafts",
         "parameters": [
           {
@@ -259217,6 +259411,52 @@
             "schema": {
               "format": "uuid",
               "type": "string"
+            }
+          },
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
             }
           },
           {
@@ -259237,11 +259477,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Data_Vec_SupportReplyDraft"
+                  "$ref": "#/components/schemas/Page_SupportReplyDraft"
                 }
               }
             },
-            "description": "The drafts."
+            "description": "One page of the drafts."
           },
           "401": {
             "content": {
@@ -259273,6 +259513,16 @@
             },
             "description": "No ticket with this id in your scope; code `support.ticket_not_found`."
           },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A paging parameter is invalid; see `errors`."
+          },
           "default": {
             "content": {
               "application/problem+json": {
@@ -259293,6 +259543,15 @@
         "tags": [
           "support"
         ],
+        "x-autoxide-filters": [
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "support.list_support_reply_drafts",
         "x-permissions": [
           "support.tickets.reply"
         ],
@@ -259830,12 +260089,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -260780,12 +261039,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -261042,12 +261301,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -261769,12 +262028,12 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "default": "desc",
+              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"

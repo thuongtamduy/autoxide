@@ -247,6 +247,39 @@ impl ScimService {
     }
 }
 
+/// Thu hồi mọi token SCIM do người `user_id` tạo, trong `connection` (transaction khoá tài khoản),
+/// mỗi token một event `auth.scim_token_revoked`. Token SCIM mạnh đúng bằng người tạo lúc dùng: tài
+/// khoản bị khoá hết đường vào (đổi email qua SCIM, "không phải tôi"…) mà token nó tạo còn sống thì
+/// kẻ đã giữ tài khoản vẫn hành động với quyền sau này của tài khoản (D-20261125-scim-sync-report).
+pub(crate) async fn revoke_created_by_in<C: sea_orm::ConnectionTrait>(
+    connection: &C,
+    tenant: &TenantContext,
+    outbox: &autoxide_kernel::event::Outbox,
+    actor: Actor,
+    user_id: Uuid,
+) -> Result<(), Error> {
+    let rows = entity::Entity::find()
+        .filter(entity::Column::CreatedBy.eq(user_id))
+        .scoped(tenant)
+        .all(connection)
+        .await?;
+    for row in rows {
+        entity::Entity::delete_many()
+            .filter(entity::Column::Id.eq(row.id))
+            .scoped(tenant)
+            .exec(connection)
+            .await?;
+        let event = events::ScimTokenRevoked {
+            before: Some(json!({"id": row.id, "name": row.name, "prefix": row.prefix})),
+            after: None,
+        };
+        let subject = Some(format!("auth.scim_token:{}", row.id));
+        outbox.record(connection, tenant, actor, subject, &event).await?;
+        tracing::info!(token_id = %row.id, %user_id, "SCIM token revoked with its creator's credentials");
+    }
+    Ok(())
+}
+
 /// Khách ghi trong token SCIM; `None` khi chuỗi không phải token SCIM.
 fn tenant_of(secret: &str) -> Option<TenantId> {
     let rest = secret.strip_prefix(TOKEN_PREFIX)?;

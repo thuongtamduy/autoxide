@@ -23,6 +23,7 @@ use uuid::Uuid;
 
 use super::ScimService;
 use super::entity::{group, mapping, member};
+use super::group_sync::SyncReport;
 use super::groups::group_subject;
 use crate::events;
 use crate::permissions::SCIM_MANAGE;
@@ -50,12 +51,13 @@ pub(crate) fn mapping_not_found(id: Uuid) -> Error {
     .with_param("id", id)
 }
 
-/// Thành viên của nhóm `group_id`.
+/// Thành viên của nhóm `group_id`. Kết nối GHI: đọc ngay sau commit luật để đồng bộ (replica có thể
+/// trễ).
 async fn members(tenant: &TenantContext, group_id: Uuid) -> Result<BTreeSet<Uuid>, Error> {
     Ok(member::Entity::find()
         .filter(member::Column::GroupId.eq(group_id))
         .scoped(tenant)
-        .all(tenant.database().read())
+        .all(tenant.database().write())
         .await?
         .into_iter()
         .map(|row| row.user_id)
@@ -117,9 +119,9 @@ impl ScimService {
     }
 
     /// Thêm luật "nhóm `group_id` → role `role_id` ở nút `org_id`", rồi cấp role cho mọi thành
-    /// viên hiện có của nhóm. Trả luật và những thành viên nhận role qua nó (D-20261125-scim-grant-cover:
-    /// thành viên của nhóm chưa có luật có thể do token quyền thấp đưa vào — người đặt luật chịu
-    /// trách nhiệm cho danh sách này, nên nó được trả về để xem lại).
+    /// viên hiện có của nhóm. Trả luật và kết quả đồng bộ từng thành viên (D-20261125-scim-grant-cover,
+    /// D-20261125-scim-sync-report: thành viên của nhóm chưa có luật có thể do token quyền thấp đưa vào
+    /// — người đặt luật chịu trách nhiệm cho danh sách này, nên nó được trả về để xem lại).
     pub(crate) async fn create_mapping(
         &self,
         tenant: &TenantContext,
@@ -127,7 +129,7 @@ impl ScimService {
         group_id: Uuid,
         org_id: Uuid,
         role_id: Uuid,
-    ) -> Result<(GroupMapping, BTreeSet<Uuid>), Error> {
+    ) -> Result<(GroupMapping, SyncReport), Error> {
         let transaction = tenant.database().begin_write().await?;
         // Khoá dòng nhóm như khi ghi thành viên (`update_group`): luật mới và một lần thêm thành viên
         // nối đuôi nhau, nên lần thêm thành viên luôn thấy luật đã commit và kiểm theo nó — không còn
@@ -179,9 +181,15 @@ impl ScimService {
             .await?;
         transaction.commit().await?;
         tracing::info!(mapping_id = %row.id, "SCIM group mapping created");
+        // Luật đã commit: đồng bộ mọi thành viên, người lỗi không chặn người sau; ai đã nhận role và
+        // ai lỗi đều trả về (và ghi log) — không im lặng để lại thành viên chưa đồng bộ.
         let members = members(tenant, group_id).await?;
-        self.sync_in(tenant, Actor::from(principal), principal, &members).await?;
-        Ok((row, members))
+        let mut report = self.sync_in(tenant, Actor::from(principal), principal, &members).await;
+        // Chỉ người thật sự giữ role ở nút sau khi đồng bộ (không gồm tài khoản vừa bị xoá hay không
+        // phải nhân sự mà lần đồng bộ bỏ qua). Đọc qua kết nối ghi: ngay sau commit, replica có thể trễ.
+        let holders = holders_of(tenant, org_id, role_id, &report.synced).await?;
+        report.synced.retain(|user_id| holders.contains(user_id));
+        Ok((row, report))
     }
 
     /// Bỏ luật `id`; thành viên của nhóm mất role đó (trừ khi nhóm khác hay tay cũng cấp).
@@ -198,6 +206,13 @@ impl ScimService {
             transaction.rollback().await?;
             return Err(mapping_not_found(id));
         };
+        // Khoá dòng nhóm như `create_mapping` / `update_group`: mọi lần đổi luật hay thành viên của
+        // một nhóm nối đuôi nhau (cùng thứ tự khoá: nhóm trước).
+        autoxide_kernel::rows::lock_one(
+            &transaction,
+            group::Entity::find_by_id((tenant.id().as_uuid(), row.group_id)),
+        )
+        .await?;
         // Bỏ luật là gỡ role đó khỏi mọi thành viên nhóm: chỉ người cấp được role đó ở nút đó mới
         // bỏ được (cùng luật như khi đặt luật, D-20261125-scim-grant-cover).
         let taken = [(row.org_id, row.role_id)];
@@ -234,8 +249,43 @@ impl ScimService {
         transaction.commit().await?;
         tracing::info!(mapping_id = %id, "SCIM group mapping deleted");
         let members = members(tenant, row.group_id).await?;
-        self.sync_in(tenant, Actor::from(principal), principal, &members).await
+        let report = self.sync_in(tenant, Actor::from(principal), principal, &members).await;
+        match report.failed.into_iter().next() {
+            Some((_, error)) => Err(error),
+            None => Ok(()),
+        }
     }
+}
+
+/// Những người trong `users` đang giữ role `role_id` ở nút `org_id` (dòng cũ `org_id` NULL là gốc).
+async fn holders_of(
+    tenant: &TenantContext,
+    org_id: Uuid,
+    role_id: Uuid,
+    users: &[Uuid],
+) -> Result<BTreeSet<Uuid>, Error> {
+    use crate::role::entity::user_role;
+    if users.is_empty() {
+        return Ok(BTreeSet::new());
+    }
+    let root = autoxide_kernel::tenancy::root_of(tenant.id()).as_uuid();
+    let at_org = if org_id == root {
+        Expr::col(user_role::Column::OrgId)
+            .eq(org_id)
+            .or(Expr::col(user_role::Column::OrgId).is_null())
+    } else {
+        Expr::col(user_role::Column::OrgId).eq(org_id)
+    };
+    Ok(user_role::Entity::find()
+        .filter(user_role::Column::RoleId.eq(role_id))
+        .filter(user_role::Column::UserId.is_in(users.iter().copied()))
+        .filter(at_org)
+        .scoped(tenant)
+        .all(tenant.database().write())
+        .await?
+        .into_iter()
+        .map(|row| row.user_id)
+        .collect())
 }
 
 /// Nhóm chưa có luật ánh xạ nào: thành viên của nó không nhận role gì từ nhóm.

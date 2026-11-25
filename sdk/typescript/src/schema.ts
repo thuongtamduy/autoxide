@@ -5473,11 +5473,18 @@ export type CreatedEndpointResponse = EndpointResponse & {
   secret: string;
 };
 
-/** A mapping rule just created, with the people it gave the role to. */
+/** A mapping rule just created, with what happened to each member of the group. */
 export type CreatedScimGroupMappingResponse = ScimGroupMappingResponse & {
   /**
-   * Every current member of the group, who now holds the role through this rule. Members of a
-   * group without rules may have been added by anyone holding a SCIM token: check this list.
+   * Members who could not be given the role (e.g. the plan's staff limit is reached), with the
+   * error code. The rule stays; they get the role on the next sync that succeeds for them.
+   */
+  failed: ScimSyncFailure[];
+  /**
+   * Members of the group whose roles were brought in line with the rule: they hold the role at
+   * the unit now — through this rule, or because they already had it (by hand, or from another
+   * group). Members of a group without rules may have been added by anyone holding a SCIM token:
+   * check this list.
    */
   granted_user_ids: string[];
 };
@@ -8235,11 +8242,18 @@ export type Data_CreatedEndpointResponse = {
 
 /** Envelope of a single result. */
 export type Data_CreatedScimGroupMappingResponse = {
-  /** A mapping rule just created, with the people it gave the role to. */
+  /** A mapping rule just created, with what happened to each member of the group. */
   data: ScimGroupMappingResponse & {
     /**
-     * Every current member of the group, who now holds the role through this rule. Members of a
-     * group without rules may have been added by anyone holding a SCIM token: check this list.
+     * Members who could not be given the role (e.g. the plan's staff limit is reached), with the
+     * error code. The rule stays; they get the role on the next sync that succeeds for them.
+     */
+    failed: ScimSyncFailure[];
+    /**
+     * Members of the group whose roles were brought in line with the rule: they hold the role at
+     * the unit now — through this rule, or because they already had it (by hand, or from another
+     * group). Members of a group without rules may have been added by anyone holding a SCIM token:
+     * check this list.
      */
     granted_user_ids: string[];
   };
@@ -16225,9 +16239,12 @@ export type Data_Vec_ScimTokenResponse = {
     /** The user who created it. */
     created_by: string;
     /**
-     * Whether the token still works fully. A SCIM token can do only what its creator can do now:
-     * anything other than `active` means syncs that give, take away or disable will be refused —
-     * create a new token from an account with the needed roles and revoke this one.
+     * State of the token's creator. A SCIM token can do only what its creator can do now. `disabled`
+     * or `deleted`: the token can no longer give, take away, disable or delete anything that needs a
+     * permission; `missing_permission`: the creator lost `auth.scim.manage` but the token keeps the
+     * creator's other roles. In every case other than `active`, create a new token from an account
+     * with the needed roles and revoke this one. `active` does not mean the creator still holds every
+     * role your group mappings give.
      */
     creator_status: ScimTokenCreatorStatus;
     id: string;
@@ -16325,53 +16342,6 @@ export type Data_Vec_SupportGrantResponse = {
     starts_at: string;
     /** The tenant the staff may enter. */
     tenant_id: string;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_SupportMacro = {
-  data: {
-    approved_at?: string | null;
-    approved_by?: string | null;
-    /** Approved for automatic answers. */
-    auto_reply: boolean;
-    /** Text per language (`vi`, `en`…), with `{customer_name}`, `{ticket_number}`, `{subject}`. */
-    bodies: Record<string, unknown>;
-    id: string;
-    name: string;
-    /** The unit it belongs to; units below use it too. */
-    org_id: string;
-    /** Ways customers ask the question, per language (automatic answers). */
-    questions: Record<string, unknown>;
-    /** Automatic use stops after this day unless reviewed again (`YYYY-MM-DD`). */
-    review_due_on?: string | null;
-    updated_at: string;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_SupportReplyDraft = {
-  data: {
-    /** Written by AI: send it with `ai_assisted: true` so it is labelled. */
-    ai_assisted: boolean;
-    body: string;
-    created_at: string;
-    id: string;
-    ticket_id: string;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_SupportRoutingRule = {
-  data: {
-    /** Only tickets of this category; empty: any. */
-    category?: string | null;
-    channel?: SupportChannel | null;
-    id: string;
-    org_id: string;
-    /** Rules of one unit are tried in this order; rules of nearer units first. */
-    position: number;
-    team_id: string;
   }[];
 };
 
@@ -26186,6 +26156,59 @@ export type Page_SupportAutoReply = {
 };
 
 /** One page of a list. */
+export type Page_SupportMacro = {
+  /** The items of this page, in the requested order. */
+  data: {
+    approved_at?: string | null;
+    approved_by?: string | null;
+    /** Approved for automatic answers. */
+    auto_reply: boolean;
+    /** Text per language (`vi`, `en`…), with `{customer_name}`, `{ticket_number}`, `{subject}`. */
+    bodies: Record<string, unknown>;
+    id: string;
+    name: string;
+    /** The unit it belongs to; units below use it too. */
+    org_id: string;
+    /** Ways customers ask the question, per language (automatic answers). */
+    questions: Record<string, unknown>;
+    /** Automatic use stops after this day unless reviewed again (`YYYY-MM-DD`). */
+    review_due_on?: string | null;
+    updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_SupportReplyDraft = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** Written by AI: send it with `ai_assisted: true` so it is labelled. */
+    ai_assisted: boolean;
+    body: string;
+    created_at: string;
+    id: string;
+    ticket_id: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_SupportRoutingRule = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** Only tickets of this category; empty: any. */
+    category?: string | null;
+    channel?: SupportChannel | null;
+    id: string;
+    org_id: string;
+    /** Rules of one unit are tried in this order; rules of nearer units first. */
+    position: number;
+    team_id: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_SupportTeam = {
   /** The items of this page, in the requested order. */
   data: {
@@ -30090,6 +30113,15 @@ export type ScimPatch = {
   schemas: string[];
 };
 
+/** A member a SCIM sync could not update. */
+export type ScimSyncFailure = {
+  /** Stable error code, e.g. `limit_exceeded`. */
+  code: string;
+  /** What went wrong, in English. */
+  message: string;
+  user_id: string;
+};
+
 /** State of the person who created a SCIM token. */
 export type ScimTokenCreatorStatus = "active" | "disabled" | "deleted" | "missing_permission";
 
@@ -30099,9 +30131,12 @@ export type ScimTokenResponse = {
   /** The user who created it. */
   created_by: string;
   /**
-   * Whether the token still works fully. A SCIM token can do only what its creator can do now:
-   * anything other than `active` means syncs that give, take away or disable will be refused —
-   * create a new token from an account with the needed roles and revoke this one.
+   * State of the token's creator. A SCIM token can do only what its creator can do now. `disabled`
+   * or `deleted`: the token can no longer give, take away, disable or delete anything that needs a
+   * permission; `missing_permission`: the creator lost `auth.scim.manage` but the token keeps the
+   * creator's other roles. In every case other than `active`, create a new token from an account
+   * with the needed roles and revoke this one. `active` does not mean the creator still holds every
+   * role your group mappings give.
    */
   creator_status: ScimTokenCreatorStatus;
   id: string;
@@ -50418,11 +50453,12 @@ export interface paths {
   "/api/v1/support/macros": {
     /** List the saved replies usable at a unit. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { org_id: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { org_id: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_SupportMacro;
+        200: Page_SupportMacro;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -50731,11 +50767,12 @@ export interface paths {
   "/api/v1/support/routing-rules": {
     /** List the routing rules of a unit. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { org_id: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { org_id: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_SupportRoutingRule;
+        200: Page_SupportRoutingRule;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -50986,12 +51023,13 @@ export interface paths {
   "/api/v1/support/tickets/{id}/reply-drafts": {
     /** List the drafts of a ticket. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_SupportReplyDraft;
+        200: Page_SupportReplyDraft;
         401: Problem;
         403: Problem;
         404: Problem;
+        422: Problem;
         default: Problem;
       };
     };

@@ -25,7 +25,10 @@ impl RoleService {
         role_ids: Vec<Uuid>,
     ) -> Result<Vec<Role>, Error> {
         let will_hold = !role_ids.is_empty();
-        let change = self.write_user_roles(tenant, actor, user_id, role_ids);
+        // Lần gán này luôn ghi (kể cả khi trùng role cũ): coi là "có đổi" cho hạn mức.
+        let change = async {
+            self.write_user_roles(tenant, actor, user_id, role_ids).await.map(|roles| (roles, true))
+        };
         self.with_member_limit(tenant, user_id, will_hold, change).await
     }
 
@@ -138,7 +141,10 @@ impl RoleService {
         memberships: Vec<(Uuid, Vec<Uuid>)>,
     ) -> Result<Vec<Membership>, Error> {
         let will_hold = memberships.iter().any(|(_, roles)| !roles.is_empty());
-        let change = self.write_memberships(tenant, actor, user_id, memberships);
+        let change = async {
+            let written = self.write_memberships(tenant, actor, user_id, memberships).await;
+            written.map(|memberships| (memberships, true))
+        };
         self.with_member_limit(tenant, user_id, will_hold, change).await
     }
 

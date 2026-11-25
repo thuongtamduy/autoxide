@@ -23,6 +23,7 @@ use uuid::Uuid;
 use super::entity::{group, mapping, member, scim_user};
 use super::error::ScimError;
 use super::filter::{self, Filter, Literal, Op};
+use super::group_sync::named_users;
 use super::users::text_condition;
 use super::{BASE_PATH, GROUP_SCHEMA, LIST_SCHEMA, ScimCaller, ScimService, patch};
 use crate::events;
@@ -262,6 +263,7 @@ impl ScimService {
         body: &Value,
     ) -> Result<Value, ScimError> {
         let input = parse_group(&patch::lowercase_keys(body.clone()))?;
+        let named = input.members.clone();
         let tenant = &caller.tenant;
         let transaction = tenant.database().begin_write().await?;
         let saved = self.save_group(&transaction, caller, None, &input).await;
@@ -273,8 +275,8 @@ impl ScimService {
             }
         };
         transaction.commit().await?;
-        self.sync_users(caller, &changed).await?;
-        let members = members_of(tenant.database().read(), tenant, &[row.id]).await?;
+        self.sync_group_members(caller, row.id, changed, &named).await?;
+        let members = members_of(tenant.database().write(), tenant, &[row.id]).await?;
         Ok(render(&row, Some(members.get(&row.id).map(Vec::as_slice).unwrap_or_default())))
     }
 
@@ -285,7 +287,7 @@ impl ScimService {
         body: &Value,
     ) -> Result<Value, ScimError> {
         let body = patch::lowercase_keys(body.clone());
-        self.update_group(caller, id, |_| parse_group(&body)).await
+        self.update_group(caller, id, named_users(&body), |_| parse_group(&body)).await
     }
 
     pub(crate) async fn patch_group(
@@ -294,7 +296,7 @@ impl ScimService {
         id: &str,
         body: &Value,
     ) -> Result<Value, ScimError> {
-        self.update_group(caller, id, |current| {
+        self.update_group(caller, id, named_users(body), |current| {
             let mut resource = patch::lowercase_keys(current);
             patch::apply(&mut resource, body, &["id"])?;
             parse_group(&resource)
@@ -306,6 +308,7 @@ impl ScimService {
         &self,
         caller: &ScimCaller,
         id: &str,
+        named: BTreeSet<Uuid>,
         change: impl FnOnce(Value) -> Result<GroupInput, ScimError>,
     ) -> Result<Value, ScimError> {
         let tenant = &caller.tenant;
@@ -334,8 +337,8 @@ impl ScimService {
             }
         };
         transaction.commit().await?;
-        self.sync_users(caller, &changed).await?;
-        let members = members_of(tenant.database().read(), tenant, &[row.id]).await?;
+        self.sync_group_members(caller, row.id, changed, &named).await?;
+        let members = members_of(tenant.database().write(), tenant, &[row.id]).await?;
         Ok(render(&row, Some(members.get(&row.id).map(Vec::as_slice).unwrap_or_default())))
     }
 
@@ -566,59 +569,6 @@ impl ScimService {
         crate::role::require_grantable(transaction, tenant, &authority, &given, &taken).await?;
         Ok(())
     }
-
-    /// Đồng bộ membership do SCIM cấp của những người `users` theo nhóm hiện tại của họ.
-    pub(crate) async fn sync_users(
-        &self,
-        caller: &ScimCaller,
-        users: &BTreeSet<Uuid>,
-    ) -> Result<(), ScimError> {
-        if users.is_empty() {
-            return Ok(());
-        }
-        let authority = self.authority(caller).await?;
-        self.sync_in(&caller.tenant, caller.actor(), &authority, users)
-            .await
-            .map_err(ScimError::from)
-    }
-
-    /// Như [`sync_users`](Self::sync_users), cho bên gọi ngoài SCIM (đổi luật ánh xạ).
-    /// `authority`: người chịu trách nhiệm — mọi role thêm / gỡ phải là thứ người đó cấp được.
-    pub(crate) async fn sync_in(
-        &self,
-        tenant: &TenantContext,
-        actor: autoxide_kernel::event::Actor,
-        authority: &autoxide_kernel::access::Principal,
-        users: &BTreeSet<Uuid>,
-    ) -> Result<(), autoxide_kernel::error::Error> {
-        for user_id in users {
-            let wanted = wanted_grants(tenant, *user_id).await?;
-            self.roles.sync_scim_grants(tenant, actor, authority, *user_id, wanted).await?;
-        }
-        Ok(())
-    }
-}
-
-/// (Nút, role) người `user_id` phải giữ theo các nhóm của họ và luật ánh xạ.
-async fn wanted_grants(
-    tenant: &TenantContext,
-    user_id: Uuid,
-) -> Result<BTreeSet<(Uuid, Uuid)>, autoxide_kernel::error::Error> {
-    let read = tenant.database().read();
-    let groups = Query::select()
-        .column(member::Column::GroupId)
-        .from(member::Entity)
-        .and_where(Expr::col(member::Column::TenantId).eq(tenant.id().as_uuid()))
-        .and_where(Expr::col(member::Column::UserId).eq(user_id))
-        .to_owned();
-    Ok(mapping::Entity::find()
-        .filter(Expr::col((mapping::Entity, mapping::Column::GroupId)).in_subquery(groups))
-        .scoped(tenant)
-        .all(read)
-        .await?
-        .into_iter()
-        .map(|row| (row.org_id, row.role_id))
-        .collect())
 }
 
 pub(crate) fn group_subject(id: Uuid) -> Option<String> {

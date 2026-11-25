@@ -4,6 +4,7 @@
 use autoxide_kernel::access::{OrgTarget, Principal};
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::event::Actor;
+use autoxide_kernel::pagination::{Page, PageRequest, SortValue, fetch_page_by};
 use autoxide_kernel::tenancy::{OrgId, OrgTree, ScopeExt, TenantContext};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder, Set,
@@ -22,8 +23,6 @@ use crate::service::{
 use crate::status::{Resolution, Status};
 use crate::tickets::{parse_status, snapshot};
 
-/// Số câu trả lời mẫu tối đa trả về một lần.
-const SAVED_REPLIES_MAX: u64 = 500;
 pub(crate) type SavedReply = saved_reply::Model;
 
 /// Where to hand a ticket over.
@@ -317,40 +316,75 @@ impl SupportService {
         Ok(after)
     }
 
-    /// Câu trả lời mẫu dùng được ở nút `org`: của nút và mọi nút trên nó.
+    /// Câu trả lời mẫu dùng được ở nút `org`: của nút và mọi nút trên nó, theo tên rồi ID, từng trang.
     pub(crate) async fn saved_replies(
         &self,
         tenant: &TenantContext,
         principal: &Principal,
         org: Uuid,
-    ) -> Result<Vec<SavedReply>, Error> {
+        page: &PageRequest,
+    ) -> Result<Page<SavedReply>, Error> {
         let node = OrgId::from_uuid(org);
-        principal
-            .require_at(tenant.database().read(), &TICKETS_READ, OrgTarget::new(node, None))
-            .await?;
-        self.replies_at(tenant, org).await
+        let read = tenant.database().read();
+        principal.require_at(read, &TICKETS_READ, OrgTarget::new(node, None)).await?;
+        let select = self.replies_select(tenant, org).await?;
+        // Thứ tự theo tên do database quyết (collation); khoá phụ ID giữ thứ tự ổn định, không trùng / sót khi
+        // duyệt (D-20261125-list-pages).
+        fetch_page_by(
+            select,
+            saved_reply::Column::Name,
+            |row| SortValue::Text(row.name.clone()),
+            saved_reply::Column::Id,
+            |row| row.id,
+            page,
+            read,
+        )
+        .await
     }
 
-    /// Câu trả lời mẫu của nút `org` và mọi nút trên nó (không kiểm quyền: bên gọi đã kiểm).
-    pub(crate) async fn replies_at(
+    /// Câu trả lời mẫu `id` dùng được ở nút `org` (của nút hay một nút trên nó), không kiểm quyền.
+    pub(crate) async fn saved_reply_at(
         &self,
         tenant: &TenantContext,
         org: Uuid,
+        id: Uuid,
+    ) -> Result<Option<SavedReply>, Error> {
+        let select = self.replies_select(tenant, org).await?;
+        Ok(select.filter(saved_reply::Column::Id.eq(id)).one(tenant.database().read()).await?)
+    }
+
+    /// `first` câu trả lời mẫu đầu tiên theo tên của nút `org` và các nút trên nó (gợi ý cho AI: chỉ cần vài
+    /// câu, không phải danh sách để duyệt).
+    pub(crate) async fn first_replies_at(
+        &self,
+        tenant: &TenantContext,
+        org: Uuid,
+        first: u64,
     ) -> Result<Vec<SavedReply>, Error> {
         use sea_orm::QuerySelect;
-        let read = tenant.database().read();
+        let select = self.replies_select(tenant, org).await?;
+        Ok(select
+            .order_by_asc(saved_reply::Column::Name)
+            .order_by_asc(saved_reply::Column::Id)
+            .limit(first)
+            .all(tenant.database().read())
+            .await?)
+    }
+
+    /// Câu trả lời mẫu của nút `org` và mọi nút trên nó (chưa sắp, chưa giới hạn).
+    async fn replies_select(
+        &self,
+        tenant: &TenantContext,
+        org: Uuid,
+    ) -> Result<sea_orm::Select<saved_reply::Entity>, Error> {
         let node = OrgId::from_uuid(org);
-        let mut lineage = OrgTree::ancestors(read, tenant.id(), node).await?;
+        let mut lineage = OrgTree::ancestors(tenant.database().read(), tenant.id(), node).await?;
         if lineage.is_empty() {
             lineage.push(node);
         }
         Ok(saved_reply::Entity::find()
             .filter(saved_reply::Column::OrgId.is_in(lineage.iter().map(OrgId::as_uuid)))
-            .scoped(tenant)
-            .order_by_asc(saved_reply::Column::Name)
-            .limit(SAVED_REPLIES_MAX)
-            .all(read)
-            .await?)
+            .scoped(tenant))
     }
 
     /// Tạo hay sửa (`id`) câu trả lời mẫu (`support.settings.manage` ở nút của nó). Sửa nội dung thì
@@ -477,10 +511,13 @@ impl SupportService {
         reply: Uuid,
     ) -> Result<String, Error> {
         let ticket = self.get(tenant, Viewer::Staff(principal), ticket_id).await?;
-        let available = self.saved_replies(tenant, principal, ticket.org_id).await?;
-        let reply = available
-            .into_iter()
-            .find(|row| row.id == reply)
+        let node = OrgId::from_uuid(ticket.org_id);
+        principal
+            .require_at(tenant.database().read(), &TICKETS_READ, OrgTarget::new(node, None))
+            .await?;
+        let reply = self
+            .saved_reply_at(tenant, ticket.org_id, reply)
+            .await?
             .ok_or_else(|| saved_reply_not_found(reply))?;
         Ok(fill(&reply, &ticket))
     }

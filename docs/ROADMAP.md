@@ -171,7 +171,14 @@ thật (P7).
     - [ ] Test dry run dời khách không tạo bảng ở đích
   - [x] Mẫu câu OTP khách tự sửa cho khớp template đã đăng ký với nhà mạng (đang viết cứng ở `compliance`, `orders`,
         `bookings`) — D-20261125-sms-templates: cấu hình theo khách nhóm `sms_template`, kiểm `{code}` đúng một lần
-  - [ ] 139 endpoint GET trả `Data<Vec<T>>` không phân trang: endpoint mới trả `Page<T>`, khai deprecation cho cái cũ
+  - [ ] 139 endpoint GET trả `Data<Vec<T>>` không phân trang: endpoint mới trả `Page<T>`, khai deprecation cho cái cũ —
+        chủ dự án quyết sửa tại chỗ cả 140 (đo lại 25/11), D-20261125-list-pages; làm theo cụm module, mỗi cụm một PR:
+    - [x] Kernel (`NaturalOrderPageQuery`, `SortChoicePageQuery::into_request`, `page_of`) + `support`
+    - [ ] Các module còn lại (theo cụm)
+    - [ ] Luật gate chặn danh sách không phân trang, hướng dẫn nâng cấp EN + VI, danh sách ngoại lệ
+  - [ ] `./gate.sh` chưa chạy tsc trên SDK và ví dụ trong `docs/guides` (CI có: `cargo xtask sdk --extract-examples` + `tsc
+        --noEmit`); `sdk --check` chỉ so SDK với `docs/openapi.json` nên kiểu SDK hỏng vẫn lọt tới CI (#517). Chạy khi SDK
+        hay ví dụ đổi và có Node; còn hai kiểu `& Record<string, unknown>` có sẵn trên `main` (`realm`, một kiểu tiền)
   - [x] Rustdoc tiếng Anh cho phần công khai của kernel, testkit, `autoxide` và `api` của module (docs.rs); gate
         `doc-language` giữ phần viết mới là tiếng Anh (D-20261123-english-rustdoc)
   - [ ] Chạy thử năm bộ nối của P7 bằng tài khoản thử thật; đối chiếu các điểm "(?)" của MoMo với trang tài liệu gốc
@@ -267,6 +274,12 @@ thật (P7).
         thì mọi thành viên nhận role (response tạo luật liệt kê ở `granted_user_ids`, hướng dẫn dặn xem trước —
         D-20261125-scim-grant-cover). Chặt hơn: ghi người đưa vào (`added_by`) ở thành viên nhóm và chỉ cấp cho
         thành viên mà người đưa vào cấp được role, còn lại chờ duyệt — cần migration, để sau
+  - [ ] Hạn mức số nhân sự: hai lần đổi role thật cho cùng một người chạy đồng thời có thể làm lệch chỗ (dùng chung
+        mã giữ chỗ `auth.member:<id>`; có từ trước) — khoá dòng người dùng quanh giữ chỗ → đổi → xác nhận, hay job
+        đối soát số nhân sự với `auth_user_role` (D-20261125-scim-sync-report)
+  - [ ] SCIM: khi đồng bộ đưa một tài khoản lên role cao hơn người đã tạo liên kết SCIM của nó (token quyền thấp tạo
+        tài khoản, token của admin cấp role cao), thu hồi mọi cách vào cũ như khi đổi email — cần ghi người tạo liên kết
+        ở `auth_scim_users` (migration) (D-20261125-scim-sync-report mục 7)
 
 - [ ] P17 — Sửa lỗi đợt test bảo mật + hiệu năng độc lập 2026-11 (29.584 case, cả hai database; PT-1..3 ở #515,
       PT-9 ở P16, PT-19 phiên khác):
