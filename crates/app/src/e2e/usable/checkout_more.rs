@@ -324,3 +324,159 @@ async fn khach_vang_lai_tra_don_bang_ma_sms_roi_xem_va_tai_hoa_don() {
     .await
     .unwrap();
 }
+
+/// Đặt một đơn trả thẻ (một ấm trà, giao tiêu chuẩn) với trang quay về `return_url`; `buyer`: token của người mua
+/// đã đăng nhập, `None`: khách vãng lai (giỏ theo `cart-token`). Trả thân câu trả lời của checkout (201).
+async fn card_checkout(
+    app: &TestApp,
+    variant: &str,
+    buyer: Option<&str>,
+    return_url: &str,
+    key: &str,
+) -> Value {
+    let who = buyer.unwrap_or(ANONYMOUS);
+    let cart = expect(app, "POST", "/api/v1/orders/carts", who, Some(json!({})), 201).await;
+    let cart_token = cart["data"]["cart_token"].as_str().map(str::to_owned);
+    let cart = id(&cart);
+    let send = |method: &str, path: &str, body: Value| {
+        let method = axum::http::Method::from_bytes(method.as_bytes()).unwrap();
+        let request = app.request(method, path).json(body);
+        match (buyer, &cart_token) {
+            (Some(token), _) => request.token(token),
+            (None, Some(cart_token)) => request.header("cart-token", cart_token),
+            (None, None) => panic!("a guest cart has a cart_token"),
+        }
+    };
+    let path = format!("/api/v1/orders/carts/{cart}");
+    assert_eq!(
+        send("PUT", &format!("{path}/lines/{variant}"), json!({"quantity": 1}))
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        200
+    );
+    let mut delivery = json!({"recipient_name": "An", "phone": "0901234567",
+        "address": {"country": "VN", "province_code": "01", "commune_code": "00004", "line": "12 Tràng Tiền"}});
+    let priced =
+        send("PUT", &format!("{path}/delivery"), delivery.clone()).send().await.unwrap().json();
+    delivery["shipping_option"] = priced["data"]["shipping"]["options"][0]["option_key"].clone();
+    let priced = send("PUT", &format!("{path}/delivery"), delivery).send().await.unwrap().json();
+    let body = json!({"cart_id": cart, "quote_token": priced["data"]["quote_token"], "payment_method": "card",
+                      "return_url": return_url, "contact": {"name": "An", "phone": "0901234567"}});
+    let answer = send("POST", "/api/v1/orders/checkout", body)
+        .header("idempotency-key", key)
+        .send()
+        .await
+        .unwrap();
+    let placed = answer.json();
+    assert_eq!(answer.status(), 201, "{placed}");
+    placed
+}
+
+/// P-5 (pentest 2026-11): `return_url` không thuộc cửa hàng bị từ chối — qua checkout (đơn vẫn đặt, lý do ở
+/// `payment_actions[0].error` là `orders.return_url_not_allowed`, không bị gộp thành "phương thức không dùng được")
+/// và qua link thanh toán của khách vãng lai lẫn người mua đã đăng nhập; địa chỉ của cửa hàng thì mở được.
+#[tokio::test]
+async fn return_url_la_bi_tu_choi_qua_checkout_va_link_thanh_toan() {
+    TestDatabase::run(async |test| {
+        let esms = FakeProviderServer::start().await.unwrap();
+        let (app, _gateway, variant, _) =
+            shop(test, &[("AUTOXIDE_ESMS_API_URL", esms.url())]).await;
+        for (field, value) in
+            [("api_key", "esms-key"), ("secret_key", "esms-secret"), ("brandname", "AMTRA")]
+        {
+            let path = format!("/api/v1/kernel/settings/esms.connection.sms.{field}");
+            expect(&app, "PUT", &path, ADMIN, Some(json!({"value": value})), 200).await;
+        }
+        esms.reply(
+            "POST",
+            ESMS_SEND,
+            200,
+            json!({"CodeResult": "100", "CountRegenerate": 0, "SMSID": "sms-1"}),
+        );
+        let refused = |action: &Value| {
+            assert_eq!(action["kind"], "none", "{action}");
+            assert_eq!(action["error"]["code"], "orders.return_url_not_allowed", "{action}");
+        };
+
+        // Khách vãng lai: checkout với trang lạ → đơn đặt, chưa có lượt thu, lý do rõ.
+        let placed =
+            card_checkout(&app, &variant, None, "https://evil.example/done", "guest-evil").await;
+        refused(&placed["data"]["payment_actions"][0]);
+        let order = placed["data"]["orders"][0]["id"].as_str().unwrap().to_owned();
+        let number = placed["data"]["orders"][0]["number"].clone();
+        drain(&app).await;
+        esms.take_requests();
+        let lookup = json!({"number": number, "phone": "0901234567"});
+        let lookup = expect(
+            &app,
+            "POST",
+            "/api/v1/orders/public/orders/lookup",
+            ANONYMOUS,
+            Some(lookup),
+            200,
+        )
+        .await;
+        drain(&app).await;
+        let texts: Vec<String> = esms
+            .take_requests()
+            .iter()
+            .filter_map(|request| request.json()["Content"].as_str().map(str::to_owned))
+            .collect();
+        let code = texts
+            .iter()
+            .flat_map(|text| text.split(|c: char| !c.is_ascii_digit() && c != '-'))
+            .find(|word| word.len() == 6 && word.bytes().all(|b| b.is_ascii_digit()))
+            .unwrap_or_else(|| panic!("no code in {texts:?}"))
+            .to_owned();
+        let confirm = format!(
+            "/api/v1/orders/public/orders/lookup/{}/confirm",
+            lookup["data"]["lookup_id"].as_str().unwrap()
+        );
+        let access =
+            expect(&app, "POST", &confirm, ANONYMOUS, Some(json!({"code": code})), 200).await;
+        let access = access["data"]["access_token"].as_str().unwrap().to_owned();
+        let guest_link = |url: &str, key: &str| {
+            app.post(&format!("/api/v1/orders/public/orders/{order}/payment-link"))
+                .header("order-token", &access)
+                .header("idempotency-key", key)
+                .json(json!({"return_url": url}))
+                .send()
+        };
+        let answer = guest_link("https://shop.example.evil.example/done", "g1").await.unwrap();
+        assert_eq!(answer.status(), 422, "{}", answer.text());
+        assert_eq!(answer.json()["code"], "orders.return_url_not_allowed");
+        let answer = guest_link("https://shop.example/done", "g2").await.unwrap();
+        assert_eq!(answer.status(), 200, "{}", answer.text());
+        assert_eq!(answer.json()["data"][0]["kind"], "redirect");
+
+        // Người mua đã đăng nhập: cùng như vậy qua `me/orders/{id}/payment-link`.
+        let placed = card_checkout(
+            &app,
+            &variant,
+            Some(BUYER),
+            "http://shop.example:8080/done",
+            "buyer-evil",
+        )
+        .await;
+        refused(&placed["data"]["payment_actions"][0]);
+        let order = placed["data"]["orders"][0]["id"].as_str().unwrap().to_owned();
+        let path = format!("/api/v1/orders/me/orders/{order}/payment-link");
+        let link = |url: &str, key: &str| {
+            app.post(&path)
+                .token(BUYER)
+                .header("idempotency-key", key)
+                .json(json!({"return_url": url}))
+                .send()
+        };
+        let answer = link("https://evil.example/done", "b1").await.unwrap();
+        assert_eq!(answer.status(), 422, "{}", answer.text());
+        assert_eq!(answer.json()["code"], "orders.return_url_not_allowed");
+        let answer = link("https://shop.example/thanks", "b2").await.unwrap();
+        assert_eq!(answer.status(), 200, "{}", answer.text());
+        assert_eq!(answer.json()["data"][0]["kind"], "redirect");
+    })
+    .await
+    .unwrap();
+}

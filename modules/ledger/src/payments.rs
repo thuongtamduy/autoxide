@@ -273,16 +273,24 @@ impl LedgerService {
                 "must be 1 to 100 visible ASCII characters",
             ));
         }
-        if let Some(url) = input.return_url.as_deref()
-            && let Some(problem) = crate::return_url::check(
+        // Kiểm và chuẩn hoá `return_url` (P-5): chuỗi lưu, đưa vào dấu vân tay và gửi cho đối tác là đúng chuỗi
+        // đã kiểm (`Url::as_str`), không phải chuỗi gốc.
+        let mut input = input;
+        if let Some(url) = input.return_url.take() {
+            match crate::return_url::check(
                 tenant,
-                url,
+                &url,
                 self.domains.as_deref(),
                 self.settings.as_deref(),
             )
             .await?
-        {
-            problems.push(problem);
+            {
+                Ok(normalized) => input.return_url = Some(normalized),
+                Err(problem) => {
+                    input.return_url = Some(url);
+                    problems.push(problem);
+                }
+            }
         }
         let gateway = match self.gateway_for(tenant, input.provider.as_deref()).await {
             Ok(gateway) => Some(gateway),

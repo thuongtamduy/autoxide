@@ -68,7 +68,9 @@ pub(crate) struct CheckoutRequest {
     /// Company details for a VAT invoice (tax code, name, address).
     #[schema(value_type = Option<Object>)]
     invoice_request: Option<serde_json::Value>,
-    /// Where the payment partner sends the buyer back.
+    /// Where the payment partner sends the buyer back: an `https://` address on one of the shop's
+    /// verified domains, or on an origin listed in `ledger.payments.return_origins`; any other address
+    /// leaves the payment unstarted with `payment_actions[].error.code` `orders.return_url_not_allowed`.
     #[validate(length(min = 1, max = 2000))]
     return_url: Option<String>,
     /// Values of the shop's buyer fields (custom fields of `orders.order` with visibility

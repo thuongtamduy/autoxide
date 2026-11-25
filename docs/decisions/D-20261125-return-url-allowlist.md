@@ -11,7 +11,11 @@ Quyết định: module `ledger` (nơi mọi lượt thu đi qua: đơn hàng, t
    chỉ scheme + host + port, http hoặc https) — website ở tên miền chưa gắn vào Autoxide, chế độ một khách, tên miền
    universal link / app link của app di động, `http://localhost:3000` lúc phát triển.
 
-Ngoài ra bị từ chối: 422 `validation_failed`, lỗi ô `return_url` mã `ledger.return_url_not_allowed`. Không nhận scheme
+Ngoài ra bị từ chối: 422 `validation_failed`, lỗi ô `return_url` mã `ledger.return_url_not_allowed`; qua checkout và
+`payment-link` của `orders` lý do giữ riêng thành `orders.return_url_not_allowed` (không gộp vào
+`orders.payment_method_unavailable`), ở `payment_actions[].error` hoặc 422 của `payment-link`. Chuỗi lưu và gửi cho
+đối tác là chuỗi đã kiểm, ở dạng chuẩn hoá (`Url::as_str`), không phải chuỗi gốc; URL có khoảng trắng ở hai đầu hay ký
+tự điều khiển bị từ chối. Origin khai có `*` bị từ chối lúc lưu (so khớp chính xác, không có ký tự đại diện). Không nhận scheme
 riêng của app (`myapp://`): đối tác thanh toán chỉ chuyển trình duyệt tới http(s), app dùng universal link. Lượt thu của
 gói thuê bao (module `plans`) thuộc khách vận hành, nên trang quay về phải thuộc khách vận hành. Trang mặc định của bộ
 nối (`momo.connection.account.return_url`) do quản trị khách đặt nên không kiểm thêm. Sửa P-5 của
