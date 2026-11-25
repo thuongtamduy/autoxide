@@ -25,7 +25,8 @@ chạy thật" (D-20261121-shop-first-order):
 4. Quản trị nâng cao 52.
 5. Bản 1.0: bước 70 P6 rồi P4.
 
-Không dựng module mới trước bản 1.0: các bước 46, 48, 49, 56, 59, 62, 63, 64, 65 tạm dừng. Ba mục cuối của 67 (thử
+Không dựng module mới trước bản 1.0: các bước 46, 48, 49, 56, 59, 62, 63, 64, 65 tạm dừng. Sau 1.0, bước 65 mở đầu tiên
+(D-20261125-miniapp-platform). Ba mục cuối của 67 (thử
 A/B, AI tạo ảnh, khối mã tự viết) cũng để sau 1.0 (D-20261122-step67-after-1-0). Mục còn mở mà chờ bước tạm
 dừng hay mốc thời gian (P17 của 51, banner người bán của 55, gỡ menu cũ của 68, cache quyền của 54) không chặn 1.0.
 Bảng dưới là thứ tự gốc của D-228, giữ để tra phụ thuộc.
@@ -576,11 +577,13 @@ Bắt đầu SAU bước 34 và 40 (đăng nhập OIDC).
 - [x] Nhân viên `active=false` thì khoá và thu hồi phiên, API key ngay; nhóm ánh xạ sang role ở nút; test trên
       cả hai database
 
-## 65. Chợ ứng dụng qua OAuth 2.0 (`apps`) (chủ dự án giao ngày 14/11/2026, D-221) — **tạm dừng tới sau 1.0** (D-20261121-community-first)
+## 65. Chợ ứng dụng qua OAuth 2.0 (`apps`) (chủ dự án giao ngày 14/11/2026, D-221) — **tạm dừng tới sau 1.0** (D-20261121-community-first); **bước đầu tiên được mở sau 1.0** (D-20261125-miniapp-platform)
 
 Đặc tả: [`docs/steps/65-apps.md`](steps/65-apps.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
 
-Bắt đầu SAU bước 54 và 33. Ứng dụng bên ngoài cắm vào như Shopify App Store.
+Bắt đầu SAU bước 54 và 33. Ứng dụng bên ngoài cắm vào như Shopify App Store. Đây là tầng "mini app" của nền
+(D-20261125-miniapp-platform): nhà phát triển bên ngoài dựng mini app trên core như trên Zalo Mini App hay MoMo Mini
+App; mọi mục phải chạy được cả khi một công ty tự vận hành nền của họ lẫn khi một dịch vụ phục vụ nhiều khách.
 
 - [ ] Máy chủ ủy quyền OAuth 2.0 trong `auth`: mã ủy quyền + PKCE bắt buộc, refresh token xoay vòng, phạm vi là
       tên permission, thu hồi và kiểm tra token, siêu dữ liệu máy chủ (RFC 7009, 7636, 7662, 8414)
@@ -588,6 +591,15 @@ Bắt đầu SAU bước 54 và 33. Ứng dụng bên ngoài cắm vào như Sho
       webhook theo ứng dụng, audit `actor_kind = app`; test trên cả hai database
 - [ ] Bán ứng dụng trả phí (D-232): thuê bao tháng, dùng thử; nền tảng là bên bán (hoá đơn thuê bao của 35), chia
       doanh thu cho nhà phát triển qua `PayoutGateway` (36); nhà phát triển nước ngoài chờ đối chiếu thuế
+- [ ] Bản mô tả mini app máy đọc được (D-20261125-miniapp-platform): tên, phiên bản, quyền xin, địa chỉ giao diện,
+      webhook, phiên bản API tối thiểu; cài một mini app từ bản mô tả trên mọi bản cài Autoxide cùng phiên bản lớn;
+      server công bố mình hỗ trợ gì để mini app tự dò
+- [ ] Giao diện mini app trong sản phẩm của người vận hành (D-20261125-miniapp-platform): hợp đồng cho giao diện chủ
+      (danh sách mini app đã cài, chỗ mở, token ngắn hạn theo phiên người dùng trong đúng quyền đã đồng ý) và SDK
+      TypeScript cho giao diện mini app (người dùng hiện tại, gọi API, yêu cầu thanh toán, thông báo); cách ly giữa
+      mini app và trang chủ
+- [ ] Hướng dẫn cho nhà phát triển mini app (EN + VI) kèm một mini app mẫu ở repo riêng, CI cài và chạy nó trên cả
+      hai database
 
 ## Giai đoạn E — Module thương mại (chủ dự án giao ngày 13/11/2026, D-191)
 

@@ -20,7 +20,8 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-175** Công khai repo; bật lại CI và phát hành tự động trên GitHub — 2026-11-13 · **chủ dự án quyết** · *thay một phần bởi D-199*
 - **D-185** Nền cho kinh doanh đa mô hình: khách hàng, tổ chức, gói, tiền, tuân thủ — 2026-11-13 · **chủ dự án quyết**
 - **D-199** Repo tạm giữ riêng tư; phần cần repo công khai tách thành bước 50 — 2026-11-13 · **chủ dự án quyết**
-- **[D-20261121-community-first](D-20261121-community-first.md)** Core cho cộng đồng trước: tạm dừng module mới, bật/tắt module, module viết ngoài repo, hai hạng module — 2026-11-21 · **chủ dự án quyết** · *thay một phần bởi D-20261121-shop-first-order, D-20261121-vn-providers*
+- **[D-20261121-community-first](D-20261121-community-first.md)** Core cho cộng đồng trước: tạm dừng module mới, bật/tắt module, module viết ngoài repo, hai hạng module — 2026-11-21 · **chủ dự án quyết** · *thay một phần bởi D-20261121-shop-first-order, D-20261121-vn-providers, D-20261125-miniapp-platform*
+- **[D-20261125-miniapp-platform](D-20261125-miniapp-platform.md)** Autoxide là nền cho nhà phát triển dựng mini app và website; bước 65 là bước đầu tiên sau 1.0 — 2026-11-25 · **chủ dự án quyết**
 
 ## Quy trình, gate, lộ trình
 
