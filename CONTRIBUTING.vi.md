@@ -98,7 +98,8 @@ bỏ phần biên dịch và test Rust (các job vẫn báo xanh). File không c
   `docs/DECISIONS.md`) và comment trong code được viết tiếng Việt.
 
 Danh sách đầy đủ, kèm lý do của từng luật, ở [`CLAUDE.md`](CLAUDE.md); các quyết định đã
-chốt có mục lục theo chủ đề ở [`docs/decisions/INDEX.md`](docs/decisions/INDEX.md).
+chốt có mục lục theo chủ đề ở `docs/decisions/INDEX.md`; file này sinh tự động, không commit:
+chạy `cargo xtask decisions` để tạo.
 
 ## Commit và pull request
 

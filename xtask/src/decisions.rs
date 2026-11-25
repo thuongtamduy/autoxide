@@ -1,7 +1,8 @@
 //! Mục lục nhật ký quyết định: `cargo xtask decisions` sinh `docs/decisions/INDEX.md` từ
 //! `docs/DECISIONS.md` (mục cũ D-001…, đóng) và `docs/decisions/D-<ngày>-<tên>.md` (mỗi mục mới một
-//! file, D-20261118-decision-ids); `cargo xtask check` báo khi file đã commit lệch. Luật về ID (không
-//! trùng, đúng dạng, tham chiếu có thật) ở `decisions/rules.rs`.
+//! file, D-20261118-decision-ids). File mục lục KHÔNG nằm trong git (D-20261125-decision-index-untracked):
+//! mỗi máy sinh lấy, nên hai PR cùng thêm quyết định không xung đột ở nó. Luật về ID (không trùng,
+//! đúng dạng, tham chiếu có thật, dòng `Thay:` nêu được mục bị thay) ở `decisions/rules.rs`.
 //!
 //! Nhật ký dài (hàng trăm mục, hàng nghìn dòng): agent đọc mục lục để biết đã quyết gì về một chủ
 //! đề, mục nào đã bị thay, rồi mới mở đúng mục. Mục lục sinh từ chính nhật ký nên không lệch được:
@@ -169,6 +170,9 @@ pub struct Entry {
     pub topic: Option<String>,
     /// Mục mà mục này thay: (ID, chỉ thay một phần).
     pub replaces: Vec<(String, bool)>,
+    /// Đoạn `Thay…` không tách ra được ID nào (nguyên văn phần đã cắt): gate báo, vì mục lục sẽ
+    /// lặng lẽ không đánh dấu "đã bị thay".
+    pub unresolved_replace: Vec<String>,
     /// File chứa mục, tính từ gốc repo.
     pub file: String,
     /// Dòng của tiêu đề trong file (đếm từ 1), cho thông báo lỗi.
@@ -225,6 +229,7 @@ fn heading(line: &str, number: usize) -> Result<Entry, String> {
         who: who.trim().to_owned(),
         topic: None,
         replaces: Vec::new(),
+        unresolved_replace: Vec::new(),
         file: String::new(),
         line: number,
     })
@@ -263,6 +268,12 @@ fn finish(entry: &mut Entry, body: &[&str]) {
             entry.topic = Some(topic.trim().trim_end_matches('.').to_owned());
         }
         if let Some(clause) = replace_clause(paragraph) {
+            // Đoạn không nêu ID nào ở ngoài ngoặc là thay thứ không phải quyết định (một câu của
+            // lộ trình, một bước…): hợp lệ. Có ID ngoài ngoặc mà phần cắt không thấy là bộ phân
+            // tích cắt nhầm (dấu `—`, `. ` nằm trong phần trích): gate báo.
+            if ids_in(&clause).is_empty() && !ids_in(&outside_parentheses(paragraph)).is_empty() {
+                entry.unresolved_replace.push(clause.clone());
+            }
             add_replaced(entry, &clause);
         }
         for clause in inline_replacements(paragraph) {
@@ -322,20 +333,51 @@ fn inline_replacements(paragraph: &str) -> Vec<String> {
     clauses
 }
 
+/// Văn bản bỏ phần trong ngoặc (kể cả ngoặc lồng).
+fn outside_parentheses(text: &str) -> String {
+    let mut depth = 0usize;
+    let mut out = String::new();
+    for c in text.chars() {
+        match c {
+            '(' => depth += 1,
+            ')' => depth = depth.saturating_sub(1),
+            _ if depth == 0 => out.push(c),
+            _ => {}
+        }
+    }
+    out
+}
+
 /// Phần đầu của câu: tới `—`, `:`, `. ` hay `)` đóng ngoặc ngoài; bỏ phần trong ngoặc.
 fn first_clause(text: &str) -> String {
     let mut clause = String::new();
     let mut depth = 0usize;
+    // Phần trong dấu nháy kép là trích dẫn: dấu `—`, `:`, `. ` và ID trong đó không phải của câu,
+    // nên bỏ cả đoạn (`Thay: câu "… — trái D-026" … của D-219` thì mục bị thay là D-219).
+    let mut quoted = false;
     let mut chars = text.chars().peekable();
     while let Some(c) = chars.next() {
+        if c == '"' {
+            quoted = !quoted;
+            continue;
+        }
+        if quoted {
+            continue;
+        }
         match c {
             '(' => depth += 1,
             ')' if depth == 0 => break,
             ')' => depth -= 1,
             '—' if depth == 0 => break,
             '.' if depth == 0 && chars.peek().is_none_or(|next| next.is_whitespace()) => break,
-            // `Thay:` mở đầu thì bỏ; `Thay D-087 (…): lý do` thì hết phần nêu mục bị thay.
-            ':' if depth == 0 && clause.trim().is_empty() => {}
+            // `Thay:` mở đầu thì bỏ. `Thay D-087 (…): lý do` thì hết phần nêu mục bị thay; nhưng dấu
+            // `:` đứng trước mọi ID (`Thay: phần "Quy trình: x" của D-087`) nằm trong phần trích,
+            // không được cắt ở đó kẻo mất ID.
+            ':' if depth == 0 && ids_in(&clause).is_empty() => {
+                if !clause.trim().is_empty() {
+                    clause.push(c);
+                }
+            }
             ':' if depth == 0 => break,
             _ if depth == 0 => clause.push(c),
             _ => {}
@@ -468,7 +510,8 @@ pub fn render(entries: &[Entry]) -> String {
     let _ = writeln!(
         text,
         "> Sinh bằng `cargo xtask decisions` từ `{LOG_FILE}` và `{DIR}/D-*.md` — **không sửa \
-         tay**; `cargo xtask check` (trong gate) báo khi file này lệch.\n"
+         tay, không commit** (file nằm trong `.gitignore`); chạy lại lệnh sau khi `git pull` hay \
+         thêm quyết định.\n"
     );
     let _ = writeln!(
         text,
@@ -548,23 +591,11 @@ pub fn write_index(root: &Path) -> Result<usize, String> {
     Ok(entries.len())
 }
 
-/// Luật `decisions-index` (mục lục đã commit khớp nhật ký) và các luật về ID của `rules`.
+/// Các luật về ID của `rules`. Mục lục không còn so với file đã commit: nó không nằm trong git
+/// (D-20261125-decision-index-untracked); ở đây chỉ dựng thử để bắt lỗi đọc nhật ký sớm.
 pub fn check(root: &Path) -> Result<Vec<Violation>, String> {
     let entries = load(root)?;
-    let mut violations = rules::check(root, &entries)?;
-    let expected = render(&entries);
-    let actual = fs::read_to_string(root.join(INDEX_FILE)).unwrap_or_default();
-    if actual != expected {
-        violations.push(Violation {
-            rule: "decisions-index",
-            location: INDEX_FILE.to_owned(),
-            message: format!(
-                "out of date with {LOG_FILE} and {DIR}/D-*.md — regenerate it with `cargo xtask \
-                 decisions` and commit the result"
-            ),
-        });
-    }
-    Ok(violations)
+    rules::check(root, &entries)
 }
 
 #[cfg(test)]
@@ -623,5 +654,29 @@ mod tests {
     #[test]
     fn tieu_de_sai_mau_bao_loi() {
         assert!(parse("## D-001 · Không có ngày — agent quyết\n").is_err());
+    }
+
+    #[test]
+    fn dau_hai_cham_trong_phan_trich_khong_lam_mat_id() {
+        let log = "## D-001 · A — 2026-11-11 — agent quyết\n\nx\n\n\
+## D-002 · B — 2026-11-12 — agent quyết\n\nThay: phần \"Quy trình: gate\" của D-001 — vì lý do.\n\n\
+## D-003 · C — 2026-11-13 — agent quyết\n\nThay D-001 (lý do): giữ phần còn lại.\n\n\
+## D-004 · D — 2026-11-14 — agent quyết\n\nThay: phần a — b của D-001.\n";
+        let entries = parse(log).unwrap();
+        assert_eq!(entries[1].replaces, vec![("D-001".to_owned(), true)]);
+        assert!(entries[1].unresolved_replace.is_empty());
+        assert_eq!(entries[2].replaces, vec![("D-001".to_owned(), false)]);
+        assert!(entries[3].replaces.is_empty());
+        assert_eq!(entries[3].unresolved_replace.len(), 1, "gate báo dòng `Thay:` không có ID");
+    }
+
+    #[test]
+    fn id_va_dau_gach_trong_nhay_kep_la_trich_dan() {
+        let log = "## D-001 · A — 2026-11-11 — agent quyết\n\nx\n\n\
+## D-002 · B — 2026-11-12 — agent quyết\n\nx\n\n\
+## D-003 · C — 2026-11-13 — agent quyết\n\nThay: câu \"trái D-001 — và D-002\" trong phần \"Đã cân nhắc\" của D-002 — lý do.\n";
+        let entries = parse(log).unwrap();
+        assert_eq!(entries[2].replaces, vec![("D-002".to_owned(), true)], "D-001 chỉ là trích dẫn");
+        assert!(entries[2].unresolved_replace.is_empty());
     }
 }

@@ -3,7 +3,7 @@
 //! - `decisions-id` — mục cũ trong `docs/DECISIONS.md` mang số `D-` + ba chữ số; mục mới là một file
 //!   `docs/decisions/D-<YYYYMMDD>-<tên>.md` chứa đúng một mục, ID trong tiêu đề trùng tên file, phần
 //!   ngày trùng ngày của mục, tên viết `a-z0-9` nối bằng `-`. Không ID nào xuất hiện hai lần. Dòng
-//!   `Chủ đề:` (nếu có) phải là một chủ đề của mục lục.
+//!   `Chủ đề:` (nếu có) phải là một chủ đề của mục lục. Đoạn `Thay…` phải nêu được ít nhất một ID.
 //! - `decisions-ref` — mọi `D-xxx` / `D-<ngày>-<tên>` nhắc tới trong file văn bản của repo (code,
 //!   tài liệu, cấu hình) là một mục có thật: số gõ nhầm hay mục bị xoá thì gate đỏ.
 //!
@@ -145,6 +145,16 @@ fn check_ids(entries: &[Entry]) -> Vec<Violation> {
                 ),
             );
         }
+        for clause in &entry.unresolved_replace {
+            push(
+                location.clone(),
+                format!(
+                    "the `Thay…` paragraph (`{clause}`) names no decision ID, so the index cannot \
+                     mark the replaced decision — write the ID(s) the way `D-001` or \
+                     `D-20261118-decision-ids` are written"
+                ),
+            );
+        }
         if let Some(topic) = &entry.topic
             && !TOPICS.iter().any(|(name, _)| name == topic)
         {
@@ -209,6 +219,7 @@ mod tests {
             who: "agent quyết".to_owned(),
             topic: None,
             replaces: Vec::new(),
+            unresolved_replace: Vec::new(),
             file: file.to_owned(),
             line: 1,
         }

@@ -10,8 +10,9 @@ Autoxide: lõi backend Rust, core trước, module cắm vào sau.
 - **Dùng gì, vì sao** → [`STACK.md`](STACK.md)
 - **Làm gì tiếp** → [`docs/ROADMAP.md`](docs/ROADMAP.md)
 - **Làm một bước thế nào** → [`docs/steps/`](docs/steps/README.md) (đặc tả bước 30–56)
-- **Đã quyết gì** → mục lục theo chủ đề [`docs/decisions/INDEX.md`](docs/decisions/INDEX.md) trước (biết mục nào đã bị
-  thay), rồi mở đúng mục trong [`docs/DECISIONS.md`](docs/DECISIONS.md)
+- **Đã quyết gì** → mục lục theo chủ đề `docs/decisions/INDEX.md` trước (biết mục nào đã bị thay), rồi mở đúng mục
+  trong [`docs/DECISIONS.md`](docs/DECISIONS.md) hay `docs/decisions/D-*.md`. File mục lục **không nằm trong git**
+  (D-20261125-decision-index-untracked): thiếu hay cũ thì chạy `cargo xtask decisions` (máy cloud đã sinh sẵn lúc mở phiên)
 
 ## Mục tiêu — không được quên
 
