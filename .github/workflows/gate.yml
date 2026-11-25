@@ -8,6 +8,14 @@
 #
 # Cache (Swatinem/rust-cache): chỉ main ghi (`save-if`), pull request và tag chỉ đọc (tag đọc được cache
 # của nhánh mặc định). Job build test có khoá `test`; clippy build khác nên có khoá riêng.
+#
+# Pull request không chạm Rust (D-20261125-ci-skip-rust): bước `changed` của `lint`, `build tests` và `external module
+# example` gọi `scripts/rust-changed.sh origin/<nhánh gốc>`; `false` (mọi file đã đổi nằm trong danh sách cho phép
+# `scripts/rust-free-paths.txt`: tài liệu, SDK TypeScript, changelog, quyết định…) thì bỏ phần biên dịch và test nặng ở
+# mức BƯỚC, như `avif` — job vẫn chạy và báo xong cùng tên, không chặn check bắt buộc (`paths:` ở trigger thì job biến
+# mất). Các shard test đọc quyết định của `build tests` (`needs.build.outputs.run`). `lint` vẫn chạy phần rẻ (fmt,
+# `cargo xtask check`, api-diff, `sdk --check`, cargo-deny, gitleaks), chỉ bỏ clippy và cache của nó. Push, tag và
+# chạy tay luôn chạy đủ. `GATE_BASE` = nhánh gốc của PR (không phải luôn `main`), để gate.sh cùng một mốc.
 name: Gate (reusable)
 
 on:
@@ -29,6 +37,7 @@ jobs:
     env:
       CARGO_INCREMENTAL: "0"
       CARGO_TERM_COLOR: always
+      GATE_BASE: ${{ github.base_ref && format('origin/{0}', github.base_ref) || 'origin/main' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -36,9 +45,22 @@ jobs:
           # Cả lịch sử và tag: `cargo xtask api-diff` so với tag phát hành gần nhất; gitleaks quét
           # toàn bộ lịch sử.
           fetch-depth: 0
+      # Không chạm Rust thì gate.sh tự bỏ clippy; ở đây chỉ bỏ tải cache của clippy (vài GB) — xtask tự biên dịch
+      # trong ~15 giây.
+      - name: changed
+        id: changed
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT_NAME" != "pull_request" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=$(scripts/rust-changed.sh "$GATE_BASE")" >> "$GITHUB_OUTPUT"
+          fi
       # Toolchain theo rust-toolchain.toml: không đối số thì rustup cài đúng bản ghim.
       - run: rustup toolchain install
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        if: steps.changed.outputs.run == 'true'
         with:
           shared-key: lint
           save-if: ${{ github.ref == 'refs/heads/main' }}
@@ -121,9 +143,26 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # So với nhánh gốc của PR (bước `changed`).
+          fetch-depth: 0
+      # Pull request không chạm Rust: bỏ các bước dưới, job vẫn báo xong (D-20261125-ci-skip-rust).
+      - name: changed
+        id: changed
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          if [ "$EVENT_NAME" != "pull_request" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=$(scripts/rust-changed.sh "origin/$BASE_REF")" >> "$GITHUB_OUTPUT"
+          fi
       - run: rustup toolchain install
+        if: steps.changed.outputs.run == 'true'
       - uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
+        if: steps.changed.outputs.run == 'true'
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        if: steps.changed.outputs.run == 'true'
         with:
           shared-key: example
           # Hai thư mục build: xtask ở workspace gốc, ví dụ ở workspace riêng của nó.
@@ -132,9 +171,11 @@ jobs:
             examples/external-module -> target
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: rui314/setup-mold@339e96b4ff1f3bd865856ba4cbbe8818a7acb038 # v1
+        if: steps.changed.outputs.run == 'true'
       - run: ./gate.sh --only example
+        if: steps.changed.outputs.run == 'true'
       - run: sccache --show-stats
-        if: always()
+        if: always() && steps.changed.outputs.run == 'true'
 
   # Build mọi chương trình test MỘT lần thành archive của nextest (`./gate.sh --only build`); các job
   # `tests` tải archive về và chạy, không biên dịch lại (D-20261120-ci-nextest-archive). Gate đầy đủ
@@ -143,6 +184,9 @@ jobs:
     name: build tests
     runs-on: ubuntu-24.04
     timeout-minutes: 45
+    # Các shard test đọc quyết định này: không build thì không có archive để chạy.
+    outputs:
+      run: ${{ steps.changed.outputs.run }}
     env:
       CARGO_INCREMENTAL: "0"
       CARGO_TERM_COLOR: always
@@ -151,29 +195,49 @@ jobs:
       # docs/BENCHMARKS.md, D-20261121-ci-sccache-build.
       SCCACHE_GHA_ENABLED: "true"
       RUSTC_WRAPPER: sccache
+      GATE_BASE: ${{ github.base_ref && format('origin/{0}', github.base_ref) || 'origin/main' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          # Pull request so với origin/main để biết crate nào bị sửa (`--pr`).
+          # Pull request so với nhánh gốc để biết crate nào bị sửa (`--pr`).
           fetch-depth: 0
+      # Pull request không chạm Rust: bỏ các bước dưới, job vẫn báo xong (D-20261125-ci-skip-rust).
+      - name: changed
+        id: changed
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          if [ "$EVENT_NAME" != "pull_request" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=$(scripts/rust-changed.sh "origin/$BASE_REF")" >> "$GITHUB_OUTPUT"
+          fi
       - run: rustup toolchain install
+        if: steps.changed.outputs.run == 'true'
       - uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
+        if: steps.changed.outputs.run == 'true'
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        if: steps.changed.outputs.run == 'true'
         with:
           shared-key: test
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: taiki-e/install-action@25f51f6b1bf4e18876107cece836f4f77ac17c8c # v2.90.7
+        if: steps.changed.outputs.run == 'true'
         with:
           tool: cargo-nextest@0.9.152
       # mold thay linker mặc định (ld) của máy CI: job này link hàng chục chương trình test lớn, mold
       # link nhanh hơn nhiều. Chỉ đổi linker hệ thống (không đổi RUSTFLAGS) nên cache sccache /
       # rust-cache giữ nguyên khoá; file chạy ra vẫn là ELF thường cho máy test (D-20261121-ci-mold-shards).
       - uses: rui314/setup-mold@339e96b4ff1f3bd865856ba4cbbe8818a7acb038 # v1
+        if: steps.changed.outputs.run == 'true'
       - run: ./gate.sh ${{ github.event_name == 'pull_request' && '--pr' || '' }} --only build
+        if: steps.changed.outputs.run == 'true'
       - run: sccache --show-stats
-        if: always()
+        if: always() && steps.changed.outputs.run == 'true'
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: steps.changed.outputs.run == 'true'
         with:
           name: test-archive
           path: target/gate-archive
@@ -229,9 +293,12 @@ jobs:
           ]') }}
     services:
       # Job SQLite cũng có service Postgres (khởi động song song với checkout, không tốn thời gian)
-      # cho matrix khỏi rẽ nhánh; nó không dùng tới.
+      # cho matrix khỏi rẽ nhánh; nó không dùng tới. `build tests` bỏ qua (PR không chạm Rust) thì image rỗng: runner
+      # không dựng service (D-20261125-ci-skip-rust).
       postgres:
-        image: postgres:${{ matrix.target.postgres }}-alpine
+        image: >-
+          ${{ needs.build.outputs.run == 'true'
+          && (matrix.target.postgres == '18' && 'postgres:18-alpine' || 'postgres:16-alpine') || '' }}
         env:
           POSTGRES_PASSWORD: postgres
         ports: ["5432:5432"]
@@ -240,7 +307,7 @@ jobs:
           --health-interval 2s --health-timeout 5s --health-retries 30
       # Máy chủ S3 giả lập cho test lưu file (D-066).
       s3:
-        image: motoserver/moto:5.2.5
+        image: ${{ needs.build.outputs.run == 'true' && 'motoserver/moto:5.2.5' || '' }}
         ports: ["5000:5000"]
     env:
       CARGO_TERM_COLOR: always
@@ -248,15 +315,21 @@ jobs:
       GATE_POSTGRES_URL: postgres://postgres:postgres@127.0.0.1:5432/postgres
       GATE_S3_ENDPOINT: http://127.0.0.1:5000
     steps:
+      - name: No Rust-relevant change, tests skipped
+        if: needs.build.outputs.run != 'true'
+        run: echo "Every file this pull request changes is in scripts/rust-free-paths.txt; build tests was skipped."
       # Mã nguồn cùng commit với archive: test đọc file của repo (bản dịch, docs/openapi.json…).
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: needs.build.outputs.run == 'true'
         with:
           persist-credentials: false
       # Không cài toolchain Rust: archive đã build, `gate.sh --archive` gọi thẳng `cargo-nextest`.
       - uses: taiki-e/install-action@25f51f6b1bf4e18876107cece836f4f77ac17c8c # v2.90.7
+        if: needs.build.outputs.run == 'true'
         with:
           tool: cargo-nextest@0.9.152
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: needs.build.outputs.run == 'true'
         with:
           name: test-archive
           path: target/gate-archive
@@ -264,7 +337,7 @@ jobs:
       # gate.sh (max_connections=300, bỏ fsync) bằng ALTER SYSTEM rồi khởi động lại. Mặc định 100
       # kết nối không đủ cho test chạy song song: test đỏ hàng loạt "too many clients".
       - name: Configure the PostgreSQL service like gate.sh
-        if: ${{ matrix.target.part == 'postgres' }}
+        if: ${{ needs.build.outputs.run == 'true' && matrix.target.part == 'postgres' }}
         # Giá trị từ ngữ cảnh đi qua `env:`, không chèn thẳng vào script (zizmor `template-injection`).
         env:
           CONTAINER: ${{ job.services.postgres.id }}
@@ -283,6 +356,7 @@ jobs:
           done
           exit 1
       - name: Create the S3 test bucket
+        if: needs.build.outputs.run == 'true'
         run: |
           for _ in $(seq 1 30); do
             curl --silent --fail --request PUT "$GATE_S3_ENDPOINT/autoxide-test" && exit 0
@@ -291,7 +365,8 @@ jobs:
           exit 1
       # Pull request: chỉ test crate bị sửa (so với main) và crate phụ thuộc (file `filter` trong
       # archive); push lên main và chạy tay: mọi test (D-20261118-ci-pr-affected-tests).
-      - run: >-
+      - if: needs.build.outputs.run == 'true'
+        run: >-
           ./gate.sh ${{ github.event_name == 'pull_request' && '--pr' || '' }}
           --only ${{ matrix.target.part }} --archive target/gate-archive
           --shard ${{ matrix.target.shard }}

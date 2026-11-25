@@ -37,9 +37,14 @@ const GLOBAL_FILES: &[&str] =
 const GLOBAL_DIRS: &[&str] = &[".cargo/"];
 
 /// File nằm ngoài thư mục crate nhưng có test của một crate đọc lúc chạy (bản sinh từ code phải
-/// khớp bản đã commit): đổi file thì chạy test của crate đó.
-const CHECKED_FILES: &[(&str, &str)] =
-    &[("docs/openapi.json", "autoxide"), (".env.example", "autoxide")];
+/// khớp bản đã commit; script mà test so với bản Rust): đổi file thì chạy test của crate đó.
+const CHECKED_FILES: &[(&str, &str)] = &[
+    ("docs/openapi.json", "autoxide"),
+    (".env.example", "autoxide"),
+    // `rust_free` của xtask chạy script và đọc danh sách (D-20261125-ci-skip-rust).
+    ("scripts/rust-changed.sh", "xtask"),
+    ("scripts/rust-free-paths.txt", "xtask"),
+];
 
 /// Thư mục ngoài crate có test đọc lúc chạy (`read_dir`, `read_to_string`), như trên. File nhúng lúc
 /// biên dịch (`include_str!` / `include_bytes!`) thì không cần ghi ở đây: [`included_files`] tự dò.
@@ -58,7 +63,8 @@ pub enum Affected {
 
 /// Crate bị ảnh hưởng bởi các file `changed` (đường dẫn tương đối so với gốc repo, dùng `/`).
 pub fn affected(workspace: &Workspace, changed: &[String]) -> Affected {
-    let included = included_files(workspace);
+    let mut included = included_files(workspace);
+    included.extend(symlinked_files(workspace));
     let mut crates = BTreeSet::new();
     for file in changed {
         if GLOBAL_FILES.contains(&file.as_str())
@@ -75,7 +81,7 @@ pub fn affected(workspace: &Workspace, changed: &[String]) -> Affected {
             .chain(
                 included
                     .iter()
-                    .filter(|(path, _)| path == file)
+                    .filter(|(path, _)| file == path || file.starts_with(&format!("{path}/")))
                     .map(|(_, package)| package.clone()),
             );
         crates.extend(readers);
@@ -135,6 +141,40 @@ fn included_files(workspace: &Workspace) -> Vec<(String, String)> {
             {
                 found.push((path, owner.name.clone()));
             }
+        }
+    }
+    found
+}
+
+/// File (hay thư mục) NGOÀI thư mục crate mà một symlink tracked trong thư mục crate trỏ tới: (đích, so với gốc repo;
+/// tên crate). Vd `crates/kernel/CHANGELOG.md` → `CHANGELOG.md` gốc, mà kernel nhúng bằng
+/// `include_str!("../../CHANGELOG.md")` — đường dẫn trong mã nằm trong crate, nên [`included_files`] không thấy file
+/// gốc. Không đọc được repo hay git thì rỗng.
+fn symlinked_files(workspace: &Workspace) -> Vec<(String, String)> {
+    let Ok(listing) = git(&workspace.root, &["ls-files", "-s"]) else {
+        return Vec::new();
+    };
+    let mut found = Vec::new();
+    for line in listing.lines() {
+        // `<mode> <object> <stage>\t<path>`; 120000 là symlink.
+        let Some((meta, link)) = line.split_once('\t') else { continue };
+        if !meta.starts_with("120000 ") {
+            continue;
+        }
+        let owner = workspace
+            .packages
+            .iter()
+            .filter(|package| {
+                !package.dir.is_empty() && link.starts_with(&format!("{}/", package.dir))
+            })
+            .max_by_key(|package| package.dir.len());
+        let Some(owner) = owner else { continue };
+        let Ok(target) = std::fs::read_link(workspace.root.join(link)) else { continue };
+        let dir = Path::new(link).parent().unwrap_or(Path::new(""));
+        if let Some(path) = normalize(&dir.join(target))
+            && !path.starts_with(&format!("{}/", owner.dir))
+        {
+            found.push((path, owner.name.clone()));
         }
     }
     found
@@ -1014,6 +1054,32 @@ mod tests {
         let (_, files) = changed_since(&repo.0, None, &snapshot_tree(&repo.0).unwrap()).unwrap();
         assert!(files.is_empty(), "{files:?}");
         assert_eq!(repo.git(&["diff", "--cached", "--name-only"]), "");
+    }
+
+    /// `crates/kernel/CHANGELOG.md` là symlink tới `CHANGELOG.md` gốc mà kernel nhúng: đổi file gốc phải chạy test của
+    /// kernel (trước đây `test-filter` bỏ sót). Symlink nằm ngoài crate (`AGENTS.md` → `CLAUDE.md`) thì không kéo gì.
+    #[cfg(unix)]
+    #[test]
+    fn symlink_trong_crate_keo_file_no_tro_toi() {
+        let repo = TempRepo::new("symlink");
+        repo.write("CHANGELOG.md", "# Changelog");
+        repo.write("CLAUDE.md", "rules");
+        repo.write("docs/shared/x.json", "{}");
+        std::os::unix::fs::symlink("../../CHANGELOG.md", repo.0.join("modules/notes/CHANGELOG.md"))
+            .unwrap();
+        std::os::unix::fs::symlink("../../docs/shared", repo.0.join("modules/notes/shared"))
+            .unwrap();
+        std::os::unix::fs::symlink("CLAUDE.md", repo.0.join("AGENTS.md")).unwrap();
+        repo.git(&["add", "--all"]);
+        let mut workspace = workspace();
+        workspace.root = repo.0.clone();
+        let changed = |files: &[&str]| {
+            affected(&workspace, &files.iter().map(|file| (*file).to_owned()).collect::<Vec<_>>())
+        };
+        assert_eq!(changed(&["CHANGELOG.md"]), crates(&["autoxide", "autoxide-notes"]));
+        assert_eq!(changed(&["docs/shared/x.json"]), crates(&["autoxide", "autoxide-notes"]));
+        assert_eq!(changed(&["CLAUDE.md"]), crates(&[]));
+        assert_eq!(changed(&["docs/shared-other.json"]), crates(&[]));
     }
 
     #[test]

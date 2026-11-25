@@ -44,11 +44,17 @@
 # `--only sqlite|postgres --archive … --shard k/n` chạy song song (D-20261120-ci-nextest-archive);
 # gate trên máy vẫn là định nghĩa "xong", CI là lưới thứ hai.
 #
+# Thay đổi không chạm Rust (D-20261125-ci-skip-rust): `scripts/rust-changed.sh` in `false` khi mọi file đã đổi nằm
+# trong danh sách cho phép `scripts/rust-free-paths.txt` (tài liệu, SDK TypeScript, changelog, quyết định…). Khi đó
+# `--pr` và `--quick` bỏ clippy (bước 2) — kết quả của nó không thể khác ở base; các bước rẻ còn lại vẫn chạy. Trên CI,
+# pull request như vậy còn bỏ phần nặng của job `build tests`, các shard test và `external module example` (gate.yml);
+# job vẫn báo xong cùng tên. Gate đầy đủ (push lên main, tag, chạy tay) không bao giờ bỏ.
+#
 # Cả hai chạy ở mức ưu tiên CPU thấp (`renice`) để máy vẫn dùng được trong lúc build.
 #
 # Theo thứ tự (dừng ở bước đỏ đầu tiên):
 #   1. định dạng            cargo fmt --check
-#   2. lint                 cargo clippy, cảnh báo tính là lỗi
+#   2. lint                 cargo clippy, cảnh báo tính là lỗi (`--pr`/`--quick` bỏ khi thay đổi không chạm Rust)
 #      avif                 clippy + test AVIF của `media` với `--features avif` (feature không bật mặc
 #                           định, D-20261121-avif-feature); phần riêng `--only avif`, CI chạy job riêng
 #   3. ranh giới workspace  cargo xtask check
@@ -80,7 +86,8 @@
 #                        TEST_S3_SECRET_ACCESS_KEY (mặc định `test` / `test`).
 #   GATE_S3_IMAGE        image cho container S3 giả lập (mặc định motoserver/moto).
 #   GATE_GITLEAKS_IMAGE  image gitleaks khi máy không cài gitleaks.
-#   GATE_BASE            với --pr: so với ref này để biết crate nào bị sửa (mặc định origin/main).
+#   GATE_BASE            với --pr: so với ref này để biết crate nào bị sửa (mặc định origin/main); với --pr và
+#                        --quick: thay đổi kể từ chỗ rẽ nhánh với ref này có chạm Rust không (bỏ clippy).
 #   GATE_ARCHIVE_DIR     với --only build: thư mục ghi archive test và file filter (mặc định
 #                        target/gate-archive).
 #   GATE_DEPS_OPT_LEVEL  với --only build: mức tối ưu (0|1|2|3) của THƯ VIỆN NGOÀI trong archive test. Mặc định
@@ -179,12 +186,25 @@ require() {
   command -v "$1" >/dev/null 2>&1 || fail "'$1' not found. $2"
 }
 
-require cargo "Install Rust from https://rustup.rs"
+# Kiểm mọi công cụ cần cho lần chạy này NGAY ĐẦU và báo hết một lần: trước đây thiếu gitleaks/Docker chỉ lộ ra sau
+# khi clippy đã chạy xong, và thiếu hai thứ thì phải chạy lại hai lần mới biết.
+MISSING=()
+need() {
+  command -v "$1" >/dev/null 2>&1 || MISSING+=("  - $1: $2")
+}
+need cargo "install Rust from https://rustup.rs"
 if [ "$ONLY" = build ] || [ -n "$ARCHIVE" ]; then
-  require cargo-nextest "Install it with: cargo install cargo-nextest --locked"
+  need cargo-nextest "cargo install cargo-nextest --locked (or a release binary: https://nexte.st)"
 fi
 if runs lint; then
-  require cargo-deny "Install it with: cargo install cargo-deny --locked"
+  need cargo-deny "cargo install cargo-deny --locked (or a release binary: https://github.com/EmbarkStudios/cargo-deny/releases)"
+  if ! command -v gitleaks >/dev/null 2>&1; then
+    need docker "the secret scan runs gitleaks in Docker; install Docker or gitleaks (https://github.com/gitleaks/gitleaks)"
+  fi
+fi
+if [ ${#MISSING[@]} -gt 0 ]; then
+  fail "missing tools for this run:
+$(printf '%s\n' "${MISSING[@]}")"
 fi
 
 export CARGO_INCREMENTAL=0
@@ -286,8 +306,18 @@ if runs lint; then
 step "format (cargo fmt)"
 cargo fmt --all --check
 
-step "lint (cargo clippy)"
-cargo clippy --workspace --all-targets --locked -- -D warnings
+# `--pr` / `--quick`: thay đổi không chạm Rust (mọi file nằm trong scripts/rust-free-paths.txt) thì clippy cho đúng kết
+# quả như ở base — bỏ, vì trên máy mới nó là cả một lần biên dịch workspace (D-20261125-ci-skip-rust).
+RUST_CHANGED=true
+if [ "$QUICK" = 1 ] || [ "$PR" = 1 ]; then
+  RUST_CHANGED="$(scripts/rust-changed.sh "${GATE_BASE:-origin/main}")"
+fi
+if [ "$RUST_CHANGED" = true ]; then
+  step "lint (cargo clippy)"
+  cargo clippy --workspace --all-targets --locked -- -D warnings
+else
+  step "lint (cargo clippy): skipped, no Rust-relevant change since ${GATE_BASE:-origin/main} (scripts/rust-free-paths.txt)"
+fi
 
 step "workspace boundaries (cargo xtask check)"
 cargo xtask check
