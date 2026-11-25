@@ -482,7 +482,34 @@ impl ProviderService {
             .unwrap_or_else(|| autoxide_kernel::tenancy::root_of(tenant.id()).as_uuid());
         let roles = BTreeSet::from([role]);
         let read = tenant.database().read();
-        crate::role::grant_problems(read, tenant, principal, "default_", org, &roles).await
+        let problems =
+            crate::role::grant_problems(read, tenant, principal, "default_", org, &roles).await?;
+        // Câu chung của `grant_problems` không nói cách làm tiếp với nhà cung cấp: thay bằng câu
+        // chỉ đường. Tên ô (`default_role_ids`) giữ nguyên — đã có trong bản phát hành.
+        let mut checked = Vec::with_capacity(problems.len());
+        for problem in problems {
+            if problem.code != "more_than_you_have" {
+                checked.push(problem);
+                continue;
+            }
+            let name = crate::role::entity::role::Entity::find_by_id(role)
+                .scoped(tenant)
+                .one(read)
+                .await?
+                .map(|row| row.name)
+                .unwrap_or_else(|| role.to_string());
+            checked.push(
+                FieldError::new(
+                    problem.field,
+                    "more_than_you_have",
+                    "role `{role}` has permissions you do not have, or has them more widely than \
+                     you do; ask someone who can give this role to save the provider, or remove \
+                     the default role",
+                )
+                .with_param("role", name),
+            );
+        }
+        Ok(checked)
     }
 }
 

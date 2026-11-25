@@ -757,17 +757,28 @@ impl OidcService {
         let reference = crate::role::member_reference(user.id);
         let limit = &crate::role::MEMBERS_LIMIT;
         // Hạn mức số nhân sự (bước 35): giữ chỗ ngoài transaction, lỗi thì trả lại (D-326).
-        if role.is_some() {
-            self.entitlements.reserve(tenant.id(), limit, 1, &reference).await?;
-        }
-        let linked = self.finish_signup(tenant, user.id, provider, external, &email).await;
+        let reserved = match role {
+            Some(_) => self.entitlements.reserve(tenant.id(), limit, 1, &reference).await,
+            None => Ok(()),
+        };
+        let linked = match reserved {
+            Ok(()) => self.finish_signup(tenant, user.id, provider, external, &email).await,
+            Err(error) => Err(error),
+        };
         if role.is_some() {
             match &linked {
                 Ok(()) => self.entitlements.confirm(tenant.id(), limit, &reference).await?,
                 Err(_) => self.entitlements.release(tenant.id(), limit, &reference).await?,
             }
         }
-        linked?;
+        if let Err(error) = linked {
+            // Tài khoản đã tạo (transaction riêng) mà chưa có liên kết hay role: xoá để không để lại
+            // tài khoản mồ côi không ai đăng nhập được (lần đăng nhập sau tạo lại từ đầu).
+            if let Err(cleanup) = self.users.delete(tenant, Actor::system(), user.id).await {
+                tracing::warn!(user_id = %user.id, error = %cleanup, "could not remove a half-created account");
+            }
+            return Err(error);
+        }
         tracing::info!(user_id = %user.id, provider_id = %provider.id, "account created by sign-in provider");
         Ok(user.id)
     }
