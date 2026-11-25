@@ -8,7 +8,9 @@ The SCIM endpoint is `/api/v1/auth/scim/v2` (`Users`, `Groups`, `ServiceProvider
 
 ## 1. Create a SCIM token
 
-Needs the permission `auth.scim.manage`, a plan with the feature `auth.scim`, and a signed-in session: an API key cannot create one (`auth.session_required`). The token belongs to the tenant (not to a person), works only on the SCIM endpoint, and is shown once.
+Needs the permission `auth.scim.manage`, a plan with the feature `auth.scim`, and a signed-in session: an API key cannot create one (`auth.session_required`). The token belongs to the tenant, works only on the SCIM endpoint, and is shown once.
+
+**A token can do only what the person who created it can do now.** It can create accounts, but it gives, takes away, disables or deletes only within that person's current permissions: an account with permissions they lack cannot be disabled or deleted with it, and a group's role they could not give themselves cannot be given or taken away through it (`403`). Create the token from an account that holds every role your group mappings give — usually an administrator.
 
 <!-- example: sign-in -->
 ```bash
@@ -26,6 +28,8 @@ curl -sS "$API/api/v1/auth/scim/tokens" -H "Authorization: Bearer $TOKEN" \
 ```
 
 The response also has `scim_base_path` (`/api/v1/auth/scim/v2`): put your server's public address in front of it for the provider. List tokens with `GET /api/v1/auth/scim/tokens` (never with their secret). To rotate, create a new token, switch the provider to it, then `DELETE /api/v1/auth/scim/tokens/{id}` the old one. A tenant has at most 5.
+
+**Rotate the token when its creator leaves or loses roles.** Otherwise removing people from mapped groups and disabling leavers fails quietly in the provider (it receives `403`). `GET /api/v1/auth/scim/tokens` shows `creator_status` for each token: `disabled`, `deleted` or `missing_permission` (no longer holds `auth.scim.manage`) means rotate now. A creator who was only demoted shows `active` but the token is limited to their new roles: rotate then too.
 
 ## 2. Set up the provider
 
@@ -78,10 +82,10 @@ Every change is in the audit log with the actor kind `scim`.
 The provider can also push its groups (`/Groups`; Okta: *Push Groups*, Entra ID: assign groups to the app). A group gives nothing by itself: the tenant decides what it means with **mapping rules** — "members of group X hold role R at unit N".
 
 1. Let the provider push the group, then find its id with `GET /api/v1/auth/scim/groups` (member count, rule count). Groups without a rule also show up in the work inbox (`auth.scim_unmapped_groups`).
-2. Add a rule with `POST /api/v1/auth/scim/group-mappings` and `{"group_id": "…", "org_id": "…", "role_id": "…"}` (`org_id` is the tenant id for the root unit). You must be able to give that role at that unit yourself. Current members get the role at once.
-3. From then on, people added to or removed from the group gain or lose the role at once. A role someone was given by hand is never removed by SCIM, and a role two groups give stays while the person is in either.
+2. Add a rule with `POST /api/v1/auth/scim/group-mappings` and `{"group_id": "…", "org_id": "…", "role_id": "…"}` (`org_id` is the tenant id for the root unit). You must be able to give that role at that unit yourself. Current members get the role at once; the response lists them in `granted_user_ids`. **Check a group's members before mapping it to a powerful role:** while a group has no rules, anyone holding a SCIM token can add people to it.
+3. From then on, people added to or removed from the group gain or lose the role at once — if the SCIM token's creator can give that role; otherwise the change is refused (`403`) and nothing is written. A role someone was given by hand is never removed by SCIM, and a role two groups give stays while the person is in either.
 
-Remove a rule with `DELETE /api/v1/auth/scim/group-mappings/{id}`; deleting the group in the provider removes its rules and the roles it gave.
+Remove a rule with `DELETE /api/v1/auth/scim/group-mappings/{id}` (you must be able to give its role yourself, `auth.role_beyond_you` otherwise); deleting the group in the provider removes its rules and the roles it gave.
 
 ## 5. What is supported
 
@@ -90,7 +94,7 @@ Remove a rule with `DELETE /api/v1/auth/scim/group-mappings/{id}`; deleting the 
 - Paging: `startIndex` (from 1) and `count` (at most 200).
 - Not supported: bulk, sorting, ETags, password change.
 
-Errors: `401` without a valid SCIM token, `403` when the plan lacks `auth.scim`, `404` for an id of another tenant, `409` `uniqueness` when `userName`, `externalId` or the email belongs to another account, `400` `invalidValue` / `invalidSyntax` / `invalidPath` / `noTarget` / `mutability` for a wrong body.
+Errors: `401` without a valid SCIM token, `403` when the plan lacks `auth.scim` or the change goes beyond the token creator's permissions (no `scimType`), `404` for an id of another tenant, `409` `uniqueness` when `userName`, `externalId` or the email belongs to another account, `400` `invalidValue` / `invalidSyntax` / `invalidPath` / `noTarget` / `mutability` for a wrong body.
 
 ## Personal data
 

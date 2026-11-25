@@ -249,6 +249,17 @@ thật (P7).
         địa chỉ hợp lệ như thanh toán (P-5) — phát hiện khi sửa P-5, để cho lượt rà soát luồng xác minh danh tính
   - [ ] Test chắc chắn đi qua nhánh "trùng unique index" khi xác minh tên miền (`check_on` → `lost_race`): hiện chỉ
         test đồng thời đi qua nhánh đó khi hai lượt tình cờ xen kẽ
+  - [ ] Chủ dự án quyết: `PUT /api/v1/auth/users/{id}/roles` (`auth.roles.manage`) cho tự gán mọi role kể cả `admin`
+        (cố ý theo mô tả permission), trong khi membership, lời mời và SCIM theo "chỉ cấp cái mình có"
+        (D-20261125-scim-grant-cover) — giữ, hay đưa đường cũ về cùng luật? Cùng lượt xem các chỗ bất nhất khác
+        (chưa đổi hành vi): (i) `require_covers` (xoá / khoá / đổi email / nhận về tài khoản) so theo tên
+        permission, bỏ qua phạm vi, còn `require_grantable` so cả phạm vi; (ii) `PUT /users/{id}/memberships` chỉ
+        kiểm role được cấp, không kiểm role bị gỡ — SCIM nay chặt hơn đường gán tay; (iii) cùng một luật ánh xạ:
+        tạo vượt quyền trả 422, xoá vượt quyền trả 403
+  - [ ] Nhóm SCIM chưa có luật chứa "thành viên chờ": ai giữ token SCIM cũng đưa người vào được; admin đặt luật
+        thì mọi thành viên nhận role (response tạo luật liệt kê ở `granted_user_ids`, hướng dẫn dặn xem trước —
+        D-20261125-scim-grant-cover). Chặt hơn: ghi người đưa vào (`added_by`) ở thành viên nhóm và chỉ cấp cho
+        thành viên mà người đưa vào cấp được role, còn lại chờ duyệt — cần migration, để sau
 
 ## Giai đoạn B — Lớp cho giao diện và phân quyền
 
