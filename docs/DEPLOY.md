@@ -419,9 +419,13 @@ setting with its value (secrets hidden) and reports every problem at once.
 
 ## Mail that bounces
 
-When the receiving server refuses a recipient address for good while a mail is being sent (SMTP
-`5xx` with enhanced status `5.1.x` or `5.2.x`: no such mailbox), the mail is not retried and the
-address gets a bounce record in its tenant. After `AUTOXIDE_MAIL_HARD_BOUNCE_LIMIT` (default 3) such
+When the receiving server refuses the recipient address itself for good while a mail is being sent
+— SMTP `5xx` with enhanced status `5.1.1` (no such mailbox), `5.1.2` (no such domain), `5.1.3` (bad
+address), `5.1.6` (mailbox moved) or `5.1.10` (the domain takes no mail) — the address gets a bounce
+record in its tenant. Errors of the sending side (`5.1.7`, `5.1.8`, a wrong sender address or a
+blocked SMTP account), a full mailbox, a message too big, or a reply without an enhanced status are
+not counted, so a sending misconfiguration never suppresses recipients. Bounces count towards
+suppression at most once per 24 hours: after `AUTOXIDE_MAIL_HARD_BOUNCE_LIMIT` (default 3) counted
 bounces the address is **suppressed** for that tenant only: new mail to it — password resets
 included — is not sent, and each skipped mail is counted on the record with its source (e.g.
 `auth.password_reset`), so "why did this person get no mail" has an answer. The API still answers

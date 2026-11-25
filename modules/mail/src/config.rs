@@ -41,9 +41,12 @@ pub(crate) const ALLOW_PRIVATE_NETWORKS: Setting = Setting::new(
 
 pub(crate) const HARD_BOUNCE_LIMIT: Setting = Setting::new(
     "AUTOXIDE_MAIL_HARD_BOUNCE_LIMIT",
-    "Hard bounces (the receiving server refuses the address itself) after which mail to an \
-     address is suppressed for that tenant, 1 to 20. A tenant's administrator lists and releases \
-     suppressed addresses at `/api/v1/mail/bounces`.",
+    "Hard bounces after which mail to an address is suppressed for that tenant, 1 to 20. Counted: \
+     the receiving server refuses the recipient address itself with enhanced status 5.1.1, 5.1.2, \
+     5.1.3, 5.1.6 or 5.1.10, at most once per 24 hours (a burst of failures counts once). Not \
+     counted: sender-side errors (5.1.7, 5.1.8), full mailbox, message too big, replies without an \
+     enhanced status. A tenant's administrator lists and releases suppressed addresses at \
+     `/api/v1/mail/bounces`.",
 )
 .with_default("3");
 

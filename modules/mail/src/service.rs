@@ -280,13 +280,17 @@ impl JobHandler for Sender {
                 tracing::info!(job_id = %job.id, "mail sent");
             }
             // Lỗi vĩnh viễn: thử lại vô ích. Báo cho module khác qua event, rồi xong job.
-            Delivery::Rejected { code } => {
+            Delivery::Rejected { code, enhanced } => {
                 tracing::warn!(job_id = %job.id, code = %code, "mail rejected for good by the receiving server");
                 let address = crate::bounces::address_of(&mail.to);
                 let transaction = tenant.database().begin_write().await?;
                 // Sổ dội cùng transaction với event: không bao giờ có cái này mà thiếu cái kia.
-                if let Some(address) = &address {
-                    self.bounces.record_hard(&transaction, tenant, address, &code).await?;
+                // Chỉ mã chắc chắn về NGƯỜI NHẬN mới vào sổ dội (lỗi của bên gửi không làm chặn oan người nhận).
+                if let Some(address) = &address
+                    && crate::bounces::counts_as_hard(enhanced.as_deref())
+                {
+                    let label = enhanced.as_deref().map_or(code.clone(), |e| format!("{code} {e}"));
+                    self.bounces.record_hard(&transaction, tenant, address, &label).await?;
                 }
                 let event = DeliveryFailed { to: mail.to, dedupe_key: mail.dedupe_key, code };
                 self.outbox.record(&transaction, tenant, Actor::system(), None, &event).await?;

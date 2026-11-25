@@ -17,8 +17,15 @@ fn bounces(limit: u32) -> Bounces {
 
 /// Ghi một lần dội cứng của `address` cho `tenant`, như job gửi làm.
 async fn bounce(service: &Bounces, tenant: &TenantContext, address: &str) -> bool {
+    bounce_at(service, tenant, address, 0).await
+}
+
+/// Như [`bounce`], vào giờ thứ `hour` kể từ một mốc cố định.
+async fn bounce_at(service: &Bounces, tenant: &TenantContext, address: &str, hour: i64) -> bool {
+    let at = autoxide_kernel::time::Timestamp::now() + jiff::SignedDuration::from_hours(hour);
     let transaction = tenant.database().begin_write().await.unwrap();
-    let suppressed = service.record_hard(&transaction, tenant, address, "550").await.unwrap();
+    let suppressed =
+        service.record_hard_at(&transaction, tenant, address, "550 5.1.1", at).await.unwrap();
     transaction.commit().await.unwrap();
     suppressed
 }
@@ -55,7 +62,7 @@ async fn doi_cung_luc_gui_duoc_ghi_va_chan_thu_sau() {
         let row = &rows[0].row;
         assert_eq!(
             (row.address.as_str(), row.hard_count, row.last_code.as_str(), row.skipped_count),
-            ("ghost@example.com", 1, "550", 1)
+            ("ghost@example.com", 1, "550 5.1.1", 1)
         );
         assert!(row.suppressed_at.is_some());
         assert_eq!(row.last_skipped_source.as_deref(), Some("auth.password_reset"));
@@ -80,9 +87,13 @@ async fn chan_theo_tung_khach_go_chan_va_xoa() {
         let (a, b) = (app.tenant("a").await.unwrap(), app.tenant("b").await.unwrap());
         let service = bounces(2);
         let address = address_of("ada@example.com").unwrap();
-        assert!(!bounce(&service, &a, &address).await, "one bounce: not yet");
-        assert!(bounce(&service, &a, &address).await, "second bounce: suppressed");
-        assert!(!bounce(&service, &a, &address).await, "already suppressed: no second event");
+        assert!(!bounce_at(&service, &a, &address, 0).await, "one bounce: not yet");
+        assert!(!bounce_at(&service, &a, &address, 1).await, "an hour later: not counted again");
+        assert!(bounce_at(&service, &a, &address, 25).await, "next day: suppressed");
+        assert!(
+            !bounce_at(&service, &a, &address, 50).await,
+            "already suppressed: no second event"
+        );
 
         // Chặn chỉ ở khách A: thư của khách B tới cùng địa chỉ vẫn đi.
         assert!(service.skip_if_suppressed(&a, &address, None).await.unwrap());
@@ -100,7 +111,7 @@ async fn chan_theo_tung_khach_go_chan_va_xoa() {
         assert_eq!(rows.len(), 1, "{listed}");
         assert_eq!(
             (&rows[0]["hard_bounces"], &rows[0]["suppressed"]),
-            (&Value::from(3), &Value::Bool(true))
+            (&Value::from(4), &Value::Bool(true))
         );
         let id = rows[0]["id"].as_str().unwrap().to_owned();
         // Khách B không thấy, không gỡ được bản ghi của A.
@@ -132,7 +143,7 @@ async fn chan_theo_tung_khach_go_chan_va_xoa() {
                 &released["data"]["strikes"],
                 &released["data"]["hard_bounces"]
             ),
-            (&Value::Bool(false), &Value::from(0), &Value::from(3))
+            (&Value::Bool(false), &Value::from(0), &Value::from(4))
         );
         assert!(!service.skip_if_suppressed(&a, &address, None).await.unwrap());
         // Xoá dấu vết (yêu cầu của chủ dữ liệu).
@@ -149,7 +160,8 @@ async fn hai_lan_doi_cung_luc_khong_tao_hai_dong() {
     TestDatabase::run(async |test| {
         let app = TestApp::builder(test).tenant("a").module(crate::module()).build().await.unwrap();
         let a = app.tenant("a").await.unwrap();
-        let service = std::sync::Arc::new(bounces(3));
+        // Ngưỡng 1: đúng một trong bốn lần dội cùng lúc được tính và làm chặn.
+        let service = std::sync::Arc::new(bounces(1));
         let address = "race@example.com";
         let tasks: Vec<_> = (0..4)
             .map(|_| {
@@ -194,4 +206,59 @@ async fn don_theo_thoi_han_giu() {
     })
     .await
     .unwrap();
+}
+
+/// Chỉ mã chắc chắn về người nhận mới vào sổ dội; lỗi của bên gửi, hộp thư đầy, thư quá cỡ không làm chặn oan.
+#[test]
+fn chi_ma_cua_nguoi_nhan_moi_tinh() {
+    for code in ["5.1.1", "5.1.2", "5.1.3", "5.1.6", "5.1.10"] {
+        assert!(crate::bounces::counts_as_hard(Some(code)), "{code}");
+    }
+    for code in [
+        Some("5.1.0"),
+        Some("5.1.7"),
+        Some("5.1.8"),
+        Some("5.2.1"),
+        Some("5.2.2"),
+        Some("5.2.3"),
+        None,
+    ] {
+        assert!(!crate::bounces::counts_as_hard(code), "{code:?}");
+    }
+}
+
+/// Qua đường gửi thật: máy chủ trả `5.1.8` (địa chỉ của BÊN GỬI bị từ chối) — event vẫn phát như cũ nhưng sổ dội
+/// không ghi gì; `5.2.2` (hộp thư đầy) cũng vậy.
+#[tokio::test]
+async fn loi_ben_gui_khong_vao_so_doi() {
+    for reply in [&b"550 5.1.8 sender address rejected\r\n"[..], &b"552 5.2.2 mailbox full\r\n"[..]]
+    {
+        TestDatabase::run(async |test| {
+            let (port, _) = fake_smtp_answering(reply).await;
+            let url = format!("smtp://127.0.0.1:{port}");
+            let (mailer, worker, database) = setup_with_database(
+                test,
+                &[
+                    ("AUTOXIDE_MAIL_SMTP_URL", url.as_str()),
+                    ("AUTOXIDE_MAIL_HARD_BOUNCE_LIMIT", "1"),
+                ],
+            )
+            .await;
+            let tenant = DatabaseRegistry::single(database.clone()).default_tenant();
+            mailer.send(&tenant, Mail::new("ada@example.com", "Hi", "Hello")).await.unwrap();
+            assert_eq!(worker.run_once().await.unwrap(), 1);
+            let owner =
+                autoxide_kernel::access::Principal::with_all_permissions(uuid::Uuid::from_u128(1))
+                    .in_tenant(tenant.id());
+            let page = autoxide_kernel::pagination::PageRequest::default();
+            let rows = bounces(1)
+                .list(&tenant, &owner, &crate::bounces::BounceFilter::default(), &page)
+                .await
+                .unwrap()
+                .data;
+            assert!(rows.is_empty(), "{:?}", String::from_utf8_lossy(reply));
+        })
+        .await
+        .unwrap();
+    }
 }

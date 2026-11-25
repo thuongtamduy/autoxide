@@ -49,6 +49,7 @@ pub(crate) mod entity {
         pub address: String,
         pub hard_count: i32,
         pub strikes: i32,
+        pub last_strike_at: Option<Timestamp>,
         pub last_code: String,
         pub first_at: Timestamp,
         pub last_at: Timestamp,
@@ -117,6 +118,23 @@ impl Event for Released {
     const NAME: &'static str = "mail.suppression_released";
 }
 
+/// Mã mở rộng (RFC 3463) chắc chắn là lỗi của ĐỊA CHỈ NGƯỜI NHẬN — chỉ chúng được tính là dội cứng
+/// (D-20261125-mail-bounces): `5.1.1` không có hộp thư, `5.1.2` tên miền đích không tồn tại / không nhận thư,
+/// `5.1.3` địa chỉ sai cú pháp, `5.1.6` hộp thư đã chuyển đi không chuyển tiếp, `5.1.10` tên miền đích khai
+/// "null MX" (không nhận thư). Không tính: `5.1.0` (chung chung), `5.1.7` / `5.1.8` (lỗi địa chỉ / hệ thống của
+/// BÊN GỬI), `5.2.1` (hộp thư bị khoá — thường tạm thời hay do chính sách), `5.2.2` (hộp thư đầy, dội mềm),
+/// `5.2.3` (thư quá cỡ), và câu trả lời không có mã mở rộng.
+pub(crate) const HARD_CODES: [&str; 5] = ["5.1.1", "5.1.2", "5.1.3", "5.1.6", "5.1.10"];
+
+/// Hai lần dội cứng của một địa chỉ chỉ cùng tính vào ngưỡng chặn khi cách nhau ít nhất chừng này: một đợt gửi
+/// hỏng trong vài phút không đủ chặn.
+pub(crate) const STRIKE_GAP_HOURS: i64 = 24;
+
+/// Lần dội với mã mở rộng `enhanced` có được ghi vào sổ dội không.
+pub(crate) fn counts_as_hard(enhanced: Option<&str>) -> bool {
+    enhanced.is_some_and(|code| HARD_CODES.contains(&code))
+}
+
 /// Địa chỉ chuẩn hoá để tra (`Ada <Ada@Example.com>` → `ada@example.com`); `None` khi không phải địa chỉ.
 pub(crate) fn address_of(raw: &str) -> Option<String> {
     let mailbox: Mailbox = raw.parse().ok()?;
@@ -183,7 +201,18 @@ impl Bounces {
         address: &str,
         code: &str,
     ) -> Result<bool, Error> {
-        let at = now();
+        self.record_hard_at(connection, tenant, address, code, now()).await
+    }
+
+    /// Như [`record_hard`](Self::record_hard), coi `at` là bây giờ (test đặt thời điểm).
+    pub(crate) async fn record_hard_at<C: ConnectionTrait>(
+        &self,
+        connection: &C,
+        tenant: &TenantContext,
+        address: &str,
+        code: &str,
+        at: Timestamp,
+    ) -> Result<bool, Error> {
         let code: String = code.chars().take(20).collect();
         let row = entity::ActiveModel {
             id: Set(Uuid::now_v7()),
@@ -191,6 +220,7 @@ impl Bounces {
             address: Set(address.to_owned()),
             hard_count: Set(0),
             strikes: Set(0),
+            last_strike_at: Set(None),
             last_code: Set(code.clone()),
             first_at: Set(at),
             last_at: Set(at),
@@ -208,9 +238,19 @@ impl Bounces {
             )
             .exec_without_returning(connection)
             .await?;
+        // Tính vào ngưỡng chỉ khi lần tính trước đã cách ít nhất `STRIKE_GAP_HOURS` (một câu `UPDATE` có điều
+        // kiện: hai job cùng lúc không cùng cộng).
+        let gap = at - SignedDuration::from_hours(STRIKE_GAP_HOURS);
+        Entity::update_many()
+            .col_expr(Column::Strikes, Expr::col(Column::Strikes).add(1))
+            .col_expr(Column::LastStrikeAt, Expr::value(Some(at)))
+            .filter(Column::Address.eq(address))
+            .filter(Column::LastStrikeAt.is_null().or(Column::LastStrikeAt.lte(gap)))
+            .scoped(tenant)
+            .exec(connection)
+            .await?;
         Entity::update_many()
             .col_expr(Column::HardCount, Expr::col(Column::HardCount).add(1))
-            .col_expr(Column::Strikes, Expr::col(Column::Strikes).add(1))
             .col_expr(Column::LastCode, Expr::value(code))
             .col_expr(Column::LastAt, Expr::value(at))
             .col_expr(Column::UpdatedAt, Expr::value(at))
@@ -254,6 +294,16 @@ impl Bounces {
         address: &str,
         dedupe_key: Option<&str>,
     ) -> Result<bool, Error> {
+        // Đọc trước trên kết nối ĐỌC: thư tới địa chỉ không bị chặn (gần như mọi thư) không chiếm kết nối ghi.
+        let suppressed = Entity::find()
+            .filter(Column::Address.eq(address))
+            .filter(Column::SuppressedAt.is_not_null())
+            .scoped(tenant)
+            .count(tenant.database().read())
+            .await?;
+        if suppressed == 0 {
+            return Ok(false);
+        }
         let at = now();
         let skipped = Entity::update_many()
             .col_expr(Column::SkippedCount, Expr::col(Column::SkippedCount).add(1))
@@ -344,6 +394,7 @@ impl Bounces {
         Entity::update_many()
             .col_expr(Column::SuppressedAt, Expr::value(Option::<Timestamp>::None))
             .col_expr(Column::Strikes, Expr::value(0))
+            .col_expr(Column::LastStrikeAt, Expr::value(Option::<Timestamp>::None))
             .col_expr(Column::ReleasedAt, Expr::value(Some(at)))
             .col_expr(Column::ReleasedBy, Expr::value(Some(principal.user_id())))
             .col_expr(Column::UpdatedAt, Expr::value(at))

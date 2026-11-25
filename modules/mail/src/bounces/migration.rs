@@ -24,6 +24,8 @@ impl MigrationTrait for Migration {
                     .col(schema::integer("hard_count"))
                     // Lần dội cứng tính tới ngưỡng chặn, đặt lại về 0 khi gỡ chặn.
                     .col(schema::integer("strikes"))
+                    // Lần cuối được tính vào ngưỡng: hai lần tính cách nhau ít nhất 24 giờ.
+                    .col(schema::timestamp_with_time_zone_null("last_strike_at"))
                     .col(schema::string_len("last_code", 20))
                     .col(schema::timestamp_with_time_zone("first_at"))
                     .col(schema::timestamp_with_time_zone("last_at"))
