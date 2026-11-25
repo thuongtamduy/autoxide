@@ -237,6 +237,33 @@ thật (P7).
         địa chỉ hợp lệ như thanh toán (P-5) — phát hiện khi sửa P-5, để cho lượt rà soát luồng xác minh danh tính
   - [ ] Test chắc chắn đi qua nhánh "trùng unique index" khi xác minh tên miền (`check_on` → `lost_race`): hiện chỉ
         test đồng thời đi qua nhánh đó khi hai lượt tình cờ xen kẽ
+  - Phát hiện của pentest 2026-11 (`docs/security/pentest-2026-11/`, D-20261125-pentest-scripts; kịch bản tái hiện ở
+    `scripts/` của thư mục đó, chuyển thành test Rust trên cả hai database khi sửa):
+  - [ ] PT-1 (trung bình), PT-2, PT-3 (thấp): `auth` (SCIM) — đã báo riêng cho phiên điều phối, đang sửa; chi tiết ghi
+        vào báo cáo khi bản sửa đã merge
+  - [ ] PT-4 (trung bình): giới hạn mã SMS theo địa chỉ khách (`compliance` sign-in / xác minh số, `bookings`) khoá theo
+        địa chỉ đầy đủ; sau reverse proxy, xoay IPv6 trong một /64 gửi không giới hạn — khoá theo /64 như `auth/phone`
+        (`ip_hash::prefix`)
+  - [ ] PT-5 (thấp): `POST /api/v1/orders/pos/sales` cộng `amount` / tiền thối bằng `sum()` không kiểm tràn → panic, 500
+  - [ ] PT-6 (thấp): tiền tệ của từng payment POS bị bỏ qua (gửi JPY được ghi như VND) — từ chối tiền tệ khác của ca
+  - [ ] PT-7 (thấp): 10 mã sai trên các challenge của một số chặn số đó lấy mã đăng nhập 24 giờ; người lạ khoá được số
+        của người khác với giá 2 SMS — đếm sai theo challenge / theo địa chỉ gửi, hay chặn ngắn hơn
+  - [ ] PT-8 (thấp): tạo bản ghi nhận `org_id` không phải đơn vị của khách (`catalog`, `menus`, `orders/pos/shifts`,
+        cài đặt theo đơn vị…) khi người gọi có quyền toàn khách; kiểm đơn vị tồn tại trong cây của khách
+  - [ ] PT-9 (thấp): `PUT /api/v1/auth/users/{id}/roles` (và tool `auth.set_user_roles`) không qua kiểm "chỉ cấp cái mình
+        có" mà `PUT …/memberships` có — thống nhất hai đường (permission đã ghi là tương đương admin)
+  - [ ] PT-15 (trung bình): khi bật tìm công khai (`AUTOXIDE_CONTENT_PUBLIC_SEMANTIC_SEARCH`), tìm theo chữ là
+        `LIKE '%q%'` quét mọi bài đã đăng (100 000 bài: 0,5–1,2 s mỗi request; 16 request không đăng nhập đẩy p50 của
+        mọi request khác từ 4 ms lên ~700 ms) — index tìm chữ chạy trên cả hai database, hay giới hạn riêng cho tìm công khai
+  - [ ] PT-16 (thấp): tạo bài kiểm slug bằng `slug = … OR slug LIKE '…-%'`, PostgreSQL (collation khác `C`) quét cả bảng
+        mỗi lần tạo (9–22 lượt/giây); hai bản nháp cùng tiêu đề tạo cùng lúc có thể nhận 409 — dùng khoảng
+        `slug >= x AND slug < x'` hay thử lại hậu tố khi trùng unique index
+  - [ ] PT-17 (thấp): trên PostgreSQL, sau `SIGTERM` khi có tải, tiến trình còn sống 30–132 s sau khi ghi `stopped`
+        (SQLite và không tải: dưới 1 s) — tìm nguyên nhân (pool, task nền) và thêm test thời gian tắt
+  - [ ] PT-10 (thông tin): endpoint của push subscription nhận địa chỉ nội bộ; hợp đồng `WebPushSender` phải yêu cầu bộ
+        gửi dùng bộ lọc địa chỉ công khai trước khi có bộ gửi thật
+  - [ ] PT-13 (thông tin): `x-permissions` của vài endpoint thiếu permission service cũng nhận (banners nhận
+        `content.read`) — sinh từ cùng nguồn với kiểm tra
 
 ## Giai đoạn B — Lớp cho giao diện và phân quyền
 
