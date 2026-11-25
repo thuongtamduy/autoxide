@@ -217,6 +217,36 @@ cài đặt không đồng ý giá), `apps.trial_reminders` (hằng ngày, trư�
 `doi_gia_khong_ap_ngay_cho_khach_dang_dung`, `doi_gia_bao_truoc_thieu_ngay_bi_tu_choi`,
 `free_sang_tra_phi_can_khach_dong_y`, `nha_phat_trien_nuoc_ngoai_chi_dang_mien_phi`.
 
+### Mini app (D-20261125-miniapp-platform)
+
+Bước này là tầng "mini app" của nền: nhà phát triển bên ngoài dựng mini app trên core như trên Zalo Platform hay
+Mini App của MoMo. Phần trên tả phía server (OAuth, cài, đồng ý, webhook, bán ứng dụng). Ba phần dưới đây làm nó
+thành nền cho mini app có giao diện. Đây mới là yêu cầu, chưa phải thiết kế chi tiết: agent mở bước này viết thiết
+kế vào đây trước khi làm, và ghi quyết định cho những lựa chọn có cách khác cũng hợp lý.
+
+- **Bản mô tả mini app máy đọc được:** một tài liệu JSON có schema công bố (tên, phiên bản, nhà phát triển, quyền
+  xin, `redirect_uris`, địa chỉ giao diện, webhook nhận, phiên bản API tối thiểu). Đăng ký ứng dụng nhận bản mô tả
+  này thay cho điền tay từng trường. Cùng một bản mô tả phải cài được trên mọi bản cài Autoxide cùng phiên bản lớn:
+  không chứa gì riêng của một bản cài. Server công bố mình hỗ trợ gì (phiên bản API, module đang bật, endpoint OAuth
+  theo RFC 8414) để mini app tự dò thay vì viết cứng.
+- **Giao diện mini app trong sản phẩm của người vận hành:** core vẫn chỉ có API (luật kiến trúc số 9), nên phần này
+  là **hợp đồng cho giao diện chủ** — giao diện của người vận hành, ở repo riêng — chứ không phải giao diện trong
+  repo này: danh sách mini app khách đã cài kèm chỗ mở; token ngắn hạn cấp cho giao diện mini app theo phiên của
+  người dùng đang đăng nhập, chỉ trong quyền khách đã đồng ý và trong quyền của chính người dùng đó; cách ly giữa
+  mini app và trang chủ (mini app không đọc được token hay dữ liệu của trang chủ). Kèm SDK TypeScript cho giao diện
+  mini app: người dùng hiện tại, gọi API, yêu cầu thanh toán, gửi thông báo — mỗi hàm là một lời gọi API có sẵn,
+  không có đường tắt nào vượt quyền.
+- **Hướng dẫn cho nhà phát triển mini app** (EN + VI) và một mini app mẫu ở repo riêng; CI cài mini app mẫu vào một
+  server thật và chạy nó trên cả hai database, như `examples/external-module/` làm cho module.
+
+Hai kiểu vận hành đều phải chạy được, không mục nào giả định một kiểu: một công ty tự vận hành nền của họ (chợ ứng
+dụng của riêng họ, tự duyệt) và một dịch vụ phục vụ nhiều khách. Core không phụ thuộc một danh bạ mini app trung
+tâm; danh bạ dùng chung giữa các bản cài, nếu có, là dịch vụ tuỳ chọn ngoài core.
+
+Pháp lý cần đối chiếu khi làm: mini app nhận dữ liệu cá nhân của người dùng thì người vận hành và nhà phát triển
+là hai bên xử lý dữ liệu (bảo vệ dữ liệu cá nhân — văn bản và điều khoản ghi trong quyết định của phần này, cần đối
+chiếu văn bản gốc / người có chuyên môn pháp lý); thanh toán trong mini app vẫn đi qua đối tác có giấy phép (D-187).
+
 ## Thứ tự làm
 
 1. Máy chủ ủy quyền OAuth 2.0 trong `auth` (PKCE, refresh token xoay vòng, thu hồi, kiểm tra, siêu dữ liệu).
@@ -224,6 +254,8 @@ cài đặt không đồng ý giá), `apps.trial_reminders` (hằng ngày, trư�
 3. Ứng dụng trả phí (D-232): giá có ngày hiệu lực, thuê bao ứng dụng và dùng thử, `AddonBilling` ở kernel + phần
    `plans` gọi nó (kỳ `addons` cho gói theo năm), hồ sơ nhà phát triển + KYC + thoả thuận, tỉ lệ chia, bút toán,
    thời gian hoàn tiền, chi trả qua `Ledger::create_payout`, đổi giá báo trước.
+4. Mini app (D-20261125-miniapp-platform): bản mô tả và tự dò; hợp đồng cho giao diện chủ, token theo phiên người
+   dùng, SDK cho giao diện mini app; hướng dẫn và mini app mẫu có CI.
 
 ## Chỗ dễ sai
 
