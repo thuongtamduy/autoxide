@@ -163,6 +163,7 @@ pub(super) async fn harness(test: &TestDatabase) -> Harness {
         ),
         consents: Some(consents),
         registry: app.registry().clone(),
+        settings: app.api::<dyn autoxide_kernel::tenancy::TenantSettings>(),
     });
     let tenant = app.default_tenant();
     Harness { app, service, ledger, tenant, tree }

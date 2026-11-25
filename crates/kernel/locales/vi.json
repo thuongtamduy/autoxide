@@ -442,5 +442,8 @@
   "field:must be an http(s), mailto: or tel: link, or a path on the site starting with /": "phải là link http(s), mailto: hay tel:, hoặc đường dẫn trong site bắt đầu bằng /",
   "field:block `{block}` is not available": "khối `{block}` không dùng được",
   "field:can only use the placeholders {allowed}; {placeholder} is not one of them": "chỉ được dùng các chỗ điền {allowed}; {placeholder} không thuộc số đó",
-  "field:must contain {placeholder} exactly once, where the one-time code goes": "phải có {placeholder} đúng một lần, ở chỗ đặt mã một lần"
+  "field:must contain {placeholder} exactly once, where the one-time code goes": "phải có {placeholder} đúng một lần, ở chỗ đặt mã một lần",
+  "field:must be an `https://` address of at most 2000 characters on one of this tenant's hosts, such as `https://shop.example/reset-password?token={token}`; no user name, spaces or placeholders in the host part": "phải là địa chỉ `https://` dài tối đa 2000 ký tự trên một host của khách này, vd `https://shop.example/dat-lai-mat-khau?token={token}`; không có tên người dùng, khoảng trắng hay placeholder trong phần host",
+  "field:must contain {placeholders}, where the server puts the value of the link": "phải có {placeholders}, chỗ máy chủ điền giá trị của link",
+  "field:the host `{host}` is not one of this tenant's verified domains nor the host of the setting `kernel.public_url`: verify the domain first (`POST /api/v1/kernel/domains`)": "host `{host}` không phải tên miền đã xác minh của khách này, cũng không phải host của cấu hình `kernel.public_url`: hãy xác minh tên miền trước (`POST /api/v1/kernel/domains`)"
 }

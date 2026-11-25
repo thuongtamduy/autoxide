@@ -96,6 +96,10 @@ impl Module for SupportModule {
         vec![("vi", include_str!("../locales/vi.json"))]
     }
 
+    fn tenant_settings(&self) -> Vec<autoxide_kernel::tenancy::TenantSetting> {
+        vec![config::GUEST_LINK]
+    }
+
     fn configure(&mut self, reader: &mut ConfigReader<'_>) -> Result<(), Invalid> {
         self.config = Some(config::read(reader)?);
         Ok(())
@@ -126,6 +130,10 @@ impl Module for SupportModule {
             ai: context.require::<dyn autoxide_kernel::ai::TextModel>().ok(),
             facts: facts::FactRegistry::default(),
             jobs: context.jobs(),
+            links: context
+                .require::<autoxide_kernel::tenancy::SiteLinks>()
+                .map(|links| (*links).clone())
+                .unwrap_or_default(),
         };
         let service = Arc::new(SupportService::new(parts, config));
         context.personal_data(service.clone())?;

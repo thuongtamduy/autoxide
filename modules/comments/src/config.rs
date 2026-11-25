@@ -232,8 +232,29 @@ pub(crate) const TENANT_USER_MODERATION: TenantSetting = TenantSetting::new(
 .checked(|raw| tenant_mode(raw).map(|_| ()));
 
 /// Mọi cấu hình theo khách của module.
+/// Trang xác minh bình luận theo từng khách (D-20261125-tenant-link-templates).
+pub(crate) const VERIFY_LINK: TenantSetting = TenantSetting::link(
+    "comments.link.verify",
+    "Page of this tenant's website that confirms a guest's comment, such as \
+     `https://shop.example/xac-nhan-binh-luan?token={token}`. Must be on this tenant's own host \
+     (verified domain or `kernel.public_url`). When unset, the server's AUTOXIDE_COMMENTS_VERIFY_URL \
+     is used.",
+    &["{token}"],
+);
+
+/// Trang ngừng nhận thư báo trả lời theo từng khách.
+pub(crate) const UNSUBSCRIBE_LINK: TenantSetting = TenantSetting::link(
+    "comments.link.unsubscribe",
+    "Page of this tenant's website that stops reply notifications, such as \
+     `https://shop.example/ngung-nhan-tra-loi?token={token}`. Must be on this tenant's own host. \
+     When unset, the server's AUTOXIDE_COMMENTS_UNSUBSCRIBE_URL is used.",
+    &["{token}"],
+);
+
 pub(crate) fn tenant_settings() -> Vec<TenantSetting> {
     vec![
+        VERIFY_LINK,
+        UNSUBSCRIBE_LINK,
         TENANT_BANNED_WORDS,
         TENANT_SUSPECT_WORDS,
         TENANT_MAX_LINKS,

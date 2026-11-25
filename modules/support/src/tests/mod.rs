@@ -126,6 +126,7 @@ pub(crate) fn service_of(app: &TestApp) -> Arc<crate::service::SupportService> {
         ai: None,
         facts: crate::facts::FactRegistry::default(),
         jobs: autoxide_kernel::job::JobQueue::new("support"),
+        links: autoxide_kernel::tenancy::SiteLinks::default(),
     };
     Arc::new(crate::service::SupportService::new(parts, Default::default()))
 }

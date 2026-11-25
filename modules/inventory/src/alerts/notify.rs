@@ -157,6 +157,7 @@ impl InventoryService {
             return Ok(());
         };
         let product = product_name(&snapshot);
+        let page = self.restock_page(tenant).await?;
         for row in waiting {
             if !open.get(&row.store_key).copied().unwrap_or(false) {
                 continue;
@@ -186,7 +187,7 @@ impl InventoryService {
                 json!({"product": product}),
                 format!("inventory.back_in_stock:{}:{count}", row.id),
             );
-            if let Some(url) = self.config.restock_confirm_url.as_deref() {
+            if let Some(url) = page.as_deref() {
                 notification = notification.link(token_link(url, tenant, &raw));
             }
             if let Some(locale) = &row.locale {

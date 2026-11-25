@@ -37,6 +37,18 @@ pub(crate) const RESTOCK_CONFIRM_URL: Setting = Setting::new(
 )
 .with_example("https://www.example.com/restock-alert?token={token}");
 
+/// Trang xác nhận báo có hàng lại theo từng khách (D-20261125-tenant-link-templates).
+pub(crate) const RESTOCK_CONFIRM_LINK: autoxide_kernel::tenancy::TenantSetting =
+    autoxide_kernel::tenancy::TenantSetting::link(
+        "inventory.link.restock_confirm",
+        "Page of this tenant's website that confirms or stops a back-in-stock alert, such as \
+         `https://shop.example/bao-co-hang?token={token}`: `{token}` is filled in, and the page \
+         sends it to `POST /api/v1/inventory/public/restock-alerts/confirm` (or `/stop`). Must be on \
+         this tenant's own host (verified domain or `kernel.public_url`). When unset, the server's \
+         AUTOXIDE_INVENTORY_RESTOCK_CONFIRM_URL is used.",
+        &["{token}"],
+    );
+
 /// Cấu hình đã đọc.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct InventoryConfig {

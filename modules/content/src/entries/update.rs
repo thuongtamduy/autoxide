@@ -173,6 +173,7 @@ impl ContentService {
         body: &Value,
         problems: &mut Vec<FieldError>,
     ) -> Result<body::BodyInfo, Error> {
+        let embed_hosts = self.embed_hosts(tenant).await?;
         let checked = if layout::is_layout(body) {
             // Trang, và mục của loại tự định nghĩa (loại khai `body = layout` thì giao diện dựng bố cục).
             if kind != "page" && kind != "custom" {
@@ -197,9 +198,9 @@ impl ContentService {
                 }
             }
             let usable = self.usable_blocks(tenant).await?;
-            layout::check(body, &self.blocks, &usable, &self.config.embed_hosts)
+            layout::check(body, &self.blocks, &usable, &embed_hosts)
         } else {
-            body::check(body, self.config.max_body_bytes, &self.config.embed_hosts)
+            body::check(body, self.config.max_body_bytes, &embed_hosts)
         };
         Ok(checked.unwrap_or_else(|errors| {
             problems.extend(errors);

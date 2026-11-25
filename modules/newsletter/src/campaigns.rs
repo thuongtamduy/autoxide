@@ -547,7 +547,7 @@ impl NewsletterService {
         }
         if matches!(action, Action::Send | Action::Schedule(_) | Action::Resume) {
             // Thiếu cấu hình thì báo NGAY, không để job hỏng lặng lẽ.
-            self.check_ready(&before.row)?;
+            self.check_ready(tenant, &before.row).await?;
             self.find_list(tenant, before.row.list_id).await?;
         }
         let mut next = before.row.clone();
@@ -688,16 +688,6 @@ impl NewsletterService {
             self.campaign_mail(tenant, &campaign.row, &list, (&email, None), &token, None).await?;
         self.mailer.send(tenant, mail).await?;
         tracing::info!(campaign_id = %id, "newsletter test mail queued");
-        Ok(())
-    }
-
-    /// Kiểm được gửi chưa: URL công khai, trang lựa chọn, địa chỉ người gửi (thư quảng cáo).
-    pub(crate) fn check_ready(&self, row: &campaign::Model) -> Result<(), Error> {
-        self.public_url.base()?;
-        self.preferences_url()?;
-        if row.advertising && self.config.postal_address.is_none() {
-            return Err(postal_address_missing());
-        }
         Ok(())
     }
 
@@ -867,7 +857,8 @@ fn not_editable(status: CampaignStatus) -> Error {
 pub(crate) fn postal_address_missing() -> Error {
     Error::unavailable(
         "newsletter.postal_address_missing",
-        "Advertising campaigns must show the sender's postal address: set \
-         AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS and restart.",
+        "Advertising campaigns must show the sender's postal address: set the tenant setting \
+         `newsletter.postal_address`, fill in the owner's address in the tenant's legal profile, \
+         or set the server's AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS.",
     )
 }

@@ -388,9 +388,10 @@ impl Invitations {
         let token = link_token(tenant, &raw);
         let days = self.days.to_string();
         let tenant_name = tenant.name().to_owned();
-        let mail = match &self.url {
+        let page = self.links.link(tenant, &crate::links::INVITATION, self.url.as_deref()).await?;
+        let mail = match &page {
             Some(url) => {
-                let link = self.links.rewrite(tenant, url).await?.replace("{token}", &token);
+                let link = url.replace("{token}", &token);
                 let params = [
                     ("tenant", tenant_name.as_str()),
                     ("inviter", &inviter),

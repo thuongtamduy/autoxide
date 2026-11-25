@@ -226,6 +226,44 @@ pub(crate) const TENANT_DEFAULT_LOCALE: TenantSetting = TenantSetting::new(
 )
 .checked(|raw| tenant_default_locale(raw).map(|_| ()));
 
+/// Host được nhúng theo khách (D-20261125-tenant-link-templates, mục 6 của đợt cấu hình theo khách).
+pub(crate) const TENANT_EMBED_HOSTS: TenantSetting = TenantSetting::new(
+    "content.embed_hosts",
+    "Hosts whose addresses this tenant's content may embed (`embed` blocks), comma-separated \
+     domain names such as `youtube.com,vimeo.com,maps.google.com` (at most 50; a host also allows \
+     its subdomains), instead of the server's AUTOXIDE_CONTENT_EMBED_HOSTS. Entries already saved \
+     keep their embeds.",
+)
+.checked(|raw| tenant_embed_hosts(raw).map(|_| ()));
+
+/// Số host nhúng tối đa của một khách.
+const EMBED_HOSTS_MAX: usize = 50;
+
+/// Danh sách host nhúng (`content.embed_hosts`): tên miền có ít nhất hai nhãn (không nhận `com`, tức mọi
+/// trang `.com`), không IP, không trùng.
+pub(crate) fn tenant_embed_hosts(raw: &str) -> Result<Vec<String>, FieldError> {
+    let mut hosts = Vec::new();
+    let mut bad = Vec::new();
+    for item in raw.split(',').map(str::trim).filter(|item| !item.is_empty()) {
+        match autoxide_kernel::tenancy::normalize_domain(item).filter(|host| host.contains('.')) {
+            Some(host) if !hosts.contains(&host) => hosts.push(host),
+            Some(_) => {}
+            None => bad.push(item.to_owned()),
+        }
+    }
+    if !bad.is_empty() || hosts.is_empty() || hosts.len() > EMBED_HOSTS_MAX {
+        return Err(FieldError::new(
+            "value",
+            "content.embed_hosts_invalid",
+            "must be 1 to {max} domain names separated by commas, such as `youtube.com,vimeo.com`; \
+             not valid: {items}",
+        )
+        .with_param("max", EMBED_HOSTS_MAX)
+        .with_param("items", bad.join(", ")));
+    }
+    Ok(hosts)
+}
+
 /// Danh sách ngôn ngữ (`content.locales`): ít nhất một mã, bỏ trùng, giữ thứ tự.
 pub(crate) fn tenant_locales(raw: &str) -> Result<Vec<String>, FieldError> {
     let mut locales = Vec::new();

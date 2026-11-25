@@ -52,6 +52,8 @@ pub(crate) struct Parts {
     pub facts: crate::facts::FactRegistry,
     /// Hàng đợi job (trả lời tự động).
     pub jobs: autoxide_kernel::job::JobQueue,
+    /// Link trong thư theo khách (`kernel.public_url`, `support.link.guest_ticket`).
+    pub links: autoxide_kernel::tenancy::SiteLinks,
 }
 
 // Service không giữ database: database là của khách, đi theo `TenantContext` của từng lời gọi.

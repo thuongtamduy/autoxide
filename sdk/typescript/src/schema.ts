@@ -10294,7 +10294,10 @@ export type Data_NewsletterErased = {
 
 /** Envelope of a single result. */
 export type Data_NewsletterSettingsResponse = {
-  /** The newsletter settings in use (set by the server's operator; no secrets). */
+  /**
+   * The newsletter settings in use for this tenant (the tenant's own settings, otherwise the
+   * server's; no secrets).
+   */
   data: {
     /**
      * Put at the start of the subject of advertising campaigns
@@ -10307,25 +10310,27 @@ export type Data_NewsletterSettingsResponse = {
      */
     advertising_max_per_day: number;
     /**
-     * The website's confirmation page is set (`AUTOXIDE_NEWSLETTER_CONFIRM_URL`); needed by
-     * lists with double opt-in.
+     * The website's confirmation page is set (tenant setting `newsletter.link.confirm` or
+     * `AUTOXIDE_NEWSLETTER_CONFIRM_URL`); needed by lists with double opt-in.
      */
     confirm_url_set: boolean;
     /**
-     * Settings still to set before campaigns can be sent: names of environment variables,
-     * empty when everything needed is set (`AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS` is listed:
-     * only advertising campaigns need it).
+     * Settings still to set before campaigns can be sent: names of the server's environment
+     * variables, empty when everything needed is set (`AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS` is
+     * listed: only advertising campaigns need it). Each can instead be set for this tenant
+     * alone with the tenant setting named in its field above.
      */
     missing: string[];
     /**
-     * The sender's postal address shown in every mail footer
-     * (`AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS`); `null`: not set — advertising campaigns cannot
-     * be sent until it is.
+     * The sender's postal address shown in every mail footer: the tenant setting
+     * `newsletter.postal_address`, otherwise the owner's name and address from the tenant's
+     * legal profile, otherwise `AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS`; `null`: none — advertising
+     * campaigns cannot be sent until one is set.
      */
     postal_address?: string | null;
     /**
-     * The website's preferences page is set (`AUTOXIDE_NEWSLETTER_PREFERENCES_URL`); needed to
-     * send any campaign (the footer link).
+     * The website's preferences page is set (tenant setting `newsletter.link.preferences` or
+     * `AUTOXIDE_NEWSLETTER_PREFERENCES_URL`); needed to send any campaign (the footer link).
      */
     preferences_url_set: boolean;
     /**
@@ -20650,7 +20655,10 @@ export type NewsletterScheduleRequest = {
   at: string;
 };
 
-/** The newsletter settings in use (set by the server's operator; no secrets). */
+/**
+ * The newsletter settings in use for this tenant (the tenant's own settings, otherwise the
+ * server's; no secrets).
+ */
 export type NewsletterSettingsResponse = {
   /**
    * Put at the start of the subject of advertising campaigns
@@ -20663,25 +20671,27 @@ export type NewsletterSettingsResponse = {
    */
   advertising_max_per_day: number;
   /**
-   * The website's confirmation page is set (`AUTOXIDE_NEWSLETTER_CONFIRM_URL`); needed by
-   * lists with double opt-in.
+   * The website's confirmation page is set (tenant setting `newsletter.link.confirm` or
+   * `AUTOXIDE_NEWSLETTER_CONFIRM_URL`); needed by lists with double opt-in.
    */
   confirm_url_set: boolean;
   /**
-   * Settings still to set before campaigns can be sent: names of environment variables,
-   * empty when everything needed is set (`AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS` is listed:
-   * only advertising campaigns need it).
+   * Settings still to set before campaigns can be sent: names of the server's environment
+   * variables, empty when everything needed is set (`AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS` is
+   * listed: only advertising campaigns need it). Each can instead be set for this tenant
+   * alone with the tenant setting named in its field above.
    */
   missing: string[];
   /**
-   * The sender's postal address shown in every mail footer
-   * (`AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS`); `null`: not set — advertising campaigns cannot
-   * be sent until it is.
+   * The sender's postal address shown in every mail footer: the tenant setting
+   * `newsletter.postal_address`, otherwise the owner's name and address from the tenant's
+   * legal profile, otherwise `AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS`; `null`: none — advertising
+   * campaigns cannot be sent until one is set.
    */
   postal_address?: string | null;
   /**
-   * The website's preferences page is set (`AUTOXIDE_NEWSLETTER_PREFERENCES_URL`); needed to
-   * send any campaign (the footer link).
+   * The website's preferences page is set (tenant setting `newsletter.link.preferences` or
+   * `AUTOXIDE_NEWSLETTER_PREFERENCES_URL`); needed to send any campaign (the footer link).
    */
   preferences_url_set: boolean;
   /**

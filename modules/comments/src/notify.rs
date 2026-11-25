@@ -118,9 +118,9 @@ impl CommentsService {
         Ok(Some(format!("{site}{path}")))
     }
 
-    /// Link theo tên miền của khách (`kernel.public_url`).
-    fn site_links(&self) -> autoxide_kernel::tenancy::SiteLinks {
-        autoxide_kernel::tenancy::SiteLinks::new(self.settings.clone())
+    /// Link theo khách (`kernel.public_url`, `comments.link.*`).
+    fn site_links(&self) -> &autoxide_kernel::tenancy::SiteLinks {
+        &self.links
     }
 
     /// Xếp mail xác minh `email` (token `issued`) cho bình luận `row`.
@@ -132,12 +132,15 @@ impl CommentsService {
         issued: &Issued,
         resource: Option<&Resource>,
     ) -> Result<(), Error> {
-        let Some(url) = self.config.verify_url.as_deref() else {
+        let page = self
+            .site_links()
+            .link(tenant, &crate::config::VERIFY_LINK, self.config.verify_url.as_deref())
+            .await?;
+        let Some(url) = page else {
             return Ok(());
         };
         let language = language(row.locale.as_deref());
         // Link mang khách của token (`autoxide_kernel::tenancy::link_token`).
-        let url = self.site_links().rewrite(tenant, url).await?;
         let link = url.replace("{token}", &link_token(tenant, &issued.token));
         let target = target_name(resource, language);
         let hours = VERIFY_HOURS.to_string();
@@ -251,7 +254,11 @@ impl CommentsService {
         tenant: &TenantContext,
         id: Uuid,
     ) -> Result<usize, Error> {
-        let Some(unsubscribe_url) = self.config.unsubscribe_url.as_deref() else {
+        let page = self
+            .site_links()
+            .link(tenant, &crate::config::UNSUBSCRIBE_LINK, self.config.unsubscribe_url.as_deref())
+            .await?;
+        let Some(unsubscribe_url) = page else {
             return Ok(0);
         };
         let reply = match self.find(tenant, id).await {
@@ -301,11 +308,8 @@ impl CommentsService {
                     SignedDuration::from_hours(24 * UNSUBSCRIBE_DAYS),
                 )
                 .await?;
-            let unsubscribe = self
-                .site_links()
-                .rewrite(tenant, unsubscribe_url)
-                .await?
-                .replace("{token}", &link_token(tenant, &issued.token));
+            let unsubscribe =
+                unsubscribe_url.replace("{token}", &link_token(tenant, &issued.token));
             let params = [
                 ("target", target.as_str()),
                 ("page", page.as_str()),

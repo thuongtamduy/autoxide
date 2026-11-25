@@ -453,6 +453,10 @@ tenant only:
 | `forms.retention_days` | `AUTOXIDE_FORMS_RETENTION_DAYS` ([forms](FORMS.md#settings)) |
 | `content.locales`, `content.default_locale` | `AUTOXIDE_CONTENT_LOCALES`, `AUTOXIDE_CONTENT_DEFAULT_LOCALE` ([content](CONTENT.md#languages)) |
 | `media.alt_locales` | `AUTOXIDE_MEDIA_ALT_LOCALES` ([media](MEDIA.md)) |
+| `content.embed_hosts` | `AUTOXIDE_CONTENT_EMBED_HOSTS` |
+| `analytics.allowed_hosts` | `AUTOXIDE_ANALYTICS_ALLOWED_HOSTS` (the tenant's verified domains are always accepted) |
+| `newsletter.postal_address` | `AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS`; when unset, the owner's name and address in the tenant's legal profile (module `compliance`) come first |
+| `<module>.link.<page>` (group `link`, see below) | the `AUTOXIDE_…_URL` page addresses in mail: `auth.link.password_reset`, `auth.link.email_verification`, `auth.link.invitation`, `auth.link.login`, `auth.link.email_change_report`, `support.link.guest_ticket`, `compliance.link.case_tracking`, `inventory.link.restock_confirm`, `notifications.link.unsubscribe`, `comments.link.verify`, `comments.link.unsubscribe`, `newsletter.link.confirm`, `newsletter.link.preferences` |
 
 `GET /api/v1/kernel/settings` lists them with what the current tenant set. A tenant's
 administrator (permission `kernel.settings.manage`) sets one with
@@ -467,6 +471,27 @@ are in the group `connection` and are named `<module>.connection.<kind>.<field>`
 `GET /api/v1/kernel/settings?group=connection` lists only those, which is what a "partner
 connections" screen needs. Every setting in the list carries its `group` (`null` when it has
 none).
+
+### Links in mail, per tenant
+
+Mail sent for a tenant links to pages of that tenant's website or app. Two layers, the second wins:
+
+1. `kernel.public_url` (e.g. `https://shop.example`) replaces the scheme and host of every page
+   address the server has (`AUTOXIDE_AUTH_PASSWORD_RESET_URL`…), keeping its path.
+2. A link setting (group `link`, `GET /api/v1/kernel/settings?group=link`) gives the whole page
+   address of one link, path included, for a site whose pages are not where the server's are —
+   e.g. `auth.link.password_reset` = `https://shop.example/dat-lai-mat-khau?token={token}`. A
+   tenant can also turn on a mail link the server has no address for.
+
+A link setting is accepted only when it is an `https://` address that contains every placeholder
+its description names (`{token}`, `{id}`…), with no user name and no placeholder in the host part,
+on a host the tenant controls: one of its verified domains (see "Custom domains of tenants"), the
+host of its `kernel.public_url`, the host of `AUTOXIDE_HTTP_PUBLIC_URL`, or the host of the
+server's own address for that link. Otherwise `PUT` answers `422` with code
+`kernel.link_host_not_allowed`, `kernel.link_placeholder_missing` or `kernel.link_template_invalid`.
+The host is checked again every time a mail is sent: when the domain is revoked later, mail falls
+back to the server's address (with a warning in the log) rather than sending a token to a host the
+tenant no longer controls. A tenant can never use another tenant's domain.
 
 The connection settings of mail and AI were renamed to this pattern. Their former names
 (`mail.smtp_url`, `mail.from`, `ai.api_key`, `ai.model`) still work: a value a tenant set under a

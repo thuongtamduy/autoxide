@@ -151,6 +151,7 @@ async fn bot_bi_loai() {
             secret: h.service.secret.clone(),
             consents: None,
             registry: h.service.registry.clone(),
+            settings: None,
         };
         let client = super::browser("192.0.2.9", SAFARI);
         let site = h.site(None).await;
@@ -183,6 +184,7 @@ async fn ten_mien_da_xac_minh_va_cau_hinh_duoc_nhan() {
             secret: h.service.secret.clone(),
             consents: None,
             registry: h.service.registry.clone(),
+            settings: None,
         };
         let site = h.site(None).await;
         let visitor = crate::ingest::Visitor { client: &other_page, host: None, user_id: None };
@@ -227,6 +229,40 @@ async fn su_kien_phia_may_chu_tu_event_cua_module() {
         assert_eq!(rows[0].day, "2026-11-10");
         // Người mua chưa đồng ý theo dõi theo người: không gắn.
         assert_eq!(rows[0].user_id, None);
+    })
+    .await
+    .unwrap();
+}
+
+/// Host website theo khách (`analytics.allowed_hosts`): danh sách của khách thay biến chung cho riêng
+/// khách đó; khách khác đặt không làm khách này nhận thêm trang nào.
+#[tokio::test]
+async fn host_rieng_cua_khach_khong_lan_sang_khach_khac() {
+    TestDatabase::run(async |test| {
+        let h = harness(test).await;
+        let settings = std::sync::Arc::new(autoxide_testkit::FakeTenantSettings::default());
+        let other = autoxide_kernel::tenancy::TenantId::from_uuid(uuid::Uuid::now_v7());
+        settings.set(other, "analytics.allowed_hosts", "www.partner.example");
+        let service = crate::service::AnalyticsService {
+            config: crate::config::AnalyticsConfig::default(),
+            catalog: h.service.catalog.clone(),
+            secret: h.service.secret.clone(),
+            consents: None,
+            registry: h.service.registry.clone(),
+            settings: Some(settings.clone()),
+        };
+        let mut partner = browser("192.0.2.1", CHROME);
+        partner.origin = Some("https://www.partner.example".to_owned());
+        let site = h.site(None).await;
+        let send = async || {
+            let visitor = crate::ingest::Visitor { client: &partner, host: None, user_id: None };
+            service.ingest(&h.tenant, &site, visitor, vec![page("/")], at(10, 9)).await.unwrap()
+        };
+        // Khách khác khai host này: khách của test vẫn bỏ.
+        assert_eq!(send().await.accepted, 0);
+        settings.set(h.tenant.id(), "analytics.allowed_hosts", "shop.example, www.partner.example");
+        assert_eq!(send().await.accepted, 1);
+        assert!(crate::config::tenant_allowed_hosts("shop.example, 10.0.0.1").is_err());
     })
     .await
     .unwrap();

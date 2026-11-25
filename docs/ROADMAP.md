@@ -1153,6 +1153,32 @@ Thứ tự ưu tiên chủ dự án đồng ý; mỗi mục khi làm thì ghi qu
 - [ ] Nợ nhỏ: tách các file `.rs` trên 800 dòng (đang làm); ~~`chrono` không còn bảo trì~~ — đã thay bằng `jiff`
       (D-20261121-time-library)
 
+## Cấu hình theo từng khách (chủ dự án giao ngày 25/11/2026)
+
+SaaS nhiều khách: thứ chỉ đặt được bằng biến môi trường chung (sửa `.env`, khởi động lại) phải đặt được theo từng khách;
+biến chung vẫn là mặc định. Mỗi PR một cụm.
+
+- [x] Link trong thư theo khách: mỗi link là một tenant setting nhóm `link` (`<module>.link.<trang>`, mẫu URL đầy đủ),
+      host ràng vào tên miền đã xác minh / `kernel.public_url`, kiểm lúc đặt và lúc dùng; áp cho auth (5 link),
+      support, compliance, inventory, notifications, comments, newsletter; luật gate `site-links`
+      (D-20261125-tenant-link-templates)
+- [x] Địa chỉ người gửi thư quảng cáo theo khách: cấu hình khách → hồ sơ pháp lý (`compliance`) → biến chung
+      (D-20261125-tenant-postal-address)
+- [x] `content.embed_hosts`, `analytics.allowed_hosts` theo khách (analytics vốn đã nhận tên miền đã xác minh)
+- [x] Link bài mới của newsletter mở trên tên miền của khách (`kernel.public_url`), như comments
+- [ ] P16: ràng `kernel.public_url` vào tên miền đã xác minh ở chế độ nhiều khách, hoặc cảnh báo — hiện nhận host bất
+      kỳ (giữ để không phá khách đang đặt), nên link mẫu chỉ khớp nhờ `kernel.public_url` tự đặt cũng chịu rủi ro đó
+      (D-20261125-tenant-link-templates); cần quyết định cho khách đã đặt giá trị không xác minh được
+- [ ] Email bị dội: ghi nhận mọi thư (không chỉ newsletter), tra theo địa chỉ, chặn sau nhiều lần dội cứng, gỡ chặn,
+      số liệu theo khách
+- [ ] Hạn mức token AI mỗi ngày theo gói (`Entitlements`)
+- [ ] Giới hạn request mỗi phút theo khách (tầng thứ ba của rate limit, gói nâng được)
+- [ ] Ngôn ngữ của `catalog` và `menus` theo khách (như `content`); múi giờ / tiền tệ đã có theo khách qua
+      `organizations.timezone` / `organizations.currency` của nút gốc — chỉ thống nhất mặc định khi thiếu
+- [ ] Tự đăng ký tài khoản theo khách
+- [ ] Passkey theo khách: RP ID là tên miền đã xác minh của khách
+- [ ] Chính sách đăng nhập theo khách: thời hạn phiên, độ dài mật khẩu tối thiểu, TOTP issuer (chỉ siết hơn mặc định)
+
 ## Chờ chủ dự án
 
 ## 50. Công khai repo (chờ chủ dự án, D-175, D-197, D-199)

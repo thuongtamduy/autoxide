@@ -170,9 +170,10 @@ impl LoginLinks {
         // Token trong mail mang khách: link mở trên tên miền chính vẫn tìm được khách.
         let token = link_token(tenant, &raw);
         let minutes = self.minutes.to_string();
-        let mail = match &self.url {
+        let page = self.links.link(tenant, &crate::links::LOGIN_LINK, self.url.as_deref()).await?;
+        let mail = match &page {
             Some(url) => {
-                let link = self.links.rewrite(tenant, url).await?.replace("{token}", &token);
+                let link = url.replace("{token}", &token);
                 let params =
                     [("email", user.email.as_str()), ("minutes", &minutes), ("link", &link)];
                 LINK_MAIL.mail(&user.email, &self.translations, language, &params)

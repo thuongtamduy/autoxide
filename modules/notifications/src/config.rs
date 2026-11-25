@@ -26,6 +26,18 @@ pub(crate) const UNSUBSCRIBE_URL: Setting = Setting::new(
 )
 .with_example("https://www.example.com/unsubscribe?token={token}");
 
+/// Trang huỷ nhận quảng cáo theo từng khách (D-20261125-tenant-link-templates).
+pub(crate) const UNSUBSCRIBE_LINK: autoxide_kernel::tenancy::TenantSetting =
+    autoxide_kernel::tenancy::TenantSetting::link(
+        "notifications.link.unsubscribe",
+        "Page of this tenant's website that withdraws a consent to advertising, such as \
+         `https://shop.example/huy-nhan-tin?token={token}`: `{token}` is filled in, and the page \
+         sends it to `POST /api/v1/notifications/public/unsubscribe`. Must be on this tenant's own \
+         host (verified domain or `kernel.public_url`). When unset, the server's \
+         AUTOXIDE_NOTIFICATIONS_UNSUBSCRIBE_URL is used; with neither, advertising emails are not sent.",
+        &["{token}"],
+    );
+
 pub(crate) const PER_RECIPIENT_PER_HOUR: Setting = Setting::new(
     "AUTOXIDE_NOTIFICATIONS_PER_RECIPIENT_PER_HOUR",
     "Transactional and advertising notifications one recipient may get per hour (1 to 10000); more \

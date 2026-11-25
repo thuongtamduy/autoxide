@@ -38,6 +38,17 @@ pub(crate) const GUEST_URL: Setting = Setting::new(
 )
 .with_example("https://www.example.com/support/tickets/{id}?token={token}");
 
+/// Trang phiếu của khách vãng lai, theo từng khách (D-20261125-tenant-link-templates).
+pub(crate) const GUEST_LINK: autoxide_kernel::tenancy::TenantSetting =
+    autoxide_kernel::tenancy::TenantSetting::link(
+        "support.link.guest_ticket",
+        "Page of this tenant's website that shows one ticket to a guest, such as \
+         `https://shop.example/ho-tro/{id}?token={token}`: `{id}` and `{token}` are filled in. Sent \
+         with the verification code. Must be on this tenant's own host (verified domain or \
+         `kernel.public_url`). When unset, the server's AUTOXIDE_SUPPORT_GUEST_URL is used.",
+        &["{id}", "{token}"],
+    );
+
 /// Cấu hình đã đọc.
 #[derive(Debug, Clone)]
 pub(crate) struct SupportConfig {
