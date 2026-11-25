@@ -38,6 +38,53 @@ use crate::service::validate::RawBody;
 
 pub(crate) use fixtures::*;
 
+/// Bản giả của `OrgDirectory` cho test: chỉ `is_within` có thật — đọc cây tổ chức của kernel (`OrgTree::is_within`,
+/// cùng hàm module `organizations` dùng); các hàm khác trả rỗng.
+pub(crate) struct TreeOrgs;
+
+#[async_trait::async_trait]
+impl autoxide_organizations::api::OrgDirectory for TreeOrgs {
+    async fn unit(
+        &self,
+        _: &TenantContext,
+        _: autoxide_kernel::tenancy::OrgId,
+    ) -> Result<Option<autoxide_organizations::api::Unit>, Error> {
+        Ok(None)
+    }
+    async fn root(&self, _: &TenantContext) -> Result<autoxide_organizations::api::Unit, Error> {
+        Err(Error::internal("not used"))
+    }
+    async fn ancestors(
+        &self,
+        _: &TenantContext,
+        _: autoxide_kernel::tenancy::OrgId,
+    ) -> Result<Vec<autoxide_organizations::api::Unit>, Error> {
+        Ok(Vec::new())
+    }
+    async fn is_within(
+        &self,
+        tenant: &TenantContext,
+        id: autoxide_kernel::tenancy::OrgId,
+        root: autoxide_kernel::tenancy::OrgId,
+    ) -> Result<bool, Error> {
+        autoxide_kernel::tenancy::OrgTree::is_within(
+            tenant.database().read(),
+            tenant.id(),
+            id,
+            &[root],
+        )
+        .await
+    }
+    async fn setting(
+        &self,
+        _: &TenantContext,
+        _: autoxide_kernel::tenancy::OrgId,
+        _: &str,
+    ) -> Result<Option<autoxide_organizations::api::EffectiveSetting>, Error> {
+        Ok(None)
+    }
+}
+
 /// Người dùng `id` với các permission `permissions` cho cả khách.
 pub(crate) fn person(id: u128, permissions: &[&str]) -> Principal {
     let root = root_of(autoxide_kernel::tenancy::DEFAULT_TENANT);
@@ -65,6 +112,15 @@ impl Harness {
     }
 
     pub(crate) async fn with(test: &TestDatabase, settings: &[(&str, &str)]) -> Harness {
+        Harness::build(test, settings, false).await
+    }
+
+    /// Như [`Harness::new`] kèm bản giả `TreeOrgs` của `OrgDirectory` (đọc cây tổ chức của kernel).
+    pub(crate) async fn with_orgs(test: &TestDatabase) -> Harness {
+        Harness::build(test, &[], true).await
+    }
+
+    async fn build(test: &TestDatabase, settings: &[(&str, &str)], orgs: bool) -> Harness {
         let shop = Shop::default();
         let people = People::default();
         let owner = person(1, &OWNER);
@@ -73,8 +129,12 @@ impl Harness {
         let mut builder = TestApp::builder(test)
             .provide::<dyn Authenticator>(Arc::new(people.clone()))
             .provide::<dyn IdempotencyStore>(Arc::new(MemoryStore::default()))
-            .module(shop.clone())
-            .module(module);
+            .module(shop.clone());
+        if orgs {
+            builder = builder
+                .provide::<dyn autoxide_organizations::api::OrgDirectory>(Arc::new(TreeOrgs));
+        }
+        let mut builder = builder.module(module);
         for (name, value) in settings {
             builder = builder.setting(name, value);
         }

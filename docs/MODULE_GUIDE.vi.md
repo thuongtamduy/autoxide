@@ -385,6 +385,10 @@ Khai event trong `src/events.rs` và trả từ `Module::events`. Dữ liệu d�
 `{"before": …, "after": …}` (bỏ phần không có) và không bao giờ chứa secret. Module
 `audit` ghi mọi event; module khác đăng ký nhận qua `Module::subscriptions` và phải chịu
 được việc nhận lại cùng một event.
+Event về dữ liệu của một đơn vị trong cây tổ chức mang đơn vị đó ở `org_id` — ngay đầu payload
+hoặc trong `after` / `before` (ảnh chụp dòng có cột `org_id` là đủ). Bên nhận đọc bằng
+`Delivered::org_id()`: luật tự động hoá của một nhánh chỉ chạy với event của nhánh đó, nên event
+không có `org_id` chỉ tới luật áp cho cả khách.
 
 Event mà màn hình của client cần thấy ngay thì đẩy qua stream thời gian thực
 (`GET /api/v1/kernel/events/stream`): khai bằng `EventInfo::new(…).streamable(NOTES_READ)`,

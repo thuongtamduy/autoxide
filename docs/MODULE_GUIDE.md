@@ -393,6 +393,10 @@ Declare events in `src/events.rs` and return them from `Module::events`. The pay
 `{"before": …, "after": …}` (omit what does not apply) and never contains secrets. The
 `audit` module records every event; other modules subscribe through
 `Module::subscriptions` and must accept receiving the same event twice.
+An event about data of one organization unit carries that unit as `org_id` - at the top of the
+payload or inside `after` / `before` (a row snapshot with its `org_id` column is enough).
+Receivers read it with `Delivered::org_id()`: an automation rule of a branch only starts for
+events of that branch, so an event without `org_id` reaches only tenant-wide rules.
 
 An event a client screen should see at once can be pushed over the real-time stream
 (`GET /api/v1/kernel/events/stream`): declare it with

@@ -255,7 +255,7 @@ async fn payment_actions(
         (status = 401, description = "Missing, wrong or expired token; code `orders.lookup_token_invalid`.", body = Problem),
         (status = 404, description = "The token opens another order; code `orders.order_not_found`.", body = Problem),
         (status = 409, description = "The order is not waiting for payment (`orders.invalid_transition`), its deadline passed (`orders.payment_expired`) or the time to pay the balance passed (`orders.balance_overdue`).", body = Problem),
-        (status = 422, description = "The payment partner refused the payment (its code, e.g. `momo.return_url_required`), the payment method is not usable (`orders.payment_method_unavailable`), `return_url` is not one of the shop's addresses (`orders.return_url_not_allowed`), the same `Idempotency-Key` with another body (`orders.idempotency_key_reused`), or invalid values (see `errors`).", body = Problem),
+        (status = 422, description = "The payment partner refused the payment (its code, e.g. `momo.return_url_required`), the payment method is not usable (`orders.payment_method_unavailable`), `return_url` is not one of the shop's addresses (`orders.return_url_not_allowed`) or not an http(s) URL (`orders.return_url_invalid`), the same `Idempotency-Key` with another body (`orders.idempotency_key_reused`), or invalid values (see `errors`).", body = Problem),
         (status = 429, description = "Started again too many times; code `orders.payment_retry_too_many`, see `Retry-After`.", body = Problem),
     )
 )]
@@ -295,7 +295,7 @@ pub(crate) async fn guest_payment_link(
         (status = 401, description = "Not signed in; code `unauthenticated`.", body = Problem),
         (status = 404, description = "No such order of yours; code `orders.order_not_found`.", body = Problem),
         (status = 409, description = "The order is not waiting for payment (`orders.invalid_transition`), its deadline passed (`orders.payment_expired`) or the time to pay the balance passed (`orders.balance_overdue`).", body = Problem),
-        (status = 422, description = "The payment partner refused the payment (its code, e.g. `momo.return_url_required`), the payment method is not usable (`orders.payment_method_unavailable`), `return_url` is not one of the shop's addresses (`orders.return_url_not_allowed`), the same `Idempotency-Key` with another body (`orders.idempotency_key_reused`), or invalid values (see `errors`).", body = Problem),
+        (status = 422, description = "The payment partner refused the payment (its code, e.g. `momo.return_url_required`), the payment method is not usable (`orders.payment_method_unavailable`), `return_url` is not one of the shop's addresses (`orders.return_url_not_allowed`) or not an http(s) URL (`orders.return_url_invalid`), the same `Idempotency-Key` with another body (`orders.idempotency_key_reused`), or invalid values (see `errors`).", body = Problem),
         (status = 429, description = "Started again too many times; code `orders.payment_retry_too_many`, see `Retry-After`.", body = Problem),
     )
 )]

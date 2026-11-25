@@ -3,15 +3,17 @@
 //! tenant (`request.rs`, step 4).
 //!
 //! - The `kernel_tenant_domains` table belongs to the control plane (only the control database holds data); a
-//!   domain belongs to exactly one tenant across the whole platform (unique index).
+//!   domain is `verified` for at most one tenant across the whole platform (partial unique index), and each
+//!   tenant has at most one row per domain. Several tenants may wait (`pending`) on the same domain: the first
+//!   to prove ownership gets it, the others' claims fail at verification (P-4 of the 2026-11 security review,
+//!   D-20261125-domain-claims) - an unproven claim no longer blocks anyone.
 //! - Status: `pending` (waiting for the TXT record) → `verified`; `pending` for more than 7 days →
 //!   `failed`; deleted → `revoked`. A `verified` domain is rechecked daily: 3 consecutive checks that do
 //!   not find the right record (`check_failures`) → `failed`, and requests to it no longer reach the
 //!   tenant; one successful check resets the count to 0. A DNS that does not answer (error, timeout) does
 //!   not count as "not found": a DNS outage does not take away a tenant's domain. A `failed` domain can be
-//!   verified again (`POST /domains/{id}/verify`). A `failed` / `revoked` domain of one tenant can be
-//!   claimed by another tenant: someone who has not proved ownership does not hold a domain forever (only
-//!   `pending` and `verified` block other tenants).
+//!   verified again (`POST /domains/{id}/verify`). Only a `verified` domain blocks other tenants from claiming
+//!   it.
 //! - The record to set: TXT `_autoxide-challenge.<domain>` = `autoxide-verify=<verification_token>`;
 //!   looked up through the trait [`DnsTxtLookup`] (the real one uses `hickory-resolver`, `dns.rs`; tests use
 //!   a fake).
@@ -28,8 +30,11 @@
 //! - After verification / revocation the domain is removed from the database registry's cache at once;
 //!   other servers see it after at most `AUTOXIDE_TENANCY_CACHE_SECONDS`.
 
+mod claims;
 mod dns;
 mod http;
+
+pub(crate) use claims::ShareClaims;
 
 use crate::time::Timestamp;
 use jiff::SignedDuration;
@@ -222,6 +227,14 @@ pub(super) mod entity {
 }
 
 use entity::{Column, Entity, Model};
+
+// Lý do ghi ở `check_error` khi khách khác xác minh tên miền trước (P-4).
+const TAKEN_BY_ANOTHER: &str = "Another tenant verified this domain first.";
+
+// Lỗi vi phạm unique index (cả SQLite và Postgres, qua `sql_err` của SeaORM).
+fn is_unique_violation(error: &sea_orm::DbErr) -> bool {
+    matches!(error.sql_err(), Some(sea_orm::SqlErr::UniqueConstraintViolation(_)))
+}
 
 const PENDING: &str = "pending";
 const VERIFIED: &str = "verified";
@@ -440,7 +453,9 @@ impl TenantDomains {
     }
 
     /// Adds domain `raw` for tenant `tenant` (status `pending`, new verification token). Resubmitting
-    /// a domain the tenant already has (`pending` / `verified`) returns it unchanged.
+    /// a domain the tenant already has (`pending` / `verified`) returns it unchanged. A domain another tenant
+    /// has verified: `tenant_domain_taken`; another tenant merely waiting on it does not block - whoever
+    /// verifies first gets it.
     pub async fn add(
         &self,
         actor: Actor,
@@ -452,13 +467,25 @@ impl TenantDomains {
         }
         let domain = self.checked(raw)?;
         let token = crate::secret::random_token(24)?;
-        let existing = self.find_domain(&domain).await?;
-        let row = match existing {
+        // Mọi dòng của tên miền này (mỗi khách tối đa một dòng): đã có khách xác minh thì từ chối; khách khác
+        // chỉ đang chờ thì không chặn (P-4).
+        let claims = self.claims(&domain).await?;
+        let me = tenant.id().as_uuid();
+        if let Some(own) = claims
+            .iter()
+            .find(|row| row.tenant_id == me && (row.status == PENDING || row.status == VERIFIED))
+        {
+            return Ok(describe(own.clone()));
+        }
+        if claims.iter().any(|row| row.status == VERIFIED) {
+            return Err(tenant_domain_taken(&domain));
+        }
+        let row = match claims.into_iter().find(|row| row.tenant_id == me) {
             None => {
                 let now = now();
                 let row = entity::ActiveModel {
                     id: Set(Uuid::now_v7()),
-                    tenant_id: Set(tenant.id().as_uuid()),
+                    tenant_id: Set(me),
                     org_id: Set(None),
                     domain: Set(domain.clone()),
                     status: Set(PENDING.to_owned()),
@@ -470,32 +497,19 @@ impl TenantDomains {
                     created_at: Set(now),
                     updated_at: Set(now),
                 };
-                // Hai khách gửi cùng tên miền cùng lúc: unique index chặn bên sau.
-                row.insert(self.control().write()).await.map_err(|error| {
-                    if matches!(
-                        error.sql_err(),
-                        Some(sea_orm::SqlErr::UniqueConstraintViolation(_))
-                    ) {
-                        tenant_domain_taken(&domain)
-                    } else {
-                        Error::from(error)
+                // Cùng khách gửi hai lần cùng lúc: unique index `(domain, tenant_id)` chặn bên sau.
+                match row.insert(self.control().write()).await {
+                    Ok(row) => row,
+                    Err(error) if is_unique_violation(&error) => {
+                        return self.add_again(tenant, &domain).await;
                     }
-                })?
-            }
-            Some(row)
-                if row.tenant_id == tenant.id().as_uuid()
-                    && (row.status == PENDING || row.status == VERIFIED) =>
-            {
-                return Ok(describe(row));
-            }
-            Some(row) if row.status == PENDING || row.status == VERIFIED => {
-                return Err(tenant_domain_taken(&domain));
+                    Err(error) => return Err(Error::from(error)),
+                }
             }
             Some(row) => {
-                // `failed` / `revoked` (của khách này hay khách khác): nhận lại từ đầu.
+                // Dòng `failed` / `revoked` của chính khách này: nhận lại từ đầu, mã xác minh mới.
                 let now = now();
                 let updated = Entity::update_many()
-                    .col_expr(Column::TenantId, Expr::value(tenant.id().as_uuid()))
                     .col_expr(Column::OrgId, Expr::value(Option::<Uuid>::None))
                     .col_expr(Column::Status, Expr::value(PENDING))
                     .col_expr(Column::VerificationToken, Expr::value(token))
@@ -506,13 +520,14 @@ impl TenantDomains {
                     .col_expr(Column::CreatedAt, Expr::value(now))
                     .col_expr(Column::UpdatedAt, Expr::value(now))
                     .filter(Column::Id.eq(row.id))
+                    .filter(Column::TenantId.eq(me))
                     .filter(Column::Status.eq(row.status.as_str()))
                     .filter(Column::UpdatedAt.eq(row.updated_at))
                     .exec(self.control().write())
                     .await?;
                 if updated.rows_affected == 0 {
-                    // Ai đó vừa đổi dòng này (vừa nhận lại, vừa xác minh lại).
-                    return Err(tenant_domain_taken(&domain));
+                    // Lệnh khác của chính khách này vừa đổi dòng (vừa nhận lại cùng lúc).
+                    return self.add_again(tenant, &domain).await;
                 }
                 self.find(row.id).await?
             }
@@ -829,12 +844,16 @@ impl TenantDomains {
         actor: Actor,
         row: Model,
     ) -> Result<Model, Error> {
+        // Khách khác đã xác minh tên miền này: lượt chờ của khách này thua ngay, khỏi chờ bản ghi DNS vô ích (P-4).
+        if self.verified_elsewhere(database, &row).await? {
+            return self.lost_race(database, row, now()).await;
+        }
         // Tra DNS NGOÀI mọi transaction: gọi mạng có thể chậm.
         let probe = self.probe(&row.domain, &row.verification_token).await;
         let now = now();
         match probe {
             Probe::Found => {
-                let updated = Entity::update_many()
+                let verified = Entity::update_many()
                     .col_expr(Column::Status, Expr::value(VERIFIED))
                     .col_expr(Column::VerifiedAt, Expr::value(now))
                     .col_expr(Column::LastCheckedAt, Expr::value(now))
@@ -845,7 +864,16 @@ impl TenantDomains {
                     .filter(Column::Status.is_in([PENDING, FAILED]))
                     .filter(Column::VerificationToken.eq(row.verification_token.as_str()))
                     .exec(database.write())
-                    .await?;
+                    .await;
+                let updated = match verified {
+                    Ok(updated) => updated,
+                    // Khách khác đã xác minh tên miền này trước (unique index một phần trên `verified`, P-4):
+                    // lượt chờ của khách này hỏng, kèm lý do.
+                    Err(error) if is_unique_violation(&error) => {
+                        return self.lost_race(database, row, now).await;
+                    }
+                    Err(error) => return Err(error.into()),
+                };
                 self.registry.invalidate_domain(&row.domain);
                 let after = self.find_in(database, row.id).await?;
                 if updated.rows_affected > 0 {
@@ -905,8 +933,53 @@ impl TenantDomains {
         }
     }
 
-    async fn find_domain(&self, domain: &str) -> Result<Option<Model>, Error> {
-        Ok(Entity::find().filter(Column::Domain.eq(domain)).one(self.control().read()).await?)
+    /// Every row of `domain` (one per tenant at most), read on the write connection: `add` decides from it.
+    // tenant-scope: một tên miền thuộc cả nền tảng; phải thấy dòng của mọi khách để biết đã có ai xác minh chưa.
+    async fn claims(&self, domain: &str) -> Result<Vec<Model>, Error> {
+        Ok(Entity::find().filter(Column::Domain.eq(domain)).all(self.control().write()).await?)
+    }
+
+    /// Whether another tenant holds `row`'s domain as `verified`.
+    // tenant-scope: tên miền thuộc cả nền tảng; hỏi dòng `verified` của khách KHÁC.
+    async fn verified_elsewhere(&self, database: &Database, row: &Model) -> Result<bool, Error> {
+        let other = Entity::find()
+            .filter(Column::Domain.eq(row.domain.as_str()))
+            .filter(Column::Status.eq(VERIFIED))
+            .filter(Column::TenantId.ne(row.tenant_id))
+            .one(database.write())
+            .await?;
+        Ok(other.is_some())
+    }
+
+    /// The tenant's own row for `domain` after a concurrent `add` of the same tenant won the race.
+    async fn add_again(&self, tenant: &TenantContext, domain: &str) -> Result<TenantDomain, Error> {
+        let claims = self.claims(domain).await?;
+        claims
+            .into_iter()
+            .find(|row| row.tenant_id == tenant.id().as_uuid() && row.status == PENDING)
+            .map(describe)
+            .ok_or_else(|| tenant_domain_taken(domain))
+    }
+
+    /// `row` proved ownership but another tenant verified the domain first: the claim becomes `failed` with
+    /// the reason (no event: nothing the tenant could use changed).
+    async fn lost_race(
+        &self,
+        database: &Database,
+        row: Model,
+        now: Timestamp,
+    ) -> Result<Model, Error> {
+        Entity::update_many()
+            .col_expr(Column::Status, Expr::value(FAILED))
+            .col_expr(Column::LastCheckedAt, Expr::value(now))
+            .col_expr(Column::CheckError, Expr::value(TAKEN_BY_ANOTHER))
+            .col_expr(Column::UpdatedAt, Expr::value(now))
+            .filter(Column::Id.eq(row.id))
+            .filter(Column::Status.eq(row.status.as_str()))
+            .exec(database.write())
+            .await?;
+        tracing::info!(domain = %row.domain, "tenant domain claim lost: verified by another tenant first");
+        self.find_in(database, row.id).await
     }
 
     async fn find(&self, id: Uuid) -> Result<Model, Error> {

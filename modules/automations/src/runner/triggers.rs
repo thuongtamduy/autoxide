@@ -6,13 +6,18 @@
 //! Cùng luật thì không kích hoạt lại; luật khác thì độ sâu chuỗi tăng một, quá
 //! [`MAX_CHAIN_DEPTH`](crate::config::MAX_CHAIN_DEPTH) thì ghi lần chạy `skipped`
 //! (`automations.loop_detected`) thay vì chạy.
+//!
+//! Phạm vi tổ chức (L-8 của rà soát bảo mật 2026-11, D-20261125-event-org): luật của nút gốc nhận event của cả
+//! khách; luật của một nút con chỉ nhận event mà [`Delivered::org_id`] nằm trong nhánh của nút đó. Event không
+//! nêu nút (của cả khách, hay module chưa ghi nút) chỉ tới luật của nút gốc — như luồng event (SSE) chỉ cho
+//! người có quyền cả khách thấy event không rõ nhánh.
 
 use std::sync::Arc;
 
 use autoxide_kernel::access::AccessPath;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::{Delivered, EventHandler};
-use autoxide_kernel::tenancy::ScopeExt;
+use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext, root_of};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde_json::{Value, json};
 
@@ -71,7 +76,12 @@ impl EventHandler for EventTrigger {
                 "actor_user_id": event.actor.user_id,
             },
         });
+        let event_org = event.org_id();
+        let root = root_of(tenant.id());
         for rule in rules {
+            if !self.0.reaches(tenant, root, OrgId::from_uuid(rule.org_id), event_org).await? {
+                continue;
+            }
             let depth = parent.as_ref().map_or(1, |parent| parent.depth + 1);
             let skip = match &parent {
                 Some(parent) if parent.rule_id == rule.id => Some((
@@ -98,6 +108,30 @@ impl EventHandler for EventTrigger {
             self.0.start_run(tenant, &rule, start).await?;
         }
         Ok(())
+    }
+}
+
+impl Automations {
+    // Event ở nút `event_org` có thuộc phạm vi của luật ở nút `rule_org` không (L-8). Hỏi cây tổ chức
+    // (module `organizations`) chỉ khi cần; không có cây thì chỉ nút trùng mới tính.
+    async fn reaches(
+        &self,
+        tenant: &TenantContext,
+        root: OrgId,
+        rule_org: OrgId,
+        event_org: Option<OrgId>,
+    ) -> Result<bool, Error> {
+        if rule_org == root {
+            return Ok(true);
+        }
+        let Some(event_org) = event_org else { return Ok(false) };
+        if event_org == rule_org {
+            return Ok(true);
+        }
+        match &self.orgs {
+            Some(orgs) => orgs.is_within(tenant, event_org, rule_org).await,
+            None => Ok(false),
+        }
     }
 }
 
