@@ -43,7 +43,7 @@ use sea_orm::{ColumnTrait as _, ConnectionTrait, EntityTrait as _, QueryFilter a
 use uuid::Uuid;
 
 pub(crate) use self::mappings::{GroupMapping, GroupSummary, UnmappedGroups};
-pub(crate) use self::token::{CreatedScimToken, ScimToken};
+pub(crate) use self::token::{CreatedScimToken, CreatorStatus, ScimToken};
 use crate::user::UserService;
 
 /// Đường dẫn gốc của endpoint SCIM (cho `meta.location`, tài liệu).

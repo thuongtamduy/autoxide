@@ -16085,6 +16085,30 @@
         ],
         "description": "A new endpoint and its signing secret, shown only once."
       },
+      "CreatedScimGroupMappingResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ScimGroupMappingResponse"
+          },
+          {
+            "properties": {
+              "granted_user_ids": {
+                "description": "Every current member of the group, who now holds the role through this rule. Members of a\ngroup without rules may have been added by anyone holding a SCIM token: check this list.",
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "granted_user_ids"
+            ],
+            "type": "object"
+          }
+        ],
+        "description": "A mapping rule just created, with the people it gave the role to."
+      },
       "CreatedScimTokenResponse": {
         "allOf": [
           {
@@ -24627,6 +24651,39 @@
               }
             ],
             "description": "A new endpoint and its signing secret, shown only once."
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_CreatedScimGroupMappingResponse": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ScimGroupMappingResponse"
+              },
+              {
+                "properties": {
+                  "granted_user_ids": {
+                    "description": "Every current member of the group, who now holds the role through this rule. Members of a\ngroup without rules may have been added by anyone holding a SCIM token: check this list.",
+                    "items": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "granted_user_ids"
+                ],
+                "type": "object"
+              }
+            ],
+            "description": "A mapping rule just created, with the people it gave the role to."
           }
         },
         "required": [
@@ -38072,54 +38129,6 @@
         ],
         "type": "object"
       },
-      "Data_ScimGroupMappingResponse": {
-        "description": "Envelope of a single result.",
-        "properties": {
-          "data": {
-            "description": "A mapping rule: members of the group hold the role at the unit.",
-            "properties": {
-              "created_at": {
-                "format": "date-time",
-                "type": "string"
-              },
-              "created_by": {
-                "format": "uuid",
-                "type": "string"
-              },
-              "group_id": {
-                "format": "uuid",
-                "type": "string"
-              },
-              "id": {
-                "format": "uuid",
-                "type": "string"
-              },
-              "org_id": {
-                "description": "Organization unit; the tenant's id is the root unit.",
-                "format": "uuid",
-                "type": "string"
-              },
-              "role_id": {
-                "format": "uuid",
-                "type": "string"
-              }
-            },
-            "required": [
-              "id",
-              "group_id",
-              "org_id",
-              "role_id",
-              "created_by",
-              "created_at"
-            ],
-            "type": "object"
-          }
-        },
-        "required": [
-          "data"
-        ],
-        "type": "object"
-      },
       "Data_SecretResponse": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -49865,6 +49874,10 @@
                   "format": "uuid",
                   "type": "string"
                 },
+                "creator_status": {
+                  "$ref": "#/components/schemas/ScimTokenCreatorStatus",
+                  "description": "Whether the token still works fully. A SCIM token can do only what its creator can do now:\nanything other than `active` means syncs that give, take away or disable will be refused —\ncreate a new token from an account with the needed roles and revoke this one."
+                },
                 "id": {
                   "format": "uuid",
                   "type": "string"
@@ -49893,7 +49906,8 @@
                 "name",
                 "prefix",
                 "created_by",
-                "created_at"
+                "created_at",
+                "creator_status"
               ],
               "type": "object"
             },
@@ -92750,6 +92764,16 @@
         ],
         "type": "object"
       },
+      "ScimTokenCreatorStatus": {
+        "description": "State of the person who created a SCIM token.",
+        "enum": [
+          "active",
+          "disabled",
+          "deleted",
+          "missing_permission"
+        ],
+        "type": "string"
+      },
       "ScimTokenResponse": {
         "description": "A SCIM token of the tenant, without its secret.",
         "properties": {
@@ -92761,6 +92785,10 @@
             "description": "The user who created it.",
             "format": "uuid",
             "type": "string"
+          },
+          "creator_status": {
+            "$ref": "#/components/schemas/ScimTokenCreatorStatus",
+            "description": "Whether the token still works fully. A SCIM token can do only what its creator can do now:\nanything other than `active` means syncs that give, take away or disable will be refused —\ncreate a new token from an account with the needed roles and revoke this one."
           },
           "id": {
             "format": "uuid",
@@ -92790,7 +92818,8 @@
           "name",
           "prefix",
           "created_by",
-          "created_at"
+          "created_at",
+          "creator_status"
         ],
         "type": "object"
       },
@@ -114508,7 +114537,7 @@
         ]
       },
       "post": {
-        "description": "Requires `auth.scim.manage`, and you must be able to give that role at that unit yourself (the\nunit is in your scope, you hold every permission of the role; `admin` only at the root). Every\ncurrent member of the group gets the role at once; later members get it when they join.",
+        "description": "Requires `auth.scim.manage`, and you must be able to give that role at that unit yourself (the\nunit is in your scope, you hold every permission of the role; `admin` only at the root). Every\ncurrent member of the group gets the role at once, and the response lists them\n(`granted_user_ids`): anyone holding a SCIM token may have added members to a group before it had\nrules, so look at the group's members first. Later members get the role when they join, if\nthe SCIM token's creator can give it.",
         "operationId": "auth_create_scim_group_mapping",
         "parameters": [
           {
@@ -114552,11 +114581,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Data_ScimGroupMappingResponse"
+                  "$ref": "#/components/schemas/Data_CreatedScimGroupMappingResponse"
                 }
               }
             },
-            "description": "The rule was created and applied to the group's members.",
+            "description": "The rule was created and applied to the group's members, listed in `granted_user_ids`.",
             "headers": {
               "Location": {
                 "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`.",
@@ -114892,7 +114921,7 @@
     },
     "/api/v1/auth/scim/tokens": {
       "get": {
-        "description": "Requires `auth.scim.manage`. Newest first; secrets are never listed.",
+        "description": "Requires `auth.scim.manage`. Newest first; secrets are never listed. `creator_status` tells\nwhether a token's creator was disabled, deleted or lost `auth.scim.manage`: such a token must be\nrotated, or the provider's changes are refused.",
         "operationId": "auth_list_scim_tokens",
         "parameters": [
           {
@@ -115403,7 +115432,7 @@
                 }
               }
             },
-            "description": "The tenant's plan does not include SCIM (`auth.scim`), or giving the roles would exceed the plan's staff limit, or or the SCIM token's creator cannot give or take away, with their permissions now, a role this change gives or takes away (the body names no `scimType`)."
+            "description": "The tenant's plan does not include SCIM (`auth.scim`), or giving the roles would exceed the plan's staff limit, or the SCIM token's creator cannot give or take away, with their permissions now, a role this change gives or takes away (the body names no `scimType`)."
           },
           "409": {
             "content": {
@@ -115500,7 +115529,7 @@
                 }
               }
             },
-            "description": "The tenant's plan does not include SCIM (`auth.scim`), or or the SCIM token's creator cannot give or take away, with their permissions now, a role this change gives or takes away (the body names no `scimType`)."
+            "description": "The tenant's plan does not include SCIM (`auth.scim`), or the SCIM token's creator cannot take away, with their permissions now, every role the Group's mapping rules give (the body names no `scimType`)."
           },
           "404": {
             "content": {
@@ -115768,7 +115797,7 @@
                 }
               }
             },
-            "description": "The tenant's plan does not include SCIM (`auth.scim`), or giving the roles would exceed the plan's staff limit, or or the SCIM token's creator cannot give or take away, with their permissions now, a role this change gives or takes away (the body names no `scimType`)."
+            "description": "The tenant's plan does not include SCIM (`auth.scim`), or giving the roles would exceed the plan's staff limit, or the SCIM token's creator cannot give or take away, with their permissions now, a role this change gives or takes away (the body names no `scimType`)."
           },
           "404": {
             "content": {
@@ -115900,7 +115929,7 @@
                 }
               }
             },
-            "description": "The tenant's plan does not include SCIM (`auth.scim`), or giving the roles would exceed the plan's staff limit, or or the SCIM token's creator cannot give or take away, with their permissions now, a role this change gives or takes away (the body names no `scimType`)."
+            "description": "The tenant's plan does not include SCIM (`auth.scim`), or giving the roles would exceed the plan's staff limit, or the SCIM token's creator cannot give or take away, with their permissions now, a role this change gives or takes away (the body names no `scimType`)."
           },
           "404": {
             "content": {

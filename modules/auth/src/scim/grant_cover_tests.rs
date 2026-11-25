@@ -181,6 +181,7 @@ async fn quyen_nguoi_tao_tinh_luc_dung_token() {
         )
         .await;
         assert_eq!(status, StatusCode::OK, "{body}");
+        assert_eq!(creator_status(&app, &admin, second.id).await, "missing_permission");
         let stranger = scim_user(&app, &second_token, "stranger@example.com").await;
         let add = patch(json!([{"op": "add", "path": "members", "value": [{"value": stranger}]}]));
         let (status, body) =
@@ -241,6 +242,185 @@ async fn nguoi_quyen_thap_khong_go_luat_anh_xa_admin() {
         let (status, _, _) = call(&app, "DELETE", &path, Some(&admin), None).await;
         assert_eq!(status, StatusCode::NO_CONTENT);
         assert!(!is_admin(&services, &member).await);
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn patch_nhieu_op_mot_op_vuot_quyen_thi_khong_ghi_gi() {
+    TestDatabase::run(async |test| {
+        let (app, services, admin, admin_token) = setup(test).await;
+        let (_, low_token) = sync_operator(&app, &services, "it@example.com").await;
+        let (group_id, _) = admin_group(&app, &services, &admin, &admin_token).await;
+        let path = format!("/Groups/{group_id}");
+        let first = scim_user(&app, &admin_token, "first@example.com").await;
+        let add = patch(json!([{"op": "add", "path": "members", "value": [{"value": first}]}]));
+        assert_eq!(scim(&app, "PATCH", &path, &admin_token, Some(add)).await.0, StatusCode::OK);
+        let second = scim_user(&app, &low_token, "second@example.com").await;
+
+        // Đổi tên (hợp lệ) + thêm người (vượt quyền): không op nào được ghi.
+        let ops = patch(json!([
+            {"op": "replace", "path": "displayName", "value": "Owners"},
+            {"op": "add", "path": "members", "value": [{"value": second}]},
+        ]));
+        let (status, body) = scim(&app, "PATCH", &path, &low_token, Some(ops)).await;
+        assert_forbidden(status, &body);
+        // Bớt một người, thêm người khác trong cùng một PATCH: cũng không ghi gì.
+        let ops = patch(json!([
+            {"op": "remove", "path": format!("members[value eq \"{first}\"]")},
+            {"op": "add", "path": "members", "value": [{"value": second}]},
+        ]));
+        let (status, body) = scim(&app, "PATCH", &path, &low_token, Some(ops)).await;
+        assert_forbidden(status, &body);
+
+        let (_, group) = scim(&app, "GET", &path, &admin_token, None).await;
+        assert_eq!(group["displayName"], "Admins", "{group}");
+        assert_eq!(members(&app, &admin_token, &group_id).await, std::slice::from_ref(&first));
+        assert!(is_admin(&services, &first).await);
+        assert!(!is_admin(&services, &second).await);
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn put_user_doi_email_tai_khoan_admin_bi_chan() {
+    TestDatabase::run(async |test| {
+        let (app, services, _, admin_token) = setup(test).await;
+        let (_, low_token) = sync_operator(&app, &services, "it@example.com").await;
+        let target = scim_user(&app, &admin_token, "chief@example.com").await;
+        let id = uuid::Uuid::parse_str(&target).unwrap();
+        crate::role::grant_admin(services.database.write(), &services.tenant, id).await.unwrap();
+        let mut body = user_body("chief@example.com", "chief@example.com");
+        body["emails"] =
+            json!([{"value": "attacker@example.com", "type": "work", "primary": true}]);
+        let (status, refused) =
+            scim(&app, "PUT", &format!("/Users/{target}"), &low_token, Some(body)).await;
+        assert_forbidden(status, &refused);
+        let account = services.users.get(&services.tenant, id).await.unwrap().unwrap();
+        assert_eq!(account.email, "chief@example.com");
+    })
+    .await
+    .unwrap();
+}
+
+/// `creator_status` của token theo `GET /scim/tokens`.
+async fn creator_status(app: &TestApp, admin: &str, created_by: uuid::Uuid) -> String {
+    let (status, _, tokens) = call(app, "GET", "/scim/tokens", Some(admin), None).await;
+    assert_eq!(status, StatusCode::OK, "{tokens}");
+    let created_by = created_by.to_string();
+    let token = tokens["data"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|token| token["created_by"] == created_by.as_str())
+        .unwrap();
+    token["creator_status"].as_str().unwrap().to_owned()
+}
+
+#[tokio::test]
+async fn token_cua_nguoi_tao_bi_khoa_hay_bi_xoa() {
+    use sea_orm::{ColumnTrait as _, EntityTrait as _, QueryFilter as _};
+    TestDatabase::run(async |test| {
+        let (app, services, admin, admin_token) = setup(test).await;
+        let tenant = &services.tenant;
+        let (group_id, _) = admin_group(&app, &services, &admin, &admin_token).await;
+        let path = format!("/Groups/{group_id}");
+        // Người có permission (để thử khoá) và người không có gì (để thử tạo).
+        let (_, _) = sync_operator(&app, &services, "it@example.com").await;
+        let it = services.users.find_by_email(tenant, "it@example.com").await.unwrap().unwrap();
+        let admin_id =
+            services.users.find_by_email(tenant, "boss@example.com").await.unwrap().unwrap().id;
+        assert_eq!(creator_status(&app, &admin, admin_id).await, "active");
+
+        let mut tokens = Vec::new();
+        for email in ["gone@example.com", "locked@example.com"] {
+            let input = NewUser {
+                email: email.to_owned(),
+                name: "Admin".to_owned(),
+                password: Some(PASSWORD.to_owned()),
+            };
+            let user = services
+                .users
+                .create_with_roles(tenant, Actor::system(), input, true)
+                .await
+                .unwrap();
+            let access = bearer(&app, email, PASSWORD).await;
+            tokens.push((user.id, scim_token(&app, &access, None).await));
+        }
+        let (gone, gone_token) = tokens.remove(0);
+        let (locked, locked_token) = tokens.remove(0);
+        services.users.delete(tenant, Actor::system(), gone).await.unwrap();
+        crate::user::entity::Entity::update_many()
+            .col_expr(
+                crate::user::entity::Column::DisabledAt,
+                sea_orm::sea_query::Expr::value(Some(autoxide_kernel::time::Timestamp::now())),
+            )
+            .filter(crate::user::entity::Column::Id.eq(locked))
+            .exec(services.database.write())
+            .await
+            .unwrap();
+        assert_eq!(creator_status(&app, &admin, gone).await, "deleted");
+        assert_eq!(creator_status(&app, &admin, locked).await, "disabled");
+
+        // Liên kết tài khoản `it` (có permission) với SCIM bằng token của admin, để thử khoá.
+        let (status, linked) =
+            scim(&app, "POST", "/Users", &admin_token, Some(user_body("it@example.com", "it")))
+                .await;
+        assert_eq!(status, StatusCode::CREATED, "{linked}");
+        for (label, token) in [("deleted", &gone_token), ("disabled", &locked_token)] {
+            let stranger = scim_user(&app, token, &format!("{label}@example.com")).await;
+            let add =
+                patch(json!([{"op": "add", "path": "members", "value": [{"value": stranger}]}]));
+            let (status, body) = scim(&app, "PATCH", &path, token, Some(add)).await;
+            assert_forbidden(status, &body);
+            assert!(!is_admin(&services, &stranger).await, "{label}");
+            let deactivate = patch(json!([{"op": "replace", "value": {"active": false}}]));
+            let (status, body) =
+                scim(&app, "PATCH", &format!("/Users/{}", it.id), token, Some(deactivate)).await;
+            assert_forbidden(status, &body);
+        }
+        assert!(services.users.get(tenant, it.id).await.unwrap().unwrap().disabled_at.is_none());
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn them_thanh_vien_dong_thoi_voi_dat_luat_khong_de_lai_thanh_vien_cho() {
+    // Khoá dòng nhóm ở cả hai phía: lần thêm thành viên và lần đặt luật nối đuôi nhau. Sau cả hai,
+    // người được token quyền thấp đưa vào hoặc không ở trong nhóm, hoặc đã nhận role qua luật của
+    // admin và có tên trong `granted_user_ids` — không có thành viên "chờ" (ở nhóm có luật mà không
+    // có role) để lần đồng bộ sau biến thành admin.
+    TestDatabase::run(async |test| {
+        let (app, services, admin, admin_token) = setup(test).await;
+        let (_, low_token) = sync_operator(&app, &services, "it@example.com").await;
+        let root = services.tenant.id().as_uuid();
+        let admin_role = admin_role(&app, &admin).await;
+        for round in 0..4 {
+            let group = json!({"schemas": [GROUP_SCHEMA], "displayName": format!("G{round}")});
+            let (_, group) = scim(&app, "POST", "/Groups", &admin_token, Some(group)).await;
+            let group_id = group["id"].as_str().unwrap().to_owned();
+            let stranger = scim_user(&app, &low_token, &format!("x{round}@example.com")).await;
+            let add =
+                patch(json!([{"op": "add", "path": "members", "value": [{"value": stranger}]}]));
+            let path = format!("/Groups/{group_id}");
+            let mapping = json!({"group_id": group_id, "org_id": root, "role_id": admin_role});
+            let (patched, mapped) = tokio::join!(
+                scim(&app, "PATCH", &path, &low_token, Some(add)),
+                call(&app, "POST", "/scim/group-mappings", Some(&admin), Some(mapping)),
+            );
+            assert_eq!(mapped.0, StatusCode::CREATED, "{}", mapped.2);
+            let in_group = members(&app, &admin_token, &group_id).await.contains(&stranger);
+            assert_eq!(in_group, patched.0 == StatusCode::OK, "{patched:?}");
+            if !in_group {
+                assert_forbidden(patched.0, &patched.1);
+            }
+            assert_eq!(is_admin(&services, &stranger).await, in_group, "vòng {round}");
+            let granted = mapped.2["data"]["granted_user_ids"].as_array().unwrap();
+            assert_eq!(granted.contains(&json!(stranger)), in_group, "vòng {round}: {}", mapped.2);
+        }
     })
     .await
     .unwrap();
