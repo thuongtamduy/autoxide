@@ -261,6 +261,15 @@ impl Module for CatalogModule {
         self.service.as_ref().map_or_else(Vec::new, listeners::subscriptions)
     }
 
+    // Chế độ "nghỉ" (bước 70 P9): module tắt vẫn bỏ người bị xoá tài khoản khỏi sản phẩm / bảng giá họ
+    // tạo. `catalog` không có phần trong bản xuất dữ liệu cá nhân.
+    fn dormant(
+        &self,
+        context: &mut autoxide_kernel::module::DormantContext<'_>,
+    ) -> Result<(), Error> {
+        context.on_user_deleted(Arc::new(listeners::ForgetUsers))
+    }
+
     fn routes(&self) -> OpenApiRouter {
         self.service.clone().map_or_else(OpenApiRouter::new, http::routes)
     }

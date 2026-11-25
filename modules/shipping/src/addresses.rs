@@ -401,8 +401,9 @@ impl ShippingService {
     }
 
     /// Mọi địa chỉ của người mua (xuất dữ liệu cá nhân), cũ trước.
+    // Hai hàm này không dùng `self`: module đang tắt (chế độ "nghỉ", bước 70 P9) gọi được mà không có
+    // service.
     pub(crate) async fn all_addresses(
-        &self,
         tenant: &TenantContext,
         buyer: Uuid,
     ) -> Result<Vec<BuyerAddress>, Error> {
@@ -416,11 +417,7 @@ impl ShippingService {
     }
 
     /// Xoá mọi địa chỉ của người mua (tài khoản bị xoá). Gọi lại không sao.
-    pub(crate) async fn erase_addresses(
-        &self,
-        tenant: &TenantContext,
-        buyer: Uuid,
-    ) -> Result<u64, Error> {
+    pub(crate) async fn erase_addresses(tenant: &TenantContext, buyer: Uuid) -> Result<u64, Error> {
         let result = address::Entity::delete_many()
             .filter(address::Column::BuyerId.eq(buyer))
             .scoped(tenant)

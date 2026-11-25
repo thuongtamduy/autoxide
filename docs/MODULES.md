@@ -146,12 +146,27 @@ through `GET /api/v1/kernel/modules`.
 ### Data of a module that is turned off
 
 Turning a module off **never deletes anything**. If the database already has its tables, they
-stay exactly as they are, and turning the module on again continues from there (migrations added
-in the meantime are applied by `autoxide migrate up` as usual).
+stay, `autoxide migrate up` keeps applying the module's new migrations to them, and turning the module
+on again continues from there.
 
-While it is off, nothing maintains that data:
+While it is off, the module still takes part in personal data and in the tenant lifecycle
+("dormant mode") — it serves no routes, MCP tools, jobs or other events, but:
 
-- personal-data exports and erasures, retention clean-up and tenant deletion do not reach it;
+- a person's data export (`GET /api/v1/auth/me/export`, subject access requests) includes its part,
+  and deleting an account deletes or anonymizes that person's data in it, as when it is on;
+- deleting a tenant for good deletes its rows of the tenant (except tables kept by law), a tenant data
+  export includes them, and moving, splitting or merging a tenant takes them along (the module's own
+  migrations are applied to its tables on both databases first, and only where it already has tables);
+- `files` still reads its own configuration while off and opens its storage, so deleting an account
+  deletes the stored content too, and `conversations` deletes call recordings through that storage and the
+  enabled voice connector; when the storage cannot be opened, the deletion is retried (nothing is reported
+  done while content remains).
+
+This is an obligation of personal data protection law (Vietnam: Law 91/2025/QH15, Decree
+13/2023/ND-CP), so it does not depend on whether you use the module any more. What it still does not
+do while off:
+
+- retention clean-up of its data does not run (the module's jobs do not run);
 - tenants created in the meantime do not get the module's starting data;
 - events other modules publish in the meantime are not delivered to it later.
 
@@ -164,15 +179,14 @@ So that data is not lost by accident:
 - `autoxide copy`, `autoxide backup create` and `autoxide backup restore` refuse to run while
   such data exists, because they only handle the modules that are on. Run them with the module
   turned on, or with `AUTOXIDE_MODULES=all`.
-- Moving a tenant to another database, and splitting or merging tenants, are refused
-  (`409 tenant_move_modules_off`, also listed by the dry run) while the tenant has rows of a module
-  that is off: only the data of modules that are on is moved.
 
 The check for such data looks at the main database and at the database of every placement.
 
-To remove the data of a module for good: turn the module on, run
-`autoxide migrate down <module> --steps 1000` (this drops its tables — back up first), then turn it
-off.
+To remove the data of a module for good, run `autoxide migrate down <module> --steps 1000` — it works
+while the module is off (this drops its tables — back up first). `autoxide migrate up` keeps the tables
+of a turned-off module up to date where they exist, and never creates them elsewhere. `migrate down` has
+no `--all`: it acts on the main database only, so the module's tables in the database of a placement stay
+(and `migrate up --all` keeps updating them) until you run it against that database too.
 
 ## Upgrading from 0.17 or earlier
 

@@ -213,6 +213,16 @@ impl Module for CommentsModule {
         Ok(())
     }
 
+    // Chế độ nghỉ (bước 70 P9): module tắt vẫn xuất bình luận của người dùng và xoá chúng khi tài
+    // khoản bị xoá — cùng hàm với lúc bật, không cần service (xem `privacy.rs`).
+    fn dormant(
+        &self,
+        context: &mut autoxide_kernel::module::DormantContext<'_>,
+    ) -> Result<(), Error> {
+        context.personal_data(Arc::new(privacy::DormantPrivacy::new()))?;
+        context.on_user_deleted(Arc::new(privacy::DormantPrivacy::new()))
+    }
+
     fn subscriptions(&self) -> Vec<Subscription> {
         let Some(service) = self.service.clone() else {
             return Vec::new();

@@ -236,6 +236,16 @@ impl Module for OrdersModule {
         jobs::schedules()
     }
 
+    // Chế độ "nghỉ" (bước 70 P9): module tắt vẫn xuất đơn của người dùng và xoá đánh giá của họ khi
+    // tài khoản bị xoá.
+    fn dormant(
+        &self,
+        context: &mut autoxide_kernel::module::DormantContext<'_>,
+    ) -> Result<(), Error> {
+        context.personal_data(Arc::new(privacy::OrderPrivacy))?;
+        context.on_user_deleted(Arc::new(reviews::UserDeleted))
+    }
+
     fn subscriptions(&self) -> Vec<autoxide_kernel::event::Subscription> {
         let Some(service) = self.service.clone() else {
             return Vec::new();
@@ -246,7 +256,7 @@ impl Module for OrdersModule {
         all.extend(preorders::subscriptions(&service));
         all.extend(invoicing::subscriptions(&service));
         all.extend(notices::subscriptions(&service));
-        all.extend(reviews::subscriptions(&service));
+        all.extend(reviews::subscriptions());
         all.extend(risk::subscriptions(&service));
         all.extend(warranty::subscriptions(&service));
         // Thanh toán xong ở `ledger` (có thể chưa cài: `optional`).

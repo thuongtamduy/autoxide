@@ -133,3 +133,47 @@ async fn khach_tu_sua_mau_sms_mang_ma() {
     .await
     .unwrap();
 }
+
+/// Cấu hình theo khách không đọc được (database bận…).
+struct BrokenSettings;
+
+#[async_trait::async_trait]
+impl autoxide_kernel::tenancy::TenantSettings for BrokenSettings {
+    async fn get(
+        &self,
+        _tenant: &autoxide_kernel::tenancy::TenantContext,
+        _setting: &autoxide_kernel::tenancy::TenantSetting,
+    ) -> Result<Option<autoxide_kernel::tenancy::SettingValue>, Error> {
+        Err(Error::internal("the database did not answer"))
+    }
+}
+
+/// Đọc mẫu lỗi sau khi đã lưu mã: không lỗi, rơi về câu mặc định — mã đã lưu vẫn được gửi.
+#[tokio::test]
+async fn doc_mau_loi_thi_gui_cau_mac_dinh() {
+    TestDatabase::run(async |test| {
+        let app = TestApp::builder(test).module(crate::module()).build().await.unwrap();
+        let tenant = app.default_tenant();
+        let text = autoxide_kernel::sms::tenant_sms_text(
+            &BrokenSettings,
+            &tenant,
+            &crate::sms_templates::SIGN_IN,
+            &["code", "minutes"],
+            &[("code", "123456"), ("minutes", "5")],
+        )
+        .await;
+        assert_eq!(text, None);
+        // Câu mặc định được lắp mã và thời hạn.
+        let text = crate::sms_templates::otp_text_with(
+            &BrokenSettings,
+            &tenant,
+            &crate::sms_templates::SIGN_IN,
+            "123456",
+            5,
+        )
+        .await;
+        assert_eq!(text, "Ma dang nhap cua ban: 123456. Het han sau 5 phut. Khong chia se ma nay.");
+    })
+    .await
+    .unwrap();
+}

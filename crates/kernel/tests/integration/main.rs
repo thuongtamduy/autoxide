@@ -20,6 +20,7 @@ mod compression;
 mod custom_fields_limit;
 mod database;
 mod distribution;
+mod dormant;
 mod event;
 mod event_stream;
 mod event_ws;

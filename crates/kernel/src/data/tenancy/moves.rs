@@ -260,8 +260,11 @@ pub(crate) struct Setup {
     pub(crate) retained: Vec<&'static str>,
     /// Split / merge policy of every module (`Module::relocation`, step 38).
     pub(crate) policies: super::relocate::Policies,
-    /// Modules present in the binary but turned off (`AUTOXIDE_MODULES`): a move does not copy their tables.
-    pub(crate) inactive: Vec<&'static str>,
+    /// Modules present in the binary but turned off (`AUTOXIDE_MODULES`) with their own migrations (dormant
+    /// mode, step 70 P9, D-20261125-dormant-modules): deleting, exporting, moving, splitting and merging a
+    /// tenant cover their tables too. `control_plane`, `retained` and `policies` already include their
+    /// declarations.
+    pub(crate) dormant: Vec<(&'static str, Migrator)>,
 }
 
 impl MoveSetup {
@@ -269,15 +272,46 @@ impl MoveSetup {
         let _ = self.0.set(setup);
     }
 
-    /// A turned-off module still has data of tenant `tenant` at `database` (step 70 P1): moving, splitting
-    /// or merging the tenant now would leave that data behind.
-    pub(crate) async fn inactive_with_data(
+    /// Before copying a tenant from `source` to `target` (move, split, merge; a real run, never a dry run):
+    /// every turned-off module whose tables exist at `source` OR `target` gets its migrations applied at both,
+    /// so its tables exist with the same columns on both sides and travel with the tenant (dormant mode,
+    /// D-20261125-dormant-modules). A module that never ran on either database is left alone.
+    pub(crate) async fn prepare_dormant(
         &self,
-        database: &Database,
-        tenant: TenantId,
-    ) -> Result<Vec<&'static str>, Error> {
-        let inactive = &self.get()?.inactive;
-        Ok(crate::module::inactive_with_tenant_data(database.read(), inactive, tenant).await?)
+        source: &Database,
+        target: &Database,
+    ) -> Result<(), Error> {
+        for (module, migrator) in &self.get()?.dormant {
+            if !installed_on(module, source).await? && !installed_on(module, target).await? {
+                continue;
+            }
+            for database in [source, target] {
+                migrator.up(database).await.map_err(|error| Error::internal(error.to_string()))?;
+            }
+        }
+        Ok(())
+    }
+
+    /// The modules whose tables a DRY RUN reads between `source` and `target` (it changes no schema): the
+    /// enabled modules, and the turned-off modules that have tables on both databases. A turned-off module
+    /// with tables at `source` only is returned in the second list: its rows are counted at `source`, and a
+    /// real run creates its tables at `target` first.
+    pub(crate) async fn dry_run_modules(
+        &self,
+        source: &Database,
+        target: &Database,
+    ) -> Result<(Vec<&'static str>, Vec<&'static str>), Error> {
+        let setup = self.get()?;
+        let mut both = setup.modules.clone();
+        let mut source_only = Vec::new();
+        for (module, _) in &setup.dormant {
+            match (installed_on(module, source).await?, installed_on(module, target).await?) {
+                (true, true) => both.push(module),
+                (true, false) => source_only.push(*module),
+                _ => {}
+            }
+        }
+        Ok((both, source_only))
     }
 
     /// Split / merge policy of every module.
@@ -310,11 +344,26 @@ impl MoveSetup {
         self.0.get().ok_or_else(|| Error::internal("tenant moves are used before modules started"))
     }
 
-    /// Names of every module and their control-plane tables (shared by tenant data export, D-328).
+    /// Names of every enabled module and the control-plane tables (scheduled backups).
     pub(crate) fn tables(&self) -> Result<(Vec<&'static str>, Vec<&'static str>), Error> {
         let setup = self.get()?;
         Ok((setup.modules.clone(), setup.control_plane.clone()))
     }
+
+    /// Like [`tables`](Self::tables), with the turned-off modules too: what deleting, exporting, moving,
+    /// splitting and merging a tenant cover (dormant mode). A module whose tables do not exist in a database
+    /// simply has no table there.
+    pub(crate) fn tenant_tables(&self) -> Result<(Vec<&'static str>, Vec<&'static str>), Error> {
+        let setup = self.get()?;
+        let mut modules = setup.modules.clone();
+        modules.extend(setup.dormant.iter().map(|(module, _)| *module));
+        Ok((modules, setup.control_plane.clone()))
+    }
+}
+
+/// The module's migration history table exists at `database` (the module once ran there).
+async fn installed_on(module: &str, database: &Database) -> Result<bool, Error> {
+    Ok(crate::migration::module_installed(database.read(), &format!("{module}_migrations")).await?)
 }
 
 /// Result of checking a move, before running it.

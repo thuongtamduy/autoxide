@@ -213,20 +213,34 @@ pub fn fill_sms_template(template: &str, values: &[(&str, &str)]) -> Option<Stri
 
 /// The text of an SMS from the template the tenant set in `setting` (a setting of [`SMS_TEMPLATE_GROUP`] whose
 /// checker is [`check_sms_template`] with the same `allowed`), filled with `values`. `None` when the tenant has
-/// not set the template, or the stored one is no longer valid (a warning is logged): the module sends its default
-/// text.
+/// not set the template, the stored one is no longer valid, or the setting cannot be read right now (the last
+/// two log a warning): the module sends its default text. Never fails, so a module can call it after it has
+/// stored a one-time code without leaving a code that is never sent.
 pub async fn tenant_sms_text(
     settings: &dyn crate::tenancy::TenantSettings,
     tenant: &crate::tenancy::TenantContext,
     setting: &crate::tenancy::TenantSetting,
     allowed: &[&str],
     values: &[(&str, &str)],
-) -> Result<Option<String>, Error> {
-    let template = crate::tenancy::parsed_setting(settings, tenant, setting, |raw| {
+) -> Option<String> {
+    let read = crate::tenancy::parsed_setting(settings, tenant, setting, |raw| {
         check_sms_template(raw, allowed).map(|()| raw.to_owned())
     })
-    .await?;
-    Ok(template.and_then(|template| fill_sms_template(&template, values)))
+    .await;
+    match read {
+        Ok(template) => template.and_then(|template| fill_sms_template(&template, values)),
+        Err(error) => {
+            // Không đọc được cấu hình (database bận…): gửi câu mặc định còn hơn để mã đã lưu không bao giờ
+            // tới người dùng.
+            tracing::warn!(
+                setting = setting.name(),
+                tenant_id = %tenant.id(),
+                code = error.code(),
+                "the tenant's SMS template cannot be read; the default text is sent"
+            );
+            None
+        }
+    }
 }
 
 /// The placeholder names in `template`, by the same rule as [`fill_sms_template`]: `{` + letters, digits, `_` +

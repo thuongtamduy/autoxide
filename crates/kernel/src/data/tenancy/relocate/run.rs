@@ -121,7 +121,7 @@ impl TenantRelocations {
     /// Tenant-level tables (except job queues) for which no module declares a split / merge policy, read at
     /// `database`; the binary's tests keep this list empty.
     pub async fn uncovered_tables(&self, database: &Database) -> Result<Vec<String>, Error> {
-        let (modules, control_plane) = self.setup.tables()?;
+        let (modules, control_plane) = self.setup.tenant_tables()?;
         let tables =
             crate::transfer::TenantTables::read(database, database, &modules, &control_plane)
                 .await

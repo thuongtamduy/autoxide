@@ -1,7 +1,7 @@
 # Phác thảo: module "nghỉ" — tắt chức năng nhưng vẫn giữ nghĩa vụ với dữ liệu
 
-Trạng thái: **đề xuất, chờ chủ dự án duyệt** (bước 70, nối tiếp P1; D-20261121-module-selection
-mục "Giới hạn đã biết"). Chưa có code.
+Trạng thái: **đã làm theo cách khác** — xem D-20261125-dormant-modules (bước 70 P9). Bản phác thảo dưới đây
+giữ lại làm lịch sử; phương án đã chọn và lý do ở quyết định đó.
 
 ## Vấn đề
 

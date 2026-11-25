@@ -144,13 +144,25 @@ File `docs/openapi.json` và `docs/mcp-tools.json` trong repo, và SDK sinh từ
 
 ### Dữ liệu của module đang tắt
 
-Tắt một module **không bao giờ xoá gì**. Database đã có bảng của nó thì bảng giữ nguyên, và bật
-lại module là dùng tiếp từ đó (migration thêm trong lúc tắt được `autoxide migrate up` áp dụng như
-thường).
+Tắt một module **không bao giờ xoá gì**. Database đã có bảng của nó thì bảng còn đó, `autoxide migrate up`
+vẫn áp migration mới của module cho các bảng đó, và bật lại module là dùng tiếp từ đó.
 
-Trong lúc tắt, không ai chăm dữ liệu đó:
+Trong lúc tắt, module vẫn tham gia dữ liệu cá nhân và vòng đời khách ("chế độ nghỉ") — không route,
+không tool MCP, không job, không nhận event khác, nhưng:
 
-- xuất và xoá dữ liệu cá nhân, dọn theo thời hạn lưu và xoá khách không chạm tới nó;
+- bản xuất dữ liệu của một người (`GET /api/v1/auth/me/export`, yêu cầu truy cập của chủ thể) có phần
+  của nó, và xoá tài khoản thì xoá / ẩn danh dữ liệu của người đó trong nó, như khi bật;
+- xoá hẳn một khách thì xoá dòng của khách đó trong bảng của nó (trừ bảng luật buộc giữ), bản xuất dữ
+  liệu của khách có các dòng đó, và dời / tách / gộp khách mang chúng theo (migration của chính module
+  được áp cho bảng của nó ở cả hai database trước, và chỉ ở nơi nó đã có bảng);
+- `files` tắt vẫn đọc cấu hình của nó và mở kho, nên xoá tài khoản xoá cả nội dung file, và `conversations`
+  xoá bản ghi âm qua kho đó và bộ nối thoại đang bật; không mở được kho thì việc xoá được thử lại (không báo
+  xong khi nội dung còn nằm lại).
+
+Đây là nghĩa vụ của pháp luật bảo vệ dữ liệu cá nhân (Việt Nam: Luật 91/2025/QH15, Nghị định
+13/2023/NĐ-CP), nên không phụ thuộc bạn còn dùng module hay không. Những việc vẫn chưa làm khi tắt:
+
+- dọn dữ liệu của nó theo thời hạn lưu không chạy (job của module không chạy);
 - khách tạo trong lúc đó không có dữ liệu khởi đầu của module;
 - event module khác phát trong lúc đó không được giao bù về sau.
 
@@ -163,15 +175,14 @@ Trong lúc tắt, không ai chăm dữ liệu đó:
 - `autoxide copy`, `autoxide backup create` và `autoxide backup restore` từ chối chạy khi còn dữ
   liệu như vậy, vì chúng chỉ xử lý module đang bật. Chạy chúng với module đó bật, hoặc với
   `AUTOXIDE_MODULES=all`.
-- Dời một khách sang database khác, và tách / gộp khách, bị từ chối
-  (`409 tenant_move_modules_off`, dry run cũng nêu) khi khách còn dòng của một module đang tắt:
-  chỉ dữ liệu của module đang bật được chuyển.
 
 Việc kiểm dữ liệu như vậy xem database chính và database của từng placement.
 
-Muốn xoá hẳn dữ liệu của một module: bật module, chạy
-`autoxide migrate down <module> --steps 1000` (lệnh
-này xoá bảng của nó — backup trước), rồi tắt.
+Muốn xoá hẳn dữ liệu của một module, chạy `autoxide migrate down <module> --steps 1000` — chạy được khi
+module đang tắt (lệnh này xoá bảng của nó — backup trước). `autoxide migrate up` giữ bảng của module đang
+tắt theo kịp bản mới ở nơi đã có bảng, và không bao giờ tạo bảng ở nơi khác. `migrate down` không có `--all`:
+nó chỉ chạy trên database chính, nên bảng của module ở database của placement còn lại (và `migrate up --all` vẫn
+cập nhật chúng) cho tới khi bạn chạy nó trên database đó.
 
 ## Nâng cấp từ 0.17 trở về trước
 

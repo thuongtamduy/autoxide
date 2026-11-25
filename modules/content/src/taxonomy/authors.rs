@@ -7,7 +7,7 @@ use std::collections::HashMap;
 
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
-use autoxide_kernel::event::Actor;
+use autoxide_kernel::event::{Actor, Outbox};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use sea_orm::sea_query::Query;
@@ -317,29 +317,7 @@ impl ContentService {
         id: Uuid,
         actor: Actor,
     ) -> Result<Option<Author>, Error> {
-        let transaction = tenant.database().begin_write().await?;
-        let Some(before) = author::Entity::find_by_id(id).scoped(tenant).one(&transaction).await?
-        else {
-            return Ok(None);
-        };
-        author::Entity::delete_by_id(id).scoped(tenant).exec(&transaction).await?;
-        entry_author::Entity::delete_many()
-            .scoped(tenant)
-            .filter(entry_author::Column::AuthorId.eq(id))
-            .exec(&transaction)
-            .await?;
-        let change = Change { before: Some(author_summary(&before)), after: None, published: None };
-        self.outbox
-            .record(
-                &transaction,
-                tenant,
-                actor,
-                events::subject("author", id),
-                &events::AuthorChanged(change),
-            )
-            .await?;
-        transaction.commit().await?;
-        Ok(Some(before))
+        remove_author_with(tenant, Some(&self.outbox), id, actor).await
     }
 
     /// Thay danh sách tác giả của mục `entry_id` (theo thứ tự). Có hiệu lực ngay. Cần
@@ -542,4 +520,40 @@ fn author_slug_conflict(error: sea_orm::DbErr) -> Error {
 pub(crate) fn author_not_found(id: Uuid) -> Error {
     Error::not_found("content.author_not_found", "No author has the id `{id}`.")
         .with_param("id", id)
+}
+
+/// Xoá tác giả `id` và liên kết với mục; `None` nếu không có. Event `content.author_changed` ghi qua
+/// `outbox` — `None` khi module đang tắt (chế độ nghỉ, bước 70 P9): không ai phát event của module
+/// tắt, nên không ghi.
+pub(crate) async fn remove_author_with(
+    tenant: &TenantContext,
+    outbox: Option<&Outbox>,
+    id: Uuid,
+    actor: Actor,
+) -> Result<Option<Author>, Error> {
+    let transaction = tenant.database().begin_write().await?;
+    let Some(before) = author::Entity::find_by_id(id).scoped(tenant).one(&transaction).await?
+    else {
+        return Ok(None);
+    };
+    author::Entity::delete_by_id(id).scoped(tenant).exec(&transaction).await?;
+    entry_author::Entity::delete_many()
+        .scoped(tenant)
+        .filter(entry_author::Column::AuthorId.eq(id))
+        .exec(&transaction)
+        .await?;
+    if let Some(outbox) = outbox {
+        let change = Change { before: Some(author_summary(&before)), after: None, published: None };
+        outbox
+            .record(
+                &transaction,
+                tenant,
+                actor,
+                events::subject("author", id),
+                &events::AuthorChanged(change),
+            )
+            .await?;
+    }
+    transaction.commit().await?;
+    Ok(Some(before))
 }

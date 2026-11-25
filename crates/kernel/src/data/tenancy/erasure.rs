@@ -132,7 +132,7 @@ impl TenantAdmin {
             return Err(tenant_not_suspended());
         }
         let setup = self.setup()?;
-        let (modules, control_plane) = setup.tables()?;
+        let (modules, control_plane) = setup.tenant_tables()?;
         let retained = setup.retained()?;
         // Database của khách: mở theo placement (khách tạm khoá vẫn mở được — chỉ request bị chặn).
         let context = self.registry().tenant(tenant_id).await?;

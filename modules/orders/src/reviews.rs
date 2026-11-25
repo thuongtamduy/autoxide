@@ -880,7 +880,8 @@ impl OrdersService {
 
     /// Tài khoản bị xoá (`privacy::USER_DELETED`): xoá phiếu của người đó (trừ đếm cùng transaction)
     /// và đánh giá của người đó (trừ thống kê). Nhận lại event: không còn gì để trừ.
-    async fn forget_user(&self, tenant: &TenantContext, user: Uuid) -> Result<(), Error> {
+    // Không dùng `self`: module đang tắt (chế độ "nghỉ") gọi được mà không có service.
+    async fn forget_user(tenant: &TenantContext, user: Uuid) -> Result<(), Error> {
         let database = tenant.database();
         database
             .write_with_retry(move || async move {
@@ -982,20 +983,18 @@ impl JobHandler for SummarizeJob {
     }
 }
 
-pub(crate) fn subscriptions(service: &Arc<OrdersService>) -> Vec<Subscription> {
-    vec![Subscription::optional(
-        autoxide_kernel::privacy::USER_DELETED,
-        Arc::new(UserDeleted(service.clone())),
-    )]
+pub(crate) fn subscriptions() -> Vec<Subscription> {
+    vec![Subscription::optional(autoxide_kernel::privacy::USER_DELETED, Arc::new(UserDeleted))]
 }
 
-struct UserDeleted(Arc<OrdersService>);
+/// Bên nghe `privacy::USER_DELETED` — cả khi module đang tắt (chế độ "nghỉ", bước 70 P9).
+pub(crate) struct UserDeleted;
 
 #[async_trait::async_trait]
 impl EventHandler for UserDeleted {
     async fn handle(&self, event: &Delivered) -> Result<(), Error> {
         let Some(user) = autoxide_kernel::privacy::deleted_user(event) else { return Ok(()) };
-        self.0.forget_user(&event.tenant, user).await
+        OrdersService::forget_user(&event.tenant, user).await
     }
 }
 

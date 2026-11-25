@@ -9,10 +9,11 @@
 
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
-use autoxide_kernel::event::Actor;
+use autoxide_kernel::event::{Actor, Outbox};
 use autoxide_kernel::secret::sha256;
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use autoxide_kernel::time::Timestamp;
+use autoxide_kernel::tokens::OneTimeTokens;
 use jiff::SignedDuration;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter, Set,
@@ -208,7 +209,15 @@ impl CommentsService {
         }
         let transaction = tenant.database().begin_write().await?;
         let actor = principal.map_or_else(Actor::public, Actor::from);
-        soft_delete(self, &transaction, tenant, &before, Deletion::ByAuthor(actor)).await?;
+        soft_delete(
+            &self.tokens,
+            Some(&self.outbox),
+            &transaction,
+            tenant,
+            &before,
+            Deletion::ByAuthor(actor),
+        )
+        .await?;
         transaction.commit().await?;
         Ok(())
     }
@@ -329,9 +338,11 @@ pub(crate) enum Deletion {
 }
 
 /// Xoá mềm `before` trong `connection`: bỏ chữ, tên, email, token sửa; giữ chỗ trong luồng; bỏ
-/// theo dõi trả lời và token của nó; số đếm.
+/// theo dõi trả lời và token của nó; số đếm. Event `comments.comment_deleted` (xoá bởi tác giả) ghi
+/// qua `outbox`; `None` chỉ khi module đang tắt (chế độ nghỉ, bước 70 P9 — chỉ xoá dữ liệu cá nhân).
 pub(crate) async fn soft_delete<C: ConnectionTrait>(
-    service: &CommentsService,
+    tokens: &OneTimeTokens,
+    outbox: Option<&Outbox>,
     connection: &C,
     tenant: &TenantContext,
     before: &comment::Model,
@@ -362,13 +373,12 @@ pub(crate) async fn soft_delete<C: ConnectionTrait>(
         .scoped(tenant)
         .exec(connection)
         .await?;
-    service.tokens.forget(connection, tenant, &before.id.to_string()).await?;
-    if let Deletion::ByAuthor(actor) = how {
+    tokens.forget(connection, tenant, &before.id.to_string()).await?;
+    if let (Deletion::ByAuthor(actor), Some(outbox)) = (how, outbox) {
         let mut after_summary = summary(&after);
         after_summary["hard"] = json!(false);
         let change = Change { before: Some(summary(before)), after: Some(after_summary) };
-        service
-            .outbox
+        outbox
             .record(
                 connection,
                 tenant,

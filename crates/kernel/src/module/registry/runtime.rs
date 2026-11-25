@@ -283,6 +283,28 @@ impl Modules {
         with_jobs.map(|module| module.name()).collect()
     }
 
+    /// The modules that delete or anonymize their data when an account is deleted (they receive
+    /// [`USER_DELETED`](crate::privacy::USER_DELETED)): enabled modules through `Module::subscriptions`,
+    /// turned-off modules through `Module::dormant` (D-20261125-dormant-modules). Call after
+    /// [`start`](Self::start).
+    // Cho test của chương trình (crate `autoxide`); không thuộc hợp đồng.
+    #[doc(hidden)]
+    pub fn user_deleted_receivers(&self) -> Vec<&'static str> {
+        let mut receivers: Vec<&'static str> = self
+            .modules
+            .iter()
+            .filter(|module| {
+                module
+                    .subscriptions()
+                    .iter()
+                    .any(|subscription| subscription.event() == crate::privacy::USER_DELETED)
+            })
+            .map(|module| module.name())
+            .collect();
+        receivers.extend(self.dormant_subscriptions.iter().map(|(module, _)| *module));
+        receivers
+    }
+
     /// The event dispatcher: reads the event tables of every module that emits events on every database of
     /// the database registry, delivering to the subscriptions of every module. Call after
     /// [`start`](Self::start). Subscribing to an event nobody declares is a startup error.
@@ -320,6 +342,8 @@ impl Modules {
         if !problems.is_empty() {
             return Err(ModuleError(problems.join("; ")));
         }
+        // Module đang tắt chỉ nhận event xoá tài khoản (chế độ "nghỉ", bước 70 P9).
+        subscriptions.extend(self.dormant_subscriptions.iter().cloned());
         Ok(Dispatcher::new(databases, self.events.modules(), subscriptions, Arc::clone(&self.wake))
             .with_entitlements(self.entitlements.clone()))
     }
@@ -430,7 +454,7 @@ impl Modules {
     }
 
     pub fn migrator(&self) -> Result<Migrator, MigrationError> {
-        let modules = self
+        let mut modules: Vec<ModuleMigrations> = self
             .modules
             .iter()
             .map(|module| {
@@ -438,6 +462,13 @@ impl Modules {
                     .with_upgrades(module.upgrades())
             })
             .collect();
+        // Module đang tắt (chế độ "nghỉ"): migration chỉ áp ở database đã có bảng của nó, để phần xuất / xoá dữ
+        // liệu cá nhân chạy trên schema mới sau nâng cấp; database mới không bao giờ có bảng của nó.
+        modules.extend(self.dormant.iter().map(|module| {
+            ModuleMigrations::new(module.name(), module.migrations())
+                .with_upgrades(module.upgrades())
+                .where_installed()
+        }));
         Ok(Migrator::new(modules)?.with_keys(self.keys.clone()))
     }
 }

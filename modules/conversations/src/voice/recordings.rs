@@ -249,53 +249,122 @@ impl ConversationsService {
         }
         Ok(count)
     }
+}
 
-    /// Tài khoản `user` bị xoá: xoá bản ghi các cuộc gọi của người đó, xoá số trong yêu cầu gọi lại.
-    pub(crate) async fn forget_calls(
-        &self,
-        tenant: &TenantContext,
-        user: Uuid,
-        threads: &[Uuid],
-    ) -> Result<(), Error> {
-        let calls = call::Entity::find()
-            .filter(
-                sea_orm::Condition::any()
-                    .add(call::Column::CallerUserId.eq(user))
-                    .add(call::Column::ThreadId.is_in(threads.to_vec())),
-            )
-            .scoped(tenant)
-            .all(tenant.database().read())
-            .await?;
-        for row in calls {
-            self.erase_recording(tenant, Actor::system(), &row, "account_deleted").await?;
+/// Ai xoá bản ghi cuộc gọi khi tài khoản bị xoá: service (module đang bật, ghi cả event), hay phần "nghỉ" của
+/// module đang tắt (bước 70 P9) với kho dùng chung và bộ nối thoại của module đang bật.
+pub(crate) enum RecordingEraser<'a> {
+    Service(&'a ConversationsService),
+    Dormant {
+        storage: Option<Arc<dyn Storage>>,
+        voice: &'a [Arc<dyn autoxide_kernel::voice::VoiceProvider>],
+    },
+}
+
+impl RecordingEraser<'_> {
+    async fn erase(&self, tenant: &TenantContext, row: &Call) -> Result<(), Error> {
+        match self {
+            RecordingEraser::Service(service) => {
+                service.erase_recording(tenant, Actor::system(), row, "account_deleted").await?;
+            }
+            RecordingEraser::Dormant { storage, voice } => {
+                if row.recording_ref.is_none() && row.provider_recording_id.is_none() {
+                    return Ok(());
+                }
+                // Thiếu kho hay bộ nối thì báo lỗi: event xoá tài khoản được thử lại, không báo xong khi bản
+                // ghi còn nằm lại.
+                if let Some(key) = &row.recording_ref {
+                    let storage = storage.clone().ok_or_else(|| {
+                        Error::internal(
+                            "module `conversations` is turned off and no file storage is available \
+                             (module `files` and AUTOXIDE_FILES_*): a call recording of a deleted \
+                             account cannot be deleted yet",
+                        )
+                    })?;
+                    TenantStorage::new(storage, tenant).delete(key).await?;
+                }
+                if let Some(id) = &row.provider_recording_id {
+                    let provider = voice
+                        .iter()
+                        .find(|found| found.provider() == row.provider)
+                        .ok_or_else(|| {
+                            Error::internal(format!(
+                                "module `conversations` is turned off and the voice provider \
+                                     `{}` is not on: a call recording of a deleted account cannot \
+                                     be deleted at the provider yet",
+                                row.provider
+                            ))
+                        })?;
+                    provider.delete_recording(tenant.id(), id).await?;
+                }
+                // Không ghi event `recording_deleted`: không ai giao event của module đang tắt.
+                call::Entity::update_many()
+                    .col_expr(call::Column::RecordingRef, Expr::value(Option::<String>::None))
+                    .col_expr(
+                        call::Column::ProviderRecordingId,
+                        Expr::value(Option::<String>::None),
+                    )
+                    .col_expr(
+                        call::Column::RecordingExpiresAt,
+                        Expr::value(Option::<Timestamp>::None),
+                    )
+                    .col_expr(call::Column::UpdatedAt, Expr::value(now()))
+                    .filter(call::Column::Id.eq(row.id))
+                    .scoped(tenant)
+                    .exec(tenant.database().write())
+                    .await?;
+            }
         }
-        let at = now();
-        // Yêu cầu còn mở của người đó: huỷ (không ai gọi tới số đã xoá).
-        callback::Entity::update_many()
-            .col_expr(callback::Column::Status, Expr::value("cancelled"))
-            .filter(callback::Column::RequesterUserId.eq(user))
-            .filter(callback::Column::Status.is_in(["open", "calling"]))
-            .scoped(tenant)
-            .exec(tenant.database().write())
-            .await?;
-        callback::Entity::update_many()
-            .col_expr(callback::Column::PhoneSealed, Expr::value(Option::<String>::None))
-            .col_expr(callback::Column::PhoneMasked, Expr::value(""))
-            .col_expr(callback::Column::RequesterUserId, Expr::value(Option::<Uuid>::None))
-            .col_expr(callback::Column::OpenKey, Expr::value(Option::<String>::None))
-            .col_expr(callback::Column::UpdatedAt, Expr::value(at))
-            .filter(callback::Column::RequesterUserId.eq(user))
-            .scoped(tenant)
-            .exec(tenant.database().write())
-            .await?;
-        call::Entity::update_many()
-            .col_expr(call::Column::CallerUserId, Expr::value(Option::<Uuid>::None))
-            .filter(call::Column::CallerUserId.eq(user))
-            .scoped(tenant)
-            .exec(tenant.database().write())
-            .await?;
         Ok(())
     }
+}
+
+/// Tài khoản `user` bị xoá: xoá bản ghi các cuộc gọi của người đó (nội dung trước, cột sau: lỗi thì trả lỗi khi
+/// dòng còn nguyên), xoá số trong yêu cầu gọi lại.
+pub(crate) async fn forget_calls(
+    eraser: &RecordingEraser<'_>,
+    tenant: &TenantContext,
+    user: Uuid,
+    threads: &[Uuid],
+) -> Result<(), Error> {
+    let calls = call::Entity::find()
+        .filter(
+            sea_orm::Condition::any()
+                .add(call::Column::CallerUserId.eq(user))
+                .add(call::Column::ThreadId.is_in(threads.to_vec())),
+        )
+        .scoped(tenant)
+        .all(tenant.database().read())
+        .await?;
+    for row in calls {
+        eraser.erase(tenant, &row).await?;
+    }
+    let at = now();
+    // Yêu cầu còn mở của người đó: huỷ (không ai gọi tới số đã xoá).
+    callback::Entity::update_many()
+        .col_expr(callback::Column::Status, Expr::value("cancelled"))
+        .filter(callback::Column::RequesterUserId.eq(user))
+        .filter(callback::Column::Status.is_in(["open", "calling"]))
+        .scoped(tenant)
+        .exec(tenant.database().write())
+        .await?;
+    callback::Entity::update_many()
+        .col_expr(callback::Column::PhoneSealed, Expr::value(Option::<String>::None))
+        .col_expr(callback::Column::PhoneMasked, Expr::value(""))
+        .col_expr(callback::Column::RequesterUserId, Expr::value(Option::<Uuid>::None))
+        .col_expr(callback::Column::OpenKey, Expr::value(Option::<String>::None))
+        .col_expr(callback::Column::UpdatedAt, Expr::value(at))
+        .filter(callback::Column::RequesterUserId.eq(user))
+        .scoped(tenant)
+        .exec(tenant.database().write())
+        .await?;
+    call::Entity::update_many()
+        .col_expr(call::Column::CallerUserId, Expr::value(Option::<Uuid>::None))
+        .filter(call::Column::CallerUserId.eq(user))
+        .scoped(tenant)
+        .exec(tenant.database().write())
+        .await?;
+    Ok(())
 }
 
 pub(crate) fn recording_not_found(id: Uuid) -> Error {

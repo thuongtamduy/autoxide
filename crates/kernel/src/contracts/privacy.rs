@@ -41,8 +41,8 @@ pub trait PersonalData: Send + Sync {
     async fn export(&self, tenant: &TenantContext, user_id: Uuid) -> Result<Value, Error>;
 }
 
-/// Part of a module: (module name, exporter).
-type Exporter = (&'static str, Arc<dyn PersonalData>);
+/// Part of a module: (module name, exporter, the module is turned off — dormant mode, step 70 P9).
+type Exporter = (&'static str, Arc<dyn PersonalData>, bool);
 
 /// Registry of the registered [`PersonalData`] exporters, shared by all modules. Cloning is cheap: every
 /// clone sees the same registry, including registrations made after the clone.
@@ -62,14 +62,41 @@ impl PersonalDataExport {
         module: &'static str,
         exporter: Arc<dyn PersonalData>,
     ) -> Result<(), Error> {
+        self.insert(module, exporter, false)
+    }
+
+    /// Registers the part of module `module`, which is turned off (dormant mode,
+    /// D-20261125-dormant-modules): it is asked only for tenants whose database has the module's tables.
+    pub(crate) fn register_dormant(
+        &self,
+        module: &'static str,
+        exporter: Arc<dyn PersonalData>,
+    ) -> Result<(), Error> {
+        self.insert(module, exporter, true)
+    }
+
+    fn insert(
+        &self,
+        module: &'static str,
+        exporter: Arc<dyn PersonalData>,
+        dormant: bool,
+    ) -> Result<(), Error> {
         let mut exporters = self.exporters.write().map_err(|_| poisoned())?;
-        if exporters.iter().any(|(name, _)| *name == module) {
+        if exporters.iter().any(|(name, _, _)| *name == module) {
             return Err(Error::internal(format!(
-                "module `{module}` registers personal data twice; register it once in `start`"
+                "module `{module}` registers personal data twice; register it once"
             )));
         }
-        exporters.push((module, exporter));
+        exporters.push((module, exporter, dormant));
         Ok(())
+    }
+
+    /// Names of the modules that registered a part (turned-off modules included), in registration order.
+    // Cho test của chương trình (crate `autoxide` kiểm mọi module có phần "nghỉ"); không thuộc hợp đồng.
+    #[doc(hidden)]
+    pub fn modules(&self) -> Result<Vec<&'static str>, Error> {
+        let exporters = self.exporters.read().map_err(|_| poisoned())?;
+        Ok(exporters.iter().map(|(name, _, _)| *name).collect())
     }
 
     /// Data of user `user_id` of tenant `tenant` from every registered module, keyed by module
@@ -81,7 +108,11 @@ impl PersonalDataExport {
     ) -> Result<BTreeMap<&'static str, Value>, Error> {
         let exporters = self.exporters.read().map_err(|_| poisoned())?.clone();
         let mut data = BTreeMap::new();
-        for (module, exporter) in exporters {
+        for (module, exporter, dormant) in exporters {
+            // Module đang tắt mà database của khách chưa từng có bảng của nó: không có dữ liệu.
+            if dormant && !crate::module::installed(module, tenant).await? {
+                continue;
+            }
             data.insert(module, exporter.export(tenant, user_id).await?);
         }
         Ok(data)

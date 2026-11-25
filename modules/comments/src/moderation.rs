@@ -463,7 +463,15 @@ impl CommentsService {
             .await?;
         let mut ids = Vec::new();
         for row in &rows {
-            soft_delete(self, &transaction, tenant, row, Deletion::Erased).await?;
+            soft_delete(
+                &self.tokens,
+                Some(&self.outbox),
+                &transaction,
+                tenant,
+                row,
+                Deletion::Erased,
+            )
+            .await?;
             ids.push(row.id);
         }
         let follows = subscription::Entity::delete_many()

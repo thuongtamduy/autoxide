@@ -136,28 +136,24 @@ impl AnalyticsService {
             .collect();
         let mut forgotten = 0;
         for chunk in withdrawn.chunks(500) {
-            forgotten += self.forget_users(tenant, chunk).await?;
+            forgotten += forget_users(tenant, chunk).await?;
         }
         Ok(forgotten)
     }
+}
 
-    /// Gỡ `user_id` khỏi mọi sự kiện của `users` ở khách `tenant`.
-    pub(crate) async fn forget_users(
-        &self,
-        tenant: &TenantContext,
-        users: &[Uuid],
-    ) -> Result<u64, Error> {
-        if users.is_empty() {
-            return Ok(0);
-        }
-        Ok(event::Entity::update_many()
-            .col_expr(event::Column::UserId, Expr::value(Option::<Uuid>::None))
-            .filter(event::Column::TenantId.eq(tenant.id().as_uuid()))
-            .filter(event::Column::UserId.is_in(users.iter().copied()))
-            .exec(tenant.database().write())
-            .await?
-            .rows_affected)
+/// Gỡ `user_id` khỏi mọi sự kiện của `users` ở khách `tenant`.
+pub(crate) async fn forget_users(tenant: &TenantContext, users: &[Uuid]) -> Result<u64, Error> {
+    if users.is_empty() {
+        return Ok(0);
     }
+    Ok(event::Entity::update_many()
+        .col_expr(event::Column::UserId, Expr::value(Option::<Uuid>::None))
+        .filter(event::Column::TenantId.eq(tenant.id().as_uuid()))
+        .filter(event::Column::UserId.is_in(users.iter().copied()))
+        .exec(tenant.database().write())
+        .await?
+        .rows_affected)
 }
 
 /// Người dùng rút đồng ý (`compliance.consent_withdrawn`) hay bị xoá (`auth.user_deleted`).
@@ -167,7 +163,7 @@ pub(crate) struct Forget(pub Arc<AnalyticsService>);
 impl EventHandler for Forget {
     async fn handle(&self, delivered: &Delivered) -> Result<(), Error> {
         if let Some(user) = autoxide_kernel::privacy::deleted_user(delivered) {
-            self.0.forget_users(&delivered.tenant, &[user]).await?;
+            forget_users(&delivered.tenant, &[user]).await?;
             return Ok(());
         }
         // Rút đồng ý: payload không nói của ai, nên hỏi lại sổ đồng ý cho mọi người còn gắn sự kiện.
@@ -184,24 +180,51 @@ impl EventHandler for Forget {
 #[async_trait::async_trait]
 impl PersonalData for AnalyticsService {
     async fn export(&self, tenant: &TenantContext, user_id: Uuid) -> Result<Value, Error> {
-        let rows = event::Entity::find()
-            .filter(event::Column::TenantId.eq(tenant.id().as_uuid()))
-            .filter(event::Column::UserId.eq(user_id))
-            .order_by_asc(event::Column::OccurredAt)
-            .all(tenant.database().read())
-            .await?;
-        let events: Vec<Value> = rows
-            .into_iter()
-            .map(|row| {
-                json!({
-                    "occurred_at": row.occurred_at,
-                    "type": row.kind,
-                    "path": row.path,
-                    "object": row.object,
-                    "site": row.site_org_id,
-                })
-            })
-            .collect();
-        Ok(json!({ "events": events }))
+        export(tenant, user_id).await
     }
+}
+
+/// Phần dữ liệu cá nhân của `analytics` khi module đang tắt (chế độ nghỉ, bước 70 P9): xuất sự kiện
+/// còn gắn với người dùng, và gỡ `user_id` khi tài khoản bị xoá — cùng hàm với lúc bật, không cần
+/// service. Rút đồng ý thì không: module tắt không nhận event nào ngoài `auth.user_deleted`.
+pub(crate) struct DormantPrivacy;
+
+#[async_trait::async_trait]
+impl PersonalData for DormantPrivacy {
+    async fn export(&self, tenant: &TenantContext, user_id: Uuid) -> Result<Value, Error> {
+        export(tenant, user_id).await
+    }
+}
+
+#[async_trait::async_trait]
+impl EventHandler for DormantPrivacy {
+    async fn handle(&self, delivered: &Delivered) -> Result<(), Error> {
+        if let Some(user) = autoxide_kernel::privacy::deleted_user(delivered) {
+            forget_users(&delivered.tenant, &[user]).await?;
+        }
+        Ok(())
+    }
+}
+
+/// Sự kiện còn gắn với người `user_id`.
+async fn export(tenant: &TenantContext, user_id: Uuid) -> Result<Value, Error> {
+    let rows = event::Entity::find()
+        .filter(event::Column::TenantId.eq(tenant.id().as_uuid()))
+        .filter(event::Column::UserId.eq(user_id))
+        .order_by_asc(event::Column::OccurredAt)
+        .all(tenant.database().read())
+        .await?;
+    let events: Vec<Value> = rows
+        .into_iter()
+        .map(|row| {
+            json!({
+                "occurred_at": row.occurred_at,
+                "type": row.kind,
+                "path": row.path,
+                "object": row.object,
+                "site": row.site_org_id,
+            })
+        })
+        .collect();
+    Ok(json!({ "events": events }))
 }

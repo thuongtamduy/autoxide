@@ -334,6 +334,7 @@ Các crate của core chưa có trên crates.io; cho tới khi có, git tag là 
 - [ ] Tool MCP cho những việc agent nên làm được
 - [ ] Mã lỗi có tiền tố tên module và có bản dịch
 - [ ] Dữ liệu về một người dùng bị xoá khi có `USER_DELETED`
+- [ ] Giữ dữ liệu cá nhân? Cài thêm `Module::dormant`: đăng ký cùng phần xuất (`context.personal_data`) và bên nghe `USER_DELETED` (`context.on_user_deleted`), dựng không cần service, để module đang tắt vẫn xuất và xoá được dữ liệu của một người (xem `modules/notes/src/lib.rs`)
 - [ ] Cấu hình mang tiền tố riêng của bạn, khai bằng `Setting`
 - [ ] Test trên SQLite và PostgreSQL, gồm ghi đồng thời, cách ly giữa các khách và luật của bảng
 - [ ] `cargo xtask check-module` không báo vi phạm

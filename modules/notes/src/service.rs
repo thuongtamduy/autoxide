@@ -284,58 +284,82 @@ impl NoteService {
 #[async_trait::async_trait]
 impl PersonalData for NoteService {
     async fn export(&self, tenant: &TenantContext, user_id: Uuid) -> Result<Value, Error> {
-        let notes = Entity::find()
-            .filter(Column::OwnerId.eq(user_id))
-            .scoped(tenant)
-            .order_by_asc(Column::Id)
-            .all(tenant.database().read())
-            .await?;
-        let notes: Vec<Value> = notes
-            .iter()
-            .map(|note| {
-                json!({
-                    "id": note.id,
-                    "title": note.title,
-                    "body": note.body,
-                    "created_at": note.created_at,
-                    "updated_at": note.updated_at,
-                })
-            })
-            .collect();
-        Ok(Value::Array(notes))
+        export_notes(tenant, user_id).await
     }
 }
 
-/// Tài khoản bị xoá thì xoá mọi ghi chú của người đó — trong khách của event (cùng người ở khách
-/// khác là tài khoản khác). Nhận lại event cũng không sao: lần sau không còn gì để xoá.
+/// Tài khoản bị xoá thì xoá mọi ghi chú của người đó.
 #[async_trait::async_trait]
 impl EventHandler for NoteService {
     async fn handle(&self, event: &Delivered) -> Result<(), Error> {
-        let Some(user_id) = deleted_user(event) else {
-            return Ok(());
-        };
-        let tenant = &event.tenant;
-        let transaction = tenant.database().begin_write().await?;
-        let notes = Entity::find()
-            .filter(Column::OwnerId.eq(user_id))
-            .scoped(tenant)
-            .all(&transaction)
-            .await?;
-        let deleted = Entity::delete_many()
-            .filter(Column::OwnerId.eq(user_id))
-            .scoped(tenant)
-            .exec(&transaction)
-            .await?;
-        // App ngoại tuyến của người khác (vd quản lý thấy ghi chú cả nút) nhận dấu xoá.
-        for note in &notes {
-            self.sync
-                .deleted(&transaction, tenant, &NOTES_SYNC, note.id, target(tenant, note))
-                .await?;
-        }
-        transaction.commit().await?;
-        tracing::info!(user_id = %user_id, notes = deleted.rows_affected, "notes of a deleted user removed");
-        Ok(())
+        forget_user(&self.sync, event).await
     }
+}
+
+/// Phần dữ liệu cá nhân của module khi nó đang tắt (chế độ "nghỉ", bước 70 P9): cùng bản xuất và cùng
+/// việc xoá như khi bật, chỉ cần luồng thay đổi — không cần cả service.
+pub(crate) struct DormantNotes {
+    pub sync: SyncLog,
+}
+
+#[async_trait::async_trait]
+impl PersonalData for DormantNotes {
+    async fn export(&self, tenant: &TenantContext, user_id: Uuid) -> Result<Value, Error> {
+        export_notes(tenant, user_id).await
+    }
+}
+
+#[async_trait::async_trait]
+impl EventHandler for DormantNotes {
+    async fn handle(&self, event: &Delivered) -> Result<(), Error> {
+        forget_user(&self.sync, event).await
+    }
+}
+
+async fn export_notes(tenant: &TenantContext, user_id: Uuid) -> Result<Value, Error> {
+    let notes = Entity::find()
+        .filter(Column::OwnerId.eq(user_id))
+        .scoped(tenant)
+        .order_by_asc(Column::Id)
+        .all(tenant.database().read())
+        .await?;
+    let notes: Vec<Value> = notes
+        .iter()
+        .map(|note| {
+            json!({
+                "id": note.id,
+                "title": note.title,
+                "body": note.body,
+                "created_at": note.created_at,
+                "updated_at": note.updated_at,
+            })
+        })
+        .collect();
+    Ok(Value::Array(notes))
+}
+
+/// Xoá mọi ghi chú của người bị xoá tài khoản — trong khách của event (cùng người ở khách khác là tài
+/// khoản khác). Nhận lại event cũng không sao: lần sau không còn gì để xoá.
+async fn forget_user(sync: &SyncLog, event: &Delivered) -> Result<(), Error> {
+    let Some(user_id) = deleted_user(event) else {
+        return Ok(());
+    };
+    let tenant = &event.tenant;
+    let transaction = tenant.database().begin_write().await?;
+    let notes =
+        Entity::find().filter(Column::OwnerId.eq(user_id)).scoped(tenant).all(&transaction).await?;
+    let deleted = Entity::delete_many()
+        .filter(Column::OwnerId.eq(user_id))
+        .scoped(tenant)
+        .exec(&transaction)
+        .await?;
+    // App ngoại tuyến của người khác (vd quản lý thấy ghi chú cả nút) nhận dấu xoá.
+    for note in &notes {
+        sync.deleted(&transaction, tenant, &NOTES_SYNC, note.id, target(tenant, note)).await?;
+    }
+    transaction.commit().await?;
+    tracing::info!(user_id = %user_id, notes = deleted.rows_affected, "notes of a deleted user removed");
+    Ok(())
 }
 
 #[async_trait::async_trait]

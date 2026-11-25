@@ -113,6 +113,21 @@ impl<'c> SchemaManager<'c> {
     }
 }
 
+/// Whether the module whose history table is `history` is installed on `connection`: the table exists AND
+/// records at least one applied migration. `migrate down` of every migration leaves an empty history table:
+/// that module counts as not installed (dormant mode: `up` of a turned-off module skips it, nothing is
+/// pending, its tables are not created again). The one definition every check uses.
+pub(crate) async fn installed<C: ConnectionTrait>(
+    connection: &C,
+    history: &str,
+) -> Result<bool, DbErr> {
+    if !has_table(connection, history).await? {
+        return Ok(false);
+    }
+    let query = Query::select().expr(Expr::val(1)).from(table_iden(history)).limit(1).to_owned();
+    Ok(connection.query_one(&query).await?.is_some())
+}
+
 /// Whether table `table` exists, reading only the catalog (works for users without DDL permission), like
 /// `sea-schema`.
 pub(crate) async fn has_table<C: ConnectionTrait>(

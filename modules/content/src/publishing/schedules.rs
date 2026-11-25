@@ -15,7 +15,7 @@ use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
-use autoxide_kernel::event::Actor;
+use autoxide_kernel::event::{Actor, Outbox};
 use autoxide_kernel::job::{EnqueueOptions, Job, JobContext, JobHandler};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use sea_orm::sea_query::Expr;
@@ -301,7 +301,7 @@ impl ContentService {
             if error.code() == "content.not_found" { schedule_not_found(id) } else { error }
         })?;
         let transaction = tenant.database().begin_write().await?;
-        let canceled = self.set_schedule_status(tenant, &transaction, id, "canceled", None).await?;
+        let canceled = set_schedule_status(tenant, &transaction, id, "canceled", None).await?;
         let Some(after) = canceled else {
             return Err(Error::conflict(
                 "content.schedule_not_pending",
@@ -356,7 +356,7 @@ impl ContentService {
                 tracing::warn!(schedule_id = %id, code, "content schedule failed");
                 let transaction = tenant.database().begin_write().await?;
                 if let Some(after) =
-                    self.set_schedule_status(tenant, &transaction, id, "failed", Some(code)).await?
+                    set_schedule_status(tenant, &transaction, id, "failed", Some(code)).await?
                 {
                     let change = Change {
                         before: Some(schedule_summary(&row)),
@@ -414,11 +414,7 @@ impl ContentService {
         let transaction = tenant.database().begin_write().await?;
         paths::lock_tree(&transaction, tenant, &entry.locale).await?;
         // Nhận lịch: chỉ một lần chạy qua được câu này.
-        if self
-            .set_schedule_status(tenant, &transaction, row.id, "succeeded", None)
-            .await?
-            .is_none()
-        {
+        if set_schedule_status(tenant, &transaction, row.id, "succeeded", None).await?.is_none() {
             return Ok(());
         }
         let current = entry::Entity::find_by_id(row.entry_id)
@@ -532,30 +528,6 @@ impl ContentService {
         Ok(())
     }
 
-    /// Đổi trạng thái lịch `id` từ `scheduled` sang `status`; `None` nếu lịch không còn chờ.
-    async fn set_schedule_status<C: sea_orm::ConnectionTrait>(
-        &self,
-        tenant: &TenantContext,
-        connection: &C,
-        id: Uuid,
-        status: &str,
-        error: Option<&str>,
-    ) -> Result<Option<Schedule>, Error> {
-        let updated = schedule::Entity::update_many()
-            .scoped(tenant)
-            .col_expr(schedule::Column::Status, Expr::value(status))
-            .col_expr(schedule::Column::ErrorCode, Expr::value(error.map(str::to_owned)))
-            .col_expr(schedule::Column::UpdatedAt, Expr::value(now()))
-            .filter(schedule::Column::Id.eq(id))
-            .filter(schedule::Column::Status.eq("scheduled"))
-            .exec(connection)
-            .await?;
-        if updated.rows_affected == 0 {
-            return Ok(None);
-        }
-        Ok(schedule::Entity::find_by_id(id).scoped(tenant).one(connection).await?)
-    }
-
     /// Huỷ các lịch `actions` đang chờ của mục `entry_id`, trong `transaction` của thao tác gây
     /// ra (gỡ, lưu trữ), mỗi lịch kèm event `content.schedule_canceled`. Không huỷ thì một lịch
     /// đăng đặt từ trước sẽ đăng lại mục vừa bị gỡ hay lưu trữ. Trả số lịch đã huỷ.
@@ -577,7 +549,7 @@ impl ContentService {
         let mut canceled = 0;
         for before in pending {
             let Some(after) =
-                self.set_schedule_status(tenant, transaction, before.id, "canceled", None).await?
+                set_schedule_status(tenant, transaction, before.id, "canceled", None).await?
             else {
                 continue;
             };
@@ -599,36 +571,40 @@ impl ContentService {
         }
         Ok(canceled)
     }
+}
 
-    /// Huỷ mọi lịch đang chờ do người `user_id` đặt (tài khoản bị xoá). Trả số lịch đã huỷ.
-    pub(crate) async fn cancel_schedules_of(
-        &self,
-        tenant: &TenantContext,
-        user_id: Uuid,
-    ) -> Result<u64, Error> {
-        let pending = schedule::Entity::find()
-            .scoped(tenant)
-            .filter(schedule::Column::CreatedBy.eq(user_id))
-            .filter(schedule::Column::Status.eq("scheduled"))
-            .all(tenant.database().read())
-            .await?;
-        let mut canceled = 0;
-        // Mỗi lịch một transaction ngắn, kèm event như huỷ bằng tay (audit, webhook). Lịch vừa
-        // chạy hay vừa bị huỷ ở nơi khác thì bỏ qua: nhận lại event xoá tài khoản cũng an toàn.
-        for before in pending {
-            let transaction = tenant.database().begin_write().await?;
-            let Some(after) =
-                self.set_schedule_status(tenant, &transaction, before.id, "canceled", None).await?
-            else {
-                transaction.rollback().await?;
-                continue;
-            };
+/// Huỷ mọi lịch đang chờ do người `user_id` đặt; trả số lịch đã huỷ. Mỗi lịch kèm event
+/// `content.schedule_canceled` qua `outbox` — `None` khi module đang tắt (chế độ nghỉ, bước 70 P9):
+/// không ai phát event của module tắt, nên không ghi.
+pub(crate) async fn cancel_schedules_by(
+    tenant: &TenantContext,
+    outbox: Option<&Outbox>,
+    user_id: Uuid,
+) -> Result<u64, Error> {
+    let pending = schedule::Entity::find()
+        .scoped(tenant)
+        .filter(schedule::Column::CreatedBy.eq(user_id))
+        .filter(schedule::Column::Status.eq("scheduled"))
+        .all(tenant.database().read())
+        .await?;
+    let mut canceled = 0;
+    // Mỗi lịch một transaction ngắn, kèm event như huỷ bằng tay (audit, webhook). Lịch vừa
+    // chạy hay vừa bị huỷ ở nơi khác thì bỏ qua: nhận lại event xoá tài khoản cũng an toàn.
+    for before in pending {
+        let transaction = tenant.database().begin_write().await?;
+        let Some(after) =
+            set_schedule_status(tenant, &transaction, before.id, "canceled", None).await?
+        else {
+            transaction.rollback().await?;
+            continue;
+        };
+        if let Some(outbox) = outbox {
             let change = Change {
                 before: Some(schedule_summary(&before)),
                 after: Some(schedule_summary(&after)),
                 published: None,
             };
-            self.outbox
+            outbox
                 .record(
                     &transaction,
                     tenant,
@@ -637,11 +613,34 @@ impl ContentService {
                     &events::ScheduleCanceled(change),
                 )
                 .await?;
-            transaction.commit().await?;
-            canceled += 1;
         }
-        Ok(canceled)
+        transaction.commit().await?;
+        canceled += 1;
     }
+    Ok(canceled)
+}
+
+/// Đổi trạng thái lịch `id` từ `scheduled` sang `status`; `None` nếu lịch không còn chờ.
+async fn set_schedule_status<C: sea_orm::ConnectionTrait>(
+    tenant: &TenantContext,
+    connection: &C,
+    id: Uuid,
+    status: &str,
+    error: Option<&str>,
+) -> Result<Option<Schedule>, Error> {
+    let updated = schedule::Entity::update_many()
+        .scoped(tenant)
+        .col_expr(schedule::Column::Status, Expr::value(status))
+        .col_expr(schedule::Column::ErrorCode, Expr::value(error.map(str::to_owned)))
+        .col_expr(schedule::Column::UpdatedAt, Expr::value(now()))
+        .filter(schedule::Column::Id.eq(id))
+        .filter(schedule::Column::Status.eq("scheduled"))
+        .exec(connection)
+        .await?;
+    if updated.rows_affected == 0 {
+        return Ok(None);
+    }
+    Ok(schedule::Entity::find_by_id(id).scoped(tenant).one(connection).await?)
 }
 
 /// Bản nháp `draft` có khác phiên bản vừa đăng `version` không.

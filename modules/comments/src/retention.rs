@@ -238,7 +238,16 @@ impl CommentsService {
         };
         let done = if others > 0 {
             // `soft_delete` ghi có điều kiện trạng thái + `updated_at` (đổi rồi thì 412).
-            match soft_delete(self, &transaction, tenant, row, Deletion::Erased).await {
+            match soft_delete(
+                &self.tokens,
+                Some(&self.outbox),
+                &transaction,
+                tenant,
+                row,
+                Deletion::Erased,
+            )
+            .await
+            {
                 Ok(_) => Expired::Cleared,
                 Err(error) if error.kind() == ErrorKind::PreconditionFailed => {
                     transaction.rollback().await?;

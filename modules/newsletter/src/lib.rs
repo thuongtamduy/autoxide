@@ -213,6 +213,16 @@ impl Module for NewsletterModule {
         Ok(())
     }
 
+    // Chế độ nghỉ (bước 70 P9): module tắt vẫn xuất danh sách / chiến dịch người dùng tạo và bỏ `created_by` khi tài khoản bị
+    // xoá — cùng hàm với lúc bật, không cần service (xem `privacy.rs`).
+    fn dormant(
+        &self,
+        context: &mut autoxide_kernel::module::DormantContext<'_>,
+    ) -> Result<(), Error> {
+        context.personal_data(Arc::new(privacy::DormantPrivacy))?;
+        context.on_user_deleted(Arc::new(privacy::DormantPrivacy))
+    }
+
     fn subscriptions(&self) -> Vec<Subscription> {
         let Some(service) = self.service.clone() else {
             return Vec::new();

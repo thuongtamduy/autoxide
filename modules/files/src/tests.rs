@@ -1,6 +1,8 @@
 //! Test của nơi lưu: chạy trên ổ đĩa, và trên S3 khi `TEST_S3_ENDPOINT` được đặt (gate
 //! luôn đặt).
 
+mod dormant;
+
 use autoxide_kernel::config::{ConfigReader, ConfigSource};
 use autoxide_kernel::error::Error;
 use autoxide_kernel::storage::{ByteStream, Storage};

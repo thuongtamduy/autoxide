@@ -353,7 +353,7 @@ impl OrdersService {
         // thì câu mặc định dịch theo ngôn ngữ của đơn.
         let custom =
             tenant_sms_text(self.settings.as_ref(), tenant, setting, SMS_PLACEHOLDERS, &values)
-                .await?;
+                .await;
         let text = match custom {
             Some(text) => text,
             None => {

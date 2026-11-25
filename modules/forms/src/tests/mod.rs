@@ -11,6 +11,7 @@
 
 mod data;
 mod definitions;
+mod dormant;
 mod exports;
 mod submissions;
 

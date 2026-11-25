@@ -95,6 +95,17 @@ impl Module for NotesModule {
         })
     }
 
+    // Chế độ "nghỉ" (bước 70 P9, D-20261125-dormant-modules): module có trong chương trình nhưng đang tắt
+    // vẫn xuất và xoá ghi chú của người dùng — mẫu cho module khác giữ dữ liệu cá nhân.
+    fn dormant(
+        &self,
+        context: &mut autoxide_kernel::module::DormantContext<'_>,
+    ) -> Result<(), Error> {
+        let part = Arc::new(service::DormantNotes { sync: context.sync_log() });
+        context.personal_data(part.clone())?;
+        context.on_user_deleted(part)
+    }
+
     fn routes(&self) -> OpenApiRouter {
         self.service.clone().map_or_else(OpenApiRouter::new, http::routes)
     }

@@ -146,7 +146,7 @@ impl TenantRelocations {
         }
         let prepared = self.prepare(&spec, Some(row)).await?;
         let (source, _) = databases(&prepared)?;
-        let (tables, _) = self.resolve(&prepared, &source, &source).await?;
+        let (tables, _) = self.resolve(&prepared, &source, &source, true).await?;
         let started = options.frozen_at.unwrap_or_else(now);
         loop {
             let mut waiting = 0;
@@ -230,7 +230,7 @@ impl TenantRelocations {
         let spec = Self::spec_of(row)?;
         let prepared = self.prepare(&spec, Some(row)).await?;
         let (source, target) = databases(&prepared)?;
-        let (tables, resolved) = self.resolve(&prepared, &source, &target).await?;
+        let (tables, resolved) = self.resolve(&prepared, &source, &target, true).await?;
         let context = self.context(row.id, &prepared, &source, &target, &tables, &resolved).await?;
         Ok((prepared, tables, resolved, context))
     }

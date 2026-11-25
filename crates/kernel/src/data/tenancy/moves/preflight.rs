@@ -68,27 +68,21 @@ impl TenantMoves {
         let target_db = self.database(&target).await;
         match (source_db, target_db) {
             (Ok(source_db), Ok(target_db)) => {
-                // Lượt dời chỉ chép bảng của module đang bật (bước 70 P1): còn dữ liệu của module
-                // đang tắt thì dừng, không để nó ở lại database nguồn.
-                let left_behind =
-                    self.setup.inactive_with_data(&source_db, TenantId::from_uuid(row.id)).await?;
-                if !left_behind.is_empty() {
-                    blockers.push(errors::tenant_move_modules_off(&left_behind.join(", ")));
-                }
                 let schema = self.schema_problems(&source, &source_db, &target, &target_db).await?;
                 let schema_ok = schema.is_empty();
                 blockers.extend(schema);
                 if schema_ok {
-                    let setup = self.setup.get()?;
-                    let found = TenantTables::read(
-                        &source_db,
-                        &target_db,
-                        &setup.modules,
-                        &setup.control_plane,
-                    )
-                    .await
-                    .map_err(transfer)?;
+                    // Kiểm (cả dry run) không đổi schema (bước 70 P9): module đang tắt có bảng ở cả hai đầu thì
+                    // đọc như module bật; chỉ có ở nguồn thì đếm dòng ở nguồn — lượt chạy thật tạo bảng ở đích
+                    // trước khi chép.
+                    let (_, control_plane) = self.setup.tenant_tables()?;
+                    let (modules, source_only) =
+                        self.setup.dry_run_modules(&source_db, &target_db).await?;
                     let tenant = TenantId::from_uuid(row.id);
+                    let found =
+                        TenantTables::read(&source_db, &target_db, &modules, &control_plane)
+                            .await
+                            .map_err(transfer)?;
                     tables = found
                         .count(&source_db, tenant)
                         .await
@@ -96,6 +90,18 @@ impl TenantMoves {
                         .into_iter()
                         .map(TenantTableRows::from)
                         .collect();
+                    if !source_only.is_empty() {
+                        let only = TenantTables::read(
+                            &source_db,
+                            &source_db,
+                            &source_only,
+                            &control_plane,
+                        )
+                        .await
+                        .map_err(transfer)?;
+                        let counted = only.count(&source_db, tenant).await.map_err(transfer)?;
+                        tables.extend(counted.into_iter().map(TenantTableRows::from));
+                    }
                 }
             }
             (source_db, target_db) => {

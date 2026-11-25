@@ -167,6 +167,15 @@ impl Module for InventoryModule {
         subscriptions
     }
 
+    // Chế độ "nghỉ" (bước 70 P9): module tắt vẫn xuất / xoá đăng ký báo có hàng gắn tài khoản.
+    fn dormant(
+        &self,
+        context: &mut autoxide_kernel::module::DormantContext<'_>,
+    ) -> Result<(), Error> {
+        context.personal_data(Arc::new(alerts::AlertPrivacy))?;
+        context.on_user_deleted(Arc::new(alerts::AlertPrivacy))
+    }
+
     fn jobs(&self) -> Vec<JobRegistration> {
         self.service.as_ref().map_or_else(Vec::new, contract::registrations)
     }

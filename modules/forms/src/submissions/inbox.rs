@@ -571,43 +571,38 @@ impl FormsService {
             .map(|row| Ok(((row.form_id, row.version), from_json(&row.fields)?)))
             .collect()
     }
+}
 
-    /// Bỏ `created_by` khỏi form của một người dùng đã bị xoá.
-    pub(crate) async fn forget_creator(
-        &self,
-        tenant: &TenantContext,
-        user_id: Uuid,
-    ) -> Result<u64, Error> {
-        let updated = form::Entity::update_many()
-            .col_expr(form::Column::CreatedBy, Expr::value(Option::<Uuid>::None))
-            .scoped(tenant)
-            .filter(form::Column::CreatedBy.eq(user_id))
-            .exec(tenant.database().write())
-            .await?;
-        export::Entity::update_many()
-            .col_expr(export::Column::RequestedBy, Expr::value(Option::<Uuid>::None))
-            .scoped(tenant)
-            .filter(export::Column::RequestedBy.eq(user_id))
-            .exec(tenant.database().write())
-            .await?;
-        Ok(updated.rows_affected)
-    }
+/// Bỏ `created_by` khỏi form của một người dùng đã bị xoá.
+pub(crate) async fn forget_creator(tenant: &TenantContext, user_id: Uuid) -> Result<u64, Error> {
+    let updated = form::Entity::update_many()
+        .col_expr(form::Column::CreatedBy, Expr::value(Option::<Uuid>::None))
+        .scoped(tenant)
+        .filter(form::Column::CreatedBy.eq(user_id))
+        .exec(tenant.database().write())
+        .await?;
+    export::Entity::update_many()
+        .col_expr(export::Column::RequestedBy, Expr::value(Option::<Uuid>::None))
+        .scoped(tenant)
+        .filter(export::Column::RequestedBy.eq(user_id))
+        .exec(tenant.database().write())
+        .await?;
+    Ok(updated.rows_affected)
+}
 
-    /// Form do người dùng `user_id` tạo (cho bản xuất dữ liệu cá nhân).
-    pub(crate) async fn forms_created_by(
-        &self,
-        tenant: &TenantContext,
-        user_id: Uuid,
-    ) -> Result<Vec<Form>, Error> {
-        form::Entity::find()
-            .scoped(tenant)
-            .filter(form::Column::CreatedBy.eq(user_id))
-            .all(tenant.database().read())
-            .await?
-            .into_iter()
-            .map(Form::parse)
-            .collect()
-    }
+/// Form do người dùng `user_id` tạo (cho bản xuất dữ liệu cá nhân).
+pub(crate) async fn forms_created_by(
+    tenant: &TenantContext,
+    user_id: Uuid,
+) -> Result<Vec<Form>, Error> {
+    form::Entity::find()
+        .scoped(tenant)
+        .filter(form::Column::CreatedBy.eq(user_id))
+        .all(tenant.database().read())
+        .await?
+        .into_iter()
+        .map(Form::parse)
+        .collect()
 }
 
 /// Bài gửi của email `email` (đã chuẩn hoá): email người gửi (cột `email`) là nó, HOẶC một câu

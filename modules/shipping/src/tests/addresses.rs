@@ -227,8 +227,8 @@ async fn xuat_va_xoa_du_lieu_ca_nhan() {
         create(&app, "x", hanoi("1 A")).await;
         create(&app, "y", hanoi("9 Z")).await;
         let tenant = app.default_tenant();
-        let service = service_of(&app);
-        let exported = service.export(&tenant, Uuid::from_u128(BUYER_X)).await.unwrap();
+        let exported =
+            crate::privacy::Erasure.export(&tenant, Uuid::from_u128(BUYER_X)).await.unwrap();
         assert_eq!(exported["addresses"].as_array().unwrap().len(), 1);
         assert_eq!(exported["addresses"][0]["address"]["line"], "1 A");
 
@@ -238,7 +238,7 @@ async fn xuat_va_xoa_du_lieu_ca_nhan() {
             autoxide_kernel::privacy::USER_DELETED,
             json!({"before": {"id": Uuid::from_u128(BUYER_X)}}),
         );
-        let handler = crate::privacy::Erasure(service.clone());
+        let handler = crate::privacy::Erasure;
         handler.handle(&event).await.unwrap();
         handler.handle(&event).await.unwrap();
         let (_, list) = call(&app, "GET", "/me/addresses", "x", None).await;

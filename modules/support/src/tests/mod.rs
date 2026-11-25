@@ -2,6 +2,7 @@
 //! `TestApp` dựng module như binary: migration → start → route → lớp HTTP của kernel.
 
 mod auto;
+mod dormant;
 mod extras;
 mod guests;
 mod scope;

@@ -142,7 +142,7 @@ impl Module for CustomersModule {
             rules: context.require::<dyn autoxide_compliance::api::ComplianceRules>().ok(),
             entitlements: context.entitlements(),
         });
-        context.personal_data(service.clone())?;
+        context.personal_data(Arc::new(privacy::CustomerPrivacy))?;
         // Hồ sơ là một loại đối tượng: nhãn và ghi chú nội bộ của bước 51 gắn lên nó (D-237).
         context.resource_type(CUSTOMER, Arc::new(resource::CustomerResolver))?;
         context.taggable(CUSTOMER, permissions::MANAGE)?;
@@ -165,6 +165,15 @@ impl Module for CustomersModule {
         Ok(())
     }
 
+    // Chế độ "nghỉ" (bước 70 P9): module tắt vẫn xuất hồ sơ khách và xoá trường cá nhân.
+    fn dormant(
+        &self,
+        context: &mut autoxide_kernel::module::DormantContext<'_>,
+    ) -> Result<(), Error> {
+        context.personal_data(Arc::new(privacy::CustomerPrivacy))?;
+        context.on_user_deleted(Arc::new(privacy::CustomerPrivacy))
+    }
+
     fn subscriptions(&self) -> Vec<Subscription> {
         let Some(service) = self.service.clone() else {
             return Vec::new();
@@ -178,7 +187,7 @@ impl Module for CustomersModule {
         vec![
             Subscription::new(
                 autoxide_kernel::privacy::USER_DELETED,
-                Arc::new(privacy::ErasedUsers),
+                Arc::new(privacy::CustomerPrivacy),
             ),
             Subscription::optional(orders::ORDER_PLACED, handler.clone()),
             Subscription::optional(orders::ORDER_STATUS_CHANGED, handler.clone()),

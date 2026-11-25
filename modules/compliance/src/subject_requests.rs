@@ -363,7 +363,7 @@ impl ComplianceService {
                 );
             }
             ("erasure", ConsentSubject::User(user)) => {
-                self.erase_user(tenant, *user).await?;
+                Self::erase_user(tenant, *user).await?;
                 erased = Some(1);
                 next_steps = Some(format!(
                     "Delete the account itself with DELETE /api/v1/auth/users/{user}: every module then \

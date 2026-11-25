@@ -192,6 +192,16 @@ impl Module for MediaModule {
         context.provide::<dyn api::Media>(service)
     }
 
+    // Chế độ nghỉ (bước 70 P9): module tắt vẫn xuất item người dùng tải lên và bỏ liên kết khi tài
+    // khoản bị xoá — cùng hàm với lúc bật, không cần service (xem `service.rs`).
+    fn dormant(
+        &self,
+        context: &mut autoxide_kernel::module::DormantContext<'_>,
+    ) -> Result<(), Error> {
+        context.personal_data(Arc::new(service::DormantPrivacy))?;
+        context.on_user_deleted(Arc::new(service::DormantPrivacy))
+    }
+
     fn subscriptions(&self) -> Vec<Subscription> {
         // Tài khoản bị xoá: bỏ liên kết item tới người đó (item vẫn giữ).
         self.service.clone().map_or_else(Vec::new, |service| {

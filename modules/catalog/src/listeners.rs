@@ -55,11 +55,24 @@ pub(crate) fn subscriptions(service: &Arc<CatalogService>) -> Vec<Subscription> 
     ]
 }
 
+/// Bên nghe `privacy::USER_DELETED` khi module đang tắt: bỏ `created_by` như lúc bật.
+pub(crate) struct ForgetUsers;
+
+#[async_trait::async_trait]
+impl EventHandler for ForgetUsers {
+    async fn handle(&self, event: &Delivered) -> Result<(), Error> {
+        match deleted_user(event) {
+            Some(user_id) => CatalogService::forget_user(event, user_id).await,
+            None => Ok(()),
+        }
+    }
+}
+
 #[async_trait::async_trait]
 impl EventHandler for CatalogService {
     async fn handle(&self, event: &Delivered) -> Result<(), Error> {
         if let Some(user_id) = deleted_user(event) {
-            return self.forget_user(event, user_id).await;
+            return Self::forget_user(event, user_id).await;
         }
         if event.name == INVENTORY_COST_CHANGED {
             let after = &event.payload["after"];
@@ -145,7 +158,8 @@ impl EventHandler for CatalogService {
 }
 
 impl CatalogService {
-    async fn forget_user(&self, event: &Delivered, user_id: Uuid) -> Result<(), Error> {
+    // Không dùng `self`: module đang tắt (chế độ "nghỉ", bước 70 P9) gọi được qua [`ForgetUsers`].
+    async fn forget_user(event: &Delivered, user_id: Uuid) -> Result<(), Error> {
         let tenant = &event.tenant;
         let write = tenant.database().write();
         product::Entity::update_many()

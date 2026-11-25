@@ -167,15 +167,6 @@ impl TenantRelocations {
         }
         let source_placement = self.placement_row(source.placement_id).await?;
         let source_db = self.database(&source_placement).await;
-        // Tách / gộp chỉ chuyển bảng của module đang bật (bước 70 P1): còn dữ liệu của module đang
-        // tắt thì dừng, không để nó ở lại khách nguồn.
-        if let Ok(database) = &source_db {
-            let left_behind =
-                self.setup.inactive_with_data(database, TenantId::from_uuid(source.id)).await?;
-            if !left_behind.is_empty() {
-                blockers.push(tenancy::tenant_move_modules_off(&left_behind.join(", ")));
-            }
-        }
         let (target_id, target_slug, org, target_placement) = match spec.kind {
             RelocationKind::Split => {
                 let org = spec.org.unwrap_or_default();
@@ -310,8 +301,17 @@ impl TenantRelocations {
         prepared: &Prepared,
         source: &Database,
         target: &Database,
+        run: bool,
     ) -> Result<(TenantTables, Vec<Resolved>), Error> {
-        let (modules, control_plane) = self.setup.tables()?;
+        // Module đang tắt cũng đi theo nhánh (chế độ "nghỉ", bước 70 P9). Lượt chạy thật đưa bảng của nó ở hai
+        // đầu về cùng migration; kế hoạch (dry run) không đổi schema, chỉ đọc module tắt có bảng ở cả hai đầu.
+        let (modules, control_plane) = if run {
+            self.setup.prepare_dormant(source, target).await?;
+            self.setup.tenant_tables()?
+        } else {
+            let (_, control_plane) = self.setup.tenant_tables()?;
+            (self.setup.dry_run_modules(source, target).await?.0, control_plane)
+        };
         let tables =
             TenantTables::read(source, target, &modules, &control_plane).await.map_err(transfer)?;
         let resolved = self.setup.policies()?.resolve(
@@ -357,7 +357,7 @@ impl TenantRelocations {
     /// The plan of the tables (when both databases are usable).
     pub(super) async fn report(&self, prepared: &Prepared) -> Result<Option<Report>, Error> {
         let Some((source, target)) = &prepared.databases else { return Ok(None) };
-        let (tables, resolved) = self.resolve(prepared, source, target).await?;
+        let (tables, resolved) = self.resolve(prepared, source, target, false).await?;
         let context =
             self.context(Uuid::nil(), prepared, source, target, &tables, &resolved).await?;
         Ok(Some(plan::report(&tables, &resolved, &context).await?))

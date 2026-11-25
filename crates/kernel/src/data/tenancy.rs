@@ -584,16 +584,6 @@ pub mod errors {
         .with_param("placement", placement)
     }
 
-    pub fn tenant_move_modules_off(modules: &str) -> Error {
-        Error::conflict(
-            "tenant_move_modules_off",
-            "The tenant has data of modules that are turned off ({modules}); only the data of \
-             modules that are on is moved, so that data would be left behind. Turn those modules \
-             on (AUTOXIDE_MODULES) and restart, then try again.",
-        )
-        .with_param("modules", modules)
-    }
-
     pub fn tenant_residency_violation(country: &str) -> Error {
         Error::conflict(
             "tenant_residency_violation",

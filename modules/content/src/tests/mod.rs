@@ -58,6 +58,7 @@ pub(crate) async fn events(database: &Database) -> Vec<String> {
 mod agent;
 mod banners;
 mod bao_mat;
+mod dormant;
 mod entries;
 mod history;
 mod library;

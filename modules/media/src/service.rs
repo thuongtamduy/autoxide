@@ -753,52 +753,78 @@ impl MediaService {
     }
 }
 
-/// Thông tin item của một người dùng đã tải lên, cho bản xuất dữ liệu cá nhân.
 #[async_trait::async_trait]
 impl PersonalData for MediaService {
     async fn export(&self, tenant: &TenantContext, user_id: Uuid) -> Result<Value, Error> {
-        let items = Entity::find()
-            .scoped(tenant)
-            .filter(Column::UploadedBy.eq(user_id))
-            .order_by_asc(Column::Id)
-            .all(tenant.database().read())
-            .await?;
-        Ok(Value::Array(
-            items
-                .iter()
-                .map(|item| {
-                    json!({
-                        "id": item.id,
-                        "name": item.name,
-                        "content_type": item.content_type,
-                        "size": item.size,
-                        "created_at": item.created_at,
-                    })
-                })
-                .collect(),
-        ))
+        export_of_user(tenant, user_id).await
     }
+}
+
+#[async_trait::async_trait]
+impl EventHandler for MediaService {
+    async fn handle(&self, event: &Delivered) -> Result<(), Error> {
+        unlink_deleted_user(event).await
+    }
+}
+
+/// Phần dữ liệu cá nhân của `media` khi module đang tắt (chế độ nghỉ, bước 70 P9): cùng hàm với
+/// lúc bật; chỉ cần database của khách, không cần service.
+pub(crate) struct DormantPrivacy;
+
+#[async_trait::async_trait]
+impl PersonalData for DormantPrivacy {
+    async fn export(&self, tenant: &TenantContext, user_id: Uuid) -> Result<Value, Error> {
+        export_of_user(tenant, user_id).await
+    }
+}
+
+#[async_trait::async_trait]
+impl EventHandler for DormantPrivacy {
+    async fn handle(&self, event: &Delivered) -> Result<(), Error> {
+        unlink_deleted_user(event).await
+    }
+}
+
+/// Thông tin item của một người dùng đã tải lên, cho bản xuất dữ liệu cá nhân.
+async fn export_of_user(tenant: &TenantContext, user_id: Uuid) -> Result<Value, Error> {
+    let items = Entity::find()
+        .scoped(tenant)
+        .filter(Column::UploadedBy.eq(user_id))
+        .order_by_asc(Column::Id)
+        .all(tenant.database().read())
+        .await?;
+    Ok(Value::Array(
+        items
+            .iter()
+            .map(|item| {
+                json!({
+                    "id": item.id,
+                    "name": item.name,
+                    "content_type": item.content_type,
+                    "size": item.size,
+                    "created_at": item.created_at,
+                })
+            })
+            .collect(),
+    ))
 }
 
 /// Tài khoản bị xoá: item người đó tải lên KHÔNG bị xoá — thư viện là của chung, không
 /// của người tải (D-086) — chỉ bỏ liên kết tới người đó (`uploaded_by` thành `NULL`).
-#[async_trait::async_trait]
-impl EventHandler for MediaService {
-    async fn handle(&self, event: &Delivered) -> Result<(), Error> {
-        let Some(user_id) = deleted_user(event) else {
-            return Ok(());
-        };
-        // Tài khoản thuộc một khách: chỉ item của khách đó (event mang ngữ cảnh khách).
-        let tenant = &event.tenant;
-        let updated = Entity::update_many()
-            .col_expr(Column::UploadedBy, Expr::value(Option::<Uuid>::None))
-            .filter(Column::UploadedBy.eq(user_id))
-            .scoped(tenant)
-            .exec(tenant.database().write())
-            .await?;
-        tracing::info!(user_id = %user_id, items = updated.rows_affected, "media items of a deleted user unlinked");
-        Ok(())
-    }
+async fn unlink_deleted_user(event: &Delivered) -> Result<(), Error> {
+    let Some(user_id) = deleted_user(event) else {
+        return Ok(());
+    };
+    // Tài khoản thuộc một khách: chỉ item của khách đó (event mang ngữ cảnh khách).
+    let tenant = &event.tenant;
+    let updated = Entity::update_many()
+        .col_expr(Column::UploadedBy, Expr::value(Option::<Uuid>::None))
+        .filter(Column::UploadedBy.eq(user_id))
+        .scoped(tenant)
+        .exec(tenant.database().write())
+        .await?;
+    tracing::info!(user_id = %user_id, items = updated.rows_affected, "media items of a deleted user unlinked");
+    Ok(())
 }
 
 /// Đích kiểm quyền của item: nút sở hữu và người tải lên.

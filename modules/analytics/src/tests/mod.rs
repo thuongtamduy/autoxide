@@ -3,6 +3,7 @@
 //! Một module giả `shop` khai loại sự kiện (xem sản phẩm, thêm giỏ — từ trình duyệt; đã mua — từ
 //! event `shop.order_paid` của nó) và phễu `shop.checkout`, như `catalog` / `orders` sẽ làm.
 
+mod dormant;
 mod ingest;
 mod privacy;
 mod reports;

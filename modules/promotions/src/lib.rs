@@ -148,7 +148,7 @@ impl Module for PromotionsModule {
             consents: context.require::<dyn autoxide_compliance::api::ConsentLedger>().ok(),
             notifier,
         });
-        context.personal_data(service.clone())?;
+        context.personal_data(Arc::new(vouchers::PromotionsPrivacy))?;
         context.resource_type(resource::PROMOTION, Arc::new(resource::PromotionResolver))?;
         // Khối flash sale và lưu voucher cho trang dựng từ khối (bước 67).
         let block_data = Arc::new(blocks::PromotionBlocks(service.clone()));
@@ -185,8 +185,17 @@ impl Module for PromotionsModule {
     fn subscriptions(&self) -> Vec<autoxide_kernel::event::Subscription> {
         vec![autoxide_kernel::event::Subscription::new(
             autoxide_kernel::privacy::USER_DELETED,
-            Arc::new(vouchers::ErasedUsers),
+            Arc::new(vouchers::PromotionsPrivacy),
         )]
+    }
+
+    // Chế độ "nghỉ" (bước 70 P9): module tắt vẫn xuất ví voucher và thu hồi voucher của tài khoản bị xoá.
+    fn dormant(
+        &self,
+        context: &mut autoxide_kernel::module::DormantContext<'_>,
+    ) -> Result<(), autoxide_kernel::error::Error> {
+        context.personal_data(Arc::new(vouchers::PromotionsPrivacy))?;
+        context.on_user_deleted(Arc::new(vouchers::PromotionsPrivacy))
     }
 
     fn tasks(&self) -> Vec<autoxide_kernel::task::Task> {

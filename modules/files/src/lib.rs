@@ -146,6 +146,31 @@ impl Module for FilesModule {
         context.provide::<dyn Storage>(storage)
     }
 
+    // Chế độ nghỉ (bước 70 P9): module tắt vẫn xuất thông tin file của người dùng và xoá file — cả nội dung
+    // trong kho — khi tài khoản bị xoá. Kho mở từ cấu hình của chính module (module tắt vẫn đọc cấu hình), và
+    // chia cho kernel / module tắt khác. Không mở được kho thì bên nghe báo lỗi để event được thử lại, không
+    // xoá dở (xem `service::DormantPrivacy`).
+    fn dormant(
+        &self,
+        context: &mut autoxide_kernel::module::DormantContext<'_>,
+    ) -> Result<(), Error> {
+        let storage: Option<Arc<dyn Storage>> = match &self.config {
+            Some(config) => match ObjectStorage::open(&config.backend) {
+                Ok(storage) => Some(Arc::new(storage)),
+                Err(error) => {
+                    tracing::warn!(error = %error, "turned-off module `files` cannot open its storage");
+                    None
+                }
+            },
+            None => None,
+        };
+        if let Some(storage) = &storage {
+            context.share_storage(storage.clone(), Some(Arc::new(store::Opener)));
+        }
+        context.personal_data(Arc::new(service::DormantPrivacy { storage: storage.clone() }))?;
+        context.on_user_deleted(Arc::new(service::DormantPrivacy { storage }))
+    }
+
     fn subscriptions(&self) -> Vec<Subscription> {
         // Tài khoản bị xoá: xoá file của người đó.
         self.service.clone().map_or_else(Vec::new, |service| {

@@ -389,8 +389,6 @@ fn is_invisible(c: char) -> bool {
 /// Số file xoá mỗi lượt khi dọn file của một tài khoản đã xoá.
 const ERASE_BATCH: u64 = 100;
 
-/// Thông tin mọi file của người dùng (không kèm nội dung), cho bản xuất dữ liệu cá
-/// nhân. Nội dung tải từng file bằng `GET /api/v1/files/{id}/content`.
 #[async_trait::async_trait]
 impl PersonalData for FileService {
     async fn export(
@@ -398,67 +396,115 @@ impl PersonalData for FileService {
         tenant: &TenantContext,
         user_id: Uuid,
     ) -> Result<serde_json::Value, Error> {
+        export_of_user(tenant, user_id).await
+    }
+}
+
+#[async_trait::async_trait]
+impl EventHandler for FileService {
+    async fn handle(&self, event: &Delivered) -> Result<(), Error> {
+        erase_deleted_user(event, Some(&self.storage)).await
+    }
+}
+
+/// Phần dữ liệu cá nhân của `files` khi module đang tắt (chế độ nghỉ, bước 70 P9): cùng hàm với
+/// lúc bật, không cần service. Kho mở từ cấu hình của chính module (`Module::dormant`); không có kho thì bên
+/// nghe trả lỗi và event xoá tài khoản được thử lại — không xoá dòng khi nội dung còn nằm lại.
+pub(crate) struct DormantPrivacy {
+    pub(crate) storage: Option<Arc<dyn Storage>>,
+}
+
+#[async_trait::async_trait]
+impl PersonalData for DormantPrivacy {
+    async fn export(
+        &self,
+        tenant: &TenantContext,
+        user_id: Uuid,
+    ) -> Result<serde_json::Value, Error> {
+        export_of_user(tenant, user_id).await
+    }
+}
+
+#[async_trait::async_trait]
+impl EventHandler for DormantPrivacy {
+    async fn handle(&self, event: &Delivered) -> Result<(), Error> {
+        erase_deleted_user(event, self.storage.as_ref()).await
+    }
+}
+
+/// Thông tin mọi file của người dùng (không kèm nội dung), cho bản xuất dữ liệu cá
+/// nhân. Nội dung tải từng file bằng `GET /api/v1/files/{id}/content`.
+async fn export_of_user(tenant: &TenantContext, user_id: Uuid) -> Result<serde_json::Value, Error> {
+    let files = Entity::find()
+        .filter(Column::OwnerId.eq(user_id))
+        .scoped(tenant)
+        .order_by_asc(Column::Id)
+        .all(tenant.database().read())
+        .await?;
+    let files: Vec<serde_json::Value> = files
+        .iter()
+        .map(|file| {
+            json!({
+                "id": file.id,
+                "name": file.name,
+                "content_type": file.content_type,
+                "size": file.size,
+                "sha256": file.sha256,
+                "created_at": file.created_at,
+            })
+        })
+        .collect();
+    Ok(serde_json::Value::Array(files))
+}
+
+/// Tài khoản bị xoá thì xoá mọi file của người đó, từng lượt: nội dung trước, dòng sau; xoá nội dung lỗi thì
+/// trả lỗi khi dòng còn nguyên. Nhận lại event thì làm tiếp phần còn lại. Không có kho (`storage` là `None`,
+/// module tắt không mở được kho): trả lỗi, không xoá gì — event được thử lại.
+async fn erase_deleted_user(
+    event: &Delivered,
+    storage: Option<&Arc<dyn Storage>>,
+) -> Result<(), Error> {
+    let Some(user_id) = deleted_user(event) else {
+        return Ok(());
+    };
+    let tenant = &event.tenant;
+    // Không có kho (module tắt mà không mở được kho từ cấu hình): không xoá dở — báo lỗi để event được thử
+    // lại khi kho dùng được; dòng file còn nguyên nên lần sau xoá được cả nội dung.
+    let Some(storage) = storage else {
+        return Err(Error::internal(
+            "module `files` is turned off and cannot open its storage (check AUTOXIDE_FILES_*): the files \
+             of a deleted account are kept until it can delete their content too",
+        ));
+    };
+    let store = TenantStorage::new(storage.clone(), tenant);
+    let mut removed: u64 = 0;
+    loop {
         let files = Entity::find()
             .filter(Column::OwnerId.eq(user_id))
             .scoped(tenant)
             .order_by_asc(Column::Id)
-            .all(tenant.database().read())
+            .limit(ERASE_BATCH)
+            .all(tenant.database().write())
             .await?;
-        let files: Vec<serde_json::Value> = files
-            .iter()
-            .map(|file| {
-                json!({
-                    "id": file.id,
-                    "name": file.name,
-                    "content_type": file.content_type,
-                    "size": file.size,
-                    "sha256": file.sha256,
-                    "created_at": file.created_at,
-                })
-            })
-            .collect();
-        Ok(serde_json::Value::Array(files))
-    }
-}
-
-/// Tài khoản bị xoá thì xoá mọi file của người đó, từng lượt: dòng trước, nội dung sau
-/// (như [`FileService::delete`]). Nhận lại event thì làm tiếp phần còn lại.
-#[async_trait::async_trait]
-impl EventHandler for FileService {
-    async fn handle(&self, event: &Delivered) -> Result<(), Error> {
-        let Some(user_id) = deleted_user(event) else {
-            return Ok(());
-        };
-        let tenant = &event.tenant;
-        let store = self.store(tenant);
-        let mut removed: u64 = 0;
-        loop {
-            let files = Entity::find()
-                .filter(Column::OwnerId.eq(user_id))
-                .scoped(tenant)
-                .order_by_asc(Column::Id)
-                .limit(ERASE_BATCH)
-                .all(tenant.database().write())
-                .await?;
-            if files.is_empty() {
-                break;
-            }
-            let ids: Vec<Uuid> = files.iter().map(|file| file.id).collect();
-            Entity::delete_many()
-                .filter(Column::Id.is_in(ids))
-                .scoped(tenant)
-                .exec(tenant.database().write())
-                .await?;
-            for file in &files {
-                if let Err(error) = store.delete(&file.storage_key()).await {
-                    tracing::warn!(file_id = %file.id, error = %error, "file deleted but its content remains");
-                }
-            }
-            removed += files.len() as u64;
+        if files.is_empty() {
+            break;
         }
-        tracing::info!(user_id = %user_id, files = removed, "files of a deleted user removed");
-        Ok(())
+        // Xoá nội dung TRƯỚC, dòng sau: xoá nội dung lỗi thì trả lỗi khi dòng còn nguyên, event được thử lại và
+        // lần sau xoá trọn (nội dung đã mất thì `delete` coi là xong). Xoá dòng trước thì lỗi giữa chừng để lại
+        // nội dung không còn ai trỏ tới — khi module tắt không có job dọn file mồ côi.
+        for file in &files {
+            store.delete(&file.storage_key()).await?;
+        }
+        let ids: Vec<Uuid> = files.iter().map(|file| file.id).collect();
+        Entity::delete_many()
+            .filter(Column::Id.is_in(ids))
+            .scoped(tenant)
+            .exec(tenant.database().write())
+            .await?;
+        removed += files.len() as u64;
     }
+    tracing::info!(user_id = %user_id, files = removed, "files of a deleted user removed");
+    Ok(())
 }
 
 pub(crate) fn details(file: &FileRecord) -> serde_json::Value {

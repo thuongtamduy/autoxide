@@ -232,6 +232,15 @@ impl Module for NotificationsModule {
         context.provide::<dyn api::Notifier>(Arc::new(provider::Provider(service)))
     }
 
+    // Chế độ "nghỉ" (bước 70 P9): module tắt vẫn xuất hộp thư / tuỳ chọn và xoá chúng khi tài khoản bị xoá.
+    fn dormant(
+        &self,
+        context: &mut autoxide_kernel::module::DormantContext<'_>,
+    ) -> Result<(), Error> {
+        context.personal_data(Arc::new(privacy::NotificationsPersonalData))?;
+        context.on_user_deleted(Arc::new(privacy::UserDeletedListener))
+    }
+
     fn routes(&self) -> OpenApiRouter {
         self.service.clone().map_or_else(OpenApiRouter::new, |service| {
             http_me::routes(service.clone())
@@ -289,7 +298,7 @@ impl Module for NotificationsModule {
         if self.listen_users {
             subscriptions.push(Subscription::new(
                 autoxide_kernel::privacy::USER_DELETED,
-                Arc::new(privacy::UserDeletedListener(service)),
+                Arc::new(privacy::UserDeletedListener),
             ));
         }
         subscriptions
