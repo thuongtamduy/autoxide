@@ -98,6 +98,8 @@ struct Inner {
     slugs: Mutex<HashMap<String, (Instant, TenantId)>>,
     /// Domain → (tenant, node bound to the domain) verified; `None`: none.
     domains: Mutex<HashMap<String, (Instant, Option<DomainSite>)>>,
+    /// Every verified domain → tenant (for CORS): `None` until read, or after a domain changed on this server.
+    verified: super::verified_domains::VerifiedDomains,
     pools: Mutex<Pools>,
     /// Root key used to open encrypted placement URLs; the `kernel` module sets it at startup.
     secret: OnceLock<SecretKey>,
@@ -124,6 +126,10 @@ impl std::fmt::Debug for DatabaseRegistry {
 
 /// Tenant and node (website) of a verified domain.
 type DomainSite = (TenantId, Option<OrgId>);
+
+/// At most this many domains (found or not) are kept in the cache: a client sending random `Host` / `Origin`
+/// values cannot grow it without bound.
+const MAX_CACHED_DOMAINS: usize = 10_000;
 
 /// Locks `mutex` even if another thread panicked while holding it: the data inside is only a cache.
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
@@ -152,6 +158,7 @@ impl DatabaseRegistry {
             tenants: Mutex::default(),
             slugs: Mutex::default(),
             domains: Mutex::default(),
+            verified: Default::default(),
             pools: Mutex::default(),
             secret: OnceLock::new(),
             storage: OnceLock::new(),
@@ -344,8 +351,37 @@ impl DatabaseRegistry {
             )),
             None => None,
         };
-        lock(&self.0.domains).insert(host, (Instant::now(), found));
+        let mut domains = lock(&self.0.domains);
+        if domains.len() >= MAX_CACHED_DOMAINS {
+            // Đầy: bỏ mục hết hạn trước; vẫn đầy (bị dội tên lạ) thì xoá sạch — cache chỉ để đỡ truy vấn,
+            // xoá không sai, chỉ tốn vài lần đọc lại.
+            let ttl = self.ttl();
+            domains.retain(|_, (at, _)| at.elapsed() < ttl);
+            if domains.len() >= MAX_CACHED_DOMAINS {
+                domains.clear();
+            }
+        }
+        domains.insert(host, (Instant::now(), found));
         Ok(found)
+    }
+
+    /// The tenant that verified domain `domain` (already normalized), from a snapshot of every verified domain
+    /// (CORS, `http::cors`; see `verified_domains`): a domain nobody verified costs no query. `single` mode:
+    /// always `None`.
+    pub(crate) async fn verified_domain_owner(
+        &self,
+        domain: &str,
+    ) -> Result<Option<TenantId>, Error> {
+        if self.0.mode == TenancyMode::Single {
+            return Ok(None);
+        }
+        self.0.verified.owner(&self.0.control, self.ttl(), domain).await
+    }
+
+    /// Number of times the verified-domain snapshot was read from the database (tests).
+    #[cfg(test)]
+    pub(crate) fn verified_domain_reads(&self) -> u64 {
+        self.0.verified.reads()
     }
 
     /// The root key used to open encrypted placement URLs. Set once (the `kernel` module sets it at startup);
@@ -472,6 +508,7 @@ impl DatabaseRegistry {
     pub fn invalidate_domain(&self, domain: &str) {
         let domain = domain.trim().trim_end_matches('.').to_ascii_lowercase();
         lock(&self.0.domains).remove(&domain);
+        self.0.verified.invalidate();
     }
 
     /// Drops tenant `id` from the cache (after editing the tenant on this server).

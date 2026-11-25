@@ -523,12 +523,23 @@ impl TenantExports {
 
     /// Content by the link's token (`<id>.<raw part>`). Wrong, expired or replaced: 404 as if it did not exist.
     pub async fn content_by_token(&self, token: &str) -> Result<Response, Error> {
+        self.content_by_token_for(token, None).await
+    }
+
+    /// Like [`TenantExports::content_by_token`], for a request from the web origin of tenant `origin`'s verified
+    /// domain: a link to another tenant's export answers like a wrong link (D-20261125-tenant-cors).
+    pub(crate) async fn content_by_token_for(
+        &self,
+        token: &str,
+        origin: Option<TenantId>,
+    ) -> Result<Response, Error> {
         let missing = || export_link_invalid();
         let (id, raw) = token.split_once('.').ok_or_else(missing)?;
         let id = Uuid::parse_str(id).map_err(|_| missing())?;
         let row = Entity::find_by_id(id).one(self.control().read()).await?.ok_or_else(missing)?;
         let valid = row.link_hash.as_deref() == Some(crate::secret::sha256(raw).as_str())
-            && row.link_expires_at.is_some_and(|until| until > now());
+            && row.link_expires_at.is_some_and(|until| until > now())
+            && origin.is_none_or(|owner| owner.as_uuid() == row.tenant_id);
         if !valid {
             return Err(missing());
         }
@@ -867,9 +878,14 @@ struct LinkQuery {
 )]
 async fn download_by_link(
     State(exports): State<Arc<TenantExports>>,
+    origin: Option<axum::Extension<crate::http::OriginGrant>>,
     Query(query): Query<LinkQuery>,
 ) -> Result<Response, Error> {
-    exports.content_by_token(&query.token).await
+    let origin = match origin {
+        Some(axum::Extension(crate::http::OriginGrant::Tenant(owner))) => Some(owner),
+        _ => None,
+    };
+    exports.content_by_token_for(&query.token, origin).await
 }
 
 // ---- MCP -------------------------------------------------------------------------------------

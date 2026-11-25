@@ -397,7 +397,7 @@ database mới.
 | `AUTOXIDE_HTTP_TRUSTED_PROXIES` | Thay cho số proxy: địa chỉ và dải địa chỉ của proxy, vd `10.0.0.0/8, 192.0.2.7` |
 | `AUTOXIDE_HTTP_MAX_CONNECTIONS` | Số kết nối mở cùng lúc tối đa, tính cả WebSocket (mặc định `4096`, `0`: không giới hạn); quá số này thì kết nối mới phải chờ. Đặt thấp hơn giới hạn file mở (`ulimit -n`, thường 1024; systemd `LimitNOFILE`, `docker run --ulimit nofile=…`) và chừa chỗ cho kết nối database và file — máy chủ cảnh báo lúc khởi động khi không như vậy. Reverse proxy vẫn nên giới hạn số kết nối theo từng client |
 | `AUTOXIDE_HTTP_PUBLIC_URL` | Địa chỉ internet dùng để gọi API, vd `https://api.example.com`; cần cho link trỏ về API trong mail (huỷ đăng ký bản tin) |
-| `AUTOXIDE_HTTP_CORS_ORIGINS` | Trang web ở origin khác được gọi API |
+| `AUTOXIDE_HTTP_CORS_ORIGINS` | Trang web ở origin khác được gọi API; tên miền đã xác minh của khách được gọi cho chính khách đó mà không cần liệt kê, xem [Tên miền riêng của khách hàng](#tên-miền-riêng-của-khách-hàng) |
 | `AUTOXIDE_HTTP_HSTS_SECONDS` | Khi mọi client đã gọi API qua HTTPS: gửi `Strict-Transport-Security` (vd `31536000`, một năm); `autoxide doctor` nhắc khi URL công khai là `https://` mà biến này là `0`. Mọi response đã có sẵn `nosniff`, `Referrer-Policy`, `X-Frame-Options` và `Content-Security-Policy` chặt (`AUTOXIDE_HTTP_SECURITY_HEADERS`, `AUTOXIDE_HTTP_REFERRER_POLICY`) |
 | `AUTOXIDE_MAIL_SMTP_URL`, `AUTOXIDE_MAIL_FROM` | Gửi mail (đặt lại mật khẩu, xác minh email) |
 | `AUTOXIDE_FILES_S3_BUCKET` và `AWS_…` | Lưu file trên S3 hay dịch vụ tương thích S3; nên đặt thêm lifecycle rule cho bucket để huỷ multipart upload dở sau một ngày |
@@ -550,6 +550,22 @@ Một tên miền có thể thuộc về một nút trong cây tổ chức của
 chưa module nào đã cài giữ cây tổ chức thì chỉ nhận `null`. Gắn nút không đổi trạng thái hay bản ghi
 DNS của tên miền; tên miền đã gỡ trả `409 tenant_domain_revoked`. Mỗi lần đổi ghi event
 `kernel.domain_updated`.
+
+**Gọi từ trình duyệt (CORS).** Trang ở `https://<tên miền>` của một tên miền đã xác minh gọi được API
+từ trình duyệt mà không phải thêm vào `AUTOXIDE_HTTP_CORS_ORIGINS` hay khởi động lại — nhưng chỉ cho
+chính khách đó: request từ trang đó mà token, header `Autoxide-Tenant` hay `Host` trỏ tới khách khác
+nhận `403 tenant_origin_mismatch`, và refresh token hay link trong mail của khách khác bị coi là sai
+trong mọi request từ trang đó, dù request nêu khách bằng cách nào; ngoài các trang đó, token tự nêu
+khách như trước.
+Đây là lớp bảo vệ thêm trong trình duyệt, không phải ranh giới bảo mật: token gửi trong header, không
+bao giờ là cookie, nên trang chỉ dùng được bí mật nó đã có, còn chương trình ngoài trình duyệt gửi
+`Origin` tuỳ ý hay không gửi. Chỉ đúng origin `https://<tên miền>` được tính (không `http`, không
+port, không tên miền con khác); giao diện thứ hai, vd `admin.shop.example`, thì xác minh thành một tên
+miền riêng. Origin trong `AUTOXIDE_HTTP_CORS_ORIGINS` (giao diện của chính nền tảng,
+`http://localhost:5173` lúc phát triển) gọi được cho mọi khách: form đăng ký hay đăng nhập dùng chung của
+nền tảng mà bạn đặt trên tên miền của một khách thì cũng phải thêm origin đó vào danh sách này. Tên miền bị gỡ hay xác minh hỏng mất
+quyền ngay trên máy chủ đã đổi nó, và trong `AUTOXIDE_TENANCY_CACHE_SECONDS` (mặc định 10 giây) trên
+các máy khác.
 
 **Chứng chỉ TLS.** Để Caddy lấy chứng chỉ khi người xem đầu tiên của một tên miền tới (on-demand
 TLS), sau khi hỏi Autoxide tên miền đó có được phép không:

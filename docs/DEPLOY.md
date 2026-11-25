@@ -401,7 +401,7 @@ into a new database.
 | `AUTOXIDE_HTTP_TRUSTED_PROXIES` | Instead of a count: the addresses and ranges of your proxies, e.g. `10.0.0.0/8, 192.0.2.7` |
 | `AUTOXIDE_HTTP_MAX_CONNECTIONS` | Most open connections at once, WebSockets included (default `4096`, `0`: no limit); over it new connections wait. Keep it below the open file limit (`ulimit -n`, often 1024; systemd `LimitNOFILE`, `docker run --ulimit nofile=…`) with some room for database connections and files — the server warns at startup when it is not. Your reverse proxy should still limit connections per client |
 | `AUTOXIDE_HTTP_PUBLIC_URL` | The address the internet reaches the API at, e.g. `https://api.example.com`; needed for links back to the API in mail (newsletter unsubscribe) |
-| `AUTOXIDE_HTTP_CORS_ORIGINS` | Web pages on other origins allowed to call the API |
+| `AUTOXIDE_HTTP_CORS_ORIGINS` | Web pages on other origins allowed to call the API; tenants' verified domains are allowed for their own tenant without being listed, see [Custom domains of tenants](#custom-domains-of-tenants) |
 | `AUTOXIDE_HTTP_HSTS_SECONDS` | Once every client reaches the API over HTTPS: send `Strict-Transport-Security` (e.g. `31536000`, one year); `autoxide doctor` reminds you when the public URL is `https://` and this is `0`. Every response already carries `nosniff`, `Referrer-Policy`, `X-Frame-Options` and a strict `Content-Security-Policy` (`AUTOXIDE_HTTP_SECURITY_HEADERS`, `AUTOXIDE_HTTP_REFERRER_POLICY`) |
 | `AUTOXIDE_MAIL_SMTP_URL`, `AUTOXIDE_MAIL_FROM` | Send mail (password reset, email verification) |
 | `AUTOXIDE_FILES_S3_BUCKET` and `AWS_…` | Store files in S3 or an S3-compatible service; also add a bucket lifecycle rule that aborts incomplete multipart uploads after a day |
@@ -563,6 +563,22 @@ must be one of the tenant's own; while no installed module keeps an organization
 `null` is accepted. Attaching does not change the domain's status or its DNS record; a removed
 domain answers `409 tenant_domain_revoked`. Each change records the event
 `kernel.domain_updated`.
+
+**Browser calls (CORS).** A page served at `https://<domain>` of a verified domain may call the
+API from the browser without adding it to `AUTOXIDE_HTTP_CORS_ORIGINS` and without a restart —
+but only for its own tenant: a request from that page whose token, `Autoxide-Tenant` header or
+`Host` points at another tenant answers `403 tenant_origin_mismatch`, and a refresh token or
+email link of another tenant counts as wrong in any request from that page, however the request
+names its tenant; outside such pages a token names its own tenant as before. This is extra
+protection inside browsers, not a security boundary: tokens are sent in a header, never as cookies, so a page can only use secrets
+it already holds, and a program outside a browser sends any `Origin` it likes, or none. Only the exact origin
+`https://<domain>` counts (no `http`, no port, no other subdomain); give a second front end, such
+as `admin.shop.example`, its own verified domain. Origins in `AUTOXIDE_HTTP_CORS_ORIGINS` (your
+platform's own front ends, `http://localhost:5173` while developing) may call for any tenant: a
+shared sign-up or sign-in form of the platform that you place on a tenant's domain needs that
+origin listed there too. A
+removed or failed domain loses the right at once on the server that changed it and within
+`AUTOXIDE_TENANCY_CACHE_SECONDS` (default 10 s) on the others.
 
 **TLS certificates.** Let Caddy get a certificate when the first visitor of a domain arrives
 (on-demand TLS), after asking Autoxide whether the domain is allowed:

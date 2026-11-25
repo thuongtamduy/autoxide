@@ -131,6 +131,7 @@ pub(crate) async fn authenticate(
         }
         _ => principal,
     };
+    ensure_origin(&parts.extensions, principal.tenant_id())?;
     parts.extensions.insert(Authenticated(principal.clone()));
     if let Some(slot) = parts.extensions.get::<crate::ops::request_log::CallerSlot>() {
         slot.note_principal(&principal);
@@ -229,10 +230,34 @@ async fn resolve_tenant(parts: &mut Parts) -> Result<TenantContext, Error> {
     } else {
         by_hint(&registry, parts).await?
     };
+    let tenant = bind_origin(&parts.extensions, tenant)?;
     ensure_serving(&tenant)?;
     ensure_writable(&tenant, &parts.method, &parts.extensions)?;
     parts.extensions.insert(tenant.clone());
     Ok(tenant)
+}
+
+/// A request from the web origin of tenant `owner`'s verified domain (CORS, `http::cors`) may only act as
+/// `owner`: a page on tenant A's domain cannot call the API as tenant B. Checked before any handler runs, so
+/// a refused request has no effect. Origins of `AUTOXIDE_HTTP_CORS_ORIGINS` are not bound to a tenant.
+fn ensure_origin(extensions: &Extensions, tenant: super::TenantId) -> Result<(), Error> {
+    match extensions.get::<crate::http::OriginGrant>() {
+        Some(crate::http::OriginGrant::Tenant(owner)) if *owner != tenant => {
+            Err(errors::tenant_origin_mismatch())
+        }
+        _ => Ok(()),
+    }
+}
+
+/// Like [`ensure_origin`] for a resolved tenant; when the request comes from that tenant's own page the tenant
+/// is marked so (`TenantContext::reached_from_page`): `resolve_link_token` then refuses a token of another
+/// tenant, so a page on tenant A's domain cannot redeem tenant B's refresh token or email link.
+fn bind_origin(extensions: &Extensions, tenant: TenantContext) -> Result<TenantContext, Error> {
+    ensure_origin(extensions, tenant.id())?;
+    Ok(match extensions.get::<crate::http::OriginGrant>() {
+        Some(crate::http::OriginGrant::Tenant(_)) => tenant.reached_from_page(),
+        _ => tenant,
+    })
 }
 
 /// The tenant by the `autoxide-tenant` header / domain, ignoring the credential (a request that is not signed
@@ -241,10 +266,20 @@ async fn by_hint(registry: &DatabaseRegistry, parts: &Parts) -> Result<TenantCon
     let hint = TenantHint::of_request(&parts.headers, &parts.extensions);
     match (hint.tenant(), hint.host()) {
         (Some(target), _) => lookup(registry, target).await,
-        (None, Some(host)) => {
-            registry.tenant_by_domain(host).await?.ok_or_else(errors::tenant_required)
+        (None, host) => {
+            if let Some(host) = host
+                && let Some(tenant) = registry.tenant_by_domain(host).await?
+            {
+                return Ok(tenant);
+            }
+            // Không header, `Host` không thuộc khách nào (thường là `api.<nền tảng>`) nhưng đến từ trang trên tên
+            // miền của khách A: khách là A. Nhờ vậy endpoint lấy khách từ token trong thân (`OptionalTenant` +
+            // `resolve_link_token`, vd `/auth/refresh`) cũng gắn với A (D-20261125-tenant-cors).
+            match parts.extensions.get::<crate::http::OriginGrant>() {
+                Some(crate::http::OriginGrant::Tenant(owner)) => registry.tenant(*owner).await,
+                _ => Err(errors::tenant_required()),
+            }
         }
-        (None, None) => Err(errors::tenant_required()),
     }
 }
 
@@ -263,6 +298,7 @@ pub(crate) async fn tenant_ignoring_bad_credential(
                 )
             })?;
             let tenant = by_hint(&registry, parts).await?;
+            let tenant = bind_origin(&parts.extensions, tenant)?;
             ensure_serving(&tenant)?;
             ensure_writable(&tenant, &parts.method, &parts.extensions)?;
             Ok(tenant)

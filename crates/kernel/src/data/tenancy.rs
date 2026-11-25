@@ -43,6 +43,7 @@ pub(crate) mod schema;
 mod scope;
 pub(crate) mod settings;
 mod site;
+mod verified_domains;
 
 use crate::time::Timestamp;
 use std::fmt;
@@ -321,6 +322,8 @@ struct Inner {
     read_only: bool,
     /// Sandbox (D-232): the original tenant and the expiry; `None` for a real tenant.
     sandbox: Option<(TenantId, Option<Timestamp>)>,
+    /// The request came from a page on this tenant's own verified domain (CORS, D-20261125-tenant-cors).
+    from_page_origin: bool,
 }
 
 impl TenantContext {
@@ -345,6 +348,7 @@ impl TenantContext {
             storage: None,
             read_only: false,
             sandbox: None,
+            from_page_origin: false,
         }))
     }
 
@@ -367,6 +371,18 @@ impl TenantContext {
     /// tenants of the store being scanned.
     pub fn storage_placement(&self) -> Option<PlacementId> {
         self.0.storage.as_ref().map(|_| self.0.placement)
+    }
+
+    /// Same tenant, marked as reached from a page on its own verified domain.
+    #[must_use]
+    pub(crate) fn reached_from_page(self) -> Self {
+        let inner = Arc::unwrap_or_clone(self.0);
+        TenantContext(Arc::new(Inner { from_page_origin: true, ..inner }))
+    }
+
+    /// Whether the request came from a page on this tenant's own verified domain (CORS).
+    pub(crate) fn is_from_page_origin(&self) -> bool {
+        self.0.from_page_origin
     }
 
     /// Same tenant, marked as having a placement that has not applied all migrations (built by the database
@@ -552,6 +568,17 @@ pub mod errors {
         Error::forbidden(
             "tenant_mismatch",
             "The credentials belong to another tenant than the one this request is for.",
+        )
+    }
+
+    /// The request came from the web origin (`Origin`) of one tenant's verified domain but acts for another
+    /// tenant: a page on a tenant's domain may only call the API as that tenant.
+    pub fn tenant_origin_mismatch() -> Error {
+        Error::forbidden(
+            "tenant_origin_mismatch",
+            "This request comes from a web page on another tenant's domain. A page on a tenant's \
+             domain may only call the API for that tenant: call from that tenant's own page, or add \
+             the page's origin to AUTOXIDE_HTTP_CORS_ORIGINS.",
         )
     }
 
