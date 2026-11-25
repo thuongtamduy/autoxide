@@ -261,7 +261,8 @@ sẵn lệnh.
    (`OpenApiRouter::routes(routes!(…))`, không dùng `.route(…)` trần). Route của
    module `x` nằm dưới `/api/v1/x`; module chỉ khai phần đuôi (`/`, `/{id}`). Thay
    đổi phá vỡ thì làm endpoint mới, khai endpoint cũ qua `Module::deprecations` (kèm
-   ngày sunset và endpoint thay thế), không sửa hành vi endpoint cũ (D-059).
+   ngày sunset và endpoint thay thế), không sửa hành vi endpoint cũ (D-059). Trước 1.0, phá vỡ
+   tại chỗ chỉ khi có quyết định nêu rõ (D-20261125-api-break-before-1-0); từ 1.0 không ngoại lệ.
 7. **Kiểm quyền bằng permission, không bằng tên role.** Module khai permission
    của mình qua `Module::permissions` (`<module>.<việc>`, vd `notes.write`). Handler
    cần đăng nhập nhận `principal: Principal` (`autoxide_kernel::access`) rồi gọi
