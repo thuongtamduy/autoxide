@@ -152,10 +152,11 @@ thật (P7).
         `POST /{id}/payment-link` của nhân viên, `return_url` mới tuỳ chọn, chống trùng theo `Idempotency-Key`, tối đa
         10 lần một giờ mỗi đơn. Đặt hàng khi đối tác từ chối vẫn trả 201 với `kind = none`, thêm
         `payment_actions[].error` (`code` ổn định + `message` theo ngôn ngữ người gọi)
-- [ ] P9 — **Ghi nợ, chủ dự án hoãn ngày 22/11/2026** (không chặn 1.0 khi chưa mở lại):
+- [ ] P9 — **Ghi nợ, hoãn ngày 22/11/2026, chủ dự án mở lại ngày 25/11/2026** (D-20261125-p9-reopened; làm trước 1.0,
+      trừ mục chạy thử bằng tài khoản thật):
   - [ ] Chế độ "nghỉ": module tắt vẫn tham gia dữ liệu cá nhân và vòng đời khách (xuất, xoá, dời khách)
-  - [ ] Mẫu câu OTP khách tự sửa cho khớp template đã đăng ký với nhà mạng (đang viết cứng ở `compliance`, `orders`,
-        `bookings`)
+  - [x] Mẫu câu OTP khách tự sửa cho khớp template đã đăng ký với nhà mạng (đang viết cứng ở `compliance`, `orders`,
+        `bookings`) — D-20261125-sms-templates: cấu hình theo khách nhóm `sms_template`, kiểm `{code}` đúng một lần
   - [ ] 139 endpoint GET trả `Data<Vec<T>>` không phân trang: endpoint mới trả `Page<T>`, khai deprecation cho cái cũ
   - [x] Rustdoc tiếng Anh cho phần công khai của kernel, testkit, `autoxide` và `api` của module (docs.rs); gate
         `doc-language` giữ phần viết mới là tiếng Anh (D-20261123-english-rustdoc)

@@ -109,7 +109,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261121-security-lints](D-20261121-security-lints.md)** Hai luật gate chặn lỗi phân quyền tái phát: `tenant-scope` và `mcp-principal`, kèm danh sách chỗ cũ chờ sửa — 2026-11-21
 - **[D-20261121-shop-first-order](D-20261121-shop-first-order.md)** Thứ tự sau bước 70 P1–P3 xếp theo kịch bản "cửa hàng bán online chạy thật" — 2026-11-21
 - **[D-20261121-sqlx-091](D-20261121-sqlx-091.md)** Nâng sqlx 0.9.1, gỡ ngoại lệ RUSTSEC-2026-0459 — 2026-11-21
-- **[D-20261122-gitleaks-8-30-1](D-20261122-gitleaks-8-30-1.md)** Ghim gitleaks 8.30.1, image lấy từ `ghcr.io/gitleaks/gitleaks` ở cả gate và CI — 2026-11-22
+- **[D-20261122-gitleaks-8-30-1](D-20261122-gitleaks-8-30-1.md)** Ghim gitleaks 8.30.1, image lấy từ `ghcr.io/gitleaks/gitleaks` ở cả gate và CI — 2026-11-22 · *thay một phần bởi D-20261125-gitleaks-digest*
 - **[D-20261122-step67-after-1-0](D-20261122-step67-after-1-0.md)** Ba mục cuối của bước 67 làm sau bản 1.0 — 2026-11-22 · **chủ dự án quyết**
 - **[D-20261122-toolchain-sync](D-20261122-toolchain-sync.md)** Ví dụ module ngoài dùng đúng toolchain của core; `cargo xtask check` chặn khi lệch — 2026-11-22
 - **[D-20261123-api-coverage](D-20261123-api-coverage.md)** Đo độ phủ endpoint và tool MCP bằng test, mục tiêu 100% trước 1.0 — 2026-11-23
@@ -120,6 +120,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261125-ci-skip-rust](D-20261125-ci-skip-rust.md)** Pull request không chạm Rust bỏ phần biên dịch và test nặng theo danh sách cho phép — 2026-11-25
 - **[D-20261125-cloud-session-setup](D-20261125-cloud-session-setup.md)** Phiên agent trên cloud: một script cài đặt trong repo, gọi từ setup script của môi trường và SessionStart hook — 2026-11-25
 - **[D-20261125-gitleaks-digest](D-20261125-gitleaks-digest.md)** Image gitleaks ghim theo digest ở `.github/gitleaks/Dockerfile`, gate và CI đọc cùng dòng — 2026-11-25
+- **[D-20261125-p9-reopened](D-20261125-p9-reopened.md)** Mở lại P9 của bước 70: mẫu OTP theo khách, chế độ "nghỉ", danh sách có phân trang — 2026-11-25 · **chủ dự án quyết**
 - **[D-20261125-typescript-range](D-20261125-typescript-range.md)** Dải TypeScript hỗ trợ cho SDK: 5.0 trở lên, phát triển trên 7 — 2026-11-25
 
 ## Kiến trúc module và kernel
@@ -201,7 +202,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261119-step69-ws](D-20261119-step69-ws.md)** WebSocket `GET /api/v1/kernel/events/ws`: dùng chung hub SSE, một vé kết nối cho cả phiên, lệnh điều khiển JSON, tín hiệu tạm trong tiến trình — 2026-11-19
 - **[D-20261121-api-shape](D-20261121-api-shape.md)** Thân request đóng ở mọi endpoint, gate kiểm hình dạng API trên openapi.json — 2026-11-21
 - **[D-20261121-stability-marks](D-20261121-stability-marks.md)** Hạng module trong hợp đồng: `x-stability` chỉ gắn cho thử nghiệm — 2026-11-21
-- **[D-20261123-http-header-timeout](D-20261123-http-header-timeout.md)** Máy chủ HTTP tự phục vụ kết nối bằng `hyper-util` có timer: timeout đọc header 30 giây, ping HTTP/2 — 2026-11-23
+- **[D-20261123-http-header-timeout](D-20261123-http-header-timeout.md)** Máy chủ HTTP tự phục vụ kết nối bằng `hyper-util` có timer: timeout đọc header 30 giây, ping HTTP/2 — 2026-11-23 · *thay một phần bởi D-20261125-max-connections*
 - **[D-20261125-max-connections](D-20261125-max-connections.md)** Máy chủ HTTP giới hạn số kết nối mở (`AUTOXIDE_HTTP_MAX_CONNECTIONS`, mặc định 4096) và đóng kết nối không gửi byte nào — 2026-11-25
 
 ## MCP, AI, agent dùng API
@@ -502,6 +503,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261122-theme-variants](D-20261122-theme-variants.md)** Chủ đề theo lịch: lịch JSON ba loại theo múi IANA của website, chọn đúng một bản, mẫu nhúng binary — 2026-11-22
 - **[D-20261123-content-types-later](D-20261123-content-types-later.md)** Loại nội dung, phần sau: trang chi tiết do `content` điền, lọc công khai theo index của bản đăng, hạn mức theo gói — 2026-11-23
 - **[D-20261123-site-health-daily](D-20261123-site-health-daily.md)** Sức khoẻ website phần sau: job hằng ngày, đếm 404 theo ngày không lưu người xem, tool MCP của trang dựng từ khối — 2026-11-23
+- **[D-20261125-sms-templates](D-20261125-sms-templates.md)** Mẫu câu SMS mang mã một lần là cấu hình theo khách, nhóm `sms_template` — 2026-11-25
 
 ## Tiền, thuế, chứng từ
 

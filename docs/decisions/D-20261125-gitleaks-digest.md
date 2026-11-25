@@ -17,5 +17,4 @@ nội dung index tải về.
 Đã cân nhắc: viết digest thẳng vào `gate.sh` và `ci.yml` — hai chỗ phải nâng tay, Dependabot không thấy; `container:`
 của job GitHub Actions — gate trên máy vẫn cần chỗ ghim riêng.
 
-Thay: phần "Nâng phiên bản về sau: đổi đủ ba chỗ" của D-20261122-gitleaks-8-30-1 — nay là hai chỗ:
-`.github/gitleaks/Dockerfile` (gate và CI) và `scripts/cloud-setup.sh` (binary).
+Thay: phần "Nâng phiên bản về sau, đổi đủ ba chỗ" của D-20261122-gitleaks-8-30-1 — nay là hai chỗ, `.github/gitleaks/Dockerfile` (gate và CI) và `scripts/cloud-setup.sh` (binary).

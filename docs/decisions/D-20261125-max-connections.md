@@ -20,4 +20,4 @@ HTTP/1 hay HTTP/2, nơi timeout đọc header của hyper chưa chạy: kết n�
 từ chối (đóng ngay) kết nối vượt giới hạn — trình duyệt và client báo lỗi thay vì chờ chút; mặc định không giới hạn —
 người cài chạy thẳng không có proxy thì vẫn hở.
 
-Thay: phần "Giới hạn số kết nối đồng thời: để cho reverse proxy" của D-20261123-http-header-timeout.
+Thay: phần "Giới hạn số kết nối đồng thời để cho reverse proxy" của D-20261123-http-header-timeout.

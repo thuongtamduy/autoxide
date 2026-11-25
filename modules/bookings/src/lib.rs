@@ -108,6 +108,10 @@ impl Module for BookingsModule {
         settings::all()
     }
 
+    fn tenant_settings(&self) -> Vec<autoxide_kernel::tenancy::TenantSetting> {
+        vec![guests::CODE_SMS_TEMPLATE]
+    }
+
     fn translations(&self) -> Vec<(&'static str, &'static str)> {
         vec![("vi", include_str!("../locales/vi.json"))]
     }
@@ -123,6 +127,7 @@ impl Module for BookingsModule {
             ledger: context.require::<dyn autoxide_ledger::api::Ledger>().ok(),
             notifier: context.require::<dyn autoxide_notifications::api::Notifier>().ok(),
             sms: context.require::<dyn autoxide_kernel::sms::SmsSender>().ok(),
+            tenant_settings: context.require::<dyn autoxide_kernel::tenancy::TenantSettings>()?,
             secret: context
                 .require::<autoxide_kernel::secret::SecretKey>()
                 .ok()
