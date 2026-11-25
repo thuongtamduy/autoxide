@@ -22,9 +22,10 @@ pub(crate) const OTP_MAX_ATTEMPTS: Setting = Setting::new(
 
 pub(crate) const OTP_WRONG_PER_PHONE_PER_DAY: Setting = Setting::new(
     "AUTOXIDE_COMPLIANCE_OTP_WRONG_PER_PHONE_PER_DAY",
-    "Wrong sign-in codes allowed for one phone number over 24 hours, across all its codes; after \
-     that no code is sent or checked for the number until the oldest wrong entry is 24 hours old, \
-     1 to 1000.",
+    "Wrong sign-in codes allowed for one phone number over 24 hours from one client address block \
+     (/24 IPv4, /64 IPv6), across all codes asked from that block; after that no code is sent to or \
+     checked for the number from that block until the oldest wrong entry is 24 hours old. Five times \
+     this many wrong codes from all blocks together lock the number everywhere, 1 to 1000.",
 )
 .with_default("10");
 

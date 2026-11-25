@@ -67,9 +67,11 @@ impl CustomersService {
             )
             .await?
         } else {
+            // Chỉ trừ số dư cùng tiền tệ với khoản giữ (PT-6).
             let filter = Condition::all()
                 .add(store_credit::Column::ProfileId.eq(id))
-                .add(store_credit::Column::TenantId.eq(tenant.id().as_uuid()));
+                .add(store_credit::Column::TenantId.eq(tenant.id().as_uuid()))
+                .add(store_credit::Column::Currency.eq(wanted.currency().code()));
             rows::adjust::<store_credit::Entity, _>(
                 &transaction,
                 store_credit::Column::BalanceMinor,

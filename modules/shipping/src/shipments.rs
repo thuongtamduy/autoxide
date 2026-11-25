@@ -282,7 +282,8 @@ impl ShippingService {
             .items
             .iter()
             .map(|item| item.weight_grams.unwrap_or(0).saturating_mul(item.quantity))
-            .sum();
+            // Cộng bão hoà (PT-5): cân nặng do người gọi gửi, không có trần; `.sum()` tràn là panic.
+            .fold(0i64, i64::saturating_add);
         let parcel_id = Uuid::now_v7();
         parcel::ActiveModel {
             id: Set(parcel_id),

@@ -19,7 +19,7 @@ use autoxide_kernel::ai::{Effort, Part, Prompt};
 use autoxide_kernel::entitlement::{Limit, Period};
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::job::{EnqueueOptions, Job, JobContext, JobHandler};
-use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
+use autoxide_kernel::tenancy::{OrgId, OrgTree, ScopeExt, TenantContext};
 use sea_orm::{ActiveModelTrait, EntityTrait, Set};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
@@ -272,6 +272,11 @@ impl ContentService {
                 &format!("content.campaign_draft:{id}"),
             )
             .await?;
+        // Nút của các bản nháp phải là nút của khách (PT-8); phạm vi kiểm lúc job tạo bản nháp.
+        if let Some(org) = input.org_id {
+            OrgTree::ensure_exists(tenant.database().read(), tenant.id(), OrgId::from_uuid(org))
+                .await?;
+        }
         let snapshot = serde_json::to_string(&principal.snapshot()).map_err(Error::internal)?;
         let transaction = tenant.database().begin_write().await?;
         let row = campaign_draft::ActiveModel {

@@ -533,6 +533,19 @@ impl CustomersService {
             .ok_or_else(|| Error::internal("store credit vanished"))
     }
 
+    /// Tiền tệ của số dư của `profile` (`None`: chưa có số dư).
+    pub(super) async fn credit_currency<C: ConnectionTrait>(
+        &self,
+        connection: &C,
+        tenant: &TenantContext,
+        profile: Uuid,
+    ) -> Result<Option<String>, Error> {
+        Ok(store_credit::Entity::find_by_id((tenant.id().as_uuid(), profile))
+            .one(connection)
+            .await?
+            .map(|row| row.currency))
+    }
+
     pub(super) async fn credit_balance<C: ConnectionTrait>(
         &self,
         connection: &C,

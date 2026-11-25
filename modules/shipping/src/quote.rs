@@ -107,8 +107,9 @@ pub(crate) fn tier_amount(tier: &rate::Model, grams: i64) -> i64 {
     if let (Some(step), Some(extra)) = (tier.step_grams, tier.step_amount_minor)
         && step > 0
     {
-        let over = (grams - tier.min_weight_grams).max(0);
-        let steps = (over + step - 1) / step;
+        // Không tràn với cân bão hoà tới `i64::MAX` (PT-5): trừ bão hoà, chia làm tròn lên không cộng.
+        let over = grams.saturating_sub(tier.min_weight_grams).max(0);
+        let steps = over / step + i64::from(over % step != 0);
         amount = amount.saturating_add(steps.saturating_mul(extra));
     }
     amount

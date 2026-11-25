@@ -36,8 +36,8 @@ pub(crate) fn push_subscription_invalid() -> Error {
     Error::new(
         ErrorKind::Validation,
         "notifications.push_subscription_invalid",
-        "The push subscription is not valid: send the `endpoint` (https) and the `p256dh` and `auth` \
-         keys of the browser's PushSubscription.",
+        "The push subscription is not valid: send the `endpoint` (https, on a public server) and the \
+         `p256dh` and `auth` keys of the browser's PushSubscription.",
     )
 }
 
@@ -260,7 +260,10 @@ impl NotificationsService {
         input: NewPushSubscription,
     ) -> Result<push_subscription::Model, Error> {
         let endpoint = input.endpoint.trim().to_owned();
+        // Địa chỉ do trình duyệt (tức người dùng) gửi; bộ gửi sẽ gọi tới nó: chỉ nhận máy chủ công khai
+        // (PT-10) — không `localhost`, IP nội bộ, link-local (metadata của cloud).
         let valid = endpoint.to_ascii_lowercase().starts_with("https://")
+            && autoxide_kernel::net::check_target_url(&endpoint, &["https"], false).is_ok()
             && endpoint.len() <= 2000
             && !endpoint.chars().any(char::is_control)
             && base64url(&input.p256dh, 80, 100)

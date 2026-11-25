@@ -37,6 +37,12 @@ use crate::verification::{
 const NOBODY: Uuid = Uuid::nil();
 /// Cửa sổ đếm lần nhập sai của một số.
 const WRONG_WINDOW: SignedDuration = SignedDuration::from_hours(CHALLENGE_KEEP_HOURS);
+/// Trần chung của một số (mọi khối địa chỉ cộng lại) = hệ số này × hạn mức của một khối
+/// (D-20261125-otp-wrong-by-block): người lạ phải xin mã từ nhiều khối mới khoá được chủ số, còn kẻ đoán mã
+/// phân tán vẫn bị chặn ở một trần hữu hạn.
+const ALL_BLOCKS_FACTOR: i64 = 5;
+/// Phạm vi khoá dấu khối địa chỉ.
+const BLOCK_SCOPE: &str = "compliance.otp";
 
 /// Số điện thoại đã nhập sai mã quá hạn mức trong 24 giờ.
 pub(crate) fn otp_daily_limit(retry_after: u64) -> Error {
@@ -61,6 +67,14 @@ impl ComplianceService {
             return Err(sms_disabled());
         };
         let otp = self.otp;
+        // Khối địa chỉ của client (PT-7): lần sai đếm theo (số, khối) — người lạ đoán sai trên mã họ xin
+        // không khoá chủ số ở khối khác.
+        let block = match ip {
+            Some(ip) => {
+                Some(autoxide_kernel::ip_hash::fingerprint(&self.secret, BLOCK_SCOPE, ip).await?)
+            }
+            None => None,
+        };
         // Số đã nhập sai đủ hạn mức trong 24 giờ: không gửi thêm mã (mã gửi đi cũng không kiểm được).
         let recent = phone_challenge::Entity::find()
             .filter(phone_challenge::Column::Phone.eq(phone.as_str()))
@@ -68,7 +82,7 @@ impl ComplianceService {
             .scoped(tenant)
             .all(tenant.database().read())
             .await?;
-        self.check_wrong_today(&recent, now())?;
+        self.check_wrong_today(&recent, block.as_deref(), now())?;
         let mut limits = vec![(
             Throttle::new("compliance", otp.per_phone_per_hour, HOUR)?,
             format!("otp-phone:{}", phone.as_str()),
@@ -76,7 +90,7 @@ impl ComplianceService {
         if let Some(ip) = ip {
             limits.push((
                 Throttle::new("compliance", otp.per_ip_per_hour, HOUR)?,
-                format!("otp-ip:{ip}"),
+                autoxide_kernel::throttle::address_key("otp-ip", ip),
             ));
         }
         for (throttle, key) in &limits {
@@ -99,6 +113,7 @@ impl ComplianceService {
             expires_at: Set(expires_at),
             consumed_at: Set(None),
             created_at: Set(at),
+            requester_block: Set(block),
         })
         .exec_without_returning(tenant.database().write())
         .await?;
@@ -164,9 +179,9 @@ impl ComplianceService {
         if row.attempts >= self.otp.max_attempts {
             return Err(otp_attempts_exceeded());
         }
-        // Hạn mức sai mỗi ngày của số (cộng mọi mã của số trong 24 giờ, đã khoá ở trên): xin mã mới
-        // liên tục không mở thêm lượt đoán.
-        self.check_wrong_today(&locked, at)?;
+        // Hạn mức sai mỗi ngày của số (cộng mọi mã của số trong 24 giờ xin từ cùng khối địa chỉ với mã
+        // này, và trần chung của mọi khối; đã khoá ở trên): xin mã mới liên tục không mở thêm lượt đoán.
+        self.check_wrong_today(&locked, row.requester_block.as_deref(), at)?;
         let digits: String = code.chars().filter(|c| !c.is_whitespace()).collect();
         if !same(&code_hash(&pepper, id, &digits), &row.code_hash) {
             phone_challenge::Entity::update_many()
@@ -201,25 +216,37 @@ impl ComplianceService {
     }
 
     /// Báo [`otp_daily_limit`] khi các mã `rows` (của cùng một số) tạo trong 24 giờ trước `at` đã bị
-    /// nhập sai tổng cộng `AUTOXIDE_COMPLIANCE_OTP_WRONG_PER_PHONE_PER_DAY` lần. Tính từ bảng mã (giữ
-    /// [`CHALLENGE_KEEP_HOURS`] giờ) nên chạy như nhau trên cả hai database, không thêm bảng đếm.
+    /// nhập sai `AUTOXIDE_COMPLIANCE_OTP_WRONG_PER_PHONE_PER_DAY` lần trên những mã xin từ khối địa chỉ
+    /// `block` (trống: không biết địa chỉ — một nhóm riêng), hoặc [`ALL_BLOCKS_FACTOR`] lần chừng ấy trên
+    /// mọi mã của số. Tính từ bảng mã (giữ [`CHALLENGE_KEEP_HOURS`] giờ) nên chạy như nhau trên cả hai
+    /// database, không thêm bảng đếm.
     fn check_wrong_today(
         &self,
         rows: &[phone_challenge::Model],
+        block: Option<&str>,
         at: Timestamp,
     ) -> Result<(), Error> {
         let since = at - WRONG_WINDOW;
-        let recent = rows.iter().filter(|row| row.created_at > since && row.attempts > 0);
-        let wrong: i64 = recent.clone().map(|row| i64::from(row.attempts)).sum();
-        if wrong < i64::from(self.otp.wrong_per_phone_per_day) {
-            return Ok(());
+        let limit = i64::from(self.otp.wrong_per_phone_per_day);
+        let recent: Vec<&phone_challenge::Model> =
+            rows.iter().filter(|row| row.created_at > since && row.attempts > 0).collect();
+        let same_block: Vec<&phone_challenge::Model> =
+            recent.iter().copied().filter(|row| row.requester_block.as_deref() == block).collect();
+        for (group, cap) in
+            [(&same_block, limit), (&recent, limit.saturating_mul(ALL_BLOCKS_FACTOR))]
+        {
+            let wrong: i64 = group.iter().map(|row| i64::from(row.attempts)).sum();
+            if wrong < cap {
+                continue;
+            }
+            // Chờ tới khi mã cũ nhất có lần sai ra khỏi cửa sổ 24 giờ.
+            // `Iterator::min` / `Ord::max` viết rõ: `ExprTrait` (sea-query) dùng trong file cũng có
+            // hàm `min` / `max`.
+            let oldest = Iterator::min(group.iter().map(|row| row.created_at)).unwrap_or(at);
+            let wait = Ord::max((oldest + WRONG_WINDOW - at).as_secs(), 1);
+            return Err(otp_daily_limit(u64::try_from(wait).unwrap_or(1)));
         }
-        // Chờ tới khi mã cũ nhất có lần sai ra khỏi cửa sổ 24 giờ.
-        // `Iterator::min` / `Ord::max` viết rõ: `ExprTrait` (sea-query) dùng trong file cũng có
-        // hàm `min` / `max`.
-        let oldest = Iterator::min(recent.map(|row| row.created_at)).unwrap_or(at);
-        let wait = Ord::max((oldest + WRONG_WINDOW - at).as_secs(), 1);
-        Err(otp_daily_limit(u64::try_from(wait).unwrap_or(1)))
+        Ok(())
     }
 
     /// Ghi `phone` là số đã xác thực của tài khoản `user_id`. Quy tắc của khách không cho thêm tài

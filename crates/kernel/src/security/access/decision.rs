@@ -81,12 +81,21 @@ impl Reach {
             Some(owner) => !self.owns.is_empty() && owner == self.user,
             None => self.owns.contains(&target.org),
         };
+        // `known`: đơn vị đích đã được chứng minh là một nút của khách (nằm trong grant, hay trong nhánh
+        // qua bảng closure). Quyền toàn khách, hay `own` theo chủ bản ghi, không nói gì về đơn vị — một ID
+        // ngẫu nhiên hay của khách khác vẫn qua (PT-8): khi đó phải tra cây.
+        let mut known = self.units.contains(&target.org) || self.owns.contains(&target.org);
         let mut allowed = self.everywhere || owned || self.units.contains(&target.org);
         if !allowed && !self.subtrees.is_empty() {
             allowed = OrgTree::is_within(db, self.tenant, target.org, &self.subtrees).await?;
+            known = allowed;
         }
         if allowed && let Some(fence) = self.fence {
             allowed = OrgTree::is_within(db, self.tenant, target.org, &[fence]).await?;
+            known = allowed;
+        }
+        if allowed && !known {
+            allowed = OrgTree::contains(db, self.tenant, target.org).await?;
         }
         Ok(allowed)
     }

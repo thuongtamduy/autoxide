@@ -63,6 +63,7 @@ pub(crate) struct CreateCartRequest {
     responses(
         (status = 201, description = "Created.", body = Data<CartResponse>),
         (status = 200, description = "You already have an active cart at this shop; here it is.", body = Data<CartResponse>),
+        (status = 404, description = "`org_id` is not a unit of this shop; code `org_not_found`.", body = Problem),
         (status = 422, description = "A value is invalid (see `errors`), like an unknown currency (`money.currency_unknown`).", body = Problem),
     )
 )]

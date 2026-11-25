@@ -410,6 +410,28 @@ pub(crate) fn shift_approval_self() -> Error {
     )
 }
 
+/// Tiền của ca (đếm két…) không cùng tiền tệ với ca (PT-6).
+pub(crate) fn cash_currency_mismatch(field: &str, currency: &str) -> Error {
+    Error::new(
+        ErrorKind::Validation,
+        "orders.cash_currency_mismatch",
+        "`{field}` must be in {currency}, the currency of the shift.",
+    )
+    .with_param("field", field)
+    .with_param("currency", currency)
+}
+
+/// Một khoản thu ở quầy khác tiền tệ của ca (PT-6).
+pub(crate) fn payment_currency_mismatch(index: usize, currency: &str) -> Error {
+    Error::new(
+        ErrorKind::Validation,
+        "orders.payment_currency_mismatch",
+        "Payment {index} is not in {currency}, the currency of the shift.",
+    )
+    .with_param("index", index)
+    .with_param("currency", currency)
+}
+
 pub(crate) fn payments_mismatch(
     paid: autoxide_kernel::money::Money,
     total: autoxide_kernel::money::Money,

@@ -74,13 +74,19 @@ impl EventHandler for SandboxAccess {
         let write = source.database().write();
         match event.name.as_str() {
             SANDBOX_CREATED => {
+                // Vai trò được chọn mà không có ở khách (ID bịa hay của khách khác): không uỷ quyền gì,
+                // không rơi về `admin` (PT-8). Không chọn vai trò thì mặc định `admin` như trước.
                 let chosen = match uuid(event, "role_id") {
                     Some(role)
                         if crate::role::role_grants(source, &[role]).await?.contains_key(&role) =>
                     {
                         Some(role)
                     }
-                    _ => crate::role::role_by_name(source, "admin").await?,
+                    Some(_) => {
+                        tracing::warn!(sandbox_id = %sandbox, "sandbox role not found; no delegation");
+                        None
+                    }
+                    None => crate::role::role_by_name(source, "admin").await?,
                 };
                 let Some(role) = chosen else {
                     tracing::warn!(sandbox_id = %sandbox, "no role to delegate into the sandbox");

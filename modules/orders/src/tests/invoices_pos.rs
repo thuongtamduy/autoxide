@@ -393,6 +393,16 @@ async fn ban_tai_quay_tru_kho_cua_hang_va_gui_lai_cung_ma() {
             .await;
         assert_eq!(status, StatusCode::CONFLICT, "{twice}");
         assert_eq!(twice["code"], "orders.shift_already_open");
+        // PT-8: ca ở nút không có trong cây của khách (ID bịa) bị từ chối, kể cả với quyền toàn khách.
+        let (status, ghost) = Call::as_user(shop, "boss")
+            .send(
+                "POST",
+                "/pos/shifts",
+                Some(json!({"org_id": Uuid::now_v7(), "register_code": "Q9", "opening_cash": vnd_json(0)})),
+            )
+            .await;
+        assert_eq!(status, StatusCode::FORBIDDEN, "{ghost}");
+        assert_eq!(ghost["code"], "org_out_of_scope");
 
         let cashier = Call::as_user(shop, "cashier_a");
         let lines = json!([{"variant_id": tea, "quantity": 2}]);
@@ -411,6 +421,24 @@ async fn ban_tai_quay_tru_kho_cua_hang_va_gui_lai_cung_ma() {
             .await;
         assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{mismatch}");
         assert_eq!(mismatch["code"], "orders.payments_mismatch");
+
+        // PT-5: các khoản cộng vượt `i64` là 422 `money.overflow`, không panic (500).
+        let (status, overflow) = cashier
+            .send("POST", "/pos/sales", Some(sale(json!([
+                {"method": "card_terminal", "amount": vnd_json(i64::MAX), "approval_code": "A1"},
+                {"method": "vietqr", "amount": vnd_json(1), "approval_code": "Q1"}]))))
+            .await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{overflow}");
+        assert_eq!(overflow["code"], "money.overflow");
+        // PT-6: khoản thu khác tiền của ca (JPY ở ca VND) bị từ chối, không ghi như VND.
+        let jpy = json!({"amount": "90000", "currency": "JPY"});
+        for paid in [json!([{"method": "card_terminal", "amount": jpy, "approval_code": "A1"}]),
+            json!([{"method": "cash", "amount": vnd_json(90_000), "tendered": {"amount": "100000", "currency": "JPY"}}])]
+        {
+            let (status, foreign) = cashier.send("POST", "/pos/sales", Some(sale(paid))).await;
+            assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{foreign}");
+            assert_eq!(foreign["code"], "orders.payment_currency_mismatch");
+        }
 
         let paid = json!([{"method": "cash", "amount": vnd_json(60_000), "tendered": vnd_json(100_000)},
             {"method": "card_terminal", "amount": vnd_json(30_000), "approval_code": "A1"}]);
@@ -464,6 +492,15 @@ async fn dong_ca_co_chenh_lech_can_ly_do_ghi_so_va_duyet_khi_vuot_nguong() {
         assert_eq!(status, StatusCode::CREATED, "{sold}");
         let boss = Call::as_user(shop, "boss");
         let close = format!("/pos/shifts/{shift}/close");
+        // PT-6 / PT-5: tiền đếm khác tiền của ca, hay `i64::MIN` (phép trừ tràn), là 422 — không ghi, không panic.
+        let (status, refused) = boss
+            .send("POST", &close, Some(json!({"counted_cash": {"amount": "545000", "currency": "JPY"}})))
+            .await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{refused}");
+        assert_eq!(refused["code"], "orders.cash_currency_mismatch");
+        let (status, refused) =
+            boss.send("POST", &close, Some(json!({"counted_cash": vnd_json(i64::MIN)}))).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{refused}");
         // Dự kiến 545.000; đếm được 540.000: thiếu 5.000 → cần lý do và ghi chú.
         let (status, refused) =
             boss.send("POST", &close, Some(json!({"counted_cash": vnd_json(540_000)}))).await;

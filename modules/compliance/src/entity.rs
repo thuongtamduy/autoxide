@@ -344,6 +344,8 @@ pub(crate) mod phone_challenge {
         pub expires_at: Timestamp,
         pub consumed_at: Option<Timestamp>,
         pub created_at: Timestamp,
+        /// Dấu khối địa chỉ của client xin mã đăng nhập (`ip_hash::fingerprint`); trống khi không biết.
+        pub requester_block: Option<String>,
     }
 
     impl ActiveModelBehavior for ActiveModel {}

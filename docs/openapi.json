@@ -127831,6 +127831,16 @@
             },
             "description": "Missing `catalog.export`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "`org_id` is not a unit of this tenant; code `org_not_found`."
+          },
           "422": {
             "content": {
               "application/problem+json": {
@@ -128163,6 +128173,16 @@
               }
             },
             "description": "Missing `catalog.import`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "`org_id` is not a unit of this tenant; code `org_not_found`."
           },
           "413": {
             "content": {
@@ -130781,7 +130801,7 @@
                 }
               }
             },
-            "description": "Missing `catalog.products.write` (code `permission_denied`), or the plan lacks `catalog.ai` (code `feature_not_enabled`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+            "description": "Missing `catalog.products.write` (code `permission_denied`), `org_id` outside your scope or not a unit of this tenant (code `org_out_of_scope`), or the plan lacks `catalog.ai` (code `feature_not_enabled`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "422": {
             "content": {
@@ -152953,7 +152973,7 @@
                 }
               }
             },
-            "description": "No promotion has this id in your scope; code `promotions.not_found`."
+            "description": "No promotion has this id in your scope (code `promotions.not_found`), or `org_id` is not a unit of this tenant (code `org_not_found`)."
           },
           "422": {
             "content": {
@@ -183979,6 +183999,16 @@
               }
             },
             "description": "The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "`store_id` is not a unit of this shop; code `org_not_found`."
           },
           "422": {
             "content": {
@@ -223928,6 +223958,16 @@
             },
             "description": "The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "`org_id` is not a unit of this shop; code `org_not_found`."
+          },
           "422": {
             "content": {
               "application/problem+json": {
@@ -227356,7 +227396,7 @@
                 }
               }
             },
-            "description": "Payments do not add up (`orders.payments_mismatch`), a product not on sale (`orders.variant_unavailable`), the reference reused for another sale (`orders.idempotency_key_reused`), or invalid values (see `errors`)."
+            "description": "Payments do not add up (`orders.payments_mismatch`) or overflow (`money.overflow`), a payment is not in the shift currency (`orders.payment_currency_mismatch`), a product not on sale (`orders.variant_unavailable`), the reference reused for another sale (`orders.idempotency_key_reused`), or invalid values (see `errors`)."
           },
           "default": {
             "content": {
@@ -227681,7 +227721,7 @@
                 }
               }
             },
-            "description": "Reason or note missing, or invalid values (see `errors`)."
+            "description": "Reason or note missing, `counted_cash` not in the shift currency (`orders.cash_currency_mismatch`), the cash adds up beyond the storable range (`money.overflow`), or invalid values (see `errors`)."
           },
           "default": {
             "content": {

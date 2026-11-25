@@ -295,7 +295,8 @@ async fn doan_ma_dong_thoi_van_bi_chan_sau_nam_lan() {
 }
 
 /// Pentest 2026-11: một địa chỉ client xin mã cho hàng loạt số khác nhau (mỗi tin tốn tiền SMS
-/// của cửa hàng) bị chặn sau 20 mã một giờ; địa chỉ khác vẫn xin được.
+/// của cửa hàng) bị chặn sau 20 mã một giờ — kể cả khi xoay địa chỉ trong khối /64 của mình; khối khác vẫn
+/// xin được.
 #[tokio::test]
 async fn mot_dia_chi_khong_xin_ma_cho_hang_loat_so() {
     TestDatabase::run(async |test| {
@@ -317,14 +318,15 @@ async fn mot_dia_chi_khong_xin_ma_cho_hang_loat_so() {
             let body = if answer.body().is_empty() { Value::Null } else { answer.json() };
             (answer.status(), body)
         };
+        // Mỗi lượt một địa chỉ khác nhưng cùng khối /64 (PT-4): vẫn tính là một client.
         for number in 0..20 {
-            let (status, sent) = ask("203.0.113.7", number).await;
+            let (status, sent) = ask(&format!("2001:db8:7:2::{:x}", number + 1), number).await;
             assert_eq!(status, StatusCode::OK, "{sent}");
         }
-        let (status, problem) = ask("203.0.113.7", 20).await;
+        let (status, problem) = ask("2001:db8:7:2::ff", 20).await;
         assert_eq!(status, StatusCode::TOO_MANY_REQUESTS, "{problem}");
         assert_eq!(problem["code"], "bookings.too_many_codes");
-        let (status, sent) = ask("198.51.100.9", 21).await;
+        let (status, sent) = ask("2001:db8:7:3::1", 21).await;
         assert_eq!(status, StatusCode::OK, "{sent}");
     })
     .await

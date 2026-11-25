@@ -52,7 +52,8 @@ fn vnd(money: Money) -> Result<i64, Error> {
 
 /// mm → cm, làm tròn lên (khai nhỏ hơn thật thì GHN tính lại phí).
 fn cm(mm: Option<i64>) -> i64 {
-    mm.filter(|mm| *mm > 0).map_or(DEFAULT_SIDE_CM, |mm| (mm + 9) / 10)
+    // Không viết `(mm + 9) / 10`: `mm` do người gọi gửi, gần `i64::MAX` thì tràn (PT-5).
+    mm.filter(|mm| *mm > 0).map_or(DEFAULT_SIDE_CM, |mm| mm / 10 + i64::from(mm % 10 != 0))
 }
 
 fn service_of(code: Option<&str>, parcels: &[CarrierParcel]) -> Result<i64, Error> {
@@ -61,7 +62,8 @@ fn service_of(code: Option<&str>, parcels: &[CarrierParcel]) -> Result<i64, Erro
         Some("5") => Ok(HEAVY),
         Some(other) if !other.is_empty() => Err(errors::service_unknown(other)),
         _ => {
-            let total: i64 = parcels.iter().map(|parcel| parcel.weight_grams).sum();
+            let total =
+                parcels.iter().map(|parcel| parcel.weight_grams).fold(0i64, i64::saturating_add);
             Ok(if parcels.len() > 1 || total >= HEAVY_FROM_GRAMS { HEAVY } else { LIGHT })
         }
     }
@@ -95,7 +97,8 @@ fn put_parcels(
     declared: Money,
     cod: Option<Money>,
 ) -> Result<(), Error> {
-    let weight: i64 = parcels.iter().map(|parcel| parcel.weight_grams.max(1)).sum();
+    let weight =
+        parcels.iter().map(|parcel| parcel.weight_grams.max(1)).fold(0i64, i64::saturating_add);
     let side = |pick: fn(&CarrierParcel) -> Option<i64>| {
         parcels.iter().map(|parcel| cm(pick(parcel))).max().unwrap_or(DEFAULT_SIDE_CM)
     };

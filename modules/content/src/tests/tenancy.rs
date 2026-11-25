@@ -87,14 +87,33 @@ async fn trung_ten_o_hai_khach_duoc_phep() {
         };
         let mut published = Vec::new();
         for tenant in [&a, &b] {
-            let entry = content.create(tenant, &ada, post("Hello")).await.unwrap();
+            let entry = content
+                .create(tenant, &ada.clone().in_tenant(tenant.id()), post("Hello"))
+                .await
+                .unwrap();
             assert_eq!(entry.slug, "hello");
-            content.publish(tenant, &ada, entry.id, None, None, false).await.unwrap();
+            content
+                .publish(tenant, &ada.clone().in_tenant(tenant.id()), entry.id, None, None, false)
+                .await
+                .unwrap();
             published.push(entry.id);
-            assert_eq!(content.create_author(tenant, &ada, author()).await.unwrap().slug, "ada");
-            let term = content.create_term(tenant, &ada, Taxonomy::Tag, tag()).await.unwrap();
+            assert_eq!(
+                content
+                    .create_author(tenant, &ada.clone().in_tenant(tenant.id()), author())
+                    .await
+                    .unwrap()
+                    .slug,
+                "ada"
+            );
+            let term = content
+                .create_term(tenant, &ada.clone().in_tenant(tenant.id()), Taxonomy::Tag, tag())
+                .await
+                .unwrap();
             assert_eq!(term.texts[0].slug, "travel");
-            content.create_redirect(tenant, &ada, redirect()).await.unwrap();
+            content
+                .create_redirect(tenant, &ada.clone().in_tenant(tenant.id()), redirect())
+                .await
+                .unwrap();
         }
         for (tenant, id) in [(&a, published[0]), (&b, published[1])] {
             match content
@@ -114,24 +133,39 @@ async fn trung_ten_o_hai_khach_duoc_phep() {
         }
         // Mục của khách này không thấy được từ khách kia.
         assert_eq!(
-            content.get(&b, &ada, published[0]).await.unwrap_err().code(),
+            content.get(&b, &ada.clone().in_tenant(b.id()), published[0]).await.unwrap_err().code(),
             "content.not_found"
         );
 
         // Trong một khách: vẫn bị chặn.
         let mut again = post("Hello again");
         again.fields.slug = Some("hello".into());
-        assert_eq!(content.create(&a, &ada, again).await.unwrap_err().code(), "content.slug_taken");
         assert_eq!(
-            content.create_author(&a, &ada, author()).await.unwrap_err().code(),
+            content.create(&a, &ada.clone().in_tenant(a.id()), again).await.unwrap_err().code(),
             "content.slug_taken"
         );
         assert_eq!(
-            content.create_term(&a, &ada, Taxonomy::Tag, tag()).await.unwrap_err().code(),
+            content
+                .create_author(&a, &ada.clone().in_tenant(a.id()), author())
+                .await
+                .unwrap_err()
+                .code(),
             "content.slug_taken"
         );
         assert_eq!(
-            content.create_redirect(&a, &ada, redirect()).await.unwrap_err().code(),
+            content
+                .create_term(&a, &ada.clone().in_tenant(a.id()), Taxonomy::Tag, tag())
+                .await
+                .unwrap_err()
+                .code(),
+            "content.slug_taken"
+        );
+        assert_eq!(
+            content
+                .create_redirect(&a, &ada.clone().in_tenant(a.id()), redirect())
+                .await
+                .unwrap_err()
+                .code(),
             "content.redirect_exists"
         );
     })
@@ -157,22 +191,41 @@ async fn cache_tim_theo_y_nghia_khong_dung_chung() {
             |q: &str| SearchQuery { q: q.into(), locale: Some("vi".into()), ..Default::default() };
         // `b` lập index và tìm trước: vector của `b` (version 1) vào bộ nhớ.
         let in_b = content
-            .create(&b, &ada, vi_post("Đà Lạt mùa hoa", "Hoa dã quỳ nở vàng đồi thông."))
+            .create(
+                &b,
+                &ada.clone().in_tenant(b.id()),
+                vi_post("Đà Lạt mùa hoa", "Hoa dã quỳ nở vàng đồi thông."),
+            )
             .await
             .unwrap();
         content.index_entry(&b, in_b.id).await.unwrap();
-        let hits = content.search(&b, Some(&ada), &query("hoa đà lạt"), None).await.unwrap();
+        let hits = content
+            .search(&b, Some(&ada.clone().in_tenant(b.id())), &query("hoa đà lạt"), None)
+            .await
+            .unwrap();
         assert_eq!(hits[0].entry_id, in_b.id);
         assert_eq!(content.search_cache.cached_version(b.id(), Scope::Draft, "vi"), Some(1));
 
         // `a` cũng ở version 1 cho cùng (`draft`, `vi`): chỉ thấy mục của chính mình.
-        let in_a =
-            content.create(&a, &ada, vi_post("Học Rust", "Ownership và lifetime.")).await.unwrap();
+        let in_a = content
+            .create(
+                &a,
+                &ada.clone().in_tenant(a.id()),
+                vi_post("Học Rust", "Ownership và lifetime."),
+            )
+            .await
+            .unwrap();
         content.index_entry(&a, in_a.id).await.unwrap();
-        let hits = content.search(&a, Some(&ada), &query("hoa đà lạt"), None).await.unwrap();
+        let hits = content
+            .search(&a, Some(&ada.clone().in_tenant(a.id())), &query("hoa đà lạt"), None)
+            .await
+            .unwrap();
         assert!(hits.iter().all(|hit| hit.entry_id == in_a.id), "{hits:?}");
         assert!(hits.iter().all(|hit| hit.entry_id != in_b.id));
-        let hits = content.search(&a, Some(&ada), &query("ownership"), None).await.unwrap();
+        let hits = content
+            .search(&a, Some(&ada.clone().in_tenant(a.id())), &query("ownership"), None)
+            .await
+            .unwrap();
         assert_eq!(hits[0].entry_id, in_a.id);
         assert_eq!(content.search_cache.cached_version(a.id(), Scope::Draft, "vi"), Some(1));
 
@@ -181,9 +234,15 @@ async fn cache_tim_theo_y_nghia_khong_dung_chung() {
             title: Some("Đà Lạt mùa mưa".into()),
             ..Default::default()
         };
-        content.update(&b, &ada, in_b.id, changes, false, None).await.unwrap();
+        content
+            .update(&b, &ada.clone().in_tenant(b.id()), in_b.id, changes, false, None)
+            .await
+            .unwrap();
         content.index_entry(&b, in_b.id).await.unwrap();
-        let hits = content.search(&b, Some(&ada), &query("mùa mưa"), None).await.unwrap();
+        let hits = content
+            .search(&b, Some(&ada.clone().in_tenant(b.id())), &query("mùa mưa"), None)
+            .await
+            .unwrap();
         assert_eq!(hits[0].entry_id, in_b.id);
         assert_eq!(content.search_cache.cached_version(b.id(), Scope::Draft, "vi"), Some(2));
         assert_eq!(content.search_cache.cached_version(a.id(), Scope::Draft, "vi"), Some(1));
@@ -200,15 +259,28 @@ async fn lich_dang_chay_dung_khach() {
     TestDatabase::run(async |test| {
         let (_app, content, a, b) = two_tenants(test, Arc::new(FakeEmbedder::disabled())).await;
         let ada = editor();
-        let entry = content.create(&b, &ada, post("Later")).await.unwrap();
+        let entry =
+            content.create(&b, &ada.clone().in_tenant(b.id()), post("Later")).await.unwrap();
         let at = Timestamp::now() + SignedDuration::from_hours(1);
-        let schedule =
-            content.create_schedule(&b, &ada, entry.id, Action::Publish, at, None).await.unwrap();
+        let schedule = content
+            .create_schedule(
+                &b,
+                &ada.clone().in_tenant(b.id()),
+                entry.id,
+                Action::Publish,
+                at,
+                None,
+            )
+            .await
+            .unwrap();
         let payload = serde_json::to_value(RunSchedule { schedule_id: schedule.id }).unwrap();
         let job = JobContext::for_tenant(b.clone(), crate::publishing::schedules::RUN, payload, 1);
         crate::publishing::schedules::Runner(content.clone()).run(&job).await.unwrap();
 
-        assert_eq!(content.get(&b, &ada, entry.id).await.unwrap().status, "published");
+        assert_eq!(
+            content.get(&b, &ada.clone().in_tenant(b.id()), entry.id).await.unwrap().status,
+            "published"
+        );
         assert!(matches!(
             content
                 .resolve(&b, &autoxide_kernel::tenancy::Site::whole(&b), "en", "/blog/later")
@@ -275,18 +347,34 @@ async fn cau_hinh_module_theo_khach_ghi_de_bien_moi_truong() {
 
         // Bài mới không nêu ngôn ngữ: mặc định của khách; `fr` chỉ hợp lệ ở `b`, `en` chỉ ở `a`.
         let ada = editor();
-        assert_eq!(content.create(&b, &ada, post("Bonjour")).await.unwrap().locale, "fr");
-        assert_eq!(content.create(&a, &ada, post("Hello")).await.unwrap().locale, "en");
+        assert_eq!(
+            content
+                .create(&b, &ada.clone().in_tenant(b.id()), post("Bonjour"))
+                .await
+                .unwrap()
+                .locale,
+            "fr"
+        );
+        assert_eq!(
+            content.create(&a, &ada.clone().in_tenant(a.id()), post("Hello")).await.unwrap().locale,
+            "en"
+        );
         let in_language = |locale: &str| {
             let mut entry = post("Xin chào");
             entry.locale = Some(locale.to_owned());
             entry
         };
-        let error = content.create(&a, &ada, in_language("fr")).await.unwrap_err();
+        let error = content
+            .create(&a, &ada.clone().in_tenant(a.id()), in_language("fr"))
+            .await
+            .unwrap_err();
         assert_eq!(error.fields()[0].code, "locale_not_supported");
-        let error = content.create(&b, &ada, in_language("en")).await.unwrap_err();
+        let error = content
+            .create(&b, &ada.clone().in_tenant(b.id()), in_language("en"))
+            .await
+            .unwrap_err();
         assert_eq!(error.fields()[0].code, "locale_not_supported");
-        content.create(&b, &ada, in_language("vi")).await.unwrap();
+        content.create(&b, &ada.clone().in_tenant(b.id()), in_language("vi")).await.unwrap();
 
         // Route công khai và cấu hình cho giao diện theo khách của request.
         let public = |slug: &'static str, locale: &'static str| {
@@ -320,7 +408,10 @@ async fn cau_hinh_module_theo_khach_ghi_de_bien_moi_truong() {
         // Bỏ cấu hình: về biến môi trường.
         let removed = app.delete(&format!("{base}/content.locales")).token("platform").send();
         assert_eq!(removed.await.unwrap().status(), 204);
-        assert_eq!(content.create(&b, &ada, post("Hi")).await.unwrap().locale, "en");
+        assert_eq!(
+            content.create(&b, &ada.clone().in_tenant(b.id()), post("Hi")).await.unwrap().locale,
+            "en"
+        );
     })
     .await
     .unwrap();

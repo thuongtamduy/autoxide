@@ -82,7 +82,13 @@ impl Tender for StoreCreditTender {
         self.0.stored_value_allowed(tenant, &STORE_CREDIT).await?;
         let buyer = buyer.ok_or_else(need_account)?;
         let profile = self.0.me(tenant, buyer).await?;
-        let balance = self.0.credit_balance(tenant.database().read(), tenant, profile.id).await?;
+        let read = tenant.database().read();
+        // Số dư của tiền tệ khác (vd VND cho đơn USD) không trả được, không quy đổi theo đơn vị nhỏ (PT-6).
+        let credit_currency = self.0.credit_currency(read, tenant, profile.id).await?;
+        if credit_currency.as_deref().is_some_and(|code| code != max.currency().code()) {
+            return Err(insufficient(0));
+        }
+        let balance = self.0.credit_balance(read, tenant, profile.id).await?;
         let cap = input["amount"].as_i64().unwrap_or(i64::MAX);
         let wanted =
             Money::new(Ord::max(Ord::min(Ord::min(balance, max.minor()), cap), 0), max.currency());

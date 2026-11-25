@@ -240,7 +240,8 @@ pub(crate) fn check_quantity(
     signed: bool,
 ) {
     let fits = if signed {
-        quantity != 0 && quantity.abs() <= MAX_QUANTITY
+        // `unsigned_abs`: `i64::MIN.abs()` tràn (panic) — số do client gửi.
+        quantity != 0 && quantity.unsigned_abs() <= MAX_QUANTITY.unsigned_abs()
     } else {
         (1..=MAX_QUANTITY).contains(&quantity)
     };

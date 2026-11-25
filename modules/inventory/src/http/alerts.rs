@@ -82,6 +82,7 @@ pub(crate) struct RestockAlertAccepted {
     responses(
         (status = 202, description = "Received.", body = Data<RestockAlertAccepted>),
         (status = 400, description = "The form token or challenge is missing, invalid or expired (codes `antispam.token_missing`, `antispam.token_invalid`, `antispam.token_expired`, `antispam.challenge_required`, `antispam.challenge_failed`): reload the form.", body = Problem),
+        (status = 404, description = "`store_id` is not a unit of this shop; code `org_not_found`.", body = Problem),
         (status = 422, description = "A value is invalid (no consent, no or bad contact, unknown language); see `errors`.", body = Problem),
         (status = 429, description = "Too many requests from this account; code `antispam.rate_limited`.", body = Problem),
         (status = 503, description = "Alerts are not set up on this server (code `inventory.restock_alerts_unavailable`) or the anti-spam check cannot run (`antispam.verifier_unavailable`).", body = Problem),

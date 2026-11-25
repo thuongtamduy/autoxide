@@ -436,11 +436,11 @@ async fn hai_khach_cung_khoa_khong_lo_menu_va_cache() {
             harness.database.clone(),
         );
         let (mine, _) = service
-            .create(a, &admin(), menu("main", "en", vec![link("Home A", "/")]))
+            .create(a, &admin().in_tenant(a.id()), menu("main", "en", vec![link("Home A", "/")]))
             .await
             .unwrap();
         let (theirs, _) = service
-            .create(b, &admin(), menu("main", "en", vec![link("Home B", "/")]))
+            .create(b, &admin().in_tenant(b.id()), menu("main", "en", vec![link("Home B", "/")]))
             .await
             .unwrap();
         let now = Timestamp::now();
@@ -465,7 +465,10 @@ async fn hai_khach_cung_khoa_khong_lo_menu_va_cache() {
 
         // Khách B sửa menu: bản của B đổi, bản đã cache của A giữ nguyên (không bị xoá).
         let items = vec![link("New B", "/new")];
-        service.replace(b, &admin(), theirs.id, items, Some(theirs.updated_at)).await.unwrap();
+        service
+            .replace(b, &admin().in_tenant(b.id()), theirs.id, items, Some(theirs.updated_at))
+            .await
+            .unwrap();
         let changed_b = service
             .public_menu(b, &autoxide_kernel::tenancy::Site::whole(b), "main", None, now)
             .await
@@ -481,7 +484,11 @@ async fn hai_khach_cung_khoa_khong_lo_menu_va_cache() {
         // Hai khách có menu giống hệt nhau vẫn nhận hai `ETag` khác nhau.
         for tenant in [a, b] {
             service
-                .create(tenant, &admin(), menu("footer", "en", vec![link("Hi", "/hi")]))
+                .create(
+                    tenant,
+                    &admin().in_tenant(tenant.id()),
+                    menu("footer", "en", vec![link("Hi", "/hi")]),
+                )
                 .await
                 .unwrap();
         }
@@ -501,15 +508,21 @@ async fn hai_khach_cung_khoa_khong_lo_menu_va_cache() {
             autoxide_kernel::pagination::PageQuery::default(),
         )
         .unwrap();
-        let listed = service.list(b, &admin(), None, &page).await.unwrap();
+        let listed = service.list(b, &admin().in_tenant(b.id()), None, &page).await.unwrap();
         assert!(listed.data.iter().all(|(menu, _)| menu.tenant_id == b.id().as_uuid()));
         assert_eq!(listed.data.len(), 2);
         let missing = "menus.menu_not_found";
-        assert_eq!(service.get(b, &admin(), mine.id).await.unwrap_err().code(), missing);
-        let replaced = service.replace(b, &admin(), mine.id, vec![], None).await;
+        assert_eq!(
+            service.get(b, &admin().in_tenant(b.id()), mine.id).await.unwrap_err().code(),
+            missing
+        );
+        let replaced = service.replace(b, &admin().in_tenant(b.id()), mine.id, vec![], None).await;
         assert_eq!(replaced.unwrap_err().code(), missing);
-        assert_eq!(service.delete(b, &admin(), mine.id).await.unwrap_err().code(), missing);
-        let (_, nodes) = service.get(a, &admin(), mine.id).await.unwrap();
+        assert_eq!(
+            service.delete(b, &admin().in_tenant(b.id()), mine.id).await.unwrap_err().code(),
+            missing
+        );
+        let (_, nodes) = service.get(a, &admin().in_tenant(a.id()), mine.id).await.unwrap();
         assert_eq!(nodes[0].item.label, "Home A");
 
         // Nhập menu cũ: mỗi khách một bản, chạy lại ở một khách không nhân đôi.

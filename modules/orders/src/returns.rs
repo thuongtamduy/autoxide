@@ -624,7 +624,9 @@ impl OrdersService {
                 ));
                 continue;
             };
-            let total = taken.get(&item.line_id).copied().unwrap_or(0) + item.quantity;
+            // Cộng bão hoà (PT-5): số lượng do người gọi gửi; vượt `line.quantity` thì báo lỗi bên dưới.
+            let total =
+                taken.get(&item.line_id).copied().unwrap_or(0).saturating_add(item.quantity);
             if item.quantity < 0 || total > line.quantity {
                 problems.push(
                     FieldError::new(
