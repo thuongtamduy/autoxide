@@ -420,7 +420,7 @@ impl Modules {
     /// Disabled modules whose tables `database` still has - an installation that once ran that module.
     /// Read-only; it changes nothing. For each module, it lists the tables that hold data so the installer
     /// knows whether disabling it loses a feature in use. It looks at ONE database only; to look at the
-    /// placements too, use
+    /// placements too, use [`dormant_everywhere`](Self::dormant_everywhere).
     pub async fn dormant(&self, database: &Database) -> Result<Vec<DormantModule>, DbErr> {
         let mut dormant = Vec::new();
         for module in &self.inactive {

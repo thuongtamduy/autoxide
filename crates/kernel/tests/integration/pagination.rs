@@ -29,6 +29,22 @@ mod item {
     impl ActiveModelBehavior for ActiveModel {}
 }
 
+// Bảng có cột sắp được phép trống: `fetch_page_by` phải từ chối (dòng NULL rơi khỏi mọi trang sau trang đầu).
+mod nullable {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "nullable_item")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub note: Option<String>,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
 async fn connect(database: &TestDatabase) -> Database {
     let source = ConfigSource::from_pairs([("DATABASE_URL", database.url())]);
     let mut reader = ConfigReader::new(&source);
@@ -458,6 +474,35 @@ async fn like_thoat_ky_tu_dai_dien() {
         assert_eq!(kinds(search::contains(item::Column::Kind, "_b-")).await, ["a_b-1"]);
         // Không thoát (cách cũ) thì `_` khớp mọi ký tự: cả `axb-1` lẫn `a%b-1`.
         assert_eq!(kinds(item::Column::Kind.starts_with("a_b-")).await.len(), 4);
+    })
+    .await
+    .unwrap();
+}
+
+/// Cột sắp được phép trống (`Option<T>` trong entity) là lỗi lập trình: từ chối trước khi truy vấn, kể cả
+/// trang đầu, thay vì làm mất trong im lặng các dòng NULL ở trang sau (D-20261125-list-pages).
+#[tokio::test]
+async fn cot_sap_duoc_phep_trong_bi_tu_choi() {
+    use autoxide_kernel::error::ErrorKind;
+    use autoxide_kernel::pagination::{SortValue, fetch_page_by};
+
+    TestDatabase::run(async |database| {
+        let db = connect(database).await;
+        // Không tạo bảng `nullable_item`: lời từ chối phải đến trước mọi câu SQL.
+        let error = fetch_page_by(
+            nullable::Entity::find(),
+            nullable::Column::Note,
+            |row| SortValue::Text(row.note.clone().unwrap_or_default()),
+            nullable::Column::Id,
+            |row| row.id,
+            &PageRequest::first(10, Order::Asc),
+            db.read(),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::Internal);
+        assert!(error.to_string().contains("`note`"), "{error}");
+        db.close().await.unwrap();
     })
     .await
     .unwrap();
