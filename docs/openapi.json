@@ -114652,7 +114652,7 @@
                 }
               }
             },
-            "description": "Missing permission `auth.scim.manage` (code `permission_denied`), or the plan's staff limit is reached."
+            "description": "Missing permission `auth.scim.manage` (code `permission_denied`)."
           },
           "404": {
             "content": {

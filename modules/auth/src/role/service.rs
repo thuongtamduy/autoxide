@@ -139,10 +139,13 @@ pub(crate) fn member_reference(user_id: Uuid) -> String {
 
 /// Người dùng `user_id` có giữ role nào ở khách `tenant` không.
 pub(crate) async fn has_membership(tenant: &TenantContext, user_id: Uuid) -> Result<bool, Error> {
+    // Đọc qua kết nối GHI, không qua `read()`: kết quả quyết định giữ hay trả chỗ trong hạn mức số
+    // nhân sự ngay sau một lần ghi; kết nối đọc có thể là read replica trễ hơn bản chính — đọc ở đó
+    // thì vừa gán role xong vẫn thấy "chưa giữ" và trả chỗ (gói bị vượt hạn mức).
     let found = user_role::Entity::find()
         .filter(user_role::Column::UserId.eq(user_id))
         .filter(user_role::Column::TenantId.eq(tenant.id().as_uuid()))
-        .one(tenant.database().read())
+        .one(tenant.database().write())
         .await?;
     Ok(found.is_some())
 }
@@ -208,10 +211,13 @@ impl RoleService {
     }
 
     /// Bọc một lần đổi role của `user_id` bằng hạn mức số nhân sự: người chưa giữ role nào mà có thể
-    /// sắp có (`will_hold`) → giữ chỗ TRƯỚC (ngoài transaction của module). Sau khi đổi, đối chiếu
-    /// với trạng thái THẬT (người đó còn giữ role nào không), không với ý định: lần đồng bộ SCIM chỉ
+    /// sắp có (`will_hold`) → giữ chỗ TRƯỚC (ngoài transaction của module). `change` trả kết quả kèm
+    /// "có đổi gì không". Có đổi: đối chiếu với trạng thái THẬT sau khi đổi (người đó còn giữ role
+    /// nào không, đọc qua kết nối ghi — xem `has_membership`), không với ý định: lần đồng bộ SCIM chỉ
     /// áp phần mình được phép (D-20261125-scim-grant-cover), nên "muốn giữ" và "đang giữ" có thể khác
-    /// — giữ role thì xác nhận chỗ, không giữ thì trả chỗ.
+    /// — giữ role thì xác nhận chỗ, không giữ thì trả chỗ. Không đổi gì: không đụng tới chỗ — mã giữ
+    /// chỗ (`auth.member:<id>`) dùng chung cho mọi lần đổi role của người đó, một lần chạy đồng thời
+    /// khác có thể đang dựa vào nó; chỗ giữ mà không ai xác nhận tự hết hạn (D-20261125-scim-sync-report).
     async fn with_member_limit<T, F>(
         &self,
         tenant: &TenantContext,
@@ -220,7 +226,7 @@ impl RoleService {
         change: F,
     ) -> Result<T, Error>
     where
-        F: std::future::Future<Output = Result<T, Error>>,
+        F: std::future::Future<Output = Result<(T, bool), Error>>,
     {
         let held = has_membership(tenant, user_id).await?;
         let reference = member_reference(user_id);
@@ -228,12 +234,17 @@ impl RoleService {
         if joining {
             self.entitlements.reserve(tenant.id(), &MEMBERS_LIMIT, 1, &reference).await?;
         }
-        let done = change.await;
-        if done.is_err() {
-            if joining {
-                self.entitlements.release(tenant.id(), &MEMBERS_LIMIT, &reference).await?;
+        let (value, changed) = match change.await {
+            Ok(done) => done,
+            Err(error) => {
+                if joining {
+                    self.entitlements.release(tenant.id(), &MEMBERS_LIMIT, &reference).await?;
+                }
+                return Err(error);
             }
-            return done;
+        };
+        if !changed {
+            return Ok(value);
         }
         let holds = has_membership(tenant, user_id).await?;
         match (joining, holds) {
@@ -248,7 +259,7 @@ impl RoleService {
             }
             _ => {}
         }
-        done
+        Ok(value)
     }
 
     /// Dịch mô tả permission bằng `translations`.

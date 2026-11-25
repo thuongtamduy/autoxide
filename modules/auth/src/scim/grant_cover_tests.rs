@@ -443,6 +443,10 @@ async fn dat_luat_cho_khoa_nhom_cua_lan_ghi_thanh_vien() {
         let stranger = scim_user(&app, &low_token, "stranger@example.com").await;
         let stranger_id = uuid::Uuid::parse_str(&stranger).unwrap();
 
+        // Đọc mọi thứ cần trước khi giữ transaction ghi (SQLite một kết nối ghi).
+        let admin_role = admin_role(&app, &admin).await;
+        let body =
+            json!({"group_id": group_id, "org_id": tenant.id().as_uuid(), "role_id": admin_role});
         let transaction = tenant.database().begin_write().await.unwrap();
         autoxide_kernel::rows::lock_one(
             &transaction,
@@ -462,7 +466,6 @@ async fn dat_luat_cho_khoa_nhom_cua_lan_ghi_thanh_vien() {
         .await
         .unwrap();
 
-        let body = json!({"group_id": group_id, "org_id": tenant.id().as_uuid(), "role_id": admin_role(&app, &admin).await});
         let mapping = call(&app, "POST", "/scim/group-mappings", Some(&admin), Some(body));
         let finished = std::sync::atomic::AtomicBool::new(false);
         let (mapped, ()) = tokio::join!(

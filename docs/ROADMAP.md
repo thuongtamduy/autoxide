@@ -260,6 +260,9 @@ thật (P7).
         thì mọi thành viên nhận role (response tạo luật liệt kê ở `granted_user_ids`, hướng dẫn dặn xem trước —
         D-20261125-scim-grant-cover). Chặt hơn: ghi người đưa vào (`added_by`) ở thành viên nhóm và chỉ cấp cho
         thành viên mà người đưa vào cấp được role, còn lại chờ duyệt — cần migration, để sau
+  - [ ] Hạn mức số nhân sự: hai lần đổi role thật cho cùng một người chạy đồng thời có thể làm lệch chỗ (dùng chung
+        mã giữ chỗ `auth.member:<id>`; có từ trước) — khoá dòng người dùng quanh giữ chỗ → đổi → xác nhận, hay job
+        đối soát số nhân sự với `auth_user_role` (D-20261125-scim-sync-report)
 
 ## Giai đoạn B — Lớp cho giao diện và phân quyền
 

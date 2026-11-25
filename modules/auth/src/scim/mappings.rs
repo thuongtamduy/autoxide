@@ -182,7 +182,11 @@ impl ScimService {
         // Luật đã commit: đồng bộ mọi thành viên, người lỗi không chặn người sau; ai đã nhận role và
         // ai lỗi đều trả về (và ghi log) — không im lặng để lại thành viên chưa đồng bộ.
         let members = members(tenant, group_id).await?;
-        let report = self.sync_in(tenant, Actor::from(principal), principal, &members).await;
+        let mut report = self.sync_in(tenant, Actor::from(principal), principal, &members).await;
+        // Chỉ người thật sự giữ role ở nút sau khi đồng bộ (không gồm tài khoản vừa bị xoá hay không
+        // phải nhân sự mà lần đồng bộ bỏ qua). Đọc qua kết nối ghi: ngay sau commit, replica có thể trễ.
+        let holders = holders_of(tenant, org_id, role_id, &report.synced).await?;
+        report.synced.retain(|user_id| holders.contains(user_id));
         Ok((row, report))
     }
 
@@ -249,6 +253,37 @@ impl ScimService {
             None => Ok(()),
         }
     }
+}
+
+/// Những người trong `users` đang giữ role `role_id` ở nút `org_id` (dòng cũ `org_id` NULL là gốc).
+async fn holders_of(
+    tenant: &TenantContext,
+    org_id: Uuid,
+    role_id: Uuid,
+    users: &[Uuid],
+) -> Result<BTreeSet<Uuid>, Error> {
+    use crate::role::entity::user_role;
+    if users.is_empty() {
+        return Ok(BTreeSet::new());
+    }
+    let root = autoxide_kernel::tenancy::root_of(tenant.id()).as_uuid();
+    let at_org = if org_id == root {
+        Expr::col(user_role::Column::OrgId)
+            .eq(org_id)
+            .or(Expr::col(user_role::Column::OrgId).is_null())
+    } else {
+        Expr::col(user_role::Column::OrgId).eq(org_id)
+    };
+    Ok(user_role::Entity::find()
+        .filter(user_role::Column::RoleId.eq(role_id))
+        .filter(user_role::Column::UserId.is_in(users.iter().copied()))
+        .filter(at_org)
+        .scoped(tenant)
+        .all(tenant.database().write())
+        .await?
+        .into_iter()
+        .map(|row| row.user_id)
+        .collect())
 }
 
 /// Nhóm chưa có luật ánh xạ nào: thành viên của nó không nhận role gì từ nhóm.

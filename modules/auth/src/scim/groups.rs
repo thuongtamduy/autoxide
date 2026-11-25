@@ -273,7 +273,11 @@ impl ScimService {
             }
         };
         transaction.commit().await?;
-        self.sync_users(caller, &changed).await?;
+        // Thành viên đổi, cùng thành viên còn "chờ" (lần đồng bộ trước lỗi): hệ thống danh tính gửi
+        // lại đúng request cũ thì không còn ai đổi, nhưng người chờ vẫn được đồng bộ lại.
+        let mut users = changed;
+        users.extend(pending_members(tenant, row.id).await?);
+        self.sync_users(caller, &users).await?;
         let members = members_of(tenant.database().read(), tenant, &[row.id]).await?;
         Ok(render(&row, Some(members.get(&row.id).map(Vec::as_slice).unwrap_or_default())))
     }
@@ -334,7 +338,11 @@ impl ScimService {
             }
         };
         transaction.commit().await?;
-        self.sync_users(caller, &changed).await?;
+        // Thành viên đổi, cùng thành viên còn "chờ" (lần đồng bộ trước lỗi): hệ thống danh tính gửi
+        // lại đúng request cũ thì không còn ai đổi, nhưng người chờ vẫn được đồng bộ lại.
+        let mut users = changed;
+        users.extend(pending_members(tenant, row.id).await?);
+        self.sync_users(caller, &users).await?;
         let members = members_of(tenant.database().read(), tenant, &[row.id]).await?;
         Ok(render(&row, Some(members.get(&row.id).map(Vec::as_slice).unwrap_or_default())))
     }
@@ -578,8 +586,8 @@ impl ScimService {
         }
         let authority = self.authority(caller).await?;
         let report = self.sync_in(&caller.tenant, caller.actor(), &authority, users).await;
-        // Đã đồng bộ mọi người được; còn lỗi thì báo lỗi đầu để hệ thống danh tính gửi lại (gửi lại
-        // chỉ đồng bộ lại, kết quả cuối như nhau).
+        // Đã đồng bộ mọi người được; còn lỗi thì báo lỗi đầu để hệ thống danh tính gửi lại. Gửi lại
+        // đồng bộ lại người còn chờ (`pending_members`) dù thành viên nhóm không đổi thêm.
         match report.failed.into_iter().next() {
             Some((_, error)) => Err(ScimError::from(error)),
             None => Ok(()),
@@ -606,7 +614,8 @@ impl ScimService {
             match synced.await {
                 Ok(_) => report.synced.push(*user_id),
                 Err(error) => {
-                    tracing::warn!(user_id = %user_id, code = error.code(), "SCIM membership sync failed for a user");
+                    // `error` đầy đủ chỉ vào log (kể cả lỗi nội bộ); ra ngoài chỉ có mã và câu chung.
+                    tracing::warn!(user_id = %user_id, code = error.code(), %error, "SCIM membership sync failed for a user");
                     report.failed.push((*user_id, error));
                 }
             }
@@ -620,6 +629,48 @@ impl ScimService {
 pub(crate) struct SyncReport {
     pub synced: Vec<Uuid>,
     pub failed: Vec<(Uuid, autoxide_kernel::error::Error)>,
+}
+
+/// Thành viên của nhóm `group_id` còn thiếu một (nút, role) mà luật của nhóm cấp — lần đồng bộ trước
+/// của họ lỗi (vượt hạn mức…) hay bị bỏ qua vì người chịu trách nhiệm không cấp được. Mỗi luật một câu;
+/// đọc qua kết nối ghi (ngay sau commit, read replica có thể trễ).
+async fn pending_members(
+    tenant: &TenantContext,
+    group_id: Uuid,
+) -> Result<BTreeSet<Uuid>, ScimError> {
+    use crate::role::entity::user_role;
+    let connection = tenant.database().write();
+    let root = autoxide_kernel::tenancy::root_of(tenant.id()).as_uuid();
+    let rules = mapping::Entity::find()
+        .filter(mapping::Column::GroupId.eq(group_id))
+        .scoped(tenant)
+        .all(connection)
+        .await?;
+    let mut pending = BTreeSet::new();
+    for rule in rules {
+        let holders = Query::select()
+            .column(user_role::Column::UserId)
+            .from(user_role::Entity)
+            .and_where(Expr::col(user_role::Column::TenantId).eq(tenant.id().as_uuid()))
+            // Dòng cũ (trước bước 34) để `org_id` NULL nghĩa là nút gốc.
+            .and_where(if rule.org_id == root {
+                Expr::col(user_role::Column::OrgId)
+                    .eq(rule.org_id)
+                    .or(Expr::col(user_role::Column::OrgId).is_null())
+            } else {
+                Expr::col(user_role::Column::OrgId).eq(rule.org_id)
+            })
+            .and_where(Expr::col(user_role::Column::RoleId).eq(rule.role_id))
+            .to_owned();
+        let missing = member::Entity::find()
+            .filter(member::Column::GroupId.eq(group_id))
+            .filter(Expr::col((member::Entity, member::Column::UserId)).not_in_subquery(holders))
+            .scoped(tenant)
+            .all(connection)
+            .await?;
+        pending.extend(missing.into_iter().map(|row| row.user_id));
+    }
+    Ok(pending)
 }
 
 /// (Nút, role) người `user_id` phải giữ theo các nhóm của họ và luật ánh xạ.

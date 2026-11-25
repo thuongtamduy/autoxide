@@ -390,7 +390,7 @@ async fn list_scim_group_mappings(
     responses(
         (status = 201, description = "The rule was created and applied to the group's members: those who hold the role now are in `granted_user_ids`, those who could not be given it (e.g. the plan's staff limit) are in `failed`.", body = Data<CreatedScimGroupMappingResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "Missing permission `auth.scim.manage` (code `permission_denied`), or the plan's staff limit is reached.", body = Problem),
+        (status = 403, description = "Missing permission `auth.scim.manage` (code `permission_denied`).", body = Problem),
         (status = 404, description = "No SCIM group has this id; code `auth.scim_group_not_found`.", body = Problem),
         (status = 409, description = "The same rule exists (code `auth.scim_mapping_taken`).", body = Problem),
         (status = 422, description = "The unit or role is unknown, out of your scope, or the role has permissions you do not have; see `errors`.", body = Problem),
@@ -412,7 +412,7 @@ async fn create_scim_group_mapping(
         .failed
         .into_iter()
         .map(|(user_id, error)| {
-            // Lỗi nội bộ không lộ chi tiết ra ngoài (đã ghi log ở chỗ đồng bộ).
+            // Lỗi nội bộ không lộ chi tiết ra ngoài; lỗi đầy đủ đã ghi log ở `ScimService::sync_in`.
             let message = if error.kind() == autoxide_kernel::error::ErrorKind::Internal {
                 "Internal error.".to_owned()
             } else {

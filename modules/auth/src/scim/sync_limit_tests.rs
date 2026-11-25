@@ -290,3 +290,31 @@ async fn bo_qua_phan_go_thi_giu_cho() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn gui_lai_cung_request_thi_dong_bo_lai_nguoi_con_cho() {
+    TestDatabase::run(async |test| {
+        let setup = setup(test).await;
+        let admins = group(&setup, "Admins", &[]).await;
+        let (status, _) = map(&setup, &admins, "admin").await;
+        assert_eq!(status, StatusCode::CREATED);
+        let newcomer = user(&setup, &setup.admin_token, "new@alpha.example").await;
+        // Hết chỗ: thành viên được ghi, đồng bộ lỗi, hệ thống danh tính nhận lỗi.
+        setup.plan.set_max(setup.plan.used().len());
+        let path = format!("/Groups/{admins}");
+        let (status, body) =
+            scim(&setup.app, "PATCH", &path, &setup.admin_token, Some(add(&newcomer))).await;
+        assert_eq!(status, StatusCode::FORBIDDEN, "{body}");
+        assert!(!is_admin(&setup, &newcomer).await);
+        // Gửi lại đúng request đó khi đã có chỗ: thành viên không đổi thêm, nhưng người chờ được
+        // đồng bộ lại.
+        setup.plan.set_max(100);
+        let (status, body) =
+            scim(&setup.app, "PATCH", &path, &setup.admin_token, Some(add(&newcomer))).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        assert!(is_admin(&setup, &newcomer).await);
+        assert!(setup.plan.used().contains(&reference(&newcomer)));
+    })
+    .await
+    .unwrap();
+}
