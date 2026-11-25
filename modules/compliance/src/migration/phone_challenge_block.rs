@@ -1,8 +1,9 @@
-//! `m0021_phone_challenge_block`: khối địa chỉ của người xin mã đăng nhập (PT-7, D-20261125-otp-wrong-by-block).
+//! `m0021_phone_challenge_block`: client (một IPv4 hay một khối /64 IPv6) của người xin mã đăng nhập (PT-7, D-20261125-otp-wrong-by-block).
 
 use autoxide_kernel::migration::prelude::*;
 
-/// Cột `requester_block`: dấu (HMAC, 22 ký tự) của khối địa chỉ /24 hay /64 của client xin mã; trống khi
+/// Cột `requester_block`: dấu (HMAC, 22 ký tự, `ip_hash::client_fingerprint`) của client xin mã — một địa chỉ IPv4
+/// hay một khối /64 IPv6; trống khi
 /// không biết địa chỉ và với mã xác thực số của người đã đăng nhập. Lần nhập sai của một số đếm theo khối
 /// này, nên người lạ đoán sai trên mã họ xin không khoá chủ số ở địa chỉ khác.
 pub(super) struct PhoneChallengeBlock;

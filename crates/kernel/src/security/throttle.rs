@@ -14,8 +14,9 @@
 //!   FIRST and then checks, so N requests fired at once cannot exceed `limit`.
 //! - Per tenant (step 33): every function takes the tenant; counts live in the tenant's database, primary key
 //!   `(tenant_id, key)` — one tenant being flooded does not lock the users of another tenant.
-//! - A limit counted per client address builds its key with [`address_key`] — never from the raw address:
-//!   a client behind IPv6 owns a whole /64 and can change address on every request (D-20261125-address-keys).
+//! - A limit counted per client address builds its key with [`address_key`] (one IPv4 address, or one IPv6 /64)
+//!   — never from the raw address: a client behind IPv6 owns a whole /64 and can change address on every
+//!   request (D-20261125-address-keys).
 
 use crate::time::Timestamp;
 use jiff::SignedDuration;
@@ -33,12 +34,14 @@ use crate::error::Error;
 use crate::secret::sha256;
 use crate::tenancy::TenantContext;
 
-/// The key of a limit counted per client address: `kind` plus the address block of `ip` (/24 for IPv4, /64 for
-/// IPv6, see [`crate::ip_hash::prefix`]). Counting by the exact address lets one client send unlimited requests
-/// by rotating addresses inside the block it owns; `cargo xtask check` (rule `address-key`) rejects keys built
-/// from a raw address.
+/// The key of a limit counted per client: `kind` plus one IPv4 address, or the /64 block of an IPv6 address
+/// (an IPv4 address written as IPv6, `::ffff:a.b.c.d`, counts as IPv4). One IPv6 client usually owns a whole
+/// /64 and can change address on every request, so counting the exact IPv6 address limits nobody; an IPv4
+/// address is a real resource, and grouping by /24 would make customers behind a mobile carrier's shared NAT
+/// block each other. Same grouping as the HTTP rate limiter (D-157). `cargo xtask check` (rule `address-key`)
+/// rejects keys built from a raw address.
 pub fn address_key(kind: &str, ip: std::net::IpAddr) -> String {
-    format!("{kind}:{}", crate::ip_hash::prefix(ip))
+    format!("{kind}:{}", crate::ip_hash::client(ip))
 }
 
 /// Result of one evaluation.
@@ -409,19 +412,20 @@ mod tests {
     #[test]
     fn khoa_theo_khoi_dia_chi() {
         let ip = |text: &str| text.parse().unwrap();
-        // Xoay địa chỉ trong một /64 (IPv6) hay một /24 (IPv4): vẫn một khoá.
+        // Xoay địa chỉ trong một /64 (IPv6): vẫn một khoá.
         assert_eq!(
             address_key("otp-ip", ip("2001:db8:1:2::1")),
             address_key("otp-ip", ip("2001:db8:1:2::30"))
-        );
-        assert_eq!(
-            address_key("otp-ip", ip("203.0.113.7")),
-            address_key("otp-ip", ip("203.0.113.200"))
         );
         assert_ne!(
             address_key("otp-ip", ip("2001:db8:1:2::1")),
             address_key("otp-ip", ip("2001:db8:1:3::1"))
         );
-        assert_eq!(address_key("otp-ip", ip("::ffff:203.0.113.7")), "otp-ip:203.0.113.0");
+        // IPv4: từng địa chỉ — khách sau NAT của nhà mạng chung một /24 không chặn nhau.
+        assert_ne!(
+            address_key("otp-ip", ip("203.0.113.7")),
+            address_key("otp-ip", ip("203.0.113.200"))
+        );
+        assert_eq!(address_key("otp-ip", ip("::ffff:203.0.113.7")), "otp-ip:203.0.113.7");
     }
 }

@@ -70,9 +70,9 @@ impl ComplianceService {
         // Khối địa chỉ của client (PT-7): lần sai đếm theo (số, khối) — người lạ đoán sai trên mã họ xin
         // không khoá chủ số ở khối khác.
         let block = match ip {
-            Some(ip) => {
-                Some(autoxide_kernel::ip_hash::fingerprint(&self.secret, BLOCK_SCOPE, ip).await?)
-            }
+            Some(ip) => Some(
+                autoxide_kernel::ip_hash::client_fingerprint(&self.secret, BLOCK_SCOPE, ip).await?,
+            ),
             None => None,
         };
         // Số đã nhập sai đủ hạn mức trong 24 giờ: không gửi thêm mã (mã gửi đi cũng không kiểm được).

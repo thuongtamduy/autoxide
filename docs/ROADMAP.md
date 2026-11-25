@@ -283,13 +283,13 @@ thật (P7).
 
 - [ ] P17 — Sửa lỗi đợt test bảo mật + hiệu năng độc lập 2026-11 (29.584 case, cả hai database; PT-1..3 ở #515,
       PT-9 ở P16, PT-19 phiên khác):
-  - [x] PT-4: giới hạn theo địa chỉ đếm theo khối /24 · /64 qua `throttle::address_key`, luật gate `address-key`
+  - [x] PT-4: giới hạn theo địa chỉ đếm theo một IPv4 hay một khối /64 IPv6 qua `throttle::address_key`, luật gate `address-key`
         (D-20261125-address-keys)
   - [x] PT-5: số tiền / số lượng của client không làm tràn `i64` (POS, kho, điểm thưởng, COD, chia kiện, nhận hàng
         trả, cân nặng, bậc phí, GHN)
   - [x] PT-6: tiền khác tiền tệ của bản ghi không bị ghi như tiền của nó (thu và đếm két POS, tín dụng cửa hàng, dòng
         bảng kê COD, khoản thanh toán của đơn)
-  - [x] PT-7: mã đăng nhập SMS nhập sai đếm theo số + khối người xin mã, trần chung 5× (D-20261125-otp-wrong-by-block)
+  - [x] PT-7: mã đăng nhập SMS nhập sai đếm theo số + client (IPv4 / khối /64) người xin mã, trần chung 5× (D-20261125-otp-wrong-by-block)
   - [x] PT-8: quyết định quyền theo đơn vị đòi đơn vị có trong cây của khách; `OrgTree::contains` / `ensure_exists`
         (D-20261125-org-must-exist)
   - [x] PT-10: push subscription chỉ nhận máy chủ công khai; hợp đồng `WebPushSender` đòi bộ gửi chỉ nối IP công khai
@@ -299,6 +299,19 @@ thật (P7).
         mua không so tiền tệ với đơn mua; tiền tệ của ca POS lấy từ `opening_cash` thay vì tiền của cửa hàng;
         sandbox nhận `role_id` không có mà vẫn 201 (kernel không biết role — nay chỉ không uỷ quyền, cần trait vai trò
         để báo 422 lúc tạo)
+  - [ ] Bản ghi đã gắn `org_id` không có trong cây từ trước PT-8: vẫn hiện trong danh sách của người có quyền toàn
+        khách nhưng mở / sửa / xoá theo ID bị 404 / 403 — cần lệnh báo cáo và dọn (gắn về nút gốc hay nút đúng)
+  - [ ] `orders.payment_currency_mismatch` bỏ qua kiểm khi `PosPayment.currencies` rỗng (chỉ REST điền) — thêm
+        đường gọi mới (tool MCP bán ở quầy) dễ quên; nên bắt buộc tiền tệ trong kiểu dữ liệu của service
+  - [ ] Bậc phí vận chuyển, cân nặng gửi GHN bão hoà về `i64::MAX` thay vì báo 422 — cần trần cân nặng / kích thước
+        ở đầu vào (như catalog 1e7 mm)
+  - [ ] Khoản thanh toán khác tiền tệ của đơn (`orders/src/payments.rs`, sau đối soát chấp nhận khoản nhận) nay vào
+        dead-letter — chưa có test, chưa có hướng dẫn xử lý cho người vận hành
+  - [ ] Luật `address-key` của `cargo xtask check` chỉ bắt `format!("…ip:{…")` trên một dòng; khoá dựng cách khác
+        (`ip.to_string()`, nhiều dòng) lọt — cân nhắc kiểm theo kiểu (`IpAddr` vào `Throttle::hit`)
+  - [ ] PT-7: trần chung 5× (mặc định 50 lần sai mỗi số mỗi ngày) làm chống đoán mã yếu đi 5 lần, và kẻ phá vẫn khoá
+        chủ số ở mọi nơi với khoảng 10 SMS từ 5 client — cân nhắc trần chung thấp hơn, mã dài hơn, hay đếm theo người
+        nhập mã (đổi `PhoneCodes::verify`)
   - [ ] PT-13, PT-14: `x-permissions` khớp chỗ kiểm; kiểm permission trước validation / ETag / tra bản ghi; test quét
         mọi operation bằng token không quyền (PR 2)
   - [ ] PT-15, PT-16, PT-17, poll outbox: tìm công khai không làm nghẽn server, slug theo khoảng dùng index, tắt

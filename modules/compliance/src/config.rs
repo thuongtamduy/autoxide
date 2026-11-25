@@ -22,10 +22,11 @@ pub(crate) const OTP_MAX_ATTEMPTS: Setting = Setting::new(
 
 pub(crate) const OTP_WRONG_PER_PHONE_PER_DAY: Setting = Setting::new(
     "AUTOXIDE_COMPLIANCE_OTP_WRONG_PER_PHONE_PER_DAY",
-    "Wrong sign-in codes allowed for one phone number over 24 hours from one client address block \
-     (/24 IPv4, /64 IPv6), across all codes asked from that block; after that no code is sent to or \
-     checked for the number from that block until the oldest wrong entry is 24 hours old. Five times \
-     this many wrong codes from all blocks together lock the number everywhere, 1 to 1000.",
+    "Wrong sign-in codes allowed for one phone number over 24 hours from one client (one IPv4 \
+     address, or one IPv6 /64 block), across all codes asked from that client; after that no code is \
+     sent to or checked for the number from that client until the oldest wrong entry is 24 hours old. \
+     Five times this many wrong codes from all clients together lock the number everywhere, 1 to \
+     1000.",
 )
 .with_default("10");
 
@@ -43,7 +44,8 @@ pub(crate) const OTP_PER_USER_PER_DAY: Setting = Setting::new(
 
 pub(crate) const OTP_PER_IP_PER_HOUR: Setting = Setting::new(
     "AUTOXIDE_COMPLIANCE_OTP_PER_IP_PER_HOUR",
-    "Phone verification codes asked for from one IP address per hour, 1 to 10000.",
+    "Phone codes (sign-in and phone verification) asked for per hour from one client: one IPv4 \
+     address, or one IPv6 /64 block; 1 to 10000.",
 )
 .with_default("20");
 
@@ -55,8 +57,8 @@ pub(crate) const COOKIE_CONSENTS_PER_IP_PER_HOUR: Setting = Setting::new(
 
 pub(crate) const PUBLIC_REPORTS_PER_IP_PER_HOUR: Setting = Setting::new(
     "AUTOXIDE_COMPLIANCE_PUBLIC_REPORTS_PER_IP_PER_HOUR",
-    "Reports of infringements and consumer complaints accepted from one network block (and from \
-     one email address) per hour through the public forms, 1 to 10000.",
+    "Reports of infringements and consumer complaints accepted from one network block (IPv4 /24, \
+     IPv6 /64) and from one email address per hour through the public forms, 1 to 10000.",
 )
 .with_default("5");
 

@@ -411,6 +411,8 @@ pub struct Principal {
     networks: Option<Arc<Vec<crate::config::IpRange>>>,
     /// Re-confirmation for sensitive actions (step 54 P5); `None`: not required.
     step_up: Option<StepUp>,
+    /// Units already shown to exist while checking permissions (shared by clones; never compared).
+    known_units: decision::KnownUnits,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -474,6 +476,7 @@ impl PrincipalSnapshot {
             networks: None,
             // Job không có phiên để xác nhận lại: đã kiểm lúc yêu cầu.
             step_up: None,
+            known_units: decision::KnownUnits::default(),
         }
     }
 
@@ -569,6 +572,7 @@ impl Principal {
             denied: Arc::default(),
             networks: None,
             step_up: None,
+            known_units: decision::KnownUnits::default(),
         }
     }
 
