@@ -41,7 +41,12 @@ Theo Semantic Versioning, một số cho cả workspace (`[workspace.package] ve
   (Rust)` nằm ở tóm tắt của job để chép vào `CHANGELOG.md` (bước 3).
 - **PR khác** chạm phần công khai (`crates/kernel/`, `crates/testkit/`, `crates/app/src/lib.rs`,
   `modules/*/src/lib.rs`, `modules/*/src/api.rs`, `modules/*/src/api/`): chỉ crate bị chạm, so với nhánh gốc
-  của PR (`--base <sha> --changed <sha>`). PR không chạm thì job bỏ qua.
+  của PR (`--base <sha> --changed <sha>`). PR sửa chính bộ kiểm (`xtask/src/semver.rs`) chạy như PR phát hành. PR
+  không chạm thì job bỏ qua.
+- Crate chia ra 4 máy (`semver 1/4` … `4/4`, `cargo xtask semver --shard k/4`); job **"Rust API compatibility
+  (cargo-semver-checks)"** gộp kết quả thành một mục và là tên check ổn định. Mỗi máy dựng mọi crate của nó trong
+  một target dir chung (`target/semver-checks`) thay vì mỗi crate một thư mục riêng như công cụ tự làm
+  (D-20261125-semver-job-time). PR phát hành: mỗi phần khoảng 10–15 phút.
 
 Chặn hay chỉ cảnh báo do `version` của workspace quyết, không cần sửa workflow:
 
@@ -52,8 +57,9 @@ Chặn hay chỉ cảnh báo do `version` của workspace quyết, không cần 
   check bắt buộc của nhánh `main` (Settings → Branches → branch protection; agent không có quyền đổi). Thiếu bước
   này thì job đỏ vẫn hiện trên PR nhưng không ngăn được merge.
 - Chạy tay trên máy: `cargo xtask semver` (so với tag trước), `--changed origin/main` (chỉ crate bị chạm),
-  `--deny` (chặn cả khi còn `0.x`). Mất vài phút tới gần một giờ và vài GB đĩa — `rm -rf target/semver-checks`
-  sau đó.
+  `--deny` (chặn cả khi còn `0.x`), `--shard k/n` (chỉ phần thứ k trong n). Mọi crate trên máy 4 nhân: khoảng 1
+  giờ và ~5 GB đĩa ở `target/semver-checks` (lệnh xoá thư mục này ở đầu mỗi lần chạy; `rm -rf` sau đó để lấy lại
+  đĩa) — nên đọc mục ở tóm tắt của job CI thay vì chạy tay.
 
 ## Dòng hỗ trợ dài hạn
 
@@ -104,8 +110,9 @@ bước 7.**
    cuối mục của nó) và xoá các mảnh. Rồi trong `CHANGELOG.md`: đổi `## [Unreleased]` thành `## [X.Y.Z] - YYYY-MM-DD`, thêm một
    mục `## [Unreleased]` trống ở trên, cập nhật hai dòng liên kết ở cuối file. Workflow kiểm
    có mục `## [X.Y.Z]` và tag khớp `version`, sai thì không phát hành.
-   Rồi chạy `cargo xtask semver --markdown` (cần `cargo-semver-checks`, phiên bản ghim ở `STACK.md`;
-   mất vài phút và vài GB đĩa — `rm -rf target/semver-checks` sau đó): nó in mục `### Breaking (Rust)`
+   Rồi lấy mục `### Breaking (Rust)` từ tóm tắt của job "Rust API compatibility (cargo-semver-checks)" ở PR phát
+   hành, hay chạy tay `cargo xtask semver --markdown` (cần `cargo-semver-checks`, phiên bản ghim ở `STACK.md`;
+   khoảng 1 giờ trên máy 4 nhân và ~5 GB đĩa — `rm -rf target/semver-checks` sau đó): nó in mục `### Breaking (Rust)`
    gồm thay đổi phá vỡ của mọi crate hợp đồng (xem "Kiểm hợp đồng Rust") so với tag trước — job `semver`
    của PR phát hành in sẵn mục này ở tóm tắt; chép vào mục `## [X.Y.Z]`. Không in gì thì không thêm mục. Còn
    `0.x` thì chỉ báo cáo, không chặn (D-167, D-242); từ `1.0` có phá vỡ ở bản không tăng major thì không

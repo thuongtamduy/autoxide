@@ -15,9 +15,17 @@
 //!   như **minor**: chỉ phá vỡ bị báo; bản tăng major (`2.0.0` so với `v1.x`) chỉ báo cáo.
 //! - Cần mạng và build bản cũ, lâu: chạy ở job CI `semver` (PR chạm phần công khai, PR phát hành) và lúc
 //!   phát hành, không trong `./gate.sh`.
+//! - Mọi lần gọi `cargo semver-checks` dùng chung một target dir (`target/semver-checks`, qua
+//!   `CARGO_TARGET_DIR`): tự công cụ dựng mỗi crate trong một target dir riêng nên mỗi crate biên dịch lại toàn
+//!   bộ phụ thuộc, hai lần (baseline và bản hiện tại). Rustdoc JSON vẫn do công cụ dựng như cũ (cùng project
+//!   giả, cùng feature), chỉ phần biên dịch được dùng lại — kết quả không đổi. Thư mục bị xoá ở đầu mỗi lần
+//!   chạy (D-20261125-semver-job-time).
+//! - `--shard k/n`: chỉ crate thứ k, k+n, … của danh sách (sau `--changed`) — CI chia crate ra n máy.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
+
+use crate::affected::Shard;
 
 /// Crate nền luôn là hợp đồng (D-164, D-167, D-20261121-external-modules), kèm đường dẫn của phần
 /// công khai: sửa file ở đó thì job CI của pull request kiểm crate này.
@@ -243,6 +251,7 @@ pub fn run(
     changed_since: Option<&str>,
     deny: bool,
     as_markdown: bool,
+    shard: Shard,
 ) -> Result<bool, String> {
     let mut crates = contract(root)?;
     if let Some(since) = changed_since {
@@ -255,7 +264,14 @@ pub fn run(
             return Ok(true);
         }
     }
-    let crates: Vec<String> = crates.into_iter().map(|contract| contract.krate).collect();
+    let crates = in_shard(crates.into_iter().map(|contract| contract.krate).collect(), shard);
+    if crates.is_empty() {
+        eprintln!(
+            "semver: no contract crate in shard {}/{}; nothing to check",
+            shard.index, shard.count
+        );
+        return Ok(true);
+    }
     let installed = Command::new("cargo")
         .args(["semver-checks", "--version"])
         .current_dir(root)
@@ -276,8 +292,11 @@ pub fn run(
     };
     let version = workspace_version(root)?;
     let mode = mode(&version, &base, deny);
+    let target_dir = shared_target_dir(root);
+    fresh_target_dir(&target_dir)?;
     let mut failures = Vec::new();
     for krate in &crates {
+        let started = std::time::Instant::now();
         let output = Command::new("cargo")
             .args([
                 "semver-checks",
@@ -290,8 +309,11 @@ pub fn run(
                 release_type(&version),
             ])
             .current_dir(root)
+            .env("CARGO_TARGET_DIR", &target_dir)
             .output()
             .map_err(|error| format!("cannot run cargo semver-checks: {error}"))?;
+        // stderr: CI đọc thời gian từng crate để chia shard (stdout của `--markdown` chỉ chứa mục CHANGELOG).
+        eprintln!("semver: {krate} checked in {}s", started.elapsed().as_secs());
         let text = format!(
             "{}{}",
             String::from_utf8_lossy(&output.stdout),
@@ -325,6 +347,40 @@ pub fn run(
         );
     }
     Ok(failures.is_empty() || mode == Mode::Report)
+}
+
+/// Crate thứ k, k+n, … (đếm từ 1) của danh sách: phần của shard `k/n`. n phần cộng lại đúng bằng cả danh sách.
+pub fn in_shard(crates: Vec<String>, shard: Shard) -> Vec<String> {
+    crates
+        .into_iter()
+        .enumerate()
+        .filter(|(position, _)| position % shard.count == shard.index - 1)
+        .map(|(_, krate)| krate)
+        .collect()
+}
+
+/// Target dir chung cho mọi lần gọi công cụ: `target/semver-checks` (như trước, `rm -rf` một chỗ là dọn hết).
+///
+/// Không có nó, `cargo semver-checks` dựng mỗi crate trong project giả riêng với target dir riêng
+/// (`target/semver-checks/local-<crate>-…/target`), nên ~28 crate × 2 bản biên dịch lại toàn bộ phụ thuộc từ đầu.
+/// Với `CARGO_TARGET_DIR`, `cargo metadata` của project giả trả về thư mục chung và cargo dùng lại mọi bản biên dịch
+/// có cùng phiên bản và feature. Bản baseline và bản hiện tại của cùng một crate là hai package khác nhau (đường
+/// dẫn khác) nên không lẫn bản biên dịch; chỉ file `doc/<crate>.json` là trùng tên — xem `fresh_target_dir`.
+fn shared_target_dir(root: &Path) -> PathBuf {
+    root.join("target").join("semver-checks")
+}
+
+/// Bắt đầu mỗi lần chạy với target dir chung trống.
+///
+/// Hai bản (baseline, hiện tại) của cùng crate ghi cùng một file `doc/<crate>.json`. Trong một lần chạy, mỗi bản
+/// được dựng đúng một lần và công cụ đọc file ngay sau khi dựng nên không lẫn; nhưng nếu giữ thư mục sang lần chạy
+/// sau, cargo có thể coi bản hiện tại là "fresh", không dựng lại, và công cụ đọc nhầm JSON của baseline.
+fn fresh_target_dir(target_dir: &Path) -> Result<(), String> {
+    match std::fs::remove_dir_all(target_dir) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(format!("cannot remove {}: {error}", target_dir.display())),
+    }
 }
 
 /// `version` của `[workspace.package]` trong `Cargo.toml` gốc.
@@ -414,6 +470,21 @@ Failed in:
         assert!(contract.touched_by(&["docs/x.md", "modules/catalog/src/lib.rs"]));
         assert!(!contract.touched_by(&["modules/catalog/src/products.rs"]));
         assert!(!contract.touched_by(&["modules/catalog/src/api.rs.bak"]));
+    }
+
+    #[test]
+    fn semver_shard_chia_deu_khong_bo_crate_nao() {
+        let crates: Vec<String> = (1..=7).map(|n| format!("c{n}")).collect();
+        let parts: Vec<Vec<String>> =
+            (1..=3).map(|index| in_shard(crates.clone(), Shard { index, count: 3 })).collect();
+        assert_eq!(parts[0], ["c1", "c4", "c7"]);
+        assert_eq!(parts[1], ["c2", "c5"]);
+        assert_eq!(parts[2], ["c3", "c6"]);
+        let mut all: Vec<String> = parts.concat();
+        all.sort();
+        assert_eq!(all, crates);
+        assert_eq!(in_shard(crates.clone(), Shard::WHOLE), crates);
+        assert!(in_shard(vec!["c1".to_owned()], Shard { index: 2, count: 2 }).is_empty());
     }
 
     #[test]

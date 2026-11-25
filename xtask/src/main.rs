@@ -2,7 +2,7 @@
 //!
 //! - `api-diff [--base <ref>]` — chặn thay đổi phá vỡ của `/api/v1` so với bản phát hành gần
 //!   nhất (xem `api_diff.rs`). `./gate.sh` gọi lệnh này ở cả hai mức.
-//! - `semver [--base <rev>] [--changed <rev>] [--deny] [--markdown]` — báo thay đổi phá vỡ của hợp
+//! - `semver [--base <rev>] [--changed <rev>] [--deny] [--markdown] [--shard k/n]` — báo thay đổi phá vỡ của hợp
 //!   đồng Rust (kernel, testkit, `autoxide`, module chính thức) bằng `cargo semver-checks`; chạy ở job
 //!   CI `semver` và lúc phát hành (xem `semver.rs`).
 //! - `sdk [--check | --extract-examples <dir>]` — sinh kiểu TypeScript của SDK từ
@@ -81,7 +81,7 @@ const USAGE: &str = "usage: cargo xtask check
        cargo xtask decisions                     regenerate docs/decisions/INDEX.md
        cargo xtask changelog                     fold changelog.d/ fragments into CHANGELOG.md (at release)
        cargo xtask api-diff [--base <ref>]       default base: the last release tag before HEAD
-       cargo xtask semver [--base <rev>] [--changed <rev>] [--deny] [--markdown]
+       cargo xtask semver [--base <rev>] [--changed <rev>] [--deny] [--markdown] [--shard <k>/<n>]
        cargo xtask publish-check [--no-verify]   package every crate as for crates.io (publishes nothing)
        cargo xtask sdk [--check | --extract-examples <dir>]
        cargo xtask upgrade-test [--from <tag>] [--image <image>] [--database sqlite|postgres|both]
@@ -92,7 +92,8 @@ const USAGE: &str = "usage: cargo xtask check
        cargo xtask test-affected --base <ref> --keep-env   on TEST_DATABASE_URL instead of SQLite
        cargo xtask test-all [--doc]               every test, on TEST_DATABASE_URL (default SQLite)
        cargo xtask test-filter --base <ref>       nextest filterset of the crates test-affected would run
-       ... test-all | test-affected ... --shard <k>/<n>   only part k of n of the tests";
+       ... test-all | test-affected ... --shard <k>/<n>   only part k of n of the tests
+       ... semver ... --shard <k>/<n>             only part k of n of the contract crates";
 
 fn main() -> ExitCode {
     // `skip(1)`: phần tử đầu của args là tên chương trình.
@@ -108,7 +109,10 @@ fn main() -> ExitCode {
             }
         }
         args.truncate(args.len() - 2);
-        if !matches!(args.first().map(String::as_str), Some("test-all" | "test-affected")) {
+        if !matches!(
+            args.first().map(String::as_str),
+            Some("test-all" | "test-affected" | "semver")
+        ) {
             eprintln!("{USAGE}");
             return ExitCode::FAILURE;
         }
@@ -124,7 +128,7 @@ fn main() -> ExitCode {
         ["changelog"] => changelog(),
         ["api-diff"] => api_diff(None),
         ["api-diff", "--base", base] => api_diff(Some(base)),
-        ["semver", rest @ ..] => semver(rest),
+        ["semver", rest @ ..] => semver(rest, shard),
         ["publish-check", rest @ ..] => publish_check(rest),
         ["sdk"] => sdk(false),
         ["sdk", "--check"] => sdk(true),
@@ -169,7 +173,7 @@ fn api_diff(base: Option<&str>) -> ExitCode {
     }
 }
 
-fn semver(args: &[&str]) -> ExitCode {
+fn semver(args: &[&str], shard: affected::Shard) -> ExitCode {
     let (mut base, mut changed) = (None, None);
     let (mut deny, mut markdown) = (false, false);
     let mut args = args.iter();
@@ -192,7 +196,7 @@ fn semver(args: &[&str]) -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    match semver::run(&root, base, changed, deny, markdown) {
+    match semver::run(&root, base, changed, deny, markdown, shard) {
         Ok(true) => ExitCode::SUCCESS,
         Ok(false) => ExitCode::FAILURE,
         Err(error) => {

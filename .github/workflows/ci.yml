@@ -89,25 +89,26 @@ jobs:
   # Hợp đồng Rust (bước 70 P4, docs/COMPATIBILITY.md): `cargo semver-checks` so phần công khai của
   # autoxide-kernel, autoxide-testkit, `autoxide` (thư viện) và crate của module core / official.
   # - PR PHÁT HÀNH (đổi `version` của Cargo.toml gốc): mọi crate hợp đồng so với tag phát hành trước; mục
-  #   `### Breaking (Rust)` ghi vào tóm tắt của job để chép vào CHANGELOG.md trước khi merge.
+  #   `### Breaking (Rust)` ghi vào tóm tắt của job để chép vào CHANGELOG.md trước khi merge. PR sửa chính bộ kiểm
+  #   (`xtask/src/semver.rs`) cũng so mọi crate với tag trước, để chứng minh nó còn chạy xong trong giới hạn.
   # - PR khác chạm phần công khai (crates/kernel, crates/testkit, crates/app/src/lib.rs, modules/*/src/lib.rs,
   #   modules/*/src/api*): chỉ crate bị chạm, so với nhánh gốc của PR — báo sớm cho người sửa.
   # - Còn lại: bỏ qua, job vẫn báo xong. Job riêng, không nằm trên đường của gate.
   # Còn `0.x` thì chỉ cảnh báo; từ 1.0 `cargo xtask semver` tự thất bại khi có phá vỡ (D-242) — cách bật chặn ở
   # docs/RELEASING.md, mục "Kiểm hợp đồng Rust".
-  semver:
-    name: Rust API compatibility (cargo-semver-checks)
+  # Crate chia ra 4 máy (`--shard k/4`), mỗi máy một target dir chung cho mọi crate của nó; job
+  # "Rust API compatibility (cargo-semver-checks)" gộp kết quả và là tên check ổn định (D-20261125-semver-job-time).
+  semver-plan:
+    name: semver (plan)
     if: ${{ github.event_name == 'pull_request' && !github.event.repository.private }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
-    env:
-      CARGO_INCREMENTAL: "0"
-      CARGO_TERM_COLOR: always
+    timeout-minutes: 5
+    outputs:
+      mode: ${{ steps.changed.outputs.mode }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          # Cả lịch sử và tag: so với tag phát hành trước hay nhánh gốc của PR.
           fetch-depth: 0
       - name: changed
         id: changed
@@ -118,7 +119,7 @@ jobs:
           before="$(git show "$BASE_SHA:Cargo.toml" | version)"
           after="$(version < Cargo.toml)"
           public='^(crates/kernel/|crates/testkit/|crates/app/src/lib\.rs$|modules/[^/]+/src/(lib\.rs$|api\.rs$|api/))'
-          if [ "$before" != "$after" ]; then
+          if [ "$before" != "$after" ] || git diff --name-only "$BASE_SHA...HEAD" | grep -Eq '^xtask/src/semver\.rs$'; then
             echo "mode=release" >> "$GITHUB_OUTPUT"
           elif git diff --name-only "$BASE_SHA...HEAD" | grep -Eq "$public"; then
             echo "mode=pull-request" >> "$GITHUB_OUTPUT"
@@ -126,48 +127,105 @@ jobs:
             echo "mode=skip" >> "$GITHUB_OUTPUT"
             echo "No public Rust API changed and the version is unchanged ($after): semver check skipped."
           fi
+
+  semver-shards:
+    name: semver ${{ matrix.shard }}/4
+    needs: semver-plan
+    if: ${{ needs.semver-plan.outputs.mode != 'skip' }}
+    runs-on: ubuntu-24.04
+    # Đo trên máy 4 nhân: mỗi phần ~10–15 phút; giới hạn chỉ để chặn job treo.
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    env:
+      CARGO_INCREMENTAL: "0"
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          # Cả lịch sử và tag: so với tag phát hành trước hay nhánh gốc của PR.
+          fetch-depth: 0
       - run: rustup toolchain install
-        if: steps.changed.outputs.mode != 'skip'
       - uses: taiki-e/install-action@25f51f6b1bf4e18876107cece836f4f77ac17c8c # v2.90.7
-        if: steps.changed.outputs.mode != 'skip'
         with:
           tool: cargo-semver-checks@0.51.0
       - name: cargo xtask semver
-        if: steps.changed.outputs.mode != 'skip'
         env:
-          MODE: ${{ steps.changed.outputs.mode }}
+          MODE: ${{ needs.semver-plan.outputs.mode }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          SHARD: ${{ matrix.shard }}
         run: |
           set -o pipefail
           if [ "$MODE" = release ]; then
             args=()
-            title="since the last release"
           else
             args=(--base "$BASE_SHA" --changed "$BASE_SHA")
-            title="in this pull request"
           fi
-          # Từ 1.0 lệnh thoát 1 khi có phá vỡ: vẫn ghi tóm tắt rồi mới báo đỏ.
+          # Từ 1.0 lệnh thoát 1 khi có phá vỡ: vẫn tải kết quả lên rồi mới báo đỏ (job gộp đọc nó).
           status=0
-          cargo xtask semver --markdown "${args[@]}" | tee semver.md || status=$?
+          cargo xtask semver --markdown "${args[@]}" --shard "$SHARD/4" > semver.md || status=$?
+          cat semver.md
+          echo "$status" > status
+          exit "$status"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: semver-${{ matrix.shard }}
+          path: |
+            semver.md
+            status
+          if-no-files-found: error
+          retention-days: 1
+
+  semver:
+    name: Rust API compatibility (cargo-semver-checks)
+    needs: [semver-plan, semver-shards]
+    # `always()`: phần nào đỏ thì job này vẫn chạy và báo đỏ (check bị bỏ qua được tính là đạt).
+    if: ${{ always() && github.event_name == 'pull_request' && !github.event.repository.private }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: needs.semver-plan.outputs.mode != 'skip'
+        with:
+          pattern: semver-*
+          path: parts
+      - name: Every part of the check passed; one summary
+        env:
+          PLAN: ${{ needs.semver-plan.result }}
+          MODE: ${{ needs.semver-plan.outputs.mode }}
+          SHARDS: ${{ needs.semver-shards.result }}
+        run: |
+          echo "plan: $PLAN ($MODE), shards: $SHARDS"
+          [ "$PLAN" = success ] || exit 1
+          [ "$MODE" = skip ] && exit 0
+          if [ "$MODE" = release ]; then title="since the last release"; else title="in this pull request"; fi
+          # Mỗi phần in `### Breaking (Rust)` + các dòng `- …`: gộp thành một mục, theo thứ tự phần.
+          for part in 1 2 3 4; do grep -h '^- ' "parts/semver-$part/semver.md" || true; done > lines.md
           {
             echo "## Breaking changes to the public Rust API $title"
             echo
-            if [ -s semver.md ]; then
+            if [ -s lines.md ]; then
               if [ "$MODE" = release ]; then
                 echo "Copy this section into the release's section of \`CHANGELOG.md\`:"
               else
                 echo "Before 1.0 this is a warning. From 1.0 a breaking change needs a new major version (docs/COMPATIBILITY.md)."
               fi
               echo
-              cat semver.md
+              echo "### Breaking (Rust)"
+              echo
+              cat lines.md
             else
               echo "None found."
             fi
           } >> "$GITHUB_STEP_SUMMARY"
-          if [ -s semver.md ]; then
+          if [ -s lines.md ]; then
             echo "::warning title=Breaking Rust API change::cargo-semver-checks found breaking changes $title; see the job summary."
           fi
-          exit "$status"
+          [ "$SHARDS" = success ]
 
   upgrade:
     # Bản phát hành trước ghi dữ liệu, bản này đọc lại trên cùng database (đặc tả 31 B1, D-246).
