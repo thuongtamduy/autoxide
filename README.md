@@ -540,8 +540,8 @@ never share foreign keys. These rules are checked automatically by the gate.
 
 - [`STACK.md`](STACK.md) — which libraries are used and why
 - [`docs/ROADMAP.md`](docs/ROADMAP.md) — what is built, in what order
-- [`docs/decisions/INDEX.md`](docs/decisions/INDEX.md) — the decision log by topic (the old
-  entries are in [`docs/DECISIONS.md`](docs/DECISIONS.md), new ones one file each in `docs/decisions/`)
+- `docs/decisions/` — the decision log (the old entries are in [`docs/DECISIONS.md`](docs/DECISIONS.md), new
+  ones one file each here); `cargo xtask decisions` generates a by-topic index, `INDEX.md`, that is not committed
 - [`CLAUDE.md`](CLAUDE.md) — the rules for contributors, human or AI agent
 - [`CHANGELOG.md`](CHANGELOG.md) — what changed in each release; released Docker images
   are at `ghcr.io/<owner>/autoxide`

@@ -219,11 +219,14 @@ thật (P7).
   - [x] P-5: `return_url` của thanh toán nhận mọi địa chỉ http(s) — chỉ nhận tên miền đã xác minh của khách (cần
         quyết danh sách địa chỉ hợp lệ) — xong (#508, D-20261125-return-url-allowlist): tên miền đã xác minh (https)
         hoặc origin khai ở `ledger.payments.return_origins`
-- [ ] P15 — Job `semver` của CI chạy xong trong giới hạn trước `1.0.0-rc.1`: ở PR phát hành `v0.19.0` (#495) job so
+- [x] P15 — Job `semver` của CI chạy xong trong giới hạn trước `1.0.0-rc.1`: ở PR phát hành `v0.19.0` (#495) job so
       mọi crate hợp đồng với tag trước và bị huỷ sau 90 phút (`timeout-minutes`), nên `CHANGELOG.md` của 0.19.0 thiếu
       mục `### Breaking (Rust)`. Từ rc.2 job này chặn phát hành (`docs/RELEASING.md`), nên phải đo thời gian từng
       crate rồi sửa tận gốc (chia crate ra nhiều máy như gate, dùng lại build baseline, hay cache rustdoc JSON) thay vì
-      chỉ nới giới hạn; xong thì chạy lại cho `v0.18.0...v0.19.0` để biết 0.19.0 có phá vỡ gì
+      chỉ nới giới hạn; xong thì chạy lại cho `v0.18.0...v0.19.0` để biết 0.19.0 có phá vỡ gì. Xong: thời gian nằm ở
+      bước dựng rustdoc JSON (công cụ dựng mỗi crate trong target dir riêng); nay một target dir chung cho mọi crate và
+      chia 4 máy (`--shard k/4`), job gộp giữ tên check cũ; `v0.18.0` → `v0.19.0` không có phá vỡ phía Rust
+      (D-20261125-semver-job-time)
 
 ## Giai đoạn B — Lớp cho giao diện và phân quyền
 
