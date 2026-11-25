@@ -163,6 +163,12 @@ thật (P7).
     - [ ] Module tắt: dọn dữ liệu theo thời hạn lưu (job của module chưa chạy khi tắt)
     - [ ] Module tắt: gieo dữ liệu khởi đầu cho khách tạo trong lúc module tắt
     - [ ] `copy` / `backup create` / `backup restore` gồm cả bảng của module tắt (hiện từ chối khi còn dữ liệu)
+    - [ ] `conversations` đang bật mà bộ nối nhà cung cấp thoại tắt: `erase_recording` bỏ qua xoá ở nhà cung cấp nhưng
+          vẫn xoá `provider_recording_id` (bản ghi nằm lại không dấu vết) — làm như đường "nghỉ": báo lỗi, thử lại
+    - [ ] `forms` tắt: job dọn file CSV xuất theo `expires_at` không chạy (cần xác minh; thuộc mục dọn theo thời hạn lưu)
+    - [ ] Kế hoạch tách / gộp (dry run) đếm cả dòng của module tắt chỉ có bảng ở nguồn (dời đã đếm)
+    - [ ] Test chiều ngược cho tách / gộp, test lệch phiên bản migration của module tắt giữa hai database
+    - [ ] Test dry run dời khách không tạo bảng ở đích
   - [x] Mẫu câu OTP khách tự sửa cho khớp template đã đăng ký với nhà mạng (đang viết cứng ở `compliance`, `orders`,
         `bookings`) — D-20261125-sms-templates: cấu hình theo khách nhóm `sms_template`, kiểm `{code}` đúng một lần
   - [ ] 139 endpoint GET trả `Data<Vec<T>>` không phân trang: endpoint mới trả `Page<T>`, khai deprecation cho cái cũ

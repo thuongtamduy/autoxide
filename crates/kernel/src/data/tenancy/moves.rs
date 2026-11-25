@@ -363,7 +363,7 @@ impl MoveSetup {
 
 /// The module's migration history table exists at `database` (the module once ran there).
 async fn installed_on(module: &str, database: &Database) -> Result<bool, Error> {
-    Ok(crate::migration::table_exists(database.read(), &format!("{module}_migrations")).await?)
+    Ok(crate::migration::module_installed(database.read(), &format!("{module}_migrations")).await?)
 }
 
 /// Result of checking a move, before running it.

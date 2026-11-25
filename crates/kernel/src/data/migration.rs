@@ -37,7 +37,7 @@ mod manager;
 pub mod schema;
 pub use helpers::{HelperTable, helper_tables};
 pub use lock::MigrationLock;
-pub(crate) use manager::has_table as table_exists;
+pub(crate) use manager::installed as module_installed;
 
 /// A data upgrade of a module. See the top of the file.
 //
@@ -148,7 +148,7 @@ impl ModuleMigrations {
         if !self.where_installed {
             return Ok(false);
         }
-        let installed = manager::has_table(connection, &self.history_table())
+        let installed = manager::installed(connection, &self.history_table())
             .await
             .map_err(|error| failure(self.module, "cannot read migration status", &error))?;
         Ok(!installed)
@@ -384,7 +384,7 @@ impl Migrator {
         let set = self.modules.iter().find(|set| set.module == module).ok_or_else(|| {
             let known: Vec<&str> = self.modules.iter().map(|set| set.module).collect();
             MigrationError(format!(
-                "unknown module `{module}`; registered modules: {}",
+                "unknown module `{module}`; modules with migrations (turned-off modules included): {}",
                 if known.is_empty() { "(none)".to_owned() } else { known.join(", ") }
             ))
         })?;

@@ -180,7 +180,9 @@ Việc kiểm dữ liệu như vậy xem database chính và database của từ
 
 Muốn xoá hẳn dữ liệu của một module, chạy `autoxide migrate down <module> --steps 1000` — chạy được khi
 module đang tắt (lệnh này xoá bảng của nó — backup trước). `autoxide migrate up` giữ bảng của module đang
-tắt theo kịp bản mới ở nơi đã có bảng, và không bao giờ tạo bảng ở nơi khác.
+tắt theo kịp bản mới ở nơi đã có bảng, và không bao giờ tạo bảng ở nơi khác. `migrate down` không có `--all`:
+nó chỉ chạy trên database chính, nên bảng của module ở database của placement còn lại (và `migrate up --all` vẫn
+cập nhật chúng) cho tới khi bạn chạy nó trên database đó.
 
 ## Nâng cấp từ 0.17 trở về trước
 

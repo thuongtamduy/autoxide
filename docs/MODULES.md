@@ -184,7 +184,9 @@ The check for such data looks at the main database and at the database of every 
 
 To remove the data of a module for good, run `autoxide migrate down <module> --steps 1000` — it works
 while the module is off (this drops its tables — back up first). `autoxide migrate up` keeps the tables
-of a turned-off module up to date where they exist, and never creates them elsewhere.
+of a turned-off module up to date where they exist, and never creates them elsewhere. `migrate down` has
+no `--all`: it acts on the main database only, so the module's tables in the database of a placement stay
+(and `migrate up --all` keeps updating them) until you run it against that database too.
 
 ## Upgrading from 0.17 or earlier
 

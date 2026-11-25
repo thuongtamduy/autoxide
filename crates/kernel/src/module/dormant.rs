@@ -29,8 +29,9 @@ use crate::tenancy::{DatabaseRegistry, TenantContext};
 /// Boundary: a turned-off module reads its configuration and may open its own resources (e.g. its file store)
 /// only to export, delete and move personal data. Nothing registered here serves requests: no routes, MCP
 /// tools, jobs, schedules or events other than [`USER_DELETED`](crate::privacy::USER_DELETED), and no trait for
-/// other modules (except the file store offered with [`share_storage`](Self::share_storage), used by the
-/// kernel's tenant lifecycle and other dormant parts).
+/// other modules. [`tenancy`](Self::tenancy) hands out the whole database registry because a dormant part reads
+/// a tenant's database at call time; a dormant part uses it only to reach tenant databases and the shared file
+/// store, never to change the registry.
 pub struct DormantContext<'a> {
     pub(super) module: &'static str,
     pub(super) apis: &'a Apis,
@@ -196,7 +197,7 @@ pub(super) fn migrators(
 /// The module's tables exist in the database of `tenant` (it has the module's migration history).
 pub(crate) async fn installed(module: &str, tenant: &TenantContext) -> Result<bool, Error> {
     let history = format!("{module}_migrations");
-    Ok(crate::migration::table_exists(tenant.database().read(), &history).await?)
+    Ok(crate::migration::module_installed(tenant.database().read(), &history).await?)
 }
 
 /// Calls the dormant handler only when the tenant's database has the module's tables; otherwise there is

@@ -331,7 +331,7 @@ mod tests {
 
             let error = execute(&action, &migrator(), &db).await.unwrap_err();
 
-            assert_eq!(error, "migration: unknown module `nope`; registered modules: notes, tags");
+            assert_eq!(error, "migration: unknown module `nope`; modules with migrations (turned-off modules included): notes, tags");
         })
         .await
         .unwrap();

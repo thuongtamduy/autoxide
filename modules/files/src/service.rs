@@ -457,9 +457,9 @@ async fn export_of_user(tenant: &TenantContext, user_id: Uuid) -> Result<serde_j
     Ok(serde_json::Value::Array(files))
 }
 
-/// Tài khoản bị xoá thì xoá mọi file của người đó, từng lượt: dòng trước, nội dung sau
-/// (như [`FileService::delete`]). Nhận lại event thì làm tiếp phần còn lại. Không có nơi lưu
-/// (`storage` là `None`, module đang tắt): chỉ xoá dòng, ghi `warn` khoá nội dung còn lại.
+/// Tài khoản bị xoá thì xoá mọi file của người đó, từng lượt: nội dung trước, dòng sau; xoá nội dung lỗi thì
+/// trả lỗi khi dòng còn nguyên. Nhận lại event thì làm tiếp phần còn lại. Không có kho (`storage` là `None`,
+/// module tắt không mở được kho): trả lỗi, không xoá gì — event được thử lại.
 async fn erase_deleted_user(
     event: &Delivered,
     storage: Option<&Arc<dyn Storage>>,

@@ -362,7 +362,7 @@ pub(crate) async fn tables_with_data<C: ConnectionTrait>(
     module: &str,
     tenant: Option<crate::tenancy::TenantId>,
 ) -> Result<Option<Vec<String>>, DbErr> {
-    if !crate::migration::table_exists(connection, &format!("{module}_migrations")).await? {
+    if !crate::migration::module_installed(connection, &format!("{module}_migrations")).await? {
         return Ok(None);
     }
     let custom = |error: crate::transfer::TransferError| DbErr::Custom(error.to_string());

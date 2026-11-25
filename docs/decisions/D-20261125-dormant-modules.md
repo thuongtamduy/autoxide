@@ -17,7 +17,7 @@ Quyết định: (bước 70 P9 mục 2, chủ dự án mở lại ở D-2026112
 3. **Vòng đời khách theo khai báo**: xoá hẳn khách, bản xuất dữ liệu của khách (D-328), dời / tách / gộp khách lấy bảng
    của module bật CỘNG module tắt (`retained_tables`, `control_plane_tables`, `relocation` của module tắt được gom như
    module bật). Chỉ **lượt chạy thật** của dời / tách / gộp áp migration của chính module tắt ở cả nguồn và đích khi
-   MỘT trong hai đã có bảng của nó (cả chiều nguồn chưa có mà đích đã có); không chạm database mà cả hai đều chưa có.
+   MỘT trong hai đã cài nó (cả chiều nguồn chưa có mà đích đã có); không chạm database mà cả hai đều chưa có.
    **Dry run không đổi schema**: chỉ đọc module tắt có bảng ở cả hai đầu; có bảng ở nguồn mà đích chưa có thì đếm dòng
    ở nguồn (dời) — kế hoạch tách / gộp bỏ qua module đó, lượt chạy thật vẫn mang nó theo. Bỏ chốt chặn
    `409 tenant_move_modules_off` (mã không còn phát ra) — phá vỡ hợp đồng mã lỗi trước 1.0, được phép theo
@@ -65,6 +65,9 @@ phạm nghĩa vụ trên — và dời khách bị chặn. Hook riêng nhỏ hơ
 Đã cân nhắc: (a) chạy `start` đầy đủ cho module "nghỉ" (phác thảo `docs/research/dormant-modules.md`) — loại vì lý do
 trên và vì tập module phải tính theo database đã kết nối; (b) lệnh riêng quét xuất / xoá mọi module — loại: yêu cầu xoá
 qua API vẫn bỏ sót tới khi có người chạy lệnh; (c) chạy migration của module tắt ở mọi database lúc `migrate up` — loại:
-database mới sẽ có bảng của module không dùng; chỉ áp khi dời khách và nguồn đã có bảng.
+database mới sẽ có bảng của module không dùng. Đã chọn (mục 3, 3b): `migrate up` chỉ áp ở database module đã cài
+(bảng lịch sử có ít nhất một dòng — một định nghĩa cho mọi chỗ kiểm; `migrate down` hết thì coi như chưa cài);
+lượt chạy thật của dời / tách / gộp áp ở cả hai đầu khi một đầu đã cài — kể cả tạo bảng rỗng ở NGUỒN khi chỉ đích
+có (bảng rỗng đó ở lại nguồn sau khi dời xong, kể cả sau `purge`; gỡ bằng `migrate down`).
 
 Thay: phần "Giới hạn đã biết" (xuất / xoá dữ liệu cá nhân, xoá khách, dời / tách / gộp khách) của D-20261121-module-selection

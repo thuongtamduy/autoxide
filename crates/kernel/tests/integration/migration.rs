@@ -207,7 +207,7 @@ async fn down_module_khong_ton_tai_thi_bao_ro() {
 
         let error = migrator().down(&db, "nope", 1).await.unwrap_err().to_string();
 
-        assert_eq!(error, "migration: unknown module `nope`; registered modules: notes, tags");
+        assert_eq!(error, "migration: unknown module `nope`; modules with migrations (turned-off modules included): notes, tags");
     })
     .await
     .unwrap();

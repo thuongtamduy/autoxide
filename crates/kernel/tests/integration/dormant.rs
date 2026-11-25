@@ -102,13 +102,18 @@ impl Module for Legacy {
     }
 }
 
-/// Bên nghe event khác của module tắt: không bao giờ được gọi.
+/// Bên nghe event khác của module tắt: không bao giờ được gọi. Đặt cờ thay vì chỉ panic — dispatcher bắt panic
+/// của bên nghe, nên panic một mình không làm test đỏ.
 struct Unreachable;
+
+/// Có lần `Unreachable` bị gọi.
+static REACHED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 #[async_trait::async_trait]
 impl EventHandler for Unreachable {
-    async fn handle(&self, event: &Delivered) -> Result<(), Error> {
-        panic!("a turned-off module received `{}`", event.name);
+    async fn handle(&self, _event: &Delivered) -> Result<(), Error> {
+        REACHED.store(true, std::sync::atomic::Ordering::SeqCst);
+        Ok(())
     }
 }
 
@@ -266,6 +271,10 @@ async fn module_nghi_van_xuat_va_xoa_du_lieu_ca_nhan() {
         let signed = SignedUp { id: Uuid::now_v7() };
         outbox.record(a.database().write(), &a, Actor::system(), None, &signed).await.unwrap();
         app.modules().dispatcher().unwrap().run_once().await.unwrap();
+        assert!(
+            !REACHED.load(std::sync::atomic::Ordering::SeqCst),
+            "a turned-off module got an event"
+        );
     })
     .await
     .unwrap();
@@ -466,6 +475,45 @@ async fn nang_cap_ap_migration_cua_module_nghi_noi_no_da_chay() {
         migrator.up(&spare).await.unwrap();
         let tables = autoxide_testkit::schema_snapshot(spare.write()).await.unwrap();
         assert!(!tables.table_names().contains(&"legacy_notes"));
+    })
+    .await
+    .unwrap();
+}
+
+/// Gỡ hẳn module tắt: `migrate down` hết migration của nó để lại bảng lịch sử rỗng — module coi như chưa cài:
+/// không còn gì chờ (máy chủ khởi động được), `up` không tạo lại bảng, phần "nghỉ" không chạy ở đó.
+#[tokio::test]
+async fn go_han_module_nghi_bang_migrate_down() {
+    TestDatabase::run(async |test| {
+        let app = TestApp::builder(test).module_turned_off(LegacyV2).build().await.unwrap();
+        let old = Modules::new(vec![Box::new(Legacy)]).unwrap().migrator().unwrap();
+        old.up(app.database()).await.unwrap();
+        let migrator = app.modules().migrator().unwrap();
+        migrator.up(app.database()).await.unwrap();
+        migrator.down(app.database(), "legacy", 1000).await.unwrap();
+
+        let tables = |app: &TestApp| {
+            let database = app.database().clone();
+            async move {
+                autoxide_testkit::schema_snapshot(database.write())
+                    .await
+                    .unwrap()
+                    .table_names()
+                    .into_iter()
+                    .map(str::to_owned)
+                    .collect::<Vec<_>>()
+            }
+        };
+        assert!(!tables(&app).await.contains(&"legacy_notes".to_owned()));
+        let pending = migrator.pending(app.database()).await.unwrap();
+        assert!(pending.iter().all(|state| state.module != "legacy"), "{pending:?}");
+        migrator.up(app.database()).await.unwrap();
+        assert!(
+            !tables(&app).await.contains(&"legacy_notes".to_owned()),
+            "up does not recreate it"
+        );
+        let (dormant, _) = app.modules().dormant_everywhere().await.unwrap();
+        assert!(dormant.is_empty(), "{dormant:?}");
     })
     .await
     .unwrap();
