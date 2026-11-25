@@ -18,6 +18,8 @@ Quyết định:
    nền của họ và cho một dịch vụ nhiều khách; một mini app viết một lần phải cài được trên mọi bản cài Autoxide cùng
    phiên bản lớn. Chợ ứng dụng thuộc về từng bản cài (người vận hành tự duyệt); core không phụ thuộc một danh bạ
    trung tâm nào.
+6. **Core chỉ có API, giữ nguyên** (luật kiến trúc số 9, D-096). Nền cho mini app không mang giao diện: bước 65 chỉ
+   đưa ra hợp đồng và SDK để giao diện ở repo riêng dùng.
 
 Lý do: chủ dự án nêu đích này ngày 25/11/2026. Lộ trình đang dựng kỹ tầng trong, còn thứ làm nên một nền tảng cho
 nhà phát triển bên ngoài (OAuth, cài / đồng ý / gỡ, webhook theo ứng dụng) nằm ở bước 65 đang tạm dừng và mới chỉ tả
@@ -27,7 +29,7 @@ bước 65 quan trọng hơn mọi module nghiệp vụ còn chờ.
 Đã cân nhắc: mở bước 65 trước 1.0 — loại, ứng dụng bên ngoài viết trên API chưa cam kết sẽ vỡ ở mỗi bản. Coi module
 Rust là "mini app" — loại cho bên thứ ba: phải viết Rust, phải build lại server, và chạy với toàn quyền. Cài mini app
 vào server đang chạy bằng plugin nạp lúc chạy — đã loại từ trước (D-005, D-026). Module mang giao diện của chính nó
-và đóng gói cả giao diện vào một binary — chưa quyết, đụng luật kiến trúc số 9 (D-096); ghi ở mục "Để sau" của lộ
-trình, bàn sau 1.0.
+và đóng gói cả giao diện vào một binary — loại: chủ dự án khẳng định lại ngày 25/11/2026 rằng **core chỉ có API**
+(luật kiến trúc số 9, D-096), không đổi và không để ngỏ; giao diện của mini app và của người vận hành luôn ở repo riêng.
 
 Thay: phần thứ tự các bước tạm dừng sau 1.0 của D-20261121-community-first (bước 65 lên đầu)

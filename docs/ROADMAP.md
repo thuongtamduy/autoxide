@@ -1184,9 +1184,6 @@ ngoại tuyến, WebSocket, mua trong ứng dụng, hướng dẫn cho người 
 
 Để sau: ý tưởng mới ghi một dòng ở đây, chưa viết đặc tả, cho tới khi xong giai đoạn A.
 
-- Module mang giao diện của chính nó và đóng gói cả giao diện vào một binary ("cài một file là chạy"): thêm vào
-  `Module` chỗ khai file giao diện, mục menu; một module "vỏ" lo đăng nhập và điều hướng. Đụng luật kiến trúc số 9
-  (D-096, chủ dự án quyết) nên phải hỏi trước khi làm; bàn sau 1.0 (D-20261125-miniapp-platform).
 - Rà 139 danh sách `Data<Vec<T>>` trong `xtask/api-shape-allow.txt` (D-20261121-api-shape): danh sách nào không có
   giới hạn thật (vd nhãn, view, ghi chú, biến thể, hoàn tiền của đơn) thì làm endpoint mới trả `Page<T>` và khai
   endpoint cũ qua `Module::deprecations` (D-059).
