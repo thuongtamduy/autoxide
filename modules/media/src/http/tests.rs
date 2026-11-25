@@ -71,6 +71,8 @@ async fn upload(app: &App, name: &str, content_type: &str, bytes: &[u8]) -> Valu
     answer.json()["data"].clone()
 }
 
+mod pages;
+
 async fn patch(app: &App, id: &str, if_match: Option<&str>, body: Value) -> TestResponse {
     let auth = as_user("admin");
     let mut headers = vec![("authorization", auth.as_str()), ("content-type", "application/json")];

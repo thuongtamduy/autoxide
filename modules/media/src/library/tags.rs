@@ -52,6 +52,17 @@ pub(crate) enum TagSort {
     CreatedAt,
 }
 
+impl TagSort {
+    // Thứ tự khi client không gửi `order`: tên A→Z, thời gian mới nhất trước.
+    pub(crate) fn default_order(self) -> autoxide_kernel::pagination::Order {
+        use autoxide_kernel::pagination::Order;
+        match self {
+            TagSort::Name => Order::Asc,
+            TagSort::CreatedAt => Order::Desc,
+        }
+    }
+}
+
 /// Một nhãn kèm số item (ngoài thùng rác) mang nó.
 #[derive(Debug, Clone)]
 pub(crate) struct TagWithCount {

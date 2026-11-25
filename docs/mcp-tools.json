@@ -11018,7 +11018,7 @@
         "returns_secret": false
       },
       "deprecation": null,
-      "description": "List media items (images, video, audio, documents), newest first. Filter by folder, type, visibility, trash, name or missing alt text; sort by `created_at`, `name` or `size`. Follow `pagination.next_cursor` with the same filters for more.",
+      "description": "List media items (images, video, audio, documents), newest first. Filter by folder, type, visibility, trash, name or missing alt text; sort by `created_at` (newest first), `name` or `size` (A→Z / smallest first); `order` reverses. Follow `pagination.next_cursor` with the same filters for more.",
       "input_schema": {
         "additionalProperties": false,
         "description": "Filters, order and paging of the media list; omitted fields do not filter.",
@@ -11055,7 +11055,7 @@
             ]
           },
           "order": {
-            "description": "`desc` (default) or `asc`.",
+            "description": "`asc` or `desc`. Default: `desc` (newest first) for `created_at`, `asc` (A→Z, smallest first) for\n`name` and `size`.",
             "type": [
               "string",
               "null"

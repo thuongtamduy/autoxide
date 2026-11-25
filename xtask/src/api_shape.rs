@@ -1,6 +1,6 @@
 //! Hình dạng thống nhất của `/api/v1`, kiểm trên `docs/openapi.json` (D-20261121-api-shape).
 //!
-//! Học một endpoint là biết các endpoint còn lại (CLAUDE.md, "Thân thiện với AI"). Bốn luật:
+//! Học một endpoint là biết các endpoint còn lại (CLAUDE.md, "Thân thiện với AI"). Năm luật:
 //!
 //! - `api-closed-body`: thân request JSON là object thì đóng (`additionalProperties: false`, tức
 //!   kiểu Rust có `#[serde(deny_unknown_fields)]`): trường lạ hay gõ sai tên bị trả 422
@@ -10,6 +10,9 @@
 //! - `api-unpaged-list`: `GET` trả mảng phải là `Page<T>` (`data` + `pagination`, lấy bằng
 //!   `fetch_page`); `Data<Vec<T>>` chỉ cho tập nhỏ có giới hạn, ghi trong [`ALLOW_FILE`].
 //! - `api-page-params`: endpoint trả `Page<T>` nhận `limit` và `cursor`.
+//! - `api-param-description`: mọi tham số (đường dẫn, query, header) có `description` ở chính tham số — chỗ
+//!   Swagger UI / Scalar hiển thị và agent đọc để gọi đúng (D-20261125-list-pages-kernel). Dòng cho phép của luật
+//!   này ghi `<đường dẫn>?<tên tham số>`.
 //!
 //! SCIM 2.0 (`/api/v1/auth/scim/v2/…`) theo RFC 7643 / 7644 — thân lỗi riêng
 //! (`application/scim+json`) và client gửi kèm thuộc tính chỉ đọc (`id`, `meta`, `schemas`) mà máy
@@ -73,7 +76,13 @@ pub fn check(root: &Path) -> Result<Report, String> {
 
 type Key = (&'static str, String, String);
 
-const RULES: &[&str] = &["api-closed-body", "api-problem", "api-unpaged-list", "api-page-params"];
+const RULES: &[&str] = &[
+    "api-closed-body",
+    "api-problem",
+    "api-unpaged-list",
+    "api-page-params",
+    "api-param-description",
+];
 
 fn parse_allow(text: &str) -> Result<BTreeSet<Key>, String> {
     let mut entries = BTreeSet::new();
@@ -124,6 +133,15 @@ fn find(document: &Value) -> Vec<(Key, String)> {
             }
             if let Some(message) = non_problem_error(operation) {
                 found.push((key("api-problem"), message));
+            }
+            for name in undescribed_parameters(operation) {
+                found.push((
+                    ("api-param-description", upper.clone(), format!("{path}?{name}")),
+                    format!(
+                        "parameter `{name}` has no description; write a `///` line on its field (or \
+                         `description` in `#[param(…)]`) saying what it does and its default"
+                    ),
+                ));
             }
             match list_shape(operation, schemas) {
                 Some(ListShape::Page) => {
@@ -235,6 +253,26 @@ fn list_shape(operation: &Value, schemas: &Map<String, Value>) -> Option<ListSha
     None
 }
 
+/// Tên các tham số không có `description` (hay để trống) ở chính tham số.
+fn undescribed_parameters(operation: &Value) -> Vec<&str> {
+    operation
+        .get("parameters")
+        .and_then(Value::as_array)
+        .map(|parameters| {
+            parameters
+                .iter()
+                .filter(|parameter| {
+                    parameter
+                        .get("description")
+                        .and_then(Value::as_str)
+                        .is_none_or(|text| text.trim().is_empty())
+                })
+                .filter_map(|parameter| parameter.get("name")?.as_str())
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
 fn parameter_names(operation: &Value) -> Vec<&str> {
     operation
         .get("parameters")
@@ -333,12 +371,31 @@ mod tests {
         // Chỉ GET mới là danh sách; POST trả mảng (vd kết quả hàng loạt) thì không.
         assert_eq!(rules(&unpaged), vec![("api-unpaged-list", "GET".to_owned())]);
         let page = document(json!({
-            "parameters": [{"name": "limit"}],
+            "parameters": [{"name": "limit", "description": "Page size."}],
             "responses": {"200": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/PageX"}}}}}
         }));
         let found = find(&page);
         assert_eq!(found.len(), 2);
         assert!(found[0].1.contains("`cursor`"));
+    }
+
+    #[test]
+    fn tham_so_thieu_mo_ta_bi_bao_theo_ten() {
+        let doc = document(json!({
+            "parameters": [
+                {"name": "q", "description": "Search text."},
+                {"name": "status"},
+                {"name": "kind", "description": "  "}
+            ]
+        }));
+        let found: Vec<(&str, String, String)> =
+            find(&doc).into_iter().map(|((rule, method, path), _)| (rule, method, path)).collect();
+        let get =
+            |name: &str| ("api-param-description", "GET".to_owned(), format!("/api/v1/x?{name}"));
+        assert!(found.contains(&get("status")));
+        assert!(found.contains(&get("kind")));
+        assert!(!found.contains(&get("q")));
+        assert_eq!(found.len(), 4, "GET and POST, two parameters each");
     }
 
     #[test]
