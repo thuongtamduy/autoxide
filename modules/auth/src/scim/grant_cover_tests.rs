@@ -662,3 +662,55 @@ async fn nguoi_tao_mat_quyen_quan_ly_scim_thi_token_khong_cap_duoc_gi() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn khoa_tai_khoan_thu_hoi_token_scim_no_tao() {
+    // Như API key: khoá tài khoản (qua SCIM `active=false` hay qua REST) thu hồi token SCIM người đó
+    // tạo; mở khoá lại không làm token sống lại.
+    TestDatabase::run(async |test| {
+        let (app, services, admin, admin_token) = setup(test).await;
+        let (_, scim_disabled) = sync_operator(&app, &services, "it@example.com").await;
+        let it = services
+            .users
+            .find_by_email(&services.tenant, "it@example.com")
+            .await
+            .unwrap()
+            .unwrap();
+        // Liên kết tài khoản `it` với SCIM (nhận về), khoá rồi mở lại qua SCIM.
+        let (status, linked) =
+            scim(&app, "POST", "/Users", &admin_token, Some(user_body("it@example.com", "it")))
+                .await;
+        assert_eq!(status, StatusCode::CREATED, "{linked}");
+        let path = format!("/Users/{}", it.id);
+        for active in [false, true] {
+            let body = patch(json!([{"op": "replace", "path": "active", "value": active}]));
+            let (status, body) = scim(&app, "PATCH", &path, &admin_token, Some(body)).await;
+            assert_eq!(status, StatusCode::OK, "{body}");
+        }
+        assert_eq!(
+            scim(&app, "GET", "/Users", &scim_disabled, None).await.0,
+            StatusCode::UNAUTHORIZED
+        );
+
+        // Qua REST: token mới, khoá rồi mở lại tài khoản.
+        let access = bearer(&app, "it@example.com", PASSWORD).await;
+        let rest_disabled = scim_token(&app, &access, None).await;
+        for disabled in [true, false] {
+            let (status, _, body) = call(
+                &app,
+                "PATCH",
+                &format!("/users/{}", it.id),
+                Some(&admin),
+                Some(json!({"disabled": disabled})),
+            )
+            .await;
+            assert_eq!(status, StatusCode::OK, "{body}");
+        }
+        assert_eq!(
+            scim(&app, "GET", "/Users", &rest_disabled, None).await.0,
+            StatusCode::UNAUTHORIZED
+        );
+    })
+    .await
+    .unwrap();
+}

@@ -15,6 +15,8 @@
 //! Gọi nhà cung cấp luôn ở NGOÀI transaction ghi; gọi xong mới mở transaction tạo liên kết.
 
 mod client;
+#[cfg(test)]
+mod configurer_tests;
 pub(crate) mod identity;
 mod jwt;
 pub(crate) mod provider;
@@ -608,7 +610,13 @@ impl OidcService {
         let Some((by, actor)) = self.roles.user_principal(tenant, configured_by).await? else {
             return Ok(false);
         };
-        if !by.is_active() || by.realm != Realm::Staff {
+        // Người cấu hình phải còn hoạt động, là nhân sự và CÒN `auth.oidc.manage` lúc dùng: mất quyền
+        // quản lý nhà cung cấp thì nhà cung cấp không tự gộp vào tài khoản có quyền nào
+        // (D-20261125-durable-grants).
+        if !by.is_active()
+            || by.realm != Realm::Staff
+            || !actor.has(&crate::permissions::OIDC_MANAGE)
+        {
             return Ok(false);
         }
         Ok(if target.has_all_permissions() {
