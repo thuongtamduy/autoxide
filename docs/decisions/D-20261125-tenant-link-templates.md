@@ -19,8 +19,9 @@ khách KHÁC không bao giờ được tin — kể cả qua `kernel.public_url`
 đường đổi host cũ (`SiteLinks::rewrite`); tên miền khách đã MẤT (dòng `revoked` / `failed`, không còn dòng
 `verified`: có thể người khác đã mua lại) cũng không được tin tới khi xác minh lại. Tên miền bị thu hồi, hỏng DNS hay
 đổi chủ thì thư thôi trỏ tới đó: trên máy chủ đã đổi thì ngay, trên máy chủ khác trong vòng
-`AUTOXIDE_TENANCY_CACHE_SECONDS` (mặc định 10 giây, tối đa 3600). Chủ tên miền đọc qua cache của sổ database
-(`domain_site`); chỉ host chưa ai xác minh mới thêm một truy vấn tra "đã mất" mỗi thư. Kiểm lúc ĐẶT (422 `kernel.link_template_invalid`,
+`AUTOXIDE_TENANCY_CACHE_SECONDS` (mặc định 10 giây, tối đa 3600). Chủ tên miền đọc từ ảnh chụp tên miền
+đã xác minh trong bộ nhớ của sổ database (`verified_domain_owner`, dùng chung với CORS — D-20261125-tenant-cors);
+chỉ host chưa ai xác minh mới thêm một truy vấn tra "đã mất" mỗi thư. Kiểm lúc ĐẶT (422 `kernel.link_template_invalid`,
 `kernel.link_placeholder_missing`, `kernel.link_host_not_allowed`) và lại lúc DÙNG: tên miền bị thu hồi hay
 `kernel.public_url` đổi thì link quay về mẫu máy chủ (ghi warn), không gửi token tới host khách không còn giữ.
 Luật gate `site-links` (`cargo xtask check`): mỗi biến `AUTOXIDE_…_URL` hoặc được nêu trong mô tả của một

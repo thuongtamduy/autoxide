@@ -15,8 +15,8 @@
 //! host that is a verified domain of ANOTHER tenant is never trusted — neither for a link setting nor for
 //! `kernel.public_url` itself ([`SiteLinks::rewrite`]): a tenant cannot borrow another tenant's domain, and
 //! a domain that changes owner stops receiving the former owner's links at once. The check runs when the value
-//! is set (422) and again on every use; it reads the domain owners through the registry's cache (no query
-//! per mail while cached). Residual risk (ROADMAP P16): a `kernel.public_url` host nobody has verified is
+//! is set (422) and again on every use; it reads the domain owners from the registry's snapshot of verified
+//! domains (shared with CORS; no query per mail). Residual risk (ROADMAP P16): a `kernel.public_url` host nobody has verified is
 //! still trusted for that tenant's own links.
 
 use std::sync::Arc;
@@ -43,10 +43,11 @@ impl LinkTrust {
         LinkTrust { registry, platform_host }
     }
 
-    /// The tenant that has verified domain `host`, if any (through the registry's cache).
+    /// The tenant that has verified domain `host`, if any: the in-memory snapshot of every verified domain that
+    /// CORS uses too (one source of truth; a host nobody verified costs no query).
     async fn owner(&self, host: &str) -> Result<Option<TenantId>, Error> {
         match &self.registry {
-            Some(registry) => Ok(registry.domain_site(host).await?.map(|(owner, _)| owner)),
+            Some(registry) => registry.verified_domain_owner(host).await,
             None => Ok(None),
         }
     }
