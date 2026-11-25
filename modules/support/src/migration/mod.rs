@@ -7,6 +7,7 @@ mod m0009_policies;
 mod m0010_macros;
 mod m0011_drafts;
 mod m0012_auto_replies;
+mod m0013_list_indexes;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 
@@ -39,5 +40,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(m0011_drafts::Migration),
         // Nhật ký trả lời tự động (mục 6, D-230).
         Box::new(m0012_auto_replies::Migration),
+        // Index của danh sách có phân trang (bước 70 P9 mục 3).
+        Box::new(m0013_list_indexes::Migration),
     ]
 }

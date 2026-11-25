@@ -180,3 +180,70 @@ async fn lien_ket_mau_cau_va_hai_long() {
     .await
     .unwrap();
 }
+
+/// Câu trả lời mẫu có phân trang theo tên (bước 70 P9): tên có dấu tiếng Việt, hoa / thường — duyệt từng trang
+/// nhỏ ra đúng như một trang lớn, không trùng, không sót (thứ tự theo tên do database quyết, khoá phụ ID). Không
+/// còn trần đọc 500. Cursor của danh sách khác hay bị sửa: 422 ở ô `cursor`.
+#[tokio::test]
+async fn mau_cau_phan_trang_theo_ten_va_con_tro_sai() {
+    TestDatabase::run(async |test| {
+        let (harness, _) = app(test).await;
+        let app = &harness.app;
+        let root = app.default_tenant().id().as_uuid();
+        for name in ["Đổi hàng", "an", "Ánh", "Zeta", "bánh", "Ẩn", "đơn", "Bánh"] {
+            let body = json!({"org_id": root, "name": name, "bodies": {"vi": "Chào bạn"}});
+            let (status, saved) = call(app, "POST", "/macros", "agent", Some(body)).await;
+            assert_eq!(status, StatusCode::CREATED, "{saved}");
+        }
+        let names = |page: &serde_json::Value| -> Vec<String> {
+            page["data"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|row| row["name"].as_str().unwrap().to_owned())
+                .collect()
+        };
+        let (_, whole) =
+            call(app, "GET", &format!("/macros?org_id={root}&limit=200&count=true"), "agent", None)
+                .await;
+        assert_eq!(whole["pagination"]["total"], 8, "{whole}");
+        let expected = names(&whole);
+        for order in ["asc", "desc"] {
+            let mut seen = Vec::new();
+            let mut cursor: Option<String> = None;
+            loop {
+                let mut uri = format!("/macros?org_id={root}&limit=3&order={order}");
+                if let Some(cursor) = &cursor {
+                    uri.push_str(&format!("&cursor={cursor}"));
+                }
+                let (status, page) = call(app, "GET", &uri, "agent", None).await;
+                assert_eq!(status, StatusCode::OK, "{page}");
+                seen.extend(names(&page));
+                match page["pagination"]["next_cursor"].as_str() {
+                    Some(next) => cursor = Some(next.to_owned()),
+                    None => break,
+                }
+            }
+            let mut wanted = expected.clone();
+            if order == "desc" {
+                wanted.reverse();
+            }
+            assert_eq!(seen, wanted, "order={order}");
+        }
+
+        // Cursor của danh sách khác (cột sắp khác) và cursor bị sửa: lỗi rõ ở ô `cursor`, không 500.
+        let (_, first) =
+            call(app, "GET", &format!("/macros?org_id={root}&limit=1"), "agent", None).await;
+        let cursor = first["pagination"]["next_cursor"].as_str().unwrap().to_owned();
+        let tampered = format!("{cursor}x");
+        let id = open(app).await;
+        let drafts = format!("/tickets/{id}/reply-drafts?cursor={cursor}");
+        for uri in [drafts, format!("/macros?org_id={root}&cursor={tampered}")] {
+            let (status, problem) = call(app, "GET", &uri, "agent", None).await;
+            assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{uri}: {problem}");
+            assert_eq!(problem["errors"][0]["field"], "cursor", "{problem}");
+        }
+    })
+    .await
+    .unwrap();
+}

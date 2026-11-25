@@ -62,10 +62,9 @@ impl SupportService {
             .iter()
             .map(|message| json!({"from": message.author_kind, "text": redact(&message.body)}))
             .collect();
-        let replies = self.replies_at(tenant, ticket.org_id).await?;
+        let replies = self.first_replies_at(tenant, ticket.org_id, 20).await?;
         let saved: Vec<_> = replies
             .iter()
-            .take(20)
             .map(|reply| json!({"name": reply.name, "text": fill(reply, ticket)}))
             .collect();
         let input = json!({
