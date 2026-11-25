@@ -16316,53 +16316,6 @@ export type Data_Vec_SupportGrantResponse = {
 };
 
 /** Envelope of a single result. */
-export type Data_Vec_SupportMacro = {
-  data: {
-    approved_at?: string | null;
-    approved_by?: string | null;
-    /** Approved for automatic answers. */
-    auto_reply: boolean;
-    /** Text per language (`vi`, `en`…), with `{customer_name}`, `{ticket_number}`, `{subject}`. */
-    bodies: Record<string, unknown>;
-    id: string;
-    name: string;
-    /** The unit it belongs to; units below use it too. */
-    org_id: string;
-    /** Ways customers ask the question, per language (automatic answers). */
-    questions: Record<string, unknown>;
-    /** Automatic use stops after this day unless reviewed again (`YYYY-MM-DD`). */
-    review_due_on?: string | null;
-    updated_at: string;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_SupportReplyDraft = {
-  data: {
-    /** Written by AI: send it with `ai_assisted: true` so it is labelled. */
-    ai_assisted: boolean;
-    body: string;
-    created_at: string;
-    id: string;
-    ticket_id: string;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_SupportRoutingRule = {
-  data: {
-    /** Only tickets of this category; empty: any. */
-    category?: string | null;
-    channel?: SupportChannel | null;
-    id: string;
-    org_id: string;
-    /** Rules of one unit are tried in this order; rules of nearer units first. */
-    position: number;
-    team_id: string;
-  }[];
-};
-
-/** Envelope of a single result. */
 export type Data_Vec_SyncResourceView = {
   data: {
     /** The change feed: `GET` it with the `cursor` of the last change you applied. */
@@ -26168,6 +26121,59 @@ export type Page_SupportAutoReply = {
     source: string;
     /** `support.ticket:<id>` or `conversations.thread:<id>`. */
     thread: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_SupportMacro = {
+  /** The items of this page, in the requested order. */
+  data: {
+    approved_at?: string | null;
+    approved_by?: string | null;
+    /** Approved for automatic answers. */
+    auto_reply: boolean;
+    /** Text per language (`vi`, `en`…), with `{customer_name}`, `{ticket_number}`, `{subject}`. */
+    bodies: Record<string, unknown>;
+    id: string;
+    name: string;
+    /** The unit it belongs to; units below use it too. */
+    org_id: string;
+    /** Ways customers ask the question, per language (automatic answers). */
+    questions: Record<string, unknown>;
+    /** Automatic use stops after this day unless reviewed again (`YYYY-MM-DD`). */
+    review_due_on?: string | null;
+    updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_SupportReplyDraft = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** Written by AI: send it with `ai_assisted: true` so it is labelled. */
+    ai_assisted: boolean;
+    body: string;
+    created_at: string;
+    id: string;
+    ticket_id: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_SupportRoutingRule = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** Only tickets of this category; empty: any. */
+    category?: string | null;
+    channel?: SupportChannel | null;
+    id: string;
+    org_id: string;
+    /** Rules of one unit are tried in this order; rules of nearer units first. */
+    position: number;
+    team_id: string;
   }[];
   pagination: Pagination;
 };
@@ -50392,11 +50398,12 @@ export interface paths {
   "/api/v1/support/macros": {
     /** List the saved replies usable at a unit. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { org_id: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { org_id: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_SupportMacro;
+        200: Page_SupportMacro;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -50705,11 +50712,12 @@ export interface paths {
   "/api/v1/support/routing-rules": {
     /** List the routing rules of a unit. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { org_id: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { org_id: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_SupportRoutingRule;
+        200: Page_SupportRoutingRule;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -50960,12 +50968,13 @@ export interface paths {
   "/api/v1/support/tickets/{id}/reply-drafts": {
     /** List the drafts of a ticket. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_SupportReplyDraft;
+        200: Page_SupportReplyDraft;
         401: Problem;
         403: Problem;
         404: Problem;
+        422: Problem;
         default: Problem;
       };
     };
