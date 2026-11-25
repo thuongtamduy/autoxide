@@ -61,40 +61,44 @@ impl LinkTrust {
     ) -> Result<Option<FieldError>, Error> {
         let host = host_of(url);
         let default_port = url.port().is_none();
-        let refused = |template: &'static str| {
-            Some(
-                FieldError::new("value", "kernel.public_url_not_allowed", template)
-                    .with_param("host", host.clone()),
+        const CODE: &str = "kernel.public_url_not_allowed";
+        let port_problem = || {
+            FieldError::new(
+                "value",
+                CODE,
+                "use `{host}` without a port: a verified domain is trusted on its default port only",
             )
+            .with_param("host", host.clone())
         };
         match self.owner(&host).await? {
             Some(owner) if owner != tenant.id() => {
-                return Ok(refused("`{host}` is a verified domain of another tenant"));
-            }
-            Some(_) if !default_port => {
-                return Ok(refused(
-                    "use `{host}` without a port: a verified domain is trusted on its default port only",
+                return Ok(Some(
+                    FieldError::new(
+                        "value",
+                        CODE,
+                        "`{host}` is a verified domain of another tenant",
+                    )
+                    .with_param("host", host.clone()),
                 ));
             }
-            Some(_) => return Ok(None),
+            Some(_) => return Ok((!default_port).then(port_problem)),
             None => {}
         }
         if self.platform_host.as_deref() == Some(host.as_str()) {
-            return Ok((!default_port).then(|| {
-                FieldError::new(
-                    "value",
-                    "kernel.public_url_not_allowed",
-                    "use `{host}` without a port: a verified domain is trusted on its default port only",
-                )
-                .with_param("host", host.clone())
-            }));
+            return Ok((!default_port).then(port_problem));
         }
         // Truy vấn database điều khiển chỉ cho host chưa ai xác minh (rủi ro P16), không cho tên miền đã xác minh.
         if let Some(registry) = &self.registry
             && crate::tenancy::domains::lost_by(registry, tenant.id(), &host).await?
         {
-            return Ok(refused(
-                "`{host}` was a domain of this tenant that is revoked or failed its DNS check: verify it again first",
+            return Ok(Some(
+                FieldError::new(
+                    "value",
+                    CODE,
+                    "`{host}` was a domain of this tenant that is revoked or failed its DNS check: \
+                     verify it again first",
+                )
+                .with_param("host", host.clone()),
             ));
         }
         Ok(None)
