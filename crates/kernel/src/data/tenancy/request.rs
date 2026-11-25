@@ -250,12 +250,12 @@ fn ensure_origin(extensions: &Extensions, tenant: super::TenantId) -> Result<(),
 }
 
 /// Like [`ensure_origin`] for a resolved tenant; when the request comes from that tenant's own page the tenant
-/// is marked so (`TenantContext::from_page_origin`): `resolve_link_token` then refuses a token of another
+/// is marked so (`TenantContext::reached_from_page`): `resolve_link_token` then refuses a token of another
 /// tenant, so a page on tenant A's domain cannot redeem tenant B's refresh token or email link.
 fn bind_origin(extensions: &Extensions, tenant: TenantContext) -> Result<TenantContext, Error> {
     ensure_origin(extensions, tenant.id())?;
     Ok(match extensions.get::<crate::http::OriginGrant>() {
-        Some(crate::http::OriginGrant::Tenant(_)) => tenant.from_page_origin(),
+        Some(crate::http::OriginGrant::Tenant(_)) => tenant.reached_from_page(),
         _ => tenant,
     })
 }

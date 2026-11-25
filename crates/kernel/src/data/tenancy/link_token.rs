@@ -172,7 +172,7 @@ mod tests {
             resolve_link_token(&registry, Some(&other), &token).await.unwrap().unwrap();
         assert_eq!((tenant.id(), raw), (DEFAULT_TENANT, "raw"));
         // …trừ khi request đến từ trang trên tên miền của khách khác đó (D-20261125-tenant-cors).
-        let page = other.clone().from_page_origin();
+        let page = other.clone().reached_from_page();
         assert!(resolve_link_token(&registry, Some(&page), &token).await.unwrap().is_none());
         // Khách không có, sai dạng, rỗng, quá dài: như token sai.
         let forged = link_token(&other, "raw");

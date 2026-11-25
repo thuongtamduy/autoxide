@@ -375,7 +375,7 @@ impl TenantContext {
 
     /// Same tenant, marked as reached from a page on its own verified domain.
     #[must_use]
-    pub(crate) fn from_page_origin(self) -> Self {
+    pub(crate) fn reached_from_page(self) -> Self {
         let inner = Arc::unwrap_or_clone(self.0);
         TenantContext(Arc::new(Inner { from_page_origin: true, ..inner }))
     }

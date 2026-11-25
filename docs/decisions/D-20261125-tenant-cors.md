@@ -15,7 +15,7 @@ Gắn với khách:
   extractor `TenantContext` / `Principal` / `OptionalTenant`, trước khi handler chạy.
 - Request không nêu khách nào (không `Autoxide-Tenant`, `Host` không thuộc khách nào — thường là `api.<nền tảng>`)
   mà mang origin của A: khách của request là A (`by_hint`), và `TenantContext` được đánh dấu "đến từ trang của
-  khách" (`from_page_origin`). Nhờ vậy endpoint lấy khách từ token trong thân hay query (`OptionalTenant` +
+  khách" (`reached_from_page`). Nhờ vậy endpoint lấy khách từ token trong thân hay query (`OptionalTenant` +
   `resolve_link_token`: `/auth/refresh`, `/auth/login/mfa`, link trong mail, lời mời, đặt lại mật khẩu, endpoint
   công khai của comments / newsletter / notifications / inventory) cũng gắn với A: `resolve_link_token` trả "không
   có" cho token của khách khác **chỉ khi** khách của request được đánh dấu như vậy. Khách đến từ credential, header
