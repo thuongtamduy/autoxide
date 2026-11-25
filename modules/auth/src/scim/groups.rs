@@ -29,6 +29,9 @@ use crate::events;
 use crate::user::entity as user;
 
 const NAME_MAX_LENGTH: usize = 255;
+/// Nhiều thành viên "chờ" nhất được đồng bộ lại sau một lần ghi nhóm: nhóm có hàng nghìn người chờ
+/// (vd gói hết chỗ) không làm mỗi request chậm theo số người đó.
+const PENDING_MAX: usize = 100;
 /// Nhiều thành viên nhất trong một lần ghi nhóm.
 const MAX_MEMBERS: usize = 10_000;
 
@@ -38,6 +41,25 @@ fn now() -> Timestamp {
 
 fn group_not_found(id: &str) -> ScimError {
     ScimError::not_found("Group", id)
+}
+
+/// Mọi ID người dùng (chuỗi là UUID) xuất hiện trong thân request: thành viên request nêu tên.
+fn named_users(body: &Value) -> BTreeSet<Uuid> {
+    let mut found = BTreeSet::new();
+    let mut stack = vec![body];
+    while let Some(value) = stack.pop() {
+        match value {
+            Value::String(text) => {
+                if let Ok(id) = Uuid::try_parse(text.trim()) {
+                    found.insert(id);
+                }
+            }
+            Value::Array(items) => stack.extend(items),
+            Value::Object(fields) => stack.extend(fields.values()),
+            _ => {}
+        }
+    }
+    found
 }
 
 /// Thân `Group` đã đọc và kiểm.
@@ -262,6 +284,7 @@ impl ScimService {
         body: &Value,
     ) -> Result<Value, ScimError> {
         let input = parse_group(&patch::lowercase_keys(body.clone()))?;
+        let named = input.members.clone();
         let tenant = &caller.tenant;
         let transaction = tenant.database().begin_write().await?;
         let saved = self.save_group(&transaction, caller, None, &input).await;
@@ -273,12 +296,8 @@ impl ScimService {
             }
         };
         transaction.commit().await?;
-        // Thành viên đổi, cùng thành viên còn "chờ" (lần đồng bộ trước lỗi): hệ thống danh tính gửi
-        // lại đúng request cũ thì không còn ai đổi, nhưng người chờ vẫn được đồng bộ lại.
-        let mut users = changed;
-        users.extend(pending_members(tenant, row.id).await?);
-        self.sync_users(caller, &users).await?;
-        let members = members_of(tenant.database().read(), tenant, &[row.id]).await?;
+        self.sync_group_members(caller, row.id, changed, &named).await?;
+        let members = members_of(tenant.database().write(), tenant, &[row.id]).await?;
         Ok(render(&row, Some(members.get(&row.id).map(Vec::as_slice).unwrap_or_default())))
     }
 
@@ -289,7 +308,7 @@ impl ScimService {
         body: &Value,
     ) -> Result<Value, ScimError> {
         let body = patch::lowercase_keys(body.clone());
-        self.update_group(caller, id, |_| parse_group(&body)).await
+        self.update_group(caller, id, named_users(&body), |_| parse_group(&body)).await
     }
 
     pub(crate) async fn patch_group(
@@ -298,7 +317,7 @@ impl ScimService {
         id: &str,
         body: &Value,
     ) -> Result<Value, ScimError> {
-        self.update_group(caller, id, |current| {
+        self.update_group(caller, id, named_users(body), |current| {
             let mut resource = patch::lowercase_keys(current);
             patch::apply(&mut resource, body, &["id"])?;
             parse_group(&resource)
@@ -310,6 +329,7 @@ impl ScimService {
         &self,
         caller: &ScimCaller,
         id: &str,
+        named: BTreeSet<Uuid>,
         change: impl FnOnce(Value) -> Result<GroupInput, ScimError>,
     ) -> Result<Value, ScimError> {
         let tenant = &caller.tenant;
@@ -338,12 +358,8 @@ impl ScimService {
             }
         };
         transaction.commit().await?;
-        // Thành viên đổi, cùng thành viên còn "chờ" (lần đồng bộ trước lỗi): hệ thống danh tính gửi
-        // lại đúng request cũ thì không còn ai đổi, nhưng người chờ vẫn được đồng bộ lại.
-        let mut users = changed;
-        users.extend(pending_members(tenant, row.id).await?);
-        self.sync_users(caller, &users).await?;
-        let members = members_of(tenant.database().read(), tenant, &[row.id]).await?;
+        self.sync_group_members(caller, row.id, changed, &named).await?;
+        let members = members_of(tenant.database().write(), tenant, &[row.id]).await?;
         Ok(render(&row, Some(members.get(&row.id).map(Vec::as_slice).unwrap_or_default())))
     }
 
@@ -575,6 +591,38 @@ impl ScimService {
         Ok(())
     }
 
+    /// Sau một lần ghi nhóm `group_id`: đồng bộ người có thành viên đổi (`changed`), cùng tối đa
+    /// [`PENDING_MAX`] thành viên còn "chờ" (thiếu role mà luật của nhóm cấp — lần đồng bộ trước lỗi),
+    /// ưu tiên người request nêu tên (`named`). Hệ thống danh tính gửi lại đúng request cũ thì không
+    /// còn ai đổi, nhưng người chờ được nêu tên vẫn được đồng bộ lại. Trả lỗi chỉ khi người đổi hay
+    /// người được nêu tên lỗi; người chờ cũ khác lỗi (vd vẫn hết chỗ) chỉ ghi log — không làm hỏng
+    /// request không liên quan tới họ (D-20261125-scim-sync-report).
+    async fn sync_group_members(
+        &self,
+        caller: &ScimCaller,
+        group_id: Uuid,
+        changed: BTreeSet<Uuid>,
+        named: &BTreeSet<Uuid>,
+    ) -> Result<(), ScimError> {
+        let pending = pending_members(&caller.tenant, group_id).await?;
+        let (first, rest): (Vec<Uuid>, Vec<Uuid>) =
+            pending.into_iter().partition(|user_id| named.contains(user_id));
+        let pending: BTreeSet<Uuid> = first.into_iter().chain(rest).take(PENDING_MAX).collect();
+        let mut must = changed.clone();
+        must.extend(pending.intersection(named).copied());
+        let mut users = changed;
+        users.extend(pending);
+        if users.is_empty() {
+            return Ok(());
+        }
+        let authority = self.authority(caller).await?;
+        let report = self.sync_in(&caller.tenant, caller.actor(), &authority, &users).await;
+        match report.failed.into_iter().find(|(user_id, _)| must.contains(user_id)) {
+            Some((_, error)) => Err(ScimError::from(error)),
+            None => Ok(()),
+        }
+    }
+
     /// Đồng bộ membership do SCIM cấp của những người `users` theo nhóm hiện tại của họ.
     pub(crate) async fn sync_users(
         &self,
@@ -678,7 +726,9 @@ async fn wanted_grants(
     tenant: &TenantContext,
     user_id: Uuid,
 ) -> Result<BTreeSet<(Uuid, Uuid)>, autoxide_kernel::error::Error> {
-    let read = tenant.database().read();
+    // Kết nối GHI: đọc ngay sau commit nhóm / luật, read replica có thể trễ — thấy người đã bị gỡ
+    // khỏi nhóm vẫn còn thì không gỡ role (D-20261125-scim-sync-report).
+    let read = tenant.database().write();
     let groups = Query::select()
         .column(member::Column::GroupId)
         .from(member::Entity)

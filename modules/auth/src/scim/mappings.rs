@@ -50,12 +50,13 @@ pub(crate) fn mapping_not_found(id: Uuid) -> Error {
     .with_param("id", id)
 }
 
-/// Thành viên của nhóm `group_id`.
+/// Thành viên của nhóm `group_id`. Kết nối GHI: đọc ngay sau commit luật để đồng bộ (replica có thể
+/// trễ).
 async fn members(tenant: &TenantContext, group_id: Uuid) -> Result<BTreeSet<Uuid>, Error> {
     Ok(member::Entity::find()
         .filter(member::Column::GroupId.eq(group_id))
         .scoped(tenant)
-        .all(tenant.database().read())
+        .all(tenant.database().write())
         .await?
         .into_iter()
         .map(|row| row.user_id)

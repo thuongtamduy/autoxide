@@ -514,6 +514,7 @@ async fn token_quyen_thap_khong_doi_user_name_tai_khoan_quyen_cao() {
         let (_, user) = scim(&app, "GET", &path, &admin_token, None).await;
         assert_eq!(user["userName"], "chief@example.com", "{user}");
         assert_eq!(user["externalId"], "chief@example.com", "{user}");
+        assert_eq!(user["displayName"], "Grace Hopper", "{user}");
         // PUT gửi lại đúng hồ sơ hiện có (không đổi gì): không bị chặn.
         let same = user_body("chief@example.com", "chief@example.com");
         let (status, body) = scim(&app, "PUT", &path, &low_token, Some(same)).await;
@@ -525,6 +526,62 @@ async fn token_quyen_thap_khong_doi_user_name_tai_khoan_quyen_cao() {
         let (status, body) =
             scim(&app, "PATCH", &format!("/Users/{plain}"), &low_token, Some(rename)).await;
         assert_eq!(status, StatusCode::OK, "{body}");
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn chiem_truoc_user_name_khong_giu_duoc_tai_khoan_khi_email_doi() {
+    // Token quyền thấp tạo trước User mang `userName` mà hệ thống danh tính SẼ dùng cho một người
+    // (`chief@corp.example`) nhưng với email của kẻ tấn công; kẻ tấn công đặt mật khẩu. Hệ thống
+    // danh tính (token của admin) khớp theo `userName`, đổi email về người thật rồi đưa vào nhóm
+    // admin: kẻ tấn công không còn đường vào nào.
+    TestDatabase::run(async |test| {
+        let (app, services, admin, admin_token) = setup(test).await;
+        let (_, low_token) = sync_operator(&app, &services, "it@example.com").await;
+        let (group_id, _) = admin_group(&app, &services, &admin, &admin_token).await;
+        let mut body = user_body("chief@corp.example", "chief");
+        body["emails"] = json!([{"value": "attacker@evil.example", "type": "work", "primary": true}]);
+        let (status, planted) = scim(&app, "POST", "/Users", &low_token, Some(body)).await;
+        assert_eq!(status, StatusCode::CREATED, "{planted}");
+        let id = planted["id"].as_str().unwrap().to_owned();
+        let user_id = uuid::Uuid::parse_str(&id).unwrap();
+        services
+            .users
+            .write_password(
+                &services.tenant,
+                Actor::system(),
+                user_id,
+                "password",
+                PASSWORD.to_owned(),
+                crate::user::PasswordWrite::Initial,
+            )
+            .await
+            .unwrap();
+        let attacker = bearer(&app, "attacker@evil.example", PASSWORD).await;
+        assert_eq!(call(&app, "GET", "/me", Some(&attacker), None).await.0, StatusCode::OK);
+
+        // Hệ thống danh tính khớp theo `userName`, đổi email về người thật, đưa vào nhóm admin.
+        let email = patch(json!([
+            {"op": "replace", "path": "emails[type eq \"work\"].value", "value": "chief@corp.example"}
+        ]));
+        let (status, body) =
+            scim(&app, "PATCH", &format!("/Users/{id}"), &admin_token, Some(email)).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        let add = patch(json!([{"op": "add", "path": "members", "value": [{"value": id}]}]));
+        let (status, body) =
+            scim(&app, "PATCH", &format!("/Groups/{group_id}"), &admin_token, Some(add)).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        assert!(is_admin(&services, &id).await);
+
+        // Phiên cũ chết; mật khẩu kẻ tấn công đặt không còn dùng được với email nào.
+        assert_eq!(call(&app, "GET", "/me", Some(&attacker), None).await.0, StatusCode::UNAUTHORIZED);
+        for email in ["attacker@evil.example", "chief@corp.example"] {
+            let login = json!({"email": email, "password": PASSWORD});
+            let (status, _, body) = call(&app, "POST", "/login", None, Some(login)).await;
+            assert_eq!(status, StatusCode::UNAUTHORIZED, "{email}: {body}");
+        }
     })
     .await
     .unwrap();

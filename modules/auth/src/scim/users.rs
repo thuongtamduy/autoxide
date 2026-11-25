@@ -531,6 +531,16 @@ impl ScimService {
             .exec(transaction)
             .await
             .map_err(unique_to_scim)?;
+        if email_changed && link_before.is_some() {
+            // Email đổi qua SCIM: mọi cách vào tài khoản gắn với email cũ đóng lại trong CÙNG
+            // transaction — mật khẩu, phiên, refresh token, API key, passkey, TOTP, link đăng nhập /
+            // đặt lại đang chờ, liên kết đăng nhập ngoài. Không thì người đã giữ tài khoản dưới email
+            // cũ (vd kẻ chiếm trước `userName` mà hệ thống danh tính sẽ khớp, rồi đặt mật khẩu qua
+            // email của mình) vẫn đăng nhập được sau khi hệ thống danh tính trao tài khoản cho người
+            // thật; chủ mới đăng nhập bằng nhà cung cấp danh tính hay đặt lại mật khẩu qua email mới.
+            self.users.lock_out_in(tenant, transaction, actor, id).await?;
+            tracing::info!(user_id = %id, "SCIM email change: sign-in credentials revoked");
+        }
         if was_active && !input.active {
             // Nhân viên nghỉ: mọi đường vào đóng ngay, cùng transaction với việc khoá.
             crate::session::SessionService::revoke_user(transaction, tenant, id).await?;

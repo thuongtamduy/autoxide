@@ -318,3 +318,33 @@ async fn gui_lai_cung_request_thi_dong_bo_lai_nguoi_con_cho() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn nguoi_cho_cu_loi_khong_lam_hong_request_khong_lien_quan() {
+    TestDatabase::run(async |test| {
+        let setup = setup(test).await;
+        let admins = group(&setup, "Admins", &[]).await;
+        let (status, _) = map(&setup, &admins, "admin").await;
+        assert_eq!(status, StatusCode::CREATED);
+        let newcomer = user(&setup, &setup.admin_token, "new@alpha.example").await;
+        setup.plan.set_max(setup.plan.used().len());
+        let path = format!("/Groups/{admins}");
+        let (status, _) =
+            scim(&setup.app, "PATCH", &path, &setup.admin_token, Some(add(&newcomer))).await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+        // Vẫn hết chỗ. Đổi tên nhóm (không nêu tên người chờ): người chờ được thử lại, lỗi chỉ vào
+        // log, request thành công.
+        let rename = json!({"schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+            "Operations": [{"op": "replace", "path": "displayName", "value": "Owners"}]});
+        let (status, body) =
+            scim(&setup.app, "PATCH", &path, &setup.admin_token, Some(rename)).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        // Gửi lại đúng request thêm người đó (nêu tên): vẫn báo lỗi để hệ thống danh tính thử lại.
+        let (status, _) =
+            scim(&setup.app, "PATCH", &path, &setup.admin_token, Some(add(&newcomer))).await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+        assert!(!is_admin(&setup, &newcomer).await);
+    })
+    .await
+    .unwrap();
+}

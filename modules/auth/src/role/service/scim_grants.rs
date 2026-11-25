@@ -22,7 +22,8 @@ impl RoleService {
         user_id: Uuid,
         wanted: BTreeSet<(Uuid, Uuid)>,
     ) -> Result<bool, Error> {
-        let read = tenant.database().read();
+        // Kết nối GHI: chạy ngay sau commit nhóm / luật (read replica có thể trễ).
+        let read = tenant.database().write();
         let grants = grant::Entity::find()
             .filter(grant::Column::UserId.eq(user_id))
             .scoped(tenant)

@@ -26,8 +26,12 @@ Quyết định:
    (`user_id`, `code`, `message`); người lỗi nhận role ở lần đồng bộ thành công sau. Request SCIM và bỏ luật vẫn trả
    lỗi đầu tiên nếu có người lỗi (hệ thống danh tính gửi lại), nhưng chỉ sau khi đã thử hết mọi người. **Gửi lại**
    đúng request cũ thì thành viên nhóm không đổi thêm; vì vậy sau mỗi lần ghi nhóm, ngoài người có thành viên đổi, còn
-   đồng bộ lại **thành viên còn chờ** của nhóm (thiếu một (nút, role) mà luật của nhóm cấp — mỗi luật một câu) — gửi
-   lại sau khi đã có chỗ thì người đó nhận role. `granted_user_ids` chỉ gồm người thật sự giữ role ở nút sau khi đồng
+   đồng bộ lại tối đa 100 **thành viên còn chờ** của nhóm (thiếu một (nút, role) mà luật của nhóm cấp — mỗi luật một
+   câu), ưu tiên người request nêu tên — gửi lại sau khi đã có chỗ thì người đó nhận role. Request chỉ báo lỗi khi
+   người có thành viên đổi hay người chờ **được request nêu tên** lỗi; người chờ cũ khác lỗi (vd vẫn hết chỗ) chỉ ghi
+   log, không làm hỏng request không liên quan. Hệ quả nối với rủi ro "nhóm chưa có luật" (D-20261125-scim-grant-cover
+   mục 5): người chờ của nhóm có luật được cấp ở lần ghi nhóm kế tiếp bằng token cấp được role đó (vd token của
+   admin), dù request đó không nêu họ — họ là thành viên mà luật đã áp cho, không phải ý định mới. `granted_user_ids` chỉ gồm người thật sự giữ role ở nút sau khi đồng
    bộ (đọc qua kết nối ghi). Log của người lỗi ghi lỗi đầy đủ; ra ngoài lỗi nội bộ chỉ là "Internal error.".
 3. **Khoá nhóm cả khi bỏ luật:** `delete_mapping` khoá dòng nhóm như `create_mapping` và `update_group`, để mọi lần
    đổi luật hay thành viên của một nhóm nối đuôi nhau (thứ tự khoá: nhóm trước).
@@ -40,6 +44,21 @@ Quyết định:
    (`require_creator_covers`); gửi lại hồ sơ không đổi gì thì không kiểm. `userName` không dùng để đăng nhập, nhưng
    nó và `externalId` là khoá hệ thống danh tính dùng để khớp người: đổi chúng trên tài khoản quyền cao thì lần đẩy
    sau bằng token của người quyền cao có thể ghi hồ sơ của người khác (kể cả email) vào tài khoản đó.
+
+6. **Đọc sau khi ghi đi qua kết nối ghi:** mọi lần đọc dẫn tới quyết định quyền ngay sau commit trong đường đồng bộ
+   (`has_membership`, `wanted_grants`, thành viên nhóm khi đặt / bỏ luật, phần đọc đầu của `sync_scim_grants`,
+   `pending_members`, `granted_user_ids`) dùng kết nối ghi: với `DATABASE_READ_URL` (read replica) trễ, đọc ở kết nối
+   đọc thì người vừa bị gỡ khỏi nhóm có luật admin vẫn giữ admin. Còn lại (chưa đổi, ghi nhận): principal của mỗi
+   request và `require_covers` / quyền người tạo token đọc qua kết nối đọc — sau khi hạ quyền, quyền cũ còn hiệu lực
+   trong khoảng replica trễ; thuộc thiết kế chung của D-20261121-access-token-revocation.
+7. **SCIM đổi email của tài khoản đã liên kết thì khoá mọi cách vào cũ** (`UserService::lock_out_in`, cùng
+   transaction): mật khẩu, phiên, refresh token, API key, passkey, TOTP, link đăng nhập / đặt lại đang chờ, liên kết
+   đăng nhập ngoài; mỗi thứ có event của nó. Lý do: token quyền thấp tạo trước một `User` mang `userName` mà hệ thống
+   danh tính sẽ dùng cho người khác, với email của kẻ tấn công, đặt mật khẩu qua email đó; khi hệ thống danh tính (token
+   của admin) khớp theo `userName`, đổi email về người thật và cấp role, kẻ tấn công vẫn giữ phiên và mật khẩu. Chủ mới
+   đăng nhập bằng nhà cung cấp danh tính hay đặt lại mật khẩu qua email mới. Còn mở (mục `[ ]` dưới P16): khi đồng bộ
+   đưa một tài khoản lên role cao hơn người đã tạo liên kết SCIM của nó, cũng thu hồi như vậy — cần ghi người tạo liên
+   kết (migration).
 
 Đính chính D-20261125-scim-grant-cover (không sửa file đó):
 

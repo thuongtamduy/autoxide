@@ -263,6 +263,9 @@ thật (P7).
   - [ ] Hạn mức số nhân sự: hai lần đổi role thật cho cùng một người chạy đồng thời có thể làm lệch chỗ (dùng chung
         mã giữ chỗ `auth.member:<id>`; có từ trước) — khoá dòng người dùng quanh giữ chỗ → đổi → xác nhận, hay job
         đối soát số nhân sự với `auth_user_role` (D-20261125-scim-sync-report)
+  - [ ] SCIM: khi đồng bộ đưa một tài khoản lên role cao hơn người đã tạo liên kết SCIM của nó (token quyền thấp tạo
+        tài khoản, token của admin cấp role cao), thu hồi mọi cách vào cũ như khi đổi email — cần ghi người tạo liên kết
+        ở `auth_scim_users` (migration) (D-20261125-scim-sync-report mục 7)
 
 ## Giai đoạn B — Lớp cho giao diện và phân quyền
 
