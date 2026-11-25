@@ -414,7 +414,8 @@ impl ContentService {
         };
         // Máy chủ làm thay người đã yêu cầu: quyền đã kiểm lúc yêu cầu; giữ người và API key để
         // audit ghi đúng, và để bản dịch mới là "của" họ (`content.write_own`).
-        let mut acting = Principal::with_all_permissions(by);
+        // `in_tenant`: quyết định quyền theo đơn vị tra cây của đúng khách này (D-20261125-org-must-exist).
+        let mut acting = Principal::with_all_permissions(by).in_tenant(tenant.id());
         if let Some(key) = request.created_by_api_key_id {
             acting = acting.via_api_key(key);
         }

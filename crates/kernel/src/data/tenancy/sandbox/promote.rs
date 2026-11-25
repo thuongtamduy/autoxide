@@ -131,7 +131,8 @@ impl TenantSandboxes {
     ) -> Result<(), Error> {
         let mut copied = crate::tenancy::settings::copy_plain(source, sandbox).await?;
         // Bên làm của job: mọi permission, chỉ ở sandbox (bản sao của chính khách).
-        let principal = Principal::with_all_permissions(Uuid::nil());
+        // `in_tenant`: quyết định quyền theo đơn vị tra cây của sandbox (D-20261125-org-must-exist).
+        let principal = Principal::with_all_permissions(Uuid::nil()).in_tenant(sandbox.id());
         let context = CopyContext { source, sandbox, options, principal: &principal };
         for (module, copy) in self.catalog.copies() {
             let count = copy.copy(&context).await.inspect_err(|error| {
