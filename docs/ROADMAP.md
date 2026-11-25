@@ -280,6 +280,8 @@ thật (P7).
   - [ ] SCIM: khi đồng bộ đưa một tài khoản lên role cao hơn người đã tạo liên kết SCIM của nó (token quyền thấp tạo
         tài khoản, token của admin cấp role cao), thu hồi mọi cách vào cũ như khi đổi email — cần ghi người tạo liên kết
         ở `auth_scim_users` (migration) (D-20261125-scim-sync-report mục 7)
+  - [ ] `automations`: luật chạy bằng quyền hiện tại của `run_as` — xem lại khi quyền của người đó đổi: tạm dừng luật
+        khi tài khoản bị khoá (nghe event của `auth`) và / hay giới hạn bằng quyền lúc tạo (D-20261125-durable-grants)
 
 ## Giai đoạn B — Lớp cho giao diện và phân quyền
 
