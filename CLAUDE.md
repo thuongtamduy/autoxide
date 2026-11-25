@@ -168,6 +168,13 @@ Dùng API chưa từng dùng trong repo thì tra đúng phiên bản đang ghim 
 
 Hai mức (D-173), các bước và biến môi trường ghi ở đầu `gate.sh`:
 
+> **Công tắc gate trên máy: TẮT** (chủ dự án quyết, D-20261125-local-gate-switch — tạm thời, tới khi chủ dự án bảo bật).
+> Khi TẮT: không chạy `./gate.sh --quick` trước khi commit hay push; trước khi push chỉ chạy `cargo fmt --check`,
+> `cargo xtask check`, `cargo xtask regen --check` khi đổi API hay cấu hình, và các bài test vừa viết hay vừa sửa (bài
+> chạm database chạy thêm trên Postgres). **CI xanh trên pull request thay gate nhanh ở mọi chỗ bên dưới**: không merge
+> vào `main` khi CI chưa xanh, không push thẳng lên `main`. Gate đầy đủ trước khi phát hành giữ nguyên. Bật lại: đổi
+> dòng đầu của khối này thành "BẬT" (bỏ phần còn lại của khối) bằng một quyết định mới; khi BẬT, luật bên dưới áp như cũ.
+
 - **`./gate.sh --quick`** — trước mỗi commit, và đủ để đánh dấu một bước xong và merge vào
   `main`: test của crate bị sửa và crate phụ thuộc vào chúng, chỉ trên SQLite (D-300).
 - **`./gate.sh`** — gate đầy đủ, cả SQLite và Postgres. **Bắt buộc xanh trước khi phát hành**
