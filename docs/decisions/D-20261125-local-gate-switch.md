@@ -1,27 +1,29 @@
-## D-20261125-local-gate-switch · Tạm tắt gate nhanh trên máy, CI trên pull request là chốt chặn — 2026-11-25 — chủ dự án quyết
+## D-20261125-local-gate-switch · Công tắc cho gate nhanh trên máy: tắt thì CI trên pull request là chốt chặn — 2026-11-25 — chủ dự án quyết
 
 Chủ đề: Quy trình, gate, lộ trình
 
 Quyết định:
 
-1. `CLAUDE.md` có một **công tắc gate trên máy**, ghi ở đầu mục "Gate". Hiện là **TẮT**, tạm thời, tới khi chủ dự án
-   bảo bật lại.
-2. Khi TẮT: không bắt buộc `./gate.sh --quick` trước commit hay push. Trước khi push chỉ chạy các kiểm rẻ —
-   `cargo fmt --check`, `cargo xtask check`, `cargo xtask regen --check` khi đổi API hay cấu hình — và các bài test vừa
-   viết hay vừa sửa (bài chạm database chạy thêm trên Postgres, D-263).
-3. Khi TẮT, **CI xanh trên pull request thay gate nhanh** ở mọi luật nhắc tới "gate nhanh xanh": không merge vào `main`
-   khi CI của đúng head đó chưa xanh, không push thẳng lên `main`.
-4. Không đổi: gate đầy đủ xanh trước khi phát hành (D-300); gate đỏ thì sửa code, không nới gate; `gate.sh` giữ nguyên,
-   ai muốn vẫn chạy được.
-5. Bật lại bằng một quyết định mới đổi công tắc thành BẬT; không cần sửa gì khác.
+1. Gate nhanh có **công tắc** là biến môi trường `GATE_LOCAL` = `on` (mặc định) | `off`, đọc bởi `gate.sh`. Bật hay tắt
+   là một lựa chọn lúc chạy, không phải sửa file: chủ dự án đặt biến ở cấu hình môi trường cloud, hoặc nói "tắt gate" /
+   "bật gate" trong phiên và phiên điều phối chuyển lời cho phiên con. Agent không tự tắt.
+2. `GATE_LOCAL=off ./gate.sh --quick` chỉ chạy các kiểm rẻ — fmt, `cargo xtask check`, SDK, api-diff, `cargo deny`,
+   gitleaks — rồi báo xanh và in rõ phần chưa kiểm. Không clippy, không kiểm file sinh, không test. Agent chạy thêm các
+   bài test vừa viết hay vừa sửa (bài chạm database thêm trên Postgres, D-263).
+3. Khi `off`, **CI xanh trên pull request thay "gate nhanh xanh"** ở mọi luật: không merge vào `main` khi CI của đúng
+   head đó chưa xanh, không push thẳng lên `main`.
+4. Không đổi: gate đầy đủ, `--pr`, `--only` không đọc công tắc; gate đầy đủ xanh trước khi phát hành (D-300); gate đỏ
+   thì sửa code, không nới gate.
+5. Tại thời điểm ghi mục này chủ dự án bảo **tắt**, tạm thời, cho mọi phiên đang chạy.
 
 Lý do: gate nhanh trên máy cloud bốn nhân mất 15–30 phút cho một thay đổi thường và 40–60 phút khi chạm kernel (mọi crate
 test lại), phần lớn là biên dịch test; nhiều phiên song song mỗi lần push đều chờ như vậy. CI trên pull request chạy
 cùng các bước đó trên cả SQLite và Postgres và đã là điều kiện merge (D-20261121-ci-batch-release-faster), nên `main`
-không kém an toàn hơn; cái giá là lỗi lộ ra muộn hơn một vòng CI. Các kiểm rẻ giữ lại vì chúng mất một hai phút và bắt
-loại lỗi hay gặp nhất (định dạng, ranh giới module, bản dịch thiếu, file sinh cũ).
+không kém an toàn hơn; cái giá là lỗi lộ ra muộn hơn một vòng CI. Các kiểm rẻ giữ lại vì mất một hai phút, bắt loại
+lỗi hay gặp nhất, và gitleaks phải chạy trước khi secret rời máy.
 
-Đã cân nhắc: giữ nguyên (chậm, là lý do của mục này); bỏ hẳn mọi kiểm trên máy (lỗi một phút cũng phải chờ một vòng
-CI); thêm cờ vào `gate.sh` (không cần — công tắc là luật cho agent, không phải hành vi của script).
+Đã cân nhắc: công tắc là một dòng trong `CLAUDE.md` (phải sửa file và merge mỗi lần đổi — chủ dự án muốn một lựa chọn);
+bỏ hẳn mọi kiểm trên máy (lỗi một phút cũng phải chờ một vòng CI, secret có thể rời máy); cờ dòng lệnh thay biến môi
+trường (biến đặt được một lần cho cả môi trường cloud, cờ thì mỗi agent phải nhớ gõ).
 
-Thay: phần "`./gate.sh --quick` trước mỗi commit, đủ để merge vào `main`" của D-300, trong lúc công tắc TẮT
+Thay: phần "`./gate.sh --quick` trước mỗi commit, đủ để merge vào `main`" của D-300, trong lúc công tắc `off`
