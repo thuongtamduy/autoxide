@@ -112,7 +112,10 @@ mod tests {
     fn khoa_trung_la_loi_khong_mat_phan_tu_trong_im_lang() {
         let items = vec!["a", "b", "b", "c"];
         let error = page_of(items, |item| (*item).to_owned(), &request("2", None, None));
-        assert!(error.is_err());
+        // Lỗi lập trình (lỗi nội bộ, 500), không phải lỗi đầu vào của người gọi.
+        let error = error.err().unwrap();
+        assert_eq!(error.kind(), crate::error::ErrorKind::Internal);
+        assert!(error.to_string().contains("`b`"), "{error}");
     }
 
     #[test]

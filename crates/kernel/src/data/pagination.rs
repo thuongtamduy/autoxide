@@ -46,8 +46,10 @@ use crate::error::{Error, FieldError};
 
 mod memory;
 mod natural;
+mod sort_choice;
 pub use memory::page_of;
 pub use natural::NaturalOrderPageQuery;
+pub use sort_choice::SortChoicePageQuery;
 
 /// Number of rows per page when the client gives no `limit`.
 pub const DEFAULT_LIMIT: u32 = 50;
@@ -64,6 +66,36 @@ pub enum Order {
     /// Descending (for creation time: newest first).
     #[default]
     Desc,
+}
+
+// Schema của tham số `order`: enum chuỗi thuần kèm `default`. Viết tay vì `inline` + `default` của
+// utoipa ra `allOf` [enum, {default, type: object}], trình sinh SDK dịch thành
+// `("asc" | "desc") & Record<string, unknown>` — hỏng kiểu `order` của mọi endpoint danh sách.
+// `default` = None: mặc định theo `sort` (`SortChoicePageQuery`), OpenAPI không diễn tả được nên mô tả nói rõ.
+fn order_schema(default: Option<Order>) -> utoipa::openapi::schema::Schema {
+    use utoipa::openapi::schema::{ObjectBuilder, Type};
+    let default = default.map(|order| match order {
+        Order::Asc => "asc",
+        Order::Desc => "desc",
+    });
+    ObjectBuilder::new()
+        .schema_type(Type::String)
+        .enum_values(Some(["asc", "desc"]))
+        .default(default.map(serde_json::Value::from))
+        .build()
+        .into()
+}
+
+fn order_schema_desc() -> utoipa::openapi::schema::Schema {
+    order_schema(Some(Order::Desc))
+}
+
+fn order_schema_asc() -> utoipa::openapi::schema::Schema {
+    order_schema(Some(Order::Asc))
+}
+
+fn order_schema_by_sort() -> utoipa::openapi::schema::Schema {
+    order_schema(None)
 }
 
 // Tham số query của mọi endpoint danh sách, đúng như client gửi (toàn chuỗi).
@@ -84,7 +116,7 @@ pub struct PageQuery {
     /// `desc` (newest first, the default) or `asc` (oldest first). Keep the same
     /// order (and `sort`, where offered) while following `next_cursor`: changing it midway only
     /// changes where the next page starts.
-    #[param(value_type = Option<Order>, inline, default = "desc")]
+    #[param(schema_with = order_schema_desc)]
     pub order: Option<String>,
     /// `true` to also get `pagination.total`, the number of items matching the filters, on the
     /// first page (without `cursor`). Costs one more query; leave it out when not needed.
@@ -112,6 +144,8 @@ pub struct PageRequest {
     limit: u32,
     position: Option<Position>,
     order: Order,
+    /// `order` came from the client or the code, not from the default: [`PageRequest::default_order`] keeps it.
+    order_chosen: bool,
     /// The client asked for the total (`count=true`).
     count: bool,
 }
@@ -185,7 +219,13 @@ fn wrong_cursor() -> Error {
 impl PageRequest {
     /// The first page. `limit` is clamped to the range `1..=MAX_LIMIT`.
     pub fn first(limit: u32, order: Order) -> Self {
-        PageRequest { limit: limit.clamp(1, MAX_LIMIT), position: None, order, count: false }
+        PageRequest {
+            limit: limit.clamp(1, MAX_LIMIT),
+            position: None,
+            order,
+            order_chosen: true,
+            count: false,
+        }
     }
 
     /// Also asks for the total number of rows matching the filters (`pagination.total`).
@@ -222,11 +262,30 @@ impl PageRequest {
     pub fn order(&self) -> Order {
         self.order
     }
+
+    /// Uses `order` when the client did not send `order`; an order the client sent is kept. For a list with a
+    /// `sort` choice (D-20261125-list-pages): creation or update time defaults to [`Order::Desc`] (newest
+    /// first), a name, position, code or size to [`Order::Asc`]. The query type is then [`SortChoicePageQuery`].
+    #[must_use]
+    pub fn default_order(mut self, order: Order) -> Self {
+        if !self.order_chosen {
+            self.order = order;
+            self.order_chosen = true;
+        }
+        self
+    }
 }
 
+// Mặc định = client không gửi gì: `order` chưa chọn, `default_order` còn đổi được.
 impl Default for PageRequest {
     fn default() -> Self {
-        PageRequest::first(DEFAULT_LIMIT, Order::default())
+        PageRequest {
+            limit: DEFAULT_LIMIT,
+            position: None,
+            order: Order::default(),
+            order_chosen: false,
+            count: false,
+        }
     }
 }
 
@@ -273,6 +332,7 @@ impl TryFrom<PageQuery> for PageRequest {
                 }
             },
         };
+        let order_chosen = query.order.as_deref().is_some_and(|order| !order.trim().is_empty());
         let order = match query.order.as_deref().map(str::trim) {
             None | Some("") => Order::default(),
             Some("asc") => Order::Asc,
@@ -293,7 +353,7 @@ impl TryFrom<PageQuery> for PageRequest {
         };
 
         if problems.is_empty() {
-            Ok(PageRequest { limit, position, order, count })
+            Ok(PageRequest { limit, position, order, order_chosen, count })
         } else {
             Err(Error::validation(problems))
         }
@@ -392,7 +452,9 @@ where
 ///
 /// - `sort_value`: that column's value for a row, to compute the next page's cursor.
 /// - `sort_column` must be `NOT NULL` (a `NULL` would make rows disappear from the pages, and the two
-///   databases place `NULL` differently): a nullable column is refused with an internal error.
+///   databases place `NULL` differently): a nullable column is refused with an internal error. The check
+///   reads the entity definition, where SeaORM marks a column nullable when its field type is written
+///   `Option<…>` or it has `#[sea_orm(nullable)]`; a field written `std::option::Option<…>` slips through.
 /// - Needs an index on the filter columns + `(sort_column, id)` to be fast.
 /// - Text is ordered by the database's collation, so SQLite and Postgres may order names differently;
 ///   within one database the order is stable and paging neither repeats nor skips a row
@@ -615,6 +677,47 @@ where
 mod tests {
     use super::*;
     use crate::error::ErrorKind;
+
+    // Schema của `order` phải là enum chuỗi thuần (kèm `default` khi có): dạng `allOf` làm SDK TypeScript ra
+    // kiểu `("asc" | "desc") & Record<string, unknown>` cho mọi endpoint danh sách (CI #517).
+    #[test]
+    fn tham_so_order_la_enum_chuoi_thuan_kem_mac_dinh() {
+        use utoipa::IntoParams;
+        let check = |params: Vec<utoipa::openapi::path::Parameter>, default: Option<&str>| {
+            let order = params.into_iter().find(|param| param.name == "order").unwrap();
+            let schema = serde_json::to_value(order.schema.unwrap()).unwrap();
+            let mut expected = serde_json::json!({"type": "string", "enum": ["asc", "desc"]});
+            if let Some(default) = default {
+                expected["default"] = default.into();
+            }
+            assert_eq!(schema, expected);
+            assert!(!schema.to_string().contains("object"), "{schema}");
+        };
+        check(PageQuery::into_params(|| None), Some("desc"));
+        check(NaturalOrderPageQuery::into_params(|| None), Some("asc"));
+        check(SortChoicePageQuery::into_params(|| None), None);
+    }
+
+    // Danh sách có `sort`: mặc định của `order` theo cột sắp; `order` client gửi thì giữ nguyên.
+    #[test]
+    fn mac_dinh_cua_order_theo_cot_sap_khong_de_lua_chon_cua_client() {
+        let request = |order: Option<&str>| {
+            PageRequest::try_from(SortChoicePageQuery::new(None, None, order.map(str::to_owned)))
+                .unwrap()
+        };
+        assert_eq!(request(None).order(), Order::Desc, "forgotten default: like PageQuery");
+        assert_eq!(request(None).default_order(Order::Asc).order(), Order::Asc);
+        assert_eq!(request(Some(" ")).default_order(Order::Asc).order(), Order::Asc);
+        assert_eq!(request(Some("desc")).default_order(Order::Asc).order(), Order::Desc);
+        assert_eq!(request(Some("asc")).default_order(Order::Desc).order(), Order::Asc);
+        // Áp một lần: lần sau không đổi nữa.
+        let twice = request(None).default_order(Order::Asc).default_order(Order::Desc);
+        assert_eq!(twice.order(), Order::Asc);
+        assert_eq!(
+            PageRequest::first(5, Order::Desc).default_order(Order::Asc).order(),
+            Order::Desc
+        );
+    }
 
     fn query(limit: Option<&str>, cursor: Option<&str>, order: Option<&str>) -> PageQuery {
         PageQuery {

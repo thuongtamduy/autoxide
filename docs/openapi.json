@@ -103439,25 +103439,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -105195,25 +105186,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -105569,25 +105551,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -105946,25 +105919,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -106486,25 +106450,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -107433,25 +107388,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -107879,25 +107825,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -110810,25 +110747,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -111652,25 +111580,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -111996,25 +111915,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -113846,25 +113756,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -114882,25 +114783,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -117560,25 +117452,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -118768,25 +118651,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -119576,25 +119450,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -120787,25 +120652,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -121529,25 +121385,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -123149,25 +122996,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -124007,25 +123845,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -124711,25 +124540,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -126661,25 +126481,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -127681,25 +127492,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -128812,25 +128614,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -129182,25 +128975,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -130135,25 +129919,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -130503,25 +130278,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -133743,25 +133509,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -134258,25 +134015,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -135203,25 +134951,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -137331,25 +137070,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -137534,25 +137264,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -138802,25 +138523,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -139386,25 +139098,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -139773,25 +139476,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -140620,25 +140314,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -140823,25 +140508,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -142406,25 +142082,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -143077,25 +142744,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -143397,25 +143055,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -144272,25 +143921,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -145434,25 +145074,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -148950,25 +148581,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -149395,25 +149017,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -150137,25 +149750,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -150750,25 +150354,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -151894,25 +151489,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -152571,25 +152157,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -153691,25 +153268,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -154925,25 +154493,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -156775,25 +156334,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -157977,25 +157527,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -158931,25 +158472,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -160837,25 +160369,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -161493,25 +161016,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -161670,25 +161184,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -161960,25 +161465,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -162145,25 +161641,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -162807,25 +162294,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -163207,25 +162685,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -164919,25 +164388,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -165579,25 +165039,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -165736,25 +165187,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -167226,25 +166668,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -168031,25 +167464,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -168660,25 +168084,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -169717,25 +169132,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -170632,25 +170038,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -170949,25 +170346,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -171932,25 +171320,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -173371,25 +172750,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -174114,25 +173484,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -175043,25 +174404,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -175303,25 +174655,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -175573,25 +174916,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -176312,25 +175646,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -176529,25 +175854,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -178491,25 +177807,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -178889,25 +178196,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -179183,25 +178481,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -180078,25 +179367,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -182004,25 +181284,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -182735,25 +182006,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -183646,25 +182908,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -184067,25 +183320,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -184311,25 +183555,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -184964,25 +184199,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -185837,25 +185063,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -186467,25 +185684,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -187128,25 +186336,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -187535,25 +186734,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -188070,25 +187260,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -188934,25 +188115,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -189227,25 +188399,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -190899,25 +190062,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -191507,25 +190661,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -191874,25 +191019,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -192345,25 +191481,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -194606,25 +193733,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -194865,25 +193983,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -198873,25 +197982,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -201100,25 +200200,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -202720,25 +201811,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -204038,25 +203120,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -204685,25 +203758,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -204842,25 +203906,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -205582,25 +204637,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -206192,25 +205238,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -206770,25 +205807,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -207078,25 +206106,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -207845,25 +206864,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -208190,25 +207200,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -208919,25 +207920,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -209325,25 +208317,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -209605,25 +208588,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -211855,25 +210829,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -212267,25 +211232,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -213022,25 +211978,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -215507,25 +214454,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -216530,25 +215468,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -218456,25 +217385,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -219893,25 +218813,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -220552,25 +219463,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -221503,25 +220405,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -222257,25 +221150,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -224505,25 +223389,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -224708,25 +223583,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -226309,25 +225175,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -230219,25 +229076,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -230794,25 +229642,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -231388,25 +230227,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -233949,25 +232779,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -234600,25 +233421,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -235758,25 +234570,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -238160,25 +236963,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -238321,25 +237115,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -239206,25 +237991,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -239712,25 +238488,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -241201,25 +239968,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -242788,25 +241546,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -243234,25 +241983,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -243569,25 +242309,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -244433,25 +243164,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -246951,25 +245673,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -247137,25 +245850,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -247808,25 +246512,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -248139,25 +246834,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -248818,25 +247504,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -248964,25 +247641,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -249691,25 +248359,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -250202,25 +248861,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -250609,25 +249259,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -251004,25 +249645,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -251695,25 +250327,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -252847,25 +251470,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -254332,25 +252946,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -255039,25 +253644,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -255304,25 +253900,16 @@
             }
           },
           {
-            "description": "`asc` (the list's natural order, the default; the endpoint says what it is) or `desc`\n(reversed). Text is ordered by the database's collation. Keep the same order while\nfollowing `next_cursor`: changing it midway only changes where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "asc",
-                  "type": "object"
-                }
-              ]
+              "default": "asc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -256032,25 +254619,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -258057,25 +256635,16 @@
             }
           },
           {
-            "description": "`asc` (the list's natural order, the default; the endpoint says what it is) or `desc`\n(reversed). Text is ordered by the database's collation. Keep the same order while\nfollowing `next_cursor`: changing it midway only changes where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "asc",
-                  "type": "object"
-                }
-              ]
+              "default": "asc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -258425,25 +256994,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -259217,25 +257777,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -260616,25 +259167,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -261277,25 +259819,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -262235,25 +260768,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -262505,25 +261029,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {
@@ -263240,25 +261755,16 @@
             }
           },
           {
-            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`: changing it midway only\nchanges where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "allOf": [
-                {
-                  "description": "Direction of a list's order: ascending or descending. What the list is ordered by (creation time,\nposition, name…) is said by each endpoint.",
-                  "enum": [
-                    "asc",
-                    "desc"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "default": "desc",
-                  "type": "object"
-                }
-              ]
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
             }
           },
           {

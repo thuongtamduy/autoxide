@@ -173,9 +173,12 @@ thật (P7).
         `bookings`) — D-20261125-sms-templates: cấu hình theo khách nhóm `sms_template`, kiểm `{code}` đúng một lần
   - [ ] 139 endpoint GET trả `Data<Vec<T>>` không phân trang: endpoint mới trả `Page<T>`, khai deprecation cho cái cũ —
         chủ dự án quyết sửa tại chỗ cả 140 (đo lại 25/11), D-20261125-list-pages; làm theo cụm module, mỗi cụm một PR:
-    - [x] Kernel (`NaturalOrderPageQuery`, `page_of`) + `support`
+    - [x] Kernel (`NaturalOrderPageQuery`, `SortChoicePageQuery` + `default_order`, `page_of`) + `support`
     - [ ] Các module còn lại (theo cụm)
     - [ ] Luật gate chặn danh sách không phân trang, hướng dẫn nâng cấp EN + VI, danh sách ngoại lệ
+  - [ ] `./gate.sh` chưa chạy tsc trên SDK và ví dụ trong `docs/guides` (CI có: `cargo xtask sdk --extract-examples` + `tsc
+        --noEmit`); `sdk --check` chỉ so SDK với `docs/openapi.json` nên kiểu SDK hỏng vẫn lọt tới CI (#517). Chạy khi SDK
+        hay ví dụ đổi và có Node; còn hai kiểu `& Record<string, unknown>` có sẵn trên `main` (`realm`, một kiểu tiền)
   - [x] Rustdoc tiếng Anh cho phần công khai của kernel, testkit, `autoxide` và `api` của module (docs.rs); gate
         `doc-language` giữ phần viết mới là tiếng Anh (D-20261123-english-rustdoc)
   - [ ] Chạy thử năm bộ nối của P7 bằng tài khoản thử thật; đối chiếu các điểm "(?)" của MoMo với trang tài liệu gốc

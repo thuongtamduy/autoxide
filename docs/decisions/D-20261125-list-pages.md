@@ -20,9 +20,17 @@ khỏi làm lại và vướng phần này nữa". Phần diễn giải dưới 
    - Đổi `order` giữa chừng chỉ đổi điểm bắt đầu trang sau (cursor không mang `order`); cursor của danh sách khác cột
      sắp hay bị sửa → 422 ở ô `cursor`. Cursor chỉ mang (cột, giá trị, id) và mọi truy vấn lọc theo khách, nên cursor của
      khách khác không lộ gì.
+   - Danh sách có tham số `sort` (vd theo thời gian tạo hoặc theo tên): `SortChoicePageQuery` — `order` không có mặc định
+     cố định mà theo cột đang chọn: thời gian (tạo, sửa) → `desc` (mới nhất trước); tên, vị trí, mã, kích thước → `asc`
+     (A→Z, nhỏ trước). Handler áp bằng `PageRequest::default_order(…)` sau khi đọc `sort` (`order` client gửi thì giữ);
+     mô tả `sort` của endpoint nêu mặc định của từng giá trị. Các endpoint `sort` đang dùng `PageQuery` (vd `media`
+     items, `newsletter` subscribers: `sort=name` đang mặc định Z→A, mô tả "newest first" sai) sửa trong PR đại trà của
+     module đó.
 2b. **Tên kiểu chốt**: `NaturalOrderPageQuery` (không đổi nữa; tên cũ `SortedPageQuery` chỉ có trong bản nháp) — `PageQuery`
    cũng có thứ tự nên tên phải nói đúng chỗ khác: thứ tự tự nhiên. Có `with_count` như `PageQuery`. Tham số `order` của
-   cả hai khai `default` máy đọc được trong OpenAPI (`desc` / `asc`); enum `Order` mô tả trung lập (tăng / giảm dần).
+   cả hai khai `default` máy đọc được trong OpenAPI (`desc` / `asc`), dạng enum chuỗi thuần `{"type": "string", "enum":
+   […], "default": …}` (khai tay bằng `schema_with`: `inline` + `default` của utoipa ra `allOf` mà SDK TypeScript dịch
+   thành `("asc" | "desc") & Record<string, unknown>`; test của kernel giữ dạng này); enum `Order` mô tả trung lập.
 3. **Danh sách trong database phân trang bằng keyset trong database**, không trần đọc: một `.limit(N)` cứng trước khi trả
    danh sách là mất dữ liệu trong im lặng. Giới hạn nghiệp vụ thật (chặn lúc tạo, có mã lỗi) giữ ở chỗ ghi. Mỗi danh sách
    có index khớp: cột lọc (`tenant_id`, `org_id`…) + cột sắp + id; thiếu thì thêm migration. Index mới bao index cũ (index
@@ -35,9 +43,18 @@ khỏi làm lại và vướng phần này nữa". Phần diễn giải dưới 
      dòng), Postgres `Index Cond` chỉ có tenant / org, phần còn lại là `Filter`; dạng mới — SQLite `SEARCH … (tenant_id=?
      AND org_id=? AND name>?)`, Postgres `Index Cond … AND name >= …`. `fetch_page` (chỉ theo id) đã là một điều kiện
      phạm vi nên không đổi.
+   - Kiểm cột nullable đọc định nghĩa entity: SeaORM coi cột là nullable khi kiểu trường viết `Option<…>` hay có
+     `#[sea_orm(nullable)]`; viết `std::option::Option<…>` thì lọt. Entity trong repo viết `Option<…>`.
+   - "Không trần đọc" áp cho danh sách trả qua API / MCP. Việc nội bộ chỉ cần N dòng đầu (ngữ cảnh gửi AI, xem trước)
+     được lấy N dòng, nhưng phải `ORDER BY` + `LIMIT` trong SQL (không lấy hết rồi cắt trong bộ nhớ, không `.limit` không
+     sắp — kết quả tuỳ database), và không trả danh sách đó ra API như một danh sách đầy đủ.
    - Giới hạn đã biết: danh sách lọc theo CHUỖI nút (`org_id IN (…)`, vd câu trả lời mẫu của `support`) không có thứ tự
      sẵn trong index trên cả chuỗi — database gộp rồi sắp (SQLite `TEMP B-TREE`); đúng, nhưng chi phí theo số dòng của
      chuỗi nút chứ không chỉ cỡ trang.
+3b. **Tool MCP danh sách** đổi cùng endpoint REST: tham số `limit` / `cursor` / `order` (+ `count`, + `sort` nếu REST có)
+   cùng tên, cùng kiểm (dựng `PageRequest` bằng đúng kiểu query của REST), kết quả `{"data": […], "pagination": {…}}`
+   như REST; test gọi cả REST và tool trên cùng dữ liệu, so trang đầu và `next_cursor`. `support` (PR 1) không có tool
+   danh sách: PR đại trà đầu tiên chọn một module có tool danh sách làm mẫu và ghi tên module + test vào đây.
 4. **`page_of` (phân trang trong bộ nhớ) chỉ cho danh sách không nằm trong database**: dựng từ code (sổ module,
    permission, kind), dữ liệu nền cố định trong bản build, kết quả gộp từ nhà cung cấp. Khoá chữ duy nhất, so theo byte.
    Hai phần tử trùng khoá là lỗi lập trình: lỗi nội bộ (không mất phần tử trong im lặng). Mọi chỗ dùng được liệt kê ở
@@ -56,9 +73,6 @@ lặng. Sau 1.0 không còn cơ hội sửa tại chỗ.
 dọn ở ngày sunset; giữ đường dẫn, `limit` tuỳ chọn, không truyền thì trả hết kèm header Deprecation — loại: hai hợp đồng
 trên một endpoint tới ngày sunset; giữ `Data<Vec<T>>` cho danh sách có trần / cố định — loại theo lời chủ dự án ("một lần
 cho tất cả"), trừ ngoại lệ có lý do về nghĩa.
-
-Đính chính D-20261125-dormant-modules (mục 2 và 3b ghi "có `<module>_migrations`"): module "đã cài" ở một database
-nghĩa là bảng lịch sử của nó có ít nhất một dòng (`migration::installed`); `migrate down` hết thì coi như chưa cài.
 
 Chỗ dùng `page_of`: chưa có (PR 1: kernel + `support`).
 
