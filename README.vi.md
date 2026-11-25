@@ -532,8 +532,8 @@ dùng foreign key xuyên module. Gate tự động kiểm các luật này.
 
 - [`STACK.md`](STACK.md) — dùng thư viện nào và vì sao
 - [`docs/ROADMAP.md`](docs/ROADMAP.md) — dựng gì, theo thứ tự nào
-- [`docs/decisions/INDEX.md`](docs/decisions/INDEX.md) — nhật ký quyết định theo chủ đề (mục cũ
-  ở [`docs/DECISIONS.md`](docs/DECISIONS.md), mục mới mỗi mục một file trong `docs/decisions/`)
+- `docs/decisions/` — nhật ký quyết định (mục cũ ở [`docs/DECISIONS.md`](docs/DECISIONS.md), mục mới mỗi mục
+  một file ở đây); `cargo xtask decisions` sinh mục lục theo chủ đề `INDEX.md`, file này không commit
 - [`CLAUDE.md`](CLAUDE.md) — luật cho người đóng góp, là người hay AI agent
 - [`CHANGELOG.md`](CHANGELOG.md) — thay đổi của từng bản phát hành (tiếng Anh); image
   Docker đã phát hành ở `ghcr.io/<owner>/autoxide`

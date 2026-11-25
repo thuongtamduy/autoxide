@@ -15,6 +15,7 @@ Quyết định: D-20261125-cloud-session-setup.
 
 `scripts/cloud-setup.sh` cài ba công cụ thiếu bằng binary dựng sẵn, kiểm SHA-256 ghim trong script, và cài đúng toolchain.
 Máy cloud còn clone nông (shallow) nên `cargo xtask api-diff` không thấy tag phát hành; script chạy `git fetch --unshallow --tags` khi cần.
+Script còn sinh mục lục quyết định `docs/decisions/INDEX.md` (`cargo xtask decisions`): file này không nằm trong git, nên máy mới không có sẵn (D-20261125-decision-index-untracked).
 Chạy lại nhiều lần được; thứ đã có thì bỏ qua. Không cần secret.
 
 ```bash

@@ -14,5 +14,4 @@ sdk/typescript/package-lock.json linguist-generated=true
 docs/openapi.json merge=generated
 docs/mcp-tools.json merge=generated
 sdk/typescript/src/schema.ts merge=generated
-docs/decisions/INDEX.md merge=generated
 .env.example merge=generated

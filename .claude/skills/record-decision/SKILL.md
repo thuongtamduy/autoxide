@@ -14,7 +14,8 @@ Nhật ký có hai phần (D-20261118-decision-ids):
   **không thêm mục mới vào đó**.
 - `docs/decisions/D-<YYYYMMDD>-<tên-ngắn>.md` — **mỗi quyết định mới một file**.
 - `docs/decisions/INDEX.md` — mục lục theo chủ đề của cả hai, sinh bằng `cargo xtask decisions`
-  (không sửa tay). Đọc mục lục trước khi tìm.
+  (không sửa tay, **không commit**: file nằm trong `.gitignore`, mỗi máy sinh lấy; D-20261125-decision-index-untracked).
+  Đọc mục lục trước khi tìm; chưa có hay cũ thì chạy lệnh trước.
 
 Vì sao không dùng số tuần tự nữa: nhiều phiên agent chạy song song trên các nhánh cùng gốc đều
 thấy cùng "số cuối", nên luôn chọn trùng số kế tiếp (đã xảy ra với D-365, D-372, D-373, D-377).
@@ -43,7 +44,7 @@ là đủ.
 
 ## Cách ghi
 
-1. Mở `docs/decisions/INDEX.md`, tìm mục cùng chủ đề. Có thì mục mới phải ghi rõ nó
+1. Chạy `cargo xtask decisions`, mở `docs/decisions/INDEX.md`, tìm mục cùng chủ đề. Có thì mục mới phải ghi rõ nó
    thay mục nào (dòng `Thay:`), và mục lục sẽ tự đánh dấu mục cũ "thay bởi …".
 2. Chọn ID: `D-` + **ngày hôm nay** dạng `YYYYMMDD` + `-` + **tên ngắn** (2–4 từ tiếng Anh
    hay tiếng Việt không dấu, chữ thường `a-z0-9` nối bằng `-`, tối đa 40 ký tự), vd
