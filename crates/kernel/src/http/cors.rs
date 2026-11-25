@@ -12,14 +12,14 @@
 //! - Matching is exact: the browser serializes `Origin` as lowercase scheme and host, punycode, no default
 //!   port, no trailing dot. A tenant origin must be exactly `https://` + a verified domain; anything else
 //!   (`null`, `http`, a port, uppercase, trailing dot, Unicode, a path) is refused, never reflected.
-//! - The answer comes from the database registry's domain cache (TTL `AUTOXIDE_TENANCY_CACHE_SECONDS`;
-//!   dropped at once on this server when a domain is verified, revoked or moves to another tenant). An
-//!   origin not in the cache costs one indexed read of the control database, and at most
-//!   [`LOOKUPS_PER_SECOND`] such reads per process per second: past that the origin is refused for now, so
-//!   random origins cannot flood the database.
+//! - The answer comes from a snapshot of every verified domain held by the database registry
+//!   (`DatabaseRegistry::verified_domain_owner`): an unknown origin is a map lookup, never a query. The
+//!   snapshot is re-read at most once per `AUTOXIDE_TENANCY_CACHE_SECONDS` (default 10 s) and dropped at once
+//!   on this server when a domain is verified, revoked, fails or moves to another tenant; other servers follow
+//!   within that TTL.
 
-use std::sync::{Arc, Mutex, PoisonError};
-use std::time::{Duration, Instant};
+use std::sync::Arc;
+use std::time::Duration;
 
 use axum::extract::Request;
 use axum::http::{HeaderName, HeaderValue, Method, header};
@@ -30,9 +30,6 @@ use tower_http::cors::{AllowOrigin, CorsLayer};
 use super::{REQUEST_ID_HEADER, idempotency};
 use crate::config::CorsOrigins;
 use crate::tenancy::{DatabaseRegistry, TenancyMode, TenantId, normalize_domain};
-
-/// Database reads for origins not in the cache, per process per second.
-pub(crate) const LOOKUPS_PER_SECOND: u32 = 50;
 
 /// Why the request's `Origin` is allowed. Absent from the extensions: no `Origin`, or not allowed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -48,23 +45,12 @@ pub(crate) struct CorsPolicy {
     origins: CorsOrigins,
     /// Only in multi-tenant mode: where tenants' verified domains are looked up.
     registry: Option<DatabaseRegistry>,
-    budget: Mutex<Budget>,
-}
-
-/// Count of database reads in the current one-second window.
-struct Budget {
-    window: Instant,
-    used: u32,
 }
 
 impl CorsPolicy {
     pub(crate) fn new(origins: CorsOrigins, registry: Option<DatabaseRegistry>) -> Self {
         let registry = registry.filter(|registry| registry.mode() == TenancyMode::Multi);
-        CorsPolicy {
-            origins,
-            registry,
-            budget: Mutex::new(Budget { window: Instant::now(), used: 0 }),
-        }
+        CorsPolicy { origins, registry }
     }
 
     /// Whether any origin can ever be allowed (when not, the CORS layer adds no header at all).
@@ -85,40 +71,14 @@ impl CorsPolicy {
         }
         let registry = self.registry.as_ref()?;
         let domain = tenant_origin_domain(origin.to_str().ok()?)?;
-        let found = match registry.cached_domain_site(domain) {
-            Some(found) => found,
-            None => {
-                if !self.spend() {
-                    tracing::warn!(
-                        "too many unknown CORS origins: an origin was refused without a lookup"
-                    );
-                    return None;
-                }
-                match registry.domain_site(domain).await {
-                    Ok(found) => found,
-                    Err(error) => {
-                        // Không tra được: từ chối (an toàn hơn cho qua); trình duyệt thử lại sau.
-                        tracing::warn!(%error, "the tenant domain of a CORS origin could not be read");
-                        None
-                    }
-                }
+        match registry.verified_domain_owner(domain).await {
+            Ok(owner) => owner.map(OriginGrant::Tenant),
+            Err(error) => {
+                // Không đọc được: từ chối (an toàn hơn cho qua); trình duyệt thử lại sau.
+                tracing::warn!(%error, "the verified tenant domains could not be read for CORS");
+                None
             }
-        };
-        found.map(|(tenant, _)| OriginGrant::Tenant(tenant))
-    }
-
-    /// Takes one database read from this second's budget; `false` when it is spent.
-    fn spend(&self) -> bool {
-        let mut budget = self.budget.lock().unwrap_or_else(PoisonError::into_inner);
-        if budget.window.elapsed() >= Duration::from_secs(1) {
-            budget.window = Instant::now();
-            budget.used = 0;
         }
-        if budget.used >= LOOKUPS_PER_SECOND {
-            return false;
-        }
-        budget.used += 1;
-        true
     }
 }
 
@@ -239,14 +199,5 @@ mod tests {
         ] {
             assert_eq!(tenant_origin_domain(origin), None, "{origin}");
         }
-    }
-
-    #[test]
-    fn ngan_sach_tra_cuu_co_gioi_han() {
-        let policy = CorsPolicy::new(CorsOrigins::None, None);
-        for _ in 0..LOOKUPS_PER_SECOND {
-            assert!(policy.spend());
-        }
-        assert!(!policy.spend());
     }
 }

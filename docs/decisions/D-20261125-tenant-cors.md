@@ -23,14 +23,23 @@ Mô hình đe doạ và cách chặn:
   khác; dù có thì quyền chỉ dùng được cho chính khách đó.
 - MCP giữ chống DNS rebinding: có `Origin` mà không có `OriginGrant` → 403; origin của khách gắn với khách.
 
-Cache và độ trễ: tái dùng cache tên miền của `DatabaseRegistry` (`domain_site`, cache cả kết quả "không có"),
-TTL `AUTOXIDE_TENANCY_CACHE_SECONDS` (mặc định 10 giây). Gỡ / xác minh / hỏng / dời khách (`move_domains`) xoá
-mục cache ngay trên máy làm việc đó; máy khác mất quyền chậm nhất sau TTL. Cache này nay giới hạn 10 000 mục
-(đầy thì bỏ mục hết hạn, vẫn đầy thì xoá sạch) — trước đó không giới hạn và `Host` lạ cũng làm nó phình. Origin
-chưa có trong cache tốn một lần đọc theo index của database điều khiển, tối đa 50 lần mỗi giây mỗi tiến trình
-(`cors::LOOKUPS_PER_SECOND`); vượt thì từ chối origin đó lúc này (fail-closed, trình duyệt thử lại sau), nên
-dội origin ngẫu nhiên (preflight không qua rate limiting) không dội được database. Chế độ một khách: không truy
+Cache và độ trễ: `DatabaseRegistry::verified_domain_owner` giữ ảnh chụp **toàn bộ** tên miền `verified` (tên
+miền → khách) trong bộ nhớ — bảng tên miền chỉ nằm ở database điều khiển nên một câu đọc là đủ. Tra origin chỉ là
+tra bản đồ: origin lạ không chạm database, không cần cache "không có" hay ngân sách truy vấn (bản đầu dùng ngân
+sách 50 lần/giây, bị bỏ vì kẻ xấu dội origin ngẫu nhiên làm cạn ngân sách và origin hợp lệ bị từ chối theo).
+Ảnh chụp đọc lại lười, tối đa một lần mỗi `AUTOXIDE_TENANCY_CACHE_SECONDS` (mặc định 10 giây), một bên đọc các bên
+chờ; gỡ / xác minh / hỏng / dời khách (`move_domains`) / sửa khách trên máy này xoá ảnh chụp ngay
+(`invalidate_domain`, `invalidate`), máy khác mất quyền chậm nhất sau TTL. Không đọc được database: từ chối
+origin của khách (fail-closed). Ngưỡng: 100 000 tên miền (`MAX_VERIFIED_DOMAINS`, khoảng vài MB); vượt thì tên
+miền mới nhất không có CORS và log lỗi — phương án dự phòng khi tới gần ngưỡng: chuyển sang tra từng origin qua
+cache `domain_site` có giới hạn tần suất theo IP nguồn. Cache `domain_site` (theo `Host`) nay cũng giới hạn
+10 000 mục (đầy thì bỏ mục hết hạn, vẫn đầy thì xoá sạch); trước đó không giới hạn. Chế độ một khách: không truy
 vấn thêm nào.
+
+Tài khoản nền tảng (người vận hành có `kernel.tenants.operate`) gọi từ origin của khách A: chỉ làm được cho A
+(vào bằng `Autoxide-Tenant: A`); làm cho chính khách nền tảng hay vào khách B từ trang đó → `tenant_origin_mismatch`.
+JavaScript trên tên miền do khách kiểm soát không được điều khiển quyền cấp nền tảng; giao diện của nền tảng đặt
+origin ở danh sách chung.
 
 Lý do: SaaS nhiều khách, mỗi khách một giao diện ở tên miền riêng; bắt người vận hành sửa `.env` và khởi động lại
 cho mỗi khách không dùng được. Tên miền đã xác minh là bằng chứng sở hữu sẵn có, đã có cache và đã có chỗ xoá

@@ -98,6 +98,10 @@ struct Inner {
     slugs: Mutex<HashMap<String, (Instant, TenantId)>>,
     /// Domain → (tenant, node bound to the domain) verified; `None`: none.
     domains: Mutex<HashMap<String, (Instant, Option<DomainSite>)>>,
+    /// Every verified domain → tenant (for CORS): `None` until read, or after a domain changed on this server.
+    verified: Mutex<Option<DomainSnapshot>>,
+    /// Only one party re-reads the snapshot at a time.
+    reading_verified: tokio::sync::Mutex<()>,
     pools: Mutex<Pools>,
     /// Root key used to open encrypted placement URLs; the `kernel` module sets it at startup.
     secret: OnceLock<SecretKey>,
@@ -129,6 +133,13 @@ type DomainSite = (TenantId, Option<OrgId>);
 /// values cannot grow it without bound.
 const MAX_CACHED_DOMAINS: usize = 10_000;
 
+/// At most this many verified domains are held in [`DatabaseRegistry::verified_domain_owner`]'s snapshot
+/// (oldest first); beyond it the rest get no CORS and an error is logged (D-20261125-tenant-cors).
+pub(crate) const MAX_VERIFIED_DOMAINS: u64 = 100_000;
+
+/// Every verified domain → its tenant, read at once, with the time it was read.
+type DomainSnapshot = (Instant, Arc<HashMap<String, TenantId>>);
+
 /// Locks `mutex` even if another thread panicked while holding it: the data inside is only a cache.
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(PoisonError::into_inner)
@@ -156,6 +167,8 @@ impl DatabaseRegistry {
             tenants: Mutex::default(),
             slugs: Mutex::default(),
             domains: Mutex::default(),
+            verified: Mutex::default(),
+            reading_verified: tokio::sync::Mutex::new(()),
             pools: Mutex::default(),
             secret: OnceLock::new(),
             storage: OnceLock::new(),
@@ -362,16 +375,51 @@ impl DatabaseRegistry {
         Ok(found)
     }
 
-    /// Like [`DatabaseRegistry::domain_site`] but only from the cache: `None` when `host` is not cached (or
-    /// the entry expired), so the caller decides whether a database read is worth it. `single` mode:
-    /// `Some(None)` (no domains, nothing to read).
-    pub(crate) fn cached_domain_site(&self, host: &str) -> Option<Option<DomainSite>> {
+    /// The tenant that verified domain `domain` (already normalized), from a snapshot of every verified domain
+    /// (CORS, `http::cors`): a domain nobody verified costs no query. The snapshot is re-read at most once per
+    /// `AUTOXIDE_TENANCY_CACHE_SECONDS`, and at once after a domain or tenant changes on this server.
+    /// `single` mode: always `None`.
+    pub(crate) async fn verified_domain_owner(&self, domain: &str) -> Result<Option<TenantId>, Error> {
         if self.0.mode == TenancyMode::Single {
-            return Some(None);
+            return Ok(None);
         }
-        let host = host.trim().trim_end_matches('.').to_ascii_lowercase();
-        let cached = lock(&self.0.domains).get(&host).cloned();
-        cached.filter(|(at, _)| at.elapsed() < self.ttl()).map(|(_, found)| found)
+        if let Some(map) = self.fresh_verified() {
+            return Ok(map.get(domain).copied());
+        }
+        // Một bên đọc lại, các bên khác chờ rồi dùng bản vừa đọc (không dội database khi bản cũ hết hạn).
+        let _reading = self.0.reading_verified.lock().await;
+        if let Some(map) = self.fresh_verified() {
+            return Ok(map.get(domain).copied());
+        }
+        // tenant-scope: ảnh chụp tên miền đã xác minh của mọi khách, để biết origin thuộc khách nào.
+        let select = Query::select()
+            .column(Alias::new("domain"))
+            .column(Alias::new("tenant_id"))
+            .from(Alias::new("kernel_tenant_domains"))
+            .and_where(Expr::col(Alias::new("status")).eq("verified"))
+            .order_by(Alias::new("id"), sea_orm::sea_query::Order::Asc)
+            .limit(MAX_VERIFIED_DOMAINS + 1)
+            .to_owned();
+        let rows = self.0.control.read().query_all(&select).await?;
+        if rows.len() as u64 > MAX_VERIFIED_DOMAINS {
+            tracing::error!(
+                limit = MAX_VERIFIED_DOMAINS,
+                "more verified tenant domains than the CORS snapshot holds: the newest get no CORS"
+            );
+        }
+        let mut map = HashMap::with_capacity(rows.len());
+        for row in rows.iter().take(MAX_VERIFIED_DOMAINS as usize) {
+            let domain = row.try_get::<String>("", "domain")?;
+            map.insert(domain, TenantId::from_uuid(row.try_get::<Uuid>("", "tenant_id")?));
+        }
+        let map = Arc::new(map);
+        *lock(&self.0.verified) = Some((Instant::now(), map.clone()));
+        Ok(map.get(domain).copied())
+    }
+
+    fn fresh_verified(&self) -> Option<Arc<HashMap<String, TenantId>>> {
+        let snapshot = lock(&self.0.verified);
+        snapshot.as_ref().filter(|(at, _)| at.elapsed() < self.ttl()).map(|(_, map)| map.clone())
     }
 
     /// The root key used to open encrypted placement URLs. Set once (the `kernel` module sets it at startup);
@@ -498,6 +546,7 @@ impl DatabaseRegistry {
     pub fn invalidate_domain(&self, domain: &str) {
         let domain = domain.trim().trim_end_matches('.').to_ascii_lowercase();
         lock(&self.0.domains).remove(&domain);
+        *lock(&self.0.verified) = None;
     }
 
     /// Drops tenant `id` from the cache (after editing the tenant on this server).
@@ -505,6 +554,7 @@ impl DatabaseRegistry {
         lock(&self.0.tenants).remove(&id);
         lock(&self.0.slugs).retain(|_, (_, known)| *known != id);
         lock(&self.0.domains).retain(|_, (_, known)| known.map(|(tenant, _)| tenant) != Some(id));
+        *lock(&self.0.verified) = None;
     }
 
     /// Every database this server runs jobs and events for: `(placement, name, database)`; only placements

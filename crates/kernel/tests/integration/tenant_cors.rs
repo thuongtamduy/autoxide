@@ -56,6 +56,7 @@ async fn app(test: &TestDatabase, settings: &[(&str, &str)]) -> TestApp {
         .domain("b", "shop-b.test")
         .user_in("a", "user-a", 1, &[MANAGE])
         .user_in("b", "user-b", 2, &[])
+        .user("ops", 9, &["kernel.tenants.operate"])
         .module(Probe)
         .build()
         .await
@@ -327,6 +328,53 @@ async fn mot_khach_khong_tra_ten_mien() {
             "https://app.example.com"
         );
         assert!(allow_origin(&preflight(&app, "https://shop-a.test").await).is_empty());
+    })
+    .await
+    .unwrap();
+}
+
+/// Nhân sự nền tảng (khách mặc định, có `kernel.tenants.operate`) mở trang trên tên miền của khách `a`: chỉ làm
+/// được cho `a` (vào bằng `Autoxide-Tenant: a`); làm cho chính nền tảng hay vào khách `b` từ trang đó bị từ chối —
+/// JavaScript trên tên miền của khách không được điều khiển quyền cấp nền tảng.
+#[tokio::test]
+async fn tai_khoan_nen_tang_tu_origin_cua_khach() {
+    TestDatabase::run(async |test| {
+        let app = app(test, &[]).await;
+        let call = |tenant: Option<&'static str>| {
+            let request =
+                app.get("/api/v1/probe").token("ops").header("origin", "https://shop-a.test");
+            match tenant {
+                Some(tenant) => request.header("autoxide-tenant", tenant),
+                None => request,
+            }
+        };
+        let answer = call(Some("a")).send().await.unwrap();
+        assert_eq!(answer.status(), StatusCode::OK, "{}", answer.json());
+        assert_eq!(answer.json()["data"]["tenant"], "a");
+        for tenant in [None, Some("b")] {
+            let answer = call(tenant).send().await.unwrap();
+            assert_eq!(answer.json()["code"], "tenant_origin_mismatch", "{tenant:?}");
+        }
+        // Từ giao diện nền tảng (không có Origin, hay origin trong danh sách chung) thì như cũ.
+        let answer = app.get("/api/v1/probe").token("ops").send().await.unwrap();
+        assert_eq!(answer.status(), StatusCode::OK, "{}", answer.json());
+    })
+    .await
+    .unwrap();
+}
+
+/// Origin lạ chỉ là một lần tra bản đồ trong bộ nhớ: dội nhiều origin ngẫu nhiên không làm origin hợp lệ bị
+/// từ chối.
+#[tokio::test]
+async fn doi_origin_la_khong_chan_origin_hop_le() {
+    TestDatabase::run(async |test| {
+        let app = app(test, &[]).await;
+        for index in 0..300 {
+            let origin = format!("https://random-{index}.test");
+            assert!(allow_origin(&preflight(&app, &origin).await).is_empty(), "{origin}");
+        }
+        assert_eq!(allow_origin(&preflight(&app, "https://shop-a.test").await), "https://shop-a.test");
+        assert_eq!(allow_origin(&preflight(&app, "https://shop-b.test").await), "https://shop-b.test");
     })
     .await
     .unwrap();
