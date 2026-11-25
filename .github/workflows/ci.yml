@@ -391,11 +391,15 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          # Toàn bộ lịch sử: secret đã commit rồi xoá vẫn nằm trong git.
+          # Toàn bộ lịch sử của ref được checkout: secret đã commit rồi xoá vẫn nằm trong git.
+          # Nhánh khác (chưa có PR) cũng được fetch nhưng KHÔNG quét — xem `--log-opts` bên dưới.
           fetch-depth: 0
       - name: gitleaks
         # Image ghim theo digest ở .github/gitleaks/Dockerfile, cùng chỗ gate.sh đọc (D-20261125-gitleaks-digest).
+        # `--log-opts=HEAD`: không truyền thì gitleaks quét MỌI ref đã fetch (`git log --all`), nên một nhánh
+        # của phiên khác làm đỏ mọi PR. HEAD là ref đang checkout (PR: merge ref = lịch sử main + commit của PR;
+        # push lên main: main) và vẫn là TOÀN BỘ lịch sử đi tới được từ đó (D-20261125-gitleaks-scope).
         run: |
           image="$(sed -n 's/^FROM //p' .github/gitleaks/Dockerfile)"
           docker run --rm -v "$PWD:/repo" "$image" \
-            git /repo --no-banner --redact --config /repo/.gitleaks.toml
+            git /repo --no-banner --redact --config /repo/.gitleaks.toml --log-opts=HEAD

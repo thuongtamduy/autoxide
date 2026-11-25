@@ -43,7 +43,7 @@ jobs:
         with:
           persist-credentials: false
           # Cả lịch sử và tag: `cargo xtask api-diff` so với tag phát hành gần nhất; gitleaks quét
-          # toàn bộ lịch sử.
+          # toàn bộ lịch sử đi tới được từ HEAD (không quét nhánh khác).
           fetch-depth: 0
       # Không chạm Rust thì gate.sh tự bỏ clippy; ở đây chỉ bỏ tải cache của clippy (vài GB) — xtask tự biên dịch
       # trong ~15 giây.
