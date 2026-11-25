@@ -122,10 +122,13 @@ thật (P7).
   - [ ] L-7: đổi mật khẩu (không phải khôi phục) giữ API key, passkey, liên kết đăng nhập ngoài — thêm lựa chọn "thu
         hồi mọi thông tin đăng nhập" hay liệt kê chúng trong câu trả lời
   - [ ] L-8: luật tự động hoá theo event nhận event của mọi tổ chức trong khách — cần event mang tổ chức thống nhất
-  - [ ] L-9: CSP của trang tài liệu API chỉ cho đúng gói Scalar đã ghim (cần thử lại trên trình duyệt, D-320)
-  - [ ] L-10: giới hạn số kết nối mở (hiện để reverse proxy làm)
-  - [ ] I-2: giới hạn kích thước câu trả lời của nhà cung cấp do người vận hành cấu hình (AI, cổng kết nối)
-  - [ ] I-5: ghim image `gitleaks` của CI bằng digest
+  - [x] L-9: CSP của trang tài liệu API chỉ cho đúng gói Scalar đã ghim (cần thử lại trên trình duyệt, D-320) — xong
+        (#PR1, D-20261125-docs-csp-pinned): đã thử trên Chromium
+  - [x] L-10: giới hạn số kết nối mở (hiện để reverse proxy làm) — xong (#PR1, D-20261125-max-connections):
+        `AUTOXIDE_HTTP_MAX_CONNECTIONS`, quá thì chờ; kết nối im lặng đóng sau 30 giây
+  - [x] I-2: giới hạn kích thước câu trả lời của nhà cung cấp do người vận hành cấu hình (AI, cổng kết nối) — xong
+        (#PR1, D-20261125-provider-response-cap): `AUTOXIDE_PROVIDER_MAX_RESPONSE_BYTES`
+  - [x] I-5: ghim image `gitleaks` của CI bằng digest — xong (#PR1, D-20261125-gitleaks-digest)
   - [ ] Phần chưa rà: SCIM, xác minh số điện thoại, định dạng file xuất / nhập / chuyển khách, đối chiếu đủ mọi tool
         MCP với REST, điểm thưởng / giới thiệu / chia thanh toán POS, `content` / `media` / `newsletter` / `analytics`
         ngoài các điểm đã thử

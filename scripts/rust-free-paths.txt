@@ -49,3 +49,5 @@ docs/*.md
 .github/ISSUE_TEMPLATE/*
 .github/pull_request_template.md
 .github/dependabot.yml
+# Image gitleaks ghim theo digest: gate bước 6 (vẫn chạy) đọc, không phải Rust.
+.github/gitleaks/Dockerfile

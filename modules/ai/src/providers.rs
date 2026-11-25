@@ -8,6 +8,7 @@ use std::time::Duration;
 
 use autoxide_kernel::ai::{Effort, Part, Prompt, Usage};
 use autoxide_kernel::error::Error;
+use autoxide_kernel::provider;
 use autoxide_kernel::tenancy::TenantContext;
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD;
@@ -76,10 +77,22 @@ pub(crate) async fn post_json(
         .and_then(|value| value.to_str().ok())
         .and_then(|value| value.trim().parse::<u64>().ok())
         .map(|seconds| seconds.clamp(1, 3600));
-    let text = match response.bytes().await {
+    // Đọc tối đa AUTOXIDE_PROVIDER_MAX_RESPONSE_BYTES (I-2 của rà soát bảo mật 2026-11): nhà cung cấp hỏng hay
+    // địa chỉ cấu hình nhầm không làm máy chủ giữ cả câu trả lời vô hạn trong bộ nhớ.
+    let max_bytes = provider::max_response_bytes();
+    let text = match provider::read_body(response, max_bytes).await {
         Ok(bytes) => bytes,
+        Err(provider::BodyError::TooLarge) => {
+            tracing::warn!(
+                purpose,
+                status,
+                max_bytes,
+                "AI provider answer larger than AUTOXIDE_PROVIDER_MAX_RESPONSE_BYTES; dropped"
+            );
+            return Err(errors::provider_unavailable(None));
+        }
         Err(error) => {
-            tracing::warn!(purpose, status, error = %error, "AI provider answer was cut off");
+            tracing::warn!(purpose, status, error = ?error, "AI provider answer was cut off");
             return Err(errors::provider_unavailable(retry_after));
         }
     };

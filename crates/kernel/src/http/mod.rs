@@ -28,6 +28,15 @@
 //! `Referrer-Policy`, `X-Frame-Options`, a strict CSP (HSTS when configured) on every response - see
 //! `security_headers`.
 
+// URL của gói Scalar đã ghim: trang tài liệu (`DOCS_HTML`) nạp nó và CSP của trang (`DOCS_CSP`) chỉ cho đúng file
+// này (L-9 của docs/security/review-2026-11.md). Viết bằng `macro_rules!` thay vì `const` vì `concat!` chỉ ghép chữ
+// viết sẵn (literal), không nhận hằng; macro khai trước các `mod` để module con (`security_headers`) dùng được.
+macro_rules! scalar_script_url {
+    () => {
+        "https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.76.4/dist/browser/standalone.js"
+    };
+}
+
 mod body_limit;
 mod cache;
 mod client;
@@ -75,9 +84,11 @@ use utoipa_scalar::{Scalar, Servable};
 
 /// The API documentation page: like the `utoipa-scalar` template but the Scalar script is version-pinned and
 /// has Subresource Integrity - if the CDN (or anyone in between) changes the file the browser will not run
-/// it. To upgrade the version: change both the URL and `integrity`
-/// (`openssl dgst -sha384 -binary standalone.js | base64`).
-const DOCS_HTML: &str = r#"<!doctype html>
+/// it. The page's CSP allows only this one script file (`DOCS_CSP`). To upgrade the version: change both the URL
+/// (`scalar_script_url!`) and `integrity` (`openssl dgst -sha384 -binary standalone.js | base64`), then open the page
+/// in a browser and check the console for CSP errors.
+const DOCS_HTML: &str = concat!(
+    r#"<!doctype html>
 <html>
 <head>
     <title>$title</title>
@@ -89,12 +100,15 @@ const DOCS_HTML: &str = r#"<!doctype html>
     $spec
 </script>
 <script
-    src="https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.76.4/dist/browser/standalone.js"
+    src=""#,
+    scalar_script_url!(),
+    r#""
     integrity="sha384-hwB9WroDTpZaI38gr+u9CXA6ksz5gUYgD2GxXazKl/agT1L2GWUiRFWGJYNiFu4Q"
     crossorigin="anonymous"></script>
 </body>
 </html>
-"#;
+"#
+);
 
 use crate::access::Authenticator;
 use crate::config::{CorsOrigins, HttpConfig};
@@ -124,7 +138,7 @@ pub use openapi::{BEARER_AUTH, DOCS_PATH, OPENAPI_PATH, lint};
 pub use problem::StandardErrorBody;
 pub use request_id::REQUEST_ID_HEADER;
 pub use security_headers::{API_CSP, DOCS_CSP};
-pub use server::{Shutdown, serve, shutdown_signal};
+pub use server::{Shutdown, serve, serve_with_limit, shutdown_signal};
 
 /// Prefix of every API route.
 pub const API_PREFIX: &str = "/api/v1";
