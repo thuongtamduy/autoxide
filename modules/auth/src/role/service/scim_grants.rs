@@ -22,26 +22,50 @@ impl RoleService {
         user_id: Uuid,
         wanted: BTreeSet<(Uuid, Uuid)>,
     ) -> Result<bool, Error> {
-        let read = tenant.database().read();
-        let grants: BTreeSet<Uuid> = grant::Entity::find()
+        // Kết nối GHI: chạy ngay sau commit nhóm / luật (read replica có thể trễ).
+        let read = tenant.database().write();
+        let grants = grant::Entity::find()
             .filter(grant::Column::UserId.eq(user_id))
             .scoped(tenant)
             .all(read)
-            .await?
-            .into_iter()
-            .map(|row| row.user_role_id)
-            .collect();
-        // Còn giữ role nào sau lần này không (cho hạn mức số nhân sự): role SCIM muốn, hay
-        // membership không do SCIM tạo. Đọc ngoài transaction như `set_memberships`.
-        let manual = user_role::Entity::find()
+            .await?;
+        let rows = user_role::Entity::find()
             .filter(user_role::Column::UserId.eq(user_id))
             .scoped(tenant)
             .all(read)
-            .await?
-            .into_iter()
-            .any(|row| !grants.contains(&row.id));
-        let will_hold = !wanted.is_empty() || manual;
-        let change = self.write_scim_grants(tenant, actor, authority, user_id, wanted);
+            .await?;
+        // Còn giữ role nào sau lần này không (cho hạn mức số nhân sự), tính theo phần lần đồng bộ
+        // SẼ áp được — không theo `wanted`: phần `authority` không cấp / gỡ được thì để nguyên
+        // (D-20261125-scim-sync-report). Giữ khi: có membership không do SCIM tạo; hay một role muốn
+        // mà đã có, hay cấp được; hay một role SCIM đã cấp mà không gỡ được. Đọc ngoài transaction như
+        // `set_memberships`; chỉ để quyết có giữ chỗ trước hay không — sau khi đổi, hạn mức đối chiếu
+        // với trạng thái thật.
+        let granted_ids: BTreeSet<Uuid> = grants.iter().map(|row| row.user_role_id).collect();
+        let manual = rows.iter().any(|row| !granted_ids.contains(&row.id));
+        let held: BTreeSet<Uuid> = rows.iter().map(|row| row.id).collect();
+        let live: BTreeSet<(Uuid, Uuid)> = grants
+            .iter()
+            .filter(|row| held.contains(&row.user_role_id))
+            .map(|row| (row.org_id, row.role_id))
+            .collect();
+        let mut will_hold = manual;
+        for pair in &wanted {
+            if will_hold {
+                break;
+            }
+            will_hold =
+                live.contains(pair) || grantable(read, tenant, authority, *pair, true).await?;
+        }
+        for pair in live.iter().filter(|pair| !wanted.contains(pair)) {
+            if will_hold {
+                break;
+            }
+            will_hold = !grantable(read, tenant, authority, *pair, false).await?;
+        }
+        let change = async {
+            let changed = self.write_scim_grants(tenant, actor, authority, user_id, wanted).await;
+            changed.map(|changed| (changed, changed))
+        };
         self.with_member_limit(tenant, user_id, will_hold, change).await
     }
 

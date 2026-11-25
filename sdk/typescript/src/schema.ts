@@ -5473,11 +5473,18 @@ export type CreatedEndpointResponse = EndpointResponse & {
   secret: string;
 };
 
-/** A mapping rule just created, with the people it gave the role to. */
+/** A mapping rule just created, with what happened to each member of the group. */
 export type CreatedScimGroupMappingResponse = ScimGroupMappingResponse & {
   /**
-   * Every current member of the group, who now holds the role through this rule. Members of a
-   * group without rules may have been added by anyone holding a SCIM token: check this list.
+   * Members who could not be given the role (e.g. the plan's staff limit is reached), with the
+   * error code. The rule stays; they get the role on the next sync that succeeds for them.
+   */
+  failed: ScimSyncFailure[];
+  /**
+   * Members of the group whose roles were brought in line with the rule: they hold the role at
+   * the unit now — through this rule, or because they already had it (by hand, or from another
+   * group). Members of a group without rules may have been added by anyone holding a SCIM token:
+   * check this list.
    */
   granted_user_ids: string[];
 };
@@ -8235,11 +8242,18 @@ export type Data_CreatedEndpointResponse = {
 
 /** Envelope of a single result. */
 export type Data_CreatedScimGroupMappingResponse = {
-  /** A mapping rule just created, with the people it gave the role to. */
+  /** A mapping rule just created, with what happened to each member of the group. */
   data: ScimGroupMappingResponse & {
     /**
-     * Every current member of the group, who now holds the role through this rule. Members of a
-     * group without rules may have been added by anyone holding a SCIM token: check this list.
+     * Members who could not be given the role (e.g. the plan's staff limit is reached), with the
+     * error code. The rule stays; they get the role on the next sync that succeeds for them.
+     */
+    failed: ScimSyncFailure[];
+    /**
+     * Members of the group whose roles were brought in line with the rule: they hold the role at
+     * the unit now — through this rule, or because they already had it (by hand, or from another
+     * group). Members of a group without rules may have been added by anyone holding a SCIM token:
+     * check this list.
      */
     granted_user_ids: string[];
   };
@@ -16236,9 +16250,12 @@ export type Data_Vec_ScimTokenResponse = {
     /** The user who created it. */
     created_by: string;
     /**
-     * Whether the token still works fully. A SCIM token can do only what its creator can do now:
-     * anything other than `active` means syncs that give, take away or disable will be refused —
-     * create a new token from an account with the needed roles and revoke this one.
+     * State of the token's creator. A SCIM token can do only what its creator can do now. `disabled`
+     * or `deleted`: the token can no longer give, take away, disable or delete anything that needs a
+     * permission; `missing_permission`: the creator lost `auth.scim.manage` but the token keeps the
+     * creator's other roles. In every case other than `active`, create a new token from an account
+     * with the needed roles and revoke this one. `active` does not mean the creator still holds every
+     * role your group mappings give.
      */
     creator_status: ScimTokenCreatorStatus;
     id: string;
@@ -30118,6 +30135,15 @@ export type ScimPatch = {
   schemas: string[];
 };
 
+/** A member a SCIM sync could not update. */
+export type ScimSyncFailure = {
+  /** Stable error code, e.g. `limit_exceeded`. */
+  code: string;
+  /** What went wrong, in English. */
+  message: string;
+  user_id: string;
+};
+
 /** State of the person who created a SCIM token. */
 export type ScimTokenCreatorStatus = "active" | "disabled" | "deleted" | "missing_permission";
 
@@ -30127,9 +30153,12 @@ export type ScimTokenResponse = {
   /** The user who created it. */
   created_by: string;
   /**
-   * Whether the token still works fully. A SCIM token can do only what its creator can do now:
-   * anything other than `active` means syncs that give, take away or disable will be refused —
-   * create a new token from an account with the needed roles and revoke this one.
+   * State of the token's creator. A SCIM token can do only what its creator can do now. `disabled`
+   * or `deleted`: the token can no longer give, take away, disable or delete anything that needs a
+   * permission; `missing_permission`: the creator lost `auth.scim.manage` but the token keeps the
+   * creator's other roles. In every case other than `active`, create a new token from an account
+   * with the needed roles and revoke this one. `active` does not mean the creator still holds every
+   * role your group mappings give.
    */
   creator_status: ScimTokenCreatorStatus;
   id: string;
