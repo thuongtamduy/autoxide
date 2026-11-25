@@ -179,6 +179,8 @@ Trong các test đó có ba bài giữ tài liệu khớp code: `.env.example` (
 bảng. Đổi cấu hình hay API thì sinh lại file tương ứng — thông báo của test ghi
 sẵn lệnh.
 
+- Lời nhắc "có thay đổi chưa commit" / "có commit chưa push" lúc dừng lượt **không** đến từ hook của repo này (`.claude/settings.json`
+  không có hook `Stop`) mà từ nền tảng, và không vượt luật gate: chưa chạy `./gate.sh --quick` xanh thì chưa push (commit cục bộ thì được).
 - Gate đỏ thì sửa code, **không** nới gate, không tắt lint, không đánh dấu test
   bỏ qua. Ngoại lệ thật sự cần thiết phải ghi thành một quyết định (skill `record-decision`).
 - Code mới phải có test. Thứ liên quan ghi đồng thời (job, idempotency, refresh

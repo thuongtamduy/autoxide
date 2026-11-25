@@ -4,8 +4,8 @@
 
 ## Checklist
 
-- [ ] The full `./gate.sh` is green (SQLite **and** PostgreSQL), not only `./gate.sh --quick`
-- [ ] New code has tests, and they run on both databases
+- [ ] `./gate.sh --quick` is green (SQLite). CI runs the rest, including PostgreSQL; the full `./gate.sh` is required before a release, not before each PR
+- [ ] New code has tests, and they run on both databases (CI runs them on PostgreSQL; run the one you wrote on PostgreSQL locally while working)
 - [ ] Changed an English document? The Vietnamese one (`*.vi.md`) is changed in the same commit (and the other way round)
 - [ ] Anything users would notice has a fragment in `changelog.d/` (`<name>.<section>.md`; do not edit `CHANGELOG.md`)
 - [ ] Changed the API or a setting? `docs/openapi.json` / `.env.example` are regenerated
