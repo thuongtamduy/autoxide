@@ -29,6 +29,10 @@ Bạn cần:
 - tuỳ chọn [`gitleaks`](https://github.com/gitleaks/gitleaks) (không có thì gate chạy nó
   trong Docker).
 
+Trên máy Linux x86_64 mới (ví dụ phiên agent trên cloud) chạy `scripts/cloud-setup.sh` thay vì cài tay: script
+cài toolchain ghim cùng `cargo-deny`, `gitleaks` và `cargo-nextest` từ bản phát hành dựng sẵn, kiểm SHA-256 đã ghim.
+Chạy lại nhiều lần được.
+
 Rồi:
 
 ```bash

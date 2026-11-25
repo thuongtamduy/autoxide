@@ -117,6 +117,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261123-property-fuzzing](D-20261123-property-fuzzing.md)** Thử phá có chủ đích bằng `proptest` trên stable, chạy dài theo lịch đêm — 2026-11-23
 - **[D-20261123-supply-chain](D-20261123-supply-chain.md)** Chuỗi cung ứng và phát hành: ký không khoá, provenance cho mọi file, Actions tối thiểu quyền, Dependabot có cooldown, bản thử `X.Y.Z-rc.N` — 2026-11-23
 - **[D-20261125-ci-skip-rust](D-20261125-ci-skip-rust.md)** Pull request không chạm Rust bỏ phần biên dịch và test nặng theo danh sách cho phép — 2026-11-25
+- **[D-20261125-cloud-session-setup](D-20261125-cloud-session-setup.md)** Phiên agent trên cloud: một script cài đặt trong repo, gọi từ setup script của môi trường và SessionStart hook — 2026-11-25
 - **[D-20261125-typescript-range](D-20261125-typescript-range.md)** Dải TypeScript hỗ trợ cho SDK: 5.0 trở lên, phát triển trên 7 — 2026-11-25
 
 ## Kiến trúc module và kernel

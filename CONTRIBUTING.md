@@ -32,6 +32,10 @@ You need:
 - optionally [`gitleaks`](https://github.com/gitleaks/gitleaks) (the gate runs it in Docker
   otherwise).
 
+On a fresh Linux x86_64 machine (for example a cloud agent session) run `scripts/cloud-setup.sh`
+instead of installing by hand: it installs the pinned toolchain and `cargo-deny`, `gitleaks` and
+`cargo-nextest` from prebuilt releases, checking pinned SHA-256 checksums. It is safe to run again.
+
 Then:
 
 ```bash
