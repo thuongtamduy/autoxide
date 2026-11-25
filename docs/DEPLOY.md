@@ -417,6 +417,31 @@ into a new database.
 Check the configuration without starting anything: `autoxide config`. It lists every
 setting with its value (secrets hidden) and reports every problem at once.
 
+## Mail that bounces
+
+When the receiving server refuses a recipient address for good while a mail is being sent (SMTP
+`5xx` with enhanced status `5.1.x` or `5.2.x`: no such mailbox), the mail is not retried and the
+address gets a bounce record in its tenant. After `AUTOXIDE_MAIL_HARD_BOUNCE_LIMIT` (default 3) such
+bounces the address is **suppressed** for that tenant only: new mail to it — password resets
+included — is not sent, and each skipped mail is counted on the record with its source (e.g.
+`auth.password_reset`), so "why did this person get no mail" has an answer. The API still answers
+as if the mail was sent, so nobody learns which addresses are suppressed.
+
+A tenant's administrator (or platform staff entering the tenant):
+
+- `GET /api/v1/mail/bounces?email=ada@example.com` — did mail to this address bounce, how often,
+  the last SMTP code, whether it is suppressed (`mail.bounces.read`);
+- `GET /api/v1/mail/bounces/stats` — addresses, suppressed, bounced and skipped in 30 days;
+- `POST /api/v1/mail/bounces/{id}/release` — mail it again once the address works
+  (`mail.bounces.manage`); a user who changes to another address is mailed at once;
+- `DELETE /api/v1/mail/bounces/{id}` — erase the record (a data subject's request).
+
+Records are deleted `AUTOXIDE_MAIL_BOUNCE_RETENTION_DAYS` (default 365) after the last bounce or
+skipped mail. Metrics: `mail_bounces_total{kind}`, `mail_suppressed_total`,
+`mail_skipped_suppressed_total`. Bounces that arrive later as a delivery report (DSN), and
+bounce webhooks of mail providers, are not read yet; the newsletter keeps its own suppression list
+(`POST /api/v1/newsletter/bounces`).
+
 ## A CDN in front of Autoxide
 
 Public reads of a website (`/api/v1/content/public/…`, `/api/v1/catalog/public/…`) answer with

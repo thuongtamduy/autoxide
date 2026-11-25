@@ -413,6 +413,29 @@ database mới.
 Kiểm cấu hình mà không khởi động gì: `autoxide config`. Lệnh liệt kê mọi biến kèm giá
 trị (secret được giấu) và báo mọi vấn đề cùng một lượt.
 
+## Thư bị dội
+
+Khi máy chủ nhận từ chối hẳn một địa chỉ người nhận lúc gửi (SMTP `5xx` với mã mở rộng `5.1.x` hay
+`5.2.x`: không có hộp thư này), thư không được thử lại và địa chỉ có một bản ghi thư bị dội ở khách
+của nó. Sau `AUTOXIDE_MAIL_HARD_BOUNCE_LIMIT` (mặc định 3) lần như vậy, địa chỉ bị **chặn** ở riêng
+khách đó: thư mới tới nó — kể cả thư đặt lại mật khẩu — không được gửi, và mỗi thư bị bỏ được đếm trên
+bản ghi kèm nguồn (vd `auth.password_reset`), nên câu hỏi "vì sao người này không nhận được thư" có câu
+trả lời. API vẫn trả lời như đã gửi, để không ai biết địa chỉ nào bị chặn.
+
+Quản trị của khách (hay nhân sự nền tảng vào khách):
+
+- `GET /api/v1/mail/bounces?email=ada@example.com` — thư tới địa chỉ này có bị dội không, bao nhiêu
+  lần, mã SMTP cuối, có đang bị chặn không (`mail.bounces.read`);
+- `GET /api/v1/mail/bounces/stats` — số địa chỉ, đang chặn, bị dội và bị bỏ thư trong 30 ngày;
+- `POST /api/v1/mail/bounces/{id}/release` — gửi lại khi địa chỉ đã dùng được (`mail.bounces.manage`);
+  người dùng đổi sang địa chỉ khác thì nhận thư ngay;
+- `DELETE /api/v1/mail/bounces/{id}` — xoá bản ghi (yêu cầu của chủ dữ liệu).
+
+Bản ghi bị xoá sau `AUTOXIDE_MAIL_BOUNCE_RETENTION_DAYS` (mặc định 365) ngày kể từ lần dội hay lần bỏ thư
+cuối. Số đo: `mail_bounces_total{kind}`, `mail_suppressed_total`, `mail_skipped_suppressed_total`. Thư dội
+báo về sau dạng báo cáo giao thư (DSN) và webhook báo dội của nhà cung cấp mail chưa được đọc; newsletter
+giữ danh sách chặn riêng của nó (`POST /api/v1/newsletter/bounces`).
+
 ## CDN phía trước Autoxide
 
 Đọc công khai của website (`/api/v1/content/public/…`, `/api/v1/catalog/public/…`) trả

@@ -14,19 +14,21 @@ publish.workspace = true
 [dependencies]
 async-trait.workspace = true
 autoxide-kernel.workspace = true
+axum.workspace = true
+jiff.workspace = true
 lettre.workspace = true
 metrics.workspace = true
+sea-orm.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 utoipa.workspace = true
+utoipa-axum.workspace = true
 uuid.workspace = true
 
 [dev-dependencies]
 autoxide-testkit.workspace = true
-axum.workspace = true
-sea-orm.workspace = true
 
 [lints]
 workspace = true

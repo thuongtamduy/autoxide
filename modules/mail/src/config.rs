@@ -39,6 +39,22 @@ pub(crate) const ALLOW_PRIVATE_NETWORKS: Setting = Setting::new(
 )
 .with_default("false");
 
+pub(crate) const HARD_BOUNCE_LIMIT: Setting = Setting::new(
+    "AUTOXIDE_MAIL_HARD_BOUNCE_LIMIT",
+    "Hard bounces (the receiving server refuses the address itself) after which mail to an \
+     address is suppressed for that tenant, 1 to 20. A tenant's administrator lists and releases \
+     suppressed addresses at `/api/v1/mail/bounces`.",
+)
+.with_default("3");
+
+pub(crate) const BOUNCE_RETENTION_DAYS: Setting = Setting::new(
+    "AUTOXIDE_MAIL_BOUNCE_RETENTION_DAYS",
+    "Days a bounce record (an email address and why mail to it failed) is kept after its last \
+     bounce or skipped mail, 30 to 3650; a suppressed address is mailed again once its record is \
+     gone.",
+)
+.with_default("365");
+
 #[derive(Debug, Clone)]
 pub(crate) struct MailConfig {
     /// `None`: ghi mail ra file.
@@ -47,6 +63,10 @@ pub(crate) struct MailConfig {
     pub file_dir: PathBuf,
     /// `AUTOXIDE_MAIL_ALLOW_PRIVATE_NETWORKS`.
     pub allow_private_networks: bool,
+    /// `AUTOXIDE_MAIL_HARD_BOUNCE_LIMIT`.
+    pub hard_bounce_limit: u32,
+    /// `AUTOXIDE_MAIL_BOUNCE_RETENTION_DAYS`.
+    pub bounce_retention_days: u32,
 }
 
 impl MailConfig {
@@ -67,11 +87,19 @@ impl MailConfig {
         });
         let file_dir = reader.get_with(&FILE_DIR, |raw| Ok(PathBuf::from(raw)));
         let allow_private_networks = reader.get::<bool>(&ALLOW_PRIVATE_NETWORKS);
+        let hard_bounce_limit = reader.get_with(&HARD_BOUNCE_LIMIT, |raw| {
+            autoxide_kernel::config::parse_in_range(raw, 1u32, 20)
+        });
+        let bounce_retention_days = reader.get_with(&BOUNCE_RETENTION_DAYS, |raw| {
+            autoxide_kernel::config::parse_in_range(raw, 30u32, 3650)
+        });
         Ok(MailConfig {
             smtp_url: smtp_url?,
             from: from?,
             file_dir: file_dir?,
             allow_private_networks: allow_private_networks?,
+            hard_bounce_limit: hard_bounce_limit?,
+            bounce_retention_days: bounce_retention_days?,
         })
     }
 }

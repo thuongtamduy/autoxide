@@ -5,12 +5,15 @@
 //! không có thì ghi file `.eml` vào `AUTOXIDE_MAIL_FILE_DIR` (cho dev và test).
 
 pub mod api;
+mod bounces;
 mod client_config;
 mod config;
 mod doctor;
 mod service;
 mod transport;
 
+#[cfg(test)]
+mod bounce_tests;
 #[cfg(test)]
 mod tests;
 
@@ -42,6 +45,8 @@ struct MailModule {
     sender: Option<Arc<Sender>>,
     /// Bước kiểm của `autoxide doctor`; có sau `start`.
     probe: Option<Arc<doctor::SmtpProbe>>,
+    /// Sổ thư bị dội; có sau `start`.
+    bounces: Option<Arc<bounces::Bounces>>,
 }
 
 impl Module for MailModule {
@@ -74,16 +79,51 @@ impl Module for MailModule {
             ),
             // Đường người làm vào khách (bước 34, D-310).
             autoxide_kernel::event::outbox_access_migration("k0001_event_access", "mail"),
+            // Sổ thư bị dội và danh sách chặn (D-20261125-mail-bounces).
+            Box::new(bounces::migration::Migration),
         ]
     }
 
+    fn permissions(&self) -> Vec<autoxide_kernel::access::Permission> {
+        vec![bounces::BOUNCES_READ, bounces::BOUNCES_MANAGE]
+    }
+
+    fn retention(&self) -> Vec<autoxide_kernel::privacy::RetentionPolicy> {
+        use autoxide_kernel::privacy::{DataCategory, Keep, RetentionPolicy};
+        let days = self.config.as_ref().map_or(365, |config| config.bounce_retention_days);
+        vec![
+            RetentionPolicy::new(
+                "mail.bounces",
+                "Email addresses whose mail bounced, why, and whether they are suppressed.",
+                DataCategory::Basic,
+                Keep::Days(days),
+            )
+            .setting(config::BOUNCE_RETENTION_DAYS.name),
+        ]
+    }
+
+    fn routes(&self) -> utoipa_axum::router::OpenApiRouter {
+        self.bounces
+            .clone()
+            .map_or_else(utoipa_axum::router::OpenApiRouter::new, bounces::http::routes)
+    }
+
+    fn schedules(&self) -> Vec<autoxide_kernel::job::Schedule> {
+        let day = std::time::Duration::from_secs(24 * 3600);
+        vec![autoxide_kernel::job::Schedule::new(bounces::CLEANUP, bounces::CLEANUP, day)]
+    }
+
     fn events(&self) -> Vec<EventInfo> {
-        vec![EventInfo::new(
-            autoxide_kernel::mail::DELIVERY_FAILED,
-            "A mail was refused for good because of its recipient address (SMTP enhanced status \
+        vec![
+            bounces::ADDRESS_SUPPRESSED,
+            bounces::SUPPRESSION_RELEASED,
+            EventInfo::new(
+                autoxide_kernel::mail::DELIVERY_FAILED,
+                "A mail was refused for good because of its recipient address (SMTP enhanced status \
              5.1.x or 5.2.x: no such mailbox, for example); `to` is the address, `dedupe_key` \
              the sender's key.",
-        )]
+            ),
+        ]
     }
 
     fn client_config(
@@ -121,17 +161,24 @@ impl Module for MailModule {
         let transport = Arc::new(Transport::new(config.smtp_url.as_deref(), config.file_dir)?);
         self.probe = Some(Arc::new(doctor::SmtpProbe { transport: transport.clone() }));
         let settings = context.require::<dyn autoxide_kernel::tenancy::TenantSettings>()?;
+        let bounces = Arc::new(bounces::Bounces {
+            hard_limit: config.hard_bounce_limit,
+            retention_days: config.bounce_retention_days,
+            outbox: context.outbox()?,
+        });
+        self.bounces = Some(bounces.clone());
         let sender = Arc::new(Sender::new(
             transport,
             config.from,
             context.outbox()?,
             settings,
+            bounces.clone(),
             config.allow_private_networks,
         ));
         // Thử kết nối SMTP từ trang cài đặt (`POST /kernel/settings/{name}/test`).
         context.connection_probe(sender.clone())?;
         self.sender = Some(sender);
-        let service = MailService::new(context.jobs());
+        let service = MailService::new(context.jobs(), bounces);
         context.provide::<dyn Mailer>(Arc::new(service))
     }
 
@@ -146,9 +193,16 @@ impl Module for MailModule {
     }
 
     fn jobs(&self) -> Vec<JobRegistration> {
-        match &self.sender {
-            Some(sender) => vec![JobRegistration::new(service::SEND, sender.clone())],
-            None => Vec::new(),
+        let mut jobs = Vec::new();
+        if let Some(sender) = &self.sender {
+            jobs.push(JobRegistration::new(service::SEND, sender.clone()));
         }
+        if let Some(bounces) = &self.bounces {
+            jobs.push(JobRegistration::new(
+                bounces::CLEANUP,
+                Arc::new(bounces::Cleanup(bounces.clone())),
+            ));
+        }
+        jobs
     }
 }
