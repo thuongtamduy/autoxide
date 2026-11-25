@@ -408,10 +408,8 @@ impl EventHandler for FileService {
 }
 
 /// Phần dữ liệu cá nhân của `files` khi module đang tắt (chế độ nghỉ, bước 70 P9): cùng hàm với
-/// lúc bật, không cần service. Nơi lưu (`dyn Storage`) chính `files` công bố, nên khi `files` tắt
-/// thường không có: khi đó chỉ xoá dòng, nội dung ở nơi lưu còn lại (ghi `warn` từng khoá để người
-/// vận hành dọn tay) — giữ dòng thì event xoá tài khoản không bao giờ xong và thông tin file vẫn
-/// gắn với người đã xoá.
+/// lúc bật, không cần service. Kho mở từ cấu hình của chính module (`Module::dormant`); không có kho thì bên
+/// nghe trả lỗi và event xoá tài khoản được thử lại — không xoá dòng khi nội dung còn nằm lại.
 pub(crate) struct DormantPrivacy {
     pub(crate) storage: Option<Arc<dyn Storage>>,
 }
@@ -491,17 +489,18 @@ async fn erase_deleted_user(
         if files.is_empty() {
             break;
         }
+        // Xoá nội dung TRƯỚC, dòng sau: xoá nội dung lỗi thì trả lỗi khi dòng còn nguyên, event được thử lại và
+        // lần sau xoá trọn (nội dung đã mất thì `delete` coi là xong). Xoá dòng trước thì lỗi giữa chừng để lại
+        // nội dung không còn ai trỏ tới — khi module tắt không có job dọn file mồ côi.
+        for file in &files {
+            store.delete(&file.storage_key()).await?;
+        }
         let ids: Vec<Uuid> = files.iter().map(|file| file.id).collect();
         Entity::delete_many()
             .filter(Column::Id.is_in(ids))
             .scoped(tenant)
             .exec(tenant.database().write())
             .await?;
-        for file in &files {
-            if let Err(error) = store.delete(&file.storage_key()).await {
-                tracing::warn!(file_id = %file.id, error = %error, "file deleted but its content remains");
-            }
-        }
         removed += files.len() as u64;
     }
     tracing::info!(user_id = %user_id, files = removed, "files of a deleted user removed");

@@ -144,9 +144,8 @@ File `docs/openapi.json` và `docs/mcp-tools.json` trong repo, và SDK sinh từ
 
 ### Dữ liệu của module đang tắt
 
-Tắt một module **không bao giờ xoá gì**. Database đã có bảng của nó thì bảng giữ nguyên, và bật
-lại module là dùng tiếp từ đó (migration thêm trong lúc tắt được `autoxide migrate up` áp dụng như
-thường).
+Tắt một module **không bao giờ xoá gì**. Database đã có bảng của nó thì bảng còn đó, `autoxide migrate up`
+vẫn áp migration mới của module cho các bảng đó, và bật lại module là dùng tiếp từ đó.
 
 Trong lúc tắt, module vẫn tham gia dữ liệu cá nhân và vòng đời khách ("chế độ nghỉ") — không route,
 không tool MCP, không job, không nhận event khác, nhưng:
@@ -179,9 +178,9 @@ không tool MCP, không job, không nhận event khác, nhưng:
 
 Việc kiểm dữ liệu như vậy xem database chính và database của từng placement.
 
-Muốn xoá hẳn dữ liệu của một module: bật module, chạy
-`autoxide migrate down <module> --steps 1000` (lệnh
-này xoá bảng của nó — backup trước), rồi tắt.
+Muốn xoá hẳn dữ liệu của một module, chạy `autoxide migrate down <module> --steps 1000` — chạy được khi
+module đang tắt (lệnh này xoá bảng của nó — backup trước). `autoxide migrate up` giữ bảng của module đang
+tắt theo kịp bản mới ở nơi đã có bảng, và không bao giờ tạo bảng ở nơi khác.
 
 ## Nâng cấp từ 0.17 trở về trước
 

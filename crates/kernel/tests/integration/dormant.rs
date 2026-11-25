@@ -91,13 +91,39 @@ impl Module for Legacy {
         panic!("a turned-off module never starts");
     }
 
+    // Module tắt không bao giờ được hỏi đăng ký event khác (chỉ `USER_DELETED` qua `dormant`).
+    fn subscriptions(&self) -> Vec<autoxide_kernel::event::Subscription> {
+        vec![autoxide_kernel::event::Subscription::new(SIGNED_UP, Arc::new(Unreachable))]
+    }
+
     fn dormant(&self, context: &mut DormantContext<'_>) -> Result<(), Error> {
         context.personal_data(Arc::new(LegacyPrivacy))?;
         context.on_user_deleted(Arc::new(LegacyPrivacy))
     }
 }
 
-/// Module quản lý tài khoản giả: phát `auth.user_deleted`.
+/// Bên nghe event khác của module tắt: không bao giờ được gọi.
+struct Unreachable;
+
+#[async_trait::async_trait]
+impl EventHandler for Unreachable {
+    async fn handle(&self, event: &Delivered) -> Result<(), Error> {
+        panic!("a turned-off module received `{}`", event.name);
+    }
+}
+
+const SIGNED_UP: &str = "auth.signed_up";
+
+#[derive(Serialize)]
+struct SignedUp {
+    id: Uuid,
+}
+
+impl Event for SignedUp {
+    const NAME: &'static str = SIGNED_UP;
+}
+
+/// Module quản lý tài khoản giả: phát `auth.user_deleted` (và `auth.signed_up`).
 struct Accounts(Arc<Mutex<Option<Outbox>>>);
 
 const USER_DELETED_INFO: EventInfo = EventInfo::new(USER_DELETED, "An account was deleted.");
@@ -124,7 +150,7 @@ impl Module for Accounts {
     }
 
     fn events(&self) -> Vec<EventInfo> {
-        vec![USER_DELETED_INFO]
+        vec![USER_DELETED_INFO, EventInfo::new(SIGNED_UP, "An account was created.")]
     }
 
     fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
@@ -205,7 +231,8 @@ async fn module_nghi_van_xuat_va_xoa_du_lieu_ca_nhan() {
         let (app, outbox) = app(test).await;
         assert_eq!(app.modules().inactive()[0].name, "legacy");
         let registry = app.modules().personal_data();
-        assert!(registry.modules().contains(&"legacy"), "{:?}", registry.modules());
+        let parts = registry.modules().unwrap();
+        assert!(parts.contains(&"legacy"), "{parts:?}");
         let a = app.tenant("a").await.unwrap();
         let (ann, bob) = (Uuid::now_v7(), Uuid::now_v7());
 
@@ -234,6 +261,11 @@ async fn module_nghi_van_xuat_va_xoa_du_lieu_ca_nhan() {
         delete_account(&app, &outbox, &a, ann).await;
         assert_eq!(notes(&a, ann).await, 0);
         assert_eq!(notes(&a, bob).await, 1);
+
+        // Event khác (không phải xoá tài khoản) không tới module tắt: `Unreachable` không bị gọi.
+        let signed = SignedUp { id: Uuid::now_v7() };
+        outbox.record(a.database().write(), &a, Actor::system(), None, &signed).await.unwrap();
+        app.modules().dispatcher().unwrap().run_once().await.unwrap();
     })
     .await
     .unwrap();
@@ -313,6 +345,127 @@ async fn doi_khach_mang_theo_bang_cua_module_nghi() {
         assert_eq!(count(&spare, a.id(), None).await, 2);
         assert_eq!(count(&main, a.id(), None).await, 0);
         assert_eq!(count(&main, b.id(), None).await, 1);
+    })
+    .await
+    .unwrap();
+}
+
+/// Database của placement `name`.
+async fn placement(app: &TestApp, name: &str) -> autoxide_kernel::database::Database {
+    let select = Query::select()
+        .column(Alias::new("id"))
+        .from(Alias::new("kernel_placements"))
+        .and_where(Expr::col(Alias::new("name")).eq(name))
+        .to_owned();
+    let row = app.database().write().query_one(&select).await.unwrap().unwrap();
+    let id: Uuid = row.try_get("", "id").unwrap();
+    let id = autoxide_kernel::tenancy::PlacementId::from_uuid(id);
+    app.registry().placement_database(id).await.unwrap()
+}
+
+/// Chiều ngược: nguồn chưa từng có bảng của module tắt, đích thì có (placement cũ). Kế hoạch (dry run) không
+/// đổi schema và không lỗi; lượt chạy thật tạo bảng ở nguồn rồi dời bình thường.
+#[tokio::test]
+async fn doi_khach_toi_noi_da_co_bang_cua_module_nghi() {
+    TestDatabase::run(async |test| {
+        let (app, _) = app(test).await;
+        let spare = placement(&app, "spare").await;
+        let legacy = Modules::new(vec![Box::new(Legacy)]).unwrap().migrator().unwrap();
+        legacy.up(&spare).await.unwrap();
+        let has_table = |database: autoxide_kernel::database::Database| async move {
+            autoxide_testkit::schema_snapshot(database.write())
+                .await
+                .unwrap()
+                .table_names()
+                .contains(&"legacy_notes")
+        };
+        assert!(!has_table(app.database().clone()).await);
+
+        let moves = app.api::<TenantMoves>().unwrap();
+        let plan = moves.plan("a", "spare", false, Language::En).await.unwrap();
+        assert!(plan.ready, "{plan:?}");
+        assert!(!has_table(app.database().clone()).await, "a dry run changes no schema");
+        let started = moves.start(Actor::system(), "a", "spare", false, false).await.unwrap();
+        app.skip_move_wait().await.unwrap();
+        let done = moves.run(started.id, "test").await.unwrap();
+        assert_eq!(done.state, "done", "{done:?}");
+    })
+    .await
+    .unwrap();
+}
+
+/// `legacy` bản mới: thêm cột `title`.
+struct LegacyV2;
+
+struct AddTitle;
+
+impl MigrationName for AddTitle {
+    fn name(&self) -> &str {
+        "m0002_add_title"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for AddTitle {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .alter_table(
+                Table::alter()
+                    .table("legacy_notes")
+                    .add_column(schema::string_len_null("title", 100))
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .alter_table(Table::alter().table("legacy_notes").drop_column("title").to_owned())
+            .await
+    }
+}
+
+impl Module for LegacyV2 {
+    fn name(&self) -> &'static str {
+        "legacy"
+    }
+
+    fn migrations(&self) -> Vec<Box<dyn MigrationTrait>> {
+        vec![Box::new(CreateLegacyNotes), Box::new(AddTitle)]
+    }
+}
+
+/// Nâng cấp khi module đang tắt: `migrate up` áp migration mới của nó ở database đã có bảng của nó (phần
+/// xuất / xoá chạy trên schema mới), không tạo bảng ở database chưa từng có.
+#[tokio::test]
+async fn nang_cap_ap_migration_cua_module_nghi_noi_no_da_chay() {
+    TestDatabase::run(async |test| {
+        let app = TestApp::builder(test)
+            .module_turned_off(LegacyV2)
+            .placement("spare")
+            .build()
+            .await
+            .unwrap();
+        let old = Modules::new(vec![Box::new(Legacy)]).unwrap().migrator().unwrap();
+        old.up(app.database()).await.unwrap();
+        let migrator = app.modules().migrator().unwrap();
+        let pending = migrator.pending(app.database()).await.unwrap();
+        assert!(
+            pending.iter().any(|state| state.module == "legacy" && state.name == "m0002_add_title"),
+            "{pending:?}"
+        );
+        migrator.up(app.database()).await.unwrap();
+        assert!(migrator.pending(app.database()).await.unwrap().is_empty());
+        let columns = autoxide_testkit::schema_snapshot(app.database().write()).await.unwrap();
+        assert!(format!("{columns:?}").contains("title"), "the new column exists");
+
+        // Database chưa từng có bảng của `legacy`: không có gì chờ, `up` không tạo bảng.
+        let spare = placement(&app, "spare").await;
+        let pending = migrator.pending(&spare).await.unwrap();
+        assert!(pending.iter().all(|state| state.module != "legacy"), "{pending:?}");
+        migrator.up(&spare).await.unwrap();
+        let tables = autoxide_testkit::schema_snapshot(spare.write()).await.unwrap();
+        assert!(!tables.table_names().contains(&"legacy_notes"));
     })
     .await
     .unwrap();

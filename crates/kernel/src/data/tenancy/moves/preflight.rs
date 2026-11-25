@@ -68,19 +68,21 @@ impl TenantMoves {
         let target_db = self.database(&target).await;
         match (source_db, target_db) {
             (Ok(source_db), Ok(target_db)) => {
-                // Module đang tắt cũng đi theo khách (chế độ "nghỉ", bước 70 P9): đưa bảng của nó ở hai
-                // đầu về cùng migration trước khi đếm / chép.
-                self.setup.prepare_dormant(&source_db, &target_db).await?;
                 let schema = self.schema_problems(&source, &source_db, &target, &target_db).await?;
                 let schema_ok = schema.is_empty();
                 blockers.extend(schema);
                 if schema_ok {
-                    let (modules, control_plane) = self.setup.tenant_tables()?;
+                    // Kiểm (cả dry run) không đổi schema (bước 70 P9): module đang tắt có bảng ở cả hai đầu thì
+                    // đọc như module bật; chỉ có ở nguồn thì đếm dòng ở nguồn — lượt chạy thật tạo bảng ở đích
+                    // trước khi chép.
+                    let (_, control_plane) = self.setup.tenant_tables()?;
+                    let (modules, source_only) =
+                        self.setup.dry_run_modules(&source_db, &target_db).await?;
+                    let tenant = TenantId::from_uuid(row.id);
                     let found =
                         TenantTables::read(&source_db, &target_db, &modules, &control_plane)
                             .await
                             .map_err(transfer)?;
-                    let tenant = TenantId::from_uuid(row.id);
                     tables = found
                         .count(&source_db, tenant)
                         .await
@@ -88,6 +90,18 @@ impl TenantMoves {
                         .into_iter()
                         .map(TenantTableRows::from)
                         .collect();
+                    if !source_only.is_empty() {
+                        let only = TenantTables::read(
+                            &source_db,
+                            &source_db,
+                            &source_only,
+                            &control_plane,
+                        )
+                        .await
+                        .map_err(transfer)?;
+                        let counted = only.count(&source_db, tenant).await.map_err(transfer)?;
+                        tables.extend(counted.into_iter().map(TenantTableRows::from));
+                    }
                 }
             }
             (source_db, target_db) => {

@@ -31,9 +31,9 @@ pub const MODULES: Setting = Setting::new(
     "Which modules run. A comma-separated list of: `core` (only the modules the core cannot run \
      without), `official` (every official module), `all` (official and experimental modules), a \
      module name to add it, `-name` to leave it out. A module that an enabled module depends on \
-     is enabled with it. A module that is left out serves no routes, MCP tools, jobs or events \
-     and its migrations do not run; data it already has in the database is kept untouched. See \
-     docs/MODULES.md for the list of modules.",
+     is enabled with it. A module that is left out serves no routes, MCP tools, jobs or events; \
+     its migrations run only on a database that already has its tables, and it still exports and \
+     deletes a person's data there. See docs/MODULES.md for the list of modules.",
 )
 .with_default("official")
 .with_example("official,bookings,-plans");

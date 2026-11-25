@@ -348,9 +348,10 @@ impl<'a> TestAppBuilder<'a> {
         self
     }
 
-    /// A module present in the program but OFF, as when `AUTOXIDE_MODULES` does not enable it: it is not
-    /// registered and its migrations do not run, but the program knows it exists
-    /// (`Modules::inactive`). For testing what the program does with the data that module left behind.
+    /// A module present in the program but OFF, as when `AUTOXIDE_MODULES` does not enable it: it does not
+    /// start and its migrations run only where its tables already exist (none on the fresh test database);
+    /// it takes part through `Module::dormant` (`Modules::inactive`). For testing what the program does with
+    /// the data that module left behind.
     pub fn module_turned_off(mut self, module: impl Module + 'static) -> Self {
         self.turned_off.push(Box::new(module));
         self

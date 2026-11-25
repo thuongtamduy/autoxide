@@ -356,8 +356,8 @@ async fn module_tat_van_xuat_va_xoa_du_lieu_ca_nhan_nhu_khi_bat() {
             names
         };
         assert_eq!(
-            sorted(core.modules.personal_data().modules()),
-            sorted(every.modules.personal_data().modules()),
+            sorted(core.modules.personal_data().modules().unwrap()),
+            sorted(every.modules.personal_data().modules().unwrap()),
             "personal data export: a module registers it in `start` but not in `dormant`"
         );
         assert_eq!(

@@ -88,3 +88,66 @@ async fn module_tat_van_xuat_va_xoa_du_lieu_ca_nhan() {
     .await
     .unwrap();
 }
+
+/// Kho xoá luôn lỗi (mạng, quyền): lỗi đó không được nuốt.
+struct FailingDeletes(autoxide_testkit::MemoryStorage);
+
+#[async_trait::async_trait]
+impl autoxide_kernel::storage::Storage for FailingDeletes {
+    async fn put(
+        &self,
+        key: &str,
+        content: autoxide_kernel::storage::ByteStream,
+    ) -> Result<u64, autoxide_kernel::error::Error> {
+        self.0.put(key, content).await
+    }
+
+    async fn get(
+        &self,
+        key: &str,
+    ) -> Result<Option<autoxide_kernel::storage::StoredFile>, autoxide_kernel::error::Error> {
+        self.0.get(key).await
+    }
+
+    async fn delete(&self, _key: &str) -> Result<(), autoxide_kernel::error::Error> {
+        Err(autoxide_kernel::error::Error::internal("the storage refused to delete"))
+    }
+
+    async fn keys(&self) -> Result<Vec<String>, autoxide_kernel::error::Error> {
+        self.0.keys().await
+    }
+}
+
+/// Xoá nội dung lỗi: không xoá dòng, trả lỗi — event được thử lại và lần sau xoá trọn, nội dung không nằm
+/// lại mà event tính là xong.
+#[tokio::test]
+async fn xoa_noi_dung_loi_thi_giu_dong_va_bao_loi() {
+    TestDatabase::run(async |test| {
+        let (app, tenant) = dormant_app(test).await;
+        let user = Uuid::now_v7();
+        let id = Uuid::now_v7();
+        crate::entity::Model {
+            id,
+            tenant_id: tenant.id().as_uuid(),
+            owner_id: user,
+            name: "photo.jpg".into(),
+            content_type: "image/jpeg".into(),
+            size: 3,
+            sha256: String::new(),
+            created_at: Timestamp::now(),
+        }
+        .into_active_model()
+        .insert(app.database().write())
+        .await
+        .unwrap();
+        let storage: std::sync::Arc<dyn autoxide_kernel::storage::Storage> =
+            std::sync::Arc::new(FailingDeletes(autoxide_testkit::MemoryStorage::default()));
+        let privacy = crate::service::DormantPrivacy { storage: Some(storage) };
+        assert!(privacy.handle(&user_deleted(&tenant, user)).await.is_err());
+        let left =
+            crate::entity::Entity::find_by_id(id).scoped(&tenant).one(app.database().read()).await;
+        assert!(left.unwrap().is_some(), "the row stays until the content is deleted");
+    })
+    .await
+    .unwrap();
+}

@@ -96,6 +96,9 @@ impl DormantContext<'_> {
     /// does this): when no enabled module publishes `dyn Storage`, the kernel uses it for the tenant
     /// lifecycle and other dormant parts reach it through `tenancy().shared_storage()`, so stored content is
     /// deleted too. Only the first offer is kept.
+    // Lối riêng cho `files` (module duy nhất mở kho): ẩn khỏi tài liệu công khai, không thuộc hợp đồng ổn định
+    // (D-20261123-compatibility-policy không cam kết phần `#[doc(hidden)]`).
+    #[doc(hidden)]
     pub fn share_storage(
         &mut self,
         storage: Arc<dyn crate::storage::Storage>,

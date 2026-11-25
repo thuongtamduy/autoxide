@@ -114,6 +114,9 @@ pub struct ModuleMigrations {
     // được. Với `Arc`, "sao chép" chỉ là thêm một tham chiếu tới cùng migration.
     migrations: Vec<Arc<dyn MigrationTrait>>,
     upgrades: Vec<Arc<dyn DataUpgrade>>,
+    /// Applied only to a database that already has the module's history table (a turned-off module, dormant
+    /// mode): its tables stay up to date where it ran, and a new database never gets them.
+    where_installed: bool,
 }
 
 impl ModuleMigrations {
@@ -124,7 +127,31 @@ impl ModuleMigrations {
             module,
             migrations: migrations.into_iter().map(Arc::from).collect(),
             upgrades: Vec::new(),
+            where_installed: false,
         }
+    }
+
+    /// Applies these migrations only to a database that already has the module's history table (the
+    /// module once ran there); elsewhere the module counts as having nothing pending. Used for modules that
+    /// are in the program but turned off (dormant mode).
+    #[must_use]
+    pub fn where_installed(mut self) -> Self {
+        self.where_installed = true;
+        self
+    }
+
+    /// The module has nothing to do on `connection`: it is applied only where installed, and is not.
+    async fn skipped_on<C: sea_orm::ConnectionTrait>(
+        &self,
+        connection: &C,
+    ) -> Result<bool, MigrationError> {
+        if !self.where_installed {
+            return Ok(false);
+        }
+        let installed = manager::has_table(connection, &self.history_table())
+            .await
+            .map_err(|error| failure(self.module, "cannot read migration status", &error))?;
+        Ok(!installed)
     }
 
     /// Adds the data upgrades of the module.
@@ -289,6 +316,9 @@ impl Migrator {
     pub async fn status(&self, database: &Database) -> Result<Vec<MigrationState>, MigrationError> {
         let mut states = Vec::new();
         for set in &self.modules {
+            if set.skipped_on(database.read()).await? {
+                continue;
+            }
             let applied = applied_names(set, database.read()).await?;
             states.extend(set.entries().iter().map(|entry| MigrationState {
                 module: set.module,
@@ -314,6 +344,9 @@ impl Migrator {
         let mut done = Vec::new();
         let context = self.context(database);
         for set in &self.modules {
+            if set.skipped_on(database.read()).await? {
+                continue;
+            }
             let applied = applied_names(set, database.read()).await?;
             let pending: Vec<Entry> =
                 set.entries().into_iter().filter(|entry| !applied.contains(entry.name())).collect();

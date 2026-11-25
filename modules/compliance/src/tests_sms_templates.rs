@@ -163,6 +163,16 @@ async fn doc_mau_loi_thi_gui_cau_mac_dinh() {
         )
         .await;
         assert_eq!(text, None);
+        // Câu mặc định được lắp mã và thời hạn.
+        let text = crate::sms_templates::otp_text_with(
+            &BrokenSettings,
+            &tenant,
+            &crate::sms_templates::SIGN_IN,
+            "123456",
+            5,
+        )
+        .await;
+        assert_eq!(text, "Ma dang nhap cua ban: 123456. Het han sau 5 phut. Khong chia se ma nay.");
     })
     .await
     .unwrap();

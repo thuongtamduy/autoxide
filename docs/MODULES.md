@@ -146,8 +146,8 @@ through `GET /api/v1/kernel/modules`.
 ### Data of a module that is turned off
 
 Turning a module off **never deletes anything**. If the database already has its tables, they
-stay exactly as they are, and turning the module on again continues from there (migrations added
-in the meantime are applied by `autoxide migrate up` as usual).
+stay, `autoxide migrate up` keeps applying the module's new migrations to them, and turning the module
+on again continues from there.
 
 While it is off, the module still takes part in personal data and in the tenant lifecycle
 ("dormant mode") — it serves no routes, MCP tools, jobs or other events, but:
@@ -182,9 +182,9 @@ So that data is not lost by accident:
 
 The check for such data looks at the main database and at the database of every placement.
 
-To remove the data of a module for good: turn the module on, run
-`autoxide migrate down <module> --steps 1000` (this drops its tables — back up first), then turn it
-off.
+To remove the data of a module for good, run `autoxide migrate down <module> --steps 1000` — it works
+while the module is off (this drops its tables — back up first). `autoxide migrate up` keeps the tables
+of a turned-off module up to date where they exist, and never creates them elsewhere.
 
 ## Upgrading from 0.17 or earlier
 

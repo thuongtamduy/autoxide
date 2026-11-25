@@ -272,18 +272,17 @@ impl MoveSetup {
         let _ = self.0.set(setup);
     }
 
-    /// Before copying a tenant from `source` to `target` (move, split, merge): every turned-off module whose
-    /// tables exist at `source` gets its migrations applied at `source` and `target`, so its tables travel
-    /// with the tenant with the same columns on both sides (dormant mode, D-20261125-dormant-modules). A
-    /// module that never ran at `source` is left alone (no tables created where it has no data).
+    /// Before copying a tenant from `source` to `target` (move, split, merge; a real run, never a dry run):
+    /// every turned-off module whose tables exist at `source` OR `target` gets its migrations applied at both,
+    /// so its tables exist with the same columns on both sides and travel with the tenant (dormant mode,
+    /// D-20261125-dormant-modules). A module that never ran on either database is left alone.
     pub(crate) async fn prepare_dormant(
         &self,
         source: &Database,
         target: &Database,
     ) -> Result<(), Error> {
         for (module, migrator) in &self.get()?.dormant {
-            let history = format!("{module}_migrations");
-            if !crate::migration::table_exists(source.read(), &history).await? {
+            if !installed_on(module, source).await? && !installed_on(module, target).await? {
                 continue;
             }
             for database in [source, target] {
@@ -291,6 +290,28 @@ impl MoveSetup {
             }
         }
         Ok(())
+    }
+
+    /// The modules whose tables a DRY RUN reads between `source` and `target` (it changes no schema): the
+    /// enabled modules, and the turned-off modules that have tables on both databases. A turned-off module
+    /// with tables at `source` only is returned in the second list: its rows are counted at `source`, and a
+    /// real run creates its tables at `target` first.
+    pub(crate) async fn dry_run_modules(
+        &self,
+        source: &Database,
+        target: &Database,
+    ) -> Result<(Vec<&'static str>, Vec<&'static str>), Error> {
+        let setup = self.get()?;
+        let mut both = setup.modules.clone();
+        let mut source_only = Vec::new();
+        for (module, _) in &setup.dormant {
+            match (installed_on(module, source).await?, installed_on(module, target).await?) {
+                (true, true) => both.push(module),
+                (true, false) => source_only.push(*module),
+                _ => {}
+            }
+        }
+        Ok((both, source_only))
     }
 
     /// Split / merge policy of every module.
@@ -338,6 +359,11 @@ impl MoveSetup {
         modules.extend(setup.dormant.iter().map(|(module, _)| *module));
         Ok((modules, setup.control_plane.clone()))
     }
+}
+
+/// The module's migration history table exists at `database` (the module once ran there).
+async fn installed_on(module: &str, database: &Database) -> Result<bool, Error> {
+    Ok(crate::migration::table_exists(database.read(), &format!("{module}_migrations")).await?)
 }
 
 /// Result of checking a move, before running it.

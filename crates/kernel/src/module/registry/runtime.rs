@@ -287,6 +287,8 @@ impl Modules {
     /// [`USER_DELETED`](crate::privacy::USER_DELETED)): enabled modules through `Module::subscriptions`,
     /// turned-off modules through `Module::dormant` (D-20261125-dormant-modules). Call after
     /// [`start`](Self::start).
+    // Cho test của chương trình (crate `autoxide`); không thuộc hợp đồng.
+    #[doc(hidden)]
     pub fn user_deleted_receivers(&self) -> Vec<&'static str> {
         let mut receivers: Vec<&'static str> = self
             .modules
@@ -452,7 +454,7 @@ impl Modules {
     }
 
     pub fn migrator(&self) -> Result<Migrator, MigrationError> {
-        let modules = self
+        let mut modules: Vec<ModuleMigrations> = self
             .modules
             .iter()
             .map(|module| {
@@ -460,6 +462,13 @@ impl Modules {
                     .with_upgrades(module.upgrades())
             })
             .collect();
+        // Module đang tắt (chế độ "nghỉ"): migration chỉ áp ở database đã có bảng của nó, để phần xuất / xoá dữ
+        // liệu cá nhân chạy trên schema mới sau nâng cấp; database mới không bao giờ có bảng của nó.
+        modules.extend(self.dormant.iter().map(|module| {
+            ModuleMigrations::new(module.name(), module.migrations())
+                .with_upgrades(module.upgrades())
+                .where_installed()
+        }));
         Ok(Migrator::new(modules)?.with_keys(self.keys.clone()))
     }
 }

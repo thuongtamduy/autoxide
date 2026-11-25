@@ -301,10 +301,17 @@ impl TenantRelocations {
         prepared: &Prepared,
         source: &Database,
         target: &Database,
+        run: bool,
     ) -> Result<(TenantTables, Vec<Resolved>), Error> {
-        // Module đang tắt cũng đi theo nhánh (chế độ "nghỉ", bước 70 P9).
-        self.setup.prepare_dormant(source, target).await?;
-        let (modules, control_plane) = self.setup.tenant_tables()?;
+        // Module đang tắt cũng đi theo nhánh (chế độ "nghỉ", bước 70 P9). Lượt chạy thật đưa bảng của nó ở hai
+        // đầu về cùng migration; kế hoạch (dry run) không đổi schema, chỉ đọc module tắt có bảng ở cả hai đầu.
+        let (modules, control_plane) = if run {
+            self.setup.prepare_dormant(source, target).await?;
+            self.setup.tenant_tables()?
+        } else {
+            let (_, control_plane) = self.setup.tenant_tables()?;
+            (self.setup.dry_run_modules(source, target).await?.0, control_plane)
+        };
         let tables =
             TenantTables::read(source, target, &modules, &control_plane).await.map_err(transfer)?;
         let resolved = self.setup.policies()?.resolve(
@@ -350,7 +357,7 @@ impl TenantRelocations {
     /// The plan of the tables (when both databases are usable).
     pub(super) async fn report(&self, prepared: &Prepared) -> Result<Option<Report>, Error> {
         let Some((source, target)) = &prepared.databases else { return Ok(None) };
-        let (tables, resolved) = self.resolve(prepared, source, target).await?;
+        let (tables, resolved) = self.resolve(prepared, source, target, false).await?;
         let context =
             self.context(Uuid::nil(), prepared, source, target, &tables, &resolved).await?;
         Ok(Some(plan::report(&tables, &resolved, &context).await?))

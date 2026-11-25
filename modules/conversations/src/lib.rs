@@ -182,8 +182,8 @@ impl Module for ConversationsModule {
     }
 
     // Chế độ nghỉ (bước 70 P9): module tắt vẫn xuất cuộc trò chuyện của người dùng và ẩn danh hoá khi
-    // tài khoản bị xoá — cùng hàm với lúc bật, không cần service (xem `privacy.rs`; bản ghi âm giữ
-    // lại tới khi bật lại).
+    // tài khoản bị xoá — cùng hàm với lúc bật, không cần service (xem `privacy.rs`). Bản ghi âm xoá qua kho
+    // dùng chung và bộ nối thoại đang bật; thiếu thì báo lỗi để event được thử lại.
     fn dormant(
         &self,
         context: &mut autoxide_kernel::module::DormantContext<'_>,

@@ -251,8 +251,6 @@ impl ConversationsService {
     }
 }
 
-/// Tài khoản `user` bị xoá: xoá bản ghi các cuộc gọi của người đó, xoá số trong yêu cầu gọi lại.
-/// `service` là `None` khi module đang tắt: bản ghi giữ lại tới khi bật lại (xem trong hàm).
 /// Ai xoá bản ghi cuộc gọi khi tài khoản bị xoá: service (module đang bật, ghi cả event), hay phần "nghỉ" của
 /// module đang tắt (bước 70 P9) với kho dùng chung và bộ nối thoại của module đang bật.
 pub(crate) enum RecordingEraser<'a> {
@@ -321,6 +319,8 @@ impl RecordingEraser<'_> {
     }
 }
 
+/// Tài khoản `user` bị xoá: xoá bản ghi các cuộc gọi của người đó (nội dung trước, cột sau: lỗi thì trả lỗi khi
+/// dòng còn nguyên), xoá số trong yêu cầu gọi lại.
 pub(crate) async fn forget_calls(
     eraser: &RecordingEraser<'_>,
     tenant: &TenantContext,

@@ -16,11 +16,24 @@ Quyết định: (bước 70 P9 mục 2, chủ dự án mở lại ở D-2026112
    không trả giá gì, tập module chạy không phụ thuộc trạng thái database.
 3. **Vòng đời khách theo khai báo**: xoá hẳn khách, bản xuất dữ liệu của khách (D-328), dời / tách / gộp khách lấy bảng
    của module bật CỘNG module tắt (`retained_tables`, `control_plane_tables`, `relocation` của module tắt được gom như
-   module bật). Trước khi chép (dời, tách, gộp — cả dry run), migration của **chính module tắt** được áp ở database
-   nguồn và đích nếu nguồn đã có bảng của nó; không chạm database chưa từng có bảng đó. Bỏ chốt chặn
+   module bật). Chỉ **lượt chạy thật** của dời / tách / gộp áp migration của chính module tắt ở cả nguồn và đích khi
+   MỘT trong hai đã có bảng của nó (cả chiều nguồn chưa có mà đích đã có); không chạm database mà cả hai đều chưa có.
+   **Dry run không đổi schema**: chỉ đọc module tắt có bảng ở cả hai đầu; có bảng ở nguồn mà đích chưa có thì đếm dòng
+   ở nguồn (dời) — kế hoạch tách / gộp bỏ qua module đó, lượt chạy thật vẫn mang nó theo. Bỏ chốt chặn
    `409 tenant_move_modules_off` (mã không còn phát ra) — phá vỡ hợp đồng mã lỗi trước 1.0, được phép theo
    D-20261125-api-break-before-1-0; ghi ở changelog mục Removed.
-4. **Gate**: test `module_tat_van_xuat_va_xoa_du_lieu_ca_nhan_nhu_khi_bat` (crate `app`, cả hai database) so tập module
+3b. **Migration của module tắt chạy nơi nó đã chạy**: `Modules::migrator()` (dùng cho `autoxide migrate up`, kiểm lúc
+   khởi động, placement) gồm cả module tắt với `ModuleMigrations::where_installed()` — chỉ áp ở database đã có
+   `<module>_migrations`, database khác coi như không có gì chờ. Không thế thì sau nâng cấp, phần xuất / xoá của module
+   tắt truy vấn cột chưa có, làm hỏng bản xuất của mọi module và `USER_DELETED` thử lại mãi. Database mới vẫn không có
+   bảng của module tắt (nghĩa của P1 giữ nguyên).
+4. **Hình dạng hợp đồng (chốt trước 1.0)**: `fn dormant(&self, …)` nhận `&self` (khác `start(&mut self)`) có chủ ý:
+   phần "nghỉ" không giữ trạng thái trong module — mọi thứ đăng ký qua `DormantContext`, module tắt không bao giờ có
+   service nửa vời; cấu hình của nó đã đọc ở `configure`. `DormantContext::share_storage` là lối riêng cho `files`
+   (module duy nhất mở kho), `#[doc(hidden)]`, ngoài cam kết ổn định. `PersonalDataExport::modules()` (trả `Result`,
+   không nuốt lock hỏng) và `Modules::user_deleted_receivers()` công khai chỉ cho test của chương trình (crate khác
+   crate kernel), `#[doc(hidden)]`.
+4b. **Gate**: test `module_tat_van_xuat_va_xoa_du_lieu_ca_nhan_nhu_khi_bat` (crate `app`, cả hai database) so tập module
    góp phần xuất / nghe `USER_DELETED` khi mọi module bật với khi chỉ module core bật — module quên cài `dormant` là
    đỏ. `Modules::user_deleted_receivers()` và `PersonalDataExport::modules()` công khai cho việc đó.
 5. **Event của module tắt không được ghi**: phần xoá dùng chung nhận `Option<&Outbox>`, khi tắt là `None` — không ai

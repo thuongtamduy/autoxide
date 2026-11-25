@@ -92,11 +92,11 @@ impl PersonalDataExport {
     }
 
     /// Names of the modules that registered a part (turned-off modules included), in registration order.
-    pub fn modules(&self) -> Vec<&'static str> {
-        self.exporters
-            .read()
-            .map(|exporters| exporters.iter().map(|(name, _, _)| *name).collect())
-            .unwrap_or_default()
+    // Cho test của chương trình (crate `autoxide` kiểm mọi module có phần "nghỉ"); không thuộc hợp đồng.
+    #[doc(hidden)]
+    pub fn modules(&self) -> Result<Vec<&'static str>, Error> {
+        let exporters = self.exporters.read().map_err(|_| poisoned())?;
+        Ok(exporters.iter().map(|(name, _, _)| *name).collect())
     }
 
     /// Data of user `user_id` of tenant `tenant` from every registered module, keyed by module
