@@ -315,10 +315,15 @@ SDK, mục lục quyết định); gate trên máy kiểm sớm bằng `cargo xt
   `Module::translations` (D-039, D-057). Thêm `code` mới thì thêm bản dịch —
   `cargo xtask check` chặn `code` thiếu bản dịch. Client không nêu ngôn ngữ thì trả
   **tiếng Anh**.
-- Response chỉ có ba hình dạng: `Data<T>` (`{"data": …}`), `Page<T>`
-  (`{"data": […], "pagination": {…}}`) và lỗi `Problem` (RFC 9457). Danh sách lấy
-  bằng `fetch_page` với tham số `limit` / `cursor` / `order`; không tự viết
-  `OFFSET`.
+- Response chỉ có ba hình dạng: `Data<T>` (`{"data": …}`, một đối tượng), `Page<T>`
+  (`{"data": […], "pagination": {…}}`) và lỗi `Problem` (RFC 9457). **Mọi danh sách là `Page<T>`**, không trả
+  `Data<Vec<T>>` (D-20261125-list-pages, chủ dự án quyết): gate `api-unpaged-list` chặn danh sách mới thiếu
+  pagination; `xtask/api-shape-allow.txt` chỉ còn các danh sách cũ chờ chuyển, không thêm dòng mới. Danh sách trong
+  database chia trang bằng keyset, tham số `limit` / `cursor` / `order`: `fetch_page` + `PageQuery` (mới nhất
+  trước); `fetch_page_by` + `NaturalOrderPageQuery` khi danh sách có thứ tự tự nhiên (vị trí, tên, mã — mặc định
+  `asc`); endpoint có tham số `sort` thì `SortChoicePageQuery::into_request(mặc định theo cột đang chọn)`. Cột sắp
+  phải NOT NULL và có index khớp (cột lọc + cột sắp + id); không trần đọc ngầm, không tự viết `OFFSET`. `page_of`
+  chỉ cho danh sách không nằm trong database. Tool MCP danh sách dùng cùng tham số và trả `pagination` như REST.
 - Doc comment `///` trên kiểu có `ToSchema` / `IntoParams` và trên handler có
   `#[utoipa::path]` được chép vào tài liệu OpenAPI: viết **tiếng Anh**, cho người
   gọi API. Giải thích cho người đọc code thì dùng `//`.
