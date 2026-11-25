@@ -469,9 +469,26 @@ async fn split_then_merge_roundtrip_restores_original_data() {
             ];
             insert(app.database(), "kernel_tenant_domains", &columns, values).await;
         }
+        // CORS theo tên miền theo chủ của tên miền (D-20261125-tenant-cors): trước khi gộp `shared.test` của
+        // `a-north`, trang trên đó không gọi được cho `a`; gộp xong (dời tên miền) thì được ngay.
+        app.registry().invalidate_domain("shared.test");
+        let from_shared = || async {
+            app.get("/api/v1/kernel/client-config")
+                .header("autoxide-tenant", "a")
+                .header("origin", "https://shared.test")
+                .unchecked()
+                .send()
+                .await
+                .unwrap()
+        };
+        let refused = from_shared().await;
+        assert_eq!(refused.json()["code"], "tenant_origin_mismatch", "{}", refused.json());
         let started = service.start(Actor::system(), &merge(root), None, false).await.unwrap();
         let done = service.run(started.id, "test").await.unwrap();
         assert_eq!(done.state, "done", "{done:?}");
+        let allowed = from_shared().await;
+        assert_eq!(allowed.status(), axum::http::StatusCode::OK, "{}", allowed.json());
+        assert_eq!(allowed.header("access-control-allow-origin"), "https://shared.test");
         assert_eq!(dump(&main, a.id()).await, before);
         let select = Query::select()
             .columns([Alias::new("domain"), Alias::new("status"), Alias::new("tenant_id")])

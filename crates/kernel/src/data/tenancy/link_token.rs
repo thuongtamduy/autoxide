@@ -50,8 +50,9 @@ pub fn split_link_token(token: &str) -> Option<(Option<TenantId>, &str)> {
 /// e.g. main domain with no header).
 ///
 /// - Token with a prefix: the tenant written in the token, looked up through `registry`. A tenant that does
-///   not exist, cannot be served (suspended, maintenance) or a malformed token → `Ok(None)`, like a wrong
-///   token: it does not reveal which tenant exists.
+///   not exist, cannot be served (suspended, maintenance), a tenant other than the request's when the request
+///   came from a page on the request tenant's own domain (CORS), or a malformed token → `Ok(None)`, like a
+///   wrong token: it does not reveal which tenant exists.
 /// - Token without a prefix: the request's tenant, else the default tenant (tokens issued before step 33
 ///   belong to the default tenant).
 ///
@@ -70,6 +71,15 @@ pub async fn resolve_link_token<'t>(
     };
     let tenant = match id {
         None => request.cloned().unwrap_or_else(|| registry.default_tenant()),
+        // Request đến từ trang trên tên miền của khách khác (CORS), dù khách được nêu bằng cách nào: như token sai.
+        // Ngoài trang của một khách thì token tự nêu khách như trước — vd người đang đăng nhập ở khách X mở link huỷ
+        // nhận thư của khách Y.
+        Some(id)
+            if request
+                .is_some_and(|request| request.is_from_page_origin() && request.id() != id) =>
+        {
+            return Ok(None);
+        }
         Some(id) => match registry.tenant(id).await {
             Ok(tenant) if ensure_serving(&tenant).is_ok() => tenant,
             Ok(_) => return Ok(None),
@@ -157,11 +167,14 @@ mod tests {
         let (tenant, _) =
             resolve_link_token(&registry, Some(&other), "raw").await.unwrap().unwrap();
         assert_eq!(tenant, other);
-        // Tiền tố của khách mặc định: tra được dù request là khách khác.
+        // Tiền tố của khách mặc định: tra được dù request là khách khác (header, `Host`, credential)…
         let token = format!("t{}.raw", DEFAULT_TENANT.as_uuid().simple());
         let (tenant, raw) =
             resolve_link_token(&registry, Some(&other), &token).await.unwrap().unwrap();
         assert_eq!((tenant.id(), raw), (DEFAULT_TENANT, "raw"));
+        // …trừ khi request đến từ trang trên tên miền của khách khác đó (D-20261125-tenant-cors).
+        let page = other.clone().reached_from_page();
+        assert!(resolve_link_token(&registry, Some(&page), &token).await.unwrap().is_none());
         // Khách không có, sai dạng, rỗng, quá dài: như token sai.
         let forged = link_token(&other, "raw");
         let long = "a".repeat(MAX_TOKEN_LEN + 1);

@@ -4,7 +4,6 @@
 //! JSON (no SSE): no tool sends intermediate messages, and the server keeps no session (like the earlier
 //! `rmcp` configuration).
 
-use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 
 use axum::body::Body;
@@ -16,7 +15,6 @@ use serde_json::{Map, Value};
 use super::McpServer;
 use super::protocol::{self, Incoming, RpcError, code};
 use crate::access::Principal;
-use crate::config::CorsOrigins;
 use crate::i18n::Language;
 use crate::tenancy::TenantContext;
 
@@ -43,16 +41,13 @@ pub(super) struct Caller {
 }
 
 /// Serves one HTTP request to `/mcp` or `/mcp/<module>` (already past the authentication layer).
-pub(super) async fn handle(
-    server: McpServer,
-    origins: Arc<CorsOrigins>,
-    request: Request,
-) -> Response {
+pub(super) async fn handle(server: McpServer, request: Request) -> Response {
     let (parts, body) = request.into_parts();
-    // Chống DNS rebinding (đặc tả: "Servers MUST validate the Origin header"): như CORS — không khai origin
-    // nào thì trình duyệt không gọi được.
-    if let Some(origin) = parts.headers.get(header::ORIGIN)
-        && !origin_allowed(&origins, origin)
+    // Chống DNS rebinding (đặc tả: "Servers MUST validate the Origin header"): cùng một nguồn sự thật với CORS
+    // (`http::cors::classify`) — origin không được phép thì không có `OriginGrant`. Origin của tên miền khách
+    // gắn với khách đó: lớp xác thực đã từ chối request làm cho khách khác (`tenant_origin_mismatch`).
+    if parts.headers.contains_key(header::ORIGIN)
+        && parts.extensions.get::<crate::http::OriginGrant>().is_none()
     {
         let error = RpcError::new(code::INVALID_REQUEST, "Forbidden: Origin is not allowed");
         return json_response(StatusCode::FORBIDDEN, &error.into_message(None));
@@ -291,16 +286,6 @@ fn error_status(error: &RpcError, modern: bool) -> StatusCode {
         code::UNSUPPORTED_PROTOCOL_VERSION | code::HEADER_MISMATCH => StatusCode::BAD_REQUEST,
         code::METHOD_NOT_FOUND => StatusCode::NOT_FOUND,
         _ => StatusCode::OK,
-    }
-}
-
-fn origin_allowed(origins: &CorsOrigins, origin: &HeaderValue) -> bool {
-    match origins {
-        CorsOrigins::None => false,
-        CorsOrigins::Any => true,
-        CorsOrigins::List(list) => {
-            origin.to_str().is_ok_and(|origin| list.iter().any(|allowed| allowed == origin))
-        }
     }
 }
 

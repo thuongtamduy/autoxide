@@ -27,6 +27,7 @@ async fn app(test: &TestDatabase) -> TestApp {
         .user("staff", 4, &["kernel.tenants.manage", "kernel.sandboxes.manage"])
         .user_in("acme", "owner", 2, &["kernel.data.export"])
         .tenant("beta")
+        .domain("beta", "shop-beta.test")
         .user_in("beta", "stranger", 3, &["kernel.data.export"])
         .build()
         .await
@@ -109,6 +110,15 @@ async fn nhan_su_nen_tang_phai_vao_khach_moi_xuat_duoc_va_khach_thay_vet() {
         let (status, link) =
             call(&app, Method::POST, &format!("{base}/{id}/link"), "owner", None).await;
         assert_eq!(status, StatusCode::OK, "{link}");
+        // Trang trên tên miền của khách khác không tải được bằng link của `acme` (D-20261125-tenant-cors).
+        let foreign = app
+            .get(link["data"]["url"].as_str().unwrap())
+            .header("origin", "https://shop-beta.test")
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(foreign.status(), StatusCode::NOT_FOUND);
+        assert_eq!(foreign.json()["code"], "kernel.export_link_invalid");
         let opened = app.get(link["data"]["url"].as_str().unwrap()).send().await.unwrap();
         assert_eq!(opened.status(), StatusCode::OK);
         assert_eq!(
