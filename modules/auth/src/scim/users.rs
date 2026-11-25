@@ -367,7 +367,15 @@ impl ScimService {
     ) -> Result<autoxide_kernel::access::Principal, ScimError> {
         let tenant = &caller.tenant;
         Ok(match self.roles.user_principal(tenant, caller.created_by).await? {
-            Some((user, principal)) if user.is_active() && user.realm == Realm::Staff => principal,
+            // Người tạo còn hoạt động, là nhân sự và CÒN `auth.scim.manage`: mất quyền quản lý SCIM
+            // thì token của họ không cấp, giữ hay gỡ được gì (`creator_status = missing_permission`).
+            Some((user, principal))
+                if user.is_active()
+                    && user.realm == Realm::Staff
+                    && principal.has(&crate::permissions::SCIM_MANAGE) =>
+            {
+                principal
+            }
             _ => autoxide_kernel::access::Principal::new(caller.created_by, [])
                 .in_tenant(tenant.id()),
         })
@@ -484,7 +492,21 @@ impl ScimService {
             0
         };
         let email_changed = account.email != input.email;
-        if link_before.is_some() && (email_changed || was_active != input.active) {
+        // Mọi thay đổi trên tài khoản đã liên kết — không chỉ email và `active` — cần người tạo token
+        // bao trùm quyền của tài khoản: `userName` / `externalId` là khoá hệ thống danh tính dùng để
+        // khớp người; đổi chúng trên tài khoản quyền cao thì lần đẩy sau (bằng token của người quyền
+        // cao) có thể ghi hồ sơ của người khác, kể cả email, vào tài khoản đó (PT-19,
+        // D-20261125-scim-sync-report). PUT / PATCH không đổi gì thì không kiểm.
+        let changed = link_before.as_ref().is_some_and(|link| {
+            email_changed
+                || was_active != input.active
+                || account.name != input.name
+                || link.user_name != input.user_name
+                || link.external_id != input.external_id
+                || link.given_name != input.given_name
+                || link.family_name != input.family_name
+        });
+        if changed {
             self.require_creator_covers(caller, id).await?;
         }
         let mut update = user::Entity::update_many()
@@ -517,6 +539,16 @@ impl ScimService {
             .exec(transaction)
             .await
             .map_err(unique_to_scim)?;
+        if email_changed && link_before.is_some() {
+            // Email đổi qua SCIM: mọi cách vào tài khoản gắn với email cũ đóng lại trong CÙNG
+            // transaction — mật khẩu, phiên, refresh token, API key, passkey, TOTP, link đăng nhập /
+            // đặt lại đang chờ, liên kết đăng nhập ngoài. Không thì người đã giữ tài khoản dưới email
+            // cũ (vd kẻ chiếm trước `userName` mà hệ thống danh tính sẽ khớp, rồi đặt mật khẩu qua
+            // email của mình) vẫn đăng nhập được sau khi hệ thống danh tính trao tài khoản cho người
+            // thật; chủ mới đăng nhập bằng nhà cung cấp danh tính hay đặt lại mật khẩu qua email mới.
+            self.users.lock_out_in(tenant, transaction, actor, id).await?;
+            tracing::info!(user_id = %id, "SCIM email change: sign-in credentials revoked");
+        }
         if was_active && !input.active {
             // Nhân viên nghỉ: mọi đường vào đóng ngay, cùng transaction với việc khoá.
             crate::session::SessionService::revoke_user(transaction, tenant, id).await?;
