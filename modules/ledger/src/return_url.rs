@@ -47,9 +47,6 @@ fn origin_of(url: &url::Url) -> Option<String> {
     Some(format!("{}://{host}:{port}", url.scheme()))
 }
 
-fn origin(raw: &str) -> Option<String> {
-    parse(raw).as_ref().and_then(origin_of)
-}
 
 // Một origin hợp lệ để khai: chỉ scheme + host (+ port), không đường dẫn, tham số hay ký tự đại diện `*` (so khớp
 // chính xác; `https://*.example.com` sẽ không bao giờ khớp nên từ chối ngay lúc lưu để quản trị viên khỏi hiểu lầm).
@@ -120,6 +117,10 @@ pub(crate) async fn check(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn origin(raw: &str) -> Option<String> {
+        parse(raw).as_ref().and_then(origin_of)
+    }
 
     #[test]
     fn origin_doc_nhu_trinh_duyet() {
