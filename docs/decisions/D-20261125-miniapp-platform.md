@@ -4,8 +4,8 @@ Chủ đề: Phạm vi và mục tiêu
 
 Quyết định:
 
-1. **Đích của sản phẩm:** Autoxide là nền để nhà phát triển dựng mini app và website trên đó, theo kiểu Zalo Platform
-   hay Mini App của MoMo: họ dùng tài khoản, phân quyền, thanh toán, thông báo… của core thay vì tự làm lại.
+1. **Đích của sản phẩm:** Autoxide là nền để nhà phát triển dựng mini app và website trên đó, theo kiểu Zalo Mini App
+   hay MoMo Mini App: họ dùng tài khoản, phân quyền, thanh toán, thông báo… của core thay vì tự làm lại.
 2. **Hai tầng mở rộng, không thay nhau:** tầng trong là module Rust biên dịch chung vào server (người được tin cậy
    viết, toàn quyền với dữ liệu của module — bước 70 P2); tầng ngoài là ứng dụng bên ngoài viết bằng ngôn ngữ bất kỳ,
    chỉ gọi được API trong các quyền khách đã đồng ý (bước 65). "Mini app" của nhà phát triển bên thứ ba là tầng ngoài.

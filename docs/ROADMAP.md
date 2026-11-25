@@ -582,8 +582,8 @@ Bắt đầu SAU bước 34 và 40 (đăng nhập OIDC).
 Đặc tả: [`docs/steps/65-apps.md`](steps/65-apps.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
 
 Bắt đầu SAU bước 54 và 33. Ứng dụng bên ngoài cắm vào như Shopify App Store. Đây là tầng "mini app" của nền
-(D-20261125-miniapp-platform): nhà phát triển bên ngoài dựng mini app trên core như trên Zalo Platform hay Mini App
-của MoMo; mọi mục phải chạy được cả khi một công ty tự vận hành nền của họ lẫn khi một dịch vụ phục vụ nhiều khách.
+(D-20261125-miniapp-platform): nhà phát triển bên ngoài dựng mini app trên core như trên Zalo Mini App hay MoMo Mini
+App; mọi mục phải chạy được cả khi một công ty tự vận hành nền của họ lẫn khi một dịch vụ phục vụ nhiều khách.
 
 - [ ] Máy chủ ủy quyền OAuth 2.0 trong `auth`: mã ủy quyền + PKCE bắt buộc, refresh token xoay vòng, phạm vi là
       tên permission, thu hồi và kiểm tra token, siêu dữ liệu máy chủ (RFC 7009, 7636, 7662, 8414)

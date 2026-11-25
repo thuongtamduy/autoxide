@@ -219,8 +219,8 @@ cài đặt không đồng ý giá), `apps.trial_reminders` (hằng ngày, trư�
 
 ### Mini app (D-20261125-miniapp-platform)
 
-Bước này là tầng "mini app" của nền: nhà phát triển bên ngoài dựng mini app trên core như trên Zalo Platform hay
-Mini App của MoMo. Phần trên tả phía server (OAuth, cài, đồng ý, webhook, bán ứng dụng). Ba phần dưới đây làm nó
+Bước này là tầng "mini app" của nền: nhà phát triển bên ngoài dựng mini app trên core như trên Zalo Mini App hay
+MoMo Mini App. Phần trên tả phía server (OAuth, cài, đồng ý, webhook, bán ứng dụng). Ba phần dưới đây làm nó
 thành nền cho mini app có giao diện. Đây mới là yêu cầu, chưa phải thiết kế chi tiết: agent mở bước này viết thiết
 kế vào đây trước khi làm, và ghi quyết định cho những lựa chọn có cách khác cũng hợp lý.
 
