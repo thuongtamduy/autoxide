@@ -10,8 +10,8 @@ use axum::extract::ConnectInfo;
 use axum::http::Request;
 use hyper_util::rt::{TokioExecutor, TokioIo, TokioTimer};
 use hyper_util::server::conn::auto::Builder;
-use tokio::net::TcpListener;
-use tokio::sync::watch;
+use tokio::net::{TcpListener, TcpStream};
+use tokio::sync::{Semaphore, watch};
 use tower::ServiceExt as _;
 
 /// How the server stopped.
@@ -38,8 +38,9 @@ const KEEP_ALIVE_TIMEOUT: Duration = Duration::from_secs(20);
 /// to finish - but no longer than `grace`. This way, when deploying a new version, in-flight requests
 /// are not cut off midway, and the process also does not hang forever because of one stuck request.
 ///
-/// A client must send a request's headers within 30 seconds, and idle HTTP/2 connections are
-/// pinged, so slow or silent clients cannot hold connections open forever.
+/// A client must send its first bytes and then a request's headers within 30 seconds, and idle HTTP/2
+/// connections are pinged, so slow or silent clients cannot hold connections open forever. There is no
+/// limit on the number of open connections; [`serve_with_limit`] sets one.
 pub async fn serve<F>(
     listener: TcpListener,
     router: Router,
@@ -49,20 +50,46 @@ pub async fn serve<F>(
 where
     F: Future<Output = ()> + Send + 'static,
 {
-    serve_with(listener, router, shutdown, grace, HEADER_READ_TIMEOUT).await
+    serve_with(listener, router, shutdown, grace, HEADER_READ_TIMEOUT, 0).await
 }
 
-// `serve` với timeout đọc header `header_timeout` (test dùng số nhỏ).
+/// Like [`serve`], but keeps at most `max_connections` connections open at once (`0`: no limit,
+/// like [`serve`]); `AUTOXIDE_HTTP_MAX_CONNECTIONS` configures it for the API port.
+///
+/// At the limit the server stops accepting until a connection closes: new connections wait in the
+/// operating system's accept queue rather than being refused, and nothing blocks a thread.
+pub async fn serve_with_limit<F>(
+    listener: TcpListener,
+    router: Router,
+    shutdown: F,
+    grace: Duration,
+    max_connections: usize,
+) -> std::io::Result<Shutdown>
+where
+    F: Future<Output = ()> + Send + 'static,
+{
+    serve_with(listener, router, shutdown, grace, HEADER_READ_TIMEOUT, max_connections).await
+}
+
+// `serve` với timeout đọc header `header_timeout` (test dùng số nhỏ) và giới hạn số kết nối
+// `max_connections` (0: không giới hạn).
 async fn serve_with<F>(
     listener: TcpListener,
     router: Router,
     shutdown: F,
     grace: Duration,
     header_timeout: Duration,
+    max_connections: usize,
 ) -> std::io::Result<Shutdown>
 where
     F: Future<Output = ()> + Send + 'static,
 {
+    // Giới hạn số kết nối mở (L-10 của rà soát bảo mật 2026-11): mỗi kết nối giữ một "vé" của
+    // `Semaphore` tới khi đóng. Hết vé thì vòng lặp CHỜ (async, không chặn thread) trước khi gọi
+    // `accept` — kết nối mới nằm trong hàng đợi của hệ điều hành chứ không bị từ chối, và process
+    // không bao giờ dùng hết file descriptor vì kết nối rỗi. `None`: không giới hạn.
+    let permits =
+        (max_connections > 0).then(|| std::sync::Arc::new(Semaphore::new(max_connections)));
     // Hai kênh `watch` dùng như chuông (cách `axum::serve` làm): `stop` — bên nhận bị bỏ khi bắt đầu
     // tắt, mỗi kết nối thấy `closed()` thì đóng êm; `alive` — mỗi kết nối giữ một bên nhận, bỏ khi
     // xong, nên `closed()` của bên gửi là "mọi kết nối đã xong".
@@ -80,6 +107,15 @@ where
 
     let mut shutdown = std::pin::pin!(shutdown);
     loop {
+        // `acquire_owned` chỉ lỗi khi semaphore bị đóng — ở đây không bao giờ đóng; lỡ có thì phục vụ
+        // không giới hạn thay vì dừng máy chủ.
+        let permit = match &permits {
+            Some(permits) => tokio::select! {
+                () = &mut shutdown => break,
+                permit = permits.clone().acquire_owned() => permit.ok(),
+            },
+            None => None,
+        };
         tokio::select! {
             () = &mut shutdown => break,
             accepted = listener.accept() => {
@@ -114,6 +150,15 @@ where
                 let stop_tx = stop_tx.clone();
                 let alive_rx = alive_rx.clone();
                 tokio::spawn(async move {
+                    // Vé giữ tới khi task của kết nối kết thúc (biến bị bỏ ở cuối block).
+                    let _permit = permit;
+                    // Kết nối chưa gửi byte nào: hyper-util còn chờ byte đầu để biết HTTP/1 hay HTTP/2, và
+                    // timeout đọc header của hyper chưa chạy, nên kết nối im lặng nằm đó mãi (L-10). Chờ byte
+                    // đầu tối đa `header_timeout`; không có (hay client đã đóng) thì bỏ kết nối.
+                    if !first_bytes_arrive(&stream, header_timeout).await {
+                        drop(alive_rx);
+                        return;
+                    }
                     let connection =
                         builder.serve_connection_with_upgrades(TokioIo::new(stream), service);
                     let mut connection = std::pin::pin!(connection);
@@ -147,6 +192,12 @@ where
         () = alive_tx.closed() => Ok(Shutdown::Graceful),
         () = tokio::time::sleep(grace) => Ok(Shutdown::TimedOut),
     }
+}
+
+// Có byte đầu tiên đến trong `timeout` không. `peek` không lấy byte khỏi socket, hyper vẫn đọc đủ.
+async fn first_bytes_arrive(stream: &TcpStream, timeout: Duration) -> bool {
+    let mut byte = [0u8; 1];
+    matches!(tokio::time::timeout(timeout, stream.peek(&mut byte)).await, Ok(Ok(read)) if read > 0)
 }
 
 // Lỗi chỉ của một kết nối (không phải của listener).
@@ -208,6 +259,7 @@ mod tests {
             },
             Duration::from_secs(5),
             Duration::from_millis(300),
+            0,
         ));
 
         let mut normal = tokio::net::TcpStream::connect(address).await.unwrap();
@@ -223,6 +275,84 @@ mod tests {
         let closed =
             tokio::time::timeout(Duration::from_secs(5), slow.read_to_end(&mut buffer)).await;
         assert!(closed.is_ok(), "the server closes a connection whose headers never finish");
+
+        stop.send(()).unwrap();
+        assert_eq!(server.await.unwrap().unwrap(), Shutdown::Graceful);
+    }
+
+    // L-10: kết nối mở mà không gửi byte nào cũng bị đóng sau timeout (trước đây nằm mãi, vì
+    // hyper-util chờ byte đầu để chọn HTTP/1 hay HTTP/2 mà không có timeout).
+    #[tokio::test]
+    async fn ket_noi_im_lang_khong_gui_byte_nao_bi_dong() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let router = Router::new().route("/", axum::routing::get(|| async { "ok" }));
+        let (stop, stopped) = tokio::sync::oneshot::channel::<()>();
+        let server = tokio::spawn(serve_with(
+            listener,
+            router,
+            async move {
+                let _ = stopped.await;
+            },
+            Duration::from_secs(5),
+            Duration::from_millis(300),
+            0,
+        ));
+
+        let mut silent = TcpStream::connect(address).await.unwrap();
+        let mut buffer = Vec::new();
+        let closed =
+            tokio::time::timeout(Duration::from_secs(5), silent.read_to_end(&mut buffer)).await;
+        assert!(closed.is_ok(), "the server closes a connection that never sends a byte");
+
+        stop.send(()).unwrap();
+        assert_eq!(server.await.unwrap().unwrap(), Shutdown::Graceful);
+    }
+
+    async fn ask(stream: &mut TcpStream) -> String {
+        stream.write_all(b"GET / HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n").await.unwrap();
+        let mut answer = String::new();
+        stream.read_to_string(&mut answer).await.unwrap();
+        answer
+    }
+
+    // L-10: quá `max_connections` kết nối thì kết nối mới chờ (không bị từ chối), và được phục vụ
+    // ngay khi một kết nối đóng.
+    #[tokio::test]
+    async fn qua_gioi_han_ket_noi_thi_ket_noi_moi_cho() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let router = Router::new().route("/", axum::routing::get(|| async { "ok" }));
+        let (stop, stopped) = tokio::sync::oneshot::channel::<()>();
+        let server = tokio::spawn(serve_with(
+            listener,
+            router,
+            async move {
+                let _ = stopped.await;
+            },
+            Duration::from_secs(5),
+            Duration::from_secs(30),
+            1,
+        ));
+
+        // Kết nối đầu giữ chỗ duy nhất: gửi nửa header rồi im.
+        let mut holder = TcpStream::connect(address).await.unwrap();
+        holder.write_all(b"GET / HTTP/1.1\r\n").await.unwrap();
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        // Kết nối thứ hai vẫn nối được (hàng đợi của hệ điều hành) nhưng chưa được trả lời.
+        let mut waiting = TcpStream::connect(address).await.unwrap();
+        let early = tokio::time::timeout(Duration::from_millis(500), ask(&mut waiting)).await;
+        assert!(early.is_err(), "a connection over the limit is not served yet");
+
+        // Kết nối đầu đóng thì kết nối thứ hai được phục vụ.
+        drop(holder);
+        let mut answer = String::new();
+        tokio::time::timeout(Duration::from_secs(5), waiting.read_to_string(&mut answer))
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(answer.starts_with("HTTP/1.1 200") && answer.ends_with("ok"), "{answer}");
 
         stop.send(()).unwrap();
         assert_eq!(server.await.unwrap().unwrap(), Shutdown::Graceful);

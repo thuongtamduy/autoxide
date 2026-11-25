@@ -17,11 +17,13 @@
 //!   `GET /api/v1/kernel/connections/webhooks`.
 //! - **Outgoing calls** use [`http_client`] (no redirects, with a timeout; a tenant-chosen address
 //!   may only be a public IP — D-20261121-ssrf-targets) and [`send`] (logs contain no secrets, plus metrics).
-//!   Not to be called inside a write transaction.
+//!   Not to be called inside a write transaction. A response body larger than
+//!   `AUTOXIDE_PROVIDER_MAX_RESPONSE_BYTES` is not read ([`read_body`]); the call counts as unreachable.
 //! - **Signatures**: [`hmac_sha256`], [`hex`], [`constant_time_eq`].
 //!
 //! Guide to writing a connector: `docs/guides/provider-adapters.md`.
 
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, PoisonError, RwLock};
 use std::time::Duration;
 
@@ -344,6 +346,74 @@ pub fn http_client(timeout: Duration, target: Target) -> Result<reqwest::Client,
     builder.build().map_err(|error| Error::internal(format!("provider HTTP client: {error}")))
 }
 
+/// Largest response body read from a provider (connectors and the `ai` module), I-2 of the 2026-11
+/// security review.
+pub const MAX_RESPONSE_BYTES: crate::config::Setting = crate::config::Setting::new(
+    "AUTOXIDE_PROVIDER_MAX_RESPONSE_BYTES",
+    "Largest response body, in bytes, read from an outside provider (AI, payment, shipping, SMS, \
+     e-invoice). A larger answer is dropped and the call fails as if the provider were unreachable, \
+     so a broken or hostile provider cannot fill the server's memory. Raise it only if a provider \
+     legitimately answers more (for example large embedding batches).",
+)
+.with_default("16777216");
+
+// Giá trị mặc định của MAX_RESPONSE_BYTES (16 MiB).
+const DEFAULT_MAX_RESPONSE_BYTES: usize = 16 * 1024 * 1024;
+
+// Giới hạn đang dùng của cả process. Một biến toàn cục (atomic) thay vì truyền qua tham số: `send` và
+// `http_client` là hàm tự do mà bộ nối gọi thẳng, không cầm cấu hình; cấu hình đọc một lần lúc khởi
+// động (module nền của kernel, `read_setting`) rồi chỉ đọc lại. `Relaxed` đủ: chỉ là một con số, không
+// đồng bộ dữ liệu nào khác theo nó.
+static MAX_RESPONSE: AtomicUsize = AtomicUsize::new(DEFAULT_MAX_RESPONSE_BYTES);
+
+/// The limit currently applied by [`send`] and [`read_body`] (`AUTOXIDE_PROVIDER_MAX_RESPONSE_BYTES`).
+pub fn max_response_bytes() -> usize {
+    MAX_RESPONSE.load(Ordering::Relaxed)
+}
+
+// Đọc `AUTOXIDE_PROVIDER_MAX_RESPONSE_BYTES` (từ 64 KiB tới 1 GiB) và áp cho cả process.
+pub(crate) fn read_setting(
+    reader: &mut crate::config::ConfigReader<'_>,
+) -> Result<usize, crate::config::Invalid> {
+    reader.get_with(&MAX_RESPONSE_BYTES, |raw| {
+        crate::config::parse_in_range(raw, 64 * 1024usize, 1024 * 1024 * 1024)
+    })
+}
+
+pub(crate) fn set_max_response_bytes(bytes: usize) {
+    MAX_RESPONSE.store(bytes, Ordering::Relaxed);
+}
+
+/// Why a provider's response body could not be read.
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum BodyError {
+    /// The connection broke or timed out while reading.
+    CutOff(reqwest::Error),
+    /// The body is larger than the limit; reading stopped there.
+    TooLarge,
+}
+
+/// Reads a provider's response body, but no more than `max_bytes` (normally [`max_response_bytes`]): a
+/// declared `Content-Length` over the limit is refused before reading, and reading stops as soon as the
+/// limit is passed - a provider (or anyone in between) cannot make the server buffer an endless answer.
+pub async fn read_body(
+    mut response: reqwest::Response,
+    max_bytes: usize,
+) -> Result<bytes::Bytes, BodyError> {
+    if response.content_length().is_some_and(|length| length > max_bytes as u64) {
+        return Err(BodyError::TooLarge);
+    }
+    let mut body = bytes::BytesMut::new();
+    while let Some(chunk) = response.chunk().await.map_err(BodyError::CutOff)? {
+        if body.len() + chunk.len() > max_bytes {
+            return Err(BodyError::TooLarge);
+        }
+        body.extend_from_slice(&chunk);
+    }
+    Ok(body.freeze())
+}
+
 /// The provider's response: HTTP status and raw body.
 #[derive(Debug, Clone)]
 pub struct ProviderReply {
@@ -377,9 +447,10 @@ pub async fn send(
     purpose: &'static str,
 ) -> Result<ProviderReply, Unreachable> {
     let outcome = async {
-        let response = request.send().await?;
+        let response = request.send().await.map_err(BodyError::CutOff)?;
         let status = response.status().as_u16();
-        Ok::<_, reqwest::Error>(ProviderReply { status, body: response.bytes().await? })
+        let body = read_body(response, max_response_bytes()).await?;
+        Ok::<_, BodyError>(ProviderReply { status, body })
     }
     .await;
     match outcome {
@@ -395,8 +466,18 @@ pub async fn send(
         Err(error) => {
             metrics::counter!("kernel_provider_calls_total", "provider" => provider, "outcome" => "unreachable")
                 .increment(1);
-            // `without_url`: URL có thể mang tham số nhạy cảm.
-            tracing::warn!(provider, purpose, error = %error.without_url(), "provider unreachable");
+            match error {
+                // `without_url`: URL có thể mang tham số nhạy cảm.
+                BodyError::CutOff(error) => {
+                    tracing::warn!(provider, purpose, error = %error.without_url(), "provider unreachable");
+                }
+                BodyError::TooLarge => tracing::warn!(
+                    provider,
+                    purpose,
+                    max_bytes = max_response_bytes(),
+                    "provider answer larger than AUTOXIDE_PROVIDER_MAX_RESPONSE_BYTES; dropped"
+                ),
+            }
             Err(Unreachable)
         }
     }
@@ -502,6 +583,69 @@ pub(crate) fn tools(accounts: ProviderAccounts) -> Vec<Tool> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    // Máy chủ giả trả `head` rồi `body_len` byte `x` (chia mảnh 64 KiB), cho mỗi kết nối.
+    async fn answering(head: String, body_len: usize) -> String {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            while let Ok((mut stream, _)) = listener.accept().await {
+                let head = head.clone();
+                tokio::spawn(async move {
+                    let mut request = [0u8; 4096];
+                    let _ = stream.read(&mut request).await;
+                    let _ = stream.write_all(head.as_bytes()).await;
+                    let chunk = vec![b'x'; 64 * 1024];
+                    let mut left = body_len;
+                    while left > 0 {
+                        let size = left.min(chunk.len());
+                        if stream.write_all(&chunk[..size]).await.is_err() {
+                            return;
+                        }
+                        left -= size;
+                    }
+                });
+            }
+        });
+        format!("http://{address}/")
+    }
+
+    async fn read(url: &str, max: usize) -> Result<bytes::Bytes, BodyError> {
+        let client = http_client(Duration::from_secs(10), Target::Fixed).unwrap();
+        read_body(client.get(url).send().await.unwrap(), max).await
+    }
+
+    // I-2 (rà soát bảo mật 2026-11): câu trả lời của nhà cung cấp lớn hơn giới hạn không được đọc hết vào
+    // bộ nhớ — cả khi khai `Content-Length`, lẫn khi không khai (đọc tới đâu đếm tới đó).
+    #[tokio::test]
+    async fn cau_tra_loi_qua_lon_bi_bo() {
+        let declared =
+            answering("HTTP/1.1 200 OK\r\nContent-Length: 5000000\r\n\r\n".to_owned(), 5_000_000)
+                .await;
+        assert!(matches!(read(&declared, 1024 * 1024).await, Err(BodyError::TooLarge)));
+        assert_eq!(read(&declared, 8 * 1024 * 1024).await.unwrap().len(), 5_000_000);
+
+        let undeclared =
+            answering("HTTP/1.1 200 OK\r\nConnection: close\r\n\r\n".to_owned(), 5_000_000).await;
+        assert!(matches!(read(&undeclared, 1024 * 1024).await, Err(BodyError::TooLarge)));
+        assert_eq!(read(&undeclared, 5_000_000).await.unwrap().len(), 5_000_000);
+    }
+
+    #[test]
+    fn gioi_han_mac_dinh_va_cau_hinh() {
+        let source = crate::config::ConfigSource::default();
+        let mut reader = crate::config::ConfigReader::new(&source);
+        let bytes = read_setting(&mut reader);
+        assert_eq!(reader.finish(bytes).unwrap().0, DEFAULT_MAX_RESPONSE_BYTES);
+        let source = crate::config::ConfigSource::from_pairs([(
+            "AUTOXIDE_PROVIDER_MAX_RESPONSE_BYTES",
+            "1000",
+        )]);
+        let mut reader = crate::config::ConfigReader::new(&source);
+        let bytes = read_setting(&mut reader);
+        assert!(reader.finish(bytes).is_err(), "below 64 KiB is refused");
+    }
 
     #[test]
     fn hmac_theo_vector_rfc_4231() {

@@ -50,6 +50,16 @@ pub const DRAIN_SECONDS: Setting = Setting::new(
 )
 .with_default("0");
 
+pub const MAX_CONNECTIONS: Setting = Setting::new(
+    "AUTOXIDE_HTTP_MAX_CONNECTIONS",
+    "Most connections the API port keeps open at once. At the limit the server stops accepting \
+     until one closes: new connections wait in the operating system's queue instead of being \
+     refused, so a flood of idle connections cannot use up the process's file descriptors. Keep it \
+     below the open file limit (`ulimit -n`). `0`: no limit (a reverse proxy in front limits \
+     connections per client better; this is the last line).",
+)
+.with_default("4096");
+
 pub const API_DOCS: Setting = Setting::new(
     "AUTOXIDE_HTTP_API_DOCS",
     "Serve an interactive API reference at `/api/docs` (`true` or `false`). The page loads its \
@@ -381,6 +391,8 @@ pub struct HttpConfig {
     /// Drain period before connections stop being accepted: `/health/ready` returns 503, requests are
     /// still served.
     pub drain: Duration,
+    /// Most open connections on the API port; `0`: no limit (L-10 of the 2026-11 security review).
+    pub max_connections: usize,
     pub api_docs: bool,
     pub metrics: bool,
     /// Dedicated port for `/metrics`; `None`: served on the API port.
@@ -442,6 +454,8 @@ impl HttpConfig {
         let shutdown_grace =
             reader.get_with(&SHUTDOWN_SECONDS, |raw| parse_in_range(raw, 0u64, 600));
         let drain = reader.get_with(&DRAIN_SECONDS, |raw| parse_in_range(raw, 0u64, 600));
+        let max_connections =
+            reader.get_with(&MAX_CONNECTIONS, |raw| parse_in_range(raw, 0usize, 1_000_000));
         let api_docs = reader.get_with(&API_DOCS, parse_bool);
         let metrics = reader.get_with(&METRICS, parse_bool);
         let mut metrics_address = reader.optional_with(&METRICS_ADDRESS, |raw| {
@@ -513,6 +527,7 @@ impl HttpConfig {
             cors_origins: cors_origins?.unwrap_or_default(),
             shutdown_grace: Duration::from_secs(shutdown_grace?),
             drain: Duration::from_secs(drain?),
+            max_connections: max_connections?,
             api_docs: api_docs?,
             metrics: metrics?,
             metrics_address: metrics_address?,
@@ -555,6 +570,7 @@ mod tests {
         assert_eq!(config.body_limit, 1024 * 1024);
         assert_eq!(config.cors_origins, CorsOrigins::None);
         assert_eq!(config.shutdown_grace, Duration::from_secs(30));
+        assert_eq!(config.max_connections, 4096);
         assert_eq!(config.drain, Duration::ZERO);
         assert!(!config.api_docs);
         assert!(!config.metrics);

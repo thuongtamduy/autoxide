@@ -343,6 +343,8 @@ jobs:
           # Toàn bộ lịch sử: secret đã commit rồi xoá vẫn nằm trong git.
           fetch-depth: 0
       - name: gitleaks
+        # Image ghim theo digest ở .github/gitleaks/Dockerfile, cùng chỗ gate.sh đọc (D-20261125-gitleaks-digest).
         run: |
-          docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.30.1 \
+          image="$(sed -n 's/^FROM //p' .github/gitleaks/Dockerfile)"
+          docker run --rm -v "$PWD:/repo" "$image" \
             git /repo --no-banner --redact --config /repo/.gitleaks.toml

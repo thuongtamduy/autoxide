@@ -834,6 +834,7 @@ mod tests {
                 "AUTOXIDE_RELOCATION_DRAIN_SECONDS",
                 "AUTOXIDE_TENANCY_SANDBOX_DAYS",
                 "AUTOXIDE_TENANCY_SANDBOX_MAX_PRODUCTS",
+                "AUTOXIDE_PROVIDER_MAX_RESPONSE_BYTES",
             ]
             .contains(name)
                 || ["AUTOXIDE_ANTISPAM_", "AUTOXIDE_EVENTS_", "AUTOXIDE_BACKUP_", "AUTOXIDE_SYNC_"]
