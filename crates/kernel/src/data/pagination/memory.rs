@@ -33,7 +33,8 @@ pub struct SortedPageQuery {
     #[param(value_type = Option<String>)]
     pub cursor: Option<String>,
     /// `asc` (the list's natural order, the default; the endpoint says what it is) or `desc`
-    /// (reversed). Keep the same order while following `next_cursor`.
+    /// (reversed). Text is ordered by the database's collation. Keep the same order while
+    /// following `next_cursor`: changing it midway only changes where the next page starts.
     #[param(value_type = Option<Order>, inline)]
     pub order: Option<String>,
     /// `true` to also get `pagination.total`, the number of items matching the filters, on the

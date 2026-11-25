@@ -80,7 +80,8 @@ pub struct PageQuery {
     #[param(value_type = Option<String>)]
     pub cursor: Option<String>,
     /// `desc` (newest first, the default) or `asc` (oldest first). Keep the same
-    /// order (and `sort`, where offered) while following `next_cursor`.
+    /// order (and `sort`, where offered) while following `next_cursor`: changing it midway only
+    /// changes where the next page starts.
     #[param(value_type = Option<Order>, inline)]
     pub order: Option<String>,
     /// `true` to also get `pagination.total`, the number of items matching the filters, on the
