@@ -194623,7 +194623,7 @@
     },
     "/api/v1/kernel/domains/{id}/verify": {
       "post": {
-        "description": "Requires `kernel.domains.manage`. Looks up the domain's TXT record right away and returns the\nnew status: `verified` when the record holds the expected value, otherwise still `pending`\nwith the reason in `check_error`. A `failed` domain can be verified again this way. When another\ntenant verified the same domain first, the answer is `failed` with that reason in `check_error`.",
+        "description": "Requires `kernel.domains.manage`. Looks up the domain's TXT record right away and returns the\nnew status: `verified` when the record holds the expected value, otherwise still `pending`\nwith the reason in `check_error`. A `failed` domain can be verified again this way. When another\ntenant has verified the same domain, the answer is `failed` with that reason in `check_error` at\nonce, whether or not your record is set.",
         "operationId": "kernel_verify_tenant_domain",
         "parameters": [
           {
