@@ -1,4 +1,4 @@
-## D-20261125-cloud-dev-friction · Máy cloud: Postgres cục bộ, build test trước khi `--warm`, test-affected chỉ dựng xtask; báo workflow đêm đỏ bằng issue — 2026-11-25 — agent quyết
+## D-20261125-cloud-dev-friction · Máy cloud: Postgres cục bộ, build test trước bằng `--prebuild`, test-affected chỉ dựng xtask; báo workflow đêm đỏ bằng issue — 2026-11-25 — agent quyết
 
 Chủ đề: Quy trình, gate, lộ trình
 
@@ -10,8 +10,8 @@ Quyết định:
 2. **`cargo-semver-checks`** cài như các công cụ khác: bản ghim 0.51.0 (khớp `ci.yml`, STACK.md), tarball musl dựng sẵn, SHA-256
    đo lúc ghim (nhà phát hành không công bố checksum).
 3. **Build lạnh.** Đo (máy 4 CPU, `CARGO_INCREMENTAL=0` như gate): `cargo test --workspace --no-run` 13 phút 28 giây, ~12 GB;
-   dựng lại không đổi gì 4,6 giây; clippy thêm 5 phút 41 giây. Vì lần gate nhanh đầu gần như toàn là build này nên `--warm`
-   thêm bước đó (bỏ qua khi đĩa trống dưới 25 GB, lỗi thì không làm hỏng script). Không build clippy trước: gate nhanh bỏ clippy.
+   dựng lại không đổi gì 4,6 giây; clippy thêm 5 phút 41 giây. Vì lần gate nhanh đầu gần như toàn là build này nên
+   thêm cờ riêng `--prebuild` cho bước đó (bỏ qua khi đĩa trống dưới 25 GB, lỗi thì không làm hỏng script). Không gộp vào `--warm`: setup script của môi trường gọi `--warm` và có giới hạn thời gian (con số ~5 phút chưa kiểm chứng), mà bước dựng ~13 phút; `--prebuild` chạy nền sau khi phiên mở. Không build clippy trước: gate nhanh bỏ clippy.
    Build với `CARGO_INCREMENTAL` bật thêm ~11 GB incremental và không dùng chung cache với gate — tài liệu dặn tránh.
 4. **`test-affected` chỉ dựng cái cần khi chỉ crate công cụ bị ảnh hưởng.** Nguyên nhân 13 phút cho một chương trình test chạy
    0,5 giây: `test-affected` luôn dựng test của cả workspace (D-299, để dùng chung cache với gate đầy đủ), kể cả khi chỉ `xtask`

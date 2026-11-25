@@ -22,7 +22,8 @@ Chạy lại nhiều lần được; thứ đã có thì bỏ qua. Không cần 
 
 ```bash
 scripts/cloud-setup.sh          # toolchain + công cụ
-scripts/cloud-setup.sh --warm   # thêm cargo fetch, build trước xtask và test của workspace
+scripts/cloud-setup.sh --warm   # thêm cargo fetch và build trước xtask (vài chục giây)
+scripts/cloud-setup.sh --prebuild   # thêm build trước test cả workspace (~13 phút, ~12 GB): chạy nền, xem mục Build lạnh
 ```
 
 ## Chạy test trên Postgres ở máy cloud
@@ -45,8 +46,16 @@ Chưa bật (vd script chưa chạy): `pg_ctlcluster 16 main start`, rồi
 Lần biên dịch đầu của một máy lạnh là phần tốn nhất của gate nhanh. Đo trên máy 4 CPU, `CARGO_INCREMENTAL=0` như gate
 (D-20261125-cloud-dev-friction): `cargo test --workspace --no-run` mất **13 phút 28 giây** và chiếm **~12 GB** `target/`;
 `cargo clippy --workspace --all-targets` thêm 5 phút 41 giây (gate nhanh bỏ clippy). Có `target/` nóng thì dựng lại không đổi gì
-mất **4,6 giây**. `--warm` build sẵn phần test (bỏ qua khi đĩa trống dưới 25 GB). Đừng build với `CARGO_INCREMENTAL` bật rồi
+mất **4,6 giây**. `--prebuild` build sẵn phần test (bỏ qua khi đĩa trống dưới 25 GB). Đừng build với `CARGO_INCREMENTAL` bật rồi
 chạy gate: cache incremental thêm ~11 GB và không dùng chung được với gate.
+
+**Không đặt `--prebuild` trong setup script của môi trường.** Mục dưới nói setup script chỉ được snapshot nếu xong trong khoảng 5 phút;
+con số đó **chưa kiểm chứng** — tài liệu môi trường của nền tảng (topic `environment.setup_script`) chỉ nói script lỗi thì báo
+chủ dự án sửa, không nêu giới hạn thời gian — nên không thể chắc điều gì xảy ra khi vượt: có thể snapshot không được lưu, hoặc script
+bị cắt. Bước dựng ~13 phút chắc chắn vượt 5 phút. Vì vậy setup script chỉ gọi `--warm` (nhanh). Muốn có build sẵn thì chạy nền sau khi
+phiên mở, vd `nohup scripts/cloud-setup.sh --prebuild >/tmp/prebuild.log 2>&1 &`, hay dán thêm vào setup script **chỉ khi** chủ dự
+án đã xác nhận giới hạn thời gian của nó cho phép. Lần gate đầu chạy song song với bản dựng nền sẽ tranh CPU; tốt nhất để nền
+chạy xong trước.
 
 ## Hai chỗ gọi script
 

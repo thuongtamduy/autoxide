@@ -3,7 +3,9 @@
 # ngay: toolchain Rust đúng bản ghim và các công cụ ngoài mà gate cần. Xem docs/CLOUD-SESSIONS.md.
 #
 #   scripts/cloud-setup.sh           toolchain + công cụ (cargo-deny, gitleaks, cargo-nextest, cargo-semver-checks) + lịch sử git đầy đủ + mục lục quyết định
-#   scripts/cloud-setup.sh --warm    thêm `cargo fetch`, build sẵn `xtask` và test của workspace (làm nóng cache)
+#   scripts/cloud-setup.sh --warm    thêm `cargo fetch` và build sẵn `xtask` (làm nóng cache; vài chục giây)
+#   scripts/cloud-setup.sh --prebuild  thêm build sẵn test của cả workspace (~13 phút, ~12 GB): KHÔNG đặt trong setup script
+#                                    của môi trường (có giới hạn thời gian), chạy nền sau khi phiên mở
 #
 # Chạy lại nhiều lần được: thứ đã có đúng phiên bản thì bỏ qua. Không cần secret, chỉ cần mạng tới
 # static.rust-lang.org và github.com. Hỏng bước nào thì thoát với thông báo nói rõ bước đó.
@@ -18,11 +20,13 @@
 set -euo pipefail
 
 WARM=0
+PREBUILD=0
 for arg in "$@"; do
   case "$arg" in
     --warm) WARM=1 ;;
+    --prebuild) PREBUILD=1 ;;
     *)
-      echo "usage: scripts/cloud-setup.sh [--warm]" >&2
+      echo "usage: scripts/cloud-setup.sh [--warm] [--prebuild]" >&2
       exit 2
       ;;
   esac
@@ -121,17 +125,6 @@ if [ "$WARM" = 1 ]; then
   cargo fetch --locked || die "cargo fetch hỏng (kiểm tra mạng tới crates.io)."
   log "build trước xtask"
   cargo build -p xtask --locked || die "build xtask hỏng."
-  # Build trước test của cả workspace: đúng lệnh và đúng cấu hình (CARGO_INCREMENTAL=0) mà
-  # `./gate.sh --quick` dùng, nên lần gate đầu chỉ còn dựng phần đã sửa (D-20261125-cloud-dev-friction).
-  # Tốn ~13 phút (máy 4 CPU) và ~12 GB đĩa: bỏ qua khi đĩa trống dưới 25 GB, không làm hỏng script.
-  free_gb="$(df -Pk . | awk 'NR==2 {print int($4 / 1048576)}')"
-  if [ "${free_gb:-0}" -lt 25 ]; then
-    log "bỏ qua build test trước: đĩa trống ${free_gb} GB (< 25 GB)"
-  else
-    log "build trước test của workspace (vài phút, ~12 GB đĩa)"
-    CARGO_INCREMENTAL=0 cargo test --workspace --locked --no-run ||
-      log "build test trước lỗi, bỏ qua (gate sẽ dựng lại khi chạy)"
-  fi
 fi
 
 # --- 5. Mục lục quyết định ----------------------------------------------------------------------------
@@ -149,7 +142,7 @@ fi
 # (D-263, D-20261125-cloud-dev-friction). Thiếu binary hay không đủ quyền thì bỏ qua, không làm hỏng script.
 POSTGRES_TEST_URL="postgres://postgres:autoxide@127.0.0.1:5432/postgres"
 if [ "${CLAUDE_CODE_REMOTE:-}" = true ] && command -v pg_lsclusters >/dev/null 2>&1 && command -v pg_ctlcluster >/dev/null 2>&1; then
-  pg_version="$(pg_lsclusters --no-header 2>/dev/null | awk '$2 == "main" {print $1; exit}')"
+  pg_version="$(pg_lsclusters --no-header 2>/dev/null | awk '$2 == "main" {print $1; exit}' || true)"
   if [ -z "$pg_version" ]; then
     log "postgres: không có cụm 'main', bỏ qua"
   elif { pg_lsclusters --no-header | awk -v v="$pg_version" '$1 == v && $2 == "main" && $4 == "online" {found=1} END {exit !found}'; } ||
@@ -163,6 +156,21 @@ if [ "${CLAUDE_CODE_REMOTE:-}" = true ] && command -v pg_lsclusters >/dev/null 2
     fi
   else
     log "postgres $pg_version: không bật được cụm (xem docs/CLOUD-SESSIONS.md)"
+  fi
+fi
+
+# --- 7. Build trước test (chỉ khi có --prebuild; để cuối vì lâu) -------------------------------------------
+if [ "$PREBUILD" = 1 ]; then
+  # Build trước test của cả workspace: đúng lệnh và đúng cấu hình (CARGO_INCREMENTAL=0) mà
+  # `./gate.sh --quick` dùng, nên lần gate đầu chỉ còn dựng phần đã sửa (D-20261125-cloud-dev-friction).
+  # Tốn ~13 phút (máy 4 CPU) và ~12 GB đĩa: bỏ qua khi đĩa trống dưới 25 GB, không làm hỏng script.
+  free_gb="$(df -Pk . 2>/dev/null | awk 'NR==2 {print int($4 / 1048576)}' || true)"
+  if [ "${free_gb:-0}" -lt 25 ]; then
+    log "bỏ qua build test trước: đĩa trống ${free_gb} GB (< 25 GB)"
+  else
+    log "build trước test của workspace (~13 phút trên máy 4 CPU, ~12 GB đĩa)"
+    CARGO_INCREMENTAL=0 cargo test --workspace --locked --no-run ||
+      log "build test trước lỗi, bỏ qua (gate sẽ dựng lại khi chạy)"
   fi
 fi
 
