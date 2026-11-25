@@ -537,13 +537,16 @@ domain answers `409 tenant_domain_revoked`. Each change records the event
 **Browser calls (CORS).** A page served at `https://<domain>` of a verified domain may call the
 API from the browser without adding it to `AUTOXIDE_HTTP_CORS_ORIGINS` and without a restart —
 but only for its own tenant: a request from that page whose token, `Autoxide-Tenant` header or
-`Host` points at another tenant answers `403 tenant_origin_mismatch`, and when such a request
-names no tenant, a refresh token or email link of another tenant counts as wrong. This is extra protection inside browsers, not a
-security boundary: tokens are sent in a header, never as cookies, so a page can only use secrets
+`Host` points at another tenant answers `403 tenant_origin_mismatch`, and a refresh token or
+email link of another tenant counts as wrong in any request from that page, however the request
+names its tenant; outside such pages a token names its own tenant as before. This is extra
+protection inside browsers, not a security boundary: tokens are sent in a header, never as cookies, so a page can only use secrets
 it already holds, and a program outside a browser sends any `Origin` it likes, or none. Only the exact origin
 `https://<domain>` counts (no `http`, no port, no other subdomain); give a second front end, such
 as `admin.shop.example`, its own verified domain. Origins in `AUTOXIDE_HTTP_CORS_ORIGINS` (your
-platform's own front ends, `http://localhost:5173` while developing) may call for any tenant. A
+platform's own front ends, `http://localhost:5173` while developing) may call for any tenant: a
+shared sign-up or sign-in form of the platform that you place on a tenant's domain needs that
+origin listed there too. A
 removed or failed domain loses the right at once on the server that changed it and within
 `AUTOXIDE_TENANCY_CACHE_SECONDS` (default 10 s) on the others.
 

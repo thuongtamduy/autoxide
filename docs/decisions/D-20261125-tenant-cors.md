@@ -14,14 +14,19 @@ Gắn với khách:
   khách A mà khách giải được (credential, `Autoxide-Tenant`, `Host`) là B → `403 tenant_origin_mismatch`, trong
   extractor `TenantContext` / `Principal` / `OptionalTenant`, trước khi handler chạy.
 - Request không nêu khách nào (không `Autoxide-Tenant`, `Host` không thuộc khách nào — thường là `api.<nền tảng>`)
-  mà mang origin của A: khách của request là A (`by_hint`), và `TenantContext` được đánh dấu "đến từ trang của
-  khách" (`reached_from_page`). Nhờ vậy endpoint lấy khách từ token trong thân hay query (`OptionalTenant` +
-  `resolve_link_token`: `/auth/refresh`, `/auth/login/mfa`, link trong mail, lời mời, đặt lại mật khẩu, endpoint
-  công khai của comments / newsletter / notifications / inventory) cũng gắn với A: `resolve_link_token` trả "không
-  có" cho token của khách khác **chỉ khi** khách của request được đánh dấu như vậy. Khách đến từ credential, header
-  hay `Host` thì token vẫn thắng như trước — người đang đăng nhập ở khách X (hay giữ `Autoxide-Tenant: X` trên sàn)
-  mở link huỷ nhận thư của khách Y vẫn được. Tải bản xuất bằng link (`/kernel/exports/download`) kiểm `OriginGrant`
-  sau khi giải token.
+  mà mang origin của A: khách của request là A (`by_hint`).
+- Mọi request mang origin của A mà khách giải ra là A (dù khách được nêu bằng credential, header, `Host` hay suy
+  từ origin) có `TenantContext` được đánh dấu "đến từ trang của khách" (`reached_from_page`). Khi đó
+  `resolve_link_token` coi token / link của khách khác là sai — endpoint lấy khách từ token trong thân hay query
+  (`OptionalTenant` + `resolve_link_token`: `/auth/refresh`, `/auth/login/mfa`, link trong mail, lời mời, đặt lại
+  mật khẩu, endpoint công khai của comments / newsletter / notifications / inventory) cũng gắn với A. Ngoài trang
+  của một khách (không `Origin`, origin trong danh sách chung, origin lạ), token tự nêu khách như trước — người
+  đang đăng nhập ở khách X (hay giữ `Autoxide-Tenant: X` trên sàn) mở link huỷ nhận thư của khách Y vẫn được.
+  Tải bản xuất bằng link (`/kernel/exports/download`) kiểm `OriginGrant` sau khi giải token.
+- Form đăng ký / đăng nhập dùng chung của nền tảng đặt trên tên miền của khách phải nằm trong danh sách chung
+  (origin trong danh sách chung gọi được cho mọi khách và không bị đánh dấu).
+- Test: route thử dùng `OptionalTenant` + `resolve_link_token` như `/auth/refresh`; chưa có test tích hợp qua
+  `/auth/refresh` thật (module `auth` tự kiểm khách của request với khách của token ở `auth::token::resolve`).
 - Tài khoản nền tảng (người vận hành có `kernel.tenants.operate`) gọi từ origin của khách A: chỉ làm được cho A
   (vào bằng `Autoxide-Tenant: A`); làm cho khách nền tảng hay vào B từ trang đó → `tenant_origin_mismatch`.
 

@@ -525,14 +525,16 @@ DNS của tên miền; tên miền đã gỡ trả `409 tenant_domain_revoked`. 
 **Gọi từ trình duyệt (CORS).** Trang ở `https://<tên miền>` của một tên miền đã xác minh gọi được API
 từ trình duyệt mà không phải thêm vào `AUTOXIDE_HTTP_CORS_ORIGINS` hay khởi động lại — nhưng chỉ cho
 chính khách đó: request từ trang đó mà token, header `Autoxide-Tenant` hay `Host` trỏ tới khách khác
-nhận `403 tenant_origin_mismatch`, và khi request đó không nêu khách nào thì refresh token hay link
-trong mail của khách khác bị coi là sai.
+nhận `403 tenant_origin_mismatch`, và refresh token hay link trong mail của khách khác bị coi là sai
+trong mọi request từ trang đó, dù request nêu khách bằng cách nào; ngoài các trang đó, token tự nêu
+khách như trước.
 Đây là lớp bảo vệ thêm trong trình duyệt, không phải ranh giới bảo mật: token gửi trong header, không
 bao giờ là cookie, nên trang chỉ dùng được bí mật nó đã có, còn chương trình ngoài trình duyệt gửi
 `Origin` tuỳ ý hay không gửi. Chỉ đúng origin `https://<tên miền>` được tính (không `http`, không
 port, không tên miền con khác); giao diện thứ hai, vd `admin.shop.example`, thì xác minh thành một tên
 miền riêng. Origin trong `AUTOXIDE_HTTP_CORS_ORIGINS` (giao diện của chính nền tảng,
-`http://localhost:5173` lúc phát triển) gọi được cho mọi khách. Tên miền bị gỡ hay xác minh hỏng mất
+`http://localhost:5173` lúc phát triển) gọi được cho mọi khách: form đăng ký hay đăng nhập dùng chung của
+nền tảng mà bạn đặt trên tên miền của một khách thì cũng phải thêm origin đó vào danh sách này. Tên miền bị gỡ hay xác minh hỏng mất
 quyền ngay trên máy chủ đã đổi nó, và trong `AUTOXIDE_TENANCY_CACHE_SECONDS` (mặc định 10 giây) trên
 các máy khác.
 

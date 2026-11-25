@@ -71,8 +71,9 @@ pub async fn resolve_link_token<'t>(
     };
     let tenant = match id {
         None => request.cloned().unwrap_or_else(|| registry.default_tenant()),
-        // Request đến từ trang trên tên miền của khách khác (CORS): như token sai. Khách đến từ header, `Host` hay
-        // credential thì token vẫn thắng — vd người đang đăng nhập ở khách X mở link huỷ nhận thư của khách Y.
+        // Request đến từ trang trên tên miền của khách khác (CORS), dù khách được nêu bằng cách nào: như token sai.
+        // Ngoài trang của một khách thì token tự nêu khách như trước — vd người đang đăng nhập ở khách X mở link huỷ
+        // nhận thư của khách Y.
         Some(id)
             if request
                 .is_some_and(|request| request.is_from_page_origin() && request.id() != id) =>

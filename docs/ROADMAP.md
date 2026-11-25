@@ -254,6 +254,8 @@ thật (P7).
         ảnh chụp như CORS)
   - [ ] `http/ws.rs` không kiểm `Origin` (mức thấp: xác thực bằng header `Authorization`, trình duyệt không gửi
         được khi mở WebSocket) — kiểm cùng nguồn `OriginGrant` như MCP
+  - [ ] Test cho lượt đọc ảnh chụp tên miền verified bị treo quá `READ_TIMEOUT` (3 giây,
+        `tenancy::verified_domains`, D-20261125-tenant-cors): cần database giả treo được
 
 ## Giai đoạn B — Lớp cho giao diện và phân quyền
 
