@@ -18,6 +18,13 @@
 //! crate, có `CARGO_MANIFEST_DIR`. Các file test chạy **song song** (D-299): `cargo test` chạy
 //! chúng lần lượt, nên một file test chậm làm cả máy ngồi chờ.
 //!
+//! Chạy test: khi là gate nhanh trên SQLite (không `--keep-env`, không `--shard`) và có `cargo-nextest`
+//! (từ 0.9.85; cài mà cũ hơn thì báo lỗi, không lặng lẽ rơi về bộ chạy cũ) thì cả bước build lẫn chạy giao
+//! cho `cargo nextest run --filterset …` — cùng bộ test và cùng cách chọn crate, nhưng mỗi test một tiến
+//! trình, nhanh hơn nhiều với chương trình test lớn (`autoxide`: 674 s → 203 s, D-20261125-ci-cancelled-not-failed).
+//! Không có nextest thì dùng bộ chạy nêu ở trên. Gate Postgres (`--keep-env`), `--shard` và CI (archive của
+//! nextest do `gate.sh` dựng) không đổi.
+//!
 //! Doc-test không chạy ở đây (cần `rustdoc`); gate đầy đủ chạy chúng.
 
 use std::collections::{BTreeSet, VecDeque};
@@ -28,6 +35,8 @@ use std::sync::{Condvar, Mutex};
 use std::time::{Duration, Instant};
 
 use serde::Deserialize;
+
+mod nextest;
 
 use crate::workspace::Workspace;
 
@@ -307,6 +316,17 @@ pub fn run(
         Affected::Crates(crates) => tools_only(workspace, crates),
         Affected::All => None,
     };
+    // Gate nhanh (SQLite, chạy cả bộ): chạy bằng nextest nếu có. Đo trên máy 4 nhân với chương trình test của
+    // `autoxide` (217 test): libtest 674 s, nextest 203 s — nextest mỗi test một tiến trình nên không dính chung
+    // trạng thái của cả chương trình, và chia việc theo từng test thay vì theo từng chương trình. Cùng bộ test
+    // với đường dưới (CI cũng chạy bằng nextest, D-20261120-ci-nextest-archive); không có nextest thì dùng đường dưới.
+    if !keep_env && shard.is_whole() && nextest::available()? {
+        let started = Instant::now();
+        nextest::run(&workspace.root, &selected, only.as_deref())?;
+        git(&workspace.root, &["update-ref", GREEN_REF, &current])?;
+        println!("\ntest-affected: all tests passed (nextest) in {:.0?}", started.elapsed());
+        return Ok(());
+    }
     let jobs: Vec<Job> = build_tests(&workspace.root, only.as_deref())?
         .into_iter()
         .filter_map(|test| {
