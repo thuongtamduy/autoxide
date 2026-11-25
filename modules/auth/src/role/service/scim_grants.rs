@@ -10,10 +10,15 @@ impl RoleService {
     /// Đặt membership do SCIM cấp của người `user_id` thành đúng `wanted` (nút, role). Trả `true`
     /// khi có thay đổi. Giữ hạn mức số nhân sự của gói như mọi lần gán role; không gỡ được admin
     /// cuối cùng (`auth.last_admin`). Tài khoản không có (vừa bị xoá) hay là người mua: bỏ qua.
+    ///
+    /// `authority`: người chịu trách nhiệm cho lần đổi này — người tạo token SCIM (tính lúc dùng
+    /// token) hay người đổi luật ánh xạ. Chỉ thêm / gỡ (nút, role) mà `authority` cấp được
+    /// (`grantable`, D-20261125-scim-grant-cover); phần còn lại giữ nguyên, ghi log.
     pub(crate) async fn sync_scim_grants(
         &self,
         tenant: &TenantContext,
         actor: Actor,
+        authority: &Principal,
         user_id: Uuid,
         wanted: BTreeSet<(Uuid, Uuid)>,
     ) -> Result<bool, Error> {
@@ -36,7 +41,7 @@ impl RoleService {
             .into_iter()
             .any(|row| !grants.contains(&row.id));
         let will_hold = !wanted.is_empty() || manual;
-        let change = self.write_scim_grants(tenant, actor, user_id, wanted);
+        let change = self.write_scim_grants(tenant, actor, authority, user_id, wanted);
         self.with_member_limit(tenant, user_id, will_hold, change).await
     }
 
@@ -44,6 +49,7 @@ impl RoleService {
         &self,
         tenant: &TenantContext,
         actor: Actor,
+        authority: &Principal,
         user_id: Uuid,
         wanted: BTreeSet<(Uuid, Uuid)>,
     ) -> Result<bool, Error> {
@@ -93,6 +99,32 @@ impl RoleService {
             .copied()
             .filter(|row| !wanted.contains(&(row.org_id, row.role_id)))
             .collect();
+        if add.is_empty() && remove.is_empty() && stale.is_empty() {
+            transaction.rollback().await?;
+            return Ok(false);
+        }
+        // "Chỉ cấp, giữ hay gỡ cái mình có": phần chênh mà `authority` không cấp / gỡ được thì để
+        // nguyên (không bao giờ cấp vượt quyền). Request SCIM đổi thứ vượt quyền đã bị 403 ở bước
+        // kiểm trước khi ghi nhóm; ở đây chỉ còn trạng thái do người khác đặt (luật mới đặt đồng
+        // thời, lần đồng bộ trước lỗi) — để cho lần đồng bộ của người có quyền đó.
+        let mut kept_add = Vec::new();
+        for pair in add {
+            if grantable(&transaction, tenant, authority, pair, true).await? {
+                kept_add.push(pair);
+            } else {
+                tracing::warn!(%user_id, role_id = %pair.1, "SCIM sync left a role it may not give");
+            }
+        }
+        let add = kept_add;
+        let mut kept_remove = Vec::new();
+        for row in remove {
+            if grantable(&transaction, tenant, authority, (row.org_id, row.role_id), false).await? {
+                kept_remove.push(row);
+            } else {
+                tracing::warn!(%user_id, role_id = %row.role_id, "SCIM sync left a role it may not take away");
+            }
+        }
+        let remove = kept_remove;
         if add.is_empty() && remove.is_empty() && stale.is_empty() {
             transaction.rollback().await?;
             return Ok(false);

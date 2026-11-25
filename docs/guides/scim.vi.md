@@ -8,7 +8,9 @@ Endpoint SCIM là `/api/v1/auth/scim/v2` (`Users`, `Groups`, `ServiceProviderCon
 
 ## 1. Tạo token SCIM
 
-Cần permission `auth.scim.manage`, gói có tính năng `auth.scim`, và một phiên đăng nhập: API key không tạo được (`auth.session_required`). Token thuộc về khách (không thuộc một người), chỉ dùng được ở endpoint SCIM, và chỉ hiện một lần.
+Cần permission `auth.scim.manage`, gói có tính năng `auth.scim`, và một phiên đăng nhập: API key không tạo được (`auth.session_required`). Token thuộc về khách, chỉ dùng được ở endpoint SCIM, và chỉ hiện một lần.
+
+**Token chỉ làm được những gì người tạo nó làm được vào lúc này.** Nó tạo được tài khoản, nhưng chỉ cấp, gỡ, khoá hay xoá trong phạm vi quyền hiện tại của người đó: tài khoản có permission mà người đó không có thì token không khoá hay xoá được, và role của nhóm mà người đó không tự cấp được thì token không cấp hay gỡ được (`403`). Hãy tạo token từ tài khoản giữ mọi role mà luật ánh xạ nhóm cấp — thường là quản trị viên.
 
 <!-- example: sign-in -->
 ```bash
@@ -26,6 +28,8 @@ curl -sS "$API/api/v1/auth/scim/tokens" -H "Authorization: Bearer $TOKEN" \
 ```
 
 Response có thêm `scim_base_path` (`/api/v1/auth/scim/v2`): ghép địa chỉ công khai của máy chủ vào trước nó khi khai ở hệ thống danh tính. Xem các token bằng `GET /api/v1/auth/scim/tokens` (không bao giờ kèm secret). Xoay vòng: tạo token mới, đổi ở hệ thống danh tính, rồi `DELETE /api/v1/auth/scim/tokens/{id}` token cũ. Mỗi khách có tối đa 5 token.
+
+**Xoay token khi người tạo nghỉ việc hay bị hạ quyền.** Không thì việc bỏ người khỏi nhóm đã có luật và khoá người nghỉ việc hỏng âm thầm ở hệ thống danh tính (nó nhận `403`). `GET /api/v1/auth/scim/tokens` có `creator_status` cho từng token: `disabled`, `deleted` hay `missing_permission` (không còn `auth.scim.manage`) nghĩa là phải xoay ngay. Người tạo chỉ bị hạ role thì hiện `active` nhưng token bị giới hạn theo role mới của họ: khi đó cũng nên xoay.
 
 ## 2. Cấu hình hệ thống danh tính
 
@@ -78,10 +82,10 @@ Mọi thay đổi có trong nhật ký audit với loại người làm `scim`.
 Hệ thống danh tính cũng đẩy được nhóm của nó (`/Groups`; Okta: *Push Groups*, Entra ID: gán nhóm cho ứng dụng). Nhóm tự nó không cho gì: khách quyết định ý nghĩa của nó bằng **luật ánh xạ** — "thành viên nhóm X giữ role R ở nút N".
 
 1. Để hệ thống danh tính đẩy nhóm sang, rồi tìm id của nó bằng `GET /api/v1/auth/scim/groups` (số thành viên, số luật). Nhóm chưa có luật cũng hiện trong hộp việc (`auth.scim_unmapped_groups`).
-2. Thêm luật bằng `POST /api/v1/auth/scim/group-mappings` với `{"group_id": "…", "org_id": "…", "role_id": "…"}` (`org_id` là id của khách cho nút gốc). Bạn phải tự gán được role đó ở nút đó. Thành viên hiện có nhận role ngay.
-3. Từ đó, người được thêm vào hay bỏ khỏi nhóm có hay mất role ngay. Role ai đó được gán tay không bao giờ bị SCIM gỡ, và role hai nhóm cùng cấp vẫn còn khi người đó còn ở một trong hai nhóm.
+2. Thêm luật bằng `POST /api/v1/auth/scim/group-mappings` với `{"group_id": "…", "org_id": "…", "role_id": "…"}` (`org_id` là id của khách cho nút gốc). Bạn phải tự gán được role đó ở nút đó. Thành viên hiện có nhận role ngay; response liệt kê họ ở `granted_user_ids`. **Xem thành viên của nhóm trước khi ánh xạ nó tới role mạnh:** khi nhóm chưa có luật, ai giữ token SCIM cũng thêm được người vào nhóm.
+3. Từ đó, người được thêm vào hay bỏ khỏi nhóm có hay mất role ngay — nếu người tạo token SCIM cấp được role đó; không thì thay đổi bị từ chối (`403`) và không có gì được ghi. Role ai đó được gán tay không bao giờ bị SCIM gỡ, và role hai nhóm cùng cấp vẫn còn khi người đó còn ở một trong hai nhóm.
 
-Gỡ luật bằng `DELETE /api/v1/auth/scim/group-mappings/{id}`; xoá nhóm ở hệ thống danh tính thì luật của nó và role nó đã cấp cũng bị gỡ.
+Gỡ luật bằng `DELETE /api/v1/auth/scim/group-mappings/{id}` (bạn phải tự cấp được role của luật, không thì `auth.role_beyond_you`); xoá nhóm ở hệ thống danh tính thì luật của nó và role nó đã cấp cũng bị gỡ.
 
 ## 5. Hỗ trợ những gì
 
@@ -90,7 +94,7 @@ Gỡ luật bằng `DELETE /api/v1/auth/scim/group-mappings/{id}`; xoá nhóm �
 - Phân trang: `startIndex` (từ 1) và `count` (tối đa 200).
 - Không hỗ trợ: bulk, sắp xếp, ETag, đổi mật khẩu.
 
-Lỗi: `401` khi không có token SCIM hợp lệ, `403` khi gói không có `auth.scim`, `404` với id của khách khác, `409` `uniqueness` khi `userName`, `externalId` hay email thuộc tài khoản khác, `400` `invalidValue` / `invalidSyntax` / `invalidPath` / `noTarget` / `mutability` khi thân sai.
+Lỗi: `401` khi không có token SCIM hợp lệ, `403` khi gói không có `auth.scim` hay thay đổi vượt quyền của người tạo token (không có `scimType`), `404` với id của khách khác, `409` `uniqueness` khi `userName`, `externalId` hay email thuộc tài khoản khác, `400` `invalidValue` / `invalidSyntax` / `invalidPath` / `noTarget` / `mutability` khi thân sai.
 
 ## Dữ liệu cá nhân
 

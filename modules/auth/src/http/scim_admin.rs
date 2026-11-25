@@ -22,7 +22,9 @@ use validator::Validate;
 
 use super::HttpState;
 use crate::permissions::SCIM_MANAGE;
-use crate::scim::{BASE_PATH, CreatedScimToken, GroupMapping, GroupSummary, ScimToken};
+use crate::scim::{
+    BASE_PATH, CreatedScimToken, CreatorStatus, GroupMapping, GroupSummary, ScimToken,
+};
 
 pub(super) fn routes() -> OpenApiRouter<Arc<HttpState>> {
     OpenApiRouter::new()
@@ -48,10 +50,40 @@ pub(crate) struct ScimTokenResponse {
     created_at: Timestamp,
     /// Last time the identity provider used it (to within 5 minutes); `null`: never.
     last_used_at: Option<Timestamp>,
+    /// Whether the token still works fully. A SCIM token can do only what its creator can do now:
+    /// anything other than `active` means syncs that give, take away or disable will be refused —
+    /// create a new token from an account with the needed roles and revoke this one.
+    creator_status: ScimTokenCreatorStatus,
 }
 
-impl From<ScimToken> for ScimTokenResponse {
-    fn from(token: ScimToken) -> Self {
+/// State of the person who created a SCIM token.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum ScimTokenCreatorStatus {
+    /// Active and still holds `auth.scim.manage`. (The token is still limited to the roles the
+    /// creator holds now.)
+    Active,
+    /// The creator's account is disabled.
+    Disabled,
+    /// The creator's account was deleted.
+    Deleted,
+    /// The creator no longer holds `auth.scim.manage`.
+    MissingPermission,
+}
+
+impl From<CreatorStatus> for ScimTokenCreatorStatus {
+    fn from(status: CreatorStatus) -> Self {
+        match status {
+            CreatorStatus::Active => Self::Active,
+            CreatorStatus::Disabled => Self::Disabled,
+            CreatorStatus::Deleted => Self::Deleted,
+            CreatorStatus::MissingPermission => Self::MissingPermission,
+        }
+    }
+}
+
+impl ScimTokenResponse {
+    fn new(token: ScimToken, creator_status: CreatorStatus) -> Self {
         ScimTokenResponse {
             id: token.id,
             name: token.name,
@@ -59,6 +91,7 @@ impl From<ScimToken> for ScimTokenResponse {
             created_by: token.created_by,
             created_at: token.created_at,
             last_used_at: token.last_used_at,
+            creator_status: creator_status.into(),
         }
     }
 }
@@ -80,7 +113,8 @@ pub(crate) struct CreatedScimTokenResponse {
 impl From<CreatedScimToken> for CreatedScimTokenResponse {
     fn from(created: CreatedScimToken) -> Self {
         CreatedScimTokenResponse {
-            token: created.token.into(),
+            // Vừa tạo bằng phiên của người có `auth.scim.manage`.
+            token: ScimTokenResponse::new(created.token, CreatorStatus::Active),
             token_secret: created.secret,
             scim_base_path: BASE_PATH.to_owned(),
         }
@@ -98,7 +132,9 @@ pub(crate) struct CreateScimTokenRequest {
 
 /// List the SCIM tokens of the tenant.
 ///
-/// Requires `auth.scim.manage`. Newest first; secrets are never listed.
+/// Requires `auth.scim.manage`. Newest first; secrets are never listed. `creator_status` tells
+/// whether a token's creator was disabled, deleted or lost `auth.scim.manage`: such a token must be
+/// rotated, or the provider's changes are refused.
 #[utoipa::path(
     get,
     path = "/scim/tokens",
@@ -118,7 +154,15 @@ async fn list_scim_tokens(
 ) -> Result<Data<Vec<ScimTokenResponse>>, Error> {
     principal.require(&SCIM_MANAGE)?;
     let tokens = state.scim.tokens(&tenant).await?;
-    Ok(Data { data: tokens.into_iter().map(ScimTokenResponse::from).collect() })
+    let statuses = state.scim.creator_statuses(&tenant, &tokens).await?;
+    let data = tokens
+        .into_iter()
+        .map(|token| {
+            let status = statuses.get(&token.id).copied().unwrap_or(CreatorStatus::Deleted);
+            ScimTokenResponse::new(token, status)
+        })
+        .collect();
+    Ok(Data { data })
 }
 
 /// Create a SCIM token for the tenant's identity provider.
@@ -234,6 +278,16 @@ impl From<GroupMapping> for ScimGroupMappingResponse {
     }
 }
 
+/// A mapping rule just created, with the people it gave the role to.
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub(crate) struct CreatedScimGroupMappingResponse {
+    #[serde(flatten)]
+    mapping: ScimGroupMappingResponse,
+    /// Every current member of the group, who now holds the role through this rule. Members of a
+    /// group without rules may have been added by anyone holding a SCIM token: check this list.
+    granted_user_ids: Vec<Uuid>,
+}
+
 /// A new mapping rule.
 #[derive(Debug, Deserialize, Validate, ToSchema)]
 #[serde(deny_unknown_fields)]
@@ -304,7 +358,10 @@ async fn list_scim_group_mappings(
 ///
 /// Requires `auth.scim.manage`, and you must be able to give that role at that unit yourself (the
 /// unit is in your scope, you hold every permission of the role; `admin` only at the root). Every
-/// current member of the group gets the role at once; later members get it when they join.
+/// current member of the group gets the role at once, and the response lists them
+/// (`granted_user_ids`): anyone holding a SCIM token may have added members to a group before it had
+/// rules, so look at the group's members first. Later members get the role when they join, if
+/// the SCIM token's creator can give it.
 #[utoipa::path(
     post,
     path = "/scim/group-mappings",
@@ -313,7 +370,7 @@ async fn list_scim_group_mappings(
     security(("bearer" = [])),
     request_body = CreateScimGroupMappingRequest,
     responses(
-        (status = 201, description = "The rule was created and applied to the group's members.", body = Data<ScimGroupMappingResponse>),
+        (status = 201, description = "The rule was created and applied to the group's members, listed in `granted_user_ids`.", body = Data<CreatedScimGroupMappingResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `auth.scim.manage` (code `permission_denied`), or the plan's staff limit is reached.", body = Problem),
         (status = 404, description = "No SCIM group has this id; code `auth.scim_group_not_found`.", body = Problem),
@@ -326,19 +383,25 @@ async fn create_scim_group_mapping(
     tenant: TenantContext,
     principal: Principal,
     ValidJson(input): ValidJson<CreateScimGroupMappingRequest>,
-) -> Result<Created<ScimGroupMappingResponse>, Error> {
+) -> Result<Created<CreatedScimGroupMappingResponse>, Error> {
     principal.require(&SCIM_MANAGE)?;
-    let row = state
+    let (row, members) = state
         .scim
         .create_mapping(&tenant, &principal, input.group_id, input.org_id, input.role_id)
         .await?;
-    Ok(Created::new(format!("/auth/scim/group-mappings/{}", row.id), row.into()))
+    let location = format!("/auth/scim/group-mappings/{}", row.id);
+    let body = CreatedScimGroupMappingResponse {
+        mapping: row.into(),
+        granted_user_ids: members.into_iter().collect(),
+    };
+    Ok(Created::new(location, body))
 }
 
 /// Remove a mapping rule.
 ///
-/// Requires `auth.scim.manage`. Members of the group lose the role at once, unless another group or
-/// a hand-made membership gives it too.
+/// Requires `auth.scim.manage`, and you must be able to give the rule's role at its unit yourself.
+/// Members of the group lose the role at once, unless another group or a hand-made membership gives
+/// it too.
 #[utoipa::path(
     delete,
     path = "/scim/group-mappings/{id}",
@@ -349,7 +412,7 @@ async fn create_scim_group_mapping(
     responses(
         (status = 204, description = "The rule was removed."),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "Missing permission `auth.scim.manage`; code `permission_denied`.", body = Problem),
+        (status = 403, description = "Missing permission `auth.scim.manage` (code `permission_denied`), or you cannot give the rule's role at its unit yourself, so you cannot take it away either (code `auth.role_beyond_you`).", body = Problem),
         (status = 404, description = "No rule has this id; code `auth.scim_mapping_not_found`.", body = Problem),
         (status = 409, description = "Removing it would leave the tenant without an active administrator; code `auth.last_admin`.", body = Problem),
     )

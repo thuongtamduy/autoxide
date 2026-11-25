@@ -256,6 +256,17 @@ thật (P7).
         được khi mở WebSocket) — kiểm cùng nguồn `OriginGrant` như MCP
   - [ ] Test cho lượt đọc ảnh chụp tên miền verified bị treo quá `READ_TIMEOUT` (3 giây,
         `tenancy::verified_domains`, D-20261125-tenant-cors): cần database giả treo được
+  - [ ] Chủ dự án quyết: `PUT /api/v1/auth/users/{id}/roles` (`auth.roles.manage`) cho tự gán mọi role kể cả `admin`
+        (cố ý theo mô tả permission), trong khi membership, lời mời và SCIM theo "chỉ cấp cái mình có"
+        (D-20261125-scim-grant-cover) — giữ, hay đưa đường cũ về cùng luật? Cùng lượt xem các chỗ bất nhất khác
+        (chưa đổi hành vi): (i) `require_covers` (xoá / khoá / đổi email / nhận về tài khoản) so theo tên
+        permission, bỏ qua phạm vi, còn `require_grantable` so cả phạm vi; (ii) `PUT /users/{id}/memberships` chỉ
+        kiểm role được cấp, không kiểm role bị gỡ — SCIM nay chặt hơn đường gán tay; (iii) cùng một luật ánh xạ:
+        tạo vượt quyền trả 422, xoá vượt quyền trả 403
+  - [ ] Nhóm SCIM chưa có luật chứa "thành viên chờ": ai giữ token SCIM cũng đưa người vào được; admin đặt luật
+        thì mọi thành viên nhận role (response tạo luật liệt kê ở `granted_user_ids`, hướng dẫn dặn xem trước —
+        D-20261125-scim-grant-cover). Chặt hơn: ghi người đưa vào (`added_by`) ở thành viên nhóm và chỉ cấp cho
+        thành viên mà người đưa vào cấp được role, còn lại chờ duyệt — cần migration, để sau
 
 ## Giai đoạn B — Lớp cho giao diện và phân quyền
 
@@ -1157,6 +1168,7 @@ Thứ tự ưu tiên chủ dự án đồng ý; mỗi mục khi làm thì ghi qu
 - [ ] Phát hành thường hơn (1–2 tuần) cho CHANGELOG mỗi bản gọn (phát hành nay tự chạy khi merge PR phát hành,
       D-20261121-auto-release); cài `cargo-semver-checks` cho bước phát hành — **chuyển thành P4 của bước 70** (xong)
 - [ ] Đăng SDK TypeScript lên npm (chờ tài khoản của chủ dự án) — **chuyển thành P5 của bước 70**
+- [ ] Quét gitleaks định kỳ MỌI nhánh bằng một job riêng không chặn PR (sau D-20261125-gitleaks-scope, nhánh chưa có PR không được quét)
 - [ ] Nợ nhỏ: tách các file `.rs` trên 800 dòng (đang làm); ~~`chrono` không còn bảo trì~~ — đã thay bằng `jiff`
       (D-20261121-time-library)
 
