@@ -42,6 +42,9 @@ CLAUDE.md
 !docs/MODULES*
 docs/*.md
 
+# Cấu hình và skill của agent (Claude Code): không crate nào đọc.
+.claude/*
+
 # Mẫu issue / PR và cấu hình Dependabot: GitHub đọc, không phải Rust. Workflow (.github/workflows/) thì chạy.
 .github/ISSUE_TEMPLATE/*
 .github/pull_request_template.md

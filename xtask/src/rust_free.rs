@@ -229,6 +229,8 @@ mod tests {
             ("docs/steps/README.md", false),
             ("changelog.d/x.added.md", false),
             ("sdk/typescript/src/client.ts", false),
+            (".claude/settings.json", false),
+            (".claude/skills/next-step/SKILL.md", false),
             ("CHANGELOG.md", true),
             ("docs/MODULES.md", true),
             ("docs/MODULES.vi.md", true),

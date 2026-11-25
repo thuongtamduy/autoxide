@@ -9,7 +9,7 @@ Quyết định:
    từ chỗ rẽ nhánh với `<base>` khớp danh sách, còn lại `true`. File không khớp dòng nào là chạm Rust. Danh sách ban
    đầu: `sdk/typescript/*`, `changelog.d/*`, `docs/decisions/*`, `docs/DECISIONS.md`, `docs/ROADMAP.md`,
    `docs/steps/*`, `docs/research/*`, tài liệu ở gốc (README, CONTRIBUTING, SECURITY, CODE_OF_CONDUCT kèm bản `.vi`,
-   `STACK.md`, `CLAUDE.md`), `docs/*.md` trừ `docs/guides/*` và `docs/MODULES*`, mẫu issue/PR và `dependabot.yml`.
+   `STACK.md`, `CLAUDE.md`), `docs/*.md` trừ `docs/guides/*` và `docs/MODULES*`, mẫu issue/PR, `dependabot.yml`, `.claude/*` (cấu hình và skill của agent).
    Không có: `Cargo.*`, `rust-toolchain.toml`, `deny.toml`, `clippy.toml`, `rustfmt.toml`, `gate.sh`, `scripts/`,
    `.github/workflows/`, `examples/`, `xtask/`, `.env.example`, `docs/openapi.json`, `docs/mcp-tools.json`,
    `docs/guides/`, `CHANGELOG.md`, `Dockerfile`, mọi thứ trong thư mục crate (migration, `locales/`…).
