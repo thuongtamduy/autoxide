@@ -66,7 +66,10 @@ pub const PUBLIC_URL: TenantSetting = TenantSetting::new(
     "Public address of this tenant's site, e.g. `https://shop.example` (scheme and host only). \
      Links in mails sent for this tenant (sign-in links, invitations, password resets, email \
      checks, newsletter and comment confirmations) open on it: the server's link addresses keep \
-     their path, only the start changes. When unset, the server's addresses are used as set.",
+     their path, only the start changes. When unset, the server's addresses are used as set. \
+     Refused (and ignored if set before): another tenant's verified domain, a domain this tenant \
+     lost (revoked or failed its DNS check) until verified again, a port other than the default \
+     on a verified domain.",
 )
 .checked(site_origin);
 
@@ -662,9 +665,14 @@ impl SettingsService {
             problem.field = "value".to_owned();
             return Err(Error::validation(vec![problem]));
         }
+        let trust = self.links.get().cloned().unwrap_or_default();
         if setting.group == Some(LINK_GROUP) {
-            let trust = self.links.get().cloned().unwrap_or_default();
             links::check_link(&trust, self, tenant, &setting, value)
+                .await?
+                .map_err(|problem| Error::validation(vec![problem]))?;
+        }
+        if setting.name == PUBLIC_URL.name {
+            links::check_public_url(&trust, tenant, value)
                 .await?
                 .map_err(|problem| Error::validation(vec![problem]))?;
         }

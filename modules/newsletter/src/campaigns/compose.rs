@@ -243,7 +243,7 @@ impl NewsletterService {
 fn is_set(page: Result<String, Error>) -> Result<bool, Error> {
     match page {
         Ok(_) => Ok(true),
-        Err(error) if error.kind() == autoxide_kernel::error::ErrorKind::Unavailable => Ok(false),
+        Err(error) if error.code().ends_with("_url_missing") => Ok(false),
         Err(error) => Err(error),
     }
 }

@@ -445,5 +445,8 @@
   "field:must contain {placeholder} exactly once, where the one-time code goes": "phải có {placeholder} đúng một lần, ở chỗ đặt mã một lần",
   "field:must be an `https://` address of at most 2000 characters on one of this tenant's hosts, with the path and placeholders of your page; no user name, spaces or placeholders in the host part": "phải là địa chỉ `https://` dài tối đa 2000 ký tự trên một host của khách này, kèm đường dẫn và placeholder của trang; không có tên người dùng, khoảng trắng hay placeholder trong phần host",
   "field:must contain {placeholders}, where the server puts the value of the link": "phải có {placeholders}, chỗ máy chủ điền giá trị của link",
-  "field:the host `{host}` (with its port) is not one of this tenant's verified domains nor the address of the setting `kernel.public_url`: verify the domain first (`POST /api/v1/kernel/domains`)": "host `{host}` (kèm port) không phải tên miền đã xác minh của khách này, cũng không phải địa chỉ của cấu hình `kernel.public_url`: hãy xác minh tên miền trước (`POST /api/v1/kernel/domains`)"
+  "field:the host `{host}` (with its port) is not one of this tenant's verified domains nor the address of the setting `kernel.public_url`: verify the domain first (`POST /api/v1/kernel/domains`)": "host `{host}` (kèm port) không phải tên miền đã xác minh của khách này, cũng không phải địa chỉ của cấu hình `kernel.public_url`: hãy xác minh tên miền trước (`POST /api/v1/kernel/domains`)",
+  "field:`{host}` is a verified domain of another tenant": "`{host}` là tên miền đã xác minh của khách khác",
+  "field:use `{host}` without a port: a verified domain is trusted on its default port only": "dùng `{host}` không kèm port: tên miền đã xác minh chỉ được tin ở port mặc định",
+  "field:`{host}` was a domain of this tenant that is revoked or failed its DNS check: verify it again first": "`{host}` từng là tên miền của khách này nhưng đã bị thu hồi hay hỏng bản ghi DNS: hãy xác minh lại trước"
 }

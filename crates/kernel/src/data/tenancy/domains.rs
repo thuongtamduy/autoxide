@@ -190,6 +190,23 @@ pub fn normalize_domain(raw: &str) -> Option<String> {
     (labels_ok && tld_ok && !local).then(|| name.to_owned())
 }
 
+/// Whether tenant `tenant` once had domain `host` and lost it: it has a `revoked` or `failed` row for it and no
+/// `verified` one (D-20261125-tenant-link-templates). Mail links of the tenant must not go there any more:
+/// whoever holds the name now (a lapsed domain bought again) would receive the tokens.
+pub(crate) async fn lost_by(
+    registry: &DatabaseRegistry,
+    tenant: TenantId,
+    host: &str,
+) -> Result<bool, Error> {
+    let rows = Entity::find()
+        .filter(Column::TenantId.eq(tenant.as_uuid()))
+        .filter(Column::Domain.eq(host))
+        .all(registry.control().read())
+        .await?;
+    let verified = rows.iter().any(|row| row.status == VERIFIED);
+    Ok(!verified && rows.iter().any(|row| row.status == REVOKED || row.status == FAILED))
+}
+
 /// Host name of `AUTOXIDE_HTTP_PUBLIC_URL` (`https://API.example.com:8443/x` → `api.example.com`).
 pub(crate) fn host_of_url(url: &str) -> Option<String> {
     let rest = url.split_once("://").map_or(url, |(_, rest)| rest);

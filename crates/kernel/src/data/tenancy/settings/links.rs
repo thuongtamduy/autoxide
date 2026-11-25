@@ -51,7 +51,56 @@ impl LinkTrust {
         }
     }
 
-    /// The tenant's `kernel.public_url`, unless its host is a verified domain of another tenant (then a
+    /// Why address `url` cannot be the `kernel.public_url` of tenant `tenant`, if it cannot: a verified domain of
+    /// another tenant, a domain the tenant lost (revoked, or failed its DNS recheck — someone else may hold the
+    /// name now), or the tenant's own verified domain or the platform host on a port other than the default.
+    pub(crate) async fn site_problem(
+        &self,
+        tenant: &TenantContext,
+        url: &url::Url,
+    ) -> Result<Option<FieldError>, Error> {
+        let host = host_of(url);
+        let default_port = url.port().is_none();
+        let refused = |template: &'static str| {
+            Some(
+                FieldError::new("value", "kernel.public_url_not_allowed", template)
+                    .with_param("host", host.clone()),
+            )
+        };
+        match self.owner(&host).await? {
+            Some(owner) if owner != tenant.id() => {
+                return Ok(refused("`{host}` is a verified domain of another tenant"));
+            }
+            Some(_) if !default_port => {
+                return Ok(refused(
+                    "use `{host}` without a port: a verified domain is trusted on its default port only",
+                ));
+            }
+            Some(_) => return Ok(None),
+            None => {}
+        }
+        if self.platform_host.as_deref() == Some(host.as_str()) {
+            return Ok((!default_port).then(|| {
+                FieldError::new(
+                    "value",
+                    "kernel.public_url_not_allowed",
+                    "use `{host}` without a port: a verified domain is trusted on its default port only",
+                )
+                .with_param("host", host.clone())
+            }));
+        }
+        // Truy vấn database điều khiển chỉ cho host chưa ai xác minh (rủi ro P16), không cho tên miền đã xác minh.
+        if let Some(registry) = &self.registry
+            && crate::tenancy::domains::lost_by(registry, tenant.id(), &host).await?
+        {
+            return Ok(refused(
+                "`{host}` was a domain of this tenant that is revoked or failed its DNS check: verify it again first",
+            ));
+        }
+        Ok(None)
+    }
+
+    /// The tenant's `kernel.public_url`, unless [`site_problem`](Self::site_problem) refuses it now (then a
     /// warning, and `None`: links keep the server's address).
     pub(crate) async fn public_site(
         &self,
@@ -63,16 +112,17 @@ impl LinkTrust {
         })
         .await?;
         let Some(site) = site else { return Ok(None) };
-        let host = parse(&site).map(|url| host_of(&url)).unwrap_or_default();
-        match self.owner(&host).await? {
-            Some(owner) if owner != tenant.id() => {
+        let Some(url) = parse(&site) else { return Ok(None) };
+        match self.site_problem(tenant, &url).await? {
+            Some(problem) => {
                 tracing::warn!(
                     tenant_id = %tenant.id(),
-                    "kernel.public_url is a verified domain of another tenant; the server's links are used"
+                    problem = %problem.template(),
+                    "kernel.public_url is not accepted any more; the server's links are used"
                 );
                 Ok(None)
             }
-            _ => Ok(Some(site)),
+            None => Ok(Some(site)),
         }
     }
 
@@ -163,6 +213,18 @@ pub(crate) fn link_template(raw: &str) -> Result<(), FieldError> {
             && url.domain().is_some()
     });
     if clean && parsed.is_some() { Ok(()) } else { Err(invalid_template()) }
+}
+
+/// Check of a new `kernel.public_url` value for tenant `tenant` ([`LinkTrust::site_problem`]).
+pub(crate) async fn check_public_url(
+    trust: &LinkTrust,
+    tenant: &TenantContext,
+    raw: &str,
+) -> Result<Result<(), FieldError>, Error> {
+    match parse(raw.trim()) {
+        Some(url) => Ok(trust.site_problem(tenant, &url).await?.map_or(Ok(()), Err)),
+        None => Ok(Ok(())),
+    }
 }
 
 /// The placeholders of `setting` missing from `raw`.

@@ -143,7 +143,11 @@ async fn ten_mien_cua_khach_khac_khong_bao_gio_duoc_tin() {
 
         // (b) B trỏ `kernel.public_url` vào tên miền của A: link mẫu trên đó bị từ chối, link máy chủ không đổi host.
         let (status, body) = put(&app, "owner-b", "kernel.public_url", "https://shop-a.test").await;
-        assert_eq!(status, StatusCode::OK, "{body}");
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{body}");
+        assert_eq!(codes(&body), ["kernel.public_url_not_allowed"]);
+        let (status, body) =
+            put(&app, "owner-a", "kernel.public_url", "https://shop-a.test:8443").await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "port: {body}");
         let (status, body) = put(&app, "owner-b", name, "https://shop-a.test/r?t={token}").await;
         assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{body}");
         assert_eq!(codes(&body), ["kernel.link_host_not_allowed"]);
@@ -178,4 +182,63 @@ async fn ten_mien_cua_khach_khac_khong_bao_gio_duoc_tin() {
     })
     .await
     .unwrap();
+}
+
+/// Đặt trạng thái của mọi dòng tên miền `domain` (giả lập DNS hỏng sau lần kiểm lại hằng ngày).
+async fn set_domain_status(app: &TestApp, domain: &str, status: &str) {
+    use sea_orm::ConnectionTrait;
+    let database = app.registry().control();
+    let backend = database.write().get_database_backend();
+    let sql = match backend {
+        sea_orm::DbBackend::Postgres => {
+            "UPDATE kernel_tenant_domains SET status = $1 WHERE domain = $2"
+        }
+        _ => "UPDATE kernel_tenant_domains SET status = ? WHERE domain = ?",
+    };
+    let statement =
+        autoxide_kernel::database::statement(backend, sql, [status.into(), domain.into()]);
+    database.write().execute_raw(statement).await.unwrap();
+}
+
+/// Rà soát #516 lần hai: tên miền khách A đã mất (thu hồi, hay hỏng DNS — có thể người khác đã mua lại) mà CHƯA
+/// ai xác minh lại: link mẫu, `kernel.public_url` và đường đổi host không còn trỏ tới đó; đặt lại bị 422.
+#[tokio::test]
+async fn ten_mien_da_mat_khong_con_duoc_tin() {
+    for lost in ["revoked", "failed"] {
+        TestDatabase::run(async |test| {
+            let app = TestApp::builder(test)
+                .tenant("a")
+                .domain("a", "shop-a.test")
+                .user_in("a", "owner-a", 1, &["kernel.settings.manage"])
+                .module(Linker)
+                .build()
+                .await
+                .unwrap();
+            let links = app.api::<SiteLinks>().unwrap();
+            let a = app.tenant("a").await.unwrap();
+            let (status, body) =
+                put(&app, "owner-a", "kernel.public_url", "https://shop-a.test").await;
+            assert_eq!(status, StatusCode::OK, "{body}");
+            let own = "https://shop-a.test/dat-lai?t={token}";
+            let (status, body) = put(&app, "owner-a", PAGE.name(), own).await;
+            assert_eq!(status, StatusCode::OK, "{body}");
+            assert_eq!(links.link(&a, &PAGE, Some(SERVER)).await.unwrap().as_deref(), Some(own));
+
+            set_domain_status(&app, "shop-a.test", lost).await;
+            // Kiểm lại DNS thật xoá cache tên miền của máy này; test đổi thẳng dòng nên tự xoá.
+            app.registry().invalidate_domain("shop-a.test");
+            assert_eq!(
+                links.link(&a, &PAGE, Some(SERVER)).await.unwrap().as_deref(),
+                Some(SERVER),
+                "{lost}"
+            );
+            assert_eq!(links.rewrite(&a, SERVER).await.unwrap(), SERVER, "{lost}");
+            let (status, body) =
+                put(&app, "owner-a", "kernel.public_url", "https://shop-a.test").await;
+            assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{lost}: {body}");
+            assert_eq!(codes(&body), ["kernel.public_url_not_allowed"]);
+        })
+        .await
+        .unwrap();
+    }
 }

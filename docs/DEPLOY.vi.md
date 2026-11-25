@@ -481,10 +481,13 @@ khách sở hữu: một tên miền đã xác minh của khách (xem "Tên mi�
 địa chỉ (host và port) của `kernel.public_url` của khách, hay host của `AUTOXIDE_HTTP_PUBLIC_URL` ở port
 mặc định. Không thì `PUT` trả `422` với mã `kernel.link_host_not_allowed`,
 `kernel.link_placeholder_missing` hay `kernel.link_template_invalid`. Host được kiểm lại mỗi lần gửi
-mail: tên miền bị thu hồi hay chuyển sang khách khác thì mail quay về địa chỉ của máy chủ (ghi cảnh báo
-vào log), không gửi token tới host khách không còn giữ. Tên miền đã xác minh của khách khác không bao giờ
-được tin, kể cả qua `kernel.public_url`. Còn một lỗ: host của `kernel.public_url` mà chưa ai xác minh vẫn
-được tin cho link của chính khách đó, nên hãy xác minh tên miền bạn đặt vào đó.
+mail: tên miền bị thu hồi, hỏng bản ghi DNS hay chuyển sang khách khác thì mail quay về địa chỉ của máy
+chủ (ghi cảnh báo vào log), không gửi token tới host khách không còn giữ — ngay trên máy chủ thấy thay
+đổi, trong vòng `AUTOXIDE_TENANCY_CACHE_SECONDS` (mặc định 10 giây) trên máy chủ khác. Tên miền đã xác minh
+của khách khác không bao giờ được tin, tên miền khách đã mất không được tin tới khi xác minh lại — kể cả
+với `kernel.public_url`, khi đó trả `422` `kernel.public_url_not_allowed`. Còn một lỗ: host của
+`kernel.public_url` mà chưa ai từng xác minh vẫn được tin cho link của chính khách đó, nên hãy xác minh
+tên miền bạn đặt vào đó.
 
 Cấu hình kết nối của mail và AI đã đổi tên theo dạng này. Tên cũ (`mail.smtp_url`, `mail.from`,
 `ai.api_key`, `ai.model`) vẫn dùng được: giá trị khách đã đặt dưới tên cũ tiếp tục có hiệu lực, và
