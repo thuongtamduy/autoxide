@@ -197,6 +197,7 @@ where
     // Tín hiệu dừng tới thì chưa ngừng nhận kết nối ngay: bật cờ để `/health/ready` trả 503, vẫn
     // phục vụ thêm `drain` để bộ cân bằng tải kịp chuyển request sang tiến trình khác. Hết khoảng
     // đó future này mới xong, và `http::serve` mới bắt đầu tắt (đếm `shutdown_grace` từ lúc ấy).
+    warn_if_over_open_files(config.http.max_connections);
     let drain = config.http.drain;
     // Stream event (SSE) không tự kết thúc: đóng chúng ngay khi bắt đầu tắt, client nối lại sang
     // máy chủ khác bằng `Last-Event-ID` (bước 40 P5).
@@ -241,8 +242,59 @@ where
     closed
 }
 
+// Chỗ dành cho file descriptor ngoài các kết nối HTTP (database, file log, cổng `/metrics`, file tải lên…).
+const SPARE_FILES: usize = 64;
+
+// Cảnh báo khi `AUTOXIDE_HTTP_MAX_CONNECTIONS` không chặn được trước giới hạn file mở của process (`ulimit -n`): khi
+// đó hết file descriptor vẫn xảy ra trước, giới hạn của Autoxide không có tác dụng (L-10). Chỉ Linux có
+// `/proc/self/limits`; nơi khác bỏ qua.
+fn warn_if_over_open_files(max_connections: usize) {
+    // `0`: người vận hành tắt giới hạn (để reverse proxy lo) — không có gì để so.
+    if max_connections == 0 {
+        return;
+    }
+    let Ok(limits) = std::fs::read_to_string("/proc/self/limits") else { return };
+    if let Some(open_files) = soft_open_files(&limits)
+        && over_open_files(max_connections, open_files)
+    {
+        tracing::warn!(
+            max_connections,
+            open_files,
+            "AUTOXIDE_HTTP_MAX_CONNECTIONS is not below the open file limit (ulimit -n); raise the limit \
+             (systemd LimitNOFILE, docker --ulimit nofile) or lower the setting so new connections wait \
+             instead of failing"
+        );
+    }
+}
+
+// Giới hạn kết nối cộng chỗ dự phòng không thấp hơn giới hạn file mở.
+fn over_open_files(max_connections: usize, open_files: usize) -> bool {
+    max_connections.saturating_add(SPARE_FILES) > open_files
+}
+
+// Giới hạn mềm "Max open files" trong nội dung của `/proc/self/limits` (`unlimited` hay không đọc được: `None`).
+fn soft_open_files(limits: &str) -> Option<usize> {
+    let line = limits.lines().find(|line| line.starts_with("Max open files"))?;
+    line.trim_start_matches("Max open files").split_whitespace().next()?.parse().ok()
+}
+
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn doc_gioi_han_file_mo() {
+        let limits = "Limit                     Soft Limit           Hard Limit           Units     \n\
+                      Max processes             63000                63000                processes \n\
+                      Max open files            1024                 524288               files     \n";
+        assert_eq!(super::soft_open_files(limits), Some(1024));
+        let unlimited =
+            "Max open files            unlimited            unlimited            files\n";
+        assert_eq!(super::soft_open_files(unlimited), None);
+        assert_eq!(super::soft_open_files(""), None);
+        assert!(super::over_open_files(4096, 1024));
+        assert!(!super::over_open_files(4096, 8192));
+        assert!(super::over_open_files(usize::MAX, 8192), "không tràn số");
+    }
+
     use super::*;
     use std::io::{Read, Write};
 

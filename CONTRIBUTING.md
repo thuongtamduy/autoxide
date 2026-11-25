@@ -91,8 +91,9 @@ in that list runs everything.
   changing it is a breaking change. Each new code needs a Vietnamese translation in the
   crate's `locales/vi.json`.
 - **The API contract stays in sync.** Every route is documented in OpenAPI. When you change
-  the API or a setting, regenerate the files the tests compare against (the failing test
-  prints the command): `docs/openapi.json` and `.env.example`. Never change the behaviour
+  the API or a setting, run `cargo xtask regen`: it regenerates every generated file in one go
+  (`docs/openapi.json`, `docs/mcp-tools.json`, `.env.example`, the TypeScript SDK schema). The
+  the gate on your machine checks them early (`cargo xtask regen --check`) and prints this command when one is stale (this step runs only locally; on CI the tests that keep the documents in sync with the code check them). Never change the behaviour
   of an existing `/api/v1` endpoint in a breaking way; add a new one and deprecate the old.
 - **Tests.** New code comes with tests. Tests that touch the database use
   `autoxide_testkit::TestDatabase`, which gives each test an empty database on whichever

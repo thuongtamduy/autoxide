@@ -473,6 +473,12 @@ async fn return_url_la_bi_tu_choi_qua_checkout_va_link_thanh_toan() {
         let answer = link("https://evil.example/done", "b1").await.unwrap();
         assert_eq!(answer.status(), 422, "{}", answer.text());
         assert_eq!(answer.json()["code"], "orders.return_url_not_allowed");
+        // Sai định dạng (không phải http(s)) là lý do khác, câu khác.
+        for (url, key) in [("ftp://shop.example/done", "b3"), ("//shop.example/done", "b4")] {
+            let answer = link(url, key).await.unwrap();
+            assert_eq!(answer.status(), 422, "{}", answer.text());
+            assert_eq!(answer.json()["code"], "orders.return_url_invalid", "{url}");
+        }
         let answer = link("https://shop.example/thanks", "b2").await.unwrap();
         assert_eq!(answer.status(), 200, "{}", answer.text());
         assert_eq!(answer.json()["data"][0]["kind"], "redirect");

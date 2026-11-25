@@ -130,6 +130,9 @@ spec:
               path: /health/live
               port: http
             periodSeconds: 10
+            # At AUTOXIDE_HTTP_MAX_CONNECTIONS health checks on the same port wait too: leave enough time
+            # that a short saturation does not restart the pod (D-20261125-connection-limit-ops).
+            timeoutSeconds: 5
             failureThreshold: 3
           startupProbe:
             httpGet:
