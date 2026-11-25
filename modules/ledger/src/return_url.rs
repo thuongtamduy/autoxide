@@ -47,7 +47,6 @@ fn origin_of(url: &url::Url) -> Option<String> {
     Some(format!("{}://{host}:{port}", url.scheme()))
 }
 
-
 // Một origin hợp lệ để khai: chỉ scheme + host (+ port), không đường dẫn, tham số hay ký tự đại diện `*` (so khớp
 // chính xác; `https://*.example.com` sẽ không bao giờ khớp nên từ chối ngay lúc lưu để quản trị viên khỏi hiểu lầm).
 fn listed_origin(raw: &str) -> Option<String> {
