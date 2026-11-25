@@ -53,4 +53,6 @@ Hướng dẫn theo tình huống, có ví dụ `curl` và SDK: [`docs/guides/`]
 ## Cho người đóng góp
 
 `src/schema.ts` là file sinh ra: đổi API, sinh lại `docs/openapi.json`, rồi chạy `cargo xtask sdk`. Gate chạy
-`cargo xtask sdk --check`; CI kiểm kiểu SDK và ví dụ của hướng dẫn bằng `npm ci && npx tsc --noEmit`.
+`cargo xtask sdk --check`; CI kiểm kiểu SDK và ví dụ của hướng dẫn bằng `npm ci && npx tsc --noEmit` (TypeScript 7, bản dùng để phát triển) và chạy lại bằng TypeScript 5.0.4.
+
+TypeScript hỗ trợ cho dự án nhập SDK: **5.0 trở lên** (đã kiểm ở 5.0.4, 5.9.3, 6.0.3 và 7.0.2). `moduleResolution: "Bundler"` cần 5.0.
