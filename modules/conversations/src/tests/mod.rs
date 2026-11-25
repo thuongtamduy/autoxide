@@ -3,6 +3,7 @@
 
 mod assist;
 mod chat;
+mod dormant;
 mod privacy;
 mod stream;
 mod voice;

@@ -256,7 +256,7 @@ impl Module for ComplianceModule {
             Arc::new(blocks::LegalFooter(service.clone())),
         )?;
         self.service = Some(service.clone());
-        context.personal_data(Arc::new(privacy::CompliancePersonalData(service.clone())))?;
+        context.personal_data(Arc::new(privacy::CompliancePersonalData))?;
         // Mã đăng nhập bằng số cho `auth` (đăng ký trước): không có `auth` (chương trình rút gọn) thì bỏ qua.
         if let Ok(extensions) = context.require::<dyn autoxide_auth::api::AuthExtensions>() {
             extensions.set_phone_codes(Arc::new(sign_in_codes::SignInCodes(service.clone())))?;
@@ -372,12 +372,23 @@ impl Module for ComplianceModule {
     }
 
     fn subscriptions(&self) -> Vec<Subscription> {
-        self.service.clone().map_or_else(Vec::new, |service| {
-            vec![Subscription::new(
-                autoxide_kernel::privacy::USER_DELETED,
-                Arc::new(privacy::UserDeletedListener(service)),
-            )]
-        })
+        if self.service.is_none() {
+            return Vec::new();
+        }
+        vec![Subscription::new(
+            autoxide_kernel::privacy::USER_DELETED,
+            Arc::new(privacy::UserDeletedListener),
+        )]
+    }
+
+    // Chế độ "nghỉ" (bước 70 P9): module tắt vẫn xuất và xoá dữ liệu của người dùng (số đã xác thực, mã
+    // một lần, liên kết đồng ý cookie, vụ việc họ gửi).
+    fn dormant(
+        &self,
+        context: &mut autoxide_kernel::module::DormantContext<'_>,
+    ) -> Result<(), Error> {
+        context.personal_data(Arc::new(privacy::CompliancePersonalData))?;
+        context.on_user_deleted(Arc::new(privacy::UserDeletedListener))
     }
 
     fn retention(&self) -> Vec<autoxide_kernel::privacy::RetentionPolicy> {

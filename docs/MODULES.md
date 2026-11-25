@@ -149,9 +149,23 @@ Turning a module off **never deletes anything**. If the database already has its
 stay exactly as they are, and turning the module on again continues from there (migrations added
 in the meantime are applied by `autoxide migrate up` as usual).
 
-While it is off, nothing maintains that data:
+While it is off, the module still takes part in personal data and in the tenant lifecycle
+("dormant mode") — it serves no routes, MCP tools, jobs or other events, but:
 
-- personal-data exports and erasures, retention clean-up and tenant deletion do not reach it;
+- a person's data export (`GET /api/v1/auth/me/export`, subject access requests) includes its part,
+  and deleting an account deletes or anonymizes that person's data in it, as when it is on;
+- deleting a tenant for good deletes its rows of the tenant (except tables kept by law), a tenant data
+  export includes them, and moving, splitting or merging a tenant takes them along (the module's own
+  migrations are applied to its tables on both databases first, and only where it already has tables).
+
+This is an obligation of personal data protection law (Vietnam: Law 91/2025/QH15, Decree
+13/2023/ND-CP), so it does not depend on whether you use the module any more. What it still does not
+do while off:
+
+- retention clean-up of its data does not run (the module's jobs do not run);
+- with `files` off, deleting an account deletes the file records but not the stored content (a warning
+  names each storage key to remove by hand); with `conversations` off, call recordings stay until the
+  module is turned on again (its retention clean-up then removes them);
 - tenants created in the meantime do not get the module's starting data;
 - events other modules publish in the meantime are not delivered to it later.
 
@@ -164,9 +178,6 @@ So that data is not lost by accident:
 - `autoxide copy`, `autoxide backup create` and `autoxide backup restore` refuse to run while
   such data exists, because they only handle the modules that are on. Run them with the module
   turned on, or with `AUTOXIDE_MODULES=all`.
-- Moving a tenant to another database, and splitting or merging tenants, are refused
-  (`409 tenant_move_modules_off`, also listed by the dry run) while the tenant has rows of a module
-  that is off: only the data of modules that are on is moved.
 
 The check for such data looks at the main database and at the database of every placement.
 

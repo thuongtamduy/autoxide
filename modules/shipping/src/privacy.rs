@@ -3,8 +3,6 @@
 //! theo luật kế toán / bưu chính, không thuộc sổ địa chỉ. Nhận lại event cũng không sao: lần sau
 //! không còn gì để xoá.
 
-use std::sync::Arc;
-
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::{Delivered, EventHandler};
 use autoxide_kernel::privacy::{PersonalData, deleted_user};
@@ -15,9 +13,9 @@ use uuid::Uuid;
 use crate::service::ShippingService;
 
 #[async_trait::async_trait]
-impl PersonalData for ShippingService {
+impl PersonalData for Erasure {
     async fn export(&self, tenant: &TenantContext, user_id: Uuid) -> Result<Value, Error> {
-        let addresses = self.all_addresses(tenant, user_id).await?;
+        let addresses = ShippingService::all_addresses(tenant, user_id).await?;
         Ok(json!({
             "addresses": addresses.iter().map(|entry| json!({
                 "label": entry.label,
@@ -32,8 +30,9 @@ impl PersonalData for ShippingService {
     }
 }
 
-/// Nghe `privacy.user_deleted`: xoá sổ địa chỉ của tài khoản.
-pub(crate) struct Erasure(pub Arc<ShippingService>);
+/// Bản xuất sổ địa chỉ, và bên nghe `privacy.user_deleted`: xoá sổ địa chỉ của tài khoản. Chỉ cần database
+/// của khách, nên dùng được cả khi module đang tắt (chế độ "nghỉ", bước 70 P9).
+pub(crate) struct Erasure;
 
 #[async_trait::async_trait]
 impl EventHandler for Erasure {
@@ -41,7 +40,7 @@ impl EventHandler for Erasure {
         let Some(user_id) = deleted_user(event) else {
             return Ok(());
         };
-        let removed = self.0.erase_addresses(&event.tenant, user_id).await?;
+        let removed = ShippingService::erase_addresses(&event.tenant, user_id).await?;
         tracing::info!(user_id = %user_id, removed, "shipping addresses of a deleted user erased");
         Ok(())
     }

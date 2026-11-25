@@ -148,9 +148,22 @@ Tắt một module **không bao giờ xoá gì**. Database đã có bảng của
 lại module là dùng tiếp từ đó (migration thêm trong lúc tắt được `autoxide migrate up` áp dụng như
 thường).
 
-Trong lúc tắt, không ai chăm dữ liệu đó:
+Trong lúc tắt, module vẫn tham gia dữ liệu cá nhân và vòng đời khách ("chế độ nghỉ") — không route,
+không tool MCP, không job, không nhận event khác, nhưng:
 
-- xuất và xoá dữ liệu cá nhân, dọn theo thời hạn lưu và xoá khách không chạm tới nó;
+- bản xuất dữ liệu của một người (`GET /api/v1/auth/me/export`, yêu cầu truy cập của chủ thể) có phần
+  của nó, và xoá tài khoản thì xoá / ẩn danh dữ liệu của người đó trong nó, như khi bật;
+- xoá hẳn một khách thì xoá dòng của khách đó trong bảng của nó (trừ bảng luật buộc giữ), bản xuất dữ
+  liệu của khách có các dòng đó, và dời / tách / gộp khách mang chúng theo (migration của chính module
+  được áp cho bảng của nó ở cả hai database trước, và chỉ ở nơi nó đã có bảng).
+
+Đây là nghĩa vụ của pháp luật bảo vệ dữ liệu cá nhân (Việt Nam: Luật 91/2025/QH15, Nghị định
+13/2023/NĐ-CP), nên không phụ thuộc bạn còn dùng module hay không. Những việc vẫn chưa làm khi tắt:
+
+- dọn dữ liệu của nó theo thời hạn lưu không chạy (job của module không chạy);
+- `files` tắt thì xoá tài khoản xoá dòng file nhưng không xoá nội dung đã lưu (log cảnh báo nêu từng khoá để
+  xoá tay); `conversations` tắt thì bản ghi âm cuộc gọi còn lại tới khi bật lại module (job dọn theo thời hạn
+  lưu sẽ xoá);
 - khách tạo trong lúc đó không có dữ liệu khởi đầu của module;
 - event module khác phát trong lúc đó không được giao bù về sau.
 
@@ -163,9 +176,6 @@ Trong lúc tắt, không ai chăm dữ liệu đó:
 - `autoxide copy`, `autoxide backup create` và `autoxide backup restore` từ chối chạy khi còn dữ
   liệu như vậy, vì chúng chỉ xử lý module đang bật. Chạy chúng với module đó bật, hoặc với
   `AUTOXIDE_MODULES=all`.
-- Dời một khách sang database khác, và tách / gộp khách, bị từ chối
-  (`409 tenant_move_modules_off`, dry run cũng nêu) khi khách còn dòng của một module đang tắt:
-  chỉ dữ liệu của module đang bật được chuyển.
 
 Việc kiểm dữ liệu như vậy xem database chính và database của từng placement.
 

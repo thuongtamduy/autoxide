@@ -249,53 +249,61 @@ impl ConversationsService {
         }
         Ok(count)
     }
+}
 
-    /// Tài khoản `user` bị xoá: xoá bản ghi các cuộc gọi của người đó, xoá số trong yêu cầu gọi lại.
-    pub(crate) async fn forget_calls(
-        &self,
-        tenant: &TenantContext,
-        user: Uuid,
-        threads: &[Uuid],
-    ) -> Result<(), Error> {
-        let calls = call::Entity::find()
-            .filter(
-                sea_orm::Condition::any()
-                    .add(call::Column::CallerUserId.eq(user))
-                    .add(call::Column::ThreadId.is_in(threads.to_vec())),
-            )
-            .scoped(tenant)
-            .all(tenant.database().read())
-            .await?;
-        for row in calls {
-            self.erase_recording(tenant, Actor::system(), &row, "account_deleted").await?;
+/// Tài khoản `user` bị xoá: xoá bản ghi các cuộc gọi của người đó, xoá số trong yêu cầu gọi lại.
+/// `service` là `None` khi module đang tắt: bản ghi giữ lại tới khi bật lại (xem trong hàm).
+pub(crate) async fn forget_calls(
+    service: Option<&ConversationsService>,
+    tenant: &TenantContext,
+    user: Uuid,
+    threads: &[Uuid],
+) -> Result<(), Error> {
+    let calls = call::Entity::find()
+        .filter(
+            sea_orm::Condition::any()
+                .add(call::Column::CallerUserId.eq(user))
+                .add(call::Column::ThreadId.is_in(threads.to_vec())),
+        )
+        .scoped(tenant)
+        .all(tenant.database().read())
+        .await?;
+    for row in calls {
+        if let Some(service) = service {
+            service.erase_recording(tenant, Actor::system(), &row, "account_deleted").await?;
+        } else if row.recording_ref.is_some() || row.provider_recording_id.is_some() {
+            // Module đang tắt (chế độ nghỉ, bước 70 P9): không có nơi lưu của nó lẫn bộ nối nhà cung
+            // cấp thoại, nên bản ghi giữ nguyên (cột không đổi) để job hạn lưu xoá khi bật lại; phần
+            // còn lại (người gọi, số gọi lại) vẫn gỡ ngay bên dưới.
+            tracing::warn!(call_id = %row.id, "call recording kept: module `conversations` is turned off");
         }
-        let at = now();
-        // Yêu cầu còn mở của người đó: huỷ (không ai gọi tới số đã xoá).
-        callback::Entity::update_many()
-            .col_expr(callback::Column::Status, Expr::value("cancelled"))
-            .filter(callback::Column::RequesterUserId.eq(user))
-            .filter(callback::Column::Status.is_in(["open", "calling"]))
-            .scoped(tenant)
-            .exec(tenant.database().write())
-            .await?;
-        callback::Entity::update_many()
-            .col_expr(callback::Column::PhoneSealed, Expr::value(Option::<String>::None))
-            .col_expr(callback::Column::PhoneMasked, Expr::value(""))
-            .col_expr(callback::Column::RequesterUserId, Expr::value(Option::<Uuid>::None))
-            .col_expr(callback::Column::OpenKey, Expr::value(Option::<String>::None))
-            .col_expr(callback::Column::UpdatedAt, Expr::value(at))
-            .filter(callback::Column::RequesterUserId.eq(user))
-            .scoped(tenant)
-            .exec(tenant.database().write())
-            .await?;
-        call::Entity::update_many()
-            .col_expr(call::Column::CallerUserId, Expr::value(Option::<Uuid>::None))
-            .filter(call::Column::CallerUserId.eq(user))
-            .scoped(tenant)
-            .exec(tenant.database().write())
-            .await?;
-        Ok(())
     }
+    let at = now();
+    // Yêu cầu còn mở của người đó: huỷ (không ai gọi tới số đã xoá).
+    callback::Entity::update_many()
+        .col_expr(callback::Column::Status, Expr::value("cancelled"))
+        .filter(callback::Column::RequesterUserId.eq(user))
+        .filter(callback::Column::Status.is_in(["open", "calling"]))
+        .scoped(tenant)
+        .exec(tenant.database().write())
+        .await?;
+    callback::Entity::update_many()
+        .col_expr(callback::Column::PhoneSealed, Expr::value(Option::<String>::None))
+        .col_expr(callback::Column::PhoneMasked, Expr::value(""))
+        .col_expr(callback::Column::RequesterUserId, Expr::value(Option::<Uuid>::None))
+        .col_expr(callback::Column::OpenKey, Expr::value(Option::<String>::None))
+        .col_expr(callback::Column::UpdatedAt, Expr::value(at))
+        .filter(callback::Column::RequesterUserId.eq(user))
+        .scoped(tenant)
+        .exec(tenant.database().write())
+        .await?;
+    call::Entity::update_many()
+        .col_expr(call::Column::CallerUserId, Expr::value(Option::<Uuid>::None))
+        .filter(call::Column::CallerUserId.eq(user))
+        .scoped(tenant)
+        .exec(tenant.database().write())
+        .await?;
+    Ok(())
 }
 
 pub(crate) fn recording_not_found(id: Uuid) -> Error {

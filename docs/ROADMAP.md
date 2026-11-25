@@ -154,7 +154,9 @@ thật (P7).
         `payment_actions[].error` (`code` ổn định + `message` theo ngôn ngữ người gọi)
 - [ ] P9 — **Ghi nợ, hoãn ngày 22/11/2026, chủ dự án mở lại ngày 25/11/2026** (D-20261125-p9-reopened; làm trước 1.0,
       trừ mục chạy thử bằng tài khoản thật):
-  - [ ] Chế độ "nghỉ": module tắt vẫn tham gia dữ liệu cá nhân và vòng đời khách (xuất, xoá, dời khách)
+  - [x] Chế độ "nghỉ": module tắt vẫn tham gia dữ liệu cá nhân và vòng đời khách (xuất, xoá, dời khách) —
+        D-20261125-dormant-modules: hook `Module::dormant`, xoá / xuất / dời / tách / gộp khách gom cả bảng của module
+        tắt; còn lại khi tắt: dọn theo thời hạn lưu, `copy` / `backup`
   - [x] Mẫu câu OTP khách tự sửa cho khớp template đã đăng ký với nhà mạng (đang viết cứng ở `compliance`, `orders`,
         `bookings`) — D-20261125-sms-templates: cấu hình theo khách nhóm `sms_template`, kiểm `{code}` đúng một lần
   - [ ] 139 endpoint GET trả `Data<Vec<T>>` không phân trang: endpoint mới trả `Page<T>`, khai deprecation cho cái cũ

@@ -146,6 +146,18 @@ impl Module for FilesModule {
         context.provide::<dyn Storage>(storage)
     }
 
+    // Chế độ nghỉ (bước 70 P9): module tắt vẫn xuất thông tin file của người dùng và xoá file khi tài
+    // khoản bị xoá. Nơi lưu chỉ có khi module khác đang bật công bố `dyn Storage` (thường là không):
+    // thiếu thì chỉ xoá dòng (xem `service::DormantPrivacy`).
+    fn dormant(
+        &self,
+        context: &mut autoxide_kernel::module::DormantContext<'_>,
+    ) -> Result<(), Error> {
+        context.personal_data(Arc::new(service::DormantPrivacy { storage: None }))?;
+        let storage = context.api::<dyn Storage>();
+        context.on_user_deleted(Arc::new(service::DormantPrivacy { storage }))
+    }
+
     fn subscriptions(&self) -> Vec<Subscription> {
         // Tài khoản bị xoá: xoá file của người đó.
         self.service.clone().map_or_else(Vec::new, |service| {

@@ -12,6 +12,7 @@
 //! - `tenancy.rs`: hai khách cùng database (bước 33) — cùng đích, cùng tên không đụng nhau, không
 //!   thấy bình luận của nhau, token trong link mail mang khách.
 
+mod dormant;
 mod moderation;
 mod posting;
 mod questions;

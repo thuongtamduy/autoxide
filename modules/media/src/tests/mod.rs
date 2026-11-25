@@ -13,6 +13,7 @@ mod avif;
 #[cfg(feature = "avif")]
 mod avif_http;
 mod direct;
+mod dormant;
 mod folders;
 mod images;
 mod items;

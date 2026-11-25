@@ -300,6 +300,16 @@ impl Module for ContentModule {
         Some(banners::presets::seed())
     }
 
+    // Chế độ nghỉ (bước 70 P9): module tắt vẫn xuất hồ sơ tác giả / mục của người dùng và gỡ liên kết
+    // khi tài khoản bị xoá — cùng hàm với lúc bật, không cần service (xem `privacy.rs`).
+    fn dormant(
+        &self,
+        context: &mut autoxide_kernel::module::DormantContext<'_>,
+    ) -> Result<(), Error> {
+        context.personal_data(Arc::new(privacy::DormantPrivacy))?;
+        context.on_user_deleted(Arc::new(privacy::DormantPrivacy))
+    }
+
     fn subscriptions(&self) -> Vec<Subscription> {
         // Tài khoản bị xoá: gỡ hồ sơ tác giả, bỏ liên kết, huỷ lịch (xem `privacy.rs`).
         self.service.clone().map_or_else(Vec::new, |service| {

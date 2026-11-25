@@ -17,10 +17,9 @@ use crate::entity::{
     cart_reminder, group_member, order_fact, profile, recent_view, wishlist_alert_batch,
     wishlist_alert_queue, wishlist_alert_setting, wishlist_item,
 };
-use crate::service::CustomersService;
 
 #[async_trait::async_trait]
-impl PersonalData for CustomersService {
+impl PersonalData for CustomerPrivacy {
     async fn export(&self, tenant: &TenantContext, user_id: Uuid) -> Result<Value, Error> {
         let read = tenant.database().read();
         let Some(row) = profile::Entity::find()
@@ -94,11 +93,12 @@ impl PersonalData for CustomersService {
     }
 }
 
-/// Bên nghe `privacy::USER_DELETED`.
-pub(crate) struct ErasedUsers;
+/// Bản xuất và bên nghe `privacy::USER_DELETED`: chỉ cần database của khách, nên dùng được cả khi module
+/// đang tắt (chế độ "nghỉ", bước 70 P9).
+pub(crate) struct CustomerPrivacy;
 
 #[async_trait::async_trait]
-impl EventHandler for ErasedUsers {
+impl EventHandler for CustomerPrivacy {
     async fn handle(&self, event: &Delivered) -> Result<(), Error> {
         let Some(user_id) = deleted_user(event) else {
             return Ok(());

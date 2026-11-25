@@ -552,28 +552,27 @@ impl ContentService {
         transaction.commit().await?;
         Ok(())
     }
+}
 
-    /// Huỷ các yêu cầu dịch còn chờ của người dùng `user_id` (tài khoản bị xoá).
-    pub(crate) async fn cancel_translations_of(
-        &self,
-        tenant: &TenantContext,
-        user_id: Uuid,
-    ) -> Result<u64, Error> {
-        let result = translation_request::Entity::update_many()
-            .scoped(tenant)
-            .col_expr(translation_request::Column::Status, Expr::value(status::FAILED))
-            .col_expr(
-                translation_request::Column::ErrorCode,
-                Expr::value("content.translation_canceled"),
-            )
-            .col_expr(translation_request::Column::ActiveKey, Expr::value(Option::<String>::None))
-            .col_expr(translation_request::Column::UpdatedAt, Expr::value(now()))
-            .filter(translation_request::Column::CreatedBy.eq(user_id))
-            .filter(translation_request::Column::Status.is_in([status::QUEUED, status::RUNNING]))
-            .exec(tenant.database().write())
-            .await?;
-        Ok(result.rows_affected)
-    }
+/// Huỷ các yêu cầu dịch còn chờ của người dùng `user_id` (tài khoản bị xoá; cả khi module đang tắt).
+pub(crate) async fn cancel_translations_by(
+    tenant: &TenantContext,
+    user_id: Uuid,
+) -> Result<u64, Error> {
+    let result = translation_request::Entity::update_many()
+        .scoped(tenant)
+        .col_expr(translation_request::Column::Status, Expr::value(status::FAILED))
+        .col_expr(
+            translation_request::Column::ErrorCode,
+            Expr::value("content.translation_canceled"),
+        )
+        .col_expr(translation_request::Column::ActiveKey, Expr::value(Option::<String>::None))
+        .col_expr(translation_request::Column::UpdatedAt, Expr::value(now()))
+        .filter(translation_request::Column::CreatedBy.eq(user_id))
+        .filter(translation_request::Column::Status.is_in([status::QUEUED, status::RUNNING]))
+        .exec(tenant.database().write())
+        .await?;
+    Ok(result.rows_affected)
 }
 
 /// Trong `entries`, những bản dịch AI đã cũ: nội dung bản gốc (các trường sửa được, như lưu

@@ -337,3 +337,41 @@ async fn database_co_du_lieu_cua_module_tat_van_khoi_dong_va_con_nguyen() {
     .await
     .unwrap();
 }
+
+/// Chế độ "nghỉ" (bước 70 P9, D-20261125-dormant-modules): module nào góp phần vào bản xuất dữ liệu cá
+/// nhân hay xoá dữ liệu khi tài khoản bị xoá lúc đang BẬT thì cũng phải làm việc đó lúc đang TẮT
+/// (`Module::dormant`). Quên khai thì dữ liệu của module tắt bị bỏ sót khi người dùng đòi xuất / xoá —
+/// bài này đỏ ở đây chứ không ở máy người cài.
+#[tokio::test]
+async fn module_tat_van_xuat_va_xoa_du_lieu_ca_nhan_nhu_khi_bat() {
+    TestDatabase::run(async |test| {
+        let every = runtime::start(installed(test.url(), Some("all")).unwrap(), Migrations::Ignore)
+            .await
+            .unwrap();
+        let core = runtime::start(installed(test.url(), Some("core")).unwrap(), Migrations::Ignore)
+            .await
+            .unwrap();
+        let sorted = |mut names: Vec<&'static str>| {
+            names.sort_unstable();
+            names
+        };
+        assert_eq!(
+            sorted(core.modules.personal_data().modules()),
+            sorted(every.modules.personal_data().modules()),
+            "personal data export: a module registers it in `start` but not in `dormant`"
+        );
+        assert_eq!(
+            sorted(core.modules.user_deleted_receivers()),
+            sorted(every.modules.user_deleted_receivers()),
+            "account deletion: a module subscribes to it in `start` but not in `dormant`"
+        );
+        // Module tắt vẫn không có route, tool hay job.
+        assert!(
+            core.modules.tools().unwrap().iter().all(|tool| !tool.name().starts_with("orders."))
+        );
+        every.database.close().await.unwrap();
+        core.database.close().await.unwrap();
+    })
+    .await
+    .unwrap();
+}

@@ -33,15 +33,17 @@ use crate::i18n::Translations;
 use crate::job::{JobQueue, JobRegistration, Schedule};
 use crate::privacy::{PersonalData, PersonalDataExport};
 
+mod dormant;
 mod later;
 pub mod navigation;
 mod registry;
 
 mod selection;
 
+pub use dormant::DormantContext;
+pub(crate) use dormant::installed;
 pub use later::Later;
 pub use registry::{ModuleError, Modules};
-pub(crate) use selection::inactive_with_tenant_data;
 pub use selection::{DormantModule, InactiveModule, MODULES, Selection, SelectionError, Stability};
 
 /// What a module declares to the core.
@@ -237,6 +239,16 @@ pub trait Module: Send + Sync {
     /// The events the module wants to receive (of every module, including itself). Called after `start`.
     fn subscriptions(&self) -> Vec<Subscription> {
         Vec::new()
+    }
+
+    /// Dormant mode (step 70 P9, D-20261125-dormant-modules): called INSTEAD of `start` when the module is
+    /// in the program but turned off (`AUTOXIDE_MODULES`), after every enabled module has started. A module
+    /// that holds personal data registers here the same export part and account-deletion handler it
+    /// registers when enabled, so a turned-off module's data is never left out of a person's export or
+    /// deletion. Nothing else of the module runs. Does nothing by default.
+    fn dormant(&self, context: &mut DormantContext<'_>) -> Result<(), Error> {
+        let _ = context;
+        Ok(())
     }
 
     /// Runners for the module's job kinds (`<name>.<action>`). With jobs the module must have a

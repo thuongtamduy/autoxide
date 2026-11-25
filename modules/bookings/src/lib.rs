@@ -142,6 +142,15 @@ impl Module for BookingsModule {
         Ok(())
     }
 
+    // Chế độ "nghỉ" (bước 70 P9): module tắt vẫn xuất / xoá dữ liệu cá nhân trong lịch đặt.
+    fn dormant(
+        &self,
+        context: &mut autoxide_kernel::module::DormantContext<'_>,
+    ) -> Result<(), Error> {
+        context.personal_data(Arc::new(privacy::BookingPrivacy))?;
+        context.on_user_deleted(Arc::new(privacy::BookingPrivacy))
+    }
+
     fn jobs(&self) -> Vec<autoxide_kernel::job::JobRegistration> {
         self.service.as_ref().map_or_else(Vec::new, |service| {
             let mut all = jobs::registrations(service);

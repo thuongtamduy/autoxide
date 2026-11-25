@@ -712,7 +712,9 @@ impl ComplianceService {
     /// Xoá dữ liệu `compliance` giữ về người dùng `user` đã bị xoá: số điện thoại đã xác thực, mã một
     /// lần; gỡ người dùng khỏi bằng chứng đồng ý cookie. Bằng chứng đồng ý / chấp nhận văn bản và hồ sơ
     /// KYC giữ theo luật (không có email / số trong đó). Gọi lại vô hại.
-    pub(crate) async fn erase_user(&self, tenant: &TenantContext, user: Uuid) -> Result<(), Error> {
+    // Không dùng `self` (cả `export_user`): module đang tắt (chế độ "nghỉ", bước 70 P9) gọi được mà không
+    // có service.
+    pub(crate) async fn erase_user(tenant: &TenantContext, user: Uuid) -> Result<(), Error> {
         let transaction = tenant.database().begin_write().await?;
         account_verification::Entity::delete_many()
             .filter(account_verification::Column::UserId.eq(user))
@@ -794,11 +796,7 @@ impl ComplianceService {
     }
 
     /// Dữ liệu `compliance` giữ về người dùng `user_id` (bản xuất dữ liệu cá nhân).
-    pub(crate) async fn export_user(
-        &self,
-        tenant: &TenantContext,
-        user_id: Uuid,
-    ) -> Result<Value, Error> {
+    pub(crate) async fn export_user(tenant: &TenantContext, user_id: Uuid) -> Result<Value, Error> {
         let read = tenant.database().read();
         let verification = account_verification::Entity::find()
             .scoped(tenant)
@@ -870,23 +868,23 @@ impl ComplianceService {
 }
 
 /// Phần dữ liệu cá nhân của `compliance` trong bản xuất của người dùng.
-pub(crate) struct CompliancePersonalData(pub Arc<ComplianceService>);
+pub(crate) struct CompliancePersonalData;
 
 #[async_trait::async_trait]
 impl PersonalData for CompliancePersonalData {
     async fn export(&self, tenant: &TenantContext, user_id: Uuid) -> Result<Value, Error> {
-        self.0.export_user(tenant, user_id).await
+        ComplianceService::export_user(tenant, user_id).await
     }
 }
 
-/// Nghe `auth.user_deleted`.
-pub(crate) struct UserDeletedListener(pub Arc<ComplianceService>);
+/// Nghe `auth.user_deleted` — cả khi module đang tắt.
+pub(crate) struct UserDeletedListener;
 
 #[async_trait::async_trait]
 impl EventHandler for UserDeletedListener {
     async fn handle(&self, event: &Delivered) -> Result<(), Error> {
         match deleted_user(event) {
-            Some(user) => self.0.erase_user(&event.tenant, user).await,
+            Some(user) => ComplianceService::erase_user(&event.tenant, user).await,
             None => Ok(()),
         }
     }

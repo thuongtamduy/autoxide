@@ -73,7 +73,10 @@ async fn yeu_cau_ket_bi_thay_va_huy_khong_bi_ghi_de() {
         );
 
         // Huỷ (tài khoản bị xoá) rồi job chạy: vẫn là huỷ.
-        assert_eq!(content.cancel_translations_of(&tenant, ada.user_id()).await.unwrap(), 1);
+        assert_eq!(
+            crate::ai::translate::cancel_translations_by(&tenant, ada.user_id()).await.unwrap(),
+            1
+        );
         content.run_translation(&tenant, fresh.id, 1).await.unwrap();
         let canceled = translation_request::Entity::find_by_id(fresh.id)
             .one(database.read())

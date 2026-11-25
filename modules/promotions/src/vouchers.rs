@@ -385,20 +385,7 @@ impl PromotionsService {
         user_id: Uuid,
         status: Option<VoucherStatus>,
     ) -> Result<Vec<Voucher>, Error> {
-        let mut select = voucher::Entity::find()
-            .filter(voucher::Column::HolderUserId.eq(user_id))
-            .scoped(tenant);
-        if let Some(status) = status {
-            select = select.filter(voucher::Column::Status.eq(status_str(status)));
-        }
-        Ok(select
-            .order_by_asc(voucher::Column::ExpiresAt)
-            .order_by_asc(voucher::Column::Id)
-            .all(tenant.database().read())
-            .await?
-            .iter()
-            .map(present)
-            .collect())
+        wallet(tenant, user_id, status).await
     }
 
     /// Ví voucher của tài khoản `user_id` cho nhân viên (tool MCP): chỉ voucher của chương trình
@@ -479,9 +466,9 @@ impl PromotionsService {
 }
 
 #[async_trait::async_trait]
-impl PersonalData for PromotionsService {
+impl PersonalData for PromotionsPrivacy {
     async fn export(&self, tenant: &TenantContext, user_id: Uuid) -> Result<Value, Error> {
-        let vouchers = self.vouchers_of(tenant, user_id, None).await?;
+        let vouchers = wallet(tenant, user_id, None).await?;
         let reminders = crate::entity::reminder::Entity::find()
             .filter(crate::entity::reminder::Column::UserId.eq(user_id))
             .scoped(tenant)
@@ -497,11 +484,12 @@ impl PersonalData for PromotionsService {
 }
 
 /// Xoá tài khoản (Luật 91/2025): voucher chưa dùng → `revoked`; mọi voucher bỏ liên kết người
-/// (voucher đã dùng giữ cho chứng từ); lời nhắc bị xoá. Nhận lại event không sao.
-pub(crate) struct ErasedUsers;
+/// (voucher đã dùng giữ cho chứng từ); lời nhắc bị xoá. Nhận lại event không sao. Cùng là bản xuất dữ liệu
+/// cá nhân; chỉ cần database của khách nên dùng được cả khi module đang tắt (chế độ "nghỉ").
+pub(crate) struct PromotionsPrivacy;
 
 #[async_trait::async_trait]
-impl EventHandler for ErasedUsers {
+impl EventHandler for PromotionsPrivacy {
     async fn handle(&self, event: &Delivered) -> Result<(), Error> {
         let Some(user_id) = deleted_user(event) else {
             return Ok(());
@@ -581,4 +569,26 @@ impl PromotionsService {
         )
         .await
     }
+}
+
+/// Ví voucher của tài khoản `user_id`, hết hạn gần nhất trước. Không cần service: dùng được cả khi module
+/// đang tắt (chế độ "nghỉ", bước 70 P9).
+async fn wallet(
+    tenant: &TenantContext,
+    user_id: Uuid,
+    status: Option<VoucherStatus>,
+) -> Result<Vec<Voucher>, Error> {
+    let mut select =
+        voucher::Entity::find().filter(voucher::Column::HolderUserId.eq(user_id)).scoped(tenant);
+    if let Some(status) = status {
+        select = select.filter(voucher::Column::Status.eq(status_str(status)));
+    }
+    Ok(select
+        .order_by_asc(voucher::Column::ExpiresAt)
+        .order_by_asc(voucher::Column::Id)
+        .all(tenant.database().read())
+        .await?
+        .iter()
+        .map(present)
+        .collect())
 }

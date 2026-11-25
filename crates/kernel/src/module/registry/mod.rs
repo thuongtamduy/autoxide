@@ -105,6 +105,11 @@ pub struct Modules {
     sync_keep: SignedDuration,
     /// Modules present in the binary but not enabled by `AUTOXIDE_MODULES` (`Modules::select`).
     pub(super) inactive: Vec<super::InactiveModule>,
+    /// The turned-off modules themselves (dormant mode, step 70 P9): their declarations (tables, migrations,
+    /// split / merge policy) and [`Module::dormant`](super::Module::dormant).
+    pub(super) dormant: Vec<Box<dyn super::Module>>,
+    /// The account-deletion handlers turned-off modules registered in `dormant`, filled at `start`.
+    dormant_subscriptions: Vec<(&'static str, crate::event::Subscription)>,
     /// `(module enabled along, module that needs it)` (`Modules::select`).
     pub(super) implied: Vec<(&'static str, &'static str)>,
     /// The verbatim `AUTOXIDE_MODULES` the installer wrote, if any.
@@ -306,6 +311,8 @@ impl Modules {
                 sandbox: Default::default(),
                 sync_keep: SignedDuration::from_hours(24 * 30),
                 inactive: Vec::new(),
+                dormant: Vec::new(),
+                dormant_subscriptions: Vec::new(),
                 implied: Vec::new(),
                 selection_text: None,
             })
@@ -437,6 +444,16 @@ impl Modules {
             )));
         }
         apis.fill_later();
+        // Module đang tắt (chế độ "nghỉ", bước 70 P9): chỉ phần dữ liệu cá nhân, sau khi mọi module bật
+        // đã khởi động — chúng chỉ thấy thứ module bật công bố.
+        self.dormant_subscriptions = super::dormant::start(
+            &self.dormant,
+            &apis,
+            registry,
+            &self.translations,
+            &self.personal_data,
+            self.sync_keep,
+        )?;
         self.dns.fill(apis.get::<dyn crate::tenancy::DnsTxtLookup>());
         partners.fill(apis.get::<dyn crate::tenancy::sandbox::SandboxRecipients>());
         self.orgs.fill(apis.get::<dyn crate::tenancy::OrgNodes>());
@@ -499,20 +516,26 @@ impl Modules {
             registry.clone(),
             self.migrator().map_err(|error| ModuleError(error.to_string()))?,
         );
-        let retained = self.modules.iter().flat_map(|module| module.retained_tables()).collect();
+        // Module đang tắt vẫn thuộc vòng đời khách (chế độ "nghỉ", bước 70 P9): khai báo bảng của nó
+        // đi cùng module đang bật.
+        let every = || self.modules.iter().chain(&self.dormant);
+        let retained = every().flat_map(|module| module.retained_tables()).collect();
+        let mut control_plane = self.control_plane_tables();
+        control_plane.extend(self.dormant.iter().flat_map(|module| module.control_plane_tables()));
         // Chính sách tách / gộp (bước 38): bảng thuộc chính module, không khai hai lần.
         let policies = crate::tenancy::relocate::Policies::collect(
-            self.modules.iter().map(|module| (module.name(), module.relocation())).collect(),
+            every().map(|module| (module.name(), module.relocation())).collect(),
         )
         .map_err(|problems| ModuleError(problems.join("; ")))?;
+        let dormant = super::dormant::migrators(&self.dormant, &self.keys, registry)?;
         self.moves.fill(crate::tenancy::moves::Setup {
             modules: self.names(),
-            control_plane: self.control_plane_tables(),
+            control_plane,
             migrator,
             placements,
             retained,
             policies,
-            inactive: self.inactive.iter().map(|module| module.name).collect(),
+            dormant,
         });
         self.backlog.fill(self.job_modules(), self.events.modules());
         Ok(())

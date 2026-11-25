@@ -303,8 +303,26 @@ async fn lich_go_ghi_revision_va_huy_lich_co_event() {
             .create_schedule(&tenant, &ada, entry.id, Action::Unpublish, at, None)
             .await
             .unwrap();
-        assert_eq!(content.cancel_schedules_of(&tenant, ada.user_id()).await.unwrap(), 1);
-        assert_eq!(content.cancel_schedules_of(&tenant, ada.user_id()).await.unwrap(), 0);
+        assert_eq!(
+            crate::publishing::schedules::cancel_schedules_by(
+                &tenant,
+                Some(&content.outbox),
+                ada.user_id()
+            )
+            .await
+            .unwrap(),
+            1
+        );
+        assert_eq!(
+            crate::publishing::schedules::cancel_schedules_by(
+                &tenant,
+                Some(&content.outbox),
+                ada.user_id()
+            )
+            .await
+            .unwrap(),
+            0
+        );
         let canceled = events(&database)
             .await
             .iter()

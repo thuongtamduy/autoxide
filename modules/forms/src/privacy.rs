@@ -14,30 +14,59 @@ use serde_json::{Value, json};
 use uuid::Uuid;
 
 use crate::service::FormsService;
+use crate::submissions::inbox::{forget_creator, forms_created_by};
 
 #[async_trait::async_trait]
 impl PersonalData for FormsService {
     async fn export(&self, tenant: &TenantContext, user_id: Uuid) -> Result<Value, Error> {
-        let forms = self.forms_created_by(tenant, user_id).await?;
-        Ok(json!({
-            "forms": forms.iter().map(|form| json!({
-                "id": form.row.id,
-                "key": form.row.key,
-                "name": form.row.name,
-                "created_at": form.row.created_at,
-            })).collect::<Vec<_>>(),
-        }))
+        export(tenant, user_id).await
     }
 }
 
 #[async_trait::async_trait]
 impl EventHandler for FormsService {
     async fn handle(&self, event: &Delivered) -> Result<(), Error> {
-        let Some(user_id) = deleted_user(event) else {
-            return Ok(());
-        };
-        let forms = self.forget_creator(&event.tenant, user_id).await?;
-        tracing::info!(user_id = %user_id, forms, "forms of a deleted user unlinked");
-        Ok(())
+        forget(event).await
     }
+}
+
+/// Phần dữ liệu cá nhân của `forms` khi module đang tắt (chế độ nghỉ, bước 70 P9): cùng hàm với
+/// lúc bật; chỉ cần database của khách, không cần service.
+pub(crate) struct DormantPrivacy;
+
+#[async_trait::async_trait]
+impl PersonalData for DormantPrivacy {
+    async fn export(&self, tenant: &TenantContext, user_id: Uuid) -> Result<Value, Error> {
+        export(tenant, user_id).await
+    }
+}
+
+#[async_trait::async_trait]
+impl EventHandler for DormantPrivacy {
+    async fn handle(&self, event: &Delivered) -> Result<(), Error> {
+        forget(event).await
+    }
+}
+
+/// Các form người `user_id` tạo.
+async fn export(tenant: &TenantContext, user_id: Uuid) -> Result<Value, Error> {
+    let forms = forms_created_by(tenant, user_id).await?;
+    Ok(json!({
+        "forms": forms.iter().map(|form| json!({
+            "id": form.row.id,
+            "key": form.row.key,
+            "name": form.row.name,
+            "created_at": form.row.created_at,
+        })).collect::<Vec<_>>(),
+    }))
+}
+
+/// Tài khoản bị xoá: bỏ `created_by` (xem đầu file).
+async fn forget(event: &Delivered) -> Result<(), Error> {
+    let Some(user_id) = deleted_user(event) else {
+        return Ok(());
+    };
+    let forms = forget_creator(&event.tenant, user_id).await?;
+    tracing::info!(user_id = %user_id, forms, "forms of a deleted user unlinked");
+    Ok(())
 }

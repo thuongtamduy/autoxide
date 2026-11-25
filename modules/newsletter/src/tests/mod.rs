@@ -9,6 +9,7 @@
 
 mod admin;
 mod consents;
+mod dormant;
 mod sending;
 mod subscribe;
 

@@ -197793,7 +197793,7 @@
                 }
               }
             },
-            "description": "It cannot run now; code `tenancy.relocation_conflict` (see the plan of the run), `tenancy.relocation_in_progress`, `tenancy.relocation_not_active`, `tenancy.relocation_org_invalid`, `tenancy.relocation_same_database`, `tenancy.relocation_tenant_exists`, `tenancy.relocation_platform`, `tenancy.relocation_cycle`, `tenancy.relocation_schema_differs`, `tenant_slug_taken`, `tenant_move_modules_off` or `tenant_placement_behind`. A dry run lists every reason."
+            "description": "It cannot run now; code `tenancy.relocation_conflict` (see the plan of the run), `tenancy.relocation_in_progress`, `tenancy.relocation_not_active`, `tenancy.relocation_org_invalid`, `tenancy.relocation_same_database`, `tenancy.relocation_tenant_exists`, `tenancy.relocation_platform`, `tenancy.relocation_cycle`, `tenancy.relocation_schema_differs`, `tenant_slug_taken` or `tenant_placement_behind`. A dry run lists every reason."
           },
           "422": {
             "content": {
@@ -201705,7 +201705,7 @@
                 }
               }
             },
-            "description": "The move cannot run now; code `tenant_move_platform`, `tenant_move_same_placement`, `tenant_move_not_active`, `tenant_move_running`, `tenant_move_unfinished`, `tenant_move_schema_differs`, `tenant_move_same_database`, `tenant_move_modules_off` or `tenant_placement_behind`. A dry run lists every reason."
+            "description": "The move cannot run now; code `tenant_move_platform`, `tenant_move_same_placement`, `tenant_move_not_active`, `tenant_move_running`, `tenant_move_unfinished`, `tenant_move_schema_differs`, `tenant_move_same_database` or `tenant_placement_behind`. A dry run lists every reason."
           },
           "422": {
             "content": {

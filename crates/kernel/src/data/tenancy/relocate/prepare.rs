@@ -167,15 +167,6 @@ impl TenantRelocations {
         }
         let source_placement = self.placement_row(source.placement_id).await?;
         let source_db = self.database(&source_placement).await;
-        // Tách / gộp chỉ chuyển bảng của module đang bật (bước 70 P1): còn dữ liệu của module đang
-        // tắt thì dừng, không để nó ở lại khách nguồn.
-        if let Ok(database) = &source_db {
-            let left_behind =
-                self.setup.inactive_with_data(database, TenantId::from_uuid(source.id)).await?;
-            if !left_behind.is_empty() {
-                blockers.push(tenancy::tenant_move_modules_off(&left_behind.join(", ")));
-            }
-        }
         let (target_id, target_slug, org, target_placement) = match spec.kind {
             RelocationKind::Split => {
                 let org = spec.org.unwrap_or_default();
@@ -311,7 +302,9 @@ impl TenantRelocations {
         source: &Database,
         target: &Database,
     ) -> Result<(TenantTables, Vec<Resolved>), Error> {
-        let (modules, control_plane) = self.setup.tables()?;
+        // Module đang tắt cũng đi theo nhánh (chế độ "nghỉ", bước 70 P9).
+        self.setup.prepare_dormant(source, target).await?;
+        let (modules, control_plane) = self.setup.tenant_tables()?;
         let tables =
             TenantTables::read(source, target, &modules, &control_plane).await.map_err(transfer)?;
         let resolved = self.setup.policies()?.resolve(

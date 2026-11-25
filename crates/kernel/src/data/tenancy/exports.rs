@@ -417,7 +417,7 @@ impl TenantExports {
     ) -> Result<(Vec<super::moves::TenantTableRows>, i64), Error> {
         let context = self.registry.tenant(tenant).await?;
         let store = self.store(&context)?;
-        let (modules, control_plane) = self.setup.tables()?;
+        let (modules, control_plane) = self.setup.tenant_tables()?;
         let database = context.database().clone();
         let tables =
             crate::transfer::TenantTables::read(&database, &database, &modules, &control_plane)

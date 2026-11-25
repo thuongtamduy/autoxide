@@ -181,6 +181,17 @@ impl Module for ConversationsModule {
         Ok(())
     }
 
+    // Chế độ nghỉ (bước 70 P9): module tắt vẫn xuất cuộc trò chuyện của người dùng và ẩn danh hoá khi
+    // tài khoản bị xoá — cùng hàm với lúc bật, không cần service (xem `privacy.rs`; bản ghi âm giữ
+    // lại tới khi bật lại).
+    fn dormant(
+        &self,
+        context: &mut autoxide_kernel::module::DormantContext<'_>,
+    ) -> Result<(), Error> {
+        context.personal_data(Arc::new(privacy::DormantPrivacy))?;
+        context.on_user_deleted(Arc::new(privacy::DormantPrivacy))
+    }
+
     fn subscriptions(&self) -> Vec<Subscription> {
         let Some(service) = self.service.clone() else {
             return Vec::new();

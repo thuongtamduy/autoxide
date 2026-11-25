@@ -235,10 +235,9 @@ impl TenantMoves {
         source: &Database,
         target: &Database,
     ) -> Result<TenantTables, Error> {
-        let setup = self.setup.get()?;
-        TenantTables::read(source, target, &setup.modules, &setup.control_plane)
-            .await
-            .map_err(transfer)
+        self.setup.prepare_dormant(source, target).await?;
+        let (modules, control_plane) = self.setup.tenant_tables()?;
+        TenantTables::read(source, target, &modules, &control_plane).await.map_err(transfer)
     }
 
     /// Records the new state of the move, only when this party still holds the lease and the state is unchanged.

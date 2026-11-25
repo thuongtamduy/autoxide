@@ -334,6 +334,7 @@ The core crates are not on crates.io yet; until they are, the git tag is the way
 - [ ] MCP tools for what agents should be able to do
 - [ ] Error codes prefixed with the module name and translated
 - [ ] Data about a user deleted on `USER_DELETED`
+- [ ] Holding personal data? Implement `Module::dormant` too: register the same export part (`context.personal_data`) and `USER_DELETED` handler (`context.on_user_deleted`), built without your service, so a turned-off module still exports and deletes a person's data (see `modules/notes/src/lib.rs`)
 - [ ] Settings with a prefix of your own, declared with `Setting`
 - [ ] Tests on SQLite and PostgreSQL, including concurrent writes, tenant isolation and the table rules
 - [ ] `cargo xtask check-module` reports no violations

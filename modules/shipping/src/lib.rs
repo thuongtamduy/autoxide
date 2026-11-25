@@ -154,7 +154,7 @@ impl Module for ShippingModule {
             units,
         };
         let service = Arc::new(ShippingService::new(parts, config));
-        context.personal_data(service.clone())?;
+        context.personal_data(Arc::new(privacy::Erasure))?;
         // `Arc<ShippingService>` tự đổi thành `Arc<dyn …>`: module khác chỉ thấy trait.
         context.provide::<dyn api::AddressBook>(service.clone())?;
         context.provide::<dyn api::ShippingRates>(service.clone())?;
@@ -176,9 +176,18 @@ impl Module for ShippingModule {
         // Tài khoản bị xoá: xoá sổ địa chỉ (`privacy.rs`).
         all.push(Subscription::new(
             autoxide_kernel::privacy::USER_DELETED,
-            Arc::new(privacy::Erasure(service)),
+            Arc::new(privacy::Erasure),
         ));
         all
+    }
+
+    // Chế độ "nghỉ" (bước 70 P9): module tắt vẫn xuất và xoá sổ địa chỉ của người mua.
+    fn dormant(
+        &self,
+        context: &mut autoxide_kernel::module::DormantContext<'_>,
+    ) -> Result<(), Error> {
+        context.personal_data(Arc::new(privacy::Erasure))?;
+        context.on_user_deleted(Arc::new(privacy::Erasure))
     }
 
     fn tools(&self) -> Vec<autoxide_kernel::mcp::Tool> {

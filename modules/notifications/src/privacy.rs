@@ -1,8 +1,6 @@
 //! Dữ liệu cá nhân module giữ (Luật Bảo vệ dữ liệu cá nhân 91/2025/QH15 — cần đối chiếu): xuất cho
 //! chủ tài khoản, xoá khi tài khoản bị xoá (event `auth.user_deleted`, nhận lại vô hại).
 
-use std::sync::Arc;
-
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::{Delivered, EventHandler};
 use autoxide_kernel::privacy::{PersonalData, deleted_user};
@@ -79,7 +77,8 @@ impl PersonalData for NotificationsPersonalData {
 impl NotificationsService {
     /// Xoá dữ liệu của người dùng `user` đã bị xoá: hộp thư, tuỳ chọn, đăng ký đẩy; nhật ký gửi giữ
     /// dòng (thống kê) nhưng bỏ địa chỉ và giá trị. Gọi lại vô hại.
-    pub(crate) async fn erase_user(&self, tenant: &TenantContext, user: Uuid) -> Result<(), Error> {
+    // Không dùng `self`: module đang tắt (chế độ "nghỉ", bước 70 P9) gọi được mà không có service.
+    pub(crate) async fn erase_user(tenant: &TenantContext, user: Uuid) -> Result<(), Error> {
         let transaction = tenant.database().begin_write().await?;
         inbox::Entity::delete_many()
             .filter(inbox::Column::UserId.eq(user))
@@ -122,14 +121,14 @@ impl NotificationsService {
     }
 }
 
-/// Nghe `auth.user_deleted`.
-pub(crate) struct UserDeletedListener(pub Arc<NotificationsService>);
+/// Nghe `auth.user_deleted` — cả khi module đang tắt.
+pub(crate) struct UserDeletedListener;
 
 #[async_trait::async_trait]
 impl EventHandler for UserDeletedListener {
     async fn handle(&self, event: &Delivered) -> Result<(), Error> {
         match deleted_user(event) {
-            Some(user) => self.0.erase_user(&event.tenant, user).await,
+            Some(user) => NotificationsService::erase_user(&event.tenant, user).await,
             None => Ok(()),
         }
     }

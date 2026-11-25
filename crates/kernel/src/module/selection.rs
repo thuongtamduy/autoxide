@@ -184,6 +184,8 @@ impl std::error::Error for SelectionError {}
 pub(super) struct Selected {
     pub(super) modules: Vec<Box<dyn Module>>,
     pub(super) inactive: Vec<InactiveModule>,
+    /// The turned-off modules themselves, in registration order (dormant mode).
+    pub(super) dormant: Vec<Box<dyn Module>>,
     /// `(module enabled along, module that needs it)`.
     pub(super) implied: Vec<(&'static str, &'static str)>,
 }
@@ -334,6 +336,7 @@ pub(super) fn select(
 
     let mut active = Vec::new();
     let mut inactive = Vec::new();
+    let mut dormant = Vec::new();
     for module in modules {
         if enabled.contains(module.name()) {
             active.push(module);
@@ -343,10 +346,11 @@ pub(super) fn select(
                 description: module.description(),
                 stability: module.stability(),
             });
+            dormant.push(module);
         }
     }
     implied.sort_unstable();
-    Ok(Selected { modules: active, inactive, implied })
+    Ok(Selected { modules: active, inactive, dormant, implied })
 }
 
 /// The module `module`'s tables in `connection` that have rows - of tenant `tenant` if given (a table
@@ -385,23 +389,6 @@ pub(crate) async fn tables_with_data<C: ConnectionTrait>(
     Ok(Some(found))
 }
 
-/// The names of modules in `inactive` that still have data of tenant `tenant` in `connection` - what a move
-/// / split / merge of the tenant would leave behind, since it copies only the tables of enabled modules.
-pub(crate) async fn inactive_with_tenant_data<C: ConnectionTrait>(
-    connection: &C,
-    inactive: &[&'static str],
-    tenant: crate::tenancy::TenantId,
-) -> Result<Vec<&'static str>, DbErr> {
-    let mut found = Vec::new();
-    for module in inactive {
-        let tables = tables_with_data(connection, module, Some(tenant)).await?;
-        if tables.is_some_and(|tables| !tables.is_empty()) {
-            found.push(*module);
-        }
-    }
-    Ok(found)
-}
-
 impl Modules {
     /// Registers the modules of `modules` that `selection` enables (see the top of the file). This is the
     /// ONLY door the binary uses to register: the caller supplies the module list, so modules written
@@ -414,6 +401,7 @@ impl Modules {
         let mut registered = Modules::new(selected.modules).map_err(SelectionError::Modules)?;
         registered.selection_text = selection.text.clone();
         registered.inactive = selected.inactive;
+        registered.dormant = selected.dormant;
         registered.implied = selected.implied;
         Ok(registered)
     }
