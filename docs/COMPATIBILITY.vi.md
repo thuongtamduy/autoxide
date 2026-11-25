@@ -4,8 +4,9 @@
 
 Trang này nói bạn dựa vào được gì khi nâng cấp Autoxide, và cái gì có thể đổi. Áp dụng từ bản
 **1.0.0**. Trước 1.0 (`0.x`), một bản minor (`0.18` → `0.19`) được phép phá vỡ mọi hợp đồng dưới
-đây; mỗi chỗ phá vỡ được ghi ở mục **Changed** hay **Removed** của
-[`CHANGELOG.md`](../CHANGELOG.md), còn HTTP API thì đã theo luật REST bên dưới từ trước.
+đây, kể cả HTTP API; mỗi chỗ phá vỡ được ghi ở mục **Changed** hay **Removed** của
+[`CHANGELOG.md`](../CHANGELOG.md) kèm việc cần làm thay thế. Từ 1.0.0 các luật dưới đây áp trọn
+vẹn: không gì trong `/api/v1` bị phá vỡ.
 
 Autoxide đánh số theo [Semantic Versioning](https://semver.org): một số phiên bản chung cho máy chủ,
 các crate Rust và SDK TypeScript.

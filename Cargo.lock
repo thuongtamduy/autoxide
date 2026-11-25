@@ -863,6 +863,7 @@ dependencies = [
  "serde_json",
  "tokio",
  "tracing",
+ "url",
  "utoipa",
  "utoipa-axum",
  "uuid",

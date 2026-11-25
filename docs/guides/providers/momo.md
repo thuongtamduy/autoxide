@@ -98,6 +98,7 @@ sent to MoMo and the answer is final at once.
 | `provider.not_configured` | A required setting of step 1 is missing. | Set it; the message names it. |
 | `momo.account_rejected` | MoMo refused your keys (its result codes 11 and 13). | Check the three values and the environment. |
 | `momo.return_url_required` | MoMo needs a return page. | Send `return_url` with the payment, or set `momo.connection.account.return_url`. |
+| `orders.return_url_not_allowed` (orders), or the field error `ledger.return_url_not_allowed` (`POST /api/v1/ledger/payments`) | The `return_url` sent is not one of your shop's addresses. | Use an `https://` address on a verified domain, or list its origin in `ledger.payments.return_origins` (see the [shop guide](../shop.md#2-connect-your-provider-accounts)). |
 | `momo.amount_out_of_range` | Outside 1,000–50,000,000 VND. | Use another payment method. |
 | `momo.currency_not_supported` | Not VND. | Charge in VND. |
 | `momo.order_already_created` | An earlier attempt already reached MoMo, and MoMo does not hand out the payment link again. | Create a new payment with a new reference. |

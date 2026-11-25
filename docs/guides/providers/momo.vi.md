@@ -98,6 +98,7 @@ hoàn một phần đều gửi tới MoMo và có kết quả ngay.
 | `provider.not_configured` | Thiếu một cấu hình bắt buộc ở bước 1. | Đặt nó; câu lỗi nêu tên. |
 | `momo.account_rejected` | MoMo từ chối bộ khoá (mã kết quả 11 và 13 của MoMo). | Kiểm ba giá trị và môi trường. |
 | `momo.return_url_required` | MoMo cần trang quay về. | Gửi `return_url` kèm thanh toán, hoặc đặt `momo.connection.account.return_url`. |
+| `orders.return_url_not_allowed` (đơn hàng), hoặc lỗi ô `ledger.return_url_not_allowed` (`POST /api/v1/ledger/payments`) | `return_url` gửi lên không phải địa chỉ của cửa hàng. | Dùng địa chỉ `https://` trên tên miền đã xác minh, hoặc khai origin của nó ở `ledger.payments.return_origins` (xem [hướng dẫn mở cửa hàng](../shop.vi.md#2-nối-tài-khoản-nhà-cung-cấp)). |
 | `momo.amount_out_of_range` | Ngoài khoảng 1.000–50.000.000 VND. | Dùng phương thức thanh toán khác. |
 | `momo.currency_not_supported` | Không phải VND. | Thu bằng VND. |
 | `momo.order_already_created` | Một lần gọi trước đã tới MoMo, và MoMo không cấp lại link thanh toán. | Tạo thanh toán mới với mã tham chiếu mới. |

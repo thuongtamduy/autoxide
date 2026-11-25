@@ -4,8 +4,9 @@
 
 This page says what you can rely on when you upgrade Autoxide, and what may change. It applies from
 version **1.0.0**. Before 1.0 (`0.x`) a minor release (`0.18` → `0.19`) may break any of the
-contracts below; every break is listed under **Changed** or **Removed** in
-[`CHANGELOG.md`](../CHANGELOG.md), and the HTTP API already follows the REST rules below.
+contracts below, the HTTP API included; every break is listed under **Changed** or **Removed** in
+[`CHANGELOG.md`](../CHANGELOG.md) with what to do instead. From 1.0.0 the rules below apply in
+full: nothing in `/api/v1` breaks.
 
 Autoxide uses [Semantic Versioning](https://semver.org): one version number for the server, the
 Rust crates and the TypeScript SDK.

@@ -40,6 +40,11 @@ pub(crate) struct ChangePasswordRequest {
     current_password: String,
     /// 12 to 128 characters.
     new_password: String,
+    /// `true`: also remove every API key, passkey and external sign-in link of the account, as a
+    /// password recovery does - use it after a suspected compromise. Default `false`: they keep
+    /// working.
+    #[serde(default)]
+    revoke_other_credentials: bool,
 }
 
 /// Email and password of an account.
@@ -474,6 +479,10 @@ async fn update_me(
 /// cannot do this). Every session of the account ends, including this one; the
 /// response carries the tokens of a new session, so this client stays signed in.
 /// Wrong current passwords count towards the sign-in lock of the account.
+///
+/// API keys, passkeys and external sign-in links keep working unless
+/// `revoke_other_credentials` is `true`; after a suspected compromise set it (or recover the
+/// password by email, which removes them too).
 #[utoipa::path(
     post,
     path = "/me/password",
@@ -506,6 +515,7 @@ async fn change_password(
             principal.user_id(),
             &input.current_password,
             input.new_password,
+            input.revoke_other_credentials,
             user_agent,
         )
         .await?;

@@ -187,7 +187,7 @@ impl UserService {
         for purpose in ["email_verification", "login_link", "reauth"] {
             OneTimeTokens::new("auth").revoke(&transaction, tenant, purpose, &subject).await?;
         }
-        if mode == PasswordWrite::Recovery {
+        if matches!(mode, PasswordWrite::Recovery | PasswordWrite::ChangeRevokingAll) {
             crate::passkey::remove_all_in(&transaction, tenant, &self.outbox, actor, id, false)
                 .await?;
             crate::api_key::revoke_all_in(&transaction, tenant, &self.outbox, actor, id).await?;
