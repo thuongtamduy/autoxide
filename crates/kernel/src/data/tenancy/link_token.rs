@@ -159,11 +159,12 @@ mod tests {
         let (tenant, _) =
             resolve_link_token(&registry, Some(&other), "raw").await.unwrap().unwrap();
         assert_eq!(tenant, other);
-        // Tiền tố của khách mặc định: tra được dù request là khách khác.
+        // Tiền tố của khách mặc định: tra được khi request chưa có khách; request là khách khác thì như token
+        // sai (D-20261125-tenant-cors).
         let token = format!("t{}.raw", DEFAULT_TENANT.as_uuid().simple());
-        let (tenant, raw) =
-            resolve_link_token(&registry, Some(&other), &token).await.unwrap().unwrap();
+        let (tenant, raw) = resolve_link_token(&registry, None, &token).await.unwrap().unwrap();
         assert_eq!((tenant.id(), raw), (DEFAULT_TENANT, "raw"));
+        assert!(resolve_link_token(&registry, Some(&other), &token).await.unwrap().is_none());
         // Khách không có, sai dạng, rỗng, quá dài: như token sai.
         let forged = link_token(&other, "raw");
         let long = "a".repeat(MAX_TOKEN_LEN + 1);
