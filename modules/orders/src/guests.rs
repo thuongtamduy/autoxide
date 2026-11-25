@@ -21,8 +21,10 @@ use autoxide_kernel::i18n::Language;
 use autoxide_kernel::reference::fingerprint;
 use autoxide_kernel::rows::{self, Bounds};
 use autoxide_kernel::secret::{random_token, sha256};
-use autoxide_kernel::sms::{PhoneNumber, SmsMessage, SmsPurpose};
-use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext};
+use autoxide_kernel::sms::{
+    PhoneNumber, SMS_TEMPLATE_GROUP, SmsMessage, SmsPurpose, check_sms_template, tenant_sms_text,
+};
+use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext, TenantSetting};
 use autoxide_kernel::throttle::Throttle;
 use autoxide_shipping::api::{QuoteItem, QuoteRequest};
 use sea_orm::sea_query::{Expr, ExprTrait as _};
@@ -71,6 +73,41 @@ const ADDRESS_SMS: &str = answer_text!(
     "Your code to change the delivery address of order {number} is {code}. It expires in \
      {minutes} minutes."
 );
+
+/// Chỗ điền của hai mẫu SMS.
+const SMS_PLACEHOLDERS: &[&str] = &["code", "minutes", "number"];
+
+fn check_sms(raw: &str) -> Result<(), FieldError> {
+    check_sms_template(raw, SMS_PLACEHOLDERS)
+}
+
+/// Mẫu câu SMS khách tự sửa cho khớp template đã đăng ký với nhà mạng (D-20261125-sms-templates).
+const LOOKUP_SMS_TEMPLATE: TenantSetting = TenantSetting::new(
+    "orders.sms_template.order_lookup",
+    "Text of the SMS that carries the code a guest buyer enters to view an order, matching the template \
+     registered with the carriers for the SMS brandname; sent as is whatever the order's language. \
+     Placeholders: `{code}` (required, once), `{number}` (order number), `{minutes}` (minutes until the \
+     code expires). Unset: `Your code to view order {number} is {code}. It expires in {minutes} \
+     minutes.`, translated to the order's language.",
+)
+.group(SMS_TEMPLATE_GROUP)
+.checked(check_sms);
+
+const ADDRESS_SMS_TEMPLATE: TenantSetting = TenantSetting::new(
+    "orders.sms_template.address_change",
+    "Text of the SMS that carries the code a guest buyer enters to change an order's delivery address, \
+     matching the template registered with the carriers for the SMS brandname; sent as is whatever the \
+     order's language. Placeholders: `{code}` (required, once), `{number}` (order number), `{minutes}` \
+     (minutes until the code expires). Unset: `Your code to change the delivery address of order \
+     {number} is {code}. It expires in {minutes} minutes.`, translated to the order's language.",
+)
+.group(SMS_TEMPLATE_GROUP)
+.checked(check_sms);
+
+/// Cấu hình theo khách của phần này.
+pub(crate) fn sms_templates() -> Vec<TenantSetting> {
+    vec![LOOKUP_SMS_TEMPLATE, ADDRESS_SMS_TEMPLATE]
+}
 
 /// Mã vừa gửi.
 #[derive(Debug, Clone)]
@@ -305,14 +342,25 @@ impl OrdersService {
         }
         .insert(tenant.database().write())
         .await?;
-        let template = if purpose == PURPOSE_ADDRESS { ADDRESS_SMS } else { LOOKUP_SMS };
-        let language = Language::from_tag(&row.locale).unwrap_or(Language::En);
+        let (setting, template) = if purpose == PURPOSE_ADDRESS {
+            (&ADDRESS_SMS_TEMPLATE, ADDRESS_SMS)
+        } else {
+            (&LOOKUP_SMS_TEMPLATE, LOOKUP_SMS)
+        };
         let minutes = CODE_TTL_MINUTES.to_string();
-        let text = self.translations.describe_with(
-            template,
-            &[("number", &row.number), ("code", &code), ("minutes", &minutes)],
-            language,
-        );
+        let values = [("number", row.number.as_str()), ("code", &code), ("minutes", &minutes)];
+        // Mẫu khách đặt (khớp template đã đăng ký với nhà mạng) gửi nguyên văn, mọi ngôn ngữ; chưa đặt
+        // thì câu mặc định dịch theo ngôn ngữ của đơn.
+        let custom =
+            tenant_sms_text(self.settings.as_ref(), tenant, setting, SMS_PLACEHOLDERS, &values)
+                .await?;
+        let text = match custom {
+            Some(text) => text,
+            None => {
+                let language = Language::from_tag(&row.locale).unwrap_or(Language::En);
+                self.translations.describe_with(template, &values, language)
+            }
+        };
         sender
             .send(SmsMessage::new(
                 tenant.id(),

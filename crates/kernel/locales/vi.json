@@ -441,5 +441,7 @@
   "field:must be an id (UUID)": "phải là một ID (UUID)",
   "field:must be a time in RFC 3339 form, e.g. 2026-12-31T17:00:00Z": "phải là thời điểm dạng RFC 3339, vd 2026-12-31T17:00:00Z",
   "field:must be an http(s), mailto: or tel: link, or a path on the site starting with /": "phải là link http(s), mailto: hay tel:, hoặc đường dẫn trong site bắt đầu bằng /",
-  "field:block `{block}` is not available": "khối `{block}` không dùng được"
+  "field:block `{block}` is not available": "khối `{block}` không dùng được",
+  "field:can only use the placeholders {allowed}; {placeholder} is not one of them": "chỉ được dùng các chỗ điền {allowed}; {placeholder} không thuộc số đó",
+  "field:must contain {placeholder} exactly once, where the one-time code goes": "phải có {placeholder} đúng một lần, ở chỗ đặt mã một lần"
 }

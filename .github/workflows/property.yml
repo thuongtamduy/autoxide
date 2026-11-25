@@ -32,4 +32,4 @@ jobs:
         with:
           save-if: false
       # Chỉ unit test (`--lib`): property test nằm cạnh hàm được thử; test tích hợp đã chạy trong gate.
-      - run: cargo test --workspace --lib --locked
+      - run: cargo test --workspace --lib --locked --no-fail-fast
