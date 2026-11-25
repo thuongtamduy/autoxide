@@ -119,13 +119,17 @@ thật (P7).
       của bên thứ ba — báo cáo `docs/security/review-2026-11.md`, D-20261123-security-review-2026-11; 3 mức cao, 8 mức
       trung bình và các mức thấp rẻ đã sửa (PR #444, #450, #452, #454, #456, #461, #464, #473). Nợ bảo mật sau rà
       soát 2026-11 (mức thấp, lý do để sau ghi trong báo cáo):
-  - [ ] L-7: đổi mật khẩu (không phải khôi phục) giữ API key, passkey, liên kết đăng nhập ngoài — thêm lựa chọn "thu
-        hồi mọi thông tin đăng nhập" hay liệt kê chúng trong câu trả lời
+  - [x] L-7: đổi mật khẩu (không phải khôi phục) giữ API key, passkey, liên kết đăng nhập ngoài — thêm lựa chọn "thu
+        hồi mọi thông tin đăng nhập" hay liệt kê chúng trong câu trả lời — xong (#508, D-20261125-password-change-revoke):
+        `revoke_other_credentials`
   - [ ] L-8: luật tự động hoá theo event nhận event của mọi tổ chức trong khách — cần event mang tổ chức thống nhất
-  - [ ] L-9: CSP của trang tài liệu API chỉ cho đúng gói Scalar đã ghim (cần thử lại trên trình duyệt, D-320)
-  - [ ] L-10: giới hạn số kết nối mở (hiện để reverse proxy làm)
-  - [ ] I-2: giới hạn kích thước câu trả lời của nhà cung cấp do người vận hành cấu hình (AI, cổng kết nối)
-  - [ ] I-5: ghim image `gitleaks` của CI bằng digest
+  - [x] L-9: CSP của trang tài liệu API chỉ cho đúng gói Scalar đã ghim (cần thử lại trên trình duyệt, D-320) — xong
+        (#505, D-20261125-docs-csp-pinned): đã thử trên Chromium
+  - [x] L-10: giới hạn số kết nối mở (hiện để reverse proxy làm) — xong (#505, D-20261125-max-connections):
+        `AUTOXIDE_HTTP_MAX_CONNECTIONS`, quá thì chờ; kết nối im lặng đóng sau 30 giây
+  - [x] I-2: giới hạn kích thước câu trả lời của nhà cung cấp do người vận hành cấu hình (AI, cổng kết nối) — xong
+        (#505, D-20261125-provider-response-cap): `AUTOXIDE_PROVIDER_MAX_RESPONSE_BYTES`
+  - [x] I-5: ghim image `gitleaks` của CI bằng digest — xong (#505, D-20261125-gitleaks-digest)
   - [ ] Phần chưa rà: SCIM, xác minh số điện thoại, định dạng file xuất / nhập / chuyển khách, đối chiếu đủ mọi tool
         MCP với REST, điểm thưởng / giới thiệu / chia thanh toán POS, `content` / `media` / `newsletter` / `analytics`
         ngoài các điểm đã thử
@@ -149,10 +153,11 @@ thật (P7).
         `POST /{id}/payment-link` của nhân viên, `return_url` mới tuỳ chọn, chống trùng theo `Idempotency-Key`, tối đa
         10 lần một giờ mỗi đơn. Đặt hàng khi đối tác từ chối vẫn trả 201 với `kind = none`, thêm
         `payment_actions[].error` (`code` ổn định + `message` theo ngôn ngữ người gọi)
-- [ ] P9 — **Ghi nợ, chủ dự án hoãn ngày 22/11/2026** (không chặn 1.0 khi chưa mở lại):
+- [ ] P9 — **Ghi nợ, hoãn ngày 22/11/2026, chủ dự án mở lại ngày 25/11/2026** (D-20261125-p9-reopened; làm trước 1.0,
+      trừ mục chạy thử bằng tài khoản thật):
   - [ ] Chế độ "nghỉ": module tắt vẫn tham gia dữ liệu cá nhân và vòng đời khách (xuất, xoá, dời khách)
-  - [ ] Mẫu câu OTP khách tự sửa cho khớp template đã đăng ký với nhà mạng (đang viết cứng ở `compliance`, `orders`,
-        `bookings`)
+  - [x] Mẫu câu OTP khách tự sửa cho khớp template đã đăng ký với nhà mạng (đang viết cứng ở `compliance`, `orders`,
+        `bookings`) — D-20261125-sms-templates: cấu hình theo khách nhóm `sms_template`, kiểm `{code}` đúng một lần
   - [ ] 139 endpoint GET trả `Data<Vec<T>>` không phân trang: endpoint mới trả `Page<T>`, khai deprecation cho cái cũ
   - [x] Rustdoc tiếng Anh cho phần công khai của kernel, testkit, `autoxide` và `api` của module (docs.rs); gate
         `doc-language` giữ phần viết mới là tiếng Anh (D-20261123-english-rustdoc)
@@ -211,13 +216,17 @@ thật (P7).
       được nhãn nội bộ (#489). Nợ mức thấp:
   - [ ] P-4: tên miền khách khai mà không xác minh chặn khách khác 7 ngày — cho nhiều khách cùng chờ, ai xác minh
         trước được (đổi unique index), hoặc endpoint cho nhân sự nền tảng thu hồi
-  - [ ] P-5: `return_url` của thanh toán nhận mọi địa chỉ http(s) — chỉ nhận tên miền đã xác minh của khách (cần
-        quyết danh sách địa chỉ hợp lệ)
-- [ ] P15 — Job `semver` của CI chạy xong trong giới hạn trước `1.0.0-rc.1`: ở PR phát hành `v0.19.0` (#495) job so
+  - [x] P-5: `return_url` của thanh toán nhận mọi địa chỉ http(s) — chỉ nhận tên miền đã xác minh của khách (cần
+        quyết danh sách địa chỉ hợp lệ) — xong (#508, D-20261125-return-url-allowlist): tên miền đã xác minh (https)
+        hoặc origin khai ở `ledger.payments.return_origins`
+- [x] P15 — Job `semver` của CI chạy xong trong giới hạn trước `1.0.0-rc.1`: ở PR phát hành `v0.19.0` (#495) job so
       mọi crate hợp đồng với tag trước và bị huỷ sau 90 phút (`timeout-minutes`), nên `CHANGELOG.md` của 0.19.0 thiếu
       mục `### Breaking (Rust)`. Từ rc.2 job này chặn phát hành (`docs/RELEASING.md`), nên phải đo thời gian từng
       crate rồi sửa tận gốc (chia crate ra nhiều máy như gate, dùng lại build baseline, hay cache rustdoc JSON) thay vì
-      chỉ nới giới hạn; xong thì chạy lại cho `v0.18.0...v0.19.0` để biết 0.19.0 có phá vỡ gì
+      chỉ nới giới hạn; xong thì chạy lại cho `v0.18.0...v0.19.0` để biết 0.19.0 có phá vỡ gì. Xong: thời gian nằm ở
+      bước dựng rustdoc JSON (công cụ dựng mỗi crate trong target dir riêng); nay một target dir chung cho mọi crate và
+      chia 4 máy (`--shard k/4`), job gộp giữ tên check cũ; `v0.18.0` → `v0.19.0` không có phá vỡ phía Rust
+      (D-20261125-semver-job-time)
 
 ## Giai đoạn B — Lớp cho giao diện và phân quyền
 

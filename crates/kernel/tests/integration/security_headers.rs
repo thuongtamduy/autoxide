@@ -102,9 +102,19 @@ async fn trang_tai_lieu_co_csp_rieng() {
         let docs = app.get("/api/docs").send().await.unwrap();
         assert_eq!(docs.status().as_u16(), 200);
         assert_eq!(docs.header(header::CONTENT_SECURITY_POLICY), DOCS_CSP);
-        // Trang nạp đúng script mà CSP cho phép.
+        // L-9: `script-src` chỉ cho đúng file Scalar mà trang nạp (URL đủ đường dẫn), không cho cả CDN.
         let page = String::from_utf8(docs.body().to_vec()).unwrap();
-        assert!(page.contains("https://cdn.jsdelivr.net/"), "{page}");
+        let script_src: Vec<&str> = DOCS_CSP
+            .split(';')
+            .map(str::trim)
+            .find_map(|directive| directive.strip_prefix("script-src "))
+            .unwrap()
+            .split_whitespace()
+            .collect();
+        assert_eq!(script_src.len(), 1, "{DOCS_CSP}");
+        let script = script_src[0];
+        assert!(script.ends_with(".js"), "script-src phải là một file: {script}");
+        assert!(page.contains(&format!("src=\"{script}\"")), "{page}");
         // Tài liệu JSON vẫn theo CSP của API.
         let document = app.get("/api/v1/openapi.json").send().await.unwrap();
         assert_eq!(document.header(header::CONTENT_SECURITY_POLICY), API_CSP);

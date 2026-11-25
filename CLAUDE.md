@@ -10,8 +10,9 @@ Autoxide: lõi backend Rust, core trước, module cắm vào sau.
 - **Dùng gì, vì sao** → [`STACK.md`](STACK.md)
 - **Làm gì tiếp** → [`docs/ROADMAP.md`](docs/ROADMAP.md)
 - **Làm một bước thế nào** → [`docs/steps/`](docs/steps/README.md) (đặc tả bước 30–56)
-- **Đã quyết gì** → mục lục theo chủ đề [`docs/decisions/INDEX.md`](docs/decisions/INDEX.md) trước (biết mục nào đã bị
-  thay), rồi mở đúng mục trong [`docs/DECISIONS.md`](docs/DECISIONS.md)
+- **Đã quyết gì** → mục lục theo chủ đề `docs/decisions/INDEX.md` trước (biết mục nào đã bị thay), rồi mở đúng mục
+  trong [`docs/DECISIONS.md`](docs/DECISIONS.md) hay `docs/decisions/D-*.md`. File mục lục **không nằm trong git**
+  (D-20261125-decision-index-untracked): thiếu hay cũ thì chạy `cargo xtask decisions` (máy cloud đã sinh sẵn lúc mở phiên)
 
 ## Mục tiêu — không được quên
 
@@ -178,6 +179,8 @@ Trong các test đó có ba bài giữ tài liệu khớp code: `.env.example` (
 bảng. Đổi cấu hình hay API thì sinh lại file tương ứng — thông báo của test ghi
 sẵn lệnh.
 
+- Lời nhắc "có thay đổi chưa commit" / "có commit chưa push" lúc dừng lượt **không** đến từ hook của repo này (`.claude/settings.json`
+  không có hook `Stop`) mà từ nền tảng, và không vượt luật gate: chưa chạy `./gate.sh --quick` xanh thì chưa push (commit cục bộ thì được).
 - Gate đỏ thì sửa code, **không** nới gate, không tắt lint, không đánh dấu test
   bỏ qua. Ngoại lệ thật sự cần thiết phải ghi thành một quyết định (skill `record-decision`).
 - Code mới phải có test. Thứ liên quan ghi đồng thời (job, idempotency, refresh

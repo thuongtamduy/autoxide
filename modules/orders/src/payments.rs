@@ -186,7 +186,11 @@ impl OrdersService {
                 Method::Cod => return Ok(()),
             }
             .map_err(|error| {
-                if error.code() == "validation_failed" {
+                if error.code() == "validation_failed"
+                    && error.fields().iter().any(|field| field.field == "return_url")
+                {
+                    errors::return_url_not_allowed()
+                } else if error.code() == "validation_failed" {
                     errors::payment_method_unavailable(&row.method)
                 } else {
                     error

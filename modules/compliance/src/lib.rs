@@ -40,6 +40,7 @@ mod privacy;
 mod provider;
 mod service;
 mod sign_in_codes;
+mod sms_templates;
 mod subject_requests;
 mod tools;
 mod tools_cases;
@@ -58,6 +59,8 @@ mod tests_moit;
 mod tests_privacy;
 #[cfg(test)]
 mod tests_sign_in_codes;
+#[cfg(test)]
+mod tests_sms_templates;
 #[cfg(test)]
 mod tests_tracking;
 #[cfg(test)]
@@ -198,6 +201,10 @@ impl Module for ComplianceModule {
         ]
     }
 
+    fn tenant_settings(&self) -> Vec<autoxide_kernel::tenancy::TenantSetting> {
+        sms_templates::all()
+    }
+
     fn configure(&mut self, reader: &mut ConfigReader<'_>) -> Result<(), Invalid> {
         self.config = config::read(reader)?;
         Ok(())
@@ -227,6 +234,7 @@ impl Module for ComplianceModule {
             verifier: context.require::<dyn autoxide_kernel::identity::IdentityVerifier>().ok(),
             callback_retention_days: self.config.callback_retention_days,
             sms: context.require::<dyn autoxide_kernel::sms::SmsSender>().ok(),
+            settings: context.require::<dyn autoxide_kernel::tenancy::TenantSettings>()?,
             secret: (*context.require::<autoxide_kernel::secret::SecretKey>()?).clone(),
             otp: self.config.otp,
             units: context.require::<dyn autoxide_address::api::AdministrativeUnits>().ok(),

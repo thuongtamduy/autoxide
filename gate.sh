@@ -4,7 +4,8 @@
 #   ./gate.sh --quick   gate nhanh, trước mỗi commit lúc đang làm một bước: như dưới đây
 #                       nhưng chỉ chạy test của crate bị sửa (kể từ lần gate nhanh xanh gần
 #                       nhất, chưa có thì so với origin/main) và crate phụ thuộc vào chúng, chỉ
-#                       trên SQLite, không cần Docker.
+#                       trên SQLite, không cần Docker. Test chạy bằng nextest khi có (từ 0.9.85; cài mà cũ
+#                       hơn thì đỏ), không thì bộ chạy `cargo xtask`.
 #   ./gate.sh           gate đầy đủ: bắt buộc trước khi merge vào main và trước khi phát hành.
 #   ./gate.sh --pr      gate của pull request trên CI (D-20261118-ci-pr-affected-tests): như gate đầy đủ nhưng chỉ chạy test
 #                       của crate bị sửa so với GATE_BASE (mặc định origin/main) và crate phụ thuộc
@@ -85,7 +86,8 @@
 #                        TEST_S3_BUCKET) và nhận TEST_S3_ACCESS_KEY_ID /
 #                        TEST_S3_SECRET_ACCESS_KEY (mặc định `test` / `test`).
 #   GATE_S3_IMAGE        image cho container S3 giả lập (mặc định motoserver/moto).
-#   GATE_GITLEAKS_IMAGE  image gitleaks khi máy không cài gitleaks.
+#   GATE_GITLEAKS_IMAGE  image gitleaks khi máy không cài gitleaks (mặc định: dòng `FROM` của
+#                        .github/gitleaks/Dockerfile, ghim theo digest, cùng image với CI).
 #   GATE_BASE            với --pr: so với ref này để biết crate nào bị sửa (mặc định origin/main); với --pr và
 #                        --quick: thay đổi kể từ chỗ rẽ nhánh với ref này có chạm Rust không (bỏ clippy).
 #   GATE_ARCHIVE_DIR     với --only build: thư mục ghi archive test và file filter (mặc định
@@ -161,7 +163,8 @@ renice -n 10 -p $$ >/dev/null 2>&1 || true
 
 POSTGRES_IMAGE="${GATE_POSTGRES_IMAGE:-postgres:16-alpine}"
 S3_IMAGE="${GATE_S3_IMAGE:-motoserver/moto:5.2.5}"
-GITLEAKS_IMAGE="${GATE_GITLEAKS_IMAGE:-ghcr.io/gitleaks/gitleaks:v8.30.1}"
+# Image gitleaks ghim theo digest ở một chỗ, CI đọc cùng dòng này (I-5, D-20261125-gitleaks-digest).
+GITLEAKS_IMAGE="${GATE_GITLEAKS_IMAGE:-$(sed -n 's/^FROM //p' .github/gitleaks/Dockerfile)}"
 CONTAINER=""
 S3_CONTAINER=""
 

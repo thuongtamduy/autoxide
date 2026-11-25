@@ -46,6 +46,8 @@ async fn setup(test: &TestDatabase) -> Setup {
         .tenant("two")
         .user_in("one", "one", 1, &ALL)
         .user_in("two", "two", 2, &ALL)
+        // Tên miền đã xác minh của khách hai: trang quay về trên đó được nhận (P-5).
+        .domain("two", "two.example")
         // Bộ nối đăng ký TRƯỚC `ledger`, như trong binary.
         .module(autoxide_momo::module())
         .module(autoxide_ledger::module())
@@ -68,6 +70,21 @@ async fn configure(app: &TestApp, token: &str, keys: Keys) {
         let (status, body) = set(app, token, field, value).await;
         assert_eq!(status, StatusCode::OK, "{body}");
     }
+    allow_return(app, token).await;
+}
+
+/// Trang quay về sau khi trả phải thuộc cửa hàng (P-5, D-20261125-return-url-allowlist): khách có token
+/// `token` khai `https://shop.example`.
+async fn allow_return(app: &TestApp, token: &str) {
+    let path = "/api/v1/kernel/settings/ledger.payments.return_origins";
+    let answer = app
+        .put(path)
+        .token(token)
+        .json(json!({"value": "https://shop.example"}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(answer.status(), StatusCode::OK, "{}", answer.json());
 }
 
 fn ledger(app: &TestApp) -> Arc<dyn Ledger> {
@@ -263,7 +280,8 @@ async fn khach_chua_cau_hinh_bao_loi_ro_va_khong_dung_tai_khoan_khac() {
         configure(app, "one", ONE).await;
         momo.reply("POST", CREATE, 200, created());
 
-        // Khách hai chưa nhập gì: lỗi nêu trường còn thiếu, không có request nào ra MoMo.
+        // Khách hai chưa nhập tài khoản MoMo: lỗi nêu trường còn thiếu, không có request nào ra MoMo.
+        allow_return(app, "two").await;
         let refused = pay(app, "two", 150_000, "P-1").await.unwrap_err();
         assert_eq!((refused.code(), refused.kind().status()), ("provider.not_configured", 422));
         assert!(refused.message().contains("momo.connection.account.partner_code"));
@@ -311,6 +329,55 @@ async fn khach_dung_moi_truong_sandbox_goi_may_chu_thu() {
         pay(app, "two", 20_000, "P-1").await.unwrap();
         assert!(setup.momo.take_requests().is_empty());
         assert_eq!(only(setup.sandbox.take_requests()).json()["partnerCode"], TWO.0);
+    })
+    .await
+    .unwrap();
+}
+
+/// P-5 (pentest 2026-11): trang quay về sau khi trả chỉ nhận địa chỉ của chính cửa hàng — tên miền đã xác
+/// minh (https) hay origin khách khai; địa chỉ lạ bị từ chối trước khi gọi MoMo (không thành open redirect).
+#[tokio::test]
+async fn trang_quay_ve_phai_thuoc_cua_hang() {
+    TestDatabase::run(async |test| {
+        let setup = setup(test).await;
+        let (app, momo) = (&setup.app, &setup.momo);
+        configure(app, "one", ONE).await;
+        configure(app, "two", TWO).await;
+        momo.reply("POST", CREATE, 200, created());
+        let attempt = async |slug: &str, url: &str, reference: &str| {
+            let tenant = app.tenant(slug).await.unwrap();
+            let payment = new_payment(&tenant, vnd(20_000), reference).return_url(url);
+            ledger(app).create_payment(&tenant, Actor::system(), payment).await
+        };
+
+        for url in [
+            "https://evil.example/done",
+            "https://shop.example.evil.example/done",
+            "https://shop.example@evil.example/done",
+            "http://shop.example:8080/done",
+            "https://two.example/done",
+        ] {
+            let refused = attempt("one", url, "P-1").await.unwrap_err();
+            assert_eq!(refused.code(), "validation_failed", "{url}");
+            // `user@host` không phải URL quay về hợp lệ (`format`); địa chỉ lạ khác: không thuộc cửa hàng.
+            let field = &refused.fields()[0];
+            assert_eq!(field.field, "return_url", "{url}");
+            assert!(
+                ["format", "ledger.return_url_not_allowed"].contains(&field.code.as_str()),
+                "{url}"
+            );
+        }
+        assert!(momo.take_requests().is_empty(), "không gọi MoMo với địa chỉ lạ");
+        attempt("one", "https://SHOP.example:443/thanks?order=1", "P-2").await.unwrap();
+
+        // Khách hai không khai origin nào: tên miền đã xác minh của mình (https) vẫn được nhận.
+        let path = "/api/v1/kernel/settings/ledger.payments.return_origins";
+        let cleared = app.delete(path).token("two").send().await.unwrap();
+        assert!(cleared.status().is_success(), "{}", cleared.json());
+        attempt("two", "https://two.example/thanks", "P-3").await.unwrap();
+        let refused = attempt("two", "http://two.example/thanks", "P-4").await.unwrap_err();
+        assert_eq!(refused.fields()[0].code, "ledger.return_url_not_allowed");
+        assert!(attempt("two", "https://shop.example/thanks", "P-5").await.is_err());
     })
     .await
     .unwrap();

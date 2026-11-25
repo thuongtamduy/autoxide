@@ -32,4 +32,26 @@ jobs:
         with:
           save-if: false
       # Chỉ unit test (`--lib`): property test nằm cạnh hàm được thử; test tích hợp đã chạy trong gate.
-      - run: cargo test --workspace --lib --locked
+      - run: cargo test --workspace --lib --locked --no-fail-fast
+
+  # Đỏ thì mở (hay cập nhật) một issue, xanh lại thì đóng (D-20261125-cloud-dev-friction): lần chạy đêm đỏ không ai
+  # thấy nếu không mở trang Actions. Quyền `issues: write` chỉ ở job này.
+  report:
+    if: ${{ always() && github.event_name == 'schedule' && !github.event.repository.private }}
+    needs: long
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: scripts/nightly-issue.sh "$TITLE" "$RESULT" "$RUN_URL"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TITLE: "Nightly property tests are failing"
+          RESULT: ${{ needs.long.result }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

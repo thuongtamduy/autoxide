@@ -40,6 +40,8 @@ mod oidc;
 mod org_tests;
 mod passkey;
 mod password;
+#[cfg(test)]
+mod password_change_tests;
 mod permissions;
 mod phone;
 #[cfg(test)]

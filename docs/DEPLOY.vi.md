@@ -393,6 +393,7 @@ database mới.
 | `AUTOXIDE_HTTP_CLIENT_IP_HEADER` | Sau reverse proxy: header chứa địa chỉ client |
 | `AUTOXIDE_HTTP_TRUSTED_PROXY_COUNT` | Số proxy của bạn mà một request đi qua (mặc định `1`) |
 | `AUTOXIDE_HTTP_TRUSTED_PROXIES` | Thay cho số proxy: địa chỉ và dải địa chỉ của proxy, vd `10.0.0.0/8, 192.0.2.7` |
+| `AUTOXIDE_HTTP_MAX_CONNECTIONS` | Số kết nối mở cùng lúc tối đa (mặc định `4096`, `0`: không giới hạn); quá số này thì kết nối mới phải chờ. Đặt thấp hơn `ulimit -n`; reverse proxy vẫn nên giới hạn số kết nối theo từng client |
 | `AUTOXIDE_HTTP_PUBLIC_URL` | Địa chỉ internet dùng để gọi API, vd `https://api.example.com`; cần cho link trỏ về API trong mail (huỷ đăng ký bản tin) |
 | `AUTOXIDE_HTTP_CORS_ORIGINS` | Trang web ở origin khác được gọi API |
 | `AUTOXIDE_HTTP_HSTS_SECONDS` | Khi mọi client đã gọi API qua HTTPS: gửi `Strict-Transport-Security` (vd `31536000`, một năm); `autoxide doctor` nhắc khi URL công khai là `https://` mà biến này là `0`. Mọi response đã có sẵn `nosniff`, `Referrer-Policy`, `X-Frame-Options` và `Content-Security-Policy` chặt (`AUTOXIDE_HTTP_SECURITY_HEADERS`, `AUTOXIDE_HTTP_REFERRER_POLICY`) |

@@ -813,34 +813,20 @@ mod tests {
 
     #[test]
     fn module_khong_khai_gi_thi_khong_co_migration_va_cau_hinh() {
-        let source = ConfigSource::default();
-        let mut reader = ConfigReader::new(&source);
-        let mut modules = Modules::new(bare(&["auth"])).unwrap();
-
-        assert_eq!(modules.configure(&mut reader), Ok(()));
-        // Chỉ biến của hai module nội bộ `kernel` và `antispam`.
-        let names: Vec<&str> = reader.values().iter().map(|value| value.setting.name).collect();
-        let internal = |name: &&str| {
-            [
-                "AUTOXIDE_SECRET_KEY",
-                "AUTOXIDE_SECRET_KEY_PREVIOUS",
-                "AUTOXIDE_HTTP_PUBLIC_URL",
-                "AUTOXIDE_USER_FLAGS_MAX",
-                "AUTOXIDE_TENANCY_EXPORT_RETENTION_DAYS",
-                "AUTOXIDE_JOBS_FILE_RETENTION_DAYS",
-                "AUTOXIDE_TEXT_OVERRIDES_UI_MAX",
-                "AUTOXIDE_TEMPLATE_MAX_BYTES",
-                "AUTOXIDE_SEARCH_BACKEND",
-                "AUTOXIDE_RELOCATION_DRAIN_SECONDS",
-                "AUTOXIDE_TENANCY_SANDBOX_DAYS",
-                "AUTOXIDE_TENANCY_SANDBOX_MAX_PRODUCTS",
-            ]
-            .contains(name)
-                || ["AUTOXIDE_ANTISPAM_", "AUTOXIDE_EVENTS_", "AUTOXIDE_BACKUP_", "AUTOXIDE_SYNC_"]
-                    .iter()
-                    .any(|prefix| name.starts_with(prefix))
+        // Biến của các module nội bộ (`kernel`, `antispam`…) đổi theo kernel; so với một bộ module
+        // KHÔNG có module người dùng nào thay vì giữ danh sách tên viết tay: module `auth` rỗng
+        // không được thêm biến nào.
+        let names_with = |modules: &[&'static str]| {
+            let source = ConfigSource::default();
+            let mut reader = ConfigReader::new(&source);
+            let mut registry = Modules::new(bare(modules)).unwrap();
+            assert_eq!(registry.configure(&mut reader), Ok(()));
+            let names: Vec<&str> = reader.values().iter().map(|value| value.setting.name).collect();
+            (registry, names.into_iter().map(str::to_owned).collect::<Vec<String>>())
         };
-        assert!(names.iter().all(internal), "{names:?}");
+        let (_, baseline) = names_with(&[]);
+        let (modules, names) = names_with(&["auth"]);
+        assert_eq!(names, baseline, "a module that declares nothing must not add settings");
         assert!(modules.migrator().is_ok());
     }
 }

@@ -50,7 +50,15 @@ async fn so_but_toan_dao_thu_qua_cong_hoan_tien_va_doi_soat() {
         let qr = json!({"amount": "250000", "description": "Thanh toan don 1", "reference": "qr-1"});
         call_tool(&app, ADMIN, "ledger.create_vietqr_payment", qr).await;
 
-        // Thu qua cổng (giả), đối tác báo đã thu, rồi hoàn một phần.
+        // Thu qua cổng (giả), đối tác báo đã thu, rồi hoàn một phần. Trang quay về phải thuộc cửa hàng (P-5):
+        // địa chỉ lạ bị từ chối, địa chỉ khai ở `ledger.payments.return_origins` thì nhận.
+        let payment = json!({"amount": vnd(300_000), "description": "Đơn 2", "method": "card",
+                             "provider": "fake", "reference": "pay-2", "return_url": "https://evil.example/done"});
+        let refused = expect(&app, "POST", "/api/v1/ledger/payments", ADMIN, Some(payment), 422).await;
+        assert_eq!(refused["errors"][0]["code"], "ledger.return_url_not_allowed", "{refused}");
+        let origins = json!({"value": "https://shop.example"});
+        let path = "/api/v1/kernel/settings/ledger.payments.return_origins";
+        expect(&app, "PUT", path, ADMIN, Some(origins), 200).await;
         let payment = json!({"amount": vnd(300_000), "description": "Đơn 2", "method": "card",
                              "provider": "fake", "reference": "pay-2", "return_url": "https://shop.example/done"});
         let payment = id(&expect(&app, "POST", "/api/v1/ledger/payments", ADMIN, Some(payment), 201).await);

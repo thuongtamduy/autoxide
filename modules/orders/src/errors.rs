@@ -111,6 +111,17 @@ pub(crate) fn payment_method_unavailable(method: &str) -> Error {
     .with_param("method", method)
 }
 
+/// `return_url` không thuộc địa chỉ nào của cửa hàng (P-5, D-20261125-return-url-allowlist): ledger từ chối ô
+/// `return_url`; giữ riêng lý do này để người tích hợp biết phải khai origin, không gộp vào "phương thức không dùng được".
+pub(crate) fn return_url_not_allowed() -> Error {
+    Error::new(
+        ErrorKind::Validation,
+        "orders.return_url_not_allowed",
+        "return_url is not one of this shop's addresses: use an https address on a verified domain, or \
+         list its origin in the tenant setting ledger.payments.return_origins.",
+    )
+}
+
 pub(crate) fn promotion_unavailable() -> Error {
     Error::conflict(
         "orders.promotion_unavailable",

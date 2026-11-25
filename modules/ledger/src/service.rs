@@ -45,6 +45,8 @@ pub(crate) struct LedgerService {
     pub accounts: Option<autoxide_kernel::provider::ProviderAccounts>,
     /// Cấu hình theo khách (cổng thanh toán mặc định khi có nhiều cổng).
     pub settings: Option<Arc<dyn autoxide_kernel::tenancy::TenantSettings>>,
+    /// Tên miền đã xác minh của khách (chế độ nhiều khách): địa chỉ quay về sau khi trả (P-5).
+    pub domains: Option<Arc<autoxide_kernel::tenancy::TenantDomains>>,
 }
 
 /// Cổng thanh toán dùng khi một lượt thu không nêu `provider` mà máy chủ có nhiều cổng (bước 70 P8).

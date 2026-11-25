@@ -87,8 +87,10 @@ mod tests {
         }
 
         #[test]
-        fn them_hau_to_van_hop_le(base in "[a-z0-9]{1,30}(-[a-z0-9]{1,30}){0,6}", n in proptest::prelude::any::<u32>()) {
-            proptest::prop_assume!(is_valid(&base));
+        fn them_hau_to_van_hop_le(base in "[a-z0-9]{1,32}(-[a-z0-9]{1,32}){0,2}", n in proptest::prelude::any::<u32>()) {
+            // Generator chỉ sinh slug hợp lệ (tối đa 32*3+2 = 98 ký tự ≤ MAX_LENGTH): không dùng
+            // `prop_assume!` vì ở 20 000 ca số ca bị loại vượt trần của proptest.
+            proptest::prop_assert!(is_valid(&base));
             let slug = with_suffix(&base, n);
             proptest::prop_assert!(is_valid(&slug), "{slug:?}");
             let suffix = format!("-{n}");

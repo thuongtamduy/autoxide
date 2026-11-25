@@ -72,6 +72,17 @@ for pair in partner_code=MOMOXXXX access_key=<Access Key> secret_key=<Secret Key
 done
 ```
 
+The page a buyer returns to after paying must be one of your shop's own addresses: an `https://` address on a
+domain you verified (`POST /api/v1/kernel/domains`), or an origin you list here — your website, your app's
+universal link domain, `http://localhost:3000` while developing. Any other `return_url` is refused, so a payment
+link cannot send your buyers to someone else's site:
+
+```bash
+curl -sS -X PUT "$API/api/v1/kernel/settings/ledger.payments.return_origins" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"value": "https://shop.example.com"}'
+```
+
 **eSMS** — the SMS sent to buyers. Until you set it, SMS notifications are skipped with the reason
 `channel_disabled` (nothing is retried, nothing fails):
 
@@ -173,8 +184,8 @@ curl -sS "$API/api/v1/orders/checkout" -H "Cart-Token: $CART_TOKEN" -H 'Idempote
        \"contact\": {\"name\": \"Nguyễn An\", \"phone\": \"0912345678\"}}"
 ```
 
-`return_url` is the page of your website the buyer comes back to after paying; MoMo requires one (or
-set `momo.connection.account.return_url` once for your shop). The answer has the order
+`return_url` is the page of your website the buyer comes back to after paying (on one of your shop's
+addresses, see step 2); MoMo requires one (or set `momo.connection.account.return_url` once for your shop). The answer has the order
 (`pending_payment`) and `payment_actions[0]`: a `redirect` to MoMo's payment page. When the buyer has paid, MoMo notifies your server, and the order becomes `confirmed` / `paid` on
 its own. The buyer receives an SMS for the order placed and for the payment confirmed.
 
@@ -208,6 +219,7 @@ curl -sS "$API/api/v1/invoices/documents?source_module=orders&source_id=$ORDER" 
 | An SMS has status `skipped`, reason `channel_disabled` (`GET /api/v1/notifications/messages`) | eSMS is not set up for your shop yet. Messages before that are not sent again. |
 | Checkout answers that `provider` is required | The server has several payment partners. Set your default one: `PUT /api/v1/kernel/settings/ledger.payments.default_provider` with `{"value": "momo"}`. |
 | `payment_actions[0].kind` is `none` | The payment could not be started at MoMo; `payment_actions[0].error` says why (`code` and `message`, e.g. `momo.return_url_required`). Fix it, then start the payment again: `POST /api/v1/orders/{id}/payment-link` (shop staff), `POST /api/v1/orders/me/orders/{id}/payment-link` (a signed-in buyer) or `POST /api/v1/orders/public/orders/{id}/payment-link` with the `Order-Token` header (a guest buyer); the buyer may send `{"return_url": "…"}`. |
+| `payment_actions[0].error.code` is `orders.return_url_not_allowed` (or `payment-link` answers 422 with that code) | `return_url` is not on one of your shop's addresses. Add its origin to `ledger.payments.return_origins` (step 2) or verify the domain, then start the payment again. |
 | The order stays `pending_payment` | MoMo could not reach `AUTOXIDE_HTTP_PUBLIC_URL`. Check the address and look at `GET /api/v1/kernel/settings?group=connection` for the last error. |
 | GHN's option is missing from the cart | GHN refused the quote. The carrier account shows the last error (`GET /api/v1/shipping/carrier-accounts`); check the item's weight and the address. |
 | The order does not move after GHN picked the parcel | The GHN webhook is not registered, or GHN has not applied it yet (about 15 minutes). |

@@ -149,6 +149,10 @@ impl Module for OrdersModule {
         vec![("vi", include_str!("../locales/vi.json"))]
     }
 
+    fn tenant_settings(&self) -> Vec<autoxide_kernel::tenancy::TenantSetting> {
+        guests::sms_templates()
+    }
+
     fn configure(&mut self, reader: &mut ConfigReader<'_>) -> Result<(), Invalid> {
         self.config = Some(config::read(reader)?);
         Ok(())
@@ -184,6 +188,7 @@ impl Module for OrdersModule {
             // `support` đăng ký trước `orders`; chưa cài thì nút "mở hỗ trợ" trả 404.
             support: context.require::<dyn autoxide_support::api::SupportIntake>().ok(),
             translations: context.translations().clone(),
+            settings: context.require::<dyn autoxide_kernel::tenancy::TenantSettings>()?,
             // `invoices`, `notifications` đăng ký trước `orders`; chưa cài thì bỏ bước đó.
             invoices: context.require::<dyn autoxide_invoices::api::Invoices>().ok(),
             notifier: context.require::<dyn autoxide_notifications::api::Notifier>().ok(),

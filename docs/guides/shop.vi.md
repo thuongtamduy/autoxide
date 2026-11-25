@@ -70,6 +70,17 @@ for pair in partner_code=MOMOXXXX access_key=<Access Key> secret_key=<Secret Key
 done
 ```
 
+Trang người mua quay về sau khi trả phải là một địa chỉ của chính cửa hàng: địa chỉ `https://` trên tên miền bạn đã
+xác minh (`POST /api/v1/kernel/domains`), hoặc origin bạn khai ở đây — website, tên miền universal link của app,
+`http://localhost:3000` lúc phát triển. `return_url` khác bị từ chối, để link thanh toán không đưa người mua của bạn
+sang trang của người khác:
+
+```bash
+curl -sS -X PUT "$API/api/v1/kernel/settings/ledger.payments.return_origins" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"value": "https://shop.example.com"}'
+```
+
 **eSMS** — tin SMS gửi người mua. Chưa đặt thì thông báo SMS được bỏ qua với lý do `channel_disabled` (không thử
 lại, không báo lỗi):
 
@@ -171,8 +182,8 @@ curl -sS "$API/api/v1/orders/checkout" -H "Cart-Token: $CART_TOKEN" -H 'Idempote
        \"contact\": {\"name\": \"Nguyễn An\", \"phone\": \"0912345678\"}}"
 ```
 
-`return_url` là trang của website mà người mua quay về sau khi trả; MoMo bắt buộc có (hoặc đặt một lần
-`momo.connection.account.return_url` cho cửa hàng). Câu trả lời có đơn (`pending_payment`) và `payment_actions[0]`: một `redirect` tới trang thanh toán của MoMo. Người
+`return_url` là trang của website mà người mua quay về sau khi trả (trên một địa chỉ của cửa hàng, xem bước 2); MoMo
+bắt buộc có (hoặc đặt một lần `momo.connection.account.return_url` cho cửa hàng). Câu trả lời có đơn (`pending_payment`) và `payment_actions[0]`: một `redirect` tới trang thanh toán của MoMo. Người
 mua trả xong, MoMo báo về máy chủ của bạn và đơn tự sang `confirmed` / `paid`. Người mua nhận SMS khi đơn được đặt
 và khi thanh toán được xác nhận.
 
@@ -205,6 +216,7 @@ curl -sS "$API/api/v1/invoices/documents?source_module=orders&source_id=$ORDER" 
 | Lời gọi trả `provider.not_configured` | Thiếu một trường của tài khoản nhà cung cấp đó. `GET /api/v1/kernel/settings?group=connection` liệt kê mỗi kết nối cần gì. |
 | Một tin SMS có trạng thái `skipped`, lý do `channel_disabled` (`GET /api/v1/notifications/messages`) | Cửa hàng chưa đặt eSMS. Tin trước lúc đó không được gửi lại. |
 | Đặt hàng báo thiếu `provider` | Máy chủ có nhiều đối tác thanh toán. Chọn đối tác mặc định: `PUT /api/v1/kernel/settings/ledger.payments.default_provider` với `{"value": "momo"}`. |
+| `payment_actions[0].error.code` là `orders.return_url_not_allowed` (hoặc `payment-link` trả 422 với mã đó) | `return_url` không nằm trên địa chỉ nào của cửa hàng. Thêm origin của nó vào `ledger.payments.return_origins` (bước 2) hoặc xác minh tên miền, rồi mở lại lượt thu. |
 | `payment_actions[0].kind` là `none` | Không mở được lượt thu ở MoMo; `payment_actions[0].error` nói lý do (`code` và `message`, vd `momo.return_url_required`). Sửa xong thì mở lại lượt thu: `POST /api/v1/orders/{id}/payment-link` (nhân viên cửa hàng), `POST /api/v1/orders/me/orders/{id}/payment-link` (người mua đã đăng nhập) hoặc `POST /api/v1/orders/public/orders/{id}/payment-link` kèm header `Order-Token` (người mua vãng lai); người mua gửi được `{"return_url": "…"}`. |
 | Đơn nằm ở `pending_payment` | MoMo không gọi tới được `AUTOXIDE_HTTP_PUBLIC_URL`. Kiểm địa chỉ và xem lỗi gần nhất ở `GET /api/v1/kernel/settings?group=connection`. |
 | Giỏ không có lựa chọn GHN | GHN từ chối báo giá. Tài khoản hãng hiện lỗi gần nhất (`GET /api/v1/shipping/carrier-accounts`); kiểm cân nặng của món và địa chỉ. |

@@ -10,17 +10,52 @@ Quyết định: D-20261125-cloud-session-setup.
 | toolchain Rust | mọi thứ                                  | chỉ `stable`; bản ghim phải tải | `rust-toolchain.toml` |
 | `cargo-deny`   | `./gate.sh --quick` và gate đầy đủ (lint) | không                  | 0.22.0              |
 | `gitleaks`     | gate (binary; không có thì gate cần Docker, mà daemon không chạy sẵn) | không                  | 8.30.1              |
-| `cargo-nextest`| `--only build`, `--archive` (CI)         | không                  | 0.9.152             |
+| `cargo-nextest`| `--only build`, `--archive` (CI); bước test của gate nhanh (tự dùng khi có, từ 0.9.85; nhanh hơn ~7 phút khi sửa kernel) | không | 0.9.152 |
+| `cargo-semver-checks` | `cargo xtask semver` (hợp đồng Rust của kernel) | không | 0.51.0 |
 | Docker         | Postgres/S3 của gate đầy đủ              | có CLI, nhưng daemon không chạy sẵn (`docker info` lỗi) | —  |
+| PostgreSQL 16  | test trên Postgres lúc làm việc (D-263)  | có sẵn (`pg_ctlcluster`), nhưng tắt; script bật | 16 (của máy) |
 
-`scripts/cloud-setup.sh` cài ba công cụ thiếu bằng binary dựng sẵn, kiểm SHA-256 ghim trong script, và cài đúng toolchain.
+`scripts/cloud-setup.sh` cài bốn công cụ thiếu bằng binary dựng sẵn, kiểm SHA-256 ghim trong script, và cài đúng toolchain.
 Máy cloud còn clone nông (shallow) nên `cargo xtask api-diff` không thấy tag phát hành; script chạy `git fetch --unshallow --tags` khi cần.
+Script còn sinh mục lục quyết định `docs/decisions/INDEX.md` (`cargo xtask decisions`): file này không nằm trong git, nên máy mới không có sẵn (D-20261125-decision-index-untracked).
 Chạy lại nhiều lần được; thứ đã có thì bỏ qua. Không cần secret.
 
 ```bash
 scripts/cloud-setup.sh          # toolchain + công cụ
-scripts/cloud-setup.sh --warm   # thêm cargo fetch và build trước xtask
+scripts/cloud-setup.sh --warm   # thêm cargo fetch và build trước xtask (vài chục giây)
+scripts/cloud-setup.sh --prebuild   # thêm build trước test cả workspace (~13 phút, ~12 GB): chạy nền, xem mục Build lạnh
 ```
+
+## Chạy test trên Postgres ở máy cloud
+
+Máy cloud có sẵn PostgreSQL 16 (không cần Docker). `scripts/cloud-setup.sh` bật cụm `main`, đặt mật khẩu cho role `postgres`
+(chỉ nghe loopback, container dùng xong bỏ) và in giá trị cần đặt. Test chạm database lấy `TEST_DATABASE_URL` (mỗi test một
+database trống, tự tạo và xoá):
+
+```bash
+export TEST_DATABASE_URL=postgres://postgres:autoxide@127.0.0.1:5432/postgres
+CARGO_INCREMENTAL=0 cargo test -p autoxide-<crate> --locked      # chạy riêng bài vừa viết trên Postgres
+```
+
+Chưa bật (vd script chưa chạy): `pg_ctlcluster 16 main start`, rồi
+`su postgres -c "psql -c \"alter user postgres password 'autoxide'\""`. Không cần `initdb` thư mục riêng. Gate đầy đủ
+(`./gate.sh`) tự dựng Postgres bằng Docker; không có daemon thì đặt `GATE_POSTGRES_URL` bằng URL trên.
+
+## Build lạnh và `--warm`
+
+Lần biên dịch đầu của một máy lạnh là phần tốn nhất của gate nhanh. Đo trên máy 4 CPU, `CARGO_INCREMENTAL=0` như gate
+(D-20261125-cloud-dev-friction): `cargo test --workspace --no-run` mất **13 phút 28 giây** và chiếm **~12 GB** `target/`;
+`cargo clippy --workspace --all-targets` thêm 5 phút 41 giây (gate nhanh bỏ clippy). Có `target/` nóng thì dựng lại không đổi gì
+mất **4,6 giây**. `--prebuild` build sẵn phần test (bỏ qua khi đĩa trống dưới 25 GB). Đừng build với `CARGO_INCREMENTAL` bật rồi
+chạy gate: cache incremental thêm ~11 GB và không dùng chung được với gate.
+
+**Không đặt `--prebuild` trong setup script của môi trường.** Mục dưới nói setup script chỉ được snapshot nếu xong trong khoảng 5 phút;
+con số đó **chưa kiểm chứng** — tài liệu môi trường của nền tảng (topic `environment.setup_script`) chỉ nói script lỗi thì báo
+chủ dự án sửa, không nêu giới hạn thời gian — nên không thể chắc điều gì xảy ra khi vượt: có thể snapshot không được lưu, hoặc script
+bị cắt. Bước dựng ~13 phút chắc chắn vượt 5 phút. Vì vậy setup script chỉ gọi `--warm` (nhanh). Muốn có build sẵn thì chạy nền sau khi
+phiên mở, vd `nohup scripts/cloud-setup.sh --prebuild >/tmp/prebuild.log 2>&1 &`, hay dán thêm vào setup script **chỉ khi** chủ dự
+án đã xác nhận giới hạn thời gian của nó cho phép. Lần gate đầu chạy song song với bản dựng nền sẽ tranh CPU; tốt nhất để nền
+chạy xong trước.
 
 ## Hai chỗ gọi script
 
