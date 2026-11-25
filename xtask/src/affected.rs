@@ -307,6 +307,17 @@ pub fn run(
         Affected::Crates(crates) => tools_only(workspace, crates),
         Affected::All => None,
     };
+    // Gate nhanh (SQLite, chạy cả bộ): chạy bằng nextest nếu có. Đo trên máy 4 nhân với chương trình test của
+    // `autoxide` (217 test): libtest 674 s, nextest 203 s — nextest mỗi test một tiến trình nên không dính chung
+    // trạng thái của cả chương trình, và chia việc theo từng test thay vì theo từng chương trình. Cùng bộ test
+    // với đường dưới (CI cũng chạy bằng nextest, D-20261120-ci-nextest-archive); không có nextest thì dùng đường dưới.
+    if !keep_env && shard.is_whole() && nextest_available() {
+        let started = Instant::now();
+        run_nextest(&workspace.root, &selected, only.as_deref())?;
+        git(&workspace.root, &["update-ref", GREEN_REF, &current])?;
+        println!("\ntest-affected: all tests passed (nextest) in {:.0?}", started.elapsed());
+        return Ok(());
+    }
     let jobs: Vec<Job> = build_tests(&workspace.root, only.as_deref())?
         .into_iter()
         .filter_map(|test| {
@@ -766,6 +777,46 @@ struct Message {
 #[derive(Deserialize)]
 struct Profile {
     test: bool,
+}
+
+fn nextest_available() -> bool {
+    Command::new("cargo-nextest")
+        .arg("--version")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .is_ok_and(|status| status.success())
+}
+
+/// Build và chạy test của các crate đã chọn bằng nextest, chỉ SQLite (bỏ biến Postgres và S3 của người chạy).
+fn run_nextest(root: &Path, selected: &Affected, only: Option<&[String]>) -> Result<(), String> {
+    let cargo = std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_owned());
+    let mut command = Command::new(&cargo);
+    without_cargo_run_env(&mut command).args(["nextest", "run", "--locked"]);
+    match only {
+        Some(names) => {
+            command.args(names.iter().flat_map(|name| ["-p", name.as_str()]));
+        }
+        None => {
+            command.arg("--workspace");
+        }
+    }
+    // Mỗi nhân hai test: nhiều test chờ I/O (cùng cách `./gate.sh` chạy nextest).
+    let threads = std::thread::available_parallelism().map_or(2, NonZero::get) * 2;
+    command
+        .args(["--filterset", &filterset(selected)])
+        .args(["--no-fail-fast", "--no-tests", "pass", "--test-threads", &threads.to_string()])
+        .env_remove("TEST_DATABASE_URL")
+        .env_remove("TEST_S3_ENDPOINT")
+        .current_dir(root)
+        .stdin(Stdio::null());
+    let status =
+        command.status().map_err(|error| format!("cannot run `{cargo} nextest`: {error}"))?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err("nextest reported failing tests (see above)".to_owned())
+    }
 }
 
 /// Tên các crate được chọn nếu TẤT CẢ đều là crate công cụ (`Role::Tool`); không thì `None`.

@@ -51,13 +51,35 @@ jobs:
     needs: parts
     runs-on: ubuntu-24.04
     timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - name: Every part of the gate passed
         env:
           GATE: ${{ needs.parts.result }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           echo "gate: $GATE"
-          [ "$GATE" = success ]
+          # Lần chạy bị huỷ vì đã có commit mới hơn trên cùng PR (concurrency.cancel-in-progress) thì
+          # kết quả của commit cũ không còn ý nghĩa: không báo đỏ để khỏi bắn thông báo "CI failed" giả
+          # (D-20261125-ci-cancelled-not-failed). Bị huỷ mà commit này VẪN là đầu PR (huỷ tay) hay lỗi
+          # khi hỏi GitHub thì vẫn đỏ: không bao giờ tính bị huỷ là xanh cho commit hiện tại.
+          superseded() {
+            [ "$EVENT" = pull_request ] || return 1
+            live="$(gh api "repos/$REPO/pulls/$PR_NUMBER" --jq .head.sha)" || return 1
+            [ -n "$live" ] && [ "$live" != "$PR_HEAD_SHA" ]
+          }
+          [ "$GATE" = success ] && exit 0
+          if [ "$GATE" = cancelled ] && superseded; then
+            echo "::notice title=Superseded::this run was cancelled by a newer commit on the pull request"
+            exit 0
+          fi
+          exit 1
 
   sdk:
     name: TypeScript SDK and guide examples (tsc)
@@ -183,6 +205,9 @@ jobs:
   semver:
     name: Rust API compatibility (cargo-semver-checks)
     needs: [semver-plan, semver-shards]
+    permissions:
+      contents: read
+      pull-requests: read
     # `always()`: phần nào đỏ thì job này vẫn chạy và báo đỏ (check bị bỏ qua được tính là đạt).
     if: ${{ always() && github.event_name == 'pull_request' && !github.event.repository.private }}
     runs-on: ubuntu-24.04
@@ -190,6 +215,8 @@ jobs:
     steps:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         if: needs.semver-plan.outputs.mode != 'skip'
+        # Shards cancelled by a newer commit upload nothing; the verdict below is read from the job results.
+        continue-on-error: true
         with:
           pattern: semver-*
           path: parts
@@ -198,8 +225,26 @@ jobs:
           PLAN: ${{ needs.semver-plan.result }}
           MODE: ${{ needs.semver-plan.outputs.mode }}
           SHARDS: ${{ needs.semver-shards.result }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           echo "plan: $PLAN ($MODE), shards: $SHARDS"
+          # Lần chạy bị huỷ vì đã có commit mới hơn trên cùng PR (concurrency.cancel-in-progress) thì
+          # kết quả của commit cũ không còn ý nghĩa: không báo đỏ để khỏi bắn thông báo "CI failed" giả
+          # (D-20261125-ci-cancelled-not-failed). Bị huỷ mà commit này VẪN là đầu PR (huỷ tay) hay lỗi
+          # khi hỏi GitHub thì vẫn đỏ: không bao giờ tính bị huỷ là xanh cho commit hiện tại.
+          superseded() {
+            [ "$EVENT" = pull_request ] || return 1
+            live="$(gh api "repos/$REPO/pulls/$PR_NUMBER" --jq .head.sha)" || return 1
+            [ -n "$live" ] && [ "$live" != "$PR_HEAD_SHA" ]
+          }
+          if { [ "$PLAN" = cancelled ] || [ "$SHARDS" = cancelled ]; } && superseded; then
+            echo "::notice title=Superseded::this run was cancelled by a newer commit on the pull request"
+            exit 0
+          fi
           [ "$PLAN" = success ] || exit 1
           [ "$MODE" = skip ] && exit 0
           if [ "$MODE" = release ]; then title="since the last release"; else title="in this pull request"; fi
