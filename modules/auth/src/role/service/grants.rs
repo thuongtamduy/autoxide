@@ -88,6 +88,42 @@ pub(crate) async fn grant_problems<C: ConnectionTrait>(
     Ok(problems)
 }
 
+/// Chỗ kiểm chung cho mọi đường đổi membership mà người làm không trực tiếp chọn từng role (nhóm
+/// SCIM, luật ánh xạ, đồng bộ SCIM — D-20261125-scim-grant-cover): `authority` phải cấp được từng
+/// cặp (nút, role) trong `give` và trong `take` ("chỉ cấp, giữ hay gỡ cái mình có"); không thì 403
+/// `auth.role_beyond_you`. Với `take`, nút hay role không còn trong khách thì bỏ qua (không còn quyền
+/// gì để gỡ). Token SCIM: `authority` là người tạo token, tính lúc dùng token.
+pub(crate) async fn require_grantable<C: ConnectionTrait>(
+    connection: &C,
+    tenant: &TenantContext,
+    authority: &Principal,
+    give: &[(Uuid, Uuid)],
+    take: &[(Uuid, Uuid)],
+) -> Result<(), Error> {
+    // Lát cắt thay vì `impl IntoIterator`: iterator giữ qua `.await` làm future mất `Send`.
+    let pairs = give.iter().map(|pair| (*pair, true)).chain(take.iter().map(|pair| (*pair, false)));
+    let pairs: Vec<((Uuid, Uuid), bool)> = pairs.collect();
+    for ((org_id, role_id), giving) in pairs {
+        let problems =
+            grant_problems(connection, tenant, authority, "", org_id, &BTreeSet::from([role_id]))
+                .await?;
+        let blocking = problems.iter().any(|problem| giving || problem.code != "unknown");
+        if blocking {
+            tracing::warn!(%role_id, %org_id, giving, "role change beyond the authority refused");
+            return Err(Error::forbidden(
+                "auth.role_beyond_you",
+                "Role `{role_id}` at unit `{org_id}` has permissions that you do not have (for a \
+                 SCIM token: that the person who created the token does not have now), or has them \
+                 more widely; you cannot give it or take it away this way. Ask someone who holds \
+                 every permission of that role at that unit.",
+            )
+            .with_param("role_id", role_id)
+            .with_param("org_id", org_id));
+        }
+    }
+    Ok(())
+}
+
 /// Người gán `actor` có `permission` với phạm vi bao được grant độ sâu `needed` khi gán ở nút
 /// `target` (`chain`: các nút tổ tiên của `target`, gồm chính nó và gốc).
 fn actor_covers(

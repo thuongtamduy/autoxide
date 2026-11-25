@@ -114643,7 +114643,7 @@
     },
     "/api/v1/auth/scim/group-mappings/{id}": {
       "delete": {
-        "description": "Requires `auth.scim.manage`. Members of the group lose the role at once, unless another group or\na hand-made membership gives it too.",
+        "description": "Requires `auth.scim.manage`, and you must be able to give the rule's role at its unit yourself.\nMembers of the group lose the role at once, unless another group or a hand-made membership gives\nit too.",
         "operationId": "auth_delete_scim_group_mapping",
         "parameters": [
           {
@@ -114704,7 +114704,7 @@
                 }
               }
             },
-            "description": "Missing permission `auth.scim.manage`; code `permission_denied`."
+            "description": "Missing permission `auth.scim.manage` (code `permission_denied`), or you cannot give the rule's role at its unit yourself, so you cannot take it away either (code `auth.role_beyond_you`)."
           },
           "404": {
             "content": {
@@ -115403,7 +115403,7 @@
                 }
               }
             },
-            "description": "The tenant's plan does not include SCIM (`auth.scim`), or giving the roles would exceed the plan's staff limit."
+            "description": "The tenant's plan does not include SCIM (`auth.scim`), or giving the roles would exceed the plan's staff limit, or or the SCIM token's creator cannot give or take away, with their permissions now, a role this change gives or takes away (the body names no `scimType`)."
           },
           "409": {
             "content": {
@@ -115440,7 +115440,7 @@
     },
     "/api/v1/auth/scim/v2/Groups/{id}": {
       "delete": {
-        "description": "Its mapping rules go with it; its members lose the roles it gave them.",
+        "description": "Its mapping rules go with it; its members lose the roles it gave them. The token's creator must be\nable to take away every role the Group's mapping rules give.",
         "operationId": "auth_scim_delete_group",
         "parameters": [
           {
@@ -115500,7 +115500,7 @@
                 }
               }
             },
-            "description": "The tenant's plan does not include SCIM (`auth.scim`)."
+            "description": "The tenant's plan does not include SCIM (`auth.scim`), or or the SCIM token's creator cannot give or take away, with their permissions now, a role this change gives or takes away (the body names no `scimType`)."
           },
           "404": {
             "content": {
@@ -115681,7 +115681,7 @@
         "x-public": true
       },
       "patch": {
-        "description": "RFC 7644 §3.5.2, e.g. `add` / `remove` `members`, `remove` `members[value eq \"…\"]`, `replace`\n`displayName`. Membership changes reach the members' roles at once.",
+        "description": "RFC 7644 §3.5.2, e.g. `add` / `remove` `members`, `remove` `members[value eq \"…\"]`, `replace`\n`displayName`. Membership changes reach the members' roles at once; the token's creator must be\nable to give (adding) or take away (removing) every role the Group's mapping rules give.",
         "operationId": "auth_scim_patch_group",
         "parameters": [
           {
@@ -115768,7 +115768,7 @@
                 }
               }
             },
-            "description": "The tenant's plan does not include SCIM (`auth.scim`), or giving the roles would exceed the plan's staff limit."
+            "description": "The tenant's plan does not include SCIM (`auth.scim`), or giving the roles would exceed the plan's staff limit, or or the SCIM token's creator cannot give or take away, with their permissions now, a role this change gives or takes away (the body names no `scimType`)."
           },
           "404": {
             "content": {
@@ -115900,7 +115900,7 @@
                 }
               }
             },
-            "description": "The tenant's plan does not include SCIM (`auth.scim`), or giving the roles would exceed the plan's staff limit."
+            "description": "The tenant's plan does not include SCIM (`auth.scim`), or giving the roles would exceed the plan's staff limit, or or the SCIM token's creator cannot give or take away, with their permissions now, a role this change gives or takes away (the body names no `scimType`)."
           },
           "404": {
             "content": {
@@ -116302,7 +116302,7 @@
                 }
               }
             },
-            "description": "The tenant's plan does not include SCIM (`auth.scim`)."
+            "description": "The tenant's plan does not include SCIM (`auth.scim`), or the account has permissions that the SCIM token's creator does not have now (the body names no `scimType`)."
           },
           "409": {
             "content": {
@@ -116339,7 +116339,7 @@
     },
     "/api/v1/auth/scim/v2/Users/{id}": {
       "delete": {
-        "description": "Deletes the account the same way as any account deletion: other modules are told to delete\nwhat they keep about the person. To only block access, PATCH `active` to `false` instead.",
+        "description": "Deletes the account the same way as any account deletion: other modules are told to delete\nwhat they keep about the person. To only block access, PATCH `active` to `false` instead. The\ntoken's creator must hold every permission the account has.",
         "operationId": "auth_scim_delete_user",
         "parameters": [
           {
@@ -116399,7 +116399,7 @@
                 }
               }
             },
-            "description": "The tenant's plan does not include SCIM (`auth.scim`)."
+            "description": "The tenant's plan does not include SCIM (`auth.scim`), or the account has permissions that the SCIM token's creator does not have now (the body names no `scimType`)."
           },
           "404": {
             "content": {
@@ -116619,7 +116619,7 @@
                 }
               }
             },
-            "description": "The tenant's plan does not include SCIM (`auth.scim`)."
+            "description": "The tenant's plan does not include SCIM (`auth.scim`), or the account has permissions that the SCIM token's creator does not have now (the body names no `scimType`)."
           },
           "404": {
             "content": {
@@ -116751,7 +116751,7 @@
                 }
               }
             },
-            "description": "The tenant's plan does not include SCIM (`auth.scim`)."
+            "description": "The tenant's plan does not include SCIM (`auth.scim`), or the account has permissions that the SCIM token's creator does not have now (the body names no `scimType`)."
           },
           "404": {
             "content": {

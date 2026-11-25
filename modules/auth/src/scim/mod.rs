@@ -21,6 +21,8 @@ pub(crate) mod discovery;
 pub(crate) mod entity;
 pub(crate) mod error;
 pub(crate) mod filter;
+#[cfg(test)]
+mod grant_cover_tests;
 mod groups;
 #[cfg(test)]
 mod groups_tests;

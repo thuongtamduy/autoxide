@@ -249,6 +249,9 @@ thật (P7).
         địa chỉ hợp lệ như thanh toán (P-5) — phát hiện khi sửa P-5, để cho lượt rà soát luồng xác minh danh tính
   - [ ] Test chắc chắn đi qua nhánh "trùng unique index" khi xác minh tên miền (`check_on` → `lost_race`): hiện chỉ
         test đồng thời đi qua nhánh đó khi hai lượt tình cờ xen kẽ
+  - [ ] Chủ dự án quyết: `PUT /api/v1/auth/users/{id}/roles` (`auth.roles.manage`) cho tự gán mọi role kể cả `admin`
+        (cố ý theo mô tả permission), trong khi membership, lời mời và SCIM theo "chỉ cấp cái mình có"
+        (D-20261125-scim-grant-cover) — giữ, hay đưa đường cũ về cùng luật?
 
 ## Giai đoạn B — Lớp cho giao diện và phân quyền
 

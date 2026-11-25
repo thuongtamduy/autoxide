@@ -10,10 +10,15 @@ impl RoleService {
     /// Đặt membership do SCIM cấp của người `user_id` thành đúng `wanted` (nút, role). Trả `true`
     /// khi có thay đổi. Giữ hạn mức số nhân sự của gói như mọi lần gán role; không gỡ được admin
     /// cuối cùng (`auth.last_admin`). Tài khoản không có (vừa bị xoá) hay là người mua: bỏ qua.
+    ///
+    /// `authority`: người chịu trách nhiệm cho lần đổi này — người tạo token SCIM (tính lúc dùng
+    /// token) hay người đổi luật ánh xạ. Mỗi (nút, role) thêm hay gỡ phải là thứ `authority` cấp
+    /// được (`require_grantable`, D-20261125-scim-grant-cover); không thì 403 và không đổi gì.
     pub(crate) async fn sync_scim_grants(
         &self,
         tenant: &TenantContext,
         actor: Actor,
+        authority: &Principal,
         user_id: Uuid,
         wanted: BTreeSet<(Uuid, Uuid)>,
     ) -> Result<bool, Error> {
@@ -36,7 +41,7 @@ impl RoleService {
             .into_iter()
             .any(|row| !grants.contains(&row.id));
         let will_hold = !wanted.is_empty() || manual;
-        let change = self.write_scim_grants(tenant, actor, user_id, wanted);
+        let change = self.write_scim_grants(tenant, actor, authority, user_id, wanted);
         self.with_member_limit(tenant, user_id, will_hold, change).await
     }
 
@@ -44,6 +49,7 @@ impl RoleService {
         &self,
         tenant: &TenantContext,
         actor: Actor,
+        authority: &Principal,
         user_id: Uuid,
         wanted: BTreeSet<(Uuid, Uuid)>,
     ) -> Result<bool, Error> {
@@ -96,6 +102,13 @@ impl RoleService {
         if add.is_empty() && remove.is_empty() && stale.is_empty() {
             transaction.rollback().await?;
             return Ok(false);
+        }
+        // "Chỉ cấp, giữ hay gỡ cái mình có": kể cả khi nhóm hay luật đã được ghi từ trước (lần đồng
+        // bộ trước lỗi), token quyền thấp không biến chúng thành quyền.
+        let taken: Vec<(Uuid, Uuid)> = remove.iter().map(|row| (row.org_id, row.role_id)).collect();
+        if let Err(error) = require_grantable(&transaction, tenant, authority, &add, &taken).await {
+            transaction.rollback().await?;
+            return Err(error);
         }
         let admins_before = count_active_admins(&transaction, tenant).await?;
         let before = memberships_json(&memberships_of(&transaction, tenant, user_id).await?);

@@ -337,8 +337,9 @@ async fn create_scim_group_mapping(
 
 /// Remove a mapping rule.
 ///
-/// Requires `auth.scim.manage`. Members of the group lose the role at once, unless another group or
-/// a hand-made membership gives it too.
+/// Requires `auth.scim.manage`, and you must be able to give the rule's role at its unit yourself.
+/// Members of the group lose the role at once, unless another group or a hand-made membership gives
+/// it too.
 #[utoipa::path(
     delete,
     path = "/scim/group-mappings/{id}",
@@ -349,7 +350,7 @@ async fn create_scim_group_mapping(
     responses(
         (status = 204, description = "The rule was removed."),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "Missing permission `auth.scim.manage`; code `permission_denied`.", body = Problem),
+        (status = 403, description = "Missing permission `auth.scim.manage` (code `permission_denied`), or you cannot give the rule's role at its unit yourself, so you cannot take it away either (code `auth.role_beyond_you`).", body = Problem),
         (status = 404, description = "No rule has this id; code `auth.scim_mapping_not_found`.", body = Problem),
         (status = 409, description = "Removing it would leave the tenant without an active administrator; code `auth.last_admin`.", body = Problem),
     )

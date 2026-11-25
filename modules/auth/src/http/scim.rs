@@ -270,7 +270,7 @@ async fn scim_list_users(
         (status = 201, description = "The User was created; `Location` is its address.", body = ScimUser, content_type = "application/scim+json"),
         (status = 400, description = "The body is not JSON (`invalidSyntax`) or a value is wrong, e.g. no `userName` or no valid email (`invalidValue`).", body = ScimErrorBody, content_type = "application/scim+json"),
         (status = 401, description = "No SCIM token, or it is unknown or revoked.", body = ScimErrorBody, content_type = "application/scim+json"),
-        (status = 403, description = "The tenant's plan does not include SCIM (`auth.scim`).", body = ScimErrorBody, content_type = "application/scim+json"),
+        (status = 403, description = "The tenant's plan does not include SCIM (`auth.scim`), or the account has permissions that the SCIM token's creator does not have now (the body names no `scimType`).", body = ScimErrorBody, content_type = "application/scim+json"),
         (status = 409, description = "`userName`, `externalId` or the email is used by another User; `scimType` `uniqueness`.", body = ScimErrorBody, content_type = "application/scim+json"),
     )
 )]
@@ -331,7 +331,7 @@ async fn scim_get_user(
         (status = 200, description = "The User after the change.", body = ScimUser, content_type = "application/scim+json"),
         (status = 400, description = "The body is not JSON (`invalidSyntax`) or a value is wrong (`invalidValue`).", body = ScimErrorBody, content_type = "application/scim+json"),
         (status = 401, description = "No SCIM token, or it is unknown or revoked.", body = ScimErrorBody, content_type = "application/scim+json"),
-        (status = 403, description = "The tenant's plan does not include SCIM (`auth.scim`).", body = ScimErrorBody, content_type = "application/scim+json"),
+        (status = 403, description = "The tenant's plan does not include SCIM (`auth.scim`), or the account has permissions that the SCIM token's creator does not have now (the body names no `scimType`).", body = ScimErrorBody, content_type = "application/scim+json"),
         (status = 404, description = "No User of this tenant has this id.", body = ScimErrorBody, content_type = "application/scim+json"),
         (status = 409, description = "A value is used by another User (`uniqueness`), or disabling would leave the tenant without an active administrator.", body = ScimErrorBody, content_type = "application/scim+json"),
     )
@@ -367,7 +367,7 @@ async fn scim_replace_user(
         (status = 200, description = "The User after the change.", body = ScimUser, content_type = "application/scim+json"),
         (status = 400, description = "The operations cannot be applied: `invalidSyntax`, `invalidPath`, `noTarget`, `mutability` (e.g. `id`) or `invalidValue`.", body = ScimErrorBody, content_type = "application/scim+json"),
         (status = 401, description = "No SCIM token, or it is unknown or revoked.", body = ScimErrorBody, content_type = "application/scim+json"),
-        (status = 403, description = "The tenant's plan does not include SCIM (`auth.scim`).", body = ScimErrorBody, content_type = "application/scim+json"),
+        (status = 403, description = "The tenant's plan does not include SCIM (`auth.scim`), or the account has permissions that the SCIM token's creator does not have now (the body names no `scimType`).", body = ScimErrorBody, content_type = "application/scim+json"),
         (status = 404, description = "No User of this tenant has this id.", body = ScimErrorBody, content_type = "application/scim+json"),
         (status = 409, description = "A value is used by another User (`uniqueness`), or disabling would leave the tenant without an active administrator.", body = ScimErrorBody, content_type = "application/scim+json"),
     )
@@ -388,7 +388,8 @@ async fn scim_patch_user(
 /// Delete a SCIM User.
 ///
 /// Deletes the account the same way as any account deletion: other modules are told to delete
-/// what they keep about the person. To only block access, PATCH `active` to `false` instead.
+/// what they keep about the person. To only block access, PATCH `active` to `false` instead. The
+/// token's creator must hold every permission the account has.
 #[utoipa::path(
     delete,
     path = "/scim/v2/Users/{id}",
@@ -400,7 +401,7 @@ async fn scim_patch_user(
     responses(
         (status = 204, description = "The User and its account were deleted."),
         (status = 401, description = "No SCIM token, or it is unknown or revoked.", body = ScimErrorBody, content_type = "application/scim+json"),
-        (status = 403, description = "The tenant's plan does not include SCIM (`auth.scim`).", body = ScimErrorBody, content_type = "application/scim+json"),
+        (status = 403, description = "The tenant's plan does not include SCIM (`auth.scim`), or the account has permissions that the SCIM token's creator does not have now (the body names no `scimType`).", body = ScimErrorBody, content_type = "application/scim+json"),
         (status = 404, description = "No User of this tenant has this id.", body = ScimErrorBody, content_type = "application/scim+json"),
         (status = 409, description = "The account is the last active administrator of the tenant.", body = ScimErrorBody, content_type = "application/scim+json"),
     )

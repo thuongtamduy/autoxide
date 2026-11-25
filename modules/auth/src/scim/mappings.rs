@@ -1,7 +1,8 @@
 //! Luật ánh xạ nhóm SCIM → role ở nút (quản trị, envelope chung của Autoxide) và nguồn việc "nhóm
 //! chưa có luật". Người tạo luật phải gán được role đó ở nút đó (cùng kiểm như gán membership:
 //! nút trong phạm vi, có mọi permission của role, `admin` chỉ ở gốc) — luật là cách gán role cho
-//! mọi người trong nhóm, nên không được dùng để tự nâng quyền.
+//! mọi người trong nhóm, nên không được dùng để tự nâng quyền. Bỏ luật cũng vậy: chỉ người cấp được
+//! role đó ở nút đó mới bỏ được (D-20261125-scim-grant-cover).
 
 use autoxide_kernel::time::Timestamp;
 use std::collections::{BTreeSet, HashMap};
@@ -169,7 +170,8 @@ impl ScimService {
             .await?;
         transaction.commit().await?;
         tracing::info!(mapping_id = %row.id, "SCIM group mapping created");
-        self.sync_in(tenant, Actor::from(principal), &members(tenant, group_id).await?).await?;
+        let members = members(tenant, group_id).await?;
+        self.sync_in(tenant, Actor::from(principal), principal, &members).await?;
         Ok(row)
     }
 
@@ -187,6 +189,15 @@ impl ScimService {
             transaction.rollback().await?;
             return Err(mapping_not_found(id));
         };
+        // Bỏ luật là gỡ role đó khỏi mọi thành viên nhóm: chỉ người cấp được role đó ở nút đó mới
+        // bỏ được (cùng luật như khi đặt luật, D-20261125-scim-grant-cover).
+        let taken = [(row.org_id, row.role_id)];
+        if let Err(error) =
+            crate::role::require_grantable(&transaction, tenant, principal, &[], &taken).await
+        {
+            transaction.rollback().await?;
+            return Err(error);
+        }
         let deleted = mapping::Entity::delete_many()
             .filter(mapping::Column::Id.eq(id))
             .scoped(tenant)
@@ -213,7 +224,8 @@ impl ScimService {
             .await?;
         transaction.commit().await?;
         tracing::info!(mapping_id = %id, "SCIM group mapping deleted");
-        self.sync_in(tenant, Actor::from(principal), &members(tenant, row.group_id).await?).await
+        let members = members(tenant, row.group_id).await?;
+        self.sync_in(tenant, Actor::from(principal), principal, &members).await
     }
 }
 

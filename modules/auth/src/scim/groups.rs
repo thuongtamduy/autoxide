@@ -358,6 +358,13 @@ impl ScimService {
             transaction.rollback().await?;
             return Err(group_not_found(id));
         };
+        // Xoá nhóm gỡ mọi luật của nó và role nó đã cấp: người tạo token phải gỡ được từng role.
+        if let Err(error) =
+            self.require_group_grantable(&transaction, caller, group_id, false).await
+        {
+            transaction.rollback().await?;
+            return Err(error);
+        }
         let former: BTreeSet<Uuid> = member::Entity::find()
             .filter(member::Column::GroupId.eq(group_id))
             .scoped(tenant)
@@ -473,6 +480,15 @@ impl ScimService {
             .collect();
         let added: Vec<Uuid> = input.members.difference(&before).copied().collect();
         let removed: Vec<Uuid> = before.difference(&input.members).copied().collect();
+        // Thêm / bớt thành viên là cấp / gỡ role theo luật của nhóm: kiểm TRƯỚC khi ghi, để token
+        // quyền thấp không để lại thành viên "chờ" mà lần đồng bộ sau (của người khác) biến thành
+        // quyền. Đổi tên nhóm không đổi gì (luật gắn ID nhóm).
+        if !added.is_empty() {
+            self.require_group_grantable(transaction, caller, row.id, true).await?;
+        }
+        if !removed.is_empty() {
+            self.require_group_grantable(transaction, caller, row.id, false).await?;
+        }
         if !removed.is_empty() {
             member::Entity::delete_many()
                 .filter(member::Column::GroupId.eq(row.id))
@@ -524,25 +540,60 @@ impl ScimService {
         Ok((row, changed))
     }
 
+    /// Người tạo token của `caller` cấp (`give`) hay gỡ được mọi (nút, role) mà luật ánh xạ của
+    /// nhóm `group_id` cấp không (D-20261125-scim-grant-cover); không thì 403.
+    async fn require_group_grantable(
+        &self,
+        transaction: &DatabaseTransaction,
+        caller: &ScimCaller,
+        group_id: Uuid,
+        give: bool,
+    ) -> Result<(), ScimError> {
+        let tenant = &caller.tenant;
+        let pairs: Vec<(Uuid, Uuid)> = mapping::Entity::find()
+            .filter(mapping::Column::GroupId.eq(group_id))
+            .scoped(tenant)
+            .all(transaction)
+            .await?
+            .into_iter()
+            .map(|row| (row.org_id, row.role_id))
+            .collect();
+        if pairs.is_empty() {
+            return Ok(());
+        }
+        let authority = self.authority(caller).await?;
+        let (given, taken) = if give { (pairs, Vec::new()) } else { (Vec::new(), pairs) };
+        crate::role::require_grantable(transaction, tenant, &authority, &given, &taken).await?;
+        Ok(())
+    }
+
     /// Đồng bộ membership do SCIM cấp của những người `users` theo nhóm hiện tại của họ.
     pub(crate) async fn sync_users(
         &self,
         caller: &ScimCaller,
         users: &BTreeSet<Uuid>,
     ) -> Result<(), ScimError> {
-        self.sync_in(&caller.tenant, caller.actor(), users).await.map_err(ScimError::from)
+        if users.is_empty() {
+            return Ok(());
+        }
+        let authority = self.authority(caller).await?;
+        self.sync_in(&caller.tenant, caller.actor(), &authority, users)
+            .await
+            .map_err(ScimError::from)
     }
 
     /// Như [`sync_users`](Self::sync_users), cho bên gọi ngoài SCIM (đổi luật ánh xạ).
+    /// `authority`: người chịu trách nhiệm — mọi role thêm / gỡ phải là thứ người đó cấp được.
     pub(crate) async fn sync_in(
         &self,
         tenant: &TenantContext,
         actor: autoxide_kernel::event::Actor,
+        authority: &autoxide_kernel::access::Principal,
         users: &BTreeSet<Uuid>,
     ) -> Result<(), autoxide_kernel::error::Error> {
         for user_id in users {
             let wanted = wanted_grants(tenant, *user_id).await?;
-            self.roles.sync_scim_grants(tenant, actor, *user_id, wanted).await?;
+            self.roles.sync_scim_grants(tenant, actor, authority, *user_id, wanted).await?;
         }
         Ok(())
     }
