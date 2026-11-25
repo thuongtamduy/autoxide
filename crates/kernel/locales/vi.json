@@ -326,6 +326,7 @@
   "tenant_domain_taken": "Tên miền `{domain}` đã thuộc một khách hàng khác.",
   "tenant_maintenance": "Dữ liệu của khách hàng này đang được bảo trì. Thử lại sau {seconds} giây.",
   "tenant_mismatch": "Thông tin đăng nhập thuộc khách hàng khác với khách hàng của yêu cầu này.",
+  "tenant_origin_mismatch": "Yêu cầu này đến từ trang web trên tên miền của khách hàng khác. Trang trên tên miền của một khách hàng chỉ được gọi API cho chính khách hàng đó: gọi từ trang của khách hàng đó, hoặc thêm origin của trang vào AUTOXIDE_HTTP_CORS_ORIGINS.",
   "tenant_move_busy": "{jobs} job hay event của khách vẫn đang chạy ở vị trí dữ liệu cũ. Lượt dời tạm dừng; chạy lại sau vài phút.",
   "tenant_move_count_mismatch": "Sau khi chép, `{table}` có {target} dòng của khách ở vị trí mới và {source} dòng ở vị trí cũ; khách giữ vị trí cũ. Chạy lại lượt dời để chép lại.",
   "tenant_move_not_abortable": "Khách đã dùng vị trí dữ liệu mới; lượt dời chỉ còn dọn vị trí cũ. Hãy chạy tiếp thay vì huỷ: dời khách sang đúng vị trí đó lần nữa.",

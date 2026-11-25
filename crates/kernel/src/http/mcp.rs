@@ -36,7 +36,6 @@ use serde_json::{Map, Value, json};
 use self::protocol::RpcError;
 use self::transport::Caller;
 use crate::access::{Authenticator, Principal};
-use crate::config::CorsOrigins;
 use crate::error::{Error, ErrorKind};
 use crate::i18n::{Language, Translations};
 use crate::mcp::{McpResource, Prompt, PromptMessage, Tool};
@@ -89,7 +88,6 @@ pub(super) fn router(
     catalog: McpCatalog,
     translations: Arc<Translations>,
     authenticator: Option<Arc<dyn Authenticator>>,
-    origins: &CorsOrigins,
     entitlements: crate::entitlement::EntitlementsHandle,
     request_log: Option<crate::ops::request_log::RequestLog>,
 ) -> Option<Router> {
@@ -102,20 +100,17 @@ pub(super) fn router(
         entitlements,
         request_log,
     };
-    let origins = Arc::new(origins.clone());
-    let endpoint = |server: McpServer, origins: Arc<CorsOrigins>| {
+    let endpoint = |server: McpServer| {
         // Mọi phương thức vào cùng một hàm: `GET` / `DELETE` của bản cũ nhận 405 có giải thích.
-        axum::routing::any(move |request: Request| {
-            transport::handle(server.clone(), origins.clone(), request)
-        })
+        axum::routing::any(move |request: Request| transport::handle(server.clone(), request))
     };
     let mut router = Router::new();
     for module in server.modules() {
         let only = server.only(&module);
-        router = router.route_service(&module_path(&module), endpoint(only, origins.clone()));
+        router = router.route_service(&module_path(&module), endpoint(only));
     }
     let router =
-        router.route_service(MCP_PATH, endpoint(server, origins)).route_layer(middleware::from_fn(
+        router.route_service(MCP_PATH, endpoint(server)).route_layer(middleware::from_fn(
             move |request: Request, next: Next| authenticate(authenticator.clone(), request, next),
         ));
     Some(router)

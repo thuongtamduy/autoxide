@@ -125,6 +125,10 @@ impl std::fmt::Debug for DatabaseRegistry {
 /// Tenant and node (website) of a verified domain.
 type DomainSite = (TenantId, Option<OrgId>);
 
+/// At most this many domains (found or not) are kept in the cache: a client sending random `Host` / `Origin`
+/// values cannot grow it without bound.
+const MAX_CACHED_DOMAINS: usize = 10_000;
+
 /// Locks `mutex` even if another thread panicked while holding it: the data inside is only a cache.
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(PoisonError::into_inner)
@@ -344,8 +348,30 @@ impl DatabaseRegistry {
             )),
             None => None,
         };
-        lock(&self.0.domains).insert(host, (Instant::now(), found));
+        let mut domains = lock(&self.0.domains);
+        if domains.len() >= MAX_CACHED_DOMAINS {
+            // Đầy: bỏ mục hết hạn trước; vẫn đầy (bị dội tên lạ) thì xoá sạch — cache chỉ để đỡ truy vấn,
+            // xoá không sai, chỉ tốn vài lần đọc lại.
+            let ttl = self.ttl();
+            domains.retain(|_, (at, _)| at.elapsed() < ttl);
+            if domains.len() >= MAX_CACHED_DOMAINS {
+                domains.clear();
+            }
+        }
+        domains.insert(host, (Instant::now(), found));
         Ok(found)
+    }
+
+    /// Like [`DatabaseRegistry::domain_site`] but only from the cache: `None` when `host` is not cached (or
+    /// the entry expired), so the caller decides whether a database read is worth it. `single` mode:
+    /// `Some(None)` (no domains, nothing to read).
+    pub(crate) fn cached_domain_site(&self, host: &str) -> Option<Option<DomainSite>> {
+        if self.0.mode == TenancyMode::Single {
+            return Some(None);
+        }
+        let host = host.trim().trim_end_matches('.').to_ascii_lowercase();
+        let cached = lock(&self.0.domains).get(&host).cloned();
+        cached.filter(|(at, _)| at.elapsed() < self.ttl()).map(|(_, found)| found)
     }
 
     /// The root key used to open encrypted placement URLs. Set once (the `kernel` module sets it at startup);

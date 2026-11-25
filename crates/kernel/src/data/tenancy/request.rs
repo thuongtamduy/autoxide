@@ -131,6 +131,7 @@ pub(crate) async fn authenticate(
         }
         _ => principal,
     };
+    ensure_origin(&parts.extensions, principal.tenant_id())?;
     parts.extensions.insert(Authenticated(principal.clone()));
     if let Some(slot) = parts.extensions.get::<crate::ops::request_log::CallerSlot>() {
         slot.note_principal(&principal);
@@ -229,10 +230,23 @@ async fn resolve_tenant(parts: &mut Parts) -> Result<TenantContext, Error> {
     } else {
         by_hint(&registry, parts).await?
     };
+    ensure_origin(&parts.extensions, tenant.id())?;
     ensure_serving(&tenant)?;
     ensure_writable(&tenant, &parts.method, &parts.extensions)?;
     parts.extensions.insert(tenant.clone());
     Ok(tenant)
+}
+
+/// A request from the web origin of tenant `owner`'s verified domain (CORS, `http::cors`) may only act as
+/// `owner`: a page on tenant A's domain cannot call the API as tenant B. Checked before any handler runs, so
+/// a refused request has no effect. Origins of `AUTOXIDE_HTTP_CORS_ORIGINS` are not bound to a tenant.
+fn ensure_origin(extensions: &Extensions, tenant: super::TenantId) -> Result<(), Error> {
+    match extensions.get::<crate::http::OriginGrant>() {
+        Some(crate::http::OriginGrant::Tenant(owner)) if *owner != tenant => {
+            Err(errors::tenant_origin_mismatch())
+        }
+        _ => Ok(()),
+    }
 }
 
 /// The tenant by the `autoxide-tenant` header / domain, ignoring the credential (a request that is not signed
@@ -263,6 +277,7 @@ pub(crate) async fn tenant_ignoring_bad_credential(
                 )
             })?;
             let tenant = by_hint(&registry, parts).await?;
+            ensure_origin(&parts.extensions, tenant.id())?;
             ensure_serving(&tenant)?;
             ensure_writable(&tenant, &parts.method, &parts.extensions)?;
             Ok(tenant)

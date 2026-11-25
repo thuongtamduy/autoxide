@@ -555,6 +555,17 @@ pub mod errors {
         )
     }
 
+    /// The request came from the web origin (`Origin`) of one tenant's verified domain but acts for another
+    /// tenant: a page on a tenant's domain may only call the API as that tenant.
+    pub fn tenant_origin_mismatch() -> Error {
+        Error::forbidden(
+            "tenant_origin_mismatch",
+            "This request comes from a web page on another tenant's domain. A page on a tenant's \
+             domain may only call the API for that tenant: call from that tenant's own page, or add \
+             the page's origin to AUTOXIDE_HTTP_CORS_ORIGINS.",
+        )
+    }
+
     pub fn tenant_platform_only() -> Error {
         Error::forbidden("tenant_platform_only", "Only administrators of the platform can do this.")
     }
