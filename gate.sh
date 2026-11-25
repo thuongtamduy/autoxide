@@ -63,7 +63,7 @@
 #   4. hợp đồng API         cargo xtask api-diff: không phá vỡ /api/v1 so với tag phát hành gần nhất;
 #                           cargo xtask sdk --check: SDK TypeScript khớp docs/openapi.json
 #   5. thư viện             cargo deny check (license, lỗ hổng, nguồn)
-#   6. secret               gitleaks: toàn bộ lịch sử git và thay đổi chưa commit
+#   6. secret               gitleaks: toàn bộ lịch sử đi tới được từ HEAD (không quét nhánh khác), thay đổi chưa commit và file mới chưa track
 #   7. test trên SQLite
 #   8. test trên Postgres   (tự dựng một container Docker dùng xong bỏ)
 #   Bước 7 và 8 chạy các file test song song (`cargo xtask test-all`, D-299); trên Postgres giới
@@ -370,12 +370,24 @@ gitleaks_run() {
 
 step "secrets (gitleaks)"
 # Giữ trong gate dù CI cũng quét (job `secrets` của ci.yml, D-108): gate bắt secret trên máy,
-# trước khi nó rời máy. Quét toàn bộ lịch sử (secret đã commit rồi xoá vẫn nằm trong git), rồi
-# thay đổi đã stage và chưa stage (bắt trước khi commit).
+# trước khi nó rời máy. Quét toàn bộ lịch sử đi tới được từ HEAD (secret đã commit rồi xoá vẫn nằm
+# trong git), rồi thay đổi đã stage và chưa stage (bắt trước khi commit). `--log-opts=HEAD` vì mặc định
+# gitleaks quét MỌI ref đã fetch: nhánh của phiên khác sẽ làm gate của máy này đỏ (D-20261125-gitleaks-scope).
 leaks=(--no-banner --redact --config .gitleaks.toml)
-gitleaks_run git . "${leaks[@]}"
+gitleaks_run git . "${leaks[@]}" --log-opts=HEAD
 gitleaks_run git . "${leaks[@]}" --pre-commit --staged
 gitleaks_run git . "${leaks[@]}" --pre-commit
+# File MỚI chưa `git add` (không bị gitignore) không nằm trong lịch sử cũng không trong `--pre-commit` (chỉ file đã
+# track): chạy gate rồi mới `git add` + commit thì chuỗi mẫu lọt. `gitleaks dir` chỉ nhận một đường dẫn, nên chép
+# các file đó (giữ đường dẫn tương đối, để allowlist theo path của .gitleaks.toml còn đúng) vào một thư mục tạm
+# trong `.git` (nằm trong thư mục repo nên Docker cũng thấy) rồi quét thư mục đó.
+untracked_dir="$(git rev-parse --git-dir)/gitleaks-untracked"
+rm -rf "$untracked_dir" && mkdir -p "$untracked_dir"
+git ls-files --others --exclude-standard -z | tar --null -T - -cf - 2>/dev/null | tar -xf - -C "$untracked_dir"
+untracked_status=0
+gitleaks_run dir "$untracked_dir" "${leaks[@]}" || untracked_status=$?
+rm -rf "$untracked_dir"
+[ "$untracked_status" -eq 0 ] || exit "$untracked_status"
 
 fi
 
