@@ -142,7 +142,7 @@ async fn token_quyen_thap_khong_dua_ai_vao_nhom_admin() {
         let (status, body) = scim(&app, "DELETE", &path, &low_token, None).await;
         assert_forbidden(status, &body);
         assert!(is_admin(&services, &stranger).await);
-        assert_eq!(members(&app, &admin_token, &group_id).await, [stranger.clone()]);
+        assert_eq!(members(&app, &admin_token, &group_id).await, std::slice::from_ref(&stranger));
 
         // Đổi tên nhóm không đổi ai có quyền gì (luật gắn ID nhóm): được.
         let rename = patch(json!([{"op": "replace", "path": "displayName", "value": "Owners"}]));
