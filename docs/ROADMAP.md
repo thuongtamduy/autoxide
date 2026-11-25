@@ -249,6 +249,13 @@ thật (P7).
         địa chỉ hợp lệ như thanh toán (P-5) — phát hiện khi sửa P-5, để cho lượt rà soát luồng xác minh danh tính
   - [ ] Test chắc chắn đi qua nhánh "trùng unique index" khi xác minh tên miền (`check_on` → `lost_race`): hiện chỉ
         test đồng thời đi qua nhánh đó khi hai lượt tình cờ xen kẽ
+  - [ ] Cache `domain_site` (theo `Host`, giới hạn 10 000 mục, D-20261125-tenant-cors) bị dội `Host` ngẫu nhiên
+        thì bị xoá sạch liên tục, tên miền thật phải đọc lại database mỗi lần — cần cách bỏ mục tốt hơn (LRU hay
+        ảnh chụp như CORS)
+  - [ ] `http/ws.rs` không kiểm `Origin` (mức thấp: xác thực bằng header `Authorization`, trình duyệt không gửi
+        được khi mở WebSocket) — kiểm cùng nguồn `OriginGrant` như MCP
+  - [ ] Test cho lượt đọc ảnh chụp tên miền verified bị treo quá `READ_TIMEOUT` (3 giây,
+        `tenancy::verified_domains`, D-20261125-tenant-cors): cần database giả treo được
   - [ ] Chủ dự án quyết: `PUT /api/v1/auth/users/{id}/roles` (`auth.roles.manage`) cho tự gán mọi role kể cả `admin`
         (cố ý theo mô tả permission), trong khi membership, lời mời và SCIM theo "chỉ cấp cái mình có"
         (D-20261125-scim-grant-cover) — giữ, hay đưa đường cũ về cùng luật? Cùng lượt xem các chỗ bất nhất khác
@@ -1161,6 +1168,7 @@ Thứ tự ưu tiên chủ dự án đồng ý; mỗi mục khi làm thì ghi qu
 - [ ] Phát hành thường hơn (1–2 tuần) cho CHANGELOG mỗi bản gọn (phát hành nay tự chạy khi merge PR phát hành,
       D-20261121-auto-release); cài `cargo-semver-checks` cho bước phát hành — **chuyển thành P4 của bước 70** (xong)
 - [ ] Đăng SDK TypeScript lên npm (chờ tài khoản của chủ dự án) — **chuyển thành P5 của bước 70**
+- [ ] Quét gitleaks định kỳ MỌI nhánh bằng một job riêng không chặn PR (sau D-20261125-gitleaks-scope, nhánh chưa có PR không được quét)
 - [ ] Nợ nhỏ: tách các file `.rs` trên 800 dòng (đang làm); ~~`chrono` không còn bảo trì~~ — đã thay bằng `jiff`
       (D-20261121-time-library)
 
