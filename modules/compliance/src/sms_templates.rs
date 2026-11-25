@@ -1,0 +1,72 @@
+//! Mẫu câu SMS mang mã một lần mà khách tự sửa (bước 70 P9, D-20261125-sms-templates): khách có brandname đăng ký
+//! template với nhà mạng thì chỉ gửi được đúng câu đã đăng ký, nên câu mặc định phải đổi được theo khách.
+//! Cấu hình theo khách của kernel (`PUT /api/v1/kernel/settings/{name}`), nhóm `sms_template`.
+
+use autoxide_kernel::error::{Error, FieldError};
+use autoxide_kernel::sms::{
+    SMS_TEMPLATE_GROUP, check_sms_template, fill_sms_template, tenant_sms_text,
+};
+use autoxide_kernel::tenancy::{TenantContext, TenantSetting};
+
+use crate::service::ComplianceService;
+
+/// Chỗ điền của cả hai mẫu.
+const PLACEHOLDERS: &[&str] = &["code", "minutes"];
+
+fn check(raw: &str) -> Result<(), FieldError> {
+    check_sms_template(raw, PLACEHOLDERS)
+}
+
+/// Câu SMS mang mã xác thực số của người đã đăng nhập.
+pub(crate) const PHONE_VERIFICATION: TenantSetting = TenantSetting::new(
+    "compliance.sms_template.phone_verification",
+    "Text of the SMS that carries the code for verifying a signed-in user's phone number, matching the \
+     template registered with the carriers for the SMS brandname. Placeholders: `{code}` (required, \
+     once) and `{minutes}` (minutes until the code expires). Unset: `Ma xac thuc cua ban: {code}. Het han \
+     sau {minutes} phut. Khong chia se ma nay.`",
+)
+.group(SMS_TEMPLATE_GROUP)
+.checked(check);
+
+/// Câu SMS mang mã đăng nhập bằng số điện thoại.
+pub(crate) const SIGN_IN: TenantSetting = TenantSetting::new(
+    "compliance.sms_template.sign_in",
+    "Text of the SMS that carries the code for signing in with a phone number, matching the template \
+     registered with the carriers for the SMS brandname. Placeholders: `{code}` (required, once) and \
+     `{minutes}` (minutes until the code expires). Unset: `Ma dang nhap cua ban: {code}. Het han sau \
+     {minutes} phut. Khong chia se ma nay.`",
+)
+.group(SMS_TEMPLATE_GROUP)
+.checked(check);
+
+/// Câu mặc định khi khách chưa đặt mẫu.
+const PHONE_VERIFICATION_DEFAULT: &str =
+    "Ma xac thuc cua ban: {code}. Het han sau {minutes} phut. Khong chia se ma nay.";
+const SIGN_IN_DEFAULT: &str =
+    "Ma dang nhap cua ban: {code}. Het han sau {minutes} phut. Khong chia se ma nay.";
+
+pub(crate) fn all() -> Vec<TenantSetting> {
+    vec![PHONE_VERIFICATION, SIGN_IN]
+}
+
+impl ComplianceService {
+    /// Câu SMS theo mẫu `setting` của khách, không có thì câu mặc định.
+    pub(crate) async fn otp_text(
+        &self,
+        tenant: &TenantContext,
+        setting: &TenantSetting,
+        code: &str,
+        minutes: i64,
+    ) -> Result<String, Error> {
+        let minutes = minutes.to_string();
+        let values = [("code", code), ("minutes", minutes.as_str())];
+        if let Some(text) =
+            tenant_sms_text(self.settings.as_ref(), tenant, setting, PLACEHOLDERS, &values).await?
+        {
+            return Ok(text);
+        }
+        let default =
+            if setting == &SIGN_IN { SIGN_IN_DEFAULT } else { PHONE_VERIFICATION_DEFAULT };
+        Ok(fill_sms_template(default, &values).unwrap_or_else(|| default.to_owned()))
+    }
+}

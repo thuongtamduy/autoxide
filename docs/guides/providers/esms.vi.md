@@ -48,15 +48,28 @@ Khi module bật, mỗi khách gửi SMS qua tài khoản eSMS của mình; khá
 4. Nếu eSMS giới hạn tài khoản theo địa chỉ IP, đưa cho họ IP của máy chủ Autoxide (không thì:
    `esms.ip_not_allowed`).
 
-Mẫu cần đăng ký cho các mã Autoxide gửi hiện nay (thay phần trong ngoặc nhọn bằng cú pháp biến eSMS
-yêu cầu):
+Mỗi tin SMS mang mã một lần có một câu mặc định, và một cấu hình theo khách để thay câu đó cho khớp mẫu
+bạn đã đăng ký (nhóm `sms_template`, xem danh sách bằng `GET /api/v1/kernel/settings?group=sms_template`).
+Đăng ký câu mặc định (thay phần trong ngoặc nhọn bằng cú pháp biến eSMS yêu cầu) hoặc câu của riêng bạn, rồi
+đặt câu đó vào cấu hình:
 
-| Dùng cho | Nội dung |
-| --- | --- |
-| Xác thực số điện thoại | `Ma xac thuc cua ban: {code}. Het han sau {minutes} phut. Khong chia se ma nay.` |
-| Đăng nhập bằng số điện thoại | `Ma dang nhap cua ban: {code}. Het han sau {minutes} phut. Khong chia se ma nay.` |
-| Mã đặt lịch (`bookings`) | `Your booking code is {code}. It expires in {minutes} minutes.` |
-| Mã đơn hàng (`orders`) và thông báo (`notifications`) | nội dung các mẫu của chính bạn trong hai module đó |
+| Dùng cho | Cấu hình | Câu mặc định | Chỗ điền |
+| --- | --- | --- | --- |
+| Xác thực số điện thoại | `compliance.sms_template.phone_verification` | `Ma xac thuc cua ban: {code}. Het han sau {minutes} phut. Khong chia se ma nay.` | `{code}`, `{minutes}` |
+| Đăng nhập bằng số điện thoại | `compliance.sms_template.sign_in` | `Ma dang nhap cua ban: {code}. Het han sau {minutes} phut. Khong chia se ma nay.` | `{code}`, `{minutes}` |
+| Mã đặt lịch (`bookings`) | `bookings.sms_template.guest_code` | `Your booking code is {code}. It expires in {minutes} minutes.` | `{code}`, `{minutes}` |
+| Tra đơn vãng lai (`orders`) | `orders.sms_template.order_lookup` | `Your code to view order {number} is {code}. It expires in {minutes} minutes.` (dịch theo ngôn ngữ của đơn) | `{code}`, `{number}`, `{minutes}` |
+| Đổi địa chỉ đơn vãng lai (`orders`) | `orders.sms_template.address_change` | `Your code to change the delivery address of order {number} is {code}. It expires in {minutes} minutes.` (có dịch) | `{code}`, `{number}`, `{minutes}` |
+| Thông báo (`notifications`) | — | nội dung các mẫu của chính bạn trong module đó | — |
+
+```bash
+curl -X PUT https://your-server/api/v1/kernel/settings/compliance.sms_template.sign_in \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"value": "[MYSHOP] {code} la ma dang nhap cua ban, hieu luc {minutes} phut"}'
+```
+
+Mẫu phải có `{code}` đúng một lần và chỉ dùng chỗ điền của tin đó (không thì 422, lỗi ở ô `value`). Câu của
+bạn gửi nguyên văn, bất kể ngôn ngữ của người mua. `DELETE` cấu hình để quay về câu mặc định.
 
 ## 3. Khách: nhập tài khoản
 

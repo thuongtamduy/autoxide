@@ -22,6 +22,8 @@ pub(crate) struct BookingsService {
     pub ledger: Option<std::sync::Arc<dyn autoxide_ledger::api::Ledger>>,
     pub notifier: Option<std::sync::Arc<dyn autoxide_notifications::api::Notifier>>,
     pub sms: Option<std::sync::Arc<dyn autoxide_kernel::sms::SmsSender>>,
+    /// Cấu hình theo khách (mẫu câu SMS mang mã, D-20261125-sms-templates).
+    pub tenant_settings: std::sync::Arc<dyn autoxide_kernel::tenancy::TenantSettings>,
     pub secret: Option<autoxide_kernel::secret::SecretKey>,
 }
 

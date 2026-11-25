@@ -119,6 +119,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261123-supply-chain](D-20261123-supply-chain.md)** Chuỗi cung ứng và phát hành: ký không khoá, provenance cho mọi file, Actions tối thiểu quyền, Dependabot có cooldown, bản thử `X.Y.Z-rc.N` — 2026-11-23
 - **[D-20261125-ci-skip-rust](D-20261125-ci-skip-rust.md)** Pull request không chạm Rust bỏ phần biên dịch và test nặng theo danh sách cho phép — 2026-11-25
 - **[D-20261125-cloud-session-setup](D-20261125-cloud-session-setup.md)** Phiên agent trên cloud: một script cài đặt trong repo, gọi từ setup script của môi trường và SessionStart hook — 2026-11-25
+- **[D-20261125-p9-reopened](D-20261125-p9-reopened.md)** Mở lại P9 của bước 70: mẫu OTP theo khách, chế độ "nghỉ", danh sách có phân trang — 2026-11-25 · **chủ dự án quyết**
 - **[D-20261125-typescript-range](D-20261125-typescript-range.md)** Dải TypeScript hỗ trợ cho SDK: 5.0 trở lên, phát triển trên 7 — 2026-11-25
 
 ## Kiến trúc module và kernel
@@ -498,6 +499,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261122-theme-variants](D-20261122-theme-variants.md)** Chủ đề theo lịch: lịch JSON ba loại theo múi IANA của website, chọn đúng một bản, mẫu nhúng binary — 2026-11-22
 - **[D-20261123-content-types-later](D-20261123-content-types-later.md)** Loại nội dung, phần sau: trang chi tiết do `content` điền, lọc công khai theo index của bản đăng, hạn mức theo gói — 2026-11-23
 - **[D-20261123-site-health-daily](D-20261123-site-health-daily.md)** Sức khoẻ website phần sau: job hằng ngày, đếm 404 theo ngày không lưu người xem, tool MCP của trang dựng từ khối — 2026-11-23
+- **[D-20261125-sms-templates](D-20261125-sms-templates.md)** Mẫu câu SMS mang mã một lần là cấu hình theo khách, nhóm `sms_template` — 2026-11-25
 
 ## Tiền, thuế, chứng từ
 

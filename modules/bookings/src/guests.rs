@@ -6,8 +6,11 @@
 
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::secret::sha256;
-use autoxide_kernel::sms::{PhoneNumber, SmsMessage, SmsPurpose, sms_disabled};
-use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
+use autoxide_kernel::sms::{
+    PhoneNumber, SMS_TEMPLATE_GROUP, SmsMessage, SmsPurpose, check_sms_template, fill_sms_template,
+    sms_disabled, tenant_sms_text,
+};
+use autoxide_kernel::tenancy::{ScopeExt, TenantContext, TenantSetting};
 use autoxide_kernel::throttle::{Outcome, Throttle};
 use autoxide_kernel::time::Timestamp;
 use jiff::SignedDuration;
@@ -31,6 +34,26 @@ const PER_PHONE_PER_HOUR: u64 = 5;
 /// Tối đa chừng này mã từ một địa chỉ client mỗi giờ (mọi số cộng lại): chặn một máy xin mã cho
 /// hàng loạt số khác nhau, mỗi tin tốn tiền SMS của cửa hàng (pentest 2026-11; như tra đơn vãng lai).
 const PER_CLIENT_PER_HOUR: u32 = 20;
+
+/// Chỗ điền của mẫu SMS.
+const SMS_PLACEHOLDERS: &[&str] = &["code", "minutes"];
+/// Câu mặc định khi khách chưa đặt mẫu.
+const CODE_SMS_DEFAULT: &str = "Your booking code is {code}. It expires in {minutes} minutes.";
+
+fn check_sms(raw: &str) -> Result<(), FieldError> {
+    check_sms_template(raw, SMS_PLACEHOLDERS)
+}
+
+/// Mẫu câu SMS khách tự sửa cho khớp template đã đăng ký với nhà mạng (D-20261125-sms-templates).
+pub(crate) const CODE_SMS_TEMPLATE: TenantSetting = TenantSetting::new(
+    "bookings.sms_template.guest_code",
+    "Text of the SMS that carries the code a guest enters to confirm their phone number when booking, \
+     matching the template registered with the carriers for the SMS brandname. Placeholders: `{code}` \
+     (required, once) and `{minutes}` (minutes until the code expires). Unset: `Your booking code is \
+     {code}. It expires in {minutes} minutes.`",
+)
+.group(SMS_TEMPLATE_GROUP)
+.checked(check_sms);
 
 /// Mã vừa gửi.
 #[derive(Debug, Clone)]
@@ -142,7 +165,20 @@ impl BookingsService {
         .insert(&transaction)
         .await?;
         transaction.commit().await?;
-        let text = format!("Your booking code is {code}. It expires in {TTL_MINUTES} minutes.");
+        let minutes = TTL_MINUTES.to_string();
+        let values = [("code", code.as_str()), ("minutes", minutes.as_str())];
+        let custom = tenant_sms_text(
+            self.tenant_settings.as_ref(),
+            tenant,
+            &CODE_SMS_TEMPLATE,
+            SMS_PLACEHOLDERS,
+            &values,
+        )
+        .await?;
+        let text = custom.unwrap_or_else(|| {
+            fill_sms_template(CODE_SMS_DEFAULT, &values)
+                .unwrap_or_else(|| CODE_SMS_DEFAULT.to_owned())
+        });
         sender
             .send(SmsMessage::new(
                 tenant.id(),

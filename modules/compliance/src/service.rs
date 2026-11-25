@@ -39,6 +39,8 @@ pub(crate) struct ComplianceService {
     pub callback_retention_days: i64,
     /// Nhà cung cấp SMS (gửi mã một lần); `None` thì xác thực số trả `sms_disabled`.
     pub sms: Option<Arc<dyn autoxide_kernel::sms::SmsSender>>,
+    /// Cấu hình theo khách (mẫu câu SMS mang mã, D-20261125-sms-templates).
+    pub settings: Arc<dyn autoxide_kernel::tenancy::TenantSettings>,
     /// Khoá gốc, để dẫn pepper của mã một lần.
     pub secret: autoxide_kernel::secret::SecretKey,
     /// Giới hạn của mã một lần (`AUTOXIDE_COMPLIANCE_OTP_*`).
