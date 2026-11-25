@@ -768,7 +768,15 @@ impl OidcService {
         if role.is_some() {
             match &linked {
                 Ok(()) => self.entitlements.confirm(tenant.id(), limit, &reference).await?,
-                Err(_) => self.entitlements.release(tenant.id(), limit, &reference).await?,
+                Err(_) => {
+                    // Trả chỗ lỗi thì chỉ ghi log: vẫn phải xoá tài khoản dở dang và trả LỖI GỐC (vd
+                    // `limit_exceeded`); chỗ không ai xác nhận tự hết hạn.
+                    if let Err(error) =
+                        self.entitlements.release(tenant.id(), limit, &reference).await
+                    {
+                        tracing::warn!(user_id = %user.id, %error, "could not release a staff seat");
+                    }
+                }
             }
         }
         if let Err(error) = linked {

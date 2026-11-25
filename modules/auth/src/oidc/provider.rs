@@ -492,12 +492,11 @@ impl ProviderService {
                 checked.push(problem);
                 continue;
             }
-            let name = crate::role::entity::role::Entity::find_by_id(role)
-                .scoped(tenant)
-                .one(read)
-                .await?
-                .map(|row| row.name)
-                .unwrap_or_else(|| role.to_string());
+            // Tên role đã có trong tham số của lỗi gốc (`grant_problems`), không đọc lại.
+            let name = problem
+                .params()
+                .find(|(key, _)| *key == "role")
+                .map_or_else(|| role.to_string(), |(_, value)| value.to_owned());
             checked.push(
                 FieldError::new(
                     problem.field,
