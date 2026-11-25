@@ -197,6 +197,10 @@ impl UserService {
             // Liên kết đăng nhập bằng nhà cung cấp ngoài cũng là một cửa: gỡ hết, chủ tài khoản
             // liên kết lại sau khi đã lấy lại tài khoản.
             self.forget_identities(&transaction, tenant, actor, id).await?;
+            // Uỷ quyền bền tài khoản tạo (token SCIM, vai người cấu hình nhà cung cấp đăng nhập): kẻ
+            // đã chiếm tài khoản có thể tạo chúng; chủ lấy lại tài khoản thì chúng mất theo
+            // (D-20261125-durable-grants).
+            super::revoke_durable_grants_in(&transaction, tenant, &self.outbox, actor, id).await?;
         }
         let event = events::PasswordChanged::default();
         self.outbox.record(&transaction, tenant, actor, events::user_subject(id), &event).await?;
