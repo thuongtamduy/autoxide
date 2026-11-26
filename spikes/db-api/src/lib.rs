@@ -550,11 +550,46 @@ impl Handle for GlobalRead<'_> {
 
 // ───────────────────────────── queries ─────────────────────────────
 
+/// Which handles accept records of a scope: `Global` everywhere, `Tenant` only on tenant handles. A tenant record
+/// on a handle without tenant does not compile.
+///
+/// ```compile_fail
+/// use autoxide_spike_db::{Queries as _, TenantKey, global_db, record};
+/// record! { struct Line in "ledger_line", scope Tenant { id: uuid::Uuid => ID, tenant_id: TenantKey => TENANT_ID } }
+/// fn f(database: &autoxide_kernel::database::Database) { let _ = global_db(database).find::<Line>(); }
+/// ```
+///
+/// The tenant column cannot be written:
+///
+/// ```compile_fail
+/// use autoxide_spike_db::{TenantKey, TenantTx, record};
+/// record! { struct Line in "ledger_line", scope Tenant { id: uuid::Uuid => ID, tenant_id: TenantKey => TENANT_ID } }
+/// fn f(tx: &TenantTx) { let _ = tx.update::<Line>().set(Line::TENANT_ID, TenantKey(uuid::Uuid::nil())); }
+/// ```
+///
+/// Control: the same shapes with a tenant handle and a settable column compile.
+///
+/// ```no_run
+/// use autoxide_spike_db::{Queries as _, TenantKey, TenantRead, TenantTx, record};
+/// record! { struct Line in "ledger_line", scope Tenant { id: uuid::Uuid => ID, tenant_id: TenantKey => TENANT_ID } }
+/// fn f(read: &TenantRead<'_>, tx: &TenantTx) {
+///     let _ = read.find::<Line>();
+///     let _ = tx.update::<Line>().set(Line::ID, uuid::Uuid::nil());
+/// }
+/// ```
+pub trait AcceptedBy<H>: Scope {}
+impl<H: Handle> AcceptedBy<H> for Global {}
+impl AcceptedBy<TenantRead<'_>> for Tenant {}
+impl AcceptedBy<TenantTx> for Tenant {}
+
 /// Query entry points, on every handle.
 pub trait Queries: Handle + Sized {
     /// `SELECT` rows of `R`. On a tenant handle a tenant record is filtered by tenant; on `GlobalRead` a
     /// tenant record does not compile (see `find_global`).
-    fn find<R: Record>(&self) -> Find<'_, Self, R> {
+    fn find<R: Record>(&self) -> Find<'_, Self, R>
+    where
+        R::Scope: AcceptedBy<Self>,
+    {
         let mut statement = Query::select();
         statement.from(table::<R>());
         for column in R::COLUMNS {
@@ -568,7 +603,10 @@ pub trait Queries: Handle + Sized {
     }
 
     /// Subquery selecting `column` of `S`, filtered by tenant like `find`.
-    fn sub<S: Record, T: DbValue>(&self, column: Col<S, T>) -> Sub<S, T> {
+    fn sub<S: Record, T: DbValue>(&self, column: Col<S, T>) -> Sub<S, T>
+    where
+        S::Scope: AcceptedBy<Self>,
+    {
         let mut statement = Query::select();
         statement.from(table::<S>()).expr(column.sq());
         if let (true, Some(tenant)) = (S::Scope::TENANT, self.tenant()) {

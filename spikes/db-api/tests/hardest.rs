@@ -3,9 +3,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::too_many_lines)]
 
 use std::collections::HashMap;
-use std::time::Duration;
-
-use autoxide_kernel::config::DatabaseConfig;
+use autoxide_kernel::config::{ConfigReader, ConfigSource, DatabaseConfig};
 use autoxide_kernel::database::Database;
 use autoxide_kernel::tenancy::{MAIN_PLACEMENT, TenantContext, TenantId, TenantStatus};
 use autoxide_kernel::time::Date;
@@ -140,13 +138,9 @@ const DDL: &[&str] = &[
 ];
 
 async fn open(test: &TestDatabase) -> Database {
-    let config = DatabaseConfig {
-        url: test.url().parse().unwrap(),
-        read_url: None,
-        write_connections: 4,
-        read_connections: 4,
-        wait: Duration::from_secs(5),
-    };
+    let source = ConfigSource::from_pairs(vec![("DATABASE_URL".to_owned(), test.url().to_owned())]);
+    let mut reader = ConfigReader::new(&source);
+    let config = DatabaseConfig::read(&mut reader).unwrap();
     let database = Database::connect(&config).await.unwrap();
     for ddl in DDL {
         database.write().execute_unprepared(ddl).await.unwrap();
@@ -184,34 +178,34 @@ async fn bon_truy_van_kho_nhat_va_cach_ly_khach() {
         // ── dữ liệu mẫu: khách A và khách B có dữ liệu giống hình dạng ──
         for (ctx, key, base) in [(&a, ta, 0x1000_u128), (&b, tb, 0x2000_u128)] {
             let tx = tenant_db(ctx).begin_write().await.unwrap();
-            let acc = id(base + 1);
+            let acc = id(base + 0x1);
             for (n, side, amount, date) in [
-                (10, "debit", 500, "2026-01-05"),
-                (11, "credit", 200, "2026-01-06"),
-                (12, "debit", 1_000, "2026-02-01"),
+                (0x10, "debit", 500, "2026-01-05"),
+                (0x11, "credit", 200, "2026-01-06"),
+                (0x12, "debit", 1_000, "2026-02-01"),
             ] {
                 let line = Line { id: id(base + n), tenant_id: key, account_id: acc, side: side.into(), amount_minor: amount, effective_date: day(date) };
                 tx.insert(line).exec().await.unwrap();
             }
-            tx.insert(Period { id: id(base + 20), tenant_id: key, closed: false }).exec().await.unwrap();
-            for (n, reservation, level, q, f, r) in [(30, 31, 40, 10, 3, 2), (32, 33, 40, 4, 0, 0), (34, 35, 41, 7, 7, 0)] {
+            tx.insert(Period { id: id(base + 0x20), tenant_id: key, closed: false }).exec().await.unwrap();
+            for (n, reservation, level, q, f, r) in [(0x30, 0x31, 0x40, 10, 3, 2), (0x32, 0x33, 0x40, 4, 0, 0), (0x34, 0x35, 0x41, 7, 7, 0)] {
                 let row = ResLine { id: id(base + n), tenant_id: key, reservation_id: id(base + reservation), level_id: id(base + level), quantity: q, fulfilled_quantity: f, released_quantity: r };
                 tx.insert(row).exec().await.unwrap();
             }
-            tx.insert(Level { id: id(base + 40), tenant_id: key, code: format!("L-{base:x}"), on_hand: 5 }).exec().await.unwrap();
-            for (n, org, date, cur, amount, facts) in [(50, 1, "2026-03-01", "VND", 100, 1), (51, 1, "2026-03-01", "VND", 250, 2), (52, 2, "2026-03-02", "USD", 7, 1)] {
+            tx.insert(Level { id: id(base + 0x40), tenant_id: key, code: format!("L-{base:x}"), on_hand: 5 }).exec().await.unwrap();
+            for (n, org, date, cur, amount, facts) in [(0x50, 0x1, "2026-03-01", "VND", 100, 1), (0x51, 0x1, "2026-03-01", "VND", 250, 2), (0x52, 0x2, "2026-03-02", "USD", 7, 1)] {
                 let row = Daily { id: id(base + n), tenant_id: key, org_id: id(base + org), local_day: day(date), currency: cur.into(), amount_minor: amount, fact_count: facts };
                 tx.insert(row).exec().await.unwrap();
             }
-            for (n, product) in [(60, 70), (61, 71), (62, 72)] {
+            for (n, product) in [(0x60, 0x70), (0x61, 0x71), (0x62, 0x72)] {
                 tx.insert(Entry { id: id(base + n), tenant_id: key, product_id: id(base + product) }).exec().await.unwrap();
             }
             let colour = id(0xC0);
-            for (n, product, text) in [(80, 70, "red"), (81, 71, "blue"), (82, 72, "red")] {
+            for (n, product, text) in [(0x80, 0x70, "red"), (0x81, 0x71, "blue"), (0x82, 0x72, "red")] {
                 let row = ProductAttr { id: id(base + n), tenant_id: key, product_id: id(base + product), attribute_id: colour, value_text: Some(text.into()), value_integer: None };
                 tx.insert(row).exec().await.unwrap();
             }
-            for (n, product, text) in [(90, 70, "ao thun 100%_cotton"), (91, 71, "ao khoac"), (92, 72, "quan jean")] {
+            for (n, product, text) in [(0x90, 0x70, "ao thun 100%_cotton"), (0x91, 0x71, "ao khoac"), (0x92, 0x72, "quan jean")] {
                 let row = Translation { id: id(base + n), tenant_id: key, product_id: id(base + product), locale: "vi".into(), search_key: text.into() };
                 tx.insert(row).exec().await.unwrap();
             }
@@ -357,7 +351,7 @@ async fn bon_truy_van_kho_nhat_va_cach_ly_khach() {
 
         // ── (8) handle không có khách: bảng của khách bị từ chối; bảng control-plane chạy ──
         let global = global_db(&database);
-        assert!(global.find::<Line>().all().await.is_err());
+        // `global.find::<Line>()` không biên dịch (doc test `compile_fail` ở `AcceptedBy`).
         assert_eq!(global.find::<Plan>().count().await.unwrap(), 0);
 
         // Đếm tổng thể: mỗi khách thấy đúng phần mình.
