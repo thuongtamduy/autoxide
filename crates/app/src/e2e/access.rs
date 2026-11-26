@@ -19,67 +19,14 @@ use autoxide_testkit::{TestApp, TestDatabase};
 use axum::http::Method;
 use serde_json::{Map, Value, json};
 
-// Danh sách còn đọc tham số trang TRƯỚC khi kiểm quyền (người không quyền gửi `limit=0` nhận 422 thay vì 403),
-// đo ngày 26/11/2026. Mỗi PR đại trà của bước 70 P9 sửa endpoint của cụm mình (gọi `principal.require(…)` trước
-// khi dựng `PageRequest`) và xoá dòng; danh sách không được dài thêm (D-20261126-list-pages-cluster-2).
-const PAGE_BEFORE_PERMISSION: &[&str] = &[
-    "GET /api/v1/auth/all-api-keys",
-    "GET /api/v1/auth/guardrails",
-    "GET /api/v1/auth/users/{id}/passkeys",
-    "GET /api/v1/bookings/bookings",
-    "GET /api/v1/bookings/resources",
-    "GET /api/v1/bookings/services",
-    "GET /api/v1/catalog/collections",
-    "GET /api/v1/comments",
-    "GET /api/v1/comments/bans",
-    "GET /api/v1/comments/targets",
-    "GET /api/v1/comments/{id}/reports",
-    "GET /api/v1/compliance/documents/{id}/acceptances",
-    "GET /api/v1/compliance/kyc/profiles",
-    "GET /api/v1/content/authors",
-    "GET /api/v1/content/banners",
-    "GET /api/v1/content/entries/{id}/ai/thread",
-    "GET /api/v1/content/entries/{id}/revisions",
-    "GET /api/v1/content/entries/{id}/translation-requests",
-    "GET /api/v1/content/page-templates",
-    "GET /api/v1/content/redirects",
-    "GET /api/v1/content/schedules",
-    "GET /api/v1/content/shared-sections",
-    "GET /api/v1/content/terms",
-    "GET /api/v1/content/theme-variants",
-    "GET /api/v1/content/types",
-    "GET /api/v1/files",
-    "GET /api/v1/forms",
-    "GET /api/v1/forms/{id}/submissions",
-    "GET /api/v1/invoices/documents",
-    "GET /api/v1/invoices/mandates",
-    "GET /api/v1/invoices/series",
-    "GET /api/v1/ledger/accounts",
-    "GET /api/v1/ledger/accounts/{id}/lines",
-    "GET /api/v1/ledger/bank-accounts",
-    "GET /api/v1/ledger/books",
-    "GET /api/v1/ledger/entries",
-    "GET /api/v1/ledger/exceptions",
-    "GET /api/v1/ledger/exchange-rates",
-    "GET /api/v1/ledger/holds",
-    "GET /api/v1/ledger/payments",
-    "GET /api/v1/ledger/payouts",
-    "GET /api/v1/ledger/periods",
-    "GET /api/v1/ledger/reconciliations",
-    "GET /api/v1/menus",
-    "GET /api/v1/newsletter/campaigns",
-    "GET /api/v1/newsletter/lists",
-    "GET /api/v1/newsletter/subscribers",
-    "GET /api/v1/newsletter/suppressions",
-    "GET /api/v1/orders",
-    "GET /api/v1/orders/carts",
-    "GET /api/v1/orders/returns",
-    "GET /api/v1/orders/reviews",
-];
+// Danh sách còn đọc tham số trang TRƯỚC khi kiểm quyền (người không quyền gửi `limit=0` nhận 422 thay vì 403). Rỗng từ
+// khi lớp kiểm permission chung của kernel chạy trước mọi extractor (D-20261126-permission-gate); không được thêm dòng
+// (D-20261126-list-pages-cluster-2).
+const PAGE_BEFORE_PERMISSION: &[&str] = &[];
 
 const SAMPLE_ID: &str = "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11";
 
-fn resolve<'a>(document: &'a Value, value: &'a Value) -> &'a Value {
+pub(super) fn resolve<'a>(document: &'a Value, value: &'a Value) -> &'a Value {
     match value.get("$ref").and_then(Value::as_str) {
         Some(reference) => document.pointer(reference.trim_start_matches('#')).unwrap_or(value),
         None => value,
@@ -87,7 +34,7 @@ fn resolve<'a>(document: &'a Value, value: &'a Value) -> &'a Value {
 }
 
 /// Giá trị tối thiểu hợp lệ theo schema (chỉ trường bắt buộc).
-fn sample(document: &Value, schema: &Value, depth: usize) -> Value {
+pub(super) fn sample(document: &Value, schema: &Value, depth: usize) -> Value {
     let schema = resolve(document, schema);
     if depth > 8 {
         return Value::Null;
@@ -189,14 +136,15 @@ fn as_text(value: &Value) -> String {
 }
 
 /// Một request mẫu cho operation.
-struct Probe {
-    method: Method,
-    uri: String,
-    headers: Vec<(String, String)>,
-    body: Option<(String, Vec<u8>)>,
+#[derive(Clone)]
+pub(super) struct Probe {
+    pub(super) method: Method,
+    pub(super) uri: String,
+    pub(super) headers: Vec<(String, String)>,
+    pub(super) body: Option<(String, Vec<u8>)>,
 }
 
-fn probe(document: &Value, method: &str, path: &str, operation: &Value) -> Probe {
+pub(super) fn probe(document: &Value, method: &str, path: &str, operation: &Value) -> Probe {
     let mut uri = path.to_owned();
     let mut query = Vec::new();
     let mut headers = Vec::new();
@@ -256,7 +204,7 @@ fn probe(document: &Value, method: &str, path: &str, operation: &Value) -> Probe
     }
 }
 
-async fn send(app: &TestApp, probe: &Probe, token: Option<&str>) -> (u16, Value) {
+pub(super) async fn send(app: &TestApp, probe: &Probe, token: Option<&str>) -> (u16, Value) {
     let mut request = app.request(probe.method.clone(), &probe.uri).unchecked();
     if let Some(token) = token {
         request = request.token(token);

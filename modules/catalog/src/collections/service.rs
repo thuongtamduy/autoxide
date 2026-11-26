@@ -213,8 +213,9 @@ impl CatalogService {
         patch: CollectionPatch,
         expected: Option<Timestamp>,
     ) -> Result<CollectionDetail, Error> {
-        let found = self.get_collection(tenant, principal, id).await?.collection;
+        // Kiểm permission trước khi tra bản ghi: người không quyền không biết bộ sưu tập nào tồn tại.
         principal.require(&COLLECTIONS_MANAGE)?;
+        let found = self.get_collection(tenant, principal, id).await?.collection;
         let mut problems = Vec::new();
         let texts = self.check_texts(tenant, &patch.texts, id, false, &mut problems).await?;
         fail_if_any(problems)?;
@@ -308,8 +309,9 @@ impl CatalogService {
         product_ids: Vec<Uuid>,
         expected: Option<Timestamp>,
     ) -> Result<CollectionDetail, Error> {
-        let found = self.get_collection(tenant, principal, id).await?.collection;
+        // Kiểm permission trước khi tra bản ghi: người không quyền không biết bộ sưu tập nào tồn tại.
         principal.require(&COLLECTIONS_MANAGE)?;
+        let found = self.get_collection(tenant, principal, id).await?.collection;
         let mut problems = Vec::new();
         if found.kind != "manual" {
             problems.push(FieldError::new(

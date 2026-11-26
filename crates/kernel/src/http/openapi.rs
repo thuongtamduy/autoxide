@@ -266,7 +266,9 @@ fn problem_media_type(response: &mut utoipa::openapi::Response) {
 ///
 /// - `x-public: true` - callable without signing in;
 /// - `x-permissions: [..]` - requires sign-in and one of the permissions (an empty list: only sign-in is
-///   required).
+///   required); the HTTP layer refuses a caller with none of them before the handler runs
+///   (D-20261126-permission-gate). With `x-buyers: true` as well, a buyer account (which has no permissions)
+///   may also call the operation; staff still need one of the permissions.
 ///
 /// Each declared permission must be mentioned in the operation's description or 403 response, so the
 /// human-readable text does not drift from the declaration.

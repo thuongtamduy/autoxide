@@ -322,7 +322,7 @@ pub(crate) struct BannersQuery {
 #[utoipa::path(
     get,
     path = "/banners",
-    extensions(("x-permissions" = json!(["content.banners"]))),
+    extensions(("x-permissions" = json!(["content.banners", "content.read"]))),
     operation_id = "list_content_banners",
     security(("bearer" = [])),
     params(BannersQuery, PageQuery),

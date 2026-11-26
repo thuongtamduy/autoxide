@@ -79,7 +79,7 @@ pub(crate) struct TeamDetail {
 #[utoipa::path(
     get,
     path = "/teams",
-    extensions(("x-permissions" = json!(["support.tickets.reply"]))),
+    extensions(("x-permissions" = json!(["support.tickets.reply", "support.settings.manage"]))),
     operation_id = "list_support_teams",
     security(("bearer" = [])),
     params(PageQuery),
@@ -150,7 +150,7 @@ pub(crate) async fn create_team(
 #[utoipa::path(
     get,
     path = "/teams/{id}",
-    extensions(("x-permissions" = json!(["support.tickets.reply"]))),
+    extensions(("x-permissions" = json!(["support.tickets.reply", "support.settings.manage"]))),
     operation_id = "get_support_team",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the team.")),
@@ -224,7 +224,7 @@ pub(crate) struct MemberRequest {
 #[utoipa::path(
     put,
     path = "/teams/{id}/members/{user_id}",
-    extensions(("x-permissions" = json!(["support.settings.manage"]))),
+    extensions(("x-permissions" = json!(["support.settings.manage", "support.tickets.reply"]))),
     operation_id = "set_support_team_member",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the team."), ("user_id" = Uuid, Path, description = "The member.")),
@@ -232,7 +232,7 @@ pub(crate) struct MemberRequest {
     responses(
         (status = 200, description = "The member.", body = Data<MemberResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "Missing permission `support.settings.manage` (`permission_denied`), or it does not cover the team (`org_out_of_scope`).", body = Problem),
+        (status = 403, description = "Missing permission `support.settings.manage` (`permission_denied`; a member with `support.tickets.reply` may only switch their own `accepting`), or it does not cover the team (`org_out_of_scope`).", body = Problem),
         (status = 404, description = "No team with this id in your scope; code `support.team_not_found`.", body = Problem),
         (status = 422, description = "The user cannot answer tickets of this unit; code `support.assignee_out_of_scope`.", body = Problem),
     )

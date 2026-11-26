@@ -57,6 +57,7 @@ mod mcp;
 mod metrics;
 mod openapi;
 mod openapi_modules;
+mod permission_gate;
 mod problem;
 mod rate_limit;
 mod rate_limit_store;
@@ -204,6 +205,9 @@ pub struct Extras {
     /// Syncable record kinds of the modules (`Modules::sync_resources`, step 69 P2): when present the
     /// kernel serves `/api/v1/kernel/sync/...` (a write batch runs commands through these modules' routes).
     pub sync: Vec<(&'static str, crate::sync::SyncResource)>,
+    /// Test audits only: build without the permission layer (see [`Extras::without_permission_gate`]).
+    #[doc(hidden)]
+    pub without_permission_gate: bool,
 }
 
 impl Extras {
@@ -290,6 +294,15 @@ impl Extras {
         self.translations = translations;
         self
     }
+
+    /// Builds the routes WITHOUT the layer that enforces `x-permissions` (D-20261126-permission-gate), so a test can
+    /// see what the services themselves accept and check the documented lists against it. Never use it in a
+    /// running application.
+    #[doc(hidden)]
+    pub fn without_permission_gate(mut self) -> Self {
+        self.without_permission_gate = true;
+        self
+    }
 }
 
 pub fn build(
@@ -372,19 +385,30 @@ pub fn build(
                 entitlement::gate(handle.clone(), name, always, request, next)
             }));
         }
-        // Giới hạn request theo khách (tầng thứ ba, D-20261126-tenant-rate-limit), mọi module. Đặt NGOÀI lớp gói
-        // (thêm sau = chạy trước): request bị 429 không được đếm vào hạn mức `kernel.api_requests`.
-        if let Some(limiter) = tenant_limiter.clone() {
-            routes = routes.layer(middleware::from_fn(move |request: Request, next: Next| {
-                tenant_rate_limit::limit(limiter.clone(), request, next)
-            }));
-        }
         // Lệnh cần duyệt khi agent gọi (bước 51 P12): `x-approval: "agent"` của module.
         let approvals = crate::ops::approvals::rules(name, routes.get_openapi_mut());
         if !approvals.is_empty() {
             let approvals = Arc::new(approvals);
             routes = routes.layer(middleware::from_fn(move |request: Request, next: Next| {
                 crate::ops::approvals::gate(approvals.clone(), request, next)
+            }));
+        }
+        // Kiểm permission trước gói, duyệt của agent và mọi extractor của handler (PT-14, D-20261126-permission-gate).
+        let permissions = permission_gate::rules(name, routes.get_openapi());
+        if !permissions.is_empty() && !extras.without_permission_gate {
+            let permissions = Arc::new(permissions);
+            routes = routes.layer(middleware::from_fn(move |request: Request, next: Next| {
+                permission_gate::gate(permissions.clone(), request, next)
+            }));
+        }
+        // Giới hạn request theo khách (tầng thứ ba, D-20261126-tenant-rate-limit), mọi module, đúng MỘT lớp và ở ngoài
+        // cùng (thêm sau cùng = chạy trước). Thứ tự: giới hạn → permission → duyệt của agent → gói → handler.
+        // Request bị 429 không được lớp gói đếm vào hạn mức `kernel.api_requests` (D-20261126-api-quota-signed-in);
+        // request bị lớp permission hay gói từ chối vẫn trừ ngân sách của khách — dò hàng loạt bằng request bị 403
+        // cũng bị chặn (D-20261126-permission-gate).
+        if let Some(limiter) = tenant_limiter.clone() {
+            routes = routes.layer(middleware::from_fn(move |request: Request, next: Next| {
+                tenant_rate_limit::limit(limiter.clone(), request, next)
             }));
         }
         if sync_state.resources.iter().any(|(module, _)| *module == name) {
