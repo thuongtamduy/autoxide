@@ -11,7 +11,7 @@ use axum::http::StatusCode;
 
 use super::tests::{claims, fake_server, oidc_body, provider, sign_in, token};
 use crate::http::test_support::PASSWORD;
-use crate::registration_tests::StaffRegistration;
+use crate::registration_tests::OrgValues;
 use crate::user::NewUser;
 
 #[tokio::test]
@@ -19,7 +19,7 @@ async fn dang_nhap_lan_dau_theo_cai_dat_tu_dang_ky_cua_khach() {
     TestDatabase::run(async |test| {
         let fake = fake_server().await;
         let services = crate::testing::services(test).await;
-        let orgs = Arc::new(StaffRegistration::default());
+        let orgs = Arc::new(OrgValues::default());
         let provided: Arc<dyn OrgDirectory> = orgs.clone();
         let mailer: Arc<dyn Mailer> = services.mails.clone();
         let app = TestApp::builder(test)
@@ -53,7 +53,7 @@ async fn dang_nhap_lan_dau_theo_cai_dat_tu_dang_ky_cua_khach() {
             (StatusCode::FORBIDDEN, Some("auth.oidc_signup_closed"))
         );
         // Khách tự mở: tài khoản mới được tạo.
-        orgs.set(services.tenant.id(), true);
+        orgs.set(services.tenant.id(), "auth.staff_registration", serde_json::json!(true));
         let (status, body) = sign_in(&app, &fake, "open", grace()).await;
         assert_eq!(status, StatusCode::OK, "{body}");
     })

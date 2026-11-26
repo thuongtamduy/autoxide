@@ -163,7 +163,7 @@ impl UserService {
         problems.extend(check_email_field("email", &email));
         problems.extend(check_name(&name));
         if let Some(password) = &input.password {
-            problems.extend(password::check_rules("password", password));
+            problems.extend(self.password_problem(tenant, "password", password).await?);
         }
         if !problems.is_empty() {
             return Err(Error::validation(problems));

@@ -34,6 +34,8 @@ mod http;
 mod invitation;
 mod links;
 mod login_link;
+#[cfg(test)]
+mod login_policy_tests;
 mod mfa;
 mod migration;
 mod oidc;
@@ -47,6 +49,7 @@ mod permissions;
 mod phone;
 #[cfg(test)]
 mod phone_tests;
+mod policy;
 mod privacy;
 mod reauth;
 mod recovery;
@@ -232,7 +235,14 @@ impl Module for AuthModule {
         let outbox = context.outbox()?;
         self.cleanup = Some(Arc::new(cleanup::Cleanup));
         self.administrator = Some(Arc::new(doctor::Administrator { databases: databases.clone() }));
-        let users = Arc::new(UserService::new(Passwords::new(), outbox.clone()));
+        // Chính sách đăng nhập theo khách (D-20261126-tenant-login-policy): đọc cài đặt ở nút gốc qua `organizations`.
+        let policy = policy::TenantPolicy::new(
+            context.require::<dyn autoxide_organizations::api::OrgDirectory>().ok(),
+        );
+        let users = Arc::new(UserService::new(
+            Passwords::new().with_policy(policy.clone()),
+            outbox.clone(),
+        ));
         let secret = match config.token_secret {
             Some(secret) => secret,
             None => {
@@ -250,21 +260,27 @@ impl Module for AuthModule {
         let mailer = context.require::<dyn Mailer>()?;
         let secrets = context.require::<autoxide_kernel::secret::SecretKey>()?;
 
-        let mfa = Arc::new(MfaService::new(
-            secrets.as_ref().clone(),
-            config.totp_issuer.clone(),
-            LoginThrottle::new(config.login_max_failures, config.login_lock)?,
-            outbox.clone(),
-        ));
-        let sessions = Arc::new(SessionService::new(
-            users.clone(),
-            access_tokens,
-            config.refresh_token_ttl,
-            throttle,
-            mfa.clone(),
-            outbox.clone(),
-            databases.clone(),
-        )?);
+        let mfa = Arc::new(
+            MfaService::new(
+                secrets.as_ref().clone(),
+                config.totp_issuer.clone(),
+                LoginThrottle::new(config.login_max_failures, config.login_lock)?,
+                outbox.clone(),
+            )
+            .with_policy(policy.clone()),
+        );
+        let sessions = Arc::new(
+            SessionService::new(
+                users.clone(),
+                access_tokens,
+                config.refresh_token_ttl,
+                throttle,
+                mfa.clone(),
+                outbox.clone(),
+                databases.clone(),
+            )?
+            .with_policy(policy),
+        );
         let passkeys = Arc::new(passkey::PasskeyService::new(
             users.clone(),
             sessions.clone(),

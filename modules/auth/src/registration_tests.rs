@@ -14,19 +14,18 @@ use serde_json::{Value, json};
 
 use crate::http::test_support::{PASSWORD, app_built, call_with};
 
-/// `OrgDirectory` giả: cài đặt `auth.staff_registration` ở nút gốc theo từng khách; khách không có trong bảng thì
-/// chưa đặt.
+/// `OrgDirectory` giả: cài đặt ở nút gốc theo từng khách; cặp (khách, khoá) không có trong bảng thì chưa đặt.
 #[derive(Default)]
-pub(crate) struct StaffRegistration(pub(crate) Mutex<HashMap<TenantId, bool>>);
+pub(crate) struct OrgValues(Mutex<HashMap<(TenantId, String), Value>>);
 
-impl StaffRegistration {
-    pub(crate) fn set(&self, tenant: TenantId, open: bool) {
-        self.0.lock().unwrap().insert(tenant, open);
+impl OrgValues {
+    pub(crate) fn set(&self, tenant: TenantId, key: &str, value: Value) {
+        self.0.lock().unwrap().insert((tenant, key.to_owned()), value);
     }
 }
 
 #[async_trait::async_trait]
-impl OrgDirectory for StaffRegistration {
+impl OrgDirectory for OrgValues {
     async fn unit(&self, _: &TenantContext, _: OrgId) -> Result<Option<Unit>, Error> {
         Ok(None)
     }
@@ -45,8 +44,7 @@ impl OrgDirectory for StaffRegistration {
         id: OrgId,
         key: &str,
     ) -> Result<Option<EffectiveSetting>, Error> {
-        let open = self.0.lock().unwrap().get(&tenant.id()).copied();
-        let value = open.filter(|_| key == "auth.staff_registration").map(Value::from);
+        let value = self.0.lock().unwrap().get(&(tenant.id(), key.to_owned())).cloned();
         Ok(Some(EffectiveSetting::new(key, value, Some(id), false)))
     }
 }
@@ -66,13 +64,13 @@ async fn register(
 #[tokio::test]
 async fn khach_tu_mo_dang_ky_khong_mo_khach_khac() {
     TestDatabase::run(async |test| {
-        let orgs = std::sync::Arc::new(StaffRegistration::default());
+        let orgs = std::sync::Arc::new(OrgValues::default());
         let provided: std::sync::Arc<dyn OrgDirectory> = orgs.clone();
         let (app, _) = app_built(test, false, |builder| {
             builder.tenant("a").tenant("b").provide::<dyn OrgDirectory>(provided)
         })
         .await;
-        orgs.set(app.tenant("a").await.unwrap().id(), true);
+        orgs.set(app.tenant("a").await.unwrap().id(), "auth.staff_registration", json!(true));
         let (status, body) = register(&app, "a", "bob@example.com").await;
         assert_eq!(status, StatusCode::CREATED, "{body}");
         let (status, body) = register(&app, "b", "bob@example.com").await;
@@ -89,13 +87,13 @@ async fn khach_tu_mo_dang_ky_khong_mo_khach_khac() {
 #[tokio::test]
 async fn khach_tu_dong_dang_ky_khi_may_chu_mo() {
     TestDatabase::run(async |test| {
-        let orgs = std::sync::Arc::new(StaffRegistration::default());
+        let orgs = std::sync::Arc::new(OrgValues::default());
         let provided: std::sync::Arc<dyn OrgDirectory> = orgs.clone();
         let (app, _) = app_built(test, true, |builder| {
             builder.tenant("a").tenant("b").provide::<dyn OrgDirectory>(provided)
         })
         .await;
-        orgs.set(app.tenant("a").await.unwrap().id(), false);
+        orgs.set(app.tenant("a").await.unwrap().id(), "auth.staff_registration", json!(false));
         let (status, body) = register(&app, "a", "bob@example.com").await;
         assert_eq!(body["code"], "auth.registration_disabled", "{status}");
         let (status, body) = register(&app, "b", "bob@example.com").await;

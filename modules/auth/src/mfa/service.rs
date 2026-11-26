@@ -59,6 +59,8 @@ pub(crate) struct MfaService {
     // cầm access token bị lộ không đoán mã vô hạn được.
     throttle: LoginThrottle,
     outbox: Outbox,
+    /// Tên trong app xác thực theo khách (`auth.totp_issuer`).
+    policy: crate::policy::TenantPolicy,
 }
 
 impl MfaService {
@@ -68,7 +70,13 @@ impl MfaService {
         throttle: LoginThrottle,
         outbox: Outbox,
     ) -> Self {
-        MfaService { secrets, issuer, throttle, outbox }
+        MfaService { secrets, issuer, throttle, outbox, policy: Default::default() }
+    }
+
+    /// Đọc tên trong app xác thực theo khách.
+    pub(crate) fn with_policy(mut self, policy: crate::policy::TenantPolicy) -> Self {
+        self.policy = policy;
+        self
     }
 
     /// Kiểm mã cho một thao tác của chính người dùng, có giới hạn số lần sai: xin lượt
@@ -150,7 +158,8 @@ impl MfaService {
         let mut bytes = vec![0u8; SECRET_BYTES];
         getrandom::fill(&mut bytes)
             .map_err(|error| Error::internal(format!("random number generator: {error}")))?;
-        let totp = self.totp(bytes, email)?;
+        let issuer = self.policy.totp_issuer(tenant, &self.issuer).await?;
+        let totp = self.totp(bytes, email, issuer)?;
         let secret = totp.secret().to_base32();
         let otpauth_url = totp
             .to_url()
@@ -390,12 +399,13 @@ impl MfaService {
         let secret = Secret::try_from_base32(base32).map_err(|error| {
             Error::internal(format!("totp: stored secret is invalid: {error:?}"))
         })?;
-        let totp = self.totp(secret.as_bytes().to_vec(), "")?;
+        // Tên trong app không ảnh hưởng mã: dùng tên của máy chủ khi chỉ kiểm mã.
+        let totp = self.totp(secret.as_bytes().to_vec(), "", self.issuer.clone())?;
         // `check` trả về số thứ tự của bước khớp.
         Ok(totp.check(&code, now).map(|step| i64::try_from(step).unwrap_or(i64::MAX)))
     }
 
-    fn totp(&self, secret: Vec<u8>, email: &str) -> Result<Totp, Error> {
+    fn totp(&self, secret: Vec<u8>, email: &str, issuer: String) -> Result<Totp, Error> {
         // Dấu `:` ngăn cách tên hệ thống và tài khoản trong URL: không được có trong email.
         let account = email.replace(':', "_");
         Builder::new()
@@ -405,7 +415,7 @@ impl MfaService {
             .with_skew(SKEW)
             .with_secret(secret)
             .with_account_name(account)
-            .with_issuer(Some(self.issuer.clone()))
+            .with_issuer(Some(issuer))
             .build()
             .map_err(|error| Error::internal(format!("totp: {error:?}")))
     }
