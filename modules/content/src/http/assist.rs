@@ -497,7 +497,8 @@ pub(crate) async fn search(
 /// No sign-in needed; off unless the server sets `AUTOXIDE_CONTENT_PUBLIC_SEMANTIC_SEARCH=true`
 /// (then `404` with code `content.semantic_search_disabled`). Like `GET /search`, but only
 /// published entries, each with its `path`. Searches by meaning have a budget per minute
-/// (`AUTOXIDE_CONTENT_PUBLIC_SEARCH_PER_MINUTE`); past it, results match words only.
+/// (`AUTOXIDE_CONTENT_PUBLIC_SEARCH_PER_MINUTE`); past it, results match words only. Searches
+/// are also limited per client address and per server, and stopped after 3 seconds.
 #[utoipa::path(
     get,
     path = "/public/search",
@@ -509,6 +510,8 @@ pub(crate) async fn search(
         (status = 200, description = "The best results shown on the website, best first.", body = Page<SearchHit>),
         (status = 404, description = "Public search is off on this server (`content.semantic_search_disabled`), or no such website (`site_not_found`).", body = Problem),
         (status = 422, description = "A parameter is invalid; see `errors`.", body = Problem),
+        (status = 429, description = "Too many searches from your network this minute (`content.public_search_rate_limited`, `AUTOXIDE_CONTENT_PUBLIC_SEARCH_PER_ADDRESS_PER_MINUTE`), or too many searches running on the server (`content.public_search_busy`, `AUTOXIDE_CONTENT_PUBLIC_SEARCH_CONCURRENCY`); wait `Retry-After` seconds.", body = Problem),
+        (status = 503, description = "The search took longer than 3 seconds and was stopped (`content.public_search_timeout`); try a more specific query.", body = Problem),
     )
 )]
 pub(crate) async fn public_search(
@@ -516,9 +519,12 @@ pub(crate) async fn public_search(
     tenant: TenantContext,
     site: autoxide_kernel::tenancy::Site,
     principal: Option<Principal>,
+    client: autoxide_kernel::http::ClientInfo,
     Query(params): Query<SearchParams>,
 ) -> Result<Page<SearchHit>, Error> {
     let limit = params.limit;
-    let hits = service.search(&tenant, principal.as_ref(), &params.query()?, Some(&site)).await?;
+    let hits = service
+        .search_public(&tenant, principal.as_ref(), &params.query()?, &site, client.ip)
+        .await?;
     Ok(page_of(hits, limit))
 }
