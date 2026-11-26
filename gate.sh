@@ -98,8 +98,9 @@
 #                        D-20261120-build-faster), còn lại để nguyên `opt-level = 1` của Cargo.toml
 #                        (máy dev chạy test nhiều lần). Rỗng: không đổi.
 #   GATE_LOCAL           `on` (mặc định) | `off` — công tắc của gate nhanh (D-20261125-local-gate-switch). `off` cùng `--quick`:
-#                        chỉ chạy các kiểm rẻ (fmt, xtask check, SDK, api-diff, cargo deny, gitleaks) rồi báo xanh;
-#                        KHÔNG clippy, không kiểm file sinh, không test — CI trên pull request kiểm phần đó. Không
+#                        chạy fmt, xtask check, SDK, clippy (như gate nhanh: bỏ khi thay đổi không chạm Rust), api-diff,
+#                        cargo deny, gitleaks rồi báo xanh; KHÔNG kiểm file sinh, không test — CI trên pull request kiểm
+#                        phần đó. Clippy giữ lại (D-20261126-light-gate-clippy): vài phút, bắt lỗi biên dịch và lint. Không
 #                        ảnh hưởng gate đầy đủ, `--pr` hay `--only`. Giá trị khác `on`/`off` là lỗi.
 #   GATE_TARGET_MAX_GB   trần dung lượng của target/ (mặc định 40): vượt thì gate dọn trước khi build
 #                        (cache incremental trước, vẫn vượt thì `cargo clean`). 0: không dọn.
@@ -343,9 +344,7 @@ if runs lint; then
 
 # --- Phần còn lại của lint: lâu hơn (biên dịch) hoặc cần mạng ---------------------------------------------
 
-if [ "$LIGHT" = 1 ]; then
-  step "lint (cargo clippy): skipped, GATE_LOCAL=off (CI on the pull request runs it)"
-elif [ "$RUST_CHANGED" = true ]; then
+if [ "$RUST_CHANGED" = true ]; then
   step "lint (cargo clippy)"
   cargo clippy --workspace --all-targets --locked -- -D warnings
 else
@@ -467,8 +466,8 @@ run_archive() {
 
 if [ "$LIGHT" = 1 ]; then
   tree_unchanged
-  printf '\n\033[32mgate --quick (GATE_LOCAL=off): green — fmt, boundaries, SDK, api contract, dependencies, secrets\033[0m\n'
-  printf 'NOT checked on this machine: clippy, generated files, every test. CI on the pull request is the check: do not merge before it is green.\n'
+  printf '\n\033[32mgate --quick (GATE_LOCAL=off): green — fmt, %s, boundaries, SDK, api contract, dependencies, secrets\033[0m\n' "$CLIPPY"
+  printf 'NOT checked on this machine: generated files, every test. CI on the pull request is the check: do not merge before it is green.\n'
   exit 0
 fi
 if [ "$QUICK" = 1 ]; then
