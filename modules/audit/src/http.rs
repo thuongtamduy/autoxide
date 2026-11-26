@@ -687,6 +687,39 @@ mod tests {
             let (wrong, _) =
                 get(&app, "/api/v1/kernel/devtools/events?object=nothing", "dev").await;
             assert_eq!(wrong, StatusCode::UNPROCESSABLE_ENTITY);
+
+            // Phân trang keyset trong audit (D-20261125-list-pages): theo `next_cursor` tới hết không trùng
+            // không sót, mới nhất trước; `order=asc` ngược lại; đối tượng sai và `limit` sai báo chung một lỗi.
+            for _ in 0..4 {
+                recorder.handle(&event(app.database(), "auth.user_updated", ada, "auth.user:1")).await.unwrap();
+            }
+            let (_, all) =
+                get(&app, "/api/v1/kernel/devtools/events?object=auth.user:1&limit=200", "dev").await;
+            let every: Vec<Value> =
+                all["data"].as_array().unwrap().iter().map(|line| line["id"].clone()).collect();
+            assert_eq!(every.len(), 5);
+            for (order, expected) in [("desc", every.clone()), ("asc", every.iter().rev().cloned().collect())] {
+                let mut seen = Vec::new();
+                let mut uri = format!("/api/v1/kernel/devtools/events?object=auth.user:1&limit=2&order={order}");
+                loop {
+                    let (status, body) = get(&app, &uri, "dev").await;
+                    assert_eq!(status, StatusCode::OK, "{body}");
+                    seen.extend(body["data"].as_array().unwrap().iter().map(|line| line["id"].clone()));
+                    match body["pagination"]["next_cursor"].as_str() {
+                        Some(cursor) => {
+                            uri = format!(
+                                "/api/v1/kernel/devtools/events?object=auth.user:1&limit=2&order={order}&cursor={cursor}"
+                            );
+                        }
+                        None => break,
+                    }
+                }
+                assert_eq!(seen, expected, "{order}");
+            }
+            let (status, both) =
+                get(&app, "/api/v1/kernel/devtools/events?object=nothing&limit=0", "dev").await;
+            assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+            assert_eq!(both["errors"].as_array().unwrap().len(), 2, "{both}");
         })
         .await
         .unwrap();

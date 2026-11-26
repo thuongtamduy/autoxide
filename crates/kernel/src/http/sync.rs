@@ -15,7 +15,7 @@ use std::sync::{Arc, OnceLock};
 
 use axum::Router;
 use axum::body::Body;
-use axum::extract::{Request, State};
+use axum::extract::{Query, Request, State};
 use axum::http::request::Parts;
 use axum::http::{HeaderValue, Method, header};
 use serde::{Deserialize, Serialize};
@@ -86,22 +86,27 @@ pub(crate) struct SyncResourceView {
 ///
 /// Each kind of record has a change feed (`changes`): load the list endpoint once, then ask the
 /// feed for what changed, keeping the `cursor` of the last change. Queue your writes on the device
-/// and send them with `POST /api/v1/kernel/sync/batch`. Needs only to be signed in.
+/// and send them with `POST /api/v1/kernel/sync/batch`. Needs only to be signed in. By name
+/// (`order=desc` reverses it); paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/sync/resources",
     extensions(("x-permissions" = json!([]))),
     operation_id = "list_sync_resources",
     security(("bearer" = [])),
+    params(crate::pagination::NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "The kinds of records that can be kept in sync.", body = Data<Vec<SyncResourceView>>),
+        (status = 200, description = "One page of the kinds of records that can be kept in sync, by name.", body = crate::pagination::Page<SyncResourceView>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn sync_resources(
     State(state): State<Arc<SyncState>>,
     _principal: Principal,
-) -> Data<Vec<SyncResourceView>> {
+    Query(page): Query<crate::pagination::NaturalOrderPageQuery>,
+) -> Result<crate::pagination::Page<SyncResourceView>, Error> {
+    let page = crate::pagination::PageRequest::try_from(page)?;
     let views = state
         .resources
         .iter()
@@ -116,7 +121,9 @@ async fn sync_resources(
             }
         })
         .collect();
-    Data { data: views }
+    // Loại bản ghi đồng bộ được do module khai trong code (cố định theo bản build): phân trang trong bộ nhớ
+    // theo tên (D-20261125-list-pages mục 4).
+    crate::pagination::page_of(views, |view| view.name.clone(), &page)
 }
 
 /// Writes queued on a device while it was offline.

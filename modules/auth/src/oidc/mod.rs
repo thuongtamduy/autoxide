@@ -130,11 +130,10 @@ impl OidcService {
     pub(crate) async fn public_providers(
         &self,
         tenant: &TenantContext,
-    ) -> Result<Vec<Provider>, Error> {
+        page: &autoxide_kernel::pagination::PageRequest,
+    ) -> Result<autoxide_kernel::pagination::Page<Provider>, Error> {
         self.require_enabled()?;
-        let mut providers = self.providers.list(tenant).await?;
-        providers.retain(|provider| provider.enabled);
-        Ok(providers)
+        self.providers.page(tenant, true, page).await
     }
 
     /// Mở lượt đăng nhập (hay liên kết, khi `link_user_id`) với nhà cung cấp `slug`. `bind_browser`:
@@ -257,27 +256,25 @@ impl OidcService {
         })
     }
 
-    /// Liên kết của người dùng `user_id`, kèm tên nhà cung cấp.
+    /// Một trang liên kết của người dùng `user_id` (mới nhất trước trừ `order=asc`; keyset trên index
+    /// (tenant_id, user_id, id)), kèm tên nhà cung cấp.
     pub(crate) async fn identities(
         &self,
         tenant: &TenantContext,
         user_id: Uuid,
-    ) -> Result<Vec<LinkedIdentity>, Error> {
+        page: &autoxide_kernel::pagination::PageRequest,
+    ) -> Result<autoxide_kernel::pagination::Page<LinkedIdentity>, Error> {
         let providers = self.providers.list(tenant).await?;
-        let found = identity::for_user(tenant, user_id).await?;
-        Ok(found
-            .into_iter()
-            .map(|identity| {
-                let provider =
-                    providers.iter().find(|provider| provider.id == identity.provider_id);
-                LinkedIdentity {
-                    provider_slug: provider.map(|p| p.slug.clone()).unwrap_or_default(),
-                    provider_name: provider.map(|p| p.name.clone()).unwrap_or_default(),
-                    provider_kind: provider.map(|p| p.kind.clone()).unwrap_or_default(),
-                    identity,
-                }
-            })
-            .collect())
+        let found = identity::page_for_user(tenant, user_id, page).await?;
+        Ok(found.map(|identity| {
+            let provider = providers.iter().find(|provider| provider.id == identity.provider_id);
+            LinkedIdentity {
+                provider_slug: provider.map(|p| p.slug.clone()).unwrap_or_default(),
+                provider_name: provider.map(|p| p.name.clone()).unwrap_or_default(),
+                provider_kind: provider.map(|p| p.kind.clone()).unwrap_or_default(),
+                identity,
+            }
+        }))
     }
 
     /// Gỡ liên kết `id` của người dùng `user_id`. Không gỡ cách đăng nhập cuối cùng (không mật

@@ -20,7 +20,7 @@
 
 use std::sync::{Arc, OnceLock};
 
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use utoipa_axum::router::OpenApiRouter;
@@ -31,7 +31,7 @@ use crate::access::{Permission, Principal};
 use crate::database::Database;
 use crate::error::Error;
 use crate::i18n::Language;
-use crate::mcp::{NoInput, Tool};
+use crate::mcp::Tool;
 use crate::migration::{Migrator, ModuleMigrations};
 use crate::module::Module;
 use crate::response::{Data, Problem};
@@ -678,8 +678,8 @@ pub(crate) fn routes(state: CatalogState) -> OpenApiRouter {
 
 /// List the installed modules.
 ///
-/// Requires `kernel.modules.read`. Every module the server runs, in start order, with what
-/// each declares. Modules are compiled into the server: installing or removing one means
+/// Requires `kernel.modules.read`. Every module the server runs, in start order (`order=desc`
+/// reverses it; paged with `limit` / `cursor`), with what each declares. Modules are compiled into the server: installing or removing one means
 /// rebuilding it, so this list does not change while the server runs. Migration `applied`
 /// is `null` here; get one module to read it.
 #[utoipa::path(
@@ -688,21 +688,53 @@ pub(crate) fn routes(state: CatalogState) -> OpenApiRouter {
     extensions(("x-permissions" = json!(["kernel.modules.read"]))),
     operation_id = "list_modules",
     security(("bearer" = [])),
+    params(crate::pagination::NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "Every installed module, in start order.", body = Data<Vec<ModuleInfo>>),
+        (status = 200, description = "One page of installed modules, in start order.", body = crate::pagination::Page<ModuleInfo>),
         (status = 401, description = "Not signed in; code `unauthorized` or the code of the authentication module.", body = Problem),
         (status = 403, description = "Missing permission `kernel.modules.read`; code `permission_denied`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_modules(
     State(state): State<Arc<CatalogState>>,
     principal: Principal,
     language: Language,
-) -> Result<Data<Vec<ModuleInfo>>, Error> {
+    Query(page): Query<crate::pagination::NaturalOrderPageQuery>,
+) -> Result<crate::pagination::Page<ModuleInfo>, Error> {
     principal.require(&MODULES_READ)?;
-    let modules = state.catalog.list()?;
-    let data = modules.into_iter().map(|info| info.localized(&state.translations, language));
-    Ok(Data { data: data.collect() })
+    let page = crate::pagination::PageRequest::try_from(page)?;
+    let page = module_page(state.catalog.list()?, &page)?;
+    Ok(page.map(|info| info.localized(&state.translations, language)))
+}
+
+/// One page of the installed modules, in start order. Modules are compiled into the server (the list does not
+/// change while it runs), so the page is cut in memory (D-20261125-list-pages item 4); the key is the start
+/// position, zero-padded so that text order is start order.
+fn module_page(
+    modules: Vec<ModuleInfo>,
+    page: &crate::pagination::PageRequest,
+) -> Result<crate::pagination::Page<ModuleInfo>, Error> {
+    let keyed: Vec<(String, ModuleInfo)> = modules
+        .into_iter()
+        .enumerate()
+        .map(|(index, info)| (format!("{index:05}"), info))
+        .collect();
+    Ok(crate::pagination::page_of(keyed, |(key, _)| key.clone(), page)?.map(|(_, info)| info))
+}
+
+/// Which page of modules.
+#[derive(Debug, Default, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ListModulesInput {
+    /// Maximum number of items to return, 1 to 200. Defaults to 50.
+    limit: Option<u32>,
+    /// The `next_cursor` of the previous page.
+    cursor: Option<String>,
+    /// `asc` (start order, the default) or `desc`.
+    order: Option<String>,
+    /// `true` to also get `pagination.total` (the number of items) on the first page.
+    count: Option<bool>,
 }
 
 /// Get one installed module.
@@ -776,9 +808,17 @@ pub(crate) fn tools(state: CatalogState) -> Vec<Tool> {
             "List the modules installed in this server, in start order, with the permissions, \
              events, jobs, schedules, MCP tools, deprecated endpoints and migrations each \
              declares. Use it to learn what this server can do.",
-            move |_tenant: crate::tenancy::TenantContext, _principal: Principal, _: NoInput| {
+            move |_tenant: crate::tenancy::TenantContext,
+                  _principal: Principal,
+                  input: ListModulesInput| {
                 let catalog = list.catalog.clone();
-                async move { catalog.list() }
+                async move {
+                    // Cùng kiểu tham số trang và cùng hàm với REST.
+                    let page = crate::mcp::PageInput::new(input.limit, input.cursor, input.order)
+                        .with_count(input.count.unwrap_or(false))
+                        .natural_page()?;
+                    module_page(catalog.list()?, &page)
+                }
             },
         )
         .requires(MODULES_READ)

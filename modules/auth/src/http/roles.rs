@@ -7,7 +7,7 @@ use autoxide_kernel::access::{Principal, Scope};
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::http::ValidJson;
-use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
+use autoxide_kernel::pagination::{NaturalOrderPageQuery, Page, PageQuery, PageRequest, page_of};
 use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, Tagged};
@@ -79,6 +79,16 @@ impl PermissionResponse {
                 scoped: permission.is_scoped(),
             })
             .collect()
+    }
+
+    /// One page of the permission catalog, by name. The permissions are declared in code by the modules (a
+    /// fixed set per build), so the page is cut in memory (D-20261125-list-pages item 4).
+    pub(crate) fn page(
+        roles: &crate::role::RoleService,
+        language: autoxide_kernel::i18n::Language,
+        page: &PageRequest,
+    ) -> Result<Page<PermissionResponse>, Error> {
+        page_of(Self::catalog(roles, language), |permission| permission.name.clone(), page)
     }
 }
 
@@ -195,27 +205,32 @@ fn roles(roles: Vec<Role>) -> Data<Vec<RoleResponse>> {
 /// List every permission that roles can grant.
 ///
 /// Requires `auth.roles.read`. Each module declares its own permissions; the list
-/// grows when modules are added. Descriptions follow `Accept-Language`. Without
-/// `auth.roles.read`, read your own permissions with `GET /api/v1/me/permissions`.
+/// grows when modules are added. Descriptions follow `Accept-Language`. By name (`order=desc`
+/// reverses it); paged with `limit` / `cursor`. Without `auth.roles.read`, read your own
+/// permissions with `GET /api/v1/me/permissions`.
 #[utoipa::path(
     get,
     path = "/permissions",
     extensions(("x-permissions" = json!(["auth.roles.read"]))),
     operation_id = "list_permissions",
     security(("bearer" = [])),
+    params(NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "Every permission, sorted by name.", body = Data<Vec<PermissionResponse>>),
+        (status = 200, description = "One page of permissions, by name.", body = Page<PermissionResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `auth.roles.read`; code `permission_denied`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_permissions(
     State(state): State<Arc<HttpState>>,
     principal: Principal,
     language: autoxide_kernel::i18n::Language,
-) -> Result<Data<Vec<PermissionResponse>>, Error> {
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<PermissionResponse>, Error> {
     principal.require(&ROLES_READ)?;
-    Ok(Data { data: PermissionResponse::catalog(&state.roles, language) })
+    let page = PageRequest::try_from(page)?;
+    PermissionResponse::page(&state.roles, language, &page)
 }
 
 /// List roles.
@@ -263,27 +278,33 @@ impl From<(Uuid, usize)> for RoleCountResponse {
 
 /// Count the people holding each role.
 ///
-/// Requires `auth.roles.read`. One entry per role of the tenant, including roles nobody holds.
+/// Requires `auth.roles.read`. One entry per role of the tenant, including roles nobody holds, in
+/// the order of `GET /api/v1/auth/roles` (newest first unless `order=asc`); paged with `limit` /
+/// `cursor`.
 #[utoipa::path(
     get,
     path = "/roles/counts",
     extensions(("x-permissions" = json!(["auth.roles.read"]))),
     operation_id = "count_role_members",
     security(("bearer" = [])),
+    params(PageQuery),
     responses(
-        (status = 200, description = "The counts, one entry per role.", body = Data<Vec<RoleCountResponse>>),
+        (status = 200, description = "One page of counts, one entry per role, newest role first.", body = Page<RoleCountResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `auth.roles.read`; code `permission_denied`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn count_role_members(
     State(state): State<Arc<HttpState>>,
     tenant: TenantContext,
     principal: Principal,
-) -> Result<Data<Vec<RoleCountResponse>>, Error> {
+    Query(page): Query<PageQuery>,
+) -> Result<Page<RoleCountResponse>, Error> {
     principal.require(&ROLES_READ)?;
-    let counts = state.roles.role_member_counts(&tenant).await?;
-    Ok(Data { data: counts.into_iter().map(RoleCountResponse::from).collect() })
+    let page = PageRequest::try_from(page)?;
+    let counts = state.roles.role_member_counts_page(&tenant, &page).await?;
+    Ok(counts.map(RoleCountResponse::from))
 }
 
 /// Create a role.
@@ -412,19 +433,21 @@ async fn delete_role(
 
 /// List the roles of a user.
 ///
-/// Requires `auth.users.read`.
+/// Requires `auth.users.read`. By name (`order=desc` reverses it); paged with `limit` /
+/// `cursor`.
 #[utoipa::path(
     get,
     path = "/users/{id}/roles",
     extensions(("x-permissions" = json!(["auth.users.read"]))),
     operation_id = "get_user_roles",
     security(("bearer" = [])),
-    params(("id" = Uuid, Path, description = "Id of the user.")),
+    params(("id" = Uuid, Path, description = "Id of the user."), NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "The user's roles, sorted by name.", body = Data<Vec<RoleResponse>>),
+        (status = 200, description = "One page of the user's roles, by name.", body = Page<RoleResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `auth.users.read`; code `permission_denied`.", body = Problem),
         (status = 404, description = "No user has this id; code `auth.user_not_found`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn get_user_roles(
@@ -432,9 +455,11 @@ async fn get_user_roles(
     tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
-) -> Result<Data<Vec<RoleResponse>>, Error> {
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<RoleResponse>, Error> {
     principal.require(&USERS_READ)?;
-    Ok(roles(state.roles.user_roles(&tenant, id).await?))
+    let page = PageRequest::try_from(page)?;
+    Ok(state.roles.user_roles_page(&tenant, id, &page).await?.map(RoleResponse::from))
 }
 
 /// Replace the roles of a user.

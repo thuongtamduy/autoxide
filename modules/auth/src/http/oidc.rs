@@ -7,9 +7,10 @@ use std::sync::Arc;
 use autoxide_kernel::access::{Principal, Realm};
 use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
+use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::{OptionalTenant, TenantContext};
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use serde::{Deserialize, Serialize};
@@ -341,31 +342,32 @@ impl ProviderPatch {
 ///
 /// No sign-in needed. Lists the enabled providers for "Sign in with …" buttons; start with
 /// `POST /api/v1/auth/oidc/{slug}/start`. Off unless the server turns it on (`AUTOXIDE_AUTH_OIDC`).
+/// Newest first unless `order=asc`; paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/oidc/providers",
     extensions(("x-public" = json!(true))),
     operation_id = "list_public_oidc_providers",
+    params(PageQuery),
     responses(
-        (status = 200, description = "The enabled providers.", body = Data<Vec<PublicProviderResponse>>),
+        (status = 200, description = "One page of the enabled providers, newest first.", body = Page<PublicProviderResponse>),
         (status = 404, description = "Outside sign-in is off on this server; code `auth.oidc_disabled`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_public_providers(
     State(state): State<Arc<HttpState>>,
     tenant: TenantContext,
-) -> Result<Data<Vec<PublicProviderResponse>>, Error> {
-    let providers = state.oidc.public_providers(&tenant).await?;
-    let data = providers
-        .into_iter()
-        .map(|row| PublicProviderResponse {
-            id: row.id,
-            slug: row.slug,
-            kind: row.kind,
-            name: row.name,
-        })
-        .collect();
-    Ok(Data { data })
+    Query(page): Query<PageQuery>,
+) -> Result<Page<PublicProviderResponse>, Error> {
+    let page = PageRequest::try_from(page)?;
+    let providers = state.oidc.public_providers(&tenant, &page).await?;
+    Ok(providers.map(|row| PublicProviderResponse {
+        id: row.id,
+        slug: row.slug,
+        kind: row.kind,
+        name: row.name,
+    }))
 }
 
 /// Start signing in with a provider.
@@ -449,25 +451,30 @@ async fn finish_oidc(
 
 /// List the outside sign-ins linked to your account.
 ///
-/// Any signed-in user, for their own account.
+/// Any signed-in user, for their own account. Newest first unless `order=asc`; paged with
+/// `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/me/identities",
     extensions(("x-permissions" = json!([]))),
     operation_id = "list_my_identities",
     security(("bearer" = [])),
+    params(PageQuery),
     responses(
-        (status = 200, description = "Your linked sign-ins, oldest first.", body = Data<Vec<IdentityResponse>>),
+        (status = 200, description = "One page of your linked sign-ins, newest first.", body = Page<IdentityResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_my_identities(
     State(state): State<Arc<HttpState>>,
     tenant: TenantContext,
     principal: Principal,
-) -> Result<Data<Vec<IdentityResponse>>, Error> {
-    let linked = state.oidc.identities(&tenant, principal.user_id()).await?;
-    Ok(Data { data: linked.into_iter().map(Into::into).collect() })
+    Query(page): Query<PageQuery>,
+) -> Result<Page<IdentityResponse>, Error> {
+    let page = PageRequest::try_from(page)?;
+    let linked = state.oidc.identities(&tenant, principal.user_id(), &page).await?;
+    Ok(linked.map(Into::into))
 }
 
 /// Start linking a provider to your account.
@@ -586,27 +593,32 @@ async fn delete_my_identity(
 
 /// List the sign-in providers of this tenant, for administrators.
 ///
-/// Requires `auth.oidc.read`. Includes disabled providers; never the client secrets.
+/// Requires `auth.oidc.read`. Includes disabled providers; never the client secrets. Newest first
+/// unless `order=asc`; paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/oidc-providers",
     extensions(("x-permissions" = json!(["auth.oidc.read"]))),
     operation_id = "list_oidc_providers",
     security(("bearer" = [])),
+    params(PageQuery),
     responses(
-        (status = 200, description = "Every provider, oldest first.", body = Data<Vec<ProviderResponse>>),
+        (status = 200, description = "One page of providers, newest first.", body = Page<ProviderResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `auth.oidc.read`; code `permission_denied`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_oidc_providers(
     State(state): State<Arc<HttpState>>,
     tenant: TenantContext,
     principal: Principal,
-) -> Result<Data<Vec<ProviderResponse>>, Error> {
+    Query(page): Query<PageQuery>,
+) -> Result<Page<ProviderResponse>, Error> {
     principal.require(&OIDC_READ)?;
-    let rows = state.oidc.providers.list(&tenant).await?;
-    Ok(Data { data: rows.into_iter().map(Into::into).collect() })
+    let page = PageRequest::try_from(page)?;
+    let rows = state.oidc.providers.page(&tenant, false, &page).await?;
+    Ok(rows.map(Into::into))
 }
 
 /// Add a sign-in provider to this tenant.

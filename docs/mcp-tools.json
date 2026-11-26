@@ -709,7 +709,39 @@
       "description": "Count the people of every organization unit: `direct` (memberships on the unit) and `total` (on the unit or a unit above it).",
       "input_schema": {
         "additionalProperties": false,
-        "description": "The tool takes no arguments.",
+        "description": "Which page of a list in a natural order (name, unit).",
+        "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`asc` (the list's natural order, the default) or `desc`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
         "type": "object"
       },
       "name": "auth.count_memberships",
@@ -730,7 +762,40 @@
       "description": "Count the people holding each role (at any unit, each person once).",
       "input_schema": {
         "additionalProperties": false,
-        "description": "The tool takes no arguments.",
+        "description": "Paging of a list: the same as the `limit`, `cursor`, `order` and `count` query parameters\nof the REST list endpoints.",
+        "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "cursor": {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the first page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "maximum": 200,
+            "minimum": 1,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first).",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
         "type": "object"
       },
       "name": "auth.count_role_members",
@@ -1223,15 +1288,45 @@
         "returns_secret": false
       },
       "deprecation": null,
-      "description": "List the roles of a user (`id` is the user's id).",
+      "description": "List the roles of a user (`id` is the user's id), by name; follow `pagination.next_cursor` for more.",
       "input_schema": {
         "additionalProperties": false,
-        "description": "A role or user to act on.",
+        "description": "A user, and which page of their roles.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "id": {
-            "description": "The id.",
+            "description": "Id of the user.",
             "format": "uuid",
             "type": "string"
+          },
+          "limit": {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`asc` (by name, the default) or `desc`.",
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
@@ -1311,6 +1406,13 @@
         "additionalProperties": false,
         "description": "Which invitations to list.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "The `next_cursor` of the previous page.",
             "type": [
@@ -1364,6 +1466,13 @@
         "additionalProperties": false,
         "description": "Which memberships to list.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "The `next_cursor` of the previous page.",
             "type": [
@@ -1436,7 +1545,40 @@
       "description": "List the outside sign-ins (Google, Microsoft, GitHub…) linked to your own account.",
       "input_schema": {
         "additionalProperties": false,
-        "description": "The tool takes no arguments.",
+        "description": "Paging of a list: the same as the `limit`, `cursor`, `order` and `count` query parameters\nof the REST list endpoints.",
+        "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "cursor": {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the first page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "maximum": 200,
+            "minimum": 1,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first).",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
         "type": "object"
       },
       "name": "auth.list_my_identities",
@@ -1455,7 +1597,40 @@
       "description": "List the sign-in providers (Google, Microsoft, GitHub, OpenID Connect) of this tenant, with disabled ones; client secrets are never shown.",
       "input_schema": {
         "additionalProperties": false,
-        "description": "The tool takes no arguments.",
+        "description": "Paging of a list: the same as the `limit`, `cursor`, `order` and `count` query parameters\nof the REST list endpoints.",
+        "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "cursor": {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the first page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "maximum": 200,
+            "minimum": 1,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first).",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
         "type": "object"
       },
       "name": "auth.list_oidc_providers",
@@ -1473,10 +1648,42 @@
         "returns_secret": false
       },
       "deprecation": null,
-      "description": "List every permission that roles can grant, with what each allows.",
+      "description": "List every permission that roles can grant, with what each allows, by name; follow `pagination.next_cursor` for more.",
       "input_schema": {
         "additionalProperties": false,
-        "description": "The tool takes no arguments.",
+        "description": "Which page of a list in a natural order (name, unit).",
+        "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`asc` (the list's natural order, the default) or `desc`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
         "type": "object"
       },
       "name": "auth.list_permissions",
@@ -1553,6 +1760,13 @@
         "additionalProperties": false,
         "description": "Which users to list; paging as for every list.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "Where to continue: the `next_cursor` of the previous page. Omit for the first page.",
             "type": [
@@ -9543,6 +9757,36 @@
         "additionalProperties": false,
         "description": "Which approval requests to list.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`desc` (newest first, the default) or `asc`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "status": {
             "description": "Only `pending`, `approved`, `rejected`, `expired` or `used` requests.",
             "type": [
@@ -9569,7 +9813,39 @@
       "description": "List the webhook addresses of the current tenant: one per webhook an installed partner connection receives (bank transactions, payment results, delivery updates…), to paste into the partner's settings page.",
       "input_schema": {
         "additionalProperties": false,
-        "description": "No input.",
+        "description": "Which page of webhook addresses.",
+        "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`asc` (by path, the default) or `desc`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
         "type": "object"
       },
       "name": "kernel.list_connection_webhooks",
@@ -9592,6 +9868,36 @@
         "additionalProperties": false,
         "description": "Which custom fields to list.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`asc` (by position, the default) or `desc`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "target": {
             "description": "Only the fields of this record type, e.g. `content.entry`.",
             "type": [
@@ -9672,7 +9978,39 @@
       "description": "List the modules installed in this server, in start order, with the permissions, events, jobs, schedules, MCP tools, deprecated endpoints and migrations each declares. Use it to learn what this server can do.",
       "input_schema": {
         "additionalProperties": false,
-        "description": "The tool takes no arguments.",
+        "description": "Which page of modules.",
+        "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`asc` (start order, the default) or `desc`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
         "type": "object"
       },
       "name": "kernel.list_modules",
@@ -9693,7 +10031,39 @@
       "description": "List the kinds of records that can be promoted from a sandbox to your tenant.",
       "input_schema": {
         "additionalProperties": false,
-        "description": "No input.",
+        "description": "Which page of promotable kinds.",
+        "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`asc` (by kind, the default) or `desc`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
         "type": "object"
       },
       "name": "kernel.list_promotable",
@@ -9829,9 +10199,39 @@
         "additionalProperties": false,
         "description": "Which settings to list.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "group": {
             "description": "Only settings of this group, e.g. `connection` (connections to partner services). Omit\nfor every setting.",
             "example": "connection",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`asc` (by name, the default) or `desc`.",
             "type": [
               "string",
               "null"

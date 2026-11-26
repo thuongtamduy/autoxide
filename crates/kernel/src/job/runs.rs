@@ -13,7 +13,7 @@ use std::sync::Arc;
 
 use axum::extract::{Path, Query, State};
 use sea_orm::ConnectionTrait;
-use sea_orm::sea_query::{Alias, Expr, Order, Query as SqlQuery};
+use sea_orm::sea_query::{Alias, Expr, Query as SqlQuery};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::{IntoParams, ToSchema};
@@ -311,8 +311,6 @@ pub(crate) struct JobsQuery {
     status: Option<String>,
     /// Only this kind of job, e.g. `forms.export`.
     kind: Option<String>,
-    /// At most this many, 1 to 200, newest first. Defaults to 50.
-    limit: Option<u64>,
 }
 
 fn view(row: &sea_orm::QueryResult) -> Result<JobRunView, Error> {
@@ -383,25 +381,27 @@ pub(crate) fn routes(state: JobsState) -> OpenApiRouter {
 /// List background jobs.
 ///
 /// Any signed-in user sees the jobs they started (exports, bulk changes…); with
-/// `kernel.jobs.read`, every tracked job of the tenant. Newest first.
+/// `kernel.jobs.read`, every tracked job of the tenant. Newest first unless `order=asc`; paged
+/// with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/jobs",
     extensions(("x-permissions" = json!([]))),
     operation_id = "list_jobs",
     security(("bearer" = [])),
-    params(JobsQuery),
+    params(JobsQuery, crate::pagination::PageQuery),
     responses(
-        (status = 200, description = "The jobs.", body = Data<Vec<JobRunView>>),
+        (status = 200, description = "One page of jobs, newest first.", body = crate::pagination::Page<JobRunView>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 422, description = "A filter is invalid; see `errors`.", body = Problem),
+        (status = 422, description = "A filter or paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_jobs(
     tenant: TenantContext,
     principal: Principal,
     Query(query): Query<JobsQuery>,
-) -> Result<Data<Vec<JobRunView>>, Error> {
+    Query(page): Query<crate::pagination::PageQuery>,
+) -> Result<crate::pagination::Page<JobRunView>, Error> {
     let mut problems = Vec::new();
     let status = query.status.as_deref().map(str::trim).filter(|status| !status.is_empty());
     if status.is_some_and(|status| !["queued", "running", "succeeded", "failed"].contains(&status))
@@ -412,20 +412,15 @@ async fn list_jobs(
             "must be `queued`, `running`, `succeeded` or `failed`",
         ));
     }
-    let limit = query.limit.unwrap_or(50);
-    if !(1..=200).contains(&limit) {
-        problems.push(FieldError::new("limit", "invalid", "must be between 1 and 200"));
-    }
-    if !problems.is_empty() {
-        return Err(Error::validation(problems));
-    }
+    let page = crate::pagination::with_filter_problems(
+        problems,
+        crate::pagination::PageRequest::try_from(page),
+    )?;
     let mut select = SqlQuery::select();
     select
         .columns(COLUMNS)
         .from(Alias::new(TABLE))
-        .and_where(Expr::col(Alias::new("tenant_id")).eq(tenant.id().as_uuid()))
-        .order_by(Alias::new("id"), Order::Desc)
-        .limit(limit);
+        .and_where(Expr::col(Alias::new("tenant_id")).eq(tenant.id().as_uuid()));
     if principal.require(&JOBS_READ).is_err() {
         select.and_where(Expr::col(Alias::new("requested_by")).eq(principal.user_id()));
     }
@@ -435,8 +430,17 @@ async fn list_jobs(
     if let Some(kind) = query.kind.as_deref().map(str::trim).filter(|kind| !kind.is_empty()) {
         select.and_where(Expr::col(Alias::new("kind")).eq(kind));
     }
-    let rows = tenant.database().read().query_all(&select).await?;
-    Ok(Data { data: rows.iter().map(view).collect::<Result<_, _>>()? })
+    // Keyset theo id trong database: index (tenant_id, id), (tenant_id, requested_by, id), (tenant_id,
+    // status, id), (tenant_id, kind, id).
+    let rows = crate::pagination::fetch_statement_page(
+        select,
+        Alias::new("id"),
+        |row| Ok(row.try_get("", "id")?),
+        &page,
+        tenant.database().read(),
+    )
+    .await?;
+    crate::pagination::try_map_page(rows, view)
 }
 
 pub(crate) async fn find(

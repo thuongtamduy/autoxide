@@ -47,9 +47,14 @@ use crate::error::{Error, FieldError};
 mod memory;
 mod natural;
 mod params;
+mod raw;
 mod sort_choice;
 pub use memory::page_of;
 pub use natural::NaturalOrderPageQuery;
+pub(crate) use raw::{
+    RawSort, fetch_statement_page, fetch_statement_page_by, fetch_statement_page_filtered,
+    merge_id_pages, try_map_page, with_filter_problems,
+};
 pub use sort_choice::SortChoicePageQuery;
 
 /// Number of rows per page when the client gives no `limit`.

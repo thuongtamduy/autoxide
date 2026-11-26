@@ -14212,51 +14212,6 @@ export type Data_Value = {
 };
 
 /** Envelope of a single result. */
-export type Data_Vec_ActivityItem = {
-  data: {
-    /** With `event`: its name, e.g. `content.entry_published`. */
-    action?: string | null;
-    actor_id?: string | null;
-    actor_name?: string | null;
-    at: string;
-    id: string;
-    /** `note` or `event`. */
-    kind: string;
-    /** With `note`: users it mentions. */
-    mentions?: string[] | null;
-    /**
-     * With `event`: what happened, in the language of `Accept-Language`, when the event has a
-     * readable sentence; with `note`: the note.
-     */
-    text?: string | null;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_ApprovalRequest = {
-  data: {
-    api_key_id?: string | null;
-    created_at: string;
-    decided_at?: string | null;
-    decided_by?: string | null;
-    expires_at: string;
-    id: string;
-    /** Any of these permissions may approve it. */
-    permissions: string[];
-    /** Why it was rejected. */
-    reason?: string | null;
-    /** The user whose agent key asked. */
-    requested_by: string;
-    /** `pending`, `approved`, `rejected`, `expired` or `used` (approved, then run). */
-    status: string;
-    /** The command, e.g. `DELETE /api/v1/content/entries/0190…`. */
-    summary: string;
-    /** Where to look at it and decide. */
-    url: string;
-  }[];
-};
-
-/** Envelope of a single result. */
 export type Data_Vec_BatchResult = {
   data: {
     /**
@@ -14272,32 +14227,6 @@ export type Data_Vec_BatchResult = {
     location?: string | null;
     /** The HTTP status the REST endpoint answered, e.g. `201`, `200`, `204`, `412`. */
     status: number;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_BlockTypeView = {
-  data: {
-    /** One sentence on when to use the block, for people and AI page builders. */
-    ai_hint: string;
-    category: BlockCategory;
-    children: Children;
-    /** Plan feature the block needs; only blocks the tenant's plan includes are listed. */
-    feature?: string | null;
-    /** The public page carries data for this block in `blocks_data`. */
-    has_data: boolean;
-    /** Name of the block in the language of `Accept-Language`. */
-    label: string;
-    /** The module that provides the block. */
-    module: string;
-    /** `<module>.<block>`, e.g. `catalog.product_grid`. */
-    name: string;
-    /**
-     * JSON Schema (draft 2020-12 subset) of the block's `props`. Extra keywords: `x-responsive`
-     * (the value may be `{base, md?, lg?}` per screen size), `x-media` (an id from `media`),
-     * `x-link` (an http(s), mailto:, tel: link or a path on the site).
-     */
-    props_schema: Record<string, unknown>;
   }[];
 };
 
@@ -14635,19 +14564,6 @@ export type Data_Vec_CatalogVariantAttributeStored = {
 };
 
 /** Envelope of a single result. */
-export type Data_Vec_ChildTenantResponse = {
-  data: {
-    id: string;
-    name: string;
-    /** The tenant right above it (this tenant for a direct child). */
-    parent_id: string;
-    slug: string;
-    /** `provisioning`, `active`, `suspended`, `maintenance` or `moving`. */
-    status: string;
-  }[];
-};
-
-/** Envelope of a single result. */
 export type Data_Vec_CommentCount = {
   data: {
     /** Shown comments (top-level and replies). */
@@ -14817,113 +14733,6 @@ export type Data_Vec_ComplianceTrackingProvider = {
 };
 
 /** Envelope of a single result. */
-export type Data_Vec_ConnectionWebhook = {
-  data: {
-    /** The connection, `<module>.connection.<kind>`. */
-    connection: string;
-    /** Where to paste the address at the partner. */
-    description: string;
-    /** Path of the address; its last part identifies this tenant and cannot be guessed. */
-    path: string;
-    /**
-     * Full address, when the server has `AUTOXIDE_HTTP_PUBLIC_URL`; otherwise put the server's
-     * public address in front of `path`.
-     */
-    url?: string | null;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_CustomFieldView = {
-  data: {
-    active: boolean;
-    created_at: string;
-    /**
-     * `text`, `long_text`, `integer`, `decimal`, `boolean`, `date`, `datetime`, `option`,
-     * `options`, `url`, `email`, `phone`, `media` or `reference`.
-     */
-    data_type: string;
-    /** Any JSON value of the field's type. */
-    default?: unknown;
-    /** Lists filter on it (`cf.<key>=`). */
-    filterable: boolean;
-    /** Help texts by language. */
-    help: {
-      [key: string]: string;
-    };
-    id: string;
-    /** `snake_case`, never changes: the key in the records' `custom_fields`. */
-    key: string;
-    /** Labels by language. */
-    labels: {
-      [key: string]: string;
-    };
-    /** Longest text, largest number (or date). */
-    max?: string | null;
-    /** Shortest text, smallest number (or date as `YYYY-MM-DD`). */
-    min?: string | null;
-    /** Allowed values of `option` / `options`. */
-    options: string[];
-    /** Personal data: goes into personal-data exports and erasure. */
-    personal_data: boolean;
-    position: number;
-    /** With `reference`: the record type it points to. */
-    reference_kind?: string | null;
-    required: boolean;
-    /** Digits after the decimal point of `decimal` (0 to 6). */
-    scale?: number | null;
-    /** The record type, e.g. `content.entry`. */
-    target: string;
-    updated_at: string;
-    /** `internal` (staff only), `public` (in public reads) or `buyer_input` (end users fill it). */
-    visibility: string;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_DelegationResponse = {
-  data: {
-    /** The tenant they may enter, with the header `Autoxide-Tenant`. */
-    child_tenant_id: string;
-    created_at: string;
-    /** When it stops working by itself; `null`: until revoked. */
-    expires_at?: string | null;
-    id: string;
-    /** The unit of the child tenant the permissions apply at. */
-    org_id: string;
-    /** The tenant that granted it (owner of the role). */
-    parent_tenant_id: string;
-    reason: string;
-    /** When it was revoked; `null` while in force. */
-    revoked_at?: string | null;
-    /**
-     * The role of the parent tenant; its holders (at the parent's root unit) get its
-     * permissions in the child.
-     */
-    role_id: string;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_IdentityResponse = {
-  data: {
-    created_at: string;
-    /** The email the provider gave at the last sign-in. */
-    email?: string | null;
-    /** Whether the provider said it verified that email. */
-    email_verified: boolean;
-    id: string;
-    /** `google`, `microsoft`, `github` or `oidc`. */
-    kind: string;
-    last_login_at?: string | null;
-    /** Slug of the provider; empty if the provider was removed meanwhile. */
-    provider: string;
-    provider_id: string;
-    provider_name: string;
-  }[];
-};
-
-/** Envelope of a single result. */
 export type Data_Vec_InventoryPublicAvailability = {
   data: {
     level: InventoryPublicStockLevel;
@@ -14932,30 +14741,6 @@ export type Data_Vec_InventoryPublicAvailability = {
     /** The store (organization unit) selling it. */
     store_id: string;
     variant_id: string;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_JobRunView = {
-  data: {
-    created_at: string;
-    /** Why it failed, when `failed`. */
-    error?: string | null;
-    file?: JobFile | null;
-    finished_at?: string | null;
-    id: string;
-    kind: string;
-    /** What it does, in English. */
-    label: string;
-    /** Module that runs it. */
-    module: string;
-    org_id?: string | null;
-    progress?: JobProgress | null;
-    requested_by?: string | null;
-    /** What the job produced (counts, ids, per-record results…), once it reports it. */
-    result?: unknown;
-    /** `queued`, `running`, `succeeded` or `failed`. */
-    status: string;
   }[];
 };
 
@@ -14974,20 +14759,6 @@ export type Data_Vec_LedgerExchangeRate = {
     rate: DecimalString;
     /** `manual` (entered by a person) or `provider:<name>` (fetched from a rate source). */
     source: string;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_MemberCountResponse = {
-  data: {
-    /** People with a membership on this unit itself (each person once, whatever their roles). */
-    direct: number;
-    org_id: string;
-    /**
-     * People with a membership on this unit or on a unit above it — the people
-     * `GET /api/v1/auth/memberships?org_id=…&inherited=true` lists.
-     */
-    total: number;
   }[];
 };
 
@@ -15011,99 +14782,6 @@ export type Data_Vec_MembershipResponse = {
      * unit (`unit`: this unit, `subtree`: this unit and the units below it).
      */
     roles: RoleResponse[];
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_MigrationRun = {
-  data: {
-    /** Migrations applied, per placement done (also when a later placement failed). */
-    applied: PlacementMigrationList[];
-    created_at: string;
-    /**
-     * Why it failed: the placement and its error. Fix it and start a new run; what is already
-     * applied is skipped.
-     */
-    error?: string | null;
-    id: string;
-    /** The placement it runs on; `null`: every placement, by name. */
-    placement?: string | null;
-    requested_by?: string | null;
-    /** `pending`, `running`, `done` or `failed`. */
-    status: string;
-    updated_at: string;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_ModuleInfo = {
-  data: {
-    /**
-     * `true` when no plan can turn the module off (sign-in, files, audit…). Otherwise a tenant
-     * whose plan does not include the module gets `403 module_not_enabled` from its endpoints.
-     */
-    always_enabled: boolean;
-    /** Endpoints of the module that are deprecated. */
-    deprecations: ModuleDeprecation[];
-    /** One sentence about what the module does; empty when the module gives none. */
-    description: string;
-    /** Events the module emits. */
-    events: ModuleEvent[];
-    /** Features of the module that a plan turns on or off (`<module>.<name>`). */
-    features: ModuleFeature[];
-    /** `true` for the modules the server always installs (`kernel`, `antispam`). */
-    internal: boolean;
-    /** Kinds of background job the module runs. */
-    jobs: string[];
-    /** Languages, besides English, the module's error messages are translated to. */
-    languages: string[];
-    /** Limits of the module that a plan sets (`<module>.<name>`). */
-    limits: ModuleLimit[];
-    /** Database migrations of the module, in the order they apply. */
-    migrations: ModuleMigration[];
-    /**
-     * The module name. Its REST endpoints live under `/api/v1/<name>`; its tables,
-     * permissions, events, error codes and job kinds start with `<name>`.
-     */
-    name: string;
-    /** Permissions the module declares; roles grant them. */
-    permissions: ModulePermission[];
-    /** Place in the start order, from 0. A module starts after the modules it depends on. */
-    position: number;
-    /** MCP prompts (templates for common jobs) the module offers at `/mcp`. */
-    prompts: ModulePrompt[];
-    /** Modules this module uses; a plan that turns this module on must turn them on too. */
-    requires: string[];
-    /** MCP resources (read-only documents) the module offers at `/mcp`. */
-    resources: ModuleResource[];
-    /** Recurring jobs the module schedules. */
-    schedules: ModuleSchedule[];
-    /**
-     * `official`, or `experimental`: the module's API and data may still change between
-     * releases, and it only runs where the installation turns it on (`AUTOXIDE_MODULES`).
-     */
-    stability: string;
-    /** Events the module listens to; `*` means every event. */
-    subscriptions: string[];
-    /** MCP tools the module offers at `/mcp`. */
-    tools: ModuleTool[];
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_MyTenantResponse = {
-  data: {
-    /**
-     * `direct` (your own tenant), `delegation` (a parent tenant let your role in) or
-     * `support` (time-limited platform support access).
-     */
-    access: string;
-    /** The delegation or support grant; `null` for `direct`. */
-    access_id?: string | null;
-    /** Send it in the header `Autoxide-Tenant` to work there. */
-    id: string;
-    name: string;
-    slug: string;
   }[];
 };
 
@@ -15274,27 +14952,6 @@ export type Data_Vec_PageTemplateResponse = {
 };
 
 /** Envelope of a single result. */
-export type Data_Vec_PermissionResponse = {
-  data: {
-    /** What the permission allows, in the language of `Accept-Language`. */
-    description: string;
-    /** `<module>.<action>`. */
-    name: string;
-    /**
-     * How careful a grant needs to be: `read`, `write`, `destructive`, `sensitive_data` or
-     * `money`.
-     */
-    risk: string;
-    /**
-     * `true` when the permission applies to data of an organization unit: a role can grant it
-     * for one unit (`unit`), a unit and everything below it (`subtree`), or only the records
-     * a person owns (`own`). `false`: it can only be granted for the whole tenant.
-     */
-    scoped: boolean;
-  }[];
-};
-
-/** Envelope of a single result. */
 export type Data_Vec_Pin = {
   data: {
     created_at: string;
@@ -15313,27 +14970,6 @@ export type Data_Vec_Pin = {
      * `<record kind>:<id>` for a record (e.g. `content.entry:0190…`).
      */
     target: string;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_Placement = {
-  data: {
-    /** `sqlite` or `postgres`. */
-    backend: string;
-    /**
-     * Country of the servers (ISO 3166-1 alpha-2), for tenants that must keep their data in one
-     * country; `null` when unknown. Set with `autoxide placement country`.
-     */
-    country_code?: string | null;
-    created_at: string;
-    id: string;
-    /** `shared` (many tenants) or `dedicated` (one tenant). */
-    kind: string;
-    name: string;
-    /** `ready`, `behind` (migrations pending: its tenants answer `503`) or `migrating`. */
-    schema_state: string;
-    storage?: PlacementStorage | null;
   }[];
 };
 
@@ -15380,17 +15016,6 @@ export type Data_Vec_PlacementResponse = {
     preset_key?: string | null;
     ratio?: Ratio | null;
     updated_at: string;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_PromotableKind = {
-  data: {
-    description: string;
-    /** `<module>.<kind>`, e.g. `content.page`. */
-    kind: string;
-    /** The module that owns it. */
-    module: string;
   }[];
 };
 
@@ -15526,52 +15151,6 @@ export type Data_Vec_PromotionsVersion = {
 };
 
 /** Envelope of a single result. */
-export type Data_Vec_ProviderResponse = {
-  data: {
-    /** Whether someone without an account may get one by signing in. */
-    allow_signup: boolean;
-    /** Only emails at these domains may sign in; `null`: any. */
-    allowed_email_domains?: string[] | null;
-    client_id: string;
-    created_at: string;
-    /** Unit where new accounts get `default_role_id`; `null`: the root unit. */
-    default_org_id?: string | null;
-    /** Role new accounts get; `null`: none. */
-    default_role_id?: string | null;
-    enabled: boolean;
-    /** Whether a client secret is stored. The secret itself is never returned. */
-    has_secret: boolean;
-    id: string;
-    /** Issuer address; `null` for github.com. */
-    issuer?: string | null;
-    /** `google`, `microsoft`, `github` or `oidc`. */
-    kind: string;
-    name: string;
-    /** `staff` or `customer`: which accounts sign in with it. */
-    realm: Realm;
-    /** Pages of the interface the provider may send the browser back to. */
-    redirect_uris: string[];
-    /** Space-separated scopes asked for. */
-    scopes: string;
-    slug: string;
-    updated_at: string;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_PublicProviderResponse = {
-  data: {
-    id: string;
-    /** `google`, `microsoft`, `github` or `oidc`. */
-    kind: string;
-    /** Label for the "Sign in with …" button. */
-    name: string;
-    /** Name in the sign-in paths, e.g. `google` in `/api/v1/auth/oidc/google/start`. */
-    slug: string;
-  }[];
-};
-
-/** Envelope of a single result. */
 export type Data_Vec_ReasonView = {
   data: {
     active: boolean;
@@ -15591,50 +15170,6 @@ export type Data_Vec_ReasonView = {
 };
 
 /** Envelope of a single result. */
-export type Data_Vec_RecordEvent = {
-  data: {
-    actor_id?: string | null;
-    actor_name?: string | null;
-    at: string;
-    id: string;
-    /** Name of the event, e.g. `content.entry_published`. */
-    name: string;
-    /**
-     * What happened, in the language of `Accept-Language`, when the event has a readable
-     * sentence.
-     */
-    text?: string | null;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_RecordNote = {
-  data: {
-    author_id: string;
-    body: string;
-    created_at: string;
-    id: string;
-    /** Users the note mentions. */
-    mentions: string[];
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_RecordType = {
-  data: {
-    /**
-     * `true` when records of this type form a tree (e.g. categories): a menu item can list a
-     * record's children automatically.
-     */
-    has_children: boolean;
-    /** `<module>.<type>`, e.g. `content.entry`. */
-    kind: string;
-    /** The module that owns the type. */
-    module: string;
-  }[];
-};
-
-/** Envelope of a single result. */
 export type Data_Vec_Referrer = {
   data: {
     /** How it points: e.g. `featured_media`, `body`, `menu_item`. */
@@ -15644,33 +15179,6 @@ export type Data_Vec_Referrer = {
     kind: string;
     /** What staff call it (title, name). */
     title: string;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_Release = {
-  data: {
-    /** Release day (`YYYY-MM-DD`); `null` for `unreleased`. */
-    date?: string | null;
-    /**
-     * The changes by kind, in the order of the changelog: `added`, `changed`, `deprecated`,
-     * `removed`, `fixed`, `security`. Each item is Markdown (in English).
-     */
-    sections: ReleaseSection[];
-    /** `0.14.0`, or `unreleased` for changes in this build that have no version yet. */
-    version: string;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_RoleCountResponse = {
-  data: {
-    /**
-     * People holding the role, at any unit; each person once. List them with
-     * `GET /api/v1/auth/memberships?role_id=…`.
-     */
-    members: number;
-    role_id: string;
   }[];
 };
 
@@ -15706,96 +15214,8 @@ export type Data_Vec_RoleResponse = {
 };
 
 /** Envelope of a single result. */
-export type Data_Vec_ScimGroupMappingResponse = {
-  data: {
-    created_at: string;
-    created_by: string;
-    group_id: string;
-    id: string;
-    /** Organization unit; the tenant's id is the root unit. */
-    org_id: string;
-    role_id: string;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_ScimTokenResponse = {
-  data: {
-    created_at: string;
-    /** The user who created it. */
-    created_by: string;
-    /**
-     * State of the token's creator. A SCIM token can do only what its creator can do now. `disabled`
-     * or `deleted`: the token can no longer give, take away, disable or delete anything that needs a
-     * permission; `missing_permission`: the creator lost `auth.scim.manage` but the token keeps the
-     * creator's other roles. In every case other than `active`, create a new token from an account
-     * with the needed roles and revoke this one. `active` does not mean the creator still holds every
-     * role your group mappings give.
-     */
-    creator_status: ScimTokenCreatorStatus;
-    id: string;
-    /** Last time the identity provider used it (to within 5 minutes); `null`: never. */
-    last_used_at?: string | null;
-    /** Name to recognise the token, e.g. the identity provider it is set up in. */
-    name: string;
-    /** Start and end of the token, to recognise it; never the whole token. */
-    prefix: string;
-  }[];
-};
-
-/** Envelope of a single result. */
 export type Data_Vec_String = {
   data: string[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_SupportGrantResponse = {
-  data: {
-    /**
-     * `support`, or `legal_request` (a request of a competent authority; the tenant cannot
-     * revoke it).
-     */
-    basis: string;
-    created_at: string;
-    expires_at: string;
-    /** When the staff first entered under it; `null`: not used. */
-    first_used_at?: string | null;
-    granted_by?: string | null;
-    id: string;
-    /** Number of the authority's document, for `legal_request`. */
-    legal_reference?: string | null;
-    reason: string;
-    revoked_at?: string | null;
-    /** `true` when the tenant revoked it. */
-    revoked_by_tenant: boolean;
-    /** The role of the platform tenant whose permissions they get. */
-    role_id: string;
-    /**
-     * Display name of that staff member, so the tenant knows who may enter; `null` when the
-     * account no longer exists.
-     */
-    staff_name?: string | null;
-    /** The platform staff account. */
-    staff_user_id: string;
-    starts_at: string;
-    /** The tenant the staff may enter. */
-    tenant_id: string;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_SyncResourceView = {
-  data: {
-    /** The change feed: `GET` it with the `cursor` of the last change you applied. */
-    changes: string;
-    description: string;
-    /** `<module>.<name>`. */
-    name: string;
-    /** The list endpoint of these records; writes in a batch go under this path. */
-    path: string;
-    /** The permission needed to read them; its scope decides which records you get. */
-    read_permission: string;
-  }[];
 };
 
 /** Envelope of a single result. */
@@ -15805,95 +15225,6 @@ export type Data_Vec_TagRef = {
     color: string;
     id: string;
     name: string;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_TagView = {
-  data: {
-    color: string;
-    created_at: string;
-    description?: string | null;
-    id: string;
-    name: string;
-    /** Records carrying it. */
-    uses: number;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_TenantExport = {
-  data: {
-    created_at: string;
-    error?: string | null;
-    /** The file is deleted after this time. */
-    expires_at?: string | null;
-    id: string;
-    /** `manual`, or `subscription_canceled` when the subscription was canceled. */
-    reason: string;
-    requested_by?: string | null;
-    /** Size of the file in bytes, once ready. */
-    size?: number | null;
-    /**
-     * `pending`, `running`, `ready` (download it), `failed` (see `error`) or `expired` (deleted
-     * after the retention days).
-     */
-    status: string;
-    /** Rows exported per table. */
-    tables: TenantTableRows[];
-    tenant_id: string;
-    updated_at: string;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_TenantSettingState = {
-  data: {
-    description: string;
-    /**
-     * Group of the setting, to filter the list by (`?group=`); `connection`: a connection to a
-     * partner service (mail server, AI provider, payment gateway…). `null`: no group.
-     */
-    group?: string | null;
-    /** Whether this tenant has set it; otherwise the server-wide configuration applies. */
-    is_set: boolean;
-    /** For a setting of a partner connection: why its last use failed; omitted when it worked. */
-    last_error?: string | null;
-    /**
-     * For a setting of a partner connection: the last time the connection was used (or tested
-     * with `POST /api/v1/kernel/settings/{name}/test`).
-     */
-    last_used_at?: string | null;
-    /**
-     * `<module>.<key>`, e.g. `kernel.public_url`; a partner connection is named
-     * `<module>.connection.<kind>.<field>`, e.g. `mail.connection.smtp.url`.
-     */
-    name: string;
-    /**
-     * The stored value is not used any more, and why: `kernel.public_url_unverified` /
-     * `kernel.link_unverified` / `kernel.domain_unverified` (its host is not a verified domain of this
-     * tenant — verify the domain or change the value). Omitted when the value is used.
-     */
-    problem?: string | null;
-    /** Secret settings are stored encrypted and never returned: `value` is always `null`. */
-    secret: boolean;
-    updated_at?: string | null;
-    /** The value, for settings that are not secret and are set. */
-    value?: string | null;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_TextView = {
-  data: {
-    /** The default wording in `locale` (`null` for `ui.*` keys: the interface owns it). */
-    default?: string | null;
-    key: string;
-    /** Required by law: cannot be replaced. */
-    legal: boolean;
-    locale: string;
-    /** The tenant's wording, when set. */
-    text?: string | null;
   }[];
 };
 
@@ -21594,6 +20925,29 @@ export type PageTemplateResponse = {
 };
 
 /** One page of a list. */
+export type Page_ActivityItem = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** With `event`: its name, e.g. `content.entry_published`. */
+    action?: string | null;
+    actor_id?: string | null;
+    actor_name?: string | null;
+    at: string;
+    id: string;
+    /** `note` or `event`. */
+    kind: string;
+    /** With `note`: users it mentions. */
+    mentions?: string[] | null;
+    /**
+     * With `event`: what happened, in the language of `Accept-Language`, when the event has a
+     * readable sentence; with `note`: the note.
+     */
+    text?: string | null;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_ActivityResponse = {
   /** The items of this page, in the requested order. */
   data: {
@@ -21717,6 +21071,32 @@ export type Page_ApiKeyResponse = {
      * 401 `auth.api_key_pending`).
      */
     status: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_ApprovalRequest = {
+  /** The items of this page, in the requested order. */
+  data: {
+    api_key_id?: string | null;
+    created_at: string;
+    decided_at?: string | null;
+    decided_by?: string | null;
+    expires_at: string;
+    id: string;
+    /** Any of these permissions may approve it. */
+    permissions: string[];
+    /** Why it was rejected. */
+    reason?: string | null;
+    /** The user whose agent key asked. */
+    requested_by: string;
+    /** `pending`, `approved`, `rejected`, `expired` or `used` (approved, then run). */
+    status: string;
+    /** The command, e.g. `DELETE /api/v1/content/entries/0190…`. */
+    summary: string;
+    /** Where to look at it and decide. */
+    url: string;
   }[];
   pagination: Pagination;
 };
@@ -21867,6 +21247,34 @@ export type Page_BillingPeriodResponse = {
     /** `open`, `paid` or `void`. */
     status: string;
     tenant_id: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_BlockTypeView = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** One sentence on when to use the block, for people and AI page builders. */
+    ai_hint: string;
+    category: BlockCategory;
+    children: Children;
+    /** Plan feature the block needs; only blocks the tenant's plan includes are listed. */
+    feature?: string | null;
+    /** The public page carries data for this block in `blocks_data`. */
+    has_data: boolean;
+    /** Name of the block in the language of `Accept-Language`. */
+    label: string;
+    /** The module that provides the block. */
+    module: string;
+    /** `<module>.<block>`, e.g. `catalog.product_grid`. */
+    name: string;
+    /**
+     * JSON Schema (draft 2020-12 subset) of the block's `props`. Extra keywords: `x-responsive`
+     * (the value may be `{base, md?, lg?}` per screen size), `x-media` (an id from `media`),
+     * `x-link` (an http(s), mailto:, tel: link or a path on the site).
+     */
+    props_schema: Record<string, unknown>;
   }[];
   pagination: Pagination;
 };
@@ -22238,6 +21646,21 @@ export type Page_CatalogSitemapItem = {
     modified_at: string;
     /** Address of the product in each of its languages. */
     translations: CatalogPublicTranslation[];
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_ChildTenantResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    id: string;
+    name: string;
+    /** The tenant right above it (this tenant for a direct child). */
+    parent_id: string;
+    slug: string;
+    /** `provisioning`, `active`, `suspended`, `maintenance` or `moving`. */
+    status: string;
   }[];
   pagination: Pagination;
 };
@@ -22693,6 +22116,25 @@ export type Page_ComplianceWebsite = {
 };
 
 /** One page of a list. */
+export type Page_ConnectionWebhook = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** The connection, `<module>.connection.<kind>`. */
+    connection: string;
+    /** Where to paste the address at the partner. */
+    description: string;
+    /** Path of the address; its last part identifies this tenant and cannot be guessed. */
+    path: string;
+    /**
+     * Full address, when the server has `AUTOXIDE_HTTP_PUBLIC_URL`; otherwise put the server's
+     * public address in front of `path`.
+     */
+    url?: string | null;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_ContentTemplate = {
   /** The items of this page, in the requested order. */
   data: {
@@ -22877,6 +22319,55 @@ export type Page_ConversationReport = {
 };
 
 /** One page of a list. */
+export type Page_CustomFieldView = {
+  /** The items of this page, in the requested order. */
+  data: {
+    active: boolean;
+    created_at: string;
+    /**
+     * `text`, `long_text`, `integer`, `decimal`, `boolean`, `date`, `datetime`, `option`,
+     * `options`, `url`, `email`, `phone`, `media` or `reference`.
+     */
+    data_type: string;
+    /** Any JSON value of the field's type. */
+    default?: unknown;
+    /** Lists filter on it (`cf.<key>=`). */
+    filterable: boolean;
+    /** Help texts by language. */
+    help: {
+      [key: string]: string;
+    };
+    id: string;
+    /** `snake_case`, never changes: the key in the records' `custom_fields`. */
+    key: string;
+    /** Labels by language. */
+    labels: {
+      [key: string]: string;
+    };
+    /** Longest text, largest number (or date). */
+    max?: string | null;
+    /** Shortest text, smallest number (or date as `YYYY-MM-DD`). */
+    min?: string | null;
+    /** Allowed values of `option` / `options`. */
+    options: string[];
+    /** Personal data: goes into personal-data exports and erasure. */
+    personal_data: boolean;
+    position: number;
+    /** With `reference`: the record type it points to. */
+    reference_kind?: string | null;
+    required: boolean;
+    /** Digits after the decimal point of `decimal` (0 to 6). */
+    scale?: number | null;
+    /** The record type, e.g. `content.entry`. */
+    target: string;
+    updated_at: string;
+    /** `internal` (staff only), `public` (in public reads) or `buyer_input` (end users fill it). */
+    visibility: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_CustomerGroupResponse = {
   /** The items of this page, in the requested order. */
   data: {
@@ -22964,6 +22455,32 @@ export type Page_CustomerResponse = {
     id: string;
     name: string;
     updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_DelegationResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** The tenant they may enter, with the header `Autoxide-Tenant`. */
+    child_tenant_id: string;
+    created_at: string;
+    /** When it stops working by itself; `null`: until revoked. */
+    expires_at?: string | null;
+    id: string;
+    /** The unit of the child tenant the permissions apply at. */
+    org_id: string;
+    /** The tenant that granted it (owner of the role). */
+    parent_tenant_id: string;
+    reason: string;
+    /** When it was revoked; `null` while in force. */
+    revoked_at?: string | null;
+    /**
+     * The role of the parent tenant; its holders (at the parent's root unit) get its
+     * permissions in the child.
+     */
+    role_id: string;
   }[];
   pagination: Pagination;
 };
@@ -23333,6 +22850,27 @@ export type Page_GuardrailResponse = {
     updated_at: string;
     /** Who set it last, and when. */
     updated_by: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_IdentityResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    created_at: string;
+    /** The email the provider gave at the last sign-in. */
+    email?: string | null;
+    /** Whether the provider said it verified that email. */
+    email_verified: boolean;
+    id: string;
+    /** `google`, `microsoft`, `github` or `oidc`. */
+    kind: string;
+    last_login_at?: string | null;
+    /** Slug of the provider; empty if the provider was removed meanwhile. */
+    provider: string;
+    provider_id: string;
+    provider_name: string;
   }[];
   pagination: Pagination;
 };
@@ -23772,6 +23310,32 @@ export type Page_InvoicesTemplate = {
     updated_at: string;
     /** Goes up by one on each change. */
     version: number;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_JobRunView = {
+  /** The items of this page, in the requested order. */
+  data: {
+    created_at: string;
+    /** Why it failed, when `failed`. */
+    error?: string | null;
+    file?: JobFile | null;
+    finished_at?: string | null;
+    id: string;
+    kind: string;
+    /** What it does, in English. */
+    label: string;
+    /** Module that runs it. */
+    module: string;
+    org_id?: string | null;
+    progress?: JobProgress | null;
+    requested_by?: string | null;
+    /** What the job produced (counts, ids, per-record results…), once it reports it. */
+    result?: unknown;
+    /** `queued`, `running`, `succeeded` or `failed`. */
+    status: string;
   }[];
   pagination: Pagination;
 };
@@ -24301,6 +23865,47 @@ export type Page_MediaItemResponse = {
 };
 
 /** One page of a list. */
+export type Page_MemberCountResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** People with a membership on this unit itself (each person once, whatever their roles). */
+    direct: number;
+    org_id: string;
+    /**
+     * People with a membership on this unit or on a unit above it — the people
+     * `GET /api/v1/auth/memberships?org_id=…&inherited=true` lists.
+     */
+    total: number;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_MembershipResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** The unit; the root unit has the id of the tenant. */
+    org_id: string;
+    /**
+     * Name of the unit, so a user who cannot read the organization tree still sees where they
+     * work; `null` when the unit no longer exists (or no organization module is installed).
+     */
+    org_name?: string | null;
+    /**
+     * Type of the unit (see `GET /api/v1/organizations/unit-types`); `tenant` for the root, `null`
+     * like `org_name`.
+     */
+    org_unit_type?: string | null;
+    /**
+     * The roles there, sorted by name. A role grants each permission at its scope from this
+     * unit (`unit`: this unit, `subtree`: this unit and the units below it).
+     */
+    roles: RoleResponse[];
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_MembershipRowResponse = {
   /** The items of this page, in the requested order. */
   data: {
@@ -24351,6 +23956,86 @@ export type Page_MenuSummary = {
 };
 
 /** One page of a list. */
+export type Page_MigrationRun = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** Migrations applied, per placement done (also when a later placement failed). */
+    applied: PlacementMigrationList[];
+    created_at: string;
+    /**
+     * Why it failed: the placement and its error. Fix it and start a new run; what is already
+     * applied is skipped.
+     */
+    error?: string | null;
+    id: string;
+    /** The placement it runs on; `null`: every placement, by name. */
+    placement?: string | null;
+    requested_by?: string | null;
+    /** `pending`, `running`, `done` or `failed`. */
+    status: string;
+    updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_ModuleInfo = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /**
+     * `true` when no plan can turn the module off (sign-in, files, audit…). Otherwise a tenant
+     * whose plan does not include the module gets `403 module_not_enabled` from its endpoints.
+     */
+    always_enabled: boolean;
+    /** Endpoints of the module that are deprecated. */
+    deprecations: ModuleDeprecation[];
+    /** One sentence about what the module does; empty when the module gives none. */
+    description: string;
+    /** Events the module emits. */
+    events: ModuleEvent[];
+    /** Features of the module that a plan turns on or off (`<module>.<name>`). */
+    features: ModuleFeature[];
+    /** `true` for the modules the server always installs (`kernel`, `antispam`). */
+    internal: boolean;
+    /** Kinds of background job the module runs. */
+    jobs: string[];
+    /** Languages, besides English, the module's error messages are translated to. */
+    languages: string[];
+    /** Limits of the module that a plan sets (`<module>.<name>`). */
+    limits: ModuleLimit[];
+    /** Database migrations of the module, in the order they apply. */
+    migrations: ModuleMigration[];
+    /**
+     * The module name. Its REST endpoints live under `/api/v1/<name>`; its tables,
+     * permissions, events, error codes and job kinds start with `<name>`.
+     */
+    name: string;
+    /** Permissions the module declares; roles grant them. */
+    permissions: ModulePermission[];
+    /** Place in the start order, from 0. A module starts after the modules it depends on. */
+    position: number;
+    /** MCP prompts (templates for common jobs) the module offers at `/mcp`. */
+    prompts: ModulePrompt[];
+    /** Modules this module uses; a plan that turns this module on must turn them on too. */
+    requires: string[];
+    /** MCP resources (read-only documents) the module offers at `/mcp`. */
+    resources: ModuleResource[];
+    /** Recurring jobs the module schedules. */
+    schedules: ModuleSchedule[];
+    /**
+     * `official`, or `experimental`: the module's API and data may still change between
+     * releases, and it only runs where the installation turns it on (`AUTOXIDE_MODULES`).
+     */
+    stability: string;
+    /** Events the module listens to; `*` means every event. */
+    subscriptions: string[];
+    /** MCP tools the module offers at `/mcp`. */
+    tools: ModuleTool[];
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_MyPermission = {
   /** The items of this page, in the requested order. */
   data: {
@@ -24359,6 +24044,25 @@ export type Page_MyPermission = {
     name: string;
     /** How careful a grant needs to be: `read`, `write`, `destructive`, `sensitive_data` or `money`. */
     risk: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_MyTenantResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /**
+     * `direct` (your own tenant), `delegation` (a parent tenant let your role in) or
+     * `support` (time-limited platform support access).
+     */
+    access: string;
+    /** The delegation or support grant; `null` for `direct`. */
+    access_id?: string | null;
+    /** Send it in the header `Autoxide-Tenant` to work there. */
+    id: string;
+    name: string;
+    slug: string;
   }[];
   pagination: Pagination;
 };
@@ -24704,6 +24408,29 @@ export type Page_PasskeyResponse = {
 };
 
 /** One page of a list. */
+export type Page_PermissionResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** What the permission allows, in the language of `Accept-Language`. */
+    description: string;
+    /** `<module>.<action>`. */
+    name: string;
+    /**
+     * How careful a grant needs to be: `read`, `write`, `destructive`, `sensitive_data` or
+     * `money`.
+     */
+    risk: string;
+    /**
+     * `true` when the permission applies to data of an organization unit: a role can grant it
+     * for one unit (`unit`), a unit and everything below it (`subtree`), or only the records
+     * a person owns (`own`). `false`: it can only be granted for the whole tenant.
+     */
+    scoped: boolean;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_Pin = {
   /** The items of this page, in the requested order. */
   data: {
@@ -24723,6 +24450,29 @@ export type Page_Pin = {
      * `<record kind>:<id>` for a record (e.g. `content.entry:0190…`).
      */
     target: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_Placement = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** `sqlite` or `postgres`. */
+    backend: string;
+    /**
+     * Country of the servers (ISO 3166-1 alpha-2), for tenants that must keep their data in one
+     * country; `null` when unknown. Set with `autoxide placement country`.
+     */
+    country_code?: string | null;
+    created_at: string;
+    id: string;
+    /** `shared` (many tenants) or `dedicated` (one tenant). */
+    kind: string;
+    name: string;
+    /** `ready`, `behind` (migrations pending: its tenants answer `503`) or `migrating`. */
+    schema_state: string;
+    storage?: PlacementStorage | null;
   }[];
   pagination: Pagination;
 };
@@ -24885,6 +24635,19 @@ export type Page_PointsEntry = {
 };
 
 /** One page of a list. */
+export type Page_PromotableKind = {
+  /** The items of this page, in the requested order. */
+  data: {
+    description: string;
+    /** `<module>.<kind>`, e.g. `content.page`. */
+    kind: string;
+    /** The module that owns it. */
+    module: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_PromotionsCode = {
   /** The items of this page, in the requested order. */
   data: {
@@ -25002,6 +24765,41 @@ export type Page_PromotionsVoucher = {
     status: PromotionsVoucherStatus;
     used_order_id?: string | null;
     valid_from: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_ProviderResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** Whether someone without an account may get one by signing in. */
+    allow_signup: boolean;
+    /** Only emails at these domains may sign in; `null`: any. */
+    allowed_email_domains?: string[] | null;
+    client_id: string;
+    created_at: string;
+    /** Unit where new accounts get `default_role_id`; `null`: the root unit. */
+    default_org_id?: string | null;
+    /** Role new accounts get; `null`: none. */
+    default_role_id?: string | null;
+    enabled: boolean;
+    /** Whether a client secret is stored. The secret itself is never returned. */
+    has_secret: boolean;
+    id: string;
+    /** Issuer address; `null` for github.com. */
+    issuer?: string | null;
+    /** `google`, `microsoft`, `github` or `oidc`. */
+    kind: string;
+    name: string;
+    /** `staff` or `customer`: which accounts sign in with it. */
+    realm: Realm;
+    /** Pages of the interface the provider may send the browser back to. */
+    redirect_uris: string[];
+    /** Space-separated scopes asked for. */
+    scopes: string;
+    slug: string;
+    updated_at: string;
   }[];
   pagination: Pagination;
 };
@@ -25232,6 +25030,21 @@ export type Page_PublicProfileResponse = {
 };
 
 /** One page of a list. */
+export type Page_PublicProviderResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    id: string;
+    /** `google`, `microsoft`, `github` or `oidc`. */
+    kind: string;
+    /** Label for the "Sign in with …" button. */
+    name: string;
+    /** Name in the sign-in paths, e.g. `google` in `/api/v1/auth/oidc/google/start`. */
+    slug: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_PublicTermCount = {
   /** The items of this page, in the requested order. */
   data: (PublicTerm & {
@@ -25258,11 +25071,82 @@ export type Page_Ranked = {
 };
 
 /** One page of a list. */
+export type Page_ReasonView = {
+  /** The items of this page, in the requested order. */
+  data: {
+    active: boolean;
+    /** Declared by the module (else added by the tenant). */
+    builtin: boolean;
+    code: string;
+    /** In the language of `Accept-Language`: the tenant's own label, else the default. */
+    label: string;
+    /** The tenant's own labels, by language. */
+    labels: {
+      [key: string]: string;
+    };
+    /** Required by law: cannot be turned off. */
+    legal: boolean;
+    position: number;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_RecentlyViewed = {
   /** The items of this page, in the requested order. */
   data: {
     product_id: string;
     viewed_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_RecordEvent = {
+  /** The items of this page, in the requested order. */
+  data: {
+    actor_id?: string | null;
+    actor_name?: string | null;
+    at: string;
+    id: string;
+    /** Name of the event, e.g. `content.entry_published`. */
+    name: string;
+    /**
+     * What happened, in the language of `Accept-Language`, when the event has a readable
+     * sentence.
+     */
+    text?: string | null;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_RecordNote = {
+  /** The items of this page, in the requested order. */
+  data: {
+    author_id: string;
+    body: string;
+    created_at: string;
+    id: string;
+    /** Users the note mentions. */
+    mentions: string[];
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_RecordType = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /**
+     * `true` when records of this type form a tree (e.g. categories): a menu item can list a
+     * record's children automatically.
+     */
+    has_children: boolean;
+    /** `<module>.<type>`, e.g. `content.entry`. */
+    kind: string;
+    /** The module that owns the type. */
+    module: string;
   }[];
   pagination: Pagination;
 };
@@ -25314,6 +25198,23 @@ export type Page_ReferralRule = {
 };
 
 /** One page of a list. */
+export type Page_Release = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** Release day (`YYYY-MM-DD`); `null` for `unreleased`. */
+    date?: string | null;
+    /**
+     * The changes by kind, in the order of the changelog: `added`, `changed`, `deprecated`,
+     * `removed`, `fixed`, `security`. Each item is Markdown (in English).
+     */
+    sections: ReleaseSection[];
+    /** `0.14.0`, or `unreleased` for changes in this build that have no version yet. */
+    version: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_ReminderRule = {
   /** The items of this page, in the requested order. */
   data: {
@@ -25349,6 +25250,20 @@ export type Page_RevisionResponse = {
      * revision.
      */
     snapshot?: Record<string, unknown> | null;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_RoleCountResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /**
+     * People holding the role, at any unit; each person once. List them with
+     * `GET /api/v1/auth/memberships?role_id=…`.
+     */
+    members: number;
+    role_id: string;
   }[];
   pagination: Pagination;
 };
@@ -25591,6 +25506,21 @@ export type Page_ScheduleResponse = {
 };
 
 /** One page of a list. */
+export type Page_ScimGroupMappingResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    created_at: string;
+    created_by: string;
+    group_id: string;
+    id: string;
+    /** Organization unit; the tenant's id is the root unit. */
+    org_id: string;
+    role_id: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_ScimGroupSummaryResponse = {
   /** The items of this page, in the requested order. */
   data: {
@@ -25605,6 +25535,33 @@ export type Page_ScimGroupSummaryResponse = {
     /** How many people are in it. */
     members: number;
     updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_ScimTokenResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    created_at: string;
+    /** The user who created it. */
+    created_by: string;
+    /**
+     * State of the token's creator. A SCIM token can do only what its creator can do now. `disabled`
+     * or `deleted`: the token can no longer give, take away, disable or delete anything that needs a
+     * permission; `missing_permission`: the creator lost `auth.scim.manage` but the token keeps the
+     * creator's other roles. In every case other than `active`, create a new token from an account
+     * with the needed roles and revoke this one. `active` does not mean the creator still holds every
+     * role your group mappings give.
+     */
+    creator_status: ScimTokenCreatorStatus;
+    id: string;
+    /** Last time the identity provider used it (to within 5 minutes); `null`: never. */
+    last_used_at?: string | null;
+    /** Name to recognise the token, e.g. the identity provider it is set up in. */
+    name: string;
+    /** Start and end of the token, to recognise it; never the whole token. */
+    prefix: string;
   }[];
   pagination: Pagination;
 };
@@ -26114,6 +26071,43 @@ export type Page_SupportAutoReply = {
 };
 
 /** One page of a list. */
+export type Page_SupportGrantResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /**
+     * `support`, or `legal_request` (a request of a competent authority; the tenant cannot
+     * revoke it).
+     */
+    basis: string;
+    created_at: string;
+    expires_at: string;
+    /** When the staff first entered under it; `null`: not used. */
+    first_used_at?: string | null;
+    granted_by?: string | null;
+    id: string;
+    /** Number of the authority's document, for `legal_request`. */
+    legal_reference?: string | null;
+    reason: string;
+    revoked_at?: string | null;
+    /** `true` when the tenant revoked it. */
+    revoked_by_tenant: boolean;
+    /** The role of the platform tenant whose permissions they get. */
+    role_id: string;
+    /**
+     * Display name of that staff member, so the tenant knows who may enter; `null` when the
+     * account no longer exists.
+     */
+    staff_name?: string | null;
+    /** The platform staff account. */
+    staff_user_id: string;
+    starts_at: string;
+    /** The tenant the staff may enter. */
+    tenant_id: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_SupportMacro = {
   /** The items of this page, in the requested order. */
   data: {
@@ -26236,6 +26230,23 @@ export type Page_SuppressionResponse = {
 };
 
 /** One page of a list. */
+export type Page_SyncResourceView = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** The change feed: `GET` it with the `cursor` of the last change you applied. */
+    changes: string;
+    description: string;
+    /** `<module>.<name>`. */
+    name: string;
+    /** The list endpoint of these records; writes in a batch go under this path. */
+    path: string;
+    /** The permission needed to read them; its scope decides which records you get. */
+    read_permission: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_TagResponse = {
   /** The items of this page, in the requested order. */
   data: {
@@ -26246,6 +26257,21 @@ export type Page_TagResponse = {
     /** Unique, ignoring case. */
     name: string;
     updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_TagView = {
+  /** The items of this page, in the requested order. */
+  data: {
+    color: string;
+    created_at: string;
+    description?: string | null;
+    id: string;
+    name: string;
+    /** Records carrying it. */
+    uses: number;
   }[];
   pagination: Pagination;
 };
@@ -26450,6 +26476,72 @@ export type Page_TenantDomain = {
 };
 
 /** One page of a list. */
+export type Page_TenantExport = {
+  /** The items of this page, in the requested order. */
+  data: {
+    created_at: string;
+    error?: string | null;
+    /** The file is deleted after this time. */
+    expires_at?: string | null;
+    id: string;
+    /** `manual`, or `subscription_canceled` when the subscription was canceled. */
+    reason: string;
+    requested_by?: string | null;
+    /** Size of the file in bytes, once ready. */
+    size?: number | null;
+    /**
+     * `pending`, `running`, `ready` (download it), `failed` (see `error`) or `expired` (deleted
+     * after the retention days).
+     */
+    status: string;
+    /** Rows exported per table. */
+    tables: TenantTableRows[];
+    tenant_id: string;
+    updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_TenantSettingState = {
+  /** The items of this page, in the requested order. */
+  data: {
+    description: string;
+    /**
+     * Group of the setting, to filter the list by (`?group=`); `connection`: a connection to a
+     * partner service (mail server, AI provider, payment gateway…). `null`: no group.
+     */
+    group?: string | null;
+    /** Whether this tenant has set it; otherwise the server-wide configuration applies. */
+    is_set: boolean;
+    /** For a setting of a partner connection: why its last use failed; omitted when it worked. */
+    last_error?: string | null;
+    /**
+     * For a setting of a partner connection: the last time the connection was used (or tested
+     * with `POST /api/v1/kernel/settings/{name}/test`).
+     */
+    last_used_at?: string | null;
+    /**
+     * `<module>.<key>`, e.g. `kernel.public_url`; a partner connection is named
+     * `<module>.connection.<kind>.<field>`, e.g. `mail.connection.smtp.url`.
+     */
+    name: string;
+    /**
+     * The stored value is not used any more, and why: `kernel.public_url_unverified` /
+     * `kernel.link_unverified` / `kernel.domain_unverified` (its host is not a verified domain of this
+     * tenant — verify the domain or change the value). Omitted when the value is used.
+     */
+    problem?: string | null;
+    /** Secret settings are stored encrypted and never returned: `value` is always `null`. */
+    secret: boolean;
+    updated_at?: string | null;
+    /** The value, for settings that are not secret and are set. */
+    value?: string | null;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_TermResponse = {
   /** The items of this page, in the requested order. */
   data: {
@@ -26462,6 +26554,22 @@ export type Page_TermResponse = {
     parent_id?: string | null;
     taxonomy: Taxonomy;
     updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_TextView = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** The default wording in `locale` (`null` for `ui.*` keys: the interface owns it). */
+    default?: string | null;
+    key: string;
+    /** Required by law: cannot be replaced. */
+    legal: boolean;
+    locale: string;
+    /** The tenant's wording, when set. */
+    text?: string | null;
   }[];
   pagination: Pagination;
 };
@@ -34129,11 +34237,12 @@ export interface paths {
   "/api/v1/auth/delegations": {
     /** List the delegations of this tenant. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { direction?: "outgoing" | "incoming" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { direction?: "outgoing" | "incoming"; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_DelegationResponse;
+        200: Page_DelegationResponse;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -34153,11 +34262,12 @@ export interface paths {
   "/api/v1/auth/delegations/tenants": {
     /** List the tenants below this one, to choose where a delegation goes. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_ChildTenantResponse;
+        200: Page_ChildTenantResponse;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -34510,10 +34620,11 @@ export interface paths {
   "/api/v1/auth/me/identities": {
     /** List the outside sign-ins linked to your account. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_IdentityResponse;
+        200: Page_IdentityResponse;
         401: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -34571,10 +34682,11 @@ export interface paths {
   "/api/v1/auth/me/memberships": {
     /** List the organization units you work in, with your roles there. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_MembershipResponse;
+        200: Page_MembershipResponse;
         401: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -34777,10 +34889,11 @@ export interface paths {
   "/api/v1/auth/me/tenants": {
     /** List the tenants you can work in. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_MyTenantResponse;
+        200: Page_MyTenantResponse;
         401: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -34801,11 +34914,12 @@ export interface paths {
   "/api/v1/auth/memberships/counts": {
     /** Count the people of every organization unit. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_MemberCountResponse;
+        200: Page_MemberCountResponse;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -34813,11 +34927,12 @@ export interface paths {
   "/api/v1/auth/oidc-providers": {
     /** List the sign-in providers of this tenant, for administrators. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_ProviderResponse;
+        200: Page_ProviderResponse;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -34875,10 +34990,11 @@ export interface paths {
   "/api/v1/auth/oidc/providers": {
     /** List the sign-in providers of this tenant. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_PublicProviderResponse;
+        200: Page_PublicProviderResponse;
         404: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -34944,11 +35060,12 @@ export interface paths {
   "/api/v1/auth/permissions": {
     /** List every permission that roles can grant. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_PermissionResponse;
+        200: Page_PermissionResponse;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -35070,11 +35187,12 @@ export interface paths {
   "/api/v1/auth/roles/counts": {
     /** Count the people holding each role. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_RoleCountResponse;
+        200: Page_RoleCountResponse;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -35122,11 +35240,12 @@ export interface paths {
   "/api/v1/auth/scim/group-mappings": {
     /** List the mapping rules from SCIM groups to roles. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_ScimGroupMappingResponse;
+        200: Page_ScimGroupMappingResponse;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -35175,11 +35294,12 @@ export interface paths {
   "/api/v1/auth/scim/tokens": {
     /** List the SCIM tokens of the tenant. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_ScimTokenResponse;
+        200: Page_ScimTokenResponse;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -35401,11 +35521,12 @@ export interface paths {
   "/api/v1/auth/support-access": {
     /** List platform staff access to this tenant's data. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_SupportGrantResponse;
+        200: Page_SupportGrantResponse;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -35426,11 +35547,12 @@ export interface paths {
   "/api/v1/auth/support-grants": {
     /** List the support access grants (platform). */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { tenant_id?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { tenant_id?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_SupportGrantResponse;
+        200: Page_SupportGrantResponse;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -35556,12 +35678,13 @@ export interface paths {
   "/api/v1/auth/users/{id}/memberships": {
     /** List the organization units a user works in, with the roles there. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_MembershipResponse;
+        200: Page_MembershipResponse;
         401: Problem;
         403: Problem;
         404: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -35650,12 +35773,13 @@ export interface paths {
   "/api/v1/auth/users/{id}/roles": {
     /** List the roles of a user. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_RoleResponse;
+        200: Page_RoleResponse;
         401: Problem;
         403: Problem;
         404: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -43643,9 +43767,9 @@ export interface paths {
   "/api/v1/kernel/approvals": {
     /** List approval requests. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { status?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_ApprovalRequest;
+        200: Page_ApprovalRequest;
         401: Problem;
         422: Problem;
         default: Problem;
@@ -43697,10 +43821,11 @@ export interface paths {
   "/api/v1/kernel/blocks": {
     /** List the block types this tenant can use. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_BlockTypeView;
+        200: Page_BlockTypeView;
         401: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -43738,11 +43863,12 @@ export interface paths {
   "/api/v1/kernel/connections/webhooks": {
     /** List the webhook addresses of this tenant. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_ConnectionWebhook;
+        200: Page_ConnectionWebhook;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -43750,9 +43876,9 @@ export interface paths {
   "/api/v1/kernel/custom-fields": {
     /** List custom fields. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { target?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { target?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_CustomFieldView;
+        200: Page_CustomFieldView;
         401: Problem;
         403: Problem;
         422: Problem;
@@ -43814,9 +43940,9 @@ export interface paths {
   "/api/v1/kernel/devtools/events": {
     /** List the events of a record. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { object: string; limit?: number }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { object: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_RecordEvent;
+        200: Page_RecordEvent;
         401: Problem;
         403: Problem;
         422: Problem;
@@ -44006,9 +44132,9 @@ export interface paths {
   "/api/v1/kernel/jobs": {
     /** List background jobs. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; kind?: string; limit?: number }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; kind?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_JobRunView;
+        200: Page_JobRunView;
         401: Problem;
         422: Problem;
         default: Problem;
@@ -44056,11 +44182,12 @@ export interface paths {
   "/api/v1/kernel/modules": {
     /** List the installed modules. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_ModuleInfo;
+        200: Page_ModuleInfo;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -44118,11 +44245,12 @@ export interface paths {
   "/api/v1/kernel/placements": {
     /** List the placements. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_Placement;
+        200: Page_Placement;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -44130,11 +44258,12 @@ export interface paths {
   "/api/v1/kernel/placements/migrations": {
     /** List the recent migration runs. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_MigrationRun;
+        200: Page_MigrationRun;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -44181,11 +44310,12 @@ export interface paths {
   "/api/v1/kernel/reasons/{list}": {
     /** List the reasons of a list. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; path: { list: string }; query: { include_inactive?: boolean }; };
+      parameters: { header: { "Accept-Language"?: string }; path: { list: string }; query: { include_inactive?: boolean; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_ReasonView;
+        200: Page_ReasonView;
         401: Problem;
         404: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -44209,10 +44339,11 @@ export interface paths {
   "/api/v1/kernel/records/types": {
     /** List the types of record that menus, embeds and notes can point to. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_RecordType;
+        200: Page_RecordType;
         401: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -44220,9 +44351,9 @@ export interface paths {
   "/api/v1/kernel/records/{kind}/{id}/activity": {
     /** Get the activity of a record. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; path: { kind: string; id: string }; query: { limit?: number }; };
+      parameters: { header: { "Accept-Language"?: string }; path: { kind: string; id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_ActivityItem;
+        200: Page_ActivityItem;
         401: Problem;
         404: Problem;
         422: Problem;
@@ -44233,11 +44364,12 @@ export interface paths {
   "/api/v1/kernel/records/{kind}/{id}/notes": {
     /** List the notes of a record. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; path: { kind: string; id: string }; };
+      parameters: { header: { "Accept-Language"?: string }; path: { kind: string; id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_RecordNote;
+        200: Page_RecordNote;
         401: Problem;
         404: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -44356,11 +44488,12 @@ export interface paths {
   "/api/v1/kernel/sandboxes/promotable": {
     /** List the kinds of records that can be promoted from a sandbox. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_PromotableKind;
+        200: Page_PromotableKind;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -44409,11 +44542,12 @@ export interface paths {
   "/api/v1/kernel/settings": {
     /** List this tenant's settings. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { group?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { group?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_TenantSettingState;
+        200: Page_TenantSettingState;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -44494,10 +44628,11 @@ export interface paths {
   "/api/v1/kernel/sync/resources": {
     /** List what an offline app can keep in sync. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_SyncResourceView;
+        200: Page_SyncResourceView;
         401: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -44505,11 +44640,12 @@ export interface paths {
   "/api/v1/kernel/tags": {
     /** List the tags. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_TagView;
+        200: Page_TagView;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -44695,12 +44831,13 @@ export interface paths {
   "/api/v1/kernel/tenants/{id}/exports": {
     /** List the data exports of a tenant. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_TenantExport;
+        200: Page_TenantExport;
         401: Problem;
         403: Problem;
         404: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -44818,12 +44955,13 @@ export interface paths {
   "/api/v1/kernel/tenants/{id}/settings": {
     /** List a tenant's settings (platform staff). */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { group?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { group?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_TenantSettingState;
+        200: Page_TenantSettingState;
         401: Problem;
         403: Problem;
         404: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -44860,11 +44998,12 @@ export interface paths {
   "/api/v1/kernel/texts": {
     /** List the texts a tenant may replace. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { locale?: string; prefix?: string; overridden?: boolean }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { locale?: string; prefix?: string; overridden?: boolean; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_TextView;
+        200: Page_TextView;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -44897,9 +45036,9 @@ export interface paths {
   "/api/v1/kernel/whats-new": {
     /** List what is new in this server. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { since?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { since?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_Release;
+        200: Page_Release;
         422: Problem;
         default: Problem;
       };

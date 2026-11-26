@@ -33,6 +33,8 @@ mod hardening_tests;
 mod http;
 mod invitation;
 mod links;
+#[cfg(test)]
+mod list_pages_tests;
 mod login_link;
 #[cfg(test)]
 mod login_policy_tests;
