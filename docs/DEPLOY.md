@@ -1282,6 +1282,9 @@ lock on its own connection; if a proxy or a failover cuts that connection the lo
 run stops before the next tenant database (run it again). Keep PgBouncer in session mode for the
 command, or point it straight at the database. On SQLite the locks are files next to the database
 (`.migrate-lock`, `.placements-lock`); an in-memory SQLite database has no lock (one process only).
+`migrate up --all` keeps the main lock while it waits (up to 15 minutes) for the tenant-database lock,
+so during that wait a server that starts with work to do on start (`AUTOXIDE_MIGRATE_ON_START`, the
+first administrator, start-up tasks) waits too.
 During a rolling update from a release older than this lock, servers of the old version may still run
 a migration run without it: let the update finish before starting runs from the API.
 

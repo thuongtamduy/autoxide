@@ -1234,7 +1234,9 @@ khách không bao giờ làm máy chủ đang khởi động phải chờ. Trên
 trên kết nối riêng; proxy hay failover cắt kết nối đó thì khoá mất, và lượt dừng trước database của
 khách kế tiếp (chạy lại). Dùng PgBouncer ở chế độ session cho lệnh này, hoặc trỏ thẳng vào database.
 Trên SQLite khoá là các file cạnh database (`.migrate-lock`, `.placements-lock`); SQLite trong bộ nhớ
-không có khoá (chỉ một tiến trình). Trong lúc cập nhật cuốn chiếu từ một bản cũ hơn khoá này, máy chủ
+không có khoá (chỉ một tiến trình). `migrate up --all` giữ khoá chính trong lúc chờ (tới 15 phút) khoá
+database của khách, nên trong lúc đó máy chủ khởi động có việc lúc khởi động (`AUTOXIDE_MIGRATE_ON_START`,
+quản trị viên đầu tiên, task khởi động) cũng phải chờ. Trong lúc cập nhật cuốn chiếu từ một bản cũ hơn khoá này, máy chủ
 bản cũ còn có thể chạy lượt migrate mà không giữ khoá: chờ cập nhật xong rồi mới chạy lượt từ API.
 
 ### Cập nhật khi hai phiên bản cùng chạy

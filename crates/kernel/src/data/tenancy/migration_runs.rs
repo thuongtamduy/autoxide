@@ -433,18 +433,15 @@ impl PlacementMigrationQueue {
         PlacementMigrationQueue(runs)
     }
 
-    /// Queues a run of every placement when one is not `ready` (pending migrations, cannot connect, left
-    /// `migrating`). `None` when every placement is ready, or a run is already queued or running.
+    /// Queues a run of every placement (the run skips quickly the ones with nothing pending). `None` when there is
+    /// no placement besides `main`, or a run is already queued or running.
     pub async fn queue_pending(&self) -> Result<Option<Uuid>, Error> {
-        // Theo trạng thái đã lưu ở database điều khiển (như `doctor`), không mở kết nối tới từng placement: lúc
-        // khởi động, một placement không trả lời không được làm chậm việc mở port. `serve` kiểm định kỳ sẽ cập
-        // nhật trạng thái; placement đã `ready` mà bản mới có migration thì lần kiểm đó đặt `behind`.
+        // Có placement nào (ngoài `main`) là xếp một lượt, không xét trạng thái đã lưu: sau khi nâng bản, trạng thái
+        // vẫn là `ready` do bản cũ ghi dù bản mới có migration mới. Lượt rẻ với placement không có việc (job đọc
+        // migration chờ trước, không lật `migrating`), và việc xếp không mở kết nối tới từng placement nên không làm
+        // chậm khởi động.
         let placements = self.0.setup.placements()?.list().await?;
-        let ready = super::SchemaState::Ready.as_str();
-        if placements
-            .iter()
-            .all(|found| found.id == super::MAIN_PLACEMENT.as_uuid() || found.schema_state == ready)
-        {
+        if placements.iter().all(|found| found.id == super::MAIN_PLACEMENT.as_uuid()) {
             return Ok(None);
         }
         match self.0.start(Actor::system(), None).await {

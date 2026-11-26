@@ -165,6 +165,10 @@ async fn migrate_luc_khoi_dong_nang_ca_placement() {
     fn settings_for_worker(url: &str) -> Settings {
         settings(url, &[("AUTOXIDE_MIGRATE_ON_START", "false")])
     }
+    /// Như máy chủ của bản mới khởi động với `AUTOXIDE_MIGRATE_ON_START=true`.
+    fn settings_for_worker_on_start(url: &str) -> Settings {
+        settings(url, &[])
+    }
 
     use autoxide_kernel::migration::prelude::{SchemaManager, Table};
     use autoxide_kernel::migration::schema;
@@ -230,6 +234,26 @@ async fn migrate_luc_khoi_dong_nang_ca_placement() {
                 ("b-good".to_owned(), SchemaState::Ready)
             ]
         );
+
+        // Nâng bản: `b-good` đang `ready` (trạng thái lưu từ bản cũ) mà bản mới có migration mới (giả lập bằng gỡ
+        // migration cuối của `auth`). Khởi động vẫn xếp lượt, và lượt nâng nó.
+        let source = ConfigSource::from_pairs([("DATABASE_URL", good.as_str())]);
+        let good_database = autoxide_kernel::database::Database::connect(
+            &crate::settings::read(&source).unwrap().config.database,
+        )
+        .await
+        .unwrap();
+        let migrator = settings_for_worker(test.url()).modules.migrator().unwrap();
+        migrator.down(&good_database, "auth", 1).await.unwrap();
+        start_and_stop(settings_for_worker_on_start(test.url())).await.unwrap();
+        let runtime = runtime::start(settings_for_worker(test.url()), Migrations::RequireApplied)
+            .await
+            .unwrap();
+        let worker = runtime.modules.worker(1).unwrap();
+        while worker.run_once().await.unwrap() > 0 {}
+        runtime.database.close().await.unwrap();
+        assert!(migrator.pending(&good_database).await.unwrap().is_empty());
+        good_database.close().await.unwrap();
         blocked.close().await.unwrap();
         database.close().await.unwrap();
     })
