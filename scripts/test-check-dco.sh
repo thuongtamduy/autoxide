@@ -57,11 +57,20 @@ expect 1 "commented-out login is not a maintainer" "$script" "$base" "$unsigned"
 expect 1 "trailing comment is not a maintainer"   "$script" "$base" "$unsigned" trailing-comment
 expect 0 "a login after a team on the line is read" "$script" "$base" "$unsigned" bob
 
-# Un PR đổi CODEOWNERS của chính nó để tự miễn: danh sách phải lấy từ nhánh base, nên vẫn bị chặn.
+# Một PR đổi CODEOWNERS của chính nó để tự miễn: danh sách phải lấy từ nhánh base, nên vẫn bị chặn.
 git checkout -q "$base"
 commit "add myself" .github/CODEOWNERS $'*  @stranger\n'
 selfish="$(git rev-parse HEAD)"
 expect 1 "a pull request cannot add itself to CODEOWNERS" "$script" "$base" "$selfish" stranger
+
+# Base chưa có CODEOWNERS (khởi động): miễn kiểm; nhưng PR không tự miễn bằng CODEOWNERS của mình khi base ĐÃ có.
+git checkout -q --orphan fresh
+git rm -rfq . >/dev/null
+echo seed > seed.txt
+git add -A && git commit -q -m "seed"
+fresh_base="$(git rev-parse HEAD)"
+commit "adds CODEOWNERS first time" .github/CODEOWNERS $'*  @someone\n'
+expect 0 "base without CODEOWNERS is not checked" "$script" "$fresh_base" HEAD stranger
 
 echo "check-dco tests: $pass passed, $fail failed"
 [ "$fail" = 0 ]

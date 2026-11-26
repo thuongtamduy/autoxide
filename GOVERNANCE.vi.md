@@ -74,4 +74,6 @@ issue công khai. Bất đồng về hướng kỹ thuật theo các luật quy�
 
 ## Sửa tài liệu này
 
-Sửa tài liệu này là một pull request cần chủ dự án duyệt.
+Sửa tài liệu này là một pull request cần chủ dự án duyệt. Các file quyết định ai được miễn kiểm hay cách phát hành (`.github/`,
+`scripts/`) được liệt kê trong `.github/CODEOWNERS`; cài đặt repo phải bật **code owner review** cho `main` thì điều đó mới có hiệu
+lực (việc của chủ dự án, xem `docs/OPENSSF.vi.md`).

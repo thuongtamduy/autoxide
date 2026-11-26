@@ -16,8 +16,9 @@ on:
 
 permissions: {}
 
+# Mỗi tag một hàng đợi: hai bản phát hành sát nhau không huỷ nhau; việc đẩy vào gh-pages tự chịu đua (script thử lại).
 concurrency:
-  group: docs-site
+  group: docs-site-${{ inputs.tag || github.ref_name }}
   cancel-in-progress: false
 
 jobs:
@@ -30,6 +31,10 @@ jobs:
     env:
       TAG: ${{ inputs.tag || (github.ref_type == 'tag' && github.ref_name) || '' }}
     steps:
+      # Tag đi vào đường dẫn thư mục và dòng lệnh: chỉ nhận đúng dạng phiên bản.
+      - name: Validate the tag
+        run: |
+          [ -z "$TAG" ] || [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]] || { echo "::error::bad tag: $TAG"; exit 1; }
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -56,6 +61,10 @@ jobs:
     env:
       TAG: ${{ inputs.tag || github.ref_name }}
     steps:
+      # Tag đi vào đường dẫn thư mục và dòng lệnh: chỉ nhận đúng dạng phiên bản.
+      - name: Validate the tag
+        run: |
+          [ -z "$TAG" ] || [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]] || { echo "::error::bad tag: $TAG"; exit 1; }
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false

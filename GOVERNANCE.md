@@ -75,4 +75,6 @@ public issue. Disagreements about technical direction follow the decision rules 
 
 ## Changing this document
 
-Changes to this document are a pull request that needs approval from the project owner.
+Changes to this document are a pull request that needs approval from the project owner. Files that decide who is exempt from
+checks or how releases are made (`.github/`, `scripts/`) are listed in `.github/CODEOWNERS`; the repository settings must
+require a **code owner review** on `main` for that to bind (a setting of the project owner, see `docs/OPENSSF.md`).

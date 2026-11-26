@@ -16,6 +16,13 @@ author="${3:-}"
 # danh sách của chính nó thì không được tự miễn. Quy tắc đọc: bỏ từ `#` tới hết dòng; chỉ nhận token đứng riêng giữa khoảng
 # trắng có dạng `@login` (chữ, số, gạch ngang); token có `/` (team `@org/team`) và email không phải người duy trì; so
 # không phân biệt hoa thường.
+# Khởi động: nhánh base CHƯA có CODEOWNERS (pull request thêm nó lần đầu) thì chưa có danh sách người duy trì đáng tin để đối
+# chiếu, nên bỏ qua kiểm. Chỉ áp khi base thiếu file — không bao giờ theo nội dung CODEOWNERS của chính PR; sau khi file có
+# trên base, mọi PR đều bị kiểm.
+if ! git cat-file -e "$base:.github/CODEOWNERS" 2>/dev/null; then
+  echo "DCO: the base branch has no .github/CODEOWNERS yet (this pull request adds it): nothing to check against."
+  exit 0
+fi
 maintainers="$(git show "$base:.github/CODEOWNERS" 2>/dev/null \
   | sed 's/#.*$//' | tr -s '[:space:]' '\n' \
   | grep -E '^@[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?$' | tr -d '@' | sort -u || true)"

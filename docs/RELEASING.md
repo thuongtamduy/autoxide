@@ -78,6 +78,17 @@ Ghi cho người ngoài ở [`SECURITY.md`](../SECURITY.md#supported-versions) (
   cập nhật.
 - Hết hạn hỗ trợ của một dòng thì xoá nó khỏi bảng trong `SECURITY.md`.
 
+## Website tài liệu có phiên bản
+
+Mỗi bản phát hành tự đăng bộ tài liệu của đúng tag lên GitHub Pages (nhánh `gh-pages`, D-20261126-docs-site-mdbook): `Auto
+release` tạo tag bằng `GITHUB_TOKEN` (không kích hoạt workflow nào theo `push: tags`) nên gọi tường minh `release.yml` và
+`docs-site.yml` bằng `workflow_dispatch` ở cùng chỗ. Tag đẩy tay thì `docs-site.yml` chạy theo `push: tags`.
+
+- Đăng lại một tag: Actions → "Docs site" → Run workflow, chọn tag (ô `tag`). Chỉ làm được cho tag có `docs-site.yml` và
+  `scripts/build-docs-site.py` — **tag cũ hơn thay đổi này không có chúng**, nên tài liệu của bản cũ không đăng bù được bằng cách này.
+- Chưa bật GitHub Pages (Settings → Pages → nguồn: nhánh `gh-pages`) thì workflow vẫn đăng vào nhánh, chỉ chưa có trang.
+- `latest` luôn là bản chính thức cao nhất; bản thử (`-rc.N`) và bản vá của dòng cũ có thư mục riêng nhưng không giành `latest`.
+
 ## Khi làm việc hằng ngày
 
 Mỗi thay đổi hành vi mà người dùng thấy (API, cấu hình, CLI, migration, Docker) thêm một **file

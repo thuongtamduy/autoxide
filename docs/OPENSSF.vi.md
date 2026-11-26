@@ -19,7 +19,7 @@ Thêm huy hiệu vào README sau khi lần chạy đầu đã công bố:
 
 Một số mục phụ thuộc cài đặt repo mà workflow không đổi được. Người duy trì phải đặt trong **Settings → Branches**
 (branch protection hay ruleset cho `main`): bắt buộc pull request, bắt buộc các status check `gate (…)`, bắt buộc ít
-nhất một người duyệt, chặn force push. Bật các mục này là cải thiện điểm lớn nhất.
+nhất một người duyệt, **bắt buộc review của code owner** (để thay đổi trong `.github/` và `scripts/` cần chủ sở hữu), chặn force push. Bật các mục này là cải thiện điểm lớn nhất.
 
 ## Huy hiệu OpenSSF Best Practices (trả lời trên web)
 

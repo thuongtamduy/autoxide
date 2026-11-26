@@ -19,7 +19,8 @@ Add the badge to the README once the first run has published:
 
 Some checks depend on repository settings that a workflow cannot change. The maintainers must set them in
 **Settings → Branches** (branch protection or a ruleset on `main`): require pull requests, require the `gate (…)`
-status checks, require at least one approving review, block force pushes. Turning these on is the largest single
+status checks, require at least one approving review, **require review from code owners** (so changes under `.github/` and `scripts/`
+need the owners), block force pushes. Turning these on is the largest single
 improvement of the score.
 
 ## OpenSSF Best Practices badge (answered on the web)

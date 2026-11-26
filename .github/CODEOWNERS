@@ -7,6 +7,7 @@
 # Vùng cần review độc lập (D-20261126-independent-review): kernel, bảo mật, tiền, thuế, quy trình phát hành.
 /crates/kernel/            @thuongtamduy
 /.github/                  @thuongtamduy
+/scripts/                  @thuongtamduy
 /SECURITY.md               @thuongtamduy
 /SECURITY.vi.md            @thuongtamduy
 /GOVERNANCE.md             @thuongtamduy

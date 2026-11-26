@@ -20,21 +20,24 @@ if [ "$(git rev-parse --abbrev-ref HEAD)" != gh-pages ]; then
   git clean -fdxq
 fi
 
-rm -rf "$tag"
-cp -r "$built/$tag" "$tag"
+# Một lần làm: thêm thư mục của tag, tính lại latest / versions.json, commit, đẩy. Đẩy thất bại vì người khác vừa đẩy (hai bản phát
+# hành sát nhau) thì lấy lại gh-pages mới nhất rồi làm lại từ đầu trên đó — cả hai thư mục phiên bản đều vào.
+publish_once() {
+  rm -rf "$tag"
+  cp -r "$built/$tag" "$tag"
 
-# Danh sách phiên bản đã đăng (thư mục dạng vX.Y.Z...), mới nhất trước; bản thử (-rc) có trong danh sách.
-versions="$(find . -maxdepth 1 -type d -name 'v[0-9]*' -printf '%f\n' | sort -rV)"
-# `latest` là bản chính thức cao nhất (không phải bản thử, không phải bản vá của dòng cũ).
-latest="$(grep -v -- '-' <<<"$versions" | head -n 1 || true)"
-if [ "$latest" = "$tag" ]; then
-  rm -rf latest
-  cp -r "$tag" latest
-fi
-jq -n --arg latest "${latest:-}" --argjson versions "$(jq -R . <<<"$versions" | jq -s .)" \
-  '{latest: $latest, versions: $versions}' > versions.json
-touch .nojekyll
-cat > index.html <<'HTML'
+  # Danh sách phiên bản đã đăng (thư mục dạng vX.Y.Z...), mới nhất trước; bản thử (-rc) có trong danh sách.
+  versions="$(find . -maxdepth 1 -type d -name 'v[0-9]*' -printf '%f\n' | sort -rV)"
+  # `latest` là bản chính thức cao nhất (không phải bản thử, không phải bản vá của dòng cũ).
+  latest="$(grep -v -- '-' <<<"$versions" | head -n 1 || true)"
+  if [ "$latest" = "$tag" ]; then
+    rm -rf latest
+    cp -r "$tag" latest
+  fi
+  jq -n --arg latest "${latest:-}" --argjson versions "$(jq -R . <<<"$versions" | jq -s .)" \
+    '{latest: $latest, versions: $versions}' > versions.json
+  touch .nojekyll
+  cat > index.html <<'HTML'
 <!doctype html>
 <meta charset="utf-8">
 <title>Autoxide documentation</title>
@@ -42,12 +45,24 @@ cat > index.html <<'HTML'
 <p><a href="latest/en/">Autoxide documentation</a> · <a href="latest/vi/">Tài liệu tiếng Việt</a></p>
 HTML
 
-git add -A
-if git diff --cached --quiet; then
-  echo "nothing to publish"
-  exit 0
-fi
-git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
-  commit --quiet -m "docs: publish $tag"
-git push --quiet origin HEAD:gh-pages
-echo "published $tag"
+  git add -A
+  if git diff --cached --quiet; then
+    echo "nothing to publish"
+    return 0
+  fi
+  git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+    commit --quiet -m "docs: publish $tag"
+  git push --quiet origin HEAD:gh-pages
+}
+
+for attempt in 1 2 3; do
+  if publish_once; then
+    echo "published $tag"
+    exit 0
+  fi
+  echo "push to gh-pages failed (attempt $attempt): fetching the latest gh-pages and trying again" >&2
+  git fetch --quiet origin gh-pages
+  git reset --quiet --hard origin/gh-pages
+done
+echo "could not publish $tag after 3 attempts" >&2
+exit 1

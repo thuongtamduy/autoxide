@@ -3,7 +3,7 @@
 Chủ đề: Quy trình, gate, lộ trình
 
 Quyết định: Website tài liệu chính thức (hướng dẫn, tham chiếu API, tài liệu cho người viết module; bước 71 G13) dùng
-**mdBook** (công cụ của chính sách Rust Book; tìm kiếm có sẵn, ra HTML tĩnh), dựng bằng `scripts/build-docs-site.sh`
+**mdBook** (công cụ của chính sách Rust Book; tìm kiếm có sẵn, ra HTML tĩnh), dựng bằng `scripts/build-docs-site.py`
 từ các file Markdown sẵn có (không viết lại tài liệu). Mỗi bản phát hành (tag `vX.Y.Z`) được dựng thành một thư mục
 `/vX.Y.Z/<ngôn ngữ>/` kèm `/latest/` (chuyển hướng tới bản chính thức cao nhất) và `versions.json` cho bộ chọn phiên bản;
 tiếng Anh và tiếng Việt là hai cuốn sách song song (`en`, `vi`) dựng từ cặp `X.md` / `X.vi.md` đã có. Workflow
