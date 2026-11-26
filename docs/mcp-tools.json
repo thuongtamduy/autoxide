@@ -5542,6 +5542,37 @@
     {
       "annotations": {
         "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Unlock sign-in codes for a phone number locked after 100 wrong codes in a row, so its owner can sign in with a code again. Check who asks first; the audit log records who unlocked it.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A phone number whose sign-in codes should be unlocked.",
+        "properties": {
+          "phone": {
+            "description": "The number, e.g. `0912345678` or `+84912345678`.",
+            "example": "0912345678",
+            "type": "string"
+          }
+        },
+        "required": [
+          "phone"
+        ],
+        "type": "object"
+      },
+      "name": "compliance.unlock_phone",
+      "output_schema": null,
+      "permissions": [
+        "compliance.phone_locks.manage"
+      ],
+      "stability": "official"
+    },
+    {
+      "annotations": {
+        "destructive": false,
         "read_only": true,
         "requires_approval_for_agent": false,
         "returns_secret": false
