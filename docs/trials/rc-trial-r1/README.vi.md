@@ -87,10 +87,7 @@ phẩm, đơn nháp (thiếu tool; xem UT-5).
 
 Lỗi thật:
 
-- **Key quyền tối thiểu thu hồi được key khác của cùng người dùng.** Tạo key A (`content.read` + `content.write_own`) và
-  key B (`audit.read` + `content.read`). Bằng B: `tools/call auth.revoke_api_key {"id":"<A>"}` trả `revoked`; A sau đó
-  bị 401. Tool này không cần permission (tạo key thì cấm với key). Mong đợi: key chỉ thu hồi được chính nó, hoặc thu hồi
-  cần permission riêng. (Bảo mật: phải qua kiểm độc lập.)
+- **Phân quyền khi quản lý API key qua MCP chưa đúng phạm vi** (đã báo kín; chi tiết giữ lại, công bố sau khi sửa).
 - `catalog.create_product` nhận `"tax_category":"nope"` và lưu (mô tả nói mã phải thuộc `GET /api/v1/tax/categories`).
 - `catalog.list_products readiness:"x"`, `audit.list_entries module:"nope"` hay `subject:"bad"` trả danh sách rỗng thay
   vì lỗi (`status` sai thì có báo lỗi): không nhất quán.
@@ -168,7 +165,7 @@ Lỗi thật:
 
 ## Tổng hợp theo ưu tiên
 
-1. **Chặn 1.0:** UT-1 (tồn kho không giảm khi giao hàng), UT-2 (key quyền tối thiểu thu hồi được key khác).
+1. **Chặn 1.0:** UT-1 (tồn kho không giảm khi giao hàng), UT-2 (phân quyền API key qua MCP chưa đúng phạm vi, chi tiết giữ kín).
 2. **Khó chịu, nên sửa trước khi mở kênh phản hồi RC:** UT-3 (đường nhanh nhất khi không có Docker: binary, secret,
    `migrate up`, cổng, PostgreSQL), UT-4 (không thử được bán hàng nếu chưa có nhà cung cấp thật; hướng dẫn shop thiếu
    bước), UT-5 (tool MCP: thiếu mô tả tham số, bảng giá / khách, kiểm giá trị), UT-6 (id thanh toán, header idempotency,

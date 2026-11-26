@@ -249,8 +249,8 @@ chỉ số của G9 đạt ngưỡng.
       các mục dưới đây đều có mã UT-x trong báo cáo; xong hết thì chạy vòng 2 trên `1.0.0-rc.1`
   - [ ] UT-1 (chặn): giao hàng không ghi dòng `sale` vào kho — `on_hand` không giảm, reservation vẫn `confirmed`, đơn vẫn
         `unfulfilled` sau `delivered`; có test chạy trên cả hai database; chạm tiền / kho nên qua kiểm độc lập
-  - [ ] UT-2 (chặn): tool MCP `auth.revoke_api_key` cho key quyền tối thiểu thu hồi key khác của cùng người dùng; ghi rõ ai
-        được thu hồi (chính nó, hay cần permission riêng) và test; chạm bảo mật nên qua kiểm độc lập
+  - [ ] UT-2 (chặn): phân quyền khi quản lý API key qua MCP chưa đúng phạm vi (đã báo kín, công bố sau khi sửa); có test;
+        chạm bảo mật nên qua kiểm độc lập
   - [ ] UT-3: đường chạy bằng binary không Docker cho người mới: README trỏ tới DEPLOY.md mục B, hai secret ở bước
         `.env`, `migrate up` trước `serve`, `AUTOXIDE_HTTP_ADDRESS`, mục "binary + PostgreSQL từ đầu", một ví dụ GET có
         dữ liệu; `config` cảnh báo biến `AUTOXIDE_*` lạ; lỗi đọc `.env` nêu tên biến

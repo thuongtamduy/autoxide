@@ -87,10 +87,8 @@ customer, product, draft order (no tools for it; see UT-5).
 
 Real bugs:
 
-- **A least-privilege key can revoke another key of the same user.** Make key A (`content.read` + `content.write_own`) and
-  key B (`audit.read` + `content.read`). With B: `tools/call auth.revoke_api_key {"id":"<A>"}` returns `revoked`; A is
-  then 401. The tool needs no permission (creating keys is forbidden for keys). Expected: a key may revoke only
-  itself, or revoking needs its own permission. (Security: independent review required.)
+- **An authorization scope problem in API-key management over MCP** (reported privately; details withheld until it is
+  fixed and then published).
 - `catalog.create_product` accepts `"tax_category":"nope"` and stores it (the description says it must be in
   `GET /api/v1/tax/categories`).
 - `catalog.list_products readiness:"x"`, `audit.list_entries module:"nope"` or `subject:"bad"` return an empty list
@@ -169,7 +167,7 @@ Real bugs:
 
 ## Summary by priority
 
-1. **Blocking for 1.0:** UT-1 (stock never decreases on delivery), UT-2 (a minimal key can revoke other keys).
+1. **Blocking for 1.0:** UT-1 (stock never decreases on delivery), UT-2 (API-key scope problem over MCP, details withheld).
 2. **Annoying, fix before the RC feedback window:** UT-3 (fastest path without Docker: binary, secrets, `migrate up`,
    port, PostgreSQL), UT-4 (no way to try a sale without real providers; shop guide missing steps), UT-5 (MCP tools:
    missing parameter descriptions, price lists / customers, validation of values), UT-6 (payment ids, idempotency
