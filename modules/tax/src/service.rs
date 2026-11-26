@@ -121,13 +121,13 @@ pub(crate) fn profile_not_found() -> Error {
     )
 }
 
-/// `from <= on < to` (nửa mở), ngày dạng `YYYY-MM-DD` so sánh như chữ.
 /// Múi giờ trong giá trị JSON (dạng chuỗi) của quy tắc [`TIME_ZONE_RULE`]: `{"time_zone": "…"}`.
 pub(crate) fn rule_time_zone(raw: &str) -> Option<jiff::tz::TimeZone> {
     let value: serde_json::Value = serde_json::from_str(raw).ok()?;
     value["time_zone"].as_str().and_then(autoxide_kernel::time::zone)
 }
 
+/// `from <= on < to` (nửa mở), ngày dạng `YYYY-MM-DD` so sánh như chữ.
 fn in_force(from: &str, to: Option<&str>, on: &str) -> bool {
     from <= on && to.is_none_or(|to| on < to)
 }
@@ -458,22 +458,10 @@ impl TaxService {
         org: OrgId,
         at: Timestamp,
     ) -> Result<Date, Error> {
-        if let Some(found) = self.nearest_profile(tenant, org).await? {
-            let tables = self.tables().await?;
-            // Tìm quy tắc theo ngày UTC: múi giờ của một vùng không đổi sát ranh giới ngày.
-            let day = at.date_utc().format("%Y-%m-%d").to_string();
-            let zone = tables
-                .rules
-                .iter()
-                .filter(|rule| {
-                    rule.jurisdiction == found.jurisdiction
-                        && rule.code == TIME_ZONE_RULE
-                        && in_force(&rule.effective_from, rule.effective_to.as_deref(), &day)
-                })
-                .find_map(|rule| rule_time_zone(&rule.value));
-            if let Some(zone) = zone {
-                return Ok(at.date_in(&zone));
-            }
+        if let Some(found) = self.nearest_profile(tenant, org).await?
+            && let Some(day) = self.jurisdiction_date(&found.jurisdiction, at).await?
+        {
+            return Ok(day);
         }
         if let Some(orgs) = &self.orgs {
             match orgs.setting(tenant, org, "organizations.timezone").await {
@@ -491,6 +479,44 @@ impl TaxService {
             }
         }
         Ok(at.date_utc())
+    }
+
+    /// Ngày của thời điểm `at` theo múi giờ của vùng thuế `jurisdiction` (quy tắc [`TIME_ZONE_RULE`]);
+    /// `None`: vùng không khai múi giờ.
+    pub(crate) async fn jurisdiction_date(
+        &self,
+        jurisdiction: &str,
+        at: Timestamp,
+    ) -> Result<Option<Date>, Error> {
+        let tables = self.tables().await?;
+        // Tìm quy tắc theo ngày UTC: múi giờ của một vùng không đổi sát ranh giới ngày.
+        let day = at.date_utc().format("%Y-%m-%d").to_string();
+        Ok(tables
+            .rules
+            .iter()
+            .filter(|rule| {
+                rule.jurisdiction == jurisdiction
+                    && rule.code == TIME_ZONE_RULE
+                    && in_force(&rule.effective_from, rule.effective_to.as_deref(), &day)
+            })
+            .find_map(|rule| rule_time_zone(&rule.value))
+            .map(|zone| at.date_in(&zone)))
+    }
+
+    /// Vùng thuế đã nhập không có quy tắc [`TIME_ZONE_RULE`] đang hiệu lực vào lúc `at`.
+    pub(crate) async fn jurisdictions_without_time_zone(
+        &self,
+        at: Timestamp,
+    ) -> Result<Vec<String>, Error> {
+        let codes: Vec<String> =
+            self.tables().await?.jurisdictions.iter().map(|found| found.code.clone()).collect();
+        let mut missing = Vec::new();
+        for code in codes {
+            if self.jurisdiction_date(&code, at).await?.is_none() {
+                missing.push(code);
+            }
+        }
+        Ok(missing)
     }
 
     /// Thuế suất hết hạn trong `warning_days` ngày tính từ `today` mà không có thuế suất nối tiếp

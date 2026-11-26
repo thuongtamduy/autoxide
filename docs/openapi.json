@@ -194767,7 +194767,7 @@
                 }
               }
             },
-            "description": "The series is retired (`invoices.series_inactive`) or the booking day is in a closed period (`ledger.period_closed`)."
+            "description": "The series is retired (`invoices.series_inactive`), the booking day is in a closed period (`ledger.period_closed`), or the draft was edited while being issued (`invoices.draft_changed`; issue again)."
           },
           "422": {
             "content": {

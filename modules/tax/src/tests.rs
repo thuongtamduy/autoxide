@@ -335,6 +335,8 @@ async fn ngay_thue_theo_gio_viet_nam_o_ranh_gioi_het_giam_thue() {
         let cases = [
             // 23:30 giờ Việt Nam ngày 31/12/2026: còn 8%.
             ("2026-12-31T16:30:00Z", Date::new(2026, 12, 31).unwrap(), "8"),
+            // 23:59:59 giờ Việt Nam ngày 31/12/2026: giây cuối còn 8%.
+            ("2026-12-31T16:59:59Z", Date::new(2026, 12, 31).unwrap(), "8"),
             // 00:00 giờ Việt Nam ngày 01/01/2027 (17:00 UTC ngày 31/12): hết giảm thuế.
             ("2026-12-31T17:00:00Z", Date::new(2027, 1, 1).unwrap(), "10"),
             // 00:30 và 06:59 giờ Việt Nam ngày 01/01/2027: vẫn ngày 31/12 theo UTC.

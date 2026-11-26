@@ -18,6 +18,18 @@ Căn cứ (rà pháp lý vòng 1, LG-2): NĐ 123/2020/NĐ-CP sửa bởi NĐ 70/
 [thuvienphapluat](https://thuvienphapluat.vn/ma-so-thue/phap-luat-thue/chi-tiet-mat-hang-giam-thue-gtgt-tu-10-xuong-8-den-het-nam-2026-892633-222484.html)).
 Số hiệu và ngày tra bằng tìm kiếm web ngày 26/11/2026 qua nguồn thứ cấp — **cần đối chiếu văn bản gốc**.
 
+Cùng ngày thuế cho mọi chỗ suy ngày (sau kiểm độc lập của #560): ngày ghi sổ cái (`ledger`, mọi bút toán không
+nêu ngày — kể cả GTGT đầu ra và khấu trừ thay của sàn) lấy `TaxEngine::tax_date`; nháp hoá đơn tính vào ngày khác ngày
+lập được tính lại thuế khi lập; hoá đơn điều chỉnh, thay thế tính thuế theo ngày lập của hoá đơn gốc (hướng dẫn các đợt
+giảm thuế trước: điều chỉnh theo thuế suất của hoá đơn bị điều chỉnh — **cần đối chiếu văn bản gốc**). Thuế của đơn là
+ước tính lúc đặt; thuế suất do hoá đơn quyết theo ngày lập, vì luật gắn thời điểm xác định thuế GTGT với lúc chuyển giao
+quyền sở hữu hàng hay hoàn thành dịch vụ (Luật Thuế GTGT 48/2024/QH15, Điều 8 — cần đối chiếu). `autoxide doctor`
+cảnh báo vùng thuế đã nhập không khai múi giờ.
+
+Cần đối chiếu thêm: (1) giảm GTGT có được gia hạn sang 2027 không — chưa xác nhận tính tới 26/11/2026; gia hạn thì nhập
+gói mới, không sửa code; (2) nhóm hàng bị loại khỏi diện giảm thuế từ 01/01/2026 (theo Luật Thuế TTĐB 66/2025/QH15, gồm
+đồ uống có đường theo một số nguồn) — khách tự xếp những mặt hàng đó vào `vat.standard`.
+
 Lý do: giờ Việt Nam là UTC+7 — đơn hay hoá đơn lập từ 00:00 tới 06:59 ngày D trước đây mang ngày D−1. Ngày 01/01/2027,
 khung đó còn tính GTGT 8% đã hết hạn; mọi ngày, ngày lập sai làm sai kỳ khai thuế ở ranh giới tháng, quý. Múi giờ đặt
 trong gói (không viết cứng) vì là quy định của từng vùng thuế, đổi bằng gói mới như thuế suất.

@@ -57,4 +57,8 @@ impl TaxEngine for Provider {
     ) -> Result<Date, Error> {
         self.0.tax_date(tenant, org, at).await
     }
+
+    async fn tax_date_in(&self, jurisdiction: &str, at: Timestamp) -> Result<Option<Date>, Error> {
+        self.0.jurisdiction_date(jurisdiction, at).await
+    }
 }

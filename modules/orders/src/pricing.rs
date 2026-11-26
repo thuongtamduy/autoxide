@@ -487,6 +487,22 @@ async fn add_gifts(
     Ok(())
 }
 
+/// Ngày thuế của đơn đặt lúc `at` (LG-2): ngày theo múi giờ của vùng thuế `jurisdiction` của người bán —
+/// đã có hồ sơ thuế nên hỏi thẳng vùng, không tra hồ sơ lần nữa trên đường nóng; vùng không khai múi giờ thì
+/// theo `TaxEngine::tax_date` (múi giờ của nút, rồi UTC).
+pub(crate) async fn tax_point(
+    engine: &dyn TaxEngine,
+    tenant: &TenantContext,
+    jurisdiction: &str,
+    org: OrgId,
+    at: Timestamp,
+) -> Result<autoxide_kernel::time::Date, Error> {
+    match engine.tax_date_in(jurisdiction, at).await? {
+        Some(day) => Ok(day),
+        None => engine.tax_date(tenant, org, at).await,
+    }
+}
+
 /// Tính thuế cho dòng (ghi vào `line.tax`, `line.gross`) và cho phí giao; trả (thuế, tiền người mua
 /// trả) của phí giao.
 async fn apply_tax(
@@ -512,7 +528,8 @@ async fn apply_tax(
     let jurisdiction = profile.jurisdiction;
     // Ngày thuế theo múi giờ của vùng thuế người bán (giờ Việt Nam), không theo UTC (LG-2): đơn đặt lúc
     // 00:30 ngày 01/01/2027 giờ Việt Nam đã hết GTGT 8%.
-    let tax_point = engine.tax_date(tenant, input.org_id, input.at).await?;
+    let tax_point =
+        tax_point(engine.as_ref(), tenant, &jurisdiction, input.org_id, input.at).await?;
     let mut shipping = (zero, shipping_net);
     // Một lần gọi cho mỗi chế độ giá (bảng giá gồm thuế hay chưa); phí giao coi như gồm thuế.
     for inclusive in [true, false] {

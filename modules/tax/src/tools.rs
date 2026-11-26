@@ -157,7 +157,14 @@ pub(crate) fn all(service: &Arc<TaxService>) -> Vec<Tool> {
                         )
                         .with_count(input.count.unwrap_or(false)),
                     )?;
-                    let on = input.on.unwrap_or_else(|| Timestamp::now().date_utc());
+                    // Mặc định: hôm nay theo múi giờ của vùng thuế (giờ Việt Nam cho `VN`), không theo UTC.
+                    let on = match input.on {
+                        Some(on) => on,
+                        None => {
+                            let now = Timestamp::now();
+                            service.jurisdiction_date(&input.jurisdiction, now).await?.unwrap_or(now.date_utc())
+                        }
+                    };
                     let day = on.format("%Y-%m-%d").to_string();
                     let tables = service.tables().await?;
                     let list: Vec<(String, RateItem)> = tables

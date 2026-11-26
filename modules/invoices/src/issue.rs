@@ -172,6 +172,34 @@ impl InvoicesService {
         self.issue_inner(tenant, Actor::from(principal), id, Some(principal)).await
     }
 
+    /// Tính lại thuế của nháp `row` theo ngày lập `on` khi ảnh chụp thuế của nó mang ngày thuế khác
+    /// (`tax_point`); `None`: không cần (cùng ngày, hay chứng từ không tính thuế).
+    async fn recompute_for(
+        &self,
+        tenant: &TenantContext,
+        row: &document::Model,
+        seller: OrgId,
+        on: Date,
+    ) -> Result<Option<crate::documents::Computed>, Error> {
+        let snapshot: Value = serde_json::from_str(&row.tax_snapshot).unwrap_or_default();
+        let Some(tax_point) = snapshot["tax_point"].as_str() else { return Ok(None) };
+        if *tax_point == *on.format("%Y-%m-%d").to_string() {
+            return Ok(None);
+        }
+        let lines = self.stored_lines(tenant, row.id).await?;
+        let buyer: crate::api::Buyer = serde_json::from_str(&row.buyer).unwrap_or_default();
+        let spec = crate::documents::Spec {
+            seller,
+            kind: &row.kind,
+            prices_include_tax: row.prices_include_tax,
+            currency: Currency::parse(&row.currency)?,
+            buyer: &buyer,
+            on,
+            lines: &lines,
+        };
+        Ok(Some(self.compute(tenant, &spec).await?))
+    }
+
     async fn issue_inner(
         &self,
         tenant: &TenantContext,
@@ -194,6 +222,24 @@ impl InvoicesService {
         };
         // Ngày lập theo múi giờ của vùng thuế người bán (giờ Việt Nam), không theo UTC (LG-2).
         let today = self.tax.tax_date(tenant, seller_org, Timestamp::now()).await?;
+        // Nháp tính thuế theo ngày tạo hay sửa cuối; lập vào ngày khác (vd tạo 31/12/2026, lập 02/01/2027)
+        // thì tính lại theo ngày lập — thuế suất là của ngày lập, không của ngày tạo nháp. Ngoài transaction:
+        // `TaxEngine` đọc database điều khiển.
+        let mut current = current;
+        let recomputed = if current.status == "draft" {
+            // Điều chỉnh / thay thế: thuế theo ngày của chứng từ gốc, không theo ngày lập.
+            let original = match current.related_document_id {
+                Some(original) => self.original_tax_date(tenant, original).await?,
+                None => None,
+            };
+            let on = original.or(current.issue_date).unwrap_or(today);
+            self.recompute_for(tenant, &current, seller_org, on).await?
+        } else {
+            None
+        };
+        if let Some(computed) = &recomputed {
+            current.total_minor = computed.total.minor();
+        }
         // Chứng từ ngoại tệ: chụp tỉ giá ngày lập (đọc `ledger` NGOÀI transaction ghi).
         let fx = if current.status == "draft" {
             self.fx_snapshot(tenant, &current, seller_org, current.issue_date.unwrap_or(today))
@@ -201,7 +247,9 @@ impl InvoicesService {
         } else {
             None
         };
-        let (outbox, jobs, seller, fx) = (&self.outbox, &self.jobs, &seller, &fx);
+        let snapshot_seen = current.tax_snapshot.clone();
+        let (outbox, jobs, seller, fx, recomputed, snapshot_seen) =
+            (&self.outbox, &self.jobs, &seller, &fx, &recomputed, &snapshot_seen);
         let issued = database
             .write_with_retry(move || async move {
                 let transaction = database.begin_write().await?;
@@ -284,6 +332,17 @@ impl InvoicesService {
                 let number = numbering::next(&transaction, tenant.id(), &format!("invoices:{}", symbol_row.id)).await?;
                 let at = now();
                 let mut active: document::ActiveModel = row.clone().into();
+                if let Some(computed) = recomputed {
+                    // Nháp bị sửa trong lúc tính lại: thuế vừa tính không còn khớp dòng đã lưu.
+                    if &row.tax_snapshot != snapshot_seen {
+                        return Err(draft_changed());
+                    }
+                    active.subtotal_minor = Set(computed.subtotal.minor());
+                    active.tax_minor = Set(computed.tax.minor());
+                    active.total_minor = Set(computed.total.minor());
+                    active.tax_snapshot = Set(computed.snapshot.to_string());
+                    Self::write_lines(&transaction, tenant, id, computed).await?;
+                }
                 active.series_id = Set(Some(symbol_row.id));
                 active.number = Set(Some(number));
                 active.status = Set("issued".to_owned());
@@ -909,4 +968,12 @@ impl JobHandler for PollJob {
     async fn run(&self, job: &JobContext) -> Result<(), Error> {
         self.0.poll_einvoices(&job.database).await.map(|_| ())
     }
+}
+
+/// Nháp bị sửa trong lúc phát hành.
+fn draft_changed() -> Error {
+    Error::conflict(
+        "invoices.draft_changed",
+        "The draft changed while it was being issued; issue it again.",
+    )
 }

@@ -251,9 +251,14 @@ async fn khach_vang_lai_tra_don_bang_ma_sms_roi_xem_va_tai_hoa_don() {
             expect(&app, "PUT", &path, ADMIN, Some(json!({"value": value})), 200).await;
         }
         esms.reply("POST", ESMS_SEND, 200, json!({"CodeResult": "100", "CountRegenerate": 0, "SMSID": "sms-1"}));
-        let year = i32::from(autoxide_kernel::time::Timestamp::now().date_utc().year());
+        // Người bán vùng thuế `VN`: năm của dãy số theo giờ Việt Nam như ngày lập hoá đơn.
+        let vietnam = autoxide_kernel::time::zone("Asia/Ho_Chi_Minh").unwrap();
+        let year = i32::from(autoxide_kernel::time::Timestamp::now().date_in(&vietnam).year());
         let series = json!({"kind": "vat_invoice", "symbol": "1C26TAA", "year": year});
         expect(&app, "POST", "/api/v1/invoices/series", ADMIN, Some(series), 201).await;
+        let root = root_of(DEFAULT_TENANT).as_uuid();
+        let profile = json!({"jurisdiction": "VN", "regime": "vat_credit"});
+        expect(&app, "PUT", &format!("/api/v1/tax/profiles/{root}"), ADMIN, Some(profile), 200).await;
 
         // Khách vãng lai đặt đơn COD.
         let cart = expect(&app, "POST", "/api/v1/orders/carts", ANONYMOUS, Some(json!({})), 201).await;
@@ -312,6 +317,13 @@ async fn khach_vang_lai_tra_don_bang_ma_sms_roi_xem_va_tai_hoa_don() {
         let documents = answer.json();
         assert_eq!(answer.status(), 200, "{documents}");
         let document = documents["data"][0]["document_id"].as_str().unwrap_or_else(|| panic!("{documents}")).to_owned();
+        // Bút toán của đơn ghi theo ngày thuế (giờ Việt Nam), trùng ngày lập hoá đơn — không theo UTC.
+        let entries = get(&app, "/api/v1/ledger/entries?source_module=orders").await;
+        let today = autoxide_kernel::time::Timestamp::now().date_in(&vietnam).to_string();
+        let dates: Vec<&str> =
+            entries["data"].as_array().unwrap().iter().filter_map(|entry| entry["effective_date"].as_str()).collect();
+        assert!(!dates.is_empty() && dates.iter().all(|day| *day == today), "{entries}");
+        assert_eq!(documents["data"][0]["issue_date"], today.as_str(), "{documents}");
         let answer = app
             .get(&format!("/api/v1/orders/public/orders/{order}/documents/{document}"))
             .header("order-token", &access)

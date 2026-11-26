@@ -312,6 +312,19 @@ impl InvoicesService {
         self.create_inner(tenant, actor, draft, None).await
     }
 
+    /// Ngày tính thuế của chứng từ gốc `id` (điều chỉnh, thay thế giữ thuế suất của nó): ngày lập của nó.
+    pub(crate) async fn original_tax_date(
+        &self,
+        tenant: &TenantContext,
+        id: Uuid,
+    ) -> Result<Option<Date>, Error> {
+        Ok(document::Entity::find_by_id(id)
+            .scoped(tenant)
+            .one(tenant.database().read())
+            .await?
+            .and_then(|found| found.issue_date))
+    }
+
     /// Lập nháp; `related`: (chứng từ gốc, `adjustment` / `replacement`, hướng).
     pub(crate) async fn create_inner(
         &self,
@@ -346,10 +359,15 @@ impl InvoicesService {
             return Err(Error::internal("a checked reference went missing"));
         };
         let seller = draft.on_behalf_of.unwrap_or(draft.org);
-        // Ngày lập mặc định: hôm nay theo múi giờ của vùng thuế người bán, không theo UTC (LG-2).
-        let on = match draft.issue_date {
-            Some(day) => day,
-            None => self.tax.tax_date(tenant, seller, Timestamp::now()).await?,
+        // Ngày tính thuế: điều chỉnh / thay thế theo ngày của chứng từ gốc (thuế suất của hoá đơn bị điều
+        // chỉnh); không thì ngày lập đã nêu, hay hôm nay theo múi giờ của vùng thuế người bán (LG-2).
+        let original_date = match &related {
+            Some((original, _, _)) => self.original_tax_date(tenant, *original).await?,
+            None => None,
+        };
+        let on = match (original_date, draft.issue_date) {
+            (Some(day), _) | (None, Some(day)) => day,
+            (None, None) => self.tax.tax_date(tenant, seller, Timestamp::now()).await?,
         };
         let computed = self
             .compute(
