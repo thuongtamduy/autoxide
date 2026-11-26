@@ -221,6 +221,8 @@ Postgres; vòng kiểm thử bảo mật kiểu bên ngoài cuối cùng không 
 - [x] Bất biến tiền, thuế, quyền thành property test chạy hằng đêm (rà ở `docs/quality/invariants.md`; phần còn thiếu ghi cuối file)
 - [ ] Đo tải trong CI hằng tuần trên cả hai database, chặn khi p95 của đường nóng tệ đi; vài benchmark vi mô cho đường
       nóng của kernel
+      — `load.yml`, `scripts/load-compare.py`, benchmark `divan` đã có; còn: lần chạy CI đầu để đặt số gốc trong
+      `docs/quality/load-baseline.json` (đang `null`, chưa chặn được hồi quy nào)
 - [ ] Chỉ số đo mỗi bản phát hành, ngưỡng cho 1.0: tải về tới request đầu tiên dưới 5 phút; người mới xong module đầu
       tiên dưới 30 phút; nâng cấp trong CI 100% thành công kể cả nhiều khách; agent thật làm xong việc mẫu trên 90%; p95
       đường nóng không tệ đi giữa hai bản

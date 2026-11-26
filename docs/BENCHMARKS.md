@@ -792,3 +792,19 @@ khi sửa theme (cache bị xoá); "nóng": lần đọc ngay sau đó (không c
 | PostgreSQL 16 | 3,4 ms | 15,2 ms | 0,66 ms | 0,83 ms |
 
 Test chỉ chặn p99 dưới 2 giây (không chặn theo máy); số ở đây để so khi đổi đường đọc.
+
+## Đo tải hằng tuần trên CI và số gốc (71-G9)
+
+`.github/workflows/load.yml` chạy mỗi thứ Hai (và bằng tay): dựng binary release, chạy `LOADTEST_ONLY=hot scripts/loadtest.sh`
+trên SQLite và PostgreSQL (mỗi lần một database trống), ghi mỗi bài một dòng JSON (`LOADTEST_JSON_OUT`) rồi
+`scripts/load-compare.py` so p95 với `docs/quality/load-baseline.json`. Năm đường nóng: đăng nhập (Argon2id, 16 kết nối),
+đọc `auth/me`, list có pagination (`auth/users?limit=50`), tạo bản ghi (`POST /files` 4 KiB), MCP `tools/call`.
+
+- **Ngưỡng:** p95 > số gốc × 1.5 + 2 ms, hoặc dưới 99% request thành công. Vượt thì đo lại một lần; chỉ khi cả hai lần
+  vượt mới đỏ (runner dùng chung nhiễu). Đỏ thì workflow mở một issue (tự đóng khi xanh lại).
+- **Số gốc:** chỉ đo trên CI (runner ubuntu-24.04), không đo trên máy cloud của agent (số khác hẳn, không đại diện). Lần
+  chạy đầu in số đo p95 vào trang tóm tắt; điền vào file gốc ở một PR riêng. Đổi số gốc là chủ ý chấp nhận đường đó
+  chậm đi: ghi lý do trong PR.
+- **Benchmark vi mô:** `cargo bench -p autoxide-kernel --bench hot_paths` (divan). Chạy cùng workflow, chỉ báo số — ns trên
+  runner chung quá nhiễu để làm ngưỡng. Dùng để so trước / sau một thay đổi trên cùng máy.
+
