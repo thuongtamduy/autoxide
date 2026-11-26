@@ -80,10 +80,11 @@ pub(crate) fn all() -> Vec<Permission> {
     ]
 }
 
-/// Mục `entry` do chính `principal` tạo: cùng người dùng và cùng API key (hay cùng không có).
+/// Mục `entry` do chính `principal` tạo: cùng người dùng và cùng credential uỷ quyền — API key hay grant OAuth
+/// (hay cùng không có). Cột `created_by_api_key_id` giữ ID credential đó (D-20261126-mcp-oauth).
 pub(crate) fn owns(principal: &Principal, entry: &Entry) -> bool {
     entry.created_by == Some(principal.user_id())
-        && entry.created_by_api_key_id == principal.api_key_id()
+        && entry.created_by_api_key_id == principal.credential_id()
 }
 
 /// Có `content.write` hoặc `content.write_own` không (được tạo mục mới; kiểm trước khi đọc mục

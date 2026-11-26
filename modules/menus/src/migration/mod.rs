@@ -4,6 +4,7 @@
 mod m0001_create_menus;
 mod m0005_add_updated_by;
 mod m0008_org;
+mod m0009_usage_indexes;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 use autoxide_kernel::tenancy::migration::TenantTable;
@@ -41,5 +42,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(m0008_org::Migration),
         // Đường người làm vào khách (bước 34, D-310).
         autoxide_kernel::event::outbox_access_migration("k0001_event_access", "menus"),
+        // Index cho "đang dùng ở đâu" theo trang keyset (bước 70 P9 mục 3).
+        Box::new(m0009_usage_indexes::Migration),
     ]
 }

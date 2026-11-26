@@ -70,13 +70,16 @@ pub(crate) struct ComplianceService {
     pub public_reports_per_hour: u32,
     /// `AUTOXIDE_COMPLIANCE_CASE_TRACKING_URL`.
     pub case_tracking_url: Option<String>,
+    /// `AUTOXIDE_COMPLIANCE_PURPOSES_TENANT_MAX`: trần mục đích riêng của một khách (sổ mục đích đọc gộp trong
+    /// bộ nhớ ở mỗi lần đọc, kể cả trang công khai — D-20261126-list-pages-done).
+    pub purposes_tenant_max: u64,
     /// Link trong thư theo khách (`kernel.public_url`, `compliance.link.case_tracking`).
     pub links: autoxide_kernel::tenancy::SiteLinks,
 }
 
 /// Duyệt hay quyết định cần phiên đăng nhập của người, không nhận API key.
 pub(crate) fn require_session(principal: &Principal) -> Result<(), Error> {
-    if principal.api_key_id().is_some() {
+    if !principal.is_session() {
         return Err(Error::forbidden(
             "compliance.session_required",
             "This needs a signed-in person; API keys cannot do it.",

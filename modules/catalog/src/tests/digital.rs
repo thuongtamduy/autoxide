@@ -378,3 +378,64 @@ async fn url_ky_cua_khach_a_bi_tu_choi_o_khach_b() {
     .await
     .unwrap();
 }
+
+/// Theo `next_cursor` của `uri` (đã có `?limit=…`) tới hết với `boss`; trả id của mọi dòng theo thứ tự, mỗi trang
+/// không quá 2 dòng.
+async fn walk_ids(app: &TestApp, uri: &str) -> Vec<Value> {
+    let mut seen = Vec::new();
+    let mut cursor: Option<String> = None;
+    loop {
+        let page_uri = match &cursor {
+            Some(cursor) => format!("{uri}&cursor={cursor}"),
+            None => uri.to_owned(),
+        };
+        let (status, page) = call(app, "GET", &page_uri, "boss", None).await;
+        assert_eq!(status, StatusCode::OK, "{page}");
+        let rows = page["data"].as_array().unwrap();
+        assert!(rows.len() <= 2, "{page}");
+        seen.extend(rows.iter().map(|row| row["id"].clone()));
+        match page["pagination"]["next_cursor"].as_str() {
+            Some(next) => cursor = Some(next.to_owned()),
+            None => return seen,
+        }
+    }
+}
+
+/// File của biến thể hàng số (keyset trong database) và quyền tải của một đơn (`page_of`) là `Page<T>` (bước 70
+/// P9 mục 3): năm file, một đơn có năm quyền tải, `limit=2` — đi hết bằng `next_cursor` ra đủ năm, không trùng
+/// không sót, hai chiều.
+#[tokio::test]
+async fn file_hang_so_va_quyen_tai_cua_don_theo_trang() {
+    TestDatabase::run(async |test| {
+        let shop = shop(test).await;
+        let mut assets = Vec::new();
+        for _ in 0..5 {
+            assets.push(attach(&shop, 3).await["id"].clone());
+        }
+        let uri = format!("/variants/{}/digital-assets?limit=2&order=asc", shop.variant);
+        assert_eq!(walk_ids(&shop.app, &uri).await, assets);
+        assets.reverse();
+        let uri = format!("/variants/{}/digital-assets?limit=2", shop.variant);
+        assert_eq!(walk_ids(&shop.app, &uri).await, assets);
+
+        let status_uri = format!("/products/{}/status", shop.product);
+        let (status, made) =
+            call(&shop.app, "POST", &status_uri, "boss", Some(json!({"status": "active"}))).await;
+        assert_eq!(status, StatusCode::OK, "{made}");
+        let (order, paid) = paid_order(&shop, Some(BUYER));
+        emit(&shop, &paid).await;
+        settle(&shop.app).await;
+        let asc =
+            walk_ids(&shop.app, &format!("/orders/{order}/downloads?limit=2&order=asc")).await;
+        assert_eq!(asc.len(), 5, "một quyền tải cho mỗi file: {asc:?}");
+        let mut unique = asc.clone();
+        unique.sort_by_key(|id| id.as_str().unwrap().to_owned());
+        unique.dedup();
+        assert_eq!(unique.len(), 5, "không trùng");
+        let mut desc = walk_ids(&shop.app, &format!("/orders/{order}/downloads?limit=2")).await;
+        desc.reverse();
+        assert_eq!(desc, asc, "hai chiều ngược nhau");
+    })
+    .await
+    .unwrap();
+}

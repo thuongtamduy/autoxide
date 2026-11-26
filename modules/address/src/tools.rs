@@ -86,6 +86,8 @@ pub(crate) struct SearchInput {
     limit: Option<u32>,
     /// The `next_cursor` of the previous page.
     cursor: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
 }
 
 /// An address to check.
@@ -140,7 +142,7 @@ pub(crate) fn all(service: &Arc<AddressService>) -> Vec<Tool> {
             move |_: TenantContext, _: Principal, input: SearchInput| {
                 let service = search.clone();
                 async move {
-                    let page = PageInput::new(input.limit, input.cursor, None).page()?;
+                    let page = PageInput::new(input.limit, input.cursor, None).with_count(input.count.unwrap_or(false)).page()?;
                     service
                         .search(&input.country, input.q.as_deref(), input.province.as_deref(), input.level, &page)
                         .await
