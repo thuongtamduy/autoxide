@@ -4,9 +4,9 @@
 //! Mỗi lệnh ghi đi cùng một event trong CÙNG transaction (luật kiến trúc 3): thay đổi
 //! và dòng audit log hoặc cùng có, hoặc cùng không.
 //!
-//! Ghi chú thuộc một khách (bước 33): mọi hàm nhận `&TenantContext`, lấy database qua
-//! `tenant.database()` và lọc MỌI truy vấn bằng `.scoped(tenant)`; `INSERT` đặt `tenant_id`. Quên
-//! khách thì không có database để truy vấn — trình biên dịch chặn.
+//! Ghi chú thuộc một khách (bước 33): mọi hàm nhận `&TenantContext` và truy vấn qua `tenant.db()` — handle
+//! của lớp `db` tự lọc MỌI truy vấn theo khách, `INSERT` dòng của khách khác bị từ chối
+//! (D-20261126-kernel-data-layer). Module không gọi thư viện database nào trực tiếp.
 //!
 //! Ghi chú thuộc một nút của cây tổ chức (bước 34) — đây là ví dụ mẫu của "dữ liệu theo nút":
 //! danh sách lọc bằng `principal.scope_condition(…)` (nút + người sở hữu); một ghi chú đọc bằng
@@ -14,27 +14,22 @@
 //! Ghi chú ngoài phạm vi báo như không có (404).
 
 use autoxide_kernel::access::{OrgTarget, Principal, Scope};
+use autoxide_kernel::db::{Queries as _, TenantKey, is_unique_violation};
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::{Actor, Delivered, EventHandler, Outbox};
-use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
+use autoxide_kernel::pagination::{Page, PageRequest};
 use autoxide_kernel::privacy::{PersonalData, deleted_user};
 use autoxide_kernel::sync::{ChangesQuery, SyncChange, SyncLog, SyncResource};
-use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext, root_of};
+use autoxide_kernel::tenancy::{OrgId, TenantContext, root_of};
 use autoxide_kernel::time::Timestamp;
-use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder, Set,
-    SqlErr,
-};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
 use crate::api::{NoteSummary, Notes};
-use crate::entity::{self, Column, Entity};
 use crate::events::{self, Change};
 use crate::permissions::{NOTES_READ, NOTES_WRITE};
 
-/// Một ghi chú.
-pub(crate) type Note = entity::Model;
+pub(crate) use crate::entity::Note;
 
 /// Dữ liệu để tạo ghi chú (đã qua kiểm độ dài ở REST / MCP).
 #[derive(Debug, Clone)]
@@ -120,22 +115,24 @@ impl NoteService {
             None => default_org(tenant, principal)?,
         };
         let now = now();
-        let transaction = tenant.database().begin_write().await?;
+        let transaction = tenant.db().begin_write().await?;
         // Nút do người gọi nêu: ngoài phạm vi → 403 `org_out_of_scope`; nút đang khoá → `org_frozen`.
         principal.require_write_at(&transaction, &NOTES_WRITE, at(org, owner)).await?;
-        let note = entity::ActiveModel {
-            id: Set(id),
-            tenant_id: Set(tenant.id().as_uuid()),
-            org_id: Set(Some(org.as_uuid())),
-            owner_id: Set(owner),
-            title: Set(title.clone()),
-            body: Set(input.body),
-            created_at: Set(now),
-            updated_at: Set(now),
-        }
-        .insert(&transaction)
-        .await
-        .map_err(|error| title_conflict(error, &title))?;
+        let note = Note {
+            id,
+            tenant_id: TenantKey::new(tenant.id()),
+            org_id: Some(org.as_uuid()),
+            owner_id: owner,
+            title: title.clone(),
+            body: input.body,
+            created_at: now,
+            updated_at: now,
+        };
+        transaction
+            .insert(note.clone())
+            .exec()
+            .await
+            .map_err(|error| title_conflict(error, &title))?;
         let event = events::NoteCreated(Change { before: None, after: Some(snapshot(&note)) });
         self.outbox
             .record(&transaction, tenant, actor, events::note_subject(note.id), &event)
@@ -155,9 +152,8 @@ impl NoteService {
         principal: &Principal,
         page: &PageRequest,
     ) -> Result<Page<Note>, Error> {
-        let scope = principal.scope_condition(&NOTES_READ, Column::OrgId, Some(Column::OwnerId))?;
-        let select = Entity::find().filter(scope).scoped(tenant);
-        fetch_page(select, Column::Id, |row| row.id, page, tenant.database().read()).await
+        let scope = principal.scope(&NOTES_READ, Note::ORG_ID, Some(Note::OWNER_ID))?;
+        tenant.db().read().find::<Note>().filter(scope).page(Note::ID, page).await
     }
 
     /// Ghi chú đã đổi (hay bị xoá) sau con trỏ của `query`, trong phạm vi `notes.read` của người
@@ -168,14 +164,16 @@ impl NoteService {
         principal: &Principal,
         query: &ChangesQuery,
     ) -> Result<Page<SyncChange<Note>>, Error> {
-        let scope = principal.scope_condition(&NOTES_READ, Column::OrgId, Some(Column::OwnerId))?;
+        let scope = principal.scope(&NOTES_READ, Note::ORG_ID, Some(Note::OWNER_ID))?;
         self.sync
             .changes(tenant, principal, &NOTES_SYNC, query, |ids| async move {
-                let notes = Entity::find()
-                    .filter(Column::Id.is_in(ids))
+                let notes = tenant
+                    .db()
+                    .read()
+                    .find::<Note>()
+                    .filter(Note::ID.is_in(ids))
                     .filter(scope)
-                    .scoped(tenant)
-                    .all(tenant.database().read())
+                    .all()
                     .await?;
                 Ok(notes.into_iter().map(|note| (note.id, note.updated_at, note)).collect())
             })
@@ -189,10 +187,14 @@ impl NoteService {
         principal: &Principal,
         id: Uuid,
     ) -> Result<Note, Error> {
-        let read = tenant.database().read();
-        let note =
-            Entity::find_by_id(id).scoped(tenant).one(read).await?.ok_or_else(|| not_found(id))?;
-        hidden(principal.require_at(read, &NOTES_READ, target(tenant, &note)).await, id)?;
+        let read = tenant.db().read();
+        let note = read
+            .find::<Note>()
+            .filter(Note::ID.eq(id))
+            .one()
+            .await?
+            .ok_or_else(|| not_found(id))?;
+        hidden(principal.require_at(&read, &NOTES_READ, target(tenant, &note)).await, id)?;
         Ok(note)
     }
 
@@ -207,36 +209,36 @@ impl NoteService {
     ) -> Result<Note, Error> {
         let actor = Actor::from(principal);
         let title = check(changes.title.as_deref(), changes.body.as_deref())?;
-        let transaction = tenant.database().begin_write().await?;
-        let before = Entity::find_by_id(id)
-            .scoped(tenant)
-            .one(&transaction)
+        let transaction = tenant.db().begin_write().await?;
+        let before = transaction
+            .find::<Note>()
+            .filter(Note::ID.eq(id))
+            .one()
             .await?
             .ok_or_else(|| not_found(id))?;
         writable(principal, &transaction, tenant, &before).await?;
-        let mut row = before.clone().into_active_model();
+        let mut update =
+            transaction.update::<Note>().set(Note::UPDATED_AT, now()).filter(Note::ID.eq(id));
         if let Some(title) = &title {
-            row.title = Set(title.clone());
+            update = update.set(Note::TITLE, title.clone());
         }
         if let Some(body) = changes.body {
-            row.body = Set(body);
+            update = update.set(Note::BODY, body);
         }
-        row.updated_at = Set(now());
-        let mut update = Entity::update(row).validate()?.scoped(tenant);
         if let Some(expected) = expected {
             // Kiểm phiên bản ngay trong câu `UPDATE`: người khác vừa sửa thì 0 dòng (D-084).
-            update = update.filter(Column::UpdatedAt.eq(expected));
+            update = update.filter(Note::UPDATED_AT.eq(expected));
         }
-        let after = match update.exec(&transaction).await {
-            Ok(after) => after,
+        let changed = update
+            .returning()
+            .await
+            .map_err(|error| title_conflict(error, title.as_deref().unwrap_or_default()))?;
+        let Some(after) = changed.into_iter().next() else {
             // Người khác vừa sửa: 412 kèm bản hiện tại, để app ngoại tuyến tự gộp (bước 69 P2).
-            Err(sea_orm::DbErr::RecordNotUpdated) => {
-                return Err(autoxide_kernel::version::changed_with(
-                    &crate::http::NoteResponse::from(before.clone()),
-                    before.updated_at,
-                ));
-            }
-            Err(error) => return Err(title_conflict(error, title.as_deref().unwrap_or_default())),
+            return Err(autoxide_kernel::version::changed_with(
+                &crate::http::NoteResponse::from(before.clone()),
+                before.updated_at,
+            ));
         };
         let change = Change { before: Some(snapshot(&before)), after: Some(snapshot(&after)) };
         let event = events::NoteUpdated(change);
@@ -255,19 +257,16 @@ impl NoteService {
         id: Uuid,
     ) -> Result<(), Error> {
         let actor = Actor::from(principal);
-        let transaction = tenant.database().begin_write().await?;
-        let note = Entity::find_by_id(id)
-            .scoped(tenant)
-            .one(&transaction)
+        let transaction = tenant.db().begin_write().await?;
+        let note = transaction
+            .find::<Note>()
+            .filter(Note::ID.eq(id))
+            .one()
             .await?
             .ok_or_else(|| not_found(id))?;
         writable(principal, &transaction, tenant, &note).await?;
-        let deleted = Entity::delete_many()
-            .filter(Column::Id.eq(id))
-            .scoped(tenant)
-            .exec(&transaction)
-            .await?;
-        if deleted.rows_affected == 0 {
+        let deleted = transaction.delete::<Note>().filter(Note::ID.eq(id)).exec().await?;
+        if deleted == 0 {
             transaction.rollback().await?;
             return Err(not_found(id));
         }
@@ -317,11 +316,13 @@ impl EventHandler for DormantNotes {
 }
 
 async fn export_notes(tenant: &TenantContext, user_id: Uuid) -> Result<Value, Error> {
-    let notes = Entity::find()
-        .filter(Column::OwnerId.eq(user_id))
-        .scoped(tenant)
-        .order_by_asc(Column::Id)
-        .all(tenant.database().read())
+    let notes = tenant
+        .db()
+        .read()
+        .find::<Note>()
+        .filter(Note::OWNER_ID.eq(user_id))
+        .order_asc(Note::ID)
+        .all()
         .await?;
     let notes: Vec<Value> = notes
         .iter()
@@ -345,27 +346,22 @@ async fn forget_user(sync: &SyncLog, event: &Delivered) -> Result<(), Error> {
         return Ok(());
     };
     let tenant = &event.tenant;
-    let transaction = tenant.database().begin_write().await?;
-    let notes =
-        Entity::find().filter(Column::OwnerId.eq(user_id)).scoped(tenant).all(&transaction).await?;
-    let deleted = Entity::delete_many()
-        .filter(Column::OwnerId.eq(user_id))
-        .scoped(tenant)
-        .exec(&transaction)
-        .await?;
+    let transaction = tenant.db().begin_write().await?;
+    let notes = transaction.find::<Note>().filter(Note::OWNER_ID.eq(user_id)).all().await?;
+    let deleted = transaction.delete::<Note>().filter(Note::OWNER_ID.eq(user_id)).exec().await?;
     // App ngoại tuyến của người khác (vd quản lý thấy ghi chú cả nút) nhận dấu xoá.
     for note in &notes {
         sync.deleted(&transaction, tenant, &NOTES_SYNC, note.id, target(tenant, note)).await?;
     }
     transaction.commit().await?;
-    tracing::info!(user_id = %user_id, notes = deleted.rows_affected, "notes of a deleted user removed");
+    tracing::info!(user_id = %user_id, notes = deleted, "notes of a deleted user removed");
     Ok(())
 }
 
 #[async_trait::async_trait]
 impl Notes for NoteService {
     async fn find(&self, tenant: &TenantContext, id: Uuid) -> Result<Option<NoteSummary>, Error> {
-        let note = Entity::find_by_id(id).scoped(tenant).one(tenant.database().read()).await?;
+        let note = tenant.db().read().find::<Note>().filter(Note::ID.eq(id)).one().await?;
         Ok(note.map(|note| NoteSummary { id: note.id, owner_id: note.owner_id, title: note.title }))
     }
 }
@@ -382,9 +378,9 @@ fn at(org: OrgId, owner: Uuid) -> OrgTarget {
 
 /// Sửa / xoá ghi chú: cần `notes.write` phủ ghi chú (không phủ mà đọc được thì 403, đọc cũng
 /// không được thì 404 — không lộ ghi chú tồn tại); nút đang khoá → `org_frozen`.
-async fn writable<C: sea_orm::ConnectionTrait>(
+async fn writable(
     principal: &Principal,
-    transaction: &C,
+    transaction: &autoxide_kernel::db::TenantTx,
     tenant: &TenantContext,
     note: &Note,
 ) -> Result<(), Error> {
@@ -462,14 +458,15 @@ fn check(title: Option<&str>, body: Option<&str>) -> Result<Option<String>, Erro
 }
 
 /// Vi phạm index unique (chủ, tên) thành lỗi 409 dễ hiểu; lỗi khác giữ nguyên.
-fn title_conflict(error: sea_orm::DbErr, title: &str) -> Error {
-    match error.sql_err() {
-        Some(SqlErr::UniqueConstraintViolation(_)) => Error::conflict(
+fn title_conflict(error: Error, title: &str) -> Error {
+    if is_unique_violation(&error) {
+        Error::conflict(
             "notes.title_taken",
             "You already have a note titled `{title}`. Choose another title.",
         )
-        .with_param("title", title),
-        _ => Error::from(error),
+        .with_param("title", title)
+    } else {
+        error
     }
 }
 
@@ -494,8 +491,6 @@ pub(crate) struct NoteCounter;
 #[async_trait::async_trait]
 impl autoxide_kernel::entitlement::UsageCounter for NoteCounter {
     async fn count(&self, tenant: &TenantContext) -> Result<i64, Error> {
-        use sea_orm::PaginatorTrait;
-        let found = Entity::find().scoped(tenant).count(tenant.database().read()).await?;
-        Ok(i64::try_from(found).unwrap_or(i64::MAX))
+        tenant.db().read().find::<Note>().count().await
     }
 }

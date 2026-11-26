@@ -799,6 +799,7 @@ name = "autoxide-kernel"
 version = "0.19.0"
 dependencies = [
  "async-trait",
+ "autoxide-macros",
  "autoxide-testkit",
  "axum",
  "base64 0.23.1",
@@ -871,6 +872,15 @@ dependencies = [
  "utoipa-axum",
  "uuid",
  "validator",
+]
+
+[[package]]
+name = "autoxide-macros"
+version = "0.19.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
 ]
 
 [[package]]
@@ -994,7 +1004,6 @@ dependencies = [
  "autoxide-testkit",
  "axum",
  "jiff",
- "sea-orm",
  "serde",
  "serde_json",
  "tokio",
@@ -6675,8 +6684,10 @@ name = "xtask"
 version = "0.19.0"
 dependencies = [
  "jiff",
+ "quote",
  "serde",
  "serde_json",
+ "syn 2.0.119",
 ]
 
 [[package]]

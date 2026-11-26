@@ -8,7 +8,7 @@
 //! `access_check` test (randomly generated trees, grants and records) proves both paths give the same result
 //! on SQLite and Postgres.
 
-use sea_orm::sea_query::Condition;
+use sea_orm::sea_query::{Condition, Expr, ExprTrait as _};
 use sea_orm::{ColumnTrait, ConnectionTrait};
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
@@ -95,11 +95,21 @@ pub(super) struct Reach {
 impl Reach {
     /// SQL condition: the record has its node in column `org` and its owner in column `owner` (if any).
     pub(super) fn condition<C: ColumnTrait>(&self, org: C, owner: Option<C>) -> Condition {
+        let column = |c: C| Expr::col((c.entity_name(), c));
+        self.condition_on(column(org), owner.map(column))
+    }
+
+    /// [`condition`](Self::condition) on columns given as expressions (shared with the `db` layer).
+    pub(super) fn condition_on(&self, org: Expr, owner: Option<Expr>) -> Condition {
         let mut condition = Condition::all();
         if !self.everywhere {
             let mut any = Condition::any();
             if !self.subtrees.is_empty() {
-                any = any.add(OrgTree::subtree_condition(self.tenant, &self.subtrees, org));
+                any = any.add(OrgTree::subtree_condition_on(
+                    self.tenant,
+                    &self.subtrees,
+                    org.clone(),
+                ));
             }
             let mut units = self.units.clone();
             match owner {
@@ -107,12 +117,12 @@ impl Reach {
                 _ => units.extend(self.owns.iter().copied()),
             }
             if !units.is_empty() {
-                any = any.add(org.is_in(units.iter().map(OrgId::as_uuid)));
+                any = any.add(org.clone().is_in(units.iter().map(OrgId::as_uuid)));
             }
             condition = condition.add(any);
         }
         if let Some(fence) = self.fence {
-            condition = condition.add(OrgTree::subtree_condition(self.tenant, &[fence], org));
+            condition = condition.add(OrgTree::subtree_condition_on(self.tenant, &[fence], org));
         }
         condition
     }
@@ -199,6 +209,25 @@ impl Principal {
         let reach = self.reach(permission).ok_or_else(|| self.refuse(permission))?;
         self.fresh_for(permission)?;
         Ok(reach.condition(org, owner))
+    }
+
+    /// [`scope_condition`](Self::scope_condition) for the `db` layer: the rows of `R` that `permission` lets
+    /// the caller see, by node column `org` and (optionally) owner column `owner`.
+    pub fn scope<R, T, U>(
+        &self,
+        permission: &Permission,
+        org: crate::db::Col<R, T>,
+        owner: Option<crate::db::Col<R, U>>,
+    ) -> Result<crate::db::Cond<R>, Error>
+    where
+        R: crate::db::Record,
+        T: crate::db::DbValue,
+        U: crate::db::DbValue,
+    {
+        let reach = self.reach(permission).ok_or_else(|| self.refuse(permission))?;
+        self.fresh_for(permission)?;
+        let condition = reach.condition_on(org.sq(), owner.map(crate::db::Col::sq));
+        Ok(crate::db::Cond::from_condition(condition))
     }
 
     /// Checks `permission` on a record (read / edit / delete) or the target node of a create / move command:
