@@ -1105,7 +1105,7 @@
         "returns_secret": false
       },
       "deprecation": null,
-      "description": "Delete a role; users who had it lose its permissions. The built-in `admin` role cannot be deleted.",
+      "description": "Delete a role; users who had it lose its permissions. You can only delete a role you could take away: you have its permissions as widely, and every permission it bans (`auth.role_beyond_you`). The built-in `admin` role cannot be deleted.",
       "input_schema": {
         "additionalProperties": false,
         "description": "A role or user to act on.",
@@ -1546,7 +1546,7 @@
         "returns_secret": false
       },
       "deprecation": null,
-      "description": "Replace the name, description and permissions of a role. The built-in `admin` role cannot be changed.",
+      "description": "Replace the name, description and permissions of a role. You cannot add, widen or unban a permission you do not have as widely (`auth.permission_beyond_you`), nor turn off `requires_mfa` of a role you could not give (`auth.role_beyond_you`). The built-in `admin` role only changes `requires_mfa`.",
       "input_schema": {
         "additionalProperties": false,
         "description": "The full new content of a role.",
@@ -1757,7 +1757,7 @@
         "returns_secret": false
       },
       "deprecation": null,
-      "description": "Replace every organization unit a user works in and the roles there. You can only give roles whose permissions you have, in units you work in.",
+      "description": "Replace every organization unit a user works in and the roles there. You can only give or take away roles whose permissions you have, in units you work in, and only take away a role whose banned permissions you all have (`auth.role_beyond_you`).",
       "input_schema": {
         "additionalProperties": false,
         "description": "The units a user should work in, with the roles there.",
@@ -1817,7 +1817,7 @@
         "returns_secret": false
       },
       "deprecation": null,
-      "description": "Replace every role of a user with `role_ids`. You can only give or take away roles whose permissions you have yourself, as widely (`auth.role_beyond_you`). The last administrator cannot lose the `admin` role.",
+      "description": "Replace every role of a user with `role_ids`. You can only give or take away roles whose permissions you have yourself, as widely, and only take away a role whose banned permissions you all have (`auth.role_beyond_you`). The last administrator cannot lose the `admin` role.",
       "input_schema": {
         "additionalProperties": false,
         "description": "The complete list of roles a user should have.",
