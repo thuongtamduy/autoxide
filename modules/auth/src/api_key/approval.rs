@@ -66,7 +66,7 @@ impl ApiKeyService {
         id: Uuid,
     ) -> Result<ApiKey, Error> {
         caller.require(&crate::permissions::API_KEYS_APPROVE)?;
-        if caller.api_key_id().is_some() {
+        if !caller.is_session() {
             return Err(Error::forbidden(
                 "auth.api_key_cannot_approve_keys",
                 "An API key cannot approve API keys. Sign in to approve keys.",

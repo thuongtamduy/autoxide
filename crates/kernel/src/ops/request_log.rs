@@ -124,7 +124,8 @@ impl CallerSlot {
         if let Ok(mut caller) = self.0.lock() {
             caller.user_id = Some(principal.user_id());
             caller.tenant_of_user = Some(principal.tenant_id());
-            caller.api_key_id = principal.api_key_id();
+            // Credential uỷ quyền (API key hay grant OAuth; loại người gọi phân biệt).
+            caller.api_key_id = principal.credential_id();
             caller.actor_kind = Some(principal.actor_kind());
         }
     }

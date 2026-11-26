@@ -77,7 +77,7 @@ impl ContentService {
         let now = now();
         let mut candidate =
             blank(tenant, id, input.kind, &locale, input.parent_id, principal.user_id(), now);
-        candidate.created_by_api_key_id = principal.api_key_id();
+        candidate.created_by_api_key_id = principal.credential_id();
         if let Some(row) = &content_type {
             candidate.type_id = Some(row.id);
             candidate.parent_key = row.id;

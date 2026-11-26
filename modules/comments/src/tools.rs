@@ -61,6 +61,8 @@ pub(crate) struct QueueInput {
     limit: Option<u32>,
     /// Where to continue: the `next_cursor` of the previous page.
     cursor: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
     /// `desc` (newest first, the default) or `asc`.
     order: Option<String>,
 }
@@ -80,6 +82,8 @@ pub(crate) struct UnansweredInput {
     limit: Option<u32>,
     /// Where to continue: the `next_cursor` of the previous page.
     cursor: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
     /// `desc` (newest first, the default) or `asc` (oldest first: who waited longest).
     order: Option<String>,
 }
@@ -156,7 +160,8 @@ pub(crate) fn all(service: &Arc<CommentsService>) -> Vec<Tool> {
                             input.limit.map(|limit| limit.to_string()),
                             input.cursor,
                             input.order,
-                        ),
+                        )
+                        .with_count(input.count.unwrap_or(false)),
                         problems,
                     )?;
                     let found = service.queue(&tenant, &principal, &filter, &page).await?;
@@ -247,7 +252,8 @@ pub(crate) fn all(service: &Arc<CommentsService>) -> Vec<Tool> {
                             input.limit.map(|limit| limit.to_string()),
                             input.cursor,
                             input.order,
-                        ),
+                        )
+                        .with_count(input.count.unwrap_or(false)),
                         Vec::new(),
                     )?;
                     let found = service.queue(&tenant, &principal, &filter, &page).await?;
