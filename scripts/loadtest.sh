@@ -286,7 +286,9 @@ if [ -n "${LOADTEST_DATASET:-}" ] && [ "${LOADTEST_ONLY:-}" = public ]; then
   exit 0
 fi
 if [ "${LOADTEST_ONLY:-}" = hot ]; then
-  run "login"          16 -m POST -H 'autoxide-tenant: default' -T application/json -d "{\"email\":\"admin@example.com\",\"password\":\"$PASSWORD\"}" "$BASE/api/v1/auth/login"
+  # Đăng nhập chậm có chủ ý (Argon2id): 8 kết nối, tối đa 20 lần/giây — chạy hết công suất thì máy chủ trả 429 để tự bảo vệ,
+  # và p95 của một cuộc đăng nhập bình thường mới là thứ cần theo dõi.
+  run "login"          8 -q 20 -m POST -H 'autoxide-tenant: default' -T application/json -d "{\"email\":\"admin@example.com\",\"password\":\"$PASSWORD\"}" "$BASE/api/v1/auth/login"
   run "read (auth/me)" "$CONNECTIONS" -H "$AUTH" "$BASE/api/v1/auth/me"
   run "list (page of 50)" "$CONNECTIONS" -H "$AUTH" "$BASE/api/v1/auth/users?limit=50"
   run "create (file, 4 KiB)" "$CONNECTIONS" -m POST -H "$AUTH" -T application/octet-stream -D small.bin "$BASE/api/v1/files?name=load.bin"
