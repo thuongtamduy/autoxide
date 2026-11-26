@@ -235,7 +235,7 @@ pub(crate) fn check_text(
 
 /// Slug còn trống trong ngôn ngữ `locale` của khách: `base`, hay `base-2`, `base-3`… (bỏ qua
 /// chính sản phẩm `product_id`). Hỏi từng nhóm ứng viên bằng `slug IN (…)` — dùng unique index trên cả hai database
-/// (PT-16; `LIKE 'base-%'` quét cả bảng trên Postgres).
+/// (PT-16; `LIKE 'base-%'` quét cả bảng trên Postgres). `connection` phải là transaction ghi (khoá theo tên).
 pub(crate) async fn free_slug<C: ConnectionTrait>(
     connection: &C,
     tenant: &TenantContext,
@@ -244,6 +244,14 @@ pub(crate) async fn free_slug<C: ConnectionTrait>(
     product_id: Uuid,
 ) -> Result<String, Error> {
     use sea_orm::QuerySelect as _;
+    // Hai request cùng sinh slug từ một gốc trong một ngôn ngữ chọn lần lượt (Postgres: khoá theo tên tới hết
+    // transaction; SQLite: transaction ghi đã giữ cả database) — không cùng chọn một slug rồi một bên vấp unique index
+    // (transaction Postgres hỏng thì không thử lại được trong nó).
+    autoxide_kernel::rows::lock_key(
+        connection,
+        &format!("catalog.slug:{}:{locale}:{base}", tenant.id().as_uuid()),
+    )
+    .await?;
     for window in 0.. {
         let wanted = autoxide_kernel::slug::candidates(base, window);
         let taken: Vec<String> = translation::Entity::find()

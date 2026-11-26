@@ -391,7 +391,8 @@ pub fn lint(openapi: &OpenApi) -> Vec<String> {
 
 /// A `HEAD` declared next to a `GET` follows its own `x-permissions` in the permission layer
 /// (D-20261126-permission-gate), so it must not be more open than that `GET`: when the `GET` lists permissions, the
-/// `HEAD` lists permissions too, each of them also opening the `GET`. Both public is fine.
+/// `HEAD` lists permissions too, each of them also opening the `GET`, and lets buyer accounts in (`x-buyers`) only
+/// when the `GET` does. Both public is fine.
 fn head_problems(path: &str, item: &PathItem) -> Option<String> {
     let (Some(get), Some(head)) = (&item.get, &item.head) else { return None };
     let listed = |operation: &Operation| -> Vec<String> {
@@ -405,6 +406,18 @@ fn head_problems(path: &str, item: &PathItem) -> Option<String> {
             .filter_map(|value| value.as_str().map(str::to_owned))
             .collect()
     };
+    let buyers = |operation: &Operation| {
+        operation
+            .extensions
+            .as_ref()
+            .and_then(|extensions| extensions.get("x-buyers"))
+            .is_some_and(|value| value == true)
+    };
+    if buyers(head) && !buyers(get) {
+        return Some(format!(
+            "HEAD {path}: lets buyer accounts in (`x-buyers`) but GET {path} does not — remove `x-buyers` from the HEAD"
+        ));
+    }
     let (get, head) = (listed(get), listed(head));
     if get.is_empty() {
         return None;
@@ -607,11 +620,17 @@ fn operations_mut(item: &mut PathItem) -> impl Iterator<Item = (&'static str, &m
 
 #[cfg(test)]
 mod tests {
+    use serde_json::json;
+
+    use super::*;
 
     fn item(get: serde_json::Value, head: serde_json::Value) -> PathItem {
         let operation = |permissions: serde_json::Value| {
             let mut operation = json!({"responses": {}});
-            if !permissions.is_null() {
+            if permissions == json!("buyers") {
+                operation["x-permissions"] = json!(["m.read"]);
+                operation["x-buyers"] = json!(true);
+            } else if !permissions.is_null() {
                 operation["x-permissions"] = permissions;
             }
             operation
@@ -630,11 +649,10 @@ mod tests {
         assert!(head_problems("/p", &item(json!(["m.read"]), json!(null))).is_some());
         assert!(head_problems("/p", &item(json!(["m.read"]), json!([]))).is_some());
         assert!(head_problems("/p", &item(json!(["m.read"]), json!(["m.peek"]))).is_some());
+        // HEAD cho tài khoản người mua vào mà GET không: lỗi; cả hai cho thì được.
+        assert!(head_problems("/p", &item(json!(["m.read"]), json!("buyers"))).is_some());
+        assert!(head_problems("/p", &item(json!("buyers"), json!("buyers"))).is_none());
     }
-
-    use serde_json::json;
-
-    use super::*;
 
     #[test]
     fn bat_ref_tro_vao_khoang_khong() {

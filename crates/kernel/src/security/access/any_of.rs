@@ -105,6 +105,16 @@ mod tests {
         let own =
             Principal::new(uuid::Uuid::now_v7(), ["demo.drop_own".to_owned()]).with_step_up(stale);
         assert!(own.require_any(&[&DROP, &DROP_OWN]).is_ok());
+        // Có cả hai, phiên cũ: quyền thường đủ để bắt đầu — thứ tự danh sách không đổi kết quả.
+        let both = Principal::new(
+            uuid::Uuid::now_v7(),
+            ["demo.drop".to_owned(), "demo.drop_own".to_owned()],
+        )
+        .with_step_up(stale);
+        assert!(both.require_any(&[&DROP, &DROP_OWN]).is_ok());
+        assert!(both.require_any(&[&DROP_OWN, &DROP]).is_ok());
+        // Mọi quyền đang có trong danh sách đều cần xác nhận lại: đòi.
+        assert_eq!(both.require_any(&[&DROP]).unwrap_err().code(), "step_up_required");
         // Không có quyền nào: `permission_denied` nêu đủ các quyền.
         let reader = Principal::new(uuid::Uuid::now_v7(), ["demo.read".to_owned()]);
         let error = reader.require_any(&[&DROP, &DROP_OWN]).unwrap_err();
