@@ -135,6 +135,25 @@ pub const API_KEY_RATE_LIMIT_BURST: Setting = Setting::new(
 )
 .with_default("30");
 
+pub const TENANT_RATE_LIMIT_PER_MINUTE: Setting = Setting::new(
+    "AUTOXIDE_HTTP_RATE_LIMIT_TENANT_PER_MINUTE",
+    "Requests one tenant may make per minute, on average (REST and MCP, every user and API key of \
+     the tenant together), on top of the limits per client address and per API key; more are \
+     answered with 429 `tenant_rate_limited` and a `Retry-After` header, so one busy tenant cannot \
+     crowd out the others. A plan may set its own level with the limit `kernel.api_rate_per_minute`. \
+     Requests whose tenant is not known yet (public pages without a tenant) only meet the limit \
+     per address. `0` turns it off (unless a plan sets a level). Counted like the limit per API key \
+     (AUTOXIDE_HTTP_RATE_LIMIT_STORE).",
+)
+.with_default("0");
+
+pub const TENANT_RATE_LIMIT_BURST: Setting = Setting::new(
+    "AUTOXIDE_HTTP_RATE_LIMIT_TENANT_BURST",
+    "Requests one tenant may make at once before its per-minute rate applies; `0`: as many as its \
+     per-minute rate.",
+)
+.with_default("0");
+
 pub const RATE_LIMIT_STORE: Setting = Setting::new(
     "AUTOXIDE_HTTP_RATE_LIMIT_STORE",
     "Where the limit per API key is counted: `memory` (each server process counts on its own; \
@@ -412,6 +431,8 @@ pub struct HttpConfig {
     pub trusted_proxies: Vec<IpRange>,
     /// Request limit per API key (D-109).
     pub api_key_rate_limit: RateLimit,
+    /// Limit per tenant (`AUTOXIDE_HTTP_RATE_LIMIT_TENANT_*`); `per_minute` 0: off unless a plan sets a level.
+    pub tenant_rate_limit: RateLimit,
     /// Where per-API-key rate limit counts are kept (step 40 P6, D-375).
     pub rate_limit_store: RateLimitStore,
     /// Header carrying the client address set by the reverse proxy; `None`: use the connection address.
@@ -478,6 +499,10 @@ impl HttpConfig {
             .get_with(&API_KEY_RATE_LIMIT_PER_MINUTE, |raw| parse_in_range(raw, 0u32, 1_000_000));
         let key_burst =
             reader.get_with(&API_KEY_RATE_LIMIT_BURST, |raw| parse_in_range(raw, 1u32, 1_000_000));
+        let tenant_per_minute = reader
+            .get_with(&TENANT_RATE_LIMIT_PER_MINUTE, |raw| parse_in_range(raw, 0u32, 10_000_000));
+        let tenant_burst =
+            reader.get_with(&TENANT_RATE_LIMIT_BURST, |raw| parse_in_range(raw, 0u32, 10_000_000));
         let rate_limit_store = reader.get_with(&RATE_LIMIT_STORE, |raw| match raw.trim() {
             "memory" => Ok(RateLimitStore::Memory),
             "database" => Ok(RateLimitStore::Database),
@@ -540,6 +565,11 @@ impl HttpConfig {
             trusted_proxy_count: trusted_proxy_count?,
             trusted_proxies: trusted_proxies?.unwrap_or_default(),
             api_key_rate_limit: RateLimit { per_minute: key_per_minute?, burst: key_burst? },
+            tenant_rate_limit: {
+                let per_minute = tenant_per_minute?;
+                let burst = tenant_burst?;
+                RateLimit { per_minute, burst: if burst == 0 { per_minute.max(1) } else { burst } }
+            },
             rate_limit_store: rate_limit_store?,
             client_ip_header: client_ip_header?,
             security_headers: SecurityHeaders {

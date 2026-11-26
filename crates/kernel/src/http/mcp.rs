@@ -68,6 +68,8 @@ struct McpServer {
     entitlements: crate::entitlement::EntitlementsHandle,
     /// The per-tenant request log (step 52); `None` when disabled.
     request_log: Option<crate::ops::request_log::RequestLog>,
+    /// Rate limit per tenant (D-20261126-tenant-rate-limit); `None` without a database registry.
+    tenant_limiter: Option<Arc<super::tenant_rate_limit::TenantLimiter>>,
 }
 
 /// The tools, resources and prompts the endpoint serves.
@@ -75,6 +77,7 @@ pub(super) struct McpCatalog {
     pub(super) tools: Vec<Tool>,
     pub(super) resources: Vec<McpResource>,
     pub(super) prompts: Vec<Prompt>,
+    pub(super) tenant_limiter: Option<Arc<super::tenant_rate_limit::TenantLimiter>>,
 }
 
 /// The path of the dedicated MCP endpoint of module `module`.
@@ -99,6 +102,7 @@ pub(super) fn router(
         translations,
         entitlements,
         request_log,
+        tenant_limiter: catalog.tenant_limiter,
     };
     let endpoint = |server: McpServer| {
         // Mọi phương thức vào cùng một hàm: `GET` / `DELETE` của bản cũ nhận 405 có giải thích.
@@ -228,6 +232,7 @@ impl McpServer {
             translations: self.translations.clone(),
             entitlements: self.entitlements.clone(),
             request_log: self.request_log.clone(),
+            tenant_limiter: self.tenant_limiter.clone(),
         }
     }
 
@@ -379,8 +384,23 @@ impl McpServer {
         // Đếm cho hạn mức `kernel.api_requests` (REST và MCP), như lớp HTTP.
         self.entitlements.count_request(caller.tenant.id());
         let started = std::time::Instant::now();
-        let outcome =
-            self.run(tool, caller.tenant.clone(), caller.principal.clone(), arguments).await;
+        // Giới hạn theo khách, như lớp REST: lời gọi tool bị từ chối trả lỗi `tenant_rate_limited`.
+        let limited = match &self.tenant_limiter {
+            Some(limiter) => match limiter.check(caller.tenant.id()).await {
+                Ok(super::rate_limit::Decision::Deny(wait)) => {
+                    Some(super::tenant_rate_limit::tenant_rate_limited(wait))
+                }
+                Ok(super::rate_limit::Decision::Allow) => None,
+                Err(error) => Some(error),
+            },
+            None => None,
+        };
+        let outcome = match limited {
+            Some(error) => Err(error),
+            None => {
+                self.run(tool, caller.tenant.clone(), caller.principal.clone(), arguments).await
+            }
+        };
         // Nhật ký lệnh của agent (D-202): tên tool và mã lỗi, không bao giờ tham số.
         if let Some(request_log) = &self.request_log {
             request_log.record_tool(

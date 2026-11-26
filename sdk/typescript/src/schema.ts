@@ -204,7 +204,10 @@ export type AiPageRequest = {
 
 /** What the AI features of this server can do now. */
 export type AiStatus = {
-  /** Daily token limit; 0 means no limit. */
+  /**
+   * Daily token limit of this tenant: its plan's `ai.daily_tokens`, otherwise the server's
+   * `AUTOXIDE_AI_DAILY_TOKEN_LIMIT`; 0 means no limit.
+   */
   daily_token_limit: number;
   /** Length of each embedding vector; 0 when off. */
   embedding_dimensions: number;
@@ -2937,7 +2940,10 @@ export type ClientConfigResponse = {
   menus: {
     /** Language of a menu when none is given. */
     default_locale: string;
-    /** Languages menus may be written in (`AUTOXIDE_MENUS_LOCALES`), the default first. */
+    /**
+     * Languages menus may be written in (tenant setting `menus.locales`, otherwise
+     * `AUTOXIDE_MENUS_LOCALES`), the default first.
+     */
     locales: string[];
   };
 };
@@ -5827,7 +5833,10 @@ export type Data_AdministrativeUnitDetail = {
 export type Data_AiStatus = {
   /** What the AI features of this server can do now. */
   data: {
-    /** Daily token limit; 0 means no limit. */
+    /**
+     * Daily token limit of this tenant: its plan's `ai.daily_tokens`, otherwise the server's
+     * `AUTOXIDE_AI_DAILY_TOKEN_LIMIT`; 0 means no limit.
+     */
     daily_token_limit: number;
     /** Length of each embedding vector; 0 when off. */
     embedding_dimensions: number;

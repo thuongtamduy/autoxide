@@ -564,7 +564,7 @@
         "description": "What the AI features of this server can do now.",
         "properties": {
           "daily_token_limit": {
-            "description": "Daily token limit; 0 means no limit.",
+            "description": "Daily token limit of this tenant: its plan's `ai.daily_tokens`, otherwise the server's\n`AUTOXIDE_AI_DAILY_TOKEN_LIMIT`; 0 means no limit.",
             "format": "int64",
             "minimum": 0,
             "type": "integer"
@@ -8615,7 +8615,7 @@
                 "type": "string"
               },
               "locales": {
-                "description": "Languages menus may be written in (`AUTOXIDE_MENUS_LOCALES`), the default first.",
+                "description": "Languages menus may be written in (tenant setting `menus.locales`, otherwise\n`AUTOXIDE_MENUS_LOCALES`), the default first.",
                 "example": [
                   "en",
                   "vi"
@@ -17160,7 +17160,7 @@
             "description": "What the AI features of this server can do now.",
             "properties": {
               "daily_token_limit": {
-                "description": "Daily token limit; 0 means no limit.",
+                "description": "Daily token limit of this tenant: its plan's `ai.daily_tokens`, otherwise the server's\n`AUTOXIDE_AI_DAILY_TOKEN_LIMIT`; 0 means no limit.",
                 "format": "int64",
                 "minimum": 0,
                 "type": "integer"

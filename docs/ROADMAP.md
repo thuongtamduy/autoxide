@@ -1252,10 +1252,14 @@ biến chung vẫn là mặc định. Mỗi PR một cụm.
       khiếu nại qua `POST /newsletter/bounces`, đổi nguồn cần chuyển dữ liệu
 - [ ] Xoá sổ dội theo tài khoản bị xoá: `auth.user_deleted` chỉ mang ID, không mang email — cần thêm email vào event
       (module `auth`); hiện xoá theo địa chỉ (`DELETE /mail/bounces/{id}`) và theo thời hạn giữ
-- [ ] Hạn mức token AI mỗi ngày theo gói (`Entitlements`)
-- [ ] Giới hạn request mỗi phút theo khách (tầng thứ ba của rate limit, gói nâng được)
-- [ ] Ngôn ngữ của `catalog` và `menus` theo khách (như `content`); múi giờ / tiền tệ đã có theo khách qua
-      `organizations.timezone` / `organizations.currency` của nút gốc — chỉ thống nhất mặc định khi thiếu
+- [x] Hạn mức token AI mỗi ngày theo gói (`ai.daily_tokens`; gói không nêu thì biến chung)
+- [x] Giới hạn request mỗi phút theo khách (tầng thứ ba, `kernel.api_rate_per_minute` của gói hay biến chung; REST và
+      MCP; D-20261126-tenant-rate-limit)
+- [x] Ngôn ngữ của `catalog` và `menus` theo khách (`catalog.locales`, `menus.locales`, `menus.default_locale`); múi
+      giờ / tiền tệ đã có theo khách qua `organizations.timezone` / `organizations.currency` của nút gốc (mặc định
+      `UTC` khai ở `organizations`; `promotions` / `shipping` dùng giờ Việt Nam theo quyết định sẵn có; "VND" viết
+      cứng ở `bookings` chỉ nằm trong test) — không thêm setting mới
+- [x] `mail.delivery_failed` mang `enhanced` / `hard`; newsletter chỉ tự chặn người đăng ký khi `hard`
 - [ ] Tự đăng ký tài khoản theo khách
 - [ ] Passkey theo khách: RP ID là tên miền đã xác minh của khách
 - [ ] Chính sách đăng nhập theo khách: thời hạn phiên, độ dài mật khẩu tối thiểu, TOTP issuer (chỉ siết hơn mặc định)

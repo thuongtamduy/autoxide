@@ -453,5 +453,6 @@
   "field:`{host}` is not a verified domain of this tenant: add it with `POST /api/v1/kernel/domains` and verify it first": "`{host}` không phải tên miền đã xác minh của khách này: thêm bằng `POST /api/v1/kernel/domains` rồi xác minh trước",
   "field:must start with `https://`": "phải bắt đầu bằng `https://`",
   "field:must start with `https://` (`http://` only for `localhost` or `127.0.0.1`)": "phải bắt đầu bằng `https://` (`http://` chỉ cho `localhost` hay `127.0.0.1`)",
-  "kernel.public_url_not_allowed": "Địa chỉ này không dùng được làm `kernel.public_url` của khách."
+  "kernel.public_url_not_allowed": "Địa chỉ này không dùng được làm `kernel.public_url` của khách.",
+  "tenant_rate_limited": "Khách này gửi quá nhiều request. Chờ {seconds} giây rồi thử lại; gửi chậm hơn, hoặc chuyển sang gói có tốc độ cao hơn."
 }

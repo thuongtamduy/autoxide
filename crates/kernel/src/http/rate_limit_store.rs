@@ -48,6 +48,8 @@ type Lots = HashMap<(TenantId, Uuid), Arc<tokio::sync::Mutex<Lot>>>;
 
 pub(super) struct SharedCounter {
     throttle: Throttle,
+    /// Đầu tên khoá đếm (`api_key`, `tenant`): hai loại giới hạn không đếm chung.
+    prefix: &'static str,
     registry: DatabaseRegistry,
     lot: u32,
     // `Mutex` thường giữ bảng (đoạn ngắn, không `await`); mỗi key một `Mutex` của tokio, giữ qua lần
@@ -60,6 +62,15 @@ pub(super) struct SharedCounter {
 impl SharedCounter {
     /// `None` when disabled (`per_minute = 0`).
     pub(super) fn new(limit: RateLimit, registry: DatabaseRegistry) -> Option<Self> {
+        Self::named(limit, registry, "api_key")
+    }
+
+    /// Như [`new`](Self::new), khoá đếm mang đầu tên `prefix`.
+    pub(super) fn named(
+        limit: RateLimit,
+        registry: DatabaseRegistry,
+        prefix: &'static str,
+    ) -> Option<Self> {
         if limit.per_minute == 0 {
             return None;
         }
@@ -67,6 +78,7 @@ impl SharedCounter {
             Throttle::new(crate::builtin::NAME, limit.per_minute.max(limit.burst), WINDOW).ok()?;
         Some(SharedCounter {
             throttle,
+            prefix,
             registry,
             lot: (limit.burst / 4).max(1),
             lots: Mutex::new(HashMap::new()),
@@ -103,7 +115,7 @@ impl SharedCounter {
         }
         self.purge_now_and_then(now);
         // Khoá đếm có khách (bước 33): khách A dùng hết lượt không chặn khách B.
-        let name = format!("api_key:{tenant}:{key}");
+        let name = format!("{}:{tenant}:{key}", self.prefix);
         let control = self.registry.default_tenant();
         match self.throttle.take(&control, &name, self.lot).await {
             Ok(taken) => {

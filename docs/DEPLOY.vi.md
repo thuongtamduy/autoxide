@@ -407,6 +407,7 @@ database mới.
 | `AUTOXIDE_PROCESS_ROLE` | `api` / `worker` để chạy API và việc nền ở tiến trình riêng |
 | `AUTOXIDE_HTTP_COMPRESSION` | `true` (mặc định): nén JSON và chữ bằng gzip hay brotli; `false` khi reverse proxy hay CDN phía trước đã nén |
 | `AUTOXIDE_HTTP_PUBLIC_CACHE_SECONDS` | CDN được giữ một lượt đọc công khai bao lâu (mặc định `60`), xem [CDN phía trước Autoxide](#cdn-phía-trước-autoxide) |
+| `AUTOXIDE_HTTP_RATE_LIMIT_TENANT_PER_MINUTE` | Nhiều khách: số request một khách gửi được mỗi phút, mọi người dùng và API key của khách cộng lại (mặc định `0`, tắt), để một khách ồn ào không làm chậm khách khác; vượt thì 429 `tenant_rate_limited` kèm `Retry-After`. Hạn mức `kernel.api_rate_per_minute` của gói thay giá trị này cho khách đó. Request chưa biết khách chỉ chịu giới hạn theo địa chỉ |
 | `AUTOXIDE_HTTP_METRICS` | Metrics Prometheus ở `/metrics`, không có xác thực. Thêm `AUTOXIDE_HTTP_METRICS_ADDRESS` (vd `127.0.0.1:9090`) để phục vụ nó ở port riêng, tách khỏi API; không có biến đó thì `/metrics` nằm cùng port với API: hãy chặn nó ở reverse proxy (Caddy: `respond /metrics 404`) và lấy số đo ngay trên máy chủ |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | Gửi trace tới một OpenTelemetry collector |
 
@@ -475,6 +476,8 @@ hành vi của module còn đặt được theo từng khách, thay giá trị c
 | `media.alt_locales` | `AUTOXIDE_MEDIA_ALT_LOCALES` ([media](MEDIA.vi.md)) |
 | `content.embed_hosts` | `AUTOXIDE_CONTENT_EMBED_HOSTS` |
 | `analytics.allowed_hosts` | `AUTOXIDE_ANALYTICS_ALLOWED_HOSTS` (tên miền đã xác minh của khách luôn được nhận) |
+| `catalog.locales` | `AUTOXIDE_CATALOG_LOCALES` |
+| `menus.locales`, `menus.default_locale` | `AUTOXIDE_MENUS_LOCALES`, `AUTOXIDE_MENUS_DEFAULT_LOCALE` |
 | `newsletter.postal_address` | `AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS`; chưa đặt thì tên và địa chỉ chủ sở hữu trong hồ sơ pháp lý của khách (module `compliance`) được dùng trước |
 | `<module>.link.<trang>` (nhóm `link`, xem dưới) | địa chỉ trang `AUTOXIDE_…_URL` trong mail: `auth.link.password_reset`, `auth.link.email_verification`, `auth.link.invitation`, `auth.link.login`, `auth.link.email_change_report`, `support.link.guest_ticket`, `compliance.link.case_tracking`, `inventory.link.restock_confirm`, `notifications.link.unsubscribe`, `comments.link.verify`, `comments.link.unsubscribe`, `newsletter.link.confirm`, `newsletter.link.preferences` |
 
