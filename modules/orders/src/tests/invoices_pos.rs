@@ -236,6 +236,24 @@ async fn hoa_don_lap_khi_giao_xong_va_dieu_chinh_khi_tra_hang() {
         assert_eq!(docs["data"].as_array().unwrap().len(), 1);
         assert_eq!(docs["data"][0]["kind"], "sales");
         assert_eq!(docs["data"][0]["number"], 1);
+        // Hoá đơn khớp số đã chốt của đơn.
+        assert_eq!(docs["data"][0]["differs_from_order"], false, "{docs}");
+        // Hoá đơn tính thuế khác đơn (vd qua mốc hết giảm GTGT): báo, không lặng lẽ (LG-10).
+        let saved = {
+            let mut documents = world.invoices.documents.lock().unwrap();
+            let (found, _) = &mut documents[0];
+            let saved = (found.tax, found.total);
+            found.tax = money(found.tax.minor() + 2_000);
+            found.total = money(found.total.minor() + 2_000);
+            saved
+        };
+        let (_, differs) = buyer.send("GET", &format!("/me/orders/{id}/documents"), None).await;
+        assert_eq!(differs["data"][0]["differs_from_order"], true, "{differs}");
+        {
+            let mut documents = world.invoices.documents.lock().unwrap();
+            let (found, _) = &mut documents[0];
+            (found.tax, found.total) = saved;
+        }
         let document = docs["data"][0]["document_id"].as_str().unwrap().to_owned();
         let answer = shop
             .get(&format!("/api/v1/orders/me/orders/{id}/documents/{document}"))

@@ -367,7 +367,9 @@ pub(crate) struct CancelRequest {
 /// Cancel an issued document.
 ///
 /// Requires `invoices.correct` on the unit. Tells the e-invoice provider, and reverses the booking.
-/// Cancelling a cancelled document returns it.
+/// Cancelling a cancelled document returns it. An e-invoice sent to the tax authority cannot be cancelled
+/// where the seller's tax jurisdiction forbids it (Vietnam since 2025-06-01): use `adjust` (decrease) or
+/// `replace` instead. An e-invoice the tax authority rejected is cancelled here only.
 #[utoipa::path(
     post,
     path = "/documents/{id}/cancel",
@@ -381,7 +383,7 @@ pub(crate) struct CancelRequest {
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing `invoices.correct`; code `permission_denied`.", body = Problem),
         (status = 404, description = "No such document in your scope; code `invoices.document_not_found`.", body = Problem),
-        (status = 409, description = "A draft or a corrected document cannot be cancelled; code `invoices.not_cancellable`.", body = Problem),
+        (status = 409, description = "A draft or a corrected document cannot be cancelled (`invoices.not_cancellable`); an e-invoice sent to the tax authority whose law forbids cancelling (`invoices.einvoice_not_cancellable`, with `legal_basis`).", body = Problem),
         (status = 503, description = "The e-invoice provider did not answer (`einvoice.provider_unavailable`).", body = Problem),
     )
 )]

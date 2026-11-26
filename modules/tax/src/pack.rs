@@ -238,6 +238,9 @@ pub(crate) fn parse_pack(text: &str) -> Result<Pack, Error> {
         {
             problems.push(format!("{what}: `value.time_zone` must be an IANA time zone"));
         }
+        if found.code == crate::service::CANCEL_RULE && !found.value["allowed"].is_boolean() {
+            problems.push(format!("{what}: `value.allowed` must be true or false"));
+        }
         window(&found.effective_from, found.effective_to.as_deref(), &what, &mut problems);
     }
     if problems.is_empty() {

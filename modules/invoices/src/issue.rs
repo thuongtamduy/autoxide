@@ -717,15 +717,29 @@ impl InvoicesService {
                 .with_param("status", row.status));
             }
         }
-        // Ngoài transaction: báo nhà cung cấp.
-        if let (Some(provider_ref), Some(series_id)) = (&row.provider_ref, row.series_id)
-            && let Some(found) =
-                series::Entity::find_by_id(series_id).scoped(tenant).one(database.read()).await?
-            && let Some(name) = found.einvoice_provider
-        {
-            self.provider(&name)?
-                .cancel(tenant.id(), &EInvoiceCancel::new(provider_ref.clone(), reason.clone()))
-                .await?;
+        // Hoá đơn điện tử đã (hay sắp) gửi cơ quan thuế: luật của vùng thuế có thể cấm huỷ — Việt Nam từ
+        // 01/6/2025 (NĐ 70/2025) chỉ điều chỉnh hay thay thế (LG-9). Bị cơ quan thuế từ chối thì chưa có hoá đơn
+        // hợp lệ nào, huỷ ở đây không cần báo nhà cung cấp.
+        let provider = match row.series_id {
+            Some(series_id) => series::Entity::find_by_id(series_id)
+                .scoped(tenant)
+                .one(database.read())
+                .await?
+                .and_then(|found| found.einvoice_provider),
+            None => None,
+        };
+        if let Some(name) = provider.filter(|_| row.status != "rejected") {
+            let seller = OrgId::from_uuid(row.on_behalf_of_org_id.unwrap_or(row.org_id));
+            let on = row.issue_date.unwrap_or_else(|| Timestamp::now().date_utc());
+            if let Some(basis) = self.tax.einvoice_cancel_forbidden(tenant, seller, on).await? {
+                return Err(einvoice_not_cancellable(basis));
+            }
+            // Ngoài transaction: báo nhà cung cấp.
+            if let Some(provider_ref) = &row.provider_ref {
+                self.provider(&name)?
+                    .cancel(tenant.id(), &EInvoiceCancel::new(provider_ref.clone(), reason.clone()))
+                    .await?;
+            }
         }
         let outbox = &self.outbox;
         let saved = database
@@ -909,4 +923,15 @@ impl JobHandler for PollJob {
     async fn run(&self, job: &JobContext) -> Result<(), Error> {
         self.0.poll_einvoices(&job.database).await.map(|_| ())
     }
+}
+
+/// Hoá đơn điện tử đã gửi cơ quan thuế mà luật của vùng thuế không cho huỷ (LG-9).
+fn einvoice_not_cancellable(legal_basis: String) -> Error {
+    Error::conflict(
+        "invoices.einvoice_not_cancellable",
+        "This e-invoice was sent to the tax authority and the law of the seller's tax jurisdiction does not \
+         allow cancelling it ({legal_basis}). Issue an adjustment instead (`POST .../documents/<id>/adjust`, \
+         `direction` `decrease` to cancel the whole amount) or a replacement (`POST .../documents/<id>/replace`).",
+    )
+    .with_param("legal_basis", legal_basis)
 }

@@ -662,3 +662,59 @@ async fn ngay_lap_theo_gio_viet_nam() {
     .await
     .unwrap();
 }
+
+/// Người bán vùng thuế `VN`: hoá đơn điện tử đã gửi cơ quan thuế không huỷ được (NĐ 70/2025, LG-9) — lỗi
+/// nêu căn cứ, hướng sang điều chỉnh / thay thế, không gọi nhà cung cấp; hoá đơn bị cơ quan thuế từ chối
+/// thì huỷ được mà không báo nhà cung cấp.
+#[tokio::test]
+async fn hoa_don_dien_tu_da_gui_khong_huy_duoc_o_viet_nam() {
+    TestDatabase::run(async |test| {
+        let Setup { app, provider, .. } = setup(test).await;
+        let root = root_of(DEFAULT_TENANT).as_uuid();
+        let profile = json!({"jurisdiction": "VN", "regime": "vat_credit"});
+        let answer = app
+            .request(Method::PUT, &format!("/api/v1/tax/profiles/{root}"))
+            .token("clerk")
+            .json(profile)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(answer.status(), StatusCode::OK, "{}", answer.text());
+        let vietnam = autoxide_kernel::time::zone("Asia/Ho_Chi_Minh").unwrap();
+        let year = Timestamp::now().date_in(&vietnam).year();
+        let body = json!({"kind": "vat_invoice", "symbol": "1C26TAA", "year": year, "einvoice_provider": "fake"});
+        let (status, created) = call(&app, "POST", "/series", Some(body)).await;
+        assert_eq!(status, StatusCode::CREATED, "{created}");
+        let reason = json!({"reason": "Wrong amount"});
+
+        let sent = draft(&app, "C-1", 100_000).await;
+        let (status, _) = call(&app, "POST", &format!("/documents/{}/issue", sent.id), None).await;
+        assert_eq!(status, StatusCode::OK);
+        drain(&app).await;
+        let (status, refused) =
+            call(&app, "POST", &format!("/documents/{}/cancel", sent.id), Some(reason.clone())).await;
+        assert_eq!(status, StatusCode::CONFLICT, "{refused}");
+        assert_eq!(refused["code"], "invoices.einvoice_not_cancellable");
+        assert!(refused["detail"].as_str().unwrap().contains("70/2025"), "{refused}");
+        assert!(provider.cancelled.lock().unwrap().is_empty());
+        // Điều chỉnh giảm vẫn làm được.
+        let decrease = json!({"direction": "decrease", "lines": [{"description": "Service fee", "kind": "service",
+            "quantity": "1", "unit_price": {"amount": "100000", "currency": "VND"}, "tax_category": "vat.standard"}]});
+        let (status, adjusted) =
+            call(&app, "POST", &format!("/documents/{}/adjust", sent.id), Some(decrease)).await;
+        assert_eq!(status, StatusCode::CREATED, "{adjusted}");
+
+        let bounced = draft(&app, "C-2", 100_000).await;
+        provider.reject_next("buyer tax code does not exist");
+        let (status, _) = call(&app, "POST", &format!("/documents/{}/issue", bounced.id), None).await;
+        assert_eq!(status, StatusCode::OK);
+        drain(&app).await;
+        let (status, cancelled) =
+            call(&app, "POST", &format!("/documents/{}/cancel", bounced.id), Some(reason)).await;
+        assert_eq!(status, StatusCode::OK, "{cancelled}");
+        assert_eq!(cancelled["data"]["status"], "cancelled");
+        assert!(provider.cancelled.lock().unwrap().is_empty());
+    })
+    .await
+    .unwrap();
+}

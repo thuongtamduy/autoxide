@@ -158,6 +158,26 @@ fn tax_category(row: &line::Model) -> String {
 }
 
 /// Dòng hoá đơn cho `quantity` đơn vị của dòng đơn `row` (khoản giảm chia theo số lượng).
+/// Loại dòng liên kết của một hoá đơn bán theo loại chứng từ.
+fn link_kind_of(kind: &str) -> String {
+    if kind == "cash_register_invoice" { "cash_register" } else { "sales" }.to_owned()
+}
+
+/// Hoá đơn bán (không phải điều chỉnh) có thuế hay tổng tiền khác số đã chốt của đơn (LG-10). `settled`:
+/// [`OrdersService::settled_amounts`]; không so được thì `false`.
+pub(crate) fn differs_from_order(
+    settled: Option<(i64, i64)>,
+    link_kind: &str,
+    document: Option<&Document>,
+) -> bool {
+    match (settled, document) {
+        (Some((tax, total)), Some(document)) if link_kind != "adjustment" => {
+            document.tax.minor() != tax || document.total.minor() != total
+        }
+        _ => false,
+    }
+}
+
 fn document_line(row: &line::Model, quantity: i64, currency: Currency) -> NewDocumentLine {
     let mut document_line = NewDocumentLine::new(
         description(row),
@@ -278,9 +298,22 @@ impl OrdersService {
         let document = match invoices.create_document(tenant, Actor::system(), draft).await? {
             Submitted::Created(document) | Submitted::Replayed(document) => document,
         };
-        let link_kind = if kind == "cash_register_invoice" { "cash_register" } else { "sales" };
-        self.save_link(tenant, id, None, link_kind, &document, &reference).await?;
+        let link_kind = link_kind_of(&kind);
+        self.save_link(tenant, id, None, &link_kind, &document, &reference).await?;
         let issued = invoices.issue(tenant, Actor::system(), document.id).await?;
+        // Hoá đơn tính thuế theo ngày lập (thời điểm xác định thuế); đơn đã chốt thuế theo ngày đặt. Qua mốc
+        // đổi thuế suất thì hai số khác nhau: không sửa lặng lẽ, báo cho người dùng (LG-10).
+        if let Some(settled) = self.settled_amounts(tenant, id).await?
+            && differs_from_order(Some(settled), &link_kind_of(&kind), Some(&issued))
+        {
+            tracing::warn!(
+                order_id = %id,
+                document_id = %issued.id,
+                order_tax = settled.0,
+                invoice_tax = issued.tax.minor(),
+                "the invoice tax differs from the tax settled on the order"
+            );
+        }
         self.link_issued(tenant, &row, &reference, &issued).await
     }
 
@@ -551,6 +584,23 @@ impl OrdersService {
             Some(link) => Ok(Some(self.with_document(tenant, link).await?)),
             None => Ok(None),
         }
+    }
+
+    /// Thuế và tổng tiền đã chốt của đơn `id` để so với hoá đơn (LG-10, D-20261126-invoice-tax-difference):
+    /// `None` khi đơn có dòng huỷ một phần — hoá đơn khi đó chỉ gồm phần còn lại, không so được nguyên đơn.
+    pub(crate) async fn settled_amounts(
+        &self,
+        tenant: &TenantContext,
+        id: Uuid,
+    ) -> Result<Option<(i64, i64)>, Error> {
+        let row = self.order(tenant, id).await?;
+        let cancelled = line::Entity::find()
+            .filter(line::Column::OrderId.eq(id))
+            .filter(line::Column::CancelledQuantity.gt(0))
+            .scoped(tenant)
+            .one(tenant.database().read())
+            .await?;
+        Ok(cancelled.is_none().then_some((row.tax_minor, row.total_minor)))
     }
 
     /// Chứng từ của `invoices` gắn với một dòng liên kết (không có khi chưa bật hoá đơn điện tử).

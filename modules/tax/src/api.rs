@@ -272,6 +272,20 @@ pub trait TaxEngine: Send + Sync {
         org: OrgId,
         on: Date,
     ) -> Result<InvoiceRequirements, Error>;
+    /// Whether the law of seller `org`'s tax jurisdiction forbids cancelling an e-invoice already sent to the
+    /// tax authority, for an invoice dated `on` (Vietnam: since 2025-06-01 an erroneous e-invoice is fixed by an
+    /// adjustment or a replacement, not cancelled). `Some(legal basis)` when it does — then cancel through an
+    /// adjustment (decrease) or a replacement instead.
+    ///
+    /// The default implementation forbids nothing; an engine with jurisdiction rules overrides it.
+    async fn einvoice_cancel_forbidden(
+        &self,
+        _tenant: &TenantContext,
+        _org: OrgId,
+        _on: Date,
+    ) -> Result<Option<String>, Error> {
+        Ok(None)
+    }
     /// The tax date of instant `at` for seller `org`: the calendar day in the time zone of the seller's tax
     /// jurisdiction (pack rule `tax_date.time_zone`; Vietnam: `Asia/Ho_Chi_Minh`), else in the unit's time
     /// zone (`organizations.timezone`), else in UTC. Use it for the tax point of an order and the issue

@@ -82,6 +82,9 @@ pub(crate) struct TaxService {
 /// Mã quy tắc trong gói thuế khai múi giờ của vùng thuế: ngày thuế, ngày lập hoá đơn tính theo nó.
 pub(crate) const TIME_ZONE_RULE: &str = "tax_date.time_zone";
 
+/// Mã quy tắc trong gói thuế: có được huỷ hoá đơn điện tử đã gửi cơ quan thuế không (`{"allowed": bool}`).
+pub(crate) const CANCEL_RULE: &str = "einvoice.cancel_after_submission";
+
 pub(crate) const REGIMES: [&str; 4] = ["vat_credit", "vat_direct", "household", "exempt"];
 pub(crate) const BUSINESS_LINES: [&str; 4] = ["goods", "services", "production_transport", "other"];
 
@@ -444,6 +447,32 @@ impl TaxService {
             }
         }
         Ok(InvoiceRequirements { cash_register_required: false, legal_basis: None })
+    }
+
+    /// Căn cứ cấm huỷ hoá đơn điện tử đã gửi cơ quan thuế của vùng thuế người bán `org`, cho hoá đơn ngày
+    /// `on` (quy tắc [`CANCEL_RULE`] của gói, `{"allowed": false}`); `None`: không cấm hay không có hồ sơ thuế.
+    pub(crate) async fn einvoice_cancel_forbidden(
+        &self,
+        tenant: &TenantContext,
+        org: OrgId,
+        on: Date,
+    ) -> Result<Option<String>, Error> {
+        let Some(found) = self.nearest_profile(tenant, org).await? else { return Ok(None) };
+        let tables = self.tables().await?;
+        let day = on.format("%Y-%m-%d").to_string();
+        Ok(tables
+            .rules
+            .iter()
+            .filter(|rule| {
+                rule.jurisdiction == found.jurisdiction
+                    && rule.code == CANCEL_RULE
+                    && in_force(&rule.effective_from, rule.effective_to.as_deref(), &day)
+            })
+            .find(|rule| {
+                let value: serde_json::Value = serde_json::from_str(&rule.value).unwrap_or_default();
+                value["allowed"] == serde_json::Value::Bool(false)
+            })
+            .map(|rule| rule.legal_basis.clone()))
     }
 
     /// Ngày thuế của thời điểm `at` với người bán `org` (LG-2, D-20261126-tax-date-time-zone): ngày theo
