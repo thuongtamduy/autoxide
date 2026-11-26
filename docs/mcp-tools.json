@@ -9975,7 +9975,7 @@
         "returns_secret": false
       },
       "deprecation": null,
-      "description": "List approval requests: those of your own AI agents, and those you may decide. An agent sees here whether a person approved its command yet.",
+      "description": "List approval requests: those of your own AI agents, and those you may decide. An agent sees here whether a person approved its command yet. A page may hold fewer items than `limit`, even none, and still have `pagination.next_cursor`: keep following it until it is null.",
       "input_schema": {
         "additionalProperties": false,
         "description": "Which approval requests to list.",
@@ -10086,7 +10086,7 @@
         "returns_secret": false
       },
       "deprecation": null,
-      "description": "List the custom fields this tenant added to record types you may read (key, type, labels, options, whether lists filter on it with `cf.<key>=`). Write their values in a record's `custom_fields`.",
+      "description": "List the custom fields this tenant added to record types you may read (key, type, labels, options, whether lists filter on it with `cf.<key>=`). Write their values in a record's `custom_fields`. A page may hold fewer items than `limit`, even none, and still have `pagination.next_cursor`: keep following it until it is null.",
       "input_schema": {
         "additionalProperties": false,
         "description": "Which custom fields to list.",

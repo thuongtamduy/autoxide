@@ -23,9 +23,10 @@ impl CustomFieldsState {
     }
 
     /// One page of the fields the caller may read (`target`: only that record type; `active_only`: only
-    /// enabled fields), by `position` then ID. Whether the caller reads a field depends on its record type's
-    /// permission, which SQL cannot test: the fields are read in bounded batches from the cursor on (keyset in
-    /// the database on the index `(tenant_id, target, position, id)`), see `fetch_statement_page_filtered`.
+    /// enabled fields), by `position` then ID. The record types the caller reads are filtered in SQL (each kind
+    /// and, for kinds with sub-kinds, `<kind>.%`); every row is checked again (a sub-kind must be
+    /// `<kind>.<key>`), in bounded batches from the cursor on (keyset in the database on the index `(tenant_id,
+    /// target, position, id)`), see `fetch_statement_page_filtered`.
     pub(super) async fn page(
         &self,
         tenant: &TenantContext,
@@ -44,8 +45,34 @@ impl CustomFieldsState {
             .columns(COLUMNS)
             .from(Alias::new(TABLE))
             .and_where(Expr::col(Alias::new("tenant_id")).eq(tenant.id().as_uuid()));
-        if let Some(target) = target {
-            select.and_where(Expr::col(Alias::new("target")).eq(target));
+        match target {
+            Some(target) => {
+                select.and_where(Expr::col(Alias::new("target")).eq(target));
+            }
+            None => {
+                // Loại bản ghi người gọi đọc được, lọc ngay trong SQL: dòng quét (và con trỏ khi hết ngân sách
+                // quét) không bao giờ là trường của loại người gọi không đọc được.
+                let (exact, parents) = self.fields.kinds(|kind| {
+                    principal.require(&CUSTOM_FIELDS_MANAGE).is_ok()
+                        || principal.require(&kind.read_permission).is_ok()
+                });
+                if exact.is_empty() {
+                    let total = page.wants_total().then_some(0);
+                    let pagination =
+                        crate::pagination::Pagination::new(page.limit(), None).with_total(total);
+                    return Ok(crate::pagination::Page { data: Vec::new(), pagination });
+                }
+                let mut readable = sea_orm::sea_query::Condition::any()
+                    .add(Expr::col(Alias::new("target")).is_in(exact));
+                for parent in parents {
+                    let escaped =
+                        parent.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_");
+                    let pattern =
+                        sea_orm::sea_query::LikeExpr::new(format!("{escaped}.%")).escape('\\');
+                    readable = readable.add(Expr::col(Alias::new("target")).like(pattern));
+                }
+                select.cond_where(readable);
+            }
         }
         if active_only {
             select.and_where(Expr::col(Alias::new("active")).eq(true));
@@ -342,7 +369,8 @@ pub(crate) fn tools(fields: CustomFields) -> Vec<crate::mcp::Tool> {
             "list_custom_fields",
             "List the custom fields this tenant added to record types you may read (key, type, \
              labels, options, whether lists filter on it with `cf.<key>=`). Write their values in \
-             a record's `custom_fields`.",
+             a record's `custom_fields`. A page may hold fewer items than `limit`, even none, and \
+             still have `pagination.next_cursor`: keep following it until it is null.",
             move |tenant: TenantContext, principal: Principal, input: ListFieldsInput| {
                 let state = CustomFieldsState {
                     fields: fields.clone(),

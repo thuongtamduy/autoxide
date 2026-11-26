@@ -49,7 +49,11 @@ impl Module for Shop {
     }
 
     fn custom_field_targets(&self) -> Vec<CustomFieldTarget> {
-        vec![CustomFieldTarget::new("shop.item", SHOP_READ, SHOP_WRITE)]
+        vec![
+            CustomFieldTarget::new("shop.item", SHOP_READ, SHOP_WRITE),
+            // Loại có loại con `shop.kind.<khoá>` do khách tạo.
+            CustomFieldTarget::new("shop.kind", SHOP_READ, SHOP_WRITE).with_subtypes(),
+        ]
     }
 }
 
@@ -257,9 +261,11 @@ async fn insert_fields(app: &TestApp, rows: &[(String, &str, i32)]) {
     }
 }
 
-// Lọc theo quyền trong bộ nhớ: trang đi qua nhiều lô 200 dòng ẩn để tìm dòng được xem; mỗi request quét tối đa
-// 10 lô, hết ngân sách thì trả trang ngắn kèm `next_cursor` ở dòng cuối đã quét, request sau đi tiếp từ đó; danh
-// sách dài hơn ngân sách thì `count=true` không có `total`.
+// Loại bản ghi đọc được lọc trong SQL; phần kiểm từng dòng còn lại (loại con sai dạng `shop.kind.a.b` của một loại
+// đọc được) làm trang đi qua nhiều lô 200 dòng bị bỏ; mỗi request quét tối đa 10 lô, hết ngân sách thì trả trang ngắn
+// kèm `next_cursor` ở dòng cuối đã quét, request sau đi tiếp từ đó; danh sách dài hơn ngân sách thì `count=true`
+// không có `total`. Trường của loại người gọi không đọc được (`vault.box`) không bao giờ được quét, nên không con
+// trỏ nào nêu nó.
 #[tokio::test]
 async fn danh_sach_truong_vuot_lo_va_ngan_sach_quet() {
     TestDatabase::run(async |test| {
@@ -271,11 +277,22 @@ async fn danh_sach_truong_vuot_lo_va_ngan_sach_quet() {
             .await
             .unwrap();
         let mut rows: Vec<(String, &str, i32)> = vec![("first".to_owned(), "shop.item", 0)];
-        rows.extend((1..=450).map(|position| (format!("h{position}"), "vault.box", position)));
+        rows.extend((1..=450).map(|position| (format!("h{position}"), "shop.kind.a.b", position)));
         rows.push(("middle".to_owned(), "shop.item", 451));
-        rows.extend((452..=2551).map(|position| (format!("h{position}"), "vault.box", position)));
+        rows.extend(
+            (452..=2551).map(|position| (format!("h{position}"), "shop.kind.a.b", position)),
+        );
+        // Trường của loại người đọc không được đọc, xen giữa: SQL bỏ, không tính vào ngân sách quét.
+        rows.extend((2552..=2851).map(|position| (format!("v{position}"), "vault.box", position)));
         rows.push(("last".to_owned(), "shop.item", 3000));
         insert_fields(&app, &rows).await;
+        // Con trỏ là base64 của JSON: vị trí trong đó không bao giờ là của một trường `vault.box`.
+        let cursor_position = |cursor: &str| -> i64 {
+            use base64::Engine as _;
+            let bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(cursor).unwrap();
+            let value: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+            value["v"]["i"].as_i64().unwrap()
+        };
         let get = async |query: &str| {
             let answer = app
                 .get(&format!("/api/v1/kernel/custom-fields?{query}"))
@@ -308,7 +325,10 @@ async fn danh_sach_truong_vuot_lo_va_ngan_sach_quet() {
             requests += 1;
             assert!(requests < 10, "không đi vòng");
             match page["pagination"]["next_cursor"].as_str() {
-                Some(next) => cursor = Some(next.to_owned()),
+                Some(next) => {
+                    assert!(!(2552..=2851).contains(&cursor_position(next)), "{next}");
+                    cursor = Some(next.to_owned());
+                }
                 None => break,
             }
         }
@@ -317,6 +337,7 @@ async fn danh_sach_truong_vuot_lo_va_ngan_sach_quet() {
         let page = get("limit=50&count=true").await;
         assert_eq!(keys(&page), ["first", "middle"]);
         let next = page["pagination"]["next_cursor"].as_str().unwrap().to_owned();
+        assert_eq!(cursor_position(&next), 1999, "dòng cuối đã quét, một trường loại con sai dạng");
         assert!(page["pagination"].get("total").is_none(), "quá ngân sách thì không đếm: {page}");
         let rest = get(&format!("limit=50&cursor={next}")).await;
         assert_eq!(keys(&rest), ["last"]);

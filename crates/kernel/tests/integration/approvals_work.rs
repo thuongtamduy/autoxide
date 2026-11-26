@@ -262,3 +262,39 @@ async fn yeu_cau_duyet_phan_trang_chi_cai_duoc_xem() {
     .await
     .unwrap();
 }
+
+// Tên permission có `_` (ký tự đại diện của `LIKE`): bộ lọc SQL thoát nó, người duyệt vẫn thấy yêu cầu của mình;
+// tên chỉ khác ở chỗ `_` không lọt vào.
+#[tokio::test]
+async fn nguoi_duyet_co_permission_chua_gach_duoi_thay_yeu_cau() {
+    TestDatabase::run(async |test| {
+        let app = TestApp::builder(test)
+            .user("fields", 1, &["kernel.custom_fields.manage"])
+            .build()
+            .await
+            .unwrap();
+        let mut visible = Vec::new();
+        for _ in 0..3 {
+            visible.push(insert_request(&app, 9, "kernel.custom_fields.manage", "pending").await);
+        }
+        insert_request(&app, 9, "kernel.customXfields.manage", "pending").await;
+        visible.reverse();
+        let page = app
+            .get("/api/v1/kernel/approvals?status=pending&count=true")
+            .token("fields")
+            .send()
+            .await
+            .unwrap()
+            .json();
+        let ids: Vec<String> = page["data"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|approval| approval["id"].as_str().unwrap().to_owned())
+            .collect();
+        assert_eq!(ids, visible, "{page}");
+        assert_eq!(page["pagination"]["total"], 3);
+    })
+    .await
+    .unwrap();
+}
