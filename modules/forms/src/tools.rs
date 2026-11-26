@@ -114,6 +114,8 @@ pub(crate) struct ListFormsInput {
     limit: Option<u32>,
     /// Where to continue: the `next_cursor` of the previous page.
     cursor: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
 }
 
 /// A new form. Same rules as `POST /api/v1/forms`.
@@ -210,6 +212,8 @@ pub(crate) struct ListSubmissionsInput {
     limit: Option<u32>,
     /// Where to continue: the `next_cursor` of the previous page.
     cursor: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
     /// `desc` (newest first, the default) or `asc`.
     order: Option<String>,
 }
@@ -259,7 +263,8 @@ pub(crate) fn all(service: &Arc<FormsService>) -> Vec<Tool> {
                         input.limit.map(|limit| limit.to_string()),
                         input.cursor,
                         None,
-                    );
+                    )
+                    .with_count(input.count.unwrap_or(false));
                     let page = page_request(paging, problems)?;
                     let found = service.list_forms(&tenant, &principal, state, None, &page).await?;
                     crate::http::counted_forms(&service, &tenant, found).await
@@ -388,7 +393,8 @@ pub(crate) fn all(service: &Arc<FormsService>) -> Vec<Tool> {
                             input.limit.map(|limit| limit.to_string()),
                             input.cursor,
                             input.order,
-                        ),
+                        )
+                        .with_count(input.count.unwrap_or(false)),
                         problems,
                     )?;
                     let found = service

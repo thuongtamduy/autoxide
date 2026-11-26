@@ -76,6 +76,8 @@ pub(crate) struct FactsInput {
     limit: Option<u32>,
     /// The `next_cursor` of the previous page.
     cursor: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
     /// `desc` (newest first, default) or `asc`.
     order: Option<String>,
 }
@@ -154,7 +156,9 @@ pub(crate) fn all(service: &Arc<Reporting>) -> Vec<Tool> {
                     };
                     let mut problems = Vec::new();
                     let filter = checked(filter.read(&mut problems), problems)?;
-                    let page = PageInput::new(input.limit, input.cursor, input.order).page()?;
+                    let page = PageInput::new(input.limit, input.cursor, input.order)
+                        .with_count(input.count.unwrap_or(false))
+                        .page()?;
                     fact_page(service.facts(&tenant, &principal, &filter, &page).await?)
                 }
             },

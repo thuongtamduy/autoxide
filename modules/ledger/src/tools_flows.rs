@@ -50,6 +50,8 @@ pub(crate) struct HoldsInput {
     limit: Option<u32>,
     /// The `next_cursor` of the previous page.
     cursor: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
 }
 
 /// Which hold.
@@ -72,6 +74,8 @@ pub(crate) struct PayoutsInput {
     limit: Option<u32>,
     /// The `next_cursor` of the previous page.
     cursor: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
 }
 
 /// A payout to make.
@@ -134,7 +138,7 @@ pub(crate) fn all(service: &Arc<LedgerService>) -> Vec<Tool> {
             move |tenant: TenantContext, principal: Principal, input: HoldsInput| {
                 let service = holds.clone();
                 async move {
-                    let page = PageInput::new(input.limit, input.cursor, None).page()?;
+                    let page = PageInput::new(input.limit, input.cursor, None).with_count(input.count.unwrap_or(false)).page()?;
                     let filter = HoldFilter {
                         status: input.status,
                         seller_org_id: input.seller_org_id,
@@ -171,7 +175,7 @@ pub(crate) fn all(service: &Arc<LedgerService>) -> Vec<Tool> {
             move |tenant: TenantContext, principal: Principal, input: PayoutsInput| {
                 let service = payouts.clone();
                 async move {
-                    let page = PageInput::new(input.limit, input.cursor, None).page()?;
+                    let page = PageInput::new(input.limit, input.cursor, None).with_count(input.count.unwrap_or(false)).page()?;
                     let filter =
                         PayoutFilter { status: input.status, payee_org_id: input.payee_org_id };
                     let found = service.list_payouts(&tenant, &principal, filter, &page).await?;
