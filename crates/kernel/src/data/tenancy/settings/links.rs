@@ -239,7 +239,14 @@ pub(crate) async fn check_public_url(
     tenant: &TenantContext,
     raw: &str,
 ) -> Result<Result<(), FieldError>, Error> {
-    let Some(url) = parse(raw.trim()) else { return Ok(Ok(())) };
+    let Some(url) = parse(raw.trim()) else {
+        // Trình duyệt không đọc được (vd port 99999): lúc dùng sẽ bị bỏ qua, nên từ chối ngay lúc đặt.
+        return Ok(Err(FieldError::new(
+            "value",
+            "invalid",
+            "must be an address such as `https://shop.example`, with no path",
+        )));
+    };
     if !trust.multi() {
         let local = matches!(url.host_str(), Some("localhost" | "127.0.0.1"));
         if url.scheme() != "https" && !local {
@@ -266,7 +273,8 @@ pub(crate) async fn stored_problem(
     if setting.name() == PUBLIC_URL.name() {
         let refused = match parse(raw.trim()) {
             Some(url) => trust.multi_problem(tenant, &url).await?.is_some(),
-            None => false,
+            // Không đọc được (vd port 99999): lúc dùng bị bỏ qua, nên cũng báo.
+            None => true,
         };
         return Ok(refused.then_some("kernel.public_url_unverified"));
     }
@@ -408,6 +416,7 @@ mod tests {
         assert!(site_origin("https://shop.acme.vn/").is_ok());
         assert!(site_origin("https://shop.acme.vn/vi").is_err());
         assert!(site_origin("ftp://shop").is_err());
+        assert!(site_origin("https://{token}.shop.example").is_err());
     }
 
     #[test]

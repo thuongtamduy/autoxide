@@ -89,7 +89,7 @@ fn site_origin(raw: &str) -> Result<(), FieldError> {
 fn origin_of(url: &str) -> Option<&str> {
     let rest = url.strip_prefix("https://").or_else(|| url.strip_prefix("http://"))?;
     let host_len = rest.find(['/', '?', '#']).unwrap_or(rest.len());
-    if host_len == 0 || rest[..host_len].contains(['@', ' ']) {
+    if host_len == 0 || rest[..host_len].contains(['@', ' ', '{', '}']) {
         return None;
     }
     Some(&url[..url.len() - rest.len() + host_len])
@@ -642,9 +642,15 @@ impl SettingsService {
         let trust = self.links.get().cloned().unwrap_or_default();
         for state in &mut states {
             if let (Some(value), Ok(setting)) = (&state.value, self.catalog.find(&state.name)) {
-                state.problem = links::stored_problem(&trust, self, tenant, &setting, value)
-                    .await?
-                    .map(str::to_owned);
+                // Không đọc được ảnh chụp tên miền: trang vẫn trả, chỉ bỏ trống cờ (gửi thư vẫn từ chối — fail closed).
+                match links::stored_problem(&trust, self, tenant, &setting, value).await {
+                    Ok(problem) => state.problem = problem.map(str::to_owned),
+                    Err(error) => tracing::warn!(
+                        %error,
+                        setting = setting.name(),
+                        "cannot check a stored setting against the verified domains"
+                    ),
+                }
             }
         }
         states.sort_by(|a, b| a.name.cmp(&b.name));

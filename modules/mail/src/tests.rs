@@ -40,7 +40,7 @@ async fn setup(
     (mailer, worker, autoxide_kernel::tenancy::DatabaseRegistry::single(database).default_tenant())
 }
 
-async fn setup_with_database(
+pub(crate) async fn setup_with_database(
     test: &TestDatabase,
     pairs: &[(&str, &str)],
 ) -> (Arc<dyn Mailer>, autoxide_kernel::job::Worker, Database) {
@@ -58,6 +58,8 @@ async fn setup_with_database(
     modules.start(&database).unwrap();
     let mailer = modules.api::<dyn Mailer>().unwrap();
     let worker = modules.worker(4).unwrap();
+    // Chạy trước job dọn sổ dội theo lịch (`mail.bounces_cleanup`) để test chỉ đếm job gửi thư.
+    worker.run_once().await.unwrap();
     (mailer, worker, database)
 }
 
@@ -112,7 +114,7 @@ async fn fake_smtp() -> (u16, Arc<Mutex<Vec<String>>>) {
 }
 
 /// Như [`fake_smtp`], nhưng trả lời `rcpt` cho lệnh `RCPT TO` (vd từ chối người nhận).
-async fn fake_smtp_answering(rcpt: &'static [u8]) -> (u16, Arc<Mutex<Vec<String>>>) {
+pub(crate) async fn fake_smtp_answering(rcpt: &'static [u8]) -> (u16, Arc<Mutex<Vec<String>>>) {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let port = listener.local_addr().unwrap().port();
     let received = Arc::new(Mutex::new(Vec::new()));
@@ -169,6 +171,8 @@ async fn co_smtp_thi_gui_qua_smtp() {
         assert!(lines.iter().any(|line| line == "Subject: Welcome"), "{lines:?}");
         let done =
             worker.list("mail", autoxide_kernel::job::JobStatus::Completed, 10).await.unwrap();
+        let done: Vec<_> =
+            done.into_iter().filter(|job| job.kind == crate::service::SEND).collect();
         assert_eq!(done.len(), 1);
     })
     .await
@@ -245,6 +249,8 @@ async fn tu_choi_han_thi_phat_event_tu_choi_tam_thi_thu_lai() {
         assert_eq!(worker.run_once().await.unwrap(), 1);
         let done =
             worker.list("mail", autoxide_kernel::job::JobStatus::Completed, 10).await.unwrap();
+        let done: Vec<_> =
+            done.into_iter().filter(|job| job.kind == crate::service::SEND).collect();
         assert_eq!(done.len(), 1, "not retried");
         let events = failures(&database).await;
         assert_eq!(events.len(), 1);
@@ -272,6 +278,8 @@ async fn tu_choi_han_thi_phat_event_tu_choi_tam_thi_thu_lai() {
         assert_eq!(worker.run_once().await.unwrap(), 1);
         let done =
             worker.list("mail", autoxide_kernel::job::JobStatus::Completed, 10).await.unwrap();
+        let done: Vec<_> =
+            done.into_iter().filter(|job| job.kind == crate::service::SEND).collect();
         assert!(done.is_empty(), "will be retried");
         assert!(failures(&database).await.is_empty());
     })
