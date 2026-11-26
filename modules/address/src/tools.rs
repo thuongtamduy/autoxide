@@ -33,6 +33,8 @@ pub(crate) struct ProvincesInput {
     cursor: Option<String>,
     /// `asc` (code order, the default) or `desc`.
     order: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
 }
 
 /// The communes of a province.
@@ -50,6 +52,8 @@ pub(crate) struct CommunesInput {
     cursor: Option<String>,
     /// `asc` (code order, the default) or `desc`.
     order: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
 }
 
 // Cùng kiểu tham số trang với REST (`NaturalOrderPageQuery`, mặc định `asc`), nên kiểm và lỗi giống hệt.
@@ -57,12 +61,12 @@ fn natural_page(
     limit: Option<u32>,
     cursor: Option<String>,
     order: Option<String>,
+    count: Option<bool>,
 ) -> Result<PageRequest, Error> {
-    PageRequest::try_from(NaturalOrderPageQuery::new(
-        limit.map(|limit| limit.to_string()),
-        cursor,
-        order,
-    ))
+    PageRequest::try_from(
+        NaturalOrderPageQuery::new(limit.map(|limit| limit.to_string()), cursor, order)
+            .with_count(count.unwrap_or(false)),
+    )
 }
 
 /// A search by name.
@@ -107,7 +111,7 @@ pub(crate) fn all(service: &Arc<AddressService>) -> Vec<Tool> {
             move |_: TenantContext, _: Principal, input: ProvincesInput| {
                 let service = provinces.clone();
                 async move {
-                    let page = natural_page(input.limit, input.cursor, input.order)?;
+                    let page = natural_page(input.limit, input.cursor, input.order, input.count)?;
                     service.provinces(&input.country, input.as_of.as_deref(), &page).await
                 }
             },
@@ -121,7 +125,7 @@ pub(crate) fn all(service: &Arc<AddressService>) -> Vec<Tool> {
             move |_: TenantContext, _: Principal, input: CommunesInput| {
                 let service = communes.clone();
                 async move {
-                    let page = natural_page(input.limit, input.cursor, input.order)?;
+                    let page = natural_page(input.limit, input.cursor, input.order, input.count)?;
                     service
                         .communes(&input.country, &input.province, input.as_of.as_deref(), &page)
                         .await

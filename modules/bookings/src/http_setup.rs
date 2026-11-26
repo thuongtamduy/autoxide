@@ -712,6 +712,8 @@ async fn list_exceptions(
     Query(query): Query<ExceptionsQuery>,
     Query(page): Query<NaturalOrderPageQuery>,
 ) -> Result<Page<BookingException>, Error> {
+    // Kiểm quyền trước khi đọc tham số trang: người không có quyền nhận 403, không phải 422 (D-20261126-list-pages-cluster-2).
+    principal.require(&crate::permissions::SERVICES_MANAGE)?;
     let page = PageRequest::try_from(page)?;
     let from = query.from.unwrap_or_else(Timestamp::now);
     let to = query.to.unwrap_or(from + SignedDuration::from_hours(24 * 90));

@@ -94,6 +94,8 @@ pub(crate) async fn list_tags(
     Query(query): Query<TagsQuery>,
     Query(paging): Query<SortChoicePageQuery>,
 ) -> Result<Page<TagResponse>, Error> {
+    // Kiểm quyền trước khi đọc tham số trang: người không có quyền nhận 403, không phải 422 (D-20261126-list-pages-cluster-2).
+    principal.require(&crate::permissions::MEDIA_READ)?;
     let mut problems = Vec::new();
     let order: TagSort = sort(query.sort.as_deref(), "`name`, `created_at`", &mut problems);
     let page = page_request(paging, order.default_order(), problems)?;

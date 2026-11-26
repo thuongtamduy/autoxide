@@ -411,11 +411,8 @@ pub(crate) fn kind_list(
     service: &Reporting,
     page: &PageRequest,
 ) -> Result<Page<KindResponse>, Error> {
-    // Một loại có thể do nhiều nguồn khai (vd hai event cùng sinh `orders.revenue`): giữ một dòng mỗi loại
-    // (trước đây trả trùng), vì khoá của `page_of` phải duy nhất.
-    let mut seen = std::collections::BTreeSet::new();
-    let kinds: Vec<KindResponse> =
-        service.kinds().iter().filter(|info| seen.insert(info.kind.kind)).map(Into::into).collect();
+    // Loại đã duy nhất từ lúc dựng service (`Reporting::new` gộp khai giống hệt; kernel chặn khai khác lúc khởi động).
+    let kinds: Vec<KindResponse> = service.kinds().iter().map(Into::into).collect();
     page_of(kinds, |kind| kind.kind.clone(), page)
 }
 

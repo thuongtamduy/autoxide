@@ -277,6 +277,8 @@ pub(crate) async fn list_items(
     Query(query): Query<ItemsQuery>,
     Query(paging): Query<SortChoicePageQuery>,
 ) -> Result<Page<MediaItemResponse>, Error> {
+    // Kiểm quyền trước khi đọc tham số trang: người không có quyền nhận 403, không phải 422 (D-20261126-list-pages-cluster-2).
+    principal.require(&crate::permissions::MEDIA_READ)?;
     let mut problems = Vec::new();
     let filter = query.filter(&mut problems);
     let page = page_request(paging, filter.sort.default_order(), problems)?;

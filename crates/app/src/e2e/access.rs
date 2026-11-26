@@ -9,7 +9,8 @@
 //!   `sensitive_data` (xem, không đổi gì).
 //!
 //! Request mẫu sinh từ tài liệu: tham số đường dẫn, query và header bắt buộc, thân tối thiểu theo
-//! schema — để lỗi kiểm dữ liệu (422, 428) không che bước kiểm quyền.
+//! schema — để lỗi kiểm dữ liệu (422, 428) không che bước kiểm quyền. Danh sách được gửi thêm `limit=0`
+//! (sai): kiểm quyền phải đi trước kiểm tham số trang.
 
 use autoxide_auth::api::{Accounts, NewAccount};
 use autoxide_kernel::access::Risk;
@@ -17,6 +18,67 @@ use autoxide_kernel::tenancy::TenantContext;
 use autoxide_testkit::{TestApp, TestDatabase};
 use axum::http::Method;
 use serde_json::{Map, Value, json};
+
+// Danh sách còn đọc tham số trang TRƯỚC khi kiểm quyền (người không quyền gửi `limit=0` nhận 422 thay vì 403),
+// đo ngày 26/11/2026. Mỗi PR đại trà của bước 70 P9 sửa endpoint của cụm mình (gọi `principal.require(…)` trước
+// khi dựng `PageRequest`) và xoá dòng; danh sách không được dài thêm (D-20261126-list-pages-cluster-2).
+const PAGE_BEFORE_PERMISSION: &[&str] = &[
+    "GET /api/v1/auth/all-api-keys",
+    "GET /api/v1/auth/guardrails",
+    "GET /api/v1/auth/users/{id}/passkeys",
+    "GET /api/v1/bookings/bookings",
+    "GET /api/v1/bookings/resources",
+    "GET /api/v1/bookings/services",
+    "GET /api/v1/catalog/collections",
+    "GET /api/v1/comments",
+    "GET /api/v1/comments/bans",
+    "GET /api/v1/comments/targets",
+    "GET /api/v1/comments/{id}/reports",
+    "GET /api/v1/compliance/documents/{id}/acceptances",
+    "GET /api/v1/compliance/kyc/profiles",
+    "GET /api/v1/content/authors",
+    "GET /api/v1/content/banners",
+    "GET /api/v1/content/entries/{id}/ai/thread",
+    "GET /api/v1/content/entries/{id}/revisions",
+    "GET /api/v1/content/entries/{id}/translation-requests",
+    "GET /api/v1/content/page-templates",
+    "GET /api/v1/content/redirects",
+    "GET /api/v1/content/schedules",
+    "GET /api/v1/content/shared-sections",
+    "GET /api/v1/content/terms",
+    "GET /api/v1/content/theme-variants",
+    "GET /api/v1/content/types",
+    "GET /api/v1/files",
+    "GET /api/v1/forms",
+    "GET /api/v1/forms/{id}/submissions",
+    "GET /api/v1/invoices/documents",
+    "GET /api/v1/invoices/mandates",
+    "GET /api/v1/invoices/series",
+    "GET /api/v1/kernel/sandbox/messages",
+    "GET /api/v1/kernel/tenants/{id}/sandboxes",
+    "GET /api/v1/ledger/accounts",
+    "GET /api/v1/ledger/accounts/{id}/lines",
+    "GET /api/v1/ledger/bank-accounts",
+    "GET /api/v1/ledger/books",
+    "GET /api/v1/ledger/entries",
+    "GET /api/v1/ledger/exceptions",
+    "GET /api/v1/ledger/exchange-rates",
+    "GET /api/v1/ledger/holds",
+    "GET /api/v1/ledger/payments",
+    "GET /api/v1/ledger/payouts",
+    "GET /api/v1/ledger/periods",
+    "GET /api/v1/ledger/reconciliations",
+    "GET /api/v1/menus",
+    "GET /api/v1/newsletter/campaigns",
+    "GET /api/v1/newsletter/lists",
+    "GET /api/v1/newsletter/subscribers",
+    "GET /api/v1/newsletter/suppressions",
+    "GET /api/v1/orders",
+    "GET /api/v1/orders/carts",
+    "GET /api/v1/orders/returns",
+    "GET /api/v1/orders/reviews",
+    "GET /api/v1/tax/profiles",
+];
 
 const SAMPLE_ID: &str = "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11";
 
@@ -162,6 +224,19 @@ fn probe(document: &Value, method: &str, path: &str, operation: &Value) -> Probe
             _ => {}
         }
     }
+    // Danh sách (có tham số `cursor`): thêm `limit=0` (sai) — người không có quyền phải nhận 403 trước, không
+    // phải 422 của tham số trang (kiểm quyền trước khi đọc tham số, D-20261126-list-pages-cluster-2).
+    let is_list = operation.get("parameters").and_then(Value::as_array).into_iter().flatten().any(
+        |parameter| {
+            let parameter = resolve(document, parameter);
+            parameter.get("name") == Some(&json!("cursor"))
+                && parameter.get("in") == Some(&json!("query"))
+        },
+    );
+    let endpoint = format!("{} {path}", method.to_uppercase());
+    if is_list && !PAGE_BEFORE_PERMISSION.contains(&endpoint.as_str()) {
+        query.push("limit=0".to_owned());
+    }
     if !query.is_empty() {
         uri = format!("{uri}?{}", query.join("&"));
     }
@@ -286,6 +361,38 @@ async fn moi_endpoint_khong_cong_khai_tra_401_va_403() {
                         body["code"]
                     ));
                 }
+            }
+        }
+
+        // `PAGE_BEFORE_PERMISSION` chỉ co lại: mục đã sửa (trả 403 với `limit=0`) hay không khớp operation nào thì
+        // đỏ, buộc xoá dòng; mục còn đúng là "chưa sửa" thì vẫn trả 422.
+        for entry in PAGE_BEFORE_PERMISSION {
+            let Some((method, path)) = entry.split_once(' ') else {
+                failures.push(format!("PAGE_BEFORE_PERMISSION `{entry}`: write `<METHOD> <path>`"));
+                continue;
+            };
+            let method = method.to_lowercase();
+            let Some(operation) = document["paths"].get(path).and_then(|item| item.get(&method)) else {
+                failures.push(format!("PAGE_BEFORE_PERMISSION `{entry}` matches no operation: remove this line"));
+                continue;
+            };
+            let mut probe = probe(&document, &method, path, operation);
+            let separator = if probe.uri.contains('?') { '&' } else { '?' };
+            probe.uri = format!("{}{separator}limit=0", probe.uri);
+            let (mut status, mut body) = send(&app, &probe, Some(&token)).await;
+            if body["code"] == "auth.session_ended" {
+                token = sign_in(&app).await;
+                (status, body) = send(&app, &probe, Some(&token)).await;
+            }
+            if status == 403 && body["code"] == "permission_denied" {
+                failures.push(format!(
+                    "PAGE_BEFORE_PERMISSION `{entry}` now checks the permission first: remove this line"
+                ));
+            } else if status != 422 {
+                failures.push(format!(
+                    "PAGE_BEFORE_PERMISSION `{entry}`: expected 422 for `limit=0` without permissions, got {status} {}",
+                    body["code"]
+                ));
             }
         }
 
