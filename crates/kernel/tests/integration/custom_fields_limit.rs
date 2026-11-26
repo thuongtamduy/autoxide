@@ -346,3 +346,45 @@ async fn danh_sach_truong_vuot_lo_va_ngan_sach_quet() {
     .await
     .unwrap();
 }
+
+// Loại con `shop.kind.<khoá>` lọc trong SQL theo tiền tố PHÂN BIỆT hoa thường trên cả hai database (không bằng
+// `LIKE`, vốn không phân biệt hoa thường với chữ ASCII trên SQLite): 2 100 trường của loại viết khác hoa thường
+// (`SHOP.KIND.x`, `Shop.kind.x` — loại người đọc không đọc được) không bao giờ được quét, nên trang đầu có đủ hai
+// trường của `shop.item`, không con trỏ, có `total` — chứ không hết ngân sách quét 10 lô × 200 dòng.
+#[tokio::test]
+async fn loai_con_khac_hoa_thuong_khong_khop_tien_to() {
+    TestDatabase::run(async |test| {
+        let app = TestApp::builder(test)
+            .user("reader", 2, &["shop.read"])
+            .module(Shop)
+            .module(Vault)
+            .build()
+            .await
+            .unwrap();
+        let mut rows: Vec<(String, &str, i32)> = vec![("first".to_owned(), "shop.item", 0)];
+        rows.extend((1..=1050).map(|position| (format!("u{position}"), "SHOP.KIND.x", position)));
+        rows.extend(
+            (1051..=2100).map(|position| (format!("m{position}"), "Shop.kind.x", position)),
+        );
+        rows.push(("last".to_owned(), "shop.item", 3000));
+        insert_fields(&app, &rows).await;
+        let page = app
+            .get("/api/v1/kernel/custom-fields?limit=50&count=true")
+            .token("reader")
+            .send()
+            .await
+            .unwrap()
+            .json();
+        let keys: Vec<&str> = page["data"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|field| field["key"].as_str().unwrap())
+            .collect();
+        assert_eq!(keys, ["first", "last"], "{page}");
+        assert!(page["pagination"]["next_cursor"].is_null(), "{page}");
+        assert_eq!(page["pagination"]["total"], 2, "{page}");
+    })
+    .await
+    .unwrap();
+}

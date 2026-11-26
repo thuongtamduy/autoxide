@@ -22,7 +22,10 @@ use autoxide_kernel::pagination::{Page, PageRequest, page_of};
 use autoxide_kernel::privacy::{DataCategory, Keep, PersonalData, deleted_user};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext, TenantId, require_platform};
 use sea_orm::sea_query::{Expr, ExprTrait as _};
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
+    QuerySelect,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use utoipa::ToSchema;
@@ -510,6 +513,18 @@ impl ComplianceService {
             .await?;
         if exists.is_some() {
             return Err(purpose_exists(&key));
+        }
+        // Sổ mục đích đọc hết rồi chia trang trong bộ nhớ (gộp với mặc định của quy tắc), kể cả ở trang công khai:
+        // trần ở chỗ ghi giữ nó nhỏ. Bản ghi đè mục đích mặc định cũng là dòng của khách nên được đếm; chúng có
+        // trần tự nhiên là số mục đích mặc định, chỉ tạo mới bị chặn. Hai request tạo cùng lúc có thể vượt trần
+        // một dòng — trần là để giữ sổ nhỏ, không phải hạn mức chính xác.
+        let own = purpose::Entity::find().scoped(tenant).count(tenant.database().read()).await?;
+        if own >= self.purposes_tenant_max {
+            return Err(Error::conflict(
+                "compliance.purpose_limit_reached",
+                "This tenant already has {max} processing purposes of its own.",
+            )
+            .with_param("max", self.purposes_tenant_max));
         }
         let row = purpose::Model {
             id: Uuid::now_v7(),

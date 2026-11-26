@@ -17,6 +17,7 @@ use axum::http::StatusCode;
 use sea_orm::sea_query::Expr;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde_json::{Value, json};
+use uuid::Uuid;
 
 use super::checkout::{body, checkout, ready_cart};
 use super::{Call, Shop, shop_with};
@@ -659,6 +660,99 @@ async fn khach_tu_sua_mau_sms_ma_tra_don() {
             guests.sms.last_text(PHONE).unwrap(),
             format!("[SHOP] Ma {code} xem don {number}, het han sau 10 phut")
         );
+    })
+    .await
+    .unwrap();
+}
+
+/// Thêm `count` chứng từ (đã phát hành) vào đơn `order` thẳng trong bảng; trả id của chứng từ theo thứ tự thêm.
+async fn add_documents(shop: &Shop, order: Uuid, count: usize) -> Vec<Value> {
+    use sea_orm::{ActiveModelTrait, Set};
+    let tenant = shop.default_tenant();
+    let mut ids = Vec::new();
+    for n in 0..count {
+        let document = Uuid::now_v7();
+        crate::entity::invoice_link::ActiveModel {
+            id: Set(Uuid::now_v7()),
+            tenant_id: Set(tenant.id().as_uuid()),
+            order_id: Set(order),
+            return_id: Set(None),
+            kind: Set("sales".to_owned()),
+            document_id: Set(document),
+            status: Set("issued".to_owned()),
+            reference: Set(format!("orders:{order}:page{n}")),
+            created_at: Set(Timestamp::now()),
+            updated_at: Set(Timestamp::now()),
+        }
+        .insert(tenant.database().write())
+        .await
+        .unwrap();
+        ids.push(json!(document.to_string()));
+    }
+    ids
+}
+
+/// Đi hết danh sách `uri` (đã có `?limit=…`) theo `next_cursor` bằng `fetch` (một request, trả trang); trả id
+/// chứng từ theo thứ tự, kiểm mỗi trang không quá 2 dòng.
+async fn walk_documents<F, Fut>(uri: &str, fetch: F) -> Vec<Value>
+where
+    F: Fn(String) -> Fut,
+    Fut: std::future::Future<Output = (StatusCode, Value)>,
+{
+    let mut seen = Vec::new();
+    let mut cursor: Option<String> = None;
+    loop {
+        let page_uri = match &cursor {
+            Some(cursor) => format!("{uri}&cursor={cursor}"),
+            None => uri.to_owned(),
+        };
+        let (status, page) = fetch(page_uri).await;
+        assert_eq!(status, StatusCode::OK, "{page}");
+        let rows = page["data"].as_array().unwrap();
+        assert!(rows.len() <= 2, "{page}");
+        seen.extend(rows.iter().map(|row| row["document_id"].clone()));
+        match page["pagination"]["next_cursor"].as_str() {
+            Some(next) => cursor = Some(next.to_owned()),
+            None => return seen,
+        }
+    }
+}
+
+/// Chứng từ của đơn (người mua đăng nhập và khách vãng lai có token) là `Page<T>` (bước 70 P9 mục 3): năm chứng
+/// từ, `limit=2` — đi hết bằng `next_cursor` ra đủ năm, không trùng không sót, hai chiều.
+#[tokio::test]
+async fn chung_tu_cua_don_theo_trang() {
+    TestDatabase::run(async |test| {
+        let guests = guests(test, false).await;
+        let shop = &guests.shop;
+        // Người mua đăng nhập.
+        let mine = super::lifecycle::cod_order(shop).await;
+        let mut made = add_documents(shop, mine, 5).await;
+        let buyer = Call::as_user(shop, "buyer1");
+        let fetch = |uri: String| {
+            let buyer = &buyer;
+            async move { buyer.send("GET", &uri, None).await }
+        };
+        let uri = format!("/me/orders/{mine}/documents?limit=2&order=asc");
+        assert_eq!(walk_documents(&uri, fetch).await, made);
+        made.reverse();
+        let uri = format!("/me/orders/{mine}/documents?limit=2");
+        assert_eq!(walk_documents(&uri, fetch).await, made);
+
+        // Khách vãng lai với `Order-Token`.
+        let (id, number) = guest_order(shop).await;
+        let id: Uuid = id.parse().unwrap();
+        let mut made = add_documents(shop, id, 5).await;
+        let token = access_token(&guests, &number).await;
+        let fetch = |uri: String| {
+            let token = token.clone();
+            async move { public(shop, "GET", &uri, Some(&token), None, None).await }
+        };
+        let uri = format!("/public/orders/{id}/documents?limit=2&order=asc");
+        assert_eq!(walk_documents(&uri, fetch).await, made);
+        made.reverse();
+        let uri = format!("/public/orders/{id}/documents?limit=2");
+        assert_eq!(walk_documents(&uri, fetch).await, made);
     })
     .await
     .unwrap();

@@ -379,6 +379,9 @@ pub(crate) async fn list_returns(
     Query(query): Query<ReturnListQuery>,
     Query(page): Query<PageQuery>,
 ) -> Result<Page<ReturnResponse>, Error> {
+    // Quyền trước tham số trang: thiếu quyền là 403, không phải 422 (như `x-permissions`); service còn giới hạn
+    // theo phạm vi.
+    principal.require(&crate::permissions::READ)?;
     let filter =
         ReturnFilter { status: query.status, org_id: query.org_id, order_id: query.order_id };
     let page = PageRequest::try_from(page)?;

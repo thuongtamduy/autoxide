@@ -1,0 +1,69 @@
+{
+  "note": "Phạm vi và ngưỡng của mutation testing hằng tuần (.github/workflows/mutants.yml, scripts/mutants-report.py). `units`: mỗi mục là một nhóm file của một crate, chia `shards` phần cho các job chạy song song. `baseline`: số mutant sống (missed) TỐI ĐA cho phép của từng nhóm; null = chưa đo, lần chạy đầu in ra số để điền. Chỉ được hạ số này xuống, không nâng lên (tệ đi thì job đỏ).",
+  "units": [
+    {
+      "name": "kernel-values",
+      "package": "autoxide-kernel",
+      "files": [
+        "crates/kernel/src/values/money.rs",
+        "crates/kernel/src/values/decimal.rs",
+        "crates/kernel/src/data/pagination.rs",
+        "crates/kernel/src/security/seal.rs",
+        "crates/kernel/src/security/tokens.rs"
+      ],
+      "shards": 8
+    },
+    {
+      "name": "kernel-access",
+      "package": "autoxide-kernel",
+      "files": [
+        "crates/kernel/src/security/access/**"
+      ],
+      "shards": 6
+    },
+    {
+      "name": "tax",
+      "package": "autoxide-tax",
+      "files": [
+        "modules/tax/src/**"
+      ],
+      "shards": 2
+    },
+    {
+      "name": "ledger-posting",
+      "package": "autoxide-ledger",
+      "files": [
+        "modules/ledger/src/posting.rs",
+        "modules/ledger/src/fx.rs",
+        "modules/ledger/src/periods.rs",
+        "modules/ledger/src/payments.rs"
+      ],
+      "shards": 8
+    },
+    {
+      "name": "promotions-engine",
+      "package": "autoxide-promotions",
+      "files": [
+        "modules/promotions/src/engine/**"
+      ],
+      "shards": 4
+    },
+    {
+      "name": "orders-lifecycle",
+      "package": "autoxide-orders",
+      "files": [
+        "modules/orders/src/lifecycle.rs",
+        "modules/orders/src/pricing.rs"
+      ],
+      "shards": 2
+    }
+  ],
+  "baseline": {
+    "kernel-values": null,
+    "kernel-access": null,
+    "tax": null,
+    "ledger-posting": null,
+    "promotions-engine": null,
+    "orders-lifecycle": null
+  }
+}

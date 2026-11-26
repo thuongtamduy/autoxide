@@ -332,6 +332,8 @@ async fn list_acceptances(
     Path(id): Path<Uuid>,
     Query(page): Query<PageQuery>,
 ) -> Result<Page<AcceptanceResponse>, Error> {
+    // Quyền trước tham số trang: thiếu quyền là 403, không phải 422 (như `x-permissions`).
+    principal.require(&DOCUMENTS_READ)?;
     let page =
         service.list_acceptances(&tenant, &principal, id, &PageRequest::try_from(page)?).await?;
     Ok(page.map(AcceptanceResponse::from))

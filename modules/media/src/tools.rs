@@ -59,6 +59,8 @@ pub(crate) struct ListMediaInput {
     limit: Option<u32>,
     /// Where to continue: the `next_cursor` of the previous page.
     cursor: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
     /// `asc` or `desc`. Default: `desc` (newest first) for `created_at`, `asc` (A→Z, smallest first) for
     /// `name` and `size`.
     order: Option<String>,
@@ -150,6 +152,8 @@ pub(crate) struct ListTagsInput {
     limit: Option<u32>,
     /// Where to continue: the `next_cursor` of the previous page.
     cursor: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
 }
 
 pub(crate) fn all(service: &Arc<MediaService>) -> Vec<Tool> {
@@ -211,7 +215,7 @@ pub(crate) fn all(service: &Arc<MediaService>) -> Vec<Tool> {
                         include: None,
                         sort: input.sort,
                     };
-                    let paging = SortChoicePageQuery::new(input.limit.map(|limit| limit.to_string()), input.cursor, input.order);
+                    let paging = SortChoicePageQuery::new(input.limit.map(|limit| limit.to_string()), input.cursor, input.order).with_count(input.count.unwrap_or(false));
                     let mut problems = Vec::new();
                     let filter = query.filter(&mut problems);
                     let page = crate::http::page_request(paging, filter.sort.default_order(), problems)?;
@@ -363,7 +367,7 @@ pub(crate) fn all(service: &Arc<MediaService>) -> Vec<Tool> {
             move |tenant: TenantContext, principal: Principal, input: ListTagsInput| {
                 let service = list_tags.clone();
                 async move {
-                    let paging = SortChoicePageQuery::new(input.limit.map(|limit| limit.to_string()), input.cursor, None);
+                    let paging = SortChoicePageQuery::new(input.limit.map(|limit| limit.to_string()), input.cursor, None).with_count(input.count.unwrap_or(false));
                     let page = crate::http::page_request(paging, TagSort::Name.default_order(), Vec::new())?;
                     let tags = service
                         .list_tags(&tenant, &principal, input.q.as_deref(), TagSort::Name, &page)

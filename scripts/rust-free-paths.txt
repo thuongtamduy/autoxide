@@ -51,3 +51,9 @@ docs/*.md
 .github/dependabot.yml
 # Image gitleaks ghim theo digest: gate bước 6 (vẫn chạy) đọc, không phải Rust.
 .github/gitleaks/Dockerfile
+
+# Cấu hình devcontainer / Codespaces: máy đọc, không phải Rust.
+.devcontainer/*
+.cursor/rules/*
+.github/copilot-instructions.md
+AGENTS.md

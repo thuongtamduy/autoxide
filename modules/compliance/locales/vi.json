@@ -53,6 +53,7 @@
   "compliance.profile_exists": "Nút tổ chức `{org_id}` đã có hồ sơ pháp lý; hãy sửa hồ sơ đó.",
   "compliance.profile_not_found": "Không có hồ sơ pháp lý này.",
   "compliance.purpose_exists": "Khách đã có mục đích riêng `{key}`; sửa bằng `PATCH /purposes/{key}`.",
+  "compliance.purpose_limit_reached": "Khách này đã có {max} mục đích xử lý riêng.",
   "compliance.purpose_not_found": "Không có mục đích xử lý `{key}`.",
   "compliance.response_closed": "Đã hết hạn phản hồi vụ việc này, hoặc vụ việc đã có quyết định.",
   "compliance.rules_invalid": "Gói quy tắc không hợp lệ: {detail}.",

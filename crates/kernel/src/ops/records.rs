@@ -562,19 +562,13 @@ async fn list_record_events(
     }))
 }
 
-/// How many usages.
-#[derive(Debug, Default, Deserialize, IntoParams)]
-#[into_params(parameter_in = Query)]
-pub(crate) struct UsagesQuery {
-    /// At most this many, 1 to 200. Defaults to 50.
-    limit: Option<u32>,
-}
-
 /// Get where a record is used.
 ///
 /// Requires being able to read the record. The records of every module that point to it — posts
 /// using an image, menu items linking to a page… — limited to modules whose `<module>.read` you
-/// hold. Use it before deleting or making a record private.
+/// hold. Use it before deleting or making a record private. Ordered by when each pointing row was
+/// created (its ID): newest first unless `order=asc`; paged with `limit` / `cursor` (`count=true`
+/// adds the total on the first page).
 #[utoipa::path(
     get,
     path = "/records/{kind}/{id}/usages",
@@ -584,13 +578,13 @@ pub(crate) struct UsagesQuery {
     params(
         ("kind" = String, Path, description = "Type of the record, e.g. `media.item`."),
         ("id" = String, Path, description = "Id of the record."),
-        UsagesQuery,
+        PageQuery,
     ),
     responses(
-        (status = 200, description = "The records using it.", body = Data<Vec<crate::ops::usages::Referrer>>),
+        (status = 200, description = "One page of the records using it, newest first.", body = Page<crate::ops::usages::Referrer>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 404, description = "No such record you may read; code `kernel.record_not_found`.", body = Problem),
-        (status = 422, description = "`limit` is not between 1 and 200; see `errors`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn get_record_usages(
@@ -598,19 +592,13 @@ async fn get_record_usages(
     tenant: TenantContext,
     principal: Principal,
     Path((kind, id)): Path<(String, String)>,
-    Query(query): Query<UsagesQuery>,
-) -> Result<Data<Vec<crate::ops::usages::Referrer>>, Error> {
-    let limit = query.limit.unwrap_or(50);
-    if !(1..=200).contains(&limit) {
-        return Err(Error::validation(vec![FieldError::new(
-            "limit",
-            "invalid",
-            "must be between 1 and 200",
-        )]));
-    }
+    Query(page): Query<PageQuery>,
+) -> Result<Page<crate::ops::usages::Referrer>, Error> {
     state.require_read(&tenant, &principal, &kind, &id).await?;
-    let limit = usize::try_from(limit).unwrap_or(200);
-    let mut found = Vec::new();
+    let page = PageRequest::try_from(page)?;
+    // Mỗi nguồn đọc một trang với cùng con trỏ (khoá UUID của dòng trỏ tới) rồi gộp theo khoá, như hoạt động
+    // của bản ghi: `limit` dòng đầu của bản gộp là trang đúng, tổng là tổng các nguồn (D-20261126-list-pages-done).
+    let mut merged: Option<Page<crate::ops::usages::KeyedReferrer>> = None;
     for (module, source) in state.references.all() {
         // Chỉ module người gọi đọc được: tiêu đề bản ghi của module khác không lộ.
         let reader = format!("{module}.read");
@@ -622,13 +610,20 @@ async fn get_record_usages(
         if !readable {
             continue;
         }
-        found.extend(source.referrers(&tenant, &kind, &id, limit).await?);
-        if found.len() >= limit {
-            break;
-        }
+        let rows = source.referrers_page(&tenant, &kind, &id, &page).await?;
+        merged = Some(match merged {
+            None => rows,
+            Some(before) => merge_id_pages(before, Some(rows), &page, |row| row.key),
+        });
     }
-    found.truncate(limit);
-    Ok(Data { data: found })
+    Ok(match merged {
+        Some(merged) => merged.map(|row| row.referrer),
+        None => Page {
+            data: Vec::new(),
+            pagination: Pagination::new(page.limit(), None)
+                .with_total(page.wants_total().then_some(0)),
+        },
+    })
 }
 
 /// A type of record in the resource directory.

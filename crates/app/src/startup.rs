@@ -210,7 +210,9 @@ pub async fn before_start(settings: &Settings) -> Result<Prepared, String> {
                     .iter()
                     .map(|state| format!("{}/{}", state.module, state.name))
                     .collect();
-                tracing::info!(count = applied.len(), applied = ?names, "migrations applied");
+                // Lần đầu có hàng trăm migration: tên từng cái ở mức debug, để dòng info không át màn hình.
+                tracing::info!(count = applied.len(), "migrations applied");
+                tracing::debug!(applied = ?names, "migrations applied, by name");
             }
             Ok::<(), String>(())
         }
@@ -313,7 +315,7 @@ async fn bootstrap_admin(runtime: &Runtime, admin: &AdminBootstrap) -> Result<()
 }
 
 /// Ghi `text` vào `path` (tạo thư mục cha), quyền `0600` trên Unix: chỉ chủ file đọc được.
-fn write_private(path: &std::path::Path, text: &str) -> std::io::Result<()> {
+pub(crate) fn write_private(path: &std::path::Path, text: &str) -> std::io::Result<()> {
     use std::io::Write as _;
     if let Some(parent) = path.parent().filter(|parent| !parent.as_os_str().is_empty()) {
         std::fs::create_dir_all(parent)?;
