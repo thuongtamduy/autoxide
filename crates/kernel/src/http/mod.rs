@@ -295,8 +295,8 @@ impl Extras {
     }
 
     /// Builds the routes WITHOUT the layer that enforces `x-permissions` (D-20261126-permission-gate), so a test can
-    /// see what the services themselves accept and check the documented lists against it. Never use it in a
-    /// running application.
+    /// see what the services themselves accept and check the documented lists against it. Only available with the
+    /// test-only feature `permission-audit` (turned on by `autoxide-testkit`); never use it in a running application.
     #[cfg(feature = "permission-audit")]
     pub fn without_permission_gate(mut self) -> Self {
         self.without_permission_gate = true;

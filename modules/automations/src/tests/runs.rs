@@ -782,3 +782,58 @@ async fn dong_lan_chay_cung_luc_worker_nhan() {
     .await
     .unwrap();
 }
+
+/// Luật có nhiều lần chạy chờ hơn một lô của câu UPDATE (500 id một lô, mỗi id một tham số): tạm dừng vẫn đóng hết, mỗi
+/// lần chạy một event.
+#[tokio::test]
+async fn tam_dung_dong_nhieu_lan_chay_hon_mot_lo() {
+    use autoxide_kernel::tenancy::ScopeExt as _;
+    use sea_orm::{ActiveModelTrait as _, EntityTrait as _, IntoActiveModel as _};
+
+    use crate::entity::run;
+    TestDatabase::run(async |test| {
+        let harness = Harness::new(test).await;
+        let actions = json!([
+            {"wait": {"minutes": 60}},
+            {"tool": "shop.tag_order", "arguments": {"order_id": "1", "tag": "x"}}
+        ]);
+        let rule = harness.rule(json!({"type": "manual"}), json!(null), actions).await;
+        let first = harness
+            .service
+            .run_rule(&harness.tenant, &harness.owner, rule.id, json!({}))
+            .await
+            .unwrap();
+        harness.settle().await;
+        let model = run::Entity::find_by_id(first.id)
+            .scoped(&harness.tenant)
+            .one(harness.tenant.database().read())
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(model.status, WAITING);
+        // Nhân bản lần chạy đang chờ: 1200 bản, ghi theo lô để câu INSERT cũng không vượt số tham số.
+        let copies: Vec<run::Model> = (0..1200)
+            .map(|index| run::Model {
+                id: Uuid::now_v7(),
+                trigger_key: format!("manual:copy-{index}"),
+                ..model.clone()
+            })
+            .collect();
+        for batch in copies.chunks(200) {
+            let rows = batch.iter().cloned().map(|copy| copy.into_active_model().reset_all());
+            run::Entity::insert_many(rows).exec(harness.tenant.database().write()).await.unwrap();
+        }
+        let failed_before = run_failed_events(&harness).await;
+        harness
+            .service
+            .pause_now(&harness.tenant, &harness.reload(rule.id).await, "test")
+            .await
+            .unwrap();
+        let runs = harness.runs(rule.id).await;
+        assert_eq!(runs.len(), 1201);
+        assert!(runs.iter().all(|run| run.status == FAILED), "every waiting run is closed");
+        assert_eq!(run_failed_events(&harness).await - failed_before, 1201);
+    })
+    .await
+    .unwrap();
+}

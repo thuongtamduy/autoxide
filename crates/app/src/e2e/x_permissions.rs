@@ -91,6 +91,7 @@ async fn x_permissions_khop_cho_service_kiem() {
 
         let mut findings = Vec::new();
         let mut untested = Vec::new();
+        let mut conclusive_total = 0;
         for (path, item) in document["paths"].as_object().unwrap() {
             for (method, operation) in item.as_object().unwrap() {
                 if !matches!(method.as_str(), "get" | "post" | "put" | "patch" | "delete") {
@@ -131,12 +132,15 @@ async fn x_permissions_khop_cho_service_kiem() {
                         ));
                     }
                 }
+                conclusive_total += conclusive;
                 let key = format!("{} {path}", method.to_uppercase());
                 if tried > 0 && conclusive == 0 {
                     untested.push(key);
                 }
             }
         }
+        // Tài liệu mất `x-permissions` (hay không còn operation nào được dò) thì bài dò không được xanh.
+        assert!(conclusive_total > 0, "no probe reached a permission check");
         // Operation không có lượt nào kết luận được thì bài dò không nói gì về nó: đỏ để mẫu request được sửa.
         assert!(
             untested.is_empty(),

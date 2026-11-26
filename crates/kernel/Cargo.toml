@@ -56,8 +56,8 @@ validator.workspace = true
 zeroize.workspace = true
 
 [features]
-# Chỉ cho test (testkit bật): dựng router KHÔNG có lớp kiểm `x-permissions` để bài dò so tài liệu với service
-# (D-20261126-permission-gate). Bản chạy thật không bao giờ có hàm này.
+# For tests only: turned on by `autoxide-testkit` to build routes WITHOUT the layer that enforces `x-permissions`, so an
+# audit can compare the documented permissions with what the services accept. Never turn it on in an application.
 permission-audit = []
 
 [dev-dependencies]

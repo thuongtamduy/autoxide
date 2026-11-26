@@ -48,6 +48,8 @@ const RUNNING_LEASE_MINUTES: i64 = 15;
 /// Trạng thái của lần chạy.
 pub(crate) const QUEUED: &str = "queued";
 pub(crate) const RUNNING: &str = "running";
+/// Số lần chạy đóng trong một câu UPDATE (`close_pending_runs`).
+const CLOSE_BATCH: usize = 500;
 pub(crate) const WAITING: &str = "waiting";
 pub(crate) const AWAITING_APPROVAL: &str = "awaiting_approval";
 pub(crate) const SUCCEEDED: &str = "succeeded";
@@ -306,18 +308,22 @@ impl Automations {
         }
         let error = rule_not_active(status);
         let at = now();
-        run::Entity::update_many()
-            .col_expr(run::Column::Status, Expr::value(FAILED))
-            .col_expr(run::Column::ErrorCode, Expr::value(error.code()))
-            .col_expr(run::Column::ErrorMessage, Expr::value(error.message()))
-            .col_expr(run::Column::FinishedAt, Expr::value(Some(at)))
-            .col_expr(run::Column::ResumeAt, Expr::value(Option::<Timestamp>::None))
-            .col_expr(run::Column::UpdatedAt, Expr::value(at))
-            .filter(run::Column::Id.is_in(pending.iter().map(|run| run.id)))
-            .filter(run::Column::Status.is_in([QUEUED, WAITING, AWAITING_APPROVAL]))
-            .scoped(tenant)
-            .exec(connection)
-            .await?;
+        // Chia lô: mỗi id là một tham số của câu lệnh; SQLite nhận tối đa 32766, Postgres 65535 tham số — luật có
+        // hàng chục nghìn lần chạy chờ vẫn đóng được, trong cùng transaction.
+        for batch in pending.chunks(CLOSE_BATCH) {
+            run::Entity::update_many()
+                .col_expr(run::Column::Status, Expr::value(FAILED))
+                .col_expr(run::Column::ErrorCode, Expr::value(error.code()))
+                .col_expr(run::Column::ErrorMessage, Expr::value(error.message()))
+                .col_expr(run::Column::FinishedAt, Expr::value(Some(at)))
+                .col_expr(run::Column::ResumeAt, Expr::value(Option::<Timestamp>::None))
+                .col_expr(run::Column::UpdatedAt, Expr::value(at))
+                .filter(run::Column::Id.is_in(batch.iter().map(|run| run.id)))
+                .filter(run::Column::Status.is_in([QUEUED, WAITING, AWAITING_APPROVAL]))
+                .scoped(tenant)
+                .exec(connection)
+                .await?;
+        }
         for run in pending {
             let failure = json!({
                 "run_id": run.id,
