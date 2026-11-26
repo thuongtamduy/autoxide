@@ -488,6 +488,7 @@ pub(crate) struct CountImportRequest {
 /// Filters of the stock count list.
 #[derive(Debug, Deserialize, IntoParams)]
 pub(crate) struct CountsQuery {
+    /// Only counts of this warehouse or store.
     pub org_id: Option<Uuid>,
     /// `open`, `applied` or `cancelled`.
     pub status: Option<String>,

@@ -123,6 +123,14 @@ async fn xuat_ban_va_quay_lai_phien_ban_mail_html_trong_khung() {
         let list = versions["data"].as_array().unwrap();
         assert_eq!(list.len(), 2);
         assert_eq!((list[0]["version"].as_i64(), list[0]["live"].as_bool()), (Some(2), Some(true)));
+        // Một trang mỗi phiên bản (bước 70 P9): mới trước, theo `next_cursor` tới bản đầu.
+        let (_, first) = call(&fx.app, "GET", &format!("{EMAIL_VI}/versions?limit=1"), "admin", None).await;
+        assert_eq!(first["data"][0]["version"], 2);
+        let cursor = first["pagination"]["next_cursor"].as_str().unwrap().to_owned();
+        let uri = format!("{EMAIL_VI}/versions?limit=1&cursor={cursor}");
+        let (_, second) = call(&fx.app, "GET", &uri, "admin", None).await;
+        assert_eq!((second["data"][0]["version"].as_i64(), second["data"][0]["live"].as_bool()), (Some(1), Some(false)));
+        assert_eq!(second["pagination"]["next_cursor"], serde_json::Value::Null);
         // Bản đã xuất bản không đổi: quay lại v1 dùng đúng nội dung cũ.
         let (status, rolled) = call(&fx.app, "POST", &format!("{EMAIL_VI}/rollback"), "admin", Some(json!({"version": 1}))).await;
         assert_eq!(status, StatusCode::OK, "{rolled}");

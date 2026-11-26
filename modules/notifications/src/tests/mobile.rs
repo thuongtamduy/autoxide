@@ -175,3 +175,75 @@ async fn dang_ky_cung_token_dong_thoi_van_gui_duoc() {
     .await
     .unwrap();
 }
+
+// Duyệt hết danh sách `first` (đã có `?limit=…`) theo `next_cursor`; trả trường `field` theo thứ tự nhận.
+async fn walk(fx: &Fixture, first: &str, field: &str) -> Vec<String> {
+    let mut seen = Vec::new();
+    let mut uri = first.to_owned();
+    loop {
+        let (status, page) = call(&fx.app, "GET", &uri, "alice", None).await;
+        assert_eq!(status, StatusCode::OK, "{uri}: {page}");
+        let rows = page["data"].as_array().unwrap();
+        assert!(rows.len() <= 2, "{page}");
+        seen.extend(rows.iter().map(|row| row[field].as_str().unwrap().to_owned()));
+        match page["pagination"]["next_cursor"].as_str() {
+            Some(cursor) => uri = format!("{first}&cursor={cursor}"),
+            None => return seen,
+        }
+    }
+}
+
+/// Bước 70 P9 (D-20261125-list-pages): thiết bị (mới trước), loại thông báo và tuỳ chọn (theo khoá loại) là
+/// một trang; theo `next_cursor` tới hết không trùng không sót, hai chiều; tool `notifications.list_my_devices`
+/// và `notifications.list_kinds` cùng tham số trả đúng trang REST trả.
+#[tokio::test]
+async fn thiet_bi_loai_va_tuy_chon_phan_trang() {
+    TestDatabase::run(async |test| {
+        let fx = fixture(test).await;
+        let mut devices = Vec::new();
+        for index in 0..5 {
+            devices.push(register(&fx, "alice", &format!("apns-token-page-{index}")).await);
+        }
+        assert_eq!(walk(&fx, "/me/device-tokens?limit=2&order=asc", "id").await, devices);
+        let newest_first: Vec<String> = devices.iter().rev().cloned().collect();
+        assert_eq!(walk(&fx, "/me/device-tokens?limit=2", "id").await, newest_first);
+
+        let kinds = walk(&fx, "/kinds?limit=2", "key").await;
+        let mut sorted = kinds.clone();
+        sorted.sort();
+        sorted.dedup();
+        assert!(kinds.len() > 2);
+        assert_eq!(kinds, sorted);
+        let down = walk(&fx, "/kinds?limit=2&order=desc", "key").await;
+        assert_eq!(down, kinds.iter().rev().cloned().collect::<Vec<_>>());
+        assert_eq!(walk(&fx, "/me/preferences?limit=2", "kind").await, kinds);
+
+        let client = fx.app.mcp("alice").await.unwrap();
+        for (tool, uri, arguments) in [
+            ("notifications.list_my_devices", "/me/device-tokens?limit=2", json!({"limit": 2})),
+            (
+                "notifications.list_kinds",
+                "/kinds?limit=2&order=desc",
+                json!({"limit": 2, "order": "desc"}),
+            ),
+        ] {
+            let (_, rest) = call(&fx.app, "GET", uri, "alice", None).await;
+            let page =
+                client.call_tool(autoxide_testkit::tool(tool, arguments.clone())).await.unwrap();
+            let page = page.structured_content.unwrap();
+            assert_eq!(page["data"], rest["data"], "{tool}");
+            assert_eq!(page["pagination"], rest["pagination"], "{tool}");
+            let mut arguments = arguments;
+            arguments["cursor"] = page["pagination"]["next_cursor"].clone();
+            let next = client.call_tool(autoxide_testkit::tool(tool, arguments)).await.unwrap();
+            let next = next.structured_content.unwrap();
+            let cursor = page["pagination"]["next_cursor"].as_str().unwrap();
+            let (_, rest_next) =
+                call(&fx.app, "GET", &format!("{uri}&cursor={cursor}"), "alice", None).await;
+            assert_eq!(next["data"], rest_next["data"], "{tool}");
+        }
+        client.cancel().await.unwrap();
+    })
+    .await
+    .unwrap();
+}

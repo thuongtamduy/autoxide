@@ -553,3 +553,83 @@ async fn xoa_tai_khoan_xoa_ban_ghi_va_so() {
     .await
     .unwrap();
 }
+
+/// Bước 70 P9 (D-20261125-list-pages): cuộc gọi của một cuộc trò chuyện là một trang, mới nhất trước; theo
+/// `next_cursor` tới hết không trùng không sót, `order=asc` ngược lại; tool `conversations.list_calls` cùng tham
+/// số trả đúng trang REST trả.
+#[tokio::test]
+async fn cuoc_goi_phan_trang_va_tool_nhu_rest() {
+    TestDatabase::run(async |test| {
+        let v = voice(test, true, false).await;
+        let id = start(&v.h.app, "buyer", "Gọi mình").await;
+        let (_, made) = request(&v.h.app, "buyer", &id, "cb-1", false).await;
+        let cb = made["data"]["id"].as_str().unwrap().to_owned();
+        let (status, placed) = call_back(&v.h.app, "agent", &cb, "k-1").await;
+        assert_eq!(status, StatusCode::CREATED, "{placed}");
+        // Thêm bốn cuộc gọi cùng cuộc trò chuyện (chép dòng có sẵn, id mới).
+        let tenant = v.h.app.default_tenant();
+        let first: Uuid = placed["data"]["id"].as_str().unwrap().parse().unwrap();
+        let row = call_entity::Entity::find_by_id(first)
+            .scoped(&tenant)
+            .one(tenant.database().read())
+            .await
+            .unwrap()
+            .unwrap();
+        let mut ids = vec![first.to_string()];
+        for index in 0..4 {
+            let mut copy = row.clone();
+            copy.id = Uuid::now_v7();
+            copy.callback_id = None;
+            copy.provider_call_id = Some(format!("copy-{index}"));
+            ids.push(copy.id.to_string());
+            sea_orm::ActiveModelTrait::insert(
+                call_entity::ActiveModel::from(copy),
+                tenant.database().write(),
+            )
+            .await
+            .unwrap();
+        }
+        let walk = async |order: &str| {
+            let mut seen = Vec::new();
+            let first = format!("/threads/{id}/calls?limit=2&order={order}");
+            let mut uri = first.clone();
+            loop {
+                let (status, page) = call(&v.h.app, "GET", &uri, "agent", None).await;
+                assert_eq!(status, StatusCode::OK, "{page}");
+                let rows = page["data"].as_array().unwrap();
+                assert!(rows.len() <= 2);
+                seen.extend(rows.iter().map(|row| row["id"].as_str().unwrap().to_owned()));
+                match page["pagination"]["next_cursor"].as_str() {
+                    Some(cursor) => uri = format!("{first}&cursor={cursor}"),
+                    None => return seen,
+                }
+            }
+        };
+        assert_eq!(walk("asc").await, ids);
+        ids.reverse();
+        assert_eq!(walk("desc").await, ids);
+
+        let (_, rest) =
+            call(&v.h.app, "GET", &format!("/threads/{id}/calls?limit=2"), "agent", None).await;
+        let client = v.h.app.mcp("agent").await.unwrap();
+        let tool = |arguments: Value| autoxide_testkit::tool("conversations.list_calls", arguments);
+        let page = client.call_tool(tool(json!({"id": id, "limit": 2}))).await.unwrap();
+        let page = page.structured_content.unwrap();
+        assert_eq!(page["data"], rest["data"]);
+        assert_eq!(page["pagination"], rest["pagination"]);
+        let cursor = page["pagination"]["next_cursor"].clone();
+        let next =
+            client.call_tool(tool(json!({"id": id, "limit": 2, "cursor": cursor}))).await.unwrap();
+        let next = next.structured_content.unwrap();
+        let shown: Vec<&str> = next["data"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|row| row["id"].as_str().unwrap())
+            .collect();
+        assert_eq!(shown, [ids[2].as_str(), ids[3].as_str()]);
+        client.cancel().await.unwrap();
+    })
+    .await
+    .unwrap();
+}

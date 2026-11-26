@@ -6,6 +6,7 @@
 
 use autoxide_kernel::error::{Error, ErrorKind};
 use autoxide_kernel::event::Actor;
+use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use autoxide_promotions::api::{GrantVoucher, VoucherSource};
 use jiff::SignedDuration;
@@ -232,12 +233,12 @@ impl CustomersService {
     pub(crate) async fn referral_rules(
         &self,
         tenant: &TenantContext,
-    ) -> Result<Vec<referral_rule::Model>, Error> {
-        Ok(referral_rule::Entity::find()
-            .scoped(tenant)
-            .order_by_desc(referral_rule::Column::EffectiveFrom)
-            .all(tenant.database().read())
-            .await?)
+        page: &PageRequest,
+    ) -> Result<Page<referral_rule::Model>, Error> {
+        // Như quy tắc nhắc giỏ: hiệu lực từ lúc tạo, keyset theo id (index `customers_referral_rules_page`).
+        let select = referral_rule::Entity::find().scoped(tenant);
+        fetch_page(select, referral_rule::Column::Id, |row| row.id, page, tenant.database().read())
+            .await
     }
 
     /// Đơn vừa hoàn tất (trong transaction của `facts`): đơn đầu tiên của người được giới thiệu đạt tiền

@@ -112,10 +112,14 @@ pub(crate) struct DocumentChange {
 pub(crate) struct DocumentsQuery {
     /// Only documents written by this unit.
     org_id: Option<Uuid>,
+    /// Only documents of this kind, e.g. `vat_invoice`, `sales_invoice`, `retail_receipt`.
     kind: Option<String>,
+    /// Only documents in this status: `draft`, `issued`, `submitting`, `accepted`, `rejected`,
+    /// `cancelled`, `replaced` or `adjusted`.
     status: Option<String>,
     /// Only documents created by this module (`invoices` for documents made through this API).
     source_module: Option<String>,
+    /// Only documents made from this source document (e.g. an order id).
     source_id: Option<String>,
 }
 

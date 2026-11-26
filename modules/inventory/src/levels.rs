@@ -4,7 +4,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::money::Money;
-use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
+use autoxide_kernel::pagination::{Page, PageRequest, fetch_page, page_of};
 use autoxide_kernel::reasons::{ReasonDefault, ReasonList};
 use autoxide_kernel::reference::{self, Reference, Submitted};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
@@ -464,13 +464,19 @@ pub(crate) struct Valuation {
 }
 
 impl InventoryService {
-    /// Giá trị tồn hiện tại theo kho và tiền tệ, trong phạm vi `inventory.read` của người gọi.
+    /// Một trang giá trị tồn hiện tại theo kho và tiền tệ, trong phạm vi `inventory.read` của người gọi.
+    ///
+    /// Kết quả là phép cộng gộp (`GROUP BY` kho, tiền tệ) tính lại mỗi lần hỏi, không phải dòng lưu sẵn: mỗi
+    /// lần đều phải cộng mọi mức tồn trong phạm vi, nên chia trang trong database không bớt việc. Số dòng là số
+    /// kho × tiền tệ trong phạm vi; trang dựng bằng `page_of` theo khoá `<org_id>:<tiền tệ>` (duy nhất, cùng thứ
+    /// tự với trước đây).
     pub(crate) async fn valuation(
         &self,
         tenant: &TenantContext,
         principal: &Principal,
         org: Option<Uuid>,
-    ) -> Result<Vec<Valuation>, Error> {
+        page: &PageRequest,
+    ) -> Result<Page<Valuation>, Error> {
         use sea_orm::QuerySelect;
         let scope = principal.scope_condition(&READ, level::Column::OrgId, None)?;
         let mut select = level::Entity::find()
@@ -494,13 +500,12 @@ impl InventoryService {
         }
         let rows: Vec<(Uuid, Option<String>, i64, i64)> =
             select.into_tuple().all(tenant.database().read()).await?;
-        let mut found: Vec<Valuation> = rows
+        let found: Vec<Valuation> = rows
             .into_iter()
             .filter_map(|(org_id, currency, units, value_minor)| {
                 currency.map(|currency| Valuation { org_id, currency, units, value_minor })
             })
             .collect();
-        found.sort_by(|a, b| (a.org_id, &a.currency).cmp(&(b.org_id, &b.currency)));
-        Ok(found)
+        page_of(found, |row| format!("{}:{}", row.org_id, row.currency), page)
     }
 }

@@ -27,6 +27,7 @@ mod embed;
 mod health;
 mod layout;
 mod layout_public;
+mod list_pages;
 mod ops;
 mod page_templates;
 mod public_site;

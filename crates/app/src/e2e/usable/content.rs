@@ -185,7 +185,13 @@ async fn loai_noi_dung_giao_dien_vi_tri_banner_va_trang_mau() {
         get(&app, &region).await;
 
         let templates = get(&app, "/api/v1/content/templates").await;
-        let key = templates["data"][0]["key"].as_str().unwrap_or_else(|| panic!("{templates}")).to_owned();
+        // Mẫu theo khoá (bước 70 P9): chọn `owner_info`, chỉ cần hồ sơ chủ và liên hệ.
+        let key = templates["data"]
+            .as_array()
+            .and_then(|items| items.iter().find(|item| item["key"] == "owner_info"))
+            .and_then(|item| item["key"].as_str())
+            .unwrap_or_else(|| panic!("{templates}"))
+            .to_owned();
         let variables = json!({"owner": {"legal_name": "Công ty TNHH An", "address": "12 Tràng Tiền, Hà Nội"},
                                "contact": {"email": "lienhe@example.com", "phone": "0901234567"}});
         call_tool(&app, ADMIN, "content.draft_from_template", json!({"key": key, "locale": "vi", "variables": variables})).await;

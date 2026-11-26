@@ -19,9 +19,7 @@ use autoxide_kernel::event::{Actor, Outbox};
 use autoxide_kernel::job::{EnqueueOptions, Job, JobContext, JobHandler};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use sea_orm::sea_query::Expr;
-use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Set,
-};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, Set};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use uuid::Uuid;
@@ -254,21 +252,27 @@ impl ContentService {
         .await
     }
 
-    /// Lịch của mục `entry_id`, mới trước. Cần `content.read`.
+    /// Một trang lịch của mục `entry_id`, mới trước (theo id), keyset trong database (index
+    /// `content_schedules_entry_page_idx`). Cần `content.read`.
     pub(crate) async fn list_schedules(
         &self,
         tenant: &TenantContext,
         principal: &Principal,
         entry_id: Uuid,
-    ) -> Result<Vec<Schedule>, Error> {
+        page: &autoxide_kernel::pagination::PageRequest,
+    ) -> Result<autoxide_kernel::pagination::Page<Schedule>, Error> {
         principal.require(&CONTENT_READ)?;
         self.get(tenant, principal, entry_id).await?;
-        Ok(schedule::Entity::find()
-            .scoped(tenant)
-            .filter(schedule::Column::EntryId.eq(entry_id))
-            .order_by_desc(schedule::Column::Id)
-            .all(tenant.database().read())
-            .await?)
+        let select =
+            schedule::Entity::find().scoped(tenant).filter(schedule::Column::EntryId.eq(entry_id));
+        autoxide_kernel::pagination::fetch_page(
+            select,
+            schedule::Column::Id,
+            |row| row.id,
+            page,
+            tenant.database().read(),
+        )
+        .await
     }
 
     /// Huỷ lịch `id` đang chờ. Cần `content.publish`.

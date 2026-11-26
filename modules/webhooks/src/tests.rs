@@ -486,6 +486,38 @@ async fn quan_ly_qua_api_khong_lo_secret() {
         let (status, events) = call("GET", "/events", "admin", None).await;
         assert_eq!(status, StatusCode::OK);
         assert!(events["data"].as_array().unwrap().iter().any(|event| event["name"] == DEMO_EVENT));
+        // Sổ event là một trang theo tên (bước 70 P9): theo `next_cursor` tới hết không trùng không sót,
+        // `order=desc` ngược lại.
+        let mut walked: Vec<Vec<String>> = Vec::new();
+        for order in ["asc", "desc"] {
+            let first = format!("/events?limit=2&order={order}");
+            let mut uri = first.clone();
+            let mut seen = Vec::new();
+            loop {
+                let (status, page) = call("GET", &uri, "admin", None).await;
+                assert_eq!(status, StatusCode::OK, "{page}");
+                let rows = page["data"].as_array().unwrap();
+                assert!(rows.len() <= 2);
+                seen.extend(rows.iter().map(|row| row["name"].as_str().unwrap().to_owned()));
+                match page["pagination"]["next_cursor"].as_str() {
+                    Some(cursor) => uri = format!("{first}&cursor={cursor}"),
+                    None => break,
+                }
+            }
+            walked.push(seen);
+        }
+        let all: Vec<String> = events["data"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|e| e["name"].as_str().unwrap().to_owned())
+            .collect();
+        let mut sorted = all.clone();
+        sorted.sort();
+        sorted.dedup();
+        assert!(all.len() > 2);
+        assert_eq!((&walked[0], &all), (&sorted, &sorted));
+        assert_eq!(walked[1], sorted.iter().rev().cloned().collect::<Vec<_>>());
 
         let body = json!({"url": "https://example.com/h", "events": [DEMO_EVENT]});
         let (status, created) = call("POST", "", "admin", Some(body)).await;

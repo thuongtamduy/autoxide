@@ -309,21 +309,20 @@ impl ContentService {
         .await
     }
 
-    /// `limit` bài mới nhất của `locale`, cho feed.
+    /// Một trang bài của `locale`, mới đăng trước (như `public_posts`), cho feed.
     pub(crate) async fn feed(
         &self,
         tenant: &TenantContext,
         site: &autoxide_kernel::tenancy::Site,
         locale: &str,
-        limit: u32,
-    ) -> Result<Vec<Published>, Error> {
+        page: &PageRequest,
+    ) -> Result<Page<Published>, Error> {
         let filter = PostFilter {
             locale: locale.to_owned(),
             site: site.lineage_ids(),
             ..Default::default()
         };
-        let page = PageRequest::first(limit, autoxide_kernel::pagination::Order::Desc);
-        Ok(self.public_posts(tenant, &filter, &page).await?.data)
+        self.public_posts(tenant, &filter, page).await
     }
 
     /// Các bản dịch đang công khai của từng mục (ngôn ngữ, đường dẫn), cho sitemap.

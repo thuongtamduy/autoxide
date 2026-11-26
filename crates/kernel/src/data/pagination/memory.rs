@@ -12,24 +12,27 @@ use crate::error::Error;
 /// Column name the cursor of [`page_of`] carries.
 const KEY: &str = "key";
 
-/// One page of `items`, a list not in the database, ordered by `key` (unique per item; compared byte by byte)
+/// One page of `items`, a list not in the database, ordered by `key` (any text: `&'static str`, `String`…;
+/// unique per item; compared byte by byte)
 /// in the request's order. Two items with the same key are a programming error (one of them could never be
 /// reached): an internal error. The cursor carries the key of the last item, so the next page starts right after
 /// it even if items were added or removed in between. `pagination.total` (with `count=true`) is the number of
 /// items.
-pub fn page_of<T>(
+// Khoá nhận mọi kiểu đọc được thành chuỗi (`AsRef<str>`) chứ không bắt `String`: danh sách dựng từ hằng
+// (`&'static str`) không phải cấp phát, và chữ ký không phải đổi về sau (hợp đồng công khai).
+pub fn page_of<T, K: AsRef<str>>(
     mut items: Vec<T>,
-    key: impl Fn(&T) -> String,
+    key: impl Fn(&T) -> K,
     request: &PageRequest,
 ) -> Result<Page<T>, Error> {
     let total = request.wants_total().then(|| u64::try_from(items.len()).unwrap_or(u64::MAX));
     // Khoá tính một lần mỗi phần tử; sắp theo byte nên hai database (và mọi máy) ra cùng thứ tự.
-    let mut keyed: Vec<(String, T)> = items.drain(..).map(|item| (key(&item), item)).collect();
-    keyed.sort_by(|(a, _), (b, _)| a.as_bytes().cmp(b.as_bytes()));
-    if let Some(pair) = keyed.windows(2).find(|pair| pair[0].0 == pair[1].0) {
+    let mut keyed: Vec<(K, T)> = items.drain(..).map(|item| (key(&item), item)).collect();
+    keyed.sort_by(|(a, _), (b, _)| a.as_ref().as_bytes().cmp(b.as_ref().as_bytes()));
+    if let Some(pair) = keyed.windows(2).find(|pair| pair[0].0.as_ref() == pair[1].0.as_ref()) {
         return Err(Error::internal(format!(
             "a paged list has two items with the key `{}`: the key must be unique",
-            pair[0].0
+            pair[0].0.as_ref()
         )));
     }
     if request.order == Order::Desc {
@@ -43,8 +46,8 @@ pub fn page_of<T>(
             keyed
                 .iter()
                 .position(|(key, _)| match request.order {
-                    Order::Asc => key.as_bytes() > after,
-                    Order::Desc => key.as_bytes() < after,
+                    Order::Asc => key.as_ref().as_bytes() > after,
+                    Order::Desc => key.as_ref().as_bytes() < after,
                 })
                 .unwrap_or(keyed.len())
         }
@@ -55,8 +58,12 @@ pub fn page_of<T>(
     let has_more = rest.len() > limit;
     rest.truncate(limit);
     let next_cursor = has_more.then(|| rest.last()).flatten().map(|(key, _)| {
-        KeyCursor { column: KEY.to_owned(), value: SortValue::Text(key.clone()), id: Uuid::nil() }
-            .encode()
+        KeyCursor {
+            column: KEY.to_owned(),
+            value: SortValue::Text(key.as_ref().to_owned()),
+            id: Uuid::nil(),
+        }
+        .encode()
     });
     Ok(Page {
         data: rest.into_iter().map(|(_, item)| item).collect(),
@@ -83,13 +90,11 @@ mod tests {
     #[test]
     fn duyet_het_danh_sach_trong_bo_nho_theo_khoa() {
         let items = vec!["delta", "alpha", "charlie", "bravo", "echo"];
-        let first =
-            page_of(items.clone(), |item| (*item).to_owned(), &request("2", None, None)).unwrap();
+        let first = page_of(items.clone(), |item| *item, &request("2", None, None)).unwrap();
         assert_eq!(names(&first), ["alpha", "bravo"]);
         assert_eq!(first.pagination.total, Some(5));
         let cursor = first.pagination.next_cursor.clone();
-        let second =
-            page_of(items.clone(), |item| (*item).to_owned(), &request("2", cursor, None)).unwrap();
+        let second = page_of(items.clone(), |item| *item, &request("2", cursor, None)).unwrap();
         assert_eq!(names(&second), ["charlie", "delta"]);
         assert_eq!(second.pagination.total, None, "only the first page counts");
         // Một phần tử thêm vào giữa chừng không làm trùng hay sót phần đã qua.
@@ -97,21 +102,21 @@ mod tests {
         grown.push("aardvark");
         let third = page_of(
             grown,
-            |item| (*item).to_owned(),
+            |item| *item,
             &request("2", second.pagination.next_cursor.clone(), None),
         )
         .unwrap();
         assert_eq!(names(&third), ["echo"]);
         assert_eq!(third.pagination.next_cursor, None);
 
-        let reversed = page_of(items, |item| (*item).to_owned(), &request("3", None, Some("desc")));
+        let reversed = page_of(items, |item| *item, &request("3", None, Some("desc")));
         assert_eq!(names(&reversed.unwrap()), ["echo", "delta", "charlie"]);
     }
 
     #[test]
     fn khoa_trung_la_loi_khong_mat_phan_tu_trong_im_lang() {
         let items = vec!["a", "b", "b", "c"];
-        let error = page_of(items, |item| (*item).to_owned(), &request("2", None, None));
+        let error = page_of(items, |item| *item, &request("2", None, None));
         // Lỗi lập trình (lỗi nội bộ, 500), không phải lỗi đầu vào của người gọi.
         let error = error.err().unwrap();
         assert_eq!(error.kind(), crate::error::ErrorKind::Internal);
@@ -121,7 +126,7 @@ mod tests {
     #[test]
     fn con_tro_la_bi_tu_choi_va_mac_dinh_tang_dan() {
         let id_cursor = Some(Uuid::now_v7().to_string());
-        let error = page_of(vec!["a"], |item| (*item).to_owned(), &request("2", id_cursor, None));
+        let error = page_of(vec!["a"], |item| *item, &request("2", id_cursor, None));
         assert!(error.is_err());
         assert_eq!(request("2", None, None).order(), Order::Asc);
         assert_eq!(PageRequest::try_from(PageQuery::default()).unwrap().order(), Order::Desc);

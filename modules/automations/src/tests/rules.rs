@@ -296,3 +296,38 @@ async fn luat_theo_event_doi_quyen_xem_event() {
     .await
     .unwrap();
 }
+
+/// Mẫu luật (bước 70 P9, D-20261125-list-pages): một trang theo `id`, theo `next_cursor` tới hết không trùng
+/// không sót, `order=desc` ngược lại; mẫu dùng tool người gọi không có quyền (`shop.refund`) không có mặt.
+#[tokio::test]
+async fn mau_luat_phan_trang_theo_id() {
+    TestDatabase::run(async |test| {
+        let harness = Harness::new(test).await;
+        let expected = ["shop.tag_big", "shop.tag_gift", "shop.tag_new", "shop.tag_vip"];
+        for (order, expected) in
+            [("asc", expected.to_vec()), ("desc", expected.iter().rev().copied().collect())]
+        {
+            let mut seen = Vec::new();
+            let first = format!("/api/v1/automations/templates?limit=3&order={order}");
+            let mut uri = first.clone();
+            loop {
+                let answer = harness.app.get(&uri).token("1").send().await.unwrap();
+                assert_eq!(answer.status(), axum::http::StatusCode::OK, "{}", answer.json());
+                let body = answer.json();
+                let page = body["data"].as_array().unwrap();
+                assert!(page.len() <= 3);
+                seen.extend(page.iter().map(|item| item["id"].as_str().unwrap().to_owned()));
+                match body["pagination"]["next_cursor"].as_str() {
+                    Some(cursor) => uri = format!("{first}&cursor={cursor}"),
+                    None => break,
+                }
+            }
+            assert_eq!(seen, expected, "{order}");
+        }
+        let wrong = harness.app.get("/api/v1/automations/templates?cursor=x").token("1");
+        let wrong = wrong.send().await.unwrap();
+        assert_eq!(wrong.status(), axum::http::StatusCode::UNPROCESSABLE_ENTITY);
+    })
+    .await
+    .unwrap();
+}

@@ -17,6 +17,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
             vec![autoxide_kernel::event::tenant_table("address")],
         ),
         autoxide_kernel::event::outbox_access_migration("k0001_event_access", "address"),
+        Box::new(ListIndexes),
     ]
 }
 
@@ -88,5 +89,44 @@ impl MigrationTrait for CreateAddress {
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager.drop_table(Table::drop().table("address_unit").to_owned()).await?;
         manager.drop_table(Table::drop().table("address_dataset").to_owned()).await
+    }
+}
+
+/// Index cho danh sách tỉnh / xã có phân trang (bước 70 P9 mục 3, D-20261125-list-pages): cột lọc + cột sắp
+/// (`code`) + id, để database nhảy thẳng tới điểm bắt đầu trang. Không index cũ nào là tiền tố của hai index
+/// này (`address_unit_parent_idx` kết thúc bằng `valid_to`), nên không xoá index nào.
+struct ListIndexes;
+
+/// `(tên index, cột)` thêm mới trên `address_unit`.
+const LIST_INDEXES: [(&str, &[&str]); 2] = [
+    ("address_unit_page_idx", &["country", "level", "code", "id"]),
+    ("address_unit_parent_page_idx", &["country", "level", "parent_code", "code", "id"]),
+];
+
+impl MigrationName for ListIndexes {
+    fn name(&self) -> &str {
+        "m0005_list_indexes"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for ListIndexes {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        for (name, columns) in LIST_INDEXES {
+            let mut index = Index::create();
+            index.name(name).table("address_unit");
+            for column in columns {
+                index.col(*column);
+            }
+            manager.create_index(index.to_owned()).await?;
+        }
+        Ok(())
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        for (name, _) in LIST_INDEXES {
+            manager.drop_index(Index::drop().name(name).table("address_unit").to_owned()).await?;
+        }
+        Ok(())
     }
 }

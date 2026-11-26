@@ -159,6 +159,7 @@ pub(crate) struct SupplierUpdate {
 pub(crate) struct SuppliersQuery {
     /// Words of the name, with or without Vietnamese accents.
     pub q: Option<String>,
+    /// `true`: only active suppliers; `false`: only inactive ones; omitted: both.
     pub active: Option<bool>,
 }
 
@@ -419,6 +420,7 @@ impl From<PurchaseOrderRequest> for PurchaseOrderInput {
 /// Filters of the purchase order list.
 #[derive(Debug, Deserialize, IntoParams)]
 pub(crate) struct PurchaseOrdersQuery {
+    /// Only purchase orders to this supplier.
     pub supplier_id: Option<Uuid>,
     /// `draft`, `ordered`, `partially_received`, `received`, `closed` or `cancelled`.
     pub status: Option<String>,
@@ -757,6 +759,7 @@ impl TryFrom<Receipt> for ReceiptResponse {
 /// Filter of the receipt list.
 #[derive(Debug, Deserialize, IntoParams)]
 pub(crate) struct ReceiptsQuery {
+    /// Only receipts from this supplier.
     pub supplier_id: Option<Uuid>,
 }
 

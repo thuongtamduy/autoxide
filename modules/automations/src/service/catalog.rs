@@ -4,6 +4,7 @@
 
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
+use autoxide_kernel::pagination::{Page, PageRequest, page_of};
 use autoxide_kernel::tenancy::TenantContext;
 use serde::Serialize;
 use serde_json::{Value, json};
@@ -168,12 +169,14 @@ impl Automations {
         Ok(Catalog { events, metrics, tools })
     }
 
-    /// Mẫu luật mà `principal` lưu được ngay (mẫu dùng event / tool / quyền họ không có thì ẩn).
+    /// Một trang mẫu luật mà `principal` lưu được ngay (mẫu dùng event / tool / quyền họ không có thì ẩn),
+    /// theo `id`. Mẫu do module khai trong code (không nằm trong database): `page_of` theo `id` (duy nhất).
     pub(crate) async fn templates(
         &self,
         tenant: &TenantContext,
         principal: &Principal,
-    ) -> Result<Vec<TemplateInfo>, Error> {
+        page: &PageRequest,
+    ) -> Result<Page<TemplateInfo>, Error> {
         principal.require(&AUTOMATIONS_READ)?;
         let mut usable = Vec::new();
         for template in self.directory.templates() {
@@ -195,7 +198,7 @@ impl Automations {
                 Err(_) => {}
             }
         }
-        Ok(usable)
+        page_of(usable, |template| template.id.clone(), page)
     }
 
     /// Chạy thử khô luật `id` với dữ liệu mẫu `sample` (thành `event`; không gửi thì dùng mẫu theo

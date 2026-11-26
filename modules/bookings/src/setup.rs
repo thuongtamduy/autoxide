@@ -10,7 +10,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::money::Money;
-use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
+use autoxide_kernel::pagination::{Page, PageRequest, SortValue, fetch_page, fetch_page_by};
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter,
@@ -598,15 +598,28 @@ impl BookingsService {
         &self,
         tenant: &TenantContext,
         org: Option<Uuid>,
-    ) -> Result<Vec<ServiceView>, Error> {
+        page: &PageRequest,
+    ) -> Result<Page<ServiceView>, Error> {
         let read = tenant.database().read();
         let mut select =
             service::Entity::find().filter(service::Column::Active.eq(true)).scoped(tenant);
         if let Some(org) = org {
             select = select.filter(service::Column::OrgId.eq(org));
         }
-        let rows = select.order_by_asc(service::Column::Name).limit_rows(500).all(read).await?;
-        Self::views(read, tenant, rows).await
+        // Theo tên rồi id, keyset trong database (index `bookings_services_public_page_idx` /
+        // `bookings_services_public_org_page_idx`, m0009).
+        let rows = fetch_page_by(
+            select,
+            service::Column::Name,
+            |row| SortValue::Text(row.name.clone()),
+            service::Column::Id,
+            |row| row.id,
+            page,
+            read,
+        )
+        .await?;
+        let data = Self::views(read, tenant, rows.data).await?;
+        Ok(Page { data, pagination: rows.pagination })
     }
 
     // ---- Tài nguyên --------------------------------------------------------------------------
@@ -1010,9 +1023,25 @@ impl BookingsService {
         resource_id: Uuid,
         from: Timestamp,
         to: Timestamp,
-    ) -> Result<Vec<exception::Model>, Error> {
+        page: &PageRequest,
+    ) -> Result<Page<exception::Model>, Error> {
         self.get_resource(tenant, principal, resource_id).await?;
-        Self::exception_rows(tenant.database().read(), tenant, &[resource_id], from, to).await
+        // Một trang theo giờ bắt đầu rồi id, keyset trong database (index `bookings_exceptions_page_idx`).
+        let select = exception::Entity::find()
+            .filter(exception::Column::ResourceId.eq(resource_id))
+            .filter(exception::Column::StartsAt.lt(to))
+            .filter(exception::Column::EndsAt.gt(from))
+            .scoped(tenant);
+        fetch_page_by(
+            select,
+            exception::Column::StartsAt,
+            |row| SortValue::Time(row.starts_at),
+            exception::Column::Id,
+            |row| row.id,
+            page,
+            tenant.database().read(),
+        )
+        .await
     }
 
     pub(crate) async fn exception_rows<C: ConnectionTrait>(

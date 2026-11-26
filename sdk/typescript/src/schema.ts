@@ -14112,40 +14112,6 @@ export type Data_Vec_ActivityItem = {
 };
 
 /** Envelope of a single result. */
-export type Data_Vec_ActivityResponse = {
-  data: {
-    /** The event, `<module>.<what_happened>`. */
-    action: string;
-    actor_user_id?: string | null;
-    /** Id of the audit entry. */
-    id: string;
-    occurred_at: string;
-    /** What happened, as a sentence in the language of `Accept-Language`. */
-    sentence: string;
-    /** Record that changed, as `<kind>:<id>`. */
-    subject?: string | null;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_AdministrativeUnit = {
-  data: {
-    code: string;
-    /** `province`, `city` (centrally governed city), `commune`, `ward` or `special_zone`. */
-    kind: string;
-    /** 1: province level; 2: commune level. */
-    level: number;
-    name: string;
-    /** Code of the province, for a commune. */
-    parent_code?: string | null;
-    /** First day in force (`YYYY-MM-DD`). */
-    valid_from: string;
-    /** First day no longer in force; `null` while in force. */
-    valid_to?: string | null;
-  }[];
-};
-
-/** Envelope of a single result. */
 export type Data_Vec_ApprovalRequest = {
   data: {
     api_key_id?: string | null;
@@ -14244,19 +14210,6 @@ export type Data_Vec_BlockTypeView = {
      * `x-link` (an http(s), mailto:, tel: link or a path on the site).
      */
     props_schema: Record<string, unknown>;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_BookingException = {
-  data: {
-    created_at: string;
-    ends_at: string;
-    id: string;
-    kind: string;
-    reason: string;
-    resource_id: string;
-    starts_at: string;
   }[];
 };
 
@@ -14793,47 +14746,6 @@ export type Data_Vec_ConnectionWebhook = {
 };
 
 /** Envelope of a single result. */
-export type Data_Vec_ContentTemplate = {
-  data: {
-    /**
-     * e.g. `return_policy`; also the page kind to link in
-     * `PUT /api/v1/compliance/websites/{id}/pages/{page_kind}` (except `seller_info`, a block
-     * for product pages).
-     */
-    key: string;
-    /** Only a marketplace needs it. */
-    marketplace: boolean;
-    /** Always `true`: have a legal professional review the text before use. */
-    needs_legal_review: boolean;
-    /** Title per language, e.g. `{"en": "…", "vi": "…"}`. */
-    titles: Record<string, unknown>;
-    variables: ContentTemplateVariable[];
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_ConversationCall = {
-  data: {
-    agent_user_id?: string | null;
-    answered_at?: string | null;
-    callback_id?: string | null;
-    created_at: string;
-    /** `inbound` (the customer called) or `outbound` (the shop called back). */
-    direction: string;
-    duration_seconds?: number | null;
-    ended_at?: string | null;
-    id: string;
-    /** A recording is stored; listen at `GET /calls/{id}/recording`. */
-    recorded: boolean;
-    recording_enabled: boolean;
-    recording_expires_at?: string | null;
-    /** `queued`, `ringing`, `in_progress`, `completed`, `no_answer`, `busy`, `failed`, `cancelled`. */
-    status: string;
-    thread_id: string;
-  }[];
-};
-
-/** Envelope of a single result. */
 export type Data_Vec_CustomFieldView = {
   data: {
     active: boolean;
@@ -14922,37 +14834,12 @@ export type Data_Vec_EventTypeInfo = {
 };
 
 /** Envelope of a single result. */
-export type Data_Vec_EventTypeResponse = {
-  data: {
-    description: string;
-    name: string;
-  }[];
-};
-
-/** Envelope of a single result. */
 export type Data_Vec_FunnelInfo = {
   data: {
     description: string;
     key: string;
     /** Event types of the steps, in order. */
     steps: string[];
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_GiftCard = {
-  data: {
-    balance: Money;
-    /** The full code: only in the answer to issuing; never stored in clear. */
-    code?: string | null;
-    /** Last 4 characters of the code. */
-    code_last4: string;
-    created_at: string;
-    expires_at?: string | null;
-    id: string;
-    initial: Money;
-    /** `active`, `void` or `expired`. */
-    status: string;
   }[];
 };
 
@@ -14988,26 +14875,6 @@ export type Data_Vec_InventoryPublicAvailability = {
 };
 
 /** Envelope of a single result. */
-export type Data_Vec_InventoryValuation = {
-  data: {
-    org_id: string;
-    /** Units on hand that have an average cost. */
-    units: number;
-    /** Sum of on hand × weighted average unit cost. */
-    value: Money;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_InvoicesExportProfile = {
-  data: {
-    description: string;
-    formats: string[];
-    name: string;
-  }[];
-};
-
-/** Envelope of a single result. */
 export type Data_Vec_JobRunView = {
   data: {
     created_at: string;
@@ -15028,34 +14895,6 @@ export type Data_Vec_JobRunView = {
     result?: unknown;
     /** `queued`, `running`, `succeeded` or `failed`. */
     status: string;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_KindResponse = {
-  data: {
-    description: string;
-    /** Dimensions the facts carry, usable in the `dimensions` filter of `GET /facts`. */
-    dimensions: string[];
-    /** `<module>.<figure>`. */
-    kind: string;
-    /** `amount` (sums of money, per currency) or `quantity` (counts). */
-    measure: string;
-    /** The module that declares it. */
-    module: string;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_LagResponse = {
-  data: {
-    /** When the store last received a fact of this tenant. */
-    last_received_at?: string | null;
-    /** When the oldest fact not yet pushed was taken. */
-    oldest_pending_at?: string | null;
-    /** Facts not yet pushed to the store. */
-    pending: number;
-    tenant_id: string;
   }[];
 };
 
@@ -15134,16 +14973,6 @@ export type Data_Vec_MembershipResponse = {
      * unit (`unit`: this unit, `subtree`: this unit and the units below it).
      */
     roles: RoleResponse[];
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_MenuSummary = {
-  data: {
-    id: string;
-    key: string;
-    locale: string;
-    updated_at: string;
   }[];
 };
 
@@ -15252,35 +15081,6 @@ export type Data_Vec_MyTenantResponse = {
 };
 
 /** Envelope of a single result. */
-export type Data_Vec_NotificationDeviceToken = {
-  data: {
-    app_id: string;
-    created_at: string;
-    id: string;
-    last_used_at?: string | null;
-    locale?: string | null;
-    platform: string;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_NotificationKindInfo = {
-  data: {
-    category: NotificationCategory;
-    /** Channels this kind may go to. */
-    channels: NotificationChannel[];
-    /** Advertising invitation: sent at most once per address and channel. */
-    invitation: boolean;
-    /** `<module>.<name>`, e.g. `orders.order_shipped`. */
-    key: string;
-    /** `true` for security notifications: they cannot be turned off. */
-    locked: boolean;
-    /** Advertising: the consent purpose it needs (in `compliance`). */
-    purpose?: string | null;
-  }[];
-};
-
-/** Envelope of a single result. */
 export type Data_Vec_NotificationKindPreference = {
   data: {
     category: NotificationCategory;
@@ -15301,24 +15101,6 @@ export type Data_Vec_NotificationTemplate = {
     title: string;
     updated_at: string;
     /** Approved Zalo ZNS template id (channel `zns`). */
-    zns_template_id?: string | null;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_NotificationTemplateVersion = {
-  data: {
-    body_html?: string | null;
-    body_text: string;
-    channel: string;
-    kind: string;
-    /** This version is the one in use. */
-    live: boolean;
-    locale: string;
-    published_at: string;
-    short: string;
-    subject: string;
-    version: number;
     zns_template_id?: string | null;
   }[];
 };
@@ -15841,109 +15623,6 @@ export type Data_Vec_ProviderResponse = {
 };
 
 /** Envelope of a single result. */
-export type Data_Vec_PublicBookingService = {
-  data: {
-    capacity: number;
-    description: string;
-    duration_minutes: number;
-    id: string;
-    name: string;
-    names: {
-      [key: string]: string;
-    };
-    org_id: string;
-    /** Staff (or courts, rooms…) that can give it; give one as `resource_id` to book that one. */
-    performers: string[];
-    price: Money;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_PublicEntryResponse = {
-  data: {
-    /**
-     * A person wrote or edited the content from AI suggestions: label it as AI-assisted (Vietnam's
-     * Law on Artificial Intelligence 134/2025/QH15, from 2026-03-01).
-     */
-    ai_assisted: boolean;
-    /**
-     * The content was generated by AI. Show readers a notice when your rules (for example
-     * Article 50 of the EU AI Act) ask for one.
-     */
-    ai_generated: boolean;
-    /**
-     * A person reviewed the AI-generated content and took editorial responsibility when it
-     * was published. Always `false` when `ai_generated` is `false`.
-     */
-    ai_reviewed: boolean;
-    /** Authors; the first is the main one. */
-    authors: PublicAuthor[];
-    /**
-     * For a page with a block layout (`body.type` is `layout`), only in `GET /public/resolve`:
-     * data of the blocks that carry data (`has_data` in `GET /api/v1/kernel/blocks`), by block
-     * `id`. `null` for a block whose data could not be read or whose record is no longer public:
-     * hide that block. Blocks of modules the site no longer has are left out of `body`.
-     */
-    blocks_data: Record<string, unknown>;
-    body: BodyNode;
-    /**
-     * The images used in `body` (nodes of type `image`), in order of appearance: find one by
-     * the `mediaId` of the node to get its size and smaller copies for `srcset`. An image
-     * that is no longer public is left out. `alt` here is the one of the media library; the
-     * node carries its own.
-     */
-    body_media: PublicMedia[];
-    body_schema_version: number;
-    /** Last change of the published content (sitemap `lastmod`, feed `updated`). */
-    content_modified_at: string;
-    /**
-     * The tenant's custom fields shown to readers (those of visibility `public`), by key, as they
-     * were when the entry was published.
-     */
-    custom_fields: Record<string, unknown>;
-    detail?: PublicDetail | null;
-    /**
-     * Records of other modules embedded in `body` (nodes `embed` with `kind` and `id`, e.g. a
-     * product), keyed by `<kind>:<id>`, in the entry's language. A record that is not public
-     * (any more) is left out: skip its node. Prices and stock are not here — read them from the
-     * owning module's public API, so they are always current.
-     */
-    embeds: {
-      [key: string]: PublicEmbed;
-    };
-    excerpt: string;
-    featured_media?: PublicMedia | null;
-    first_published_at: string;
-    /** Stable id (also the id of feed items). */
-    id: string;
-    kind: Kind;
-    /**
-     * For a page with a block layout, only in `GET /public/resolve`: the legal footer to draw
-     * below the page, outside the layout (owner information and the Ministry of Industry and
-     * Trade logo, as `GET /api/v1/compliance/public/owner` and `/public/badge`). Absent when the
-     * website has no legal profile yet or the `compliance` module is off. Pages cannot remove it.
-     */
-    legal_footer?: Record<string, unknown> | null;
-    locale: string;
-    parent_id?: string | null;
-    /** Address computed by the server, without domain or language prefix. */
-    path: string;
-    /** The date shown as the publication date. */
-    published_at: string;
-    reading_time_minutes: number;
-    seo: PublicSeo;
-    slug: string;
-    /** Categories and tags; the first category is the main one. */
-    terms: PublicTerm[];
-    title: string;
-    translation_group_id: string;
-    /** Other published languages of this entry, for `hreflang`. */
-    translations: PublicTranslation[];
-    word_count: number;
-  }[];
-};
-
-/** Envelope of a single result. */
 export type Data_Vec_PublicProfileResponse = {
   data: {
     address?: Address | null;
@@ -16030,14 +15709,6 @@ export type Data_Vec_ReasonView = {
 };
 
 /** Envelope of a single result. */
-export type Data_Vec_RecentlyViewed = {
-  data: {
-    product_id: string;
-    viewed_at: string;
-  }[];
-};
-
-/** Envelope of a single result. */
 export type Data_Vec_RecordEvent = {
   data: {
     actor_id?: string | null;
@@ -16082,25 +15753,6 @@ export type Data_Vec_RecordType = {
 };
 
 /** Envelope of a single result. */
-export type Data_Vec_ReferralRule = {
-  data: {
-    currency: string;
-    effective_from: string;
-    id: string;
-    /** Goods of the first order must reach this amount (smallest currency unit). */
-    min_first_order_minor: number;
-    /** Points for the new buyer. */
-    referee_points: number;
-    /** Voucher promotion for the new buyer. */
-    referee_promotion_id?: string | null;
-    /** Points for the buyer who shared the code. */
-    referrer_points: number;
-    /** Voucher promotion for the buyer who shared the code. */
-    referrer_promotion_id?: string | null;
-  }[];
-};
-
-/** Envelope of a single result. */
 export type Data_Vec_Referrer = {
   data: {
     /** How it points: e.g. `featured_media`, `body`, `menu_item`. */
@@ -16125,17 +15777,6 @@ export type Data_Vec_Release = {
     sections: ReleaseSection[];
     /** `0.14.0`, or `unreleased` for changes in this build that have no version yet. */
     version: string;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_ReminderRule = {
-  data: {
-    /** Minutes after a cart is abandoned at which reminders go out. */
-    delays_minutes: number[];
-    effective_from: string;
-    enabled: boolean;
-    id: string;
   }[];
 };
 
@@ -16205,27 +15846,6 @@ export type Data_Vec_SavedView = {
     resource: string;
     /** `personal` (only its owner sees it), `node` (everyone at `org_id`) or `tenant`. */
     scope: string;
-    updated_at: string;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_ScheduleResponse = {
-  data: {
-    action: Action;
-    /** `true` when whoever scheduled it confirmed that the AI-generated content was reviewed. */
-    ai_reviewed: boolean;
-    created_at: string;
-    created_by?: string | null;
-    entry_id: string;
-    /** Why it failed, an error code such as `content.schedule_outdated`. */
-    error_code?: string | null;
-    id: string;
-    /** The revision that will be published (for `publish`). */
-    revision_id?: string | null;
-    run_at: string;
-    /** `scheduled`, `succeeded`, `failed` or `canceled`. */
-    status: string;
     updated_at: string;
   }[];
 };
@@ -16485,18 +16105,6 @@ export type Data_Vec_TaxWithholdingRateResponse = {
     /** `vat` or `pit`. */
     tax_kind: string;
     threshold?: Money | null;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_TemplateInfo = {
-  data: {
-    description: string;
-    /** `<module>.<name>`. */
-    id: string;
-    /** `{"trigger", "conditions", "actions"}`: send it to `POST /rules` with a name. */
-    rule: Record<string, unknown>;
-    title: string;
   }[];
 };
 
@@ -22332,6 +21940,24 @@ export type PageTemplateResponse = {
 };
 
 /** One page of a list. */
+export type Page_ActivityResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** The event, `<module>.<what_happened>`. */
+    action: string;
+    actor_user_id?: string | null;
+    /** Id of the audit entry. */
+    id: string;
+    occurred_at: string;
+    /** What happened, as a sentence in the language of `Accept-Language`. */
+    sentence: string;
+    /** Record that changed, as `<kind>:<id>`. */
+    subject?: string | null;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_AdministrativeUnit = {
   /** The items of this page, in the requested order. */
   data: {
@@ -22552,6 +22178,21 @@ export type Page_BannerResponse = {
     /** Text banners: a colour token of the theme (`primary`, `secondary`, `accent`, `neutral`). */
     tone?: string | null;
     updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_BookingException = {
+  /** The items of this page, in the requested order. */
+  data: {
+    created_at: string;
+    ends_at: string;
+    id: string;
+    kind: string;
+    reason: string;
+    resource_id: string;
+    starts_at: string;
   }[];
   pagination: Pagination;
 };
@@ -23330,6 +22971,27 @@ export type Page_ComplianceWebsite = {
 };
 
 /** One page of a list. */
+export type Page_ContentTemplate = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /**
+     * e.g. `return_policy`; also the page kind to link in
+     * `PUT /api/v1/compliance/websites/{id}/pages/{page_kind}` (except `seller_info`, a block
+     * for product pages).
+     */
+    key: string;
+    /** Only a marketplace needs it. */
+    marketplace: boolean;
+    /** Always `true`: have a legal professional review the text before use. */
+    needs_legal_review: boolean;
+    /** Title per language, e.g. `{"en": "…", "vi": "…"}`. */
+    titles: Record<string, unknown>;
+    variables: ContentTemplateVariable[];
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_ContentTypeResponse = {
   /** The items of this page, in the requested order. */
   data: {
@@ -23395,6 +23057,30 @@ export type Page_Conversation = {
      */
     unread: number;
     updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_ConversationCall = {
+  /** The items of this page, in the requested order. */
+  data: {
+    agent_user_id?: string | null;
+    answered_at?: string | null;
+    callback_id?: string | null;
+    created_at: string;
+    /** `inbound` (the customer called) or `outbound` (the shop called back). */
+    direction: string;
+    duration_seconds?: number | null;
+    ended_at?: string | null;
+    id: string;
+    /** A recording is stored; listen at `GET /calls/{id}/recording`. */
+    recorded: boolean;
+    recording_enabled: boolean;
+    recording_expires_at?: string | null;
+    /** `queued`, `ringing`, `in_progress`, `completed`, `no_answer`, `busy`, `failed`, `cancelled`. */
+    status: string;
+    thread_id: string;
   }[];
   pagination: Pagination;
 };
@@ -23712,6 +23398,16 @@ export type Page_EntryResponse = {
 };
 
 /** One page of a list. */
+export type Page_EventTypeResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    description: string;
+    name: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_FactResponse = {
   /** The items of this page, in the requested order. */
   data: {
@@ -23814,6 +23510,25 @@ export type Page_FormResponse = {
      * the version it was sent with, and is shown with that version's labels.
      */
     version: number;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_GiftCard = {
+  /** The items of this page, in the requested order. */
+  data: {
+    balance: Money;
+    /** The full code: only in the answer to issuing; never stored in clear. */
+    code?: string | null;
+    /** Last 4 characters of the code. */
+    code_last4: string;
+    created_at: string;
+    expires_at?: string | null;
+    id: string;
+    initial: Money;
+    /** `active`, `void` or `expired`. */
+    status: string;
   }[];
   pagination: Pagination;
 };
@@ -24094,6 +23809,19 @@ export type Page_InventoryTransfer = {
 };
 
 /** One page of a list. */
+export type Page_InventoryValuation = {
+  /** The items of this page, in the requested order. */
+  data: {
+    org_id: string;
+    /** Units on hand that have an average cost. */
+    units: number;
+    /** Sum of on hand × weighted average unit cost. */
+    value: Money;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_InvitationResponse = {
   /** The items of this page, in the requested order. */
   data: {
@@ -24224,6 +23952,17 @@ export type Page_InvoicesExport = {
 };
 
 /** One page of a list. */
+export type Page_InvoicesExportProfile = {
+  /** The items of this page, in the requested order. */
+  data: {
+    description: string;
+    formats: string[];
+    name: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_InvoicesMandate = {
   /** The items of this page, in the requested order. */
   data: {
@@ -24280,6 +24019,38 @@ export type Page_InvoicesTemplate = {
     updated_at: string;
     /** Goes up by one on each change. */
     version: number;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_KindResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    description: string;
+    /** Dimensions the facts carry, usable in the `dimensions` filter of `GET /facts`. */
+    dimensions: string[];
+    /** `<module>.<figure>`. */
+    kind: string;
+    /** `amount` (sums of money, per currency) or `quantity` (counts). */
+    measure: string;
+    /** The module that declares it. */
+    module: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_LagResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** When the store last received a fact of this tenant. */
+    last_received_at?: string | null;
+    /** When the oldest fact not yet pushed was taken. */
+    oldest_pending_at?: string | null;
+    /** Facts not yet pushed to the store. */
+    pending: number;
+    tenant_id: string;
   }[];
   pagination: Pagination;
 };
@@ -24790,6 +24561,32 @@ export type Page_MembershipTier = {
 };
 
 /** One page of a list. */
+export type Page_MenuSummary = {
+  /** The items of this page, in the requested order. */
+  data: {
+    id: string;
+    key: string;
+    locale: string;
+    updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_NotificationDeviceToken = {
+  /** The items of this page, in the requested order. */
+  data: {
+    app_id: string;
+    created_at: string;
+    id: string;
+    last_used_at?: string | null;
+    locale?: string | null;
+    platform: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_NotificationInboxItem = {
   /** The items of this page, in the requested order. */
   data: {
@@ -24802,6 +24599,36 @@ export type Page_NotificationInboxItem = {
     /** When you read it; `null`: unread. */
     read_at?: string | null;
     title: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_NotificationKindInfo = {
+  /** The items of this page, in the requested order. */
+  data: {
+    category: NotificationCategory;
+    /** Channels this kind may go to. */
+    channels: NotificationChannel[];
+    /** Advertising invitation: sent at most once per address and channel. */
+    invitation: boolean;
+    /** `<module>.<name>`, e.g. `orders.order_shipped`. */
+    key: string;
+    /** `true` for security notifications: they cannot be turned off. */
+    locked: boolean;
+    /** Advertising: the consent purpose it needs (in `compliance`). */
+    purpose?: string | null;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_NotificationKindPreference = {
+  /** The items of this page, in the requested order. */
+  data: {
+    category: NotificationCategory;
+    channels: NotificationChannelPreference[];
+    kind: string;
   }[];
   pagination: Pagination;
 };
@@ -24834,6 +24661,26 @@ export type Page_NotificationMessage = {
      */
     status: string;
     user_id?: string | null;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_NotificationTemplateVersion = {
+  /** The items of this page, in the requested order. */
+  data: {
+    body_html?: string | null;
+    body_text: string;
+    channel: string;
+    kind: string;
+    /** This version is the one in use. */
+    live: boolean;
+    locale: string;
+    published_at: string;
+    short: string;
+    subject: string;
+    version: number;
+    zns_template_id?: string | null;
   }[];
   pagination: Pagination;
 };
@@ -25043,6 +24890,54 @@ export type Page_PasskeyResponse = {
     last_used_at?: string | null;
     /** Name the user gave it, e.g. the device. */
     name: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_PlacementResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** Banners it takes: `image`, `text` or `any`. */
+    accepts: string;
+    /** Off: public reads leave it out. */
+    active: boolean;
+    /** `site` (the website of the tenant). */
+    audience: string;
+    created_at: string;
+    description: string;
+    /** `all`, `desktop` or `mobile`: call the placement only on these devices. */
+    devices: string;
+    /**
+     * How to draw it: `single`, `carousel`, `grid`, `stack`, `strip` (a thin text bar) or
+     * `popup`. See `docs/CONTENT.md` for what each one must do (e.g. a popup always has a close
+     * button and never shows on cart, checkout, sign-in or account pages).
+     */
+    display: string;
+    /**
+     * Settings of the display: `carousel` — `autoplay_seconds` (0 = off, else at least 4);
+     * `grid` — `columns` (2–4); `popup` — `frequency` (`once_per_session`, `once_per_day`,
+     * `once_per_week`) and `delay_seconds` (0–60). Other displays have none.
+     */
+    display_settings: Record<string, unknown>;
+    id: string;
+    key: string;
+    /** Most banners shown at once (per organization unit and language). */
+    max_items: number;
+    min_height?: number | null;
+    /** Smallest picture accepted, in pixels. */
+    min_width?: number | null;
+    mobile_ratio?: Ratio | null;
+    name: string;
+    /**
+     * Kinds of pages it is used on: `home`, `category`, `collection`, `product`, `search`,
+     * `cart`, `content_entry`, `content_type`, `landing`, or `any`.
+     */
+    page_kinds: string[];
+    /** Key in the standard set of placements, when the row came from it. */
+    preset_key?: string | null;
+    ratio?: Ratio | null;
+    updated_at: string;
   }[];
   pagination: Pagination;
 };
@@ -25313,6 +25208,26 @@ export type Page_ProvisioningResponse = {
 };
 
 /** One page of a list. */
+export type Page_PublicBookingService = {
+  /** The items of this page, in the requested order. */
+  data: {
+    capacity: number;
+    description: string;
+    duration_minutes: number;
+    id: string;
+    name: string;
+    names: {
+      [key: string]: string;
+    };
+    org_id: string;
+    /** Staff (or courts, rooms…) that can give it; give one as `resource_id` to book that one. */
+    performers: string[];
+    price: Money;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_PublicComment = {
   /** The items of this page, in the requested order. */
   data: {
@@ -25452,6 +25367,16 @@ export type Page_PublicTermCount = {
 };
 
 /** One page of a list. */
+export type Page_RecentlyViewed = {
+  /** The items of this page, in the requested order. */
+  data: {
+    product_id: string;
+    viewed_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_RedirectResponse = {
   /** The items of this page, in the requested order. */
   data: {
@@ -25472,6 +25397,40 @@ export type Page_RedirectResponse = {
     /** Target address (a path in the site, or a full URL). */
     to_url?: string | null;
     updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_ReferralRule = {
+  /** The items of this page, in the requested order. */
+  data: {
+    currency: string;
+    effective_from: string;
+    id: string;
+    /** Goods of the first order must reach this amount (smallest currency unit). */
+    min_first_order_minor: number;
+    /** Points for the new buyer. */
+    referee_points: number;
+    /** Voucher promotion for the new buyer. */
+    referee_promotion_id?: string | null;
+    /** Points for the buyer who shared the code. */
+    referrer_points: number;
+    /** Voucher promotion for the buyer who shared the code. */
+    referrer_promotion_id?: string | null;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_ReminderRule = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** Minutes after a cart is abandoned at which reminders go out. */
+    delays_minutes: number[];
+    effective_from: string;
+    enabled: boolean;
+    id: string;
   }[];
   pagination: Pagination;
 };
@@ -26323,6 +26282,20 @@ export type Page_TaxProfileResponse = {
     updated_at: string;
     updated_by?: string | null;
   })[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_TemplateInfo = {
+  /** The items of this page, in the requested order. */
+  data: {
+    description: string;
+    /** `<module>.<name>`. */
+    id: string;
+    /** `{"trigger", "conditions", "actions"}`: send it to `POST /rules` with a name. */
+    rule: Record<string, unknown>;
+    title: string;
+  }[];
   pagination: Pagination;
 };
 
@@ -33618,9 +33591,9 @@ export interface paths {
   "/api/v1/address/provinces": {
     /** List the provinces. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { country?: string; as_of?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { country?: string; as_of?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_AdministrativeUnit;
+        200: Page_AdministrativeUnit;
         304: void;
         422: Problem;
         default: Problem;
@@ -33630,9 +33603,9 @@ export interface paths {
   "/api/v1/address/provinces/{code}/communes": {
     /** List the communes, wards and special zones of a province. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; path: { code: string }; query: { country?: string; as_of?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; path: { code: string }; query: { country?: string; as_of?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_AdministrativeUnit;
+        200: Page_AdministrativeUnit;
         304: void;
         404: Problem;
         422: Problem;
@@ -33851,9 +33824,9 @@ export interface paths {
   "/api/v1/audit/activity": {
     /** List recent activity. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_ActivityResponse;
+        200: Page_ActivityResponse;
         401: Problem;
         422: Problem;
         default: Problem;
@@ -35776,11 +35749,12 @@ export interface paths {
   "/api/v1/automations/templates": {
     /** List the ready-made rule templates you can use. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_TemplateInfo;
+        200: Page_TemplateInfo;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -35929,12 +35903,13 @@ export interface paths {
   "/api/v1/bookings/exceptions": {
     /** List time off and extra hours of a resource. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { resource_id: string; from?: string; to?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { resource_id: string; from?: string; to?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_BookingException;
+        200: Page_BookingException;
         401: Problem;
         403: Problem;
         404: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -36053,10 +36028,11 @@ export interface paths {
   "/api/v1/bookings/public/services": {
     /** List bookable services (public). */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_PublicBookingService;
+        200: Page_PublicBookingService;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -39658,11 +39634,13 @@ export interface paths {
   "/api/v1/content/entries/{id}/schedules": {
     /** List the schedules of an entry. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_ScheduleResponse;
+        200: Page_ScheduleResponse;
         401: Problem;
         403: Problem;
+        404: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -39808,11 +39786,12 @@ export interface paths {
   "/api/v1/content/menus": {
     /** List menus. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_MenuSummary;
+        200: Page_MenuSummary;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -39898,11 +39877,12 @@ export interface paths {
   "/api/v1/content/placements": {
     /** List display placements. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_PlacementResponse;
+        200: Page_PlacementResponse;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -40004,9 +39984,9 @@ export interface paths {
   "/api/v1/content/public/feed": {
     /** The newest posts of a language, for RSS, Atom or JSON Feed (public). */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { locale: string; limit?: number; site?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { locale: string; site?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_PublicEntryResponse;
+        200: Page_PublicEntryResponse;
         403: Problem;
         422: Problem;
         default: Problem;
@@ -40429,11 +40409,12 @@ export interface paths {
   "/api/v1/content/templates": {
     /** List the mandatory page templates (Vietnam). */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_ContentTemplate;
+        200: Page_ContentTemplate;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -41153,12 +41134,13 @@ export interface paths {
   "/api/v1/conversations/threads/{id}/calls": {
     /** List the calls of a conversation. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_ConversationCall;
+        200: Page_ConversationCall;
         401: Problem;
         403: Problem;
         404: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -41649,11 +41631,12 @@ export interface paths {
   "/api/v1/customers/me/gift-cards": {
     /** List your gift cards. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_GiftCard;
+        200: Page_GiftCard;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -41730,11 +41713,12 @@ export interface paths {
   "/api/v1/customers/me/recently-viewed": {
     /** List the products you looked at recently, newest first. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_RecentlyViewed;
+        200: Page_RecentlyViewed;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -41866,11 +41850,12 @@ export interface paths {
   "/api/v1/customers/referral-rules": {
     /** List referral reward rules, newest first. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_ReferralRule;
+        200: Page_ReferralRule;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -41890,11 +41875,12 @@ export interface paths {
   "/api/v1/customers/reminder-rules": {
     /** List abandoned cart reminder rules, newest first. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_ReminderRule;
+        200: Page_ReminderRule;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -42773,11 +42759,12 @@ export interface paths {
   "/api/v1/inventory/reports/valuation": {
     /** Value of the stock now: on hand × weighted average cost, per warehouse and currency. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string | null }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string | null; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_InventoryValuation;
+        200: Page_InventoryValuation;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -43247,11 +43234,12 @@ export interface paths {
   "/api/v1/invoices/export-profiles": {
     /** List the export profiles. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_InvoicesExportProfile;
+        200: Page_InvoicesExportProfile;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -46581,10 +46569,11 @@ export interface paths {
   "/api/v1/notifications/kinds": {
     /** List the notification kinds. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_NotificationKindInfo;
+        200: Page_NotificationKindInfo;
         401: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -46604,10 +46593,11 @@ export interface paths {
   "/api/v1/notifications/me/device-tokens": {
     /** List your registered mobile devices. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_NotificationDeviceToken;
+        200: Page_NotificationDeviceToken;
         401: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -46684,10 +46674,11 @@ export interface paths {
   "/api/v1/notifications/me/preferences": {
     /** List which notifications you get. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_NotificationKindPreference;
+        200: Page_NotificationKindPreference;
         401: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -46956,9 +46947,9 @@ export interface paths {
   "/api/v1/notifications/templates/{kind}/{channel}/{locale}/versions": {
     /** List the published versions of a template, newest first. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; path: { kind: string; channel: string; locale: string }; };
+      parameters: { header: { "Accept-Language"?: string }; path: { kind: string; channel: string; locale: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_NotificationTemplateVersion;
+        200: Page_NotificationTemplateVersion;
         401: Problem;
         403: Problem;
         422: Problem;
@@ -49733,11 +49724,12 @@ export interface paths {
   "/api/v1/reporting/kinds": {
     /** List the kinds of report figures. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_KindResponse;
+        200: Page_KindResponse;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -49745,11 +49737,12 @@ export interface paths {
   "/api/v1/reporting/lag": {
     /** See how far behind the report store is. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_LagResponse;
+        200: Page_LagResponse;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -51288,11 +51281,12 @@ export interface paths {
   "/api/v1/webhooks/events": {
     /** List the kinds of events endpoints can receive. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_EventTypeResponse;
+        200: Page_EventTypeResponse;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };

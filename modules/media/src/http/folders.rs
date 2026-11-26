@@ -6,7 +6,7 @@ use std::sync::Arc;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
-use autoxide_kernel::pagination::{Page, PageQuery};
+use autoxide_kernel::pagination::{Page, SortChoicePageQuery};
 use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, Tagged};
@@ -82,7 +82,7 @@ pub(crate) struct UpdateFolderRequest {
     extensions(("x-permissions" = json!(["media.read"]))),
     operation_id = "list_media_folders",
     security(("bearer" = [])),
-    params(FoldersQuery, PageQuery),
+    params(FoldersQuery, SortChoicePageQuery),
     responses(
         (status = 200, description = "One page of folders.", body = Page<FolderResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
@@ -95,12 +95,12 @@ pub(crate) async fn list_folders(
     tenant: TenantContext,
     principal: Principal,
     Query(query): Query<FoldersQuery>,
-    Query(paging): Query<PageQuery>,
+    Query(paging): Query<SortChoicePageQuery>,
 ) -> Result<Page<FolderResponse>, Error> {
     let mut problems = Vec::new();
     let parent = folder_filter(query.parent_id.as_deref(), "parent_id", &mut problems);
     let order: FolderSort = sort(query.sort.as_deref(), "`created_at`, `name`", &mut problems);
-    let page = page_request(paging, problems)?;
+    let page = page_request(paging, order.default_order(), problems)?;
     let page = service.list_folders(&tenant, &principal, parent, order, &page).await?;
     let autoxide_kernel::pagination::Page { data, pagination } = page;
     Ok(autoxide_kernel::pagination::Page {

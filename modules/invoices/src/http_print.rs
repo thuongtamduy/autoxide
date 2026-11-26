@@ -6,7 +6,7 @@ use std::sync::Arc;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::http::{Disposition, ValidJson, content_disposition};
-use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
+use autoxide_kernel::pagination::{NaturalOrderPageQuery, Page, PageQuery, PageRequest, page_of};
 use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::{OrgId, TenantContext};
 use axum::body::Body;
@@ -475,22 +475,29 @@ pub(crate) struct ProfileResponse {
 
 /// List the export profiles.
 ///
-/// Requires `invoices.export`.
+/// Requires `invoices.export`. By name unless `order=desc`; paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/export-profiles",
     extensions(("x-permissions" = json!(["invoices.export"]))),
     operation_id = "list_invoice_export_profiles",
     security(("bearer" = [])),
+    params(NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "The profiles.", body = Data<Vec<ProfileResponse>>),
+        (status = 200, description = "One page of the profiles, by name.", body = Page<ProfileResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing `invoices.export`; code `permission_denied`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
-async fn export_profiles(principal: Principal) -> Result<Data<Vec<ProfileResponse>>, Error> {
+async fn export_profiles(
+    principal: Principal,
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<ProfileResponse>, Error> {
     principal.require(&EXPORT)?;
-    let data = PROFILES
+    let page = PageRequest::try_from(page)?;
+    // Hồ sơ xuất là hằng trong bản build (`PROFILES`), không nằm trong database: `page_of` theo tên.
+    let profiles = PROFILES
         .iter()
         .map(|(name, description)| ProfileResponse {
             name: (*name).to_owned(),
@@ -498,7 +505,7 @@ async fn export_profiles(principal: Principal) -> Result<Data<Vec<ProfileRespons
             formats: FORMATS.iter().map(|format| (*format).to_owned()).collect(),
         })
         .collect();
-    Ok(Data { data })
+    page_of(profiles, |profile| profile.name.clone(), &page)
 }
 
 /// An accounting export.

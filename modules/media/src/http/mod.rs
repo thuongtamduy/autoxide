@@ -13,7 +13,7 @@ use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::error::{Error, FieldError};
-use autoxide_kernel::pagination::{PageQuery, PageRequest};
+use autoxide_kernel::pagination::{Order, PageRequest, SortChoicePageQuery};
 use autoxide_kernel::tenancy::TenantContext;
 use serde::{Deserialize, Deserializer, Serialize};
 use utoipa::ToSchema;
@@ -264,11 +264,13 @@ fn folder_filter(raw: Option<&str>, field: &str, problems: &mut Vec<FieldError>)
 }
 
 /// Yêu cầu trang, gộp lỗi của nó với lỗi của bộ lọc để báo một lần.
+// `default`: thứ tự khi client không gửi `order`, theo cột `sort` đang chọn (D-20261125-list-pages).
 pub(crate) fn page_request(
-    query: PageQuery,
+    query: SortChoicePageQuery,
+    default: Order,
     mut problems: Vec<FieldError>,
 ) -> Result<PageRequest, Error> {
-    let page = PageRequest::try_from(query);
+    let page = query.into_request(default);
     if let Err(error) = &page {
         problems.extend(error.fields().iter().cloned());
     }

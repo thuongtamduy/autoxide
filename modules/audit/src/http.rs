@@ -144,31 +144,24 @@ pub(crate) struct ActivityResponse {
     occurred_at: Timestamp,
 }
 
-/// How many lines.
-#[derive(Debug, Default, Deserialize, IntoParams)]
-#[into_params(parameter_in = Query)]
-pub(crate) struct ActivityQuery {
-    /// At most this many lines, 1 to 100. Defaults to 20.
-    limit: Option<u32>,
-}
-
 /// List recent activity.
 ///
 /// Any signed-in user. Readable sentences ("Ada published …") for the events modules mark as
 /// activity, newest first — only those whose module lets the caller see them (for example
 /// published entries need `content.read`). Unlike `GET /api/v1/audit` it needs no `audit.read`
-/// and shows no before / after values.
+/// and shows no before / after values. Paged with `limit` / `cursor`; `order=asc` for oldest
+/// first.
 #[utoipa::path(
     get,
     path = "/activity",
     extensions(("x-permissions" = json!([]))),
     operation_id = "list_activity",
     security(("bearer" = [])),
-    params(ActivityQuery),
+    params(PageQuery),
     responses(
-        (status = 200, description = "Recent activity, newest first.", body = Data<Vec<ActivityResponse>>),
+        (status = 200, description = "One page of recent activity, newest first.", body = Page<ActivityResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 422, description = "`limit` is not between 1 and 100; see `errors`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_activity(
@@ -176,30 +169,18 @@ async fn list_activity(
     tenant: TenantContext,
     principal: Principal,
     language: autoxide_kernel::i18n::Language,
-    Query(query): Query<ActivityQuery>,
-) -> Result<Data<Vec<ActivityResponse>>, Error> {
-    let limit = query.limit.unwrap_or(20);
-    if !(1..=100).contains(&limit) {
-        return Err(Error::validation(vec![autoxide_kernel::error::FieldError::new(
-            "limit",
-            "invalid",
-            "must be between 1 and 100",
-        )]));
-    }
-    let lines = service.recent_activity(&tenant, &principal, limit, language).await?;
-    Ok(Data {
-        data: lines
-            .into_iter()
-            .map(|line| ActivityResponse {
-                id: line.row.id,
-                action: line.row.action,
-                sentence: line.sentence,
-                subject: line.row.subject,
-                actor_user_id: line.row.actor_user_id,
-                occurred_at: line.row.occurred_at,
-            })
-            .collect(),
-    })
+    Query(page): Query<PageQuery>,
+) -> Result<Page<ActivityResponse>, Error> {
+    let page = PageRequest::try_from(page)?;
+    let lines = service.recent_activity(&tenant, &principal, &page, language).await?;
+    Ok(lines.map(|line| ActivityResponse {
+        id: line.row.id,
+        action: line.row.action,
+        sentence: line.sentence,
+        subject: line.row.subject,
+        actor_user_id: line.row.actor_user_id,
+        occurred_at: line.row.occurred_at,
+    }))
 }
 
 /// List the audit log.
@@ -603,8 +584,69 @@ mod tests {
                 lines[0]["sentence"], "— added “Ấm trà”",
                 "không có module tài khoản: không có tên"
             );
-            let (_, none) = get(&app, "/api/v1/audit/activity", "nobody").await;
+            let (_, none) = get(&app, "/api/v1/audit/activity?count=true", "nobody").await;
             assert_eq!(none["data"], json!([]), "không có permission đọc của event");
+            assert_eq!(none["pagination"]["total"], 0);
+        })
+        .await
+        .unwrap();
+    }
+
+    /// Hoạt động gần đây phân trang (bước 70 P9, D-20261125-list-pages): mới nhất trước, theo `next_cursor`
+    /// tới hết không trùng không sót, `order=asc` ngược lại; dòng không có câu hoạt động không chen vào trang.
+    #[tokio::test]
+    async fn hoat_dong_gan_day_phan_trang() {
+        TestDatabase::run(async |test| {
+            let app = TestApp::builder(test)
+                .user("clerk", 0, &["shop.read"])
+                .module(Shop)
+                .module(crate::module())
+                .build()
+                .await
+                .unwrap();
+            let recorder = crate::recorder::Recorder;
+            let mut ids = Vec::new();
+            for index in 0..7 {
+                let name = if index % 2 == 0 { "shop.item_added" } else { "shop.item_viewed" };
+                let delivered = Delivered::new(
+                    autoxide_kernel::tenancy::DatabaseRegistry::single(app.database().clone())
+                        .default_tenant(),
+                    "shop",
+                    name.to_owned(),
+                    json!({"after": {"name": format!("item {index}")}}),
+                )
+                .occurred_at(Timestamp::now());
+                if index % 2 == 0 {
+                    ids.push(json!(delivered.id));
+                }
+                recorder.handle(&delivered).await.unwrap();
+            }
+            ids.reverse();
+            for (order, expected) in
+                [("desc", ids.clone()), ("asc", ids.iter().rev().cloned().collect())]
+            {
+                let mut seen = Vec::new();
+                let mut uri = format!("/api/v1/audit/activity?limit=3&order={order}");
+                loop {
+                    let (status, body) = get(&app, &uri, "clerk").await;
+                    assert_eq!(status, StatusCode::OK, "{body}");
+                    let lines = body["data"].as_array().unwrap();
+                    assert!(lines.len() <= 3);
+                    seen.extend(lines.iter().map(|line| line["id"].clone()));
+                    match body["pagination"]["next_cursor"].as_str() {
+                        Some(cursor) => {
+                            uri = format!(
+                                "/api/v1/audit/activity?limit=3&order={order}&cursor={cursor}"
+                            );
+                        }
+                        None => break,
+                    }
+                }
+                assert_eq!(seen, expected, "{order}");
+            }
+            let (status, bad) = get(&app, "/api/v1/audit/activity?limit=0", "clerk").await;
+            assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+            assert_eq!(bad["errors"][0]["field"], "limit");
         })
         .await
         .unwrap();

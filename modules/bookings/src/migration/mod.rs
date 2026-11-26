@@ -2,6 +2,7 @@
 //! một dòng vào cuối [`all`].
 
 mod m0001_create_bookings;
+mod m0009_list_indexes;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 
@@ -28,5 +29,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
             "m0008_tenancy_throttle",
             vec![autoxide_kernel::throttle::tenant_table("bookings")],
         ),
+        // Index cho danh sách có phân trang (bước 70 P9).
+        Box::new(m0009_list_indexes::Migration),
     ]
 }

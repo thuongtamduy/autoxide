@@ -108,6 +108,16 @@ pub(crate) struct TemplateSummary {
     pub variables: Vec<TemplateVariable>,
 }
 
+/// Một trang mẫu theo khoá (REST `GET /templates` và tool `content.legal_templates` cùng gọi). Mẫu nằm trong
+/// bản build, không trong database: `page_of` theo khoá (duy nhất sau khi gộp hai ngôn ngữ). Cần `content.read`.
+pub(crate) fn summary_page(
+    principal: &autoxide_kernel::access::Principal,
+    page: &autoxide_kernel::pagination::PageRequest,
+) -> Result<autoxide_kernel::pagination::Page<TemplateSummary>, autoxide_kernel::error::Error> {
+    principal.require(&crate::permissions::CONTENT_READ)?;
+    autoxide_kernel::pagination::page_of(summaries(), |item| item.key.clone(), page)
+}
+
 /// Danh sách mẫu (gộp hai ngôn ngữ của cùng khoá), theo thứ tự file.
 pub(crate) fn summaries() -> Vec<TemplateSummary> {
     let mut out: Vec<TemplateSummary> = Vec::new();
