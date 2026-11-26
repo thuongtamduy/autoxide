@@ -111,6 +111,10 @@ mod write;
 pub use autoxide_macros::Record;
 pub use check::RecordInfo;
 pub(crate) use check::problems as record_problems;
+pub(crate) use check::register_control_plane;
+#[cfg(feature = "testing")]
+#[doc(hidden)]
+pub use check::register_control_plane_for_tests;
 #[doc(hidden)]
 pub use handle::Connection;
 #[cfg(feature = "testing")]

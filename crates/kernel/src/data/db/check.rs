@@ -4,6 +4,9 @@
 
 use sea_orm::{ConnectionTrait, DbBackend};
 
+use std::collections::BTreeSet;
+use std::sync::{OnceLock, PoisonError, RwLock};
+
 use super::record::{Record, Scope};
 use crate::database::Database;
 
@@ -130,4 +133,30 @@ async fn columns(database: &Database, table: &str) -> Result<Vec<LiveColumn>, St
             Ok(LiveColumn { name, nullable: nullable == 1 })
         })
         .collect()
+}
+
+// Sổ chung của tiến trình: mọi bảng control-plane mà module đã khai, ghi khi dựng `Modules` (chỉ thêm, không bớt).
+// Đọc ở mỗi truy vấn record `global` — tập nhỏ (vài chục tên), khoá đọc rẻ.
+static CONTROL_PLANE: OnceLock<RwLock<BTreeSet<&'static str>>> = OnceLock::new();
+
+fn control_plane_set() -> &'static RwLock<BTreeSet<&'static str>> {
+    CONTROL_PLANE.get_or_init(|| RwLock::new(BTreeSet::new()))
+}
+
+/// Records `tables` as control-plane tables (called when the modules are built).
+pub(crate) fn register_control_plane(tables: impl IntoIterator<Item = &'static str>) {
+    let mut set = control_plane_set().write().unwrap_or_else(PoisonError::into_inner);
+    set.extend(tables);
+}
+
+/// Whether `table` is a registered control-plane table.
+pub(crate) fn is_control_plane(table: &str) -> bool {
+    control_plane_set().read().unwrap_or_else(PoisonError::into_inner).contains(table)
+}
+
+/// Only for tests: registers control-plane tables without building modules (a test table of a global record).
+#[cfg(feature = "testing")]
+#[doc(hidden)]
+pub fn register_control_plane_for_tests(tables: &[&'static str]) {
+    register_control_plane(tables.iter().copied());
 }

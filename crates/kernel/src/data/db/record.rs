@@ -224,23 +224,49 @@ impl<R: Record> Col<R, String> {
         Cond::wrap(lowered(self.sq()).like(LikeExpr::new(pattern).escape('\\')))
     }
 
-    /// Starts with `prefix`, ignoring case like [`contains`](Self::contains), matched literally.
+    /// Starts with `prefix`, ignoring case like [`contains`](Self::contains), matched literally. `LOWER(column)`
+    /// does not use a plain index on the column: on a large table, search a column stored folded and indexed.
     pub fn starts_with(self, prefix: &str) -> Cond<R> {
         let pattern = format!("{}%", crate::search::escape_like(&prefix.to_lowercase()));
         Cond::wrap(lowered(self.sq()).like(LikeExpr::new(pattern).escape('\\')))
     }
 }
 
-/// The tenants of the subqueries inside a condition or an expression: `Some(t)` for a subquery of tenant
-/// records built from the handle of tenant `t`, `None` for one built from an "all tenants" handle. A query
-/// refuses a subquery whose tenant is not its own (a subquery of another handle cannot widen it).
-pub(crate) type Subs = Vec<Option<Uuid>>;
+/// Where a subquery inside a condition or an expression came from: the handle of tenant `Some(t)` (or of all
+/// tenants, `None`), or a subquery the kernel refused (a global record on a table not registered as
+/// control-plane). A query refuses a subquery of another handle, and every refused one.
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SubOrigin {
+    Handle(Option<Uuid>),
+    Refused(&'static str),
+}
 
-/// The error when a condition carries a subquery of another handle.
-pub(crate) fn foreign_sub(subs: &[Option<Uuid>], tenant: Option<Uuid>) -> Option<Error> {
-    subs.iter().any(|sub| *sub != tenant).then(|| {
-        Error::internal("a subquery built from another handle (another tenant, or all tenants) is used in this query")
+pub(crate) type Subs = Vec<SubOrigin>;
+
+/// The error when a condition carries a subquery of another handle, or a refused one.
+pub(crate) fn foreign_sub(subs: &[SubOrigin], tenant: Option<Uuid>) -> Option<Error> {
+    subs.iter().find_map(|sub| match sub {
+        SubOrigin::Handle(origin) if *origin == tenant => None,
+        SubOrigin::Handle(_) => Some(Error::internal(
+            "a subquery built from another handle (another tenant, or all tenants) is used in this query",
+        )),
+        SubOrigin::Refused(table) => Some(global_refused(table)),
     })
+}
+
+/// The fail-closed check of a global record: its table must be one a module declared in
+/// `control_plane_tables` (registered when the modules are built). A global record on any other table — a
+/// tenant table read without the tenant filter — is refused on every handle, whatever the lint saw.
+pub(crate) fn global_check<R: Record>() -> Option<&'static str> {
+    (!R::Scope::TENANT && !super::check::is_control_plane(R::TABLE)).then_some(R::TABLE)
+}
+
+pub(crate) fn global_refused(table: &str) -> Error {
+    Error::internal(format!(
+        "record of `{table}` is `scope = global`, but `{table}` is not a control-plane table any module declares \
+         (`control_plane_tables`): a tenant table's records are `scope = tenant`"
+    ))
 }
 
 fn lowered(expr: sea_query::Expr) -> sea_query::Expr {
@@ -436,19 +462,19 @@ pub trait Selectable<R>: Sized {
     type Out: DbValue;
     /// The expression and the tenants of the subqueries inside it.
     #[doc(hidden)]
-    fn select_expr(self) -> (sea_query::Expr, Vec<Option<Uuid>>);
+    fn select_expr(self) -> (sea_query::Expr, Vec<SubOrigin>);
 }
 
 impl<R: Record, T: DbValue> Selectable<R> for Col<R, T> {
     type Out = T;
-    fn select_expr(self) -> (sea_query::Expr, Vec<Option<Uuid>>) {
+    fn select_expr(self) -> (sea_query::Expr, Vec<SubOrigin>) {
         (self.sq(), Vec::new())
     }
 }
 
 impl<R: Record, T: DbValue> Selectable<R> for Agg<R, T> {
     type Out = T;
-    fn select_expr(self) -> (sea_query::Expr, Vec<Option<Uuid>>) {
+    fn select_expr(self) -> (sea_query::Expr, Vec<SubOrigin>) {
         (self.inner, self.subs)
     }
 }
@@ -458,14 +484,14 @@ pub trait Selection<R> {
     /// The tuple each row is read as.
     type Out;
     #[doc(hidden)]
-    fn exprs(self) -> Vec<(sea_query::Expr, Vec<Option<Uuid>>)>;
+    fn exprs(self) -> Vec<(sea_query::Expr, Vec<SubOrigin>)>;
 }
 
 macro_rules! selections {
     ($( ($($name:ident $index:tt),+) )*) => {$(
         impl<Rec: Record, $($name: Selectable<Rec>),+> Selection<Rec> for ($($name,)+) {
             type Out = ($($name::Out,)+);
-            fn exprs(self) -> Vec<(sea_query::Expr, Vec<Option<Uuid>>)> {
+            fn exprs(self) -> Vec<(sea_query::Expr, Vec<SubOrigin>)> {
                 vec![$(self.$index.select_expr()),+]
             }
         }

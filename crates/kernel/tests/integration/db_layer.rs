@@ -8,7 +8,7 @@ use autoxide_kernel::config::{ConfigReader, ConfigSource, DatabaseConfig};
 use autoxide_kernel::database::Database;
 use autoxide_kernel::db::{
     Bounds, Cond, Expr, Queries as _, Record, TenantKey, all_tenants_for_tests,
-    is_unique_violation, max, sum,
+    is_unique_violation, max, register_control_plane_for_tests, sum,
 };
 use autoxide_kernel::pagination::{Order, PageRequest};
 use autoxide_kernel::tenancy::{MAIN_PLACEMENT, TenantContext, TenantId, TenantStatus};
@@ -123,6 +123,8 @@ async fn open(test: &TestDatabase) -> Database {
     let mut reader = ConfigReader::new(&source);
     let config = DatabaseConfig::read(&mut reader);
     let database = Database::connect(&reader.finish(config).unwrap().0).await.unwrap();
+    // Bảng control-plane của file này (trong app thật: `Module::control_plane_tables`).
+    register_control_plane_for_tests(&["kernel_t_plan"]);
     let tx = all_tenants_for_tests(&database).begin_write().await.unwrap();
     for ddl in DDL {
         tx.sql(ddl).execute().await.unwrap();
@@ -616,6 +618,41 @@ async fn loi_thoat_da_dong_upsert_nhieu_dong_subquery_la_hoa_thuong() {
             read_a.find::<Level>().filter(Level::CODE.starts_with("l-1")).count().await.unwrap(),
             1
         );
+    })
+    .await
+    .unwrap();
+}
+
+/// Record nhẹ khai `global` trên bảng của khách (`kernel_t_level` có `tenant_id`, không phải bảng control-plane).
+#[derive(Record, Debug, Clone)]
+#[record(table = "kernel_t_level", scope = global)]
+struct LevelAsGlobal {
+    id: Uuid,
+    code: String,
+}
+
+#[tokio::test]
+async fn record_global_tren_bang_cua_khach_bi_tu_choi_luc_chay() {
+    TestDatabase::run(async |test| {
+        let database = open(test).await;
+        let (a, b) = (tenant(&database, 0xA), tenant(&database, 0xB));
+        seed(&a, &b).await;
+        // Mọi đường đều lỗi, dù lint có bỏ sót record này: đọc, đếm, subquery, sửa, xoá.
+        let read = a.db().read();
+        assert!(read.find::<LevelAsGlobal>().all().await.is_err());
+        assert!(read.find::<LevelAsGlobal>().count().await.is_err());
+        let sub = read.sub(LevelAsGlobal::ID);
+        assert!(read.find::<Level>().filter(Level::ID.in_sub(sub)).all().await.is_err());
+        let everyone = all_tenants_for_tests(&database);
+        assert!(everyone.read().find::<LevelAsGlobal>().all().await.is_err());
+        let tx = a.db().begin_write().await.unwrap();
+        assert!(
+            tx.update::<LevelAsGlobal>().set(LevelAsGlobal::CODE, "x".into()).exec().await.is_err()
+        );
+        assert!(tx.delete::<LevelAsGlobal>().exec().await.is_err());
+        tx.rollback().await.unwrap();
+        // Dữ liệu không đổi.
+        assert_eq!(read.find::<Level>().count().await.unwrap(), 1);
     })
     .await
     .unwrap();

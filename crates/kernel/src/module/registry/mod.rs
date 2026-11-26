@@ -281,6 +281,10 @@ impl Modules {
         let automations = crate::automation::AutomationDirectory::new(entitlements.clone());
         problems.extend(crate::sync::module_problems(&modules, &permissions));
         if problems.is_empty() {
+            // Sổ bảng control-plane cho chốt lúc chạy của `db`: record `global` chỉ dùng được trên các bảng này.
+            crate::db::register_control_plane(
+                modules.iter().flat_map(|module| module.control_plane_tables()),
+            );
             Ok(Modules {
                 modules,
                 permissions,

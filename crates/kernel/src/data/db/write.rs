@@ -7,7 +7,10 @@ use sea_orm::sea_query::{self, Alias, ExprTrait as _, OnConflict, Query, Returni
 use sea_orm::{DbErr, SqlErr};
 
 use super::handle::{AcceptedBy, Access, Handle, Tx, tenant_of_handle};
-use super::record::{Col, ColName, Cond, Expr, Record, Updated, foreign_sub, table, tenant_filter};
+use super::record::{
+    Col, ColName, Cond, Expr, Record, Updated, foreign_sub, global_check, global_refused, table,
+    tenant_filter,
+};
 use super::value::Settable;
 use crate::error::Error;
 
@@ -74,7 +77,7 @@ impl<A: Access> Tx<A> {
         let tenant = tenant_of_handle::<Self, R>(self);
         let mut statement = Query::insert();
         statement.into_table(table::<R>()).columns(R::COLUMNS.iter().map(|c| Alias::new(*c)));
-        let mut error = None;
+        let mut error = global_check::<R>().map(global_refused);
         let mut rows_count: u64 = 0;
         for row in rows {
             rows_count += 1;
@@ -116,7 +119,8 @@ impl<A: Access> Tx<A> {
         if let Some(tenant) = tenant_of_handle::<Self, R>(self) {
             statement.and_where(tenant_filter::<R>(tenant));
         }
-        Update { tx: self, statement, has_set: false, error: None, _marker: PhantomData }
+        let error = global_check::<R>().map(global_refused);
+        Update { tx: self, statement, has_set: false, error, _marker: PhantomData }
     }
 
     /// `DELETE` rows of `R` (filtered by tenant on a tenant handle).
@@ -129,7 +133,8 @@ impl<A: Access> Tx<A> {
         if let Some(tenant) = tenant_of_handle::<Self, R>(self) {
             statement.and_where(tenant_filter::<R>(tenant));
         }
-        Delete { tx: self, statement, error: None, _marker: PhantomData }
+        let error = global_check::<R>().map(global_refused);
+        Delete { tx: self, statement, error, _marker: PhantomData }
     }
 }
 

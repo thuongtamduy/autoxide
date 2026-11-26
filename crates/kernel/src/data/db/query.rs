@@ -7,7 +7,8 @@ use uuid::Uuid;
 
 use super::handle::{AcceptedBy, Access, Handle, Tx, tenant_of_handle};
 use super::record::{
-    Col, Cond, On, Record, Scope as _, Selection, Subs, count, foreign_sub, table, tenant_filter,
+    Col, Cond, On, Record, Scope as _, Selection, SubOrigin, Subs, count, foreign_sub,
+    global_check, global_refused, table, tenant_filter,
 };
 use super::value::{DbValue, FromRow, Row};
 use crate::error::Error;
@@ -29,7 +30,8 @@ pub trait Queries: Handle + Sized {
         if let Some(tenant) = tenant_of_handle::<Self, R>(self) {
             statement.and_where(tenant_filter::<R>(tenant));
         }
-        Find { handle: self, statement, joined: Vec::new(), error: None, _marker: PhantomData }
+        let error = global_check::<R>().map(global_refused);
+        Find { handle: self, statement, joined: Vec::new(), error, _marker: PhantomData }
     }
 
     /// A subquery selecting `column` of `S` (for `Col::in_sub`), filtered by tenant like `find`. It remembers
@@ -44,7 +46,11 @@ pub trait Queries: Handle + Sized {
             statement.and_where(tenant_filter::<S>(tenant));
         }
         // Subquery trên bảng của khách mang khách của handle; trên bảng control-plane thì không gắn khách.
-        let subs = if S::Scope::TENANT { vec![self.access().tenant()] } else { Vec::new() };
+        let subs = match global_check::<S>() {
+            Some(table) => vec![SubOrigin::Refused(table)],
+            None if S::Scope::TENANT => vec![SubOrigin::Handle(self.access().tenant())],
+            None => Vec::new(),
+        };
         Sub { statement, subs, _marker: PhantomData }
     }
 
@@ -85,7 +91,7 @@ pub struct Find<'h, H, R> {
 
 impl<'h, H: Handle, R: Record> Find<'h, H, R> {
     // Điều kiện mang subquery của handle khác (khách khác, hay "mọi khách") thì từ chối khi chạy.
-    fn check(&mut self, subs: &[Option<Uuid>]) {
+    fn check(&mut self, subs: &[SubOrigin]) {
         if self.error.is_none() {
             self.error = foreign_sub(subs, self.handle.access().tenant());
         }
@@ -109,6 +115,9 @@ impl<'h, H: Handle, R: Record> Find<'h, H, R> {
         let mut condition = sea_query::Condition::all().add(on.expr);
         if let Some(tenant) = tenant_of_handle::<H, S>(self.handle) {
             condition = condition.add(tenant_filter::<S>(tenant));
+        }
+        if self.error.is_none() {
+            self.error = global_check::<S>().map(global_refused);
         }
         self.statement.inner_join(table::<S>(), condition);
         self.joined.push(S::TABLE);
