@@ -1,0 +1,22 @@
+## D-20261126-permission-audit · Công tắc dò permission chỉ có trong test; bài dò PT-13 không được qua mà không thử — 2026-11-26 — agent quyết
+
+Chủ đề: HTTP, REST, OpenAPI
+
+Quyết định: bổ sung D-20261126-permission-gate.
+
+- Hàm dựng router KHÔNG có lớp `x-permissions` (`Extras::without_permission_gate`) chỉ có khi bật feature
+  `permission-audit` của `autoxide-kernel`; chỉ `autoxide-testkit` bật (`TestAppBuilder::without_permission_gate`).
+  Testkit chỉ được khai ở `[dev-dependencies]`, nên bản build chạy thật không có hàm này; trường cờ là riêng tư.
+- Bài dò `x_permissions_khop_cho_service_kiem` đếm lượt có kết luận theo từng operation (service trả 403
+  `permission_denied`, hay nhận): 422 `validation_failed` và 404 của operation khai `x-hides-existence` (ID ngẫu nhiên
+  không có, kiểm quyền hay không cũng 404) không tính. Operation có permission để thử mà không có lượt nào kết luận
+  được thì test đỏ. Bài dò bỏ `limit=0` mà mẫu request thêm cho bài thứ tự PT-14, để danh sách cũng được dò.
+- Lớp permission tra operation bằng map theo đường dẫn (`Arc` dùng chung, không chép danh sách permission mỗi
+  request) và kiểm cả operation khai `head` riêng (không khai thì `HEAD` dùng quy tắc của `GET`).
+- `Principal::require_any(&[&Permission])` công khai cho service nhận một trong nhiều permission; lỗi
+  `permission_denied` nêu đủ các permission dùng được.
+
+Lý do: rà soát độc lập #533 — cờ `doc(hidden)` công khai không phải ranh giới; bài dò có thể xanh mà không thử
+operation nào (mọi lượt 422, hay 404 của operation ẩn tồn tại).
+
+Đã cân nhắc: danh sách cho phép đóng băng các operation không dò được — không cần, đo lúc dựng không còn operation nào.

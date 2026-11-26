@@ -9,6 +9,7 @@
 //! cannot be authenticated gets the authentication error here (401), before any extractor of the handler.
 //! `HEAD` is guarded like `GET` (axum answers `HEAD` with the `GET` handler).
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use axum::extract::{FromRequestParts, MatchedPath, Request};
@@ -27,10 +28,11 @@ struct Guard {
     buyers: bool,
 }
 
-/// `(method, full path template)` → its guard.
+/// Full path template → its guarded methods. Looked up once per request by the matched path: a map, not a scan over
+/// every operation of the module; the guard is shared (`Arc`), nothing is copied per request.
 #[derive(Debug, Default)]
 pub(super) struct Rules {
-    operations: Vec<(Method, String, Guard)>,
+    operations: HashMap<String, Vec<(Method, Arc<Guard>)>>,
 }
 
 impl Rules {
@@ -38,19 +40,19 @@ impl Rules {
         self.operations.is_empty()
     }
 
-    fn find(&self, method: &Method, path: &str) -> Option<&Guard> {
-        // axum chạy handler `get` cho `HEAD` (bỏ thân trả lời) → kiểm như `GET`.
-        let method = if method == Method::HEAD { &Method::GET } else { method };
-        self.operations
-            .iter()
-            .find(|(known, template, _)| known == method && template == path)
-            .map(|(_, _, guard)| guard)
+    fn find(&self, method: &Method, path: &str) -> Option<Arc<Guard>> {
+        let methods = self.operations.get(path)?;
+        let exact = |wanted: &Method| {
+            methods.iter().find(|(known, _)| known == wanted).map(|(_, guard)| guard.clone())
+        };
+        // axum chạy handler `get` cho `HEAD` (bỏ thân trả lời) khi route không khai `head` riêng → kiểm như `GET`.
+        exact(method).or_else(|| if method == Method::HEAD { exact(&Method::GET) } else { None })
     }
 }
 
 /// Operations of module `module` (full path `/api/v1/<module>…`) that list at least one permission.
 pub(super) fn rules(module: &str, openapi: &OpenApi) -> Rules {
-    let mut operations = Vec::new();
+    let mut operations: HashMap<String, Vec<(Method, Arc<Guard>)>> = HashMap::new();
     for (path, item) in &openapi.paths.paths {
         let methods = [
             (Method::GET, item.get.as_ref()),
@@ -58,6 +60,7 @@ pub(super) fn rules(module: &str, openapi: &OpenApi) -> Rules {
             (Method::PUT, item.put.as_ref()),
             (Method::PATCH, item.patch.as_ref()),
             (Method::DELETE, item.delete.as_ref()),
+            (Method::HEAD, item.head.as_ref()),
         ];
         for (method, operation) in methods {
             let Some(operation) = operation else { continue };
@@ -80,8 +83,11 @@ pub(super) fn rules(module: &str, openapi: &OpenApi) -> Rules {
                 .is_some_and(|value| value == true);
             // Đường gốc của module là `/` trong tài liệu của nó, `/api/v1/<module>` sau khi ghép (không có `/` cuối).
             let tail = if path == "/" { "" } else { path.as_str() };
-            let guard = Guard { permissions, buyers };
-            operations.push((method, format!("{}/{module}{tail}", super::API_PREFIX), guard));
+            let guard = Arc::new(Guard { permissions, buyers });
+            operations
+                .entry(format!("{}/{module}{tail}", super::API_PREFIX))
+                .or_default()
+                .push((method, guard));
         }
     }
     Rules { operations }
@@ -89,11 +95,10 @@ pub(super) fn rules(module: &str, openapi: &OpenApi) -> Rules {
 
 /// The layer (see the top of the file).
 pub(super) async fn gate(rules: Arc<Rules>, request: Request, next: Next) -> Response {
-    let Some((permissions, buyers)) = request
+    let Some(guard) = request
         .extensions()
         .get::<MatchedPath>()
         .and_then(|matched| rules.find(request.method(), matched.as_str()))
-        .map(|guard| (guard.permissions.clone(), guard.buyers))
     else {
         return next.run(request).await;
     };
@@ -105,8 +110,8 @@ pub(super) async fn gate(rules: Arc<Rules>, request: Request, next: Next) -> Res
         Ok(principal) => principal,
         Err(error) => return error.into_response(),
     };
-    if !(buyers && principal.realm() == Realm::Customer)
-        && let Err(error) = principal.require_any_named(&permissions)
+    if !(guard.buyers && principal.realm() == Realm::Customer)
+        && let Err(error) = principal.require_any_named(&guard.permissions)
     {
         return error.into_response();
     }

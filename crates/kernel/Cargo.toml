@@ -55,6 +55,11 @@ uuid.workspace = true
 validator.workspace = true
 zeroize.workspace = true
 
+[features]
+# Chỉ cho test (testkit bật): dựng router KHÔNG có lớp kiểm `x-permissions` để bài dò so tài liệu với service
+# (D-20261126-permission-gate). Bản chạy thật không bao giờ có hàm này.
+permission-audit = []
+
 [dev-dependencies]
 proptest.workspace = true
 # tests/stack.rs xác nhận các thư viện nền hợp nhau trên cả hai database. Thư viện

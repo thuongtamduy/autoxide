@@ -722,3 +722,62 @@ async fn duyet_buoc_nhay_cam_doi_xac_nhan_lai() {
     .await
     .unwrap();
 }
+
+/// Số event `automations.run_failed` trong outbox.
+async fn run_failed_events(harness: &Harness) -> i64 {
+    use sea_orm::ConnectionTrait;
+    let read = harness.tenant.database().read();
+    let backend = read.get_database_backend();
+    let sql = match backend {
+        sea_orm::DatabaseBackend::Postgres => {
+            "SELECT COUNT(*) AS n FROM automations_events WHERE name = $1"
+        }
+        _ => "SELECT COUNT(*) AS n FROM automations_events WHERE name = ?",
+    };
+    let statement =
+        autoxide_kernel::database::statement(backend, sql, ["automations.run_failed".into()]);
+    let row = read.query_one_raw(statement).await.unwrap().unwrap();
+    row.try_get::<i64>("", "n").unwrap()
+}
+
+/// Đóng lần chạy đang chờ (luật tạm dừng) cùng lúc worker nhận nó: lần chạy kết thúc đúng một lần — hoặc worker chạy
+/// xong (tool gọi đúng một lần, không event hỏng), hoặc hỏng với đúng một event `automations.run_failed` — không bao
+/// giờ hỏng hai lần hay còn treo.
+#[tokio::test]
+async fn dong_lan_chay_cung_luc_worker_nhan() {
+    TestDatabase::run(async |test| {
+        let harness = Harness::new(test).await;
+        let actions = json!([
+            {"wait": {"minutes": 60}},
+            {"tool": "shop.tag_order", "arguments": {"order_id": "1", "tag": "x"}}
+        ]);
+        for round in 0..5 {
+            let rule = harness.rule(json!({"type": "manual"}), json!(null), actions.clone()).await;
+            let run = harness
+                .service
+                .run_rule(&harness.tenant, &harness.owner, rule.id, json!({}))
+                .await
+                .unwrap();
+            harness.settle().await;
+            let failed_before = run_failed_events(&harness).await;
+            let tagged_before = harness.count(|c| &c.tagged);
+            let rule = harness.reload(rule.id).await;
+            let (closed, worked) = tokio::join!(
+                harness.service.pause_now(&harness.tenant, &rule, "test"),
+                harness.service.execute(&harness.tenant, run.id),
+            );
+            closed.unwrap();
+            worked.unwrap();
+            let done = harness.service.get_run(&harness.tenant, &harness.owner, run.id).await.unwrap();
+            let failed = run_failed_events(&harness).await - failed_before;
+            let tagged = harness.count(|c| &c.tagged) - tagged_before;
+            match done.status.as_str() {
+                SUCCEEDED => assert_eq!((failed, tagged), (0, 1), "round {round}"),
+                FAILED => assert_eq!((failed, tagged), (1, 0), "round {round}"),
+                other => panic!("round {round}: run left `{other}`"),
+            }
+        }
+    })
+    .await
+    .unwrap();
+}
