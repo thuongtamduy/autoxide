@@ -21,6 +21,8 @@ pub(crate) mod identity;
 mod jwt;
 pub(crate) mod provider;
 #[cfg(test)]
+mod registration_tests;
+#[cfg(test)]
 mod tests;
 #[cfg(test)]
 mod unlink_tests;
