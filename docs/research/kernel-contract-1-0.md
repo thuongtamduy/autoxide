@@ -463,6 +463,8 @@ Mỗi dòng một PR, mỗi PR có test trên cả hai database cho phần chạ
 4. HTTP: `endpoint`, `routes!`, `Schema`, `Params`, `Validate`, extractor, `NoContent`/`Download`; `time::Duration…`;
    `async_trait` xuất lại; `notes` chuyển hết → `notes` không còn khai thư viện bọc nào. Đo thời gian biên dịch (§4.2).
 5. `Manifest` + `StartContext` gọn; `notes` chuyển; luật `module-contract-legacy`.
+5b. Đánh phiên bản event / webhook / `x-*` (§13): `EventInfo::payload`, `docs/events.json`, danh mục phần mở rộng,
+   `xtask contract-diff`.
 6. Ba hạng: feature `unstable`, đường `unstable::`, `bench_seed` sang testkit; semver-checks chạy feature mặc định; luật
    `exhaustive`, `deprecated-note`, `stable-signatures` (baseline).
 7–12. Chuyển 38 module còn lại theo cụm phụ thuộc (đáy trước): nền (`auth`, `organizations`, `plans`, `files`, `audit`,
@@ -499,6 +501,72 @@ không chạm cùng file.
    cũng vào hạng thử nghiệm lúc 1.0 (D-20261126-road-to-1-0 mục 4 gợi ý vậy)?
 4. RLS mặc định `off` lúc đầu có đủ "hướng dài hạn"?
 
+## 13. Đánh phiên bản hợp đồng ngoài REST (71-G13)
+
+Hiện trạng 26/11/2026: event chỉ khai tên + mô tả (`EventInfo`), payload là `serde_json::Value` không có schema; webhook gửi
+thân theo dạng Standard Webhooks (`type`, `timestamp`, `data{id, module, subject, actor, payload}`) không có số phiên bản;
+OpenAPI có 9 phần mở rộng (`x-permissions` 1.150 chỗ, `x-autoxide-list`/`x-autoxide-filters` 296, `x-stability` 210,
+`x-public` 175, `x-sunset`, `x-buyers`, `x-approval`, `x-idempotency`) không có danh mục; `api-diff` chỉ so path và schema
+REST. Tên và schema tool MCP do phiên AI agent làm.
+
+Quy tắc chung cho cả ba (giống REST, D-059): **thêm** trường tuỳ chọn / giá trị enum mới (enum đã khai là mở) / event mới /
+phần mở rộng mới là không phá vỡ; **bỏ, đổi kiểu, đổi nghĩa, thêm trường bắt buộc** là phá vỡ → làm bản mới chạy song song,
+bản cũ khai sắp bỏ kèm ngày sunset và cái thay thế, gỡ chỉ ở bản lớn (trước 1.0: theo D-20261125-api-break-before-1-0).
+
+### 13.1 Event giữa module
+
+- `EventInfo` thêm schema payload có kiểu: `EventInfo::new("notes.note_created", "…").payload::<NoteChange>()` với
+  `NoteChange: Schema` (§4.2) — cùng derive với REST, nên một nguồn cho cả tài liệu lẫn kiểm. `Outbox::record` nhận
+  `&impl EventPayload` (trait gắn kiểu payload với `EventInfo`), không nhận `Value` thô; bên nhận đọc bằng
+  `delivered.payload_as::<NoteChange>()`.
+- Bản mới của event có tên mới hậu tố `.v2` (`notes.note_created.v2`); module phát **cả hai** trong cùng transaction tới
+  sunset; `EventInfo::deprecated(since, sunset, replaced_by)`. Bên nhận chọn bản bằng tên khi đăng ký, nên không ai bị đổi
+  hình dạng dưới chân.
+- Catalog sinh ra `docs/events.json` (tên, mô tả, JSON Schema payload, hạng, sunset) bằng `cargo xtask regen`;
+  `xtask contract-diff` (mở rộng `api-diff`) so với bản phát hành gần nhất theo quy tắc trên và đỏ khi phá vỡ không qua đường
+  `.v2`. Event của module hạng thử nghiệm được báo, không chặn.
+
+### 13.2 Webhook gửi đi
+
+- Thân giữ dạng Standard Webhooks, thêm header `webhook-version: 1` và trường `data.schema` = tên event có hậu tố bản
+  (`notes.note_created` hoặc `….v2`). Đăng ký webhook chọn tên event cụ thể (gồm bản), nên webhook nhận bản nào là do người
+  đăng ký quyết; khi bản cũ tới sunset, đăng ký đó nhận thông báo trước 30 ngày (event `webhooks.subscription_deprecated` vào
+  hộp việc) rồi tự chuyển tắt.
+- Khung thân (`type`, `timestamp`, `data.{id, module, subject, actor}`) là một hợp đồng riêng, bản `1`; đổi phá vỡ khung =
+  `webhook-version: 2`, đăng ký chọn bản khung, bản cũ chạy song song tới bản lớn.
+- OpenAPI khai payload gửi đi ở mục `webhooks` (71-G7) sinh từ catalog event, nên SDK có kiểu cho bên nhận.
+
+### 13.3 Phần mở rộng `x-*` của OpenAPI
+
+- Danh mục ở kernel (`http::extensions`): tên, JSON Schema của giá trị, hạng, mô tả; `#[endpoint]` chỉ sinh phần mở rộng có
+  trong danh mục (lỗi biên dịch nếu không). Xuất ra `docs/openapi-extensions.json` và mô tả trong `info.x-autoxide-extensions`
+  của OpenAPI để client tự khám phá.
+- Phần mở rộng mới đặt tên `x-autoxide-<tên>`; 7 tên ngắn cũ (`x-permissions`, `x-public`, `x-stability`, `x-sunset`,
+  `x-buyers`, `x-approval`, `x-idempotency`) giữ nguyên vì client đã đọc — đăng ký vào danh mục, không đổi tên.
+- `contract-diff` so cả giá trị phần mở rộng: đổi `x-permissions` của một thao tác sang quyền khác là phá vỡ (client sinh
+  giao diện theo nó); thêm quyền thay thế (danh sách "một trong") là không.
+
+## 14. Đủ cho bước 54 và 52 (làm sau G1–G2, D-20261126-steps-52-54-before-1-0)
+
+Bước 54/52 viết thẳng trên hợp đồng mới, nên hợp đồng phải có sẵn chỗ cắm. Đối chiếu từng mục còn mở:
+
+| Mục còn mở                                                     | Chỗ cắm trong thiết kế này                                                    |
+| -------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| 54 Quyền theo trường dữ liệu (cá nhân / nhạy cảm / tài chính, che khi thiếu `<module>.read_personal`, đọc có audit) | `#[derive(Schema)]` nhận `#[schema(data_class = personal | sensitive | financial)]` trên trường: sinh `x-autoxide-data-class` trong OpenAPI **và** cài trait `Redact` cho kiểu. Kernel bọc response (`Data`, `Page`, `Tagged`, kết quả tool MCP) bằng bước che theo `principal` trước khi trả: thiếu quyền đọc lớp đó thì trường thành `null` (kiểu đã là `Option` hoặc có giá trị che khai sẵn), có quyền thì ghi event audit "đọc dữ liệu nhạy cảm" (gom theo request). Vì che nằm ở lớp response của kernel, REST và MCP giống nhau, module không viết tay |
+| 54 Chia sẻ bản ghi có hạn (`viewer`/`editor`, không trao quyền mình không có), API key chọn bản ghi | `manifest.relation(Relation::new("notes.note", ["viewer", "editor"]))`; `principal.can::<Note>(&NOTES_READ)` trả `Cond<Note>` của lớp `db` gồm phạm vi nút **hoặc** `EXISTS` trên `kernel_shares` (bảng kernel, cùng database) theo người / nhóm / nút / key — thay `scope_condition` trả `Condition` của sea-query |
+| 54 Nâng quyền đúng lúc, tài khoản khẩn cấp, lệnh hai người, cặp quyền xung đột (ngưỡng là dữ liệu) | Khai trong manifest: `manifest.conflicting(PERM_A, PERM_B)`, `manifest.two_person(&PERMISSION)`; `#[endpoint(approval = "…")]` sinh `x-approval` và bọc handler bằng bước duyệt của kernel (REST và MCP như nhau) |
+| 54 Giải thích, mô phỏng, "ai có quyền trên bản ghi này", quyền không dùng 90 ngày | Manifest là dữ liệu: kernel có đủ permission, quan hệ, xung đột của mọi module mà không cần khởi động; số lần dùng permission đo ở bước kiểm `require` |
+| 54 AuthZEN Authorization API 1.0, `on_behalf_of` cho agent | Loại tài nguyên = `manifest.relation`/`resource_type`; `on_behalf_of` là trường của `Principal` và `Actor`, đi vào khung event (§13.1) và webhook (§13.2) |
+| 54 Nhân sự nền tảng xin vào dữ liệu khách, "xem như" chỉ đọc | `TenantDb` mở ở chế độ chỉ đọc khi `principal` là phiên "xem như": `begin_write` trả lỗi trước khi chạm database, áp cho mọi module mà không sửa module; `all_tenants` cấm trong phiên đó |
+| 52 Thông báo theo loại event, lý do nhận, cấu hình kênh | Catalog event có schema (§13.1) cho giao diện liệt kê và lọc loại event |
+| 52 Trợ lý AI chạy tool MCP với quyền người gọi, ghi là nháp / yêu cầu duyệt | Tool đăng ký trong `start` cùng service với REST (luật 8); `approval` ở `#[endpoint]` và tool dùng chung một bước duyệt |
+| 52 Sức khoẻ người bán / tuân thủ, ngưỡng có ngày hiệu lực | Cài đặt hợp nhất (§8) cho ngưỡng theo khách/nút; ngưỡng theo luật là dữ liệu có ngày hiệu lực ở module, không ở hợp đồng |
+| 52 Event theo bản ghi qua tool MCP, điều hướng `mobile`, ghim | Đã có hình dạng; chuyển sang `manifest.navigation(…)`, không đổi nghĩa |
+
+Hệ quả cho thứ tự PR: phần `data_class` của `#[derive(Schema)]` và `Cond<R>` có chia sẻ là **API ổn định từ PR 2 và 4** (để
+54 không phải đổi chữ ký), còn hành vi (che, audit, bảng `kernel_shares`) do bước 54 làm. §13 thành PR 5b (sau manifest, vì
+`EventInfo` khai trong manifest).
+
 ## Quyết định đi kèm
 
 - D-20261126-contract-tiers — ba hạng, cơ chế, danh sách xuất phát
@@ -509,3 +577,4 @@ không chạm cùng file.
 - D-20261126-kernel-crates — tách crate theo lớp, `autoxide-host`
 - D-20261126-tenant-isolation — ba lớp cách ly, RLS tuỳ chọn, hạn mức request chưa xác thực
 - D-20261126-one-settings-system — hợp nhất cài đặt theo khách
+- D-20261126-contract-versioning — đánh phiên bản event, webhook, phần mở rộng `x-*` (§13)
