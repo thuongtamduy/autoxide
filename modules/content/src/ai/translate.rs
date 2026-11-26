@@ -161,7 +161,7 @@ impl ContentService {
             error_code: Set(None),
             result_entry_id: Set(None),
             created_by: Set(Some(principal.user_id())),
-            created_by_api_key_id: Set(principal.api_key_id()),
+            created_by_api_key_id: Set(principal.credential_id()),
             created_at: Set(now),
             updated_at: Set(now),
         };
@@ -232,7 +232,7 @@ impl ContentService {
             .await?
             .ok_or_else(|| request_not_found(id))?;
         let own = request.created_by == Some(principal.user_id())
-            && request.created_by_api_key_id == principal.api_key_id();
+            && request.created_by_api_key_id == principal.credential_id();
         if !own && !principal.has(&CONTENT_READ) {
             return Err(request_not_found(id));
         }

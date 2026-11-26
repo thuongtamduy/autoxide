@@ -43,6 +43,7 @@ mod module_catalog;
 mod money;
 mod navigation;
 mod numbering;
+mod oauth_resource;
 mod ops_alerts;
 mod ops_backlog;
 mod org_exists;

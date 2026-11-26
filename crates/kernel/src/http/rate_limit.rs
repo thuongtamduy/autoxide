@@ -178,7 +178,7 @@ impl Authenticator for ApiKeyLimited {
         hint: &crate::tenancy::TenantHint,
     ) -> Result<Principal, Error> {
         let principal = self.inner.authenticate(authorization, hint).await?;
-        let Some(key) = principal.api_key_id() else { return Ok(principal) };
+        let Some(key) = principal.credential_id() else { return Ok(principal) };
         let decision = match &self.counter {
             KeyCounter::Memory(cells) => cells.check(key, Instant::now()),
             KeyCounter::Database(shared) => shared.check(principal.tenant_id(), key).await,

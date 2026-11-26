@@ -147,6 +147,7 @@ pub async fn start(settings: Settings, migrations: Migrations) -> Result<Runtime
         .and_then(|url| url.base().ok().map(str::to_owned));
     let mut extras = http::Extras::default()
         .authenticator(authenticator)
+        .authorization_server(modules.api::<dyn autoxide_kernel::access::AuthorizationServer>())
         .idempotency(modules.api::<dyn IdempotencyStore>())
         .translations(modules.translations().clone())
         .deprecations(modules.deprecations())

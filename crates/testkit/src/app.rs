@@ -643,6 +643,7 @@ impl<'a> TestAppBuilder<'a> {
         };
         let mut extras = Extras::default()
             .authenticator(authenticator)
+            .authorization_server(modules.api::<dyn autoxide_kernel::access::AuthorizationServer>())
             .idempotency(modules.api::<dyn IdempotencyStore>())
             .deprecations(modules.deprecations())
             .experimental(modules.experimental())
