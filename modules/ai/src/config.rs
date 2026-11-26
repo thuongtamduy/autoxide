@@ -52,10 +52,10 @@ pub(crate) const TIMEOUT_SECONDS: Setting = Setting::new(
 
 pub(crate) const DAILY_TOKEN_LIMIT: Setting = Setting::new(
     "AUTOXIDE_AI_DAILY_TOKEN_LIMIT",
-    "Tokens (input plus output, text and embeddings together) the server may use per UTC day; \
-     past it, AI features answer 429 `ai.quota_exceeded` until the next day. Counted in the \
-     database, shared by every server process; concurrent calls may go slightly over. `0` \
-     means no limit.",
+    "Tokens (input plus output, text and embeddings together) each tenant may use per UTC day, \
+     unless its plan sets `ai.daily_tokens`; past it, AI features answer 429 \
+     `ai.quota_exceeded` until the next day. Counted in the database, shared by every server \
+     process; concurrent calls may go slightly over. `0` means no limit.",
 )
 .with_default("2000000");
 

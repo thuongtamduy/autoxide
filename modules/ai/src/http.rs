@@ -52,7 +52,8 @@ pub(crate) struct AiStatus {
     embedding_dimensions: usize,
     /// Tokens used today (UTC), text and embeddings together.
     tokens_today: u64,
-    /// Daily token limit; 0 means no limit.
+    /// Daily token limit of this tenant: its plan's `ai.daily_tokens`, otherwise the server's
+    /// `AUTOXIDE_AI_DAILY_TOKEN_LIMIT`; 0 means no limit.
     daily_token_limit: u64,
 }
 
@@ -69,7 +70,7 @@ impl Status {
             embedding_model: self.embeddings.model_id().to_owned(),
             embedding_dimensions: self.embeddings.dimensions(),
             tokens_today: self.book.used_today(tenant).await?,
-            daily_token_limit: self.book.limit(),
+            daily_token_limit: self.book.limit_for(tenant).await?.unwrap_or(0),
         })
     }
 }

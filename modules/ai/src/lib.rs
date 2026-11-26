@@ -81,6 +81,10 @@ impl Module for AiModule {
         vec![http::AI_VIEW]
     }
 
+    fn limits(&self) -> Vec<autoxide_kernel::entitlement::Limit> {
+        vec![usage::DAILY_TOKENS]
+    }
+
     fn translations(&self) -> Vec<(&'static str, &'static str)> {
         vec![("vi", include_str!("../locales/vi.json"))]
     }
@@ -90,7 +94,9 @@ impl Module for AiModule {
             .config
             .clone()
             .ok_or_else(|| Error::internal("module `ai` started before it was configured"))?;
-        let book = Arc::new(UsageBook::new(config.daily_token_limit));
+        let book = Arc::new(
+            UsageBook::new(config.daily_token_limit).with_entitlements(context.entitlements()),
+        );
         let (provider, capabilities): (Option<Arc<dyn providers::Provider>>, Capabilities) =
             match &config.text {
                 None => (None, Capabilities::default()),

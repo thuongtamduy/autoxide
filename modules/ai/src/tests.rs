@@ -485,3 +485,99 @@ async fn khoa_mo_hinh_va_han_muc_theo_khach() {
     .await
     .unwrap();
 }
+
+/// Gói giả: khách trong `limited` có `ai.daily_tokens` = 5; khách khác có gói nhưng không nêu hạn mức này.
+struct DailyTokens {
+    limited: Mutex<Option<autoxide_kernel::tenancy::TenantId>>,
+}
+
+#[async_trait::async_trait]
+impl autoxide_kernel::entitlement::Entitlements for DailyTokens {
+    async fn snapshot(
+        &self,
+        tenant: autoxide_kernel::tenancy::TenantId,
+    ) -> Result<Arc<autoxide_kernel::entitlement::TenantEntitlements>, autoxide_kernel::error::Error>
+    {
+        let mut limits = std::collections::BTreeMap::new();
+        if *self.limited.lock().unwrap() == Some(tenant) {
+            limits.insert("ai.daily_tokens".to_owned(), Some(5));
+        }
+        Ok(Arc::new(autoxide_kernel::entitlement::TenantEntitlements {
+            modules: ["ai".to_owned()].into(),
+            limits,
+            ..autoxide_kernel::entitlement::TenantEntitlements::default()
+        }))
+    }
+
+    async fn reserve(
+        &self,
+        _: autoxide_kernel::tenancy::TenantId,
+        _: &autoxide_kernel::entitlement::Limit,
+        _: i64,
+        _: &str,
+    ) -> Result<(), autoxide_kernel::error::Error> {
+        Ok(())
+    }
+
+    async fn confirm(
+        &self,
+        _: autoxide_kernel::tenancy::TenantId,
+        _: &autoxide_kernel::entitlement::Limit,
+        _: &str,
+    ) -> Result<(), autoxide_kernel::error::Error> {
+        Ok(())
+    }
+
+    async fn release(
+        &self,
+        _: autoxide_kernel::tenancy::TenantId,
+        _: &autoxide_kernel::entitlement::Limit,
+        _: &str,
+    ) -> Result<(), autoxide_kernel::error::Error> {
+        Ok(())
+    }
+
+    async fn record_usage(
+        &self,
+        _: autoxide_kernel::tenancy::TenantId,
+        _: &autoxide_kernel::entitlement::Limit,
+        _: i64,
+        _: &str,
+    ) -> Result<(), autoxide_kernel::error::Error> {
+        Ok(())
+    }
+}
+
+/// Hạn mức token theo gói (`ai.daily_tokens`): khách có gói nêu hạn mức theo gói; khách có gói không nêu dùng
+/// `AUTOXIDE_AI_DAILY_TOKEN_LIMIT` (gói không nêu ≠ 0, không chặn AI).
+#[tokio::test]
+async fn han_muc_token_theo_goi() {
+    TestDatabase::run(async |test| {
+        let plan = Arc::new(DailyTokens { limited: Mutex::new(None) });
+        let provider: Arc<dyn autoxide_kernel::entitlement::Entitlements> = plan.clone();
+        let app = autoxide_testkit::TestApp::builder(test)
+            .setting("AUTOXIDE_AI_DAILY_TOKEN_LIMIT", "20")
+            .tenant("a")
+            .tenant("b")
+            .user_in("a", "viewer-a", 1, &["ai.view"])
+            .user_in("b", "viewer-b", 2, &["ai.view"])
+            .provide::<dyn autoxide_kernel::entitlement::Entitlements>(provider)
+            .module(crate::module())
+            .build()
+            .await
+            .unwrap();
+        *plan.limited.lock().unwrap() = Some(app.tenant("a").await.unwrap().id());
+        let limit = |token: &'static str| {
+            let app = &app;
+            async move {
+                let answer = app.get("/api/v1/ai/status").token(token).send().await.unwrap();
+                assert_eq!(answer.status(), StatusCode::OK, "{}", answer.text());
+                answer.json()["data"]["daily_token_limit"].clone()
+            }
+        };
+        assert_eq!(limit("viewer-a").await, 5);
+        assert_eq!(limit("viewer-b").await, 20);
+    })
+    .await
+    .unwrap();
+}
