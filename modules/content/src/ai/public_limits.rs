@@ -1,5 +1,6 @@
-//! Chốt của tìm công khai (PT-15): tìm theo chữ trên bản đã đăng là `LIKE '%q%'` quét mọi bài đã đăng của ngôn ngữ, nên
-//! vài chục request không đăng nhập cùng lúc làm chậm mọi request khác. Ba chốt, trong bộ nhớ của từng tiến trình:
+//! Chốt của tìm công khai (PT-15): tìm theo ý nghĩa tốn CPU và gọi nhà cung cấp; tìm theo chữ đi qua chỉ mục từ có trần
+//! thời gian câu lệnh riêng (`publishing::words`, D-20261126-content-word-index). Ba chốt, trong bộ nhớ của từng
+//! tiến trình:
 //!
 //! - số lượt tìm công khai chạy cùng lúc (`AUTOXIDE_CONTENT_PUBLIC_SEARCH_CONCURRENCY`): hết chỗ thì trả 429 ngay, không
 //!   xếp hàng giữ kết nối;

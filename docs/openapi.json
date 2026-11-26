@@ -165233,7 +165233,7 @@
             }
           },
           {
-            "description": "Only posts whose title, summary or body contains this text, ignoring case and accents.\nAt most 200 characters.",
+            "description": "Only posts whose title, summary or body contain every word of this text, ignoring case and\naccents; a word of 3 letters or more also matches longer words that start with it (`lat` finds\n\"Da Lat\"). Covers the 1,000 newest matching posts. At most 200 characters.",
             "in": "query",
             "name": "q",
             "required": false,
@@ -165341,6 +165341,16 @@
             },
             "description": "A parameter is invalid; see `errors`."
           },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The search by `q` took longer than 2 seconds and was stopped (`content.public_search_timeout`); try more specific words."
+          },
           "default": {
             "content": {
               "application/problem+json": {
@@ -165382,7 +165392,7 @@
             "operator": "eq"
           },
           {
-            "description": "Only posts whose title, summary or body contains this text, ignoring case and accents.\nAt most 200 characters.",
+            "description": "Only posts whose title, summary or body contain every word of this text, ignoring case and\naccents; a word of 3 letters or more also matches longer words that start with it (`lat` finds\n\"Da Lat\"). Covers the 1,000 newest matching posts. At most 200 characters.",
             "kind": "string",
             "name": "q",
             "operator": "contains"
