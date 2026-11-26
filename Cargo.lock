@@ -858,6 +858,7 @@ dependencies = [
  "futures-util",
  "jiff",
  "metrics",
+ "proptest",
  "rust_decimal",
  "sea-orm",
  "serde",

@@ -29,6 +29,8 @@ use uuid::Uuid;
 
 mod any_of;
 mod decision;
+#[cfg(test)]
+mod properties;
 mod step_up;
 
 pub use decision::Decision;
