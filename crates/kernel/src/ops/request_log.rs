@@ -531,6 +531,8 @@ pub(crate) struct RequestLogInput {
     limit: Option<u32>,
     /// `next_cursor` of the previous page.
     cursor: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching calls) on the first page.
+    count: Option<bool>,
 }
 
 pub(crate) fn tools() -> Vec<Tool> {
@@ -552,11 +554,10 @@ pub(crate) fn tools() -> Vec<Tool> {
                     from: input.from,
                     to: input.to,
                 };
-                let page = PageRequest::try_from(PageQuery::new(
-                    input.limit.map(|limit| limit.to_string()),
-                    input.cursor,
-                    None,
-                ))?;
+                let page = PageRequest::try_from(
+                    PageQuery::new(input.limit.map(|limit| limit.to_string()), input.cursor, None)
+                        .with_count(input.count.unwrap_or(false)),
+                )?;
                 list(&tenant, &filter, &page).await
             },
         )

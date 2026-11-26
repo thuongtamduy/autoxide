@@ -35,6 +35,8 @@ pub(crate) struct SearchCustomersInput {
     limit: Option<u32>,
     /// `next_cursor` of the previous page.
     cursor: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
 }
 
 /// One customer.
@@ -63,6 +65,8 @@ pub(crate) struct ListGroupsInput {
     limit: Option<u32>,
     /// `next_cursor` of the previous page.
     cursor: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
 }
 
 /// A group to create (no `id`) or change (with `id`).
@@ -113,7 +117,9 @@ pub(crate) fn all(service: &Arc<CustomersService>) -> Vec<Tool> {
             move |tenant: TenantContext, principal: Principal, input: SearchCustomersInput| {
                 let service = search.clone();
                 async move {
-                    let page = PageInput::new(input.limit, input.cursor, None).page()?;
+                    let page = PageInput::new(input.limit, input.cursor, None)
+                        .with_count(input.count.unwrap_or(false))
+                        .page()?;
                     let filter = ProfileFilter {
                         q: input.q,
                         group_id: input.group_id,
@@ -159,7 +165,9 @@ pub(crate) fn all(service: &Arc<CustomersService>) -> Vec<Tool> {
             move |tenant: TenantContext, principal: Principal, input: ListGroupsInput| {
                 let service = groups.clone();
                 async move {
-                    let page = PageInput::new(input.limit, input.cursor, None).page()?;
+                    let page = PageInput::new(input.limit, input.cursor, None)
+                        .with_count(input.count.unwrap_or(false))
+                        .page()?;
                     Ok(service
                         .list_groups(&tenant, &principal, &page)
                         .await?

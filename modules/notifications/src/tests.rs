@@ -36,6 +36,7 @@ use crate::api::{
 };
 
 mod mobile;
+mod pages;
 mod templates;
 
 // Bọc `NotificationTemplate::new` để `cargo xtask check` không đòi bản dịch cho loại chỉ có trong test.

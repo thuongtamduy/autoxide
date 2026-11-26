@@ -6,6 +6,7 @@ mod billing;
 mod enforcement;
 mod invoicing;
 mod lifecycle;
+mod pages;
 mod payments;
 mod provisioning;
 mod signup;

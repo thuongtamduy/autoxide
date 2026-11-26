@@ -5,9 +5,10 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::i18n::Language;
+use autoxide_kernel::pagination::{Page, PageRequest, SortValue, fetch_page_by};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use sea_orm::sea_query::OnConflict;
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set};
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
 use serde_json::json;
 
 use crate::api::{Channel, NotificationKind};
@@ -185,19 +186,26 @@ impl NotificationsService {
         })
     }
 
+    /// Một trang câu thay thế của khách: theo loại, rồi ID (UUIDv7 cấp lúc ghi lần đầu; dòng cũ được cấp
+    /// theo kênh rồi ngôn ngữ ở migration `m0011`), keyset trong database (index
+    /// `notifications_templates_page`).
     pub(crate) async fn list_templates(
         &self,
         tenant: &TenantContext,
         principal: &Principal,
-    ) -> Result<Vec<template::Model>, Error> {
+        page: &PageRequest,
+    ) -> Result<Page<template::Model>, Error> {
         principal.require(&TEMPLATES_MANAGE)?;
-        Ok(template::Entity::find()
-            .scoped(tenant)
-            .order_by_asc(template::Column::Kind)
-            .order_by_asc(template::Column::Channel)
-            .order_by_asc(template::Column::Locale)
-            .all(tenant.database().read())
-            .await?)
+        fetch_page_by(
+            template::Entity::find().scoped(tenant),
+            template::Column::Kind,
+            |row| SortValue::Text(row.kind.clone()),
+            template::Column::Id,
+            |row| row.id,
+            page,
+            tenant.database().read(),
+        )
+        .await
     }
 
     /// Kiểm (loại, kênh, ngôn ngữ) của đường dẫn mẫu; trả loại và ngôn ngữ chuẩn.
@@ -285,6 +293,8 @@ impl NotificationsService {
         }
         let transaction = tenant.database().begin_write().await?;
         template::Entity::insert(template::ActiveModel {
+            // Ghi lại cùng (loại, kênh, ngôn ngữ) đi nhánh `ON CONFLICT` bên dưới, không đổi `id`.
+            id: Set(uuid::Uuid::now_v7()),
             tenant_id: Set(tenant.id().as_uuid()),
             kind: Set(kind.key().to_owned()),
             channel: Set(channel.as_str().to_owned()),

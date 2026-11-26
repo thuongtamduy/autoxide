@@ -19,13 +19,12 @@ use std::sync::Arc;
 
 use autoxide_kernel::error::{Error, ErrorKind};
 use autoxide_kernel::event::Actor;
+use autoxide_kernel::pagination::{Page, PageRequest, SortValue, fetch_page_by};
 use autoxide_kernel::rows;
 use autoxide_kernel::store::{AppStore, PurchaseState, StorePurchase, StorePurchases};
 use autoxide_kernel::tenancy::{DEFAULT_TENANT, TenantId};
 use sea_orm::sea_query::OnConflict;
-use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, Set,
-};
+use sea_orm::{ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, Set};
 use serde_json::json;
 use uuid::Uuid;
 
@@ -233,12 +232,22 @@ impl PlansService {
     }
 
     /// Mọi sản phẩm đã nối, theo cửa hàng và mã.
-    pub(crate) async fn store_products(&self) -> Result<Vec<product::Model>, Error> {
-        Ok(product::Entity::find()
-            .order_by_asc(product::Column::Store)
-            .order_by_asc(product::Column::ProductId)
-            .all(self.databases.control().read())
-            .await?)
+    /// Sản phẩm đã nối, theo mã sản phẩm của cửa hàng rồi ID (cùng mã ở App Store và Google Play
+    /// đứng cạnh nhau); keyset trong database (index `plans_store_product_page_idx`).
+    pub(crate) async fn store_products(
+        &self,
+        page: &PageRequest,
+    ) -> Result<Page<product::Model>, Error> {
+        fetch_page_by(
+            product::Entity::find(),
+            product::Column::ProductId,
+            |row| SortValue::Text(row.product_id.clone()),
+            product::Column::Id,
+            |row| row.id,
+            page,
+            self.databases.control().read(),
+        )
+        .await
     }
 
     /// Bỏ nối sản phẩm (thuê bao đang chạy giữ gói cũ tới hết kỳ).
@@ -565,15 +574,24 @@ impl PlansService {
     }
 
     /// Giao dịch cửa hàng của `tenant`, mới trước.
+    /// Giao dịch mua của khách `tenant`, đổi gần nhất trước (theo `updated_at` rồi ID, mặc định
+    /// `desc`); keyset trong database (index `plans_store_purchase_page_idx`). Dòng được cửa hàng cập
+    /// nhật trong lúc duyệt có thể nhảy trang — như mọi danh sách sắp theo giá trị đổi được.
     pub(crate) async fn store_purchases(
         &self,
         tenant: TenantId,
-    ) -> Result<Vec<purchase::Model>, Error> {
-        Ok(purchase::Entity::find()
-            .filter(purchase::Column::TenantId.eq(tenant.as_uuid()))
-            .order_by_desc(purchase::Column::UpdatedAt)
-            .all(self.databases.control().read())
-            .await?)
+        page: &PageRequest,
+    ) -> Result<Page<purchase::Model>, Error> {
+        fetch_page_by(
+            purchase::Entity::find().filter(purchase::Column::TenantId.eq(tenant.as_uuid())),
+            purchase::Column::UpdatedAt,
+            |row| SortValue::Time(row.updated_at),
+            purchase::Column::Id,
+            |row| row.id,
+            page,
+            self.databases.control().read(),
+        )
+        .await
     }
 }
 

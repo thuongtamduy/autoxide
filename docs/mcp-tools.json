@@ -437,11 +437,25 @@
         "returns_secret": false
       },
       "deprecation": null,
-      "description": "The most viewed objects (`<kind>:<id>`, e.g. products) of a website over a range of days; `kind` keeps one kind.",
+      "description": "The most viewed objects (`<kind>:<id>`, e.g. products) of a website over a range of days, most first; `kind` keeps one kind; follow `pagination.next_cursor`.",
       "input_schema": {
         "additionalProperties": false,
         "description": "A ranking over a website and a range of days.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "from": {
             "format": "date",
             "type": [
@@ -457,11 +471,18 @@
             ]
           },
           "limit": {
-            "description": "Rows to return, 1 to 100; defaults to 10.",
-            "format": "int64",
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "format": "int32",
             "minimum": 0,
             "type": [
               "integer",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`asc` (most first, the default) or `desc` (fewest first).",
+            "type": [
+              "string",
               "null"
             ]
           },
@@ -497,11 +518,25 @@
         "returns_secret": false
       },
       "deprecation": null,
-      "description": "The most viewed pages of a website over a range of days.",
+      "description": "The most viewed pages of a website over a range of days, most first; the same pages as `GET /api/v1/analytics/pages`; follow `pagination.next_cursor`.",
       "input_schema": {
         "additionalProperties": false,
         "description": "A ranking over a website and a range of days.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "from": {
             "format": "date",
             "type": [
@@ -517,11 +552,18 @@
             ]
           },
           "limit": {
-            "description": "Rows to return, 1 to 100; defaults to 10.",
-            "format": "int64",
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "format": "int32",
             "minimum": 0,
             "type": [
               "integer",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`asc` (most first, the default) or `desc` (fewest first).",
+            "type": [
+              "string",
               "null"
             ]
           },
@@ -7167,6 +7209,13 @@
         "additionalProperties": false,
         "description": "A page of groups.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "`next_cursor` of the previous page.",
             "type": [
@@ -7277,6 +7326,13 @@
         "additionalProperties": false,
         "description": "Which customers to find.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "`next_cursor` of the previous page.",
             "type": [
@@ -9667,6 +9723,13 @@
               "null"
             ]
           },
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "The `next_cursor` of the previous page.",
             "type": [
@@ -9713,6 +9776,13 @@
         "additionalProperties": false,
         "description": "Which sandboxes to list.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "The `next_cursor` of the previous page.",
             "type": [
@@ -10031,6 +10101,13 @@
             "format": "uuid",
             "type": [
               "string",
+              "null"
+            ]
+          },
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching calls) on the first page.",
+            "type": [
+              "boolean",
               "null"
             ]
           },
@@ -12182,6 +12259,13 @@
               "null"
             ]
           },
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "The `next_cursor` of the previous page.",
             "type": [
@@ -12292,6 +12376,13 @@
         "additionalProperties": false,
         "description": "Which inbox page.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "The `next_cursor` of the previous page.",
             "type": [
@@ -13174,15 +13265,45 @@
         "returns_secret": false
       },
       "deprecation": null,
-      "description": "Get the settings in force at an organization unit (time zone, currency, language…) and where each value comes from: the unit, a unit above, or the default.",
+      "description": "Get the settings in force at an organization unit (time zone, currency, language…) and where each value comes from: the unit, a unit above, or the default. By key; follow `pagination.next_cursor`.",
       "input_schema": {
         "additionalProperties": false,
-        "description": "A unit to act on.",
+        "description": "A unit and a page of its settings.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "id": {
             "description": "Id of the unit.",
             "format": "uuid",
             "type": "string"
+          },
+          "limit": {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`asc` (key order, the default) or `desc`.",
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
@@ -13241,6 +13362,13 @@
         "additionalProperties": false,
         "description": "Which unit groups to list.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "The `next_cursor` of the previous page.",
             "type": [
@@ -13294,6 +13422,13 @@
         "additionalProperties": false,
         "description": "Which units to list.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "The `next_cursor` of the previous page.",
             "type": [
@@ -13868,6 +14003,13 @@
       "input_schema": {
         "additionalProperties": false,
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "The `next_cursor` of the previous page.",
             "type": [
@@ -13913,6 +14055,13 @@
       "input_schema": {
         "additionalProperties": false,
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "The `next_cursor` of the previous page.",
             "type": [
@@ -13961,10 +14110,41 @@
         "returns_secret": false
       },
       "deprecation": null,
-      "description": "Platform staff: a tenant's use of every limit (metered limits: this month).",
+      "description": "Platform staff: a tenant's use of every limit (metered limits: this month), by limit key; follow `pagination.next_cursor`.",
       "input_schema": {
         "additionalProperties": false,
+        "description": "A tenant and a page of its limits.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`asc` (limit key order, the default) or `desc`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "tenant_id": {
             "description": "Id of the tenant.",
             "format": "uuid",
@@ -15906,18 +16086,48 @@
         "returns_secret": false
       },
       "deprecation": null,
-      "description": "The tax rates in force on a day for a jurisdiction, with their legal basis.",
+      "description": "The tax rates in force on a day for a jurisdiction, with their legal basis; by category, stage and start date, the same order and pages as `GET /api/v1/tax/rates`; follow `pagination.next_cursor`.",
       "input_schema": {
         "additionalProperties": false,
         "description": "Which rates.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "jurisdiction": {
             "description": "Tax jurisdiction, e.g. `VN`.",
             "type": "string"
           },
+          "limit": {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
           "on": {
             "description": "Day, `YYYY-MM-DD`; default today.",
             "format": "date",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`asc` (by category, stage and start date, the default) or `desc`.",
             "type": [
               "string",
               "null"

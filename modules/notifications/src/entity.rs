@@ -123,6 +123,9 @@ pub(crate) mod template {
         pub channel: String,
         #[sea_orm(primary_key, auto_increment = false)]
         pub locale: String,
+        /// UUIDv7 cấp khi ghi lần đầu (dòng cũ: cấp ở migration `m0011`), cho cursor của danh sách;
+        /// unique trong khách (`notifications_templates_id_key`).
+        pub id: Uuid,
         pub title: String,
         pub body: String,
         pub short: String,

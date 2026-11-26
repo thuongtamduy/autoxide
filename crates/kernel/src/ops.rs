@@ -15,6 +15,7 @@ pub mod doctor;
 pub(crate) mod filter_parse;
 pub mod find;
 pub mod list_exports;
+pub(crate) mod list_indexes;
 pub mod logging;
 pub mod metrics;
 pub(crate) mod module_catalog;

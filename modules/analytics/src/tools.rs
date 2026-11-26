@@ -7,6 +7,7 @@ use std::sync::Arc;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::mcp::Tool;
+use autoxide_kernel::pagination::{NaturalOrderPageQuery, Page, PageRequest};
 use autoxide_kernel::tenancy::TenantContext;
 use serde::Deserialize;
 use utoipa::ToSchema;
@@ -15,7 +16,7 @@ use validator::Validate;
 
 use crate::errors;
 use crate::permissions::ANALYTICS_READ;
-use crate::reports::{Dimension, TOP_DEFAULT};
+use crate::reports::Dimension;
 use crate::service::AnalyticsService;
 use crate::shared::valid_kind;
 
@@ -42,11 +43,16 @@ pub(crate) struct TopInput {
     from: Option<Date>,
     #[schema(value_type = Option<String>, format = Date)]
     to: Option<Date>,
-    /// Rows to return, 1 to 100; defaults to 10.
-    #[validate(range(min = 1, max = 100))]
-    limit: Option<u64>,
     /// For objects only: just this kind, e.g. `catalog.product`.
     kind: Option<String>,
+    /// Maximum number of items to return, 1 to 200. Defaults to 50.
+    limit: Option<u32>,
+    /// The `next_cursor` of the previous page.
+    cursor: Option<String>,
+    /// `asc` (most first, the default) or `desc` (fewest first).
+    order: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
 }
 
 /// A funnel over a website and a range of days.
@@ -68,15 +74,23 @@ async fn top(
     principal: &Principal,
     input: TopInput,
     dimension: Dimension,
-) -> Result<Vec<crate::reports::Ranked>, Error> {
+) -> Result<Page<crate::reports::Ranked>, Error> {
+    // Cùng kiểu tham số trang và cùng hàm với REST (`NaturalOrderPageQuery`: mặc định nhiều nhất trước).
+    let page = PageRequest::try_from(
+        NaturalOrderPageQuery::new(
+            input.limit.map(|limit| limit.to_string()),
+            input.cursor,
+            input.order,
+        )
+        .with_count(input.count.unwrap_or(false)),
+    )?;
     let prefix = match input.kind.as_deref().map(str::trim).filter(|kind| !kind.is_empty()) {
         Some(kind) if valid_kind(kind) => Some(format!("{kind}:")),
         Some(_) => return Err(errors::kind_invalid()),
         None => None,
     };
     let range = service.range(tenant, principal, input.site, input.from, input.to).await?;
-    let limit = input.limit.unwrap_or(TOP_DEFAULT);
-    service.top(tenant, &range, dimension, prefix.as_deref(), limit).await
+    service.ranking_page(tenant, &range, dimension, prefix.as_deref(), &page).await
 }
 
 pub(crate) fn all(service: &Arc<AnalyticsService>) -> Vec<Tool> {
@@ -102,7 +116,8 @@ pub(crate) fn all(service: &Arc<AnalyticsService>) -> Vec<Tool> {
         .read_only(),
         Tool::new(
             "top_pages",
-            "The most viewed pages of a website over a range of days.",
+            "The most viewed pages of a website over a range of days, most first; the same pages as \
+             `GET /api/v1/analytics/pages`; follow `pagination.next_cursor`.",
             move |tenant: TenantContext, principal: Principal, input: TopInput| {
                 let service = pages.clone();
                 async move { top(&service, &tenant, &principal, input, Dimension::Page).await }
@@ -113,7 +128,7 @@ pub(crate) fn all(service: &Arc<AnalyticsService>) -> Vec<Tool> {
         Tool::new(
             "top_objects",
             "The most viewed objects (`<kind>:<id>`, e.g. products) of a website over a range of \
-             days; `kind` keeps one kind.",
+             days, most first; `kind` keeps one kind; follow `pagination.next_cursor`.",
             move |tenant: TenantContext, principal: Principal, input: TopInput| {
                 let service = objects.clone();
                 async move { top(&service, &tenant, &principal, input, Dimension::Object).await }
