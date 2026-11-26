@@ -488,6 +488,7 @@ tenant only:
 | `analytics.allowed_hosts` | `AUTOXIDE_ANALYTICS_ALLOWED_HOSTS` (the tenant's verified domains are always accepted) |
 | `catalog.locales` | `AUTOXIDE_CATALOG_LOCALES` |
 | `menus.locales`, `menus.default_locale` | `AUTOXIDE_MENUS_LOCALES`, `AUTOXIDE_MENUS_DEFAULT_LOCALE` |
+| `auth.passkey_rp_id` | `AUTOXIDE_AUTH_PASSKEY_RP_ID` (only one of the tenant's own verified domains; checked when set and at every use — if the domain is lost or moves to another tenant, the server's setting applies again and passkeys registered on it stop working) |
 | `newsletter.postal_address` | `AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS`; when unset, the owner's name and address in the tenant's legal profile (module `compliance`) come first |
 | `<module>.link.<page>` (group `link`, see below) | the `AUTOXIDE_…_URL` page addresses in mail: `auth.link.password_reset`, `auth.link.email_verification`, `auth.link.invitation`, `auth.link.login`, `auth.link.email_change_report`, `support.link.guest_ticket`, `compliance.link.case_tracking`, `inventory.link.restock_confirm`, `notifications.link.unsubscribe`, `comments.link.verify`, `comments.link.unsubscribe`, `newsletter.link.confirm`, `newsletter.link.preferences` |
 
@@ -663,6 +664,17 @@ have no permission, and are separate from staff even with the same email. Custom
 `"realm": "customer"`; a tenant closes customer sign-up with the organization setting
 `auth.customer_registration` (`false`). Staff manage them with `GET /api/v1/auth/customers` and
 `PATCH /api/v1/auth/customers/{id}` (permissions `auth.customers.read`, `auth.customers.manage`).
+
+**Sign-in policy per tenant.** Organization settings at a tenant's root unit (`PUT
+/api/v1/organizations/units/{id}/settings/{key}`) let a tenant decide for itself, within the server's
+limits:
+
+| Setting | Effect |
+| ------- | ------ |
+| `auth.staff_registration` | `true` / `false`: anyone may create their own staff account (`POST /api/v1/auth/register`, or a first sign-in with a provider that allows sign-up). Unset: `AUTOXIDE_AUTH_SELF_REGISTRATION` |
+| `auth.password_min_length` | 12 to 128: shortest new password. Only raises the server's minimum of 12 |
+| `auth.session_days` | 1 to 365: lifetime of each refresh token. Only shortens `AUTOXIDE_AUTH_REFRESH_TOKEN_DAYS`; a longer value is ignored |
+| `auth.totp_issuer` | Name shown in authenticator apps (no `:`), instead of `AUTOXIDE_AUTH_TOTP_ISSUER` |
 
 **Inviting staff.** Instead of creating accounts with passwords, invite people:
 `POST /api/v1/auth/invitations` with an `email`, the `role_ids` and the unit (`org_id`) they get

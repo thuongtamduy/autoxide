@@ -478,6 +478,7 @@ hành vi của module còn đặt được theo từng khách, thay giá trị c
 | `analytics.allowed_hosts` | `AUTOXIDE_ANALYTICS_ALLOWED_HOSTS` (tên miền đã xác minh của khách luôn được nhận) |
 | `catalog.locales` | `AUTOXIDE_CATALOG_LOCALES` |
 | `menus.locales`, `menus.default_locale` | `AUTOXIDE_MENUS_LOCALES`, `AUTOXIDE_MENUS_DEFAULT_LOCALE` |
+| `auth.passkey_rp_id` | `AUTOXIDE_AUTH_PASSKEY_RP_ID` (chỉ là một tên miền khách này đã xác minh; kiểm lúc đặt và mỗi lần dùng — tên miền mất xác minh hay chuyển sang khách khác thì cấu hình của máy chủ áp lại và passkey đăng ký trên tên miền đó hết dùng được) |
 | `newsletter.postal_address` | `AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS`; chưa đặt thì tên và địa chỉ chủ sở hữu trong hồ sơ pháp lý của khách (module `compliance`) được dùng trước |
 | `<module>.link.<trang>` (nhóm `link`, xem dưới) | địa chỉ trang `AUTOXIDE_…_URL` trong mail: `auth.link.password_reset`, `auth.link.email_verification`, `auth.link.invitation`, `auth.link.login`, `auth.link.email_change_report`, `support.link.guest_ticket`, `compliance.link.case_tracking`, `inventory.link.restock_confirm`, `notifications.link.unsubscribe`, `comments.link.verify`, `comments.link.unsubscribe`, `newsletter.link.confirm`, `newsletter.link.preferences` |
 
@@ -644,6 +645,16 @@ permission nào, tách khỏi nhân sự dù trùng email. Người mua đăng k
 `"realm": "customer"`; khách đóng đăng ký người mua bằng cài đặt theo cây tổ chức
 `auth.customer_registration` (`false`). Nhân sự quản lý người mua bằng `GET /api/v1/auth/customers`
 và `PATCH /api/v1/auth/customers/{id}` (permission `auth.customers.read`, `auth.customers.manage`).
+
+**Chính sách đăng nhập theo khách.** Cài đặt tổ chức ở nút gốc của khách (`PUT
+/api/v1/organizations/units/{id}/settings/{key}`) cho khách tự quyết, trong giới hạn của máy chủ:
+
+| Cài đặt | Tác dụng |
+| ------- | -------- |
+| `auth.staff_registration` | `true` / `false`: ai cũng tự tạo được tài khoản nhân sự (`POST /api/v1/auth/register`, hay đăng nhập lần đầu qua nhà cung cấp cho đăng ký). Chưa đặt: `AUTOXIDE_AUTH_SELF_REGISTRATION` |
+| `auth.password_min_length` | 12 tới 128: độ dài tối thiểu của mật khẩu mới. Chỉ nâng mức 12 của máy chủ |
+| `auth.session_days` | 1 tới 365: thời hạn mỗi refresh token. Chỉ rút ngắn `AUTOXIDE_AUTH_REFRESH_TOKEN_DAYS`; giá trị dài hơn bị bỏ qua |
+| `auth.totp_issuer` | Tên hiện trong app xác thực (không có `:`), thay `AUTOXIDE_AUTH_TOTP_ISSUER` |
 
 **Mời nhân sự.** Thay vì tạo tài khoản kèm mật khẩu, hãy mời: `POST /api/v1/auth/invitations` với
 `email`, các `role_ids` và nút (`org_id`) họ nhận (permission `auth.invitations.manage`; không mời kèm
