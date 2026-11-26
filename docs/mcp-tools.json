@@ -1771,7 +1771,7 @@
         "returns_secret": false
       },
       "deprecation": null,
-      "description": "Replace every role of a user with `role_ids`. The last administrator cannot lose the `admin` role.",
+      "description": "Replace every role of a user with `role_ids`. You can only give or take away roles whose permissions you have yourself, as widely (`auth.role_beyond_you`). The last administrator cannot lose the `admin` role.",
       "input_schema": {
         "additionalProperties": false,
         "description": "The complete list of roles a user should have.",
