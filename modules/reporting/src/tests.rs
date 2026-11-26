@@ -299,3 +299,32 @@ async fn local_day_uses_org_timezone() {
     .await
     .unwrap();
 }
+
+/// Một module khai cùng một loại (giống hệt) ở hai event: `kinds` của service (và `GET /kinds`) chỉ có một dòng
+/// cho loại đó (D-20261126-list-pages-cluster-2).
+#[tokio::test]
+async fn loai_khai_giong_het_o_hai_event_chi_mot_dong() {
+    use autoxide_kernel::report::FactSource;
+    fn none(_: &Delivered) -> Result<Vec<Fact>, Error> {
+        Ok(Vec::new())
+    }
+    TestDatabase::run(async |test| {
+        let sales = Sales::default();
+        let app = tree(TestApp::builder(test), &sales).build().await.unwrap();
+        let sources = vec![
+            ("sales", FactSource::new("sales.sold", vec![SALES_AMOUNT], none)),
+            ("sales", FactSource::new("sales.refunded", vec![SALES_AMOUNT], none)),
+        ];
+        let reporting = Reporting::new(
+            app.registry().clone(),
+            None,
+            None,
+            &sources,
+            ReportingConfig::default(),
+        );
+        let kinds: Vec<&str> = reporting.kinds().iter().map(|info| info.kind.kind).collect();
+        assert_eq!(kinds, [SALES_AMOUNT.kind]);
+    })
+    .await
+    .unwrap();
+}
