@@ -231,7 +231,7 @@ impl ContentService {
         candidate.status = Status::Draft.as_str().to_owned();
         candidate.has_unpublished_changes = false;
         candidate.created_by = Some(principal.user_id());
-        candidate.created_by_api_key_id = principal.api_key_id();
+        candidate.created_by_api_key_id = principal.credential_id();
         // Bản dịch là mục mới: không mang cờ của bản gốc; ai tạo bằng AI thì tự khai (hay máy
         // chủ đặt khi nó dịch).
         candidate.ai_generated = false;
