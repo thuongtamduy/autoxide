@@ -290,3 +290,56 @@ async fn mot_khach_nhu_cu() {
     .await
     .unwrap();
 }
+
+/// Rà soát #516 (điểm không chặn): port mặc định viết rõ (`:443`) được nhận, port khác bị 422; host nền tảng làm
+/// `kernel.public_url`; host chữ hoa và có dấu chấm cuối được chuẩn hoá; địa chỉ trình duyệt không đọc được bị 422.
+#[tokio::test]
+async fn dang_viet_khac_cua_cung_host() {
+    TestDatabase::run(async |test| {
+        let app = TestApp::builder(test)
+            .setting("AUTOXIDE_HTTP_PUBLIC_URL", "https://api.example.com")
+            .tenant("a")
+            .tenant("b")
+            .domain("a", "shop-a.test")
+            .user_in("a", "owner-a", 1, &["kernel.settings.manage"])
+            .user_in("b", "owner-b", 2, &["kernel.settings.manage"])
+            .module(Linker)
+            .build()
+            .await
+            .unwrap();
+        let links = app.api::<SiteLinks>().unwrap();
+        let a = app.tenant("a").await.unwrap();
+        for (value, ok) in [
+            ("https://shop-a.test:443", true),
+            ("https://SHOP-A.test.", true),
+            ("https://shop-a.test:8443", false),
+            ("https://shop-a.test:99999", false),
+        ] {
+            let (status, body) = put(&app, "owner-a", "kernel.public_url", value).await;
+            let expected = if ok { StatusCode::OK } else { StatusCode::UNPROCESSABLE_ENTITY };
+            assert_eq!(status, expected, "{value}: {body}");
+        }
+        for (value, ok) in [
+            ("https://Shop-A.Test./dat-lai?t={token}", true),
+            ("https://shop-a.test:443/dat-lai?t={token}", true),
+            ("https://shop-a.test:8443/dat-lai?t={token}", false),
+        ] {
+            let (status, body) = put(&app, "owner-a", PAGE.name(), value).await;
+            let expected = if ok { StatusCode::OK } else { StatusCode::UNPROCESSABLE_ENTITY };
+            assert_eq!(status, expected, "{value}: {body}");
+        }
+        assert_eq!(
+            links.link(&a, &PAGE, Some(SERVER)).await.unwrap().as_deref(),
+            Some("https://shop-a.test:443/dat-lai?t={token}")
+        );
+        // Host nền tảng: khách chưa có tên miền vẫn đặt được `kernel.public_url` trên đó (port mặc định).
+        let (status, body) =
+            put(&app, "owner-b", "kernel.public_url", "https://api.example.com").await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        let (status, body) =
+            put(&app, "owner-b", "kernel.public_url", "https://api.example.com:8443").await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{body}");
+    })
+    .await
+    .unwrap();
+}

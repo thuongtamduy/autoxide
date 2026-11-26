@@ -1002,6 +1002,50 @@ export type BounceRequest = {
   type: BounceKind;
 };
 
+/**
+ * A mail address of this tenant that bounced: how often, why, and whether mail to it is
+ * suppressed.
+ */
+export type BounceResponse = {
+  /** The address, in lower case. */
+  email: string;
+  first_bounced_at: string;
+  /**
+   * Hard bounces since the record was created: the receiving server refused the address
+   * itself (SMTP enhanced status 5.1.x or 5.2.x).
+   */
+  hard_bounces: number;
+  id: string;
+  last_bounced_at: string;
+  /** SMTP status of the last bounce, e.g. `550 5.1.1`. */
+  last_code: string;
+  last_skipped_at?: string | null;
+  /** What the last skipped mail was, from the sender's key, e.g. `auth.password_reset`. */
+  last_skipped_source?: string | null;
+  released_at?: string | null;
+  /** The user who last took the address off the suppression list. */
+  released_by?: string | null;
+  /** Mails not sent because the address was suppressed. */
+  skipped: number;
+  /** Hard bounces counted towards suppression; back to 0 when the address is released. */
+  strikes: number;
+  /** Whether mail to this address is suppressed: new mail to it is not sent. */
+  suppressed: boolean;
+  suppressed_at?: string | null;
+};
+
+/** Bounce figures of this tenant. */
+export type BounceStatsResponse = {
+  /** Addresses with a bounce record. */
+  addresses: number;
+  /** Addresses that bounced in the last 30 days. */
+  bounced_last_30_days: number;
+  /** Addresses that had a mail skipped (suppressed) in the last 30 days. */
+  skipped_last_30_days: number;
+  /** Addresses whose mail is suppressed. */
+  suppressed: number;
+};
+
 /** The brand of a website, inherited down the organization tree. */
 export type BrandResponse = {
   email?: string | null;
@@ -6284,6 +6328,56 @@ export type Data_BounceOutcome = {
   data: {
     /** The address is (now or already) suppressed. */
     suppressed: boolean;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_BounceResponse = {
+  /**
+   * A mail address of this tenant that bounced: how often, why, and whether mail to it is
+   * suppressed.
+   */
+  data: {
+    /** The address, in lower case. */
+    email: string;
+    first_bounced_at: string;
+    /**
+     * Hard bounces since the record was created: the receiving server refused the address
+     * itself (SMTP enhanced status 5.1.x or 5.2.x).
+     */
+    hard_bounces: number;
+    id: string;
+    last_bounced_at: string;
+    /** SMTP status of the last bounce, e.g. `550 5.1.1`. */
+    last_code: string;
+    last_skipped_at?: string | null;
+    /** What the last skipped mail was, from the sender's key, e.g. `auth.password_reset`. */
+    last_skipped_source?: string | null;
+    released_at?: string | null;
+    /** The user who last took the address off the suppression list. */
+    released_by?: string | null;
+    /** Mails not sent because the address was suppressed. */
+    skipped: number;
+    /** Hard bounces counted towards suppression; back to 0 when the address is released. */
+    strikes: number;
+    /** Whether mail to this address is suppressed: new mail to it is not sent. */
+    suppressed: boolean;
+    suppressed_at?: string | null;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_BounceStatsResponse = {
+  /** Bounce figures of this tenant. */
+  data: {
+    /** Addresses with a bounce record. */
+    addresses: number;
+    /** Addresses that bounced in the last 30 days. */
+    bounced_last_30_days: number;
+    /** Addresses that had a mail skipped (suppressed) in the last 30 days. */
+    skipped_last_30_days: number;
+    /** Addresses whose mail is suppressed. */
+    suppressed: number;
   };
 };
 
@@ -22269,6 +22363,39 @@ export type Page_BookingService = {
     price: Money;
     required: string[];
     updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_BounceResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** The address, in lower case. */
+    email: string;
+    first_bounced_at: string;
+    /**
+     * Hard bounces since the record was created: the receiving server refused the address
+     * itself (SMTP enhanced status 5.1.x or 5.2.x).
+     */
+    hard_bounces: number;
+    id: string;
+    last_bounced_at: string;
+    /** SMTP status of the last bounce, e.g. `550 5.1.1`. */
+    last_code: string;
+    last_skipped_at?: string | null;
+    /** What the last skipped mail was, from the sender's key, e.g. `auth.password_reset`. */
+    last_skipped_source?: string | null;
+    released_at?: string | null;
+    /** The user who last took the address off the suppression list. */
+    released_by?: string | null;
+    /** Mails not sent because the address was suppressed. */
+    skipped: number;
+    /** Hard bounces counted towards suppression; back to 0 when the address is released. */
+    strikes: number;
+    /** Whether mail to this address is suppressed: new mail to it is not sent. */
+    suppressed: boolean;
+    suppressed_at?: string | null;
   }[];
   pagination: Pagination;
 };
@@ -45418,6 +45545,68 @@ export interface paths {
         404: Problem;
         413: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/mail/bounces": {
+    /** List the mail addresses of this tenant that bounced. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { email?: string; suppressed?: boolean; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_BounceResponse;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/mail/bounces/stats": {
+    /** Get bounce figures of this tenant. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_BounceStatsResponse;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/mail/bounces/{id}": {
+    /** Get one bounce record. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_BounceResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Delete a bounce record. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/mail/bounces/{id}/release": {
+    /** Take an address off the suppression list. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_BounceResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
         default: Problem;
       };
     };
