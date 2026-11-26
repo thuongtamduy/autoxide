@@ -138,6 +138,17 @@ impl UserService {
         self.write_password(tenant, actor, id, "password", password, PasswordWrite::Initial).await
     }
 
+    /// Lỗi của trường `field` nếu `password` không đạt luật độ dài của khách `tenant` (độ dài tối thiểu theo
+    /// `auth.password_min_length`, D-20261126-tenant-login-policy).
+    pub(crate) async fn password_problem(
+        &self,
+        tenant: &TenantContext,
+        field: &str,
+        password: &str,
+    ) -> Result<Option<autoxide_kernel::error::FieldError>, Error> {
+        self.passwords.problem(tenant, field, password).await
+    }
+
     /// Hash và lưu mật khẩu. `field`: tên trường báo trong lỗi luật mật khẩu.
     /// [`PasswordWrite::Initial`]: chỉ ghi khi tài khoản chưa có mật khẩu — kiểm ngay trong câu
     /// `UPDATE` nên hai request đồng thời không cùng ghi được.
@@ -155,7 +166,7 @@ impl UserService {
         mode: PasswordWrite,
     ) -> Result<(), Error> {
         let only_if_unset = mode == PasswordWrite::Initial;
-        if let Some(problem) = password::check_rules(field, &password) {
+        if let Some(problem) = self.password_problem(tenant, field, &password).await? {
             return Err(Error::validation(vec![problem]));
         }
         let hash = self.passwords.hash(password).await?;

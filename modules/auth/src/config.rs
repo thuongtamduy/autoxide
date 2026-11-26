@@ -33,7 +33,8 @@ pub(crate) const ACCESS_TOKEN_SECONDS: Setting = Setting::new(
 pub(crate) const REFRESH_TOKEN_DAYS: Setting = Setting::new(
     "AUTOXIDE_AUTH_REFRESH_TOKEN_DAYS",
     "How long a refresh token stays valid, in days (1 to 365). Each refresh issues a new one \
-     with a fresh lifetime; a session left unused this long must sign in again.",
+     with a fresh lifetime; a session left unused this long must sign in again. A tenant may \
+     shorten it for itself with the setting `auth.session_days` at its root unit.",
 )
 .with_default("30");
 
@@ -138,14 +139,16 @@ pub(crate) const SELF_REGISTRATION: Setting = Setting::new(
     "AUTOXIDE_AUTH_SELF_REGISTRATION",
     "Let anyone create an account with `POST /api/v1/auth/register` (`true` or `false`). New \
      accounts get no role. When `false`, only users with the `auth.users.manage` permission \
-     create accounts.",
+     create accounts. A tenant may decide for itself with the setting \
+     `auth.staff_registration` at its root unit.",
 )
 .with_default("false");
 
 pub(crate) const TOTP_ISSUER: Setting = Setting::new(
     "AUTOXIDE_AUTH_TOTP_ISSUER",
     "Name shown next to the account in authenticator apps (Google Authenticator, 1Password…) \
-     when a user turns on two-step sign-in. Usually your product name; no `:`.",
+     when a user turns on two-step sign-in. Usually your product name; no `:`. A tenant may \
+     use its own name with the setting `auth.totp_issuer` at its root unit.",
 )
 .with_default("Autoxide");
 

@@ -8432,12 +8432,17 @@
                 "description": "`true` when people can sign in with a link sent by email (`AUTOXIDE_AUTH_LOGIN_LINK`,\n`POST /api/v1/auth/login/link`): show \"sign in with a link\".",
                 "type": "boolean"
               },
+              "passkey_rp_id": {
+                "description": "The domain passkeys belong to for this tenant (the WebAuthn relying party id); empty when\npasskeys are off. A page on another domain cannot use them.",
+                "example": "shop.example",
+                "type": "string"
+              },
               "passkeys": {
-                "description": "`true` when passkeys are set up (`AUTOXIDE_AUTH_PASSKEY_RP_ID`): show \"sign in with a\npasskey\".",
+                "description": "`true` when passkeys are set up for this tenant (its setting `auth.passkey_rp_id`, otherwise\n`AUTOXIDE_AUTH_PASSKEY_RP_ID`): show \"sign in with a passkey\".",
                 "type": "boolean"
               },
               "self_registration": {
-                "description": "`true` when people can create their own account (`AUTOXIDE_AUTH_SELF_REGISTRATION`):\nshow \"create an account\".",
+                "description": "`true` when people can create their own staff account in this tenant (its setting\n`auth.staff_registration`, otherwise `AUTOXIDE_AUTH_SELF_REGISTRATION`): show \"create an\naccount\".",
                 "type": "boolean"
               },
               "support_access_max_hours": {
@@ -8451,6 +8456,7 @@
             "required": [
               "login_link",
               "passkeys",
+              "passkey_rp_id",
               "self_registration",
               "support_access_max_hours"
             ],
@@ -42141,7 +42147,7 @@
                 "type": "string"
               },
               "problem": {
-                "description": "The stored value is not used any more, and why: `kernel.public_url_unverified` /\n`kernel.link_unverified` (its host is not a verified domain of this tenant — verify the domain or\nchange the value). Omitted when the value is used.",
+                "description": "The stored value is not used any more, and why: `kernel.public_url_unverified` /\n`kernel.link_unverified` / `kernel.domain_unverified` (its host is not a verified domain of this\ntenant — verify the domain or change the value). Omitted when the value is used.",
                 "example": "kernel.public_url_unverified",
                 "type": [
                   "string",
@@ -49845,7 +49851,7 @@
                   "type": "string"
                 },
                 "problem": {
-                  "description": "The stored value is not used any more, and why: `kernel.public_url_unverified` /\n`kernel.link_unverified` (its host is not a verified domain of this tenant — verify the domain or\nchange the value). Omitted when the value is used.",
+                  "description": "The stored value is not used any more, and why: `kernel.public_url_unverified` /\n`kernel.link_unverified` / `kernel.domain_unverified` (its host is not a verified domain of this\ntenant — verify the domain or change the value). Omitted when the value is used.",
                   "example": "kernel.public_url_unverified",
                   "type": [
                     "string",
@@ -100768,7 +100774,7 @@
             "type": "string"
           },
           "problem": {
-            "description": "The stored value is not used any more, and why: `kernel.public_url_unverified` /\n`kernel.link_unverified` (its host is not a verified domain of this tenant — verify the domain or\nchange the value). Omitted when the value is used.",
+            "description": "The stored value is not used any more, and why: `kernel.public_url_unverified` /\n`kernel.link_unverified` / `kernel.domain_unverified` (its host is not a verified domain of this\ntenant — verify the domain or change the value). Omitted when the value is used.",
             "example": "kernel.public_url_unverified",
             "type": [
               "string",
@@ -114237,7 +114243,7 @@
                 }
               }
             },
-            "description": "Self-registration of staff is turned off (code `auth.registration_disabled`), or the shop does not let customers create accounts (code `auth.customer_registration_closed`)."
+            "description": "Self-registration of staff is turned off for this tenant (setting `auth.staff_registration`, otherwise the server's AUTOXIDE_AUTH_SELF_REGISTRATION; code `auth.registration_disabled`), or the shop does not let customers create accounts (code `auth.customer_registration_closed`)."
           },
           "409": {
             "content": {
@@ -114325,7 +114331,7 @@
                 }
               }
             },
-            "description": "Self-registration of staff is turned off (code `auth.registration_disabled`), or the shop does not let customers create accounts (code `auth.customer_registration_closed`)."
+            "description": "Self-registration of staff is turned off for this tenant (setting `auth.staff_registration`, otherwise the server's AUTOXIDE_AUTH_SELF_REGISTRATION; code `auth.registration_disabled`), or the shop does not let customers create accounts (code `auth.customer_registration_closed`)."
           },
           "422": {
             "content": {

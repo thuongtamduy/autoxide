@@ -13,6 +13,7 @@
 //! - số lần hash chạy cùng lúc bị giới hạn bằng số nhân CPU, để một loạt request
 //!   đăng nhập không ăn hết bộ nhớ của máy.
 
+use crate::policy::TenantPolicy;
 use std::num::NonZero;
 use std::sync::Arc;
 
@@ -57,12 +58,31 @@ pub(crate) struct Passwords {
     // `Semaphore`: một chồng vé. Mỗi lần hash lấy một vé, xong thì trả; hết vé thì
     // lần hash sau chờ tới khi có vé.
     permits: Arc<Semaphore>,
+    /// Chính sách theo khách (độ dài tối thiểu).
+    policy: TenantPolicy,
 }
 
 impl Passwords {
     pub(crate) fn new() -> Self {
         let cores = std::thread::available_parallelism().map_or(1, NonZero::get);
-        Passwords { permits: Arc::new(Semaphore::new(cores)) }
+        Passwords { permits: Arc::new(Semaphore::new(cores)), policy: TenantPolicy::default() }
+    }
+
+    /// Độ dài tối thiểu theo khách (`auth.password_min_length`).
+    pub(crate) fn with_policy(mut self, policy: TenantPolicy) -> Self {
+        self.policy = policy;
+        self
+    }
+
+    /// Lỗi của trường `field` nếu `password` không đạt luật độ dài của khách `tenant` (xem [`check_length`]).
+    pub(crate) async fn problem(
+        &self,
+        tenant: &autoxide_kernel::tenancy::TenantContext,
+        field: &str,
+        password: &str,
+    ) -> Result<Option<FieldError>, Error> {
+        let min = self.policy.password_min_length(tenant).await?;
+        Ok(check_length(field, password, min))
     }
 
     /// Hash `password` với salt ngẫu nhiên; trả chuỗi PHC để lưu.
@@ -136,14 +156,19 @@ fn is_outdated(parsed: &PasswordHash) -> bool {
 /// Chỉ luật độ dài, không bắt buộc chữ hoa, số hay ký tự đặc biệt: theo NIST SP
 /// 800-63B, luật ghép ký tự làm mật khẩu dễ đoán hơn chứ không khó hơn.
 pub(crate) fn check_rules(field: &str, password: &str) -> Option<FieldError> {
+    check_length(field, password, MIN_LENGTH)
+}
+
+/// Như [`check_rules`] với độ dài tối thiểu `min` (của khách, không dưới [`MIN_LENGTH`]).
+pub(crate) fn check_length(field: &str, password: &str, min: usize) -> Option<FieldError> {
     let length = password.chars().count();
-    (!(MIN_LENGTH..=MAX_LENGTH).contains(&length)).then(|| {
+    (!(min..=MAX_LENGTH).contains(&length)).then(|| {
         FieldError::new(
             field,
             "length",
             "must be between {min_length} and {max_length} characters long",
         )
-        .with_param("min_length", MIN_LENGTH)
+        .with_param("min_length", min)
         .with_param("max_length", MAX_LENGTH)
     })
 }

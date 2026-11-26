@@ -1264,9 +1264,17 @@ biến chung vẫn là mặc định. Mỗi PR một cụm.
       `UTC` khai ở `organizations`; `promotions` / `shipping` dùng giờ Việt Nam theo quyết định sẵn có; "VND" viết
       cứng ở `bookings` chỉ nằm trong test) — không thêm setting mới
 - [x] `mail.delivery_failed` mang `enhanced` / `hard`; newsletter chỉ tự chặn người đăng ký khi `hard`
-- [ ] Tự đăng ký tài khoản theo khách
-- [ ] Passkey theo khách: RP ID là tên miền đã xác minh của khách
-- [ ] Chính sách đăng nhập theo khách: thời hạn phiên, độ dài mật khẩu tối thiểu, TOTP issuer (chỉ siết hơn mặc định)
+- [x] Tự đăng ký tài khoản nhân sự theo khách (`auth.staff_registration` ở nút gốc; REST và đăng nhập OIDC lần đầu;
+      chưa đặt thì `AUTOXIDE_AUTH_SELF_REGISTRATION`) — D-20261126-tenant-login-policy
+- [x] Passkey theo khách: RP ID là tên miền ĐANG xác minh của khách (`auth.passkey_rp_id`, loại cài đặt `own_domain`
+      của kernel, kiểm lúc đặt và lúc dùng; tên miền chuyển khách thì passkey trên đó hết dùng ở khách cũ) —
+      D-20261126-tenant-passkey-rp
+- [ ] Passkey đăng ký trên RP của máy chủ dùng song song với RP của khách (lưu RP vào từng passkey): hiện đổi RP làm
+      passkey cũ hết dùng được
+- [x] Chính sách đăng nhập theo khách, chỉ siết hơn máy chủ: `auth.password_min_length`, `auth.session_days`,
+      `auth.totp_issuer` — D-20261126-tenant-login-policy
+- [x] Hạn mức `kernel.api_requests`: đếm sau giới hạn theo khách, chỉ chặn người gọi của khách; nhớ xác thực thất bại
+      trong request — D-20261126-api-quota-signed-in
 
 ## Chờ chủ dự án
 

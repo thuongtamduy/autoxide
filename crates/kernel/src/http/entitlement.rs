@@ -6,7 +6,8 @@
 //! - the tenant is read-only due to its subscription (suspended / cancelled): write requests (`POST`,
 //!   `PUT`, `PATCH`, `DELETE`) get 403 `tenant_read_only`; reads still pass.
 //!
-//! Only a signed-in caller acting in its own tenant is counted (see `tenant_rate_limit`). The request's tenant
+//! Only signed-in callers are counted and held to the quota, against the tenant they act in (see
+//! `tenant_rate_limit::budget_tenant`); a request refused by the rate limit per tenant is not counted. The request's tenant
 //! for the plan checks is resolved with the same extractor the handlers use (the result is cached in the
 //! request, so handlers do not resolve it again). If it cannot be resolved (a public route without a
 //! tenant...), the request passes through: the handler returns its own error.
@@ -33,28 +34,24 @@ pub(crate) async fn gate(
         return next.run(request).await;
     }
     let (mut parts, body) = request.into_parts();
-    // Đếm request cho hạn mức `kernel.api_requests` (mọi module): chỉ người gọi đã xác thực, vào khách của chính
-    // họ (D-20261126-tenant-rate-limit) — request ẩn danh nêu tên khách không được làm cạn lượng của khách đó.
-    // Lệnh trong một lô ghi mang dấu của lô: lô tính một lần.
-    if parts.extensions.get::<Counted>().is_none() {
+    // Khách chịu hạn mức `kernel.api_requests` của request này: chỉ người gọi đã xác thực, vào khách họ làm
+    // việc (của mình hay khách đã uỷ quyền; D-20261126-tenant-rate-limit, D-20261126-api-quota-signed-in).
+    // Request ẩn danh nêu tên khách không làm cạn, cũng không bị chặn bởi, lượng của khách đó; nhân sự nền tảng
+    // và quyền hỗ trợ cũng vậy, để hỗ trợ được khách đã hết lượng. Lệnh trong một lô ghi mang dấu của lô: lô
+    // tính một lần.
+    let budget = if parts.extensions.get::<Counted>().is_some() {
+        None
+    } else {
         match super::tenant_rate_limit::signed_in(&mut parts).await {
-            Ok(principal) => {
-                if let Some(tenant) =
-                    principal.as_ref().and_then(super::tenant_rate_limit::budget_tenant)
-                {
-                    entitlements.count_request(tenant);
-                    parts.extensions.insert(Counted);
-                }
-            }
+            Ok(principal) => principal.as_ref().and_then(super::tenant_rate_limit::budget_tenant),
             Err(error) => return error.into_response(),
         }
-    }
-    if let Ok(tenant) = crate::tenancy::request::tenant(&mut parts).await {
-        if always_enabled {
-            return next.run(Request::from_parts(parts, body)).await;
-        }
+    };
+    if let Ok(tenant) = crate::tenancy::request::tenant(&mut parts).await
+        && !always_enabled
+    {
         // Hết lượng request của kỳ (gói đặt mức tối đa): module nền vẫn chạy (đăng nhập, xem gói).
-        if let Some(wait) = entitlements.request_quota_wait(tenant.id()) {
+        if let Some(wait) = budget.and_then(|budget| entitlements.request_quota_wait(budget)) {
             return crate::entitlement::quota_exhausted(
                 crate::entitlement::API_REQUESTS.key(),
                 wait,
@@ -74,6 +71,12 @@ pub(crate) async fn gate(
             metrics::counter!("entitlement_denials_total", "kind" => "read_only").increment(1);
             return crate::tenancy::errors::tenant_read_only().into_response();
         }
+    }
+    // Đếm khi request được cho qua (sau giới hạn theo khách ở lớp ngoài và các chốt của gói ở trên): request bị
+    // từ chối không tiêu lượng của gói, nên agent retry qua 429 không đốt hạn mức.
+    if let Some(budget) = budget {
+        entitlements.count_request(budget);
+        parts.extensions.insert(Counted);
     }
     next.run(Request::from_parts(parts, body)).await
 }

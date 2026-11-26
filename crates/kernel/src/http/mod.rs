@@ -385,6 +385,13 @@ pub fn build(
                 entitlement::gate(handle.clone(), name, always, request, next)
             }));
         }
+        // Giới hạn request theo khách (tầng thứ ba, D-20261126-tenant-rate-limit), mọi module. Đặt NGOÀI lớp gói
+        // (thêm sau = chạy trước): request bị 429 không được đếm vào hạn mức `kernel.api_requests`.
+        if let Some(limiter) = tenant_limiter.clone() {
+            routes = routes.layer(middleware::from_fn(move |request: Request, next: Next| {
+                tenant_rate_limit::limit(limiter.clone(), request, next)
+            }));
+        }
         // Lệnh cần duyệt khi agent gọi (bước 51 P12): `x-approval: "agent"` của module.
         let approvals = crate::ops::approvals::rules(name, routes.get_openapi_mut());
         if !approvals.is_empty() {
