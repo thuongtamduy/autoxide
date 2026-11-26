@@ -20,6 +20,10 @@ const OWNER: [&str; 7] = [
 ];
 
 async fn app(test: &TestDatabase) -> TestApp {
+    app_with(test, &[]).await
+}
+
+async fn app_with(test: &TestDatabase, settings: &[(&str, &str)]) -> TestApp {
     let dir = std::env::temp_dir().join(format!("autoxide-plans-{}", uuid::Uuid::now_v7()));
     let mut builder = TestApp::builder(test)
         .setting("AUTOXIDE_FILES_DIR", &dir.join("files").display().to_string())
@@ -42,6 +46,9 @@ async fn app(test: &TestDatabase) -> TestApp {
         .user_in("acme", "owner", 2, &OWNER)
         .tenant("beta")
         .user_in("beta", "stranger", 3, &["kernel.data.export"]);
+    for (name, value) in settings {
+        builder = builder.setting(name, value);
+    }
     for module in crate::modules::all() {
         builder = builder.boxed_module(module);
     }
@@ -171,6 +178,40 @@ async fn dem_request_api_va_het_quota_tra_429() {
         let (status, _) =
             call(&app, Method::GET, "/api/v1/plans/entitlements", "owner", None).await;
         assert_eq!(status, StatusCode::OK);
+        // Request không đăng nhập nêu khách `acme` không bị chặn vì lượng của `acme` (D-20261126-api-quota-signed-in):
+        // nó đi tiếp tới handler, nhận lỗi của chính nó (401).
+        let anonymous =
+            app.request(Method::GET, "/api/v1/forms").header("autoxide-tenant", "acme").send();
+        assert_eq!(anonymous.await.unwrap().status(), StatusCode::UNAUTHORIZED);
+    })
+    .await
+    .unwrap();
+}
+
+/// Request bị giới hạn theo khách từ chối (429 `tenant_rate_limited`) không tiêu lượng `kernel.api_requests`: agent
+/// retry qua 429 không đốt hạn mức của gói.
+#[tokio::test]
+async fn request_bi_429_khong_tieu_quota() {
+    TestDatabase::run(async |test| {
+        let app = app_with(
+            test,
+            &[
+                ("AUTOXIDE_HTTP_RATE_LIMIT_TENANT_PER_MINUTE", "1"),
+                ("AUTOXIDE_HTTP_RATE_LIMIT_PER_MINUTE", "0"),
+            ],
+        )
+        .await;
+        let acme = put_on(&app, "metered", &["forms"], json!({"kernel.api_requests": 2})).await;
+        let (status, body) = call(&app, Method::GET, "/api/v1/forms", "owner", None).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        for _ in 0..4 {
+            let (status, body) = call(&app, Method::GET, "/api/v1/forms", "owner", None).await;
+            assert_eq!(body["code"], "tenant_rate_limited", "{status} {body}");
+        }
+        // Chỉ một request được đếm (1 ≤ 2): chưa hết lượng.
+        let entitlements = app.modules().entitlements();
+        entitlements.flush_usage("test-node", 1).await;
+        assert!(entitlements.request_quota_wait(acme).is_none());
     })
     .await
     .unwrap();

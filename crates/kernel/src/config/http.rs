@@ -141,9 +141,10 @@ pub const TENANT_RATE_LIMIT_PER_MINUTE: Setting = Setting::new(
      the tenant together), on top of the limits per client address and per API key; more are \
      answered with 429 `tenant_rate_limited` and a `Retry-After` header, so one busy tenant cannot \
      crowd out the others. A plan may set its own level with the limit `kernel.api_rate_per_minute` \
-     (where `0` blocks every request of the tenant). Only signed-in callers acting in their own \
-     tenant are counted: requests without a valid credential (public pages, inbound webhooks), \
-     platform staff and support access only meet the limit per address. `0` here turns it off \
+     (where `0` blocks every request of the tenant). Only signed-in callers are counted, against \
+     the tenant they act in (their own, or one that delegated work to them): requests without a \
+     valid credential (public pages, inbound webhooks), platform staff operating in a tenant and \
+     support access only meet the limit per address. `0` here turns it off \
      (unless a plan sets a level). Counted like the limit per API key \
      (AUTOXIDE_HTTP_RATE_LIMIT_STORE); with `database` and a small burst nearly every request \
      writes to the database, so prefer `memory` for low levels on a single server.",

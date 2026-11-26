@@ -384,9 +384,6 @@ impl McpServer {
         // Đếm cho hạn mức `kernel.api_requests` và giới hạn theo khách, như lớp REST: người gọi đã xác thực,
         // không tính nhân sự nền tảng hay quyền hỗ trợ (D-20261126-tenant-rate-limit).
         let budget = super::tenant_rate_limit::budget_tenant(&caller.principal);
-        if let Some(tenant) = budget {
-            self.entitlements.count_request(tenant);
-        }
         let started = std::time::Instant::now();
         let limited = match (&self.tenant_limiter, budget) {
             (Some(limiter), Some(tenant)) => match limiter.check(tenant).await {
@@ -398,6 +395,10 @@ impl McpServer {
             },
             _ => None,
         };
+        // Lời gọi bị 429 không tiêu lượng `kernel.api_requests` của gói.
+        if let (None, Some(tenant)) = (&limited, budget) {
+            self.entitlements.count_request(tenant);
+        }
         let outcome = match limited {
             Some(error) => Err(error),
             None => {

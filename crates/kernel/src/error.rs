@@ -211,6 +211,29 @@ const INTERNAL_MESSAGE: &str =
     "An internal error occurred. Retry later; if it persists, report the request id.";
 
 impl Error {
+    /// A copy of this error for answering again (e.g. the remembered failure of authentication within one
+    /// request); the root cause, kept only for the log, is not copied.
+    pub(crate) fn replay(&self) -> Error {
+        Error {
+            kind: self.kind,
+            code: self.code.clone(),
+            template: self.template.clone(),
+            params: self.params.clone(),
+            fields: self.fields.clone(),
+            extra: self.extra.as_ref().map(|extra| {
+                Box::new(Extra {
+                    source: None,
+                    retry_after: extra.retry_after,
+                    reason: extra.reason,
+                    current: extra.current.clone(),
+                    challenge: extra.challenge.clone(),
+                })
+            }),
+        }
+    }
+}
+
+impl Error {
     /// Creates an error. `code` is the stable machine code and the i18n key: `snake_case`, a module's errors
     /// carry the prefix `<module>.` (e.g. `notes.title_taken`). `message` is the English
     /// sentence stating what to fix; write placeholders as `{name}` and assign them with

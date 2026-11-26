@@ -361,12 +361,6 @@ pub fn build(
             routes = routes.merge(sync::routes(sync_state.clone()));
         }
         openapi::label_module(name, routes.get_openapi_mut());
-        // Giới hạn request theo khách (tầng thứ ba, D-20261126-tenant-rate-limit), mọi module.
-        if let Some(limiter) = tenant_limiter.clone() {
-            routes = routes.layer(middleware::from_fn(move |request: Request, next: Next| {
-                tenant_rate_limit::limit(limiter.clone(), request, next)
-            }));
-        }
         // Gói của khách (bước 35): đếm request ở mọi module; chặn ở module bị gói chi phối.
         if name != crate::user_flags::ME {
             let always = extras.entitlements.catalog().is_always_enabled(name);
@@ -376,6 +370,13 @@ pub fn build(
             let handle = extras.entitlements.clone();
             routes = routes.layer(middleware::from_fn(move |request: Request, next: Next| {
                 entitlement::gate(handle.clone(), name, always, request, next)
+            }));
+        }
+        // Giới hạn request theo khách (tầng thứ ba, D-20261126-tenant-rate-limit), mọi module. Đặt NGOÀI lớp gói
+        // (thêm sau = chạy trước): request bị 429 không được đếm vào hạn mức `kernel.api_requests`.
+        if let Some(limiter) = tenant_limiter.clone() {
+            routes = routes.layer(middleware::from_fn(move |request: Request, next: Next| {
+                tenant_rate_limit::limit(limiter.clone(), request, next)
             }));
         }
         // Lệnh cần duyệt khi agent gọi (bước 51 P12): `x-approval: "agent"` của module.
