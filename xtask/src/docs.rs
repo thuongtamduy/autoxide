@@ -15,7 +15,7 @@ use crate::boundaries::Violation;
 
 /// File phải có, tính từ gốc repo. Cặp `X.md` / `X.vi.md` trong danh sách còn được luật
 /// `docs-translation` so khung.
-const REQUIRED: [&str; 16] = [
+const REQUIRED: [&str; 22] = [
     "README.md",
     "README.vi.md",
     "SECURITY.md",
@@ -24,6 +24,12 @@ const REQUIRED: [&str; 16] = [
     "CONTRIBUTING.vi.md",
     "CODE_OF_CONDUCT.md",
     "CODE_OF_CONDUCT.vi.md",
+    "SUPPORT.md",
+    "SUPPORT.vi.md",
+    "GOVERNANCE.md",
+    "GOVERNANCE.vi.md",
+    "DCO",
+    ".github/CODEOWNERS",
     "CHANGELOG.md",
     "LICENSE-MIT",
     "LICENSE-APACHE",

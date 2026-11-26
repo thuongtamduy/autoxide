@@ -37,6 +37,8 @@ administrator account (`POST /api/v1/auth/login`).
 
 The demo always uses its own SQLite file in the demo folder: it ignores `DATABASE_URL` from your environment and `.env`, so it cannot touch a real database. `--database-url <url>` points it at another database on purpose.
 
+The demo also turns off outside services from your environment (SMTP mail, S3 file storage, OpenTelemetry, AI providers, provider modules): mail is written to files and uploads stay in the demo folder. `--keep-external-services` keeps them on purpose.
+
 Not for production: the secrets sit in a plain file in the demo folder, and the API reference page
 loads its viewer script from a public CDN.
 

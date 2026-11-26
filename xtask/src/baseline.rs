@@ -23,13 +23,23 @@ pub struct Filtered {
 }
 
 pub fn apply(root: &Path, violations: Vec<Violation>) -> Result<Filtered, String> {
-    let text = fs::read_to_string(root.join(FILE)).unwrap_or_default();
-    Ok(filter(&parse(&text)?, violations))
+    apply_file(root, FILE, violations)
+}
+
+/// Như [`apply`], với danh sách ở file `file` (luật khác dùng cùng cách: `library-baseline.txt`).
+pub fn apply_file(root: &Path, file: &str, violations: Vec<Violation>) -> Result<Filtered, String> {
+    let text = fs::read_to_string(root.join(file)).unwrap_or_default();
+    Ok(filter_in(file, &parse_in(file, &text)?, violations))
 }
 
 type Key = (String, String);
 
+#[cfg(test)]
 fn parse(text: &str) -> Result<BTreeMap<Key, usize>, String> {
+    parse_in(FILE, text)
+}
+
+fn parse_in(file: &str, text: &str) -> Result<BTreeMap<Key, usize>, String> {
     let mut entries = BTreeMap::new();
     for (index, line) in text.lines().enumerate() {
         let line = line.split('#').next().unwrap_or("").trim();
@@ -39,20 +49,25 @@ fn parse(text: &str) -> Result<BTreeMap<Key, usize>, String> {
         let fields: Vec<&str> = line.split_whitespace().collect();
         let [rule, count, path] = fields.as_slice() else {
             return Err(format!(
-                "{FILE}:{}: expected `<rule> <count> <path>`, got `{line}`",
+                "{file}:{}: expected `<rule> <count> <path>`, got `{line}`",
                 index + 1
             ));
         };
         let count = count
             .parse::<usize>()
-            .map_err(|_| format!("{FILE}:{}: `{count}` is not a count", index + 1))?;
+            .map_err(|_| format!("{file}:{}: `{count}` is not a count", index + 1))?;
         entries.insert(((*rule).to_owned(), (*path).to_owned()), count);
     }
     Ok(entries)
 }
 
 /// Phần không đọc đĩa của [`apply`], để test được.
+#[cfg(test)]
 fn filter(baseline: &BTreeMap<Key, usize>, violations: Vec<Violation>) -> Filtered {
+    filter_in(FILE, baseline, violations)
+}
+
+fn filter_in(file: &str, baseline: &BTreeMap<Key, usize>, violations: Vec<Violation>) -> Filtered {
     let mut groups: BTreeMap<Key, Vec<Violation>> = BTreeMap::new();
     for violation in violations {
         let path = violation.location.rsplit_once(':').map_or(&*violation.location, |(p, _)| p);
@@ -67,7 +82,7 @@ fn filter(baseline: &BTreeMap<Key, usize>, violations: Vec<Violation>) -> Filter
                 let mut violation = violation.clone();
                 if allowed > 0 {
                     violation.message.push_str(&format!(
-                        " ({FILE} allows {allowed} existing case(s) in this file, now {}: fix the \
+                        " ({file} allows {allowed} existing case(s) in this file, now {}: fix the \
                          new one)",
                         found.len()
                     ));
@@ -76,7 +91,7 @@ fn filter(baseline: &BTreeMap<Key, usize>, violations: Vec<Violation>) -> Filter
             }
         } else if found.len() < allowed {
             warnings.push(format!(
-                "warning: [{}] {}: {} case(s) left, {FILE} still allows {allowed}: lower the count",
+                "warning: [{}] {}: {} case(s) left, {file} still allows {allowed}: lower the count",
                 key.0,
                 key.1,
                 found.len()
@@ -85,7 +100,7 @@ fn filter(baseline: &BTreeMap<Key, usize>, violations: Vec<Violation>) -> Filter
     }
     for (rule, path) in baseline.keys().filter(|key| !groups.contains_key(*key)) {
         warnings
-            .push(format!("warning: [{rule}] {path}: no case left — remove its line from {FILE}"));
+            .push(format!("warning: [{rule}] {path}: no case left — remove its line from {file}"));
     }
     Filtered { violations: kept, warnings }
 }

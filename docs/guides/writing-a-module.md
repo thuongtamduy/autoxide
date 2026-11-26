@@ -13,7 +13,7 @@ This guide goes from an empty directory to a module that runs, has tests on SQLi
 
 ## 1. The workspace
 
-One repository, two crates: the module and the server. To get this whole layout generated — a copy of the example with your names — run `cargo xtask new-module --external <dir> <module> <entity>` in a checkout of Autoxide (for example `cargo xtask new-module --external ../acme bookmarks bookmark`), then read on to see what each part does. The new folder builds and passes its tests at once; it also has a `README.md` + `README.vi.md`, an `AGENTS.md` with the rules for AI agents working in it (`CLAUDE.md` links to it), and `.github/workflows/ci.yml`, which runs `check.sh` on SQLite and PostgreSQL once you push it. Add `--core-path <checkout>` to depend on a local checkout of Autoxide instead of the release tag (to try a change of the core).
+One repository, two crates: the module and the server. To get this whole layout generated — a copy of the example with your names — run `cargo xtask new-module --external <dir> <module> <entity>` in a checkout of Autoxide (for example `cargo xtask new-module --external ../acme bookmarks bookmark`), then read on to see what each part does. The new folder builds and passes its tests at once; it also has a `README.md` + `README.vi.md`, an `AGENTS.md` with the rules for AI agents working in it (`CLAUDE.md` links to it, and short versions for Cursor and Copilot sit in `.cursor/rules/` and `.github/copilot-instructions.md`), and `.github/workflows/ci.yml`, which runs `check.sh` on SQLite and PostgreSQL once you push it. Add `--core-path <checkout>` to depend on a local checkout of Autoxide instead of the release tag (to try a change of the core).
 
 ```text
 acme/

@@ -131,11 +131,21 @@ async fn diagnose(settings: Settings) -> Vec<Line> {
     let migrated = migrations.as_ref().is_some_and(passes);
     lines.push(line("migrations", migrations));
     // Module chạy trên bảng chưa có thì mọi bước sau chỉ báo lỗi kéo theo.
-    if migrated && let Err(error) = modules.start(&database) {
+    // Record của module khớp schema (D-20261126-kernel-data-layer) rồi mới khởi động; lỗi nào cũng báo ở `modules`.
+    let started = if migrated {
+        match modules.check_records(&database).await {
+            Ok(()) => modules.start(&database),
+            Err(error) => Err(error),
+        }
+    } else {
+        Ok(())
+    };
+    if migrated && let Err(error) = started {
         lines.push(line(
             "modules",
             Some(Finding::failed(error.to_string()).with_hint(
-                "A module could not start; the message names it and what it is missing.",
+                "A module could not start, or a record does not match its table; the message names the module and \
+                 what is missing.",
             )),
         ));
         lines.extend(skipped(["secret_key"]));
