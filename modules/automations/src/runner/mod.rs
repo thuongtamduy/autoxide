@@ -152,11 +152,18 @@ impl Automations {
         // Giới hạn số lần chạy mỗi giờ của một luật (đếm trên index `(tenant, rule, created_at)`).
         // Khoá dòng luật trước khi đếm (D-181): nhiều kích hoạt cùng lúc từng cùng đếm thiếu trên
         // Postgres và vượt `max_runs_per_hour`.
-        autoxide_kernel::rows::lock_one(
+        let locked = autoxide_kernel::rows::lock_one(
             &transaction,
             rule::Entity::find_by_id(rule.id).scoped(tenant),
         )
         .await?;
+        // Bên gọi lọc luật qua kết nối đọc (có thể trễ): xem lại dưới khoá — luật vừa rời `active` không nhận lần chạy
+        // mới, và lần chạy chụp đúng bản luật đang có (D-20261126-automation-owner-revoked).
+        let Some(locked) = locked.filter(|row| row.status == crate::service::rules::ACTIVE) else {
+            transaction.rollback().await?;
+            return Ok(None);
+        };
+        let rule = &locked;
         let recent = run::Entity::find()
             .filter(run::Column::RuleId.eq(rule.id))
             .filter(run::Column::CreatedAt.gt(now - SignedDuration::from_hours(1)))
@@ -227,7 +234,7 @@ impl Automations {
             .filter(rule::Column::RunAsApiKey.eq(key))
             .filter(rule::Column::Status.eq(ACTIVE))
             .scoped(tenant)
-            .all(tenant.database().read())
+            .all(tenant.database().write())
             .await?;
         for rule in &rules {
             self.pause_now(tenant, rule, "credential_revoked").await?;
@@ -247,7 +254,7 @@ impl Automations {
             .filter(rule::Column::RunAs.eq(user))
             .filter(rule::Column::Status.eq(ACTIVE))
             .scoped(tenant)
-            .all(tenant.database().read())
+            .all(tenant.database().write())
             .await?;
         for rule in &rules {
             self.pause_now(tenant, rule, "owner_access_revoked").await?;
@@ -287,8 +294,41 @@ impl Automations {
             .scoped(tenant)
             .all(connection)
             .await?;
-        for mut run in pending {
-            self.finish_in(connection, tenant, &mut run, FAILED, Some(rule_not_active(status)))
+        let error = rule_not_active(status);
+        for run in pending {
+            // Một câu UPDATE có điều kiện trạng thái: lần chạy vừa được worker nhận (`running`) giữa lúc đọc và lúc ghi
+            // không bị ghi đè — runner tự dừng nó trước bước kế tiếp.
+            let at = now();
+            let closed = run::Entity::update_many()
+                .col_expr(run::Column::Status, Expr::value(FAILED))
+                .col_expr(run::Column::ErrorCode, Expr::value(error.code()))
+                .col_expr(run::Column::ErrorMessage, Expr::value(error.message()))
+                .col_expr(run::Column::FinishedAt, Expr::value(Some(at)))
+                .col_expr(run::Column::ResumeAt, Expr::value(Option::<Timestamp>::None))
+                .col_expr(run::Column::UpdatedAt, Expr::value(at))
+                .filter(run::Column::Id.eq(run.id))
+                .filter(run::Column::Status.is_in([QUEUED, WAITING, AWAITING_APPROVAL]))
+                .scoped(tenant)
+                .exec(connection)
+                .await?;
+            if closed.rows_affected == 0 {
+                continue;
+            }
+            let failure = json!({
+                "run_id": run.id,
+                "rule_id": run.rule_id,
+                "error_code": error.code(),
+                "error_message": error.message(),
+            });
+            let change = Change { before: None, after: Some(failure) };
+            self.outbox
+                .record(
+                    connection,
+                    tenant,
+                    Actor::system(),
+                    events::rule_subject(run.rule_id),
+                    &events::RunFailed(change),
+                )
                 .await?;
         }
         Ok(())

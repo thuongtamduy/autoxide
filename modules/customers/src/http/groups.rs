@@ -47,7 +47,7 @@ pub(crate) struct CreateGroupRequest {
 #[utoipa::path(
     get,
     path = "/groups",
-    extensions(("x-permissions" = json!(["customers.read"]))),
+    extensions(("x-permissions" = json!(["customers.read", "customers.segments.manage"]))),
     operation_id = "list_customer_groups",
     security(("bearer" = [])),
     params(PageQuery),
@@ -224,7 +224,7 @@ pub(crate) async fn delete_group(
 #[utoipa::path(
     get,
     path = "/groups/{id}/preview",
-    extensions(("x-permissions" = json!(["customers.read"]))),
+    extensions(("x-permissions" = json!(["customers.read", "customers.segments.manage"]))),
     operation_id = "preview_customer_group",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the group.")),
