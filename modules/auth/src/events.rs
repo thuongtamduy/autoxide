@@ -50,6 +50,8 @@ events! {
     MEMBERSHIPS_CHANGED, MembershipsChanged, "auth.memberships_changed", "The organization units a user works in, or their roles there, changed.";
     API_KEY_CREATED, ApiKeyCreated, "auth.api_key_created", "An API key was created.";
     API_KEY_REVOKED, ApiKeyRevoked, "auth.api_key_revoked", "An API key was revoked.";
+    OAUTH_GRANTED, OauthGranted, "auth.oauth_granted", "A person approved an MCP / OAuth client to act for them (`after`: grant_id, user_id, client_id, client_name, resource, permissions, days). The client name is what the client called itself.";
+    OAUTH_REVOKED, OauthRevoked, "auth.oauth_revoked", "An approval of an MCP / OAuth client was revoked (`after.grant_id`; `after.reason`: `revoked` by a person, `account` when the account was locked or signed out everywhere, `client_revoked`, `code_reused`, `refresh_reused`).";
     GUARDRAIL_SET, GuardrailSet, "auth.guardrail_set", "This tenant set or changed the most permissions a tenant below it can use (`after`: tenant, permissions).";
     GUARDRAIL_REMOVED, GuardrailRemoved, "auth.guardrail_removed", "This tenant removed the guardrail it had set for a tenant below it (`before.tenant_id`).";
     API_KEY_APPROVED, ApiKeyApproved, "auth.api_key_approved", "An API key that waited for approval was approved and works from now on (`after`: owner, name, prefix).";

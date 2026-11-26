@@ -20,3 +20,4 @@ api-page-params GET /api/v1/content/search # kết quả xếp theo độ khớp
 api-unpaged-list GET /api/v1/catalog/variants # tra cứu theo mã client gửi (`code`): tối đa một biến thể theo SKU và một theo mã vạch, không phải danh sách lớn dần — ngoại lệ được cho phép, D-20261126-list-pages-done mục 2
 api-unpaged-list GET /api/v1/comments/public/counts # tra cứu theo id client gửi (tối đa 100), giữ thứ tự hỏi — ngoại lệ được cho phép, D-20261126-list-pages-done mục 2
 api-unpaged-list GET /api/v1/inventory/public/availability # tra cứu theo biến thể client gửi (tối đa 100) — ngoại lệ được cho phép, D-20261126-list-pages-done mục 2
+api-closed-body POST /api/v1/auth/oauth/register # RFC 7591 §3.1: máy chủ phải bỏ qua trường lạ của client (D-20261126-mcp-oauth)

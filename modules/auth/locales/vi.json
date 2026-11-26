@@ -268,5 +268,19 @@
   "auth.phone_taken": "Số điện thoại này đã có tài khoản. Hãy đăng nhập bằng mã gửi tới số đó.",
   "auth.phone_signup_throttled": "Đã tạo quá nhiều tài khoản từ địa chỉ này. Thử lại sau {retry_after} giây.",
   "field:is not valid or has expired; look the order up again": "không hợp lệ hoặc đã hết hạn; hãy tra lại đơn hàng",
-  "field:must be the `next_cursor` value of a previous page, unchanged": "phải là giá trị `next_cursor` nguyên vẹn của một trang trước"
+  "field:must be the `next_cursor` value of a previous page, unchanged": "phải là giá trị `next_cursor` nguyên vẹn của một trang trước",
+  "auth.oauth_disabled": "Máy chủ này chưa bật đăng nhập OAuth cho client MCP: hãy đặt AUTOXIDE_HTTP_PUBLIC_URL và AUTOXIDE_AUTH_OAUTH_CONSENT_URL, hoặc kết nối bằng API key.",
+  "auth.oauth_grant_not_found": "Không có lần cho phép client nào mang id `{id}`.",
+  "auth.oauth_rate_limited": "Có quá nhiều yêu cầu uỷ quyền từ địa chỉ này; hãy đợi một phút rồi thử lại.",
+  "auth.oauth_request_not_found": "Yêu cầu uỷ quyền này không tồn tại hoặc đã hết hạn (yêu cầu chờ 10 phút). Hãy kết nối client lại từ đầu.",
+  "auth.oauth_staff_only": "Chỉ tài khoản nhân sự mới kết nối được client MCP.",
+  "auth.oauth_client_invalid": "Client không hợp lệ: {detail}",
+  "auth.oauth_redirect_invalid": "Địa chỉ chuyển hướng không thuộc danh sách client đã đăng ký: {detail}",
+  "field:`{name}` is not one of the permissions you can grant to this request": "`{name}` không thuộc các permission bạn cấp được cho yêu cầu này",
+  "field:a chosen permission can delete data, touch money or read personal data: confirm it is you with `POST /api/v1/auth/me/reauth` and send the token it returns": "một permission đã chọn có thể xoá dữ liệu, chạm tới tiền hay đọc dữ liệu cá nhân: hãy xác nhận lại bằng `POST /api/v1/auth/me/reauth` rồi gửi token nó trả về",
+  "field:choose at least one permission": "hãy chọn ít nhất một permission",
+  "field:must be from 1 to {max}": "phải từ 1 tới {max}",
+  "text:A person approved an MCP / OAuth client to act for them (`after`: grant_id, user_id, client_id, client_name, resource, permissions, days). The client name is what the client called itself.": "Một người đã cho phép một client MCP / OAuth làm thay họ (`after`: grant_id, user_id, client_id, client_name, resource, permissions, days). Tên client là tên client tự đặt.",
+  "text:An approval of an MCP / OAuth client was revoked (`after.grant_id`; `after.reason`: `revoked` by a person, `account` when the account was locked or signed out everywhere, `client_revoked`, `code_reused`, `refresh_reused`).": "Một lần cho phép client MCP / OAuth đã bị thu hồi (`after.grant_id`; `after.reason`: `revoked` do một người, `account` khi tài khoản bị khoá hay đăng xuất khắp nơi, `client_revoked`, `code_reused`, `refresh_reused`).",
+  "text:See every approval people gave to MCP / OAuth clients (Claude, ChatGPT, IDEs) to act for them, and revoke any of them, e.g. when a client misbehaves or a person leaves.": "Xem mọi lần người dùng cho phép client MCP / OAuth (Claude, ChatGPT, IDE) làm thay họ, và thu hồi bất kỳ lần nào, vd khi client hoạt động sai hay người đó nghỉ việc."
 }

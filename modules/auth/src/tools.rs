@@ -539,6 +539,7 @@ mod tests {
 
     fn state(services: &crate::testing::Services) -> Arc<HttpState> {
         Arc::new(HttpState {
+            oauth: None,
             oidc: Arc::new(crate::oidc::OidcService {
                 enabled: false,
                 providers: crate::oidc::ProviderService {

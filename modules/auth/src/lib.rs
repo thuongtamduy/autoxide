@@ -40,6 +40,7 @@ mod login_link;
 mod login_policy_tests;
 mod mfa;
 mod migration;
+mod oauth;
 mod oidc;
 #[cfg(test)]
 mod org_tests;
@@ -120,6 +121,8 @@ struct AuthModule {
     invitations: Option<Arc<invitation::Invitations>>,
     verifications: Option<Arc<verify::EmailVerifications>>,
     administrator: Option<Arc<doctor::Administrator>>,
+    /// Issuer của máy chủ uỷ quyền OAuth khi bật (cho `doctor`).
+    oauth_issuer: Option<String>,
 }
 
 impl Module for AuthModule {
@@ -367,7 +370,38 @@ impl Module for AuthModule {
             context.permissions().clone(),
             outbox.clone(),
         ));
+        // Máy chủ uỷ quyền OAuth cho client MCP (bước 71 G4, D-20261126-mcp-oauth): bật khi có public URL và trang
+        // consent; kernel phục vụ tài liệu khám phá từ metadata nó công bố.
+        let public_url = context
+            .require::<autoxide_kernel::public_url::PublicUrl>()
+            .ok()
+            .and_then(|url| url.base().ok().map(str::to_owned));
+        let oauth_config = config.oauth_consent_url.clone().map(|consent_url| oauth::OAuthConfig {
+            consent_url,
+            dynamic_registration: config.oauth_dynamic_registration,
+            allow_private_networks: config.oauth_allow_private_networks,
+            grant_days: config.oauth_grant_days,
+            access_ttl: SignedDuration::try_from(config.access_token_ttl)
+                .unwrap_or_else(|_| SignedDuration::from_mins(15)),
+        });
+        let oauth = oauth::OAuthService::enabled(
+            oauth_config,
+            public_url.as_deref(),
+            databases.clone(),
+            roles.clone(),
+            guardrails.clone(),
+            context.permissions().clone(),
+            outbox.clone(),
+        )?
+        .map(Arc::new);
+        self.oauth_issuer = oauth.as_ref().map(|oauth| oauth.issuer.clone());
+        if let Some(oauth) = &oauth {
+            context.provide::<dyn autoxide_kernel::access::AuthorizationServer>(Arc::new(
+                oauth::Metadata(oauth.clone()),
+            ))?;
+        }
         let authenticator = RequestAuthenticator {
+            oauth: oauth.clone(),
             guardrails: guardrails.clone(),
             support: support.clone(),
             sessions: sessions.clone(),
@@ -482,6 +516,7 @@ impl Module for AuthModule {
         // Nhóm SCIM chưa có luật ánh xạ vào hộp việc (bước 51 P2).
         context.work_source(Arc::new(scim::UnmappedGroups))?;
         self.state = Some(http::HttpState {
+            oauth,
             scim,
             phone,
             oidc,
@@ -586,6 +621,11 @@ impl Module for AuthModule {
                 "AUTOXIDE_AUTH_TOKEN_SECRET is set, so access tokens survive a restart and work \
                  on every server.",
                 Arc::new(doctor::TokenSecret { configured }),
+            ),
+            autoxide_kernel::doctor::Check::new(
+                "mcp_oauth",
+                "MCP clients (Claude, ChatGPT, IDEs) can sign in with OAuth instead of an API key.",
+                Arc::new(doctor::McpOAuth { issuer: self.oauth_issuer.clone() }),
             ),
         ]
     }

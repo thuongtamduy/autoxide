@@ -32167,6 +32167,204 @@
         ],
         "type": "object"
       },
+      "Data_OAuthDecisionResult": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "Where to send the browser after a decision.",
+            "properties": {
+              "redirect_to": {
+                "description": "Open this address in the browser: the client's `redirect_uri` with `code` (or `error`), `state` and `iss`.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "redirect_to"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_OAuthGrant": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A person's approval of an MCP client.",
+            "properties": {
+              "client_host": {
+                "description": "Host of `client_id`.",
+                "type": "string"
+              },
+              "client_id": {
+                "description": "The client: for a metadata-document client, the URL of the document.",
+                "type": "string"
+              },
+              "client_name": {
+                "description": "Name the client gave itself when approved (unverified).",
+                "type": "string"
+              },
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "expires_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "last_used_at": {
+                "description": "Last time the client used it (to the minute); `null`: never.",
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "permissions": {
+                "description": "The permissions granted; the client never has more than the person currently has.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "registration": {
+                "description": "`cimd` or `dynamic`.",
+                "type": "string"
+              },
+              "resource": {
+                "description": "The resource the client uses the access for.",
+                "type": "string"
+              },
+              "revoked_at": {
+                "description": "When it was revoked; `null`: still active (until `expires_at`).",
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "user_id": {
+                "description": "The person who approved.",
+                "format": "uuid",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "user_id",
+              "client_id",
+              "client_host",
+              "client_name",
+              "registration",
+              "resource",
+              "permissions",
+              "created_at",
+              "expires_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_OAuthRequest": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "An authorization request waiting for the signed-in person's decision.",
+            "properties": {
+              "client_host": {
+                "description": "Host of `client_id`; show it next to the name, which the client chose itself and is not verified.",
+                "type": "string"
+              },
+              "client_id": {
+                "description": "The client's identifier: for a metadata-document client, the URL of the document.",
+                "type": "string"
+              },
+              "client_name": {
+                "description": "Name the client gave itself (unverified).",
+                "type": "string"
+              },
+              "current_permissions": {
+                "description": "Permissions of the person's current approval of this client for this resource, if any.",
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "expires_at": {
+                "description": "Until when the request waits.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "localhost_redirect": {
+                "description": "Every registered redirect points to this device (`localhost`): another program on the device could\npretend to be this client. Warn the person.",
+                "type": "boolean"
+              },
+              "permissions": {
+                "description": "Permissions the person can grant (those they hold, narrowed to what the client asked for).",
+                "items": {
+                  "$ref": "#/components/schemas/OAuthOfferedPermission"
+                },
+                "type": "array"
+              },
+              "redirect_host": {
+                "description": "Host of `redirect_uri`; always show it.",
+                "type": "string"
+              },
+              "redirect_uri": {
+                "description": "Where the browser goes back to.",
+                "type": "string"
+              },
+              "registration": {
+                "description": "`cimd` (client metadata document) or `dynamic` (self-registered).",
+                "type": "string"
+              },
+              "requested_scope": {
+                "description": "What the client asked for (empty: the person chooses).",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "resource": {
+                "description": "The resource the client will use the access for.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "client_id",
+              "client_host",
+              "client_name",
+              "registration",
+              "redirect_uri",
+              "redirect_host",
+              "localhost_redirect",
+              "resource",
+              "requested_scope",
+              "permissions",
+              "expires_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_OpsBacklog": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -57316,6 +57514,449 @@
         ],
         "type": "object"
       },
+      "OAuthClientRegistered": {
+        "description": "Answer of dynamic registration (RFC 7591 §3.2.1).",
+        "properties": {
+          "client_id": {
+            "description": "Use it as `client_id` in the authorization and token requests.",
+            "type": "string"
+          },
+          "client_id_issued_at": {
+            "description": "When it was issued (Unix seconds).",
+            "format": "int64",
+            "type": "integer"
+          },
+          "client_name": {
+            "type": "string"
+          },
+          "grant_types": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "redirect_uris": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "response_types": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "token_endpoint_auth_method": {
+            "description": "Always `none`: a public client proving itself with PKCE.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "client_id",
+          "client_id_issued_at",
+          "client_name",
+          "redirect_uris",
+          "token_endpoint_auth_method",
+          "grant_types",
+          "response_types"
+        ],
+        "type": "object"
+      },
+      "OAuthClientRegistration": {
+        "description": "Dynamic client registration request (RFC 7591 §2). Unknown fields are ignored (RFC 7591 §3.1).",
+        "properties": {
+          "client_name": {
+            "description": "Name shown to the person approving the client.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "grant_types": {
+            "description": "`authorization_code` and optionally `refresh_token`.",
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "redirect_uris": {
+            "description": "Where the browser comes back with the code: `https` URLs, or `http` to a loopback address.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "response_types": {
+            "description": "Only `code`.",
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "token_endpoint_auth_method": {
+            "description": "Only `none` (public client using PKCE).",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "OAuthDecision": {
+        "additionalProperties": false,
+        "description": "The person's approval.",
+        "properties": {
+          "days": {
+            "description": "How many days the approval lasts (1 to the server's maximum, default the maximum).",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "permissions": {
+            "description": "The permissions to grant, chosen one by one from `permissions` of the request.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "reauth_token": {
+            "description": "A token from `POST /api/v1/auth/me/reauth`: required when a chosen permission is `destructive`,\n`sensitive_data` or `money`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "permissions"
+        ],
+        "type": "object"
+      },
+      "OAuthDecisionResult": {
+        "description": "Where to send the browser after a decision.",
+        "properties": {
+          "redirect_to": {
+            "description": "Open this address in the browser: the client's `redirect_uri` with `code` (or `error`), `state` and `iss`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "redirect_to"
+        ],
+        "type": "object"
+      },
+      "OAuthGrant": {
+        "description": "A person's approval of an MCP client.",
+        "properties": {
+          "client_host": {
+            "description": "Host of `client_id`.",
+            "type": "string"
+          },
+          "client_id": {
+            "description": "The client: for a metadata-document client, the URL of the document.",
+            "type": "string"
+          },
+          "client_name": {
+            "description": "Name the client gave itself when approved (unverified).",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "last_used_at": {
+            "description": "Last time the client used it (to the minute); `null`: never.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "permissions": {
+            "description": "The permissions granted; the client never has more than the person currently has.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "registration": {
+            "description": "`cimd` or `dynamic`.",
+            "type": "string"
+          },
+          "resource": {
+            "description": "The resource the client uses the access for.",
+            "type": "string"
+          },
+          "revoked_at": {
+            "description": "When it was revoked; `null`: still active (until `expires_at`).",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "user_id": {
+            "description": "The person who approved.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "user_id",
+          "client_id",
+          "client_host",
+          "client_name",
+          "registration",
+          "resource",
+          "permissions",
+          "created_at",
+          "expires_at"
+        ],
+        "type": "object"
+      },
+      "OAuthOfferedPermission": {
+        "description": "One permission the person can grant.",
+        "properties": {
+          "description": {
+            "description": "What it allows, for the person deciding.",
+            "type": "string"
+          },
+          "name": {
+            "description": "Permission name, e.g. `notes.write`.",
+            "type": "string"
+          },
+          "requested": {
+            "description": "The client asked for it (directly or through a prefix).",
+            "type": "boolean"
+          },
+          "risk": {
+            "description": "`read`, `write`, `destructive`, `sensitive_data` or `money`. The last three need a recent re-confirmation\n(`reauth_token`) to grant.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "description",
+          "risk",
+          "requested"
+        ],
+        "type": "object"
+      },
+      "OAuthRequest": {
+        "description": "An authorization request waiting for the signed-in person's decision.",
+        "properties": {
+          "client_host": {
+            "description": "Host of `client_id`; show it next to the name, which the client chose itself and is not verified.",
+            "type": "string"
+          },
+          "client_id": {
+            "description": "The client's identifier: for a metadata-document client, the URL of the document.",
+            "type": "string"
+          },
+          "client_name": {
+            "description": "Name the client gave itself (unverified).",
+            "type": "string"
+          },
+          "current_permissions": {
+            "description": "Permissions of the person's current approval of this client for this resource, if any.",
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "expires_at": {
+            "description": "Until when the request waits.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "localhost_redirect": {
+            "description": "Every registered redirect points to this device (`localhost`): another program on the device could\npretend to be this client. Warn the person.",
+            "type": "boolean"
+          },
+          "permissions": {
+            "description": "Permissions the person can grant (those they hold, narrowed to what the client asked for).",
+            "items": {
+              "$ref": "#/components/schemas/OAuthOfferedPermission"
+            },
+            "type": "array"
+          },
+          "redirect_host": {
+            "description": "Host of `redirect_uri`; always show it.",
+            "type": "string"
+          },
+          "redirect_uri": {
+            "description": "Where the browser goes back to.",
+            "type": "string"
+          },
+          "registration": {
+            "description": "`cimd` (client metadata document) or `dynamic` (self-registered).",
+            "type": "string"
+          },
+          "requested_scope": {
+            "description": "What the client asked for (empty: the person chooses).",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "resource": {
+            "description": "The resource the client will use the access for.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "client_id",
+          "client_host",
+          "client_name",
+          "registration",
+          "redirect_uri",
+          "redirect_host",
+          "localhost_redirect",
+          "resource",
+          "requested_scope",
+          "permissions",
+          "expires_at"
+        ],
+        "type": "object"
+      },
+      "OAuthRevokeRequest": {
+        "description": "Body of `POST /oauth/revoke` (`application/x-www-form-urlencoded`, RFC 7009 §2.1). `token_type_hint` is accepted\nand ignored.",
+        "properties": {
+          "client_id": {
+            "description": "The client's `client_id`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "token": {
+            "description": "The access token or refresh token to revoke.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "OAuthTokenRequest": {
+        "description": "Thân `POST /oauth/token` (`application/x-www-form-urlencoded`, OAuth 2.1 §3.2.2).",
+        "properties": {
+          "client_id": {
+            "description": "The client's `client_id`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "code": {
+            "description": "The code from the redirect (`authorization_code`).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "code_verifier": {
+            "description": "The PKCE verifier of the request (`authorization_code`).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "grant_type": {
+            "description": "`authorization_code` or `refresh_token`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "redirect_uri": {
+            "description": "The same `redirect_uri` as in the authorization request (`authorization_code`).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "refresh_token": {
+            "description": "The refresh token (`refresh_token`).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "resource": {
+            "description": "The resource, as in the authorization request (RFC 8707). Optional; when sent it must match.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "scope": {
+            "description": "Ignored when it lists only permissions of the approval; a token never carries more than was approved.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "OAuthTokenResponse": {
+        "description": "Successful token response (OAuth 2.1 §3.2.3).",
+        "properties": {
+          "access_token": {
+            "description": "Send it as `Authorization: Bearer <access_token>`.",
+            "type": "string"
+          },
+          "expires_in": {
+            "description": "Seconds until the access token expires.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "refresh_token": {
+            "description": "Use once with `grant_type=refresh_token` to get new tokens; every use returns a new one.",
+            "type": "string"
+          },
+          "scope": {
+            "description": "The permissions granted, space-separated.",
+            "type": "string"
+          },
+          "token_type": {
+            "description": "Always `Bearer`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "access_token",
+          "token_type",
+          "expires_in",
+          "refresh_token",
+          "scope"
+        ],
+        "type": "object"
+      },
       "OpenSupportTicketRequest": {
         "additionalProperties": false,
         "description": "A ticket from the website. Signed-in customers send only the question; guests also send\nexactly one of `email` or `phone`, and the anti-spam fields of the form.",
@@ -73716,6 +74357,101 @@
                 "body_text",
                 "short",
                 "published_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
+      "Page_OAuthGrant": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "A person's approval of an MCP client.",
+              "properties": {
+                "client_host": {
+                  "description": "Host of `client_id`.",
+                  "type": "string"
+                },
+                "client_id": {
+                  "description": "The client: for a metadata-document client, the URL of the document.",
+                  "type": "string"
+                },
+                "client_name": {
+                  "description": "Name the client gave itself when approved (unverified).",
+                  "type": "string"
+                },
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "expires_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "last_used_at": {
+                  "description": "Last time the client used it (to the minute); `null`: never.",
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "permissions": {
+                  "description": "The permissions granted; the client never has more than the person currently has.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "registration": {
+                  "description": "`cimd` or `dynamic`.",
+                  "type": "string"
+                },
+                "resource": {
+                  "description": "The resource the client uses the access for.",
+                  "type": "string"
+                },
+                "revoked_at": {
+                  "description": "When it was revoked; `null`: still active (until `expires_at`).",
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "user_id": {
+                  "description": "The person who approved.",
+                  "format": "uuid",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "user_id",
+                "client_id",
+                "client_host",
+                "client_name",
+                "registration",
+                "resource",
+                "permissions",
+                "created_at",
+                "expires_at"
               ],
               "type": "object"
             },
@@ -112673,6 +113409,248 @@
         "x-permissions": []
       }
     },
+    "/api/v1/auth/me/oauth-grants": {
+      "get": {
+        "description": "Newest first, including revoked and expired approvals.",
+        "operationId": "auth_list_my_oauth_grants",
+        "parameters": [
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the first page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order (and `sort`, where offered) while following `next_cursor`: changing it midway only changes where the next page starts.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the first page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_OAuthGrant"
+                }
+              }
+            },
+            "description": "One page of your approvals, newest first."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "OAuth sign-in is off on this server; code `auth.oauth_disabled`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A paging parameter is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the MCP / OAuth clients you approved.",
+        "tags": [
+          "auth"
+        ],
+        "x-autoxide-filters": [
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the first page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "auth.list_my_oauth_grants",
+        "x-permissions": []
+      }
+    },
+    "/api/v1/auth/me/oauth-grants/{id}": {
+      "delete": {
+        "description": "Signed in with a password session only. Its tokens stop working at once. Safe to repeat.",
+        "operationId": "auth_revoke_my_oauth_grant",
+        "parameters": [
+          {
+            "description": "ID of the approval.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_OAuthGrant"
+                }
+              }
+            },
+            "description": "Revoked; the approval as it is now."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not a password session; code `auth.session_required`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "You have no such approval; code `auth.oauth_grant_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Revoke a client you approved.",
+        "tags": [
+          "auth"
+        ],
+        "x-permissions": []
+      }
+    },
     "/api/v1/auth/me/passkeys": {
       "get": {
         "description": "Newest first unless `order=asc`.",
@@ -114208,6 +115186,913 @@
         "x-permissions": [
           "auth.users.read"
         ]
+      }
+    },
+    "/api/v1/auth/oauth-grants": {
+      "get": {
+        "description": "Requires `auth.oauth_grants.manage`. Newest first, including revoked and expired approvals.",
+        "operationId": "auth_list_oauth_grants",
+        "parameters": [
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the first page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order (and `sort`, where offered) while following `next_cursor`: changing it midway only changes where the next page starts.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the first page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_OAuthGrant"
+                }
+              }
+            },
+            "description": "One page of approvals, newest first."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `auth.oauth_grants.manage`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "OAuth sign-in is off on this server; code `auth.oauth_disabled`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A paging parameter is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List every approval people gave to MCP / OAuth clients.",
+        "tags": [
+          "auth"
+        ],
+        "x-autoxide-filters": [
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the first page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "auth.list_oauth_grants",
+        "x-permissions": [
+          "auth.oauth_grants.manage"
+        ]
+      }
+    },
+    "/api/v1/auth/oauth-grants/{id}": {
+      "delete": {
+        "description": "Requires `auth.oauth_grants.manage`, signed in with a password session. Its tokens stop working at once. Safe\nto repeat.",
+        "operationId": "auth_revoke_oauth_grant",
+        "parameters": [
+          {
+            "description": "ID of the approval.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_OAuthGrant"
+                }
+              }
+            },
+            "description": "Revoked; the approval as it is now."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `auth.oauth_grants.manage` (code `permission_denied`), or not a password session (code `auth.session_required`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such approval; code `auth.oauth_grant_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Revoke any approval of an MCP / OAuth client.",
+        "tags": [
+          "auth"
+        ],
+        "x-permissions": [
+          "auth.oauth_grants.manage"
+        ]
+      }
+    },
+    "/api/v1/auth/oauth/authorize": {
+      "get": {
+        "description": "Opened in the browser by the client. Needs no sign-in. Checks the client (a client metadata document URL or a\nregistered `client_id`) and `redirect_uri` first: when either is wrong the answer is a 400 here, never a\nredirect. Then checks the rest (`response_type=code`, PKCE `S256`, `resource`, `scope`): when wrong, redirects\nback to the client with `error`, `state` and `iss`. When valid, redirects to the interface's consent page\n(`AUTOXIDE_AUTH_OAUTH_CONSENT_URL`) with the request token.",
+        "operationId": "auth_oauth_authorize",
+        "parameters": [
+          {
+            "description": "Must be `code`.",
+            "in": "query",
+            "name": "response_type",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "URL of the client's metadata document, or the `client_id` from dynamic registration.",
+            "in": "query",
+            "name": "client_id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Where the browser returns; must match one the client registered.",
+            "in": "query",
+            "name": "redirect_uri",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "PKCE code challenge (base64url SHA-256 of the verifier, 43 characters).",
+            "in": "query",
+            "name": "code_challenge",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Must be `S256`.",
+            "in": "query",
+            "name": "code_challenge_method",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Opaque value returned unchanged to the client.",
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Space-separated permissions (`notes.read`) or prefixes (`notes.*`) the client asks for. Omit to let the\nperson choose.",
+            "in": "query",
+            "name": "scope",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The resource the token is for: `{issuer}/mcp` (default), `{issuer}/mcp/{module}` or `{issuer}/api/v1`.",
+            "in": "query",
+            "name": "resource",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Redirect to the consent page, or back to the client with `error`, `state` and `iss`."
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The client is unknown or invalid (code `auth.oauth_client_invalid`), or `redirect_uri` is not one it registered (code `auth.oauth_redirect_invalid`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "OAuth sign-in is off on this server; code `auth.oauth_disabled`."
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Too many requests from this address; code `auth.oauth_rate_limited`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Start connecting an MCP / OAuth client (OAuth 2.1 authorization endpoint).",
+        "tags": [
+          "auth"
+        ],
+        "x-public": true
+      }
+    },
+    "/api/v1/auth/oauth/register": {
+      "post": {
+        "description": "For clients that cannot use a client metadata document (MCP 2026-07-28 deprecates dynamic registration). Only\npublic clients (`token_endpoint_auth_method` `none`, PKCE). Unknown fields are ignored. Errors follow RFC 7591\n§3.2.2.",
+        "operationId": "auth_oauth_register",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OAuthClientRegistration"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthClientRegistered"
+                }
+              }
+            },
+            "description": "The registered client; use `client_id` in the authorization request.",
+            "headers": {
+              "Location": {
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "RFC 7591 error: `invalid_redirect_uri`, `invalid_client_metadata`."
+          },
+          "404": {
+            "description": "OAuth sign-in or dynamic registration is off on this server."
+          },
+          "429": {
+            "description": "Too many registrations from this address (`slow_down`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Register an MCP / OAuth client (RFC 7591, deprecated).",
+        "tags": [
+          "auth"
+        ],
+        "x-public": true
+      }
+    },
+    "/api/v1/auth/oauth/requests/{token}": {
+      "get": {
+        "description": "For the interface's consent page. Signed in with a password session only. Show `client_host` and\n`redirect_host` (the client chose its name itself), warn when `localhost_redirect` is true, and let the person\nchoose permissions from `permissions`.",
+        "operationId": "auth_describe_oauth_request",
+        "parameters": [
+          {
+            "description": "The request token the consent page received.",
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_OAuthRequest"
+                }
+              }
+            },
+            "description": "The request."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not a password session (code `auth.session_required`) or not a staff account (code `auth.oauth_staff_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such request, or it expired (code `auth.oauth_request_not_found`); or OAuth is off (code `auth.oauth_disabled`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Read an authorization request waiting for your decision.",
+        "tags": [
+          "auth"
+        ],
+        "x-permissions": []
+      }
+    },
+    "/api/v1/auth/oauth/requests/{token}/approve": {
+      "post": {
+        "description": "Signed in with a password session only. Permissions that can delete data, touch money or read personal data\nneed `reauth_token` from `POST /api/v1/auth/me/reauth`. Answers where to send the browser: the client's\n`redirect_uri` with the code. The client then never has more than you currently have.",
+        "operationId": "auth_approve_oauth_request",
+        "parameters": [
+          {
+            "description": "The request token the consent page received.",
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OAuthDecision"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_OAuthDecisionResult"
+                }
+              }
+            },
+            "description": "Approved; open `redirect_to` in the browser."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not a password session (code `auth.session_required`) or not a staff account (code `auth.oauth_staff_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such request, it expired or was already decided (code `auth.oauth_request_not_found`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A permission is not one you can grant, `days` is out of range, or `reauth_token` is missing; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Approve a client: grant it the permissions you choose.",
+        "tags": [
+          "auth"
+        ],
+        "x-permissions": []
+      }
+    },
+    "/api/v1/auth/oauth/requests/{token}/deny": {
+      "post": {
+        "description": "Signed in with a password session only. Answers where to send the browser: the client's `redirect_uri` with\n`error=access_denied`.",
+        "operationId": "auth_deny_oauth_request",
+        "parameters": [
+          {
+            "description": "The request token the consent page received.",
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_OAuthDecisionResult"
+                }
+              }
+            },
+            "description": "Declined; open `redirect_to` in the browser."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not a password session (code `auth.session_required`) or not a staff account (code `auth.oauth_staff_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such request, it expired or was already decided (code `auth.oauth_request_not_found`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Decline a client.",
+        "tags": [
+          "auth"
+        ],
+        "x-permissions": []
+      }
+    },
+    "/api/v1/auth/oauth/revoke": {
+      "post": {
+        "description": "Form-encoded `token` (access or refresh token) and `client_id`. Revokes the whole approval the token belongs\nto. Answers 200 even for an unknown token.",
+        "operationId": "auth_oauth_revoke",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/OAuthRevokeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Revoked (or nothing to revoke)."
+          },
+          "400": {
+            "description": "RFC 6749 error: `invalid_request` (no `token`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Revoke a token (RFC 7009).",
+        "tags": [
+          "auth"
+        ],
+        "x-public": true
+      }
+    },
+    "/api/v1/auth/oauth/token": {
+      "post": {
+        "description": "Form-encoded body (`application/x-www-form-urlencoded`). `grant_type=authorization_code` with `code`,\n`code_verifier`, `redirect_uri`, `client_id` (and `resource`); `grant_type=refresh_token` with `refresh_token`\nand `client_id`. Every refresh returns a new refresh token; using an old one again revokes the approval. Errors\nfollow RFC 6749 §5.2: `{\"error\": …, \"error_description\": …}`.",
+        "operationId": "auth_oauth_token",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/OAuthTokenRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthTokenResponse"
+                }
+              }
+            },
+            "description": "The new access token and refresh token."
+          },
+          "400": {
+            "description": "RFC 6749 error: `invalid_request`, `invalid_grant` (code or refresh token unknown, expired, used; PKCE mismatch), `invalid_target`, `unsupported_grant_type`."
+          },
+          "404": {
+            "description": "OAuth sign-in is off on this server (`invalid_request`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Exchange a code or a refresh token for tokens (OAuth 2.1 token endpoint).",
+        "tags": [
+          "auth"
+        ],
+        "x-public": true
       }
     },
     "/api/v1/auth/oidc-providers": {
