@@ -218,6 +218,8 @@ impl OAuthService {
         if !mark_used(tenant.database().write(), &tenant, row.id, now).await? {
             // Refresh token đã dùng bị gửi lại: không phân biệt được kẻ trộm với client gửi trùng, nên thu hồi cả grant
             // (RFC 9700 §4.14.2, OAuth 2.1 §4.3.1). Client phải làm mới tuần tự.
+            // Đếm để đo báo nhầm (client làm mới song song) so với đánh cắp thật.
+            metrics::counter!("auth_oauth_refresh_reused_total").increment(1);
             super::grants::revoke_grant(self, &tenant, grant.id, "refresh_reused").await?;
             return Err(invalid());
         }

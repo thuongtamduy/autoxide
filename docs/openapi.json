@@ -116080,7 +116080,7 @@
     },
     "/api/v1/auth/oauth/token": {
       "post": {
-        "description": "Form-encoded body (`application/x-www-form-urlencoded`). `grant_type=authorization_code` with `code`,\n`code_verifier`, `redirect_uri`, `client_id` (and `resource`); `grant_type=refresh_token` with `refresh_token`\nand `client_id`. Every refresh returns a new refresh token; using an old one again revokes the approval. Errors\nfollow RFC 6749 §5.2: `{\"error\": …, \"error_description\": …}`.",
+        "description": "Form-encoded body (`application/x-www-form-urlencoded`). `grant_type=authorization_code` with `code`,\n`code_verifier`, `redirect_uri`, `client_id` (and `resource`); `grant_type=refresh_token` with `refresh_token`\nand `client_id`. Every refresh returns a new refresh token; using an old one again revokes the approval, so\nrefresh one at a time (two parallel refreshes with the same token count as reuse). Errors\nfollow RFC 6749 §5.2: `{\"error\": …, \"error_description\": …}`.",
         "operationId": "auth_oauth_token",
         "parameters": [
           {

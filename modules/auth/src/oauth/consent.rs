@@ -190,6 +190,15 @@ impl OAuthService {
                 .with_retry_after(60));
             }
         }
+        // `client_id` và `redirect_uri` tối đa 2048 ký tự (cột lưu chúng): kiểm trước khi đọc hay lưu.
+        let too_long =
+            |value: &Option<String>| value.as_ref().is_some_and(|value| value.len() > MAX_URI);
+        if too_long(&query.client_id) {
+            return Err(client_invalid("client_id is longer than 2048 characters".to_owned()));
+        }
+        if too_long(&query.redirect_uri) {
+            return Err(redirect_invalid("redirect_uri is longer than 2048 characters".to_owned()));
+        }
         let client_id = query
             .client_id
             .as_deref()

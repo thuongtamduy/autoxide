@@ -88,7 +88,8 @@ async fn authorize(
 ///
 /// Form-encoded body (`application/x-www-form-urlencoded`). `grant_type=authorization_code` with `code`,
 /// `code_verifier`, `redirect_uri`, `client_id` (and `resource`); `grant_type=refresh_token` with `refresh_token`
-/// and `client_id`. Every refresh returns a new refresh token; using an old one again revokes the approval. Errors
+/// and `client_id`. Every refresh returns a new refresh token; using an old one again revokes the approval, so
+/// refresh one at a time (two parallel refreshes with the same token count as reuse). Errors
 /// follow RFC 6749 §5.2: `{"error": …, "error_description": …}`.
 #[utoipa::path(
     post,

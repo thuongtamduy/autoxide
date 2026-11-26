@@ -38,8 +38,8 @@ const MAX_CACHED: usize = 1000;
 /// Số lần tải đồng thời: `/authorize` chưa xác thực mà gọi ra ngoài, nên có trần.
 const MAX_FETCHES: usize = 8;
 const NAME_MAX: usize = 200;
-/// Số lần tải tài liệu từ một host mỗi phút.
-const FETCHES_PER_HOST: u32 = 20;
+/// Số lần tải hỏng từ một host mỗi phút trước khi tạm ngừng tải từ host đó.
+const FAILURES_PER_HOST: u32 = 20;
 const HOST_WINDOW: Duration = Duration::from_secs(60);
 const MAX_REDIRECTS: usize = 10;
 
@@ -72,8 +72,8 @@ impl RegisteredClient {
 fn without_loopback_port(uri: &str) -> Option<String> {
     let url = Url::parse(uri).ok()?;
     // Chỉ địa chỉ IP loopback được linh hoạt cổng; tên `localhost` thì không (RFC 8252 §7.3, §8.3).
-    let literal = url.host_str().is_some_and(|host| host.eq_ignore_ascii_case("localhost"));
-    if url.scheme() != "http" || literal || !is_loopback(&url) {
+    let is_localhost = url.host_str().is_some_and(|host| host.eq_ignore_ascii_case("localhost"));
+    if url.scheme() != "http" || is_localhost || !is_loopback(&url) {
         return None;
     }
     let mut url = url;
@@ -215,12 +215,16 @@ impl ClientDirectory {
         if let Some(cached) = self.cached(client_id) {
             return cached;
         }
-        if !self.host_allows(url.host_str().unwrap_or_default()) {
-            return Err(OAuthError::new(
-                StatusCode::SERVICE_UNAVAILABLE,
-                "temporarily_unavailable",
-                "Too many client metadata fetches for this host; retry in a minute.",
-            ));
+        let host = url.host_str().unwrap_or_default().to_ascii_lowercase();
+        // Host đang có quá nhiều lần tải hỏng (đường dẫn bịa…): phục vụ bản tốt cũ nếu có, không để client thật bị chặn.
+        if self.host_blocked(&host) {
+            return self.stale(client_id).ok_or_else(|| {
+                OAuthError::new(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "temporarily_unavailable",
+                    "Too many failed client metadata fetches for this host; retry in a minute.",
+                )
+            });
         }
         let Ok(_permit) = self.fetches.try_acquire() else {
             return Err(OAuthError::new(
@@ -230,6 +234,9 @@ impl ClientDirectory {
             ));
         };
         let outcome = self.fetch(client_id, url).await;
+        if outcome.is_err() {
+            self.note_failure(&host);
+        }
         let (entry, ttl) = match &outcome {
             Ok((client, ttl)) => (Cached::Client(client.clone()), *ttl),
             Err(description) => (Cached::Failed(description.clone()), FAILURE_CACHE),
@@ -238,19 +245,35 @@ impl ClientDirectory {
         outcome.map(|(client, _)| client).map_err(OAuthError::invalid_client)
     }
 
-    /// Còn được tải từ `host` trong phút này không (đếm luôn lần này).
-    fn host_allows(&self, host: &str) -> bool {
-        let Ok(mut hosts) = self.hosts.lock() else { return false };
+    /// `host` đã có [`FAILURES_PER_HOST`] lần tải hỏng trong phút này. Chỉ lần hỏng bị đếm: tải thành công của client
+    /// thật không tiêu ngân sách của ai.
+    fn host_blocked(&self, host: &str) -> bool {
+        let Ok(hosts) = self.hosts.lock() else { return true };
+        hosts.get(host).is_some_and(|(failures, since)| {
+            since.elapsed() < HOST_WINDOW && *failures >= FAILURES_PER_HOST
+        })
+    }
+
+    fn note_failure(&self, host: &str) {
+        let Ok(mut hosts) = self.hosts.lock() else { return };
         let now = Instant::now();
         if hosts.len() >= MAX_CACHED {
             hosts.retain(|_, (_, since)| now.duration_since(*since) < HOST_WINDOW);
         }
-        let entry = hosts.entry(host.to_ascii_lowercase()).or_insert((0, now));
+        let entry = hosts.entry(host.to_owned()).or_insert((0, now));
         if now.duration_since(entry.1) >= HOST_WINDOW {
             *entry = (0, now);
         }
         entry.0 += 1;
-        entry.0 <= FETCHES_PER_HOST
+    }
+
+    /// Bản tốt đã hết hạn cache của `client_id`, nếu còn trong bộ nhớ.
+    fn stale(&self, client_id: &str) -> Option<RegisteredClient> {
+        let cache = self.cache.lock().ok()?;
+        match cache.get(client_id)? {
+            (Cached::Client(client), _) => Some(client.clone()),
+            (Cached::Failed(_), _) => None,
+        }
     }
 
     fn cached(&self, client_id: &str) -> Option<Result<RegisteredClient, OAuthError>> {
