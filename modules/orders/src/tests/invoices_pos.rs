@@ -230,7 +230,8 @@ async fn hoa_don_lap_khi_giao_xong_va_dieu_chinh_khi_tra_hang() {
         }
         assert_eq!(count_events(shop, "orders.invoice_linked").await, 1);
         let buyer = Call::as_user(shop, "buyer1");
-        let (status, docs) = buyer.send("GET", &format!("/me/orders/{id}/documents"), None).await;
+        let (status, docs) =
+            buyer.send("GET", &format!("/me/orders/{id}/documents?order=asc"), None).await;
         assert_eq!(status, StatusCode::OK, "{docs}");
         assert_eq!(docs["data"].as_array().unwrap().len(), 1);
         assert_eq!(docs["data"][0]["kind"], "sales");
@@ -287,7 +288,8 @@ async fn hoa_don_lap_khi_giao_xong_va_dieu_chinh_khi_tra_hang() {
             assert_eq!(draft.lines.len(), 1);
             assert_eq!(draft.lines[0].unit_price.map(|price| price.minor()), Some(100_000));
         }
-        let (_, docs) = buyer.send("GET", &format!("/me/orders/{id}/documents"), None).await;
+        let (_, docs) =
+            buyer.send("GET", &format!("/me/orders/{id}/documents?order=asc"), None).await;
         assert_eq!(docs["data"].as_array().unwrap().len(), 2);
         assert_eq!(docs["data"][1]["kind"], "adjustment");
     })

@@ -18,6 +18,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::doctor::{Finding, Probe};
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::{Actor, Delivered, EventHandler};
+use autoxide_kernel::pagination::{Page, PageRequest, page_of};
 use autoxide_kernel::privacy::{DataCategory, Keep, PersonalData, deleted_user};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext, TenantId, require_platform};
 use sea_orm::sea_query::{Expr, ExprTrait as _};
@@ -389,7 +390,8 @@ impl ComplianceService {
         &self,
         tenant: &TenantContext,
         principal: &Principal,
-    ) -> Result<Vec<PurposeWithCounts>, Error> {
+        page: &PageRequest,
+    ) -> Result<Page<PurposeWithCounts>, Error> {
         principal.require(&PRIVACY_READ)?;
         let purposes = self.purposes(tenant).await?;
         // Một câu đếm cho mọi mục đích: số người (khoá chủ thể khác nhau) theo mục đích và trạng thái.
@@ -413,13 +415,26 @@ impl ComplianceService {
                 _ => {}
             }
         }
-        Ok(purposes
+        let all = purposes
             .into_iter()
             .map(|purpose| {
                 let (consented, withdrawn) = counts.get(&purpose.key).copied().unwrap_or_default();
                 PurposeWithCounts { purpose, consented, withdrawn }
             })
-            .collect())
+            .collect();
+        // Một trang (`page_of`): sổ mục đích là mục đích mặc định của quy tắc pháp lý gộp với mục đích khách thêm
+        // hay sửa (dòng của khách thay mục đích mặc định cùng khoá) — gộp hai nguồn, không phải một keyset trong
+        // database; sổ do người quản trị khai, vài chục mục. Theo khoá (duy nhất sau khi gộp).
+        page_of(all, |item| item.purpose.key.clone(), page)
+    }
+
+    /// Mục đích công khai: một trang (`page_of`, cùng lý do với [`Self::list_purposes`]), theo khoá.
+    pub(crate) async fn public_purposes_page(
+        &self,
+        tenant: &TenantContext,
+        page: &PageRequest,
+    ) -> Result<Page<Purpose>, Error> {
+        page_of(self.public_purposes(tenant).await?, |item| item.key.clone(), page)
     }
 
     /// Mục đích công khai (đang dùng), kèm nhà cung cấp mã theo dõi đang bật là bên nhận dữ liệu.
@@ -645,10 +660,14 @@ impl ComplianceService {
         &self,
         tenant: &TenantContext,
         principal: &Principal,
-    ) -> Result<Vec<RetentionItem>, Error> {
+        page: &PageRequest,
+    ) -> Result<Page<RetentionItem>, Error> {
         principal.require(&PRIVACY_READ)?;
         let jurisdiction = self.jurisdiction(tenant).await?;
-        self.retention_items(&jurisdiction).await
+        // Một trang (`page_of`): mỗi module khai dữ liệu cá nhân nó giữ trong code (sổ dựng lúc khởi động), không
+        // nằm trong database. Theo module rồi tên.
+        let items = self.retention_items(&jurisdiction).await?;
+        page_of(items, |item| format!("{}\u{1f}{}", item.module, item.name), page)
     }
 
     // ---- Nơi lưu ---------------------------------------------------------------------------

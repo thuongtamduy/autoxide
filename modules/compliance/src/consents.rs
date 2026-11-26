@@ -6,10 +6,11 @@
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
+use autoxide_kernel::pagination::{Page, PageRequest, SortValue, fetch_page_by};
 use autoxide_kernel::rows;
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use sea_orm::sea_query::OnConflict;
-use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, Set};
+use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, Set};
 use serde_json::json;
 use uuid::Uuid;
 
@@ -303,14 +304,23 @@ impl ComplianceService {
         &self,
         tenant: &TenantContext,
         principal: &Principal,
-    ) -> Result<Vec<Consent>, Error> {
-        let rows = consent::Entity::find()
+        page: &PageRequest,
+    ) -> Result<Page<Consent>, Error> {
+        // Theo mục đích rồi id, keyset trong database (index `compliance_consents_subject_page_idx`).
+        let select = consent::Entity::find()
             .scoped(tenant)
             .filter(consent::Column::SubjectKind.eq("user"))
-            .filter(consent::Column::SubjectKey.eq(principal.user_id().to_string()))
-            .order_by_asc(consent::Column::Purpose)
-            .all(tenant.database().read())
-            .await?;
-        Ok(rows.iter().map(describe_consent).collect())
+            .filter(consent::Column::SubjectKey.eq(principal.user_id().to_string()));
+        let rows = fetch_page_by(
+            select,
+            consent::Column::Purpose,
+            |row| SortValue::Text(row.purpose.clone()),
+            consent::Column::Id,
+            |row| row.id,
+            page,
+            tenant.database().read(),
+        )
+        .await?;
+        Ok(rows.map(|row| describe_consent(&row)))
     }
 }

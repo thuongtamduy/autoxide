@@ -6,7 +6,7 @@ use std::sync::Arc;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
-use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
+use autoxide_kernel::pagination::{NaturalOrderPageQuery, Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, Query, State};
@@ -19,7 +19,7 @@ use validator::Validate;
 
 use crate::api::Cart;
 use crate::http::dto::PromotionListItem;
-use crate::insights::{Conflict, DailyStats, Simulation, check_range};
+use crate::insights::{Conflict, DailyStats, Simulation, range_and_page};
 use crate::model::{Kind, Status};
 use crate::permissions::READ;
 use crate::programs::PromotionFilter;
@@ -85,19 +85,21 @@ async fn simulate(
 ///
 /// Requires `promotions.read`. Other promotions of the same unit, at the same time, on shared
 /// targets and in the same class, where one side is exclusive: only one of them applies to a
-/// line. A warning, never a block (`activate` returns it in `warnings`).
+/// line. A warning, never a block (`activate` returns it in `warnings`). Newest first unless
+/// `order=asc`; paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/promotions/{id}/conflicts",
     extensions(("x-permissions" = json!(["promotions.read"]))),
     operation_id = "list_promotion_conflicts",
     security(("bearer" = [])),
-    params(("id" = Uuid, Path, description = "Id of the promotion.")),
+    params(("id" = Uuid, Path, description = "Id of the promotion."), PageQuery),
     responses(
-        (status = 200, description = "The clashing promotions (empty when none).", body = Data<Vec<Conflict>>),
+        (status = 200, description = "One page of the clashing promotions (empty when none).", body = Page<Conflict>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing `promotions.read`; code `permission_denied`.", body = Problem),
         (status = 404, description = "No such promotion in your scope; code `promotions.not_found`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn conflicts(
@@ -105,9 +107,11 @@ async fn conflicts(
     tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
-) -> Result<Data<Vec<Conflict>>, Error> {
+    Query(page): Query<PageQuery>,
+) -> Result<Page<Conflict>, Error> {
     principal.require(&READ)?;
-    Ok(Data { data: service.conflicts(&tenant, &principal, id).await? })
+    let page = PageRequest::try_from(page)?;
+    service.conflicts(&tenant, &principal, id, &page).await
 }
 
 /// A range of days (Vietnam dates, both included).
@@ -146,7 +150,7 @@ pub(crate) struct CalendarQuery {
         (status = 200, description = "One page of promotions.", body = Page<PromotionListItem>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing `promotions.read`; code `permission_denied`.", body = Problem),
-        (status = 422, description = "`from` is after `to` or the range is longer than 366 days; see `errors`.", body = Problem),
+        (status = 422, description = "`from` is after `to`, the range is longer than 366 days or a paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn calendar(
@@ -157,8 +161,7 @@ async fn calendar(
     Query(page): Query<PageQuery>,
 ) -> Result<Page<PromotionListItem>, Error> {
     principal.require(&READ)?;
-    let page = PageRequest::try_from(page)?;
-    check_range(query.from, query.to)?;
+    let page = range_and_page(query.from, query.to, page)?;
     let filter = PromotionFilter {
         org_id: query.org_id,
         window: Some((
@@ -183,20 +186,21 @@ async fn calendar(
 /// Get the daily counts of a promotion.
 ///
 /// Requires `promotions.read`. Confirmed uses, discount given, order value and who paid, per
-/// Vietnam date; days without use are left out. Counts only, no buyer data.
+/// Vietnam date; days without use are left out. Counts only, no buyer data. Oldest day first
+/// unless `order=desc`; paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/promotions/{id}/stats",
     extensions(("x-permissions" = json!(["promotions.read"]))),
     operation_id = "get_promotion_stats",
     security(("bearer" = [])),
-    params(("id" = Uuid, Path, description = "Id of the promotion."), RangeQuery),
+    params(("id" = Uuid, Path, description = "Id of the promotion."), RangeQuery, NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "The counts, oldest day first.", body = Data<Vec<DailyStats>>),
+        (status = 200, description = "One page of the counts, by day.", body = Page<DailyStats>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing `promotions.read`; code `permission_denied`.", body = Problem),
         (status = 404, description = "No such promotion in your scope; code `promotions.not_found`.", body = Problem),
-        (status = 422, description = "`from` is after `to` or the range is longer than 366 days; see `errors`.", body = Problem),
+        (status = 422, description = "`from` is after `to`, the range is longer than 366 days or a paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn stats(
@@ -205,7 +209,9 @@ async fn stats(
     principal: Principal,
     Path(id): Path<Uuid>,
     Query(range): Query<RangeQuery>,
-) -> Result<Data<Vec<DailyStats>>, Error> {
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<DailyStats>, Error> {
     principal.require(&READ)?;
-    Ok(Data { data: service.stats(&tenant, &principal, id, range.from, range.to).await? })
+    let page = range_and_page(range.from, range.to, page)?;
+    service.stats(&tenant, &principal, id, range.from, range.to, &page).await
 }

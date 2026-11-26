@@ -23,6 +23,7 @@ use crate::incidents::NewIncident;
 use crate::permissions::{INCIDENTS_MANAGE, PRIVACY_MANAGE, PRIVACY_READ, TRACKING_MANAGE};
 use crate::service::ComplianceService;
 use crate::subject_requests::NewRequest;
+use crate::tools::NaturalPageInput;
 
 /// Records with a deadline.
 #[derive(Debug, Deserialize, Validate, ToSchema)]
@@ -37,6 +38,8 @@ pub(crate) struct DeadlineInput {
     limit: Option<u32>,
     /// The `next_cursor` of the previous page.
     cursor: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
 }
 
 /// A personal data breach to record.
@@ -99,6 +102,8 @@ pub(crate) struct TagsInput {
     limit: Option<u32>,
     /// The `next_cursor` of the previous page.
     cursor: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
 }
 
 pub(crate) fn all(service: &Arc<ComplianceService>) -> Vec<Tool> {
@@ -110,10 +115,11 @@ pub(crate) fn all(service: &Arc<ComplianceService>) -> Vec<Tool> {
         Tool::new(
             "purposes",
             "List the tenant's purposes for processing personal data with their legal basis \
-             (Vietnam, Personal Data Protection Law 91/2025/QH15).",
-            move |tenant: TenantContext, principal: Principal, _: NoInput| {
+             (Vietnam, Personal Data Protection Law 91/2025/QH15), by key; follow \
+             `pagination.next_cursor` for more.",
+            move |tenant: TenantContext, principal: Principal, input: NaturalPageInput| {
                 let service = purposes.clone();
-                async move { service.list_purposes(&tenant, &principal).await }
+                async move { service.list_purposes(&tenant, &principal, &input.page()?).await }
             },
         )
         .requires(PRIVACY_READ)
@@ -121,10 +127,11 @@ pub(crate) fn all(service: &Arc<ComplianceService>) -> Vec<Tool> {
         Tool::new(
             "retention",
             "How long each kind of personal data is kept, compared with the limits of the legal \
-             rule `privacy.retention_limits` (`ok`, `exceeds_limit`, `forever_not_allowed`).",
-            move |tenant: TenantContext, principal: Principal, _: NoInput| {
+             rule `privacy.retention_limits` (`ok`, `exceeds_limit`, `forever_not_allowed`), by \
+             module and name; follow `pagination.next_cursor` for more.",
+            move |tenant: TenantContext, principal: Principal, input: NaturalPageInput| {
                 let service = retention.clone();
-                async move { service.retention(&tenant, &principal).await }
+                async move { service.retention(&tenant, &principal, &input.page()?).await }
             },
         )
         .requires(PRIVACY_READ)
@@ -147,7 +154,9 @@ pub(crate) fn all(service: &Arc<ComplianceService>) -> Vec<Tool> {
             move |tenant: TenantContext, principal: Principal, input: DeadlineInput| {
                 let service = incidents.clone();
                 async move {
-                    let page = PageInput::new(input.limit, input.cursor, None).page()?;
+                    let page = PageInput::new(input.limit, input.cursor, None)
+                        .with_count(input.count.unwrap_or(false))
+                        .page()?;
                     let found = service
                         .list_incidents(&tenant, &principal, input.status.as_deref(), input.overdue, &page)
                         .await?;
@@ -225,7 +234,9 @@ pub(crate) fn all(service: &Arc<ComplianceService>) -> Vec<Tool> {
             move |tenant: TenantContext, principal: Principal, input: DeadlineInput| {
                 let service = requests.clone();
                 async move {
-                    let page = PageInput::new(input.limit, input.cursor, None).page()?;
+                    let page = PageInput::new(input.limit, input.cursor, None)
+                        .with_count(input.count.unwrap_or(false))
+                        .page()?;
                     let found = service
                         .list_subject_requests(&tenant, &principal, input.status.as_deref(), input.overdue, &page)
                         .await?;
@@ -268,7 +279,9 @@ pub(crate) fn all(service: &Arc<ComplianceService>) -> Vec<Tool> {
             move |tenant: TenantContext, principal: Principal, input: TagsInput| {
                 let service = tags.clone();
                 async move {
-                    let page = PageInput::new(input.limit, input.cursor, None).page()?;
+                    let page = PageInput::new(input.limit, input.cursor, None)
+                        .with_count(input.count.unwrap_or(false))
+                        .page()?;
                     let found = service.list_tags(&tenant, &principal, input.org_id, &page).await?;
                     Ok::<Page<TagResponse>, Error>(found.map(TagResponse::from))
                 }

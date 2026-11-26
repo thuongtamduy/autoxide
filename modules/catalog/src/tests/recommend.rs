@@ -191,7 +191,7 @@ async fn san_pham_tuong_tu_theo_y_nghia() {
         let uri = format!("/products/{black}/similar?locale=vi&site={site}");
         let (status, problem, _) = public(&app, &uri, None).await;
         assert_eq!(status, StatusCode::NOT_FOUND, "{problem}");
-        let uri = format!("/products/{white}/similar?locale=vi&site={site}&limit=50");
+        let uri = format!("/products/{white}/similar?locale=vi&site={site}&limit=201");
         let (status, _, _) = public(&app, &uri, None).await;
         assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
     })

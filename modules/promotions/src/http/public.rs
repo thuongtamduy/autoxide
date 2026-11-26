@@ -3,8 +3,8 @@
 use std::sync::Arc;
 
 use autoxide_kernel::error::Error;
-use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
-use autoxide_kernel::response::{Data, Problem};
+use autoxide_kernel::pagination::{NaturalOrderPageQuery, Page, PageQuery, PageRequest};
+use autoxide_kernel::response::Problem;
 use autoxide_kernel::tenancy::{Site, SiteQuery, TenantContext};
 use axum::extract::{Path, Query, State};
 use axum::http::{HeaderValue, header};
@@ -85,16 +85,18 @@ pub(crate) struct ForProductQuery {
 /// each with the price of one unit with the coupon, its conditions and the uses left (only when
 /// there is a real limit). Cheapest first; empty when none applies. The listed price stays the
 /// price without a coupon: show these as "X with code …", not as a discounted price. Discounts
-/// that need no coupon are already in the catalog price.
+/// that need no coupon are already in the catalog price. Paged with `limit` / `cursor`
+/// (`order=desc` puts the dearest first).
 #[utoipa::path(
     get,
     path = "/public/promotions/for-product/{product_id}",
     extensions(("x-public" = json!(true))),
     operation_id = "list_public_codes_for_product",
     security((), ("bearer" = [])),
-    params(("product_id" = Uuid, Path, description = "Id of the product."), ForProductQuery, SiteQuery),
+    params(("product_id" = Uuid, Path, description = "Id of the product."), ForProductQuery, SiteQuery, NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "The coupons, cheapest first.", body = Data<Vec<ProductCode>>),
+        (status = 200, description = "One page of the coupons, cheapest first.", body = Page<ProductCode>),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
         (status = 404, description = "The variant is not of this product (`promotions.product_not_found`) or the `site` is not a unit of this tenant (`site_not_found`).", body = Problem),
     )
 )]
@@ -104,11 +106,11 @@ async fn codes_for_product(
     site: Site,
     Path(product_id): Path<uuid::Uuid>,
     Query(query): Query<ForProductQuery>,
-) -> Result<Data<Vec<ProductCode>>, Error> {
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<ProductCode>, Error> {
+    let page = PageRequest::try_from(page)?;
     let locale = locale_of(query.locale.as_deref());
-    let data =
-        service.codes_for_product(&tenant, &site, product_id, query.variant_id, &locale).await?;
-    Ok(Data { data })
+    service.codes_for_product(&tenant, &site, product_id, query.variant_id, &locale, &page).await
 }
 
 /// List the public flash sales running now or starting within a day (public).

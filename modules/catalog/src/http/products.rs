@@ -55,7 +55,9 @@ fn tagged(product: ProductResponse) -> Tagged<ProductResponse> {
 /// Filters of the product list.
 #[derive(Debug, Deserialize, IntoParams)]
 pub(crate) struct ProductsQuery {
+    /// Only products in this state: `draft`, `active`, `inactive` or `archived`.
     pub status: Option<StatusDto>,
+    /// Only products of this kind: `physical`, `digital`, `service` or `bundle`.
     pub kind: Option<KindDto>,
     /// Only products of this unit.
     pub org_id: Option<Uuid>,

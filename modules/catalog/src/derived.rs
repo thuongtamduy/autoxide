@@ -12,6 +12,7 @@ use std::sync::Arc;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::job::{EnqueueOptions, Job, JobContext, JobHandler};
+use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, Condition, ConnectionTrait, EntityTrait, QueryFilter,
@@ -118,12 +119,12 @@ impl CatalogService {
     pub(crate) async fn list_rounding_rules(
         &self,
         tenant: &TenantContext,
-    ) -> Result<Vec<rounding_rule::Model>, Error> {
-        Ok(rounding_rule::Entity::find()
-            .scoped(tenant)
-            .order_by_asc(rounding_rule::Column::Id)
-            .all(tenant.database().read())
-            .await?)
+        page: &PageRequest,
+    ) -> Result<Page<rounding_rule::Model>, Error> {
+        // Theo thứ tự tạo, keyset trong database (index `catalog_rounding_rules_idx` (tenant_id, id)).
+        let select = rounding_rule::Entity::find().scoped(tenant);
+        fetch_page(select, rounding_rule::Column::Id, |row| row.id, page, tenant.database().read())
+            .await
     }
 
     /// Xếp job ghi giá cho các bảng suy ra từ `source` (trong transaction của thay đổi). Không có

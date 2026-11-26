@@ -24,6 +24,7 @@ use std::ops::Range;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::event::Actor;
+use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::storage::{Storage as _, StoredFile, TenantStorage};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use sea_orm::sea_query::{Expr, OnConflict};
@@ -188,7 +189,8 @@ impl CatalogService {
         tenant: &TenantContext,
         principal: &Principal,
         variant_id: Uuid,
-    ) -> Result<Vec<digital_asset::Model>, Error> {
+        page: &PageRequest,
+    ) -> Result<Page<digital_asset::Model>, Error> {
         principal.require(&PRODUCTS_READ)?;
         let read = tenant.database().read();
         let (_, product) = self.variant_and_product(read, tenant, variant_id).await?;
@@ -196,12 +198,11 @@ impl CatalogService {
             errors::variant_not_found(variant_id)
         })
         .await?;
-        Ok(digital_asset::Entity::find()
+        // Theo thứ tự tạo, keyset trong database (index `catalog_digital_assets_variant_page_idx`).
+        let select = digital_asset::Entity::find()
             .filter(digital_asset::Column::VariantId.eq(variant_id))
-            .scoped(tenant)
-            .order_by_asc(digital_asset::Column::Id)
-            .all(read)
-            .await?)
+            .scoped(tenant);
+        fetch_page(select, digital_asset::Column::Id, |row| row.id, page, read).await
     }
 
     /// Gỡ file `id`. Không gỡ được khi còn quyền tải dùng được (`catalog.digital_asset_in_use`),

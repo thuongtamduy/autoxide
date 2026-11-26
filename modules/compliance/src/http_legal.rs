@@ -8,7 +8,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::http::{ClientInfo, ValidJson};
-use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
+use autoxide_kernel::pagination::{NaturalOrderPageQuery, Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, Query, State};
@@ -22,6 +22,7 @@ use validator::Validate;
 use crate::api::{Consent, ConsentEvidence, ConsentKey, ConsentSubject, Rule, Subject};
 use crate::documents::{NewAcceptance, NewVersion};
 use crate::entity::{acceptance, document, policy, version};
+use crate::permissions::{DOCUMENTS_READ, POLICIES_MANAGE, RULES_READ};
 use crate::service::{ComplianceService, RuleFilter, describe_rule};
 
 pub(crate) fn routes(service: Arc<ComplianceService>) -> OpenApiRouter {
@@ -146,26 +147,32 @@ pub(crate) struct VersionRequest {
 
 /// List the legal documents of the tenant.
 ///
-/// Requires `compliance.documents.read`.
+/// Requires `compliance.documents.read`. By kind (A→Z unless `order=desc`); paged with `limit` /
+/// `cursor`.
 #[utoipa::path(
     get,
     path = "/documents",
     extensions(("x-permissions" = json!(["compliance.documents.read"]))),
     operation_id = "list_compliance_documents",
     security(("bearer" = [])),
+    params(NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "The documents.", body = Data<Vec<DocumentResponse>>),
+        (status = 200, description = "One page of the documents.", body = Page<DocumentResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing `compliance.documents.read`; code `permission_denied`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_documents(
     State(service): State<Arc<ComplianceService>>,
     tenant: TenantContext,
     principal: Principal,
-) -> Result<Data<Vec<DocumentResponse>>, Error> {
-    let rows = service.list_documents(&tenant, &principal).await?;
-    Ok(Data { data: rows.into_iter().map(|row| describe_document(row, None)).collect() })
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<DocumentResponse>, Error> {
+    principal.require(&DOCUMENTS_READ)?;
+    let page = PageRequest::try_from(page)?;
+    let rows = service.list_documents(&tenant, &principal, &page).await?;
+    Ok(rows.map(|row| describe_document(row, None)))
 }
 
 /// Create a legal document.
@@ -340,19 +347,21 @@ pub(crate) struct AcceptanceCount {
 
 /// Count acceptances per version of a document.
 ///
-/// Requires `compliance.documents.read`.
+/// Requires `compliance.documents.read`. By version number, oldest first unless `order=desc`;
+/// paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/documents/{id}/acceptance-stats",
     extensions(("x-permissions" = json!(["compliance.documents.read"]))),
     operation_id = "get_compliance_acceptance_stats",
     security(("bearer" = [])),
-    params(("id" = Uuid, Path, description = "Id of the document.")),
+    params(("id" = Uuid, Path, description = "Id of the document."), NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "Counts per version.", body = Data<Vec<AcceptanceCount>>),
+        (status = 200, description = "One page of the counts per version.", body = Page<AcceptanceCount>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing `compliance.documents.read`; code `permission_denied`.", body = Problem),
         (status = 404, description = "No such document; code `compliance.document_not_found`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn acceptance_stats(
@@ -360,14 +369,12 @@ async fn acceptance_stats(
     tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
-) -> Result<Data<Vec<AcceptanceCount>>, Error> {
-    let stats = service.acceptance_stats(&tenant, &principal, id).await?;
-    Ok(Data {
-        data: stats
-            .into_iter()
-            .map(|(version, accepted)| AcceptanceCount { version, accepted })
-            .collect(),
-    })
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<AcceptanceCount>, Error> {
+    principal.require(&DOCUMENTS_READ)?;
+    let page = PageRequest::try_from(page)?;
+    let stats = service.acceptance_stats(&tenant, &principal, id, &page).await?;
+    Ok(stats.map(|(version, accepted)| AcceptanceCount { version, accepted }))
 }
 
 /// A document you still have to accept.
@@ -382,35 +389,36 @@ pub(crate) struct PendingAcceptance {
 
 /// List the legal documents you must accept (again).
 ///
-/// Any signed-in user.
+/// Any signed-in user. By document kind (A→Z unless `order=desc`); paged with `limit` /
+/// `cursor`.
 #[utoipa::path(
     get,
     path = "/me/pending-acceptances",
     extensions(("x-permissions" = json!([]))),
     operation_id = "list_my_pending_acceptances",
     security(("bearer" = [])),
+    params(NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "Documents to accept.", body = Data<Vec<PendingAcceptance>>),
+        (status = 200, description = "One page of the documents to accept.", body = Page<PendingAcceptance>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn pending_acceptances(
     State(service): State<Arc<ComplianceService>>,
     tenant: TenantContext,
     principal: Principal,
-) -> Result<Data<Vec<PendingAcceptance>>, Error> {
-    let rows = service.pending_acceptances(&tenant, &Subject::User(principal.user_id())).await?;
-    Ok(Data {
-        data: rows
-            .into_iter()
-            .map(|(doc, current)| PendingAcceptance {
-                document_id: doc.id,
-                kind: doc.kind,
-                title: doc.title,
-                version: current.into(),
-            })
-            .collect(),
-    })
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<PendingAcceptance>, Error> {
+    let page = PageRequest::try_from(page)?;
+    let rows =
+        service.pending_acceptances(&tenant, &Subject::User(principal.user_id()), &page).await?;
+    Ok(rows.map(|(doc, current)| PendingAcceptance {
+        document_id: doc.id,
+        kind: doc.kind,
+        title: doc.title,
+        version: current.into(),
+    }))
 }
 
 /// An acceptance to record.
@@ -520,24 +528,28 @@ pub(crate) struct ConsentRequest {
 
 /// List your consents.
 ///
-/// Any signed-in user.
+/// Any signed-in user. By purpose (A→Z unless `order=desc`); paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/me/consents",
     extensions(("x-permissions" = json!([]))),
     operation_id = "list_my_consents",
     security(("bearer" = [])),
+    params(NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "Your consents.", body = Data<Vec<Consent>>),
+        (status = 200, description = "One page of your consents.", body = Page<Consent>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn my_consents(
     State(service): State<Arc<ComplianceService>>,
     tenant: TenantContext,
     principal: Principal,
-) -> Result<Data<Vec<Consent>>, Error> {
-    Ok(Data { data: service.my_consents(&tenant, &principal).await? })
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<Consent>, Error> {
+    let page = PageRequest::try_from(page)?;
+    service.my_consents(&tenant, &principal, &page).await
 }
 
 /// Give or withdraw a consent.
@@ -610,30 +622,34 @@ pub(crate) struct RulesQuery {
 ///
 /// Requires `compliance.rules.read`. Without `as_of`: every version of every rule, the latest
 /// effective date first per rule — the history of each rule. With `as_of`: for each rule only the
-/// version in effect then (the latest `effective_from` not after it, not yet ended).
+/// version in effect then (the latest `effective_from` not after it, not yet ended). By
+/// jurisdiction, then key (A→Z unless `order=desc`); paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/rules",
     extensions(("x-permissions" = json!(["compliance.rules.read"]))),
     operation_id = "list_compliance_rules",
     security(("bearer" = [])),
-    params(RulesQuery),
+    params(RulesQuery, NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "The rules, newest effective version first per rule.", body = Data<Vec<Rule>>),
+        (status = 200, description = "One page of the rules, newest effective version first per rule.", body = Page<Rule>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing `compliance.rules.read`; code `permission_denied`.", body = Problem),
-        (status = 422, description = "A parameter is invalid (e.g. `as_of` is not RFC 3339); see `errors`.", body = Problem),
+        (status = 422, description = "A parameter is invalid (e.g. `as_of` is not RFC 3339, or a paging parameter); see `errors`.", body = Problem),
     )
 )]
 async fn list_rules(
     State(service): State<Arc<ComplianceService>>,
     principal: Principal,
     Query(query): Query<RulesQuery>,
-) -> Result<Data<Vec<Rule>>, Error> {
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<Rule>, Error> {
+    principal.require(&RULES_READ)?;
+    let page = PageRequest::try_from(page)?;
     let filter =
         RuleFilter { jurisdiction: query.jurisdiction, key: query.key, as_of: query.as_of };
-    let rules = service.list_rules(&principal, filter).await?;
-    Ok(Data { data: rules.iter().map(describe_rule).collect() })
+    let rules = service.list_rules(&principal, filter, &page).await?;
+    Ok(rules.map(|row| describe_rule(&row)))
 }
 
 /// Rules to import.
@@ -711,32 +727,31 @@ pub(crate) struct PolicyRequest {
 
 /// List the compliance policies set by the tenant.
 ///
-/// Requires `compliance.policies.manage`.
+/// Requires `compliance.policies.manage`. By key (A→Z unless `order=desc`); paged with `limit` /
+/// `cursor`.
 #[utoipa::path(
     get,
     path = "/policies",
     extensions(("x-permissions" = json!(["compliance.policies.manage"]))),
     operation_id = "list_compliance_policies",
     security(("bearer" = [])),
+    params(NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "The policies set (others use their defaults).", body = Data<Vec<PolicyResponse>>),
+        (status = 200, description = "One page of the policies set (others use their defaults).", body = Page<PolicyResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing `compliance.policies.manage`; code `permission_denied`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_policies(
     State(service): State<Arc<ComplianceService>>,
     tenant: TenantContext,
     principal: Principal,
-) -> Result<Data<Vec<PolicyResponse>>, Error> {
-    Ok(Data {
-        data: service
-            .list_policies(&tenant, &principal)
-            .await?
-            .into_iter()
-            .map(PolicyResponse::from)
-            .collect(),
-    })
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<PolicyResponse>, Error> {
+    principal.require(&POLICIES_MANAGE)?;
+    let page = PageRequest::try_from(page)?;
+    Ok(service.list_policies(&tenant, &principal, &page).await?.map(PolicyResponse::from))
 }
 
 /// Set a compliance policy.

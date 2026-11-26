@@ -9,7 +9,7 @@ use std::ops::Range;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, ErrorKind};
 use autoxide_kernel::event::Actor;
-use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
+use autoxide_kernel::pagination::{Page, PageRequest, fetch_page, page_of};
 use autoxide_kernel::rows::{self, Bounds};
 use autoxide_kernel::storage::Storage as _;
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
@@ -265,17 +265,18 @@ impl CatalogService {
         tenant: &TenantContext,
         principal: &Principal,
         order_id: Uuid,
-    ) -> Result<Vec<GrantView>, Error> {
+        page: &PageRequest,
+    ) -> Result<Page<GrantView>, Error> {
         let read = tenant.database().read();
         let grants = self.managed_grants(read, tenant, principal, order_id).await?;
-        let names = self.file_names(tenant, grants.iter().map(|grant| grant.asset_id)).await?;
-        Ok(grants
-            .into_iter()
-            .map(|grant| {
-                let file_name = names.get(&grant.asset_id).cloned().unwrap_or_default();
-                GrantView { grant, file_name, token: None }
-            })
-            .collect())
+        // Một trang (`page_of`): quyền tải của MỘT đơn — bị chặn theo cấu trúc (số dòng của đơn × số file của biến
+        // thể), và quyền xem từng quyền tải kiểm trong code theo nút sở hữu. Khoá là id (UUIDv7: thứ tự tạo).
+        let grants = page_of(grants, |grant| grant.id.to_string(), page)?;
+        let names = self.file_names(tenant, grants.data.iter().map(|grant| grant.asset_id)).await?;
+        Ok(grants.map(|grant| {
+            let file_name = names.get(&grant.asset_id).cloned().unwrap_or_default();
+            GrantView { grant, file_name, token: None }
+        }))
     }
 
     /// Người quản lý thu hồi các quyền tải của đơn mà họ quản lý. Trả số quyền vừa thu hồi.

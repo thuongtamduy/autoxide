@@ -10,6 +10,8 @@
 
 use autoxide_kernel::migration::prelude::*;
 
+mod m0009_list_indexes;
+
 pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
     vec![
         Box::new(CreatePromotions),
@@ -32,6 +34,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
             "m0008_tenancy_throttle",
             vec![autoxide_kernel::throttle::tenant_table("promotions")],
         ),
+        Box::new(m0009_list_indexes::Migration),
     ]
 }
 

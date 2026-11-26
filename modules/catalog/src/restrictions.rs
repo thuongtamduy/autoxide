@@ -12,6 +12,7 @@ use std::collections::BTreeMap;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
+use autoxide_kernel::pagination::{Page, PageRequest, fetch_page, page_of};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use sea_orm::sea_query::Expr;
 use sea_orm::{
@@ -310,6 +311,27 @@ impl CatalogService {
             .await?)
     }
 
+    /// Một trang thuộc tính của danh mục `id`, theo thứ tự của lần thay gần nhất (`PUT` ghi lại cả tập, id
+    /// UUIDv7 theo thứ tự thân yêu cầu); keyset trong database (index `catalog_category_attributes_page_idx`).
+    pub(crate) async fn category_attributes_page(
+        &self,
+        tenant: &TenantContext,
+        id: Uuid,
+        page: &PageRequest,
+    ) -> Result<Page<category_attribute::Model>, Error> {
+        let select = category_attribute::Entity::find()
+            .filter(category_attribute::Column::CategoryId.eq(id))
+            .scoped(tenant);
+        fetch_page(
+            select,
+            category_attribute::Column::Id,
+            |row| row.id,
+            page,
+            tenant.database().read(),
+        )
+        .await
+    }
+
     /// Thay cả tập thuộc tính của danh mục `id`; tính lại `readiness` của mọi sản phẩm trong nhánh.
     pub(crate) async fn put_category_attributes(
         &self,
@@ -447,13 +469,19 @@ impl CatalogService {
     }
 
     /// Quy tắc hàng cấm / có điều kiện (dữ liệu dùng chung, chỉ đọc).
-    pub(crate) async fn restriction_rules(&self) -> Result<Vec<restriction_rule::Model>, Error> {
-        Ok(restriction_rule::Entity::find()
-            .order_by_asc(restriction_rule::Column::Jurisdiction)
-            .order_by_asc(restriction_rule::Column::Code)
-            .order_by_asc(restriction_rule::Column::EffectiveFrom)
-            .all(self.databases.control().read())
-            .await?)
+    /// Một trang quy tắc hàng cấm (`page_of`): dữ liệu luật dùng chung mọi khách ở mặt điều khiển, nạp bằng task
+    /// của người vận hành — không lớn dần theo dữ liệu khách (như bảng thuế, D-20261126-list-pages-cluster-3).
+    /// Theo vùng, mã, ngày hiệu lực (`YYYY-MM-DD` so theo byte đúng thứ tự ngày; bộ ba duy nhất).
+    pub(crate) async fn restriction_rules(
+        &self,
+        page: &PageRequest,
+    ) -> Result<Page<restriction_rule::Model>, Error> {
+        let rows = restriction_rule::Entity::find().all(self.databases.control().read()).await?;
+        page_of(
+            rows,
+            |row| format!("{}\u{1f}{}\u{1f}{}", row.jurisdiction, row.code, row.effective_from),
+            page,
+        )
     }
 
     /// Giá trị thuộc tính của sản phẩm (đọc, không kiểm quyền — dùng sau khi đã kiểm).
@@ -477,9 +505,22 @@ impl CatalogService {
         tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
-    ) -> Result<Vec<product_attribute::Model>, Error> {
+        page: &PageRequest,
+    ) -> Result<Page<product_attribute::Model>, Error> {
         self.get_product(tenant, principal, id).await?;
-        self.product_attributes(tenant.database().read(), tenant, id).await
+        // Theo thứ tự của lần thay gần nhất (`PUT` ghi lại cả tập), keyset trong database (index
+        // `catalog_product_attr_product_page_idx`).
+        let select = product_attribute::Entity::find()
+            .filter(product_attribute::Column::ProductId.eq(id))
+            .scoped(tenant);
+        fetch_page(
+            select,
+            product_attribute::Column::Id,
+            |row| row.id,
+            page,
+            tenant.database().read(),
+        )
+        .await
     }
 
     /// Thay cả tập giá trị thuộc tính của sản phẩm; tính lại `readiness`.
@@ -554,7 +595,8 @@ impl CatalogService {
         tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
-    ) -> Result<Vec<product_document::Model>, Error> {
+        page: &PageRequest,
+    ) -> Result<Page<product_document::Model>, Error> {
         let read = tenant.database().read();
         let row = product::Entity::find_by_id(id)
             .scoped(tenant)
@@ -564,12 +606,11 @@ impl CatalogService {
         readable(principal, read, &PRODUCTS_READ, row.org_id, || errors::product_not_found(id))
             .await?;
         principal.require_at(read, &DOCUMENTS_MANAGE, crate::service::at(row.org_id)).await?;
-        Ok(product_document::Entity::find()
+        // Theo thứ tự tạo, keyset trong database (index `catalog_product_documents_page_idx`).
+        let select = product_document::Entity::find()
             .filter(product_document::Column::ProductId.eq(id))
-            .scoped(tenant)
-            .order_by_asc(product_document::Column::Id)
-            .all(read)
-            .await?)
+            .scoped(tenant);
+        fetch_page(select, product_document::Column::Id, |row| row.id, page, read).await
     }
 
     /// Thêm giấy tờ cho sản phẩm `id`; tính lại `readiness`.
@@ -676,7 +717,8 @@ impl CatalogService {
         tenant: &TenantContext,
         principal: &Principal,
         group_by: &str,
-    ) -> Result<Vec<(String, u64)>, Error> {
+        page: &PageRequest,
+    ) -> Result<Page<(String, u64)>, Error> {
         let (column, keys): (product::Column, &[&str]) = match group_by {
             "status" => (product::Column::Status, &["draft", "active", "inactive", "archived"]),
             "readiness" => (product::Column::Readiness, &readiness::ALL),
@@ -699,16 +741,21 @@ impl CatalogService {
             .into_tuple()
             .all(tenant.database().read())
             .await?;
-        Ok(keys
+        let counts: Vec<(usize, String, u64)> = keys
             .iter()
-            .map(|key| {
+            .enumerate()
+            .map(|(index, key)| {
                 let count = rows
                     .iter()
                     .find(|(value, _)| value == key)
                     .map_or(0, |(_, count)| u64::try_from(*count).unwrap_or(0));
-                ((*key).to_owned(), count)
+                (index, (*key).to_owned(), count)
             })
-            .collect())
+            .collect();
+        // Một trang (`page_of`): một dòng cho mỗi khoá của tập cố định trong code (trạng thái hay mức sẵn sàng),
+        // giữ thứ tự khai báo (khoá trang là vị trí, đệm 0).
+        let found = page_of(counts, |(index, _, _)| format!("{index:04}"), page)?;
+        Ok(found.map(|(_, key, count)| (key, count)))
     }
 
     /// Ghi event `catalog.category_changed` cho danh mục `id` (thuộc tính hay quy tắc đổi).

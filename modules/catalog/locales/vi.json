@@ -91,7 +91,6 @@
   "field:must be 1 to 600 months": "phải từ 1 đến 600 tháng",
   "field:must be 1 to 64 letters, digits, `_`, `-` or `.`": "phải gồm 1 đến 64 chữ, số, `_`, `-` hay `.`",
   "field:must be 1 to 64 lower-case letters, digits or `_`": "phải gồm 1 đến 64 chữ thường, chữ số hoặc `_`",
-  "field:must be 1 to {max}": "phải từ 1 đến {max}",
   "field:must be 1 to {max} characters": "phải dài 1 đến {max} ký tự",
   "field:must be `all`": "phải là `all`",
   "field:must be `consumer` or `business`": "phải là `consumer` hay `business`",
@@ -170,7 +169,6 @@
   "text:See the price lists and prices in your scope.": "Xem bảng giá và giá trong phạm vi của bạn.",
   "text:See the products, variants and categories in your scope, including drafts.": "Xem sản phẩm, biến thể và danh mục trong phạm vi của bạn, kể cả bản nháp.",
   "text:The expected availability date of a pre-order variant changed.": "Ngày dự kiến có hàng của một biến thể đặt trước thay đổi.",
-  "field:must be between 1 and 12": "phải từ 1 đến 12",
   "text:Test event.": "Event dùng trong test.",
   "catalog.transfer_not_found": "Không có lần nhập hay xuất `{id}` nào của bạn.",
   "catalog.storage_unavailable": "Nhập, xuất và hàng số cần nơi lưu file: hãy cài module `files`.",
@@ -213,5 +211,6 @@
   "text:Use to feature one product with its picture, current price and rating.": "Dùng để giới thiệu một sản phẩm kèm ảnh, giá hiện tại và điểm đánh giá.",
   "text:Collection": "Bộ sưu tập",
   "text:Use to show the products of a collection the shop prepared, in the collection's order.": "Dùng để hiện sản phẩm của một bộ sưu tập cửa hàng đã soạn, theo thứ tự của bộ sưu tập.",
-  "field:must be comma-separated language codes like `en` or `pt-BR`": "phải là các mã ngôn ngữ cách nhau bằng dấu phẩy, như `en` hay `pt-BR`"
+  "field:must be comma-separated language codes like `en` or `pt-BR`": "phải là các mã ngôn ngữ cách nhau bằng dấu phẩy, như `en` hay `pt-BR`",
+  "field:must be the `next_cursor` value of a previous page of the same list and sort, unchanged": "phải là giá trị `next_cursor` nguyên vẹn của một trang trước, cùng danh sách và cùng cách sắp"
 }

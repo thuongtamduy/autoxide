@@ -9,13 +9,13 @@ use std::collections::{BTreeMap, BTreeSet};
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
+use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::reference::Submitted;
 use autoxide_kernel::rows;
 use autoxide_kernel::tenancy::{OrgId, OrgTree, ScopeExt, TenantContext};
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseTransaction, EntityTrait, QueryFilter,
-    QueryOrder,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -299,7 +299,8 @@ impl PromotionsService {
         tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
-    ) -> Result<Vec<ParticipationView>, Error> {
+        page: &PageRequest,
+    ) -> Result<Page<ParticipationView>, Error> {
         let read = tenant.database().read();
         let program = promotion::Entity::find_by_id(id)
             .scoped(tenant)
@@ -316,8 +317,9 @@ impl PromotionsService {
                 None,
             )?);
         }
-        let rows = select.order_by_asc(participation::Column::Id).all(read).await?;
-        Ok(rows.iter().map(present).collect())
+        // Theo thứ tự tạo (id UUIDv7), keyset trong database (index `promotions_participations_page_idx`).
+        let rows = fetch_page(select, participation::Column::Id, |row| row.id, page, read).await?;
+        Ok(rows.map(|row| present(&row)))
     }
 
     /// Sàn duyệt (`approve`) hay từ chối lần đăng ký; duyệt thì sản phẩm thành suất flash sale.

@@ -5,16 +5,22 @@
 //! nhận.
 
 use autoxide_kernel::time::Timestamp;
-use std::collections::HashMap;
 
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::event::Actor;
-use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
+use autoxide_kernel::pagination::{
+    Order, Page, PageRequest, Pagination, SortValue, fetch_page, fetch_page_by, page_of,
+    text_key_cursor,
+};
 use autoxide_kernel::rows;
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use sea_orm::sea_query::OnConflict;
-use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, Set};
+use sea_orm::sea_query::{Alias, Expr, Query};
+use sea_orm::{
+    ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect,
+    QueryTrait as _, Set,
+};
 use serde_json::json;
 use uuid::Uuid;
 
@@ -65,6 +71,17 @@ pub(crate) struct NewAcceptance {
     pub method: String,
     pub ip_fingerprint: Option<String>,
     pub user_agent: Option<String>,
+}
+
+/// Tên thứ tự trong con trỏ của số chấp nhận theo phiên bản.
+const STATS_CURSOR: &str = "acceptance_stats:version";
+
+fn invalid_cursor() -> Error {
+    Error::validation(vec![FieldError::new(
+        "cursor",
+        "invalid",
+        "must be the `next_cursor` value of a previous page of the same list and sort, unchanged",
+    )])
 }
 
 impl ComplianceService {
@@ -150,13 +167,21 @@ impl ComplianceService {
         &self,
         tenant: &TenantContext,
         principal: &Principal,
-    ) -> Result<Vec<document::Model>, Error> {
+        page: &PageRequest,
+    ) -> Result<Page<document::Model>, Error> {
         principal.require(&DOCUMENTS_READ)?;
-        Ok(document::Entity::find()
-            .scoped(tenant)
-            .order_by_asc(document::Column::Kind)
-            .all(tenant.database().read())
-            .await?)
+        // Theo loại rồi id (một loại có thể có văn bản của từng nút), keyset trong database (index
+        // `compliance_documents_page_idx`).
+        fetch_page_by(
+            document::Entity::find().scoped(tenant),
+            document::Column::Kind,
+            |row| SortValue::Text(row.kind.clone()),
+            document::Column::Id,
+            |row| row.id,
+            page,
+            tenant.database().read(),
+        )
+        .await
     }
 
     pub(crate) async fn document_for(
@@ -349,7 +374,8 @@ impl ComplianceService {
         &self,
         tenant: &TenantContext,
         subject: &Subject,
-    ) -> Result<Vec<(document::Model, version::Model)>, Error> {
+        page: &PageRequest,
+    ) -> Result<Page<(document::Model, version::Model)>, Error> {
         let read = tenant.database().read();
         let documents = document::Entity::find()
             .scoped(tenant)
@@ -377,7 +403,9 @@ impl ComplianceService {
                 pending.push((doc, current));
             }
         }
-        Ok(pending)
+        // Một trang (`page_of`): việc "còn phải chấp nhận" tính trong code cho từng văn bản, và tập này bị chặn
+        // theo cấu trúc — chỉ văn bản cấp khách (`org_key` rỗng), mỗi loại của `DOCUMENT_KINDS` tối đa một.
+        page_of(pending, |(doc, _)| doc.kind.clone(), page)
     }
 
     /// Ghi chấp nhận (gọi lại vô hại).
@@ -539,20 +567,65 @@ impl ComplianceService {
         tenant: &TenantContext,
         principal: &Principal,
         document_id: Uuid,
-    ) -> Result<Vec<(i32, u64)>, Error> {
+        page: &PageRequest,
+    ) -> Result<Page<(i32, u64)>, Error> {
         self.document_for(tenant, principal, document_id).await?;
-        let rows = acceptance::Entity::find()
+        // `GROUP BY version` trong SQL, keyset theo số phiên bản (khoá của nhóm) ngay trong `WHERE`: database chỉ
+        // trả `limit + 1` nhóm (index `compliance_acceptances_stats_idx`).
+        let after = page
+            .text_key_after(STATS_CURSOR)?
+            .map(|key| key.parse::<i32>().map_err(|_| invalid_cursor()))
+            .transpose()?;
+        let groups = acceptance::Entity::find()
             .scoped(tenant)
             .filter(acceptance::Column::DocumentId.eq(document_id))
-            .all(tenant.database().read())
-            .await?;
-        let mut counts: HashMap<i32, u64> = HashMap::new();
-        for row in rows {
-            *counts.entry(row.version).or_default() += 1;
+            .select_only()
+            .column(acceptance::Column::Version)
+            .column_as(acceptance::Column::Id.count(), "accepted")
+            .group_by(acceptance::Column::Version);
+        let read = tenant.database().read();
+        let total = if page.wants_total() {
+            let count = Query::select()
+                .expr(Expr::cust("COUNT(*)"))
+                .from_subquery(groups.clone().into_query(), Alias::new("groups"))
+                .to_owned();
+            let total: i64 = match read.query_one(&count).await? {
+                Some(row) => row.try_get_by_index(0)?,
+                None => 0,
+            };
+            Some(u64::try_from(total).unwrap_or_default())
+        } else {
+            None
+        };
+        let ascending = page.order() == Order::Asc;
+        let mut select = groups;
+        if let Some(after) = after {
+            select = select.filter(if ascending {
+                acceptance::Column::Version.gt(after)
+            } else {
+                acceptance::Column::Version.lt(after)
+            });
         }
-        let mut stats: Vec<(i32, u64)> = counts.into_iter().collect();
-        stats.sort_unstable();
-        Ok(stats)
+        let select = if ascending {
+            select.order_by_asc(acceptance::Column::Version)
+        } else {
+            select.order_by_desc(acceptance::Column::Version)
+        };
+        let mut rows: Vec<(i32, i64)> =
+            select.limit(u64::from(page.limit()) + 1).into_tuple().all(read).await?;
+        let has_more = rows.len() > page.limit() as usize;
+        rows.truncate(page.limit() as usize);
+        let next = has_more
+            .then(|| rows.last())
+            .flatten()
+            .map(|(version, _)| text_key_cursor(STATS_CURSOR, &version.to_string()));
+        Ok(Page {
+            data: rows
+                .into_iter()
+                .map(|(version, accepted)| (version, u64::try_from(accepted).unwrap_or_default()))
+                .collect(),
+            pagination: Pagination::new(page.limit(), next).with_total(total),
+        })
     }
 
     /// Bản hiện hành công khai của văn bản `kind` theo ngôn ngữ (không có bản ngôn ngữ đó: bản đầu

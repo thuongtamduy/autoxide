@@ -231,7 +231,8 @@ async fn so_thoi_han_luu_co_audit_webhooks_newsletter() {
     TestDatabase::run(async |test| {
         let dir = std::env::temp_dir().join(format!("autoxide-privacy-{}", Uuid::now_v7()));
         let app = app(test, &dir).await;
-        let (status, body) = call(&app, Method::GET, "/compliance/retention", "staff", None).await;
+        let (status, body) =
+            call(&app, Method::GET, "/compliance/retention?limit=200", "staff", None).await;
         assert_eq!(status, StatusCode::OK, "{body}");
         let items = body["data"].as_array().unwrap();
         let find = |name: &str| {

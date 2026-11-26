@@ -34,6 +34,8 @@ pub(crate) struct ListCollectionsInput {
     limit: Option<u32>,
     /// The `next_cursor` of the previous page.
     cursor: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
 }
 
 /// Texts of a collection in one language.
@@ -193,7 +195,9 @@ pub(crate) fn all(service: &Arc<CatalogService>) -> Vec<Tool> {
             move |tenant: TenantContext, principal: Principal, input: ListCollectionsInput| {
                 let service = list.clone();
                 async move {
-                    let page = PageInput::new(input.limit, input.cursor, None).page()?;
+                    let page = PageInput::new(input.limit, input.cursor, None)
+                        .with_count(input.count.unwrap_or(false))
+                        .page()?;
                     let found = service
                         .list_collections(&tenant, &principal, input.status.as_deref(), &page)
                         .await?;

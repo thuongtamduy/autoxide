@@ -10,7 +10,7 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::http::{ClientInfo, ValidJson};
 use autoxide_kernel::i18n::Language;
 use autoxide_kernel::mail::MailTemplate;
-use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
+use autoxide_kernel::pagination::{NaturalOrderPageQuery, Page, PageQuery, PageRequest, page_of};
 use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::{Site, SiteQuery, TenantContext};
 use autoxide_kernel::version::Tagged;
@@ -167,21 +167,29 @@ impl From<Banner> for SettingsResponse {
 /// List the built-in tracking providers.
 ///
 /// Requires `compliance.tracking.manage`. Tenants only enter the tracking ID of these; no script.
+/// By key (A→Z unless `order=desc`); paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/tracking-providers",
     extensions(("x-permissions" = json!(["compliance.tracking.manage"]))),
     operation_id = "list_compliance_tracking_providers",
     security(("bearer" = [])),
+    params(NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "Every provider.", body = Data<Vec<ProviderResponse>>),
+        (status = 200, description = "One page of the providers.", body = Page<ProviderResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing `compliance.tracking.manage`; code `permission_denied`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
-async fn list_providers(principal: Principal) -> Result<Data<Vec<ProviderResponse>>, Error> {
+async fn list_providers(
+    principal: Principal,
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<ProviderResponse>, Error> {
     principal.require(&TRACKING_MANAGE)?;
-    Ok(Data { data: providers() })
+    let page = PageRequest::try_from(page)?;
+    // Một trang (`page_of`): nhà cung cấp dựng sẵn trong code (`PROVIDERS`), không nằm trong database.
+    page_of(providers(), |item| item.key.clone(), &page)
 }
 
 pub(crate) fn providers() -> Vec<ProviderResponse> {

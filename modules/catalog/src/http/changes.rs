@@ -6,9 +6,10 @@ use std::sync::Arc;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
+use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::ToSchema;
@@ -62,27 +63,31 @@ impl From<rounding_rule::Model> for RoundingRuleResponse {
 
 /// List the rounding rules of the tenant.
 ///
-/// Requires `catalog.prices.read`.
+/// Requires `catalog.prices.read`. Newest first unless `order=asc`; paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/rounding-rules",
     extensions(("x-permissions" = json!(["catalog.prices.read"]))),
     operation_id = "list_catalog_rounding_rules",
     security(("bearer" = [])),
+    params(PageQuery),
     responses(
-        (status = 200, description = "Every rounding rule.", body = Data<Vec<RoundingRuleResponse>>),
+        (status = 200, description = "One page of the rounding rules.", body = Page<RoundingRuleResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing `catalog.prices.read`; code `permission_denied`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_rounding_rules(
     State(service): State<Arc<CatalogService>>,
     tenant: TenantContext,
     principal: Principal,
-) -> Result<Data<Vec<RoundingRuleResponse>>, Error> {
+    Query(page): Query<PageQuery>,
+) -> Result<Page<RoundingRuleResponse>, Error> {
     principal.require(&PRICES_READ)?;
-    let rows = service.list_rounding_rules(&tenant).await?;
-    Ok(Data { data: rows.into_iter().map(Into::into).collect() })
+    let page = PageRequest::try_from(page)?;
+    let rows = service.list_rounding_rules(&tenant, &page).await?;
+    Ok(rows.map(Into::into))
 }
 
 /// A new rounding rule.

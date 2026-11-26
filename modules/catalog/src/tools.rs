@@ -9,7 +9,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::mcp::{PageInput, Tool};
 use autoxide_kernel::money::{Currency, Money};
-use autoxide_kernel::pagination::Page;
+use autoxide_kernel::pagination::{NaturalOrderPageQuery, Page, PageRequest};
 use autoxide_kernel::reference::Reference;
 use autoxide_kernel::tenancy::{OrgId, TenantContext};
 use serde::Deserialize;
@@ -49,6 +49,8 @@ pub(crate) struct ListProductsInput {
     pub limit: Option<u32>,
     /// The `next_cursor` of the previous page.
     pub cursor: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    pub count: Option<bool>,
 }
 
 /// A product to act on.
@@ -178,7 +180,9 @@ pub(crate) fn all(service: &Arc<CatalogService>) -> Vec<Tool> {
             move |tenant: TenantContext, principal: Principal, input: ListProductsInput| {
                 let service = list.clone();
                 async move {
-                    let page = PageInput::new(input.limit, input.cursor, None).page()?;
+                    let page = PageInput::new(input.limit, input.cursor, None)
+                        .with_count(input.count.unwrap_or(false))
+                        .page()?;
                     let filter = ProductsQuery {
                         status: input.status,
                         kind: input.kind,
@@ -307,14 +311,22 @@ pub(crate) fn all(service: &Arc<CatalogService>) -> Vec<Tool> {
         // mcp-principal: danh mục chung của khách, không gắn nút tổ chức; REST `GET /categories` cũng trả cả khách.
         Tool::new(
             "list_categories",
-            "List every category of the tenant, by depth then display order.",
-            move |tenant: TenantContext, _principal: Principal, _input: EmptyInput| {
+            "List the categories of the tenant, by depth then display order (parents before \
+             children); follow `pagination.next_cursor` for more.",
+            move |tenant: TenantContext, _principal: Principal, input: CategoriesInput| {
                 let service = categories.clone();
                 async move {
-                    let rows = service.list_categories(&tenant).await?;
-                    Ok::<_, Error>(
-                        rows.into_iter().map(CategoryResponse::from).collect::<Vec<_>>(),
-                    )
+                    // Cùng kiểu tham số trang với REST (`NaturalOrderPageQuery`, mặc định `asc`).
+                    let page = PageRequest::try_from(
+                        NaturalOrderPageQuery::new(
+                            input.limit.map(|limit| limit.to_string()),
+                            input.cursor,
+                            input.order,
+                        )
+                        .with_count(input.count.unwrap_or(false)),
+                    )?;
+                    let rows = service.list_categories_page(&tenant, &page).await?;
+                    Ok::<Page<CategoryResponse>, Error>(rows.map(CategoryResponse::from))
                 }
             },
         )
@@ -404,8 +416,17 @@ pub(crate) fn all(service: &Arc<CatalogService>) -> Vec<Tool> {
     tools
 }
 
-/// No input.
+/// One page of the categories: the same as the query parameters of `GET /api/v1/catalog/categories`.
 #[derive(Debug, Default, Deserialize, Validate, ToSchema)]
 #[serde(deny_unknown_fields)]
-#[schema(as = CatalogEmptyInput)]
-pub(crate) struct EmptyInput {}
+#[schema(as = CatalogListCategoriesInput)]
+pub(crate) struct CategoriesInput {
+    /// Maximum number of categories, 1 to 200. Defaults to 50.
+    pub limit: Option<u32>,
+    /// The `next_cursor` of the previous page.
+    pub cursor: Option<String>,
+    /// `asc` (the default: parents first) or `desc`.
+    pub order: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    pub count: Option<bool>,
+}

@@ -10,7 +10,7 @@ use std::sync::Arc;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::money::Money;
-use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
+use autoxide_kernel::pagination::{NaturalOrderPageQuery, Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Data, Problem};
 use autoxide_kernel::tenancy::{Site, SiteQuery, TenantContext};
 use axum::extract::{Path, Query, State};
@@ -816,17 +816,18 @@ async fn get_public_product(
 /// List the category tree (public).
 ///
 /// No sign-in needed. Visible categories with a name in `locale`, parents before children, by
-/// depth then position; a category under a hidden one is left out.
+/// depth then position (then id; `order=desc` reverses it); a category under a hidden one is
+/// left out. Paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/public/categories",
     extensions(("x-public" = json!(true))),
     operation_id = "list_public_catalog_categories",
     security((), ("bearer" = [])),
-    params(LocaleQuery),
+    params(LocaleQuery, NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "Every visible category.", body = Data<Vec<PublicCategoryResponse>>, headers(("ETag" = String, description = "Fingerprint of the whole answer; send it in `If-None-Match` to get 304."))),
-        (status = 422, description = "The language is not supported; code `catalog.unsupported_locale`.", body = Problem),
+        (status = 200, description = "One page of the visible categories.", body = Page<PublicCategoryResponse>, headers(("ETag" = String, description = "Fingerprint of the whole answer; send it in `If-None-Match` to get 304."))),
+        (status = 422, description = "The language is not supported (code `catalog.unsupported_locale`) or a paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_public_categories(
@@ -834,21 +835,20 @@ async fn list_public_categories(
     tenant: TenantContext,
     _principal: Option<Principal>,
     Query(query): Query<LocaleQuery>,
+    Query(page): Query<NaturalOrderPageQuery>,
 ) -> Result<Response, Error> {
+    let page = PageRequest::try_from(page)?;
     let locale = service.locale(&tenant, &query.locale).await?;
-    let rows = service.public_categories(&tenant, &locale).await?;
-    let data: Vec<PublicCategoryResponse> = rows
-        .into_iter()
-        .map(|row| PublicCategoryResponse {
-            id: row.category.id,
-            parent_id: row.category.parent_id,
-            name: row.text.name,
-            slug: row.text.slug,
-            depth: row.category.depth,
-            position: row.category.position,
-        })
-        .collect();
-    cached(&tenant, Data { data })
+    let rows = service.public_categories_page(&tenant, &locale, &page).await?;
+    let data = rows.map(|row| PublicCategoryResponse {
+        id: row.category.id,
+        parent_id: row.category.parent_id,
+        name: row.text.name,
+        slug: row.text.slug,
+        depth: row.category.depth,
+        position: row.category.position,
+    });
+    cached(&tenant, data)
 }
 
 /// Get a category by its address (public).

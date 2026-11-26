@@ -6,7 +6,7 @@ use std::sync::Arc;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
-use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
+use autoxide_kernel::pagination::{NaturalOrderPageQuery, Page, PageQuery, PageRequest};
 use autoxide_kernel::reference::Submitted;
 use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
@@ -83,60 +83,69 @@ pub(crate) struct AtQuery {
 ///
 /// Requires `promotions.read`. Shared law data with effective dates, legal basis and notes
 /// ("to be checked against the original text"); loaded with `autoxide task
-/// promotions.load_legal_data`.
+/// promotions.load_legal_data`. By promotion kind, then program kind and jurisdiction (A→Z unless
+/// `order=desc`); paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/legal-limits",
     extensions(("x-permissions" = json!(["promotions.read"]))),
     operation_id = "list_promotion_legal_limits",
     security(("bearer" = [])),
-    params(AtQuery),
+    params(AtQuery, NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "The limits in force.", body = Data<Vec<LegalLimitDto>>),
+        (status = 200, description = "One page of the limits in force.", body = Page<LegalLimitDto>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing `promotions.read`; code `permission_denied`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn legal_limits(
     State(service): State<Arc<PromotionsService>>,
     principal: Principal,
     Query(query): Query<AtQuery>,
-) -> Result<Data<Vec<LegalLimitDto>>, Error> {
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<LegalLimitDto>, Error> {
     principal.require(&READ)?;
-    let rows = service.legal_limits_at(query.at).await?;
-    Ok(Data { data: rows.iter().map(LegalLimitDto::from).collect() })
+    let page = PageRequest::try_from(page)?;
+    let rows = service.legal_limits_at(query.at, &page).await?;
+    Ok(rows.map(|row| LegalLimitDto::from(&row)))
 }
 
 /// List the promotion notice rules in force on a day.
 ///
 /// Requires `promotions.read`. Shared law data: which promotions must be notified, to whom and
-/// how many days before.
+/// how many days before. By promotion kind, then jurisdiction (A→Z unless `order=desc`); paged
+/// with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/notice-rules",
     extensions(("x-permissions" = json!(["promotions.read"]))),
     operation_id = "list_promotion_notice_rules",
     security(("bearer" = [])),
-    params(AtQuery),
+    params(AtQuery, NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "The rules in force.", body = Data<Vec<NoticeRuleDto>>),
+        (status = 200, description = "One page of the rules in force.", body = Page<NoticeRuleDto>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing `promotions.read`; code `permission_denied`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn notice_rules(
     State(service): State<Arc<PromotionsService>>,
     principal: Principal,
     Query(query): Query<AtQuery>,
-) -> Result<Data<Vec<NoticeRuleDto>>, Error> {
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<NoticeRuleDto>, Error> {
     principal.require(&READ)?;
-    let rows = service.notice_rules_at(query.at).await?;
-    Ok(Data { data: rows.iter().map(NoticeRuleDto::from).collect() })
+    let page = PageRequest::try_from(page)?;
+    let rows = service.notice_rules_at(query.at, &page).await?;
+    Ok(rows.map(|row| NoticeRuleDto::from(&row)))
 }
 
 /// Filters of the redemption list.
 #[derive(Debug, Deserialize, IntoParams)]
 pub(crate) struct RedemptionsQuery {
+    /// Only the usage held for this order.
     pub order_id: Option<Uuid>,
     /// `held`, `confirmed`, `released` or `expired`.
     pub status: Option<String>,
@@ -229,6 +238,7 @@ async fn release_redemption(
 /// Filters of the wallet.
 #[derive(Debug, Deserialize, IntoParams)]
 pub(crate) struct WalletQuery {
+    /// Only vouchers in this state: `available`, `held`, `used`, `expired` or `revoked`.
     pub status: Option<VoucherStatus>,
 }
 

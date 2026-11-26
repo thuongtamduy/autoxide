@@ -16,6 +16,7 @@
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::{Actor, Delivered, EventHandler};
 use autoxide_kernel::money::Money;
+use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::reference::{self, Reference, Submitted};
 use autoxide_kernel::rows;
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
@@ -497,13 +498,12 @@ impl OrdersService {
         tenant: &TenantContext,
         principal: &autoxide_kernel::access::Principal,
         order_id: Uuid,
-    ) -> Result<Vec<refund::Model>, Error> {
+        page: &PageRequest,
+    ) -> Result<Page<refund::Model>, Error> {
         self.staff_order(tenant, principal, order_id).await?;
-        Ok(refund::Entity::find()
-            .filter(refund::Column::OrderId.eq(order_id))
-            .scoped(tenant)
-            .order_by_asc(refund::Column::Id)
-            .all(tenant.database().read())
-            .await?)
+        // Theo thứ tự tạo (id UUIDv7), keyset trong database (index `orders_refunds_order_page_idx`).
+        let select =
+            refund::Entity::find().filter(refund::Column::OrderId.eq(order_id)).scoped(tenant);
+        fetch_page(select, refund::Column::Id, |row| row.id, page, tenant.database().read()).await
     }
 }

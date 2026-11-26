@@ -41,6 +41,8 @@ pub(crate) struct ListOrdersInput {
     pub limit: Option<u32>,
     /// The `next_cursor` of the previous page.
     pub cursor: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    pub count: Option<bool>,
 }
 
 /// One order.
@@ -104,6 +106,8 @@ pub(crate) struct ListReturnsInput {
     pub limit: Option<u32>,
     /// The `next_cursor` of the previous page.
     pub cursor: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    pub count: Option<bool>,
 }
 
 /// A step of a return.
@@ -133,6 +137,14 @@ pub(crate) struct LookupWarrantyInput {
     pub serial: Option<String>,
     /// Phone number the buyer ordered with.
     pub phone: Option<String>,
+    /// Maximum number of warranties, 1 to 200. Defaults to 50.
+    pub limit: Option<u32>,
+    /// The `next_cursor` of the previous page.
+    pub cursor: Option<String>,
+    /// `desc` (newest first, the default) or `asc` (oldest first).
+    pub order: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    pub count: Option<bool>,
 }
 
 /// A status change of a warranty claim.
@@ -162,7 +174,9 @@ pub(crate) fn all(service: &Arc<OrdersService>) -> Vec<Tool> {
             move |tenant: TenantContext, principal: Principal, input: ListOrdersInput| {
                 let service = list.clone();
                 async move {
-                    let page = PageInput::new(input.limit, input.cursor, None).page()?;
+                    let page = PageInput::new(input.limit, input.cursor, None)
+                        .with_count(input.count.unwrap_or(false))
+                        .page()?;
                     let filter = OrderFilter {
                         status: input.status,
                         org_id: input.org_id,
@@ -269,7 +283,9 @@ pub(crate) fn all(service: &Arc<OrdersService>) -> Vec<Tool> {
             move |tenant: TenantContext, principal: Principal, input: ListReturnsInput| {
                 let service = returns.clone();
                 async move {
-                    let page = PageInput::new(input.limit, input.cursor, None).page()?;
+                    let page = PageInput::new(input.limit, input.cursor, None)
+                        .with_count(input.count.unwrap_or(false))
+                        .page()?;
                     let filter = ReturnFilter {
                         status: input.status,
                         org_id: input.org_id,
@@ -315,21 +331,25 @@ pub(crate) fn all(service: &Arc<OrdersService>) -> Vec<Tool> {
         Tool::new(
             "lookup_warranty",
             "Find warranties of shops in your scope by `serial` or buyer `phone` (either matches): \
-             product, order line, start, end and `active` / `expired`.",
+             product, order line, start, end and `active` / `expired`. Newest first; follow \
+             `pagination.next_cursor` for more.",
             move |tenant: TenantContext, principal: Principal, input: LookupWarrantyInput| {
                 let service = lookup.clone();
                 async move {
+                    // Cùng kiểu tham số trang với REST (`PageQuery`, mặc định `desc`).
+                    let page = PageInput::new(input.limit, input.cursor, input.order)
+                        .with_count(input.count.unwrap_or(false))
+                        .page()?;
                     let rows = service
                         .find_warranties(
                             &tenant,
                             &principal,
                             input.serial.as_deref(),
                             input.phone.as_deref(),
+                            &page,
                         )
                         .await?;
-                    Ok::<Vec<WarrantyResponse>, Error>(
-                        rows.into_iter().map(WarrantyResponse::new).collect(),
-                    )
+                    Ok::<Page<WarrantyResponse>, Error>(rows.map(WarrantyResponse::new))
                 }
             },
         )

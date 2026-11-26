@@ -21,6 +21,7 @@ use autoxide_invoices::api::{Buyer, Document, NewDocument, NewDocumentLine, Rend
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::{Actor, Delivered, EventHandler, Subscription};
 use autoxide_kernel::money::{Currency, Money};
+use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::reference::Submitted;
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext};
 use sea_orm::sea_query::Expr;
@@ -510,23 +511,59 @@ impl OrdersService {
         &self,
         tenant: &TenantContext,
         id: Uuid,
-    ) -> Result<Vec<(invoice_link::Model, Option<Document>)>, Error> {
-        let links = invoice_link::Entity::find()
+        page: &PageRequest,
+    ) -> Result<Page<(invoice_link::Model, Option<Document>)>, Error> {
+        // Theo thứ tự tạo (id UUIDv7 sinh cùng lúc `created_at`), keyset trong database (index
+        // `orders_invoice_links_order_page_idx`).
+        let select = invoice_link::Entity::find()
+            .filter(invoice_link::Column::OrderId.eq(id))
+            .filter(invoice_link::Column::Status.ne("draft"))
+            .scoped(tenant);
+        let links = fetch_page(
+            select,
+            invoice_link::Column::Id,
+            |row| row.id,
+            page,
+            tenant.database().read(),
+        )
+        .await?;
+        let mut found = Vec::with_capacity(links.data.len());
+        for link in links.data {
+            found.push(self.with_document(tenant, link).await?);
+        }
+        Ok(Page { data: found, pagination: links.pagination })
+    }
+
+    /// Một chứng từ (đã phát hành, không còn nháp) của đơn `id`, đọc lại từ database.
+    pub(crate) async fn order_document(
+        &self,
+        tenant: &TenantContext,
+        id: Uuid,
+        link_id: Uuid,
+    ) -> Result<Option<(invoice_link::Model, Option<Document>)>, Error> {
+        let found = invoice_link::Entity::find_by_id(link_id)
             .filter(invoice_link::Column::OrderId.eq(id))
             .filter(invoice_link::Column::Status.ne("draft"))
             .scoped(tenant)
-            .order_by_asc(invoice_link::Column::CreatedAt)
-            .all(tenant.database().read())
+            .one(tenant.database().read())
             .await?;
-        let mut found = Vec::with_capacity(links.len());
-        for link in links {
-            let document = match &self.invoices {
-                Some(invoices) => invoices.document(tenant, link.document_id).await?,
-                None => None,
-            };
-            found.push((link, document));
+        match found {
+            Some(link) => Ok(Some(self.with_document(tenant, link).await?)),
+            None => Ok(None),
         }
-        Ok(found)
+    }
+
+    /// Chứng từ của `invoices` gắn với một dòng liên kết (không có khi chưa bật hoá đơn điện tử).
+    async fn with_document(
+        &self,
+        tenant: &TenantContext,
+        link: invoice_link::Model,
+    ) -> Result<(invoice_link::Model, Option<Document>), Error> {
+        let document = match &self.invoices {
+            Some(invoices) => invoices.document(tenant, link.document_id).await?,
+            None => None,
+        };
+        Ok((link, document))
     }
 
     /// Bản in (PDF) của một chứng từ của đơn `id`.

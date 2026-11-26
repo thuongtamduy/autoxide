@@ -11,6 +11,7 @@ mod display_price;
 mod extensions;
 mod from_images;
 mod media_alts;
+mod pages;
 mod pricing;
 mod products;
 mod public;

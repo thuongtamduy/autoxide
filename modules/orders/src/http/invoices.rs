@@ -8,9 +8,10 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::money::Money;
+use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, HeaderValue, header};
 use axum::response::{IntoResponse, Response};
 use serde::{Deserialize, Serialize};
@@ -110,10 +111,8 @@ async fn requested(
     let link = service.request_invoice(tenant, row, body.into()).await?;
     let document = match link {
         Some(link) => service
-            .order_documents(tenant, id)
+            .order_document(tenant, id, link.id)
             .await?
-            .into_iter()
-            .find(|(found, _)| found.id == link.id)
             .map(|(link, document)| document_response(link, document)),
         None => None,
     };
@@ -184,26 +183,27 @@ async fn documents(
     service: &OrdersService,
     tenant: &TenantContext,
     id: Uuid,
-) -> Result<Data<Vec<DocumentResponse>>, Error> {
-    let found = service.order_documents(tenant, id).await?;
-    Ok(Data {
-        data: found.into_iter().map(|(link, document)| document_response(link, document)).collect(),
-    })
+    page: &PageRequest,
+) -> Result<Page<DocumentResponse>, Error> {
+    let found = service.order_documents(tenant, id, page).await?;
+    Ok(found.map(|(link, document)| document_response(link, document)))
 }
 
 /// Documents of one of your orders.
 ///
-/// Signed in: an order you placed. Invoices and adjustments issued for it.
+/// Signed in: an order you placed. Invoices and adjustments issued for it. Newest first unless
+/// `order=asc`; paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/me/orders/{id}/documents",
     extensions(("x-permissions" = json!([]))),
     operation_id = "list_my_order_documents",
-    params(("id" = Uuid, Path, description = "Id of the order.")),
+    params(("id" = Uuid, Path, description = "Id of the order."), PageQuery),
     responses(
-        (status = 200, description = "The documents (empty when none yet).", body = Data<Vec<DocumentResponse>>),
+        (status = 200, description = "One page of the documents (empty when none yet).", body = Page<DocumentResponse>),
         (status = 401, description = "Not signed in; code `unauthenticated`.", body = Problem),
         (status = 404, description = "No such order of yours; code `orders.order_not_found`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 pub(crate) async fn my_documents(
@@ -211,14 +211,17 @@ pub(crate) async fn my_documents(
     tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
-) -> Result<Data<Vec<DocumentResponse>>, Error> {
+    Query(page): Query<PageQuery>,
+) -> Result<Page<DocumentResponse>, Error> {
+    let page = PageRequest::try_from(page)?;
     service.my_order(&tenant, principal.user_id(), id).await?;
-    documents(&service, &tenant, id).await
+    documents(&service, &tenant, id, &page).await
 }
 
 /// Documents of a guest order.
 ///
-/// Public with the `Order-Token` header: only the order the token opens.
+/// Public with the `Order-Token` header: only the order the token opens. Newest first unless
+/// `order=asc`; paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/public/orders/{id}/documents",
@@ -228,11 +231,13 @@ pub(crate) async fn my_documents(
     params(
         ("id" = Uuid, Path, description = "Id of the order."),
         ("Order-Token" = String, Header, description = "Access token of the order."),
+        PageQuery,
     ),
     responses(
-        (status = 200, description = "The documents (empty when none yet).", body = Data<Vec<DocumentResponse>>),
+        (status = 200, description = "One page of the documents (empty when none yet).", body = Page<DocumentResponse>),
         (status = 401, description = "Missing, wrong or expired token; code `orders.lookup_token_invalid`.", body = Problem),
         (status = 404, description = "The token opens another order; code `orders.order_not_found`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 pub(crate) async fn guest_documents(
@@ -240,11 +245,13 @@ pub(crate) async fn guest_documents(
     tenant: TenantContext,
     headers: HeaderMap,
     Path(id): Path<Uuid>,
-) -> Result<Data<Vec<DocumentResponse>>, Error> {
+    Query(page): Query<PageQuery>,
+) -> Result<Page<DocumentResponse>, Error> {
     let token = headers.get(ORDER_TOKEN).and_then(|value| value.to_str().ok());
     let access = service.guest_access(&tenant, token).await?;
     service.guest_order(&tenant, &access, id).await?;
-    documents(&service, &tenant, id).await
+    let page = PageRequest::try_from(page)?;
+    documents(&service, &tenant, id, &page).await
 }
 
 fn pdf(rendered: autoxide_invoices::api::Rendered) -> Response {

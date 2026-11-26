@@ -16,6 +16,7 @@ use std::sync::Arc;
 use autoxide_kernel::access::{OrgTarget, Principal};
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::{Actor, Delivered, EventHandler, Subscription};
+use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::sms::PhoneNumber;
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext};
 use sea_orm::sea_query::Expr;
@@ -242,7 +243,8 @@ impl OrdersService {
         principal: &Principal,
         serial: Option<&str>,
         phone: Option<&str>,
-    ) -> Result<Vec<warranty::Model>, Error> {
+        page: &PageRequest,
+    ) -> Result<Page<warranty::Model>, Error> {
         principal.require(&WARRANTY_MANAGE)?;
         let mut condition = Condition::any();
         if let Some(serial) = serial.map(str::trim).filter(|serial| !serial.is_empty()) {
@@ -267,13 +269,10 @@ impl OrdersService {
             )]));
         }
         let scope = principal.scope_condition(&WARRANTY_MANAGE, warranty::Column::OrgId, None)?;
-        Ok(warranty::Entity::find()
-            .filter(condition)
-            .filter(scope)
-            .scoped(tenant)
-            .order_by_desc(warranty::Column::Id)
-            .all(tenant.database().read())
-            .await?)
+        // Theo thứ tự tạo (id UUIDv7), keyset trong database (index `orders_warranties_serial_page_idx`,
+        // `orders_warranties_key_page_idx`).
+        let select = warranty::Entity::find().filter(condition).filter(scope).scoped(tenant);
+        fetch_page(select, warranty::Column::Id, |row| row.id, page, tenant.database().read()).await
     }
 
     /// `GET /me/warranties`: bảo hành của người mua.
@@ -281,13 +280,12 @@ impl OrdersService {
         &self,
         tenant: &TenantContext,
         buyer: Uuid,
-    ) -> Result<Vec<warranty::Model>, Error> {
-        Ok(warranty::Entity::find()
-            .filter(warranty::Column::BuyerUserId.eq(buyer))
-            .scoped(tenant)
-            .order_by_desc(warranty::Column::Id)
-            .all(tenant.database().read())
-            .await?)
+        page: &PageRequest,
+    ) -> Result<Page<warranty::Model>, Error> {
+        // Index `orders_warranties_buyer_page_idx` (tenant_id, buyer_user_id, id).
+        let select =
+            warranty::Entity::find().filter(warranty::Column::BuyerUserId.eq(buyer)).scoped(tenant);
+        fetch_page(select, warranty::Column::Id, |row| row.id, page, tenant.database().read()).await
     }
 
     /// `POST /warranty-claims`: tiếp nhận yêu cầu bảo hành tại nút `org` (còn hạn, chưa huỷ).

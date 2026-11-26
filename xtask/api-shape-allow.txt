@@ -33,33 +33,8 @@ api-unpaged-list GET /api/v1/auth/support-access # có trước luật
 api-unpaged-list GET /api/v1/auth/support-grants # có trước luật
 api-unpaged-list GET /api/v1/auth/users/{id}/memberships # có trước luật
 api-unpaged-list GET /api/v1/auth/users/{id}/roles # có trước luật
-api-unpaged-list GET /api/v1/catalog/attributes # có trước luật
-api-unpaged-list GET /api/v1/catalog/categories # có trước luật
-api-unpaged-list GET /api/v1/catalog/categories/{id}/attributes # có trước luật
-api-unpaged-list GET /api/v1/catalog/orders/{id}/downloads # có trước luật
-api-unpaged-list GET /api/v1/catalog/products/counts # có trước luật
-api-unpaged-list GET /api/v1/catalog/products/{id}/attributes # có trước luật
-api-unpaged-list GET /api/v1/catalog/products/{id}/documents # có trước luật
-api-unpaged-list GET /api/v1/catalog/public/categories # có trước luật
-api-unpaged-list GET /api/v1/catalog/public/products/{id}/frequently-bought-together # có trước luật
-api-unpaged-list GET /api/v1/catalog/public/products/{id}/similar # có trước luật
-api-unpaged-list GET /api/v1/catalog/public/search/suggest # có trước luật
-api-unpaged-list GET /api/v1/catalog/restriction-rules # có trước luật
-api-unpaged-list GET /api/v1/catalog/rounding-rules # có trước luật
-api-unpaged-list GET /api/v1/catalog/variants # có trước luật
-api-unpaged-list GET /api/v1/catalog/variants/{id}/attributes # có trước luật
-api-unpaged-list GET /api/v1/catalog/variants/{id}/digital-assets # có trước luật
+api-unpaged-list GET /api/v1/catalog/variants # tra cứu theo mã client gửi (`code`): tối đa một biến thể theo SKU và một theo mã vạch, không phải danh sách lớn dần
 api-unpaged-list GET /api/v1/comments/public/counts # tra cứu theo id client gửi (tối đa 100), giữ thứ tự hỏi — chờ chủ dự án duyệt ngoại lệ
-api-unpaged-list GET /api/v1/compliance/documents # có trước luật
-api-unpaged-list GET /api/v1/compliance/documents/{id}/acceptance-stats # có trước luật
-api-unpaged-list GET /api/v1/compliance/me/consents # có trước luật
-api-unpaged-list GET /api/v1/compliance/me/pending-acceptances # có trước luật
-api-unpaged-list GET /api/v1/compliance/policies # có trước luật
-api-unpaged-list GET /api/v1/compliance/public/purposes # có trước luật
-api-unpaged-list GET /api/v1/compliance/purposes # có trước luật
-api-unpaged-list GET /api/v1/compliance/retention # có trước luật
-api-unpaged-list GET /api/v1/compliance/rules # có trước luật
-api-unpaged-list GET /api/v1/compliance/tracking-providers # có trước luật
 api-unpaged-list GET /api/v1/inventory/public/availability # tra cứu theo biến thể client gửi (tối đa 100) — chờ chủ dự án duyệt ngoại lệ
 api-unpaged-list GET /api/v1/kernel/approvals # có trước luật
 api-unpaged-list GET /api/v1/kernel/blocks # một dòng cho mỗi loại khối mà module đang chạy khai (bước 67): tập nhỏ, cố định theo binary, như sổ module
@@ -83,33 +58,9 @@ api-unpaged-list GET /api/v1/kernel/tenants/{id}/exports # có trước luật
 api-unpaged-list GET /api/v1/kernel/tenants/{id}/settings # có trước luật
 api-unpaged-list GET /api/v1/kernel/texts # có trước luật
 api-unpaged-list GET /api/v1/kernel/whats-new # có trước luật
-api-unpaged-list GET /api/v1/orders/me/orders/{id}/documents # có trước luật
-api-unpaged-list GET /api/v1/orders/me/warranties # có trước luật
-api-unpaged-list GET /api/v1/orders/public/orders/{id}/documents # có trước luật
-api-unpaged-list GET /api/v1/orders/reports/sales # có trước luật
-api-unpaged-list GET /api/v1/orders/risk/cod-blocks # có trước luật
-api-unpaged-list GET /api/v1/orders/risk/cod-rules # có trước luật
-api-unpaged-list GET /api/v1/orders/warranties # có trước luật
-api-unpaged-list GET /api/v1/orders/{id}/refunds # có trước luật
-api-unpaged-list GET /api/v1/promotions/legal-limits # có trước luật
-api-unpaged-list GET /api/v1/promotions/notice-rules # có trước luật
-api-unpaged-list GET /api/v1/promotions/promotions/{id}/conflicts # có trước luật
-api-unpaged-list GET /api/v1/promotions/promotions/{id}/participations # có trước luật
-api-unpaged-list GET /api/v1/promotions/promotions/{id}/stats # có trước luật
-api-unpaged-list GET /api/v1/promotions/promotions/{id}/versions # có trước luật
-api-unpaged-list GET /api/v1/promotions/public/promotions/for-product/{product_id} # có trước luật
 # api-param-description: tham số có sẵn trước luật (25/11/2026); thêm mô tả trong PR đại trà của module rồi xoá dòng
-api-param-description GET /api/v1/catalog/products?status # có trước luật
-api-param-description GET /api/v1/catalog/products?kind # có trước luật
-api-param-description GET /api/v1/catalog/variants/{id}/price?customer_group # có trước luật
 api-param-description GET /api/v1/newsletter/campaigns?status # có trước luật
 api-param-description GET /api/v1/newsletter/campaigns?list_id # có trước luật
-api-param-description GET /api/v1/orders/reviews?product_id # có trước luật
-api-param-description GET /api/v1/orders/reviews/count?product_id # có trước luật
-api-param-description GET /api/v1/promotions/me/vouchers?status # có trước luật
-api-param-description GET /api/v1/promotions/promotions?status # có trước luật
-api-param-description GET /api/v1/promotions/promotions?kind # có trước luật
-api-param-description GET /api/v1/promotions/redemptions?order_id # có trước luật
 api-param-description GET /api/v1/shipping/shipments?order_id # có trước luật
 api-param-description GET /api/v1/shipping/shipments?status # có trước luật
 api-param-description GET /api/v1/shipping/shipments?org_id # có trước luật
@@ -126,17 +77,8 @@ mcp-page-count TOOL auth.list_invitations # có trước luật
 mcp-page-count TOOL auth.list_memberships # có trước luật
 mcp-page-count TOOL auth.list_users # có trước luật
 mcp-page-count TOOL bookings.list_bookings # có trước luật
-mcp-page-count TOOL catalog.list_collections # có trước luật
-mcp-page-count TOOL catalog.list_products # có trước luật
 mcp-page-count TOOL comments.queue # có trước luật
 mcp-page-count TOOL comments.unanswered # có trước luật
-mcp-page-count TOOL compliance.incidents # có trước luật
-mcp-page-count TOOL compliance.kyc_profiles # có trước luật
-mcp-page-count TOOL compliance.legal_profiles # có trước luật
-mcp-page-count TOOL compliance.list_cases # có trước luật
-mcp-page-count TOOL compliance.subject_requests # có trước luật
-mcp-page-count TOOL compliance.tracking_tags # có trước luật
-mcp-page-count TOOL compliance.websites # có trước luật
 mcp-page-count TOOL content.list # có trước luật
 mcp-page-count TOOL content.list_banners # có trước luật
 mcp-page-count TOOL content.list_revisions # có trước luật
@@ -158,9 +100,6 @@ mcp-page-count TOOL media.list # có trước luật
 mcp-page-count TOOL media.list_tags # có trước luật
 mcp-page-count TOOL newsletter.find_subscribers # có trước luật
 mcp-page-count TOOL newsletter.list_lists # có trước luật
-mcp-page-count TOOL orders.list_orders # có trước luật
-mcp-page-count TOOL orders.list_returns # có trước luật
-mcp-page-count TOOL promotions.list_promotions # có trước luật
 mcp-page-count TOOL reporting.facts # có trước luật
 mcp-page-count TOOL shipping.list_cod_discrepancies # có trước luật
 mcp-page-count TOOL shipping.list_shipments # có trước luật

@@ -3089,10 +3089,42 @@
         "returns_secret": false
       },
       "deprecation": null,
-      "description": "List every category of the tenant, by depth then display order.",
+      "description": "List the categories of the tenant, by depth then display order (parents before children); follow `pagination.next_cursor` for more.",
       "input_schema": {
         "additionalProperties": false,
-        "description": "No input.",
+        "description": "One page of the categories: the same as the query parameters of `GET /api/v1/catalog/categories`.",
+        "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of categories, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`asc` (the default: parents first) or `desc`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
         "type": "object"
       },
       "name": "catalog.list_categories",
@@ -3115,6 +3147,13 @@
         "additionalProperties": false,
         "description": "Paging and filter of the collection list.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "The `next_cursor` of the previous page.",
             "type": [
@@ -3165,6 +3204,13 @@
             "format": "uuid",
             "type": [
               "string",
+              "null"
+            ]
+          },
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
               "null"
             ]
           },
@@ -4352,10 +4398,42 @@
         "returns_secret": false
       },
       "deprecation": null,
-      "description": "List the legal documents of the tenant (terms of use, privacy policy…) with their current version number.",
+      "description": "List the legal documents of the tenant (terms of use, privacy policy…) with their current version number, by kind; follow `pagination.next_cursor` for more.",
       "input_schema": {
         "additionalProperties": false,
-        "description": "The tool takes no arguments.",
+        "description": "One page of a list in its natural order (kind, key…): the same as the `limit`, `cursor`, `order`\nand `count` query parameters of the REST endpoint.",
+        "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of items, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`asc` (the default, A→Z) or `desc`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
         "type": "object"
       },
       "name": "compliance.documents",
@@ -4450,6 +4528,13 @@
         "additionalProperties": false,
         "description": "Records with a deadline.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "The `next_cursor` of the previous page.",
             "type": [
@@ -4500,6 +4585,13 @@
         "additionalProperties": false,
         "description": "Which profiles.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "The `next_cursor` of the previous page.",
             "type": [
@@ -4546,6 +4638,13 @@
         "additionalProperties": false,
         "description": "One page of a list.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "The `next_cursor` of the previous page.",
             "type": [
@@ -4585,6 +4684,13 @@
         "additionalProperties": false,
         "description": "Which cases.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "The `next_cursor` of the previous page.",
             "type": [
@@ -4702,10 +4808,42 @@
         "returns_secret": false
       },
       "deprecation": null,
-      "description": "The legal documents you must accept (again) before going on.",
+      "description": "The legal documents you must accept (again) before going on, by kind; follow `pagination.next_cursor` for more.",
       "input_schema": {
         "additionalProperties": false,
-        "description": "The tool takes no arguments.",
+        "description": "One page of a list in its natural order (kind, key…): the same as the `limit`, `cursor`, `order`\nand `count` query parameters of the REST endpoint.",
+        "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of items, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`asc` (the default, A→Z) or `desc`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
         "type": "object"
       },
       "name": "compliance.pending_acceptances",
@@ -4798,10 +4936,42 @@
         "returns_secret": false
       },
       "deprecation": null,
-      "description": "List the tenant's purposes for processing personal data with their legal basis (Vietnam, Personal Data Protection Law 91/2025/QH15).",
+      "description": "List the tenant's purposes for processing personal data with their legal basis (Vietnam, Personal Data Protection Law 91/2025/QH15), by key; follow `pagination.next_cursor` for more.",
       "input_schema": {
         "additionalProperties": false,
-        "description": "The tool takes no arguments.",
+        "description": "One page of a list in its natural order (kind, key…): the same as the `limit`, `cursor`, `order`\nand `count` query parameters of the REST endpoint.",
+        "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of items, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`asc` (the default, A→Z) or `desc`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
         "type": "object"
       },
       "name": "compliance.purposes",
@@ -4908,10 +5078,42 @@
         "returns_secret": false
       },
       "deprecation": null,
-      "description": "How long each kind of personal data is kept, compared with the limits of the legal rule `privacy.retention_limits` (`ok`, `exceeds_limit`, `forever_not_allowed`).",
+      "description": "How long each kind of personal data is kept, compared with the limits of the legal rule `privacy.retention_limits` (`ok`, `exceeds_limit`, `forever_not_allowed`), by module and name; follow `pagination.next_cursor` for more.",
       "input_schema": {
         "additionalProperties": false,
-        "description": "The tool takes no arguments.",
+        "description": "One page of a list in its natural order (kind, key…): the same as the `limit`, `cursor`, `order`\nand `count` query parameters of the REST endpoint.",
+        "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of items, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`asc` (the default, A→Z) or `desc`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
         "type": "object"
       },
       "name": "compliance.retention",
@@ -4990,6 +5192,13 @@
         "additionalProperties": false,
         "description": "Records with a deadline.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "The `next_cursor` of the previous page.",
             "type": [
@@ -5040,6 +5249,13 @@
         "additionalProperties": false,
         "description": "Which tags.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "The `next_cursor` of the previous page.",
             "type": [
@@ -5166,6 +5382,13 @@
         "additionalProperties": false,
         "description": "One page of a list.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "The `next_cursor` of the previous page.",
             "type": [
@@ -12770,6 +12993,13 @@
         "additionalProperties": false,
         "description": "Orders to list.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "The `next_cursor` of the previous page.",
             "type": [
@@ -12831,6 +13061,13 @@
         "additionalProperties": false,
         "description": "Returns to list.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "The `next_cursor` of the previous page.",
             "type": [
@@ -12886,11 +13123,41 @@
         "returns_secret": false
       },
       "deprecation": null,
-      "description": "Find warranties of shops in your scope by `serial` or buyer `phone` (either matches): product, order line, start, end and `active` / `expired`.",
+      "description": "Find warranties of shops in your scope by `serial` or buyer `phone` (either matches): product, order line, start, end and `active` / `expired`. Newest first; follow `pagination.next_cursor` for more.",
       "input_schema": {
         "additionalProperties": false,
         "description": "Warranties to find.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of warranties, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "phone": {
             "description": "Phone number the buyer ordered with.",
             "type": [
@@ -14785,6 +15052,13 @@
         "additionalProperties": false,
         "description": "Promotions to list.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "The `next_cursor` of the previous page.",
             "type": [

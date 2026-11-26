@@ -12,7 +12,7 @@ pub(crate) mod transitions;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::event::{Actor, Outbox};
-use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
+use autoxide_kernel::pagination::{Page, PageRequest, SortValue, fetch_page, fetch_page_by};
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext};
 use autoxide_kernel::time::Timestamp;
 use sea_orm::{ColumnTrait, Condition, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder};
@@ -515,14 +515,24 @@ impl PromotionsService {
         tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
-    ) -> Result<Vec<version::Model>, Error> {
+        page: &PageRequest,
+    ) -> Result<Page<version::Model>, Error> {
         let view = self.promotion(tenant, principal, id).await?;
-        Ok(version::Entity::find()
+        // Keyset trong database theo (`version`, id); `version` duy nhất trong một chương trình nên index unique
+        // `promotions_versions_unique` (tenant_id, promotion_id, version) đã đủ cho trang.
+        let select = version::Entity::find()
             .filter(version::Column::PromotionId.eq(view.row.id))
-            .scoped(tenant)
-            .order_by_asc(version::Column::Version)
-            .all(tenant.database().read())
-            .await?)
+            .scoped(tenant);
+        fetch_page_by(
+            select,
+            version::Column::Version,
+            |row| SortValue::Integer(i64::from(row.version)),
+            version::Column::Id,
+            |row| row.id,
+            page,
+            tenant.database().read(),
+        )
+        .await
     }
 }
 
