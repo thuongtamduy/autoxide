@@ -249,7 +249,7 @@ Việc từ rà pháp lý vòng 1 do AI đóng vai (`docs/legal/review-2026-11-r
 
 - [ ] LG-1 (chặn 1.0): quy tắc `moit.checklist.*`, `cases.deadlines` phiên bản mới theo NĐ 248/2026 (thay NĐ 52/2013, 85/2021
       từ 01/7/2026), chuyển tiếp tới 30/6/2027; sửa `COMPLIANCE.md` / `.vi.md` và mẫu trang
-- [ ] LG-2 (chặn 1.0): ngày lập hoá đơn và `tax_point` của đơn theo múi giờ người bán, không theo UTC; test mốc
+- [x] LG-2 (chặn 1.0): ngày lập hoá đơn và `tax_point` của đơn theo múi giờ người bán, không theo UTC; test mốc
       31/12/2026 – 01/01/2027 giờ Việt Nam; xong trước 31/12/2026; qua kiểm độc lập
 - [ ] LG-3: tài liệu nói rõ cổng KYC người bán chưa chặn đăng bán; cài `ListingGate` gọi `KycGate` là điều kiện của module
       sàn; đối chiếu trường KYC với NĐ 248 Điều 18 (từ 01/01/2027)
