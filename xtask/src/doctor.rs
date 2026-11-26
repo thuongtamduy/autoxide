@@ -145,12 +145,38 @@ pub fn run() -> ExitCode {
     if failed {
         println!("Install the tools marked MISSING, then run `cargo xtask doctor` again.");
         ExitCode::FAILURE
+    } else if let gate_missing @ [_, ..] = gate_missing().as_slice() {
+        // `./gate.sh` kiểm các công cụ này ngay đầu và dừng nếu thiếu: không nói "sẵn sàng" khi gate chưa chạy được.
+        println!(
+            "You can build and run the tests, but `./gate.sh` cannot run yet: it needs {}.",
+            gate_missing.join(" and ")
+        );
+        println!("Try `cargo run -p autoxide -- demo`.");
+        ExitCode::SUCCESS
     } else {
         println!(
             "Ready: `./gate.sh --quick` and `cargo test` can run. Try `cargo run -p autoxide -- demo`."
         );
         ExitCode::SUCCESS
     }
+}
+
+/// Công cụ mà `gate.sh` bắt buộc (gate.sh, khối `need`): `cargo-deny`, và `gitleaks` hoặc `docker`.
+fn gate_missing() -> Vec<&'static str> {
+    let found = |program: &str| {
+        TOOLS
+            .iter()
+            .find(|tool| tool.program == program)
+            .is_some_and(|tool| probe(tool) != Found::Missing)
+    };
+    let mut missing = Vec::new();
+    if !found("cargo-deny") {
+        missing.push("cargo-deny");
+    }
+    if !found("gitleaks") && !found("docker") {
+        missing.push("gitleaks (or Docker)");
+    }
+    missing
 }
 
 /// `None` khi `rustc` đang dùng đúng bản ghim (hay không đọc được để so).

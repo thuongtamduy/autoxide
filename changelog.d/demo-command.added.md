@@ -8,3 +8,5 @@
   for each missing one; every violation of `cargo xtask check` / `check-module` now prints a `how to fix:` line.
 - A `.devcontainer/` for Codespaces and VS Code, an English `AGENTS.md` for people and agents outside the project,
   and rules for Cursor (`.cursor/rules`) and Copilot (`.github/copilot-instructions.md`).
+- `autoxide demo` always uses its own SQLite file and ignores `DATABASE_URL` from the environment and `.env`, so it
+  cannot touch a real database; `--database-url` points it at another database on purpose.

@@ -78,7 +78,7 @@ const FIXES: &[(&str, &str)] = &[
     ),
     (
         "i18n",
-        "Add the error code to the module's `locales/vi.json` (the code is the i18n key) and list it in `Module::translations`.",
+        "Add the error code to the module's `locales/vi.json` (the code is the i18n key) and list it in `Module::translations`; a translation for a code that no longer exists is deleted from the file.",
     ),
     (
         "i18n-field",
@@ -129,7 +129,7 @@ const FIXES: &[(&str, &str)] = &[
     ),
     (
         "toolchain",
-        "Change the Rust version in rust-toolchain.toml, examples/external-module (channel and rust-version) and the Dockerfile `ARG RUST_VERSION` together.",
+        "Change the Rust version in rust-toolchain.toml, `rust-version` in the root Cargo.toml, examples/external-module (channel and rust-version) and the Dockerfile `ARG RUST_VERSION` together.",
     ),
 ];
 

@@ -2,13 +2,14 @@
   "name": "Autoxide",
   "image": "mcr.microsoft.com/devcontainers/rust:1-trixie",
   "features": {
-    "ghcr.io/devcontainers/features/node:1": { "version": "lts" }
+    "ghcr.io/devcontainers/features/node:1": { "version": "lts" },
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
   },
   "forwardPorts": [8080],
   "portsAttributes": {
     "8080": { "label": "Autoxide API", "onAutoForward": "notify" }
   },
-  "postCreateCommand": "rustup show active-toolchain && cargo xtask doctor",
+  "postCreateCommand": "rustup show active-toolchain && cargo install cargo-deny cargo-nextest --locked && cargo xtask doctor",
   "customizations": {
     "vscode": {
       "extensions": ["rust-lang.rust-analyzer", "tamasfe.even-better-toml"],

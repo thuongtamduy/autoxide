@@ -43,7 +43,12 @@ cargo run -p autoxide -- demo           # a running server with an admin passwor
    secrets, tokens, passwords or request bodies.
 9. **Tests** for every change, in `tests/integration/` with a `mod` line in `main.rs` (no stray `tests/<name>.rs`).
    Database tests get their database from `TestDatabase::run`, apps from `TestApp::builder`.
-10. **A red gate is fixed in the code**, never by loosening a lint or skipping a test. When `cargo xtask check`
+10. **Feature freeze until 1.0.** No new business modules or features: bug fixes, debt and the items of step 71 of
+    `docs/ROADMAP.md` only. A module of your own lives in your own repository (see the last section).
+11. **Vietnamese law.** Features about e-commerce, personal data, tax, invoices or payments follow the regulations in
+    force; rules that change (rates, deadlines, document lists) are data with an effective date, never hard-coded; write the
+    legal basis in the decision. Unsure: say "needs checking against the source text or a lawyer".
+12. **A red gate is fixed in the code**, never by loosening a lint or skipping a test. When `cargo xtask check`
     reports a violation it prints a `how to fix:` line.
 
 ## Before you push

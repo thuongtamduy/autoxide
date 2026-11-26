@@ -67,6 +67,21 @@ impl ConfigSource {
         self
     }
 
+    /// Sets `name` to `value`, replacing whatever the environment or `.env` said. For commands that must not
+    /// inherit a setting, such as `autoxide demo` and its database.
+    #[must_use]
+    pub fn with_value(mut self, name: &str, value: impl Into<String>) -> Self {
+        self.values.insert(name.to_owned(), value.into());
+        self
+    }
+
+    /// Removes `name`, as if it had never been set.
+    #[must_use]
+    pub fn without(mut self, name: &str) -> Self {
+        self.values.remove(name);
+        self
+    }
+
     /// The value of `name`, trimmed of surrounding whitespace. An empty string counts as unset: `VAR=` in a
     /// `.env` file or compose means "use the default".
     pub fn get(&self, name: &str) -> Option<&str> {
@@ -85,6 +100,15 @@ mod tests {
         assert_eq!(source.get("B"), None);
         assert_eq!(source.get("C"), Some("x"));
         assert_eq!(source.get("MISSING"), None);
+    }
+
+    #[test]
+    fn mac_dinh_khong_de_len_gia_tri_da_dat_nhung_with_value_thi_co() {
+        let source =
+            ConfigSource::from_pairs([("A", "user")]).with_default("A", "d").with_default("B", "d");
+        assert_eq!((source.get("A"), source.get("B")), (Some("user"), Some("d")));
+        let source = source.with_value("A", "forced").without("B");
+        assert_eq!((source.get("A"), source.get("B")), (Some("forced"), None));
     }
 
     /// A temporary directory private to one test, removed automatically when done.

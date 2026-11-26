@@ -35,6 +35,8 @@ or Microsoft certificate, so the system may warn the first time:
 Then open `http://127.0.0.1:8080/api/docs` for the API reference and sign in with the printed
 administrator account (`POST /api/v1/auth/login`).
 
+The demo always uses its own SQLite file in the demo folder: it ignores `DATABASE_URL` from your environment and `.env`, so it cannot touch a real database. `--database-url <url>` points it at another database on purpose.
+
 Not for production: the secrets sit in a plain file in the demo folder, and the API reference page
 loads its viewer script from a public CDN.
 

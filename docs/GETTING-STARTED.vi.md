@@ -34,6 +34,8 @@ Apple hay Microsoft, nên hệ điều hành có thể cảnh báo lần đầu:
 Rồi mở `http://127.0.0.1:8080/api/docs` xem tài liệu API và đăng nhập bằng tài khoản quản trị đã in
 (`POST /api/v1/auth/login`).
 
+Demo luôn dùng file SQLite riêng trong thư mục demo: nó bỏ qua `DATABASE_URL` trong môi trường và `.env`, nên không thể chạm vào database thật. `--database-url <url>` trỏ nó tới database khác khi bạn chủ ý.
+
 Không dùng cho production: secret nằm trong một file thường ở thư mục demo, và trang tài liệu API nạp
 script xem từ một CDN công cộng.
 
