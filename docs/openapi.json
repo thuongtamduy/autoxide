@@ -210972,7 +210972,7 @@
             }
           },
           {
-            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the first page. Treat the value as opaque.",
             "in": "query",
             "name": "cursor",
             "required": false,
@@ -210981,12 +210981,12 @@
             }
           },
           {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order (and `sort`, where offered) while following `next_cursor`: changing it midway only changes where the next page starts.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
               "default": "desc",
-              "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same order while following `next_cursor`: changing it midway only changes where the next page starts.",
               "enum": [
                 "asc",
                 "desc"
@@ -210995,7 +210995,7 @@
             }
           },
           {
-            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the first page (without `cursor`). Costs one more query; leave it out when not needed.",
             "example": true,
             "in": "query",
             "name": "count",
@@ -211092,7 +211092,7 @@
             "operator": "eq"
           },
           {
-            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the first page (without `cursor`). Costs one more query; leave it out when not needed.",
             "kind": "boolean",
             "name": "count",
             "operator": "eq"
