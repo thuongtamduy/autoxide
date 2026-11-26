@@ -57,7 +57,7 @@ fn view(row: edit_lock::Model, principal: &Principal) -> EditLock {
 }
 
 fn holds(row: &edit_lock::Model, principal: &Principal) -> bool {
-    row.user_id == principal.user_id() && row.api_key_id == principal.api_key_id()
+    row.user_id == principal.user_id() && row.api_key_id == principal.credential_id()
 }
 
 /// 409 `content.edit_locked`: người khác đang giữ khoá.
@@ -73,7 +73,7 @@ pub(crate) fn locked(lock: &EditLock) -> Error {
 
 /// Điều kiện "khoá này của người gọi" (cùng người, cùng API key — NULL so bằng `IS NULL`).
 fn owned_by(principal: &Principal) -> Condition {
-    let key = match principal.api_key_id() {
+    let key = match principal.credential_id() {
         Some(key) => Column::ApiKeyId.eq(key),
         None => Column::ApiKeyId.is_null(),
     };
@@ -119,7 +119,7 @@ impl ContentService {
             tenant_id: Set(tenant.id().as_uuid()),
             entry_id: Set(id),
             user_id: Set(principal.user_id()),
-            api_key_id: Set(principal.api_key_id()),
+            api_key_id: Set(principal.credential_id()),
             acquired_at: Set(now),
             expires_at: Set(now + SignedDuration::from_secs(EDIT_LOCK_SECONDS)),
         };

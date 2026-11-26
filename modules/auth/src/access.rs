@@ -28,7 +28,7 @@ use crate::session::{SessionService, bearer_token};
 /// tài khoản hay tạo credential mới (API key, token SCIM, nhà cung cấp đăng nhập). Kiểm ở service
 /// layer để REST và MCP cùng chặn.
 pub(crate) fn require_session(principal: &Principal) -> Result<(), Error> {
-    if principal.api_key_id().is_some() {
+    if !principal.is_session() {
         return Err(Error::forbidden(
             "auth.session_required",
             "This action needs you to be signed in with your password; an API key cannot do it.",
