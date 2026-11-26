@@ -5,8 +5,8 @@ use std::sync::Arc;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::module::{ClientSection, TenantClientSection};
 use autoxide_kernel::tenancy::TenantContext;
-use serde::Serialize;
 use autoxide_spike_macros::Schema as ToSchema;
+use serde::Serialize;
 
 use crate::config::ContentConfig;
 

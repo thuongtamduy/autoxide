@@ -17,13 +17,13 @@ use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Page, PageRequest, SortValue, fetch_page, fetch_page_by};
 use autoxide_kernel::rows;
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
+use autoxide_spike_macros::Schema as ToSchema;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter,
     QuerySelect, Set, SqlErr,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use autoxide_spike_macros::Schema as ToSchema;
 use uuid::Uuid;
 
 use crate::entity::ROOT;

@@ -42,7 +42,9 @@ struct Extra {
 enum Kind {
     /// First.
     A,
-    B { value: u32 },
+    B {
+        value: u32,
+    },
 }
 
 #[test]

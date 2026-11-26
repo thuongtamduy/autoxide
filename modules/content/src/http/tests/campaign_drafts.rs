@@ -12,8 +12,8 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::mcp::Tool;
 use autoxide_kernel::module::{Module, StartContext};
 use autoxide_kernel::resource::{Resource, ResourceResolver};
-use serde::Deserialize;
 use autoxide_spike_macros::Schema as ToSchema;
+use serde::Deserialize;
 use validator::Validate;
 
 use super::*;

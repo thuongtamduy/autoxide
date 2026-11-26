@@ -9,10 +9,10 @@ use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::response::{Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::time::Timestamp;
+use autoxide_spike_macros::Schema as ToSchema;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use serde::{Deserialize, Serialize};
-use autoxide_spike_macros::Schema as ToSchema;
 use uuid::Uuid;
 use validator::Validate;
 

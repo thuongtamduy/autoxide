@@ -2,7 +2,6 @@
 //! `db` API, run on SQLite and Postgres (`TEST_DATABASE_URL`). Plus the tenant escape hatches the review named.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::too_many_lines)]
 
-use std::collections::HashMap;
 use autoxide_kernel::config::{ConfigReader, ConfigSource, DatabaseConfig};
 use autoxide_kernel::database::Database;
 use autoxide_kernel::tenancy::{MAIN_PLACEMENT, TenantContext, TenantId, TenantStatus};
@@ -12,6 +11,7 @@ use autoxide_spike_db::{
 };
 use autoxide_testkit::TestDatabase;
 use sea_orm::ConnectionTrait as _;
+use std::collections::HashMap;
 use uuid::Uuid;
 
 // ── records (what `#[derive(Record)]` would generate) ──

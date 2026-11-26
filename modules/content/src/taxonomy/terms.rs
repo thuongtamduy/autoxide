@@ -10,6 +10,7 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
+use autoxide_spike_macros::Schema as ToSchema;
 use sea_orm::sea_query::Query;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseTransaction, EntityTrait,
@@ -17,7 +18,6 @@ use sea_orm::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use autoxide_spike_macros::Schema as ToSchema;
 use uuid::Uuid;
 
 use crate::entity::{entry, entry_term, published, term, term_translation};

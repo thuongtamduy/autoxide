@@ -42,9 +42,9 @@ use std::sync::Arc;
 
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::pagination::{Order, PageQuery, PageRequest, SortChoicePageQuery};
+use autoxide_spike_macros::Schema as ToSchema;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
-use autoxide_spike_macros::Schema as ToSchema;
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 use uuid::Uuid;

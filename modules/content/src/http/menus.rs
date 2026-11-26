@@ -10,10 +10,10 @@ use autoxide_kernel::pagination::{NaturalOrderPageQuery, Page, PageRequest};
 use autoxide_kernel::response::{Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, Tagged};
+use autoxide_spike_macros::Schema as ToSchema;
 use axum::extract::{Path, Query, State};
 use serde::{Deserialize, Serialize};
 use utoipa::IntoParams;
-use autoxide_spike_macros::Schema as ToSchema;
 use uuid::Uuid;
 use validator::Validate;
 

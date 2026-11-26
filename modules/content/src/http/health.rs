@@ -7,10 +7,10 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::response::{Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::time::Timestamp;
+use autoxide_spike_macros::Schema as ToSchema;
 use axum::extract::{Path, Query, State};
 use serde::{Deserialize, Serialize};
 use utoipa::IntoParams;
-use autoxide_spike_macros::Schema as ToSchema;
 use uuid::Uuid;
 
 use crate::health::{Finding, HealthReport};

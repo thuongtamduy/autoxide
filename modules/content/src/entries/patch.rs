@@ -6,9 +6,9 @@
 //! Tự viết (~150 dòng) thay vì thêm thư viện: sáu thao tác, không phụ thuộc gì ngoài `serde_json`.
 
 use autoxide_kernel::error::FieldError;
+use autoxide_spike_macros::Schema as ToSchema;
 use serde::Deserialize;
 use serde_json::Value;
-use autoxide_spike_macros::Schema as ToSchema;
 
 /// Số thao tác tối đa của một patch.
 pub(crate) const MAX_OPERATIONS: usize = 200;

@@ -11,11 +11,11 @@ use autoxide_kernel::i18n::{Language, Translations};
 use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
+use autoxide_spike_macros::Schema as ToSchema;
 use axum::extract::{Path, Query, State};
 use axum::http::{HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use serde::{Deserialize, Serialize};
-use autoxide_spike_macros::Schema as ToSchema;
 use uuid::Uuid;
 use validator::Validate;
 

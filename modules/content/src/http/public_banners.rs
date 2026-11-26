@@ -7,13 +7,13 @@ use std::sync::Arc;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::response::{Data, Problem};
 use autoxide_kernel::tenancy::{Site, SiteQuery, TenantContext};
+use autoxide_spike_macros::Schema as ToSchema;
 use axum::extract::{Path, Query, State};
 use axum::http::{HeaderValue, header};
 use axum::response::{IntoResponse, Response};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use utoipa::IntoParams;
-use autoxide_spike_macros::Schema as ToSchema;
 
 use super::placements::Ratio;
 use super::public::{PublicMedia, media};

@@ -10,10 +10,10 @@ use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, Tagged};
+use autoxide_spike_macros::Schema as ToSchema;
 use axum::extract::{Path, Query, State};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use autoxide_spike_macros::Schema as ToSchema;
 use uuid::Uuid;
 use validator::Validate;
 

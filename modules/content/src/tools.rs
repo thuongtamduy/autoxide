@@ -17,9 +17,9 @@ use autoxide_kernel::mcp::{PageInput, Tool};
 use autoxide_kernel::pagination::{Page, PageQuery};
 use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, etag};
+use autoxide_spike_macros::Schema as ToSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use autoxide_spike_macros::Schema as ToSchema;
 use uuid::Uuid;
 use validator::Validate;
 

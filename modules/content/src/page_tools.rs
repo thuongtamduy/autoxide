@@ -7,8 +7,8 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::mcp::Tool;
 use autoxide_kernel::tenancy::TenantContext;
-use serde::Deserialize;
 use autoxide_spike_macros::Schema as ToSchema;
+use serde::Deserialize;
 use uuid::Uuid;
 use validator::Validate;
 

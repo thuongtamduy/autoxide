@@ -11,11 +11,11 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use autoxide_kernel::time::Timestamp;
+use autoxide_spike_macros::Schema as ToSchema;
 use jiff::SignedDuration;
 use sea_orm::sea_query::{Expr, OnConflict};
 use sea_orm::{ColumnTrait, Condition, EntityTrait, QueryFilter, Set};
 use serde::Serialize;
-use autoxide_spike_macros::Schema as ToSchema;
 use uuid::Uuid;
 
 use crate::entity::edit_lock::{self, Column, Entity};
