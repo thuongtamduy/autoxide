@@ -6,14 +6,14 @@ use std::sync::Arc;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::mcp::{PageInput, Tool};
-use autoxide_kernel::pagination::Page;
+use autoxide_kernel::pagination::{NaturalOrderPageQuery, Page, PageRequest};
 use autoxide_kernel::tenancy::TenantContext;
 use serde::Deserialize;
 use utoipa::ToSchema;
 use uuid::Uuid;
 use validator::Validate;
 
-use crate::http::{CreateUnitRequest, UnitResponse};
+use crate::http::{CreateUnitRequest, UnitResponse, unit_settings_page};
 use crate::permissions::{SETTINGS_WRITE, UNITS_MANAGE, UNITS_READ, UNITS_WRITE};
 use crate::service::{OrgService, UnitChanges, UnitFilter};
 
@@ -35,6 +35,8 @@ pub(crate) struct ListUnitsInput {
     cursor: Option<String>,
     /// `desc` (newest first, the default) or `asc`.
     order: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
 }
 
 /// A unit to act on.
@@ -91,6 +93,22 @@ pub(crate) struct SetSettingInput {
     value: Option<serde_json::Value>,
 }
 
+/// A unit and a page of its settings.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct SettingsInput {
+    /// Id of the unit.
+    id: Uuid,
+    /// Maximum number of items to return, 1 to 200. Defaults to 50.
+    limit: Option<u32>,
+    /// The `next_cursor` of the previous page.
+    cursor: Option<String>,
+    /// `asc` (key order, the default) or `desc`.
+    order: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
+}
+
 pub(crate) fn all(service: &Arc<OrgService>) -> Vec<Tool> {
     let (settings, set_setting) = (service.clone(), service.clone());
     let mut tools = units(service);
@@ -98,13 +116,22 @@ pub(crate) fn all(service: &Arc<OrgService>) -> Vec<Tool> {
         Tool::new(
             "get_settings",
             "Get the settings in force at an organization unit (time zone, currency, language…) and \
-             where each value comes from: the unit, a unit above, or the default.",
-            move |tenant: TenantContext, principal: Principal, input: UnitId| {
+             where each value comes from: the unit, a unit above, or the default. By key; follow \
+             `pagination.next_cursor`.",
+            move |tenant: TenantContext, principal: Principal, input: SettingsInput| {
                 let service = settings.clone();
                 async move {
-                    let found = service.effective_settings(&tenant, &principal, input.id).await?;
-                    let found: Vec<crate::http::UnitSettingResponse> =
-                        found.into_iter().map(Into::into).collect();
+                    // Cùng kiểu tham số trang và cùng hàm với REST `GET /units/{id}/settings`.
+                    let page = PageRequest::try_from(
+                        NaturalOrderPageQuery::new(
+                            input.limit.map(|limit| limit.to_string()),
+                            input.cursor,
+                            input.order,
+                        )
+                        .with_count(input.count.unwrap_or(false)),
+                    )?;
+                    let found: Page<crate::http::UnitSettingResponse> =
+                        unit_settings_page(&service, &tenant, &principal, input.id, &page).await?;
                     Ok::<_, Error>(found)
                 }
             },
@@ -156,7 +183,9 @@ fn units(service: &Arc<OrgService>) -> Vec<Tool> {
                         status: input.status,
                         q: input.q,
                     };
-                    let page = PageInput::new(input.limit, input.cursor, input.order).page()?;
+                    let page = PageInput::new(input.limit, input.cursor, input.order)
+                        .with_count(input.count.unwrap_or(false))
+                        .page()?;
                     let page = service.list(&tenant, &principal, &filter, &page).await?;
                     Ok::<Page<UnitResponse>, Error>(page.map(UnitResponse::from))
                 }

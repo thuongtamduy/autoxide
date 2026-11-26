@@ -6,10 +6,11 @@ use autoxide_address::api::{Address, AddressInput};
 use autoxide_kernel::access::{OrgTarget, Principal};
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::event::Actor;
+use autoxide_kernel::pagination::{Page, PageRequest, SortValue, fetch_page_by};
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext};
 use autoxide_kernel::time::{Date, Timestamp};
 use sea_orm::sea_query::OnConflict;
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set};
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, QueryTrait, Set};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::BTreeSet;
@@ -516,6 +517,55 @@ impl OrgService {
             a.position.cmp(&b.position).then_with(|| a.display_name.cmp(&b.display_name))
         });
         Ok(found)
+    }
+
+    /// Một trang cửa hàng công khai (`GET /public/stores`): theo `position` rồi ID nút, keyset trong
+    /// database (index `organizations_profile_public_page_idx`). Nút không hoạt động lọc trong cùng câu
+    /// (`org_id IN (nút active)`), nên trang không hụt dòng.
+    pub(crate) async fn public_store_page(
+        &self,
+        tenant: &TenantContext,
+        page: &PageRequest,
+    ) -> Result<Page<Profile>, Error> {
+        let read = tenant.database().read();
+        let active = unit::Entity::find()
+            .select_only()
+            .column(unit::Column::Id)
+            .filter(unit::Column::Status.eq("active"))
+            .scoped(tenant)
+            .into_query();
+        let select = entity::Entity::find()
+            .filter(entity::Column::Public.eq(true))
+            .filter(entity::Column::OrgId.in_subquery(active))
+            .scoped(tenant);
+        let rows = fetch_page_by(
+            select,
+            entity::Column::Position,
+            |row| SortValue::Integer(i64::from(row.position)),
+            entity::Column::OrgId,
+            |row| row.org_id,
+            page,
+            read,
+        )
+        .await?;
+        let units = unit::Entity::find()
+            .filter(unit::Column::Id.is_in(rows.data.iter().map(|row| row.org_id)))
+            .scoped(tenant)
+            .all(read)
+            .await?;
+        // Mỗi dòng của trang có nút active (lọc ở câu trên); nút vừa bị đổi trạng thái giữa hai câu thì bỏ.
+        let pagination = rows.pagination;
+        let data = rows
+            .data
+            .iter()
+            .filter_map(|row| {
+                units
+                    .iter()
+                    .find(|unit| unit.id == row.org_id)
+                    .map(|unit| profile_of(unit, Some(row)))
+            })
+            .collect();
+        Ok(Page { data, pagination })
     }
 }
 

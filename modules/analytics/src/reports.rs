@@ -8,6 +8,7 @@
 
 use autoxide_kernel::access::{OrgTarget, Principal};
 use autoxide_kernel::error::Error;
+use autoxide_kernel::pagination::{Page, PageRequest};
 use autoxide_kernel::tenancy::{OrgId, Site, TenantContext, root_of};
 use autoxide_kernel::time::Date;
 use sea_orm::sea_query::{Alias, Expr, ExprTrait as _, Func, Order, Query};
@@ -24,8 +25,7 @@ use crate::service::{AnalyticsService, day_text, now};
 pub(crate) const RANGE_MAX_DAYS: i64 = 400;
 /// Khoảng mặc định: 30 ngày tới hôm nay.
 const DEFAULT_DAYS: i64 = 30;
-/// Số dòng mặc định / tối đa của danh sách xếp hạng.
-pub(crate) const TOP_DEFAULT: u64 = 10;
+/// Số dòng tối đa của xếp hạng dùng nội bộ (gợi ý của `shared`); danh sách qua API phân trang.
 pub(crate) const TOP_MAX: u64 = 100;
 
 /// Website và khoảng ngày đã kiểm.
@@ -223,8 +223,74 @@ impl AnalyticsService {
         })
     }
 
-    /// Xếp hạng theo một chiều: cộng các ngày, nhiều nhất trước. `prefix`: chỉ giá trị bắt đầu bằng
-    /// chuỗi này (vd `catalog.product:`).
+    /// Một trang của bảng xếp hạng theo một chiều (REST và tool): mọi giá trị trong khoảng ngày, nhiều nhất
+    /// trước (`order=asc`, mặc định), cùng số thì theo giá trị; `order=desc` đảo lại. Phân trang bằng keyset
+    /// ngay trong SQL trên tổng của nhóm (`HAVING`, D-20261126-list-pages-cluster-3): database chỉ trả
+    /// `limit + 1` nhóm, không kéo mọi nhóm của khoảng ngày về bộ nhớ. Số được cộng thêm mỗi giờ: một giá
+    /// trị đổi hạng trong lúc duyệt có thể lặp hay sót — chấp nhận, như mọi danh sách sắp theo giá trị đổi được.
+    pub(crate) async fn ranking_page(
+        &self,
+        tenant: &TenantContext,
+        range: &Range,
+        dimension: Dimension,
+        prefix: Option<&str>,
+        page: &PageRequest,
+    ) -> Result<Page<Ranked>, Error> {
+        let after =
+            page.text_key_after(RANK_CURSOR)?.map(|key| parse_rank_key(&key)).transpose()?;
+        let most_first = page.order() == autoxide_kernel::pagination::Order::Asc;
+        let rank = rank_expr(dimension);
+        let mut select = self.ranking_select(tenant, range, dimension, prefix);
+        if let Some((count, value)) = after {
+            // Nhiều trước: (tổng < n) hoặc (tổng = n và giá trị > v); đảo chiều thì ngược lại.
+            let (beyond, tie) = if most_first {
+                (rank.clone().lt(count), Expr::col(daily::Column::Value).gt(value))
+            } else {
+                (rank.clone().gt(count), Expr::col(daily::Column::Value).lt(value))
+            };
+            select.and_having(beyond.or(rank.clone().eq(count).and(tie)));
+        }
+        let (rank_order, value_order) =
+            if most_first { (Order::Desc, Order::Asc) } else { (Order::Asc, Order::Desc) };
+        select
+            .order_by_expr(rank, rank_order)
+            .order_by(daily::Column::Value, value_order)
+            .limit(u64::from(page.limit()) + 1);
+        let mut rows = read_ranked(tenant, &select).await?;
+        let has_more = rows.len() > page.limit() as usize;
+        rows.truncate(page.limit() as usize);
+        let by_events = matches!(dimension, Dimension::Type);
+        let next = has_more.then(|| rows.last()).flatten().map(|row| {
+            let count = if by_events { row.events } else { row.views };
+            autoxide_kernel::pagination::text_key_cursor(
+                RANK_CURSOR,
+                &format!("{count}\u{1f}{}", row.value),
+            )
+        });
+        let total = if page.wants_total() {
+            // Số nhóm (giá trị) của khoảng ngày: đếm trên subquery `GROUP BY`, chạy được trên cả hai database.
+            let groups = self.ranking_select(tenant, range, dimension, prefix);
+            let count = Query::select()
+                .expr(Expr::cust("COUNT(*)"))
+                .from_subquery(groups, Alias::new("groups"))
+                .to_owned();
+            let total: i64 = match tenant.database().read().query_one(&count).await? {
+                Some(row) => row.try_get_by_index(0)?,
+                None => 0,
+            };
+            Some(u64::try_from(total).unwrap_or_default())
+        } else {
+            None
+        };
+        Ok(Page {
+            data: rows,
+            pagination: autoxide_kernel::pagination::Pagination::new(page.limit(), next)
+                .with_total(total),
+        })
+    }
+
+    /// Xếp hạng theo một chiều: cộng các ngày, nhiều nhất trước, tối đa `limit` dòng (việc nội bộ: gợi ý
+    /// của `shared`). `prefix`: chỉ giá trị bắt đầu bằng chuỗi này (vd `catalog.product:`).
     pub(crate) async fn top(
         &self,
         tenant: &TenantContext,
@@ -233,40 +299,53 @@ impl AnalyticsService {
         prefix: Option<&str>,
         limit: u64,
     ) -> Result<Vec<Ranked>, Error> {
-        let views = sum_bigint(daily::Column::Views);
-        let events = sum_bigint(daily::Column::Events);
-        let rank =
-            if matches!(dimension, Dimension::Type) { events.clone() } else { views.clone() };
+        self.ranked(tenant, range, dimension, prefix, limit.clamp(1, TOP_MAX)).await
+    }
+
+    /// Các nhóm của chiều `dimension` trong khoảng ngày, nhiều nhất trước, tối đa `limit` (`ORDER BY` + `LIMIT`
+    /// trong SQL).
+    async fn ranked(
+        &self,
+        tenant: &TenantContext,
+        range: &Range,
+        dimension: Dimension,
+        prefix: Option<&str>,
+        limit: u64,
+    ) -> Result<Vec<Ranked>, Error> {
+        let mut select = self.ranking_select(tenant, range, dimension, prefix);
+        select
+            .order_by_expr(rank_expr(dimension), Order::Desc)
+            .order_by(daily::Column::Value, Order::Asc)
+            .limit(limit);
+        read_ranked(tenant, &select).await
+    }
+
+    /// `SELECT value, SUM(views), SUM(visitors), SUM(events) … GROUP BY value` của chiều trong khoảng ngày (chưa
+    /// sắp, chưa giới hạn). `prefix`: chỉ giá trị bắt đầu bằng chuỗi này.
+    fn ranking_select(
+        &self,
+        tenant: &TenantContext,
+        range: &Range,
+        dimension: Dimension,
+        prefix: Option<&str>,
+    ) -> sea_orm::sea_query::SelectStatement {
         let mut select = Query::select();
         select
             .from(daily::Entity)
             .column(daily::Column::Value)
-            .expr_as(views, Alias::new("views"))
+            .expr_as(sum_bigint(daily::Column::Views), Alias::new("views"))
             .expr_as(sum_bigint(daily::Column::Visitors), Alias::new("visitors"))
-            .expr_as(events, Alias::new("events"))
+            .expr_as(sum_bigint(daily::Column::Events), Alias::new("events"))
             .and_where(Expr::col(daily::Column::TenantId).eq(tenant.id().as_uuid()))
             .and_where(Expr::col(daily::Column::SiteOrgId).eq(range.site.as_uuid()))
             .and_where(Expr::col(daily::Column::Dimension).eq(dimension.as_str()))
             .and_where(Expr::col(daily::Column::Day).between(range.first_day(), range.last_day()))
-            .group_by_col(daily::Column::Value)
-            .order_by_expr(rank, Order::Desc)
-            .order_by(daily::Column::Value, Order::Asc)
-            .limit(limit.clamp(1, TOP_MAX));
+            .group_by_col(daily::Column::Value);
         if let Some(prefix) = prefix {
             // `prefix` là loại đối tượng đã kiểm (chữ thường, số, `_`, `.`): không có `%`.
             select.and_where(Expr::col(daily::Column::Value).like(format!("{prefix}%")));
         }
-        let rows = tenant.database().read().query_all(&select).await?;
-        let mut ranked = Vec::with_capacity(rows.len());
-        for row in rows {
-            ranked.push(Ranked {
-                value: row.try_get("", "value")?,
-                views: row.try_get::<Option<i64>>("", "views")?.unwrap_or(0),
-                visitors: row.try_get::<Option<i64>>("", "visitors")?.unwrap_or(0),
-                events: row.try_get::<Option<i64>>("", "events")?.unwrap_or(0),
-            });
-        }
-        Ok(ranked)
+        select
     }
 
     /// Phễu `key` của website trong khoảng ngày.
@@ -319,6 +398,49 @@ impl AnalyticsService {
 
 /// `CAST(SUM(cột) AS BIGINT)`: Postgres trả `numeric` cho tổng của `bigint`, ép về số nguyên để hai
 /// database trả cùng kiểu.
+/// Tên thứ tự trong con trỏ của bảng xếp hạng (`text_key_cursor`): con trỏ của danh sách khác bị từ chối.
+const RANK_CURSOR: &str = "rank";
+
+/// Tổng xếp hạng của chiều: số sự kiện cho `type`, số lượt xem cho chiều khác.
+fn rank_expr(dimension: Dimension) -> Expr {
+    if matches!(dimension, Dimension::Type) {
+        sum_bigint(daily::Column::Events)
+    } else {
+        sum_bigint(daily::Column::Views)
+    }
+}
+
+/// Khoá con trỏ `<tổng>\u{1f}<giá trị>`; hỏng thì 422 ở `cursor`.
+fn parse_rank_key(key: &str) -> Result<(i64, String), Error> {
+    key.split_once('\u{1f}')
+        .and_then(|(count, value)| Some((count.parse::<i64>().ok()?, value.to_owned())))
+        .ok_or_else(|| {
+            Error::validation(vec![autoxide_kernel::error::FieldError::new(
+                "cursor",
+                "invalid",
+                "must be the `next_cursor` value of a previous page of the same list and sort, unchanged",
+            )])
+        })
+}
+
+/// Đọc các dòng của câu xếp hạng.
+async fn read_ranked(
+    tenant: &TenantContext,
+    select: &sea_orm::sea_query::SelectStatement,
+) -> Result<Vec<Ranked>, Error> {
+    let rows = tenant.database().read().query_all(select).await?;
+    let mut ranked = Vec::with_capacity(rows.len());
+    for row in rows {
+        ranked.push(Ranked {
+            value: row.try_get("", "value")?,
+            views: row.try_get::<Option<i64>>("", "views")?.unwrap_or(0),
+            visitors: row.try_get::<Option<i64>>("", "visitors")?.unwrap_or(0),
+            events: row.try_get::<Option<i64>>("", "events")?.unwrap_or(0),
+        });
+    }
+    Ok(ranked)
+}
+
 pub(crate) fn sum_bigint(column: impl sea_orm::sea_query::IntoColumnRef) -> Expr {
     Func::cast_as(Func::sum(Expr::col(column)), Alias::new("BIGINT")).into()
 }

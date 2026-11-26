@@ -8,7 +8,7 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::money::{Currency, Money};
-use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
+use autoxide_kernel::pagination::{NaturalOrderPageQuery, Page, PageQuery, PageRequest, page_of};
 use autoxide_kernel::response::{Data, Problem};
 use autoxide_kernel::tenancy::{OrgId, TenantContext, require_platform, root_of};
 use autoxide_kernel::version::{IfMatch, Tagged};
@@ -46,6 +46,20 @@ pub(crate) fn routes(service: Arc<TaxService>) -> OpenApiRouter {
 /// `tax.read` ở bất kỳ nút nào (dữ liệu luật, không thuộc nút nào).
 fn reader(principal: &Principal) -> Result<(), Error> {
     principal.require(&READ)
+}
+
+// Danh sách dữ liệu luật phân trang trong bộ nhớ (`page_of`, D-20261125-list-pages mục 4): bảng thuế là dữ
+// liệu nền chung mọi khách (nhà vận hành nhập gói, không lớn dần theo khách), bộ máy tính thuế đã giữ trọn
+// trong bộ nhớ đệm (`TaxService::tables`) — đọc lại database theo keyset không bớt việc. Khoá ghép các cột
+// của thứ tự cũ bằng `\u{1f}` (nhỏ hơn mọi ký tự của mã) để thứ tự byte của khoá đúng thứ tự cột, thêm ID
+// khi các cột chưa duy nhất.
+fn sort_key(parts: &[&str]) -> String {
+    parts.join("\u{1f}")
+}
+
+/// Tầng thuế thành chuỗi 10 chữ số, thứ tự chuỗi đúng thứ tự số (kể cả số âm).
+fn stage_key(stage: i32) -> String {
+    format!("{:010}", i64::from(stage) - i64::from(i32::MIN))
 }
 
 // ---- Dữ liệu luật -----------------------------------------------------------------------------
@@ -163,19 +177,23 @@ fn in_force_on(from: &str, to: Option<&String>, on: Option<Date>) -> bool {
     extensions(("x-permissions" = json!(["tax.read"]))),
     operation_id = "list_tax_jurisdictions",
     security(("bearer" = [])),
+    params(NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "The jurisdictions, by code.", body = Data<Vec<JurisdictionResponse>>),
+        (status = 200, description = "One page of the jurisdictions, by code.", body = Page<JurisdictionResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing `tax.read`; code `permission_denied`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_jurisdictions(
     State(service): State<Arc<TaxService>>,
     principal: Principal,
-) -> Result<Data<Vec<JurisdictionResponse>>, Error> {
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<JurisdictionResponse>, Error> {
     reader(&principal)?;
+    let page = PageRequest::try_from(page)?;
     let tables = service.tables().await?;
-    let mut list: Vec<JurisdictionResponse> = tables
+    let list: Vec<JurisdictionResponse> = tables
         .jurisdictions
         .iter()
         .map(|row| JurisdictionResponse {
@@ -186,8 +204,7 @@ async fn list_jurisdictions(
             pack_version: row.pack_version,
         })
         .collect();
-    list.sort_by(|a, b| a.code.cmp(&b.code));
-    Ok(Data { data: list })
+    page_of(list, |row| row.code.clone(), &page)
 }
 
 /// List the tax categories.
@@ -199,22 +216,24 @@ async fn list_jurisdictions(
     extensions(("x-permissions" = json!(["tax.read"]))),
     operation_id = "list_tax_categories",
     security(("bearer" = [])),
-    params(DataQuery),
+    params(DataQuery, NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "The categories, by jurisdiction and code.", body = Data<Vec<CategoryResponse>>),
+        (status = 200, description = "One page of the categories, by jurisdiction and code.", body = Page<CategoryResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing `tax.read`; code `permission_denied`.", body = Problem),
-        (status = 422, description = "A parameter is invalid; every problem in `errors`.", body = Problem),
+        (status = 422, description = "A filter or a paging parameter is invalid; every problem in `errors`.", body = Problem),
     )
 )]
 async fn list_categories(
     State(service): State<Arc<TaxService>>,
     principal: Principal,
     Query(filter): Query<DataQuery>,
-) -> Result<Data<Vec<CategoryResponse>>, Error> {
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<CategoryResponse>, Error> {
     reader(&principal)?;
+    let page = PageRequest::try_from(page)?;
     let tables = service.tables().await?;
-    let mut list: Vec<CategoryResponse> = tables
+    let list: Vec<CategoryResponse> = tables
         .categories
         .iter()
         .filter(|row| filter.jurisdiction.as_ref().is_none_or(|code| &row.jurisdiction == code))
@@ -226,8 +245,7 @@ async fn list_categories(
             tax_kind: row.tax_kind.clone(),
         })
         .collect();
-    list.sort_by(|a, b| (&a.jurisdiction, &a.code).cmp(&(&b.jurisdiction, &b.code)));
-    Ok(Data { data: list })
+    page_of(list, |row| sort_key(&[&row.jurisdiction, &row.code]), &page)
 }
 
 /// List the tax rates with their dates.
@@ -239,22 +257,24 @@ async fn list_categories(
     extensions(("x-permissions" = json!(["tax.read"]))),
     operation_id = "list_tax_rates",
     security(("bearer" = [])),
-    params(DataQuery),
+    params(DataQuery, NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "The rates, by category, stage and start date.", body = Data<Vec<RateResponse>>),
+        (status = 200, description = "One page of the rates, by jurisdiction, category, stage and start date.", body = Page<RateResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing `tax.read`; code `permission_denied`.", body = Problem),
-        (status = 422, description = "A parameter is invalid; every problem in `errors`.", body = Problem),
+        (status = 422, description = "A filter or a paging parameter is invalid; every problem in `errors`.", body = Problem),
     )
 )]
 async fn list_rates(
     State(service): State<Arc<TaxService>>,
     principal: Principal,
     Query(filter): Query<DataQuery>,
-) -> Result<Data<Vec<RateResponse>>, Error> {
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<RateResponse>, Error> {
     reader(&principal)?;
+    let page = PageRequest::try_from(page)?;
     let tables = service.tables().await?;
-    let mut list: Vec<RateResponse> = tables
+    let list: Vec<RateResponse> = tables
         .rates
         .iter()
         .filter(|row| filter.jurisdiction.as_ref().is_none_or(|code| &row.jurisdiction == code))
@@ -278,15 +298,22 @@ async fn list_rates(
             pack_version: row.pack_version,
         })
         .collect();
-    list.sort_by(|a, b| {
-        (&a.jurisdiction, &a.category, a.stage, &a.effective_from).cmp(&(
-            &b.jurisdiction,
-            &b.category,
-            b.stage,
-            &b.effective_from,
-        ))
-    });
-    Ok(Data { data: list })
+    page_of(list, rate_key, &page)
+}
+
+/// Khoá trang của thuế suất: khu vực, nhóm, tầng, ngày bắt đầu, rồi ID (dùng chung với tool `tax.rates`).
+pub(crate) fn rate_key(row: &RateResponse) -> String {
+    rate_sort_key(&row.jurisdiction, &row.category, row.stage, &row.effective_from, row.id)
+}
+
+pub(crate) fn rate_sort_key(
+    jurisdiction: &str,
+    category: &str,
+    stage: i32,
+    from: &str,
+    id: Uuid,
+) -> String {
+    sort_key(&[jurisdiction, category, &stage_key(stage), from, &id.to_string()])
 }
 
 /// List the withholding rates for platforms.
@@ -298,22 +325,24 @@ async fn list_rates(
     extensions(("x-permissions" = json!(["tax.read"]))),
     operation_id = "list_tax_withholding_rates",
     security(("bearer" = [])),
-    params(DataQuery),
+    params(DataQuery, NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "The withholding rates.", body = Data<Vec<WithholdingRateResponse>>),
+        (status = 200, description = "One page of the withholding rates, by payer kind, payee regime, business line, tax kind and start date.", body = Page<WithholdingRateResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing `tax.read`; code `permission_denied`.", body = Problem),
-        (status = 422, description = "A parameter is invalid; every problem in `errors`.", body = Problem),
+        (status = 422, description = "A filter or a paging parameter is invalid; every problem in `errors`.", body = Problem),
     )
 )]
 async fn list_withholding_rates(
     State(service): State<Arc<TaxService>>,
     principal: Principal,
     Query(filter): Query<DataQuery>,
-) -> Result<Data<Vec<WithholdingRateResponse>>, Error> {
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<WithholdingRateResponse>, Error> {
     reader(&principal)?;
+    let page = PageRequest::try_from(page)?;
     let tables = service.tables().await?;
-    let mut list: Vec<WithholdingRateResponse> = tables
+    let list: Vec<WithholdingRateResponse> = tables
         .withholding
         .iter()
         .filter(|row| filter.jurisdiction.as_ref().is_none_or(|code| &row.jurisdiction == code))
@@ -335,16 +364,18 @@ async fn list_withholding_rates(
             legal_basis: row.legal_basis.clone(),
         })
         .collect();
-    list.sort_by(|a, b| {
-        (&a.payer_kind, &a.payee_regime, &a.business_line, &a.tax_kind, &a.effective_from).cmp(&(
-            &b.payer_kind,
-            &b.payee_regime,
-            &b.business_line,
-            &b.tax_kind,
-            &b.effective_from,
-        ))
-    });
-    Ok(Data { data: list })
+    let key = |row: &WithholdingRateResponse| {
+        let id = row.id.to_string();
+        sort_key(&[
+            &row.payer_kind,
+            &row.payee_regime,
+            &row.business_line,
+            &row.tax_kind,
+            &row.effective_from,
+            &id,
+        ])
+    };
+    page_of(list, key, &page)
 }
 
 /// List the tax rules with their dates.
@@ -356,22 +387,24 @@ async fn list_withholding_rates(
     extensions(("x-permissions" = json!(["tax.read"]))),
     operation_id = "list_tax_rules",
     security(("bearer" = [])),
-    params(DataQuery),
+    params(DataQuery, NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "The rules.", body = Data<Vec<RuleResponse>>),
+        (status = 200, description = "One page of the rules, by code and start date.", body = Page<RuleResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing `tax.read`; code `permission_denied`.", body = Problem),
-        (status = 422, description = "A parameter is invalid; every problem in `errors`.", body = Problem),
+        (status = 422, description = "A filter or a paging parameter is invalid; every problem in `errors`.", body = Problem),
     )
 )]
 async fn list_rules(
     State(service): State<Arc<TaxService>>,
     principal: Principal,
     Query(filter): Query<DataQuery>,
-) -> Result<Data<Vec<RuleResponse>>, Error> {
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<RuleResponse>, Error> {
     reader(&principal)?;
+    let page = PageRequest::try_from(page)?;
     let tables = service.tables().await?;
-    let mut list: Vec<RuleResponse> = tables
+    let list: Vec<RuleResponse> = tables
         .rules
         .iter()
         .filter(|row| filter.jurisdiction.as_ref().is_none_or(|code| &row.jurisdiction == code))
@@ -386,8 +419,8 @@ async fn list_rules(
             legal_basis: row.legal_basis.clone(),
         })
         .collect();
-    list.sort_by(|a, b| (&a.code, &a.effective_from).cmp(&(&b.code, &b.effective_from)));
-    Ok(Data { data: list })
+    let key = |row: &RuleResponse| sort_key(&[&row.code, &row.effective_from, &row.id.to_string()]);
+    page_of(list, key, &page)
 }
 
 // ---- Tính thuế ---------------------------------------------------------------------------------
@@ -580,6 +613,8 @@ async fn list_profiles(
     principal: Principal,
     Query(page): Query<PageQuery>,
 ) -> Result<Page<ProfileResponse>, Error> {
+    // Quyền trước tham số trang: người không có quyền nhận 403, không phải 422 (D-20261126-list-pages-cluster-2).
+    reader(&principal)?;
     let page = service.list_profiles(&tenant, &principal, &PageRequest::try_from(page)?).await?;
     Ok(page.map(|row| respond(&row, None)))
 }
@@ -701,25 +736,30 @@ pub(crate) struct PackRequest {
 
 /// List the imported tax data packs.
 ///
-/// Requires `tax.read`.
+/// Requires `tax.read`. Most recently imported first (a higher version of a pack is always
+/// imported after the lower one) unless `order=asc`; paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/packs",
     extensions(("x-permissions" = json!(["tax.read"]))),
     operation_id = "list_tax_packs",
     security(("bearer" = [])),
+    params(PageQuery),
     responses(
-        (status = 200, description = "The packs, newest version first per code.", body = Data<Vec<PackResponse>>),
+        (status = 200, description = "One page of the imported packs, most recently imported first.", body = Page<PackResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing `tax.read`; code `permission_denied`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_packs(
     State(service): State<Arc<TaxService>>,
     principal: Principal,
-) -> Result<Data<Vec<PackResponse>>, Error> {
+    Query(page): Query<PageQuery>,
+) -> Result<Page<PackResponse>, Error> {
     reader(&principal)?;
-    Ok(Data { data: service.packs().await?.into_iter().map(PackResponse::from).collect() })
+    let page = PageRequest::try_from(page)?;
+    Ok(service.packs(&page).await?.map(PackResponse::from))
 }
 
 /// Import a tax data pack.

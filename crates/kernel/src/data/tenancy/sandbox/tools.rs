@@ -27,6 +27,8 @@ pub(crate) struct ListInput {
     cursor: Option<String>,
     /// `desc` (newest first, the default) or `asc`.
     order: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
 }
 
 /// Which kept messages of the current sandbox to list.
@@ -41,6 +43,8 @@ pub(crate) struct MessagesInput {
     cursor: Option<String>,
     /// `desc` (newest first, the default) or `asc`.
     order: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
 }
 
 /// Records of a sandbox to promote.
@@ -89,7 +93,9 @@ pub(crate) fn all(service: Arc<TenantSandboxes>) -> Vec<Tool> {
             move |tenant: TenantContext, principal: Principal, input: ListInput| {
                 let service = list.clone();
                 async move {
-                    let page = PageInput::new(input.limit, input.cursor, input.order).page()?;
+                    let page = PageInput::new(input.limit, input.cursor, input.order)
+                        .with_count(input.count.unwrap_or(false))
+                        .page()?;
                     let source = tenant.id().as_uuid();
                     let found = service.list(&tenant, &principal, source, &page).await?;
                     Ok::<Page<Sandbox>, Error>(found)
@@ -134,7 +140,9 @@ pub(crate) fn all(service: Arc<TenantSandboxes>) -> Vec<Tool> {
              (payments, e-invoices, identity checks), SMS, Zalo and push messages, mail to people \
              who cannot enter the sandbox and webhooks to URLs not allowed. Newest first.",
             move |tenant: TenantContext, principal: Principal, input: MessagesInput| async move {
-                let page = PageInput::new(input.limit, input.cursor, input.order).page()?;
+                let page = PageInput::new(input.limit, input.cursor, input.order)
+                    .with_count(input.count.unwrap_or(false))
+                    .page()?;
                 let found =
                     super::mailbox::list(&tenant, &principal, input.channel.as_deref(), &page)
                         .await?;

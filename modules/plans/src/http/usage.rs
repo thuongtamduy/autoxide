@@ -42,6 +42,18 @@ pub(crate) async fn limit_uses(
     Ok(limit_uses_of(service, &snapshot, &used))
 }
 
+/// Một trang lượng dùng của khách `tenant`, theo khoá hạn mức. Không nằm trong database: dựng từ sổ
+/// hạn mức module khai (trong code) cộng phần riêng theo phần của gói — số dòng theo cấu trúc sổ hạn mức,
+/// nên phân trang trong bộ nhớ (`page_of`, D-20261125-list-pages mục 4).
+pub(crate) async fn limit_use_page(
+    service: &PlansService,
+    tenant: TenantId,
+    page: &PageRequest,
+) -> Result<Page<LimitUse>, Error> {
+    let uses = limit_uses(service, tenant).await?;
+    page_of(uses, |row| row.key.clone(), page)
+}
+
 /// Lượng dùng từng hạn mức, từ quyền dùng và lượng đã đọc sẵn (dùng chung cho một khách và cho cả
 /// trang khách của `expand=usage`).
 pub(crate) fn limit_uses_of(
@@ -116,19 +128,23 @@ pub(super) async fn entitlements(
     extensions(("x-permissions" = json!(["plans.billing.read"]))),
     operation_id = "get_own_usage",
     security(("bearer" = [])),
+    params(NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "Use of each limit (metered limits: this month).", body = Data<Vec<LimitUse>>),
+        (status = 200, description = "One page of the use of each limit (metered limits: this month), by limit key.", body = Page<LimitUse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing `plans.billing.read`; code `permission_denied`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 pub(super) async fn own_usage(
     State(service): State<Arc<PlansService>>,
     tenant: TenantContext,
     principal: Principal,
-) -> Result<Data<Vec<LimitUse>>, Error> {
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<LimitUse>, Error> {
     principal.require(&BILLING_READ)?;
-    Ok(Data { data: limit_uses(&service, tenant.id()).await? })
+    let page = PageRequest::try_from(page)?;
+    limit_use_page(&service, tenant.id(), &page).await
 }
 
 /// Get a tenant's use of every limit.
@@ -140,20 +156,23 @@ pub(super) async fn own_usage(
     extensions(("x-permissions" = json!(["plans.subscriptions.read"]))),
     operation_id = "get_tenant_usage",
     security(("bearer" = [])),
-    params(("tenant_id" = Uuid, Path, description = "Id of the tenant.")),
+    params(("tenant_id" = Uuid, Path, description = "Id of the tenant."), NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "Use of each limit (metered limits: this month).", body = Data<Vec<LimitUse>>),
+        (status = 200, description = "One page of the use of each limit (metered limits: this month), by limit key.", body = Page<LimitUse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Not platform staff (`tenant_platform_only`) or missing `plans.subscriptions.read` (`permission_denied`).", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 pub(super) async fn tenant_usage(
     State(service): State<Arc<PlansService>>,
     principal: Principal,
     Path(tenant_id): Path<Uuid>,
-) -> Result<Data<Vec<LimitUse>>, Error> {
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<LimitUse>, Error> {
     operator(&principal, &SUBSCRIPTIONS_READ)?;
-    Ok(Data { data: limit_uses(&service, TenantId::from_uuid(tenant_id)).await? })
+    let page = PageRequest::try_from(page)?;
+    limit_use_page(&service, TenantId::from_uuid(tenant_id), &page).await
 }
 
 /// Get what a tenant may use now.

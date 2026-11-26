@@ -56,6 +56,8 @@ async fn list_sandboxes(
     Path(id): Path<Uuid>,
     Query(page): Query<PageQuery>,
 ) -> Result<Page<Sandbox>, Error> {
+    // Quyền trước tham số trang: người không có quyền nhận 403, không phải 422 (D-20261126-list-pages-cluster-2).
+    principal.require(&super::SANDBOXES_READ)?;
     service.list(&tenant, &principal, id, &PageRequest::try_from(page)?).await
 }
 
@@ -190,6 +192,7 @@ async fn list_sandbox_messages(
     Query(filter): Query<MessageFilter>,
     Query(page): Query<PageQuery>,
 ) -> Result<Page<SandboxMessage>, Error> {
+    principal.require(&super::SANDBOXES_READ)?;
     let page = PageRequest::try_from(page)?;
     super::mailbox::list(&tenant, &principal, filter.channel.as_deref(), &page).await
 }

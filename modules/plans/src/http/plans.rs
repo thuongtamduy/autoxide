@@ -4,18 +4,25 @@ use super::*;
 
 /// List the plans on sale, with their prices.
 ///
-/// No sign-in needed: a sign-up page shows these. Only active plans and active prices.
+/// No sign-in needed: a sign-up page shows these. Only active plans and active prices. By code
+/// (A→Z unless `order=desc`); paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/catalog",
     extensions(("x-public" = json!(true))),
     operation_id = "plans_catalog",
-    responses((status = 200, description = "Active base plans and add-ons, by code.", body = Data<Vec<PlanResponse>>))
+    params(NaturalOrderPageQuery),
+    responses(
+        (status = 200, description = "One page of the active base plans and add-ons, by code.", body = Page<PlanResponse>),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
+    )
 )]
 pub(super) async fn catalog(
     State(service): State<Arc<PlansService>>,
-) -> Result<Data<Vec<PlanResponse>>, Error> {
-    Ok(Data { data: service.catalog().await?.into_iter().map(PlanResponse::from).collect() })
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<PlanResponse>, Error> {
+    let page = PageRequest::try_from(page)?;
+    Ok(service.catalog(&page).await?.map(PlanResponse::from))
 }
 
 /// List every plan, including drafts and retired plans.

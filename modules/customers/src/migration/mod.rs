@@ -7,6 +7,7 @@ mod m0007_engagement;
 mod m0008_stored_value;
 mod m0011_wishlist_alerts;
 mod m0012_list_indexes;
+mod m0013_wishlist_ids;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 
@@ -42,5 +43,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(m0011_wishlist_alerts::Migration),
         // Index cho danh sách có phân trang (bước 70 P9).
         Box::new(m0012_list_indexes::Migration),
+        // Cột `id` (UUIDv7) của yêu thích, để phân trang bằng cursor (bước 70 P9).
+        Box::new(m0013_wishlist_ids::Migration),
     ]
 }

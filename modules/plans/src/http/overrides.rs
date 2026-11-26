@@ -4,28 +4,32 @@ use super::*;
 
 /// List a tenant's overrides.
 ///
-/// Platform staff with `plans.subscriptions.read`.
+/// Platform staff with `plans.subscriptions.read`. Expired overrides included; newest first
+/// unless `order=asc`; paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/tenants/{tenant_id}/overrides",
     extensions(("x-permissions" = json!(["plans.subscriptions.read"]))),
     operation_id = "list_overrides",
     security(("bearer" = [])),
-    params(("tenant_id" = Uuid, Path, description = "Id of the tenant.")),
+    params(("tenant_id" = Uuid, Path, description = "Id of the tenant."), PageQuery),
     responses(
-        (status = 200, description = "The overrides, oldest first (expired ones included).", body = Data<Vec<OverrideResponse>>),
+        (status = 200, description = "One page of the overrides, newest first (expired ones included).", body = Page<OverrideResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Not platform staff (`tenant_platform_only`) or missing `plans.subscriptions.read` (`permission_denied`).", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 pub(super) async fn list_overrides(
     State(service): State<Arc<PlansService>>,
     principal: Principal,
     Path(tenant_id): Path<Uuid>,
-) -> Result<Data<Vec<OverrideResponse>>, Error> {
+    Query(page): Query<PageQuery>,
+) -> Result<Page<OverrideResponse>, Error> {
     operator(&principal, &SUBSCRIPTIONS_READ)?;
-    let rows = service.overrides(TenantId::from_uuid(tenant_id)).await?;
-    Ok(Data { data: rows.into_iter().map(OverrideResponse::from).collect() })
+    let page = PageRequest::try_from(page)?;
+    let rows = service.overrides(TenantId::from_uuid(tenant_id), &page).await?;
+    Ok(rows.map(OverrideResponse::from))
 }
 
 /// Set an override for a tenant.

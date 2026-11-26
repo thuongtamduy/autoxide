@@ -24,7 +24,7 @@ impl Entitlements for Provider {
     ) -> Result<Vec<String>, Error> {
         Ok(self
             .0
-            .catalog()
+            .catalog_all()
             .await?
             .into_iter()
             .filter(|row| {
