@@ -2863,13 +2863,19 @@ export type ClientConfigResponse = {
      */
     login_link: boolean;
     /**
-     * `true` when passkeys are set up (`AUTOXIDE_AUTH_PASSKEY_RP_ID`): show "sign in with a
-     * passkey".
+     * The domain passkeys belong to for this tenant (the WebAuthn relying party id); empty when
+     * passkeys are off. A page on another domain cannot use them.
+     */
+    passkey_rp_id: string;
+    /**
+     * `true` when passkeys are set up for this tenant (its setting `auth.passkey_rp_id`, otherwise
+     * `AUTOXIDE_AUTH_PASSKEY_RP_ID`): show "sign in with a passkey".
      */
     passkeys: boolean;
     /**
-     * `true` when people can create their own account (`AUTOXIDE_AUTH_SELF_REGISTRATION`):
-     * show "create an account".
+     * `true` when people can create their own staff account in this tenant (its setting
+     * `auth.staff_registration`, otherwise `AUTOXIDE_AUTH_SELF_REGISTRATION`): show "create an
+     * account".
      */
     self_registration: boolean;
     /**
@@ -13868,8 +13874,8 @@ export type Data_TenantSettingState = {
     name: string;
     /**
      * The stored value is not used any more, and why: `kernel.public_url_unverified` /
-     * `kernel.link_unverified` (its host is not a verified domain of this tenant — verify the domain or
-     * change the value). Omitted when the value is used.
+     * `kernel.link_unverified` / `kernel.domain_unverified` (its host is not a verified domain of this
+     * tenant — verify the domain or change the value). Omitted when the value is used.
      */
     problem?: string | null;
     /** Secret settings are stored encrypted and never returned: `value` is always `null`. */
@@ -16272,8 +16278,8 @@ export type Data_Vec_TenantSettingState = {
     name: string;
     /**
      * The stored value is not used any more, and why: `kernel.public_url_unverified` /
-     * `kernel.link_unverified` (its host is not a verified domain of this tenant — verify the domain or
-     * change the value). Omitted when the value is used.
+     * `kernel.link_unverified` / `kernel.domain_unverified` (its host is not a verified domain of this
+     * tenant — verify the domain or change the value). Omitted when the value is used.
      */
     problem?: string | null;
     /** Secret settings are stored encrypted and never returned: `value` is always `null`. */
@@ -32790,8 +32796,8 @@ export type TenantSettingState = {
   name: string;
   /**
    * The stored value is not used any more, and why: `kernel.public_url_unverified` /
-   * `kernel.link_unverified` (its host is not a verified domain of this tenant — verify the domain or
-   * change the value). Omitted when the value is used.
+   * `kernel.link_unverified` / `kernel.domain_unverified` (its host is not a verified domain of this
+   * tenant — verify the domain or change the value). Omitted when the value is used.
    */
   problem?: string | null;
   /** Secret settings are stored encrypted and never returned: `value` is always `null`. */
