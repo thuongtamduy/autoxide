@@ -1,25 +1,31 @@
 # Bảng chỉ số của một bản phát hành (71-G9; mô tả và ngưỡng ở docs/RELEASING.md, "Chỉ số của mỗi bản phát hành"): đo thời
-# gian từ tải về tới request đầu tiên trên máy sạch rồi gộp với kết quả đã có của CI (nâng cấp, p95, eval agent). Chạy khi
-# workflow `Release` xong (không dùng `release: published`: bản phát hành tạo bằng GITHUB_TOKEN không kích hoạt workflow khác).
+# gian từ tải về tới request đầu tiên trên máy sạch rồi gộp với kết quả đã có của CI (nâng cấp, p95, eval agent), ghi bảng
+# vào trang tóm tắt và ghi chú bản phát hành. Workflow dùng lại (reusable): `release.yml` gọi nó như một job SAU khi đã
+# đăng bản phát hành (không dùng trigger `workflow_run`: zizmor xếp nó là không an toàn); chạy tay cho một tag đã có bằng
+# `workflow_dispatch`. Chỉ số ĐÃ ĐO mà không đạt thì bảng ghi KHÔNG ĐẠT và bước cuối báo cảnh báo (không làm đỏ cả workflow
+# Release: bản đã đăng rồi, đỏ cũng không rút lại được); bản 1.0 chỉ phát hành khi cả năm chỉ số đạt, kiểm tay lúc chốt.
 name: Release metrics
 
 on:
-  workflow_run:
-    workflows: [Release]
-    types: [completed]
+  workflow_call:
+    inputs:
+      tag:
+        description: Release tag, for example v1.0.0
+        required: true
+        type: string
   workflow_dispatch:
     inputs:
-      version:
-        description: Version without the leading v, for example 1.0.0
+      tag:
+        description: Release tag, for example v1.0.0
         required: true
+        type: string
 
 permissions:
   contents: read
 
 jobs:
   metrics:
-    # Chỉ bản phát hành thật đã thành công; tag pre-release (`-rc.N`) cũng được đo.
-    if: ${{ !github.event.repository.private && (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success') }}
+    if: ${{ !github.event.repository.private }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
@@ -29,15 +35,12 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
-      INPUT_VERSION: ${{ inputs.version }}
-      RUN_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+      INPUT_TAG: ${{ inputs.tag }}
     steps:
       - name: Version and commit of the release
         id: release
         run: |
-          # Tag phát hành là `vX.Y.Z`; `head_branch` của workflow_run do tag đẩy là chính tên tag.
-          tag="v${INPUT_VERSION#v}"
-          [ -n "$INPUT_VERSION" ] || tag="$RUN_HEAD_BRANCH"
+          tag="v${INPUT_TAG#v}"
           case "$tag" in v[0-9]*) ;; *) echo "::error::not a release tag: $tag"; exit 1 ;; esac
           sha="$(gh api "repos/$GH_REPO/commits/$tag" --jq .sha)"
           {
@@ -55,6 +58,7 @@ jobs:
         run: scripts/release-time-to-first-request.sh "$VERSION" "$GH_REPO" | tee first-request.json
       # Bộ eval agent của G4: file kết quả `docs/quality/agent-eval.json` (định dạng agent-eval.schema.json) nếu bản này có.
       - name: Table
+        id: table
         env:
           VERSION: ${{ steps.release.outputs.version }}
           SHA: ${{ steps.release.outputs.sha }}
@@ -64,7 +68,8 @@ jobs:
           set +e
           # shellcheck disable=SC2086
           scripts/release-metrics.py --version "$VERSION" --sha "$SHA" --first-request first-request.json $eval_file | tee metrics.md
-          echo "status=${PIPESTATUS[0]}" >> "$GITHUB_ENV"
+          status="${PIPESTATUS[0]}"
+          echo "status=$status" >> "$GITHUB_OUTPUT"
       # Thêm bảng vào ghi chú bản phát hành (một lần: thay phần cũ nếu chạy lại).
       - name: Add the table to the release notes
         env:
@@ -78,5 +83,6 @@ jobs:
           open("notes.md", "w").write(notes + "\n\n" + open("metrics.md").read())
           PY
           gh release edit "$TAG" --notes-file notes.md
-      - name: Fail when a measured metric misses its limit
-        run: '[ "$status" = "0" ]'
+      - name: Warn when a measured metric misses its limit
+        if: ${{ steps.table.outputs.status != '0' }}
+        run: echo "::warning::at least one measured release metric misses its 1.0 limit; see the table in the job summary and the release notes"

@@ -531,3 +531,16 @@ jobs:
             gh release create "$TAG" --title "Autoxide $TAG" --notes-file ../notes.md --verify-tag "${flags[@]}" \
               "${files[@]}"
           fi
+
+  # Bảng chỉ số của bản phát hành (71-G9, docs/RELEASING.md): đo sau khi bản đã đăng. Chỉ ghi vào trang tóm tắt và ghi
+  # chú bản phát hành (cần `contents: write` đúng cho việc đó), không làm đỏ Release.
+  metrics:
+    needs: [verify, publish]
+    if: ${{ !cancelled() && !github.event.repository.private && needs.publish.result == 'success' }}
+    permissions:
+      contents: write
+      actions: read
+      packages: read
+    uses: ./.github/workflows/release-metrics.yml
+    with:
+      tag: ${{ github.ref_name }}

@@ -185,9 +185,8 @@ bước 7.**
 
 ## Chỉ số của mỗi bản phát hành (ngưỡng cho 1.0, 71-G9)
 
-Mỗi bản phát hành có một bảng năm chỉ số, do workflow `Release metrics` (`.github/workflows/release-metrics.yml`) dựng sau khi
-`Release` xong, ghi vào trang tóm tắt của lần chạy và vào ghi chú bản phát hành (`scripts/release-metrics.py`). Chỉ số
-**đã đo mà không đạt** làm workflow đỏ; **chưa đo** thì ghi "chưa đo" / "chờ …", không bịa số. Bản 1.0 chỉ phát hành khi
+Mỗi bản phát hành có một bảng năm chỉ số, do workflow `Release metrics` (`.github/workflows/release-metrics.yml`, `release.yml` gọi như một job sau khi đăng bản; chạy tay cho tag đã có bằng `workflow_dispatch`) dựng, ghi vào trang tóm tắt của lần chạy và vào ghi chú bản phát hành (`scripts/release-metrics.py`). Chỉ số
+**đã đo mà không đạt** ghi "KHÔNG ĐẠT" trong bảng và báo cảnh báo (không làm đỏ workflow `Release`: bản đã đăng, đỏ cũng không rút lại được); **chưa đo** thì ghi "chưa đo" / "chờ …", không bịa số. Bản 1.0 chỉ phát hành khi
 cả năm đều đã đo và đạt (chủ dự án duyệt lúc chốt, D-20261126-road-to-1-0).
 
 | Chỉ số | Ngưỡng 1.0 | Đo bằng gì | Tự động? |
