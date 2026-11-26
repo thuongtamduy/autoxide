@@ -217,7 +217,7 @@ Postgres; vòng kiểm thử bảo mật kiểu bên ngoài cuối cùng không 
 
 - [x] Kiểm độc lập bắt buộc theo D-20261126-independent-review (mẫu pull request có mục kết quả kiểm)
 - [ ] Mutation testing (`cargo-mutants`) cho kernel và phần tiền / thuế, chạy định kỳ
-- [ ] Bất biến tiền, thuế, quyền thành property test chạy hằng đêm
+- [x] Bất biến tiền, thuế, quyền thành property test chạy hằng đêm (rà ở `docs/quality/invariants.md`; phần còn thiếu ghi cuối file)
 - [ ] Đo tải trong CI hằng tuần trên cả hai database, chặn khi p95 của đường nóng tệ đi; vài benchmark vi mô cho đường
       nóng của kernel
 - [ ] Chỉ số đo mỗi bản phát hành, ngưỡng cho 1.0: tải về tới request đầu tiên dưới 5 phút; người mới xong module đầu
