@@ -252,7 +252,7 @@ impl ContentService {
 }
 
 /// Đọc vị trí: `content.manage` hay `content.banners`.
-fn require_read(principal: &Principal) -> Result<(), Error> {
+pub(crate) fn require_read(principal: &Principal) -> Result<(), Error> {
     if principal.has(&CONTENT_BANNERS) {
         return Ok(());
     }

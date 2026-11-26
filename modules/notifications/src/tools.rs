@@ -62,6 +62,8 @@ pub(crate) struct ListPage {
     cursor: Option<String>,
     /// `asc` or `desc`; the default is the list's own (newest first for devices, by key for kinds).
     order: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
 }
 
 /// Which messages.
@@ -170,7 +172,9 @@ pub(crate) fn all(service: &Arc<NotificationsService>) -> Vec<Tool> {
                 let service = devices.clone();
                 async move {
                     // Cùng kiểu tham số trang với REST (`PageQuery`, mới trước).
-                    let page = PageInput::new(input.limit, input.cursor, input.order).page()?;
+                    let page = PageInput::new(input.limit, input.cursor, input.order)
+                        .with_count(input.count.unwrap_or(false))
+                        .page()?;
                     let rows = service.my_device_tokens(&tenant, &principal, &page).await?;
                     Ok::<Page<DeviceTokenResponse>, Error>(rows.map(DeviceTokenResponse::from))
                 }
@@ -241,7 +245,8 @@ pub(crate) fn all(service: &Arc<NotificationsService>) -> Vec<Tool> {
                         input.limit.map(|limit| limit.to_string()),
                         input.cursor,
                         input.order,
-                    );
+                    )
+                    .with_count(input.count.unwrap_or(false));
                     let page = autoxide_kernel::pagination::PageRequest::try_from(paging)?;
                     kind_page(&service, &page) as Result<Page<KindResponse>, Error>
                 }

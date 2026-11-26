@@ -99,6 +99,13 @@
               "null"
             ]
           },
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "country": {
             "type": "string"
           },
@@ -157,6 +164,13 @@
             "description": "The list in force on this day (`YYYY-MM-DD`); defaults to today.",
             "type": [
               "string",
+              "null"
+            ]
+          },
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
               "null"
             ]
           },
@@ -5592,6 +5606,13 @@
         "additionalProperties": false,
         "description": "Paging of the template list.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "The `next_cursor` of the previous page.",
             "type": [
@@ -6918,6 +6939,13 @@
         "additionalProperties": false,
         "description": "The calls of a conversation, one page.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "The `next_cursor` of the previous page.",
             "type": [
@@ -12096,6 +12124,13 @@
         "additionalProperties": false,
         "description": "One page of a list (same parameters as REST).",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "The `next_cursor` of the previous page.",
             "type": [
@@ -12206,6 +12241,13 @@
         "additionalProperties": false,
         "description": "One page of a list (same parameters as REST).",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "The `next_cursor` of the previous page.",
             "type": [
@@ -14839,6 +14881,13 @@
         "additionalProperties": false,
         "description": "One page of the kinds (same parameters as REST).",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "The `next_cursor` of the previous page.",
             "type": [

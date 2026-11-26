@@ -474,6 +474,8 @@ pub(crate) async fn list_entries(
     Query(paging): Query<SortChoicePageQuery>,
     Query(raw): Query<std::collections::HashMap<String, String>>,
 ) -> Result<Page<EntryResponse>, Error> {
+    // Kiểm quyền trước khi đọc tham số trang: người không có quyền nhận 403, không phải 422 (D-20261126-list-pages-cluster-2).
+    principal.require(&crate::permissions::CONTENT_READ)?;
     let mut problems = Vec::new();
     let mut filter = query.filter(principal.user_id(), &mut problems);
     // Trường tự định nghĩa (bước 51 P19): `cf.<khoá>=<toán tử>:<giá trị>`.

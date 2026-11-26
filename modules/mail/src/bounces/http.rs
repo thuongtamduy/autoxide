@@ -147,6 +147,9 @@ async fn list_mail_bounces(
     Query(filter): Query<BounceQuery>,
     Query(page): Query<PageQuery>,
 ) -> Result<Page<BounceResponse>, Error> {
+    // Kiểm quyền trước khi đọc tham số trang: người không có quyền nhận 403, không phải 422
+    // (D-20261126-list-pages-cluster-2).
+    principal.require(&super::BOUNCES_READ)?;
     let filter = BounceFilter { email: filter.email, suppressed: filter.suppressed };
     let page = service.list(&tenant, &principal, &filter, &PageRequest::try_from(page)?).await?;
     Ok(page.map(BounceResponse::from))

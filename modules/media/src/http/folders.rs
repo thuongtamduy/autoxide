@@ -97,6 +97,8 @@ pub(crate) async fn list_folders(
     Query(query): Query<FoldersQuery>,
     Query(paging): Query<SortChoicePageQuery>,
 ) -> Result<Page<FolderResponse>, Error> {
+    // Kiểm quyền trước khi đọc tham số trang: người không có quyền nhận 403, không phải 422 (D-20261126-list-pages-cluster-2).
+    principal.require(&crate::permissions::MEDIA_READ)?;
     let mut problems = Vec::new();
     let parent = folder_filter(query.parent_id.as_deref(), "parent_id", &mut problems);
     let order: FolderSort = sort(query.sort.as_deref(), "`created_at`, `name`", &mut problems);
