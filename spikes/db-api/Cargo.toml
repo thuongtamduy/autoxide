@@ -1,0 +1,17 @@
+[package]
+name = "autoxide-spike-db"
+description = "SPIKE, never merged: prototype of the kernel `db` layer (D-20261126-kernel-data-layer)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+autoxide-kernel.workspace = true
+sea-orm.workspace = true
+uuid.workspace = true
+sha2.workspace = true
+
+[dev-dependencies]
+autoxide-testkit.workspace = true
+tokio.workspace = true

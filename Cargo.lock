@@ -1209,6 +1209,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "autoxide-spike-db"
+version = "0.19.0"
+dependencies = [
+ "autoxide-kernel",
+ "autoxide-testkit",
+ "sea-orm",
+ "sha2 0.11.1",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "autoxide-spike-macros"
+version = "0.19.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+]
+
+[[package]]
 name = "autoxide-support"
 version = "0.19.0"
 dependencies = [
