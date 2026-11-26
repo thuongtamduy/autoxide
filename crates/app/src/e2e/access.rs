@@ -364,6 +364,38 @@ async fn moi_endpoint_khong_cong_khai_tra_401_va_403() {
             }
         }
 
+        // `PAGE_BEFORE_PERMISSION` chỉ co lại: mục đã sửa (trả 403 với `limit=0`) hay không khớp operation nào thì
+        // đỏ, buộc xoá dòng; mục còn đúng là "chưa sửa" thì vẫn trả 422.
+        for entry in PAGE_BEFORE_PERMISSION {
+            let Some((method, path)) = entry.split_once(' ') else {
+                failures.push(format!("PAGE_BEFORE_PERMISSION `{entry}`: write `<METHOD> <path>`"));
+                continue;
+            };
+            let method = method.to_lowercase();
+            let Some(operation) = document["paths"].get(path).and_then(|item| item.get(&method)) else {
+                failures.push(format!("PAGE_BEFORE_PERMISSION `{entry}` matches no operation: remove this line"));
+                continue;
+            };
+            let mut probe = probe(&document, &method, path, operation);
+            let separator = if probe.uri.contains('?') { '&' } else { '?' };
+            probe.uri = format!("{}{separator}limit=0", probe.uri);
+            let (mut status, mut body) = send(&app, &probe, Some(&token)).await;
+            if body["code"] == "auth.session_ended" {
+                token = sign_in(&app).await;
+                (status, body) = send(&app, &probe, Some(&token)).await;
+            }
+            if status == 403 && body["code"] == "permission_denied" {
+                failures.push(format!(
+                    "PAGE_BEFORE_PERMISSION `{entry}` now checks the permission first: remove this line"
+                ));
+            } else if status != 422 {
+                failures.push(format!(
+                    "PAGE_BEFORE_PERMISSION `{entry}`: expected 422 for `limit=0` without permissions, got {status} {}",
+                    body["code"]
+                ));
+            }
+        }
+
         // Tool MCP: mỗi tool đòi permission hay khai `for_any_signed_in`; tool chỉ đọc gọi được bằng
         // ít nhất một permission mức xem (`read` / `sensitive_data`). Ngoại lệ có lý do (D-245):
         // `files.list_files` — `files.upload` gồm cả xem file của chính mình, `files` không có

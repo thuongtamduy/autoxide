@@ -294,6 +294,19 @@ async fn tool_danh_sach_tra_dung_trang_nhu_rest() {
             assert_ne!(second["data"], first["data"], "{name}");
             assert!(second["pagination"]["next_cursor"].is_null(), "{name}");
         }
+        // `count: true` của tool cho cùng `pagination.total` với `count=true` của REST (D-20261126-list-pages-cluster-2).
+        let rest = app.get("/api/v1/address/provinces?limit=1&count=true").send().await.unwrap().json();
+        let counted = client
+            .call_tool(autoxide_testkit::tool(
+                "address.list_provinces",
+                serde_json::json!({"limit": 1, "count": true}),
+            ))
+            .await
+            .unwrap()
+            .structured_content
+            .unwrap();
+        assert!(rest["pagination"]["total"].as_u64().is_some_and(|total| total >= 2), "{rest}");
+        assert_eq!(counted["pagination"], rest["pagination"]);
         client.cancel().await.unwrap();
     })
     .await

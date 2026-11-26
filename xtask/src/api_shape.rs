@@ -51,12 +51,12 @@ pub fn check(root: &Path) -> Result<Report, String> {
     let allow_text = fs::read_to_string(root.join(ALLOW_FILE)).unwrap_or_default();
     let allowed = parse_allow(&allow_text)?;
     let mut found = find(&document);
-    // Thiếu file tool (repo chưa sinh) thì bỏ qua luật của tool; test giữ tài liệu khớp code bắt file cũ.
-    if let Ok(text) = fs::read_to_string(root.join(MCP_FILE)) {
-        let tools: Value =
-            serde_json::from_str(&text).map_err(|error| format!("{MCP_FILE}: {error}"))?;
-        found.extend(find_tools(&tools));
-    }
+    // Thiếu hay hỏng file tool là lỗi (luật `mcp-page-count` không được lặng lẽ bỏ qua).
+    let tools_text =
+        fs::read_to_string(root.join(MCP_FILE)).map_err(|error| format!("{MCP_FILE}: {error}"))?;
+    let tools: Value =
+        serde_json::from_str(&tools_text).map_err(|error| format!("{MCP_FILE}: {error}"))?;
+    found.extend(find_tools(&tools));
     let mut used = BTreeSet::new();
     let mut violations = Vec::new();
     for (key, message) in found {
@@ -67,7 +67,12 @@ pub fn check(root: &Path) -> Result<Report, String> {
         let (rule, method, path) = key;
         violations.push(Violation {
             rule,
-            location: format!("{OPENAPI_FILE} {method} {path}"),
+            // Luật của tool ghi vị trí ở file tool, luật của endpoint ở file OpenAPI.
+            location: if method == "TOOL" {
+                format!("{MCP_FILE} {path}")
+            } else {
+                format!("{OPENAPI_FILE} {method} {path}")
+            },
             message,
         });
     }
