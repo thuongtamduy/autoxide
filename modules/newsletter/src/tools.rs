@@ -47,6 +47,8 @@ pub(crate) struct ListListsInput {
     limit: Option<u32>,
     /// Where to continue: the `next_cursor` of the previous page.
     cursor: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
 }
 
 /// Filters of a subscriber search.
@@ -66,6 +68,8 @@ pub(crate) struct FindSubscribersInput {
     limit: Option<u32>,
     /// Where to continue: the `next_cursor` of the previous page.
     cursor: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
 }
 
 /// A new draft campaign.
@@ -144,7 +148,8 @@ pub(crate) fn all(service: &Arc<NewsletterService>) -> Vec<Tool> {
                         input.limit.map(|limit| limit.to_string()),
                         input.cursor,
                         None,
-                    );
+                    )
+                    .with_count(input.count.unwrap_or(false));
                     let page = page_request(paging, Vec::new())?;
                     let found = service.list_lists(&tenant, &principal, &page).await?;
                     let ids: Vec<Uuid> = found.data.iter().map(|list| list.row.id).collect();
@@ -183,7 +188,8 @@ pub(crate) fn all(service: &Arc<NewsletterService>) -> Vec<Tool> {
                         input.limit.map(|limit| limit.to_string()),
                         input.cursor,
                         None,
-                    );
+                    )
+                    .with_count(input.count.unwrap_or(false));
                     let page = page_request(paging, problems)?;
                     let found =
                         service.list_subscribers(&tenant, &principal, &filter, &page).await?;

@@ -151,8 +151,10 @@ impl From<UpdateCampaignRequest> for CampaignInput {
 #[derive(Debug, Default, Deserialize, IntoParams)]
 #[into_params(parameter_in = Query)]
 pub(crate) struct CampaignsQuery {
+    /// Only campaigns in this status.
     #[param(value_type = Option<CampaignStatus>, inline)]
     pub status: Option<String>,
+    /// Only campaigns sent to this list.
     #[param(value_type = Option<Uuid>)]
     pub list_id: Option<String>,
 }

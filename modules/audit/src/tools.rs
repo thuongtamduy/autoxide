@@ -32,6 +32,8 @@ pub(crate) struct ListEntriesInput {
     limit: Option<u32>,
     /// Where to continue: the `next_cursor` of the previous page.
     cursor: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
     /// `desc` (newest first, the default) or `asc` (oldest first).
     order: Option<String>,
 }
@@ -54,7 +56,8 @@ pub(crate) fn all(service: &Arc<AuditService>) -> Vec<Tool> {
             move |tenant: TenantContext, _: Principal, input: ListEntriesInput| {
                 let service = list.clone();
                 async move {
-                    let page = PageInput::new(input.limit, input.cursor, input.order);
+                    let page = PageInput::new(input.limit, input.cursor, input.order)
+                        .with_count(input.count.unwrap_or(false));
                     let filter = Filter {
                         actor_user_id: input.actor_user_id,
                         subject: input.subject,

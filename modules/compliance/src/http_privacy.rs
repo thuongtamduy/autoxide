@@ -145,7 +145,7 @@ async fn list_purposes(
         (status = 201, description = "The purpose.", body = Data<Purpose>, headers(("Location" = String, description = "Path of the purposes."))),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing `compliance.privacy.manage`; code `permission_denied`.", body = Problem),
-        (status = 409, description = "The tenant already has this purpose; code `compliance.purpose_exists`.", body = Problem),
+        (status = 409, description = "The tenant already has this purpose (code `compliance.purpose_exists`), or already has `AUTOXIDE_COMPLIANCE_PURPOSES_TENANT_MAX` purposes of its own (code `compliance.purpose_limit_reached`).", body = Problem),
         (status = 422, description = "A value is invalid; every problem in `errors`.", body = Problem),
     )
 )]

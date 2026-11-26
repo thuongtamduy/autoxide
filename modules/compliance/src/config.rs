@@ -62,6 +62,13 @@ pub(crate) const PUBLIC_REPORTS_PER_IP_PER_HOUR: Setting = Setting::new(
 )
 .with_default("5");
 
+pub(crate) const PURPOSES_TENANT_MAX: Setting = Setting::new(
+    "AUTOXIDE_COMPLIANCE_PURPOSES_TENANT_MAX",
+    "Most processing purposes of its own a tenant may add (on top of the defaults of the legal rules), 1 \
+     to 10000.",
+)
+.with_default("200");
+
 pub(crate) const CASE_TRACKING_URL: Setting = Setting::new(
     "AUTOXIDE_COMPLIANCE_CASE_TRACKING_URL",
     "Address of the interface's page where a reporter follows a report or complaint, with `{case}` \
@@ -129,6 +136,8 @@ pub(crate) struct Config {
     pub public_reports_per_hour: u32,
     /// `AUTOXIDE_COMPLIANCE_CASE_TRACKING_URL`.
     pub case_tracking_url: Option<String>,
+    /// `AUTOXIDE_COMPLIANCE_PURPOSES_TENANT_MAX`.
+    pub purposes_tenant_max: u64,
 }
 
 impl Default for Config {
@@ -139,6 +148,7 @@ impl Default for Config {
             cookie_consents_per_hour: 60,
             public_reports_per_hour: 5,
             case_tracking_url: None,
+            purposes_tenant_max: 200,
         }
     }
 }
@@ -161,7 +171,10 @@ pub(crate) fn read(reader: &mut ConfigReader<'_>) -> Result<Config, Invalid> {
     let public_reports_per_hour =
         reader.get_with(&PUBLIC_REPORTS_PER_IP_PER_HOUR, |raw| parse_in_range(raw, 1u32, 10_000));
     let case_tracking_url = reader.optional_with(&CASE_TRACKING_URL, tracking_url);
+    let purposes_tenant_max =
+        reader.get_with(&PURPOSES_TENANT_MAX, |raw| parse_in_range(raw, 1u64, 10_000));
     Ok(Config {
+        purposes_tenant_max: purposes_tenant_max?,
         public_reports_per_hour: public_reports_per_hour?,
         case_tracking_url: case_tracking_url?,
         cookie_consents_per_hour: cookie_consents_per_hour?,

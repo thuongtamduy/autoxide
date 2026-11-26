@@ -17,6 +17,7 @@ older curl, replace `--json '…'` with `-H 'Content-Type: application/json' -H 
 - [API keys for programs and AI agents](api-keys.md): least permissions, rate limit, revoking
 - [Retrying safely](retries.md): `Idempotency-Key`
 - [Reading long lists](pagination.md): `limit`, `cursor`, `order`
+- [Upgrading clients: every list is a page](list-pages-upgrade.md): `data` + `pagination`, `count`, default orders, MCP tools
 - [Reading errors](errors.md): `code`, `errors`, `Retry-After`
 - [Connecting an AI agent over MCP](mcp.md): a key for the agent, client setup, the tools
 - [Receiving events in real time](realtime-events.md): Server-Sent Events, `Last-Event-ID`, limits
