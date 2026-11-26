@@ -6,16 +6,29 @@ use super::{Permission, Principal};
 use crate::error::Error;
 
 impl Principal {
-    /// `Ok` when the caller has at least one of `permissions` (at any depth) and, like [`Principal::require`], has
-    /// re-confirmed the sign-in recently when that permission is high-risk (step-up); otherwise 403
-    /// `permission_denied` naming every one of them, with reason `denied_by_role` / `outside_guardrail` when a role
-    /// or the guardrail removed the first. The service still checks the depth and the record.
+    /// `Ok` when the caller has at least one of `permissions` (at any depth) and can use one of those it has: like
+    /// [`Principal::require`], a high-risk permission (destructive, money) needs a recent sign-in (step-up), so the
+    /// call is refused with `step_up_required` only when EVERY listed permission the caller has needs one — the order
+    /// of the list does not matter. Otherwise 403 `permission_denied` naming every listed permission.
+    ///
+    /// This only says the caller may start the action. Where the service actually does the high-risk part, it must
+    /// still call [`Principal::require`] for that permission, which asks for the step-up there.
     pub fn require_any(&self, permissions: &[&Permission]) -> Result<(), Error> {
-        // Bước xác nhận lại theo permission ĐẦU TIÊN người gọi có, như `require` của permission đó.
-        if let Some(held) = permissions.iter().find(|permission| self.has(permission)) {
-            return self.fresh_for(held);
+        let mut refusal = None;
+        for permission in permissions.iter().filter(|permission| self.has(permission)) {
+            // Permission đầu tiên không cần xác nhận lại (hay phiên vừa xác nhận) là đủ; mọi permission đang có đều
+            // cần mà phiên cũ thì trả lỗi xác nhận lại của permission đầu tiên.
+            match self.fresh_for(permission) {
+                Ok(()) => return Ok(()),
+                Err(error) => {
+                    refusal.get_or_insert(error);
+                }
+            }
         }
-        Err(self.refuse_any(permissions.iter().map(|permission| permission.name())))
+        match refusal {
+            Some(error) => Err(error),
+            None => Err(self.refuse_any(permissions.iter().map(|permission| permission.name()))),
+        }
     }
 
     /// "Has at least one of `names`", by name, for the HTTP permission layer only: it does not ask for step-up —
@@ -92,6 +105,16 @@ mod tests {
         let own =
             Principal::new(uuid::Uuid::now_v7(), ["demo.drop_own".to_owned()]).with_step_up(stale);
         assert!(own.require_any(&[&DROP, &DROP_OWN]).is_ok());
+        // Có cả hai, phiên cũ: quyền thường đủ để bắt đầu — thứ tự danh sách không đổi kết quả.
+        let both = Principal::new(
+            uuid::Uuid::now_v7(),
+            ["demo.drop".to_owned(), "demo.drop_own".to_owned()],
+        )
+        .with_step_up(stale);
+        assert!(both.require_any(&[&DROP, &DROP_OWN]).is_ok());
+        assert!(both.require_any(&[&DROP_OWN, &DROP]).is_ok());
+        // Mọi quyền đang có trong danh sách đều cần xác nhận lại: đòi.
+        assert_eq!(both.require_any(&[&DROP]).unwrap_err().code(), "step_up_required");
         // Không có quyền nào: `permission_denied` nêu đủ các quyền.
         let reader = Principal::new(uuid::Uuid::now_v7(), ["demo.read".to_owned()]);
         let error = reader.require_any(&[&DROP, &DROP_OWN]).unwrap_err();

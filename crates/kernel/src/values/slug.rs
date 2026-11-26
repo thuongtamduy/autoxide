@@ -52,6 +52,20 @@ pub fn with_suffix(base: &str, n: u32) -> String {
     format!("{trimmed}{suffix}")
 }
 
+/// How many slugs [`candidates`] gives per window.
+pub const WINDOW: u32 = 20;
+
+/// The `window`th group of slugs to try for `base` (from 0): `base`, `base-2` … `base-20`, then `base-21` …
+/// `base-40`, and so on. A module looks the whole group up with one `slug IN (…)` query, which uses its unique index
+/// on SQLite and Postgres alike (a `LIKE 'base-%'` prefix query does not on Postgres unless the column uses the "C"
+/// collation), and takes the first one not in use; when all are in use, it asks for the next window.
+pub fn candidates(base: &str, window: u32) -> Vec<String> {
+    let first = window.saturating_mul(WINDOW).saturating_add(1);
+    (first..first.saturating_add(WINDOW))
+        .map(|n| if n == 1 { base.to_owned() } else { with_suffix(base, n) })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -68,6 +82,11 @@ mod tests {
         assert!(slug.len() <= MAX_LENGTH && is_valid(&slug), "{slug}");
         assert_eq!(from_title(&"a".repeat(150), id).len(), MAX_LENGTH);
         assert_eq!(with_suffix("abc", 2), "abc-2");
+        let first = candidates("abc", 0);
+        assert_eq!(first.len(), WINDOW as usize);
+        assert_eq!((first[0].as_str(), first[1].as_str()), ("abc", "abc-2"));
+        assert_eq!(first.last().map(String::as_str), Some("abc-20"));
+        assert_eq!(candidates("abc", 1)[0], "abc-21");
         assert_eq!(with_suffix(&"a".repeat(100), 12).len(), MAX_LENGTH);
         for good in ["a", "a-b", "ab1-2c"] {
             assert!(is_valid(good), "{good}");

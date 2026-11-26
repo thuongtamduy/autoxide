@@ -152,6 +152,38 @@ async fn sku_dong_thoi_chi_mot_thang() {
     .unwrap();
 }
 
+/// PT-16: tám sản phẩm cùng tên (khác SKU) tạo cùng lúc đều được tạo, mỗi sản phẩm một slug — hai request không cùng
+/// chọn một slug rồi một bên nhận 409 `catalog.slug_taken`.
+#[tokio::test]
+async fn cung_ten_dong_thoi_moi_san_pham_mot_slug() {
+    TestDatabase::run(async |test| {
+        let (app, tree) = app(test).await;
+        let app = Arc::new(app);
+        let tasks: Vec<_> = (0..8)
+            .map(|index| {
+                let app = app.clone();
+                let body = product_body(tree.a, &format!("SAME-{index}"), "Cà phê sữa");
+                tokio::spawn(
+                    async move { call(&app, "POST", "/products", "boss", Some(body)).await },
+                )
+            })
+            .collect();
+        let mut slugs = Vec::new();
+        for task in tasks {
+            let (status, body) = task.await.unwrap();
+            assert_eq!(status, StatusCode::CREATED, "{body}");
+            slugs.push(
+                body["data"]["translations"][0]["slug"].as_str().unwrap_or_default().to_owned(),
+            );
+        }
+        slugs.sort();
+        slugs.dedup();
+        assert_eq!(slugs.len(), 8, "{slugs:?}");
+    })
+    .await
+    .unwrap();
+}
+
 /// Tuỳ chọn: thêm tuỳ chọn thì biến thể cũ nhận giá trị đầu; biến thể theo tổ hợp, trùng tổ hợp
 /// → 409; nhãn "Đỏ / M" theo ngôn ngữ qua `dyn Catalog`; bỏ giá trị đang dùng → 409.
 #[tokio::test]

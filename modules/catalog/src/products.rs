@@ -234,7 +234,8 @@ pub(crate) fn check_text(
 }
 
 /// Slug còn trống trong ngôn ngữ `locale` của khách: `base`, hay `base-2`, `base-3`… (bỏ qua
-/// chính sản phẩm `product_id`).
+/// chính sản phẩm `product_id`). Hỏi từng nhóm ứng viên bằng `slug IN (…)` — dùng unique index trên cả hai database
+/// (PT-16; `LIKE 'base-%'` quét cả bảng trên Postgres). `connection` phải là transaction ghi (khoá theo tên).
 pub(crate) async fn free_slug<C: ConnectionTrait>(
     connection: &C,
     tenant: &TenantContext,
@@ -242,29 +243,32 @@ pub(crate) async fn free_slug<C: ConnectionTrait>(
     base: &str,
     product_id: Uuid,
 ) -> Result<String, Error> {
-    let taken: Vec<String> = translation::Entity::find()
-        .filter(translation::Column::Locale.eq(locale))
-        .filter(translation::Column::ProductId.ne(product_id))
-        .filter(Condition::any().add(translation::Column::Slug.eq(base)).add(
-            autoxide_kernel::search::starts_with(translation::Column::Slug, &format!("{base}-")),
-        ))
-        .scoped(tenant)
-        .all(connection)
-        .await?
-        .into_iter()
-        .map(|row| row.slug)
-        .collect();
-    if !taken.iter().any(|slug| slug == base) {
-        return Ok(base.to_owned());
-    }
-    let mut n = 2;
-    loop {
-        let next = autoxide_kernel::slug::with_suffix(base, n);
-        if !taken.contains(&next) {
-            return Ok(next);
+    use sea_orm::QuerySelect as _;
+    // Hai request cùng sinh slug từ một gốc trong một ngôn ngữ chọn lần lượt (Postgres: khoá theo tên tới hết
+    // transaction; SQLite: transaction ghi đã giữ cả database) — không cùng chọn một slug rồi một bên vấp unique index
+    // (transaction Postgres hỏng thì không thử lại được trong nó).
+    autoxide_kernel::rows::lock_key(
+        connection,
+        &format!("catalog.slug:{}:{locale}:{base}", tenant.id().as_uuid()),
+    )
+    .await?;
+    for window in 0.. {
+        let wanted = autoxide_kernel::slug::candidates(base, window);
+        let taken: Vec<String> = translation::Entity::find()
+            .select_only()
+            .column(translation::Column::Slug)
+            .filter(translation::Column::Locale.eq(locale))
+            .filter(translation::Column::ProductId.ne(product_id))
+            .filter(translation::Column::Slug.is_in(wanted.iter().map(String::as_str)))
+            .scoped(tenant)
+            .into_tuple::<String>()
+            .all(connection)
+            .await?;
+        if let Some(free) = wanted.into_iter().find(|slug| !taken.contains(slug)) {
+            return Ok(free);
         }
-        n += 1;
     }
+    Err(errors::slug_taken(base))
 }
 
 /// Dòng nội dung theo ngôn ngữ, kèm khoá tìm (`search_key`, `name_key` — D-201).
