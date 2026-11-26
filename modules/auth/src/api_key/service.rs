@@ -10,7 +10,7 @@ use std::collections::{BTreeSet, HashMap};
 use std::sync::Arc;
 
 use autoxide_kernel::access::ActorKind;
-use autoxide_kernel::access::Principal;
+use autoxide_kernel::access::{Credential, Principal};
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use sea_orm::sea_query::Expr;
 use sea_orm::{
@@ -383,10 +383,33 @@ impl ApiKeyService {
             .await?
             .ok_or_else(|| api_key_not_found(id))?
             .user_id;
-        if owner != caller.user_id() {
-            self.roles.require_covers(tenant, caller, owner).await?;
+        // Chỉ bỏ qua kiểm khi chính chủ gọi bằng phiên đăng nhập. API key hay token OAuth mang
+        // `auth.api_keys.manage` cũng phải bao trùm quyền của chủ key đích — kể cả key khác của cùng chủ, như
+        // `DELETE /api-keys/{id}` (D-20261126-api-key-self-scope).
+        if !(caller.is_session() && owner == caller.user_id()) {
+            self.require_covers_owner(tenant, caller, owner).await?;
         }
         self.revoke_where(tenant, caller, id, None).await
+    }
+
+    /// `require_covers` với chủ key `owner`. Chủ key không phải nhân sự (người mua): không có gì để so — quyền
+    /// `auth.api_keys.manage` là đủ (`require_covers` chỉ nhận nhân sự và trả `auth.user_not_found` với người khác).
+    async fn require_covers_owner(
+        &self,
+        tenant: &TenantContext,
+        caller: &Principal,
+        owner: Uuid,
+    ) -> Result<(), Error> {
+        let staff = crate::user::entity::Entity::find_by_id(owner)
+            .filter(crate::user::entity::Column::Realm.eq("staff"))
+            .scoped(tenant)
+            .one(tenant.database().read())
+            .await?
+            .is_some();
+        if staff {
+            self.roles.require_covers(tenant, caller, owner).await?;
+        }
+        Ok(())
     }
 
     /// Thu hồi (xoá) key `id` của bên gọi. Key thôi dùng được ngay.
@@ -398,10 +421,12 @@ impl ApiKeyService {
     ) -> Result<(), Error> {
         // Gọi bằng API key: chỉ thu hồi được chính key đó (key lộ tự tắt được), không thu hồi key khác của cùng chủ —
         // key quyền tối thiểu không được tắt key quyền cao hơn (UT-2). Key khác: 404 như key không có.
-        if let Some(own) = caller.api_key_id()
-            && own != id
-        {
-            return Err(api_key_not_found(id));
+        // Token OAuth (hay loại credential khác): không thu hồi key nào — client làm thay người dùng không quản lý
+        // credential của họ. 404 như key không có, không lộ key nào tồn tại.
+        match caller.credential() {
+            Credential::Session => {}
+            Credential::ApiKey(own) if own == id => {}
+            _ => return Err(api_key_not_found(id)),
         }
         self.revoke_where(tenant, caller, id, Some(caller.user_id())).await
     }

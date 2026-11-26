@@ -173,3 +173,75 @@ async fn quan_ly_key_khong_thu_hoi_key_cua_nguoi_quyen_cao_hon() {
     .await
     .unwrap();
 }
+
+/// Kiểm độc lập #572: token OAuth (client làm thay người dùng) không xem, không thu hồi, không xoay key nào; API key có
+/// `auth.api_keys.manage` không thu hồi được key khác của chính chủ qua `/all-api-keys`; xoay key bằng API key bị từ
+/// chối cùng một lỗi dù id có tồn tại hay không.
+#[tokio::test]
+async fn token_oauth_va_api_key_quan_ly_khong_vuot_pham_vi() {
+    TestDatabase::run(async |test| {
+        use autoxide_kernel::access::OAuthAccess;
+        use autoxide_kernel::pagination::{Order, PageRequest};
+        let (app, services) = app(test).await;
+        let tenant = services.tenant.clone();
+        let boss = NewUser {
+            email: "boss@example.com".to_owned(),
+            name: "Boss".to_owned(),
+            password: Some(PASSWORD.to_owned()),
+        };
+        let boss =
+            services.users.create_with_roles(&tenant, Actor::system(), boss, true).await.unwrap();
+        let session = bearer(&app, "boss@example.com", PASSWORD).await;
+        let (deploy_id, _) = key(&app, &session, "deploy", json!(["auth.users.read"])).await;
+        let (manager_id, _) =
+            key(&app, &session, "ops", json!(["auth.api_keys.manage", "auth.users.read"])).await;
+        let deploy: uuid::Uuid = deploy_id.parse().unwrap();
+        let manager: uuid::Uuid = manager_id.parse().unwrap();
+        let (_, principal) =
+            services.roles.user_principal(&tenant, boss.id).await.unwrap().unwrap();
+        let first = PageRequest::first(10, Order::Desc);
+
+        // Token OAuth: danh sách rỗng, thu hồi 404, xoay 403.
+        let oauth = principal.clone().with_oauth(OAuthAccess::new(
+            uuid::Uuid::now_v7(),
+            "https://client.example/app.json",
+            "https://api.example.com/api/v1",
+        ));
+        assert!(services.api_keys.list_own(&tenant, &oauth, &first).await.unwrap().data.is_empty());
+        let error = services.api_keys.revoke(&tenant, &oauth, deploy).await.unwrap_err();
+        assert_eq!(error.code(), "auth.api_key_not_found");
+
+        // API key quản lý key: không thu hồi key khác của chính chủ qua `revoke_any` (không bao trùm quyền chủ).
+        // Như bộ xác thực dựng cho key: chỉ các quyền của key.
+        let via_manager = autoxide_kernel::access::Principal::new(
+            boss.id,
+            ["auth.api_keys.manage".to_owned(), "auth.users.read".to_owned()],
+        )
+        .in_tenant(tenant.id())
+        .via_api_key(manager);
+        let error = services.api_keys.revoke_any(&tenant, &via_manager, deploy).await.unwrap_err();
+        assert_eq!(error.code(), "auth.target_has_more_permissions");
+
+        // Xoay bằng API key: cùng lỗi cho key có thật và id không có.
+        for id in [deploy, uuid::Uuid::now_v7()] {
+            let rotation = crate::api_key::Rotation {
+                overlap_hours: 0,
+                expires_at: None,
+                current_password: PASSWORD.to_owned(),
+                second_factor: None,
+            };
+            let error =
+                services.api_keys.rotate(&tenant, &via_manager, id, rotation).await.unwrap_err();
+            assert_eq!(error.code(), "auth.api_key_cannot_create_keys");
+        }
+
+        // Phiên đăng nhập của chủ: vẫn thu hồi được key của mình qua `revoke_any`; key còn nguyên tới lúc đó.
+        let (status, _, list) = call(&app, "GET", "/api-keys", Some(&session), None).await;
+        assert_eq!((status, list["data"].as_array().unwrap().len()), (StatusCode::OK, 2));
+        let (status, _, _) =
+            call(&app, "DELETE", &format!("/all-api-keys/{deploy}"), Some(&session), None).await;
+        assert_eq!(status, StatusCode::NO_CONTENT);
+    })
+    .await
+    .unwrap();
+}

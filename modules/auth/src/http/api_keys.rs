@@ -110,8 +110,8 @@ async fn list_all_api_keys(
 
 /// Revoke an API key of any user.
 ///
-/// Requires `auth.api_keys.manage`, and every permission of the key's owner when the key is
-/// someone else's. The key stops working at once; the audit log records who revoked it.
+/// Requires `auth.api_keys.manage`, and every permission of the key's owner (a staff member)
+/// unless you revoke one of your own keys from a password session. The key stops working at once; the audit log records who revoked it.
 #[utoipa::path(
     delete,
     path = "/all-api-keys/{id}",
@@ -327,7 +327,7 @@ impl From<CreatedApiKey> for CreatedApiKeyResponse {
 /// List your API keys.
 ///
 /// Any signed-in user. Newest first unless `order=asc`. Secrets are never listed. Called with
-/// an API key, the list holds only that key.
+/// an API key, the list holds only that key; called with an OAuth token, it is empty.
 #[utoipa::path(
     get,
     path = "/api-keys",
@@ -395,7 +395,8 @@ async fn create_api_key(
 /// Revoke one of your API keys.
 ///
 /// The key stops working at once. Called with an API key, only that same key can be revoked (a
-/// leaked key can switch itself off); any other id answers `404`.
+/// leaked key can switch itself off); any other id answers `404`. An OAuth token revokes no key
+/// (`404`).
 #[utoipa::path(
     delete,
     path = "/api-keys/{id}",

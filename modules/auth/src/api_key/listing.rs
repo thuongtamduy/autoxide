@@ -1,7 +1,7 @@
 //! Danh sách API key (tách khỏi `service.rs` theo trách nhiệm, D-20261118-file-length): key của bên gọi và key của mọi
 //! người cho người quản lý.
 
-use autoxide_kernel::access::Principal;
+use autoxide_kernel::access::{Credential, Principal};
 use autoxide_kernel::error::Error;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
@@ -22,15 +22,22 @@ impl ApiKeyService {
         self.list_where(tenant, user_id, None, page).await
     }
 
-    /// Key của bên gọi (`GET /me/api-keys`, tool `list_api_keys`). Gọi bằng API key: chỉ thấy chính key đó — key quyền
-    /// thấp không dò được tên, quyền, phạm vi của các key khác của cùng chủ (UT-2).
+    /// Key của bên gọi (`GET /api-keys`, tool `list_api_keys`), theo loại credential (UT-2): phiên đăng nhập thấy mọi key
+    /// của mình; API key chỉ thấy chính nó (key quyền thấp không dò được các key khác của cùng chủ); token OAuth hay
+    /// loại credential khác: danh sách rỗng — client làm thay người dùng không quản lý credential của họ.
     pub(crate) async fn list_own(
         &self,
         tenant: &TenantContext,
         caller: &Principal,
         page: &PageRequest,
     ) -> Result<Page<ApiKey>, Error> {
-        self.list_where(tenant, caller.user_id(), caller.api_key_id(), page).await
+        let only = match caller.credential() {
+            Credential::Session => None,
+            Credential::ApiKey(own) => Some(own),
+            // UUID rỗng không phải ID của key nào: trang rỗng.
+            _ => Some(Uuid::nil()),
+        };
+        self.list_where(tenant, caller.user_id(), only, page).await
     }
 
     async fn list_where(

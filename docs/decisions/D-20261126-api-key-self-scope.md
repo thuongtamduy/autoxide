@@ -2,16 +2,25 @@
 
 Chủ đề: Xác thực, phân quyền, bảo mật
 
-Quyết định: trong `ApiKeyService` (service layer, nên REST và tool MCP cùng chịu — luật kiến trúc 8):
+Quyết định: trong `ApiKeyService` (service layer, nên REST và tool MCP cùng chịu — luật kiến trúc 8), rẽ nhánh theo
+loại credential (`Principal::credential()`), không theo "có `api_key_id` không" (token OAuth không có `api_key_id` mà
+cũng không phải phiên đăng nhập):
 
-- `list_own` (`GET /api/v1/auth/api-keys`, tool `auth.list_api_keys`): gọi bằng API key thì chỉ trả chính key đó.
-- `revoke` (`DELETE /api/v1/auth/api-keys/{id}`, tool `auth.revoke_api_key`): gọi bằng API key thì chỉ thu hồi được chính
-  key đó; id khác trả `404 auth.api_key_not_found` như key không có (không lộ key nào tồn tại).
-- `revoke_any` (`DELETE /api/v1/auth/all-api-keys/{id}`, cần `auth.api_keys.manage`): key của người khác cần thêm
-  `require_covers` với chủ key (D-079), như khoá hay xoá tài khoản.
+| Thao tác | Phiên đăng nhập | API key | Token OAuth / loại khác |
+| --- | --- | --- | --- |
+| `list_own` (`GET /api/v1/auth/api-keys`, tool `auth.list_api_keys`) | mọi key của mình | chỉ chính nó | rỗng |
+| `revoke` (`DELETE /api/v1/auth/api-keys/{id}`, tool `auth.revoke_api_key`) | key của mình | chỉ chính nó | không key nào |
+| `rotate` | key của mình | 403 `auth.api_key_cannot_create_keys` | 403 như API key |
 
-Phiên đăng nhập của chủ vẫn quản lý mọi key của mình. Tạo, xoay, duyệt key vốn đã cấm API key
-(`auth.api_key_cannot_create_keys`, `auth.api_key_cannot_approve_keys`).
+Id không được phép trả `404 auth.api_key_not_found` như key không có. `rotate` kiểm credential **trước** khi tra key, để
+lỗi giống nhau dù id có tồn tại hay không.
+
+`revoke_any` (`DELETE /api/v1/auth/all-api-keys/{id}`, cần `auth.api_keys.manage`): bỏ qua `require_covers` chỉ khi chính
+chủ key gọi bằng phiên đăng nhập. Mọi trường hợp khác (key của người khác; key khác của chính chủ mà gọi bằng API key
+hay token OAuth) đòi bên gọi bao trùm quyền của chủ key (D-079). Chủ key không phải nhân sự: không có gì để so,
+`auth.api_keys.manage` là đủ (`require_covers` chỉ nhận nhân sự).
+
+`GET /api/v1/auth/me/passkeys` đòi phiên đăng nhập như các thao tác passkey khác. Tạo, duyệt key vốn đã chỉ cho phiên.
 
 Lý do: UT-2 (đợt dùng thử) — key quyền tối thiểu thu hồi được key khác của cùng chủ qua tool MCP (và REST, cùng service):
 service chỉ kiểm "key thuộc cùng người dùng", trong khi mỗi API key là một danh tính có phạm vi riêng. Key lộ không được
