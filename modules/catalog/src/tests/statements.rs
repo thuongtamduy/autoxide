@@ -4,7 +4,7 @@
 use autoxide_testkit::{TestApp, TestDatabase};
 use axum::http::StatusCode;
 
-use super::app;
+use super::app_with;
 use super::public::{drain, on_sale, price_list};
 
 /// Số câu SQL của `GET /api/v1/catalog{uri}` (không đăng nhập); kiểm trả 200.
@@ -18,7 +18,10 @@ async fn count(app: &TestApp, uri: &str) -> usize {
 
 /// Đếm mọi đường công khai với `products` sản phẩm đang bán.
 async fn measure(test: &TestDatabase, products: usize) -> Vec<(String, usize)> {
-    let (app, tree) = app(test).await;
+    // Cache theo khách (cài đặt khách, khách theo tên miền) giữ suốt bài đo: hết hạn giữa chừng (mặc định 10 giây,
+    // bài chạy lâu hơn trên Postgres) thì một lượt đo có thêm câu nạp lại cache — đo sai, không phải N+1.
+    let (app, tree) =
+        app_with(test, |builder| builder.setting("AUTOXIDE_TENANCY_CACHE_SECONDS", "3600")).await;
     let list = price_list(&app, tree.chain).await;
     let mut first = String::new();
     for index in 0..products {
@@ -41,6 +44,10 @@ async fn measure(test: &TestDatabase, products: usize) -> Vec<(String, usize)> {
         format!("/public/categories?locale=vi&site={site}"),
         format!("/public/sitemap?site={site}"),
     ];
+    // Gọi mỗi đường một lần trước khi đếm: lượt đầu nạp cache (cài đặt khách…), không phải việc của số sản phẩm.
+    for uri in &uris {
+        count(&app, uri).await;
+    }
     let mut counted = Vec::new();
     for uri in uris {
         let name = uri.split('?').next().unwrap_or_default().replace(&first, "{id}");
