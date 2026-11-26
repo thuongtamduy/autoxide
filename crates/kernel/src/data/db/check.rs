@@ -98,6 +98,18 @@ pub(crate) async fn problems(
     Ok(problems)
 }
 
+/// The problem of control-plane table `table` of `module` when it does not carry the module's prefix: a module
+/// declares only its own tables, never another module's (or a tenant table it does not own).
+pub(crate) fn control_plane_prefix_problem(module: &str, table: &str) -> Option<String> {
+    let prefix = format!("{module}_");
+    (!table.starts_with(&prefix) || table.len() == prefix.len()).then(|| {
+        format!(
+            "module `{module}` declares control-plane table `{table}`, which is not one of its tables \
+             (`{prefix}…`)"
+        )
+    })
+}
+
 /// One column of the live schema.
 struct LiveColumn {
     name: String,

@@ -410,8 +410,9 @@ async fn permission_cua_toi_kem_mo_ta_va_rui_ro() {
     .unwrap();
 }
 
-/// Module giả cùng tên `notes`, khai record lệch với bảng thật mà migration của `notes` dựng.
-struct Declares(Vec<autoxide_kernel::db::RecordInfo>);
+/// Module giả cùng tên `notes`, khai record (hay bảng control-plane) lệch với bảng thật mà migration của
+/// `notes` dựng.
+struct Declares(Vec<autoxide_kernel::db::RecordInfo>, Vec<&'static str>);
 
 impl autoxide_kernel::module::Module for Declares {
     fn name(&self) -> &'static str {
@@ -420,6 +421,10 @@ impl autoxide_kernel::module::Module for Declares {
 
     fn records(&self) -> Vec<autoxide_kernel::db::RecordInfo> {
         self.0.clone()
+    }
+
+    fn control_plane_tables(&self) -> Vec<&'static str> {
+        self.1.clone()
     }
 }
 
@@ -457,17 +462,51 @@ async fn record_lech_schema_thi_khong_khoi_dong() {
     TestDatabase::run(async |test| {
         // `TestApp` đã chạy chính bước này cho record thật của `notes` (`Module::records`).
         let app = TestApp::builder(test).module(crate::module()).build().await.unwrap();
-        let wrong = Modules::new(vec![Box::new(Declares(vec![
-            RecordInfo::of::<NoteWithExtra>(),
-            RecordInfo::of::<NoteAsGlobal>(),
-            RecordInfo::of::<NoteStrictOrg>(),
-        ]))])
+        let wrong = Modules::new(vec![Box::new(Declares(
+            vec![
+                RecordInfo::of::<NoteWithExtra>(),
+                RecordInfo::of::<NoteAsGlobal>(),
+                RecordInfo::of::<NoteStrictOrg>(),
+            ],
+            Vec::new(),
+        ))])
         .unwrap();
         let message = wrong.check_records(app.database()).await.unwrap_err().to_string();
         assert!(message.contains("field `pinned` has no column"), "{message}");
         assert!(message.contains("is `scope = global` but the table has `tenant_id`"), "{message}");
         assert!(message.contains("is not in the module's `control_plane_tables`"), "{message}");
         assert!(message.contains("field `org_id` must be an `Option`"), "{message}");
+    })
+    .await
+    .unwrap();
+}
+
+/// Module không lách được chốt record `global` bằng bảng control-plane: khai bảng của module khác thì không
+/// dựng được `Modules`; khai bảng của khách (có `tenant_id`) là control-plane thì record `global` trên nó vẫn
+/// bị chặn lúc khởi động (bảng control-plane có `tenant_id` là hợp lệ theo D-253, record `global` thì không).
+#[tokio::test]
+async fn khai_bang_control_plane_khong_lach_duoc_chot_global() {
+    use autoxide_kernel::db::RecordInfo;
+    use autoxide_kernel::module::Modules;
+    TestDatabase::run(async |test| {
+        let app = TestApp::builder(test).module(crate::module()).build().await.unwrap();
+        let foreign = Modules::new(vec![Box::new(Declares(Vec::new(), vec!["kernel_tenants"]))]);
+        let message = foreign.err().map(|error| error.to_string()).unwrap_or_default();
+        assert!(
+            message
+                .contains("control-plane table `kernel_tenants`, which is not one of its tables"),
+            "{message}"
+        );
+        let bare = Modules::new(vec![Box::new(Declares(Vec::new(), vec!["notes_"]))]);
+        assert!(bare.is_err());
+        let tenant = Modules::new(vec![Box::new(Declares(
+            vec![RecordInfo::of::<NoteAsGlobal>()],
+            vec!["notes_note"],
+        ))])
+        .unwrap();
+        let message = tenant.check_records(app.database()).await.unwrap_err().to_string();
+        assert!(message.contains("is `scope = global` but the table has `tenant_id`"), "{message}");
+        assert!(!message.contains("is not in the module's `control_plane_tables`"), "{message}");
     })
     .await
     .unwrap();

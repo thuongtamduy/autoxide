@@ -280,6 +280,14 @@ impl Modules {
         });
         let automations = crate::automation::AutomationDirectory::new(entitlements.clone());
         problems.extend(crate::sync::module_problems(&modules, &permissions));
+        // Bảng control-plane chỉ là bảng của chính module: không khai bảng của module khác để mở đường đọc
+        // không lọc theo khách (chốt `global` của `db`). Bảng có `tenant_id` vẫn được là control-plane
+        // (D-253: sổ thuê bao, tên miền của khách), nhưng record `global` trên nó bị `check_records` chặn.
+        for module in &modules {
+            for table in module.control_plane_tables() {
+                problems.extend(crate::db::control_plane_prefix_problem(module.name(), table));
+            }
+        }
         if problems.is_empty() {
             // Sổ bảng control-plane cho chốt lúc chạy của `db`: record `global` chỉ dùng được trên các bảng này.
             crate::db::register_control_plane(
@@ -370,10 +378,16 @@ impl Modules {
     }
 
     /// Checks the records every module declares (`Module::records`) against the live schema of `database`
-    /// (migrations applied). Call it after the migrations and before serving; a mismatch is an error listing
+    /// (migrations applied), and that the control-plane tables of turned-off modules are their own. Call it after the migrations and before serving; a mismatch is an error listing
     /// every problem.
     pub async fn check_records(&self, database: &Database) -> Result<(), ModuleError> {
         let mut problems = Vec::new();
+        // Module đang tắt không qua bước dựng `Modules`: kiểm tiền tố bảng control-plane của nó ở đây.
+        for module in &self.dormant {
+            for table in module.control_plane_tables() {
+                problems.extend(crate::db::control_plane_prefix_problem(module.name(), table));
+            }
+        }
         for module in &self.modules {
             let records = module.records();
             if records.is_empty() {

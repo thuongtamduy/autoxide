@@ -141,11 +141,13 @@ pub trait Module: Send + Sync {
         Vec::new()
     }
 
-    /// The module's control-plane tables (step 33, D-253): tables with no `tenant_id` because they are
-    /// shared across the whole platform and live only in the control database. Every other table of the
-    /// module (except `<m>_migrations`) is a tenant-level table and must have `tenant_id` - the testkit and
-    /// `cargo xtask check` verify this. Empty by default: business modules have almost no tables of this
-    /// kind.
+    /// The module's control-plane tables (step 33, D-253): tables shared across the whole platform that live
+    /// only in the control database. Each must be one of the module's own tables (`<module>_…`), or the
+    /// modules do not build. A control-plane table may still carry `tenant_id` when it keeps platform data
+    /// about each tenant (subscriptions, domains), but a `scope = global` record never maps such a table.
+    /// Every other table of the module (except `<m>_migrations`) is a tenant-level table and must have
+    /// `tenant_id` - the testkit and `cargo xtask check` verify this. Empty by default: business modules
+    /// have almost no tables of this kind.
     fn control_plane_tables(&self) -> Vec<&'static str> {
         Vec::new()
     }

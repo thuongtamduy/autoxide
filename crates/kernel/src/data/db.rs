@@ -110,6 +110,7 @@ mod write;
 /// `#[derive(Record)]`: see [`Record`].
 pub use autoxide_macros::Record;
 pub use check::RecordInfo;
+pub(crate) use check::control_plane_prefix_problem;
 pub(crate) use check::problems as record_problems;
 pub(crate) use check::register_control_plane;
 #[cfg(feature = "testing")]
