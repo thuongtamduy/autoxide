@@ -9,7 +9,7 @@ các module chính thức. [English](README.md)
 | `server/` | binary: các module chính thức cộng module này |
 | `check.sh` | định dạng, lint, và mọi test trên SQLite và PostgreSQL |
 | `.github/workflows/ci.yml` | CI chạy `check.sh` trên cả hai database |
-| `AGENTS.md` | luật cho AI agent làm việc ở đây (`CLAUDE.md` liên kết tới nó) |
+| `AGENTS.md` | luật cho AI agent làm việc ở đây (`CLAUDE.md` liên kết tới nó); bản ngắn cho Cursor (`.cursor/rules/`) và Copilot (`.github/copilot-instructions.md`) |
 
 ## Chạy
 

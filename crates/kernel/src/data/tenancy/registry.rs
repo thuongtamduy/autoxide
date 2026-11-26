@@ -175,6 +175,11 @@ impl DatabaseRegistry {
         &self.0.config
     }
 
+    /// Configuration of the control database (`DATABASE_URL`); `None` for a [`single`](Self::single) registry.
+    pub(crate) fn control_config(&self) -> Option<&DatabaseConfig> {
+        self.0.base.as_ref()
+    }
+
     /// The control database (placement `main`): the control-plane tables and the default tenant's data.
     pub fn control(&self) -> &Database {
         &self.0.control

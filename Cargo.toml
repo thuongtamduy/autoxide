@@ -46,6 +46,7 @@ dbg_macro = "deny"
 # phiên bản (D-20261121-external-modules). Đổi `version` của workspace thì đổi cả các dòng này —
 # `cargo xtask check` (luật `publish-ready`) chặn chỗ lệch. Module mẫu `notes` không đăng nên không có.
 autoxide-kernel = { path = "crates/kernel", version = "=0.19.0" }
+autoxide-macros = { path = "crates/macros", version = "=0.19.0" }
 autoxide-testkit = { path = "crates/testkit", version = "=0.19.0" }
 autoxide-audit = { path = "modules/audit", version = "=0.19.0" }
 autoxide-auth = { path = "modules/auth", version = "=0.19.0" }
@@ -212,6 +213,10 @@ argon2 = "0.6"
 # Cả bốn đã có sẵn trong cây phụ thuộc (qua sqlx, uuid, argon2).
 hmac = "0.13"
 sha2 = "0.11"
+# Macro thủ tục của kernel (`autoxide-macros`, D-20261126-kernel-data-layer): đọc cú pháp Rust và sinh mã.
+proc-macro2 = "1.0.107"
+quote = "1.0.47"
+syn = { version = "2.0.119", features = ["full"] }
 base64 = "0.23"
 getrandom = "0.4"
 # Mã hoá secret khi lưu (AES-256-GCM, bước 33, D-257). Cả hai đã có trong cây phụ thuộc (`ring` qua
@@ -267,6 +272,7 @@ tokio-tungstenite = "0.29"
 # Property test cho bộ kiểm đầu vào (đặc tả 31 B3): sinh đầu vào ngẫu nhiên, thu gọn ca hỏng.
 # Bỏ `fork` / `timeout` (chạy mỗi ca trong tiến trình con): không cần.
 proptest = { version = "1.12", default-features = false, features = ["std"] }
+divan = { version = "0.1.21", default-features = false }
 
 # Bản build để dev và test chỉ giữ thông tin dòng code (đủ để backtrace và panic chỉ đúng file,
 # dòng), bỏ thông tin biến cho debugger: `target/` nhỏ đi và biên dịch, link nhanh hơn (D-172).

@@ -18,9 +18,18 @@ ARG RUST_VERSION=1.100.0
 FROM rust:1.100.0-slim-trixie@sha256:6f14b2b4b278ec0d50aa1d69541c304ce0f95e0f6268487aa9924af1c2e9aebe AS chef
 # ARG khai trước `FROM` chỉ dùng được trong `FROM`; muốn dùng trong stage phải khai lại.
 ARG RUST_VERSION
+# Build tái lập (docs/COMPATIBILITY.md, "Reproducible builds"): luôn build trong /src và xoá đường dẫn build, đường dẫn
+# registry khỏi binary (`--remap-path-prefix`), nên binary không phụ thuộc máy build. `SOURCE_DATE_EPOCH` (thời điểm
+# commit của bản phát hành, do workflow phát hành truyền vào) là mốc thời gian duy nhất mà build được dùng; khai ở stage
+# `build` dưới đây, sau lớp thư viện, để mỗi bản phát hành không làm mất cache lớp đó.
 ENV RUSTUP_TOOLCHAIN=${RUST_VERSION} \
-    CARGO_INCREMENTAL=0
-RUN cargo install cargo-chef --locked --version 0.1.78
+    CARGO_INCREMENTAL=0 \
+    RUSTFLAGS="--remap-path-prefix=/src=/build --remap-path-prefix=/usr/local/cargo/registry/src=/cargo-registry"
+# cargo-auditable nhúng danh sách crate Rust đúng như lúc build vào binary (đoạn `.dep-v0`), để máy quét lỗ hổng
+# (cargo audit bin, Syft, Trivy) thấy crate trong binary đã strip (SBOM, docs/COMPATIBILITY.md).
+RUN cargo install cargo-chef --locked --version 0.1.78 \
+    && cargo install cargo-auditable --locked --version 0.7.7 \
+    && cargo install cargo-about --locked --version 0.9.3 --features cli
 WORKDIR /src
 
 # --- công thức: chỉ danh sách thư viện ngoài -----------------------------------
@@ -35,10 +44,16 @@ FROM chef AS build
 COPY --from=planner /src/recipe.json recipe.json
 # Lớp thư viện: chỉ build lại khi recipe.json đổi. Không dùng `--mount=type=cache` cho `target/`: thư mục
 # đó nằm ngoài lớp nên cache lớp không giữ được nó (và cache mount không sống qua các máy chạy của GitHub).
-RUN cargo chef cook --release --locked -p autoxide --recipe-path recipe.json
+RUN cargo auditable chef cook --release --locked -p autoxide --recipe-path recipe.json
 COPY . .
-RUN cargo build --release --locked -p autoxide \
+ARG SOURCE_DATE_EPOCH=0
+ENV SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH}
+RUN cargo auditable build --release --locked -p autoxide \
     && cp target/release/autoxide /usr/local/bin/autoxide
+# Văn bản giấy phép của mọi crate trong binary (D-20261126-third-party-licenses): nghĩa vụ giữ thông báo bản quyền khi
+# phân phối binary. Đi cùng image, và workflow phát hành lấy từ đây đưa vào tarball và trang Release.
+RUN cargo about generate --manifest-path crates/app/Cargo.toml --locked about.hbs \
+    -o /usr/local/share/THIRD-PARTY-LICENSES.html
 
 # --- chạy ----------------------------------------------------------------------
 FROM debian:trixie-slim@sha256:a72b4433de1cf7d6bae0c4cee74d0547f58601a643b3375f070c51600d63b6b2
@@ -58,6 +73,8 @@ RUN apt-get update \
     && mkdir -p /var/lib/autoxide/data \
     && chown -R autoxide:autoxide /var/lib/autoxide
 COPY --from=build /usr/local/bin/autoxide /usr/local/bin/autoxide
+COPY --from=build /usr/local/share/THIRD-PARTY-LICENSES.html /usr/share/doc/autoxide/THIRD-PARTY-LICENSES.html
+COPY LICENSE-MIT LICENSE-APACHE /usr/share/doc/autoxide/
 USER autoxide
 WORKDIR /var/lib/autoxide
 # Mọi dữ liệu ghi xuống đĩa (SQLite, file tải lên, mail ghi ra file) nằm trong `data/`.

@@ -220,6 +220,16 @@ impl PageRequest {
         self.limit
     }
 
+    /// The cursor of a list sorted by ID (for `db::Find::page`): `None` on the first page; a cursor of a list
+    /// sorted by another column is a 422 on `cursor`.
+    pub(crate) fn id_cursor(&self) -> Result<Option<Uuid>, Error> {
+        match &self.position {
+            None => Ok(None),
+            Some(Position::Id(id)) => Ok(Some(*id)),
+            Some(Position::Key(_)) => Err(wrong_cursor()),
+        }
+    }
+
     /// The cursor's ID (list sorted by ID). `None` on the first page, or when the cursor belongs to a list
     /// sorted by another column.
     pub fn cursor(&self) -> Option<Uuid> {

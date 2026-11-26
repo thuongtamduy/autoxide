@@ -1,0 +1,111 @@
+# Đo tải hằng tuần (71-G9, D-20261126-road-to-1-0): chạy `autoxide serve` thật (binary release, TCP thật) và đo p95
+# của các đường nóng — đăng nhập, đọc, list có pagination, tạo bản ghi, MCP tools/call — trên SQLite và PostgreSQL, rồi
+# so với số đo gốc `docs/quality/load-baseline.json`. Đỏ khi p95 tệ hơn gốc × 1.5 (+ 2 ms sàn) sau khi đã đo lại một
+# lần (runner dùng chung nhiễu), hoặc khi đo ra lỗi. Công cụ: `oha` + `scripts/loadtest.sh` có từ D-076 (docs/BENCHMARKS.md).
+# Job `micro` chạy benchmark vi mô của kernel (divan) và chỉ báo số, chưa chặn: số đo ns trên runner chung quá nhiễu để
+# làm ngưỡng. Không chặn PR; chỉ chạy khi repo công khai (D-197).
+name: Load test
+
+on:
+  schedule:
+    - cron: "23 2 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  load:
+    if: ${{ !github.event.repository.private }}
+    name: load (${{ matrix.backend }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        backend: [sqlite, postgres]
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 2s --health-timeout 5s --health-retries 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: load
+          save-if: false
+      - run: cargo install oha --version 1.17.0 --locked
+      - run: cargo build --release --locked -p autoxide
+      # Mỗi lần đo một database Postgres trống riêng (loadtest.sh đòi database trống). Đo xong so với số gốc; vượt
+      # thì đo lại đúng một lần — chỉ khi cả hai lần đều vượt mới đỏ.
+      - name: Measure and compare
+        env:
+          BACKEND: ${{ matrix.backend }}
+          PGPASSWORD: postgres
+          LOADTEST_BINARY: ${{ github.workspace }}/target/release/autoxide
+          LOADTEST_ONLY: hot
+          LOADTEST_DURATION: 15s
+        run: |
+          attempt() {
+            rm -f results.jsonl
+            if [ "$BACKEND" = postgres ]; then
+              name="load_$1"
+              psql -h 127.0.0.1 -U postgres -c "create database $name" >/dev/null
+              export LOADTEST_DATABASE_URL="postgres://postgres:postgres@127.0.0.1:5432/$name"
+            fi
+            LOADTEST_JSON_OUT="$PWD/results.jsonl" scripts/loadtest.sh
+            scripts/load-compare.py results.jsonl "$BACKEND"
+          }
+          attempt 1 || { echo "::warning::p95 over the limit; measuring once more"; attempt 2; }
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ always() }}
+        with:
+          name: load-${{ matrix.backend }}
+          path: results.jsonl
+          if-no-files-found: ignore
+
+  micro:
+    if: ${{ !github.event.repository.private }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          save-if: false
+      - name: Kernel micro benchmarks
+        run: |
+          cargo bench -p autoxide-kernel --bench hot_paths --locked | tee micro.txt
+          { echo '## Kernel micro benchmarks'; echo; echo '```'; cat micro.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
+  # Đỏ thì mở (hay cập nhật) một issue, xanh lại thì đóng — như property.yml.
+  report:
+    if: ${{ always() && github.event_name == 'schedule' && !github.event.repository.private }}
+    needs: [load, micro]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: scripts/nightly-issue.sh "$TITLE" "$RESULT" "$RUN_URL"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TITLE: "Weekly load test found a slower hot path"
+          RESULT: ${{ needs.load.result == 'success' && needs.micro.result == 'success' && 'success' || 'failure' }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

@@ -16,6 +16,9 @@ publish = false
 jiff.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+# Đọc cú pháp Rust cho luật `record-registered` (derive viết nhiều dòng, `cfg_attr`, module lồng), D-20261126-kernel-data-layer.
+syn.workspace = true
+quote.workspace = true
 
 [lints]
 workspace = true
