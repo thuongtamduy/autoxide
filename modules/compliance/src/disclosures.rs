@@ -4,7 +4,7 @@
 //! chính `compliance` giữ.
 //!
 //! Căn cứ — cần đối chiếu văn bản gốc / người có chuyên môn pháp lý: Luật Thương mại điện tử 2025,
-//! NĐ 85/2021/NĐ-CP (cung cấp thông tin khi cơ quan yêu cầu), Luật Bảo vệ dữ liệu cá nhân
+//! NĐ 248/2026/NĐ-CP (từ 01/7/2026, thay NĐ 85/2021/NĐ-CP; cung cấp thông tin khi cơ quan yêu cầu), Luật Bảo vệ dữ liệu cá nhân
 //! 91/2025/QH15 (cung cấp dữ liệu cá nhân theo yêu cầu của cơ quan có thẩm quyền).
 
 use autoxide_kernel::time::Timestamp;
