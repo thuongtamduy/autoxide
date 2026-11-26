@@ -7,6 +7,7 @@ use std::sync::Arc;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::http::{ClientInfo, ValidJson};
+use autoxide_kernel::pagination::{NaturalOrderPageQuery, Page, PageRequest, page_of};
 use autoxide_kernel::response::{Data, Problem};
 use autoxide_kernel::tenancy::{Site, SiteQuery, TenantContext};
 use axum::extract::{Path, Query, State};
@@ -22,7 +23,7 @@ use validator::Validate;
 use crate::errors;
 use crate::ingest::{IncomingEvent, Ingested, Visitor};
 use crate::permissions::ANALYTICS_READ;
-use crate::reports::{Dimension, FunnelReport, Overview, Ranked, TOP_DEFAULT};
+use crate::reports::{Dimension, FunnelReport, Overview, Ranked};
 use crate::service::{AnalyticsService, now};
 use crate::shared::valid_kind;
 
@@ -117,21 +118,26 @@ pub(crate) struct EventTypeInfo {
 /// List the event types (public).
 ///
 /// No sign-in needed. Every event type the installed modules declare: what pages may send and
-/// which props each type takes.
+/// which props each type takes. By key unless `order=desc`; paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/event-types",
     extensions(("x-public" = json!(true))),
     operation_id = "list_analytics_event_types",
     security((), ("bearer" = [])),
+    params(NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "The event types.", body = Data<Vec<EventTypeInfo>>),
+        (status = 200, description = "One page of the event types, by key.", body = Page<EventTypeInfo>),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn event_types(
     State(service): State<Arc<AnalyticsService>>,
-) -> Result<Data<Vec<EventTypeInfo>>, Error> {
-    let types = service
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<EventTypeInfo>, Error> {
+    let page = PageRequest::try_from(page)?;
+    // Sổ loại event do module khai trong code: phân trang trong bộ nhớ (D-20261125-list-pages mục 4).
+    let types: Vec<EventTypeInfo> = service
         .catalog
         .events()
         .map(|event| EventTypeInfo {
@@ -149,7 +155,7 @@ async fn event_types(
                 .collect(),
         })
         .collect();
-    Ok(Data { data: types })
+    page_of(types, |event| event.key.clone(), &page)
 }
 
 /// A funnel a module declares.
@@ -163,25 +169,31 @@ pub(crate) struct FunnelInfo {
 
 /// List the funnels.
 ///
-/// Requires `analytics.read`. Funnels are declared by the installed modules.
+/// Requires `analytics.read`. Funnels are declared by the installed modules. By key unless
+/// `order=desc`; paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/funnels",
     extensions(("x-permissions" = json!(["analytics.read"]))),
     operation_id = "list_analytics_funnels",
     security(("bearer" = [])),
+    params(NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "The funnels.", body = Data<Vec<FunnelInfo>>),
+        (status = 200, description = "One page of the funnels, by key.", body = Page<FunnelInfo>),
         (status = 401, description = "Not signed in.", body = Problem),
         (status = 403, description = "Missing permission `analytics.read`; code `permission_denied`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_funnels(
     State(service): State<Arc<AnalyticsService>>,
     principal: Principal,
-) -> Result<Data<Vec<FunnelInfo>>, Error> {
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<FunnelInfo>, Error> {
     principal.require(&ANALYTICS_READ)?;
-    let funnels = service
+    let page = PageRequest::try_from(page)?;
+    // Phễu do module khai trong code: phân trang trong bộ nhớ (D-20261125-list-pages mục 4).
+    let funnels: Vec<FunnelInfo> = service
         .catalog
         .funnels()
         .map(|funnel| FunnelInfo {
@@ -190,7 +202,7 @@ async fn list_funnels(
             steps: funnel.steps.iter().map(|step| (*step).to_owned()).collect(),
         })
         .collect();
-    Ok(Data { data: funnels })
+    page_of(funnels, |funnel| funnel.key.clone(), &page)
 }
 
 /// Which website and days.
@@ -206,15 +218,6 @@ pub(crate) struct RangeQuery {
     /// Last day (UTC, `YYYY-MM-DD`); omitted: today. At most 400 days from `from`.
     #[param(value_type = Option<String>, format = Date)]
     pub to: Option<Date>,
-}
-
-/// How many rows.
-#[derive(Debug, Deserialize, IntoParams)]
-#[into_params(parameter_in = Query)]
-pub(crate) struct LimitQuery {
-    /// Rows to return, 1 to 100; defaults to 10.
-    #[param(minimum = 1, maximum = 100)]
-    pub limit: Option<u64>,
 }
 
 /// Get the visit overview of a website.
@@ -247,36 +250,40 @@ async fn overview(
     Ok(Data { data: service.overview(&tenant, &range).await? })
 }
 
+// `analytics.read` (ở bất kỳ nút nào; nút của website do `range` kiểm) trước khi đọc tham số trang, để người
+// không có quyền nhận 403 chứ không phải 422 (D-20261126-list-pages-cluster-2).
 async fn ranked(
     service: &AnalyticsService,
     tenant: &TenantContext,
     principal: &Principal,
     query: RangeQuery,
-    limit: LimitQuery,
+    page: NaturalOrderPageQuery,
     dimension: Dimension,
     prefix: Option<&str>,
-) -> Result<Data<Vec<Ranked>>, Error> {
+) -> Result<Page<Ranked>, Error> {
+    principal.require(&ANALYTICS_READ)?;
+    let page = PageRequest::try_from(page)?;
     let range = service.range(tenant, principal, query.site, query.from, query.to).await?;
-    let limit = limit.limit.unwrap_or(TOP_DEFAULT);
-    Ok(Data { data: service.top(tenant, &range, dimension, prefix, limit).await? })
+    service.ranking_page(tenant, &range, dimension, prefix, &page).await
 }
 
 /// List the most viewed pages.
 ///
-/// Requires `analytics.read` at the website's unit. Page paths by page views, most first.
+/// Requires `analytics.read` at the website's unit. Page paths by page views, most first (then by
+/// path; `order=desc` reverses it); paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/pages",
     extensions(("x-permissions" = json!(["analytics.read"]))),
     operation_id = "list_analytics_pages",
     security(("bearer" = [])),
-    params(RangeQuery, LimitQuery),
+    params(RangeQuery, NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "Pages, most viewed first.", body = Data<Vec<Ranked>>),
+        (status = 200, description = "One page of the pages, most viewed first.", body = Page<Ranked>),
         (status = 401, description = "Not signed in.", body = Problem),
         (status = 403, description = "Missing permission `analytics.read` at the website's unit.", body = Problem),
         (status = 404, description = "There is no such website; code `analytics.site_unknown`.", body = Problem),
-        (status = 422, description = "The range is too long or reversed.", body = Problem),
+        (status = 422, description = "The range is too long or reversed, or a paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn pages(
@@ -284,29 +291,29 @@ async fn pages(
     tenant: TenantContext,
     principal: Principal,
     Query(query): Query<RangeQuery>,
-    Query(limit): Query<LimitQuery>,
-) -> Result<Data<Vec<Ranked>>, Error> {
-    ranked(&service, &tenant, &principal, query, limit, Dimension::Page, None).await
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<Ranked>, Error> {
+    ranked(&service, &tenant, &principal, query, page, Dimension::Page, None).await
 }
 
 /// List the traffic sources.
 ///
 /// Requires `analytics.read` at the website's unit. Where visits came from, by page views that
 /// started outside the website: the `utm_source`, else the referring site (without `www.`), else
-/// `direct`.
+/// `direct`. Most first (then by name; `order=desc` reverses it); paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/sources",
     extensions(("x-permissions" = json!(["analytics.read"]))),
     operation_id = "list_analytics_sources",
     security(("bearer" = [])),
-    params(RangeQuery, LimitQuery),
+    params(RangeQuery, NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "Sources, most page views first.", body = Data<Vec<Ranked>>),
+        (status = 200, description = "One page of the sources, most page views first.", body = Page<Ranked>),
         (status = 401, description = "Not signed in.", body = Problem),
         (status = 403, description = "Missing permission `analytics.read` at the website's unit.", body = Problem),
         (status = 404, description = "There is no such website; code `analytics.site_unknown`.", body = Problem),
-        (status = 422, description = "The range is too long or reversed.", body = Problem),
+        (status = 422, description = "The range is too long or reversed, or a paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn sources(
@@ -314,28 +321,29 @@ async fn sources(
     tenant: TenantContext,
     principal: Principal,
     Query(query): Query<RangeQuery>,
-    Query(limit): Query<LimitQuery>,
-) -> Result<Data<Vec<Ranked>>, Error> {
-    ranked(&service, &tenant, &principal, query, limit, Dimension::Source, None).await
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<Ranked>, Error> {
+    ranked(&service, &tenant, &principal, query, page, Dimension::Source, None).await
 }
 
 /// List the UTM campaigns.
 ///
 /// Requires `analytics.read` at the website's unit. `utm_campaign` values (lowercased) by page
-/// views that started outside the website.
+/// views that started outside the website. Most first (then by name; `order=desc` reverses it);
+/// paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/campaigns",
     extensions(("x-permissions" = json!(["analytics.read"]))),
     operation_id = "list_analytics_campaigns",
     security(("bearer" = [])),
-    params(RangeQuery, LimitQuery),
+    params(RangeQuery, NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "Campaigns, most page views first.", body = Data<Vec<Ranked>>),
+        (status = 200, description = "One page of the campaigns, most page views first.", body = Page<Ranked>),
         (status = 401, description = "Not signed in.", body = Problem),
         (status = 403, description = "Missing permission `analytics.read` at the website's unit.", body = Problem),
         (status = 404, description = "There is no such website; code `analytics.site_unknown`.", body = Problem),
-        (status = 422, description = "The range is too long or reversed.", body = Problem),
+        (status = 422, description = "The range is too long or reversed, or a paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn campaigns(
@@ -343,27 +351,28 @@ async fn campaigns(
     tenant: TenantContext,
     principal: Principal,
     Query(query): Query<RangeQuery>,
-    Query(limit): Query<LimitQuery>,
-) -> Result<Data<Vec<Ranked>>, Error> {
-    ranked(&service, &tenant, &principal, query, limit, Dimension::Campaign, None).await
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<Ranked>, Error> {
+    ranked(&service, &tenant, &principal, query, page, Dimension::Campaign, None).await
 }
 
 /// List the event types by count.
 ///
-/// Requires `analytics.read` at the website's unit. Every event type seen, most events first.
+/// Requires `analytics.read` at the website's unit. Every event type seen, most events first (then
+/// by key; `order=desc` reverses it); paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/types",
     extensions(("x-permissions" = json!(["analytics.read"]))),
     operation_id = "list_analytics_type_counts",
     security(("bearer" = [])),
-    params(RangeQuery, LimitQuery),
+    params(RangeQuery, NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "Event types, most events first.", body = Data<Vec<Ranked>>),
+        (status = 200, description = "One page of the event types, most events first.", body = Page<Ranked>),
         (status = 401, description = "Not signed in.", body = Problem),
         (status = 403, description = "Missing permission `analytics.read` at the website's unit.", body = Problem),
         (status = 404, description = "There is no such website; code `analytics.site_unknown`.", body = Problem),
-        (status = 422, description = "The range is too long or reversed.", body = Problem),
+        (status = 422, description = "The range is too long or reversed, or a paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn types(
@@ -371,9 +380,9 @@ async fn types(
     tenant: TenantContext,
     principal: Principal,
     Query(query): Query<RangeQuery>,
-    Query(limit): Query<LimitQuery>,
-) -> Result<Data<Vec<Ranked>>, Error> {
-    ranked(&service, &tenant, &principal, query, limit, Dimension::Type, None).await
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<Ranked>, Error> {
+    ranked(&service, &tenant, &principal, query, page, Dimension::Type, None).await
 }
 
 /// Which objects.
@@ -388,20 +397,20 @@ pub(crate) struct ObjectQuery {
 /// List the most viewed objects.
 ///
 /// Requires `analytics.read` at the website's unit. Objects (`<kind>:<id>`) by the events about
-/// them, most first.
+/// them, most first (then by object; `order=desc` reverses it); paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/objects",
     extensions(("x-permissions" = json!(["analytics.read"]))),
     operation_id = "list_analytics_objects",
     security(("bearer" = [])),
-    params(RangeQuery, LimitQuery, ObjectQuery),
+    params(RangeQuery, ObjectQuery, NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "Objects, most viewed first.", body = Data<Vec<Ranked>>),
+        (status = 200, description = "One page of the objects, most viewed first.", body = Page<Ranked>),
         (status = 401, description = "Not signed in.", body = Problem),
         (status = 403, description = "Missing permission `analytics.read` at the website's unit.", body = Problem),
         (status = 404, description = "There is no such website; code `analytics.site_unknown`.", body = Problem),
-        (status = 422, description = "The range is too long or reversed, or `kind` is malformed (`analytics.kind_invalid`).", body = Problem),
+        (status = 422, description = "The range is too long or reversed, `kind` is malformed (`analytics.kind_invalid`), or a paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn objects(
@@ -409,15 +418,15 @@ async fn objects(
     tenant: TenantContext,
     principal: Principal,
     Query(query): Query<RangeQuery>,
-    Query(limit): Query<LimitQuery>,
+    Query(page): Query<NaturalOrderPageQuery>,
     Query(object): Query<ObjectQuery>,
-) -> Result<Data<Vec<Ranked>>, Error> {
+) -> Result<Page<Ranked>, Error> {
     let prefix = match object.kind.as_deref().map(str::trim).filter(|kind| !kind.is_empty()) {
         Some(kind) if valid_kind(kind) => Some(format!("{kind}:")),
         Some(_) => return Err(errors::kind_invalid()),
         None => None,
     };
-    ranked(&service, &tenant, &principal, query, limit, Dimension::Object, prefix.as_deref()).await
+    ranked(&service, &tenant, &principal, query, page, Dimension::Object, prefix.as_deref()).await
 }
 
 /// Get a funnel.
@@ -437,7 +446,7 @@ async fn objects(
         (status = 401, description = "Not signed in.", body = Problem),
         (status = 403, description = "Missing permission `analytics.read` at the website's unit.", body = Problem),
         (status = 404, description = "No such website (`analytics.site_unknown`) or funnel (`analytics.funnel_unknown`).", body = Problem),
-        (status = 422, description = "The range is too long or reversed.", body = Problem),
+        (status = 422, description = "The range is too long or reversed, or a paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn funnel(

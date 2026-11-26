@@ -9,9 +9,10 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::money::Money;
+use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Data, Problem};
 use autoxide_kernel::tenancy::{TenantContext, TenantId};
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use utoipa_axum::router::OpenApiRouter;
@@ -336,54 +337,62 @@ async fn suspend_tenant(
 
 /// List your tenant's billing periods.
 ///
-/// Requires `plans.billing.read`. Newest first, at most 200.
+/// Requires `plans.billing.read`. Newest first unless `order=asc`; paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/billing-periods",
     extensions(("x-permissions" = json!(["plans.billing.read"]))),
     operation_id = "list_billing_periods",
     security(("bearer" = [])),
+    params(PageQuery),
     responses(
-        (status = 200, description = "The billing periods, newest first.", body = Data<Vec<BillingPeriodResponse>>),
+        (status = 200, description = "One page of the billing periods, newest first.", body = Page<BillingPeriodResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing `plans.billing.read`; code `permission_denied`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_billing_periods(
     State(service): State<Arc<PlansService>>,
     tenant: TenantContext,
     principal: Principal,
-) -> Result<Data<Vec<BillingPeriodResponse>>, Error> {
+    Query(page): Query<PageQuery>,
+) -> Result<Page<BillingPeriodResponse>, Error> {
     principal.require(&BILLING_READ)?;
-    let rows = service.billing_periods(tenant.id()).await?;
-    Ok(Data { data: rows.into_iter().map(BillingPeriodResponse::from).collect() })
+    let page = PageRequest::try_from(page)?;
+    let rows = service.billing_periods(tenant.id(), &page).await?;
+    Ok(rows.map(BillingPeriodResponse::from))
 }
 
 /// List a tenant's billing periods.
 ///
-/// Platform staff with `plans.subscriptions.read`. Newest first, at most 200. Record a payment
-/// checked by hand with `POST /billing-periods/{id}/mark-paid`.
+/// Platform staff with `plans.subscriptions.read`. Newest first unless `order=asc`; paged with
+/// `limit` / `cursor`. Record a payment checked by hand with
+/// `POST /billing-periods/{id}/mark-paid`.
 #[utoipa::path(
     get,
     path = "/tenants/{tenant_id}/billing-periods",
     extensions(("x-permissions" = json!(["plans.subscriptions.read"]))),
     operation_id = "list_tenant_billing_periods",
     security(("bearer" = [])),
-    params(("tenant_id" = Uuid, Path, description = "Id of the tenant.")),
+    params(("tenant_id" = Uuid, Path, description = "Id of the tenant."), PageQuery),
     responses(
-        (status = 200, description = "The billing periods, newest first.", body = Data<Vec<BillingPeriodResponse>>),
+        (status = 200, description = "One page of the billing periods, newest first.", body = Page<BillingPeriodResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Not platform staff (`tenant_platform_only`) or missing `plans.subscriptions.read` (`permission_denied`).", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn tenant_billing_periods(
     State(service): State<Arc<PlansService>>,
     principal: Principal,
     Path(tenant_id): Path<Uuid>,
-) -> Result<Data<Vec<BillingPeriodResponse>>, Error> {
+    Query(page): Query<PageQuery>,
+) -> Result<Page<BillingPeriodResponse>, Error> {
     operator(&principal, &SUBSCRIPTIONS_READ)?;
-    let rows = service.billing_periods(TenantId::from_uuid(tenant_id)).await?;
-    Ok(Data { data: rows.into_iter().map(BillingPeriodResponse::from).collect() })
+    let page = PageRequest::try_from(page)?;
+    let rows = service.billing_periods(TenantId::from_uuid(tenant_id), &page).await?;
+    Ok(rows.map(BillingPeriodResponse::from))
 }
 
 /// Get one of your tenant's billing periods.

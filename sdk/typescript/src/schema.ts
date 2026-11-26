@@ -14275,39 +14275,6 @@ export type Data_Vec_BatchResult = {
 };
 
 /** Envelope of a single result. */
-export type Data_Vec_BillingPeriodResponse = {
-  data: {
-    amount: Money;
-    created_at: string;
-    due_at: string;
-    id: string;
-    /**
-     * The operator's invoice for the period (`GET /api/v1/invoices/documents/{id}` for the
-     * operator), and its series and number.
-     */
-    invoice_id?: string | null;
-    invoice_number?: string | null;
-    /**
-     * `initial` (first period), `renewal`, `proration` (part of a period after an upgrade) or
-     * `metered`.
-     */
-    kind: string;
-    paid_at?: string | null;
-    period_end: string;
-    period_start: string;
-    plan_id: string;
-    price_id?: string | null;
-    /** The payment provider's reference (or the bank transfer's), when paid. */
-    provider_reference?: string | null;
-    /** Unique per tenant: `plans:<subscription_id>:<period start>:<kind>`. */
-    reference: string;
-    /** `open`, `paid` or `void`. */
-    status: string;
-    tenant_id: string;
-  }[];
-};
-
-/** Envelope of a single result. */
 export type Data_Vec_BlockTypeView = {
   data: {
     /** One sentence on when to use the block, for people and AI page builders. */
@@ -14937,33 +14904,6 @@ export type Data_Vec_DelegationResponse = {
 };
 
 /** Envelope of a single result. */
-export type Data_Vec_EventTypeInfo = {
-  data: {
-    description: string;
-    /** The `type` to send, e.g. `catalog.product_viewed`. */
-    key: string;
-    /** When set, events must carry `object` = `<object_kind>:<id>`. */
-    object_kind?: string | null;
-    props: PropInfo[];
-    /**
-     * `browser` (pages send it) or `server` (recorded by the server from what happened; pages
-     * cannot send it).
-     */
-    source: string;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_FunnelInfo = {
-  data: {
-    description: string;
-    key: string;
-    /** Event types of the steps, in order. */
-    steps: string[];
-  }[];
-};
-
-/** Envelope of a single result. */
 export type Data_Vec_IdentityResponse = {
   data: {
     created_at: string;
@@ -15033,29 +14973,6 @@ export type Data_Vec_LedgerExchangeRate = {
     rate: DecimalString;
     /** `manual` (entered by a person) or `provider:<name>` (fetched from a rate source). */
     source: string;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_LimitUse = {
-  data: {
-    /**
-     * The limit; `<limit>.<part>` is the separate cap of one part of a limit that has parts (for
-     * example `organizations.units.store`: units of type `store`), listed when the plan caps that
-     * part or the tenant uses it.
-     */
-    key: string;
-    /** `count`, `amount` or `metered`. */
-    kind: string;
-    /** The most the tenant may use; `null` is unlimited. */
-    max?: number | null;
-    /**
-     * `true` when more is in use than allowed (after moving to a smaller plan): nothing is
-     * removed, but nothing new can be added.
-     */
-    over_limit: boolean;
-    /** In use now (for `metered`: this month). */
-    used: number;
   }[];
 };
 
@@ -15173,17 +15090,6 @@ export type Data_Vec_ModuleInfo = {
 };
 
 /** Envelope of a single result. */
-export type Data_Vec_MyPermission = {
-  data: {
-    /** What it allows, in the language of `Accept-Language`. */
-    description: string;
-    name: string;
-    /** How careful a grant needs to be: `read`, `write`, `destructive`, `sensitive_data` or `money`. */
-    risk: string;
-  }[];
-};
-
-/** Envelope of a single result. */
 export type Data_Vec_MyTenantResponse = {
   data: {
     /**
@@ -15206,22 +15112,6 @@ export type Data_Vec_NotificationKindPreference = {
     category: NotificationCategory;
     channels: NotificationChannelPreference[];
     kind: string;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_NotificationTemplate = {
-  data: {
-    body: string;
-    channel: string;
-    kind: string;
-    locale: string;
-    /** For SMS, ZNS and push. */
-    short: string;
-    title: string;
-    updated_at: string;
-    /** Approved Zalo ZNS template id (channel `zns`). */
-    zns_template_id?: string | null;
   }[];
 };
 
@@ -15360,28 +15250,6 @@ export type Data_Vec_OrdersWarranty = {
 };
 
 /** Envelope of a single result. */
-export type Data_Vec_OverrideResponse = {
-  data: {
-    created_at: string;
-    /** User who set it. */
-    created_by?: string | null;
-    /** With `module` / `feature`. */
-    enabled?: boolean | null;
-    /** The override no longer applies from this time. */
-    expires_at?: string | null;
-    id: string;
-    key: string;
-    /** `module`, `feature` or `limit`. */
-    kind: string;
-    /** With `limit`: the new maximum; `null` is unlimited. */
-    max_value?: number | null;
-    reason: string;
-    /** The tenant it applies to. */
-    tenant_id: string;
-  }[];
-};
-
-/** Envelope of a single result. */
 export type Data_Vec_PageTemplateResponse = {
   data: {
     created_at: string;
@@ -15510,59 +15378,6 @@ export type Data_Vec_PlacementResponse = {
     /** Key in the standard set of placements, when the row came from it. */
     preset_key?: string | null;
     ratio?: Ratio | null;
-    updated_at: string;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_PlanResponse = {
-  data: {
-    code: string;
-    created_at: string;
-    description: string;
-    /** Features turned on. */
-    features: string[];
-    /** Days a tenant keeps full access after a period ends unpaid. */
-    grace_days: number;
-    id: string;
-    /**
-     * Tenants without a subscription get this plan. At most one plan is the default; with none,
-     * such tenants are not limited.
-     */
-    is_default: boolean;
-    /** `base` (a tenant has one) or `addon` (added on top, with a quantity). */
-    kind: string;
-    /** Limits by key; `null` means unlimited. A limit not listed is 0. */
-    limits: {
-      [key: string]: number | null;
-    };
-    /** Modules turned on (modules that are always on are not listed). */
-    modules: string[];
-    name: string;
-    /** Where a new tenant on this plan keeps its data: `shared` or `dedicated`. */
-    placement: string;
-    prices: PriceResponse[];
-    /** Days before a period ends that the next one is billed and a reminder sent. */
-    renewal_lead_days: number;
-    /** A new tenant on this plan must pass identity checks first. */
-    requires_kyc: boolean;
-    /** Days the data of a canceled subscription is kept before the tenant is deleted. */
-    retention_days: number;
-    /** A new tenant on this plan starts with sample data. */
-    sample_data: boolean;
-    /** New tenants may choose this plan when they sign up by themselves (`POST /signups`). */
-    self_signup: boolean;
-    /** `draft`, `active` (sold) or `retired` (no longer sold; tenants on it keep it). */
-    status: string;
-    /**
-     * Tenants on the plan now (subscriptions not canceled, as base plan or add-on). Only for
-     * platform staff: `null` in the public catalog.
-     */
-    subscriber_count?: number | null;
-    /** Days a suspended (read-only) subscription waits before it is canceled. */
-    suspend_days: number;
-    /** Days of free trial for a tenant that never had one; 0 for none. */
-    trial_days: number;
     updated_at: string;
   }[];
 };
@@ -15743,46 +15558,6 @@ export type Data_Vec_ProviderResponse = {
 };
 
 /** Envelope of a single result. */
-export type Data_Vec_PublicProfileResponse = {
-  data: {
-    address?: Address | null;
-    /** Cover image (id in the `media` library). */
-    cover_media_id?: string | null;
-    /** Name shown to visitors; defaults to the unit's name. */
-    display_name: string;
-    opening_hours: {
-      /** Local time `HH:MM`, after `opens`. */
-      closes: string;
-      /** ISO day of the week: 1 Monday … 7 Sunday. */
-      day: number;
-      /** Local time `HH:MM` (the unit's time zone, setting `organizations.timezone`). */
-      opens: string;
-    }[];
-    /** Customers can pick up orders here. */
-    pickup: boolean;
-    /** Order among the public units (smaller first). */
-    position: number;
-    /** Shown on websites (`GET /api/v1/organizations/public/stores`). */
-    public: boolean;
-    special_days: {
-      /** Closed all day. */
-      closed?: boolean;
-      closes?: string | null;
-      /** `YYYY-MM-DD`. */
-      date: string;
-      /** Shown to visitors, up to 200 characters. */
-      note?: string | null;
-      /** When open: local time `HH:MM`. */
-      opens?: string | null;
-    }[];
-    unit_id: string;
-    unit_type: string;
-    /** `null` until the profile is first saved. */
-    updated_at?: string | null;
-  }[];
-};
-
-/** Envelope of a single result. */
 export type Data_Vec_PublicProviderResponse = {
   data: {
     id: string;
@@ -15792,20 +15567,6 @@ export type Data_Vec_PublicProviderResponse = {
     name: string;
     /** Name in the sign-in paths, e.g. `google` in `/api/v1/auth/oidc/google/start`. */
     slug: string;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_Ranked = {
-  data: {
-    /** Events (for event types and objects). */
-    events: number;
-    /** The page path, source, campaign, object (`<kind>:<id>`) or event type. */
-    value: string;
-    /** Page views (for objects: events about the object). */
-    views: number;
-    /** Sum of the daily unique visitors. */
-    visitors: number;
   }[];
 };
 
@@ -15944,33 +15705,6 @@ export type Data_Vec_RoleResponse = {
 };
 
 /** Envelope of a single result. */
-export type Data_Vec_SavedView = {
-  data: {
-    /** The columns shown, in order. */
-    columns: string[];
-    created_at: string;
-    /** `compact` or `comfortable`. */
-    density?: string | null;
-    group_by?: string | null;
-    id: string;
-    name: string;
-    org_id?: string | null;
-    /** Who saved it. */
-    owner: string;
-    /** The query parameters of the list (filters, `sort`, `order`). */
-    params: Record<string, unknown>;
-    /**
-     * The list, as `x-autoxide-list` of its endpoint in this document, e.g.
-     * `content.list_content_entries`.
-     */
-    resource: string;
-    /** `personal` (only its owner sees it), `node` (everyone at `org_id`) or `tenant`. */
-    scope: string;
-    updated_at: string;
-  }[];
-};
-
-/** Envelope of a single result. */
 export type Data_Vec_ScimGroupMappingResponse = {
   data: {
     created_at: string;
@@ -16005,54 +15739,6 @@ export type Data_Vec_ScimTokenResponse = {
     name: string;
     /** Start and end of the token, to recognise it; never the whole token. */
     prefix: string;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_SettingResponse = {
-  data: {
-    /** The value when no unit sets it; `null`: none. */
-    default?: unknown;
-    /** What it is for and which values it takes. */
-    description: string;
-    /** `<module>.<name>`, e.g. `organizations.timezone`. */
-    key: string;
-    /**
-     * The shape of the value as a JSON Schema (`type`: `string`, `boolean`, `integer`, `number`,
-     * `array` or `object`, with `enum`, `pattern`, `items`… where they apply), for building the
-     * right input; `null` when the module does not say. The server checks every value anyway.
-     */
-    schema?: Record<string, unknown> | null;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_StoreProductResponse = {
-  data: {
-    /** The base plan a purchase of this product gives. */
-    plan_id: string;
-    /** The product id set up in the store. */
-    product_id: string;
-    /** `app_store` or `google_play`. */
-    store: string;
-    updated_at: string;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_StorePurchaseResponse = {
-  data: {
-    /** When the store period ends. */
-    expires_at?: string | null;
-    id: string;
-    product_id: string;
-    /** Made in the store's test environment. */
-    sandbox: boolean;
-    /** `active`, `expired`, `refunded` or `revoked`. */
-    state: string;
-    /** `app_store` or `google_play`. */
-    store: string;
-    updated_at: string;
   }[];
 };
 
@@ -16135,100 +15821,6 @@ export type Data_Vec_TagView = {
 };
 
 /** Envelope of a single result. */
-export type Data_Vec_TaxCategoryResponse = {
-  data: {
-    code: string;
-    jurisdiction: string;
-    name_en: string;
-    name_vi: string;
-    /** `vat`, `excise`, `environment`. */
-    tax_kind: string;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_TaxJurisdictionResponse = {
-  data: {
-    code: string;
-    default_currency: string;
-    name: string;
-    /** The data pack it comes from, and its version. */
-    pack_code: string;
-    pack_version: number;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_TaxPackResponse = {
-  data: {
-    /** Day its sources were last checked. */
-    checked_on: string;
-    code: string;
-    content_sha256: string;
-    id: string;
-    imported_at: string;
-    imported_by?: string | null;
-    source_note: string;
-    version: number;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_TaxRateResponse = {
-  data: {
-    /** `percent`, `per_unit` or `exempt` (not subject to the tax). */
-    basis: string;
-    category: string;
-    /** First day in force. */
-    effective_from: string;
-    /** First day no longer in force; `null` while in force. */
-    effective_to?: string | null;
-    id: string;
-    jurisdiction: string;
-    /** Legal basis (check it against the original document before production use). */
-    legal_basis: string;
-    pack_version: number;
-    per_unit?: Money | null;
-    rate_percent: string;
-    /** Order the taxes apply in: a later stage is computed on the price plus earlier taxes. */
-    stage: number;
-    tax_kind: string;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_TaxRuleResponse = {
-  data: {
-    code: string;
-    effective_from: string;
-    effective_to?: string | null;
-    id: string;
-    jurisdiction: string;
-    legal_basis: string;
-    value: Record<string, unknown>;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_TaxWithholdingRateResponse = {
-  data: {
-    business_line: string;
-    effective_from: string;
-    effective_to?: string | null;
-    id: string;
-    jurisdiction: string;
-    legal_basis: string;
-    payee_regime: string;
-    /** `marketplace` or `affiliate`. */
-    payer_kind: string;
-    rate_percent: string;
-    /** `vat` or `pit`. */
-    tax_kind: string;
-    threshold?: Money | null;
-  }[];
-};
-
-/** Envelope of a single result. */
 export type Data_Vec_TenantExport = {
   data: {
     created_at: string;
@@ -16301,65 +15893,6 @@ export type Data_Vec_TextView = {
     locale: string;
     /** The tenant's wording, when set. */
     text?: string | null;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_UnitResponse = {
-  data: {
-    /** Internal code, unique in the tenant when set. */
-    code?: string | null;
-    created_at: string;
-    /** Id of the unit. The root unit has the id of the tenant. */
-    id: string;
-    name: string;
-    /** The unit above; `null` only for the root. */
-    parent_id?: string | null;
-    status: UnitStatusValue;
-    /** Why the status was last changed, when given. */
-    status_reason?: string | null;
-    /** Code of the unit type (see `GET /api/v1/organizations/unit-types`); `tenant` for the root. */
-    unit_type: string;
-    updated_at: string;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_UnitSettingResponse = {
-  data: {
-    /** `true` when the value comes from a unit above or the default, not from this unit. */
-    inherited: boolean;
-    /** Key of the setting. */
-    key: string;
-    /** The unit that set this value (this unit or one above it); `null`: the default. */
-    source_unit_id?: string | null;
-    /** The value in force; `null` when nothing sets it and it has no default. */
-    value?: unknown;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_UnitTypeResponse = {
-  data: {
-    code: string;
-    created_at: string;
-    description: string;
-    name: string;
-    updated_at: string;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_UserFlag = {
-  data: {
-    /**
-     * Lower-case letters, digits, `.`, `_` and `-`, up to 100 characters; group flags with a
-     * prefix, e.g. `hint.saved_views`.
-     */
-    key: string;
-    updated_at: string;
-    /** Up to 200 characters, e.g. `dismissed` or the last version whose news were seen. */
-    value: string;
   }[];
 };
 
@@ -22303,6 +21836,41 @@ export type Page_BannerResponse = {
 };
 
 /** One page of a list. */
+export type Page_BillingPeriodResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    amount: Money;
+    created_at: string;
+    due_at: string;
+    id: string;
+    /**
+     * The operator's invoice for the period (`GET /api/v1/invoices/documents/{id}` for the
+     * operator), and its series and number.
+     */
+    invoice_id?: string | null;
+    invoice_number?: string | null;
+    /**
+     * `initial` (first period), `renewal`, `proration` (part of a period after an upgrade) or
+     * `metered`.
+     */
+    kind: string;
+    paid_at?: string | null;
+    period_end: string;
+    period_start: string;
+    plan_id: string;
+    price_id?: string | null;
+    /** The payment provider's reference (or the bank transfer's), when paid. */
+    provider_reference?: string | null;
+    /** Unique per tenant: `plans:<subscription_id>:<period start>:<kind>`. */
+    reference: string;
+    /** `open`, `paid` or `void`. */
+    status: string;
+    tenant_id: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_BookingException = {
   /** The items of this page, in the requested order. */
   data: {
@@ -23551,6 +23119,25 @@ export type Page_EntryResponse = {
 };
 
 /** One page of a list. */
+export type Page_EventTypeInfo = {
+  /** The items of this page, in the requested order. */
+  data: {
+    description: string;
+    /** The `type` to send, e.g. `catalog.product_viewed`. */
+    key: string;
+    /** When set, events must carry `object` = `<object_kind>:<id>`. */
+    object_kind?: string | null;
+    props: PropInfo[];
+    /**
+     * `browser` (pages send it) or `server` (recorded by the server from what happened; pages
+     * cannot send it).
+     */
+    source: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_EventTypeResponse = {
   /** The items of this page, in the requested order. */
   data: {
@@ -23663,6 +23250,18 @@ export type Page_FormResponse = {
      * the version it was sent with, and is shown with that version's labels.
      */
     version: number;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_FunnelInfo = {
+  /** The items of this page, in the requested order. */
+  data: {
+    description: string;
+    key: string;
+    /** Event types of the steps, in order. */
+    steps: string[];
   }[];
   pagination: Pagination;
 };
@@ -24508,6 +24107,31 @@ export type Page_LedgerReconciliationResponse = {
 };
 
 /** One page of a list. */
+export type Page_LimitUse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /**
+     * The limit; `<limit>.<part>` is the separate cap of one part of a limit that has parts (for
+     * example `organizations.units.store`: units of type `store`), listed when the plan caps that
+     * part or the tenant uses it.
+     */
+    key: string;
+    /** `count`, `amount` or `metered`. */
+    kind: string;
+    /** The most the tenant may use; `null` is unlimited. */
+    max?: number | null;
+    /**
+     * `true` when more is in use than allowed (after moving to a smaller plan): nothing is
+     * removed, but nothing new can be added.
+     */
+    over_limit: boolean;
+    /** In use now (for `metered`: this month). */
+    used: number;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_ListResponse = {
   /** The items of this page, in the requested order. */
   data: {
@@ -24726,6 +24350,19 @@ export type Page_MenuSummary = {
 };
 
 /** One page of a list. */
+export type Page_MyPermission = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** What it allows, in the language of `Accept-Language`. */
+    description: string;
+    name: string;
+    /** How careful a grant needs to be: `read`, `write`, `destructive`, `sensitive_data` or `money`. */
+    risk: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_NotificationDeviceToken = {
   /** The items of this page, in the requested order. */
   data: {
@@ -24814,6 +24451,24 @@ export type Page_NotificationMessage = {
      */
     status: string;
     user_id?: string | null;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_NotificationTemplate = {
+  /** The items of this page, in the requested order. */
+  data: {
+    body: string;
+    channel: string;
+    kind: string;
+    locale: string;
+    /** For SMS, ZNS and push. */
+    short: string;
+    title: string;
+    updated_at: string;
+    /** Approved Zalo ZNS template id (channel `zns`). */
+    zns_template_id?: string | null;
   }[];
   pagination: Pagination;
 };
@@ -25043,6 +24698,30 @@ export type Page_PasskeyResponse = {
     last_used_at?: string | null;
     /** Name the user gave it, e.g. the device. */
     name: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_Pin = {
+  /** The items of this page, in the requested order. */
+  data: {
+    created_at: string;
+    id: string;
+    /** `navigation` (a screen) or `record`. */
+    kind: string;
+    /**
+     * The screen's label in the language of `Accept-Language`, or the label sent when pinning
+     * a record.
+     */
+    label: string;
+    /** Display order, smallest first. */
+    position: number;
+    /**
+     * The screen id from `GET /api/v1/kernel/navigation` (e.g. `content.entries`), or
+     * `<record kind>:<id>` for a record (e.g. `content.entry:0190…`).
+     */
+    target: string;
   }[];
   pagination: Pagination;
 };
@@ -25510,12 +25189,70 @@ export type Page_PublicEntryResponse = {
 };
 
 /** One page of a list. */
+export type Page_PublicProfileResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    address?: Address | null;
+    /** Cover image (id in the `media` library). */
+    cover_media_id?: string | null;
+    /** Name shown to visitors; defaults to the unit's name. */
+    display_name: string;
+    opening_hours: {
+      /** Local time `HH:MM`, after `opens`. */
+      closes: string;
+      /** ISO day of the week: 1 Monday … 7 Sunday. */
+      day: number;
+      /** Local time `HH:MM` (the unit's time zone, setting `organizations.timezone`). */
+      opens: string;
+    }[];
+    /** Customers can pick up orders here. */
+    pickup: boolean;
+    /** Order among the public units (smaller first). */
+    position: number;
+    /** Shown on websites (`GET /api/v1/organizations/public/stores`). */
+    public: boolean;
+    special_days: {
+      /** Closed all day. */
+      closed?: boolean;
+      closes?: string | null;
+      /** `YYYY-MM-DD`. */
+      date: string;
+      /** Shown to visitors, up to 200 characters. */
+      note?: string | null;
+      /** When open: local time `HH:MM`. */
+      opens?: string | null;
+    }[];
+    unit_id: string;
+    unit_type: string;
+    /** `null` until the profile is first saved. */
+    updated_at?: string | null;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_PublicTermCount = {
   /** The items of this page, in the requested order. */
   data: (PublicTerm & {
     /** Published posts in `locale` that carry the term. */
     posts: number;
   })[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_Ranked = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** Events (for event types and objects). */
+    events: number;
+    /** The page path, source, campaign, object (`<kind>:<id>`) or event type. */
+    value: string;
+    /** Page views (for objects: events about the object). */
+    views: number;
+    /** Sum of the daily unique visitors. */
+    visitors: number;
+  }[];
   pagination: Pagination;
 };
 
@@ -25800,6 +25537,35 @@ export type Page_SandboxMessage = {
 };
 
 /** One page of a list. */
+export type Page_SavedView = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** The columns shown, in order. */
+    columns: string[];
+    created_at: string;
+    /** `compact` or `comfortable`. */
+    density?: string | null;
+    group_by?: string | null;
+    id: string;
+    name: string;
+    org_id?: string | null;
+    /** Who saved it. */
+    owner: string;
+    /** The query parameters of the list (filters, `sort`, `order`). */
+    params: Record<string, unknown>;
+    /**
+     * The list, as `x-autoxide-list` of its endpoint in this document, e.g.
+     * `content.list_content_entries`.
+     */
+    resource: string;
+    /** `personal` (only its owner sees it), `node` (everyone at `org_id`) or `tenant`. */
+    scope: string;
+    updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_ScheduleResponse = {
   /** The items of this page, in the requested order. */
   data: {
@@ -25899,6 +25665,26 @@ export type Page_SessionResponse = {
      * none was sent.
      */
     user_agent?: string | null;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_SettingResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** The value when no unit sets it; `null`: none. */
+    default?: unknown;
+    /** What it is for and which values it takes. */
+    description: string;
+    /** `<module>.<name>`, e.g. `organizations.timezone`. */
+    key: string;
+    /**
+     * The shape of the value as a JSON Schema (`type`: `string`, `boolean`, `integer`, `number`,
+     * `array` or `object`, with `enum`, `pattern`, `items`… where they apply), for building the
+     * right input; `null` when the module does not say. The server checks every value anyway.
+     */
+    schema?: Record<string, unknown> | null;
   }[];
   pagination: Pagination;
 };
@@ -26199,6 +25985,40 @@ export type Page_SitemapItem = {
 };
 
 /** One page of a list. */
+export type Page_StoreProductResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** The base plan a purchase of this product gives. */
+    plan_id: string;
+    /** The product id set up in the store. */
+    product_id: string;
+    /** `app_store` or `google_play`. */
+    store: string;
+    updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_StorePurchaseResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** When the store period ends. */
+    expires_at?: string | null;
+    id: string;
+    product_id: string;
+    /** Made in the store's test environment. */
+    sandbox: boolean;
+    /** `active`, `expired`, `refunded` or `revoked`. */
+    state: string;
+    /** `app_store` or `google_play`. */
+    store: string;
+    updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_SubmissionResponse = {
   /** The items of this page, in the requested order. */
   data: {
@@ -26429,6 +26249,51 @@ export type Page_TagResponse = {
 };
 
 /** One page of a list. */
+export type Page_TaxCategoryResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    code: string;
+    jurisdiction: string;
+    name_en: string;
+    name_vi: string;
+    /** `vat`, `excise`, `environment`. */
+    tax_kind: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_TaxJurisdictionResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    code: string;
+    default_currency: string;
+    name: string;
+    /** The data pack it comes from, and its version. */
+    pack_code: string;
+    pack_version: number;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_TaxPackResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** Day its sources were last checked. */
+    checked_on: string;
+    code: string;
+    content_sha256: string;
+    id: string;
+    imported_at: string;
+    imported_by?: string | null;
+    source_note: string;
+    version: number;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_TaxProfileResponse = {
   /** The items of this page, in the requested order. */
   data: (TaxProfile & {
@@ -26437,6 +26302,67 @@ export type Page_TaxProfileResponse = {
     updated_at: string;
     updated_by?: string | null;
   })[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_TaxRateResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** `percent`, `per_unit` or `exempt` (not subject to the tax). */
+    basis: string;
+    category: string;
+    /** First day in force. */
+    effective_from: string;
+    /** First day no longer in force; `null` while in force. */
+    effective_to?: string | null;
+    id: string;
+    jurisdiction: string;
+    /** Legal basis (check it against the original document before production use). */
+    legal_basis: string;
+    pack_version: number;
+    per_unit?: Money | null;
+    rate_percent: string;
+    /** Order the taxes apply in: a later stage is computed on the price plus earlier taxes. */
+    stage: number;
+    tax_kind: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_TaxRuleResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    code: string;
+    effective_from: string;
+    effective_to?: string | null;
+    id: string;
+    jurisdiction: string;
+    legal_basis: string;
+    value: Record<string, unknown>;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_TaxWithholdingRateResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    business_line: string;
+    effective_from: string;
+    effective_to?: string | null;
+    id: string;
+    jurisdiction: string;
+    legal_basis: string;
+    payee_regime: string;
+    /** `marketplace` or `affiliate`. */
+    payer_kind: string;
+    rate_percent: string;
+    /** `vat` or `pit`. */
+    tax_kind: string;
+    threshold?: Money | null;
+  }[];
   pagination: Pagination;
 };
 
@@ -26667,6 +26593,51 @@ export type Page_UnitResponse = {
 };
 
 /** One page of a list. */
+export type Page_UnitSettingResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** `true` when the value comes from a unit above or the default, not from this unit. */
+    inherited: boolean;
+    /** Key of the setting. */
+    key: string;
+    /** The unit that set this value (this unit or one above it); `null`: the default. */
+    source_unit_id?: string | null;
+    /** The value in force; `null` when nothing sets it and it has no default. */
+    value?: unknown;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_UnitTypeResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    code: string;
+    created_at: string;
+    description: string;
+    name: string;
+    updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_UserFlag = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /**
+     * Lower-case letters, digits, `.`, `_` and `-`, up to 100 characters; group flags with a
+     * prefix, e.g. `hint.saved_views`.
+     */
+    key: string;
+    updated_at: string;
+    /** Up to 200 characters, e.g. `dismissed` or the last version whose news were seen. */
+    value: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_UserResponse = {
   /** The items of this page, in the requested order. */
   data: {
@@ -26720,6 +26691,17 @@ export type Page_VoucherReward = {
     points_cost?: number | null;
     /** The voucher promotion of the promotions module. */
     promotion_id: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_WishlistItem = {
+  /** The items of this page, in the requested order. */
+  data: {
+    added_at: string;
+    product_id: string;
+    variant_id?: string | null;
   }[];
   pagination: Pagination;
 };
@@ -33820,9 +33802,9 @@ export interface paths {
   "/api/v1/analytics/campaigns": {
     /** List the UTM campaigns. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { site?: string; from?: string; to?: string; limit?: number }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { site?: string; from?: string; to?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_Ranked;
+        200: Page_Ranked;
         401: Problem;
         403: Problem;
         404: Problem;
@@ -33834,10 +33816,11 @@ export interface paths {
   "/api/v1/analytics/event-types": {
     /** List the event types (public). */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_EventTypeInfo;
+        200: Page_EventTypeInfo;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -33845,11 +33828,12 @@ export interface paths {
   "/api/v1/analytics/funnels": {
     /** List the funnels. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_FunnelInfo;
+        200: Page_FunnelInfo;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -33871,9 +33855,9 @@ export interface paths {
   "/api/v1/analytics/objects": {
     /** List the most viewed objects. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { site?: string; from?: string; to?: string; limit?: number; kind?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { site?: string; from?: string; to?: string; kind?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_Ranked;
+        200: Page_Ranked;
         401: Problem;
         403: Problem;
         404: Problem;
@@ -33899,9 +33883,9 @@ export interface paths {
   "/api/v1/analytics/pages": {
     /** List the most viewed pages. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { site?: string; from?: string; to?: string; limit?: number }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { site?: string; from?: string; to?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_Ranked;
+        200: Page_Ranked;
         401: Problem;
         403: Problem;
         404: Problem;
@@ -33929,9 +33913,9 @@ export interface paths {
   "/api/v1/analytics/sources": {
     /** List the traffic sources. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { site?: string; from?: string; to?: string; limit?: number }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { site?: string; from?: string; to?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_Ranked;
+        200: Page_Ranked;
         401: Problem;
         403: Problem;
         404: Problem;
@@ -33943,9 +33927,9 @@ export interface paths {
   "/api/v1/analytics/types": {
     /** List the event types by count. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { site?: string; from?: string; to?: string; limit?: number }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { site?: string; from?: string; to?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_Ranked;
+        200: Page_Ranked;
         401: Problem;
         403: Problem;
         404: Problem;
@@ -41933,11 +41917,12 @@ export interface paths {
   "/api/v1/customers/me/wishlist": {
     /** List your wishlist, newest first. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_WishlistItem;
+        200: Page_WishlistItem;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -45657,9 +45642,9 @@ export interface paths {
   "/api/v1/me/flags": {
     /** List my interface flags. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { prefix?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { prefix?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_UserFlag;
+        200: Page_UserFlag;
         401: Problem;
         422: Problem;
         default: Problem;
@@ -45693,10 +45678,11 @@ export interface paths {
   "/api/v1/me/permissions": {
     /** List your own permissions. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_MyPermission;
+        200: Page_MyPermission;
         401: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -45704,10 +45690,11 @@ export interface paths {
   "/api/v1/me/pins": {
     /** List my pins. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_Pin;
+        200: Page_Pin;
         401: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -45753,10 +45740,11 @@ export interface paths {
   "/api/v1/me/views": {
     /** List my saved views. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { resource?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { resource?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_SavedView;
+        200: Page_SavedView;
         401: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -47016,11 +47004,12 @@ export interface paths {
   "/api/v1/notifications/templates": {
     /** List the replaced texts of the tenant. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_NotificationTemplate;
+        200: Page_NotificationTemplate;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -48479,10 +48468,11 @@ export interface paths {
   "/api/v1/organizations/public/stores": {
     /** List the stores of this tenant shown on its websites. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_PublicProfileResponse;
+        200: Page_PublicProfileResponse;
         304: void;
+        422: Problem;
         default: Problem;
       };
     };
@@ -48490,10 +48480,11 @@ export interface paths {
   "/api/v1/organizations/settings": {
     /** List the settings units can set. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_SettingResponse;
+        200: Page_SettingResponse;
         401: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -48501,11 +48492,12 @@ export interface paths {
   "/api/v1/organizations/unit-types": {
     /** List the unit types of the tenant. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_UnitTypeResponse;
+        200: Page_UnitTypeResponse;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -48608,12 +48600,13 @@ export interface paths {
   "/api/v1/organizations/units/{id}/ancestors": {
     /** List the units above an organization unit. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_UnitResponse;
+        200: Page_UnitResponse;
         401: Problem;
         403: Problem;
         404: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -48663,12 +48656,13 @@ export interface paths {
   "/api/v1/organizations/units/{id}/settings": {
     /** Get the settings in force at an organization unit. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_UnitSettingResponse;
+        200: Page_UnitSettingResponse;
         401: Problem;
         403: Problem;
         404: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -48718,11 +48712,12 @@ export interface paths {
   "/api/v1/plans/billing-periods": {
     /** List your tenant's billing periods. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_BillingPeriodResponse;
+        200: Page_BillingPeriodResponse;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -48814,9 +48809,10 @@ export interface paths {
   "/api/v1/plans/catalog": {
     /** List the plans on sale, with their prices. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_PlanResponse;
+        200: Page_PlanResponse;
+        422: Problem;
         default: Problem;
       };
     };
@@ -49060,11 +49056,12 @@ export interface paths {
   "/api/v1/plans/store/products": {
     /** List the app store products linked to plans. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_StoreProductResponse;
+        200: Page_StoreProductResponse;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -49098,11 +49095,12 @@ export interface paths {
   "/api/v1/plans/store/purchases": {
     /** List the app store purchases of your tenant. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_StorePurchaseResponse;
+        200: Page_StorePurchaseResponse;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -49195,11 +49193,12 @@ export interface paths {
   "/api/v1/plans/tenants/{tenant_id}/billing-periods": {
     /** List a tenant's billing periods. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; path: { tenant_id: string }; };
+      parameters: { header: { "Accept-Language"?: string }; path: { tenant_id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_BillingPeriodResponse;
+        200: Page_BillingPeriodResponse;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -49233,11 +49232,12 @@ export interface paths {
   "/api/v1/plans/tenants/{tenant_id}/overrides": {
     /** List a tenant's overrides. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; path: { tenant_id: string }; };
+      parameters: { header: { "Accept-Language"?: string }; path: { tenant_id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_OverrideResponse;
+        200: Page_OverrideResponse;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -49327,11 +49327,12 @@ export interface paths {
   "/api/v1/plans/tenants/{tenant_id}/usage": {
     /** Get a tenant's use of every limit. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; path: { tenant_id: string }; };
+      parameters: { header: { "Accept-Language"?: string }; path: { tenant_id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_LimitUse;
+        200: Page_LimitUse;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -49339,11 +49340,12 @@ export interface paths {
   "/api/v1/plans/usage": {
     /** Get your tenant's use of every limit. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_LimitUse;
+        200: Page_LimitUse;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -51292,9 +51294,9 @@ export interface paths {
   "/api/v1/tax/categories": {
     /** List the tax categories. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { jurisdiction?: string; category?: string; on?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { jurisdiction?: string; category?: string; on?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_TaxCategoryResponse;
+        200: Page_TaxCategoryResponse;
         401: Problem;
         403: Problem;
         422: Problem;
@@ -51305,11 +51307,12 @@ export interface paths {
   "/api/v1/tax/jurisdictions": {
     /** List the tax jurisdictions. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_TaxJurisdictionResponse;
+        200: Page_TaxJurisdictionResponse;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -51317,11 +51320,12 @@ export interface paths {
   "/api/v1/tax/packs": {
     /** List the imported tax data packs. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_TaxPackResponse;
+        200: Page_TaxPackResponse;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -51395,9 +51399,9 @@ export interface paths {
   "/api/v1/tax/rates": {
     /** List the tax rates with their dates. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { jurisdiction?: string; category?: string; on?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { jurisdiction?: string; category?: string; on?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_TaxRateResponse;
+        200: Page_TaxRateResponse;
         401: Problem;
         403: Problem;
         422: Problem;
@@ -51408,9 +51412,9 @@ export interface paths {
   "/api/v1/tax/rules": {
     /** List the tax rules with their dates. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { jurisdiction?: string; category?: string; on?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { jurisdiction?: string; category?: string; on?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_TaxRuleResponse;
+        200: Page_TaxRuleResponse;
         401: Problem;
         403: Problem;
         422: Problem;
@@ -51435,9 +51439,9 @@ export interface paths {
   "/api/v1/tax/withholding-rates": {
     /** List the withholding rates for platforms. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { jurisdiction?: string; category?: string; on?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { jurisdiction?: string; category?: string; on?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_TaxWithholdingRateResponse;
+        200: Page_TaxWithholdingRateResponse;
         401: Problem;
         403: Problem;
         422: Problem;

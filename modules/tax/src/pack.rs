@@ -14,6 +14,7 @@ use autoxide_kernel::decimal::{parse, to_column};
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::money::Money;
+use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::task::{Task, TaskArgs, TaskArgument, TaskRun};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set};
 use serde::Deserialize;
@@ -249,12 +250,11 @@ impl TaxService {
             .await?)
     }
 
-    pub(crate) async fn packs(&self) -> Result<Vec<pack::Model>, Error> {
-        Ok(pack::Entity::find()
-            .order_by_asc(pack::Column::Code)
-            .order_by_desc(pack::Column::Version)
-            .all(self.databases.control().read())
-            .await?)
+    /// Gói đã nhập, theo thứ tự nhập (ID sinh lúc nhập; bản cao hơn luôn nhập sau bản thấp), keyset
+    /// theo khoá chính.
+    pub(crate) async fn packs(&self, page: &PageRequest) -> Result<Page<pack::Model>, Error> {
+        let read = self.databases.control().read();
+        fetch_page(pack::Entity::find(), pack::Column::Id, |row| row.id, page, read).await
     }
 
     /// Nhập gói (đã đọc dạng chữ). Cùng nội dung đã nhập: không đổi gì.

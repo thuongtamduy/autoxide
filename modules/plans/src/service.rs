@@ -14,7 +14,9 @@ use autoxide_kernel::entitlement::{EntitlementsHandle, TenantAccess, TenantEntit
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::event::{Actor, Event, Outbox};
 use autoxide_kernel::money::Money;
-use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
+use autoxide_kernel::pagination::{
+    MAX_LIMIT, NaturalOrderPageQuery, Page, PageRequest, SortValue, fetch_page, fetch_page_by,
+};
 use autoxide_kernel::rows;
 use autoxide_kernel::tenancy::{DEFAULT_TENANT, DatabaseRegistry, TenantId};
 use sea_orm::{
@@ -257,22 +259,45 @@ impl PlansService {
         }))
     }
 
-    /// Gói `base` / `addon` đang bán, kèm giá đang dùng — cho trang đăng ký (công khai).
-    pub(crate) async fn catalog(&self) -> Result<Vec<PlanRow>, Error> {
-        let plans = plan::Entity::find()
-            .filter(plan::Column::Status.eq("active"))
-            .order_by_asc(plan::Column::Code)
-            .all(self.control().read())
-            .await?;
-        let ids: Vec<Uuid> = plans.iter().map(|row| row.id).collect();
+    /// Gói `base` / `addon` đang bán, kèm giá đang dùng — cho trang đăng ký (công khai). Theo mã
+    /// (thứ tự tự nhiên; mã duy nhất), keyset trong database (index `plans_plan_catalog_idx`).
+    pub(crate) async fn catalog(&self, page: &PageRequest) -> Result<Page<PlanRow>, Error> {
+        let read = self.control().read();
+        let select = plan::Entity::find().filter(plan::Column::Status.eq("active"));
+        let page = fetch_page_by(
+            select,
+            plan::Column::Code,
+            |row| SortValue::Text(row.code.clone()),
+            plan::Column::Id,
+            |row| row.id,
+            page,
+            read,
+        )
+        .await?;
+        let ids: Vec<Uuid> = page.data.iter().map(|row| row.id).collect();
         let mut details = self.details(&ids, true).await?;
-        Ok(plans
-            .into_iter()
-            .map(|plan| {
-                let (grants, prices) = details.remove(&plan.id).unwrap_or_default();
-                PlanRow { plan, grants, prices, subscribers: None }
-            })
-            .collect())
+        Ok(page.map(|plan| {
+            let (grants, prices) = details.remove(&plan.id).unwrap_or_default();
+            PlanRow { plan, grants, prices, subscribers: None }
+        }))
+    }
+
+    /// Mọi gói đang bán (việc nội bộ: gói nào cung cấp một quyền dùng) — duyệt hết các trang của
+    /// [`Self::catalog`] bên trong, không cắt.
+    pub(crate) async fn catalog_all(&self) -> Result<Vec<PlanRow>, Error> {
+        let mut found = Vec::new();
+        let mut cursor = None;
+        loop {
+            let limit = Some(MAX_LIMIT.to_string());
+            let request =
+                PageRequest::try_from(NaturalOrderPageQuery::new(limit, cursor.take(), None))?;
+            let page = self.catalog(&request).await?;
+            found.extend(page.data);
+            match page.pagination.next_cursor {
+                Some(next) => cursor = Some(next),
+                None => return Ok(found),
+            }
+        }
     }
 
     pub(crate) async fn get_plan(&self, id: Uuid) -> Result<PlanRow, Error> {

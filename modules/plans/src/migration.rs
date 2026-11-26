@@ -8,6 +8,8 @@
 
 use autoxide_kernel::migration::prelude::*;
 
+mod m0016_list_indexes;
+
 pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
     vec![
         Box::new(CreatePlans),
@@ -40,6 +42,8 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         ),
         // Mua trong ứng dụng qua App Store / Google Play (bước 69 P4).
         crate::store::migration(),
+        // Index cho danh sách có phân trang (bước 70 P9).
+        Box::new(m0016_list_indexes::Migration),
     ]
 }
 

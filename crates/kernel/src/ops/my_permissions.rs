@@ -4,7 +4,7 @@
 
 use std::sync::Arc;
 
-use axum::extract::State;
+use axum::extract::{Query, State};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use utoipa_axum::router::OpenApiRouter;
@@ -13,7 +13,8 @@ use utoipa_axum::routes;
 use crate::access::{PermissionCatalog, Principal};
 use crate::error::Error;
 use crate::i18n::{Language, Translations};
-use crate::response::{Data, Problem};
+use crate::pagination::{NaturalOrderPageQuery, Page, PageRequest, page_of};
+use crate::response::Problem;
 
 pub(crate) struct MyPermissions {
     pub(crate) catalog: PermissionCatalog,
@@ -39,25 +40,32 @@ pub(crate) fn routes(state: MyPermissions) -> OpenApiRouter {
 /// List your own permissions.
 ///
 /// Any signed-in user. Every permission the caller holds (through roles, or the permissions of
-/// the API key used), with its description and risk, sorted by name. Use it to offer the
-/// permissions a new API key may get: a key cannot have a permission its owner lacks.
+/// the API key used), with its description and risk, by name (`order=desc` reverses it); paged
+/// with `limit` / `cursor`. Use it to offer the permissions a new API key may get: a key cannot
+/// have a permission its owner lacks.
 #[utoipa::path(
     get,
     path = "/permissions",
     extensions(("x-permissions" = json!([]))),
     operation_id = "list_my_permissions",
     security(("bearer" = [])),
+    params(NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "The caller's permissions, by name.", body = Data<Vec<MyPermission>>),
+        (status = 200, description = "One page of the caller's permissions, by name.", body = Page<MyPermission>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_my_permissions(
     State(state): State<Arc<MyPermissions>>,
     principal: Principal,
     language: Language,
-) -> Result<Data<Vec<MyPermission>>, Error> {
-    let mut data: Vec<MyPermission> = state
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<MyPermission>, Error> {
+    let page = PageRequest::try_from(page)?;
+    // Sổ permission do module khai trong code, lọc theo người gọi: phân trang trong bộ nhớ theo tên
+    // (D-20261125-list-pages mục 4).
+    let data: Vec<MyPermission> = state
         .catalog
         .iter()
         .filter(|permission| principal.has(permission))
@@ -67,6 +75,5 @@ async fn list_my_permissions(
             risk: permission.risk().as_str().to_owned(),
         })
         .collect();
-    data.sort_by(|a, b| a.name.cmp(&b.name));
-    Ok(Data { data })
+    page_of(data, |permission| permission.name.clone(), &page)
 }

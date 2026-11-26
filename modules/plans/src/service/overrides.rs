@@ -4,12 +4,14 @@ use super::*;
 use autoxide_kernel::time::Timestamp;
 
 impl PlansService {
-    pub(crate) async fn overrides(&self, tenant: TenantId) -> Result<Vec<grant::Model>, Error> {
-        Ok(grant::Entity::find()
-            .filter(grant::Column::TenantId.eq(tenant.as_uuid()))
-            .order_by_asc(grant::Column::Id)
-            .all(self.control().read())
-            .await?)
+    /// Ghi đè của khách `tenant`, theo trang (thứ tự tạo; index `plans_override_tenant_page_idx`).
+    pub(crate) async fn overrides(
+        &self,
+        tenant: TenantId,
+        page: &PageRequest,
+    ) -> Result<Page<grant::Model>, Error> {
+        let select = grant::Entity::find().filter(grant::Column::TenantId.eq(tenant.as_uuid()));
+        fetch_page(select, grant::Column::Id, |row| row.id, page, self.control().read()).await
     }
 
     /// Ghi đè của mọi khách (nhà vận hành), theo trang; `active`: chỉ cái còn hiệu lực lúc `at`

@@ -8,5 +8,6 @@
   "text:See the visit reports (pages, sources, campaigns, objects, funnels) of the websites in your scope.": "Xem báo cáo truy cập (trang, nguồn, chiến dịch, đối tượng, phễu) của các website trong phạm vi của bạn.",
   "text:Sum of the daily unique visitors of the website of the chosen unit over the last 7 days (today included, UTC), from the hourly totals; no cookies, so one person on two days counts twice.": "Tổng khách duy nhất từng ngày của website của nút đang chọn trong 7 ngày qua (gồm hôm nay, giờ UTC), từ số gộp mỗi giờ; không dùng cookie nên một người ghé hai ngày được đếm hai lần.",
   "text:Visitors, last 7 days": "Khách 7 ngày qua",
-  "field:must be 1 to 50 host names separated by commas, such as `shop.example`; not valid: {items}": "phải là 1 tới 50 tên host cách nhau bằng dấu phẩy, vd `shop.example`; không hợp lệ: {items}"
+  "field:must be 1 to 50 host names separated by commas, such as `shop.example`; not valid: {items}": "phải là 1 tới 50 tên host cách nhau bằng dấu phẩy, vd `shop.example`; không hợp lệ: {items}",
+  "field:must be the `next_cursor` value of a previous page of the same list and sort, unchanged": "phải là giá trị `next_cursor` nguyên vẹn của một trang trước, cùng danh sách và cùng cách sắp"
 }

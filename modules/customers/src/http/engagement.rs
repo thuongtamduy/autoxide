@@ -186,22 +186,27 @@ impl From<referral_rule::Model> for ReferralRule {
 
 /// List your wishlist, newest first.
 ///
-/// Any signed-in buyer.
+/// Any signed-in buyer. Most recently added first unless `order=asc`; paged with `limit` /
+/// `cursor`.
 #[utoipa::path(
     get, path = "/me/wishlist", extensions(("x-permissions" = json!([]))),
     operation_id = "list_my_wishlist", security(("bearer" = [])),
+    params(PageQuery),
     responses(
-        (status = 200, description = "Your wishlist.", body = Data<Vec<WishlistItem>>),
+        (status = 200, description = "One page of your wishlist, most recently added first.", body = Page<WishlistItem>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 pub(crate) async fn list_wishlist(
     State(service): State<Arc<CustomersService>>,
     tenant: TenantContext,
     principal: Principal,
-) -> Result<Data<Vec<WishlistItem>>, Error> {
-    let rows = service.wishlist(&tenant, principal.user_id()).await?;
-    Ok(Data { data: rows.into_iter().map(WishlistItem::from).collect() })
+    Query(page): Query<PageQuery>,
+) -> Result<Page<WishlistItem>, Error> {
+    let page = PageRequest::try_from(page)?;
+    let rows = service.wishlist_page(&tenant, principal.user_id(), &page).await?;
+    Ok(rows.map(WishlistItem::from))
 }
 
 /// Add a product to your wishlist.

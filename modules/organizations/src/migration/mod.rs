@@ -5,6 +5,7 @@ mod m0001_create_units;
 mod m0005_settings;
 mod m0006_profiles;
 mod m0007_groups;
+mod m0008_list_indexes;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 
@@ -26,5 +27,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         autoxide_kernel::event::outbox_access_migration("k0001_event_access", "organizations"),
         // Nhóm nút ngoài cây cho báo cáo (bước 38, D-232).
         Box::new(m0007_groups::Migration),
+        // Index cho danh sách có phân trang (bước 70 P9).
+        Box::new(m0008_list_indexes::Migration),
     ]
 }

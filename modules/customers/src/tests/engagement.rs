@@ -320,3 +320,46 @@ async fn vua_xem_va_quy_tac_phan_trang() {
     .await
     .unwrap();
 }
+
+/// `GET /me/wishlist` theo trang (bước 70 P9): thêm gần nhất trước, trang 2 tới hết không trùng không sót,
+/// `order=asc` theo thứ tự thêm; dòng mới có ID (cursor theo ID).
+#[tokio::test]
+async fn wishlist_pages_newest_first() {
+    TestDatabase::run(async |test| {
+        let shop = shop(test).await;
+        let products: Vec<Uuid> = (0..5).map(|_| Uuid::now_v7()).collect();
+        for product in &products {
+            let (status, body) =
+                call(&shop, "POST", "/me/wishlist", "buyer", Some(json!({"product_id": product})))
+                    .await;
+            assert_eq!(status, StatusCode::OK, "{body}");
+        }
+        let walk = async |query: &str| {
+            let mut found = Vec::new();
+            let mut uri = format!("/me/wishlist?limit=2{query}");
+            loop {
+                let (status, page) = call(&shop, "GET", &uri, "buyer", None).await;
+                assert_eq!(status, StatusCode::OK, "{page}");
+                let rows = page["data"].as_array().unwrap();
+                assert!(rows.len() <= 2);
+                found.extend(
+                    rows.iter()
+                        .map(|row| row["product_id"].as_str().unwrap().parse::<Uuid>().unwrap()),
+                );
+                match page["pagination"]["next_cursor"].as_str() {
+                    Some(cursor) => uri = format!("/me/wishlist?limit=2{query}&cursor={cursor}"),
+                    None => return found,
+                }
+            }
+        };
+        assert_eq!(walk("").await, products.iter().rev().copied().collect::<Vec<_>>());
+        assert_eq!(walk("&order=asc").await, products);
+        let (status, counted) = call(&shop, "GET", "/me/wishlist?count=true", "buyer", None).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(counted["pagination"]["total"], 5);
+        let (status, _) = call(&shop, "GET", "/me/wishlist?limit=0", "buyer", None).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    })
+    .await
+    .unwrap();
+}

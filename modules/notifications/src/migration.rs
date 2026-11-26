@@ -5,6 +5,7 @@
 use autoxide_kernel::migration::prelude::*;
 
 mod m0010_list_indexes;
+mod m0011_template_ids;
 
 pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
     vec![
@@ -31,6 +32,8 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(CreateTemplateVersions),
         // Index cho danh sách có phân trang (bước 70 P9).
         Box::new(m0010_list_indexes::Migration),
+        // Cột `id` (UUIDv7) của câu thay thế mẫu, để phân trang bằng cursor (bước 70 P9).
+        Box::new(m0011_template_ids::Migration),
     ]
 }
 

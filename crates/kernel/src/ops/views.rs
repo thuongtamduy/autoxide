@@ -17,7 +17,7 @@ use std::sync::Arc;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use sea_orm::ConnectionTrait;
-use sea_orm::sea_query::{Alias, Cond, Expr, Order, Query as SqlQuery};
+use sea_orm::sea_query::{Alias, Expr, Order, Query as SqlQuery};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::openapi::OpenApi;
@@ -31,8 +31,12 @@ use crate::access::{OrgTarget, Permission, Principal};
 use crate::error::{Error, FieldError};
 use crate::http::ValidJson;
 use crate::migration::prelude::*;
+use crate::pagination::{Page, PageQuery, PageRequest, fetch_page};
 use crate::response::{Created, Data, Problem};
-use crate::tenancy::{OrgId, TenantContext};
+use crate::tenancy::{OrgId, ScopeExt, TenantContext};
+use sea_orm::{ColumnTrait, Condition, EntityTrait, QueryFilter};
+
+mod entity;
 
 const TABLE: &str = "kernel_saved_views";
 
@@ -435,41 +439,61 @@ async fn require_manage(
 /// List my saved views.
 ///
 /// Any signed-in user. Your personal views, and the views shared with the whole tenant or with an
-/// organization unit, newest first.
+/// organization unit, newest first unless `order=asc`; paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/views",
     extensions(("x-permissions" = json!([]))),
     operation_id = "list_views",
     security(("bearer" = [])),
-    params(ViewsQuery),
+    params(ViewsQuery, PageQuery),
     responses(
-        (status = 200, description = "The views.", body = Data<Vec<SavedView>>),
+        (status = 200, description = "One page of the views, newest first.", body = Page<SavedView>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_views(
     tenant: TenantContext,
     principal: Principal,
     Query(query): Query<ViewsQuery>,
-) -> Result<Data<Vec<SavedView>>, Error> {
-    let mut select = SqlQuery::select();
-    select
-        .columns(COLUMNS)
-        .from(Alias::new(TABLE))
-        .and_where(Expr::col(Alias::new("tenant_id")).eq(tenant.id().as_uuid()))
-        .cond_where(
-            Cond::any()
-                .add(Expr::col(Alias::new("scope")).ne("personal"))
-                .add(Expr::col(Alias::new("owner_id")).eq(principal.user_id())),
+    Query(page): Query<PageQuery>,
+) -> Result<Page<SavedView>, Error> {
+    let page = PageRequest::try_from(page)?;
+    // Keyset theo ID trong database (index `kernel_saved_views_page_idx` / `…_resource_page_idx`); không
+    // còn trần 500 dòng.
+    let mut select = entity::Entity::find()
+        .filter(
+            Condition::any()
+                .add(entity::Column::Scope.ne("personal"))
+                .add(entity::Column::OwnerId.eq(principal.user_id())),
         )
-        .order_by(Alias::new("id"), Order::Desc)
-        .limit(500);
+        .scoped(&tenant);
     if let Some(resource) = query.resource.as_deref().filter(|resource| !resource.is_empty()) {
-        select.and_where(Expr::col(Alias::new("resource")).eq(resource));
+        select = select.filter(entity::Column::Resource.eq(resource));
     }
-    let rows = tenant.database().read().query_all(&select).await?;
-    Ok(Data { data: rows.iter().map(view).collect::<Result<_, _>>()? })
+    let read = tenant.database().read();
+    let rows = fetch_page(select, entity::Column::Id, |row| row.id, &page, read).await?;
+    Ok(rows.map(SavedView::from))
+}
+
+impl From<entity::Model> for SavedView {
+    fn from(row: entity::Model) -> Self {
+        SavedView {
+            id: row.id,
+            resource: row.resource,
+            name: row.name,
+            scope: row.scope,
+            org_id: row.org_id,
+            owner: row.owner_id,
+            params: serde_json::from_str(&row.params).unwrap_or_default(),
+            columns: serde_json::from_str(&row.columns).unwrap_or_default(),
+            group_by: row.group_by,
+            density: row.density,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+        }
+    }
 }
 
 /// Save a list view.

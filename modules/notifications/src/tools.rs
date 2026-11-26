@@ -80,6 +80,8 @@ pub(crate) struct MessagesInput {
     limit: Option<u32>,
     /// The `next_cursor` of the previous page.
     cursor: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
 }
 
 /// Which inbox page.
@@ -93,6 +95,8 @@ pub(crate) struct InboxInput {
     limit: Option<u32>,
     /// The `next_cursor` of the previous page.
     cursor: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
 }
 
 /// Which notification to mark read.
@@ -290,7 +294,9 @@ pub(crate) fn all(service: &Arc<NotificationsService>) -> Vec<Tool> {
             move |tenant: TenantContext, principal: Principal, input: MessagesInput| {
                 let service = messages.clone();
                 async move {
-                    let page = PageInput::new(input.limit, input.cursor, None).page()?;
+                    let page = PageInput::new(input.limit, input.cursor, None)
+                        .with_count(input.count.unwrap_or(false))
+                        .page()?;
                     let filter = MessageFilter {
                         kind: input.kind,
                         status: input.status,
@@ -310,7 +316,9 @@ pub(crate) fn all(service: &Arc<NotificationsService>) -> Vec<Tool> {
             move |tenant: TenantContext, principal: Principal, input: InboxInput| {
                 let service = inbox.clone();
                 async move {
-                    let page = PageInput::new(input.limit, input.cursor, None).page()?;
+                    let page = PageInput::new(input.limit, input.cursor, None)
+                        .with_count(input.count.unwrap_or(false))
+                        .page()?;
                     let found = service.inbox(&tenant, &principal, input.unread, &page).await?;
                     Ok::<Page<InboxItem>, Error>(found.map(InboxItem::from))
                 }
