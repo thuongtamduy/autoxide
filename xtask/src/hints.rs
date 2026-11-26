@@ -104,8 +104,16 @@ const FIXES: &[(&str, &str)] = &[
     ),
     ("metric-labels", "Use labels from a small fixed set (an enum), never ids or raw paths."),
     (
+        "private-paths",
+        "Use the public path (`autoxide_kernel::db::…`, `autoxide_kernel::http::…`); `__private` is only for code the kernel's macros generate.",
+    ),
+    (
         "publish-ready",
         "Fill the missing crates.io field in the crate's Cargo.toml (description, license, repository, readme…), and keep the `version` pins in [workspace.dependencies] equal to the workspace version.",
+    ),
+    (
+        "raw-sql",
+        "Express the query with the `autoxide_kernel::db` builder (`find`, `select`, `sub`, `group_by`); keep `db.sql` only where it is measured to be slow, with a recorded reason and a tenant-isolation test.",
     ),
     (
         "raw-statement",
@@ -130,6 +138,10 @@ const FIXES: &[(&str, &str)] = &[
     (
         "toolchain",
         "Change the Rust version in rust-toolchain.toml, `rust-version` in the root Cargo.toml, examples/external-module (channel and rust-version) and the Dockerfile `ARG RUST_VERSION` together.",
+    ),
+    (
+        "wrapped-libraries",
+        "Remove the dependency from the module's Cargo.toml and use the kernel layer instead (`autoxide_kernel::db` with `#[derive(Record)]` for queries; see docs/research/kernel-contract-1-0.md); a module not yet converted stays in xtask/library-baseline.txt until its cluster is converted.",
     ),
 ];
 
