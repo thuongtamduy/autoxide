@@ -548,6 +548,7 @@ dependencies = [
  "autoxide-kernel",
  "autoxide-media",
  "autoxide-organizations",
+ "autoxide-spike-macros",
  "autoxide-testkit",
  "axum",
  "base64 0.23.1",
