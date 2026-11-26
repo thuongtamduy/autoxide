@@ -158,6 +158,60 @@ These may change in any release, including patch releases where it fixes a bug:
 - Database tables, columns and indexes (see above), the order of items where the API does not
   promise one, and performance figures.
 
+## Building from source
+
+### Minimum supported Rust version (MSRV)
+
+The MSRV is the `rust-version` of the workspace `Cargo.toml` (today the release before the pinned toolchain in
+`rust-toolchain.toml`). Policy:
+
+- The repository builds and its library crates compile with the MSRV; CI has a job that builds the workspace with
+  exactly that version, so a newer language feature cannot slip in unnoticed.
+- The pinned toolchain (`rust-toolchain.toml`, used by developers, CI and the Docker image) is newer than the MSRV and
+  moves forward with stable Rust; the MSRV is raised only when a dependency or a feature needs it, never in a patch
+  release, and the raise is listed in the changelog.
+- Modules in other repositories need at least the MSRV. The external-module example uses the same `rust-version`
+  (checked by `cargo xtask check`).
+
+### Cargo features
+
+The default build has every feature a production server needs. These optional features exist:
+
+| Crate                | Feature            | What it does                                                        | In releases | Contract |
+| -------------------- | ------------------ | ------------------------------------------------------------------- | ----------- | -------- |
+| `autoxide`           | `avif`             | AVIF thumbnails (`AUTOXIDE_MEDIA_AVIF`); pulls the `rav1e` encoder   | Off         | Stable   |
+| `autoxide`           | `bench-seed`       | `task <module>.bench_seed` generates sample data for measurements    | Off         | None     |
+| `autoxide-kernel`    | `permission-audit` | Test-only: builds routes without the permission layer for audits     | Off         | None     |
+| module crates        | `testing`          | Test helpers a module shares with `autoxide-testkit`                 | Off         | None     |
+| module crates        | `bench-seed`, `avif` | Forwarded from the `autoxide` features above                       | Off         | As above |
+
+"None" means not part of the compatibility promise: never enable these in an application. Features are additive; a
+new feature never changes the default build.
+
+### Reproducible builds
+
+The release image is built so that the same source gives the same binary:
+
+- `Cargo.lock` is committed and every release build uses `--locked`; the toolchain is pinned (`rust-toolchain.toml`, the
+  Docker `RUST_VERSION`), and the base images are pinned by digest.
+- The Dockerfile builds in a fixed directory and passes `--remap-path-prefix` so no build path ends up in the binary,
+  and `SOURCE_DATE_EPOCH` (the commit time of the release) is used for every timestamp, including the release archives
+  (sorted, with fixed owner and modification time).
+- To check a release, rebuild from the tag with the same Dockerfile and compare the SHA-256 of
+  `/usr/local/bin/autoxide` in your image with the one in `SHA256SUMS`. Differences usually mean a different
+  base image digest or a different target architecture; [`docs/VERIFYING.md`](VERIFYING.md) shows how to verify
+  attestations too.
+
+### Software bill of materials (SBOM)
+
+Every release carries two lists of what is inside:
+
+- **Rust crates in the binary.** The binary is built with `cargo auditable`, which embeds the exact dependency list
+  in the executable. Tools such as `cargo audit bin autoxide`, Syft, Trivy or Grype read it, so a vulnerability scanner
+  sees the Rust crates even in a stripped binary.
+- **CycloneDX file.** `autoxide.cdx.json` (CycloneDX 1.5, generated from `Cargo.lock` by `cargo cyclonedx`) is attached to the
+  GitHub Release and attested; the image also carries an SPDX SBOM (`sbom.spdx.json`).
+
 ## Support
 
 Which releases get fixes, and for how long, is in [`SECURITY.md`](../SECURITY.md#supported-versions).

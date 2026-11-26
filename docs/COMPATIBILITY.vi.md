@@ -152,6 +152,58 @@ Những thứ sau có thể đổi ở bất kỳ bản nào, kể cả bản pa
 - Bảng, cột và index của database (xem trên), thứ tự phần tử ở chỗ API không hứa thứ tự, và số đo
   hiệu năng.
 
+## Build từ mã nguồn
+
+### Phiên bản Rust tối thiểu (MSRV)
+
+MSRV là `rust-version` trong `Cargo.toml` gốc của workspace (hiện là bản phát hành liền trước toolchain được ghim trong
+`rust-toolchain.toml`). Chính sách:
+
+- Repo build được và các crate thư viện biên dịch được với MSRV; CI có một job build workspace bằng đúng phiên bản đó,
+  nên một tính năng ngôn ngữ mới không lọt vào mà không ai biết.
+- Toolchain được ghim (`rust-toolchain.toml`, dùng bởi người phát triển, CI và image Docker) mới hơn MSRV và đi theo Rust
+  stable; MSRV chỉ được nâng khi một dependency hay một tính năng cần, không bao giờ trong bản patch, và việc nâng được
+  ghi trong changelog.
+- Module ở repo khác cần ít nhất MSRV. Ví dụ module ngoài dùng cùng `rust-version` (`cargo xtask check` kiểm).
+
+### Cargo feature
+
+Bản build mặc định có đủ mọi feature mà một máy chủ production cần. Các feature tuỳ chọn:
+
+| Crate                | Feature            | Làm gì                                                              | Trong bản phát hành | Hợp đồng |
+| -------------------- | ------------------ | ------------------------------------------------------------------- | ------------------- | -------- |
+| `autoxide`           | `avif`             | Ảnh thu nhỏ AVIF (`AUTOXIDE_MEDIA_AVIF`); kéo bộ mã hoá `rav1e`      | Tắt                 | Ổn định  |
+| `autoxide`           | `bench-seed`       | `task <module>.bench_seed` sinh dữ liệu mẫu để đo                    | Tắt                 | Không    |
+| `autoxide-kernel`    | `permission-audit` | Chỉ cho test: dựng route không có lớp permission để rà soát          | Tắt                 | Không    |
+| các crate module     | `testing`          | Đồ phụ trợ test module dùng chung với `autoxide-testkit`             | Tắt                 | Không    |
+| các crate module     | `bench-seed`, `avif` | Chuyển tiếp từ các feature của `autoxide` ở trên                   | Tắt                 | Như trên |
+
+"Không" nghĩa là nằm ngoài cam kết tương thích: không bao giờ bật trong ứng dụng. Feature chỉ cộng thêm; feature mới
+không bao giờ đổi bản build mặc định.
+
+### Build tái lập
+
+Image phát hành được build để cùng mã nguồn cho ra cùng binary:
+
+- `Cargo.lock` được commit và mọi bản build phát hành dùng `--locked`; toolchain được ghim (`rust-toolchain.toml`,
+  `RUST_VERSION` của Docker) và image nền ghim theo digest.
+- Dockerfile build trong một thư mục cố định và truyền `--remap-path-prefix` để không đường dẫn build nào lọt vào
+  binary; `SOURCE_DATE_EPOCH` (thời điểm commit của bản phát hành) dùng cho mọi mốc thời gian, kể cả file nén phát hành
+  (xếp theo tên, chủ sở hữu và thời gian sửa cố định).
+- Để kiểm một bản phát hành, build lại từ tag bằng cùng Dockerfile rồi so SHA-256 của `/usr/local/bin/autoxide` trong
+  image của bạn với giá trị trong `SHA256SUMS`. Khác nhau thường do digest image nền khác hay kiến trúc đích khác;
+  [`docs/VERIFYING.vi.md`](VERIFYING.vi.md) chỉ cách kiểm cả attestation.
+
+### Bảng kê vật liệu phần mềm (SBOM)
+
+Mỗi bản phát hành kèm hai danh sách những gì nằm bên trong:
+
+- **Crate Rust trong binary.** Binary được build bằng `cargo auditable`, công cụ nhúng đúng danh sách dependency vào file
+  thực thi. Các công cụ như `cargo audit bin autoxide`, Syft, Trivy hay Grype đọc được, nên máy quét lỗ hổng thấy các crate
+  Rust kể cả trong binary đã strip.
+- **File CycloneDX.** `autoxide.cdx.json` (CycloneDX 1.5, sinh từ `Cargo.lock` bằng `cargo cyclonedx`) được đính kèm
+  GitHub Release và có attestation; image còn mang một SBOM SPDX (`sbom.spdx.json`).
+
 ## Hỗ trợ
 
 Bản nào được vá, và trong bao lâu, ghi ở [`SECURITY.vi.md`](../SECURITY.vi.md#phiên-bản-được-vá).

@@ -158,13 +158,20 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      # Build tái lập (docs/COMPATIBILITY.md): mọi mốc thời gian của image và file nén lấy từ thời điểm commit của tag.
+      - name: SOURCE_DATE_EPOCH
+        run: echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)" >> "$GITHUB_ENV"
       - id: build
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        env:
+          SOURCE_DATE_EPOCH: ${{ env.SOURCE_DATE_EPOCH }}
         with:
           context: .
           platforms: ${{ matrix.platform }}
           labels: ${{ steps.meta.outputs.labels }}
-          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          build-args: |
+            SOURCE_DATE_EPOCH=${{ env.SOURCE_DATE_EPOCH }}
+          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true,rewrite-timestamp=true
           # Chứng thực của BuildKit nằm cùng image: SBOM và nguồn gốc build đầy đủ.
           sbom: true
           provenance: mode=max
@@ -199,7 +206,10 @@ jobs:
           docker rm "$container" >/dev/null
           cp LICENSE-MIT LICENSE-APACHE README.md "dist/$name/"
           file "dist/$name/autoxide"
-          tar -C dist --owner=0 --group=0 -czf "dist/$name.tar.gz" "$name"
+          # Cùng thư mục cho cùng byte: xếp theo tên, chủ sở hữu và mốc thời gian cố định, gzip không ghi tên/giờ.
+          touch -d "@$SOURCE_DATE_EPOCH" "dist/$name"/*
+          tar -C dist --sort=name --owner=0 --group=0 --numeric-owner --mtime="@$SOURCE_DATE_EPOCH" -cf - "$name" \
+            | gzip -n > "dist/$name.tar.gz"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: binary-${{ strategy.job-index }}
@@ -302,6 +312,16 @@ jobs:
           subject-digest: ${{ steps.index.outputs.digest }}
           sbom-path: dist/sbom.spdx.json
           push-to-registry: true
+      # Danh sách crate Rust (CycloneDX 1.5) sinh từ Cargo.lock cho đúng binary `autoxide`, ngoài danh sách nhúng trong
+      # binary bởi `cargo auditable` (Dockerfile). `cargo cyclonedx` sinh một file mỗi crate của workspace; lấy file của
+      # crate `autoxide` (mọi phụ thuộc của binary). Phiên bản công cụ ghim, `--locked`.
+      - name: Rust crates SBOM (CycloneDX)
+        run: |
+          rustup toolchain install
+          cargo install cargo-cyclonedx --locked --version 0.5.10
+          cargo cyclonedx --manifest-path crates/app/Cargo.toml --format json --spec-version 1.5 \
+            --override-filename autoxide.cdx
+          cp crates/app/autoxide.cdx.json dist/autoxide.cdx.json
       - name: Release notes from CHANGELOG.md
         env:
           TAG: ${{ github.ref_name }}
@@ -343,7 +363,7 @@ jobs:
       - name: Checksums of the release files
         working-directory: dist
         run: |
-          sha256sum -- *.tar.gz *.tgz sbom.spdx.json > SHA256SUMS
+          sha256sum -- *.tar.gz *.tgz sbom.spdx.json autoxide.cdx.json > SHA256SUMS
           cat SHA256SUMS
       - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
@@ -351,6 +371,7 @@ jobs:
             dist/*.tar.gz
             dist/*.tgz
             dist/sbom.spdx.json
+            dist/autoxide.cdx.json
       - name: Sign the checksums with cosign (keyless)
         working-directory: dist
         run: cosign sign-blob --yes --bundle SHA256SUMS.sigstore.json SHA256SUMS
@@ -365,6 +386,7 @@ jobs:
           sdk="$(ls autoxide-sdk-*.tgz)"
           files=(
             "sbom.spdx.json#SBOM (SPDX JSON) of the Docker image"
+            "autoxide.cdx.json#SBOM (CycloneDX JSON) of the Rust crates in the binary"
             "$sdk#TypeScript SDK (npm install <URL of this file>)"
             "SHA256SUMS#SHA-256 checksums of the release files"
             "SHA256SUMS.sigstore.json#Sigstore bundle: cosign signature of SHA256SUMS"

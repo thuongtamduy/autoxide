@@ -421,3 +421,50 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: scripts/check-dco.sh "$BASE_SHA" "$HEAD_SHA"
+
+  # MSRV (D-20261126-road-to-1-0, G8; docs/COMPATIBILITY.md, "Minimum supported Rust version"): biên dịch cả workspace
+  # bằng đúng `rust-version` của Cargo.toml — thấp hơn toolchain ghim — để một tính năng ngôn ngữ mới không lọt vào mà
+  # không ai biết. Chỉ `cargo check` (không test): MSRV là lời hứa "biên dịch được". Pull request không chạm Rust thì bỏ
+  # qua như phần nặng của gate (`scripts/rust-changed.sh`); push main và chạy tay luôn chạy.
+  msrv:
+    name: MSRV build (rust-version)
+    if: ${{ !github.event.repository.private }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      CARGO_INCREMENTAL: "0"
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Rust changed, and the MSRV
+        id: plan
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          if [ "$EVENT_NAME" = pull_request ]; then
+            run="$(scripts/rust-changed.sh "origin/$BASE_REF")"
+          else
+            run=true
+          fi
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+          echo "msrv=$(sed -n 's/^rust-version = "\(.*\)"/\1/p' Cargo.toml | head -n 1)" >> "$GITHUB_OUTPUT"
+      - name: Install the MSRV toolchain
+        if: steps.plan.outputs.run == 'true'
+        env:
+          MSRV: ${{ steps.plan.outputs.msrv }}
+        run: rustup toolchain install "$MSRV" --profile minimal
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        if: steps.plan.outputs.run == 'true'
+        with:
+          shared-key: msrv
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: cargo check with the MSRV
+        if: steps.plan.outputs.run == 'true'
+        env:
+          MSRV: ${{ steps.plan.outputs.msrv }}
+        # `+$MSRV` thắng `rust-toolchain.toml`. `--locked`: Cargo.lock không được đổi.
+        run: cargo "+$MSRV" check --workspace --locked

@@ -596,6 +596,11 @@ SQLite và PostgreSQL. Không bao giờ commit secret — chỉ `.env.example` �
 trong Git, `.env` thì không. [`CONTRIBUTING.vi.md`](CONTRIBUTING.vi.md) hướng dẫn chuẩn
 bị máy, những luật quan trọng nhất và cách gửi thay đổi.
 
+Mỗi commit có một dòng `Signed-off-by` ([DCO](DCO), `git commit -s`). Câu hỏi: [`SUPPORT.vi.md`](SUPPORT.vi.md). Quyết
+định được đưa ra thế nào và cách đề xuất thay đổi: [`GOVERNANCE.vi.md`](GOVERNANCE.vi.md). Dự án đang đi đâu (tiếng Anh):
+[`docs/ROADMAP.public.md`](docs/ROADMAP.public.md). Xây và đăng module của riêng bạn:
+[`docs/MODULE_ECOSYSTEM.vi.md`](docs/MODULE_ECOSYSTEM.vi.md). Dùng tên dự án: [`TRADEMARK.vi.md`](TRADEMARK.vi.md).
+
 ## Bảo mật
 
 Tìm thấy lỗ hổng? Đừng mở issue công khai: hãy báo riêng theo
