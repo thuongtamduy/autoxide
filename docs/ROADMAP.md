@@ -320,8 +320,8 @@ thật (P7).
         (`ip.to_string()`, nhiều dòng) lọt — cân nhắc kiểm theo kiểu (`IpAddr` vào `Throttle::hit`)
   - [ ] PT-7: trần chung 5× nới giới hạn đoán mã mỗi số mỗi ngày, và trần chung còn cho phép khoá chủ số từ nhiều
         client — cân nhắc trần chung thấp hơn, mã dài hơn, hay đếm theo người nhập mã (đổi `PhoneCodes::verify`)
-  - [ ] PT-13, PT-14: `x-permissions` khớp chỗ kiểm; kiểm permission trước validation / ETag / tra bản ghi; test quét
-        mọi operation bằng token không quyền (PR 2)
+  - [x] PT-13, PT-14: lớp kiểm permission chung của kernel đọc `x-permissions` (403 trước validation / ETag / tra bản
+        ghi), 18 `x-permissions` thiếu đã bổ sung, hai test e2e giữ (D-20261126-permission-gate)
   - [ ] PT-15, PT-16, PT-17, poll outbox: tìm công khai không làm nghẽn server, slug theo khoảng dùng index, tắt
         nhanh khi có tải trên Postgres, giảm câu SQL nền khi rảnh (PR 3)
   - [ ] PT-11, PT-12, PT-18 và chỗ vướng cho việc test (bộ mồi dữ liệu thương mại, tool MCP trỏ operationId REST,

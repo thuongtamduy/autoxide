@@ -53,7 +53,7 @@ pub(crate) struct PolicyRequest {
 #[utoipa::path(
     get,
     path = "/policies/{org_id}",
-    extensions(("x-permissions" = json!(["support.tickets.reply"]))),
+    extensions(("x-permissions" = json!(["support.tickets.reply", "support.settings.manage"]))),
     operation_id = "get_support_policy",
     security(("bearer" = [])),
     params(("org_id" = Uuid, Path, description = "The unit.")),

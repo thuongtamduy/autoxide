@@ -136,6 +136,8 @@ pub struct TestAppBuilder<'a> {
     domains: Vec<(String, String)>,
     /// Migrate on an empty database instead of copying the template database ([`TestAppBuilder::empty_database`]).
     empty_database: bool,
+    /// Build without the layer enforcing `x-permissions` ([`TestAppBuilder::without_permission_gate`]).
+    without_permission_gate: bool,
 }
 
 // `for<'c>`: hàm nhận `StartContext` với lifetime bất kỳ — lifetime thật chỉ biết lúc
@@ -158,6 +160,7 @@ impl TestApp {
             tenant_users: Vec::new(),
             domains: Vec::new(),
             empty_database: false,
+            without_permission_gate: false,
         }
     }
 
@@ -480,6 +483,14 @@ impl<'a> TestAppBuilder<'a> {
         self
     }
 
+    /// Builds the app WITHOUT the kernel layer that enforces each operation's `x-permissions`
+    /// (D-20261126-permission-gate): only for an audit that compares the documented permissions with what the
+    /// services themselves accept.
+    pub fn without_permission_gate(mut self) -> Self {
+        self.without_permission_gate = true;
+        self
+    }
+
     /// Reads configuration, runs every migration (copying the migrated template database when possible),
     /// starts the modules, assembles the router.
     pub async fn build(self) -> Result<TestApp, TestAppError> {
@@ -649,6 +660,9 @@ impl<'a> TestAppBuilder<'a> {
             .translations(modules.translations().clone());
         if let Some(registry) = modules.tenancy() {
             extras = extras.tenancy(registry);
+        }
+        if self.without_permission_gate {
+            extras = extras.without_permission_gate();
         }
         let root = http::health_routes(database.clone(), http::Draining::default());
         let api = http::build(&config.http, root, modules.routes(), extras);

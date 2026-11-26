@@ -130,7 +130,7 @@ impl Automations {
         use sea_orm::EntityTrait;
         let rule = crate::entity::rule::Entity::find_by_id(run.rule_id)
             .scoped(tenant)
-            .one(tenant.database().read())
+            .one(tenant.database().write())
             .await?;
         Ok(rule.map(|rule| rule.run_as))
     }

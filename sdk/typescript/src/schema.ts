@@ -12600,8 +12600,9 @@ export type Data_RunResponse = {
     resume_at?: string | null;
     rule_id: string;
     /**
-     * The version of the rule the run uses (changing the rule does not change runs already
-     * started).
+     * The version of the rule the run was started with. Editing the rule (even only its name) or
+     * enabling it again stops runs still in progress or waiting, with
+     * `automations.rule_changed`.
      */
     rule_version: number;
     /**
@@ -25470,8 +25471,9 @@ export type Page_RunResponse = {
     resume_at?: string | null;
     rule_id: string;
     /**
-     * The version of the rule the run uses (changing the rule does not change runs already
-     * started).
+     * The version of the rule the run was started with. Editing the rule (even only its name) or
+     * enabling it again stops runs still in progress or waiting, with
+     * `automations.rule_changed`.
      */
     rule_version: number;
     /**
@@ -29998,8 +30000,9 @@ export type RunResponse = {
   resume_at?: string | null;
   rule_id: string;
   /**
-   * The version of the rule the run uses (changing the rule does not change runs already
-   * started).
+   * The version of the rule the run was started with. Editing the rule (even only its name) or
+   * enabling it again stops runs still in progress or waiting, with
+   * `automations.rule_changed`.
    */
   rule_version: number;
   /**

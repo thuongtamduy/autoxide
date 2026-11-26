@@ -866,7 +866,7 @@ async fn create_receipt(
 #[utoipa::path(
     get,
     path = "/receipts/{id}",
-    extensions(("x-permissions" = json!(["inventory.receive"]))),
+    extensions(("x-permissions" = json!(["inventory.receive", "inventory.read"]))),
     operation_id = "get_inventory_receipt",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the receipt.")),

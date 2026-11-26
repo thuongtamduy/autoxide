@@ -184,7 +184,7 @@ impl From<DraftRequest> for Content {
 #[utoipa::path(
     get,
     path = "/templates/{kind}/{channel}/{locale}/draft",
-    extensions(("x-permissions" = json!(["notifications.templates.read"]))),
+    extensions(("x-permissions" = json!(["notifications.templates.read", "notifications.templates.manage"]))),
     operation_id = "get_notification_template_draft",
     security(("bearer" = [])),
     params(
@@ -322,7 +322,7 @@ pub(crate) fn describe_version(row: template_version::Model, live: Option<i32>) 
 #[utoipa::path(
     get,
     path = "/templates/{kind}/{channel}/{locale}/versions",
-    extensions(("x-permissions" = json!(["notifications.templates.read"]))),
+    extensions(("x-permissions" = json!(["notifications.templates.read", "notifications.templates.manage"]))),
     operation_id = "list_notification_template_versions",
     security(("bearer" = [])),
     params(
@@ -528,7 +528,7 @@ impl From<Preview> for PreviewResponse {
 #[utoipa::path(
     post,
     path = "/templates/{kind}/{channel}/{locale}/preview",
-    extensions(("x-permissions" = json!(["notifications.templates.read"]))),
+    extensions(("x-permissions" = json!(["notifications.templates.read", "notifications.templates.manage"]))),
     operation_id = "preview_notification_template",
     security(("bearer" = [])),
     params(
@@ -673,7 +673,7 @@ pub(crate) struct BrandingRequest {
 #[utoipa::path(
     get,
     path = "/branding",
-    extensions(("x-permissions" = json!(["notifications.templates.read"]))),
+    extensions(("x-permissions" = json!(["notifications.templates.read", "notifications.templates.manage", "notifications.branding.manage"]))),
     operation_id = "get_notification_branding",
     security(("bearer" = [])),
     responses(

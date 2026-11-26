@@ -16,6 +16,7 @@ async fn app(test: &TestDatabase, store: &str) -> TestApp {
         .tenant("b")
         .user_in("a", "owner-a", 1, &["kernel.settings.manage"])
         .user_in("b", "owner-b", 2, &["kernel.settings.manage"])
+        .user_in("a", "nobody-a", 3, &[])
         .build()
         .await
         .unwrap()
@@ -35,6 +36,28 @@ async fn moi_khach_mot_muc_rieng() {
             assert!(!limited.header("retry-after").is_empty(), "{store}");
             // Khách B vẫn chạy.
             assert_eq!(get("owner-b").await.unwrap().status(), StatusCode::OK, "{store}");
+        })
+        .await
+        .unwrap();
+    }
+}
+
+/// Lớp giới hạn theo khách nằm ngoài lớp permission (D-20261126-permission-gate) và chỉ có MỘT lớp: request bị 403
+/// vẫn trừ ngân sách của khách, mỗi request đúng một lần — mức 2 thì hai request bị 403, request thứ ba 429.
+#[tokio::test]
+async fn request_bi_tu_choi_tru_ngan_sach_mot_lan() {
+    for store in ["memory", "database"] {
+        TestDatabase::run(async |test| {
+            let app = app(test, store).await;
+            let get = || app.get("/api/v1/kernel/settings").token("nobody-a").send();
+            for _ in 0..2 {
+                let refused = get().await.unwrap();
+                assert_eq!(refused.status(), StatusCode::FORBIDDEN, "{store}");
+                assert_eq!(refused.json()["code"], "permission_denied", "{store}");
+            }
+            let limited = get().await.unwrap();
+            assert_eq!(limited.status(), StatusCode::TOO_MANY_REQUESTS, "{store}");
+            assert_eq!(limited.json()["code"], "tenant_rate_limited", "{store}");
         })
         .await
         .unwrap();
