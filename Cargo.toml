@@ -267,6 +267,7 @@ tokio-tungstenite = "0.29"
 # Property test cho bộ kiểm đầu vào (đặc tả 31 B3): sinh đầu vào ngẫu nhiên, thu gọn ca hỏng.
 # Bỏ `fork` / `timeout` (chạy mỗi ca trong tiến trình con): không cần.
 proptest = { version = "1.12", default-features = false, features = ["std"] }
+divan = { version = "0.1.21", default-features = false }
 
 # Bản build để dev và test chỉ giữ thông tin dòng code (đủ để backtrace và panic chỉ đúng file,
 # dòng), bỏ thông tin biến cho debugger: `target/` nhỏ đi và biên dịch, link nhanh hơn (D-172).
