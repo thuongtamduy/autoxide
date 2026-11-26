@@ -810,10 +810,10 @@ async fn token_quyen_o_nhanh_khac_khong_doi_tai_khoan_ngoai_nhanh() {
         let (app, services, _, admin_token) = setup(test).await;
         let tenant = &services.tenant;
         let root = autoxide_kernel::tenancy::root_of(tenant.id());
-        if let Ok(write) = services.database.begin_write().await {
-            if OrgTree::insert_root(&write, tenant.id()).await.is_ok() {
-                write.commit().await.unwrap();
-            }
+        if let Ok(write) = services.database.begin_write().await
+            && OrgTree::insert_root(&write, tenant.id()).await.is_ok()
+        {
+            write.commit().await.unwrap();
         }
         let (a, b) =
             (OrgId::from_uuid(uuid::Uuid::now_v7()), OrgId::from_uuid(uuid::Uuid::now_v7()));
