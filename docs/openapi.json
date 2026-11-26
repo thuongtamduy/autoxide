@@ -32310,7 +32310,7 @@
                 "type": "string"
               },
               "localhost_redirect": {
-                "description": "Every registered redirect points to this device (`localhost`): another program on the device could\npretend to be this client. Warn the person.",
+                "description": "The redirect points to this device (`localhost`, a loopback address): another program on the device could\npretend to be this client. Warn the person.",
                 "type": "boolean"
               },
               "permissions": {
@@ -57655,6 +57655,24 @@
         ],
         "type": "object"
       },
+      "OAuthErrorResponse": {
+        "description": "Error answer of the OAuth endpoints (RFC 6749 §5.2, RFC 7591 §3.2.2).",
+        "properties": {
+          "error": {
+            "description": "Machine-readable error, e.g. `invalid_grant`, `invalid_request`, `invalid_client_metadata`.",
+            "type": "string"
+          },
+          "error_description": {
+            "description": "What went wrong, for the developer.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "error",
+          "error_description"
+        ],
+        "type": "object"
+      },
       "OAuthGrant": {
         "description": "A person's approval of an MCP client.",
         "properties": {
@@ -57792,7 +57810,7 @@
             "type": "string"
           },
           "localhost_redirect": {
-            "description": "Every registered redirect points to this device (`localhost`): another program on the device could\npretend to be this client. Warn the person.",
+            "description": "The redirect points to this device (`localhost`, a loopback address): another program on the device could\npretend to be this client. Warn the person.",
             "type": "boolean"
           },
           "permissions": {
@@ -115634,12 +115652,33 @@
             }
           },
           "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthErrorResponse"
+                }
+              }
+            },
             "description": "RFC 7591 error: `invalid_redirect_uri`, `invalid_client_metadata`."
           },
           "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthErrorResponse"
+                }
+              }
+            },
             "description": "OAuth sign-in or dynamic registration is off on this server."
           },
           "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthErrorResponse"
+                }
+              }
+            },
             "description": "Too many registrations from this address (`slow_down`)."
           },
           "default": {
@@ -116012,6 +116051,13 @@
             "description": "Revoked (or nothing to revoke)."
           },
           "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthErrorResponse"
+                }
+              }
+            },
             "description": "RFC 6749 error: `invalid_request` (no `token`)."
           },
           "default": {
@@ -116072,9 +116118,23 @@
             "description": "The new access token and refresh token."
           },
           "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthErrorResponse"
+                }
+              }
+            },
             "description": "RFC 6749 error: `invalid_request`, `invalid_grant` (code or refresh token unknown, expired, used; PKCE mismatch), `invalid_target`, `unsupported_grant_type`."
           },
           "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthErrorResponse"
+                }
+              }
+            },
             "description": "OAuth sign-in is off on this server (`invalid_request`)."
           },
           "default": {

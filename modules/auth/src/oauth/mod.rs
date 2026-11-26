@@ -283,13 +283,24 @@ impl From<sea_orm::DbErr> for OAuthError {
     }
 }
 
+/// Error answer of the OAuth endpoints (RFC 6749 §5.2, RFC 7591 §3.2.2).
+#[derive(Debug, serde::Serialize, utoipa::ToSchema)]
+#[schema(as = OAuthErrorResponse)]
+pub(crate) struct ErrorBody {
+    /// Machine-readable error, e.g. `invalid_grant`, `invalid_request`, `invalid_client_metadata`.
+    pub error: &'static str,
+    /// What went wrong, for the developer.
+    pub error_description: String,
+}
+
 impl IntoResponse for OAuthError {
     fn into_response(self) -> Response {
-        let body = json!({"error": self.error, "error_description": self.description});
-        let mut response = (self.status, axum::Json(body)).into_response();
+        let body = ErrorBody { error: self.error, error_description: self.description };
+        let status = self.status;
+        let mut response = (status, axum::Json(body)).into_response();
         let headers = response.headers_mut();
         headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
-        if self.status == StatusCode::UNAUTHORIZED {
+        if status == StatusCode::UNAUTHORIZED {
             headers.insert(
                 header::WWW_AUTHENTICATE,
                 HeaderValue::from_static("Basic realm=\"oauth\""),
@@ -304,10 +315,15 @@ impl IntoResponse for OAuthError {
 /// Người duyệt / quản lý grant phải là phiên đăng nhập của người làm nhân sự (không API key, không token OAuth).
 pub(crate) fn require_person(principal: &Principal) -> Result<(), Error> {
     crate::access::require_session(principal)?;
-    if principal.realm() == autoxide_kernel::access::Realm::Customer {
+    // Cho phép client làm thay mình là việc của chính người đó, trong khách của mình: không qua uỷ quyền, hỗ trợ hay
+    // nhân sự nền tảng vào khách khác.
+    if principal.realm() == autoxide_kernel::access::Realm::Customer
+        || principal.operator_from().is_some()
+        || !matches!(principal.access(), autoxide_kernel::access::AccessPath::Direct)
+    {
         return Err(Error::forbidden(
             "auth.oauth_staff_only",
-            "Only staff accounts can connect MCP clients.",
+            "Only staff working directly in their own tenant can connect MCP clients.",
         ));
     }
     Ok(())

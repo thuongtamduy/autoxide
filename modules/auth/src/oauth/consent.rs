@@ -37,6 +37,8 @@ const CODE_SECONDS: i64 = 60;
 pub(crate) const CODE_PREFIX: &str = "axc1_";
 /// Yêu cầu `/authorize` mỗi địa chỉ mỗi phút: endpoint chưa xác thực, có ghi database và có thể tải tài liệu ngoài.
 const AUTHORIZE_PER_MINUTE: u32 = 30;
+/// Độ dài tối đa của `client_id` và `redirect_uri` (cột lưu chúng là 2048 ký tự).
+pub(crate) const MAX_URI: usize = 2048;
 
 /// Query của `/authorize` (OAuth 2.1 §4.1.1, RFC 8707, MCP 2026-07-28).
 #[derive(Debug, Default, Deserialize, IntoParams)]
@@ -67,7 +69,6 @@ struct Pending {
     client_id: String,
     client_name: String,
     registration: String,
-    redirect_uris: Vec<String>,
     redirect_uri: String,
     code_challenge: String,
     resource: String,
@@ -107,7 +108,7 @@ pub(crate) struct RequestView {
     pub redirect_uri: String,
     /// Host of `redirect_uri`; always show it.
     pub redirect_host: String,
-    /// Every registered redirect points to this device (`localhost`): another program on the device could
+    /// The redirect points to this device (`localhost`, a loopback address): another program on the device could
     /// pretend to be this client. Warn the person.
     pub localhost_redirect: bool,
     /// The resource the client will use the access for.
@@ -207,12 +208,15 @@ impl OAuthService {
             }
         };
         let state = query.state.clone();
-        let fail = |error: &str, description: &str| {
-            Ok(self.answer(
-                &redirect_uri,
-                &[("error", error), ("error_description", description)],
-                state.as_deref(),
-            ))
+        // Client tự đăng ký (động hay tài liệu metadata) chọn `redirect_uri` của chính nó: chuyển hướng lỗi về đó biến
+        // máy chủ thành bộ chuyển hướng mở (RFC 9700 §4.11.2). Mọi lỗi tham số trả 400 ở đây.
+        let fail = |error: &str, description: &str| -> Result<String, Error> {
+            Err(Error::bad_request(
+                "auth.oauth_request_invalid",
+                "The authorization request is not valid (`{error}`): {detail}",
+            )
+            .with_param("error", error)
+            .with_param("detail", description))
         };
         if query.response_type.as_deref() != Some("code") {
             return fail("unsupported_response_type", "response_type must be `code`.");
@@ -241,7 +245,6 @@ impl OAuthService {
             client_id: registered.client_id,
             client_name: registered.name,
             registration: registered.registration.to_owned(),
-            redirect_uris: registered.redirect_uris,
             redirect_uri,
             code_challenge: challenge,
             resource,
@@ -358,7 +361,7 @@ impl OAuthService {
             client_name: pending.client_name.clone(),
             registration: pending.registration.clone(),
             redirect_host: host_of(&pending.redirect_uri),
-            localhost_redirect: localhost_only(&pending.redirect_uris),
+            localhost_redirect: localhost_only(std::slice::from_ref(&pending.redirect_uri)),
             redirect_uri: pending.redirect_uri.clone(),
             resource: pending.resource.clone(),
             requested_scope: pending.scope.clone(),

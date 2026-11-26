@@ -38,6 +38,9 @@ const MAX_CACHED: usize = 1000;
 /// Số lần tải đồng thời: `/authorize` chưa xác thực mà gọi ra ngoài, nên có trần.
 const MAX_FETCHES: usize = 8;
 const NAME_MAX: usize = 200;
+/// Số lần tải tài liệu từ một host mỗi phút.
+const FETCHES_PER_HOST: u32 = 20;
+const HOST_WINDOW: Duration = Duration::from_secs(60);
 const MAX_REDIRECTS: usize = 10;
 
 /// Một client đã nhận diện.
@@ -68,7 +71,9 @@ impl RegisteredClient {
 /// `http://127.0.0.1:1234/cb` → `http://127.0.0.1/cb` (chỉ với địa chỉ loopback qua `http`).
 fn without_loopback_port(uri: &str) -> Option<String> {
     let url = Url::parse(uri).ok()?;
-    if url.scheme() != "http" || !is_loopback(&url) {
+    // Chỉ địa chỉ IP loopback được linh hoạt cổng; tên `localhost` thì không (RFC 8252 §7.3, §8.3).
+    let literal = url.host_str().is_some_and(|host| host.eq_ignore_ascii_case("localhost"));
+    if url.scheme() != "http" || literal || !is_loopback(&url) {
         return None;
     }
     let mut url = url;
@@ -143,6 +148,8 @@ pub(crate) struct ClientDirectory {
     issuer: String,
     cache: Mutex<HashMap<String, (Cached, Instant)>>,
     fetches: Semaphore,
+    /// Số lần tải theo host trong phút hiện tại: một host không bị dùng làm đích dội request.
+    hosts: Mutex<HashMap<String, (u32, Instant)>>,
 }
 
 impl ClientDirectory {
@@ -167,6 +174,7 @@ impl ClientDirectory {
             issuer,
             cache: Mutex::new(HashMap::new()),
             fetches: Semaphore::new(MAX_FETCHES),
+            hosts: Mutex::new(HashMap::new()),
         })
     }
 
@@ -207,6 +215,13 @@ impl ClientDirectory {
         if let Some(cached) = self.cached(client_id) {
             return cached;
         }
+        if !self.host_allows(url.host_str().unwrap_or_default()) {
+            return Err(OAuthError::new(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "temporarily_unavailable",
+                "Too many client metadata fetches for this host; retry in a minute.",
+            ));
+        }
         let Ok(_permit) = self.fetches.try_acquire() else {
             return Err(OAuthError::new(
                 StatusCode::SERVICE_UNAVAILABLE,
@@ -221,6 +236,21 @@ impl ClientDirectory {
         };
         self.remember(client_id, entry, ttl);
         outcome.map(|(client, _)| client).map_err(OAuthError::invalid_client)
+    }
+
+    /// Còn được tải từ `host` trong phút này không (đếm luôn lần này).
+    fn host_allows(&self, host: &str) -> bool {
+        let Ok(mut hosts) = self.hosts.lock() else { return false };
+        let now = Instant::now();
+        if hosts.len() >= MAX_CACHED {
+            hosts.retain(|_, (_, since)| now.duration_since(*since) < HOST_WINDOW);
+        }
+        let entry = hosts.entry(host.to_ascii_lowercase()).or_insert((0, now));
+        if now.duration_since(entry.1) >= HOST_WINDOW {
+            *entry = (0, now);
+        }
+        entry.0 += 1;
+        entry.0 <= FETCHES_PER_HOST
     }
 
     fn cached(&self, client_id: &str) -> Option<Result<RegisteredClient, OAuthError>> {
@@ -254,7 +284,25 @@ impl ClientDirectory {
     /// không trùng issuer.
     fn check_client_id(&self, client_id: &str) -> Result<Url, OAuthError> {
         let invalid = |why: &str| OAuthError::invalid_client(format!("The client_id URL {why}."));
+        if client_id.len() > super::consent::MAX_URI {
+            return Err(invalid("is longer than 2048 characters"));
+        }
         let url = Url::parse(client_id).map_err(|_| invalid("is not a valid URL"))?;
+        // So `client_id` bằng chuỗi (CIMD -03 §3): scheme và host viết thường, để một client không có hai khoá cache.
+        let authority = client_id
+            .split_once("://")
+            .map_or("", |(_, rest)| rest.split('/').next().unwrap_or_default());
+        if client_id
+            .split_once("://")
+            .is_some_and(|(scheme, _)| scheme != scheme.to_ascii_lowercase())
+            || authority != authority.to_ascii_lowercase()
+        {
+            return Err(invalid("must use a lowercase scheme and host"));
+        }
+        // Chỉ cổng 443 (mặc định của https): không quét cổng khác của máy chủ ngoài.
+        if !self.allow_private_networks && url.port().is_some_and(|port| port != 443) {
+            return Err(invalid("must use the default https port"));
+        }
         match url.scheme() {
             "https" => {}
             "http" if self.allow_private_networks => {}
@@ -389,6 +437,9 @@ fn checked_redirects(redirect_uris: Vec<String>) -> Result<Vec<String>, String> 
         return Err(format!("The client must list 1 to {MAX_REDIRECTS} redirect_uris."));
     }
     for uri in &redirect_uris {
+        if uri.len() > super::consent::MAX_URI {
+            return Err("every redirect_uri must be at most 2048 characters".to_owned());
+        }
         if let Some(problem) = redirect_problem(uri) {
             return Err(format!("redirect_uri `{uri}` {problem}."));
         }
@@ -576,6 +627,13 @@ mod tests {
         assert!(!client.allows_redirect("https://c.example:8443/cb"));
         assert!(!client.allows_redirect("https://c.example/cb/other"));
         assert!(!client.allows_redirect("http://127.0.0.1:1/other"));
+        // `localhost` không được linh hoạt cổng (RFC 8252 §8.3).
+        let named = RegisteredClient {
+            redirect_uris: vec!["http://localhost/cb".to_owned()],
+            ..client.clone()
+        };
+        assert!(!named.allows_redirect("http://localhost:5555/cb"));
+        assert!(named.allows_redirect("http://localhost/cb"));
         assert!(localhost_only(&["http://localhost:1/cb".to_owned()]));
         assert!(!localhost_only(&client.redirect_uris));
     }
@@ -594,6 +652,9 @@ mod tests {
             "https://client.example/a/../c.json",
             "https://127.0.0.1/c.json",
             "https://10.0.0.1/c.json",
+            "HTTPS://client.example/c.json",
+            "https://Client.example/c.json",
+            "https://client.example:8443/c.json",
         ] {
             assert!(directory.check_client_id(bad).is_err(), "{bad}");
         }

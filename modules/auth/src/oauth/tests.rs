@@ -21,6 +21,8 @@ async fn oauth_app(test: &TestDatabase) -> (TestApp, String) {
         builder
             .setting("AUTOXIDE_HTTP_PUBLIC_URL", PUBLIC)
             .setting("AUTOXIDE_AUTH_OAUTH_CONSENT_URL", CONSENT)
+            // Máy chủ tài liệu metadata của client trong test chạy ở 127.0.0.1.
+            .setting("AUTOXIDE_AUTH_OAUTH_ALLOW_PRIVATE_NETWORKS", "true")
     })
     .await;
     let boss = NewUser {
@@ -183,7 +185,7 @@ async fn luong_day_du_tu_dang_ky_toi_goi_mcp_va_thu_hoi() {
             (StatusCode::UNAUTHORIZED, Some("oauth_token_audience"))
         );
 
-        // Xoay refresh token; gửi lại token liền trước ngay sau đó: chỉ bị từ chối, grant còn sống.
+        // Xoay refresh token; gửi lại token đã dùng: thu hồi cả grant, không ân hạn (RFC 9700 §4.14.2).
         let refresh = tokens["refresh_token"].as_str().unwrap().to_owned();
         let refreshing = [
             ("grant_type", "refresh_token"),
@@ -193,20 +195,31 @@ async fn luong_day_du_tu_dang_ky_toi_goi_mcp_va_thu_hoi() {
         let (status, renewed) = form(&app, "/oauth/token", &refreshing).await;
         assert_eq!(status, StatusCode::OK, "{renewed}");
         assert_ne!(renewed["refresh_token"], tokens["refresh_token"]);
-        let (status, _) = form(&app, "/oauth/token", &refreshing).await;
-        assert_eq!(status, StatusCode::BAD_REQUEST);
         let renewed_access = renewed["access_token"].as_str().unwrap().to_owned();
         assert_eq!(mcp_status(&app, &renewed_access).await, StatusCode::OK);
-
-        // Mã dùng lại: thu hồi cả grant, mọi token của nó ngừng ngay.
-        let (status, _) = exchange(&app, &client_id, &code, VERIFIER).await;
+        let (status, _) = form(&app, "/oauth/token", &refreshing).await;
         assert_eq!(status, StatusCode::BAD_REQUEST);
         assert_eq!(mcp_status(&app, &renewed_access).await, StatusCode::UNAUTHORIZED);
+        let next = [
+            ("grant_type", "refresh_token"),
+            ("refresh_token", renewed["refresh_token"].as_str().unwrap()),
+            ("client_id", client_id.as_str()),
+        ];
+        assert_eq!(form(&app, "/oauth/token", &next).await.0, StatusCode::BAD_REQUEST);
+
+        // Mã dùng lại: thu hồi cả grant, mọi token của nó ngừng ngay.
+        let (client_id, code) = approved_code(&app, &session, &["notes.write"]).await;
+        let (_, tokens) = exchange(&app, &client_id, &code, VERIFIER).await;
+        let access = tokens["access_token"].as_str().unwrap().to_owned();
+        assert_eq!(mcp_status(&app, &access).await, StatusCode::OK);
+        let (status, _) = exchange(&app, &client_id, &code, VERIFIER).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(mcp_status(&app, &access).await, StatusCode::UNAUTHORIZED);
 
         let (status, _, grants) = call(&app, "GET", "/me/oauth-grants", Some(&session), None).await;
         assert_eq!(status, StatusCode::OK, "{grants}");
         let list = grants["data"].as_array().unwrap();
-        assert_eq!(list.len(), 2);
+        assert_eq!(list.len(), 3);
         assert!(list.iter().all(|grant| grant["client_host"].is_string()));
     })
     .await
@@ -238,17 +251,18 @@ async fn nguoi_dung_thu_hoi_grant_va_redirect_la_khong_chuyen_huong() {
         );
         let answer = app.get(&authorize).unchecked().send().await.unwrap();
         assert_eq!(answer.status(), StatusCode::BAD_REQUEST);
-        // Thiếu PKCE: chuyển hướng về client với lỗi, kèm `iss`.
+        // Thiếu PKCE: 400 tại chỗ, không chuyển hướng lỗi về client tự đăng ký (RFC 9700 §4.11.2).
         let authorize = format!(
             "/api/v1/auth/oauth/authorize?response_type=code&client_id={client_id}&redirect_uri={}&state=s",
             encode(REDIRECT),
         );
         let answer = app.get(&authorize).send().await.unwrap();
-        assert_eq!(answer.status(), StatusCode::FOUND);
-        let query = query_of(answer.header(header::LOCATION));
-        assert_eq!(query["error"], "invalid_request");
-        assert_eq!(query["iss"], PUBLIC);
-        assert_eq!(query["state"], "s");
+        assert_eq!(answer.status(), StatusCode::BAD_REQUEST);
+        assert_eq!(answer.json()["code"], "auth.oauth_request_invalid");
+        // `client_id` quá dài: 400.
+        let long = format!("https://client.example/{}", "a".repeat(2100));
+        let authorize = format!("/api/v1/auth/oauth/authorize?client_id={}", encode(&long));
+        assert_eq!(app.get(&authorize).send().await.unwrap().status(), StatusCode::BAD_REQUEST);
     })
     .await
     .unwrap();
@@ -270,6 +284,185 @@ async fn hai_lan_doi_cung_refresh_token_dong_thoi_chi_mot_lan_thang() {
             tokio::join!(form(&app, "/oauth/token", &pairs), form(&app, "/oauth/token", &pairs));
         let wins = [first.0, second.0].iter().filter(|status| **status == StatusCode::OK).count();
         assert_eq!(wins, 1, "{first:?} {second:?}");
+        // Lượt thua là "dùng lại" (không phân biệt được với kẻ trộm): grant bị thu hồi, token của lượt thắng cũng ngừng.
+        let won = if first.0 == StatusCode::OK { first.1 } else { second.1 };
+        let access = won["access_token"].as_str().unwrap();
+        assert_eq!(mcp_status(&app, access).await, StatusCode::UNAUTHORIZED);
+    })
+    .await
+    .unwrap();
+}
+
+/// Mở `/authorize` cho `client_id`, trả token của yêu cầu đang chờ.
+async fn request_token(app: &TestApp, client_id: &str, redirect: &str) -> String {
+    let authorize = format!(
+        "/api/v1/auth/oauth/authorize?response_type=code&client_id={}&redirect_uri={}&code_challenge={CHALLENGE}\
+         &code_challenge_method=S256",
+        encode(client_id),
+        encode(redirect),
+    );
+    let answer = app.get(&authorize).send().await.unwrap();
+    assert_eq!(answer.status(), StatusCode::FOUND, "{}", answer.text());
+    query_of(answer.header(header::LOCATION))["request"].clone()
+}
+
+#[tokio::test]
+async fn duyet_quyen_nhay_cam_can_xac_nhan_lai_va_chi_quyen_duoc_moi() {
+    TestDatabase::run(async |test| {
+        let (app, session) = oauth_app(test).await;
+        let registration = json!({"redirect_uris": [REDIRECT], "client_name": "Test client"});
+        let (_, _, client) = call(&app, "POST", "/oauth/register", None, Some(registration)).await;
+        let client_id = client["client_id"].as_str().unwrap().to_owned();
+        let token = request_token(&app, &client_id, REDIRECT).await;
+        let approve = format!("/oauth/requests/{token}/approve");
+        // Permission phá huỷ (`auth.oauth_grants.manage`) cần `reauth_token`; tên lạ không được mời.
+        let decision = json!({"permissions": ["auth.oauth_grants.manage", "nope.read"]});
+        let (status, _, problem) =
+            call(&app, "POST", &approve, Some(&session), Some(decision)).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{problem}");
+        let codes: Vec<&str> = problem["errors"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|error| error["code"].as_str())
+            .collect();
+        assert!(codes.contains(&"not_offered") && codes.contains(&"required"), "{problem}");
+        // Yêu cầu vẫn chờ (lỗi đầu vào không đốt nó).
+        let (status, _, _) =
+            call(&app, "GET", &format!("/oauth/requests/{token}"), Some(&session), None).await;
+        assert_eq!(status, StatusCode::OK);
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn api_key_va_token_oauth_khong_goi_duoc_api_consent() {
+    TestDatabase::run(async |test| {
+        let (app, session) = oauth_app(test).await;
+        let body =
+            json!({"name": "robot", "current_password": PASSWORD, "permissions": ["notes.write"]});
+        let (status, _, created) =
+            call(&app, "POST", "/api-keys", Some(&session), Some(body)).await;
+        assert_eq!(status, StatusCode::CREATED, "{created}");
+        let key = format!("Bearer {}", created["data"]["key"].as_str().unwrap());
+        let registration = json!({"redirect_uris": [REDIRECT], "client_name": "Test client"});
+        let (_, _, client) = call(&app, "POST", "/oauth/register", None, Some(registration)).await;
+        let client_id = client["client_id"].as_str().unwrap().to_owned();
+        let token = request_token(&app, &client_id, REDIRECT).await;
+        let (status, _, problem) =
+            call(&app, "GET", &format!("/oauth/requests/{token}"), Some(&key), None).await;
+        assert_eq!(
+            (status, problem["code"].as_str()),
+            (StatusCode::FORBIDDEN, Some("auth.session_required"))
+        );
+        let decision = json!({"permissions": ["notes.write"]});
+        let (status, _, _) = call(
+            &app,
+            "POST",
+            &format!("/oauth/requests/{token}/approve"),
+            Some(&key),
+            Some(decision),
+        )
+        .await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+        // Token OAuth (cấp cho `/mcp`) không tới được REST của consent.
+        let (client_id, code) = approved_code(&app, &session, &["notes.write"]).await;
+        let (_, tokens) = exchange(&app, &client_id, &code, VERIFIER).await;
+        let oauth = format!("Bearer {}", tokens["access_token"].as_str().unwrap());
+        let (status, _, _) = call(&app, "GET", "/me/oauth-grants", Some(&oauth), None).await;
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn dang_xuat_khap_noi_thu_hoi_grant_va_token_sai_khach_bi_tu_choi() {
+    TestDatabase::run(async |test| {
+        let (app, session) = oauth_app(test).await;
+        let (client_id, code) = approved_code(&app, &session, &["notes.write"]).await;
+        let (_, tokens) = exchange(&app, &client_id, &code, VERIFIER).await;
+        let access = tokens["access_token"].as_str().unwrap().to_owned();
+        assert_eq!(mcp_status(&app, &access).await, StatusCode::OK);
+        // Đổi ID khách trong token: không khớp băm, không lộ khách nào tồn tại.
+        let forged = format!("axo1_{}{}", uuid::Uuid::now_v7().simple(), &access[37..]);
+        assert_eq!(mcp_status(&app, &forged).await, StatusCode::UNAUTHORIZED);
+        let (status, _, _) = call(&app, "DELETE", "/me/sessions", Some(&session), None).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(mcp_status(&app, &access).await, StatusCode::UNAUTHORIZED);
+        // Đăng ký động: `redirect_uri` http tới máy khác bị từ chối.
+        let registration = json!({"redirect_uris": ["http://evil.example/cb"]});
+        let (status, _, error) =
+            call(&app, "POST", "/oauth/register", None, Some(registration)).await;
+        assert_eq!(
+            (status, error["error"].as_str()),
+            (StatusCode::BAD_REQUEST, Some("invalid_redirect_uri"))
+        );
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn client_nhan_dien_bang_tai_lieu_metadata() {
+    TestDatabase::run(async |test| {
+        let (app, session) = oauth_app(test).await;
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let client_id =
+            format!("http://127.0.0.1:{}/client.json", listener.local_addr().unwrap().port());
+        let document = json!({
+            "client_id": client_id,
+            "client_name": "Metadata client",
+            "redirect_uris": [REDIRECT],
+            "token_endpoint_auth_method": "none",
+        });
+        // Máy chủ tài liệu tối giản: trả cùng một tài liệu JSON cho mọi request.
+        let body = document.to_string();
+        let server = tokio::spawn(async move {
+            use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
+            while let Ok((mut stream, _)) = listener.accept().await {
+                let mut buffer = [0u8; 4096];
+                let _ = stream.read(&mut buffer).await;
+                let answer = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                    body.len()
+                );
+                let _ = stream.write_all(answer.as_bytes()).await;
+            }
+        });
+        let token = request_token(&app, &client_id, "http://127.0.0.1:40000/cb").await;
+        let (status, _, request) =
+            call(&app, "GET", &format!("/oauth/requests/{token}"), Some(&session), None).await;
+        assert_eq!(status, StatusCode::OK, "{request}");
+        assert_eq!(request["data"]["registration"], "cimd");
+        assert_eq!(request["data"]["client_name"], "Metadata client");
+        assert_eq!(request["data"]["client_host"], "127.0.0.1");
+        let decision = json!({"permissions": ["notes.write"]});
+        let (status, _, approved) = call(
+            &app,
+            "POST",
+            &format!("/oauth/requests/{token}/approve"),
+            Some(&session),
+            Some(decision),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{approved}");
+        let code = query_of(approved["data"]["redirect_to"].as_str().unwrap())["code"].clone();
+        let (status, tokens) = form(
+            &app,
+            "/oauth/token",
+            &[
+                ("grant_type", "authorization_code"),
+                ("code", &code),
+                ("code_verifier", VERIFIER),
+                ("client_id", &client_id),
+                ("redirect_uri", "http://127.0.0.1:40000/cb"),
+            ],
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{tokens}");
+        server.abort();
     })
     .await
     .unwrap();

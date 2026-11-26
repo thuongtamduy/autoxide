@@ -10760,7 +10760,7 @@ export type Data_OAuthRequest = {
     /** Until when the request waits. */
     expires_at: string;
     /**
-     * Every registered redirect points to this device (`localhost`): another program on the device could
+     * The redirect points to this device (`localhost`, a loopback address): another program on the device could
      * pretend to be this client. Warn the person.
      */
     localhost_redirect: boolean;
@@ -19182,6 +19182,14 @@ export type OAuthDecisionResult = {
   redirect_to: string;
 };
 
+/** Error answer of the OAuth endpoints (RFC 6749 §5.2, RFC 7591 §3.2.2). */
+export type OAuthErrorResponse = {
+  /** Machine-readable error, e.g. `invalid_grant`, `invalid_request`, `invalid_client_metadata`. */
+  error: string;
+  /** What went wrong, for the developer. */
+  error_description: string;
+};
+
 /** A person's approval of an MCP client. */
 export type OAuthGrant = {
   /** Host of `client_id`. */
@@ -19235,7 +19243,7 @@ export type OAuthRequest = {
   /** Until when the request waits. */
   expires_at: string;
   /**
-   * Every registered redirect points to this device (`localhost`): another program on the device could
+   * The redirect points to this device (`localhost`, a loopback address): another program on the device could
    * pretend to be this client. Warn the person.
    */
   localhost_redirect: boolean;
@@ -35379,9 +35387,9 @@ export interface paths {
       requestBody: OAuthClientRegistration;
       responses: {
         201: OAuthClientRegistered;
-        400: void;
-        404: void;
-        429: void;
+        400: OAuthErrorResponse;
+        404: OAuthErrorResponse;
+        429: OAuthErrorResponse;
         default: Problem;
       };
     };
@@ -35434,7 +35442,7 @@ export interface paths {
       requestBody: string;
       responses: {
         200: void;
-        400: void;
+        400: OAuthErrorResponse;
         default: Problem;
       };
     };
@@ -35446,8 +35454,8 @@ export interface paths {
       requestBody: string;
       responses: {
         200: OAuthTokenResponse;
-        400: void;
-        404: void;
+        400: OAuthErrorResponse;
+        404: OAuthErrorResponse;
         default: Problem;
       };
     };

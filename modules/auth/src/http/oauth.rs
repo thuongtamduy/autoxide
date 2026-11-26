@@ -98,8 +98,8 @@ async fn authorize(
     request_body(content = TokenForm, content_type = "application/x-www-form-urlencoded"),
     responses(
         (status = 200, description = "The new access token and refresh token.", body = TokenResponse),
-        (status = 400, description = "RFC 6749 error: `invalid_request`, `invalid_grant` (code or refresh token unknown, expired, used; PKCE mismatch), `invalid_target`, `unsupported_grant_type`."),
-        (status = 404, description = "OAuth sign-in is off on this server (`invalid_request`)."),
+        (status = 400, description = "RFC 6749 error: `invalid_request`, `invalid_grant` (code or refresh token unknown, expired, used; PKCE mismatch), `invalid_target`, `unsupported_grant_type`.", body = crate::oauth::ErrorBody),
+        (status = 404, description = "OAuth sign-in is off on this server (`invalid_request`).", body = crate::oauth::ErrorBody),
     )
 )]
 async fn token(State(state): State<Arc<HttpState>>, body: Bytes) -> Response {
@@ -131,7 +131,7 @@ async fn token(State(state): State<Arc<HttpState>>, body: Bytes) -> Response {
     request_body(content = RevokeForm, content_type = "application/x-www-form-urlencoded"),
     responses(
         (status = 200, description = "Revoked (or nothing to revoke)."),
-        (status = 400, description = "RFC 6749 error: `invalid_request` (no `token`)."),
+        (status = 400, description = "RFC 6749 error: `invalid_request` (no `token`).", body = crate::oauth::ErrorBody),
     )
 )]
 async fn revoke(State(state): State<Arc<HttpState>>, body: Bytes) -> Response {
@@ -161,9 +161,9 @@ async fn revoke(State(state): State<Arc<HttpState>>, body: Bytes) -> Response {
     request_body = Registration,
     responses(
         (status = 201, description = "The registered client; use `client_id` in the authorization request.", body = RegistrationResponse),
-        (status = 400, description = "RFC 7591 error: `invalid_redirect_uri`, `invalid_client_metadata`."),
-        (status = 404, description = "OAuth sign-in or dynamic registration is off on this server."),
-        (status = 429, description = "Too many registrations from this address (`slow_down`)."),
+        (status = 400, description = "RFC 7591 error: `invalid_redirect_uri`, `invalid_client_metadata`.", body = crate::oauth::ErrorBody),
+        (status = 404, description = "OAuth sign-in or dynamic registration is off on this server.", body = crate::oauth::ErrorBody),
+        (status = 429, description = "Too many registrations from this address (`slow_down`).", body = crate::oauth::ErrorBody),
     )
 )]
 async fn register(

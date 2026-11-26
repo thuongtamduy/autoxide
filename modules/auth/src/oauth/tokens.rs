@@ -2,9 +2,8 @@
 //!
 //! - Đổi mã: mã dùng một lần, sống 60 giây; kiểm PKCE (`S256`), `client_id`, `redirect_uri`, `resource`. Mã dùng lại
 //!   (bị đánh cắp và dùng trước) → thu hồi cả grant và mọi token đã sinh từ nó (OAuth 2.1 §4.1.3).
-//! - Refresh token xoay vòng mỗi lần dùng. Dùng lại refresh token cũ → thu hồi cả grant, trừ khi đó là token liền
-//!   trước của token còn sống và vừa đổi trong [`REFRESH_GRACE`] (client gửi lại vì mất kết nối): chỉ trả
-//!   `invalid_grant`.
+//! - Refresh token xoay vòng mỗi lần dùng. Dùng lại refresh token cũ → thu hồi cả grant, không ân hạn (RFC 9700
+//!   §4.14.2): kẻ trộm dùng trước thì người thật gửi lại cũng bị coi là dùng lại; client phải làm mới tuần tự.
 //! - Mọi câu "đánh dấu đã dùng" là MỘT câu `UPDATE … WHERE used_at IS NULL`: hai request đồng thời, đúng một thắng
 //!   trên cả hai database.
 
@@ -37,8 +36,6 @@ pub(crate) const REFRESH_PREFIX: &str = "axr1_";
 pub(crate) const CODE: &str = "code";
 const ACCESS: &str = "access";
 const REFRESH: &str = "refresh";
-/// Ân hạn cho đúng refresh token liền trước (client gửi lại sau khi mất câu trả lời).
-const REFRESH_GRACE: SignedDuration = SignedDuration::from_secs(30);
 /// Ghi `last_used_at` của grant thưa nhất mỗi chừng này.
 const TOUCH_EVERY: SignedDuration = SignedDuration::from_secs(60);
 
@@ -140,7 +137,7 @@ impl OAuthService {
             .filter(token::Column::TokenHash.eq(sha256(secret)))
             .filter(token::Column::Kind.eq(CODE))
             .scoped(&tenant)
-            .one(tenant.database().read())
+            .one(tenant.database().write())
             .await?
             .ok_or_else(invalid)?;
         let now = Timestamp::now();
@@ -154,7 +151,10 @@ impl OAuthService {
         if row.expires_at <= now {
             return Err(invalid());
         }
-        let grant = self.live_grant(&tenant, row.grant_id).await?.ok_or_else(invalid)?;
+        let grant = self
+            .live_grant(tenant.database().write(), &tenant, row.grant_id)
+            .await?
+            .ok_or_else(invalid)?;
         if grant.client_id != client_id {
             return Err(invalid());
         }
@@ -198,54 +198,43 @@ impl OAuthService {
             .filter(token::Column::TokenHash.eq(sha256(presented)))
             .filter(token::Column::Kind.eq(REFRESH))
             .scoped(&tenant)
-            .one(tenant.database().read())
+            // Đường xoay vòng đọc trên kết nối ghi: không đọc bản trễ của read replica.
+            .one(tenant.database().write())
             .await?
             .ok_or_else(invalid)?;
         let now = Timestamp::now();
-        let grant = self.live_grant(&tenant, row.grant_id).await?.ok_or_else(invalid)?;
+        let grant = self
+            .live_grant(tenant.database().write(), &tenant, row.grant_id)
+            .await?
+            .ok_or_else(invalid)?;
         if grant.client_id != client_id {
             return Err(invalid());
         }
         if row.expires_at <= now {
             return Err(invalid());
         }
+        // Scope sai không được đốt mất refresh token: kiểm trước khi đánh dấu đã dùng.
+        narrower_scope(form.scope.as_deref(), &grant)?;
         if !mark_used(tenant.database().write(), &tenant, row.id, now).await? {
-            // Đã dùng. Đúng token liền trước, vừa đổi: client gửi lại — không thu hồi. Còn lại: token cũ bị dùng lại,
-            // có thể đã bị đánh cắp — thu hồi cả grant (OAuth 2.1 §4.3.1).
-            let used = token::Entity::find_by_id((tenant.id().as_uuid(), row.id))
-                .scoped(&tenant)
-                .one(tenant.database().read())
-                .await?
-                .and_then(|row| row.used_at);
-            let latest = token::Entity::find()
-                .filter(token::Column::GrantId.eq(grant.id))
-                .filter(token::Column::Kind.eq(REFRESH))
-                .filter(token::Column::Id.gt(row.id))
-                .scoped(&tenant)
-                .all(tenant.database().read())
-                .await?;
-            let retry = used.is_some_and(|used| used + REFRESH_GRACE > now)
-                && latest.len() == 1
-                && latest.iter().all(|next| next.used_at.is_none());
-            if !retry {
-                super::grants::revoke_grant(self, &tenant, grant.id, "refresh_reused").await?;
-            }
+            // Refresh token đã dùng bị gửi lại: không phân biệt được kẻ trộm với client gửi trùng, nên thu hồi cả grant
+            // (RFC 9700 §4.14.2, OAuth 2.1 §4.3.1). Client phải làm mới tuần tự.
+            super::grants::revoke_grant(self, &tenant, grant.id, "refresh_reused").await?;
             return Err(invalid());
         }
-        narrower_scope(form.scope.as_deref(), &grant)?;
         self.issue(&tenant, &grant, now).await
     }
 
     /// Grant còn hiệu lực (chưa thu hồi, chưa hết hạn).
-    async fn live_grant(
+    async fn live_grant<C: ConnectionTrait>(
         &self,
+        connection: &C,
         tenant: &TenantContext,
         id: Uuid,
     ) -> Result<Option<grant::Model>, Error> {
         let now = Timestamp::now();
         Ok(grant::Entity::find_by_id((tenant.id().as_uuid(), id))
             .scoped(tenant)
-            .one(tenant.database().read())
+            .one(connection)
             .await?
             .filter(|grant| grant.revoked_at.is_none() && grant.expires_at > now))
     }
@@ -314,7 +303,10 @@ impl OAuthService {
             .one(tenant.database().read())
             .await?
             .ok_or_else(invalid)?;
-        let grant = self.live_grant(&tenant, row.grant_id).await?.ok_or_else(invalid)?;
+        let grant = self
+            .live_grant(tenant.database().read(), &tenant, row.grant_id)
+            .await?
+            .ok_or_else(invalid)?;
         let (user, principal) =
             self.roles.user_principal(&tenant, grant.user_id).await?.ok_or_else(invalid)?;
         if !user.is_active() {
