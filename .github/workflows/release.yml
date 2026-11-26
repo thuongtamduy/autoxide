@@ -247,6 +247,19 @@ jobs:
           path: sbom/autoxide.cdx.json
           if-no-files-found: error
           retention-days: 1
+      # Văn bản giấy phép của các crate trong binary, cho archive macOS/Windows (build bằng cargo trực tiếp, không qua Docker
+      # nên không có file này như archive Linux). MIT/Apache buộc kèm thông báo giấy phép trong mọi bản phân phối binary.
+      - run: cargo install cargo-about --locked --version 0.9.3 --features cli
+      - run: |
+          mkdir licenses
+          cargo about generate --manifest-path crates/app/Cargo.toml --locked about.hbs -o licenses/THIRD-PARTY-LICENSES.html
+          test -s licenses/THIRD-PARTY-LICENSES.html
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: third-party-licenses
+          path: licenses/THIRD-PARTY-LICENSES.html
+          if-no-files-found: error
+          retention-days: 1
 
   # Binary macOS và Windows (G6, D-20261126-demo-and-native-binaries): người không dùng Docker hay Rust tải về chạy. Build bằng
   # toolchain đã ghim trên máy runner của từng hệ điều hành (không giả lập). Không chặn phát hành: một nền tảng hỏng thì
@@ -254,8 +267,10 @@ jobs:
   # Chưa ký bằng khoá của Apple hay Microsoft (cần chứng chỉ trả phí của chủ dự án): chứng thực SLSA và `SHA256SUMS`
   # ký bằng cosign vẫn có, cách kiểm ở docs/VERIFYING.md; cách mở file chưa ký ở docs/GETTING-STARTED.md.
   native:
-    needs: [verify, gate]
-    if: ${{ !cancelled() && needs.verify.result == 'success' && contains(fromJSON('["success","skipped"]'), needs.gate.result) }}
+    # `sbom` cho văn bản giấy phép bên thứ ba đóng vào archive; thiếu nó thì archive native không được tạo (bản phân phối binary
+    # không kèm thông báo giấy phép là không hợp lệ).
+    needs: [verify, gate, sbom]
+    if: ${{ !cancelled() && needs.verify.result == 'success' && needs.sbom.result == 'success' && contains(fromJSON('["success","skipped"]'), needs.gate.result) }}
     strategy:
       fail-fast: false
       matrix:
@@ -277,6 +292,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: third-party-licenses
+          path: licenses
       # `rust-toolchain.toml` ghim phiên bản; rustup tải đúng bản và mục tiêu của máy này.
       - name: Build the binary
         shell: bash
@@ -293,7 +312,7 @@ jobs:
           exe=autoxide
           if [ "$ARCHIVE" = zip ]; then exe=autoxide.exe; fi
           cp "target/release/$exe" "dist/$name/$exe"
-          cp LICENSE-MIT LICENSE-APACHE README.md "dist/$name/"
+          cp LICENSE-MIT LICENSE-APACHE README.md licenses/THIRD-PARTY-LICENSES.html "dist/$name/"
           # Chạy thử ngay trên máy build: binary không khởi động được thì không đính kèm.
           "dist/$name/$exe" --version
           if [ "$ARCHIVE" = zip ]; then
@@ -415,6 +434,16 @@ jobs:
           tar -xzf dist/autoxide-*-x86_64-unknown-linux-gnu.tar.gz -O --wildcards '*/THIRD-PARTY-LICENSES.html' \
             > dist/THIRD-PARTY-LICENSES.html
           test -s dist/THIRD-PARTY-LICENSES.html
+      # Mọi archive binary (Linux, macOS, Windows) phải mang văn bản giấy phép bên thứ ba: thiếu ở một archive thì không phát hành.
+      - name: Every binary archive carries the license texts
+        run: |
+          shopt -s nullglob
+          for archive in dist/*.tar.gz; do
+            tar -tzf "$archive" | grep -q '/THIRD-PARTY-LICENSES.html$' || { echo "::error::$archive has no THIRD-PARTY-LICENSES.html"; exit 1; }
+          done
+          for archive in dist/*.zip; do
+            unzip -l "$archive" | grep -q '/THIRD-PARTY-LICENSES.html$' || { echo "::error::$archive has no THIRD-PARTY-LICENSES.html"; exit 1; }
+          done
       - name: Release notes from CHANGELOG.md
         env:
           TAG: ${{ github.ref_name }}
