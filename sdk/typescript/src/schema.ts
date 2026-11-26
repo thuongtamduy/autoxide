@@ -40485,6 +40485,8 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
+        503: Problem;
         default: Problem;
       };
     };

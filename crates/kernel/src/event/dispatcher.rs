@@ -111,9 +111,15 @@ impl Dispatcher {
         let databases = self.databases.databases().await?;
         self.cleanup(&databases).await?;
         let mut handled = 0;
+        let tables: Vec<String> = self.modules.iter().map(|module| table_name(module)).collect();
         for (placement, _, database) in &databases {
-            for module in &self.modules {
-                handled += self.run_table(*placement, database, module).await?;
+            // Một câu hỏi bảng nào có event chờ, rồi chỉ đọc các bảng đó: lượt rảnh là một câu mỗi database thay vì
+            // một câu mỗi module (PT nền, D-20261126-idle-polling).
+            let busy = crate::data::busy::tables_with(database, &tables, &pending(now())).await?;
+            for (module, busy) in self.modules.iter().zip(busy) {
+                if busy {
+                    handled += self.run_table(*placement, database, module).await?;
+                }
             }
         }
         Ok(handled)

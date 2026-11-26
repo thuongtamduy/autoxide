@@ -31,6 +31,8 @@ mod any_of;
 mod authenticator;
 mod decision;
 mod oauth;
+#[cfg(test)]
+mod properties;
 mod step_up;
 
 pub use authenticator::Authenticator;
