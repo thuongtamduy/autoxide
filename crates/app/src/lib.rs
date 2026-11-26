@@ -49,6 +49,14 @@ enum Command {
     /// `autoxide restore`.
     Backup(commands::backup::BackupArguments),
 
+    /// Try Autoxide in one command: a local server with sample data and an administrator.
+    ///
+    /// Needs no setup: creates a directory (default `autoxide-demo`), a SQLite database, random
+    /// secrets and an administrator whose password is printed on screen, loads the reference
+    /// data (addresses, taxes, promotion limits) and serves the API with its reference page
+    /// at `/api/docs`. Run it again to continue with the same data. Not for production.
+    Demo(commands::demo::Arguments),
+
     /// Check the configuration and show every setting with its current value.
     ///
     /// Settings are read from environment variables and from a `.env` file in
@@ -260,6 +268,7 @@ fn dispatch(command: Command) -> ExitCode {
         Command::Backup(arguments) => commands::backup::backup(&arguments),
         Command::Config(arguments) => commands::config::run(&arguments),
         Command::Copy(arguments) => commands::copy::run(&arguments),
+        Command::Demo(arguments) => commands::demo::run(&arguments),
         Command::Doctor(arguments) => commands::doctor::run(&arguments),
         Command::Jobs(arguments) => commands::jobs::run(&arguments),
         Command::Migrate(arguments) => commands::migrate::run(&arguments),
