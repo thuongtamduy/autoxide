@@ -48,6 +48,8 @@ type Lots = HashMap<(TenantId, Uuid), Arc<tokio::sync::Mutex<Lot>>>;
 
 pub(super) struct SharedCounter {
     throttle: Throttle,
+    /// Prefix of the counter names (`api_key`, `tenant`), so the two limits never share a counter.
+    prefix: &'static str,
     registry: DatabaseRegistry,
     lot: u32,
     // `Mutex` thường giữ bảng (đoạn ngắn, không `await`); mỗi key một `Mutex` của tokio, giữ qua lần
@@ -60,6 +62,15 @@ pub(super) struct SharedCounter {
 impl SharedCounter {
     /// `None` when disabled (`per_minute = 0`).
     pub(super) fn new(limit: RateLimit, registry: DatabaseRegistry) -> Option<Self> {
+        Self::named(limit, registry, "api_key")
+    }
+
+    /// Like [`new`](Self::new), with counter names starting with `prefix`.
+    pub(super) fn named(
+        limit: RateLimit,
+        registry: DatabaseRegistry,
+        prefix: &'static str,
+    ) -> Option<Self> {
         if limit.per_minute == 0 {
             return None;
         }
@@ -67,6 +78,7 @@ impl SharedCounter {
             Throttle::new(crate::builtin::NAME, limit.per_minute.max(limit.burst), WINDOW).ok()?;
         Some(SharedCounter {
             throttle,
+            prefix,
             registry,
             lot: (limit.burst / 4).max(1),
             lots: Mutex::new(HashMap::new()),
@@ -103,7 +115,7 @@ impl SharedCounter {
         }
         self.purge_now_and_then(now);
         // Khoá đếm có khách (bước 33): khách A dùng hết lượt không chặn khách B.
-        let name = format!("api_key:{tenant}:{key}");
+        let name = format!("{}:{tenant}:{key}", self.prefix);
         let control = self.registry.default_tenant();
         match self.throttle.take(&control, &name, self.lot).await {
             Ok(taken) => {
@@ -124,7 +136,8 @@ impl SharedCounter {
                 metrics::counter!("http_rate_limit_store_errors_total").increment(1);
                 tracing::warn!(
                     error = %error,
-                    "counting the API key rate limit in the database failed; letting the request through"
+                    limit = self.prefix,
+                    "counting a rate limit in the database failed; letting the request through"
                 );
                 Decision::Allow
             }
@@ -140,11 +153,12 @@ impl SharedCounter {
         }
         *last = Some(now);
         let throttle = self.throttle.clone();
+        let prefix = self.prefix;
         let database = self.registry.default_tenant().database().clone();
         tokio::spawn(async move {
             let before = Timestamp::now() - SignedDuration::from_mins(10);
             if let Err(error) = throttle.purge(&database, before).await {
-                tracing::warn!(error = %error, "purging old API key rate limit counters failed");
+                tracing::warn!(error = %error, limit = prefix, "purging old rate limit counters failed");
             }
         });
     }

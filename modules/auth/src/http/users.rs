@@ -974,6 +974,7 @@ mod event_tests {
                     "auth.email_verification_requested", // mail xác minh cho bob
                     "auth.role_created",
                     "auth.user_roles_changed",
+                    "auth.access_revoked", // khoá bob: dừng thứ bob dựng để làm thay mình
                     "auth.user_updated",
                     "auth.api_key_created",
                     "auth.mfa_enabled",
@@ -983,7 +984,7 @@ mod event_tests {
             assert_eq!(events[1].1, None);
             assert!(events[3..].iter().all(|(_, actor, ..)| *actor == Some(root.id)));
             assert_eq!(events[3].2.as_deref(), Some(format!("auth.user:{bob_id}").as_str()));
-            let disabled: serde_json::Value = serde_json::from_str(&events[7].3).unwrap();
+            let disabled: serde_json::Value = serde_json::from_str(&events[8].3).unwrap();
             assert!(disabled["before"]["disabled_at"].is_null());
             assert!(disabled["after"]["disabled_at"].is_string());
             let roles: serde_json::Value = serde_json::from_str(&events[6].3).unwrap();

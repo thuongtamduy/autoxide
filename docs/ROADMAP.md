@@ -265,13 +265,18 @@ thật (P7).
         được khi mở WebSocket) — kiểm cùng nguồn `OriginGrant` như MCP
   - [ ] Test cho lượt đọc ảnh chụp tên miền verified bị treo quá `READ_TIMEOUT` (3 giây,
         `tenancy::verified_domains`, D-20261125-tenant-cors): cần database giả treo được
-  - [ ] Chủ dự án quyết: `PUT /api/v1/auth/users/{id}/roles` (`auth.roles.manage`) cho tự gán mọi role kể cả `admin`
-        (cố ý theo mô tả permission), trong khi membership, lời mời và SCIM theo "chỉ cấp cái mình có"
-        (D-20261125-scim-grant-cover) — giữ, hay đưa đường cũ về cùng luật? Cùng lượt xem các chỗ bất nhất khác
-        (chưa đổi hành vi): (i) `require_covers` (xoá / khoá / đổi email / nhận về tài khoản) so theo tên
-        permission, bỏ qua phạm vi, còn `require_grantable` so cả phạm vi; (ii) `PUT /users/{id}/memberships` chỉ
-        kiểm role được cấp, không kiểm role bị gỡ — SCIM nay chặt hơn đường gán tay; (iii) cùng một luật ánh xạ:
-        tạo vượt quyền trả 422, xoá vượt quyền trả 403
+  - [x] Chủ dự án quyết: `PUT /api/v1/auth/users/{id}/roles` (`auth.roles.manage`) cho tự gán mọi role kể cả `admin`
+        — chặn (PT-9, D-20261126-no-self-grant): gán role và sửa role theo "chỉ cấp cái mình có", kể cả cho chính mình
+  - [ ] Các chỗ bất nhất còn lại của luật cấp quyền (chưa đổi hành vi): (i) `require_covers` (xoá / khoá / đổi
+        email / nhận về tài khoản) so theo tên permission, bỏ qua phạm vi, còn `require_grantable` so cả phạm vi;
+        (iii) cùng một luật ánh xạ: tạo vượt quyền trả 422, xoá vượt quyền trả 403; (iv) hạ quyền người khác bằng cách
+        thu hẹp permission của role họ giữ không qua luật "gỡ được" như gỡ role (sửa role chỉ chặn thêm / nới / bỏ cấm)
+  - [ ] `automations`: `run_as_limit` chỉ giới hạn theo TÊN permission (`Principal::only` giữ phạm vi hiện tại của chủ
+        luật) — chụp cả phạm vi lúc tạo (D-20261126-automation-owner-revoked)
+  - [ ] `automations`: event `auth.access_revoked` vào dead-letter thì luật không tạm dừng và không có đường dự phòng
+        (runner chỉ dừng lần chạy khi luật đã `paused`)
+  - [ ] Gỡ role có lệnh cấm đòi người gỡ `allows(p)` theo TÊN permission, bỏ qua phạm vi; khách có guardrail: role cấm
+        một permission ngoài rào thì có thể không ai trong khách gỡ được role đó (cần kiểm chứng)
   - [ ] Nhóm SCIM chưa có luật chứa "thành viên chờ": ai giữ token SCIM cũng đưa người vào được; admin đặt luật
         thì mọi thành viên nhận role (response tạo luật liệt kê ở `granted_user_ids`, hướng dẫn dặn xem trước —
         D-20261125-scim-grant-cover). Chặt hơn: ghi người đưa vào (`added_by`) ở thành viên nhóm và chỉ cấp cho
@@ -282,8 +287,8 @@ thật (P7).
   - [ ] SCIM: khi đồng bộ đưa một tài khoản lên role cao hơn người đã tạo liên kết SCIM của nó (token quyền thấp tạo
         tài khoản, token của admin cấp role cao), thu hồi mọi cách vào cũ như khi đổi email — cần ghi người tạo liên kết
         ở `auth_scim_users` (migration) (D-20261125-scim-sync-report mục 7)
-  - [ ] `automations`: luật chạy bằng quyền hiện tại của `run_as` — xem lại khi quyền của người đó đổi: tạm dừng luật
-        khi tài khoản bị khoá (nghe event của `auth`) và / hay giới hạn bằng quyền lúc tạo (D-20261125-durable-grants)
+  - [x] `automations`: luật chạy bằng quyền hiện tại của `run_as` — luật tạm dừng khi tài khoản bị cắt cửa vào
+        (event `auth.access_revoked`) và không có hơn quyền lúc tạo (D-20261126-automation-owner-revoked)
 
 - [ ] P17 — Sửa lỗi đợt test bảo mật + hiệu năng độc lập 2026-11 (29.584 case, cả hai database; PT-1..3 ở #515,
       PT-9 ở P16, PT-19 phiên khác):
@@ -313,9 +318,8 @@ thật (P7).
         dead-letter — chưa có test, chưa có hướng dẫn xử lý cho người vận hành
   - [ ] Luật `address-key` của `cargo xtask check` chỉ bắt `format!("…ip:{…")` trên một dòng; khoá dựng cách khác
         (`ip.to_string()`, nhiều dòng) lọt — cân nhắc kiểm theo kiểu (`IpAddr` vào `Throttle::hit`)
-  - [ ] PT-7: trần chung 5× (mặc định 50 lần sai mỗi số mỗi ngày) làm chống đoán mã yếu đi 5 lần, và kẻ phá vẫn khoá
-        chủ số ở mọi nơi với khoảng 10 SMS từ 5 client — cân nhắc trần chung thấp hơn, mã dài hơn, hay đếm theo người
-        nhập mã (đổi `PhoneCodes::verify`)
+  - [ ] PT-7: trần chung 5× nới giới hạn đoán mã mỗi số mỗi ngày, và trần chung còn cho phép khoá chủ số từ nhiều
+        client — cân nhắc trần chung thấp hơn, mã dài hơn, hay đếm theo người nhập mã (đổi `PhoneCodes::verify`)
   - [ ] PT-13, PT-14: `x-permissions` khớp chỗ kiểm; kiểm permission trước validation / ETag / tra bản ghi; test quét
         mọi operation bằng token không quyền (PR 2)
   - [ ] PT-15, PT-16, PT-17, poll outbox: tìm công khai không làm nghẽn server, slug theo khoảng dùng index, tắt
@@ -1252,10 +1256,14 @@ biến chung vẫn là mặc định. Mỗi PR một cụm.
       khiếu nại qua `POST /newsletter/bounces`, đổi nguồn cần chuyển dữ liệu
 - [ ] Xoá sổ dội theo tài khoản bị xoá: `auth.user_deleted` chỉ mang ID, không mang email — cần thêm email vào event
       (module `auth`); hiện xoá theo địa chỉ (`DELETE /mail/bounces/{id}`) và theo thời hạn giữ
-- [ ] Hạn mức token AI mỗi ngày theo gói (`Entitlements`)
-- [ ] Giới hạn request mỗi phút theo khách (tầng thứ ba của rate limit, gói nâng được)
-- [ ] Ngôn ngữ của `catalog` và `menus` theo khách (như `content`); múi giờ / tiền tệ đã có theo khách qua
-      `organizations.timezone` / `organizations.currency` của nút gốc — chỉ thống nhất mặc định khi thiếu
+- [x] Hạn mức token AI mỗi ngày theo gói (`ai.daily_tokens`; gói không nêu thì biến chung)
+- [x] Giới hạn request mỗi phút theo khách (tầng thứ ba, `kernel.api_rate_per_minute` của gói hay biến chung; REST và
+      MCP; D-20261126-tenant-rate-limit)
+- [x] Ngôn ngữ của `catalog` và `menus` theo khách (`catalog.locales`, `menus.locales`, `menus.default_locale`); múi
+      giờ / tiền tệ đã có theo khách qua `organizations.timezone` / `organizations.currency` của nút gốc (mặc định
+      `UTC` khai ở `organizations`; `promotions` / `shipping` dùng giờ Việt Nam theo quyết định sẵn có; "VND" viết
+      cứng ở `bookings` chỉ nằm trong test) — không thêm setting mới
+- [x] `mail.delivery_failed` mang `enhanced` / `hard`; newsletter chỉ tự chặn người đăng ký khi `hard`
 - [ ] Tự đăng ký tài khoản theo khách
 - [ ] Passkey theo khách: RP ID là tên miền đã xác minh của khách
 - [ ] Chính sách đăng nhập theo khách: thời hạn phiên, độ dài mật khẩu tối thiểu, TOTP issuer (chỉ siết hơn mặc định)

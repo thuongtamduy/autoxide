@@ -76,6 +76,7 @@ impl CatalogService {
         let details = self.attribute_details(&transaction, tenant, &ids).await?;
         let mut problems = Vec::new();
         let mut rows = Vec::new();
+        let tenant_locales = self.locales(tenant).await?;
         for (index, input) in values.iter().enumerate() {
             let Some(detail) = details.get(&input.attribute_id) else {
                 return Err(attribute_not_found(input.attribute_id));
@@ -99,7 +100,9 @@ impl CatalogService {
             }
             for (locale, text) in &input.texts {
                 let field = format!("attributes[{index}].texts.{locale}");
-                let Some(locale) = self.config.locale(locale) else {
+                let Some(locale) = crate::config::canonical_locale(locale)
+                    .filter(|locale| tenant_locales.contains(locale))
+                else {
                     problems.push(FieldError::new(field, "locale", "is not a configured language"));
                     continue;
                 };

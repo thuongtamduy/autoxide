@@ -555,8 +555,15 @@ impl ScimService {
             crate::api_key::revoke_all_in(transaction, tenant, &self.outbox, actor, id).await?;
             // Token SCIM và vai người cấu hình nhà cung cấp đăng nhập của nhân viên nghỉ: thu hồi như
             // API key — bật lại tài khoản không làm chúng sống lại.
-            crate::user::revoke_durable_grants_in(transaction, tenant, &self.outbox, actor, id)
-                .await?;
+            crate::user::revoke_durable_grants_in(
+                transaction,
+                tenant,
+                &self.outbox,
+                actor,
+                id,
+                "disabled",
+            )
+            .await?;
             if admins_before > 0
                 && crate::role::count_active_admins(transaction, tenant).await? == 0
             {

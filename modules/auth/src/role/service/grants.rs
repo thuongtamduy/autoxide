@@ -112,6 +112,10 @@ pub(crate) async fn require_grantable<C: ConnectionTrait>(
 
 /// `authority` cấp (`giving`) hay gỡ được role `role_id` ở nút `org_id` không. Gỡ thì nút / role
 /// không còn trong khách được coi là gỡ được (không còn quyền gì để gỡ).
+///
+/// Gỡ một role (khỏi một người, hay xoá hẳn role) còn bỏ các permission CẤM của nó — cấm thắng mọi role khác, nên
+/// bỏ cấm là mở thêm quyền: người gỡ phải có mọi permission role cấm (cùng luật với [`rules_beyond`] khi sửa role,
+/// D-20261126-no-self-grant). Một luật dùng chung cho `PUT /users/{id}/roles`, membership, xoá role và SCIM.
 pub(crate) async fn grantable<C: ConnectionTrait>(
     connection: &C,
     tenant: &TenantContext,
@@ -121,7 +125,15 @@ pub(crate) async fn grantable<C: ConnectionTrait>(
 ) -> Result<bool, Error> {
     let roles = BTreeSet::from([role_id]);
     let problems = grant_problems(connection, tenant, authority, "", org_id, &roles).await?;
-    Ok(!problems.iter().any(|problem| giving || problem.code != "unknown"))
+    if problems.iter().any(|problem| giving || problem.code != "unknown") {
+        return Ok(false);
+    }
+    if giving {
+        return Ok(true);
+    }
+    let mut rules = permissions_of(connection, tenant, [role_id]).await?;
+    let denies = rules.remove(&role_id).unwrap_or_default().denies;
+    Ok(denies.iter().all(|permission| authority.allows(permission)))
 }
 
 pub(crate) fn role_beyond_you(org_id: Uuid, role_id: Uuid) -> Error {
@@ -134,6 +146,45 @@ pub(crate) fn role_beyond_you(org_id: Uuid, role_id: Uuid) -> Error {
     )
     .with_param("role_id", role_id)
     .with_param("org_id", org_id)
+}
+
+/// PT-9 (D-20261126-no-self-grant): sửa luật của role có hiệu lực ngay với mọi người đang giữ role — kể cả người
+/// sửa. Permission được THÊM hay NỚI rộng (`before` → `after`) phải là thứ `actor` đang có, đủ rộng, ở nút gốc
+/// (role có thể được giữ ở bất kỳ nút nào); bỏ một permission cấm cũng là mở thêm quyền, cần `actor` có
+/// permission đó. Trả permission đầu tiên vượt quyền (`None`: được).
+pub(crate) fn rules_beyond(
+    actor: &Principal,
+    root: OrgId,
+    before: &RoleRules,
+    after: &RoleRules,
+) -> Option<String> {
+    let rank = |scope: Scope| match scope {
+        Scope::Own => 0,
+        Scope::Unit => 1,
+        Scope::Subtree => 2,
+        Scope::Tenant => 3,
+    };
+    for (permission, scope) in &after.grants {
+        let had = before.grants.iter().find(|(old, _)| old == permission).map(|(_, old)| *old);
+        let widened = had.is_none_or(|old| rank(*scope) > rank(old));
+        if widened && !actor_covers(actor, root, &[root], permission, *scope) {
+            return Some(permission.clone());
+        }
+    }
+    before
+        .denies
+        .iter()
+        .find(|permission| !after.denies.contains(permission) && !actor.allows(permission))
+        .cloned()
+}
+
+pub(crate) fn permission_beyond_you(permission: &str) -> Error {
+    Error::forbidden(
+        "auth.permission_beyond_you",
+        "You cannot give a role permission `{permission}` (or give it more widely, or lift a ban \
+         on it): you do not have it that widely yourself. Ask someone who has it.",
+    )
+    .with_param("permission", permission)
 }
 
 /// Người gán `actor` có `permission` với phạm vi bao được grant độ sâu `needed` khi gán ở nút

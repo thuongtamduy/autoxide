@@ -36,8 +36,9 @@ pub(crate) fn quota_exceeded() -> Error {
     let until_midnight = (86_400 - elapsed).max(1);
     Error::too_many_requests(
         "ai.quota_exceeded",
-        "Today's AI token limit (AUTOXIDE_AI_DAILY_TOKEN_LIMIT) is used up. Try again after \
-         midnight UTC, or ask the operator to raise the limit.",
+        "Today's AI token limit of this tenant (its plan's `ai.daily_tokens`, otherwise \
+         AUTOXIDE_AI_DAILY_TOKEN_LIMIT) is used up. Try again after midnight UTC, or move to a plan \
+         with a higher limit.",
     )
     .with_retry_after(u64::try_from(until_midnight).unwrap_or(1))
 }

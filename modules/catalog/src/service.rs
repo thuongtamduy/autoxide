@@ -76,6 +76,8 @@ pub(crate) struct CatalogService {
     pub(crate) files: Option<Arc<dyn autoxide_files::api::Files>>,
     /// Khoá ký của kernel: ký địa chỉ file của hàng số theo khách.
     pub(crate) secrets: Arc<autoxide_kernel::secret::SecretKey>,
+    /// Cấu hình theo khách (`catalog.locales`); `None` khi kernel không công bố.
+    pub(crate) settings: Option<Arc<dyn autoxide_kernel::tenancy::TenantSettings>>,
 }
 
 impl crate::api::CatalogExtensions for CatalogService {
@@ -98,9 +100,34 @@ impl CatalogService {
         self.entitlements.require_feature(tenant.id(), feature).await
     }
 
-    /// Ngôn ngữ đã chuẩn hoá, hay `catalog.unsupported_locale`.
-    pub(crate) fn locale(&self, locale: &str) -> Result<String, Error> {
-        self.config.locale(locale).ok_or_else(|| crate::errors::unsupported_locale(locale))
+    /// Ngôn ngữ của khách `tenant`: cấu hình `catalog.locales`, thiếu thì `AUTOXIDE_CATALOG_LOCALES`. Đọc qua
+    /// cache của kernel (không thêm truy vấn mỗi request).
+    pub(crate) async fn locales(&self, tenant: &TenantContext) -> Result<Vec<String>, Error> {
+        let own = match &self.settings {
+            Some(settings) => {
+                autoxide_kernel::tenancy::parsed_setting(
+                    settings.as_ref(),
+                    tenant,
+                    &crate::config::TENANT_LOCALES,
+                    crate::config::tenant_locales,
+                )
+                .await?
+            }
+            None => None,
+        };
+        Ok(own.unwrap_or_else(|| self.config.locales.clone()))
+    }
+
+    /// Ngôn ngữ đã chuẩn hoá nếu khách `tenant` dùng nó, hay `catalog.unsupported_locale`.
+    pub(crate) async fn locale(
+        &self,
+        tenant: &TenantContext,
+        locale: &str,
+    ) -> Result<String, Error> {
+        let locales = self.locales(tenant).await?;
+        crate::config::canonical_locale(locale)
+            .filter(|locale| locales.contains(locale))
+            .ok_or_else(|| crate::errors::unsupported_locale(locale))
     }
 }
 

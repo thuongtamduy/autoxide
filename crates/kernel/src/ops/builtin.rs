@@ -464,6 +464,7 @@ impl Module for KernelModule {
     fn limits(&self) -> Vec<crate::entitlement::Limit> {
         vec![
             crate::entitlement::API_REQUESTS,
+            crate::http::tenant_rate_limit::API_RATE,
             crate::ops::custom_fields::CUSTOM_FIELDS_LIMIT,
             crate::tenancy::SANDBOXES_LIMIT,
         ]

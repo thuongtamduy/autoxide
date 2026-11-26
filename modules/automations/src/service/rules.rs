@@ -228,6 +228,10 @@ impl Automations {
         row.updated_by = Set(principal.user_id());
         row.updated_at = Set(now);
         let after = self.save(&transaction, tenant, row, expected).await?;
+        // Luật rời `active` (tắt, tạm dừng, chuyển sang chờ duyệt): lần chạy đang chờ kết thúc cùng transaction.
+        if after.status != ACTIVE {
+            self.close_pending_runs(&transaction, tenant, id, &after.status).await?;
+        }
         let change = Change { before: Some(snapshot(&before)), after: Some(snapshot(&after)) };
         self.outbox
             .record(
@@ -267,7 +271,8 @@ impl Automations {
         self.set_status(tenant, principal, id, (ACTIVE, checked), expected).await
     }
 
-    /// Tắt luật (lần chạy đang dở vẫn chạy nốt).
+    /// Tắt luật; lần chạy đang chờ của nó kết thúc cùng lúc (`automations.rule_not_active`), lần chạy đang chạy dừng
+    /// trước bước kế tiếp.
     pub(crate) async fn disable_rule(
         &self,
         tenant: &TenantContext,
@@ -309,6 +314,9 @@ impl Automations {
         row.status = Set(status.to_owned());
         row.status_reason = Set(None);
         if let Some((body, zone, _)) = body {
+            // Bật lại đổi người chịu trách nhiệm (`run_as`): tăng phiên bản để lần chạy tạo trước đó (định nghĩa và
+            // người cũ) không chạy tiếp bằng quyền của người bật (D-20261126-automation-owner-revoked).
+            row.version = Set(before.version + 1);
             row.run_as = Set(principal.user_id());
             let (key, limit) = super::credential(principal)?;
             row.run_as_api_key = Set(key);
@@ -321,6 +329,10 @@ impl Automations {
         row.updated_by = Set(principal.user_id());
         row.updated_at = Set(now);
         let after = self.save(&transaction, tenant, row, expected).await?;
+        // Luật rời `active` (tắt, tạm dừng, chuyển sang chờ duyệt): lần chạy đang chờ kết thúc cùng transaction.
+        if after.status != ACTIVE {
+            self.close_pending_runs(&transaction, tenant, id, &after.status).await?;
+        }
         let change = Change { before: Some(snapshot(&before)), after: Some(snapshot(&after)) };
         self.outbox
             .record(

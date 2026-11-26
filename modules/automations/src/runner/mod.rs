@@ -230,7 +230,66 @@ impl Automations {
             .all(tenant.database().read())
             .await?;
         for rule in &rules {
-            self.pause(tenant.database().write(), tenant, rule, "credential_revoked").await?;
+            self.pause_now(tenant, rule, "credential_revoked").await?;
+        }
+        Ok(())
+    }
+
+    /// Mọi cửa vào tài khoản `user` bị cắt (event `auth.access_revoked`): tạm dừng mọi luật đang bật chạy bằng
+    /// quyền của họ (lý do `owner_access_revoked`); bật lại cần một người có quyền (người bật thành `run_as`).
+    /// Nhận lại cùng event thì không còn luật nào đang bật: không làm gì.
+    pub(crate) async fn owner_revoked(
+        &self,
+        tenant: &TenantContext,
+        user: Uuid,
+    ) -> Result<(), Error> {
+        let rules = rule::Entity::find()
+            .filter(rule::Column::RunAs.eq(user))
+            .filter(rule::Column::Status.eq(ACTIVE))
+            .scoped(tenant)
+            .all(tenant.database().read())
+            .await?;
+        for rule in &rules {
+            self.pause_now(tenant, rule, "owner_access_revoked").await?;
+        }
+        if !rules.is_empty() {
+            tracing::info!(user_id = %user, rules = rules.len(), "automation rules paused: owner access revoked");
+        }
+        Ok(())
+    }
+
+    /// [`pause`](Self::pause) trong transaction riêng: trạng thái luật, lần chạy dở và event ghi cùng lúc.
+    pub(crate) async fn pause_now(
+        &self,
+        tenant: &TenantContext,
+        rule: &Rule,
+        reason: &str,
+    ) -> Result<(), Error> {
+        let transaction = tenant.database().begin_write().await?;
+        self.pause(&transaction, tenant, rule, reason).await?;
+        transaction.commit().await?;
+        Ok(())
+    }
+
+    /// Kết thúc mọi lần chạy đang chờ (`queued`, `waiting`, `awaiting_approval`) của luật `rule_id` vừa rời
+    /// trạng thái `active` (sang `status`), với `automations.rule_not_active` và event `automations.run_failed`
+    /// như lần chạy hỏng khác. Chạy trong `connection` của thay đổi trạng thái (thường là transaction đang mở).
+    pub(crate) async fn close_pending_runs<C: sea_orm::ConnectionTrait>(
+        &self,
+        connection: &C,
+        tenant: &TenantContext,
+        rule_id: Uuid,
+        status: &str,
+    ) -> Result<(), Error> {
+        let pending = run::Entity::find()
+            .filter(run::Column::RuleId.eq(rule_id))
+            .filter(run::Column::Status.is_in([QUEUED, WAITING, AWAITING_APPROVAL]))
+            .scoped(tenant)
+            .all(connection)
+            .await?;
+        for mut run in pending {
+            self.finish_in(connection, tenant, &mut run, FAILED, Some(rule_not_active(status)))
+                .await?;
         }
         Ok(())
     }
@@ -255,6 +314,9 @@ impl Automations {
         if updated.rows_affected == 0 {
             return Ok(());
         }
+        // Luật rời `active`: lần chạy đang chờ của nó kết thúc cùng lúc — không ai chạy tiếp chúng bằng quyền của
+        // người bật lại sau này (D-20261126-automation-owner-revoked).
+        self.close_pending_runs(connection, tenant, rule.id, PAUSED).await?;
         let mut after = snapshot(rule);
         after["status"] = Value::from(PAUSED);
         after["status_reason"] = Value::from(reason);
@@ -274,14 +336,9 @@ impl Automations {
     /// bước ghi vào lần chạy (`failed`).
     pub(crate) async fn execute(&self, tenant: &TenantContext, id: Uuid) -> Result<(), Error> {
         let Some(mut run) = self.claim(tenant, id).await? else { return Ok(()) };
-        let rule = rule::Entity::find_by_id(run.rule_id)
-            .scoped(tenant)
-            .one(tenant.database().read())
-            .await?;
-        let Some(rule) = rule else {
-            return self
-                .finish(tenant, &mut run, FAILED, Some(crate::service::rule_not_found(id)))
-                .await;
+        let rule = match self.current_rule(tenant, &run).await? {
+            Ok(rule) => rule,
+            Err(error) => return self.finish(tenant, &mut run, FAILED, Some(error)).await,
         };
         let definition = parse_json(&run.definition);
         let mut errors = Vec::new();
@@ -296,6 +353,10 @@ impl Automations {
         while let Some(action) =
             usize::try_from(run.cursor).ok().and_then(|index| actions.get(index))
         {
+            // Trước MỖI bước (không chỉ lúc bắt đầu): luật có thể vừa bị tạm dừng / tắt / sửa / bật lại giữa hai bước.
+            if let Err(error) = self.current_rule(tenant, &run).await? {
+                return self.finish(tenant, &mut run, FAILED, Some(error)).await;
+            }
             context["steps"] = steps_context(&steps);
             match self.step(tenant, &principal, &mut run, action, &context).await? {
                 steps::Outcome::Done(log) => {
@@ -361,7 +422,7 @@ impl Automations {
     ) -> Result<Result<Principal, Error>, Error> {
         let principal = self.rule_principal(tenant, rule).await?;
         let Some(principal) = principal else {
-            self.pause(tenant.database().write(), tenant, rule, "owner_unavailable").await?;
+            self.pause_now(tenant, rule, "owner_unavailable").await?;
             return Ok(Err(owner_unavailable()));
         };
         for action in actions {
@@ -369,7 +430,7 @@ impl Automations {
                 let allowed =
                     self.directory.tool(tool).is_some_and(|found| found.allows(&principal));
                 if !allowed {
-                    self.pause(tenant.database().write(), tenant, rule, "permission_lost").await?;
+                    self.pause_now(tenant, rule, "permission_lost").await?;
                     return Ok(Err(Error::forbidden(
                         "automations.permission_missing",
                         "The author of the rule can no longer use tool `{tool}`; the rule is paused.",
@@ -379,6 +440,29 @@ impl Automations {
             }
         }
         Ok(Ok(principal))
+    }
+
+    /// Luật của lần chạy `run`, nếu lần chạy còn được chạy: luật còn `active` VÀ đúng phiên bản lúc tạo lần chạy.
+    /// Sửa luật hay bật lại luật tăng `version` — bật lại đổi `run_as` sang người bật — nên lần chạy cũ (định nghĩa
+    /// cũ, người chịu trách nhiệm cũ) không chạy bằng quyền của người mới (D-20261126-automation-owner-revoked).
+    /// Đọc qua kết nối GHI: bản đọc có thể trễ sau lệnh tạm dừng vừa ghi.
+    async fn current_rule(
+        &self,
+        tenant: &TenantContext,
+        run: &run::Model,
+    ) -> Result<Result<Rule, Error>, Error> {
+        let rule = rule::Entity::find_by_id(run.rule_id)
+            .scoped(tenant)
+            .one(tenant.database().write())
+            .await?;
+        let Some(rule) = rule else { return Ok(Err(crate::service::rule_not_found(run.rule_id))) };
+        if rule.status != crate::service::rules::ACTIVE {
+            return Ok(Err(rule_not_active(&rule.status)));
+        }
+        if rule.version != run.rule_version {
+            return Ok(Err(rule_changed()));
+        }
+        Ok(Ok(rule))
     }
 
     /// Ghi bước vừa xong (lần chạy vẫn `running`).
@@ -425,6 +509,21 @@ impl Automations {
             Some(error) if error.kind() == ErrorKind::Internal => return Err(error),
             other => other,
         };
+        let transaction = tenant.database().begin_write().await?;
+        self.finish_in(&transaction, tenant, run, status, error).await?;
+        transaction.commit().await?;
+        Ok(())
+    }
+
+    /// Phần ghi của [`finish`](Self::finish) trong `connection` (transaction của bên gọi).
+    async fn finish_in<C: sea_orm::ConnectionTrait>(
+        &self,
+        connection: &C,
+        tenant: &TenantContext,
+        run: &mut run::Model,
+        status: &str,
+        error: Option<Error>,
+    ) -> Result<(), Error> {
         let now = now();
         run.status = status.to_owned();
         run.error_code = error.as_ref().map(|error| error.code().to_owned());
@@ -432,8 +531,7 @@ impl Automations {
         run.finished_at = Some(now);
         run.resume_at = None;
         run.updated_at = now;
-        let transaction = tenant.database().begin_write().await?;
-        save(&transaction, tenant, run).await?;
+        save(connection, tenant, run).await?;
         if status == FAILED {
             let failure = json!({
                 "run_id": run.id,
@@ -444,7 +542,7 @@ impl Automations {
             let change = Change { before: None, after: Some(failure) };
             self.outbox
                 .record(
-                    &transaction,
+                    connection,
                     tenant,
                     Actor::system(),
                     events::rule_subject(run.rule_id),
@@ -452,7 +550,6 @@ impl Automations {
                 )
                 .await?;
         }
-        transaction.commit().await?;
         Ok(())
     }
 
@@ -489,6 +586,24 @@ fn put(steps: &mut Vec<StepLog>, log: StepLog) {
 fn steps_context(steps: &[StepLog]) -> Value {
     Value::Array(
         steps.iter().map(|step| json!({"status": step.status, "result": step.result})).collect(),
+    )
+}
+
+fn rule_not_active(status: &str) -> Error {
+    Error::conflict(
+        "automations.rule_not_active",
+        "The rule became `{status}` before this run finished, so the run stopped. Check the rule, \
+         enable it again and run it if needed.",
+    )
+    .with_param("status", status.to_owned())
+}
+
+fn rule_changed() -> Error {
+    Error::conflict(
+        "automations.rule_changed",
+        "The rule was changed or enabled again after this run started, so the run stopped: it would \
+         otherwise finish the old actions under the new person responsible. Run the rule again if \
+         needed.",
     )
 }
 

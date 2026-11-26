@@ -454,8 +454,8 @@ impl CatalogService {
             None => None,
         };
         let locale = match values.get("locale") {
-            Some(raw) => self.locale(raw)?,
-            None => self.config.locales.first().cloned().unwrap_or_else(|| "en".to_owned()),
+            Some(raw) => self.locale(tenant, raw).await?,
+            None => self.locales(tenant).await?.first().cloned().unwrap_or_else(|| "en".to_owned()),
         };
         let existing = variant::Entity::find()
             .filter(variant::Column::SkuKey.eq(sku_key(&sku)))
