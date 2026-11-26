@@ -29,12 +29,15 @@ struct Guard {
     buyers: bool,
 }
 
+/// A method of a path and its guard (`None`: a declared `HEAD` with no permission).
+type MethodGuard = (Method, Option<Arc<Guard>>);
+
 /// Full path template → its methods: a guard, or `None` for a declared `HEAD` that lists no permission (so it does not
 /// fall back to the `GET` rule). Looked up once per request by the matched path: a map, not a scan over
 /// every operation of the module; the guard is shared (`Arc`), nothing is copied per request.
 #[derive(Debug, Default)]
 pub(super) struct Rules {
-    operations: HashMap<String, Vec<(Method, Option<Arc<Guard>>)>>,
+    operations: HashMap<String, Vec<MethodGuard>>,
 }
 
 impl Rules {
@@ -58,7 +61,7 @@ impl Rules {
 
 /// Operations of module `module` (full path `/api/v1/<module>…`) that list at least one permission.
 pub(super) fn rules(module: &str, openapi: &OpenApi) -> Rules {
-    let mut operations: HashMap<String, Vec<(Method, Option<Arc<Guard>>)>> = HashMap::new();
+    let mut operations: HashMap<String, Vec<MethodGuard>> = HashMap::new();
     for (path, item) in &openapi.paths.paths {
         let methods = [
             (Method::GET, item.get.as_ref()),
