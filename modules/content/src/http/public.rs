@@ -491,7 +491,7 @@ pub(crate) struct PostsQuery {
     author_id: Option<Uuid>,
     /// Only posts whose title, summary or body contain every word of this text, ignoring case and
     /// accents; a word of 3 letters or more also matches longer words that start with it (`lat` finds
-    /// "Đà Lạt"). Covers the 1,000 newest matching posts. At most 200 characters.
+    /// "Da Lat"). Covers the 1,000 newest matching posts. At most 200 characters.
     q: Option<String>,
 }
 

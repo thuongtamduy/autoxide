@@ -40403,6 +40403,7 @@ export interface paths {
         200: Page_PublicEntryResponse;
         403: Problem;
         422: Problem;
+        503: Problem;
         default: Problem;
       };
     };
