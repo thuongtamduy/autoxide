@@ -166,6 +166,18 @@ async fn send(router: axum::Router, request: Request<Body>) -> Answer {
     Answer { status, headers, body: serde_json::from_slice(&bytes).unwrap_or(Value::Null) }
 }
 
+#[test]
+fn token_oauth_khong_phai_phien_dang_nhap() {
+    use autoxide_kernel::access::Credential;
+    let oauth = granted(&["notes.*"], &format!("{PUBLIC}/mcp"));
+    assert!(!oauth.is_session());
+    assert!(matches!(oauth.credential(), Credential::OAuthGrant(_)));
+    assert!(oauth.credential_id().is_some());
+    assert!(user().is_session());
+    let key = Uuid::now_v7();
+    assert_eq!(user().via_api_key(key).credential(), Credential::ApiKey(key));
+}
+
 async fn get(router: axum::Router, path: &str) -> Answer {
     send(
         router,
@@ -198,16 +210,17 @@ async fn tai_lieu_kham_pha_theo_rfc_9728_va_8414() {
     TestDatabase::run(async |test| {
         let app = router(test, true).await;
 
+        // Không có tài liệu gốc: token cho cả máy chủ không bao giờ được cấp (chỉ `/mcp`, `/mcp/<module>`, `/api/v1`).
         let root = get(app.clone(), "/.well-known/oauth-protected-resource").await;
-        assert_eq!(root.status, StatusCode::OK);
-        assert_eq!(root.body["resource"], PUBLIC);
-        assert_eq!(root.body["authorization_servers"], json!([PUBLIC]));
-        assert_eq!(root.body["bearer_methods_supported"], json!(["header"]));
-        assert!(root.body.get("scopes_supported").is_none());
-        assert_eq!(root.headers[header::ACCESS_CONTROL_ALLOW_ORIGIN], "*");
+        assert_eq!(root.status, StatusCode::NOT_FOUND);
 
         let mcp = get(app.clone(), "/.well-known/oauth-protected-resource/mcp").await;
+        assert_eq!(mcp.status, StatusCode::OK);
         assert_eq!(mcp.body["resource"], format!("{PUBLIC}/mcp"));
+        assert_eq!(mcp.body["authorization_servers"], json!([PUBLIC]));
+        assert_eq!(mcp.body["bearer_methods_supported"], json!(["header"]));
+        assert!(mcp.body.get("scopes_supported").is_none());
+        assert_eq!(mcp.headers[header::ACCESS_CONTROL_ALLOW_ORIGIN], "*");
         let notes = get(app.clone(), "/.well-known/oauth-protected-resource/mcp/notes").await;
         assert_eq!(notes.body["resource"], format!("{PUBLIC}/mcp/notes"));
         let rest = get(app.clone(), "/.well-known/oauth-protected-resource/api/v1").await;
@@ -312,6 +325,9 @@ async fn token_chi_dung_duoc_o_resource_duoc_cap() {
         .await;
         assert_eq!(mcp_at_rest.status, StatusCode::UNAUTHORIZED);
         assert_eq!(mcp_at_rest.body["code"], "oauth_token_audience");
+        // Đường dẫn ngoài các resource (vd `/mcp/<module lạ>`) không bao giờ nhận token OAuth.
+        let unknown = mcp(app.clone(), "/mcp/unknown", Some("mcp"), list_tools()).await;
+        assert_ne!(unknown.status, StatusCode::OK);
         // Phiên đăng nhập (không audience) vẫn như cũ.
         assert_eq!(mcp(app, "/mcp", Some("session"), list_tools()).await.status, StatusCode::OK);
     })
@@ -338,8 +354,9 @@ async fn thieu_scope_ma_nguoi_dung_co_quyen_thi_403_insufficient_scope() {
             )),
             "{challenge}"
         );
-        // Thân vẫn là kết quả lỗi của tool cho client không làm step-up.
+        // Thân vẫn là kết quả lỗi của tool cho client không làm step-up, kèm challenge trong `_meta` (ChatGPT).
         assert_eq!(refused.body["result"]["isError"], true);
+        assert_eq!(refused.body["result"]["_meta"]["mcp/www_authenticate"], json!([challenge]));
 
         let rest = send(
             app,

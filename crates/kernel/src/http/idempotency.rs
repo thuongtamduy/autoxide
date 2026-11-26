@@ -126,7 +126,7 @@ async fn run(
     }
     // Người gọi trong khách: cùng tài khoản (cùng `user_id`) ở hai khách là hai phạm vi. Khách mặc
     // định giữ phạm vi như trước bước 33: nâng cấp không làm mất key đang còn hiệu lực.
-    let api_key = principal.api_key_id().map(|id| id.as_bytes().to_vec()).unwrap_or_default();
+    let api_key = principal.credential_id().map(|id| id.as_bytes().to_vec()).unwrap_or_default();
     let scope = if tenant.is_platform() {
         hash(&[principal.user_id().as_bytes(), &api_key])
     } else {

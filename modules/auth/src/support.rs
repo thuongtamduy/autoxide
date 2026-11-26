@@ -390,7 +390,7 @@ impl SupportService {
         let platform = self.platform();
         if principal.tenant_id() != platform.id()
             || principal.realm() == Realm::Customer
-            || principal.api_key_id().is_some()
+            || !principal.is_session()
             || principal.operator_from().is_some()
         {
             return Ok(None);

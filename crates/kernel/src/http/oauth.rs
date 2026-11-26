@@ -6,9 +6,9 @@
 //! [`AuthorizationServer`](crate::access::AuthorizationServer). Without it, or without
 //! `AUTOXIDE_HTTP_PUBLIC_URL`, the documents answer 404 and challenges stay a bare `Bearer`.
 //!
-//! Resources (canonical, no trailing slash): `{origin}` (everything), `{origin}/mcp` (every MCP endpoint),
-//! `{origin}/mcp/<module>` and `{origin}/api/v1` (REST). `origin` is the public URL, or `https://<domain>` when
-//! the request arrived on a tenant's verified domain.
+//! Resources (canonical, no trailing slash): `{issuer}/mcp` (every MCP endpoint), `{issuer}/mcp/<module>` and
+//! `{issuer}/api/v1` (REST). The issuer is the public URL (one for the whole platform; a public URL with a path
+//! turns OAuth off). Any other path never accepts an OAuth token.
 
 use std::sync::Arc;
 
@@ -25,7 +25,6 @@ use super::API_PREFIX;
 use super::mcp::MCP_PATH;
 use crate::access::{AuthorizationServer, Principal};
 use crate::error::Error;
-use crate::tenancy::{DatabaseRegistry, TenantHint};
 
 /// Where the protected resource metadata documents live (RFC 9728 §3).
 pub const PROTECTED_RESOURCE_PATH: &str = "/.well-known/oauth-protected-resource";
@@ -34,8 +33,8 @@ pub const AUTHORIZATION_SERVER_PATH: &str = "/.well-known/oauth-authorization-se
 
 /// What the resource server needs to know, shared by the documents, the challenge layer and the audience check.
 pub(crate) struct ProtectedResources {
-    public_url: Option<String>,
-    registry: Option<DatabaseRegistry>,
+    /// The issuer and resource prefix: the public URL, lowercase, without path. `None` turns OAuth off.
+    origin: Option<String>,
     server: Option<Arc<dyn AuthorizationServer>>,
     /// Modules with an MCP endpoint (`/mcp/<module>`).
     mcp_modules: Vec<String>,
@@ -48,33 +47,37 @@ pub(crate) struct Resources(pub(crate) Arc<ProtectedResources>);
 impl ProtectedResources {
     pub(crate) fn new(
         public_url: Option<String>,
-        registry: Option<DatabaseRegistry>,
         server: Option<Arc<dyn AuthorizationServer>>,
         mcp_modules: Vec<String>,
     ) -> Self {
-        ProtectedResources { public_url, registry, server, mcp_modules }
+        // Một issuer cho cả nền tảng (D-20261126-mcp-oauth): public URL. Public URL có path (API sau một tiền tố của
+        // proxy) thì tài liệu khám phá phải chèn path theo RFC 8414 / 9728 mà proxy chưa chắc chuyển tới đây: tắt
+        // OAuth và báo, thay vì phát địa chỉ sai.
+        let origin = public_url.and_then(|url| {
+            let origin = crate::access::canonical_resource(&url)?;
+            let path = origin.split_once("://").map_or("", |(_, rest)| rest.split_once('/').map_or("", |(_, path)| path));
+            if path.is_empty() {
+                Some(origin)
+            } else {
+                if server.is_some() {
+                    tracing::warn!(
+                        "AUTOXIDE_HTTP_PUBLIC_URL has a path: OAuth sign-in for MCP is off. Serve the API at the \
+                         root of its own host name to turn it on."
+                    );
+                }
+                None
+            }
+        });
+        ProtectedResources { origin, server, mcp_modules }
     }
 
-    /// OAuth is on: a module issues tokens and the public address is known.
-    fn enabled(&self) -> bool {
-        self.server.is_some() && self.public_url.is_some()
-    }
-
-    /// The origin (issuer and resource prefix) for a request to `host`: the tenant's verified domain, otherwise
-    /// the public URL. An unknown `Host` never becomes an issuer (no reflection of attacker-chosen hosts).
-    async fn origin(&self, host: Option<&str>) -> Result<Option<String>, Error> {
-        let Some(public) = &self.public_url else { return Ok(None) };
-        if let (Some(host), Some(registry)) = (host, &self.registry)
-            && !same_host(public, host)
-            && registry.tenant_by_domain(host).await?.is_some()
-        {
-            return Ok(Some(format!("https://{host}")));
-        }
-        Ok(Some(public.clone()))
+    /// OAuth is on: a module issues tokens and the public address is known: the issuer.
+    fn issuer(&self) -> Option<&str> {
+        self.server.as_ref().and(self.origin.as_deref())
     }
 
     /// The resource path (after the origin) a request path belongs to: `/mcp`, `/mcp/<module>`, `/api/v1`, or
-    /// `""` (the whole server) for anything else.
+    /// `""` (no resource: OAuth tokens are never accepted there).
     fn resource_path<'a>(&self, path: &'a str) -> &'a str {
         if let Some(rest) = path.strip_prefix(MCP_PATH) {
             if rest.is_empty() || rest == "/" {
@@ -85,50 +88,53 @@ impl ProtectedResources {
             {
                 return &path[..MCP_PATH.len() + 1 + module.trim_end_matches('/').len()];
             }
-            return MCP_PATH;
+            return "";
         }
         if path == API_PREFIX || path.starts_with(&format!("{API_PREFIX}/")) {
             return API_PREFIX;
         }
         ""
     }
-}
 
-/// `https://api.example.com:8443` and `api.example.com` (normalized `Host`, no port) are the same host.
-fn same_host(public: &str, host: &str) -> bool {
-    let authority = public.split_once("://").map_or(public, |(_, rest)| rest);
-    let name = match authority.strip_prefix('[') {
-        Some(rest) => rest.split(']').next().unwrap_or_default(),
-        None => authority.rsplit_once(':').map_or(authority, |(name, _)| name),
-    };
-    name.eq_ignore_ascii_case(host)
-}
-
-fn host_of(parts: &Parts) -> Option<String> {
-    TenantHint::of_request(&parts.headers, &parts.extensions).host().map(str::to_owned)
+    /// `challenge` (a `Bearer …` value) with `resource_metadata` pointing at the document of the resource that
+    /// `path` belongs to. Unchanged when OAuth is off, the path is no resource, or it already has one.
+    pub(crate) fn complete(&self, path: &str, challenge: &str) -> String {
+        let resource = self.resource_path(path);
+        let Some(origin) = self.issuer() else { return challenge.to_owned() };
+        if resource.is_empty()
+            || !challenge.starts_with("Bearer")
+            || challenge.contains("resource_metadata=")
+        {
+            return challenge.to_owned();
+        }
+        let metadata = format!("resource_metadata=\"{origin}{PROTECTED_RESOURCE_PATH}{resource}\"");
+        match challenge.strip_prefix("Bearer").map(str::trim) {
+            Some("") | None => format!("Bearer {metadata}"),
+            Some(rest) => format!("Bearer {rest}, {metadata}"),
+        }
+    }
 }
 
 /// Rejects an OAuth access token used outside the resource it was issued for (RFC 8707, MCP: servers MUST
-/// validate the audience). Credentials without an audience (sessions, API keys) pass.
-pub(crate) async fn admit_audience(parts: &Parts, principal: &Principal) -> Result<(), Error> {
+/// validate the audience). Fail-closed: a request path that is no resource (`/mcp`, `/mcp/<module>`, `/api/v1`)
+/// never accepts an OAuth token. Credentials without an audience (sessions, API keys) pass.
+pub(crate) fn admit_audience(parts: &Parts, principal: &Principal) -> Result<(), Error> {
     let Some(access) = principal.oauth() else { return Ok(()) };
-    let resources = parts.extensions.get::<Resources>().map(|resources| resources.0.clone());
-    let origin = match &resources {
-        Some(resources) if resources.enabled() => {
-            resources.origin(host_of(parts).as_deref()).await?
-        }
-        _ => None,
-    };
-    let (Some(resources), Some(origin)) = (resources, origin) else {
+    let Some(resources) = parts.extensions.get::<Resources>().map(|resources| resources.0.clone())
+    else {
         return Err(wrong_audience());
     };
+    let Some(origin) = resources.issuer() else { return Err(wrong_audience()) };
     // Router lồng (`nest`) cắt tiền tố khỏi `uri`; `OriginalUri` giữ đường dẫn đầy đủ.
     let path = parts
         .extensions
         .get::<axum::extract::OriginalUri>()
         .map_or_else(|| parts.uri.path(), |original| original.0.path());
-    let resource = format!("{origin}{}", resources.resource_path(path));
-    if access.covers(&resource) { Ok(()) } else { Err(wrong_audience()) }
+    let resource = resources.resource_path(path);
+    if resource.is_empty() || !access.covers(&format!("{origin}{resource}")) {
+        return Err(wrong_audience());
+    }
+    Ok(())
 }
 
 fn wrong_audience() -> Error {
@@ -150,38 +156,21 @@ pub(crate) async fn challenge(
     next: Next,
 ) -> Response {
     request.extensions_mut().insert(Resources(resources.clone()));
-    if !resources.enabled() {
+    if resources.issuer().is_none() {
         return next.run(request).await;
     }
     let path = request.uri().path().to_owned();
-    let (parts, body) = request.into_parts();
-    let host = host_of(&parts);
-    let mut response = next.run(Request::from_parts(parts, body)).await;
-    let protected = path == MCP_PATH
-        || path.starts_with(&format!("{MCP_PATH}/"))
-        || path.starts_with(&format!("{API_PREFIX}/"));
-    if !protected || !matches!(response.status().as_u16(), 401 | 403) {
+    let mut response = next.run(request).await;
+    if !matches!(response.status().as_u16(), 401 | 403) {
         return response;
     }
-    let Some(current) = response
-        .headers()
-        .get(header::WWW_AUTHENTICATE)
-        .and_then(|value| value.to_str().ok())
-        .filter(|value| value.starts_with("Bearer") && !value.contains("resource_metadata="))
-        .map(str::to_owned)
+    let Some(current) =
+        response.headers().get(header::WWW_AUTHENTICATE).and_then(|value| value.to_str().ok())
     else {
         return response;
     };
-    let Ok(Some(origin)) = resources.origin(host.as_deref()).await else { return response };
-    let metadata = format!(
-        "resource_metadata=\"{origin}{PROTECTED_RESOURCE_PATH}{}\"",
-        resources.resource_path(&path)
-    );
-    let value = match current.strip_prefix("Bearer").map(str::trim) {
-        Some("") | None => format!("Bearer {metadata}"),
-        Some(rest) => format!("Bearer {rest}, {metadata}"),
-    };
-    if let Ok(value) = HeaderValue::from_str(&value) {
+    let completed = resources.complete(&path, current);
+    if let Ok(value) = HeaderValue::from_str(&completed) {
         response.headers_mut().insert(header::WWW_AUTHENTICATE, value);
     }
     response
@@ -189,35 +178,11 @@ pub(crate) async fn challenge(
 
 pub(super) fn routes(resources: Arc<ProtectedResources>) -> OpenApiRouter {
     OpenApiRouter::new()
-        .routes(routes!(server_resource))
         .routes(routes!(mcp_resource))
         .routes(routes!(mcp_module_resource))
         .routes(routes!(rest_resource))
         .routes(routes!(authorization_server))
         .with_state(resources)
-}
-
-/// Protected resource metadata of the whole server.
-///
-/// RFC 9728 document for the resource `{origin}` (every endpoint): which authorization server issues tokens for
-/// it. MCP clients find this through the `resource_metadata` parameter of a 401 answer.
-#[utoipa::path(
-    get,
-    path = "/.well-known/oauth-protected-resource",
-    extensions(("x-public" = json!(true))),
-    tag = "health",
-    operation_id = "oauth_protected_resource",
-    responses(
-        (status = 200, description = "The RFC 9728 metadata document.", body = Object),
-        (status = 404, description = "OAuth sign-in is not set up on this server (code `oauth_unavailable`): \
-         use an API key.", body = crate::response::Problem),
-    )
-)]
-async fn server_resource(
-    State(resources): State<Arc<ProtectedResources>>,
-    parts: Parts,
-) -> Result<Response, Error> {
-    resource_document(&resources, &parts, "").await
 }
 
 /// Protected resource metadata of the MCP endpoint.
@@ -236,11 +201,8 @@ async fn server_resource(
          body = crate::response::Problem),
     )
 )]
-async fn mcp_resource(
-    State(resources): State<Arc<ProtectedResources>>,
-    parts: Parts,
-) -> Result<Response, Error> {
-    resource_document(&resources, &parts, MCP_PATH).await
+async fn mcp_resource(State(resources): State<Arc<ProtectedResources>>) -> Result<Response, Error> {
+    resource_document(&resources, MCP_PATH)
 }
 
 /// Protected resource metadata of one module's MCP endpoint.
@@ -262,12 +224,11 @@ async fn mcp_resource(
 async fn mcp_module_resource(
     State(resources): State<Arc<ProtectedResources>>,
     Path(module): Path<String>,
-    parts: Parts,
 ) -> Result<Response, Error> {
     if !resources.mcp_modules.contains(&module) {
         return Err(unavailable());
     }
-    resource_document(&resources, &parts, &format!("{MCP_PATH}/{module}")).await
+    resource_document(&resources, &format!("{MCP_PATH}/{module}"))
 }
 
 /// Protected resource metadata of the REST API.
@@ -287,22 +248,13 @@ async fn mcp_module_resource(
 )]
 async fn rest_resource(
     State(resources): State<Arc<ProtectedResources>>,
-    parts: Parts,
 ) -> Result<Response, Error> {
-    resource_document(&resources, &parts, API_PREFIX).await
+    resource_document(&resources, API_PREFIX)
 }
 
-async fn resource_document(
-    resources: &ProtectedResources,
-    parts: &Parts,
-    path: &str,
-) -> Result<Response, Error> {
-    if !resources.enabled() {
-        return Err(unavailable());
-    }
-    let origin = resources.origin(host_of(parts).as_deref()).await?.ok_or_else(unavailable)?;
+fn resource_document(resources: &ProtectedResources, path: &str) -> Result<Response, Error> {
+    let origin = resources.issuer().ok_or_else(unavailable)?;
     let name = match path {
-        "" => "Autoxide".to_owned(),
         MCP_PATH => "Autoxide MCP".to_owned(),
         API_PREFIX => "Autoxide REST API".to_owned(),
         other => format!("Autoxide MCP ({})", other.trim_start_matches("/mcp/")),
@@ -336,15 +288,13 @@ async fn resource_document(
 )]
 async fn authorization_server(
     State(resources): State<Arc<ProtectedResources>>,
-    parts: Parts,
 ) -> Result<Response, Error> {
-    let (Some(server), true) = (&resources.server, resources.enabled()) else {
+    let (Some(server), Some(issuer)) = (&resources.server, resources.issuer()) else {
         return Err(unavailable());
     };
-    let issuer = resources.origin(host_of(&parts).as_deref()).await?.ok_or_else(unavailable)?;
-    let mut document = server.metadata(&issuer);
+    let mut document = server.metadata(issuer);
     // Kernel tự đặt `issuer`: client PHẢI so nó với địa chỉ đã tải (RFC 8414 §3.3).
-    document.insert("issuer".to_owned(), Value::String(issuer));
+    document.insert("issuer".to_owned(), Value::String(issuer.to_owned()));
     Ok(public_json(Value::Object(document)))
 }
 
@@ -369,32 +319,29 @@ fn unavailable() -> Error {
 mod tests {
     use super::*;
 
-    fn resources() -> ProtectedResources {
-        ProtectedResources::new(
-            Some("https://api.example.com".to_owned()),
-            None,
-            None,
-            vec!["notes".to_owned()],
-        )
+    fn resources(public: &str) -> ProtectedResources {
+        ProtectedResources::new(Some(public.to_owned()), None, vec!["notes".to_owned()])
     }
 
     #[test]
     fn duong_dan_ra_resource() {
-        let resources = resources();
+        let resources = resources("https://api.example.com");
         assert_eq!(resources.resource_path("/mcp"), "/mcp");
         assert_eq!(resources.resource_path("/mcp/notes"), "/mcp/notes");
         assert_eq!(resources.resource_path("/mcp/notes/"), "/mcp/notes");
-        // Module lạ: thuộc `/mcp` chung (token cho `/mcp/<lạ>` không bao giờ được cấp).
-        assert_eq!(resources.resource_path("/mcp/unknown"), "/mcp");
+        // Module lạ, đường dẫn ngoài `/mcp` và `/api/v1`: không phải resource, token OAuth không bao giờ được nhận.
+        assert_eq!(resources.resource_path("/mcp/unknown"), "");
         assert_eq!(resources.resource_path("/api/v1/notes/1"), "/api/v1");
         assert_eq!(resources.resource_path("/api/v1x"), "");
         assert_eq!(resources.resource_path("/health/live"), "");
     }
 
     #[test]
-    fn cung_host_bo_qua_port_va_hoa_thuong() {
-        assert!(same_host("https://API.example.com:8443", "api.example.com"));
-        assert!(same_host("http://[::1]:3000", "::1"));
-        assert!(!same_host("https://api.example.com", "shop.example.com"));
+    fn public_url_co_path_thi_tat_oauth() {
+        assert_eq!(
+            resources("https://API.example.com/").origin.as_deref(),
+            Some("https://api.example.com")
+        );
+        assert_eq!(resources("https://example.com/api").origin, None);
     }
 }

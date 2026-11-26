@@ -121,19 +121,34 @@ pub(super) async fn handle(server: McpServer, request: Request) -> Response {
     };
 
     let outcome = server.dispatch(&method, params, &caller).await;
+    // Tool bị từ chối vì grant OAuth thiếu scope (D-20261126-mcp-oauth): challenge đủ `resource_metadata`, gửi ở
+    // header 403 (đặc tả MCP) và trong `_meta["mcp/www_authenticate"]` của kết quả (client chỉ đọc thân, như ChatGPT).
+    let challenge = caller.scope_challenge.lock().ok().and_then(|mut slot| slot.take()).map(
+        |value| match parts.extensions.get::<crate::http::oauth::Resources>() {
+            Some(resources) => resources.0.complete(parts.uri.path(), &value),
+            None => value,
+        },
+    );
     let (status, message) = match outcome {
         Ok(mut result) => {
             if modern {
                 decorate(&method, &mut result);
             }
+            if let Some(challenge) = &challenge {
+                let meta = result.entry("_meta").or_insert_with(|| Value::Object(Map::new()));
+                if let Value::Object(meta) = meta {
+                    meta.insert(
+                        "mcp/www_authenticate".to_owned(),
+                        Value::from(vec![challenge.clone()]),
+                    );
+                }
+            }
             (StatusCode::OK, protocol::result_message(id, Value::Object(result)))
         }
         Err(error) => (error_status(&error, modern), error.into_message(Some(id))),
     };
-    let challenge = caller.scope_challenge.lock().ok().and_then(|mut slot| slot.take());
     let status = if challenge.is_some() { StatusCode::FORBIDDEN } else { status };
     let mut response = json_response(status, &message);
-    // Lớp OAuth của kernel thêm `resource_metadata` vào challenge này.
     if let Some(value) = challenge.and_then(|value| HeaderValue::from_str(&value).ok()) {
         response.headers_mut().insert(header::WWW_AUTHENTICATE, value);
     }

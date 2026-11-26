@@ -35,7 +35,7 @@ mod step_up;
 
 pub use authenticator::Authenticator;
 pub use decision::Decision;
-pub use oauth::{AuthorizationServer, OAuthAccess, scope_allows};
+pub use oauth::{AuthorizationServer, Credential, OAuthAccess, canonical_resource, scope_allows};
 pub use step_up::StepUp;
 
 use crate::error::Error;

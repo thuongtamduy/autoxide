@@ -76,7 +76,7 @@ pub(crate) struct ComplianceService {
 
 /// Duyệt hay quyết định cần phiên đăng nhập của người, không nhận API key.
 pub(crate) fn require_session(principal: &Principal) -> Result<(), Error> {
-    if principal.api_key_id().is_some() {
+    if !principal.is_session() {
         return Err(Error::forbidden(
             "compliance.session_required",
             "This needs a signed-in person; API keys cannot do it.",

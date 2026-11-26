@@ -187,7 +187,8 @@ async fn checked(
         parts.method,
         String::from_utf8_lossy(&bytes)
     ));
-    let api_key = principal.api_key_id();
+    // Credential uỷ quyền (API key hay grant OAuth): lệnh đã duyệt chỉ dùng lại được bằng đúng credential đó.
+    let api_key = principal.credential_id();
     if let Some(approval) = parts.headers.get(&APPROVAL_HEADER) {
         let id = approval.to_str().ok().and_then(|raw| raw.parse::<Uuid>().ok());
         let used = match id {

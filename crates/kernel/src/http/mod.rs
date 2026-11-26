@@ -356,7 +356,6 @@ pub fn build(
     // 404 khi chưa bật) để hợp đồng OpenAPI không đổi theo cấu hình.
     let protected = Arc::new(oauth::ProtectedResources::new(
         extras.public_url.clone(),
-        extras.tenancy.clone(),
         extras.authorization_server.clone(),
         mcp::endpoint_modules(&extras.tools, &resources, &extras.prompts).into_iter().collect(),
     ));

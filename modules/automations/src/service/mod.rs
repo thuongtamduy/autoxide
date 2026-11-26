@@ -94,12 +94,13 @@ pub(crate) fn bounded(
 
 /// Cột `run_as_api_key`, `run_as_limit` cho người đang lưu / bật luật: luôn chụp quyền của người làm lúc
 /// này (`run_as_limit`), nên luật không bao giờ có hơn quyền lúc tạo / sửa / bật — kể cả khi tài khoản sau đó
-/// được thêm quyền (D-20261126-automation-owner-revoked); API key thì kèm ID key.
+/// được thêm quyền (D-20261126-automation-owner-revoked); credential uỷ quyền (API key hay grant OAuth) thì kèm ID
+/// của nó (D-20261126-mcp-oauth).
 pub(crate) fn credential(
     principal: &autoxide_kernel::access::Principal,
 ) -> Result<(Option<Uuid>, Option<String>), Error> {
     let limit = serde_json::to_string(&principal.snapshot()).map_err(Error::internal)?;
-    Ok((principal.api_key_id(), Some(limit)))
+    Ok((principal.credential_id(), Some(limit)))
 }
 
 /// Bây giờ, cắt tới micro giây (hai database lưu cùng một giá trị — dùng làm phiên bản).
