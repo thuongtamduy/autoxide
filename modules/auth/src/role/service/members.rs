@@ -241,7 +241,7 @@ impl RoleService {
             })?),
             None => None,
         };
-        // Cột `org_id` luôn có giá trị (nút gốc = id của khách, m0029).
+        // Cột `org_id` luôn có giá trị: service luôn ghi, m0047 gắn dòng NULL cũ về nút gốc (= id của khách).
         let units = user_role::Entity::find()
             .select_only()
             .column(user_role::Column::OrgId)

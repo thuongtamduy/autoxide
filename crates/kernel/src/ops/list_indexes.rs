@@ -52,7 +52,8 @@ impl MigrationTrait for AddListIndexes {
 
 /// Indexes for the kernel lists paged in cluster 3 (D-20261125-list-pages): `GET /jobs` without a filter or by
 /// `kind` (by `requested_by` and by `status` already have theirs), and `GET /custom-fields` by `position` with
-/// or without `target`. No older index is a prefix of a new one, so none is dropped.
+/// or without `target`, and `GET /approvals?status=…`. No older index is a prefix of a new one, so none is
+/// dropped.
 pub(crate) struct AddListIndexesKernel;
 
 impl MigrationName for AddListIndexesKernel {
@@ -62,7 +63,13 @@ impl MigrationName for AddListIndexesKernel {
 }
 
 /// `(table, index name, columns)` added.
-const KERNEL_ADDED: [(&str, &str, &[&str]); 4] = [
+const KERNEL_ADDED: [(&str, &str, &[&str]); 5] = [
+    // `GET /approvals?status=…`: the filter column before the id.
+    (
+        "kernel_approval_requests",
+        "kernel_approval_requests_status_page_idx",
+        &["tenant_id", "status", "id"],
+    ),
     ("kernel_job_runs", "kernel_job_runs_page_idx", &["tenant_id", "id"]),
     ("kernel_job_runs", "kernel_job_runs_kind_page_idx", &["tenant_id", "kind", "id"]),
     ("kernel_custom_fields", "kernel_custom_fields_page_idx", &["tenant_id", "position", "id"]),

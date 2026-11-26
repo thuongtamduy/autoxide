@@ -200,3 +200,128 @@ async fn danh_sach_truong_phan_trang_chi_loai_doc_duoc() {
     .await
     .unwrap();
 }
+
+/// Thêm thẳng vào bảng các trường `(khoá, loại bản ghi, vị trí)` (bỏ qua trần 100 trường mỗi loại của API: cần
+/// hàng nghìn dòng ẩn để vượt nhiều lô đọc).
+async fn insert_fields(app: &TestApp, rows: &[(String, &str, i32)]) {
+    use sea_orm::ConnectionTrait;
+    use sea_orm::sea_query::{Alias, Query};
+    let tenant =
+        autoxide_kernel::tenancy::DatabaseRegistry::single(app.database().clone()).default_tenant();
+    let write = tenant.database().write();
+    for chunk in rows.chunks(200) {
+        let mut insert = Query::insert();
+        insert.into_table(Alias::new("kernel_custom_fields")).columns(
+            [
+                "id",
+                "tenant_id",
+                "target",
+                "key",
+                "data_type",
+                "labels",
+                "help",
+                "required",
+                "options",
+                "visibility",
+                "filterable",
+                "personal_data",
+                "position",
+                "active",
+                "created_at",
+                "updated_at",
+            ]
+            .map(Alias::new),
+        );
+        for (key, target, position) in chunk {
+            let now = autoxide_kernel::time::Timestamp::now();
+            insert.values_panic([
+                uuid::Uuid::now_v7().into(),
+                tenant.id().as_uuid().into(),
+                (*target).into(),
+                key.clone().into(),
+                "text".into(),
+                "{}".into(),
+                "{}".into(),
+                false.into(),
+                "[]".into(),
+                "internal".into(),
+                false.into(),
+                false.into(),
+                (*position).into(),
+                true.into(),
+                now.into(),
+                now.into(),
+            ]);
+        }
+        write.execute(&insert).await.unwrap();
+    }
+}
+
+// Lọc theo quyền trong bộ nhớ: trang đi qua nhiều lô 200 dòng ẩn để tìm dòng được xem; mỗi request quét tối đa
+// 10 lô, hết ngân sách thì trả trang ngắn kèm `next_cursor` ở dòng cuối đã quét, request sau đi tiếp từ đó; danh
+// sách dài hơn ngân sách thì `count=true` không có `total`.
+#[tokio::test]
+async fn danh_sach_truong_vuot_lo_va_ngan_sach_quet() {
+    TestDatabase::run(async |test| {
+        let app = TestApp::builder(test)
+            .user("reader", 2, &["shop.read"])
+            .module(Shop)
+            .module(Vault)
+            .build()
+            .await
+            .unwrap();
+        let mut rows: Vec<(String, &str, i32)> = vec![("first".to_owned(), "shop.item", 0)];
+        rows.extend((1..=450).map(|position| (format!("h{position}"), "vault.box", position)));
+        rows.push(("middle".to_owned(), "shop.item", 451));
+        rows.extend((452..=2551).map(|position| (format!("h{position}"), "vault.box", position)));
+        rows.push(("last".to_owned(), "shop.item", 3000));
+        insert_fields(&app, &rows).await;
+        let get = async |query: &str| {
+            let answer = app
+                .get(&format!("/api/v1/kernel/custom-fields?{query}"))
+                .token("reader")
+                .send()
+                .await
+                .unwrap();
+            assert_eq!(answer.status(), StatusCode::OK, "{}", answer.json());
+            answer.json()
+        };
+        let keys = |page: &serde_json::Value| -> Vec<String> {
+            page["data"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|f| f["key"].as_str().unwrap().to_owned())
+                .collect()
+        };
+        // `limit=1`: theo con trỏ tới hết ra đúng ba trường được xem, qua nhiều lô ẩn.
+        let mut seen = Vec::new();
+        let mut cursor: Option<String> = None;
+        let mut requests = 0;
+        loop {
+            let mut query = "limit=1".to_owned();
+            if let Some(cursor) = &cursor {
+                query.push_str(&format!("&cursor={cursor}"));
+            }
+            let page = get(&query).await;
+            seen.extend(keys(&page));
+            requests += 1;
+            assert!(requests < 10, "không đi vòng");
+            match page["pagination"]["next_cursor"].as_str() {
+                Some(next) => cursor = Some(next.to_owned()),
+                None => break,
+            }
+        }
+        assert_eq!(seen, ["first", "middle", "last"]);
+        // Trang lớn: 10 lô (2000 dòng) hết trước khi gặp `last` — trang ngắn hơn `limit` nhưng vẫn có con trỏ.
+        let page = get("limit=50&count=true").await;
+        assert_eq!(keys(&page), ["first", "middle"]);
+        let next = page["pagination"]["next_cursor"].as_str().unwrap().to_owned();
+        assert!(page["pagination"].get("total").is_none(), "quá ngân sách thì không đếm: {page}");
+        let rest = get(&format!("limit=50&cursor={next}")).await;
+        assert_eq!(keys(&rest), ["last"]);
+        assert!(rest["pagination"]["next_cursor"].is_null());
+    })
+    .await
+    .unwrap();
+}

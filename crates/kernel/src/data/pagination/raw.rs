@@ -173,11 +173,23 @@ pub(crate) struct RawSort<'a> {
     pub value_of: fn(&QueryResult) -> Result<SortValue, Error>,
 }
 
+/// At most this many batches of [`MAX_LIMIT`](super::MAX_LIMIT) rows are read for one page of a filtered list
+/// ([`fetch_statement_page_filtered`]), and again at most this many to count it.
+pub(crate) const SCAN_BATCHES: usize = 10;
+
 /// Like [`fetch_statement_page`] (`sort: None`) or [`fetch_statement_page_by`], keeping only the rows `keep`
-/// accepts — for a rule SQL cannot test (who may see a row depends on its permissions). The rows are read in
-/// batches of [`MAX_LIMIT`](super::MAX_LIMIT) from the cursor on, keyset in the database, until the page is
-/// full; the cursor is the last kept row's. With `count=true` the first page also counts every kept row (one
-/// more walk over the list).
+/// accepts — for a rule SQL cannot test (who may see a row depends on its permissions; push as much of the rule
+/// as possible into `select` first). The rows are read in batches of [`MAX_LIMIT`](super::MAX_LIMIT) from the
+/// cursor on, keyset in the database, at most [`SCAN_BATCHES`] batches per request:
+///
+/// - the page fills and one more kept row is found: `next_cursor` is the last row of the page;
+/// - the list ends: no `next_cursor`;
+/// - the scan budget runs out first: the rows found so far (maybe none) and a `next_cursor` at the LAST SCANNED
+///   row, so the next request goes on from there. A page shorter than `limit`, even empty, with a `next_cursor`
+///   is therefore normal for these lists: keep following the cursor until it is `null`.
+///
+/// With `count=true` the first page also counts the kept rows while walking from the start, within the same
+/// budget; `pagination.total` is left out when the list is longer than the budget.
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn fetch_statement_page_filtered<C: ConnectionTrait>(
     select: SelectStatement,
@@ -188,112 +200,126 @@ pub(crate) async fn fetch_statement_page_filtered<C: ConnectionTrait>(
     request: &PageRequest,
     connection: &C,
 ) -> Result<Page<QueryResult>, Error> {
-    let limit = request.limit as usize;
-    let batch = |position: Option<Position>| PageRequest {
-        limit: super::MAX_LIMIT,
-        position,
-        order: request.order,
-        count: false,
-    };
-    let (found, has_more) = walk(
-        &select,
+    let walker = Walker {
+        select: &select,
         sort,
-        &id_column,
+        id_column: &id_column,
         id_of,
-        &keep,
-        batch(request.position.clone()),
-        Some(limit),
-        connection,
-    )
-    .await?;
-    let cursor_of = |row: &QueryResult| -> Result<String, Error> {
-        Ok(match sort {
-            None => id_of(row)?.to_string(),
-            Some(sort) => KeyCursor {
-                column: sort.name.to_owned(),
-                value: (sort.value_of)(row)?,
-                id: id_of(row)?,
-            }
-            .encode(),
-        })
+        keep: &keep,
+        order: request.order,
     };
-    let next_cursor = match (has_more, found.last()) {
-        (true, Some(row)) => Some(cursor_of(row)?),
-        _ => None,
-    };
+    let (found, resume, _) =
+        walker.walk(request.position.clone(), Some(request.limit as usize), connection).await?;
+    let next_cursor = resume.map(|position| match position {
+        Position::Id(id) => id.to_string(),
+        Position::Key(cursor) => cursor.encode(),
+    });
     let total = if request.wants_total() {
-        let (all, _) =
-            walk(&select, sort, &id_column, id_of, &keep, batch(None), None, connection).await?;
-        Some(u64::try_from(all.len()).unwrap_or(u64::MAX))
+        let (_, resume, kept) = walker.walk(None, None, connection).await?;
+        // Danh sách dài hơn ngân sách quét: không biết tổng, bỏ `total` thay vì báo sai.
+        resume.is_none().then(|| u64::try_from(kept).unwrap_or(u64::MAX))
     } else {
         None
     };
     Ok(Page { data: found, pagination: Pagination { limit: request.limit, next_cursor, total } })
 }
 
-/// Reads batches from `first` on and keeps rows until `wanted` + 1 are kept (or the list ends); returns at most
-/// `wanted` rows and whether more follow.
-#[allow(clippy::too_many_arguments)]
-async fn walk<C: ConnectionTrait>(
-    select: &SelectStatement,
-    sort: Option<&RawSort<'_>>,
-    id_column: &sea_orm::sea_query::ColumnRef,
+/// What one walk over a filtered list needs.
+struct Walker<'a, K> {
+    select: &'a SelectStatement,
+    sort: Option<&'a RawSort<'a>>,
+    id_column: &'a sea_orm::sea_query::ColumnRef,
     id_of: fn(&QueryResult) -> Result<Uuid, Error>,
-    keep: &impl Fn(&QueryResult) -> Result<bool, Error>,
-    first: PageRequest,
-    wanted: Option<usize>,
-    connection: &C,
-) -> Result<(Vec<QueryResult>, bool), Error> {
-    let mut found: Vec<QueryResult> = Vec::new();
-    let mut batch = first;
-    loop {
-        let rows = match sort {
-            None => {
-                fetch_statement_page(select.clone(), id_column.clone(), id_of, &batch, connection)
-                    .await?
-            }
-            Some(sort) => {
-                fetch_statement_page_by(
-                    select.clone(),
-                    sort.column.clone(),
-                    sort.name,
-                    sort.fits,
-                    sort.value_of,
-                    id_column.clone(),
-                    id_of,
-                    &batch,
-                    connection,
-                )
-                .await?
-            }
-        };
-        let more = rows.pagination.next_cursor.is_some();
-        let next = match rows.data.last() {
-            Some(last) => Some(match sort {
-                None => Position::Id(id_of(last)?),
-                Some(sort) => Position::Key(KeyCursor {
-                    column: sort.name.to_owned(),
-                    value: (sort.value_of)(last)?,
-                    id: id_of(last)?,
-                }),
+    keep: &'a K,
+    order: Order,
+}
+
+impl<K: Fn(&QueryResult) -> Result<bool, Error>> Walker<'_, K> {
+    /// The position right after `row` (its cursor).
+    fn position_of(&self, row: &QueryResult) -> Result<Position, Error> {
+        Ok(match self.sort {
+            None => Position::Id((self.id_of)(row)?),
+            Some(sort) => Position::Key(KeyCursor {
+                column: sort.name.to_owned(),
+                value: (sort.value_of)(row)?,
+                id: (self.id_of)(row)?,
             }),
-            None => None,
+        })
+    }
+
+    /// Reads batches from `start` on, at most [`SCAN_BATCHES`]. `wanted`: keep at most that many rows (`None`:
+    /// keep none, only count). Returns the kept rows, where the next page starts (`None`: the list is over) and
+    /// how many rows were kept in all (with `wanted: None`, the count).
+    async fn walk<C: ConnectionTrait>(
+        &self,
+        start: Option<Position>,
+        wanted: Option<usize>,
+        connection: &C,
+    ) -> Result<(Vec<QueryResult>, Option<Position>, usize), Error> {
+        let mut found: Vec<QueryResult> = Vec::new();
+        let mut kept = 0usize;
+        let mut batch = PageRequest {
+            limit: super::MAX_LIMIT,
+            position: start,
+            order: self.order,
+            count: false,
         };
-        for row in rows.data {
-            if keep(&row)? {
-                found.push(row);
+        for _ in 0..SCAN_BATCHES {
+            let rows = match self.sort {
+                None => {
+                    fetch_statement_page(
+                        self.select.clone(),
+                        self.id_column.clone(),
+                        self.id_of,
+                        &batch,
+                        connection,
+                    )
+                    .await?
+                }
+                Some(sort) => {
+                    fetch_statement_page_by(
+                        self.select.clone(),
+                        sort.column.clone(),
+                        sort.name,
+                        sort.fits,
+                        sort.value_of,
+                        self.id_column.clone(),
+                        self.id_of,
+                        &batch,
+                        connection,
+                    )
+                    .await?
+                }
+            };
+            let more = rows.pagination.next_cursor.is_some();
+            let last = match rows.data.last() {
+                Some(last) => Some(self.position_of(last)?),
+                None => None,
+            };
+            for row in rows.data {
+                if !(self.keep)(&row)? {
+                    continue;
+                }
+                kept += 1;
+                if let Some(wanted) = wanted {
+                    if found.len() == wanted {
+                        // Trang đã đủ và còn một dòng được xem nữa: trang sau bắt đầu sau dòng cuối của trang.
+                        let resume = match found.last() {
+                            Some(row) => Some(self.position_of(row)?),
+                            None => None,
+                        };
+                        return Ok((found, resume, kept));
+                    }
+                    found.push(row);
+                }
+            }
+            match last {
+                Some(position) if more => batch.position = Some(position),
+                _ => return Ok((found, None, kept)),
             }
         }
-        if let Some(wanted) = wanted
-            && found.len() > wanted
-        {
-            found.truncate(wanted);
-            return Ok((found, true));
-        }
-        match next {
-            Some(position) if more => batch.position = Some(position),
-            _ => return Ok((found, false)),
-        }
+        // Hết ngân sách quét: trang sau đi tiếp từ dòng cuối đã quét (có thể trả trang ngắn, kể cả rỗng).
+        Ok((found, batch.position, kept))
     }
 }
 

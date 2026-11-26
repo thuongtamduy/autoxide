@@ -346,6 +346,26 @@ fn not_found(id: Uuid) -> Error {
         .with_param("id", id)
 }
 
+/// [`may_see`] in SQL, so the database skips what the caller may not see: the caller's own requests, and — for
+/// a person — requests naming a permission the caller holds (`permissions` is a JSON array of names; a name is
+/// matched with its quotes, `_` escaped). `may_see` still checks every row read.
+fn visible_to(principal: &Principal) -> sea_orm::sea_query::Condition {
+    use sea_orm::sea_query::{Condition, LikeExpr};
+    let mine = Expr::col(Alias::new("requested_by")).eq(principal.user_id());
+    let mut visible = Condition::any().add(mine);
+    if matches!(principal.actor_kind(), ActorKind::Human | ActorKind::Support) {
+        if principal.has_all_permissions() {
+            return Condition::all();
+        }
+        for permission in principal.permissions() {
+            let escaped = permission.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_");
+            let pattern = LikeExpr::new(format!("%\"{escaped}\"%")).escape('\\');
+            visible = visible.add(Expr::col(Alias::new("permissions")).like(pattern));
+        }
+    }
+    visible
+}
+
 /// The caller sees the request: their own, or one they can decide with a permission (and is not an agent).
 fn may_see(principal: &Principal, approval: &ApprovalView) -> bool {
     approval.requested_by == principal.user_id() || may_decide(principal, approval)
@@ -381,7 +401,9 @@ pub(crate) struct ApprovalsState {
 ///
 /// Any signed-in user: the requests of your own agents, and those you may decide (a person holding
 /// one of the command's permissions). Newest first unless `order=asc`; paged with `limit` /
-/// `cursor`.
+/// `cursor`. The rows read per request are bounded: a page may hold fewer than `limit` items (even
+/// none) while `pagination.next_cursor` is set — keep following it until it is `null`. With
+/// `count=true`, `total` is left out when the list is too long to count in one request.
 #[utoipa::path(
     get,
     path = "/approvals",
@@ -408,9 +430,10 @@ async fn list_approvals(
 const STATUSES: [&str; 5] = ["pending", "approved", "rejected", "expired", "used"];
 
 /// One page of the requests the caller may see, by ID (newest first unless `order=asc`); `status` filters by
-/// status. Status and paging problems come back in one 422. Who may see a request depends on its permissions,
-/// which SQL cannot test: the requests are read in batches from the cursor on (keyset in the database, index
-/// `(tenant_id, id)`) and filtered until the page is full.
+/// status. Status and paging problems come back in one 422. Who may see a request is filtered in SQL
+/// ([`visible_to`], keyset on the indexes `(tenant_id, id)` / `(tenant_id, status, id)`) and checked again per
+/// row; the scan per request is bounded, so a page may be shorter than `limit` (even empty) while
+/// `next_cursor` is set (see `fetch_statement_page_filtered`).
 pub(crate) async fn page_for(
     tenant: &TenantContext,
     principal: &Principal,
@@ -450,6 +473,7 @@ pub(crate) async fn page_for(
         }
         None => {}
     }
+    select.cond_where(visible_to(principal));
     let rows = fetch_statement_page_filtered(
         select,
         None,

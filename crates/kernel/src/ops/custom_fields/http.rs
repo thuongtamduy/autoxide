@@ -24,8 +24,8 @@ impl CustomFieldsState {
 
     /// One page of the fields the caller may read (`target`: only that record type; `active_only`: only
     /// enabled fields), by `position` then ID. Whether the caller reads a field depends on its record type's
-    /// permission, which SQL cannot test: the fields are read in batches from the cursor on (keyset in the
-    /// database on the index `(tenant_id, target, position, id)`) and filtered until the page is full.
+    /// permission, which SQL cannot test: the fields are read in bounded batches from the cursor on (keyset in
+    /// the database on the index `(tenant_id, target, position, id)`), see `fetch_statement_page_filtered`.
     pub(super) async fn page(
         &self,
         tenant: &TenantContext,
@@ -78,7 +78,9 @@ impl CustomFieldsState {
 /// `kernel.custom_fields.manage`, or the permission that reads `target`'s records (without
 /// `target`: the fields of every record type you may read). The fields the tenant defined, by
 /// `position` (`order=desc` reverses it; paged with `limit` / `cursor`) — interfaces and agents
-/// build forms and filter chips from them.
+/// build forms and filter chips from them. The rows read per request are bounded: a page may hold
+/// fewer than `limit` items (even none) while `pagination.next_cursor` is set — keep following it
+/// until it is `null`. With `count=true`, `total` is left out when the list is too long to count.
 #[utoipa::path(
     get,
     path = "/custom-fields",

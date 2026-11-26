@@ -42,7 +42,7 @@ mod m0043_phone_accounts;
 mod m0044_scim;
 mod m0045_scim_groups;
 mod m0046_oidc_configured_by;
-mod m0047_list_page_indexes;
+pub(crate) mod m0047_list_page_indexes;
 pub(crate) mod u0001_seal_totp;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;

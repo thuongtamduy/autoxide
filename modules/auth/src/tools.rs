@@ -679,7 +679,11 @@ mod tests {
             let catalog =
                 call(&tools, &tenant, "list_permissions", admin.clone(), json!({})).await.unwrap();
             assert!(
-                catalog.as_array().unwrap().iter().any(|item| item["name"] == "auth.users.read")
+                catalog["data"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|item| item["name"] == "auth.users.read")
             );
             let page = call(&tools, &tenant, "list_users", admin.clone(), json!({"limit": 1}))
                 .await
@@ -747,7 +751,8 @@ mod tests {
             assert_eq!(set[0]["name"], "editor");
             let of_user = json!({"id": ada.id});
             let roles = call(&tools, &tenant, "get_user_roles", admin.clone(), of_user).await.unwrap();
-            assert_eq!(roles.as_array().unwrap().len(), 1);
+            assert_eq!(roles["data"].as_array().unwrap().len(), 1);
+            assert!(roles["pagination"]["next_cursor"].is_null());
 
             // API key: cần mật khẩu như REST; key không tạo được key.
             let input = json!({"name": "agent", "permissions": ["auth.users.read"], "current_password": "nope"});

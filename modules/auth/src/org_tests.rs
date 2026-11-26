@@ -516,3 +516,48 @@ async fn membership_role_va_so_nguoi_phan_trang() {
     .await
     .unwrap();
 }
+
+/// Dòng membership `org_id` NULL (dữ liệu cũ, sửa tay) là quyền ở nút gốc: m0047 gắn nó về nút gốc để trang
+/// membership theo nút không giấu nó; dòng NULL trùng nhau hay trùng dòng gốc đã có bị bỏ; chạy lại không đổi.
+#[tokio::test]
+async fn membership_org_null_hien_o_nut_goc_sau_migration() {
+    use autoxide_kernel::pagination::{Order, PageRequest};
+    use sea_orm::{ActiveModelTrait, Set};
+    TestDatabase::run(async |test| {
+        let services = services(test).await;
+        let tenant = &services.tenant;
+        let ann = user(&services, "ann@example.com").await;
+        let bob = user(&services, "bob@example.com").await;
+        let reader = role(&services, "reader", &[], &[("notes.read", Scope::Subtree)]).await;
+        let root = root_of(tenant.id()).as_uuid();
+        let row =
+            |user_id: Uuid, org_id: Option<Uuid>| crate::role::entity::user_role::ActiveModel {
+                id: Set(Uuid::now_v7()),
+                tenant_id: Set(tenant.id().as_uuid()),
+                user_id: Set(user_id),
+                role_id: Set(reader.id),
+                org_id: Set(org_id),
+                created_at: Set(autoxide_kernel::time::Timestamp::now()),
+            };
+        let write = tenant.database().write();
+        // Ann: hai dòng NULL cùng role (unique không chặn NULL). Bob: một dòng NULL và một dòng ở nút gốc.
+        row(ann, None).insert(write).await.unwrap();
+        row(ann, None).insert(write).await.unwrap();
+        row(bob, None).insert(write).await.unwrap();
+        row(bob, Some(root)).insert(write).await.unwrap();
+        for _ in 0..2 {
+            crate::migration::m0047_list_page_indexes::root_null_memberships(write).await.unwrap();
+        }
+        let first = PageRequest::first(50, Order::Asc);
+        for person in [ann, bob] {
+            let page = services.roles.memberships_page(tenant, person, &first).await.unwrap();
+            assert_eq!(page.data.len(), 1, "{page:?}");
+            assert_eq!(page.data[0].org_id, root);
+            assert_eq!(page.data[0].roles.iter().map(|r| r.id).collect::<Vec<_>>(), [reader.id]);
+        }
+        let counts = services.roles.role_member_counts(tenant).await.unwrap();
+        assert!(counts.contains(&(reader.id, 2)), "{counts:?}");
+    })
+    .await
+    .unwrap();
+}

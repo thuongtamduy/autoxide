@@ -195782,7 +195782,7 @@
     },
     "/api/v1/kernel/approvals": {
       "get": {
-        "description": "Any signed-in user: the requests of your own agents, and those you may decide (a person holding\none of the command's permissions). Newest first unless `order=asc`; paged with `limit` /\n`cursor`.",
+        "description": "Any signed-in user: the requests of your own agents, and those you may decide (a person holding\none of the command's permissions). Newest first unless `order=asc`; paged with `limit` /\n`cursor`. The rows read per request are bounded: a page may hold fewer than `limit` items (even\nnone) while `pagination.next_cursor` is set — keep following it until it is `null`. With\n`count=true`, `total` is left out when the list is too long to count in one request.",
         "operationId": "kernel_list_approvals",
         "parameters": [
           {
@@ -196762,7 +196762,7 @@
     },
     "/api/v1/kernel/custom-fields": {
       "get": {
-        "description": "`kernel.custom_fields.manage`, or the permission that reads `target`'s records (without\n`target`: the fields of every record type you may read). The fields the tenant defined, by\n`position` (`order=desc` reverses it; paged with `limit` / `cursor`) — interfaces and agents\nbuild forms and filter chips from them.",
+        "description": "`kernel.custom_fields.manage`, or the permission that reads `target`'s records (without\n`target`: the fields of every record type you may read). The fields the tenant defined, by\n`position` (`order=desc` reverses it; paged with `limit` / `cursor`) — interfaces and agents\nbuild forms and filter chips from them. The rows read per request are bounded: a page may hold\nfewer than `limit` items (even none) while `pagination.next_cursor` is set — keep following it\nuntil it is `null`. With `count=true`, `total` is left out when the list is too long to count.",
         "operationId": "kernel_list_custom_fields",
         "parameters": [
           {
@@ -200844,7 +200844,7 @@
     },
     "/api/v1/kernel/reasons/{list}/{code}": {
       "put": {
-        "description": "Requires `kernel.reasons.manage`. Changes the labels, order or on / off of a reason; a code the\nlist does not have yet becomes the tenant's own reason. Reasons required by law stay on\n(`kernel.reason_legal`). Codes are lower-case letters, digits and `_` (`kernel.reason_invalid`).",
+        "description": "Requires `kernel.reasons.manage`. Changes the labels, order or on / off of a reason; a code the\nlist does not have yet becomes the tenant's own reason. Reasons required by law stay on\n(`kernel.reason_legal`). Codes are lower-case letters, digits and `_` (`kernel.reason_invalid`).\nA tenant adds at most `AUTOXIDE_REASONS_TENANT_MAX` reasons of its own to one list\n(`kernel.reason_limit_reached`).",
         "operationId": "kernel_set_reason",
         "parameters": [
           {
@@ -200950,7 +200950,7 @@
                 }
               }
             },
-            "description": "Turning off a reason required by law; code `kernel.reason_legal`."
+            "description": "Turning off a reason required by law (code `kernel.reason_legal`), or the list already has `AUTOXIDE_REASONS_TENANT_MAX` reasons of the tenant's own (code `kernel.reason_limit_reached`)."
           },
           "422": {
             "content": {

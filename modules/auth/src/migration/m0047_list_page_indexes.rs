@@ -4,8 +4,15 @@
 //! (`down` tạo lại). Các danh sách khác đã có index khớp: khoá chính (tenant_id, id); role theo tên — unique
 //! (tenant_id, name); nút của membership — unique (tenant_id, user_id, org_id, role_id); lần cấp hỗ trợ theo
 //! khách — (tenant_id, target_tenant_id, id).
+//!
+//! Trước khi thêm index: dòng membership có `org_id` NULL (dữ liệu cũ hay sửa tay — m0029 để cột NULL được) được
+//! gắn về nút gốc (= id của khách), đúng nghĩa mọi chỗ đọc đã dùng (`org_id` NULL = nút gốc), để trang
+//! membership theo nút (keyset trên `org_id`) không giấu một quyền đang có hiệu lực. Dòng NULL trùng một dòng
+//! đã có ở nút gốc (hay trùng nhau) bị bỏ trước để không vi phạm unique (tenant_id, user_id, org_id, role_id).
+//! Chạy lại không đổi gì; `down` không đặt lại NULL (sửa dữ liệu, không có trạng thái cũ để quay về).
 
 use autoxide_kernel::migration::prelude::*;
+use sea_orm::{ConnectionTrait, Statement};
 
 pub(crate) struct Migration;
 
@@ -31,9 +38,31 @@ fn index(table: &str, name: &str, columns: &[&str]) -> IndexCreateStatement {
     index.to_owned()
 }
 
+/// Gắn membership `org_id` NULL về nút gốc (xem đầu file); chạy lại không đổi gì.
+pub(crate) async fn root_null_memberships<C: ConnectionTrait>(connection: &C) -> Result<(), DbErr> {
+    let backend = connection.get_database_backend();
+    for sql in ROOT_NULL_MEMBERSHIPS {
+        connection.execute_raw(Statement::from_string(backend, sql.to_owned())).await?;
+    }
+    Ok(())
+}
+
+/// Bỏ dòng NULL đã có bản ở nút gốc hay trùng một dòng NULL id nhỏ hơn, rồi gắn phần còn lại về nút gốc.
+const ROOT_NULL_MEMBERSHIPS: [&str; 3] = [
+    "DELETE FROM auth_user_role WHERE org_id IS NULL AND EXISTS (SELECT 1 FROM auth_user_role kept \
+     WHERE kept.tenant_id = auth_user_role.tenant_id AND kept.user_id = auth_user_role.user_id \
+     AND kept.role_id = auth_user_role.role_id AND kept.org_id = auth_user_role.tenant_id)",
+    "DELETE FROM auth_user_role WHERE org_id IS NULL AND EXISTS (SELECT 1 FROM auth_user_role kept \
+     WHERE kept.org_id IS NULL AND kept.tenant_id = auth_user_role.tenant_id \
+     AND kept.user_id = auth_user_role.user_id AND kept.role_id = auth_user_role.role_id \
+     AND kept.id < auth_user_role.id)",
+    "UPDATE auth_user_role SET org_id = tenant_id WHERE org_id IS NULL",
+];
+
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        root_null_memberships(manager.get_connection()).await?;
         for (table, name, columns) in ADDED {
             manager.create_index(index(table, name, columns)).await?;
         }

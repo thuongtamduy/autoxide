@@ -179,23 +179,27 @@ async fn list_child_tenants(
     principal.require(&DELEGATIONS_MANAGE)?;
     let page = PageRequest::try_from(page)?;
     // Cây khách đọc từng tầng (tối đa 16 tầng) trên sổ khách của mặt điều khiển; thứ tự (tầng, slug) chỉ biết
-    // sau khi đi hết các tầng trên, nên phân trang trong bộ nhớ theo vị trí trong lần đi (D-20261125-list-pages
-    // mục 4, như tổ tiên của nút `organizations`). Khoá là vị trí, đủ 6 chữ số để so theo byte đúng thứ tự.
+    // sau khi đi hết các tầng trên, nên phân trang trong bộ nhớ (D-20261125-list-pages mục 4, như tổ tiên của
+    // nút `organizations`). Khoá ổn định giữa hai request (cây đổi giữa chừng không làm trùng / sót các khách còn
+    // lại): tầng (2 chữ số) rồi slug — slug là duy nhất trên sổ khách.
     let children = state.delegations.databases.tenant_descendants(tenant.id()).await?;
-    let keyed: Vec<(String, ChildTenantResponse)> = children
-        .into_iter()
-        .enumerate()
-        .map(|(index, child)| {
-            let response = ChildTenantResponse {
-                id: child.id.as_uuid(),
-                parent_id: child.parent_id.as_uuid(),
-                slug: child.slug,
-                name: child.name,
-                status: child.status,
-            };
-            (format!("{index:06}"), response)
-        })
-        .collect();
+    let mut depths: std::collections::HashMap<Uuid, u32> =
+        std::collections::HashMap::from([(tenant.id().as_uuid(), 0)]);
+    let mut keyed: Vec<(String, ChildTenantResponse)> = Vec::with_capacity(children.len());
+    // Đi theo thứ tự tầng: tầng của cha đã biết khi gặp con.
+    for child in children {
+        let depth = depths.get(&child.parent_id.as_uuid()).copied().unwrap_or(0) + 1;
+        depths.insert(child.id.as_uuid(), depth);
+        let key = format!("{depth:02}\u{1f}{}", child.slug);
+        let response = ChildTenantResponse {
+            id: child.id.as_uuid(),
+            parent_id: child.parent_id.as_uuid(),
+            slug: child.slug,
+            name: child.name,
+            status: child.status,
+        };
+        keyed.push((key, response));
+    }
     Ok(page_of(keyed, |(key, _)| key.clone(), &page)?.map(|(_, child)| child))
 }
 
