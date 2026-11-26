@@ -48,6 +48,14 @@ async fn dieu_chinh_co_ly_do_ghi_so_va_chay_mot_lan() {
         assert_eq!(problem["code"], "inventory.reason_required");
         assert_eq!(problem["errors"].as_array().unwrap().len(), 2, "{problem}");
 
+        // PT-5: số lượng `i64::MIN` là lỗi 422 của trường, không panic (500).
+        let body = json!({"org_id": a, "reference": "adj-min", "lines": [
+            {"variant_id": item, "quantity": i64::MIN, "reason_code": "damaged"},
+        ]});
+        let (status, problem) = call(&shop, "POST", "/adjustments", "boss", Some(body)).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{problem}");
+        assert_eq!(problem["errors"][0]["field"], "lines[0].quantity", "{problem}");
+
         // Lý do không có trong danh sách.
         let body = json!({"org_id": a, "reference": "adj-1", "lines": [
             {"variant_id": item, "quantity": -2, "reason_code": "eaten"},

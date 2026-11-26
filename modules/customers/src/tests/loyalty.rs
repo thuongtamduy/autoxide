@@ -91,6 +91,21 @@ async fn points_expire_fifo_by_lot() {
             .await;
             assert_eq!(status, StatusCode::OK, "{body}");
         }
+        // PT-5: điểm ngoài trần (kể cả `i64::MIN`, mà `-points` tràn) là 422, không panic.
+        for points in [i64::MIN, i64::MAX] {
+            let (status, body) = call(
+                &shop,
+                "POST",
+                &format!("/{id}/points/adjustments"),
+                "boss",
+                Some(
+                    json!({"points": points, "reference": format!("big-{points}"), "reason": "x"}),
+                ),
+            )
+            .await;
+            assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{body}");
+            assert_eq!(body["errors"][0]["field"], "points", "{body}");
+        }
         // Cùng tham chiếu lần hai: không cộng thêm.
         call(
             &shop,

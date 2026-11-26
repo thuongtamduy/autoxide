@@ -192,7 +192,7 @@ impl PhoneSignIn {
         if let Some(ip) = ip {
             let hour = std::time::Duration::from_secs(3600);
             let throttle = Throttle::new("auth", SIGNUPS_PER_IP_PER_HOUR, hour)?;
-            let key = format!("phone-signup-ip:{}", autoxide_kernel::ip_hash::prefix(ip));
+            let key = autoxide_kernel::throttle::address_key("phone-signup-ip", ip);
             if let Outcome::Limited { retry_after } = throttle.hit(tenant, &key).await? {
                 return Err(signups_throttled(retry_after));
             }

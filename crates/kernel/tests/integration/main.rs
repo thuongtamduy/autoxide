@@ -43,6 +43,7 @@ mod navigation;
 mod numbering;
 mod ops_alerts;
 mod ops_backlog;
+mod org_exists;
 mod org_tree;
 mod pagination;
 mod pins;

@@ -251,3 +251,27 @@ async fn sandbox_vong_doi_database_chung() {
 async fn sandbox_vong_doi_database_rieng() {
     lifecycle(true).await;
 }
+
+/// PT-8: sandbox tạo với `role_id` không có ở khách (ID bịa) không uỷ quyền gì — trước đây rơi về role `admin`
+/// của khách gốc.
+#[tokio::test]
+async fn sandbox_voi_role_la_khong_uy_quyen_admin() {
+    TestDatabase::run(async |test| {
+        let app = app(test, false).await;
+        let shop = app.tenant("shop").await.unwrap();
+        let token = owner(&app, "shop").await;
+        let path = format!("/kernel/tenants/{}/sandboxes", shop.id());
+        let body = json!({"name": "Unknown role", "role_id": uuid::Uuid::now_v7()});
+        let (status, created, _) =
+            call(&app, Method::POST, &path, &token, "shop", Some(body)).await;
+        assert_eq!(status, StatusCode::CREATED, "{created}");
+        let id = created["data"]["id"].as_str().unwrap().to_owned();
+        settle(&app).await;
+        assert_eq!(sandbox_status(&app, &id).await, "active");
+        let (status, refused, _) =
+            call(&app, Method::GET, "/kernel/tenant", &token, &id, None).await;
+        assert_eq!(status, StatusCode::FORBIDDEN, "không có uỷ quyền vào sandbox: {refused}");
+    })
+    .await
+    .unwrap();
+}

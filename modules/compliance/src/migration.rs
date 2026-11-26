@@ -6,6 +6,7 @@
 use autoxide_kernel::migration::prelude::*;
 
 mod kyc_document_key;
+mod phone_challenge_block;
 
 pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
     vec![
@@ -44,6 +45,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(ConsentStatsIndex),
         Box::new(KycReviewNote),
         Box::new(kyc_document_key::KycVerifiedDocument),
+        Box::new(phone_challenge_block::PhoneChallengeBlock),
     ]
 }
 

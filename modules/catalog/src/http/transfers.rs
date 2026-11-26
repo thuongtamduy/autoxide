@@ -132,6 +132,7 @@ pub(crate) struct ImportQuery {
         (status = 201, description = "Queued.", body = Data<TransferResponse>, headers(("Location" = String, description = "Path of the import."))),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing `catalog.import`; code `permission_denied`.", body = Problem),
+        (status = 404, description = "`org_id` is not a unit of this tenant; code `org_not_found`.", body = Problem),
         (status = 413, description = "The file is larger than 20 MiB; code `payload_too_large`.", body = Problem),
         (status = 422, description = "The file is too large; see `errors`.", body = Problem),
         (status = 503, description = "No file storage is installed; code `catalog.storage_unavailable`.", body = Problem),
@@ -202,6 +203,7 @@ pub(crate) struct ExportRequest {
         (status = 201, description = "Queued.", body = Data<TransferResponse>, headers(("Location" = String, description = "Path of the export."))),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing `catalog.export`; code `permission_denied`.", body = Problem),
+        (status = 404, description = "`org_id` is not a unit of this tenant; code `org_not_found`.", body = Problem),
         (status = 422, description = "The body is not valid; see `errors`.", body = Problem),
         (status = 503, description = "No file storage is installed; code `catalog.storage_unavailable`.", body = Problem),
     )

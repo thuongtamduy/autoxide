@@ -136,8 +136,10 @@ impl ShippingService {
                     FieldError::new(format!("lines.{key}"), "range", "must be 1 to {max}")
                         .with_param("max", have),
                 );
+            } else {
+                // Chỉ cộng số hợp lệ (≤ số đang có): số ngoài khoảng do client gửi làm tràn (PT-5).
+                moving_total = moving_total.saturating_add(*quantity);
             }
-            moving_total += quantity;
         }
         if lines.is_empty() || moving_total >= total {
             problems.push(FieldError::new("lines", "split", "move some, not all, of the items"));

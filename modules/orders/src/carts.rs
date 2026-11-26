@@ -9,7 +9,7 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::money::{Currency, Money};
 use autoxide_kernel::reference::Submitted;
 use autoxide_kernel::secret::{random_token, sha256};
-use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext, root_of};
+use autoxide_kernel::tenancy::{OrgId, OrgTree, ScopeExt, TenantContext, root_of};
 use autoxide_kernel::time::Timestamp;
 use autoxide_promotions::api::{Eligibility, GiftSelection};
 use autoxide_shipping::api::Address;
@@ -118,6 +118,8 @@ impl OrdersService {
         locale: Option<&str>,
     ) -> Result<Submitted<NewCart>, Error> {
         let org = org.map_or_else(|| root_of(tenant.id()), OrgId::from_uuid);
+        // Endpoint công khai: nút bán phải là nút của khách (PT-8).
+        OrgTree::ensure_exists(tenant.database().read(), tenant.id(), org).await?;
         let currency = Currency::parse(currency.unwrap_or("VND"))?;
         let locale = locale.unwrap_or("vi").to_owned();
         let buyer = principal.map(Principal::user_id);

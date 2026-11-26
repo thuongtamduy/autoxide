@@ -12,12 +12,12 @@
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
-use autoxide_kernel::access::{Principal, PrincipalSnapshot};
+use autoxide_kernel::access::{OrgTarget, Principal, PrincipalSnapshot};
 use autoxide_kernel::ai::{Effort, Part, Prompt};
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::job::{EnqueueOptions, Job, JobContext, JobHandler};
-use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
+use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext};
 use sea_orm::sea_query::Expr;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
 use serde::{Deserialize, Serialize};
@@ -155,7 +155,17 @@ impl CatalogService {
         }
         fail_if_any(problems)?;
         let org = match input.org_id {
-            Some(org) => org,
+            Some(org) => {
+                // Nút của nháp phải là nút của khách, trong phạm vi người gọi (PT-8).
+                principal
+                    .require_at(
+                        tenant.database().read(),
+                        &PRODUCTS_WRITE,
+                        OrgTarget::new(OrgId::from_uuid(org), None),
+                    )
+                    .await?;
+                org
+            }
             None => default_org(tenant, principal, &PRODUCTS_WRITE)?.as_uuid(),
         };
         let id = Uuid::now_v7();

@@ -99,7 +99,7 @@ impl From<image_draft::Model> for ImageDraftResponse {
     responses(
         (status = 201, description = "Queued.", body = Data<ImageDraftResponse>, headers(("Location" = String, description = "Path of the request."))),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "Missing `catalog.products.write` (code `permission_denied`), or the plan lacks `catalog.ai` (code `feature_not_enabled`).", body = Problem),
+        (status = 403, description = "Missing `catalog.products.write` (code `permission_denied`), `org_id` outside your scope or not a unit of this tenant (code `org_out_of_scope`), or the plan lacks `catalog.ai` (code `feature_not_enabled`).", body = Problem),
         (status = 422, description = "A value is invalid (an image not in the media library, too many images, unknown language or category, bad tax category); see `errors`.", body = Problem),
         (status = 503, description = "AI is off (code `ai.disabled`), or the model cannot read images (code `catalog.ai_images_unavailable`).", body = Problem),
     )

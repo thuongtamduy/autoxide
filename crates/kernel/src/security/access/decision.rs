@@ -10,6 +10,8 @@
 
 use sea_orm::sea_query::Condition;
 use sea_orm::{ColumnTrait, ConnectionTrait};
+use std::collections::HashSet;
+use std::sync::{Arc, Mutex};
 use uuid::Uuid;
 
 use super::{OrgTarget, Permission, Principal, Scope, org_out_of_scope};
@@ -28,6 +30,46 @@ pub enum Decision {
     OutOfScope,
 }
 
+/// Units shown to exist in a tenant (`OrgTree::contains`) while checking this caller's permissions, so a request
+/// that checks many permissions at the same unit (navigation, work queue, find, summary) looks the unit up
+/// once. Shared by the clones of one `Principal` (one request, one job run); only "exists" is remembered, which
+/// stays true because units are never deleted. Not part of the caller's identity: never compared.
+#[derive(Clone, Default)]
+pub(super) struct KnownUnits(Arc<Mutex<HashSet<(TenantId, OrgId)>>>);
+
+// Giữ bộ nhớ có hạn cho principal sống lâu (job): quá trần thì không nhớ thêm, chỉ tra lại.
+const MAX_KNOWN_UNITS: usize = 256;
+
+impl KnownUnits {
+    fn contains(&self, tenant: TenantId, org: OrgId) -> bool {
+        // `lock()` chỉ lỗi khi một thread khác panic lúc giữ khoá: khi đó coi như chưa nhớ, tra lại.
+        self.0.lock().is_ok_and(|known| known.contains(&(tenant, org)))
+    }
+
+    fn remember(&self, tenant: TenantId, org: OrgId) {
+        if let Ok(mut known) = self.0.lock()
+            && known.len() < MAX_KNOWN_UNITS
+        {
+            known.insert((tenant, org));
+        }
+    }
+}
+
+// Hai principal giống nhau dù đã nhớ những đơn vị khác nhau: bộ nhớ không phải danh tính.
+impl PartialEq for KnownUnits {
+    fn eq(&self, _: &Self) -> bool {
+        true
+    }
+}
+
+impl Eq for KnownUnits {}
+
+impl std::fmt::Debug for KnownUnits {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("KnownUnits")
+    }
+}
+
 /// The part a permission allows: derived from the caller's grants, shared by the SQL condition and the
 /// per-record check.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -44,6 +86,7 @@ pub(super) struct Reach {
     fence: Option<OrgId>,
     tenant: TenantId,
     user: Uuid,
+    known: KnownUnits,
 }
 
 impl Reach {
@@ -81,12 +124,24 @@ impl Reach {
             Some(owner) => !self.owns.is_empty() && owner == self.user,
             None => self.owns.contains(&target.org),
         };
+        // `known`: đơn vị đích đã được chứng minh là một nút của khách (nằm trong grant, hay trong nhánh
+        // qua bảng closure). Quyền toàn khách, hay `own` theo chủ bản ghi, không nói gì về đơn vị — một ID
+        // ngẫu nhiên hay của khách khác vẫn qua (PT-8): khi đó phải tra cây.
+        let mut known = self.units.contains(&target.org) || self.owns.contains(&target.org);
         let mut allowed = self.everywhere || owned || self.units.contains(&target.org);
         if !allowed && !self.subtrees.is_empty() {
             allowed = OrgTree::is_within(db, self.tenant, target.org, &self.subtrees).await?;
+            known = allowed;
         }
         if allowed && let Some(fence) = self.fence {
             allowed = OrgTree::is_within(db, self.tenant, target.org, &[fence]).await?;
+            known = allowed;
+        }
+        if allowed && !known && !self.known.contains(self.tenant, target.org) {
+            allowed = OrgTree::contains(db, self.tenant, target.org).await?;
+            if allowed {
+                self.known.remember(self.tenant, target.org);
+            }
         }
         Ok(allowed)
     }
@@ -110,6 +165,7 @@ impl Principal {
             fence: self.fence(),
             tenant: self.tenant_id(),
             user: self.user_id(),
+            known: self.known_units.clone(),
         })
     }
 

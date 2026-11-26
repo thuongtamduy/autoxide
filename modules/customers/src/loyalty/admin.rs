@@ -97,6 +97,9 @@ fn effective(from: Option<Timestamp>) -> Result<Timestamp, Error> {
     }
 }
 
+/// Trần số điểm một lần điều chỉnh tay (mỗi phía của 0).
+const MAX_ADJUST_POINTS: i64 = 1_000_000_000;
+
 impl CustomersService {
     /// Mọi quyền quản trị điểm là quyền ở cả khách (chương trình chung của khách).
     async fn require_tenant_wide(
@@ -381,8 +384,12 @@ impl CustomersService {
             )
             .await?;
         let mut problems = Vec::new();
-        if points == 0 {
-            problems.push(FieldError::new("points", "range", "must not be 0"));
+        // Có trần: `-points` và điểm × giá trị điểm không được tràn `i64` (PT-5).
+        if points == 0 || points.unsigned_abs() > MAX_ADJUST_POINTS.unsigned_abs() {
+            problems.push(
+                FieldError::new("points", "range", "must be from -{max} to {max}, and not 0")
+                    .with_param("max", MAX_ADJUST_POINTS),
+            );
         }
         if !(1..=200).contains(&reference.trim().chars().count()) {
             problems.push(FieldError::new("reference", "length", "must be 1 to 200 characters"));
@@ -437,8 +444,10 @@ impl CustomersService {
                         actor,
                     )
                     .await?;
-                let value: i64 =
-                    taken.iter().map(|part| part.points.saturating_mul(part.value)).sum();
+                let value: i64 = taken
+                    .iter()
+                    .map(|part| part.points.saturating_mul(part.value))
+                    .fold(0i64, i64::saturating_add);
                 self.queue_posting(
                     &transaction,
                     tenant,

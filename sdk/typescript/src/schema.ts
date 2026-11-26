@@ -36508,6 +36508,7 @@ export interface paths {
         201: Data_CatalogTransfer;
         401: Problem;
         403: Problem;
+        404: Problem;
         422: Problem;
         503: Problem;
         default: Problem;
@@ -36549,6 +36550,7 @@ export interface paths {
         201: Data_CatalogTransfer;
         401: Problem;
         403: Problem;
+        404: Problem;
         413: Problem;
         422: Problem;
         503: Problem;
@@ -42582,6 +42584,7 @@ export interface paths {
         202: Data_RestockAlertAccepted;
         400: Problem;
         403: Problem;
+        404: Problem;
         422: Problem;
         429: Problem;
         503: Problem;
@@ -47008,6 +47011,7 @@ export interface paths {
         200: Data_OrdersCart;
         201: Data_OrdersCart;
         403: Problem;
+        404: Problem;
         422: Problem;
         default: Problem;
       };

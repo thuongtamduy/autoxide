@@ -365,6 +365,10 @@ async fn store_credit_adjusted_by_staff_and_spent_once() {
         let tenant = shop.default_tenant();
         let until = Timestamp::now() + SignedDuration::from_mins(30);
         let buyer = Some(Uuid::from_u128(BUYER));
+        // PT-6: số dư VND không trả cho đơn USD (không quy đổi theo đơn vị nhỏ).
+        let usd = autoxide_kernel::money::Money::new(30_000, autoxide_kernel::money::Currency::USD);
+        let error = tender.hold(&tenant, "orders:usd", buyer, &json!({}), usd, until).await.unwrap_err();
+        assert_eq!(error.code(), "customers.insufficient_balance");
         let first = tender.hold(&tenant, "orders:a", buyer, &json!({}), vnd(30_000), until).await.unwrap();
         let second = tender.hold(&tenant, "orders:b", buyer, &json!({}), vnd(30_000), until).await.unwrap();
         assert_eq!((first, second), (vnd(30_000), vnd(20_000)));

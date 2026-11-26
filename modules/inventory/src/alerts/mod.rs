@@ -246,6 +246,15 @@ impl InventoryService {
         else {
             return Ok(());
         };
+        // Cửa hàng phải là nút của khách (PT-8): không lưu ID bịa.
+        if let Some(store) = input.store_id {
+            autoxide_kernel::tenancy::OrgTree::ensure_exists(
+                tenant.database().read(),
+                tenant.id(),
+                autoxide_kernel::tenancy::OrgId::from_uuid(store),
+            )
+            .await?;
+        }
         let store_key = input.store_id.unwrap_or(Uuid::nil());
         let (kind, value) = who.parts();
         let consent = json!({

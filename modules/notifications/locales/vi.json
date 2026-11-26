@@ -44,7 +44,7 @@
   "notifications.platform_security_notice.short": "{title}",
   "notifications.platform_security_notice.title": "{title}",
   "notifications.preference_locked": "Không tắt được thông báo bảo mật.",
-  "notifications.push_subscription_invalid": "Đăng ký nhận thông báo đẩy không hợp lệ: gửi `endpoint` (https) cùng khoá `p256dh` và `auth` trong PushSubscription của trình duyệt.",
+  "notifications.push_subscription_invalid": "Đăng ký nhận thông báo đẩy không hợp lệ: gửi `endpoint` (https, trên máy chủ công khai) cùng khoá `p256dh` và `auth` trong PushSubscription của trình duyệt.",
   "notifications.push_subscription_not_found": "Không có đăng ký nhận thông báo đẩy này của bạn.",
   "notifications.recipient_unknown": "Khách không có người dùng mang ID này.",
   "notifications.template_draft_not_found": "Mẫu này chưa có bản nháp; lưu bản nháp bằng `PUT …/draft` trước.",

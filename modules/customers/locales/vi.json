@@ -8,6 +8,7 @@
   "field:a manual group has no rule": "nhóm tay không có quy tắc",
   "field:a rule group needs a rule": "nhóm theo quy tắc cần có quy tắc",
   "field:cannot change": "không đổi được",
+  "field:must be from -{max} to {max}, and not 0": "phải từ -{max} tới {max}, khác 0",
   "field:cannot change; create a new group instead": "không đổi được; hãy tạo nhóm mới",
   "field:is required": "là bắt buộc",
   "field:lists hold at most 50 values": "mỗi danh sách có tối đa 50 giá trị",

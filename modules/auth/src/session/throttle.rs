@@ -107,10 +107,14 @@ fn key(email: &str) -> String {
     format!("login:{}", email.trim().to_lowercase())
 }
 
-/// Khoá đếm của cặp email + địa chỉ (`-`: không biết địa chỉ).
+/// Khoá đếm của cặp email + khối địa chỉ (`-`: không biết địa chỉ). Theo khối /24 hay /64, không theo
+/// địa chỉ đúng (D-20261125-address-keys): xoay địa chỉ trong khối không mở thêm lượt thử.
 fn pair_key(email: &str, ip: Option<IpAddr>) -> String {
-    let ip = ip.map_or_else(|| "-".to_owned(), |ip| ip.to_string());
-    format!("login-ip:{}|{ip}", email.trim().to_lowercase())
+    let block = match ip {
+        Some(ip) => autoxide_kernel::throttle::address_key("login-ip", ip),
+        None => "login-ip:-".to_owned(),
+    };
+    format!("{block}|{}", email.trim().to_lowercase())
 }
 
 #[cfg(test)]

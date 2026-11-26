@@ -154,7 +154,7 @@ pub(crate) struct CloseShiftRequest {
         (status = 403, description = "Missing `orders.pos.shift` at the store; code `permission_denied`.", body = Problem),
         (status = 404, description = "No such shift; code `orders.shift_not_found`.", body = Problem),
         (status = 409, description = "The shift is not open; code `orders.shift_not_open`.", body = Problem),
-        (status = 422, description = "Reason or note missing, or invalid values (see `errors`).", body = Problem),
+        (status = 422, description = "Reason or note missing, `counted_cash` not in the shift currency (`orders.cash_currency_mismatch`), the cash adds up beyond the storable range (`money.overflow`), or invalid values (see `errors`).", body = Problem),
     )
 )]
 pub(crate) async fn close_shift(
@@ -169,7 +169,7 @@ pub(crate) async fn close_shift(
             &tenant,
             &principal,
             id,
-            input.counted_cash.minor(),
+            input.counted_cash,
             input.variance_reason,
             input.variance_note,
         )
@@ -332,7 +332,7 @@ pub(crate) struct PosSaleResponse {
         (status = 403, description = "Missing `orders.pos.sell` at the store; code `permission_denied`.", body = Problem),
         (status = 404, description = "No such shift; code `orders.shift_not_found`.", body = Problem),
         (status = 409, description = "The shift is not open (`orders.shift_not_open`) or not enough stock in the store (`orders.out_of_stock`).", body = Problem),
-        (status = 422, description = "Payments do not add up (`orders.payments_mismatch`), a product not on sale (`orders.variant_unavailable`), the reference reused for another sale (`orders.idempotency_key_reused`), or invalid values (see `errors`).", body = Problem),
+        (status = 422, description = "Payments do not add up (`orders.payments_mismatch`) or overflow (`money.overflow`), a payment is not in the shift currency (`orders.payment_currency_mismatch`), a product not on sale (`orders.variant_unavailable`), the reference reused for another sale (`orders.idempotency_key_reused`), or invalid values (see `errors`).", body = Problem),
     )
 )]
 pub(crate) async fn sell(
@@ -350,6 +350,10 @@ pub(crate) async fn sell(
             amount: payment.amount.minor(),
             tendered: payment.tendered.map(Money::minor),
             approval_code: payment.approval_code,
+            currencies: std::iter::once(payment.amount)
+                .chain(payment.tendered)
+                .map(|money| money.currency().code().to_owned())
+                .collect(),
         })
         .collect();
     let sold = service

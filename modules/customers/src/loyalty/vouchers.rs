@@ -170,7 +170,10 @@ impl CustomersService {
         let currency = current_rule(&transaction, tenant, now())
             .await?
             .map_or_else(|| "VND".to_owned(), |rule| rule.currency);
-        let value: i64 = taken.iter().map(|part| part.points.saturating_mul(part.value)).sum();
+        let value: i64 = taken
+            .iter()
+            .map(|part| part.points.saturating_mul(part.value))
+            .fold(0i64, i64::saturating_add);
         self.queue_posting(
             &transaction,
             tenant,

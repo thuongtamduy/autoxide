@@ -24,7 +24,7 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::job::{EnqueueOptions, Job, JobContext, JobHandler};
 use autoxide_kernel::storage::{ByteStream, Storage, StoredFile, TenantStorage};
-use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext, TenantId};
+use autoxide_kernel::tenancy::{OrgId, OrgTree, ScopeExt, TenantContext, TenantId};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder,
     QuerySelect, Set,
@@ -161,6 +161,11 @@ impl CatalogService {
         if content.len() > MAX_IMPORT_BYTES {
             return Err(import_too_large());
         }
+        // Nút nhận phải là nút của khách (PT-8); phạm vi của người gọi kiểm lúc job tạo sản phẩm.
+        if let Some(org) = org_id {
+            OrgTree::ensure_exists(tenant.database().read(), tenant.id(), OrgId::from_uuid(org))
+                .await?;
+        }
         let store = self.store(tenant)?;
         let id = Uuid::now_v7();
         let key = format!("catalog/imports/{id}.csv");
@@ -178,6 +183,10 @@ impl CatalogService {
         org_id: Option<Uuid>,
     ) -> Result<transfer::Model, Error> {
         principal.require(&EXPORT_PERMISSION)?;
+        if let Some(org) = org_id {
+            OrgTree::ensure_exists(tenant.database().read(), tenant.id(), OrgId::from_uuid(org))
+                .await?;
+        }
         self.store(tenant)?;
         self.queue_transfer(tenant, principal, Uuid::now_v7(), "export", org_id, None).await
     }

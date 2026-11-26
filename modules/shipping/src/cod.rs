@@ -177,8 +177,10 @@ impl ShippingService {
             .lines
             .first()
             .map_or(autoxide_kernel::money::Currency::VND, |line| line.cod.currency());
-        let total_cod: i64 = statement.lines.iter().map(|line| line.cod.minor()).sum();
-        let total_fee: i64 = statement.lines.iter().map(|line| line.fee.minor()).sum();
+        // Cộng có kiểm (PT-5): số trong file đối soát do người gọi gửi; tổng vượt `i64` hay các dòng
+        // khác tiền tệ là lỗi 422 (`money.overflow` / `money.currency_mismatch`), không panic.
+        let total_cod = Money::sum(currency, statement.lines.iter().map(|line| line.cod))?.minor();
+        let total_fee = Money::sum(currency, statement.lines.iter().map(|line| line.fee))?.minor();
         let at = now();
         let id = Uuid::now_v7();
         let transaction = tenant.database().begin_write().await?;
@@ -196,7 +198,13 @@ impl ShippingService {
                 Some(row) if !matches!(status_of(row), ShipmentStatus::Delivered) => {
                     "not_delivered"
                 }
-                Some(row) if row.cod_minor.unwrap_or(0) != line.cod.minor() => "amount_mismatch",
+                // Khác tiền tệ cũng là lệch số tiền (PT-6): không đối chiếu số đơn vị nhỏ của hai tiền.
+                Some(row)
+                    if row.cod_minor.unwrap_or(0) != line.cod.minor()
+                        || row.currency != line.cod.currency().code() =>
+                {
+                    "amount_mismatch"
+                }
                 Some(_) => "matched",
             };
             let line_id = Uuid::now_v7();

@@ -168,3 +168,75 @@ async fn sai_qua_han_muc_moi_ngay_thi_khoa_so() {
     .await
     .unwrap();
 }
+
+fn ip(text: &str) -> Option<std::net::IpAddr> {
+    Some(text.parse().unwrap())
+}
+
+/// PT-4: giới hạn gửi mã theo địa chỉ đếm theo khối /64 với IPv6, theo đúng địa chỉ với IPv4 — xoay địa chỉ trong khối của
+/// mình không gửi thêm được mã tới hàng loạt số (mỗi tin tốn tiền SMS của cửa hàng).
+#[tokio::test]
+async fn xoay_dia_chi_trong_khoi_khong_gui_them_ma() {
+    TestDatabase::run(async |test| {
+        let settings = [("AUTOXIDE_COMPLIANCE_OTP_PER_IP_PER_HOUR", "5")];
+        let (app, codes, _sms) = app_with(test, &settings).await;
+        let tenant = app.default_tenant();
+        for number in 0..5u32 {
+            let client = ip(&format!("2001:db8:5:2::{:x}", number + 1));
+            codes.send(&tenant, &format!("09120{number:05}"), client).await.unwrap();
+        }
+        let error = codes.send(&tenant, "0912000099", ip("2001:db8:5:2::abcd")).await.unwrap_err();
+        assert_eq!(error.code(), "compliance.otp_throttled");
+        // IPv4: theo đúng địa chỉ; địa chỉ bên cạnh trong cùng /24 (NAT của nhà mạng) không bị chặn oan.
+        for number in 0..5u32 {
+            codes.send(&tenant, &format!("09130{number:05}"), ip("198.51.100.7")).await.unwrap();
+        }
+        let error = codes.send(&tenant, "0913000099", ip("198.51.100.7")).await.unwrap_err();
+        assert_eq!(error.code(), "compliance.otp_throttled");
+        codes.send(&tenant, "0913000098", ip("198.51.100.8")).await.unwrap();
+        // Khối khác vẫn gửi được.
+        codes.send(&tenant, "0914000001", ip("2001:db8:5:3::1")).await.unwrap();
+    })
+    .await
+    .unwrap();
+}
+
+/// PT-7: người lạ xin mã cho số của người khác rồi nhập sai cho đủ hạn mức ngày không khoá được chủ số
+/// ở địa chỉ khác; chính khối của họ thì bị khoá. Đoán sai từ đủ nhiều khối (trần chung = 5 × hạn mức)
+/// vẫn khoá số ở mọi nơi — chống đoán mã phân tán.
+#[tokio::test]
+async fn doan_sai_tu_khoi_khac_khong_khoa_chu_so() {
+    TestDatabase::run(async |test| {
+        let settings = [
+            ("AUTOXIDE_COMPLIANCE_OTP_WRONG_PER_PHONE_PER_DAY", "2"),
+            ("AUTOXIDE_COMPLIANCE_OTP_PER_PHONE_PER_HOUR", "100"),
+        ];
+        let (app, codes, sms) = app_with(test, &settings).await;
+        let tenant = app.default_tenant();
+        let wrong_for = |code: &str| if code == "000000" { "111111" } else { "000000" }.to_owned();
+        let burn = async |client: &str| {
+            let sent = codes.send(&tenant, "0912000333", ip(client)).await.unwrap();
+            let wrong = wrong_for(&code_in(&sms, "+84912000333"));
+            for _ in 0..2 {
+                let error = codes.verify(&tenant, sent.id, &wrong).await.unwrap_err();
+                assert_eq!(error.code(), "compliance.otp_invalid");
+            }
+        };
+        burn("203.0.113.10").await;
+        // Khối của kẻ nhập sai: bị khoá.
+        let error = codes.send(&tenant, "0912000333", ip("203.0.113.10")).await.unwrap_err();
+        assert_eq!(error.code(), "compliance.otp_daily_limit");
+        // Chủ số ở khối khác: vẫn xin và dùng mã được.
+        let own = codes.send(&tenant, "0912000333", ip("2001:db8:9:1::1")).await.unwrap();
+        codes.verify(&tenant, own.id, &code_in(&sms, "+84912000333")).await.unwrap();
+
+        // Đủ 5 khối × 2 lần sai = 10: số bị khoá ở mọi nơi.
+        for block in 1..5 {
+            burn(&format!("198.51.{block}.1")).await;
+        }
+        let error = codes.send(&tenant, "0912000333", ip("2001:db8:9:1::2")).await.unwrap_err();
+        assert_eq!(error.code(), "compliance.otp_daily_limit");
+    })
+    .await
+    .unwrap();
+}

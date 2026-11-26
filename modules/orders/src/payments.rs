@@ -322,7 +322,15 @@ impl OrdersService {
                 paid.updated_at = Set(now);
                 paid.update(&transaction).await?;
                 let late = current.status == OrderStatus::Cancelled.as_str();
-                let paid_minor = current.paid_minor + amount.minor();
+                // Cộng có kiểm (PT-5, PT-6): khoản nhận khác tiền của đơn (vd đối soát chấp nhận một
+                // khoản ngoại tệ) hay tràn `i64` là lỗi — event vào dead-letter để người xử lý, không ghi
+                // số đơn vị nhỏ của tiền khác vào đơn.
+                let paid_minor = autoxide_kernel::money::Money::from_columns(
+                    current.paid_minor,
+                    &current.currency,
+                )?
+                .checked_add(amount)?
+                .minor();
                 let order_id = current.id;
                 // Trả trước một phần (D-232): khoản lúc đặt → `partially_paid`; phần còn lại →
                 // `paid`, đơn đã xác nhận từ trước nên không chuyển trạng thái.

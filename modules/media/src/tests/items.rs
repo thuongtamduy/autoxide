@@ -676,7 +676,11 @@ async fn khoa_file_co_tien_to_khach() {
         let ada = editor();
         let mut input = upload("a.png", "image/png");
         input.tags = vec!["Shared".into()];
-        let item = media.upload(&other, &ada, input, body(&samples::png(2, 2))).await.unwrap().item;
+        let item = media
+            .upload(&other, &ada.clone().in_tenant(other.id()), input, body(&samples::png(2, 2)))
+            .await
+            .unwrap()
+            .item;
 
         let prefixed = format!("tenants/{}/{}", other.id(), item.storage_key());
         assert!(storage.get(&prefixed).await.unwrap().is_some(), "under the tenant prefix");
@@ -699,12 +703,24 @@ async fn khoa_file_co_tien_to_khach() {
 
         // Cùng tên thư mục ở hai khách; chuyển thư mục ở khách chưa có dòng khoá.
         let mine = media.create_folder(&default, &ada, "Photos", None).await.unwrap();
-        let theirs = media.create_folder(&other, &ada, "Photos", None).await.unwrap();
-        let inner = media.create_folder(&other, &ada, "Inner", None).await.unwrap();
+        let theirs = media
+            .create_folder(&other, &ada.clone().in_tenant(other.id()), "Photos", None)
+            .await
+            .unwrap();
+        let inner = media
+            .create_folder(&other, &ada.clone().in_tenant(other.id()), "Inner", None)
+            .await
+            .unwrap();
         let moved = FolderChanges { parent_id: Some(Some(theirs.id)), ..Default::default() };
-        media.update_folder(&other, &ada, inner.id, moved, None).await.unwrap();
+        media
+            .update_folder(&other, &ada.clone().in_tenant(other.id()), inner.id, moved, None)
+            .await
+            .unwrap();
         let across = FolderChanges { parent_id: Some(Some(mine.id)), ..Default::default() };
-        let refused = media.update_folder(&other, &ada, inner.id, across, None).await.unwrap_err();
+        let refused = media
+            .update_folder(&other, &ada.clone().in_tenant(other.id()), inner.id, across, None)
+            .await
+            .unwrap_err();
         assert_eq!(refused.code(), "validation_failed");
 
         // Sổ chỉ có khách mặc định: khoá của khách kia để nguyên, kể cả khoá mồ côi.

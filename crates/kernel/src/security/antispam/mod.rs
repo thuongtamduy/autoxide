@@ -559,6 +559,7 @@ impl SpamGuard {
                     let bucket =
                         crate::ip_hash::bucket(&self.secret, submission.scope, ip, now).await?;
                     if !throttle
+                        // address-key: `bucket` là dấu của khối /24 hay /64 (`ip_hash::bucket`).
                         .hit(tenant, &format!("ip:{}:{bucket}", submission.scope))
                         .await?
                         .is_allowed()
