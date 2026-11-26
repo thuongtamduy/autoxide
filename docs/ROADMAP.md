@@ -16,8 +16,8 @@ thuộc đã xong. **Bước ghi "tạm dừng tới sau 1.0" không bao giờ l
 ## Thứ tự làm (D-228, D-20261121-community-first)
 
 **Từ ngày 26/11/2026 (chủ dự án quyết, D-20261126-road-to-1-0):** bước 71 (đường tới 1.0) và các mục còn mở của bước
-70 (P4, P5, P6, P9, P16, P17) làm trước mọi bước khác; không mở tính năng nghiệp vụ mới tới 1.0. Các mục còn mở của 52 và
-54 chuyển sang sau 1.0. Điều kiện ra 1.0 ghi ở đầu bước 71. Đoạn "Từ ngày 21/11/2026" dưới đây giữ để tra lịch sử; thứ tự
+70 (P4, P5, P6, P9, P16, P17) làm trước mọi bước khác; không mở tính năng nghiệp vụ mới tới 1.0. Các mục còn mở của 54
+và 52 cũng làm trước 1.0, sau bước 71 G1–G2 (D-20261126-steps-52-54-before-1-0). Điều kiện ra 1.0 ghi ở đầu bước 71. Đoạn "Từ ngày 21/11/2026" dưới đây giữ để tra lịch sử; thứ tự
 1–5 của nó đã được thay.
 
 **Từ ngày 21/11/2026:** bước 70 (P1–P3) làm trước mọi bước còn mở. Sau đó xếp theo kịch bản "một cửa hàng bán online
@@ -88,13 +88,13 @@ Bước lớn nhất là 33 (sửa mọi bảng của mọi module): một ngư�
 
 ## Giai đoạn G — Đường tới 1.0 (làm trước, chủ dự án quyết ngày 26/11/2026, D-20261126-road-to-1-0)
 
-## 71. Đường tới 1.0: chuẩn tương lai, chuẩn AI agent, nâng cấp một nút, mọi trình độ dùng được, chuẩn cộng đồng
+## 71. Đường tới 1.0: chuẩn tương lai, chuẩn AI agent, nâng cấp một nút, mọi trình độ dùng được, chuẩn cộng đồng, sẵn sàng phát hành
 
 Nguồn: rà soát core ngày 26/11/2026 (bảy hướng). Mọi mục làm trước khi phát hành 1.0, chọn hướng dài hạn (không làm đối
 phó); mục lớn có quyết định thiết kế (skill `record-decision`) trước khi viết code. Mục chạm kernel, bảo mật, tiền, thuế
 qua kiểm độc lập (D-20261126-independent-review).
 
-**Điều kiện ra 1.0:** mọi mục `[ ]` dưới đây và P4, P6, P9, P16, P17 của bước 70 xong; gate đầy đủ xanh trên SQLite và
+**Điều kiện ra 1.0:** mọi mục `[ ]` dưới đây, P4, P6, P9, P16, P17 của bước 70 và các mục còn mở của 54, 52 xong; gate đầy đủ xanh trên SQLite và
 Postgres; kiểm thử bảo mật bên ngoài không còn lỗi mức cao trở lên; luật sư đã rà phần dữ liệu cá nhân, hoá đơn, thuế; các
 chỉ số của G9 đạt ngưỡng.
 
@@ -214,7 +214,7 @@ chỉ số của G9 đạt ngưỡng.
 
 ### G9 — Chất lượng thành quy trình và đo bằng con số
 
-- [ ] Kiểm độc lập bắt buộc theo D-20261126-independent-review (mẫu pull request có mục kết quả kiểm)
+- [x] Kiểm độc lập bắt buộc theo D-20261126-independent-review (mẫu pull request có mục kết quả kiểm)
 - [ ] Mutation testing (`cargo-mutants`) cho kernel và phần tiền / thuế, chạy định kỳ
 - [ ] Bất biến tiền, thuế, quyền thành property test chạy hằng đêm
 - [ ] Đo tải trong CI hằng tuần trên cả hai database, chặn khi p95 của đường nóng tệ đi; vài benchmark vi mô cho đường
@@ -238,6 +238,44 @@ chỉ số của G9 đạt ngưỡng.
 - [ ] Luật sư rà phần dữ liệu cá nhân (Luật 91/2025/QH15, Nghị định 356/2025/NĐ-CP — cần đối chiếu văn bản gốc), hoá
       đơn điện tử, thuế
 - [ ] Đợt kiểm thử bảo mật bên ngoài trước 1.0; sau 1.0 cân nhắc chương trình thưởng báo lỗi bảo mật
+
+### G13 — Phát hành 1.0 (chủ dự án duyệt ngày 26/11/2026, D-20261126-release-1-0-readiness)
+
+- [ ] Đánh phiên bản mọi hợp đồng, không chỉ REST: tên và payload event giữa module, payload webhook gửi đi, tên và schema
+      tool MCP, schema `x-*` của OpenAPI; quy tắc thêm / đổi / bỏ, cách khai bản cũ sắp bỏ, test giữ hợp đồng (như api-diff)
+- [ ] Thời gian chạy thử trước 1.0: phát hành `1.0.0-rc.N` cho người ngoài dùng 2–4 tuần, kênh nhận phản hồi, tiêu chí
+      chốt (không còn lỗi hợp đồng mở); chỉ sửa lỗi trong thời gian này
+- [ ] Chính sách hỗ trợ dài hạn: bản 1.x nhận vá bảo mật bao lâu, bản lớn trước còn được hỗ trợ bao lâu khi bản lớn mới ra,
+      quy trình vá ngược; ghi vào `docs/COMPATIBILITY.md` và `SECURITY.md` (EN + VI)
+- [ ] Trang tài liệu có phiên bản: website tài liệu chính thức (hướng dẫn, tham chiếu API sinh từ OpenAPI, MCP, docs.rs),
+      có tìm kiếm, mỗi bản phát hành một bộ tài liệu, EN + VI, tự dựng khi phát hành
+- [ ] Chạy nhiều máy chủ cùng lúc: test trong CI 2–3 máy chủ song song không giao trùng việc nền / event, không mất lock
+      migration; tài liệu sức chứa (SQLite chịu tới đâu, khi nào chuyển Postgres, số khách mỗi máy chủ, cấu hình đề xuất)
+- [ ] Mô hình mối đe doạ của core (`docs/THREAT_MODEL.md`, EN + VI) làm đầu vào cho đợt kiểm thử bên ngoài; mã hoá ở mức
+      trường cho dữ liệu cá nhân nhạy cảm (khoá quản lý được, xoay khoá); nhật ký kiểm toán khó sửa lén (chuỗi băm hay tương
+      đương)
+- [ ] Mục tiêu khôi phục sau sự cố: RPO / RTO ghi rõ cho từng cách triển khai; diễn tập khôi phục trong CI cả trường hợp
+      nhiều khách có database riêng và kho file
+- [ ] Rà giấy phép thư viện: `cargo deny` chặn giấy phép không hợp MIT/Apache; danh sách giấy phép của bên thứ ba đi kèm
+      mỗi bản phát hành (binary, image, SDK)
+
+### G14 — Vận hành và cam kết nền (chủ dự án duyệt ngày 26/11/2026, D-20261126-operations-baseline)
+
+- [ ] Cam kết nền tảng: chính sách bản Postgres (các bản lớn còn được hãng hỗ trợ), bản SQLite tối thiểu, hệ điều hành và
+      kiến trúc CPU cho binary và image; CI chạy ma trận các bản Postgres được hỗ trợ (ít nhất bản cũ nhất và mới nhất); ghi
+      vào `docs/COMPATIBILITY.md` (EN + VI); `doctor` cảnh báo khi chạy trên bản ngoài danh sách
+- [ ] Bộ đồ nghề vận hành: sổ tay xử lý sự cố `docs/RUNBOOK.md` (EN + VI) cho các tình huống thường gặp (database đầy hay
+      chậm, hàng đợi việc nền ứ, xoay khoá ký và khoá mã hoá khi lộ, thu hồi hàng loạt API key / phiên, khôi phục một khách
+      từ sao lưu, khách báo mất dữ liệu); mẫu bảng theo dõi và luật cảnh báo dựng sẵn từ số đo OTLP / Prometheus của core;
+      quy trình ứng phó lỗ hổng bảo mật (nhận báo, đánh giá, vá, công bố, xin mã CVE) ghi ở `SECURITY.md`
+- [ ] Thử hỏng có chủ đích trong CI trên cả hai database: mất kết nối database giữa transaction, đầy ổ đĩa, Postgres
+      chuyển máy dự phòng / khởi động lại, tiến trình bị giết giữa việc nền, migration và sao lưu; hệ thống tự hồi phục,
+      không mất hay nhân đôi event / job, không hỏng dữ liệu; kết quả ghi vào tài liệu sức chứa
+- [ ] Mở rộng danh sách hợp đồng được cam kết (bổ sung G13): tên lệnh, tham số và mã thoát của CLI `autoxide`; định dạng
+      file sao lưu và file xuất dữ liệu (bản 1.x đọc được file do mọi bản 1.y trước đó tạo, có số phiên bản định dạng trong
+      file); test giữ hợp đồng như api-diff
+- [ ] Đường chuyển từ 0.x lên 1.0 cho người viết module: hướng dẫn từng bước (EN + VI) và công cụ tự sửa code cũ sang hợp
+      đồng mới (dùng chính nó để chuyển module trong repo); chạy thử trên `examples/external-module`
 
 ## Giai đoạn A — Hợp đồng và nền lõi
 
@@ -584,7 +622,7 @@ chính làm trước bước 33 theo lệnh của chủ dự án; phần theo kh
 - [ ] Gỡ menu cũ của `content` khi qua 2027-05-14: bốn endpoint, trait `LegacyMenus`, bảng `content_menus` và
       `content_menu_items` (migration mới), mục menu trong `docs/CONTENT.md`
 
-## 54. Phân quyền chuẩn hàng đầu (chủ dự án giao ngày 13/11/2026, D-205) — mục còn mở **tạm dừng tới sau 1.0** (D-20261126-road-to-1-0)
+## 54. Phân quyền chuẩn hàng đầu (chủ dự án giao ngày 13/11/2026, D-205) — làm trước 1.0 (D-20261126-steps-52-54-before-1-0)
 
 Đặc tả: [`docs/steps/54-authorization.md`](steps/54-authorization.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
 
@@ -618,7 +656,7 @@ Google Zanzibar, AWS IAM, GitHub, Microsoft Entra, Salesforce, Shopify, Stripe v
 - [ ] "Xem như" người dùng chỉ đọc thay cho đăng nhập thay (D-232): người mua phải cấp phép, không xem người
       quyền cao hơn, mọi lệnh ghi bị chặn kể cả qua MCP, không trả secret, audit hai id
 
-## 52. Trải nghiệm quản trị nâng cao (D-201) — mục còn mở **tạm dừng tới sau 1.0** (D-20261126-road-to-1-0)
+## 52. Trải nghiệm quản trị nâng cao (D-201) — làm trước 1.0 (D-20261126-steps-52-54-before-1-0)
 
 Đặc tả: [`docs/steps/52-admin-experience.md`](steps/52-admin-experience.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
 
