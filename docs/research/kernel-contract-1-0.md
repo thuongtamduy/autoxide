@@ -459,7 +459,10 @@ Mỗi dòng một PR, mỗi PR có test trên cả hai database cho phần chạ
    `legacy_default`.
 2. `autoxide-macros` + `db` (Record, find/insert/update/delete, `TenantDb`/`Db`/`AllTenants`, lỗi `conflict()`), test cách ly
    hai database; chuyển `notes` làm mẫu; luật `wrapped-libraries` với baseline 38 module.
-3. Migration `Plan` + file chụp SQL + `notes` chuyển migration.
+3. Migration `Plan` + file chụp SQL + `notes` chuyển migration. **Đi sau các PR của G3 (nâng cấp một nút) chạm
+   `migration.rs`/`manager.rs`**: G3 dựa vào manifest tên migration theo từng bản phát hành (rollback) và lock của placement
+   trong `kernel_migration_runs`, nên PR này giữ nguyên **tên** mọi migration, bảng lịch sử và đường chạy của G3; chỉ thêm
+   cách khai mới bên cạnh.
 4. HTTP: `endpoint`, `routes!`, `Schema`, `Params`, `Validate`, extractor, `NoContent`/`Download`; `time::Duration…`;
    `async_trait` xuất lại; `notes` chuyển hết → `notes` không còn khai thư viện bọc nào. Đo thời gian biên dịch (§4.2).
 5. `Manifest` + `StartContext` gọn; `notes` chuyển; luật `module-contract-legacy`.
@@ -488,8 +491,8 @@ không chạm cùng file.
   `#[schema(…)]`), nên phần lớn là đổi `use` và tên; file chụp SQL + test sẵn có của module bắt sai.
 - **Lớp `db` thiếu một mẫu truy vấn**: thêm vào `db` (ổn định) hay tạm qua `db.sql` có lý do; không mở lối gọi thẳng SeaORM.
 - **Thời gian biên dịch** của bản sao bóng: đo ở PR 4, vượt ngưỡng thì chuyển sang sinh thẳng bằng builder (§4.2).
-- **Đụng phiên "Nâng cấp một nút"** (lệnh migrate, CI nâng cấp): PR 3 chạm bộ chạy migration — báo phiên điều phối trước khi
-  sửa `migration.rs`/`manager.rs`.
+- **Đụng G3 "Nâng cấp một nút"**: PR 3 chạm bộ chạy migration nên làm sau các PR của G3 ở `migration.rs`/`manager.rs`;
+  tên migration là khoá của manifest rollback theo bản phát hành, không bao giờ đổi khi viết lại sang `Plan`.
 - **Kiểu SeaORM rò qua `api` của module** (trait giữa module có tham số `&DatabaseTransaction` để ghi chung transaction):
   thay bằng `&TenantTx`/`&Tx` của kernel ở cụm chuyển tương ứng.
 
