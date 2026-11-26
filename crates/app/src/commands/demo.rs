@@ -45,6 +45,12 @@ pub struct Arguments {
     /// the migrations, reference data and the administrator are written to the database you name here.
     #[arg(long, value_name = "URL")]
     database_url: Option<String>,
+
+    /// Keep the outside services from your environment and `.env` (SMTP mail, S3 file storage, OpenTelemetry,
+    /// AI providers). By default the demo turns them off: mail is written to files and uploads stay in the demo
+    /// directory, so a try-out never sends a real email or writes to a real bucket.
+    #[arg(long)]
+    keep_external_services: bool,
 }
 
 /// Giá trị demo sinh một lần và giữ lại giữa các lần chạy.
@@ -72,7 +78,12 @@ pub fn run(arguments: &Arguments) -> ExitCode {
     if let Err(error) = std::env::set_current_dir(&arguments.dir) {
         return report_failure(&format!("cannot enter `{}`: {error}", arguments.dir.display()));
     }
-    let source = demo_source(source, &state, arguments.database_url.as_deref());
+    let source = demo_source(
+        source,
+        &state,
+        arguments.database_url.as_deref(),
+        arguments.keep_external_services,
+    );
     let settings = match settings::read_with(&source, crate::registry::all()) {
         Ok(settings) => settings,
         Err(errors) => return report_invalid_configuration(&errors),
@@ -99,6 +110,7 @@ pub fn run(arguments: &Arguments) -> ExitCode {
         }),
         // Database đã có dữ liệu mà không còn file bí mật cũ: quản trị viên cũ giữ mật khẩu cũ.
         existing_admin_unknown: database_existed && !had_state,
+        external_services: arguments.keep_external_services,
     };
     print!("{}", banner.render());
     let config = settings.config.clone();
@@ -112,10 +124,31 @@ pub fn run(arguments: &Arguments) -> ExitCode {
 /// - **Ép** (ghi đè mọi thứ người dùng đặt): database (không bao giờ chạm database thật khi không có
 ///   `--database-url`), bản sao đọc, migrate lúc khởi động (database demo mới trống), định dạng log (người đọc terminal).
 /// - **Mặc định** (người dùng ghi đè được): khoá, quản trị viên, dữ liệu tham chiếu, trang tài liệu API.
-fn demo_source(source: ConfigSource, state: &State, database_url: Option<&str>) -> ConfigSource {
-    let source = match database_url {
+fn demo_source(
+    source: ConfigSource,
+    state: &State,
+    database_url: Option<&str>,
+    keep_external_services: bool,
+) -> ConfigSource {
+    let mut source = match database_url {
         Some(url) => source.with_value("DATABASE_URL", url),
         None => source.with_value("DATABASE_URL", DEMO_DATABASE_URL).without("DATABASE_READ_URL"),
+    };
+    if !keep_external_services {
+        // Dịch vụ ngoài: thư gửi đi, kho file, telemetry, nhà cung cấp AI. Bỏ chúng thì mail ghi ra file `data/mail`
+        // và file nằm ở `data/files` (mặc định của các module đó). Module bộ nối nhà cung cấp là module thử nghiệm,
+        // tắt trừ khi `AUTOXIDE_MODULES` nêu tên: ép về `official`.
+        for name in EXTERNAL_SERVICE_SETTINGS {
+            source = source.without(name);
+        }
+        source = source.with_value("AUTOXIDE_MODULES", "official");
+    }
+    // Mật khẩu đã đặt bằng file thì không đặt thêm mặc định `_PASSWORD`: cấu hình cấm đặt cả hai.
+    let password_file_set = source.get("AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD_FILE").is_some();
+    let source = if password_file_set {
+        source
+    } else {
+        source.with_default("AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD", &state.admin_password)
     };
     source
         .with_value("AUTOXIDE_MIGRATE_ON_START", "true")
@@ -123,10 +156,27 @@ fn demo_source(source: ConfigSource, state: &State, database_url: Option<&str>) 
         .with_default("AUTOXIDE_AUTH_TOKEN_SECRET", &state.token_secret)
         .with_default("AUTOXIDE_SECRET_KEY", &state.secret_key)
         .with_default("AUTOXIDE_BOOTSTRAP_ADMIN_EMAIL", ADMIN_EMAIL)
-        .with_default("AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD", &state.admin_password)
         .with_default("AUTOXIDE_STARTUP_TASKS", SAMPLE_DATA_TASKS)
         .with_default("AUTOXIDE_HTTP_API_DOCS", "true")
 }
+
+/// Biến cấu hình trỏ ra dịch vụ bên ngoài: thư (SMTP), kho file (S3 và thông tin đăng nhập AWS), OpenTelemetry, nhà
+/// cung cấp AI và embedding.
+const EXTERNAL_SERVICE_SETTINGS: &[&str] = &[
+    "AUTOXIDE_MAIL_SMTP_URL",
+    "AUTOXIDE_FILES_S3_BUCKET",
+    "AUTOXIDE_FILES_S3_PREFIX",
+    "AWS_ENDPOINT_URL",
+    "AWS_ACCESS_KEY_ID",
+    "AWS_SECRET_ACCESS_KEY",
+    "AWS_REGION",
+    "OTEL_EXPORTER_OTLP_ENDPOINT",
+    "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
+    "AUTOXIDE_AI_API_KEY",
+    "AUTOXIDE_AI_BASE_URL",
+    "AUTOXIDE_EMBEDDING_API_KEY",
+    "AUTOXIDE_EMBEDDING_BASE_URL",
+];
 
 struct Banner {
     dir: PathBuf,
@@ -136,6 +186,8 @@ struct Banner {
     /// Email và (nếu biết) mật khẩu của quản trị viên theo cấu hình đã nạp.
     admin: Option<(String, Option<String>)>,
     existing_admin_unknown: bool,
+    /// `--keep-external-services`: dịch vụ ngoài từ cấu hình đang bật.
+    external_services: bool,
 }
 
 impl Banner {
@@ -264,7 +316,7 @@ mod tests {
             ("DATABASE_READ_URL", "postgres://replica/db"),
             ("AUTOXIDE_MIGRATE_ON_START", "false"),
         ]);
-        let source = demo_source(user, &state(), None);
+        let source = demo_source(user, &state(), None, false);
         assert_eq!(source.get("AUTOXIDE_HTTP_API_DOCS"), Some("false"));
         assert_eq!(source.get("DATABASE_URL"), Some(DEMO_DATABASE_URL));
         assert_eq!(source.get("DATABASE_READ_URL"), None);
@@ -273,13 +325,14 @@ mod tests {
 
     #[test]
     fn co_database_url_ro_rang_thi_dung_no() {
-        let source = demo_source(ConfigSource::default(), &state(), Some("sqlite://other.db"));
+        let source =
+            demo_source(ConfigSource::default(), &state(), Some("sqlite://other.db"), false);
         assert_eq!(source.get("DATABASE_URL"), Some("sqlite://other.db"));
     }
 
     #[test]
     fn cau_hinh_cua_demo_hop_le() {
-        let source = demo_source(ConfigSource::default(), &state(), None);
+        let source = demo_source(ConfigSource::default(), &state(), None, false);
         settings::read(&source).unwrap();
     }
 
@@ -291,6 +344,7 @@ mod tests {
             database: "SQLite file data/autoxide.sqlite".into(),
             admin,
             existing_admin_unknown: unknown,
+            external_services: false,
         }
         .render()
     }
@@ -311,6 +365,10 @@ mod tests {
     }
 
     /// Demo khởi động thật trên SQLite trong một thư mục tạm: migrate, tạo quản trị viên, nạp dữ liệu, rồi dừng.
+    ///
+    /// Bài này tự mở SQLite thay vì dùng `TestDatabase::run`: demo CHỈ chạy trên SQLite (một file trong thư mục demo,
+    /// hay URL do `--database-url` chỉ ra), nên không có nhánh Postgres nào để chạy cả hai; và bài kiểm đúng đường
+    /// `demo_source` → `serve` mà người dùng đi, không phải một database do testkit dựng.
     #[test]
     fn demo_khoi_dong_duoc_tren_sqlite() {
         let dir = std::env::temp_dir().join(format!("autoxide-demo-boot-{}", std::process::id()));
@@ -325,6 +383,7 @@ mod tests {
             ConfigSource::from_pairs([("AUTOXIDE_HTTP_ADDRESS", "127.0.0.1:0")]),
             &state,
             Some(&url),
+            false,
         );
         let settings = settings::read_with(&source, crate::registry::all()).unwrap();
         let result = crate::commands::block_on(super::super::serve::serve(settings, async {
@@ -333,5 +392,37 @@ mod tests {
         assert!(result.is_ok(), "{result:?}");
         assert!(dir.join("autoxide.sqlite").exists());
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn dich_vu_ngoai_bi_bo_tru_khi_xin_giu() {
+        let user = ConfigSource::from_pairs([
+            ("AUTOXIDE_MAIL_SMTP_URL", "smtp://real"),
+            ("AUTOXIDE_FILES_S3_BUCKET", "real-bucket"),
+            ("AWS_ACCESS_KEY_ID", "key"),
+            ("OTEL_EXPORTER_OTLP_ENDPOINT", "http://collector"),
+            ("AUTOXIDE_AI_API_KEY", "ai"),
+            ("AUTOXIDE_MODULES", "official,momo"),
+        ]);
+        let off = demo_source(user.clone(), &state(), None, false);
+        for name in EXTERNAL_SERVICE_SETTINGS {
+            assert_eq!(off.get(name), None, "{name}");
+        }
+        assert_eq!(off.get("AUTOXIDE_MODULES"), Some("official"));
+        let kept = demo_source(user, &state(), None, true);
+        assert_eq!(kept.get("AUTOXIDE_MAIL_SMTP_URL"), Some("smtp://real"));
+        assert_eq!(kept.get("AUTOXIDE_MODULES"), Some("official,momo"));
+    }
+
+    #[test]
+    fn mat_khau_bang_file_khong_bi_them_mat_khau_mac_dinh() {
+        let user = ConfigSource::from_pairs([(
+            "AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD_FILE",
+            "/run/secrets/admin",
+        )]);
+        let source = demo_source(user, &state(), None, false);
+        assert_eq!(source.get("AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD"), None);
+        // Cấu hình vẫn hợp lệ (không báo "not both").
+        settings::read(&source).unwrap();
     }
 }
