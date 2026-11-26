@@ -56,7 +56,7 @@ api-unpaged-list GET /api/v1/catalog/rounding-rules # có trước luật
 api-unpaged-list GET /api/v1/catalog/variants # có trước luật
 api-unpaged-list GET /api/v1/catalog/variants/{id}/attributes # có trước luật
 api-unpaged-list GET /api/v1/catalog/variants/{id}/digital-assets # có trước luật
-api-unpaged-list GET /api/v1/comments/public/counts # có trước luật
+api-unpaged-list GET /api/v1/comments/public/counts # tra cứu theo id client gửi (tối đa 100), giữ thứ tự hỏi — chờ chủ dự án duyệt ngoại lệ
 api-unpaged-list GET /api/v1/compliance/documents # có trước luật
 api-unpaged-list GET /api/v1/compliance/documents/{id}/acceptance-stats # có trước luật
 api-unpaged-list GET /api/v1/compliance/me/consents # có trước luật
@@ -68,7 +68,7 @@ api-unpaged-list GET /api/v1/compliance/retention # có trước luật
 api-unpaged-list GET /api/v1/compliance/rules # có trước luật
 api-unpaged-list GET /api/v1/compliance/tracking-providers # có trước luật
 api-unpaged-list GET /api/v1/customers/me/wishlist # có trước luật
-api-unpaged-list GET /api/v1/inventory/public/availability # có trước luật
+api-unpaged-list GET /api/v1/inventory/public/availability # tra cứu theo biến thể client gửi (tối đa 100) — chờ chủ dự án duyệt ngoại lệ
 api-unpaged-list GET /api/v1/kernel/approvals # có trước luật
 api-unpaged-list GET /api/v1/kernel/blocks # một dòng cho mỗi loại khối mà module đang chạy khai (bước 67): tập nhỏ, cố định theo binary, như sổ module
 api-unpaged-list GET /api/v1/kernel/connections/webhooks # một dòng cho mỗi loại kết nối mà bộ nối đang bật đăng ký (D-20261121-provider-accounts): tập nhỏ, cố định theo binary
@@ -151,3 +151,61 @@ api-param-description GET /api/v1/support/tickets?status # có trước luật
 api-param-description GET /api/v1/support/tickets?team_id # có trước luật
 api-param-description GET /api/v1/support/tickets?category # có trước luật
 api-param-description GET /api/v1/support/tickets?priority # có trước luật
+# mcp-page-count: tool danh sách có trước luật (26/11/2026) chưa nhận count; thêm trong PR đại trà của module rồi xoá dòng
+mcp-page-count TOOL address.search_units # có trước luật
+mcp-page-count TOOL audit.list_entries # có trước luật
+mcp-page-count TOOL auth.list_invitations # có trước luật
+mcp-page-count TOOL auth.list_memberships # có trước luật
+mcp-page-count TOOL auth.list_users # có trước luật
+mcp-page-count TOOL bookings.list_bookings # có trước luật
+mcp-page-count TOOL catalog.list_collections # có trước luật
+mcp-page-count TOOL catalog.list_products # có trước luật
+mcp-page-count TOOL comments.queue # có trước luật
+mcp-page-count TOOL comments.unanswered # có trước luật
+mcp-page-count TOOL compliance.incidents # có trước luật
+mcp-page-count TOOL compliance.kyc_profiles # có trước luật
+mcp-page-count TOOL compliance.legal_profiles # có trước luật
+mcp-page-count TOOL compliance.list_cases # có trước luật
+mcp-page-count TOOL compliance.subject_requests # có trước luật
+mcp-page-count TOOL compliance.tracking_tags # có trước luật
+mcp-page-count TOOL compliance.websites # có trước luật
+mcp-page-count TOOL content.list # có trước luật
+mcp-page-count TOOL content.list_banners # có trước luật
+mcp-page-count TOOL content.list_revisions # có trước luật
+mcp-page-count TOOL content.list_theme_variants # có trước luật
+mcp-page-count TOOL content.list_types # có trước luật
+mcp-page-count TOOL conversations.list_callbacks # có trước luật
+mcp-page-count TOOL conversations.list_threads # có trước luật
+mcp-page-count TOOL customers.list_groups # có trước luật
+mcp-page-count TOOL customers.search_customers # có trước luật
+mcp-page-count TOOL forms.list # có trước luật
+mcp-page-count TOOL forms.list_submissions # có trước luật
+mcp-page-count TOOL inventory.get_levels # có trước luật
+mcp-page-count TOOL inventory.list_low_stock # có trước luật
+mcp-page-count TOOL inventory.list_movements # có trước luật
+mcp-page-count TOOL invoices.documents # có trước luật
+mcp-page-count TOOL kernel.list_sandbox_messages # có trước luật
+mcp-page-count TOOL kernel.list_sandboxes # có trước luật
+mcp-page-count TOOL kernel.request_log # có trước luật
+mcp-page-count TOOL ledger.entries # có trước luật
+mcp-page-count TOOL ledger.exceptions # có trước luật
+mcp-page-count TOOL ledger.holds # có trước luật
+mcp-page-count TOOL ledger.payouts # có trước luật
+mcp-page-count TOOL media.list # có trước luật
+mcp-page-count TOOL media.list_tags # có trước luật
+mcp-page-count TOOL newsletter.find_subscribers # có trước luật
+mcp-page-count TOOL newsletter.list_lists # có trước luật
+mcp-page-count TOOL notifications.list_messages # có trước luật
+mcp-page-count TOOL notifications.list_my_inbox # có trước luật
+mcp-page-count TOOL orders.list_orders # có trước luật
+mcp-page-count TOOL orders.list_returns # có trước luật
+mcp-page-count TOOL organizations.list_groups # có trước luật
+mcp-page-count TOOL organizations.list_units # có trước luật
+mcp-page-count TOOL plans.list_plans # có trước luật
+mcp-page-count TOOL plans.list_signups # có trước luật
+mcp-page-count TOOL promotions.list_promotions # có trước luật
+mcp-page-count TOOL reporting.facts # có trước luật
+mcp-page-count TOOL shipping.list_cod_discrepancies # có trước luật
+mcp-page-count TOOL shipping.list_shipments # có trước luật
+mcp-page-count TOOL support.list_tickets # có trước luật
+mcp-page-count TOOL webhooks.list_deliveries # có trước luật

@@ -76,6 +76,7 @@ mod tenant_exports;
 mod tenant_links;
 mod tenant_logs;
 mod tenant_move;
+mod tenant_rate_limit;
 mod tenant_settings;
 mod texts;
 mod throttle;

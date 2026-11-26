@@ -329,7 +329,7 @@ impl CatalogService {
         input: NewProduct,
     ) -> Result<ProductDetail, Error> {
         let id = Uuid::now_v7();
-        let locale = self.locale(&input.locale)?;
+        let locale = self.locale(tenant, &input.locale).await?;
         let mut problems = Vec::new();
         check_tax_category(&mut problems, &input.tax_category);
         check_warranty(&mut problems, input.warranty_months);
@@ -687,7 +687,7 @@ impl CatalogService {
             check_warranty(&mut problems, months);
         }
         let default_locale = match &changes.default_locale {
-            Some(locale) => Some(self.locale(locale)?),
+            Some(locale) => Some(self.locale(tenant, locale).await?),
             None => None,
         };
         fail_if_any(problems)?;

@@ -123,6 +123,10 @@ impl Module for CatalogModule {
         vec![service::PRODUCTS_LIMIT]
     }
 
+    fn tenant_settings(&self) -> Vec<autoxide_kernel::tenancy::TenantSetting> {
+        vec![config::TENANT_LOCALES]
+    }
+
     fn configure(&mut self, reader: &mut ConfigReader<'_>) -> Result<(), Invalid> {
         self.config = Some(CatalogConfig::read(reader)?);
         Ok(())
@@ -150,6 +154,7 @@ impl Module for CatalogModule {
             text_model: context.require::<dyn autoxide_kernel::ai::TextModel>().ok(),
             files: context.require::<dyn autoxide_files::api::Files>().ok(),
             secrets: context.require::<autoxide_kernel::secret::SecretKey>()?,
+            settings: context.require::<dyn autoxide_kernel::tenancy::TenantSettings>().ok(),
         });
         // Khối bán hàng cho trang dựng từ khối (bước 67): một bộ trả dữ liệu cho cả ba khối.
         let block_data = Arc::new(blocks::CatalogBlocks(service.clone()));

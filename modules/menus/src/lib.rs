@@ -98,7 +98,19 @@ impl Module for MenusModule {
     fn client_config(
         &self,
     ) -> Result<Option<autoxide_kernel::module::ClientSection>, autoxide_kernel::error::Error> {
-        self.config.as_ref().map_or(Ok(None), client_config::section)
+        let Some(config) = &self.config else { return Ok(None) };
+        let section = client_config::section(config)?;
+        // Ngôn ngữ là cấu hình theo khách: request xác định được khách thì lấy của khách.
+        Ok(match &self.service {
+            Some(service) => section.map(|section| {
+                section.per_tenant(Arc::new(client_config::TenantLanguages(service.clone())))
+            }),
+            None => section,
+        })
+    }
+
+    fn tenant_settings(&self) -> Vec<autoxide_kernel::tenancy::TenantSetting> {
+        vec![config::TENANT_LOCALES, config::TENANT_DEFAULT_LOCALE]
     }
 
     fn configure(&mut self, reader: &mut ConfigReader<'_>) -> Result<(), Invalid> {
@@ -127,6 +139,7 @@ impl Module for MenusModule {
             legacy: context.require::<dyn LegacyMenus>().ok(),
             // Tuỳ chọn như `legacy`: không có `organizations` thì mọi website dùng cấu hình chung.
             orgs: context.require::<dyn autoxide_organizations::api::OrgDirectory>().ok(),
+            settings: context.require::<dyn autoxide_kernel::tenancy::TenantSettings>().ok(),
         };
         let service = Arc::new(MenuService::new(context.outbox()?, dependencies, config));
         context.reference_source(Arc::new(usages::Menus));

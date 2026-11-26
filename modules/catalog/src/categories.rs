@@ -68,8 +68,9 @@ fn slug_conflict(error: sea_orm::DbErr, slug: &str) -> Error {
 
 impl CatalogService {
     /// Kiểm tên theo ngôn ngữ của danh mục, trả (ngôn ngữ, tên, slug) đã chuẩn hoá.
-    fn check_category_texts(
+    async fn check_category_texts(
         &self,
+        tenant: &TenantContext,
         texts: &BTreeMap<String, CategoryText>,
         id: Uuid,
     ) -> Result<Vec<(String, String, String)>, Error> {
@@ -79,7 +80,7 @@ impl CatalogService {
         }
         let mut out = Vec::new();
         for (locale, text) in texts {
-            let locale = self.locale(locale)?;
+            let locale = self.locale(tenant, locale).await?;
             let name = text.name.trim().to_owned();
             check_length(&mut problems, &format!("texts.{locale}.name"), &name, 1, 200);
             let slug = match text.slug.as_deref().map(str::trim).filter(|slug| !slug.is_empty()) {
@@ -150,7 +151,7 @@ impl CatalogService {
     ) -> Result<CategoryDetail, Error> {
         principal.require(&CATEGORIES_MANAGE)?;
         let id = Uuid::now_v7();
-        let texts = self.check_category_texts(&input.texts, id)?;
+        let texts = self.check_category_texts(tenant, &input.texts, id).await?;
         let actor = Actor::from(principal);
         let transaction = tenant.database().begin_write().await?;
         let tree = self.lock_tree(&transaction, tenant).await?;
@@ -274,8 +275,11 @@ impl CatalogService {
         texts: BTreeMap<String, CategoryText>,
     ) -> Result<CategoryDetail, Error> {
         principal.require(&CATEGORIES_MANAGE)?;
-        let texts =
-            if texts.is_empty() { Vec::new() } else { self.check_category_texts(&texts, id)? };
+        let texts = if texts.is_empty() {
+            Vec::new()
+        } else {
+            self.check_category_texts(tenant, &texts, id).await?
+        };
         let actor = Actor::from(principal);
         let transaction = tenant.database().begin_write().await?;
         let before = category::Entity::find_by_id(id)

@@ -37,5 +37,7 @@
   "text:See the website menus in your scope as they are saved.": "Xem menu website trong phạm vi của bạn như đã lưu.",
   "text:The items of a website menu were replaced.": "Các mục của một menu website được thay.",
   "text:Menu": "Menu",
-  "text:Use to show a menu of the website by its key, usually `main` in the header and `footer` in the footer.": "Dùng để hiện một menu của website theo khoá, thường là `main` ở đầu trang và `footer` ở chân trang."
+  "text:Use to show a menu of the website by its key, usually `main` in the header and `footer` in the footer.": "Dùng để hiện một menu của website theo khoá, thường là `main` ở đầu trang và `footer` ở chân trang.",
+  "field:must be comma-separated language codes like `en` or `pt-BR`": "phải là các mã ngôn ngữ cách nhau bằng dấu phẩy, như `en` hay `pt-BR`",
+  "field:must be a language code like `en` or `pt-BR`": "phải là một mã ngôn ngữ như `en` hay `pt-BR`"
 }

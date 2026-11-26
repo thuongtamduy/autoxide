@@ -89,6 +89,13 @@ impl PageInput {
         PageInput { limit, cursor, order, count: None }
     }
 
+    /// Also asks for `pagination.total` on the first page (the `count` input of a list tool).
+    #[must_use]
+    pub fn with_count(mut self, count: bool) -> Self {
+        self.count = Some(count);
+        self
+    }
+
     /// Validated page request, like REST's.
     pub fn page(self) -> Result<PageRequest, Error> {
         let count = self.count.unwrap_or(false);

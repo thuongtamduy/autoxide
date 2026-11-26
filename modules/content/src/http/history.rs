@@ -299,6 +299,8 @@ pub(crate) async fn list_schedules(
     Path(id): Path<Uuid>,
     Query(paging): Query<PageQuery>,
 ) -> Result<Page<ScheduleResponse>, Error> {
+    // Kiểm quyền trước khi đọc tham số trang: người không có quyền nhận 403, không phải 422 (D-20261126-list-pages-cluster-2).
+    principal.require(&crate::permissions::CONTENT_READ)?;
     let page = PageRequest::try_from(paging)?;
     let rows = service.list_schedules(&tenant, &principal, id, &page).await?;
     Ok(rows.map(ScheduleResponse::from))

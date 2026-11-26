@@ -393,7 +393,7 @@ async fn list_public_products(
     Query(mut paging): Query<PageQuery>,
     Query(raw): Query<Vec<(String, String)>>,
 ) -> Result<Response, Error> {
-    let filter = parse_filter(&service, query, raw, &mut paging)?;
+    let filter = parse_filter(&service, &tenant, query, raw, &mut paging).await?;
     let page = PageRequest::try_from(paging)?;
     let Page { data, pagination } = service.public_products(&tenant, &site, &filter, &page).await?;
     let data = cards(&service, &tenant, &site, &filter.locale, &data).await?;
@@ -402,13 +402,14 @@ async fn list_public_products(
 
 /// Đọc và kiểm bộ lọc của danh sách công khai (dùng chung cho danh sách và số đếm facet); gom
 /// lỗi một lần. `sort=price_asc|price_desc` đặt luôn `order` của `paging`.
-pub(crate) fn parse_filter(
+pub(crate) async fn parse_filter(
     service: &CatalogService,
+    tenant: &TenantContext,
     query: PublicProductsQuery,
     raw: Vec<(String, String)>,
     paging: &mut PageQuery,
 ) -> Result<PublicFilter, Error> {
-    let locale = service.locale(&query.locale)?;
+    let locale = service.locale(tenant, &query.locale).await?;
     let mut problems = Vec::new();
     if query.q.as_deref().is_some_and(|q| q.trim().chars().count() > QUERY_MAX) {
         problems.push(
@@ -779,7 +780,7 @@ async fn get_public_product(
     Path(slug): Path<String>,
     Query(query): Query<LocaleQuery>,
 ) -> Result<Response, Error> {
-    let locale = service.locale(&query.locale)?;
+    let locale = service.locale(&tenant, &query.locale).await?;
     let product = service.public_product(&tenant, &site, &locale, &slug).await?;
     let ids: Vec<Uuid> = product.media.iter().map(|row| row.media_id).collect();
     // `alt` theo ngôn ngữ của trang (D-202): media theo ngôn ngữ, bản ghi đè của sản phẩm.
@@ -834,7 +835,7 @@ async fn list_public_categories(
     _principal: Option<Principal>,
     Query(query): Query<LocaleQuery>,
 ) -> Result<Response, Error> {
-    let locale = service.locale(&query.locale)?;
+    let locale = service.locale(&tenant, &query.locale).await?;
     let rows = service.public_categories(&tenant, &locale).await?;
     let data: Vec<PublicCategoryResponse> = rows
         .into_iter()
@@ -873,7 +874,7 @@ async fn get_public_category(
     Path(slug): Path<String>,
     Query(query): Query<LocaleQuery>,
 ) -> Result<Response, Error> {
-    let locale = service.locale(&query.locale)?;
+    let locale = service.locale(&tenant, &query.locale).await?;
     let row = service.public_category(&tenant, &locale, &slug).await?;
     let data = PublicCategoryResponse {
         id: row.category.id,
@@ -929,7 +930,10 @@ async fn public_sitemap(
     Query(query): Query<SitemapQuery>,
     Query(paging): Query<PageQuery>,
 ) -> Result<Response, Error> {
-    let locale = query.locale.as_deref().map(|locale| service.locale(locale)).transpose()?;
+    let locale = match query.locale.as_deref() {
+        Some(locale) => Some(service.locale(&tenant, locale).await?),
+        None => None,
+    };
     let page = PageRequest::try_from(paging)?;
     let Page { data, pagination } =
         service.public_sitemap(&tenant, &site, locale.as_deref(), &page).await?;

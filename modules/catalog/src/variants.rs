@@ -552,7 +552,7 @@ impl CatalogService {
                 );
             }
             for (locale, name) in &option.names {
-                self.locale(locale)?;
+                self.locale(tenant, locale).await?;
                 check_length(
                     &mut problems,
                     &format!("options[{index}].names.{locale}"),
@@ -563,7 +563,7 @@ impl CatalogService {
             }
             for (value_index, value) in option.values.iter().enumerate() {
                 for (locale, label) in &value.labels {
-                    self.locale(locale)?;
+                    self.locale(tenant, locale).await?;
                     let field = format!("options[{index}].values[{value_index}].labels.{locale}");
                     check_length(&mut problems, &field, label, 1, 100);
                 }

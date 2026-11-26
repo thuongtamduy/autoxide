@@ -27,7 +27,7 @@ impl CatalogService {
         locale: &str,
         text: TextInput,
     ) -> Result<ProductDetail, Error> {
-        let locale = self.locale(locale)?;
+        let locale = self.locale(tenant, locale).await?;
         let mut problems = Vec::new();
         let text = check_text(&mut problems, &text, id);
         fail_if_any(problems)?;
@@ -72,7 +72,7 @@ impl CatalogService {
         id: Uuid,
         locale: &str,
     ) -> Result<ProductDetail, Error> {
-        let locale = self.locale(locale)?;
+        let locale = self.locale(tenant, locale).await?;
         let actor = Actor::from(principal);
         let transaction = tenant.database().begin_write().await?;
         let before =

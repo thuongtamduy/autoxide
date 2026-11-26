@@ -126,8 +126,9 @@ impl Module for MailModule {
             EventInfo::new(
                 autoxide_kernel::mail::DELIVERY_FAILED,
                 "A mail was refused for good because of its recipient address (SMTP enhanced status \
-             5.1.x or 5.2.x: no such mailbox, for example); `to` is the address, `dedupe_key` \
-             the sender's key.",
+             5.1.x or 5.2.x); `to` is the address, `dedupe_key` the sender's key, `enhanced` the \
+             enhanced status, `hard` whether the address itself does not work (5.1.1, 5.1.2, \
+             5.1.3, 5.1.6, 5.1.10): stop mailing it only when `hard` is true.",
             ),
         ]
     }

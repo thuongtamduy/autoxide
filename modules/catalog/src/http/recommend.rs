@@ -49,7 +49,7 @@ async fn recommend(
     query: RecommendationQuery,
     kind: Recommendation,
 ) -> Result<Response, Error> {
-    let locale = service.locale(&query.locale)?;
+    let locale = service.locale(tenant, &query.locale).await?;
     let limit = query.limit.unwrap_or(LIMIT_DEFAULT);
     if !(1..=LIMIT_MAX).contains(&limit) {
         return Err(Error::validation(vec![FieldError::new(

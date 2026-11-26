@@ -185,7 +185,7 @@ impl CatalogService {
                 break;
             }
             for (locale, label) in &option.labels {
-                self.locale(locale)?;
+                self.locale(tenant, locale).await?;
                 check_length(&mut problems, "options.labels", label, 1, 100);
             }
         }
@@ -266,7 +266,7 @@ impl CatalogService {
         let mut problems = Vec::new();
         if let Some(names) = &names {
             for (locale, name) in names {
-                self.locale(locale)?;
+                self.locale(tenant, locale).await?;
                 check_length(&mut problems, "names", name, 1, 100);
             }
         }

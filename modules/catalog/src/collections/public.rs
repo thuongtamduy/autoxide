@@ -58,7 +58,7 @@ impl CatalogService {
         slug: &str,
         now: Timestamp,
     ) -> Result<(collection::Model, collection_text::Model), Error> {
-        let locale = self.locale(locale)?;
+        let locale = self.locale(tenant, locale).await?;
         let read = tenant.database().read();
         let text = collection_text::Entity::find()
             .filter(collection_text::Column::Locale.eq(locale.as_str()))

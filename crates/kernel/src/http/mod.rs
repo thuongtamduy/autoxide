@@ -66,6 +66,7 @@ mod security_headers;
 mod server;
 pub(crate) mod stream;
 mod sync;
+pub(crate) mod tenant_rate_limit;
 pub(crate) mod ws;
 
 use std::time::Duration;
@@ -335,6 +336,19 @@ pub fn build(
         std::iter::once(("kernel", root.get_openapi()))
             .chain(modules.iter().map(|(name, routes)| (*name, routes.get_openapi()))),
     );
+    // Giới hạn request theo khách: đếm như giới hạn theo API key (bộ nhớ, hay chung qua database).
+    let tenant_limiter: Option<Arc<tenant_rate_limit::TenantLimiter>> =
+        extras.tenancy.as_ref().map(|registry| {
+            let store = match config.rate_limit_store {
+                crate::config::RateLimitStore::Database => Some(registry.clone()),
+                _ => None,
+            };
+            Arc::new(tenant_rate_limit::TenantLimiter::new(
+                config.tenant_rate_limit,
+                extras.entitlements.clone(),
+                store,
+            ))
+        });
     let mut api = OpenApiRouter::new();
     // Đồng bộ ngoại tuyến (bước 69 P2): endpoint của kernel và route của module có bản ghi đồng bộ
     // được, để lô ghi chạy lệnh qua đúng route đó.
@@ -348,6 +362,12 @@ pub fn build(
             routes = routes.merge(sync::routes(sync_state.clone()));
         }
         openapi::label_module(name, routes.get_openapi_mut());
+        // Giới hạn request theo khách (tầng thứ ba, D-20261126-tenant-rate-limit), mọi module.
+        if let Some(limiter) = tenant_limiter.clone() {
+            routes = routes.layer(middleware::from_fn(move |request: Request, next: Next| {
+                tenant_rate_limit::limit(limiter.clone(), request, next)
+            }));
+        }
         // Gói của khách (bước 35): đếm request ở mọi module; chặn ở module bị gói chi phối.
         if name != crate::user_flags::ME {
             let always = extras.entitlements.catalog().is_always_enabled(name);
@@ -427,6 +447,7 @@ pub fn build(
         tools: extras.tools,
         resources,
         prompts: std::mem::take(&mut extras.prompts),
+        tenant_limiter: tenant_limiter.clone(),
     };
     // Một nguồn sự thật cho origin (D-20261125-tenant-cors): header CORS, kiểm `Origin` của MCP và kiểm khách
     // đều đọc `OriginGrant` lớp `cors::classify` để lại.

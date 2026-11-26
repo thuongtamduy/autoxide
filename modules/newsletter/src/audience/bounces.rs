@@ -302,6 +302,10 @@ impl EventHandler for DeliveryFailures {
         };
         let email = autoxide_kernel::email::normalize(address);
         let code = event.payload.get("code").and_then(|code| code.as_str()).map(str::to_owned);
+        // Chỉ lỗi chắc chắn của địa chỉ người nhận mới chặn (D-20261125-mail-bounces); lỗi của bên gửi (5.1.7,
+        // 5.1.8…), hộp thư đầy, thư quá cỡ thì chỉ ghi thư đó hỏng. Event thiếu `hard` (ghi trước khi nâng cấp, hay
+        // module ngoài theo hợp đồng cũ): không chắc lỗi thuộc địa chỉ nên không chặn, chỉ ghi thư hỏng.
+        let hard = event.payload.get("hard").and_then(serde_json::Value::as_bool).unwrap_or(false);
         let delivery_id = event
             .payload
             .get("dedupe_key")
@@ -312,7 +316,10 @@ impl EventHandler for DeliveryFailures {
             delivery::Entity::update_many()
                 .scoped(tenant)
                 .col_expr(delivery::Column::Status, Expr::value(DeliveryStatus::Failed.as_str()))
-                .col_expr(delivery::Column::Error, Expr::value(Some("hard_bounce")))
+                .col_expr(
+                    delivery::Column::Error,
+                    Expr::value(Some(if hard { "hard_bounce" } else { "rejected" })),
+                )
                 .filter(delivery::Column::Id.eq(id))
                 .exec(tenant.database().write())
                 .await?;
@@ -323,7 +330,7 @@ impl EventHandler for DeliveryFailures {
             .one(tenant.database().read())
             .await?
             .is_some();
-        if (delivery_id.is_some() || known) && autoxide_kernel::email::is_valid(&email) {
+        if hard && (delivery_id.is_some() || known) && autoxide_kernel::email::is_valid(&email) {
             let note = code.map(|code| format!("smtp {code}"));
             service.bounce(tenant, Actor::system(), &email, BounceKind::Hard, note).await?;
         }

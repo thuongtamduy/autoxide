@@ -411,6 +411,7 @@ into a new database.
 | `AUTOXIDE_PROCESS_ROLE` | `api` / `worker` to run the API and background work in separate processes |
 | `AUTOXIDE_HTTP_COMPRESSION` | `true` (default): compress JSON and text with gzip or brotli; `false` when a reverse proxy or CDN in front already compresses |
 | `AUTOXIDE_HTTP_PUBLIC_CACHE_SECONDS` | How long a CDN may keep a public read (default `60`), see [A CDN in front of Autoxide](#a-cdn-in-front-of-autoxide) |
+| `AUTOXIDE_HTTP_RATE_LIMIT_TENANT_PER_MINUTE` | Several tenants: requests one tenant may make per minute, all its users and API keys together (default `0`, off), so a busy tenant cannot slow the others; over it, 429 `tenant_rate_limited` with `Retry-After`. A plan's limit `kernel.api_rate_per_minute` replaces it for that tenant (in a plan `0` blocks every request; here `0` means off). Only signed-in callers acting in their own tenant are counted: requests without a valid credential (public pages, inbound webhooks), platform staff and support access only meet the per-address limit, so nobody can use up a tenant's budget from outside. A write batch counts once. With `AUTOXIDE_HTTP_RATE_LIMIT_STORE=database` a small burst means nearly one database write per request: prefer `memory` for low levels on a single server |
 | `AUTOXIDE_HTTP_METRICS` | Prometheus metrics at `/metrics`, which has no authentication. Add `AUTOXIDE_HTTP_METRICS_ADDRESS` (e.g. `127.0.0.1:9090`) to serve it on its own port, away from the API; without it, `/metrics` is on the API port: block it in your reverse proxy (Caddy: `respond /metrics 404`) and scrape it from the machine itself |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | Send traces to an OpenTelemetry collector |
 
@@ -485,6 +486,8 @@ tenant only:
 | `media.alt_locales` | `AUTOXIDE_MEDIA_ALT_LOCALES` ([media](MEDIA.md)) |
 | `content.embed_hosts` | `AUTOXIDE_CONTENT_EMBED_HOSTS` |
 | `analytics.allowed_hosts` | `AUTOXIDE_ANALYTICS_ALLOWED_HOSTS` (the tenant's verified domains are always accepted) |
+| `catalog.locales` | `AUTOXIDE_CATALOG_LOCALES` |
+| `menus.locales`, `menus.default_locale` | `AUTOXIDE_MENUS_LOCALES`, `AUTOXIDE_MENUS_DEFAULT_LOCALE` |
 | `newsletter.postal_address` | `AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS`; when unset, the owner's name and address in the tenant's legal profile (module `compliance`) come first |
 | `<module>.link.<page>` (group `link`, see below) | the `AUTOXIDE_…_URL` page addresses in mail: `auth.link.password_reset`, `auth.link.email_verification`, `auth.link.invitation`, `auth.link.login`, `auth.link.email_change_report`, `support.link.guest_ticket`, `compliance.link.case_tracking`, `inventory.link.restock_confirm`, `notifications.link.unsubscribe`, `comments.link.verify`, `comments.link.unsubscribe`, `newsletter.link.confirm`, `newsletter.link.preferences` |
 
