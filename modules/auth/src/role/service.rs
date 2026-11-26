@@ -348,7 +348,9 @@ impl RoleService {
         self.get(tenant, id).await
     }
 
-    /// Thay toàn bộ tên, mô tả và permission của role `id` (đường hệ thống, không kiểm người sửa).
+    /// Thay toàn bộ tên, mô tả và permission của role `id` (đường hệ thống, không kiểm người sửa) — chỉ để test
+    /// dựng dữ liệu; code chạy thật dùng [`update_as`](Self::update_as).
+    #[cfg(test)]
     pub(crate) async fn update(
         &self,
         tenant: &TenantContext,
@@ -473,7 +475,9 @@ impl RoleService {
         self.get(tenant, id).await
     }
 
-    /// Xoá role `id`; người dùng đang có role này mất nó (đường hệ thống, không kiểm người xoá).
+    /// Xoá role `id`; người dùng đang có role này mất nó (đường hệ thống, không kiểm người xoá) — chỉ để test;
+    /// code chạy thật dùng [`delete_as`](Self::delete_as).
+    #[cfg(test)]
     pub(crate) async fn delete(
         &self,
         tenant: &TenantContext,

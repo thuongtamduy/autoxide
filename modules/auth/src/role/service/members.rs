@@ -16,7 +16,9 @@ impl RoleService {
         roles_of_user(connection, tenant, user_id).await
     }
 
-    /// Thay toàn bộ role của người dùng `user_id` bằng `role_ids` (đường hệ thống, không kiểm người gán).
+    /// Thay toàn bộ role của người dùng `user_id` bằng `role_ids` (đường hệ thống, không kiểm người gán) — chỉ
+    /// để test dựng dữ liệu; code chạy thật dùng [`set_user_roles_as`](Self::set_user_roles_as).
+    #[cfg(test)]
     pub(crate) async fn set_user_roles(
         &self,
         tenant: &TenantContext,
