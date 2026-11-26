@@ -11,6 +11,8 @@
 mod access;
 pub mod api;
 mod api_key;
+#[cfg(test)]
+mod api_key_scope_tests;
 #[cfg(any(test, feature = "bench-seed"))]
 mod bench_seed;
 mod cleanup;
