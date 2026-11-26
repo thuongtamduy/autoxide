@@ -65,11 +65,17 @@ impl CustomFieldsState {
                 let mut readable = sea_orm::sea_query::Condition::any()
                     .add(Expr::col(Alias::new("target")).is_in(exact));
                 for parent in parents {
-                    let escaped =
-                        parent.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_");
-                    let pattern =
-                        sea_orm::sea_query::LikeExpr::new(format!("{escaped}.%")).escape('\\');
-                    readable = readable.add(Expr::col(Alias::new("target")).like(pattern));
+                    // Loại con `<loại>.<khoá>`: so tiền tố bằng `SUBSTR(target, 1, n) = '<loại>.'` (phân biệt hoa
+                    // thường trên cả hai database), không bằng `LIKE` — `LIKE` của SQLite không phân biệt hoa
+                    // thường với chữ ASCII nên `Shop.%` khớp cả `shop.x`. `SUBSTR` đếm ký tự trên cả hai database.
+                    let prefix = format!("{parent}.");
+                    let length = <i32 as TryFrom<usize>>::try_from(prefix.chars().count())
+                        .unwrap_or(i32::MAX);
+                    let head = sea_orm::sea_query::Func::cust(Alias::new("SUBSTR"))
+                        .arg(Expr::col(Alias::new("target")))
+                        .arg(1)
+                        .arg(length);
+                    readable = readable.add(Expr::expr(head).eq(prefix));
                 }
                 select.cond_where(readable);
             }

@@ -311,6 +311,7 @@ impl From<Rule> for RuleResponse {
 #[derive(Debug, Deserialize, IntoParams)]
 #[into_params(parameter_in = Query)]
 pub(crate) struct RuleQuery {
+    /// The unit (organization node) whose routing rules to list.
     org_id: Uuid,
 }
 

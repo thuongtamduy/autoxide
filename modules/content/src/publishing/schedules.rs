@@ -120,7 +120,7 @@ impl ContentService {
     ) -> Result<Schedule, Error> {
         let SchedulePlan { action, run_at, ai_reviewed } = plan;
         principal.require(&CONTENT_PUBLISH)?;
-        if ai_reviewed && principal.api_key_id().is_some() {
+        if ai_reviewed && !principal.is_session() {
             return Err(Error::forbidden(
                 "content.ai_review_requires_human",
                 "Only a person signed in (not an API key) can confirm that AI-generated content was reviewed.",

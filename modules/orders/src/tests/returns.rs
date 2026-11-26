@@ -378,3 +378,59 @@ async fn preview_shows_refund_methods_and_eta_without_saving_and_photos_are_chec
     .await
     .unwrap();
 }
+
+/// Hoàn tiền của một đơn là `Page<T>` (bước 70 P9 mục 3): năm lần hoàn, `limit=2` — đi hết bằng `next_cursor` ra đủ
+/// năm, không trùng không sót, mới nhất trước (mặc định) và cũ nhất trước với `order=asc`.
+#[tokio::test]
+async fn hoan_tien_cua_don_theo_trang() {
+    TestDatabase::run(async |test| {
+        let shop = shop(test).await;
+        let shirt = shop.catalog.add(shop.tree.a, 100_000);
+        shop.inventory.stock(shop.tree.a, shirt, 5);
+        let buyer = Call::as_user(&shop, "buyer1");
+        let (cart, _, quote) = ready_cart(&buyer, shop.tree.a, shirt, 2).await;
+        let (status, placed) = checkout(&buyer, Some("pay-pages"), body(&cart, &quote, "card")).await;
+        assert_eq!(status, StatusCode::CREATED, "{placed}");
+        let id: Uuid = placed["data"]["orders"][0]["id"].as_str().unwrap().parse().unwrap();
+        let payment = shop.ledger.last_payment().unwrap();
+        emit(&shop, &PaymentSucceeded(json!({"payment_id": payment.id, "source_module": "orders", "amount": payment.amount}))).await;
+        drain(&shop).await;
+        let boss = Call::as_user(&shop, "boss");
+        let mut made = Vec::new();
+        for n in 0..5 {
+            let (status, refund) = boss
+                .send(
+                    "POST",
+                    &format!("/{id}/refunds"),
+                    Some(json!({"amount": {"amount": "1000", "currency": "VND"}, "reason": "goodwill", "reference": format!("page{n}")})),
+                )
+                .await;
+            assert_eq!(status, StatusCode::CREATED, "{refund}");
+            made.push(refund["data"]["id"].clone());
+        }
+        let walk = async |order: &str| {
+            let mut seen = Vec::new();
+            let mut cursor: Option<String> = None;
+            loop {
+                let mut uri = format!("/{id}/refunds?limit=2&order={order}");
+                if let Some(cursor) = &cursor {
+                    uri.push_str(&format!("&cursor={cursor}"));
+                }
+                let (status, page) = boss.send("GET", &uri, None).await;
+                assert_eq!(status, StatusCode::OK, "{page}");
+                let rows = page["data"].as_array().unwrap();
+                assert!(rows.len() <= 2, "{page}");
+                seen.extend(rows.iter().map(|row| row["id"].clone()));
+                match page["pagination"]["next_cursor"].as_str() {
+                    Some(next) => cursor = Some(next.to_owned()),
+                    None => return seen,
+                }
+            }
+        };
+        assert_eq!(walk("asc").await, made);
+        made.reverse();
+        assert_eq!(walk("desc").await, made);
+    })
+    .await
+    .unwrap();
+}

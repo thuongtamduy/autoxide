@@ -4,6 +4,7 @@ pub mod ai;
 pub mod backup;
 pub mod config;
 pub mod copy;
+pub mod demo;
 pub mod doctor;
 pub mod jobs;
 pub mod mcp_manifest;

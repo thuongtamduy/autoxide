@@ -32,8 +32,11 @@ use crate::shipments::{ParcelInput, ShipmentFilter, ShipmentView, status_of};
 #[derive(Debug, Deserialize, IntoParams)]
 #[into_params(parameter_in = Query)]
 pub(crate) struct ShipmentQuery {
+    /// Only shipments of this order.
     order_id: Option<Uuid>,
+    /// Only shipments in this status.
     status: Option<ShipmentStatus>,
+    /// Only shipments of this store (organization unit), not of the units below it.
     org_id: Option<Uuid>,
     /// Tracking number of the carrier.
     tracking: Option<String>,

@@ -406,6 +406,18 @@ impl Modules {
                 })
                 .collect(),
         );
+        // Sổ thời hạn lưu được liệt kê theo trang với khoá `<module>` + tên (`compliance` retention): hai mục
+        // trùng tên trong một module làm trang đó lỗi 500 mỗi lần đọc — chặn ngay lúc khởi động, nói rõ chỗ sai.
+        let mut seen = std::collections::BTreeSet::new();
+        for (module, policy) in self.retention.all() {
+            if !seen.insert((*module, policy.name)) {
+                return Err(ModuleError(format!(
+                    "module `{module}` declares the retention policy `{}` twice \
+                     (`Module::retention`): each name must be unique within the module",
+                    policy.name
+                )));
+            }
+        }
         for module in &mut self.modules {
             let name = module.name();
             let mut context = StartContext {

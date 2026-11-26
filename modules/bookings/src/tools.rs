@@ -38,6 +38,8 @@ pub(crate) struct ListBookingsInput {
     limit: Option<u32>,
     /// `next_cursor` of the previous page.
     cursor: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
     /// `desc` (newest first, the default) or `asc`.
     order: Option<String>,
 }
@@ -108,7 +110,7 @@ pub(crate) fn all(service: &Arc<BookingsService>) -> Vec<Tool> {
             move |tenant: TenantContext, principal: Principal, input: ListBookingsInput| {
                 let service = list.clone();
                 async move {
-                    let page = PageInput::new(input.limit, input.cursor, input.order).page()?;
+                    let page = PageInput::new(input.limit, input.cursor, input.order).with_count(input.count.unwrap_or(false)).page()?;
                     let filter = BookingFilter {
                         status: input.status,
                         resource_id: input.resource_id,

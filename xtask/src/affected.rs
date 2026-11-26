@@ -1109,7 +1109,7 @@ mod tests {
     }
 
     /// `crates/kernel/CHANGELOG.md` là symlink tới `CHANGELOG.md` gốc mà kernel nhúng: đổi file gốc phải chạy test của
-    /// kernel (trước đây `test-filter` bỏ sót). Symlink nằm ngoài crate (`AGENTS.md` → `CLAUDE.md`) thì không kéo gì.
+    /// kernel (trước đây `test-filter` bỏ sót). Symlink nằm ngoài crate thì không kéo gì (ví dụ cũ: `AGENTS.md` → `CLAUDE.md`; nay chỉ còn là kịch bản kiểm).
     #[cfg(unix)]
     #[test]
     fn symlink_trong_crate_keo_file_no_tro_toi() {

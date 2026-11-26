@@ -254,6 +254,7 @@ impl Module for ComplianceModule {
             guard: (*context.require::<autoxide_kernel::antispam::SpamGuard>()?).clone(),
             public_reports_per_hour: self.config.public_reports_per_hour,
             case_tracking_url: self.config.case_tracking_url.clone(),
+            purposes_tenant_max: self.config.purposes_tenant_max,
             links: context
                 .require::<autoxide_kernel::tenancy::SiteLinks>()
                 .map(|links| (*links).clone())

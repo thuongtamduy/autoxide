@@ -137,6 +137,8 @@ jobs:
       # build lại cả core nên không có chúng nó thành job dài nhất của CI (D-20261122-module-helpers).
       SCCACHE_GHA_ENABLED: "true"
       RUSTC_WRAPPER: sccache
+      # Phòng xa: server sccache chết giữa lúc biên dịch thì biên dịch lại bằng rustc thường thay vì báo lỗi.
+      SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
       # Database dùng xong bỏ của CI: mật khẩu này không bảo vệ gì.
       GATE_POSTGRES_URL: postgres://postgres:postgres@127.0.0.1:5432/postgres
     steps:
@@ -161,6 +163,19 @@ jobs:
         if: steps.changed.outputs.run == 'true'
       - uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
         if: steps.changed.outputs.run == 'true'
+      # Cache của GitHub Actions hết hạn mức (HTTP 503 "Egress is over the account limit") thì sccache KHÔNG khởi động
+      # được, và `sccache rustc` làm hỏng cả bước build (đọc mã nguồn sccache: lỗi lúc kiểm cache khi khởi động server
+      # là lỗi cứng, không có đường lui; `SCCACHE_IGNORE_SERVER_IO_ERROR` chỉ che lỗi đọc phản hồi sau khi biên dịch
+      # đã bắt đầu). Nên thử khởi động trước: không được thì bỏ sccache và biên dịch thường — chậm hơn nhưng CI không chết
+      # theo cache. Lỗi cache giữa chừng (đọc / ghi một crate) sccache đã tự coi là cache miss.
+      - name: sccache fail-open
+        if: steps.changed.outputs.run == 'true'
+        run: |
+          if ! sccache --start-server; then
+            echo "::warning::sccache could not start (cache backend error); building without the compile cache"
+            echo "RUSTC_WRAPPER=" >> "$GITHUB_ENV"
+            echo "SCCACHE_GHA_ENABLED=false" >> "$GITHUB_ENV"
+          fi
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         if: steps.changed.outputs.run == 'true'
         with:
@@ -174,7 +189,7 @@ jobs:
         if: steps.changed.outputs.run == 'true'
       - run: ./gate.sh --only example
         if: steps.changed.outputs.run == 'true'
-      - run: sccache --show-stats
+      - run: sccache --show-stats || true
         if: always() && steps.changed.outputs.run == 'true'
 
   # Build mọi chương trình test MỘT lần thành archive của nextest (`./gate.sh --only build`); các job
@@ -195,6 +210,8 @@ jobs:
       # docs/BENCHMARKS.md, D-20261121-ci-sccache-build.
       SCCACHE_GHA_ENABLED: "true"
       RUSTC_WRAPPER: sccache
+      # Phòng xa: server sccache chết giữa lúc biên dịch thì biên dịch lại bằng rustc thường thay vì báo lỗi.
+      SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
       GATE_BASE: ${{ github.base_ref && format('origin/{0}', github.base_ref) || 'origin/main' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -218,6 +235,19 @@ jobs:
         if: steps.changed.outputs.run == 'true'
       - uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
         if: steps.changed.outputs.run == 'true'
+      # Cache của GitHub Actions hết hạn mức (HTTP 503 "Egress is over the account limit") thì sccache KHÔNG khởi động
+      # được, và `sccache rustc` làm hỏng cả bước build (đọc mã nguồn sccache: lỗi lúc kiểm cache khi khởi động server
+      # là lỗi cứng, không có đường lui; `SCCACHE_IGNORE_SERVER_IO_ERROR` chỉ che lỗi đọc phản hồi sau khi biên dịch
+      # đã bắt đầu). Nên thử khởi động trước: không được thì bỏ sccache và biên dịch thường — chậm hơn nhưng CI không chết
+      # theo cache. Lỗi cache giữa chừng (đọc / ghi một crate) sccache đã tự coi là cache miss.
+      - name: sccache fail-open
+        if: steps.changed.outputs.run == 'true'
+        run: |
+          if ! sccache --start-server; then
+            echo "::warning::sccache could not start (cache backend error); building without the compile cache"
+            echo "RUSTC_WRAPPER=" >> "$GITHUB_ENV"
+            echo "SCCACHE_GHA_ENABLED=false" >> "$GITHUB_ENV"
+          fi
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         if: steps.changed.outputs.run == 'true'
         with:
@@ -234,7 +264,7 @@ jobs:
         if: steps.changed.outputs.run == 'true'
       - run: ./gate.sh ${{ github.event_name == 'pull_request' && '--pr' || '' }} --only build
         if: steps.changed.outputs.run == 'true'
-      - run: sccache --show-stats
+      - run: sccache --show-stats || true
         if: always() && steps.changed.outputs.run == 'true'
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: steps.changed.outputs.run == 'true'
