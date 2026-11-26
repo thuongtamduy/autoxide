@@ -22,7 +22,8 @@ pub fn is_unique_violation(error: &Error) -> bool {
 }
 
 fn unique_violation() -> Error {
-    Error::conflict(UNIQUE_VIOLATION, "A record with the same unique value already exists.")
+    // Mã viết thẳng (không qua hằng) để `cargo xtask check` thấy nó có bản dịch.
+    Error::conflict("db.unique_violation", "A record with the same unique value already exists.")
 }
 
 // Lỗi của database khi ghi: vi phạm unique thành mã ổn định cho module; lỗi khác giữ nguyên (lỗi nội bộ).
