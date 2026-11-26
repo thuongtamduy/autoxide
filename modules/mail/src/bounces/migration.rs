@@ -67,7 +67,7 @@ impl MigrationTrait for Migration {
         manager
             .create_index(
                 Index::create()
-                    .name("mail_bounces_last_at_idx")
+                    .name("mail_bounces_last_at_sweep_idx")
                     .table("mail_bounces")
                     .col("last_at")
                     .to_owned(),
