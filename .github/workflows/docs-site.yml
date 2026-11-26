@@ -1,0 +1,45 @@
+# Website tài liệu có phiên bản (D-20261126-docs-site-mdbook, G13): khi tag phát hành `vX.Y.Z` được đẩy, dựng bộ tài liệu của
+# đúng tag đó bằng mdBook (EN + VI) và đăng vào nhánh `gh-pages`; bản cũ giữ nguyên, `latest` trỏ bản chính thức cao nhất.
+# Bật GitHub Pages (Settings → Pages → nguồn: nhánh gh-pages) là việc của chủ dự án. Chạy tay (workflow_dispatch) để
+# đăng lại một tag, hay để dựng thử trên PR không đăng (không có bước đăng khi không chọn tag).
+name: Docs site
+
+on:
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to publish (e.g. v0.20.0); empty = build only
+        default: ""
+
+permissions: {}
+
+concurrency:
+  group: docs-site
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: ${{ !github.event.repository.private }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: write # đẩy nhánh gh-pages
+    env:
+      TAG: ${{ inputs.tag || (github.ref_type == 'tag' && github.ref_name) || '' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.tag || github.ref }}
+      - uses: taiki-e/install-action@25f51f6b1bf4e18876107cece836f4f77ac17c8c # v2.90.7
+        with:
+          tool: mdbook@0.5.4
+      - name: Build the books
+        run: python3 -I scripts/build-docs-site.py "${TAG:-main}" "$RUNNER_TEMP/site" --repo "$GITHUB_REPOSITORY"
+      - name: Publish to gh-pages
+        if: ${{ env.TAG != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/publish-docs-site.sh "$TAG" "$RUNNER_TEMP/site"

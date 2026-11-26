@@ -250,10 +250,10 @@ chỉ số của G9 đạt ngưỡng.
       tool MCP, schema `x-*` của OpenAPI; quy tắc thêm / đổi / bỏ, cách khai bản cũ sắp bỏ, test giữ hợp đồng (như api-diff)
 - [ ] Thời gian chạy thử trước 1.0: phát hành `1.0.0-rc.N` cho người ngoài dùng 2–4 tuần, kênh nhận phản hồi, tiêu chí
       chốt (không còn lỗi hợp đồng mở); chỉ sửa lỗi trong thời gian này
-- [ ] Chính sách hỗ trợ dài hạn: bản 1.x nhận vá bảo mật bao lâu, bản lớn trước còn được hỗ trợ bao lâu khi bản lớn mới ra,
-      quy trình vá ngược; ghi vào `docs/COMPATIBILITY.md` và `SECURITY.md` (EN + VI)
-- [ ] Trang tài liệu có phiên bản: website tài liệu chính thức (hướng dẫn, tham chiếu API sinh từ OpenAPI, MCP, docs.rs),
-      có tìm kiếm, mỗi bản phát hành một bộ tài liệu, EN + VI, tự dựng khi phát hành
+- [x] Chính sách hỗ trợ dài hạn: bản 1.x nhận vá bảo mật bao lâu, bản lớn trước còn được hỗ trợ bao lâu khi bản lớn mới ra,
+      quy trình vá ngược; ghi vào `docs/COMPATIBILITY.md` và `SECURITY.md` (EN + VI) — quy trình vá ngược và bảng ở `COMPATIBILITY.md` / `SECURITY.md`
+- [x] Trang tài liệu có phiên bản: website tài liệu chính thức (hướng dẫn, tham chiếu API sinh từ OpenAPI, MCP, docs.rs),
+      có tìm kiếm, mỗi bản phát hành một bộ tài liệu, EN + VI, tự dựng khi phát hành — mdBook, `scripts/build-docs-site.py`, workflow `docs-site.yml` (D-20261126-docs-site-mdbook); **chủ dự án bật GitHub Pages (nguồn: nhánh `gh-pages`)**
 - [ ] Chạy nhiều máy chủ cùng lúc: test trong CI 2–3 máy chủ song song không giao trùng việc nền / event, không mất lock
       migration; tài liệu sức chứa (SQLite chịu tới đâu, khi nào chuyển Postgres, số khách mỗi máy chủ, cấu hình đề xuất)
 - [ ] Mô hình mối đe doạ của core (`docs/THREAT_MODEL.md`, EN + VI) làm đầu vào cho đợt kiểm thử bên ngoài; mã hoá ở mức
@@ -261,8 +261,8 @@ chỉ số của G9 đạt ngưỡng.
       đương)
 - [ ] Mục tiêu khôi phục sau sự cố: RPO / RTO ghi rõ cho từng cách triển khai; diễn tập khôi phục trong CI cả trường hợp
       nhiều khách có database riêng và kho file
-- [ ] Rà giấy phép thư viện: `cargo deny` chặn giấy phép không hợp MIT/Apache; danh sách giấy phép của bên thứ ba đi kèm
-      mỗi bản phát hành (binary, image, SDK)
+- [x] Rà giấy phép thư viện: `cargo deny` chặn giấy phép không hợp MIT/Apache; danh sách giấy phép của bên thứ ba đi kèm
+      mỗi bản phát hành (binary, image, SDK) — `cargo deny` (đã có) + `THIRD-PARTY-LICENSES.html` bằng cargo-about (D-20261126-third-party-licenses)
 
 ## Giai đoạn A — Hợp đồng và nền lõi
 
