@@ -322,8 +322,9 @@ thật (P7).
         client — cân nhắc trần chung thấp hơn, mã dài hơn, hay đếm theo người nhập mã (đổi `PhoneCodes::verify`)
   - [x] PT-13, PT-14: lớp kiểm permission chung của kernel đọc `x-permissions` (403 trước validation / ETag / tra bản
         ghi), 18 `x-permissions` thiếu đã bổ sung, hai test e2e giữ (D-20261126-permission-gate)
-  - [ ] PT-15, PT-16, PT-17, poll outbox: tìm công khai không làm nghẽn server, slug theo khoảng dùng index, tắt
-        nhanh khi có tải trên Postgres, giảm câu SQL nền khi rảnh (PR 3)
+  - [x] PT-16, PT-17: slug tự sinh tìm theo nhóm ứng viên `slug IN (…)` dùng unique index (content, catalog); bộ
+        phát event và worker xét lệnh dừng giữa hai lượt cả khi còn việc (tắt nhanh sau đợt tải)
+  - [ ] PT-15, poll outbox: tìm công khai không làm nghẽn server, giảm câu SQL nền khi rảnh (PR 3c)
   - [ ] PT-11, PT-12, PT-18 và chỗ vướng cho việc test (bộ mồi dữ liệu thương mại, tool MCP trỏ operationId REST,
         đếm câu SQL theo request) (PR 4, sau #516)
 

@@ -70,6 +70,8 @@ impl Module for Notes {
 struct Recorder {
     seen: Mutex<Vec<Delivered>>,
     fail: bool,
+    /// Mỗi event chờ chừng này mili giây (bên nhận chậm).
+    slow_ms: u64,
 }
 
 #[async_trait::async_trait]
@@ -77,6 +79,9 @@ impl EventHandler for Recorder {
     async fn handle(&self, event: &Delivered) -> Result<(), Error> {
         if event.payload["title"] == "bug" {
             panic!("the event handler has a bug");
+        }
+        if self.slow_ms > 0 {
+            tokio::time::sleep(std::time::Duration::from_millis(self.slow_ms)).await;
         }
         self.seen.lock().unwrap().push(event.clone());
         if self.fail {
@@ -450,6 +455,31 @@ async fn subscription_optional_khong_loi_khoi_dong() {
             .unwrap();
         assert_eq!(dispatcher.run_once().await.unwrap(), 1);
         assert_eq!(recorder.seen.lock().unwrap().len(), 1);
+    })
+    .await
+    .unwrap();
+}
+
+/// PT-17: lệnh dừng tới khi còn tồn đọng lớn thì bộ phát dừng sau lượt đang chạy, không giao hết rồi mới dừng (trước
+/// đây tiến trình sống thêm hàng chục giây sau SIGTERM). Event chưa giao nằm lại cho lần chạy sau.
+#[tokio::test]
+async fn lenh_dung_khong_doi_giao_het_ton_dong() {
+    TestDatabase::run(async |test| {
+        let recorder = Arc::new(Recorder { slow_ms: 5, ..Recorder::default() });
+        let listener = Listener { event: Subscription::ALL, recorder: recorder.clone() };
+        let setup = setup(test, listener).await;
+        for index in 0..250 {
+            record(&setup, &format!("note-{index}")).await;
+        }
+        let dispatcher = setup.modules.dispatcher().unwrap();
+        // Lệnh dừng đã có từ đầu: một lượt (một lô) rồi dừng.
+        dispatcher.run(std::future::ready(())).await;
+        let delivered = recorder.seen.lock().unwrap().len();
+        assert!(delivered > 0 && delivered < 250, "delivered {delivered} of 250 before stopping");
+        // Phần còn lại vẫn được giao ở lần chạy sau.
+        let rest = setup.modules.dispatcher().unwrap();
+        while rest.run_once().await.unwrap() > 0 {}
+        assert_eq!(recorder.seen.lock().unwrap().len(), 250);
     })
     .await
     .unwrap();
