@@ -3,7 +3,7 @@
 **English** · [Tiếng Việt](CONTRIBUTING.vi.md)
 
 Thank you for helping. This guide is for people; if you work with an AI coding agent, point
-it at [`CLAUDE.md`](CLAUDE.md) (also linked as `AGENTS.md`), which holds the full rules the
+it at [`AGENTS.md`](AGENTS.md) (short, in English; the full internal rules are in [`CLAUDE.md`](CLAUDE.md)), which holds the rules the
 agent follows. The rules below are the same, only shorter. Everyone taking part follows the
 [code of conduct](CODE_OF_CONDUCT.md).
 

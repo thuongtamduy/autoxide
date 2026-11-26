@@ -5,6 +5,8 @@ use std::sync::Arc;
 
 use autoxide_kernel::error::Error;
 use autoxide_kernel::module::{Module, StartContext};
+use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::usages::{ReferenceSource, Referrer};
 use autoxide_media::api::Media;
 use autoxide_testkit::{TestApp, TestDatabase, tool};
 use axum::http::{Method, StatusCode, header};
@@ -28,7 +30,32 @@ impl Module for Shop {
 
     fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
         context.resource_type("shop.item", Arc::new(Items))?;
+        context.reference_source(Arc::new(ShopReferences));
         context.resource_type("shop.category", Arc::new(Categories))
+    }
+}
+
+/// Nguồn "đang dùng ở đâu" giả của `shop`, chỉ cài `referrers` (không ghi đè `referrers_page`): kiểm cài đặt
+/// mặc định của kernel gộp được với trang keyset của `menus`. Chỉ trả cho `shop.item` / `p-many`.
+struct ShopReferences;
+
+#[async_trait::async_trait]
+impl ReferenceSource for ShopReferences {
+    async fn referrers(
+        &self,
+        _tenant: &TenantContext,
+        kind: &str,
+        id: &str,
+        limit: usize,
+    ) -> Result<Vec<Referrer>, Error> {
+        if (kind, id) != ("shop.item", "p-many") {
+            return Ok(Vec::new());
+        }
+        let mut rows: Vec<Referrer> = (1..=3)
+            .map(|n| Referrer::new("shop.bundle", format!("b{n}"), format!("Bundle {n}"), "items"))
+            .collect();
+        rows.truncate(limit);
+        Ok(rows)
     }
 }
 
@@ -498,6 +525,99 @@ async fn menu_tro_toi_ban_ghi_hien_o_dang_dung_o_dau() {
         assert_eq!(found["data"][0]["id"], menu);
         assert_eq!(found["data"][0]["field"], "menu_item");
         assert_eq!(usages("seller").await["data"], json!([]), "không đọc được menu thì không thấy");
+    })
+    .await
+    .unwrap();
+}
+
+/// "Đang dùng ở đâu" là `Page<T>` (bước 70 P9 mục 3): mục menu (trang keyset trong database) và nguồn giả của
+/// `shop` (cài đặt mặc định của kernel) gộp với một con trỏ chung — đi hết bằng `next_cursor` ra đủ 3 + 3 dòng,
+/// không trùng không sót, hai chiều ngược nhau; `count=true` cho tổng của cả hai nguồn.
+#[tokio::test]
+async fn dang_dung_o_dau_chia_trang_qua_hai_nguon() {
+    TestDatabase::run(async |test| {
+        let app = TestApp::builder(test)
+            .user("admin", 1, &["menus.read", "menus.manage", "shop.read"])
+            .user("seller", 2, &["shop.read"])
+            .provide::<dyn Media>(Arc::new(fake_media()) as Arc<dyn Media>)
+            .module(Shop)
+            .module(crate::module())
+            .build()
+            .await
+            .unwrap();
+        let body = json!({"key": "main", "locale": "vi", "items": [
+            {"label": "Một", "ref": {"kind": "shop.item", "id": "p-many"}},
+            {"label": "Hai", "ref": {"kind": "shop.item", "id": "p-many"}},
+            {"label": "Khác", "ref": {"kind": "shop.item", "id": "p-other"}}
+        ]});
+        let created = send(&app, "POST", "", Some("admin"), &[], Some(body)).await;
+        assert_eq!(created.status(), StatusCode::CREATED, "{}", created.json());
+        let body = json!({"key": "footer", "locale": "vi", "items": [
+            {"label": "Ba", "ref": {"kind": "shop.item", "id": "p-many"}}
+        ]});
+        let created = send(&app, "POST", "", Some("admin"), &[], Some(body)).await;
+        assert_eq!(created.status(), StatusCode::CREATED, "{}", created.json());
+
+        let walk = |who: &'static str, order: &'static str| {
+            let app = &app;
+            async move {
+                let mut seen = Vec::new();
+                let mut cursor: Option<String> = None;
+                let mut first = true;
+                loop {
+                    let mut uri = format!(
+                        "/api/v1/kernel/records/shop.item/p-many/usages?limit=2&order={order}"
+                    );
+                    if first {
+                        uri.push_str("&count=true");
+                    }
+                    if let Some(cursor) = &cursor {
+                        uri.push_str(&format!("&cursor={cursor}"));
+                    }
+                    let page = app.get(&uri).token(who).send().await.unwrap();
+                    assert_eq!(page.status(), StatusCode::OK, "{}", page.json());
+                    let page = page.json();
+                    if first {
+                        let total = page["pagination"]["total"].clone();
+                        seen.push(json!({"total": total}));
+                        first = false;
+                    }
+                    let rows = page["data"].as_array().unwrap().clone();
+                    assert!(rows.len() <= 2, "{page}");
+                    for row in rows {
+                        seen.push(json!(format!("{}|{}", row["kind"], row["title"])));
+                    }
+                    match page["pagination"]["next_cursor"].as_str() {
+                        Some(next) => cursor = Some(next.to_owned()),
+                        None => break,
+                    }
+                }
+                seen
+            }
+        };
+        let desc = walk("admin", "desc").await;
+        assert_eq!(desc[0], json!({"total": 6}), "{desc:?}");
+        let mut rows: Vec<String> =
+            desc[1..].iter().map(|row| row.as_str().unwrap().to_owned()).collect();
+        assert_eq!(rows.len(), 6, "{rows:?}");
+        let asc = walk("admin", "asc").await;
+        let mut reversed: Vec<String> =
+            asc[1..].iter().map(|row| row.as_str().unwrap().to_owned()).collect();
+        reversed.reverse();
+        assert_eq!(rows, reversed, "asc là desc đảo ngược");
+        rows.sort();
+        rows.dedup();
+        assert_eq!(rows.len(), 6, "không trùng: {rows:?}");
+        assert_eq!(
+            rows.iter().filter(|row| row.starts_with("\"menus.menu\"")).count(),
+            3,
+            "{rows:?}"
+        );
+        assert!(rows.iter().any(|row| row.ends_with("\"footer (vi) · Ba\"")), "{rows:?}");
+        // Không đọc được menu: chỉ nguồn của `shop`.
+        let seller = walk("seller", "desc").await;
+        assert_eq!(seller[0], json!({"total": 3}), "{seller:?}");
+        assert_eq!(seller.len(), 4, "{seller:?}");
     })
     .await
     .unwrap();

@@ -17,6 +17,22 @@ OpenAPI contract, with the same permissions as people. The core stays neutral an
 Payment, SMS, shipping and e-invoice providers sit behind interfaces that ship today with
 simulated providers only: connecting a real provider is still to be done.
 
+## Try it in one command
+
+Just looking around? `autoxide demo` needs no setup: it creates a folder, a SQLite database, random
+secrets and an administrator, loads the reference data, and prints the administrator's password on
+screen. The API reference opens at `/api/docs`. Not for production.
+
+```bash
+# With Docker (nothing to install or compile):
+docker run --rm -it -p 127.0.0.1:8080:8080 ghcr.io/thuongtamduy/autoxide:latest demo
+# Or with a downloaded binary (Linux, macOS, Windows: see the release page):
+./autoxide demo
+```
+
+Needs a release made after 0.19.0. [`docs/GETTING-STARTED.md`](docs/GETTING-STARTED.md) has the
+downloads, keeping the demo data, and the next steps.
+
 ## Quickstart
 
 One command, nothing to compile: SQLite in a Docker volume, the tables created, a first

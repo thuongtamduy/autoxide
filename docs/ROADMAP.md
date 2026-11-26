@@ -222,7 +222,7 @@ Postgres; vòng kiểm thử bảo mật kiểu bên ngoài cuối cùng không 
 ### G9 — Chất lượng thành quy trình và đo bằng con số
 
 - [x] Kiểm độc lập bắt buộc theo D-20261126-independent-review (mẫu pull request có mục kết quả kiểm)
-- [ ] Mutation testing (`cargo-mutants`) cho kernel và phần tiền / thuế, chạy định kỳ
+- [ ] Mutation testing (`cargo-mutants`) cho kernel và phần tiền / thuế, chạy định kỳ — workflow `mutants.yml` và báo cáo đã có; còn: lần chạy CI đầu tiên để đặt `baseline` trong `docs/quality/mutation.json` (đang `null`, chưa có hồi quy nào làm đỏ được), rồi chỉnh số shard; chạy thêm trên Postgres và test tích hợp (hiện chỉ `--lib` trên SQLite)
 - [x] Bất biến tiền, thuế, quyền thành property test chạy hằng đêm (rà ở `docs/quality/invariants.md`; phần còn thiếu ghi cuối file)
 - [ ] Đo tải trong CI hằng tuần trên cả hai database, chặn khi p95 của đường nóng tệ đi; vài benchmark vi mô cho đường
       nóng của kernel
@@ -404,13 +404,19 @@ thật (P7).
     - [ ] Test dry run dời khách không tạo bảng ở đích
   - [x] Mẫu câu OTP khách tự sửa cho khớp template đã đăng ký với nhà mạng (đang viết cứng ở `compliance`, `orders`,
         `bookings`) — D-20261125-sms-templates: cấu hình theo khách nhóm `sms_template`, kiểm `{code}` đúng một lần
-  - [ ] 139 endpoint GET trả `Data<Vec<T>>` không phân trang: endpoint mới trả `Page<T>`, khai deprecation cho cái cũ —
-        chủ dự án quyết sửa tại chỗ cả 140 (đo lại 25/11), D-20261125-list-pages; làm theo cụm module, mỗi cụm một PR:
+  - [x] 139 endpoint GET trả `Data<Vec<T>>` không phân trang: endpoint mới trả `Page<T>`, khai deprecation cho cái cũ —
+        chủ dự án quyết sửa tại chỗ cả 140 (đo lại 25/11), D-20261125-list-pages; làm theo cụm module, mỗi cụm một PR;
+        xong ở D-20261126-list-pages-done:
     - [x] Kernel (`NaturalOrderPageQuery`, `SortChoicePageQuery::into_request`, `page_of`) + `support`
-    - [ ] Các module còn lại (theo cụm) — cụm 1 (12 module, 25 endpoint) và cụm 2 (plans, tax, organizations,
-          analytics, kernel `/me/*`) xong; còn auth, catalog, compliance, orders, promotions, kernel
+    - [x] Các module còn lại (theo cụm) — cụm 1 (12 module, 25 endpoint), cụm 2 (plans, tax, organizations,
+          analytics, kernel `/me/*`), cụm 3 (auth, catalog, compliance, orders, promotions, kernel; cuối cùng
+          `kernel/records/{kind}/{id}/usages` qua `ReferenceSource::referrers_page`)
     - [x] `customers/me/wishlist` và `notifications/templates`: thêm cột id UUIDv7 + migration điền dữ liệu rồi phân trang
-    - [ ] Luật gate chặn danh sách không phân trang, hướng dẫn nâng cấp EN + VI, danh sách ngoại lệ
+    - [x] Luật gate chặn danh sách không phân trang (`api-unpaged-list`, `api-page-params`, `api-param-description`,
+          `mcp-page-count`), hướng dẫn nâng cấp EN + VI (`docs/guides/list-pages-upgrade.md`), danh sách ngoại lệ — ba
+          tra cứu theo khoá client gửi (`catalog/variants?code=`, `comments/public/counts`,
+          `inventory/public/availability`) được cho phép (chủ dự án giao phiên điều phối quyết, 26/11/2026,
+          D-20261126-list-pages-done mục 2)
   - [ ] `./gate.sh` chưa chạy tsc trên SDK và ví dụ trong `docs/guides` (CI có: `cargo xtask sdk --extract-examples` + `tsc
         --noEmit`); `sdk --check` chỉ so SDK với `docs/openapi.json` nên kiểu SDK hỏng vẫn lọt tới CI (#517). Chạy khi SDK
         hay ví dụ đổi và có Node; còn hai kiểu `& Record<string, unknown>` có sẵn trên `main` (`realm`, một kiểu tiền)

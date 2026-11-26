@@ -17,6 +17,7 @@ Ví dụ `curl` gửi JSON bằng `--json '…'`, cần curl 7.82 trở lên (`c
 - [API key cho chương trình và AI agent](api-keys.vi.md): ít permission nhất, giới hạn tốc độ, thu hồi
 - [Gọi lại an toàn](retries.vi.md): `Idempotency-Key`
 - [Đọc danh sách dài](pagination.vi.md): `limit`, `cursor`, `order`
+- [Nâng cấp client: mọi danh sách là một trang](list-pages-upgrade.vi.md): `data` + `pagination`, `count`, thứ tự mặc định, tool MCP
 - [Đọc lỗi](errors.vi.md): `code`, `errors`, `Retry-After`
 - [Nối AI agent qua MCP](mcp.vi.md): key cho agent, cấu hình client, các tool
 - [Nhận event theo thời gian thực](realtime-events.vi.md): Server-Sent Events, `Last-Event-ID`, giới hạn

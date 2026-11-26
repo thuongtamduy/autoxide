@@ -141,6 +141,10 @@ impl PromotionsService {
         // Một trang (`page_of`): xung đột do luật `clashes` tính trong code trên các chương trình cùng nút trùng
         // thời gian — không viết được thành điều kiện SQL. Khoá là id (UUIDv7, chữ thường đệm đủ: so theo byte
         // đúng thứ tự tạo), như `PageQuery` của danh sách theo thời điểm tạo.
+        // Tập đọc có trần theo cấu trúc, không thêm trần riêng (D-20261126-list-pages-done): chỉ chương trình
+        // cùng nút, chưa huỷ / không nháp, trùng khoảng thời gian của chương trình này và có chung đối tượng áp
+        // dụng — đúng tập mà bước kiểm xung đột lúc kích hoạt (`conflict_check`) đã đọc trọn mỗi lần; chương trình
+        // đang chạy của khách còn được bộ máy giá nạp hết vào bộ nhớ (`compiled.rs`) cho mỗi giỏ hàng.
         let found: Vec<Conflict> = self
             .overlapping_programs(tenant, &program, true)
             .await?

@@ -463,6 +463,8 @@ pub(crate) async fn staff_reviews(
     Query(query): Query<StaffReviewQuery>,
     Query(page): Query<PageQuery>,
 ) -> Result<Page<ReviewResponse>, Error> {
+    // Quyền trước tham số trang: thiếu quyền là 403, không phải 422 (như `x-permissions`).
+    principal.require(&crate::permissions::REVIEWS_MODERATE)?;
     let page = PageRequest::try_from(page)?;
     let found = service.staff_reviews(&tenant, &principal, &query.filter(), &page).await?;
     let data = found.data.into_iter().map(|row| ReviewResponse::new(row, None)).collect();
