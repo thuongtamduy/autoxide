@@ -310,15 +310,10 @@ pub(super) fn check_invariants(
             };
         }
     };
-    // Tổng số lượng theo chuỗi (= nhóm): thuế theo đơn vị của nhóm là đơn giá × tổng này.
-    let mut quantities: BTreeMap<Vec<Uuid>, Decimal> = BTreeMap::new();
-    for (line, chain) in lines {
-        *quantities.entry(chain.iter().map(|rate| rate.id).collect()).or_default() +=
-            line.quantity.map_or(Decimal::ZERO, |quantity| quantity.0);
-    }
     let mut by_column: BTreeMap<(String, String, bool), i128> = BTreeMap::new();
     for (taxed, (line, chain)) in computed.lines.iter().zip(lines) {
-        let quantity = quantities[&chain.iter().map(|rate| rate.id).collect::<Vec<_>>()];
+        // Thuế theo đơn vị chia về dòng theo số lượng của dòng: dòng số lượng 0 không mang nó.
+        let quantity = line.quantity.map_or(Decimal::ZERO, |quantity| quantity.0);
         // I4.
         if taxed.net.is_negative() {
             return Err(format!("I4 giá chưa thuế âm: {taxed:?}"));
@@ -404,14 +399,13 @@ fn pct(position: i32, percent: &str) -> ResolvedRate {
 fn inclusive(
     chain: &[ResolvedRate],
     amounts: &[i64],
-    quantity: Decimal,
+    quantities: &[Decimal],
 ) -> (Vec<i64>, Vec<Vec<i64>>, Vec<i64>) {
     let lines: Vec<_> = amounts
         .iter()
         .enumerate()
         .map(|(index, amount)| {
-            // Cả số lượng nằm ở dòng đầu: thuế theo đơn vị của nhóm = đơn giá × tổng số lượng.
-            let quantity = if index == 0 { quantity } else { Decimal::ZERO };
+            let quantity = quantities.get(index).copied().unwrap_or(Decimal::ZERO);
             let line =
                 TaxableLine::new(format!("l{index}"), "c", Money::new(*amount, Currency::VND))
                     .with_quantity(quantity);
@@ -437,7 +431,7 @@ fn ba_tang_tang_cuoi_khong_nhan_phan_du_am() {
     // [65%, 10%, 10%], tổng 5: giá chưa thuế 3, TTĐB 2, tầng 10% thứ hai làm tròn ra 0. Cách cũ: tầng
     // cuối = 5 − 3 − 2 − 1 = −1.
     let chain = [pct(0, "65"), pct(1, "10"), pct(2, "10")];
-    let (nets, _, totals) = inclusive(&chain, &[5], Decimal::ZERO);
+    let (nets, _, totals) = inclusive(&chain, &[5], &[]);
     assert_eq!(nets, [3]);
     assert_eq!(totals, [2, 0, 0]);
 }
@@ -446,7 +440,7 @@ fn ba_tang_tang_cuoi_khong_nhan_phan_du_am() {
 fn thue_suat_rat_nho_o_tang_cuoi_khong_am() {
     // [0,01%, 10%, 0,01%], tổng 5505: cách cũ [1, 501, −1]; phần thừa 1 trừ ở tầng 10%.
     let chain = [pct(0, "0.01"), pct(1, "10"), pct(2, "0.01")];
-    let (nets, _, totals) = inclusive(&chain, &[5505], Decimal::ZERO);
+    let (nets, _, totals) = inclusive(&chain, &[5505], &[]);
     assert_eq!(nets, [5004]);
     assert_eq!(totals, [1, 500, 0]);
 }
@@ -455,7 +449,7 @@ fn thue_suat_rat_nho_o_tang_cuoi_khong_am() {
 fn thue_theo_don_vi_so_luong_le_cuoi_chuoi_khong_am() {
     // [0,01%, 16,07%, 1 đ/đơn vị] số lượng 0,5, tổng 5804: cách cũ [1, 804, −1].
     let chain = [pct(0, "0.01"), pct(1, "16.07"), stage(2, Basis::PerUnit, Decimal::ZERO, 1)];
-    let (nets, _, totals) = inclusive(&chain, &[5804], Decimal::new(5, 1));
+    let (nets, _, totals) = inclusive(&chain, &[5804], &[Decimal::new(5, 1)]);
     assert_eq!(nets, [5000]);
     assert_eq!(totals, [1, 803, 0]);
 }
@@ -465,7 +459,7 @@ fn tang_thue_suat_khong_cuoi_chuoi_khong_nhan_phan_thieu() {
     // [4%, 4%, 0%], tổng 10: giá chưa thuế 9, hai tầng 4% làm tròn ra 0, thiếu 1. Không được dồn vào
     // tầng 0% — vào tầng 4% sau cùng.
     let chain = [pct(0, "4"), pct(1, "4"), pct(2, "0")];
-    let (nets, _, totals) = inclusive(&chain, &[10], Decimal::ZERO);
+    let (nets, _, totals) = inclusive(&chain, &[10], &[]);
     assert_eq!(nets, [9]);
     assert_eq!(totals, [0, 1, 0]);
 }
@@ -474,7 +468,7 @@ fn tang_thue_suat_khong_cuoi_chuoi_khong_nhan_phan_thieu() {
 fn thue_theo_don_vi_so_luong_khong_cuoi_chuoi_khong_nhan_phan_thieu() {
     // [4%, 4%, 49 đ/đơn vị] số lượng 0: thuế theo đơn vị bằng 0, phần thiếu 1 vào tầng 4% sau cùng.
     let chain = [pct(0, "4"), pct(1, "4"), stage(2, Basis::PerUnit, Decimal::ZERO, 49)];
-    let (nets, _, totals) = inclusive(&chain, &[10], Decimal::ZERO);
+    let (nets, _, totals) = inclusive(&chain, &[10], &[]);
     assert_eq!(nets, [9]);
     assert_eq!(totals, [0, 1, 0]);
 }
@@ -484,7 +478,7 @@ fn chia_ve_dong_khong_ra_thue_am() {
     // [1%, 1%], hai dòng 26 + 26: nhóm 51 + [1, 0]. Cách cũ chia tầng 0 thành [1, 0] rồi lấy tầng 1 của
     // dòng = phần còn lại → [−1, +1]. Nay đơn vị thuế duy nhất về dòng có giá chưa thuế nhỏ hơn.
     let chain = [pct(0, "1"), pct(1, "1")];
-    let (nets, taxes, totals) = inclusive(&chain, &[26, 26], Decimal::ZERO);
+    let (nets, taxes, totals) = inclusive(&chain, &[26, 26], &[]);
     assert_eq!(nets, [26, 25]);
     assert_eq!(taxes, [vec![0, 0], vec![1, 0]]);
     assert_eq!(totals, [1, 0]);
@@ -492,19 +486,55 @@ fn chia_ve_dong_khong_ra_thue_am() {
 
 #[test]
 fn chia_ve_dong_thue_theo_don_vi_so_tien_lon_khong_am() {
-    // [10%, 2 đ/đơn vị] tổng số lượng 1, bốn dòng ~1e11: cách cũ cho dòng thứ ba −1 đ thuế theo đơn vị.
+    // [10%, 2 đ/đơn vị], bốn dòng ~1e11, cả số lượng 1 ở dòng đầu: cách cũ cho dòng thứ ba −1 đ thuế theo
+    // đơn vị. Nay thuế theo đơn vị đi theo số lượng — trọn 2 đ ở dòng đầu.
     let chain = [pct(0, "10"), stage(1, Basis::PerUnit, Decimal::ZERO, 2)];
     let amounts = [415_698_296_401, 846_558_977_934, 29_261_856_332, 626_942_279_638];
-    let (nets, taxes, totals) = inclusive(&chain, &amounts, Decimal::ONE);
-    assert_eq!(nets, [377_907_542_182, 769_599_070_848, 26_601_687_575, 569_947_526_943]);
+    let (nets, taxes, totals) = inclusive(&chain, &amounts, &[Decimal::ONE]);
+    assert_eq!(nets, [377_907_542_181, 769_599_070_849, 26_601_687_574, 569_947_526_944]);
     assert_eq!(
         taxes,
         [
-            vec![37_790_754_219, 0],
-            vec![76_959_907_085, 1],
-            vec![2_660_168_757, 0],
-            vec![56_994_752_694, 1],
+            vec![37_790_754_218, 2],
+            vec![76_959_907_085, 0],
+            vec![2_660_168_758, 0],
+            vec![56_994_752_694, 0],
         ]
     );
     assert_eq!(totals, [174_405_582_755, 2]);
+}
+
+#[test]
+fn thue_theo_don_vi_chia_theo_so_luong_cua_dong() {
+    // Hai dòng 5.000 đ, 1.000 đ/đơn vị, số lượng 1 và 0: cách cũ chia theo số tiền (500 + 500), dòng số
+    // lượng 0 mang thuế theo đơn vị. Nay trọn 1.000 ở dòng có số lượng.
+    let chain = [stage(0, Basis::PerUnit, Decimal::ZERO, 1_000)];
+    let (nets, taxes, _) = inclusive(&chain, &[5_000, 5_000], &[Decimal::ONE, Decimal::ZERO]);
+    assert_eq!(nets, [4_000, 5_000]);
+    assert_eq!(taxes, [vec![1_000], vec![0]]);
+}
+
+#[test]
+fn chuoi_phan_tram_va_theo_don_vi_chia_theo_gia_tri_cua_dong() {
+    // [10%, 1.000 đ/đơn vị], hai dòng 5.000 đ, số lượng 0,5 và 1,5: mỗi cột chia theo giá trị chính xác của
+    // chính dòng — thuế theo đơn vị 500 / 1.500, giá chưa thuế và GTGT theo phần còn lại của dòng.
+    let chain = [pct(0, "10"), stage(1, Basis::PerUnit, Decimal::ZERO, 1_000)];
+    let (nets, taxes, totals) =
+        inclusive(&chain, &[5_000, 5_000], &[Decimal::new(5, 1), Decimal::new(15, 1)]);
+    assert_eq!(nets, [4_091, 3_182]);
+    assert_eq!(taxes, [vec![409, 500], vec![318, 1_500]]);
+    assert_eq!(totals, [727, 2_000]);
+}
+
+#[test]
+fn nhieu_dong_phai_hoan_doi_van_nhanh() {
+    // 100.000 dòng 26 đ, [1%, 1%]: nửa số dòng có ô âm phải hoán đổi. Vòng hoán đổi chỉ tiến con trỏ
+    // (tuyến tính); bản quét lại mọi dòng mỗi lượt cần ~1e10 bước ở đây.
+    let chain = [pct(0, "1"), pct(1, "1")];
+    let amounts = vec![26; 100_000];
+    let started = std::time::Instant::now();
+    let (_, _, totals) = inclusive(&chain, &amounts, &[]);
+    // 2.600.000 / 1,0201 → 2.548.770; 1% → 25.488; 1% của 2.574.258 → 25.743, thừa 1 trừ ở tầng cuối.
+    assert_eq!(totals, [25_488, 25_742]);
+    assert!(started.elapsed() < std::time::Duration::from_secs(20), "{:?}", started.elapsed());
 }

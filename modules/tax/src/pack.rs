@@ -10,7 +10,7 @@ use autoxide_kernel::time::Date;
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
-use autoxide_kernel::decimal::{parse, to_column};
+use autoxide_kernel::decimal::{Decimal, parse, to_column};
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::money::Money;
@@ -126,6 +126,14 @@ fn date(text: &str) -> Option<Date> {
 }
 
 /// Đọc và kiểm một gói; báo mọi chỗ sai một lần (tối đa 20).
+/// Trần thuế suất trong gói (phần trăm). Thuế suất cao nhất trong luật đang biết là vài trăm phần trăm
+/// (TTĐB); một con số lớn vô lý là lỗi nhập liệu và làm tràn số khi tính.
+const MAX_RATE_PERCENT: i64 = 1_000;
+
+fn rate_in_range(rate: Decimal) -> bool {
+    !rate.is_sign_negative() && rate <= Decimal::from(MAX_RATE_PERCENT)
+}
+
 pub(crate) fn parse_pack(text: &str) -> Result<Pack, Error> {
     let pack: Pack =
         serde_json::from_str(text).map_err(|error| pack_invalid(format!("not a pack: {error}")))?;
@@ -177,8 +185,14 @@ pub(crate) fn parse_pack(text: &str) -> Result<Pack, Error> {
             }
             _ => {}
         }
-        if parse(&found.rate_percent).map_or(true, |rate| rate.is_sign_negative()) {
-            problems.push(format!("{what}: `rate_percent` must be a decimal string, not negative"));
+        // Thuế theo đơn vị âm sẽ làm giá chưa thuế lớn hơn giá đã gồm thuế — không có ở luật nào.
+        if found.per_unit.is_some_and(Money::is_negative) {
+            problems.push(format!("{what}: `per_unit` must not be negative"));
+        }
+        if !parse(&found.rate_percent).is_ok_and(rate_in_range) {
+            problems.push(format!(
+                "{what}: `rate_percent` must be a decimal string from 0 to {MAX_RATE_PERCENT}"
+            ));
         }
         window(&found.effective_from, found.effective_to.as_deref(), &what, &mut problems);
     }
@@ -206,8 +220,11 @@ pub(crate) fn parse_pack(text: &str) -> Result<Pack, Error> {
         if !jurisdictions.contains(found.jurisdiction.as_str()) {
             problems.push(format!("{what}: unknown jurisdiction"));
         }
-        if parse(&found.rate_percent).map_or(true, |rate| rate.is_sign_negative()) {
-            problems.push(format!("{what}: `rate_percent` must be a decimal string, not negative"));
+        // Khấu trừ thay là một phần của số tiền: không quá 100%.
+        if !parse(&found.rate_percent)
+            .is_ok_and(|rate| !rate.is_sign_negative() && rate <= Decimal::ONE_HUNDRED)
+        {
+            problems.push(format!("{what}: `rate_percent` must be a decimal string from 0 to 100"));
         }
         window(&found.effective_from, found.effective_to.as_deref(), &what, &mut problems);
     }
@@ -493,5 +510,24 @@ mod tests {
         let error = parse_pack(text).unwrap_err();
         assert_eq!(error.code(), "validation_failed");
         assert!(error.fields().len() >= 4, "{:?}", error.fields());
+    }
+
+    #[test]
+    fn goi_tu_choi_thue_theo_don_vi_am_va_thue_suat_qua_tran() {
+        let text = r#"{"code": "x", "version": 1, "checked_on": "2026-01-01", "source_note": "",
+            "jurisdictions": [{"code": "XX", "name": "X", "default_currency": "VND"}],
+            "categories": [{"jurisdiction": "XX", "code": "a", "name_en": "a", "name_vi": "a", "tax_kind": "env"}],
+            "rates": [
+              {"jurisdiction": "XX", "category_code": "a", "tax_kind": "env", "basis": "per_unit", "rate_percent": "0", "per_unit": {"amount": "-5", "currency": "VND"}, "stage": 0, "effective_from": "2026-01-01", "effective_to": null, "legal_basis": ""},
+              {"jurisdiction": "XX", "category_code": "a", "tax_kind": "excise", "basis": "percent", "rate_percent": "240000000000000000000", "stage": 1, "effective_from": "2026-01-01", "effective_to": null, "legal_basis": ""}
+            ]}"#;
+        let error = parse_pack(text).unwrap_err();
+        let messages: Vec<&str> =
+            error.fields().iter().map(|field| field.message.as_str()).collect();
+        assert!(
+            messages.iter().any(|message| message.contains("`per_unit` must not be negative")),
+            "{messages:?}"
+        );
+        assert!(messages.iter().any(|message| message.contains("from 0 to 1000")), "{messages:?}");
     }
 }
