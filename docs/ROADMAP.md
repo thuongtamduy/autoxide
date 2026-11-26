@@ -552,7 +552,8 @@ thật (P7).
         dead-letter — chưa có test, chưa có hướng dẫn xử lý cho người vận hành
   - [ ] Luật `address-key` của `cargo xtask check` chỉ bắt `format!("…ip:{…")` trên một dòng; khoá dựng cách khác
         (`ip.to_string()`, nhiều dòng) lọt — cân nhắc kiểm theo kiểu (`IpAddr` vào `Throttle::hit`)
-  - [x] PT-7: theo NIST SP 800-63B-4 — mã sống tối đa 10 phút; trần cứng 100 lần sai liên tiếp (bộ đếm bền, mọi client);
+  - [x] PT-7: theo NIST SP 800-63B-4 — mã sống tối đa 10 phút; lần sai liên tiếp đếm bền (client lạ khoá từ 90, mọi client từ
+        100; quản trị viên mở khoá qua REST / MCP / CLI);
         trần chung là setting riêng thay cho 5×; số mã mỗi giờ theo cặp (số, client); client đã đăng nhập bằng số không
         bị trần "mọi client" khoá
         (D-20261126-otp-nist)

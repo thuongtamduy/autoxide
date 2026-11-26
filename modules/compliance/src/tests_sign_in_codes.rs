@@ -36,7 +36,11 @@ async fn app_with(
     let capture = Arc::new(Capture::default());
     let sender: Arc<dyn SmsSender> = sms.clone();
     // `alice`: người đã đăng nhập, xác thực lại số để mở khoá (D-20261126-otp-nist).
-    let mut builder = TestApp::builder(test).user("alice", 2, &[]);
+    let mut builder = TestApp::builder(test).user("alice", 2, &[]).user(
+        "admin",
+        3,
+        &["compliance.phone_locks.manage"],
+    );
     for (name, value) in settings {
         builder = builder.setting(name, value);
     }
@@ -290,15 +294,34 @@ async fn nguoi_la_het_luot_gui_ma_chu_so_van_nhan_duoc() {
     .unwrap();
 }
 
-/// NIST SP 800-63B-4 §3.2.2: 100 lần sai liên tiếp (mọi client, không theo cửa sổ thời gian) khoá mã đăng nhập của số
-/// với mọi client, kể cả client quen. Đăng nhập đúng cho hết hạn mọi mã còn mở khác của số. Chủ số xác thực lại số từ
-/// tài khoản đã đăng nhập thì mở khoá.
+/// Đặt bộ đếm lần sai liên tiếp của mọi số trong khách thành `failures` (như sau nhiều ngày đoán từ nhiều nơi).
+async fn set_failures(
+    app: &TestApp,
+    tenant: &autoxide_kernel::tenancy::TenantContext,
+    failures: i32,
+) {
+    use sea_orm::EntityTrait;
+    use sea_orm::sea_query::Expr;
+    crate::entity::phone_failure::Entity::update_many()
+        .col_expr(crate::entity::phone_failure::Column::Failures, Expr::value(failures))
+        .scoped(tenant)
+        .exec(app.database().write())
+        .await
+        .unwrap();
+}
+
+/// NIST SP 800-63B-4 §3.2.2 (D-20261126-otp-nist): lần sai liên tiếp đếm bền, không theo cửa sổ thời gian. Từ 90 lần,
+/// client lạ bị khoá (403 `compliance.otp_locked` cả khi xin lẫn khi kiểm mã) nhưng client quen của chủ số vẫn đăng nhập
+/// được; tới 100 thì khoá cả client quen. Đăng nhập đúng cho hết hạn mọi mã đăng nhập còn mở khác của số. Quản trị viên
+/// (`compliance.phone_locks.manage`) mở khoá; chủ số xác thực lại số từ tài khoản cũng mở khoá.
 #[tokio::test]
-async fn sai_lien_tiep_toi_tran_cung_thi_khoa_den_khi_xac_thuc_lai() {
+async fn sai_lien_tiep_toi_tran_cung_thi_khoa_den_khi_mo_khoa() {
     TestDatabase::run(async |test| {
-        use sea_orm::EntityTrait;
-        use sea_orm::sea_query::Expr;
-        let settings = [("AUTOXIDE_COMPLIANCE_OTP_PER_PHONE_PER_HOUR", "100")];
+        let settings = [
+            ("AUTOXIDE_COMPLIANCE_OTP_PER_PHONE_PER_HOUR", "100"),
+            ("AUTOXIDE_COMPLIANCE_OTP_PER_PHONE_ALL_CLIENTS_PER_HOUR", "100"),
+            ("AUTOXIDE_COMPLIANCE_OTP_PER_PHONE_PER_DAY", "1000"),
+        ];
         let (app, codes, sms) = app_with(test, &settings).await;
         let tenant = app.default_tenant();
         let wrong_for = |code: &str| if code == "000000" { "111111" } else { "000000" }.to_owned();
@@ -316,23 +339,53 @@ async fn sai_lien_tiep_toi_tran_cung_thi_khoa_den_khi_xac_thuc_lai() {
             "codes asked before the right one are closed"
         );
 
-        // Một lần sai thật, rồi đưa bộ đếm tới 99 (như sau nhiều ngày đoán từ nhiều nơi), rồi một lần sai nữa.
-        let first = codes.send(&tenant, "0912000555", ip("203.0.113.41")).await.unwrap();
+        // Người lạ: một lần sai thật, bộ đếm lên 89, rồi một lần sai nữa → 90: client lạ bị khoá, cả khi kiểm mã.
+        let stranger = ip("203.0.113.41");
+        let first = codes.send(&tenant, "0912000555", stranger).await.unwrap();
         let wrong = wrong_for(&code_in(&sms, "+84912000555"));
         codes.verify(&tenant, first.id, &wrong).await.unwrap_err();
-        crate::entity::phone_failure::Entity::update_many()
-            .col_expr(crate::entity::phone_failure::Column::Failures, Expr::value(99))
-            .scoped(&tenant)
-            .exec(app.database().write())
-            .await
-            .unwrap();
+        set_failures(&app, &tenant, 89).await;
+        codes.verify(&tenant, first.id, &wrong).await.unwrap_err();
         let error = codes.verify(&tenant, first.id, &wrong).await.unwrap_err();
-        assert_eq!(error.code(), "compliance.otp_invalid");
-        // Đủ 100: khoá với mọi client, kể cả mạng quen của chủ số.
+        assert_eq!(error.code(), "compliance.otp_locked", "the check path is locked too");
+        let error = codes.send(&tenant, "0912000555", ip("198.51.100.50")).await.unwrap_err();
+        assert_eq!(error.code(), "compliance.otp_locked");
+        // Chủ số ở mạng quen: vẫn đăng nhập được (phần dự trữ 90 → 100).
+        let again = codes.send(&tenant, "0912000555", home).await.unwrap();
+        let right = code_in(&sms, "+84912000555");
+        codes.verify(&tenant, again.id, &right).await.unwrap();
+
+        // Tới 100: khoá cả mạng quen.
+        let mine = codes.send(&tenant, "0912000555", home).await.unwrap();
+        let wrong = wrong_for(&code_in(&sms, "+84912000555"));
+        codes.verify(&tenant, mine.id, &wrong).await.unwrap_err();
+        set_failures(&app, &tenant, 100).await;
         let error = codes.send(&tenant, "0912000555", home).await.unwrap_err();
         assert_eq!(error.code(), "compliance.otp_locked");
 
-        // Mở khoá: chủ số đăng nhập cách khác (`alice`) và xác thực lại số trong tài khoản.
+        // Quản trị viên mở khoá (REST); người không có quyền thì 403.
+        let unlock = serde_json::json!({"phone": "0912000555"});
+        let (status, _) =
+            crate::tests::call(&app, "POST", "/phone-locks/unlock", "alice", Some(unlock.clone()))
+                .await;
+        assert_eq!(status, axum::http::StatusCode::FORBIDDEN);
+        let (status, done) =
+            crate::tests::call(&app, "POST", "/phone-locks/unlock", "admin", Some(unlock.clone()))
+                .await;
+        assert_eq!(status, axum::http::StatusCode::OK, "{done}");
+        assert_eq!(done["data"]["unlocked"], true);
+        let (_, again) =
+            crate::tests::call(&app, "POST", "/phone-locks/unlock", "admin", Some(unlock)).await;
+        assert_eq!(again["data"]["unlocked"], false, "nothing left to unlock");
+        let back = codes.send(&tenant, "0912000555", home).await.unwrap();
+        codes.verify(&tenant, back.id, &code_in(&sms, "+84912000555")).await.unwrap();
+
+        // Chủ số xác thực lại số từ tài khoản cũng mở khoá; và không làm hết hạn mã đăng nhập đang mở của người khác.
+        let pending = codes.send(&tenant, "0912000555", ip("198.51.100.60")).await.unwrap();
+        let pending_code = code_in(&sms, "+84912000555");
+        let wrong = wrong_for(&pending_code);
+        codes.verify(&tenant, pending.id, &wrong).await.unwrap_err();
+        set_failures(&app, &tenant, 100).await;
         let (status, sent) = crate::tests::call(
             &app,
             "POST",
@@ -347,8 +400,90 @@ async fn sai_lien_tiep_toi_tran_cung_thi_khoa_den_khi_xac_thuc_lai() {
         let uri = format!("/me/phone-verifications/{id}/confirm");
         let (status, confirmed) = crate::tests::call(&app, "POST", &uri, "alice", Some(body)).await;
         assert_eq!(status, axum::http::StatusCode::OK, "{confirmed}");
-        let again = codes.send(&tenant, "0912000555", home).await.unwrap();
-        codes.verify(&tenant, again.id, &code_in(&sms, "+84912000555")).await.unwrap();
+        codes.send(&tenant, "0912000555", home).await.unwrap();
+    })
+    .await
+    .unwrap();
+}
+
+/// Lần sai cùng lúc trên nhiều mã của một số đều được đếm (bộ đếm là upsert trong transaction, mã của số bị khoá dòng).
+#[tokio::test]
+async fn lan_sai_dong_thoi_deu_duoc_dem() {
+    TestDatabase::run(async |test| {
+        use sea_orm::EntityTrait;
+        let settings = [("AUTOXIDE_COMPLIANCE_OTP_PER_PHONE_PER_HOUR", "100")];
+        let (app, codes, sms) = app_with(test, &settings).await;
+        let tenant = app.default_tenant();
+        let mut tries = Vec::new();
+        for block in 1..=4 {
+            let sent =
+                codes.send(&tenant, "0912000666", ip(&format!("198.51.{block}.9"))).await.unwrap();
+            let code = code_in(&sms, "+84912000666");
+            tries.push((sent.id, if code == "000000" { "111111" } else { "000000" }.to_owned()));
+        }
+        let verify = |at: usize| codes.verify(&tenant, tries[at].0, &tries[at].1);
+        let (a, b, c, d) = tokio::join!(verify(0), verify(1), verify(2), verify(3));
+        let answers = [a, b, c, d];
+        assert!(answers.iter().all(Result::is_err));
+        let rows = crate::entity::phone_failure::Entity::find()
+            .scoped(&tenant)
+            .all(app.database().read())
+            .await
+            .unwrap();
+        assert_eq!(rows.iter().map(|row| row.failures).collect::<Vec<_>>(), [4]);
+    })
+    .await
+    .unwrap();
+}
+
+/// Job dọn hằng ngày: client quen quá 90 ngày và bộ đếm không đổi quá một năm bị xoá.
+#[tokio::test]
+async fn job_don_client_quen_cu_va_bo_dem_cu() {
+    TestDatabase::run(async |test| {
+        use sea_orm::EntityTrait;
+        use sea_orm::sea_query::Expr;
+        let (app, codes, sms) = app(test).await;
+        let tenant = app.default_tenant();
+        let sent = codes.send(&tenant, "0912000777", ip("198.51.100.70")).await.unwrap();
+        codes.verify(&tenant, sent.id, &code_in(&sms, "+84912000777")).await.unwrap();
+        let sent = codes.send(&tenant, "0912000777", ip("198.51.100.71")).await.unwrap();
+        let code = code_in(&sms, "+84912000777");
+        codes
+            .verify(&tenant, sent.id, if code == "000000" { "111111" } else { "000000" })
+            .await
+            .unwrap_err();
+        let old =
+            autoxide_kernel::time::Timestamp::now() - jiff::SignedDuration::from_hours(400 * 24);
+        crate::entity::phone_known_client::Entity::update_many()
+            .col_expr(crate::entity::phone_known_client::Column::LastSuccessAt, Expr::value(old))
+            .scoped(&tenant)
+            .exec(app.database().write())
+            .await
+            .unwrap();
+        crate::entity::phone_failure::Entity::update_many()
+            .col_expr(crate::entity::phone_failure::Column::UpdatedAt, Expr::value(old))
+            .scoped(&tenant)
+            .exec(app.database().write())
+            .await
+            .unwrap();
+        crate::tests::run_jobs(&app).await;
+        let read = app.database().read();
+        assert!(
+            crate::entity::phone_known_client::Entity::find()
+                .scoped(&tenant)
+                .all(read)
+                .await
+                .unwrap()
+                .is_empty()
+        );
+        assert!(
+            crate::entity::phone_failure::Entity::find()
+                .scoped(&tenant)
+                .all(read)
+                .await
+                .unwrap()
+                .is_empty()
+        );
     })
     .await
     .unwrap();

@@ -38,7 +38,7 @@ pub(crate) const SMS_TIMEOUT: Duration = Duration::from_secs(10);
 /// Mã đã hết hạn / đã dùng giữ lại chừng này rồi job hằng ngày xoá.
 pub(crate) const CHALLENGE_KEEP_HOURS: i64 = 24;
 pub(crate) const HOUR: Duration = Duration::from_secs(3_600);
-const DAY: Duration = Duration::from_secs(86_400);
+pub(crate) const DAY: Duration = Duration::from_secs(86_400);
 
 /// Trạng thái xác thực của một tài khoản.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -308,6 +308,11 @@ impl ComplianceService {
                 Throttle::new("compliance", otp.per_user_per_day, DAY)?,
                 format!("otp-user:{user_id}"),
             ),
+            // Trần SMS mỗi ngày của một số, dùng chung với mã đăng nhập (D-20261126-otp-nist): chặn dội SMS tới một số.
+            (
+                Throttle::new("compliance", otp.per_phone_per_day, DAY)?,
+                format!("otp-phone-day:{}", phone.as_str()),
+            ),
         ];
         if let Some(ip) = ip {
             limits.push((
@@ -554,7 +559,15 @@ impl ComplianceService {
             .exec(database.write())
             .await?
             .rows_affected;
-        Ok(challenges + clients)
+        // Bộ đếm lần sai liên tiếp không đổi quá một năm: số đã thôi dùng, không giữ khoá của số mãi.
+        let stale = Timestamp::now() - SignedDuration::from_hours(365 * 24);
+        // tenant-scope: việc nền quét mọi khách của database, chủ ý không lọc khách
+        let failures = crate::entity::phone_failure::Entity::delete_many()
+            .filter(crate::entity::phone_failure::Column::UpdatedAt.lt(stale))
+            .exec(database.write())
+            .await?
+            .rows_affected;
+        Ok(challenges + clients + failures)
     }
 }
 

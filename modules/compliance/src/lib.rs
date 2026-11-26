@@ -37,6 +37,7 @@ mod migration;
 mod overview;
 mod permissions;
 mod phone_lock;
+mod phone_locks;
 mod privacy;
 mod provider;
 mod service;
@@ -298,12 +299,21 @@ impl Module for ComplianceModule {
                 .merge(http_privacy::routes(service.clone()))
                 .merge(http_tracking::routes(service.clone()))
                 .merge(http_verification::routes(service.clone()))
+                .merge(phone_locks::routes(service.clone()))
                 .merge(overview::routes(service))
         })
     }
 
     fn tools(&self) -> Vec<Tool> {
-        self.service.as_ref().map_or_else(Vec::new, tools::all)
+        self.service.as_ref().map_or_else(Vec::new, |service| {
+            let mut all = tools::all(service);
+            all.push(phone_locks::tool(service));
+            all
+        })
+    }
+
+    fn tasks(&self) -> Vec<autoxide_kernel::task::Task> {
+        self.service.clone().map_or_else(Vec::new, |service| vec![phone_locks::task(service)])
     }
 
     fn checks(&self) -> Vec<autoxide_kernel::doctor::Check> {

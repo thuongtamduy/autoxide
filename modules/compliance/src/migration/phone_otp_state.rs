@@ -47,7 +47,7 @@ impl MigrationTrait for PhoneOtpState {
         super::index(
             manager,
             KNOWN,
-            "compliance_phone_known_clients_age_idx",
+            "compliance_phone_known_clients_sweep_idx",
             &["last_success_at"],
             false,
         )

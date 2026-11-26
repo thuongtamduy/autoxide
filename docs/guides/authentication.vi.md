@@ -44,15 +44,20 @@ mới gửi tới chính số của mình; sau đó thêm được passkey và �
 **Giới hạn chống đoán mã** (NIST SP 800-63B-4). Mã sống tối đa 10 phút
 (`AUTOXIDE_COMPLIANCE_OTP_TTL_SECONDS`, 60 tới 600) và chỉ cho nhập sai vài lần. Theo từng số:
 
-- số mã mỗi giờ từ một client (một địa chỉ IPv4, hay một khối IPv6 /64), và từ mọi client cộng lại;
+- số mã mỗi giờ từ một client (một địa chỉ IPv4, hay một khối IPv6 /64) và từ mọi client cộng lại, và số mã mỗi
+  ngày (`429 compliance.otp_throttled`);
 - số mã sai mỗi ngày từ một client, và từ mọi client cộng lại (`429 compliance.otp_daily_limit`);
-- 100 mã sai liên tiếp, không theo cửa sổ thời gian: mã đăng nhập của số bị khoá với mọi client
-  (`403 compliance.otp_locked`) cho tới khi chủ số đăng nhập bằng cách khác và xác thực lại số trong tài khoản.
+- số mã sai liên tiếp, không theo cửa sổ thời gian: từ 90 lần thì số bị khoá với client chưa từng đăng nhập bằng số,
+  từ 100 lần thì khoá với mọi client (`403 compliance.otp_locked`).
 
-Client (một địa chỉ IPv4, hay một khối IPv6 /64) đã đăng nhập bằng số trong 90 ngày không bị tính vào các giới hạn
-của mọi client cộng lại, nên người lạ không khoá được chủ số ở mạng họ hay dùng. **Rủi ro còn lại:** mạng di động sau
-NAT của nhà mạng đổi địa chỉ thường xuyên; ở mạng chủ số chưa từng đăng nhập, họ có thể bị khoá tới một ngày khi người
-lạ chạm các giới hạn đó. Hãy cho người mua thêm một cách đăng nhập (mật khẩu hay passkey) — NIST đòi điều này với mã SMS.
+Client đã đăng nhập bằng số trong 90 ngày không bị tính vào các giới hạn "mọi client" và giữ 10 lượt cuối của 100,
+nên người lạ không khoá được chủ số ở mạng họ hay dùng. Nhập đúng thì bộ đếm về 0. Số bị khoá được mở khi chủ số đăng
+nhập bằng cách khác và xác thực lại số trong tài khoản, hay khi cửa hàng mở khoá
+(`POST /api/v1/compliance/phone-locks/unlock`, permission `compliance.phone_locks.manage`; tool MCP
+`compliance.unlock_phone`; `autoxide task compliance.unlock_phone phone=…`) — đường lấy lại tài khoản cho người chỉ
+đăng nhập bằng số. **Rủi ro còn lại:** mạng di động sau NAT của nhà mạng đổi địa chỉ thường xuyên; ở mạng chủ số chưa
+từng đăng nhập, họ có thể bị khoá khi người lạ chạm các giới hạn đó. Hãy cho người mua thêm một cách đăng nhập (mật khẩu
+hay passkey) — NIST đòi điều này với mã SMS.
 
 ## Làm mới trước khi access token hết hạn
 

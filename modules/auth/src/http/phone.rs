@@ -73,8 +73,9 @@ pub(crate) struct PhoneLoginRequest {
     operation_id = "send_phone_sign_in_code", request_body = PhoneCodeRequest,
     responses(
         (status = 202, description = "The code was sent.", body = Data<PhoneCodeResponse>),
+        (status = 403, description = "Too many wrong codes in a row for this number; sign-in codes are locked until the owner verifies the number again from a signed-in account or the shop unlocks it (`compliance.otp_locked`).", body = Problem),
         (status = 422, description = "Not a mobile number the shop accepts (`compliance.phone_not_allowed`), or a value is invalid.", body = Problem),
-        (status = 429, description = "Too many codes; code `compliance.otp_throttled`, see `Retry-After`.", body = Problem),
+        (status = 429, description = "Too many codes (`compliance.otp_throttled`), or too many wrong codes for this number today (`compliance.otp_daily_limit`); see `Retry-After`.", body = Problem),
         (status = 503, description = "This server cannot send SMS (`auth.phone_sign_in_unavailable`, `compliance.sms_disabled`) or the provider did not answer.", body = Problem),
     )
 )]
@@ -102,9 +103,10 @@ async fn send_phone_code(
         (status = 200, description = "Signed in.", body = Data<TokenResponse>),
         (status = 201, description = "A new buyer account was created and signed in.", body = Data<TokenResponse>),
         (status = 202, description = "Code accepted; the account's second step is needed. Continue with `POST /api/v1/auth/login/mfa`.", body = Data<MfaChallengeResponse>),
-        (status = 403, description = "The account is disabled (`auth.user_disabled`), or the shop does not let buyers create accounts (`auth.customer_registration_closed`).", body = Problem),
+        (status = 403, description = "The account is disabled (`auth.user_disabled`), the shop does not let buyers create accounts (`auth.customer_registration_closed`), or sign-in codes of the number are locked after too many wrong codes in a row (`compliance.otp_locked`).", body = Problem),
         (status = 404, description = "No such code; code `compliance.challenge_not_found`.", body = Problem),
         (status = 422, description = "Wrong or expired code (`compliance.otp_invalid`), too many wrong tries (`compliance.otp_attempts_exceeded`), or a value is invalid.", body = Problem),
+        (status = 429, description = "Too many wrong codes for this number today; code `compliance.otp_daily_limit`, see `Retry-After`.", body = Problem),
         (status = 503, description = "This server cannot send SMS; code `auth.phone_sign_in_unavailable`.", body = Problem),
     )
 )]

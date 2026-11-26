@@ -52,6 +52,20 @@ pub(crate) async fn record_failure<C: ConnectionTrait>(
     Ok(())
 }
 
+/// Xoá bộ đếm lần sai của số (quản trị viên mở khoá); `true` nếu có bộ đếm để xoá.
+pub(crate) async fn clear<C: ConnectionTrait>(
+    connection: &C,
+    tenant: &TenantContext,
+    phone_key: &str,
+) -> Result<bool, Error> {
+    let deleted = phone_failure::Entity::delete_many()
+        .filter(phone_failure::Column::PhoneKey.eq(phone_key))
+        .scoped(tenant)
+        .exec(connection)
+        .await?;
+    Ok(deleted.rows_affected > 0)
+}
+
 /// Lần đúng: xoá bộ đếm lần sai của số (NIST SP 800-63B-4 §3.2.2) và cho hết hạn mọi mã đăng nhập còn mở khác của số
 /// — mã tạo trước lần đúng không còn nhận lượt đoán nào nữa.
 pub(crate) async fn succeeded<C: ConnectionTrait>(
