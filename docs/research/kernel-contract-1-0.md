@@ -631,7 +631,7 @@ mới; baseline của `wrapped-libraries` giảm đúng số module của cụm.
    `async_trait` xuất lại; `notes` chuyển hết → `notes` không còn khai thư viện bọc nào. Đo thời gian biên dịch (§4.2) ít nhất 3
    lần, lấy trung vị. Có test khẳng định rõ `openapi.json` sinh ra bằng đúng bản đã commit sau khi đổi derive (không chỉ dựa
    vào việc file sinh lại không đổi). **Trước PR 4** (kiểm lần 2, F9): spike `#[endpoint]` + `Params` trên một module trọn vẹn
-   không còn khai `utoipa`/`utoipa-axum`, `openapi.json` giống từng byte.
+   không còn khai `utoipa`/`utoipa-axum`, `openapi.json` giống từng byte — **đã làm, đạt** (§15.4).
 5. `Manifest` + `StartContext` gọn; `notes` chuyển; luật `module-contract-legacy`.
 5b. Đánh phiên bản event / webhook / `x-*` (§13): `EventInfo::payload`, `docs/events.json`, danh mục phần mở rộng,
    `xtask contract-diff`.
@@ -768,6 +768,60 @@ người đọc; và lọc/sắp theo trường nhạy cảm vẫn lộ giá tr�
   nhân) không che phần của chính người đó.
 - Trường tuỳ biến (`custom_fields`) khai lớp khi tạo trường; giá trị đi qua cùng bước egress.
 
+### 14.2 Mã hoá mức trường (G13) cắm vào `db` — trả lời 5 điểm của `docs/research/g13-field-encryption-audit.md` §4
+
+Thiết kế G13 ở PR #577; mục này chốt phần chạm hợp đồng kernel. Code của G13 đi sau G1 PR 2–5 như thiết kế đó ghi.
+
+1. **Tên và kiểu — chốt, nhưng thêm ở PR 1 của G13, không chen vào PR 2.** Bộ kiểu trường (§3.1) nhận thêm
+   `db::Sensitive<T>` (`T`: `String`, `serde_json::Value`, cùng `Option<Sensitive<T>>` cho cột cho NULL). Thêm kiểu trường và
+   thuộc tính mới là thay đổi **cộng thêm**: module chưa dùng không đổi gì, và derive hiện từ chối mọi tuỳ chọn lạ trong
+   `#[record(…)]` nên không có module nào lỡ viết sẵn. Điều chỉnh so với #577:
+   - **Kiểu quyết định, không cần `#[record(encrypted)]`**: trường `Sensitive<T>` luôn mã hoá khi lưu (một cách làm cho một
+     việc). Ngoại lệ duy nhất là `#[record(plaintext = "<lý do>")]` trên trường `Sensitive<T>` (lưu rõ trong lúc chuyển, vẫn che
+     ở egress); gate `sensitive-plaintext` đếm theo baseline chỉ giảm.
+   - `Record` không biết `data_class` (lớp khai trên DTO `#[derive(Schema)]`, kiểu khác), nên "thiếu `encrypted` trên trường
+     `data_class = sensitive` là lỗi biên dịch" của #577 không làm được ở derive `Record`. Thay bằng chuỗi kiểu: `Sensitive<T>`
+     không cài `Serialize`; `reveal(&principal)` trả `Classified<T>`, và `#[derive(Schema)]` coi trường kiểu `Classified<T>` là
+     `data_class = sensitive` **tự động** (sinh `x-autoxide-data-class`, `Redact` che). Giá trị đi từ cột mã hoá ra response
+     không thể mất lớp dọc đường. Chiều ngược (cột nhạy cảm mà khai `String`) do rà soát ở PR 3 của G13 bắt, theo danh sách
+     trường `data_class = sensitive` của DTO.
+   - `scope = global` mà có trường `Sensitive<T>` là lỗi biên dịch: không có khách thì không có DEK.
+2. **Chỗ gọi codec.** Ghi: trong `Tx::insert`/`insert_many`, ngay sau bước kiểm `tenant_of(row) == khách của handle` và trước khi
+   dựng câu; đọc: trong `Record::read` của handle, sau khi có dòng, với khách của handle (handle `AllTenants`: khách lấy từ
+   `tenant_id` của chính dòng). AAD cần khoá chính của dòng, nên:
+   - `Col<R, Sensitive<_>>` **không** cài `Settable`: không `update().set(…)` hàng loạt (không biết khoá chính từng dòng).
+     Đổi giá trị nhạy cảm bằng `tx.update_row(&record)` (ghi cả dòng theo khoá chính, mới ở PR 1 G13) hay `insert`.
+   - `on_conflict_update` không nhận cột `Sensitive` trong danh sách cập nhật (dòng va chạm có khoá chính khác dòng chèn).
+   - Không `eq`/`order_*`/`select`/hàm gộp/`group_by` trên cột `Sensitive` (thiếu impl → lỗi biên dịch); tra đúng giá trị qua
+     cột `BlindIndex<T>` có `.matches(&value)`, handle tính HMAC bằng khoá của khách.
+   - `db.sql`: `Sensitive` không chuyển được sang `db::Value` nên không bind được; đọc kết quả `db.sql` thành record có trường
+     `Sensitive` cũng bị chặn (derive sinh dấu `HasSensitive`, hàm đọc của `Sql` đòi `R: NoSensitive`).
+   - Cầu tạm `ConnectionTrait` (G2) không đi qua codec: module chỉ được khai `Sensitive` khi đã chuyển **hết** sang `db`
+     (baseline `wrapped-libraries` không còn tên nó). `compliance` và `ledger` vì vậy chuyển cụm trước PR 3 của G13.
+3. **Hạng và crate.** Việc tách crate đã dời sau 1.0, nên tất cả nằm trong `autoxide-kernel`, trừ phần chạy:
+   - `db::Sensitive<T>`, `db::BlindIndex<T>`, `#[record(plaintext)]`: **ổn định** ở `autoxide_kernel::db` (là kiểu trường của
+     `Record`; dời đường dẫn sau này là phá vỡ chữ ký của module — đúng điều #577 muốn tránh). Điều kiện: ≥ 2 module dùng trước
+     1.0 (`compliance`, `ledger`); không kịp thì ở `unstable::db` tới khi đủ.
+   - `KeyProvider`, `AuditAnchor`: **thử nghiệm**, `autoxide_kernel::unstable::security` — là hợp đồng của bộ nối nhà cung cấp
+     (KMS, Vault, Object Lock, RFC 3161), cùng tiêu chí với `payment`/`sms` (§2.1). `audit` (official) dùng `AuditAnchor` bên
+     trong được, miễn `api` của nó không lộ kiểu này (gate `stable-signatures`).
+   - Codec `enc:v1`, bộ nhớ đệm DEK, `LocalKeyProvider`: **nội bộ** — codec và cache ở kernel (handle gọi), không công khai;
+     `LocalKeyProvider`, lệnh `autoxide keys …`, job `kernel.fields.rekey` thuộc `autoxide-host` khi tách.
+4. **`kernel_data_keys`: đúng, bảng cấp khách của kernel**, có `tenant_id`, ở mọi placement, **không** nằm trong
+   `control_plane_tables`, đi theo khách khi dời, cùng loại với `kernel_shares` (§14). Chỉ kernel ghi (không có `Record` công
+   khai). Hai hệ quả phải làm cùng PR 1 của G13:
+   - **Tách / gộp khách đổi `tenant_id` của dòng** (`relocate::kernel_tables` đặt lại `tenant_id`), mà AAD có `tenant_id`: bước
+     tách/gộp phải mã hoá lại cột `Sensitive` (mở bằng DEK của khách nguồn, khoá bằng DEK của khách đích). `Relocation` của module
+     liệt kê cột `Sensitive` từ `Module::records` (đã có `RecordInfo`), không bắt module khai lần nữa. Dời placement giữ
+     `tenant_id` nên không cần.
+   - Xuất khách sang bản cài khác (`transfer`): DEK bọc bằng KEK của bản cài nguồn vô dụng ở đích → bản xuất mang giá trị đã
+     giải mã trong file mã hoá của lệnh xuất (như hiện nay với dữ liệu), hay bọc lại DEK bằng khoá của đích; chọn ở PR 2 của G13.
+5. **Egress: đúng, `Sensitive` = `data_class = sensitive`, che kể cả khi lưu rõ.** Che dựa trên lớp của trường DTO, không dựa
+   trên cách lưu; `plaintext` chỉ đổi cách lưu, không bao giờ đổi việc che. Hai lớp kiểm khác nhau: `reveal(&principal)` kiểm
+   **người đang thao tác** (và ghi audit "đọc dữ liệu nhạy cảm"); bước egress (§14.1) kiểm **người nhận** (chủ webhook, người
+   nhận thông báo, bên tải file xuất) — dữ liệu đã `reveal` cho người A vẫn bị che khi đi tới người B thiếu quyền. Payload event
+   và chỉ mục tìm kiếm không chứa được `Sensitive` (không `Serialize`); muốn mang thì khai trường DTO với lớp, như §14.1.
+
 ## 15. Kết quả ba spike (trước PR 2)
 
 Mã nháp ở nhánh `claude/kernel-contract-spikes` (PR nháp, **không merge**): crate `spikes/db-api` (nguyên mẫu `db`),
@@ -827,6 +881,49 @@ sinh `#[derive(Record)]` thật (spike dùng `macro_rules!` đứng thay).
   — dưới ngưỡng 20% → **dời sau 1.0**, trước 1.0 chỉ tách `autoxide-host` (đã quyết).
 - Cái rút thời gian thật nằm ở phía module (70–75%), không ở kernel: ghi để xét sau 1.0 (vd module chỉ phụ thuộc phần kernel
   mình dùng, hay giảm mã sinh ra của derive).
+
+### 15.4 Spike F9 (trước PR 4): `#[endpoint]` + `Params` trên module trọn vẹn
+
+Mã nháp ở nhánh `claude/kernel-contract-spike-f9` (**không merge**), dựng trên PR 2 (#568). `autoxide-macros` có thêm
+`#[endpoint]`, `#[derive(Schema)]`, `#[derive(Params)]`; kernel có `http::{Endpoint, Routes, ModuleRouter}` và `routes!`.
+Hai module chuyển trọn: `notes` (6 endpoint, dùng `etag`) và `audit` (3 endpoint, `IntoParams` có `#[into_params]`,
+`#[param(example)]`, `#[param(inline)]` trên enum cũng đổi sang `Schema`). **Cả hai không còn khai `utoipa` / `utoipa-axum`**.
+
+- **Giống từng byte.** `audit` có trong binary: `cargo xtask regen --check` không lệch `docs/openapi.json` lẫn
+  `docs/mcp-tools.json`; đối chứng: sửa một chữ trong mô tả thì lệnh báo lệch. `notes` không có trong binary: test
+  `spike_f9_openapi_giong_tung_byte` so tài liệu OpenAPI của app có `notes` với bản chụp từ mã cũ; đối chứng tương tự cho đỏ.
+  So sau khi qua `serde_json::Value` (khoá sắp theo tên), như `autoxide openapi` làm: extension của operation nằm trong
+  `HashMap` của utoipa nên thứ tự khoá đổi mỗi lần chạy, so chuỗi thô là sai.
+- **Thời gian biên dịch: không đo được khác biệt.** `-Ztime-passes` của `audit`: 2,04 s (mới) và 2,08 s (cũ). Đo xen kẽ
+  bản mới / bản cũ, chạm file nguồn rồi biên dịch lại riêng module, 6 lần mỗi ô, lấy trung vị:
+
+  | Module | `check` cũ → mới | `build` cũ → mới |
+  | --- | --- | --- |
+  | `notes` | 1,43 → 1,43 s (+0,5%) | 2,76 → 2,94 s (+6,4%) |
+  | `audit` | 2,55 → 2,52 s (−1,0%) | 4,62 → 4,57 s (−1,1%) |
+
+  Lượt đo đầu (đo hết bản cũ rồi mới đo bản mới) cho `audit` +20%, `notes` −12%: đó là nhiễu do điều kiện máy đổi giữa hai
+  đợt. Luật đo cho PR 4 (§4.2): **đo xen kẽ hai bản trong cùng một đợt**, không đo hai đợt nối tiếp.
+- **Cách làm đã chạy** (giữ cho PR 4):
+  - `#[endpoint]` giữ nguyên hàm của module, sinh thêm một struct đánh dấu **cùng tên hàm** cài `http::Endpoint`.
+    Struct phải có ngoặc nhọn (`struct x {}`): struct đơn vị `struct x;` chiếm cả namespace giá trị nên trùng tên hàm.
+    `routes![a, b]` vì vậy chỉ cần tên hàm, không cần `paste`.
+  - Trong thân `Endpoint::__describe` có một bản sao chữ ký của hàm (thân `loop {}`, không bao giờ chạy) mang
+    `#[utoipa::path]`, với `utoipa` lấy từ `::autoxide_kernel::__private`. Bản sao giữ nguyên mẫu tham số, vì feature
+    `axum_extras` của utoipa đọc extractor (`Path(id): Path<Uuid>`, `Query<T>`) để điền tham số.
+  - Ba đường tắt đã dùng: `permission = "…"` (sinh `x-permissions` + `security`), `operation_id` mặc định là tên hàm, `etag`
+    trên response (header `ETag` chuẩn).
+  - `Routes` thêm từng endpoint một: axum gộp các method của cùng một path, utoipa gộp operation, nên không cần gom theo
+    path như `utoipa_axum::routes!`.
+- **Còn để PR 4 quyết:**
+  - Endpoint không cần permission (`x-permissions: []`, như `GET /audit/activity`) vẫn viết tay `extensions` + `security`.
+    Cần một dạng ngắn, ví dụ `permission = none`.
+  - Response 401/403 chuẩn chưa sinh tự động: mô tả 403 khác nhau theo endpoint (nêu các mã lỗi). Chỉ sinh khi module
+    không tự viết.
+  - `Module::routes` còn trả `ModuleRouter`, bí danh tạm của `OpenApiRouter`, tới khi manifest (PR 5) nhận `Routes`.
+  - `ValidJson` vẫn dựa trên `validator`, như §4.3.
+- **Bẫy khi đo:** nhiều worktree dùng chung `CARGO_TARGET_DIR` ghi đè bản build của nhau, vì hash của crate path trong
+  workspace không gồm đường dẫn. Mỗi worktree một thư mục target, như luật chia agent.
 
 ## 16. Mở rộng hợp đồng: CLI và định dạng file (71-G14 mục 4, D-20261126-operations-baseline)
 
