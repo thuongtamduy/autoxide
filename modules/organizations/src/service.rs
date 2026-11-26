@@ -568,11 +568,11 @@ impl OrgService {
         Ok(after)
     }
 
-    /// Cần `organizations.units.read` ở bất kỳ độ sâu nào.
     /// Loại nút của khách theo mã, keyset trong database. Bảng không có cột ID riêng: khoá chính
     /// (`tenant_id`, `code`) và mọi câu lọc một khách, nên mã đã duy nhất trong câu — cột phụ phá hoà
     /// của keyset là `tenant_id` (bằng nhau trên mọi dòng, không bao giờ quyết thứ tự; cursor chỉ mang
     /// ID của chính khách gọi). Index: khoá chính (`tenant_id`, `code`).
+    /// Cần `organizations.units.read` ở bất kỳ độ sâu nào.
     pub(crate) async fn list_types(
         &self,
         tenant: &TenantContext,

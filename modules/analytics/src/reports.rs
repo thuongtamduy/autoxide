@@ -236,8 +236,10 @@ impl AnalyticsService {
         prefix: Option<&str>,
         page: &PageRequest,
     ) -> Result<Page<Ranked>, Error> {
-        let after =
-            page.text_key_after(RANK_CURSOR)?.map(|key| parse_rank_key(&key)).transpose()?;
+        let after = page
+            .text_key_after(&rank_cursor(dimension))?
+            .map(|key| parse_rank_key(&key))
+            .transpose()?;
         let most_first = page.order() == autoxide_kernel::pagination::Order::Asc;
         let rank = rank_expr(dimension);
         let mut select = self.ranking_select(tenant, range, dimension, prefix);
@@ -263,7 +265,7 @@ impl AnalyticsService {
         let next = has_more.then(|| rows.last()).flatten().map(|row| {
             let count = if by_events { row.events } else { row.views };
             autoxide_kernel::pagination::text_key_cursor(
-                RANK_CURSOR,
+                &rank_cursor(dimension),
                 &format!("{count}\u{1f}{}", row.value),
             )
         });
@@ -396,10 +398,12 @@ impl AnalyticsService {
     }
 }
 
-/// `CAST(SUM(cột) AS BIGINT)`: Postgres trả `numeric` cho tổng của `bigint`, ép về số nguyên để hai
-/// database trả cùng kiểu.
-/// Tên thứ tự trong con trỏ của bảng xếp hạng (`text_key_cursor`): con trỏ của danh sách khác bị từ chối.
-const RANK_CURSOR: &str = "rank";
+/// Tên thứ tự trong con trỏ của bảng xếp hạng (`text_key_cursor`): gồm chiều, nên con trỏ của bảng khác (vd
+/// `sources` dùng cho `pages`) bị từ chối (422 ở `cursor`). Không gồm hướng: như mọi danh sách, đổi `order`
+/// giữa chừng chỉ đổi điểm bắt đầu của trang sau (D-20261125-list-pages).
+fn rank_cursor(dimension: Dimension) -> String {
+    format!("rank:{}", dimension.as_str())
+}
 
 /// Tổng xếp hạng của chiều: số sự kiện cho `type`, số lượt xem cho chiều khác.
 fn rank_expr(dimension: Dimension) -> Expr {
@@ -441,6 +445,8 @@ async fn read_ranked(
     Ok(ranked)
 }
 
+/// `CAST(SUM(cột) AS BIGINT)`: Postgres trả `numeric` cho tổng của `bigint`, ép về số nguyên để hai
+/// database trả cùng kiểu.
 pub(crate) fn sum_bigint(column: impl sea_orm::sea_query::IntoColumnRef) -> Expr {
     Func::cast_as(Func::sum(Expr::col(column)), Alias::new("BIGINT")).into()
 }
