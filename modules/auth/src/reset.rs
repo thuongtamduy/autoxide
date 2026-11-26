@@ -188,6 +188,12 @@ impl PasswordResets {
             return Err(invalid_token().with_reason(TokenRejection::Unknown.as_str()));
         };
         let tenant = &tenant;
+        // Luật của khách (`auth.password_min_length`) biết khi đã biết khách; vẫn trước khi dùng token.
+        if let Some(problem) =
+            self.users.password_problem(tenant, "password", &new_password).await?
+        {
+            return Err(Error::validation(vec![problem]));
+        }
         let consumed = tokens().consume(tenant.database().write(), tenant, PURPOSE, token).await?;
         let Some(user_id) = consumed.and_then(|consumed| consumed.subject.parse::<Uuid>().ok())
         else {

@@ -407,7 +407,7 @@ database mới.
 | `AUTOXIDE_PROCESS_ROLE` | `api` / `worker` để chạy API và việc nền ở tiến trình riêng |
 | `AUTOXIDE_HTTP_COMPRESSION` | `true` (mặc định): nén JSON và chữ bằng gzip hay brotli; `false` khi reverse proxy hay CDN phía trước đã nén |
 | `AUTOXIDE_HTTP_PUBLIC_CACHE_SECONDS` | CDN được giữ một lượt đọc công khai bao lâu (mặc định `60`), xem [CDN phía trước Autoxide](#cdn-phía-trước-autoxide) |
-| `AUTOXIDE_HTTP_RATE_LIMIT_TENANT_PER_MINUTE` | Nhiều khách: số request một khách gửi được mỗi phút, mọi người dùng và API key của khách cộng lại (mặc định `0`, tắt), để một khách ồn ào không làm chậm khách khác; vượt thì 429 `tenant_rate_limited` kèm `Retry-After`. Hạn mức `kernel.api_rate_per_minute` của gói thay giá trị này cho khách đó (trong gói `0` là chặn mọi request; ở biến này `0` là tắt). Chỉ tính người gọi đã đăng nhập và đang làm việc trong khách của chính họ: request không có thông tin xác thực hợp lệ (trang công khai, webhook gửi đến), nhân sự nền tảng và quyền hỗ trợ chỉ chịu giới hạn theo địa chỉ, nên người ngoài không làm cạn hạn mức của khách được. Một lô ghi tính một lần. Với `AUTOXIDE_HTTP_RATE_LIMIT_STORE=database`, burst nhỏ nghĩa là gần như mỗi request một lần ghi database: mức thấp trên một máy chủ thì nên dùng `memory` |
+| `AUTOXIDE_HTTP_RATE_LIMIT_TENANT_PER_MINUTE` | Nhiều khách: số request một khách gửi được mỗi phút, mọi người dùng và API key của khách cộng lại (mặc định `0`, tắt), để một khách ồn ào không làm chậm khách khác; vượt thì 429 `tenant_rate_limited` kèm `Retry-After`. Hạn mức `kernel.api_rate_per_minute` của gói thay giá trị này cho khách đó (trong gói `0` là chặn mọi request; ở biến này `0` là tắt). Chỉ tính người gọi đã đăng nhập, vào khách họ đang làm việc (khách của chính họ, hay khách đã uỷ quyền cho họ): request không có thông tin xác thực hợp lệ (trang công khai, webhook gửi đến), nhân sự nền tảng thao tác trong khách và quyền hỗ trợ chỉ chịu giới hạn theo địa chỉ, nên người ngoài không làm cạn hạn mức của khách được. Một lô ghi tính một lần. Với `AUTOXIDE_HTTP_RATE_LIMIT_STORE=database`, burst nhỏ nghĩa là gần như mỗi request một lần ghi database: mức thấp trên một máy chủ thì nên dùng `memory` |
 | `AUTOXIDE_HTTP_METRICS` | Metrics Prometheus ở `/metrics`, không có xác thực. Thêm `AUTOXIDE_HTTP_METRICS_ADDRESS` (vd `127.0.0.1:9090`) để phục vụ nó ở port riêng, tách khỏi API; không có biến đó thì `/metrics` nằm cùng port với API: hãy chặn nó ở reverse proxy (Caddy: `respond /metrics 404`) và lấy số đo ngay trên máy chủ |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | Gửi trace tới một OpenTelemetry collector |
 
@@ -478,6 +478,7 @@ hành vi của module còn đặt được theo từng khách, thay giá trị c
 | `analytics.allowed_hosts` | `AUTOXIDE_ANALYTICS_ALLOWED_HOSTS` (tên miền đã xác minh của khách luôn được nhận) |
 | `catalog.locales` | `AUTOXIDE_CATALOG_LOCALES` |
 | `menus.locales`, `menus.default_locale` | `AUTOXIDE_MENUS_LOCALES`, `AUTOXIDE_MENUS_DEFAULT_LOCALE` |
+| `auth.passkey_rp_id` | `AUTOXIDE_AUTH_PASSKEY_RP_ID` (chỉ là một tên miền khách này đã xác minh; kiểm lúc đặt và mỗi lần dùng — tên miền mất xác minh hay chuyển sang khách khác thì cấu hình của máy chủ áp lại và passkey đăng ký trên tên miền đó hết dùng được) |
 | `newsletter.postal_address` | `AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS`; chưa đặt thì tên và địa chỉ chủ sở hữu trong hồ sơ pháp lý của khách (module `compliance`) được dùng trước |
 | `<module>.link.<trang>` (nhóm `link`, xem dưới) | địa chỉ trang `AUTOXIDE_…_URL` trong mail: `auth.link.password_reset`, `auth.link.email_verification`, `auth.link.invitation`, `auth.link.login`, `auth.link.email_change_report`, `support.link.guest_ticket`, `compliance.link.case_tracking`, `inventory.link.restock_confirm`, `notifications.link.unsubscribe`, `comments.link.verify`, `comments.link.unsubscribe`, `newsletter.link.confirm`, `newsletter.link.preferences` |
 
@@ -644,6 +645,16 @@ permission nào, tách khỏi nhân sự dù trùng email. Người mua đăng k
 `"realm": "customer"`; khách đóng đăng ký người mua bằng cài đặt theo cây tổ chức
 `auth.customer_registration` (`false`). Nhân sự quản lý người mua bằng `GET /api/v1/auth/customers`
 và `PATCH /api/v1/auth/customers/{id}` (permission `auth.customers.read`, `auth.customers.manage`).
+
+**Chính sách đăng nhập theo khách.** Cài đặt tổ chức ở nút gốc của khách (`PUT
+/api/v1/organizations/units/{id}/settings/{key}`) cho khách tự quyết, trong giới hạn của máy chủ:
+
+| Cài đặt | Tác dụng |
+| ------- | -------- |
+| `auth.staff_registration` | `true` / `false`: ai cũng tự tạo được tài khoản nhân sự (`POST /api/v1/auth/register`, hay đăng nhập lần đầu qua nhà cung cấp cho đăng ký). Chưa đặt: `AUTOXIDE_AUTH_SELF_REGISTRATION` |
+| `auth.password_min_length` | 12 tới 128: độ dài tối thiểu của mật khẩu mới. Chỉ nâng mức 12 của máy chủ |
+| `auth.session_days` | 1 tới 365: thời hạn mỗi refresh token. Chỉ rút ngắn `AUTOXIDE_AUTH_REFRESH_TOKEN_DAYS`; giá trị dài hơn bị bỏ qua |
+| `auth.totp_issuer` | Tên hiện trong app xác thực (không có `:`), thay `AUTOXIDE_AUTH_TOTP_ISSUER` |
 
 **Mời nhân sự.** Thay vì tạo tài khoản kèm mật khẩu, hãy mời: `POST /api/v1/auth/invitations` với
 `email`, các `role_ids` và nút (`org_id`) họ nhận (permission `auth.invitations.manage`; không mời kèm

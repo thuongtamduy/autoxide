@@ -476,11 +476,14 @@ impl Invitations {
                             invitation.name.clone()
                         }
                     });
-                let problems: Vec<FieldError> = password
-                    .as_deref()
-                    .and_then(|password| crate::password::check_rules("password", password))
-                    .into_iter()
-                    .collect();
+                let problems: Vec<FieldError> = match password.as_deref() {
+                    Some(password) => {
+                        self.users.password_problem(&tenant, "password", password).await?
+                    }
+                    None => None,
+                }
+                .into_iter()
+                .collect();
                 if !problems.is_empty() {
                     return Err(Error::validation(problems));
                 }

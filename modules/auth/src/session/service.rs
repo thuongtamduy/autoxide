@@ -109,6 +109,8 @@ pub(crate) struct SessionService {
     outbox: Outbox,
     /// Sổ database: tìm khách ghi trong refresh token / `mfa_token`.
     databases: DatabaseRegistry,
+    /// Thời hạn phiên theo khách (`auth.session_days`, chỉ ngắn hơn `refresh_token_ttl`).
+    policy: crate::policy::TenantPolicy,
 }
 
 /// Kết quả của bước nhập mật khẩu.
@@ -151,7 +153,22 @@ impl SessionService {
             mfa,
             outbox,
             databases,
+            policy: crate::policy::TenantPolicy::default(),
         })
+    }
+
+    /// Thời hạn phiên theo khách.
+    pub(crate) fn with_policy(mut self, policy: crate::policy::TenantPolicy) -> Self {
+        self.policy = policy;
+        self
+    }
+
+    /// Thời hạn của refresh token mới ở khách `tenant`.
+    pub(crate) async fn refresh_token_ttl(
+        &self,
+        tenant: &TenantContext,
+    ) -> Result<SignedDuration, Error> {
+        self.policy.session_ttl(tenant, self.refresh_token_ttl).await
     }
 
     /// Đăng nhập bằng email và mật khẩu. Tài khoản chưa bật MFA: mở một họ refresh
@@ -232,7 +249,7 @@ impl SessionService {
         // Mọi lỗi của đầu vào báo một lần.
         let problems: Vec<FieldError> = FieldError::blank("current_password", current)
             .into_iter()
-            .chain(crate::password::check_rules("new_password", &new))
+            .chain(self.users.password_problem(tenant, "new_password", &new).await?)
             .collect();
         if !problems.is_empty() {
             return Err(Error::validation(problems));
@@ -453,8 +470,9 @@ impl SessionService {
         user_agent: Option<&str>,
         proof: Proof,
     ) -> Result<Tokens, Error> {
+        let ttl = self.refresh_token_ttl(tenant).await?;
         let now = now();
-        let expires_at = now + self.refresh_token_ttl;
+        let expires_at = now + ttl;
         let user_agent = user_agent
             .map(str::trim)
             .filter(|agent| !agent.is_empty())

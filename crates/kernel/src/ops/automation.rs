@@ -134,6 +134,8 @@ impl AutomationDirectory {
                 principal.require(&permission)?;
             }
         }
-        crate::http::call_mcp_tool(&self.entitlements, tool, tenant, principal, arguments).await
+        // Quy tắc tự động chạy ngầm, không phải request: không tính vào hạn mức request của gói (như trước).
+        crate::http::call_mcp_tool(&self.entitlements, tool, tenant, principal, arguments, None)
+            .await
     }
 }

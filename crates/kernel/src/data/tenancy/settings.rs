@@ -190,6 +190,16 @@ impl TenantSetting {
         setting
     }
 
+    /// A domain of the tenant's own (group [`DOMAIN_GROUP`], see [`SiteLinks::own_domain`]): a bare domain name
+    /// that, in multi-tenant mode, this tenant has verified (`POST /api/v1/kernel/domains`) — checked when set
+    /// and again every time it is used, so a domain the tenant loses or that moves to another tenant stops
+    /// counting at once. Name it `<module>.<key>`.
+    pub const fn own_domain(name: &'static str, description: &'static str) -> Self {
+        let mut setting = TenantSetting::new(name, description).checked(links::domain_name);
+        setting.group = Some(DOMAIN_GROUP);
+        setting
+    }
+
     /// The value is a secret: stored encrypted, never returned.
     pub const fn secret(mut self) -> Self {
         self.secret = true;
@@ -512,8 +522,8 @@ pub(crate) struct SettingState {
     #[serde(skip_serializing_if = "Option::is_none")]
     last_error: Option<String>,
     /// The stored value is not used any more, and why: `kernel.public_url_unverified` /
-    /// `kernel.link_unverified` (its host is not a verified domain of this tenant — verify the domain or
-    /// change the value). Omitted when the value is used.
+    /// `kernel.link_unverified` / `kernel.domain_unverified` (its host is not a verified domain of this
+    /// tenant — verify the domain or change the value). Omitted when the value is used.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schema(example = "kernel.public_url_unverified")]
     problem: Option<String>,
@@ -690,6 +700,11 @@ impl SettingsService {
         let trust = self.links.get().cloned().unwrap_or_default();
         if setting.group == Some(LINK_GROUP) {
             links::check_link(&trust, self, tenant, &setting, value)
+                .await?
+                .map_err(|problem| Error::validation(vec![problem]))?;
+        }
+        if setting.group == Some(DOMAIN_GROUP) {
+            links::check_own_domain(&trust, tenant, value)
                 .await?
                 .map_err(|problem| Error::validation(vec![problem]))?;
         }
@@ -1096,7 +1111,7 @@ pub(crate) fn routes(service: Arc<SettingsService>, registry: DatabaseRegistry) 
 mod links;
 mod tools;
 pub(crate) use links::LinkTrust;
-pub use links::{LINK_GROUP, SiteLinks};
+pub use links::{DOMAIN_GROUP, LINK_GROUP, SiteLinks};
 pub(crate) use tools::tools;
 
 /// The `kernel_tenant_settings` table (tenant level, has `tenant_id` from the start).
