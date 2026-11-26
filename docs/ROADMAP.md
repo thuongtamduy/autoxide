@@ -214,7 +214,7 @@ chỉ số của G9 đạt ngưỡng.
 
 ### G9 — Chất lượng thành quy trình và đo bằng con số
 
-- [ ] Kiểm độc lập bắt buộc theo D-20261126-independent-review (mẫu pull request có mục kết quả kiểm)
+- [x] Kiểm độc lập bắt buộc theo D-20261126-independent-review (mẫu pull request có mục kết quả kiểm)
 - [ ] Mutation testing (`cargo-mutants`) cho kernel và phần tiền / thuế, chạy định kỳ
 - [ ] Bất biến tiền, thuế, quyền thành property test chạy hằng đêm
 - [ ] Đo tải trong CI hằng tuần trên cả hai database, chặn khi p95 của đường nóng tệ đi; vài benchmark vi mô cho đường
@@ -258,6 +258,24 @@ chỉ số của G9 đạt ngưỡng.
       nhiều khách có database riêng và kho file
 - [ ] Rà giấy phép thư viện: `cargo deny` chặn giấy phép không hợp MIT/Apache; danh sách giấy phép của bên thứ ba đi kèm
       mỗi bản phát hành (binary, image, SDK)
+
+### G14 — Vận hành và cam kết nền (chủ dự án duyệt ngày 26/11/2026, D-20261126-operations-baseline)
+
+- [ ] Cam kết nền tảng: chính sách bản Postgres (các bản lớn còn được hãng hỗ trợ), bản SQLite tối thiểu, hệ điều hành và
+      kiến trúc CPU cho binary và image; CI chạy ma trận các bản Postgres được hỗ trợ (ít nhất bản cũ nhất và mới nhất); ghi
+      vào `docs/COMPATIBILITY.md` (EN + VI); `doctor` cảnh báo khi chạy trên bản ngoài danh sách
+- [ ] Bộ đồ nghề vận hành: sổ tay xử lý sự cố `docs/RUNBOOK.md` (EN + VI) cho các tình huống thường gặp (database đầy hay
+      chậm, hàng đợi việc nền ứ, xoay khoá ký và khoá mã hoá khi lộ, thu hồi hàng loạt API key / phiên, khôi phục một khách
+      từ sao lưu, khách báo mất dữ liệu); mẫu bảng theo dõi và luật cảnh báo dựng sẵn từ số đo OTLP / Prometheus của core;
+      quy trình ứng phó lỗ hổng bảo mật (nhận báo, đánh giá, vá, công bố, xin mã CVE) ghi ở `SECURITY.md`
+- [ ] Thử hỏng có chủ đích trong CI trên cả hai database: mất kết nối database giữa transaction, đầy ổ đĩa, Postgres
+      chuyển máy dự phòng / khởi động lại, tiến trình bị giết giữa việc nền, migration và sao lưu; hệ thống tự hồi phục,
+      không mất hay nhân đôi event / job, không hỏng dữ liệu; kết quả ghi vào tài liệu sức chứa
+- [ ] Mở rộng danh sách hợp đồng được cam kết (bổ sung G13): tên lệnh, tham số và mã thoát của CLI `autoxide`; định dạng
+      file sao lưu và file xuất dữ liệu (bản 1.x đọc được file do mọi bản 1.y trước đó tạo, có số phiên bản định dạng trong
+      file); test giữ hợp đồng như api-diff
+- [ ] Đường chuyển từ 0.x lên 1.0 cho người viết module: hướng dẫn từng bước (EN + VI) và công cụ tự sửa code cũ sang hợp
+      đồng mới (dùng chính nó để chuyển module trong repo); chạy thử trên `examples/external-module`
 
 ## Giai đoạn A — Hợp đồng và nền lõi
 
