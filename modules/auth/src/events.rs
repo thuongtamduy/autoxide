@@ -36,6 +36,7 @@ macro_rules! events {
 events! {
     USER_CREATED, UserCreated, "auth.user_created", "A user account was created.";
     USER_UPDATED, UserUpdated, "auth.user_updated", "A user account was renamed, disabled or enabled.";
+    ACCESS_REVOKED, AccessRevoked, "auth.access_revoked", "Every way into a user account was cut (locked out, recovered by email, all sessions revoked with a password change, disabled or deleted); `after.user_id` is its id, `after.reason` one of `locked_out`, `recovered`, `sessions_revoked`, `disabled`, `deleted`. Modules stop what the account set up to act on its behalf until a person checks it.";
     USER_DELETED, UserDeleted, "auth.user_deleted", "A user account was deleted; `before.id` is its id. Modules that keep data about users delete theirs when they receive it.";
     PASSWORD_CHANGED, PasswordChanged, "auth.password_changed", "A user's password was changed; their sessions were ended.";
     SIGNED_IN, SignedIn, "auth.signed_in", "A user signed in; `after.method` says how (`password`, `password_and_mfa`, `passkey`, `email_link`, `oidc`…).";
@@ -96,5 +97,6 @@ mod tests {
     #[test]
     fn ten_event_xoa_nguoi_dung_khop_kernel() {
         assert_eq!(super::USER_DELETED.name(), autoxide_kernel::privacy::USER_DELETED);
+        assert_eq!(super::ACCESS_REVOKED.name(), autoxide_kernel::accounts::ACCESS_REVOKED);
     }
 }

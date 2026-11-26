@@ -35,7 +35,8 @@ pub(crate) mod rule {
         pub actions: String,
         /// `active`, `disabled`, `pending_approval`, `paused`.
         pub status: String,
-        /// Vì sao luật bị tạm dừng (`rate_limit`, `permission_lost`, `owner_unavailable`, `credential_revoked`).
+        /// Vì sao luật bị tạm dừng (`rate_limit`, `permission_lost`, `owner_unavailable`, `credential_revoked`,
+        /// `owner_access_revoked`).
         pub status_reason: Option<String>,
         /// Múi giờ IANA của lịch.
         pub timezone: String,

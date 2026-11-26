@@ -16,7 +16,9 @@ impl RoleService {
         roles_of_user(connection, tenant, user_id).await
     }
 
-    /// Thay toàn bộ role của người dùng `user_id` bằng `role_ids`.
+    /// Thay toàn bộ role của người dùng `user_id` bằng `role_ids` (đường hệ thống, không kiểm người gán) — chỉ
+    /// để test dựng dữ liệu; code chạy thật dùng [`set_user_roles_as`](Self::set_user_roles_as).
+    #[cfg(test)]
     pub(crate) async fn set_user_roles(
         &self,
         tenant: &TenantContext,
@@ -24,10 +26,37 @@ impl RoleService {
         user_id: Uuid,
         role_ids: Vec<Uuid>,
     ) -> Result<Vec<Role>, Error> {
+        self.set_user_roles_checked(tenant, actor, None, user_id, role_ids).await
+    }
+
+    /// Như `set_user_roles` (đường chỉ có trong test), do `principal` làm (REST, MCP): role được thêm hay bị
+    /// gỡ phải là role họ cấp được — cùng luật với membership, lời mời và SCIM (PT-9,
+    /// D-20261126-no-self-grant); không thì 403 `auth.role_beyond_you`.
+    pub(crate) async fn set_user_roles_as(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+        user_id: Uuid,
+        role_ids: Vec<Uuid>,
+    ) -> Result<Vec<Role>, Error> {
+        let actor = Actor::from(principal);
+        self.set_user_roles_checked(tenant, actor, Some(principal), user_id, role_ids).await
+    }
+
+    async fn set_user_roles_checked(
+        &self,
+        tenant: &TenantContext,
+        actor: Actor,
+        authority: Option<&Principal>,
+        user_id: Uuid,
+        role_ids: Vec<Uuid>,
+    ) -> Result<Vec<Role>, Error> {
         let will_hold = !role_ids.is_empty();
         // Lần gán này luôn ghi (kể cả khi trùng role cũ): coi là "có đổi" cho hạn mức.
         let change = async {
-            self.write_user_roles(tenant, actor, user_id, role_ids).await.map(|roles| (roles, true))
+            self.write_user_roles(tenant, actor, authority, user_id, role_ids)
+                .await
+                .map(|roles| (roles, true))
         };
         self.with_member_limit(tenant, user_id, will_hold, change).await
     }
@@ -36,6 +65,7 @@ impl RoleService {
         &self,
         tenant: &TenantContext,
         actor: Actor,
+        authority: Option<&Principal>,
         user_id: Uuid,
         role_ids: Vec<Uuid>,
     ) -> Result<Vec<Role>, Error> {
@@ -77,10 +107,33 @@ impl RoleService {
                 "every entry must be the id of an existing role",
             )]));
         }
-        let admins_before = count_active_admins(&transaction, tenant).await?;
-        let before = role_names(&roles_of_user(&transaction, tenant, user_id).await?);
         // Đường cũ (trước bước 34): role ở nút gốc. Membership ở nút khác giữ nguyên.
         let root = root_of(tenant.id()).as_uuid();
+        if let Some(authority) = authority {
+            // Chỉ cấp, giữ hay gỡ cái mình cấp được (PT-9): so role thêm / gỡ ở nút gốc, đọc dưới khoá dòng
+            // người dùng ở trên nên không lệch với lần gán chạy song song.
+            let held: BTreeSet<Uuid> = user_role::Entity::find()
+                .filter(user_role::Column::UserId.eq(user_id))
+                .filter(user_role::Column::OrgId.eq(root))
+                .scoped(tenant)
+                .all(&transaction)
+                .await?
+                .into_iter()
+                .map(|row| row.role_id)
+                .collect();
+            let give: Vec<(Uuid, Uuid)> =
+                role_ids.difference(&held).map(|role| (root, *role)).collect();
+            let take: Vec<(Uuid, Uuid)> =
+                held.difference(&role_ids).map(|role| (root, *role)).collect();
+            if let Err(error) =
+                require_grantable(&transaction, tenant, authority, &give, &take).await
+            {
+                transaction.rollback().await?;
+                return Err(error);
+            }
+        }
+        let admins_before = count_active_admins(&transaction, tenant).await?;
+        let before = role_names(&roles_of_user(&transaction, tenant, user_id).await?);
         user_role::Entity::delete_many()
             .filter(user_role::Column::UserId.eq(user_id))
             .filter(user_role::Column::OrgId.eq(root))
@@ -206,6 +259,27 @@ impl RoleService {
         if !problems.is_empty() {
             transaction.rollback().await?;
             return Err(Error::validation(problems));
+        }
+        // Membership bị bỏ (nút, role) cũng phải là thứ người gán gỡ được — kể cả permission cấm của role
+        // (D-20261126-no-self-grant); đọc dưới khoá dòng người dùng ở trên.
+        let held = user_role::Entity::find()
+            .filter(user_role::Column::UserId.eq(user_id))
+            .scoped(tenant)
+            .all(&transaction)
+            .await?;
+        let take: Vec<(Uuid, Uuid)> = held
+            .iter()
+            .filter_map(|row| {
+                let org = row.org_id.unwrap_or_else(|| root_of(tenant.id()).as_uuid());
+                let kept = wanted
+                    .iter()
+                    .any(|(wanted_org, roles)| *wanted_org == org && roles.contains(&row.role_id));
+                (!kept).then_some((org, row.role_id))
+            })
+            .collect();
+        if let Err(error) = require_grantable(&transaction, tenant, actor, &[], &take).await {
+            transaction.rollback().await?;
+            return Err(error);
         }
         let admins_before = count_active_admins(&transaction, tenant).await?;
         let before = memberships_json(&memberships_of(&transaction, tenant, user_id).await?);

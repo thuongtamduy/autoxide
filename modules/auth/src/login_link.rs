@@ -278,8 +278,16 @@ impl LoginLinks {
         crate::mfa::service::remove_in(transaction, tenant, &self.outbox, actor, user_id, false)
             .await?;
         crate::oidc::identity::delete_for_user(transaction, tenant, user_id).await?;
-        crate::user::revoke_durable_grants_in(transaction, tenant, &self.outbox, actor, user_id)
-            .await?;
+        let reason = "locked_out";
+        crate::user::revoke_durable_grants_in(
+            transaction,
+            tenant,
+            &self.outbox,
+            actor,
+            user_id,
+            reason,
+        )
+        .await?;
         tracing::info!(%user_id, "unverified account claimed by its email owner");
         Ok(())
     }

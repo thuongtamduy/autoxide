@@ -3,6 +3,7 @@
 //!
 //! Step 33+ adds more here: `payment`, `einvoice`, `identity`, `sms`, `entitlement`.
 
+pub mod accounts;
 pub mod ai;
 pub mod analytics;
 pub mod blocks;
