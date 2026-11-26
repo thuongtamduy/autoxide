@@ -114282,7 +114282,7 @@
     },
     "/api/v1/auth/roles/{id}": {
       "delete": {
-        "description": "Requires `auth.roles.manage`. Users who had the role lose it.",
+        "description": "Requires `auth.roles.manage`. Users who had the role lose it, so you can only delete a role\nyou could take away: you have its permissions as widely, and every permission it bans.",
         "operationId": "auth_delete_role",
         "parameters": [
           {
@@ -114343,7 +114343,7 @@
                 }
               }
             },
-            "description": "Missing permission `auth.roles.manage`; code `permission_denied`."
+            "description": "Missing permission `auth.roles.manage` (code `permission_denied`), or the role has permissions you do not have as widely, or bans one you do not have (code `auth.role_beyond_you`)."
           },
           "404": {
             "content": {
@@ -114588,7 +114588,7 @@
                 }
               }
             },
-            "description": "Missing permission `auth.roles.manage` (code `permission_denied`), or the change adds, widens or unbans a permission you do not have as widely (code `auth.permission_beyond_you`)."
+            "description": "Missing permission `auth.roles.manage` (code `permission_denied`), or the change adds, widens or unbans a permission you do not have as widely (code `auth.permission_beyond_you`), or turns off `requires_mfa` of a role you could not give (code `auth.role_beyond_you`)."
           },
           "404": {
             "content": {
@@ -118499,7 +118499,7 @@
         ]
       },
       "put": {
-        "description": "Requires `auth.roles.manage`. You can only give roles whose permissions you have yourself,\nin units you work in; the built-in `admin` role only at the root unit. Takes effect on the\nuser's next request. The last user with the `admin` role cannot lose it.",
+        "description": "Requires `auth.roles.manage`. You can only give or take away roles whose permissions you have\nyourself (and, to take one away, every permission it bans), in units you work in; the\nbuilt-in `admin` role only at the root unit. Takes effect on the\nuser's next request. The last user with the `admin` role cannot lose it.",
         "operationId": "auth_replace_user_memberships",
         "parameters": [
           {
@@ -118577,7 +118577,7 @@
                 }
               }
             },
-            "description": "Missing permission `auth.roles.manage`; code `permission_denied`."
+            "description": "Missing permission `auth.roles.manage` (code `permission_denied`), or a membership taken away has a role you could not give, or that bans a permission you do not have (code `auth.role_beyond_you`)."
           },
           "404": {
             "content": {
@@ -119403,7 +119403,7 @@
                 }
               }
             },
-            "description": "Missing permission `auth.roles.manage` (code `permission_denied`), or a role given or taken away has permissions you do not have as widely (code `auth.role_beyond_you`)."
+            "description": "Missing permission `auth.roles.manage` (code `permission_denied`), or a role given or taken away has permissions you do not have as widely, or a role taken away bans a permission you do not have (code `auth.role_beyond_you`)."
           },
           "404": {
             "content": {
