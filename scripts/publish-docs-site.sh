@@ -23,20 +23,23 @@ fi
 # Một lần làm: thêm thư mục của tag, tính lại latest / versions.json, commit, đẩy. Đẩy thất bại vì người khác vừa đẩy (hai bản phát
 # hành sát nhau) thì lấy lại gh-pages mới nhất rồi làm lại từ đầu trên đó — cả hai thư mục phiên bản đều vào.
 publish_once() {
-  rm -rf "$tag"
-  cp -r "$built/$tag" "$tag"
+  # Trong `if publish_once` thì `set -e` không có tác dụng: mỗi lệnh phải tự `|| return 1`, không thì lỗi bị bỏ qua và
+  # versions.json hỏng vẫn được commit.
+  rm -rf "$tag" || return 1
+  cp -r "$built/$tag" "$tag" || return 1
 
   # Danh sách phiên bản đã đăng (thư mục dạng vX.Y.Z...), mới nhất trước; bản thử (-rc) có trong danh sách.
-  versions="$(find . -maxdepth 1 -type d -name 'v[0-9]*' -printf '%f\n' | sort -rV)"
+  versions="$(find . -maxdepth 1 -type d -name 'v[0-9]*' -printf '%f\n' | sort -rV)" || return 1
   # `latest` là bản chính thức cao nhất (không phải bản thử, không phải bản vá của dòng cũ).
   latest="$(grep -v -- '-' <<<"$versions" | head -n 1 || true)"
   if [ "$latest" = "$tag" ]; then
-    rm -rf latest
-    cp -r "$tag" latest
+    rm -rf latest || return 1
+    cp -r "$tag" latest || return 1
   fi
-  jq -n --arg latest "${latest:-}" --argjson versions "$(jq -R . <<<"$versions" | jq -s .)" \
-    '{latest: $latest, versions: $versions}' > versions.json
-  touch .nojekyll
+  versions_json="$(jq -R . <<<"$versions" | jq -s .)" || return 1
+  jq -n --arg latest "${latest:-}" --argjson versions "$versions_json" \
+    '{latest: $latest, versions: $versions}' > versions.json || return 1
+  touch .nojekyll || return 1
   cat > index.html <<'HTML'
 <!doctype html>
 <meta charset="utf-8">
@@ -45,14 +48,14 @@ publish_once() {
 <p><a href="latest/en/">Autoxide documentation</a> · <a href="latest/vi/">Tài liệu tiếng Việt</a></p>
 HTML
 
-  git add -A
+  git add -A || return 1
   if git diff --cached --quiet; then
     echo "nothing to publish"
     return 0
   fi
   git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
-    commit --quiet -m "docs: publish $tag"
-  git push --quiet origin HEAD:gh-pages
+    commit --quiet -m "docs: publish $tag" || return 1
+  git push --quiet origin HEAD:gh-pages || return 1
 }
 
 for attempt in 1 2 3; do

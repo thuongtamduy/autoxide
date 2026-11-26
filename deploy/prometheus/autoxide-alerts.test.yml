@@ -1,3 +1,4 @@
+# Series trong test mang `job` và `instance` như Prometheus thật gắn (lần trước thiếu `job` nên test xanh mà luật không bao giờ bắn).
 # Test của autoxide-alerts.yml: `promtool test rules deploy/prometheus/autoxide-alerts.test.yml` (job `alert rules` của CI).
 # Mỗi luật có ca "series chưa tồn tại": bộ đếm chưa tăng lần nào thì Prometheus không có series đó, và biểu thức `a + b`
 # hay `a / (a + b)` của series thiếu ra rỗng — luật phải vẫn bắn khi vế còn lại có dữ liệu.
@@ -9,7 +10,7 @@ tests:
   # Webhook hỏng ngay từ đầu: `webhooks_delivered_total` chưa từng tăng nên không tồn tại; chỉ `webhooks_failed_total` có.
   - interval: 1m
     input_series:
-      - series: 'webhooks_failed_total{instance="a"}'
+      - series: 'webhooks_failed_total{job="autoxide",instance="a"}'
         values: "0+10x90"
     alert_rule_test:
       - eval_time: 80m
@@ -24,7 +25,7 @@ tests:
   # Giao đều không lỗi (`webhooks_failed_total` không tồn tại): không bắn.
   - interval: 1m
     input_series:
-      - series: 'webhooks_delivered_total{instance="a"}'
+      - series: 'webhooks_delivered_total{job="autoxide",instance="a"}'
         values: "0+10x90"
     alert_rule_test:
       - eval_time: 80m
@@ -42,7 +43,7 @@ tests:
   # Chỉ tầng theo API key bị giới hạn, hai tầng kia chưa từng tăng (không tồn tại): vẫn bắn.
   - interval: 1m
     input_series:
-      - series: 'http_api_key_rate_limited_total{instance="a"}'
+      - series: 'http_api_key_rate_limited_total{job="autoxide",instance="a"}'
         values: "0+120x60"
     alert_rule_test:
       - eval_time: 45m

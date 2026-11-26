@@ -150,7 +150,7 @@ git commit -s -m "fix(notes): reject empty titles"
 ```
 
 To sign commits you already made: `git rebase --signoff origin/main` and push again with `--force-with-lease`.
-The `DCO sign-off` job in CI fails when a commit of a pull request has no `Signed-off-by` line (merge commits are not
+The `DCO sign-off` job in CI fails when a commit of a pull request has no `Signed-off-by` line (when the branch the pull request targets has no `.github/CODEOWNERS` yet, which is true of old branches such as a `release/X.Y` cut from an old tag, nothing is checked; merge commits are not
 checked, so prefer rebasing over merging `main` into your branch). A pull request
 opened by a maintainer (a login listed in `.github/CODEOWNERS` on the branch the pull request targets, not in the pull request; GitHub authenticates the login) is exempt, including
 commits written by their agent sessions: maintainers are the licensors and answer for what they submit.

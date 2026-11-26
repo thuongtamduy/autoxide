@@ -85,10 +85,11 @@ groups:
       # Rules added with docs/RUNBOOK.md: signals that a client, a partner or a mail provider is misbehaving.
       - alert: AutoxideRateLimitedClients
         expr: |
-          # `or vector(0)`: a counter that never increased does not exist yet, and `a + b` of a missing series is empty.
-          (sum without(instance) (rate(http_rate_limited_total[10m])) or vector(0))
-            + (sum without(instance) (rate(http_api_key_rate_limited_total[10m])) or vector(0))
-            + (sum without(instance) (rate(http_tenant_rate_limited_total[10m])) or vector(0)) > 1
+          # `or vector(0)`: a counter that never increased does not exist yet, and `a + b` of a missing series is empty. `sum(…)` drops
+          # every label (`job`, `instance`): `vector(0)` has none, and vectors with different labels never match in `+` and `/`.
+          (sum(rate(http_rate_limited_total[10m])) or vector(0))
+            + (sum(rate(http_api_key_rate_limited_total[10m])) or vector(0))
+            + (sum(rate(http_tenant_rate_limited_total[10m])) or vector(0)) > 1
         for: 15m
         labels:
           severity: warn
@@ -98,9 +99,9 @@ groups:
       - alert: AutoxideWebhooksFailing
         expr: |
           # Both sides default to 0: with no delivery yet (or no failure yet) the series does not exist.
-          (sum without(instance) (rate(webhooks_failed_total[30m])) or vector(0))
-            / ((sum without(instance) (rate(webhooks_failed_total[30m])) or vector(0))
-               + (sum without(instance) (rate(webhooks_delivered_total[30m])) or vector(0)))
+          (sum(rate(webhooks_failed_total[30m])) or vector(0))
+            / ((sum(rate(webhooks_failed_total[30m])) or vector(0))
+               + (sum(rate(webhooks_delivered_total[30m])) or vector(0)))
             > 0.2
         for: 30m
         labels:
