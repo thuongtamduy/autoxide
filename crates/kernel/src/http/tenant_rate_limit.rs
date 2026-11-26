@@ -238,8 +238,8 @@ mod tests {
         assert_eq!(limiter.check_memory(a, level, now + Duration::from_secs(1)), Decision::Allow);
     }
 
-    /// Nhân sự nền tảng thao tác trong khách khác và quyền hỗ trợ không tính vào khách đích (để hỗ trợ được khách
-    /// đang ở trần); người gọi thường tính vào khách của mình.
+    // Nhân sự nền tảng thao tác trong khách khác và quyền hỗ trợ không tính vào khách đích (để hỗ trợ được khách
+    // đang ở trần); người gọi thường tính vào khách của mình.
     #[test]
     fn nhan_su_nen_tang_va_ho_tro_khong_tinh() {
         let (home, target) =
