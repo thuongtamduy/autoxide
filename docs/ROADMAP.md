@@ -1247,8 +1247,14 @@ biến chung vẫn là mặc định. Mỗi PR một cụm.
 - [x] Link bài mới của newsletter mở trên tên miền của khách (`kernel.public_url`), như comments
 - [x] P16: ràng `kernel.public_url` và link mẫu vào tên miền ĐANG xác minh của chính khách (hay host nền tảng) ở chế độ
       nhiều khách; giá trị cũ không thoả bị bỏ qua và báo trong `GET /kernel/settings` (D-20261125-tenant-site-verified)
-- [ ] Email bị dội: ghi nhận mọi thư (không chỉ newsletter), tra theo địa chỉ, chặn sau nhiều lần dội cứng, gỡ chặn,
-      số liệu theo khách
+- [x] Email bị dội: sổ dội và danh sách chặn cho mọi thư trong module `mail` (dội cứng SMTP 5.1.x / 5.2.x lúc gửi), tra
+      theo địa chỉ, chặn sau `AUTOXIDE_MAIL_HARD_BOUNCE_LIMIT` lần, gỡ chặn, số liệu theo khách, thời hạn giữ
+      (D-20261125-mail-bounces)
+- [ ] Thư dội báo về sau (DSN) và webhook báo dội của nhà cung cấp mail cho mọi thư — hiện chỉ đọc lỗi lúc gửi SMTP
+- [ ] Gộp danh sách chặn riêng của `newsletter` vào sổ dội của `mail` (một nguồn) — newsletter còn nhận dội mềm /
+      khiếu nại qua `POST /newsletter/bounces`, đổi nguồn cần chuyển dữ liệu
+- [ ] Xoá sổ dội theo tài khoản bị xoá: `auth.user_deleted` chỉ mang ID, không mang email — cần thêm email vào event
+      (module `auth`); hiện xoá theo địa chỉ (`DELETE /mail/bounces/{id}`) và theo thời hạn giữ
 - [ ] Hạn mức token AI mỗi ngày theo gói (`Entitlements`)
 - [ ] Giới hạn request mỗi phút theo khách (tầng thứ ba của rate limit, gói nâng được)
 - [ ] Ngôn ngữ của `catalog` và `menus` theo khách (như `content`); múi giờ / tiền tệ đã có theo khách qua

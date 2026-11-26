@@ -20,6 +20,7 @@ use lettre::message::header::{HeaderName, HeaderValue};
 use lettre::message::{Mailbox, MultiPart, SinglePart};
 use serde::{Deserialize, Serialize};
 
+use crate::bounces::Bounces;
 use crate::transport::{Delivery, Transport};
 
 /// Loại job gửi một mail.
@@ -105,11 +106,13 @@ pub(crate) const TENANT_FROM: TenantSetting = TenantSetting::new(
 
 pub(crate) struct MailService {
     queue: JobQueue,
+    /// Sổ dội: thư tới địa chỉ đang chặn không xếp hàng (D-20261125-mail-bounces).
+    bounces: Arc<Bounces>,
 }
 
 impl MailService {
-    pub(crate) fn new(queue: JobQueue) -> Self {
-        MailService { queue }
+    pub(crate) fn new(queue: JobQueue, bounces: Arc<Bounces>) -> Self {
+        MailService { queue, bounces }
     }
 }
 
@@ -134,6 +137,13 @@ impl Mailer for MailService {
         problems.extend(mail.header_problems());
         if !problems.is_empty() {
             return Err(Error::validation(problems));
+        }
+        // Địa chỉ đang chặn ở khách này: không xếp hàng, để dấu vết trên sổ dội; trả `Ok` như thường để API
+        // (quên mật khẩu…) không để lộ địa chỉ nào bị chặn.
+        if let Some(address) = crate::bounces::address_of(&mail.to)
+            && self.bounces.skip_if_suppressed(tenant, &address, mail.dedupe_key.as_deref()).await?
+        {
+            return Ok(());
         }
         // Khoá chống trùng của bên gửi thành `unique_key` của job: chạy lại không gửi hai lần.
         let mut options = EnqueueOptions::default();
@@ -165,6 +175,7 @@ pub(crate) struct Sender {
     from: Mailbox,
     outbox: Outbox,
     settings: Arc<dyn TenantSettings>,
+    bounces: Arc<Bounces>,
     /// `AUTOXIDE_MAIL_ALLOW_PRIVATE_NETWORKS`.
     allow_private_networks: bool,
     /// Kết nối SMTP riêng của khách, theo URL: dựng một lần (đã phân giải IP), dùng lại (pool của
@@ -178,6 +189,7 @@ impl Sender {
         from: Mailbox,
         outbox: Outbox,
         settings: Arc<dyn TenantSettings>,
+        bounces: Arc<Bounces>,
         allow_private_networks: bool,
     ) -> Self {
         Sender {
@@ -185,6 +197,7 @@ impl Sender {
             from,
             outbox,
             settings,
+            bounces,
             allow_private_networks,
             tenant_transports: Mutex::new(HashMap::new()),
         }
@@ -267,10 +280,19 @@ impl JobHandler for Sender {
                 tracing::info!(job_id = %job.id, "mail sent");
             }
             // Lỗi vĩnh viễn: thử lại vô ích. Báo cho module khác qua event, rồi xong job.
-            Delivery::Rejected { code } => {
+            Delivery::Rejected { code, enhanced } => {
                 tracing::warn!(job_id = %job.id, code = %code, "mail rejected for good by the receiving server");
-                let event = DeliveryFailed { to: mail.to, dedupe_key: mail.dedupe_key, code };
+                let address = crate::bounces::address_of(&mail.to);
                 let transaction = tenant.database().begin_write().await?;
+                // Sổ dội cùng transaction với event: không bao giờ có cái này mà thiếu cái kia.
+                // Chỉ mã chắc chắn về NGƯỜI NHẬN mới vào sổ dội (lỗi của bên gửi không làm chặn oan người nhận).
+                if let Some(address) = &address
+                    && crate::bounces::counts_as_hard(enhanced.as_deref())
+                {
+                    let label = enhanced.as_deref().map_or(code.clone(), |e| format!("{code} {e}"));
+                    self.bounces.record_hard(&transaction, tenant, address, &label).await?;
+                }
+                let event = DeliveryFailed { to: mail.to, dedupe_key: mail.dedupe_key, code };
                 self.outbox.record(&transaction, tenant, Actor::system(), None, &event).await?;
                 transaction.commit().await?;
                 metrics::counter!("mail_rejected_total").increment(1);

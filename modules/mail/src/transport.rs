@@ -34,6 +34,8 @@ pub(crate) enum Delivery {
     /// — không có hộp thư, hộp thư bị khoá…): gửi lại cũng vô ích.
     Rejected {
         code: String,
+        /// Mã trạng thái mở rộng (RFC 3463), vd `5.1.1`.
+        enhanced: Option<String>,
     },
 }
 
@@ -108,7 +110,8 @@ impl Transport {
                 Err(error) if error.is_permanent() && blames_recipient(&error.to_string()) => {
                     let code =
                         error.status().map_or_else(|| "5xx".to_owned(), |code| code.to_string());
-                    return Ok(Delivery::Rejected { code });
+                    let enhanced = enhanced_code(&error.to_string());
+                    return Ok(Delivery::Rejected { code, enhanced });
                 }
                 // Lỗi 5xx khác (sai mật khẩu SMTP 535, địa chỉ gửi không được phép, hết hạn mức
                 // 5.4.5, nội dung bị chặn…) là lỗi của BÊN GỬI: thử lại theo job queue rồi vào
@@ -186,9 +189,14 @@ fn percent_decode(raw: &str) -> Option<String> {
 /// mã trạng thái mở rộng (RFC 3463) đầu tiên là `5.1.x` (địa chỉ) hoặc `5.2.x` (hộp thư). Không
 /// có mã mở rộng thì không đoán: coi là lỗi bên gửi.
 pub(crate) fn blames_recipient(text: &str) -> bool {
+    enhanced_code(text).is_some_and(|code| code.starts_with("5.1.") || code.starts_with("5.2."))
+}
+
+/// Mã trạng thái mở rộng (RFC 3463) đầu tiên trong câu trả lời `text` của máy chủ, nếu có.
+pub(crate) fn enhanced_code(text: &str) -> Option<String> {
     text.split(|c: char| c.is_whitespace() || matches!(c, '(' | ')' | ':' | ',' | ';' | '[' | ']'))
         .find(|word| is_enhanced_code(word))
-        .is_some_and(|code| code.starts_with("5.1.") || code.starts_with("5.2."))
+        .map(str::to_owned)
 }
 
 /// `class.subject.detail`: `2|4|5`, rồi hai số 1–3 chữ số.

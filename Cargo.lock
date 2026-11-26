@@ -879,6 +879,7 @@ dependencies = [
  "autoxide-kernel",
  "autoxide-testkit",
  "axum",
+ "jiff",
  "lettre",
  "metrics",
  "sea-orm",
@@ -887,6 +888,7 @@ dependencies = [
  "tokio",
  "tracing",
  "utoipa",
+ "utoipa-axum",
  "uuid",
 ]
 
