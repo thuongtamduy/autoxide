@@ -15,7 +15,7 @@ Phần chạm database (ghi bút toán thật, số dư, cô lập khách) là t
 | Cộng / trừ / nhân tràn thì báo lỗi, không panic; cộng rồi trừ trả lại số cũ; cấm cộng khác loại tiền | `money.rs` |
 | Đọc số tiền không panic; đọc lại đúng số đã ghi (chuỗi và JSON) | `money.rs` |
 | Số thập phân: làm tròn, đọc / ghi | `crates/kernel/src/values/decimal.rs` |
-| Bút toán chỉ qua cửa kiểm khi nợ = có, cùng loại tiền, mọi dòng dương; số cực lớn không panic, không tràn âm thầm | `modules/ledger/src/posting_properties.rs` (mới) |
+| Cửa kiểm bút toán (phần thuần, không database): nợ và có chia độc lập thành số dòng khác nhau, trộn thứ tự, vẫn qua; lệch một đơn vị là `ledger.unbalanced`; một dòng khác loại tiền là `ledger.currency_mixed`; dòng 0 hay âm bị chặn (`validation_failed`) dù bút toán vẫn cân; số cực lớn không panic, tràn thì báo `money.overflow`. Chưa phủ: kiểm khoá tài khoản, ngày, kỳ đóng, đảo bút toán (cần database) | `modules/ledger/src/posting_properties.rs` (mới) |
 | Khuyến mãi không làm giá âm, không giảm quá số gốc | `modules/promotions/src/engine/tests.rs` |
 | Vòng đời đơn hàng chỉ đi theo các cạnh hợp lệ | `modules/orders/src/lifecycle.rs` |
 
@@ -30,17 +30,18 @@ Phần chạm database (ghi bút toán thật, số dư, cô lập khách) là t
 
 | Bất biến | Nơi giữ |
 | -------- | ------- |
-| `only` là phép giao: không bao giờ cấp thêm | `crates/kernel/src/security/access/properties.rs` (mới) |
-| Cấm thắng cho phép (kể cả người có mọi quyền); quyền không bị cấm giữ nguyên; lỗi `permission_denied` | `access/properties.rs` (mới) |
+| `only` là phép giao: không bao giờ cấp thêm, grant giữ nguyên, quyền giữ lại thì `require` qua | `crates/kernel/src/security/access/properties.rs` (mới) |
+| Cấm thắng cho phép (kể cả người có mọi quyền); quyền không bị cấm giữ nguyên cả grant và `require` qua; lỗi `permission_denied` | `access/properties.rs` (mới) |
 | Rào của khách cha (`within`) không cấp thêm, không vượt tập cho phép | `access/properties.rs` (mới) |
 | Cấm và rào áp theo thứ tự nào cũng ra cùng tập quyền | `access/properties.rs` (mới) |
-| Bản chụp người gọi (job chạy sau) khôi phục đúng quyền, chủ, khách, qua JSON | `access/properties.rs` (mới) |
+| Bản chụp người gọi (job chạy sau) khôi phục đúng quyền, grant (nút, độ sâu), chủ, khách, API key, hàng rào, realm, qua JSON; người gọi được sinh với độ sâu Own/Unit/Subtree/Tenant ở nhiều nút, nhiều grant mỗi quyền, tên quyền ngoài danh mục | `access/properties.rs` (mới) |
 | API key (token), phiên, JWT, ký webhook: không panic với đầu vào bậy, vòng đọc / ghi nguyên vẹn | `modules/auth/...`, `modules/webhooks/src/signature.rs` |
 
 ## Còn thiếu (để sau, ghi để không quên)
 
-- **Phạm vi theo nhánh (`Scope::Own/Unit/Subtree`) và hàng rào API key (`fence`)**: logic nằm ở `access/decision.rs`
-  cần cây tổ chức; hiện chỉ có test ví dụ. Property: quyền ở nút `n` không bao giờ cho đọc nút ngoài cây của `n`.
+- **Quyết định theo nút (`require_at`, `scope_condition`, hàng rào `fence` khi kiểm một bản ghi)**: logic ở
+  `access/decision.rs` cần cây tổ chức; property test ở trên chỉ giữ grant không đổi qua các phép thu hẹp, chưa kiểm
+  "quyền ở nút `n` không bao giờ cho đọc nút ngoài cây của `n`".
 - **Cô lập khách (`tenant_id`)**: do gate `tenant-scope` chặn ở mức mã nguồn và test tích hợp hai khách; chưa có
   property test sinh ngẫu nhiên chuỗi thao tác hai khách trên database (tốn: cần database, nên để workflow riêng).
 - **Hoá đơn (`invoices`) và đơn hàng (`orders`)**: tổng chứng từ lấy từ engine thuế nên đã được phủ gián tiếp; chưa có

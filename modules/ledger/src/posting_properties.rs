@@ -4,6 +4,8 @@
 use super::*;
 use proptest::prelude::*;
 
+use std::collections::BTreeSet;
+
 fn book() -> OrgId {
     OrgId::from_uuid(Uuid::from_u128(1))
 }
@@ -20,74 +22,100 @@ fn currency() -> impl Strategy<Value = Currency> {
     prop_oneof![Just(Currency::VND), Just(Currency::USD), Just(Currency::parse("KWD").unwrap())]
 }
 
-/// Số tiền dương đủ nhỏ để tổng không tràn.
-fn amounts() -> impl Strategy<Value = Vec<i64>> {
-    proptest::collection::vec(1i64..=1_000_000_000_000, 1..6)
+/// Chia `total` thành các phần dương bằng các điểm cắt (phân biệt, trong 1..total).
+fn parts(total: i64, cuts: &BTreeSet<i64>) -> Vec<i64> {
+    let mut edges = vec![0];
+    edges.extend(cuts.iter().copied().filter(|cut| *cut < total));
+    edges.push(total);
+    edges.windows(2).map(|pair| pair[1] - pair[0]).collect()
 }
 
-/// Bút toán cân: các dòng nợ, và các dòng có là cùng các số đó theo thứ tự ngược.
-fn balanced(amounts: &[i64], currency: Currency) -> Vec<NewLine> {
-    let debits = amounts
-        .iter()
-        .enumerate()
-        .map(|(index, minor)| NewLine::debit(account(index), Money::new(*minor, currency)));
-    let credits =
-        amounts.iter().rev().enumerate().map(|(index, minor)| {
-            NewLine::credit(account(index + 50), Money::new(*minor, currency))
-        });
-    debits.chain(credits).collect()
+/// Bút toán cân: một tổng chung, bên nợ và bên có mỗi bên chia ĐỘC LẬP thành số phần khác nhau (vd một dòng
+/// nợ 100 ứng với hai dòng có 60 + 40), rồi trộn thứ tự để hai bên xen kẽ.
+fn balanced(currency: Currency) -> impl Strategy<Value = Vec<NewLine>> {
+    let cuts = || proptest::collection::btree_set(1i64..1_000_000_000_000, 0..5);
+    (1_000_000_000_000i64..=2_000_000_000_000, cuts(), cuts()).prop_flat_map(
+        move |(total, debit_cuts, credit_cuts)| {
+            let debits = parts(total, &debit_cuts).into_iter().map(|minor| (Side::Debit, minor));
+            let credits = parts(total, &credit_cuts).into_iter().map(|minor| (Side::Credit, minor));
+            let lines: Vec<NewLine> = debits
+                .chain(credits)
+                .enumerate()
+                .map(|(index, (side, minor))| NewLine {
+                    account: account(index),
+                    side,
+                    amount: Money::new(minor, currency),
+                })
+                .collect();
+            Just(lines).prop_shuffle()
+        },
+    )
+}
+
+fn code_of(lines: Vec<NewLine>) -> Option<String> {
+    checked(&entry(lines), None).err().map(|error| error.code().to_owned())
 }
 
 proptest! {
     #[test]
-    fn but_toan_can_thi_qua_cua_kiem(amounts in amounts(), currency in currency()) {
-        match checked(&entry(balanced(&amounts, currency)), None) {
-            Ok(checked) => prop_assert_eq!(checked.currency, currency),
+    fn but_toan_can_thi_qua_cua_kiem(lines in currency().prop_flat_map(balanced)) {
+        let expected = lines[0].amount.currency();
+        match checked(&entry(lines), None) {
+            Ok(checked) => prop_assert_eq!(checked.currency, expected),
             Err(error) => prop_assert!(false, "bút toán cân bị chặn: {}", error.code()),
         }
     }
 
     #[test]
     fn lech_mot_don_vi_la_khong_can(
-        amounts in amounts(),
-        currency in currency(),
+        lines in currency().prop_flat_map(balanced),
         which in any::<proptest::sample::Index>(),
         delta in 1i64..=1_000_000,
     ) {
-        let mut lines = balanced(&amounts, currency);
+        let mut lines = lines;
+        let currency = lines[0].amount.currency();
         // Cộng `delta` vào đúng một dòng: nợ ≠ có.
         let index = which.index(lines.len());
         lines[index].amount = Money::new(lines[index].amount.minor() + delta, currency);
-        let error = checked(&entry(lines), None).err().unwrap();
-        prop_assert_eq!(error.code(), "ledger.unbalanced");
+        let code = code_of(lines);
+        prop_assert_eq!(code.as_deref(), Some("ledger.unbalanced"));
     }
 
     #[test]
     fn mot_dong_khac_loai_tien_bi_chan(
-        amounts in amounts(),
+        lines in balanced(Currency::VND),
         which in any::<proptest::sample::Index>(),
     ) {
-        let mut lines = balanced(&amounts, Currency::VND);
+        let mut lines = lines;
         let index = which.index(lines.len());
         lines[index].amount = Money::new(lines[index].amount.minor(), Currency::USD);
-        let error = checked(&entry(lines), None).err().unwrap();
-        prop_assert_eq!(error.code(), "ledger.currency_mixed");
+        let code = code_of(lines);
+        prop_assert_eq!(code.as_deref(), Some("ledger.currency_mixed"));
     }
 
+    // Dòng 0 hay âm BỊ CHẶN dù bút toán vẫn cân: thêm cặp dòng bù nhau (nợ `bad`, có `bad`) vào bút toán cân thì
+    // tổng nợ vẫn bằng tổng có, nên chỉ luật "số tiền > 0" mới chặn được. Thiếu luật đó test này đỏ.
     #[test]
-    fn dong_khong_hoac_am_bi_chan(
-        amounts in amounts(),
-        currency in currency(),
-        which in any::<proptest::sample::Index>(),
-        bad in i64::MIN..=0,
+    fn dong_khong_hoac_am_bi_chan_du_but_toan_van_can(
+        lines in balanced(Currency::VND),
+        bad in i64::MIN / 4..=0,
+        zero_only in any::<bool>(),
     ) {
-        let mut lines = balanced(&amounts, currency);
-        let index = which.index(lines.len());
-        lines[index].amount = Money::new(bad, currency);
-        prop_assert!(checked(&entry(lines), None).is_err());
+        let mut lines = lines;
+        let at = lines.len();
+        if zero_only {
+            // Một dòng 0 ở bên nợ: tổng không đổi.
+            lines.push(NewLine::debit(account(at), Money::zero(Currency::VND)));
+        } else {
+            lines.push(NewLine::debit(account(at), Money::new(bad, Currency::VND)));
+            lines.push(NewLine::credit(account(at + 1), Money::new(bad, Currency::VND)));
+        }
+        let code = code_of(lines);
+        prop_assert_eq!(code.as_deref(), Some("validation_failed"));
     }
 
-    /// Số tiền cực lớn: hoặc cân và qua, hoặc lỗi có mã — không panic, không tràn âm thầm.
+    // Số cực lớn trộn lẫn: hoặc cân và qua, hoặc lỗi có mã `ledger.unbalanced` / `money.overflow` — không panic,
+    // không tràn âm thầm, và bút toán cân thật chỉ bị chặn khi tổng tràn số học.
     #[test]
     fn so_cuc_lon_khong_panic_khong_tran_am_tham(
         minors in proptest::collection::vec(prop_oneof![1i64..=10, (i64::MAX - 10)..=i64::MAX], 2..6),
@@ -104,19 +132,25 @@ proptest! {
             lines.iter().filter(|line| line.side == side).map(|line| i128::from(line.amount.minor())).sum()
         };
         let expected_balanced = sum(Side::Debit) == sum(Side::Credit);
-        match checked(&entry(lines.clone()), None) {
-            Ok(_) => prop_assert!(expected_balanced, "bút toán lệch mà qua cửa: {lines:?}"),
-            Err(error) => {
-                let code = error.code();
-                prop_assert!(
-                    matches!(code, "ledger.unbalanced" | "money.overflow" | "validation"),
-                    "{code}"
-                );
-                // Cân thật thì chỉ được lỗi khi tràn số học.
-                if expected_balanced && code != "money.overflow" {
-                    prop_assert!(false, "bút toán cân bị chặn: {code}");
-                }
-            }
+        let overflows = sum(Side::Debit) > i128::from(i64::MAX) || sum(Side::Credit) > i128::from(i64::MAX);
+        let code = code_of(lines.clone());
+        match code.as_deref() {
+            None => prop_assert!(expected_balanced && !overflows, "bút toán lệch hay tràn mà qua cửa: {lines:?}"),
+            Some("money.overflow") => prop_assert!(overflows, "báo tràn mà không tràn: {lines:?}"),
+            Some("ledger.unbalanced") => prop_assert!(!expected_balanced && !overflows, "{lines:?}"),
+            Some(other) => prop_assert!(false, "mã lỗi lạ: {other}"),
         }
+    }
+
+    // `n` dòng MAX mỗi bên: cân nhưng tổng tràn i64 → lỗi tràn, không phải "cân" cũng không phải panic.
+    #[test]
+    fn nhieu_dong_max_moi_ben_bao_tran(n in 2usize..6) {
+        let mut lines = Vec::new();
+        for index in 0..n {
+            lines.push(NewLine::debit(account(index), Money::new(i64::MAX, Currency::VND)));
+            lines.push(NewLine::credit(account(index + 50), Money::new(i64::MAX, Currency::VND)));
+        }
+        let code = code_of(lines);
+        prop_assert_eq!(code.as_deref(), Some("money.overflow"));
     }
 }
