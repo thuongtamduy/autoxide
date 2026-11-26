@@ -1,11 +1,12 @@
-//! Lớp kiểm quyền chung (PT-14, D-20261126-permission-gate): trước mọi extractor của handler (thân JSON, `If-Match`,
-//! tham số) và trước khi service tra bản ghi, người gọi phải có ít nhất một permission trong `x-permissions` của
-//! operation — không thì 403 `permission_denied`. Người không có quyền không học được endpoint cần `ETag`, trường nào
-//! sai hay bản ghi nào tồn tại.
+//! The shared permission check of the HTTP layer (D-20261126-permission-gate): before any extractor of the
+//! handler (JSON body, `If-Match`, parameters) and before the service looks a record up, the caller must have at
+//! least one permission listed in the operation's `x-permissions` — otherwise 403 `permission_denied`. A caller
+//! without access does not learn which endpoints need an `ETag`, which fields are wrong or which records exist.
 //!
-//! Nguồn duy nhất là tài liệu OpenAPI của module (như `approvals::rules`): `x-permissions: []` (chỉ cần đăng nhập)
-//! hay operation công khai không bị lớp này chặn. Lớp chỉ kiểm "có permission ở bất kỳ nút nào"; phạm vi, bản ghi và
-//! xác nhận lại (step-up) vẫn do service kiểm như trước. Không xác thực được thì để handler trả 401 như thường.
+//! The only source is the module's OpenAPI document (like `approvals::rules`): `x-permissions: []` (any signed-in
+//! user) and public operations pass. The layer only checks "has the permission at some unit"; scope, records and
+//! step-up are still checked by the service. A caller that cannot be authenticated reaches the handler, which
+//! answers 401 as before.
 
 use std::sync::Arc;
 

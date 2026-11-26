@@ -1,5 +1,5 @@
-//! Kiểm "có ít nhất một trong các permission" theo TÊN — cho lớp kiểm quyền chung của HTTP, đọc danh sách
-//! `x-permissions` từ tài liệu OpenAPI (PT-14, D-20261126-permission-gate).
+//! "Has at least one of these permissions", by name — for the shared permission check of the HTTP layer, which
+//! reads the `x-permissions` list of the OpenAPI document (D-20261126-permission-gate).
 
 use super::Principal;
 use crate::error::Error;
