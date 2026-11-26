@@ -245,8 +245,25 @@ impl Worker {
         self.enqueue_schedules(&databases).await?;
         self.cleanup(&databases).await?;
         let mut claimed = 0;
+        // Chỉ module còn chỗ trống mới cần hỏi; mọi module đầy chỗ thì lượt này không hỏi database.
+        let open: Vec<&'static str> = self
+            .modules
+            .iter()
+            .copied()
+            .filter(|module| slots.get(module).is_some_and(|slots| slots.available_permits() > 0))
+            .collect();
+        let tables: Vec<String> = open.iter().map(|module| table_name(module)).collect();
         for (placement, _, database) in &databases {
-            for module in &self.modules {
+            if open.is_empty() {
+                break;
+            }
+            // Một câu hỏi bảng nào có job tới hạn, rồi chỉ nhận ở các bảng đó: lượt rảnh là một câu mỗi database thay
+            // vì một câu mỗi module (D-20261126-idle-polling).
+            let busy = crate::data::busy::tables_with(database, &tables, &pending(now())).await?;
+            for (module, busy) in open.iter().zip(busy) {
+                if !busy {
+                    continue;
+                }
                 let Some(slots) = slots.get(module) else { continue };
                 let free = u64::try_from(slots.available_permits()).unwrap_or(0);
                 if free == 0 {

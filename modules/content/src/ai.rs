@@ -3,6 +3,7 @@
 
 pub(crate) mod campaign;
 pub(crate) mod pages;
+pub(crate) mod public_limits;
 pub(crate) mod segments;
 pub(crate) mod semantic;
 pub(crate) mod seo;
