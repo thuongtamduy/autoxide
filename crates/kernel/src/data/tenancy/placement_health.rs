@@ -1,9 +1,9 @@
-//! Bước kiểm `kernel.placements` của `autoxide doctor`: placement (database riêng của khách) nào chưa sẵn sàng —
-//! khách trên đó nhận 503 `tenant_maintenance`. Chỉ đọc trạng thái đã ghi ở database điều khiển (không mở kết nối
-//! tới từng placement), nên nhanh cả khi có nhiều khách.
-//!
-//! Placement `migrating` mà lấy được khoá migration ngay thì không ai đang migrate nó: tiến trình đã dừng giữa
-//! chừng (D-20261126-placement-migration-exclusive). Lần migrate sau tự dọn; doctor nói rõ để người vận hành chạy.
+// Bước kiểm `kernel.placements` của `autoxide doctor`: placement (database riêng của khách) nào chưa sẵn sàng —
+// khách trên đó nhận 503 `tenant_maintenance`. Chỉ đọc trạng thái đã ghi ở database điều khiển (không mở kết nối
+// tới từng placement), nên nhanh cả khi có nhiều khách.
+//
+// Placement `migrating` mà lấy được khoá migration ngay thì không ai đang migrate nó: tiến trình đã dừng giữa
+// chừng (D-20261126-placement-migration-exclusive). Lần migrate sau tự dọn; doctor nói rõ để người vận hành chạy.
 
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
 
@@ -71,7 +71,7 @@ impl Probe for PlacementHealth {
 }
 
 impl PlacementHealth {
-    /// Lấy được khoá migration ngay (rồi nhả): không tiến trình nào đang migrate.
+    // Lấy được khoá migration ngay (rồi nhả): không tiến trình nào đang migrate.
     async fn nobody_migrating(&self) -> bool {
         let Some(config) = self.registry.control_config() else {
             return true;
