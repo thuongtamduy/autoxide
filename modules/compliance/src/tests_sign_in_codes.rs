@@ -322,6 +322,7 @@ async fn sai_lien_tiep_toi_tran_cung_thi_khoa_den_khi_xac_thuc_lai() {
         codes.verify(&tenant, first.id, &wrong).await.unwrap_err();
         crate::entity::phone_failure::Entity::update_many()
             .col_expr(crate::entity::phone_failure::Column::Failures, Expr::value(99))
+            .scoped(&tenant)
             .exec(app.database().write())
             .await
             .unwrap();
