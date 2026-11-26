@@ -112,6 +112,10 @@ pub(crate) async fn require_grantable<C: ConnectionTrait>(
 
 /// `authority` cấp (`giving`) hay gỡ được role `role_id` ở nút `org_id` không. Gỡ thì nút / role
 /// không còn trong khách được coi là gỡ được (không còn quyền gì để gỡ).
+///
+/// Gỡ một role (khỏi một người, hay xoá hẳn role) còn bỏ các permission CẤM của nó — cấm thắng mọi role khác, nên
+/// bỏ cấm là mở thêm quyền: người gỡ phải có mọi permission role cấm (cùng luật với [`rules_beyond`] khi sửa role,
+/// D-20261126-no-self-grant). Một luật dùng chung cho `PUT /users/{id}/roles`, membership, xoá role và SCIM.
 pub(crate) async fn grantable<C: ConnectionTrait>(
     connection: &C,
     tenant: &TenantContext,
@@ -121,7 +125,15 @@ pub(crate) async fn grantable<C: ConnectionTrait>(
 ) -> Result<bool, Error> {
     let roles = BTreeSet::from([role_id]);
     let problems = grant_problems(connection, tenant, authority, "", org_id, &roles).await?;
-    Ok(!problems.iter().any(|problem| giving || problem.code != "unknown"))
+    if problems.iter().any(|problem| giving || problem.code != "unknown") {
+        return Ok(false);
+    }
+    if giving {
+        return Ok(true);
+    }
+    let mut rules = permissions_of(connection, tenant, [role_id]).await?;
+    let denies = rules.remove(&role_id).unwrap_or_default().denies;
+    Ok(denies.iter().all(|permission| authority.allows(permission)))
 }
 
 pub(crate) fn role_beyond_you(org_id: Uuid, role_id: Uuid) -> Error {

@@ -401,6 +401,23 @@ impl RoleService {
         if current.all_permissions && !only_mfa {
             return Err(builtin_role());
         }
+        // Nới yêu cầu MFA của role (kể cả role `admin`) là mở quyền cho người giữ role chưa bật MFA: người sửa phải
+        // trao được role đó (D-20261126-no-self-grant). Siết thì không cần.
+        if let Some(authority) = authority
+            && current.requires_mfa
+            && !requires_mfa
+            && !grantable(
+                &transaction,
+                tenant,
+                authority,
+                (root_of(tenant.id()).as_uuid(), id),
+                true,
+            )
+            .await?
+        {
+            transaction.rollback().await?;
+            return Err(role_beyond_you(root_of(tenant.id()).as_uuid(), id));
+        }
         if let Some(authority) = authority {
             let mut rules = permissions_of(&transaction, tenant, [id]).await?;
             let held = rules.remove(&id).unwrap_or_default();
@@ -456,11 +473,32 @@ impl RoleService {
         self.get(tenant, id).await
     }
 
-    /// Xoá role `id`; người dùng đang có role này mất nó.
+    /// Xoá role `id`; người dùng đang có role này mất nó (đường hệ thống, không kiểm người xoá).
     pub(crate) async fn delete(
         &self,
         tenant: &TenantContext,
         actor: Actor,
+        id: Uuid,
+    ) -> Result<(), Error> {
+        self.delete_checked(tenant, actor, None, id).await
+    }
+
+    /// Như [`delete`](Self::delete), do `principal` làm (REST, MCP): xoá role là gỡ nó khỏi mọi người giữ —
+    /// cùng luật với gỡ role khỏi một người (`grantable`, kể cả permission cấm; D-20261126-no-self-grant).
+    pub(crate) async fn delete_as(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+        id: Uuid,
+    ) -> Result<(), Error> {
+        self.delete_checked(tenant, Actor::from(principal), Some(principal), id).await
+    }
+
+    async fn delete_checked(
+        &self,
+        tenant: &TenantContext,
+        actor: Actor,
+        authority: Option<&Principal>,
         id: Uuid,
     ) -> Result<(), Error> {
         let transaction = tenant.database().begin_write().await?;
@@ -471,6 +509,14 @@ impl RoleService {
             .ok_or_else(|| role_not_found(id))?;
         if current.all_permissions {
             return Err(builtin_role());
+        }
+        if let Some(authority) = authority {
+            let take = [(root_of(tenant.id()).as_uuid(), id)];
+            if let Err(error) = require_grantable(&transaction, tenant, authority, &[], &take).await
+            {
+                transaction.rollback().await?;
+                return Err(error);
+            }
         }
         let before = role_snapshot(&transaction, tenant, &current).await?;
         role::Entity::delete_by_id(id).scoped(tenant).exec(&transaction).await?;

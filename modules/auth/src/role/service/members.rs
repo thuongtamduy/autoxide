@@ -258,6 +258,27 @@ impl RoleService {
             transaction.rollback().await?;
             return Err(Error::validation(problems));
         }
+        // Membership bị bỏ (nút, role) cũng phải là thứ người gán gỡ được — kể cả permission cấm của role
+        // (D-20261126-no-self-grant); đọc dưới khoá dòng người dùng ở trên.
+        let held = user_role::Entity::find()
+            .filter(user_role::Column::UserId.eq(user_id))
+            .scoped(tenant)
+            .all(&transaction)
+            .await?;
+        let take: Vec<(Uuid, Uuid)> = held
+            .iter()
+            .filter_map(|row| {
+                let org = row.org_id.unwrap_or_else(|| root_of(tenant.id()).as_uuid());
+                let kept = wanted
+                    .iter()
+                    .any(|(wanted_org, roles)| *wanted_org == org && roles.contains(&row.role_id));
+                (!kept).then_some((org, row.role_id))
+            })
+            .collect();
+        if let Err(error) = require_grantable(&transaction, tenant, actor, &[], &take).await {
+            transaction.rollback().await?;
+            return Err(error);
+        }
         let admins_before = count_active_admins(&transaction, tenant).await?;
         let before = memberships_json(&memberships_of(&transaction, tenant, user_id).await?);
         user_role::Entity::delete_many()

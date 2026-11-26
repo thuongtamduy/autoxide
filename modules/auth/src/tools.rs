@@ -279,7 +279,7 @@ fn roles(state: &Arc<HttpState>) -> Vec<Tool> {
             move |tenant: TenantContext, principal: Principal, input: IdInput| {
                 let state = delete.clone();
                 async move {
-                    state.roles.delete(&tenant, Actor::from(&principal), input.id).await?;
+                    state.roles.delete_as(&tenant, &principal, input.id).await?;
                     Ok::<_, Error>(serde_json::json!({ "deleted": input.id }))
                 }
             },

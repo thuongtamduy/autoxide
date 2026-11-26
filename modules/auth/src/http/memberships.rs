@@ -175,8 +175,9 @@ async fn get_user_memberships(
 
 /// Replace every organization unit a user works in, and the roles there.
 ///
-/// Requires `auth.roles.manage`. You can only give roles whose permissions you have yourself,
-/// in units you work in; the built-in `admin` role only at the root unit. Takes effect on the
+/// Requires `auth.roles.manage`. You can only give or take away roles whose permissions you have
+/// yourself (and, to take one away, every permission it bans), in units you work in; the
+/// built-in `admin` role only at the root unit. Takes effect on the
 /// user's next request. The last user with the `admin` role cannot lose it.
 #[utoipa::path(
     put,
@@ -189,7 +190,7 @@ async fn get_user_memberships(
     responses(
         (status = 200, description = "The user's memberships after the change.", body = Data<Vec<MembershipResponse>>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "Missing permission `auth.roles.manage`; code `permission_denied`.", body = Problem),
+        (status = 403, description = "Missing permission `auth.roles.manage` (code `permission_denied`), or a membership taken away has a role you could not give, or that bans a permission you do not have (code `auth.role_beyond_you`).", body = Problem),
         (status = 404, description = "No user has this id; code `auth.user_not_found`.", body = Problem),
         (status = 409, description = "The change would leave no active admin; code `auth.last_admin`.", body = Problem),
         (status = 422, description = "A unit or role is unknown, outside your scope, listed twice, or a role has permissions you do not have; see `errors`.", body = Problem),

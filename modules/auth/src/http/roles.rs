@@ -359,7 +359,7 @@ async fn get_role(
     responses(
         (status = 200, description = "The role after the change.", body = Data<RoleResponse>, headers(("ETag" = String, description = "Version of the record: send it back in `If-Match` when changing it."))),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "Missing permission `auth.roles.manage` (code `permission_denied`), or the change adds, widens or unbans a permission you do not have as widely (code `auth.permission_beyond_you`).", body = Problem),
+        (status = 403, description = "Missing permission `auth.roles.manage` (code `permission_denied`), or the change adds, widens or unbans a permission you do not have as widely (code `auth.permission_beyond_you`), or turns off `requires_mfa` of a role you could not give (code `auth.role_beyond_you`).", body = Problem),
         (status = 404, description = "No role has this id; code `auth.role_not_found`.", body = Problem),
         (status = 409, description = "Another role has this name (`auth.role_name_taken`), or the role is the built-in `admin` (`auth.role_builtin`).", body = Problem),
         (status = 422, description = "A value is invalid, e.g. an unknown permission; see `errors`.", body = Problem),
@@ -382,7 +382,8 @@ async fn replace_role(
 
 /// Delete a role.
 ///
-/// Requires `auth.roles.manage`. Users who had the role lose it.
+/// Requires `auth.roles.manage`. Users who had the role lose it, so you can only delete a role
+/// you could take away: you have its permissions as widely, and every permission it bans.
 #[utoipa::path(
     delete,
     path = "/roles/{id}",
@@ -393,7 +394,7 @@ async fn replace_role(
     responses(
         (status = 204, description = "The role was deleted."),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "Missing permission `auth.roles.manage`; code `permission_denied`.", body = Problem),
+        (status = 403, description = "Missing permission `auth.roles.manage` (code `permission_denied`), or the role has permissions you do not have as widely, or bans one you do not have (code `auth.role_beyond_you`).", body = Problem),
         (status = 404, description = "No role has this id; code `auth.role_not_found`.", body = Problem),
         (status = 409, description = "The role is the built-in `admin`; code `auth.role_builtin`.", body = Problem),
     )
@@ -405,7 +406,7 @@ async fn delete_role(
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, Error> {
     principal.require(&ROLES_MANAGE)?;
-    state.roles.delete(&tenant, Actor::from(&principal), id).await?;
+    state.roles.delete_as(&tenant, &principal, id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -452,7 +453,7 @@ async fn get_user_roles(
     responses(
         (status = 200, description = "The user's roles after the change, sorted by name.", body = Data<Vec<RoleResponse>>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "Missing permission `auth.roles.manage` (code `permission_denied`), or a role given or taken away has permissions you do not have as widely (code `auth.role_beyond_you`).", body = Problem),
+        (status = 403, description = "Missing permission `auth.roles.manage` (code `permission_denied`), or a role given or taken away has permissions you do not have as widely, or a role taken away bans a permission you do not have (code `auth.role_beyond_you`).", body = Problem),
         (status = 404, description = "No user has this id; code `auth.user_not_found`.", body = Problem),
         (status = 409, description = "No user would keep the `admin` role; code `auth.last_admin`.", body = Problem),
         (status = 422, description = "A role id does not exist, or the list is too long; see `errors`.", body = Problem),
