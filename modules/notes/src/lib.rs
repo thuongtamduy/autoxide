@@ -29,7 +29,7 @@ use autoxide_kernel::access::Permission;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::{EventInfo, Subscription};
 use autoxide_kernel::mcp::Tool;
-use autoxide_kernel::migration::prelude::MigrationTrait;
+use autoxide_kernel::migration::MigrationTrait;
 use autoxide_kernel::module::{Module, StartContext};
 use utoipa_axum::router::OpenApiRouter;
 

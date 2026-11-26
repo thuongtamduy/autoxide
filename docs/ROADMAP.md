@@ -126,6 +126,9 @@ Postgres; vòng kiểm thử bảo mật kiểu bên ngoài cuối cùng không 
       bọc, kiểu nào để thư viện, đường chuyển
 - [ ] Làm lớp của kernel; chữ ký công khai hạng ổn định của kernel và testkit không còn kiểu của SeaORM, sea-query, axum,
       utoipa (gate kiểm)
+      - [ ] Chặn 1.0: gỡ cầu tạm `ConnectionTrait` trên handle của `db` (các hàm kernel nhận handle thay connection) và
+            `TenantContext::database()` thô; baseline `raw-database` của `xtask/library-baseline.txt` về rỗng
+            (D-20261126-kernel-data-layer)
 - [ ] Chuyển 39 module sang lớp của kernel theo cụm; `cargo xtask check` và `check-module` chặn phụ thuộc trực tiếp vào
       thư viện đã có lớp
 - [ ] Nhịp và công cụ nâng thư viện: `cargo xtask upgrade` hỗ trợ bản lớn (chạy thử, báo chỗ vỡ), giảm crate trùng phiên

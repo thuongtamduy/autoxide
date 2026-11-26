@@ -43,10 +43,20 @@ pub(crate) fn expand(input: &DeriveInput) -> syn::Result<TokenStream> {
             "`Record` does not support generic parameters",
         ));
     }
-    check_table(&options.table)?;
+    let tracked_manifest = check_table(&options.table)?;
 
-    let tenant_field =
-        fields.iter().find(|field| field.ident.as_ref().is_some_and(|name| name == "tenant_id"));
+    // `r#tenant_id` cũng là cột `tenant_id`: so theo tên đã bỏ `r#`, và không cho viết dạng thô.
+    let tenant_field = fields
+        .iter()
+        .find(|field| field.ident.as_ref().is_some_and(|name| unraw(name) == "tenant_id"));
+    if let Some(ident) = tenant_field.and_then(|field| field.ident.as_ref())
+        && ident.to_string().starts_with("r#")
+    {
+        return Err(syn::Error::new_spanned(
+            ident,
+            "write the tenant column as `tenant_id`, not `r#tenant_id`",
+        ));
+    }
     match (options.scope, tenant_field) {
         (Scope::Global, Some(field)) => {
             return Err(syn::Error::new_spanned(
@@ -57,7 +67,8 @@ pub(crate) fn expand(input: &DeriveInput) -> syn::Result<TokenStream> {
         (Scope::Tenant, None) => {
             return Err(syn::Error::new_spanned(
                 &input.ident,
-                "a `scope = tenant` record needs a field `tenant_id: TenantKey`",
+                "a `scope = tenant` record needs a field `tenant_id: TenantKey`; every record of a tenant table — \
+                 even one that reads only a few columns — is `scope = tenant` with `tenant_id`",
             ));
         }
         (Scope::Tenant, Some(field)) if !is_tenant_key(&field.ty) => {
@@ -99,8 +110,13 @@ pub(crate) fn expand(input: &DeriveInput) -> syn::Result<TokenStream> {
         Scope::Tenant => quote!(::autoxide_kernel::db::Tenant),
         Scope::Global => quote!(::autoxide_kernel::db::Global),
     };
+    // Gọi qua đường đầy đủ của kernel: trường `tenant_id` mang kiểu khác `TenantKey` của kernel là lỗi biên dịch.
     let tenant_of = match options.scope {
-        Scope::Tenant => quote!(::core::option::Option::Some(self.tenant_id.as_uuid())),
+        Scope::Tenant => {
+            quote!(::core::option::Option::Some(::autoxide_kernel::db::TenantKey::as_uuid(
+                self.tenant_id
+            )))
+        }
         Scope::Global => quote!(::core::option::Option::None),
     };
     let primary_key = match primary_key {
@@ -122,6 +138,18 @@ pub(crate) fn expand(input: &DeriveInput) -> syn::Result<TokenStream> {
     } else {
         quote!()
     };
+    let nullable: Vec<bool> = field_types.iter().map(|ty| is_option(ty)).collect();
+    // Crate ngoài khai tên module trong `Cargo.toml`: đọc file đó qua `include_str!` để Cargo biên dịch lại khi nó đổi.
+    let track = if tracked_manifest {
+        quote!(
+            const _: &str = ::core::include_str!(::core::concat!(
+                ::core::env!("CARGO_MANIFEST_DIR"),
+                "/Cargo.toml"
+            ));
+        )
+    } else {
+        quote!()
+    };
     let docs: Vec<String> =
         column_names.iter().map(|column| format!("Column `{column}`.")).collect();
 
@@ -136,11 +164,16 @@ pub(crate) fn expand(input: &DeriveInput) -> syn::Result<TokenStream> {
         }
 
         #has_id
+        #track
+
+        // Chỉ derive sinh dòng này (gate `private-paths` chặn viết tay `__private`): `Record` không cài tay được.
+        impl ::autoxide_kernel::__private::RecordSeal for #name {}
 
         impl ::autoxide_kernel::db::Record for #name {
             const TABLE: &'static str = #table;
             type Scope = #scope;
             const COLUMNS: &'static [&'static str] = &[#(#column_names),*];
+            const NULLABLE: &'static [bool] = &[#(#nullable),*];
             const PRIMARY_KEY: ::core::option::Option<&'static str> = #primary_key;
 
             fn tenant_of(&self) -> ::core::option::Option<::autoxide_kernel::__private::Uuid> {
@@ -193,8 +226,8 @@ fn options(input: &DeriveInput) -> syn::Result<Options> {
     let scope = scope.ok_or_else(|| {
         syn::Error::new_spanned(
             &input.ident,
-            "add `scope = tenant` (a table of one tenant, with `tenant_id`) or `scope = global` (a control-plane table) \
-             to `#[record(…)]`",
+            "add `scope = tenant` to `#[record(…)]` for a table with `tenant_id` (every tenant table); \
+             `scope = global` is only for a control-plane table the module lists in `control_plane_tables`",
         )
     })?;
     Ok(Options { table, scope })
@@ -202,12 +235,13 @@ fn options(input: &DeriveInput) -> syn::Result<Options> {
 
 /// Architecture rule 1 at compile time: a module declares records only for its own tables, named
 /// `<module>_…`, where `<module>` comes from the crate being compiled.
-fn check_table(table: &LitStr) -> syn::Result<()> {
-    let module = module_name().map_err(|message| syn::Error::new(table.span(), message))?;
+fn check_table(table: &LitStr) -> syn::Result<bool> {
+    let (module, from_manifest) =
+        module_name().map_err(|message| syn::Error::new(table.span(), message))?;
     let value = table.value();
     let prefix = format!("{module}_");
     if value.starts_with(&prefix) && value.len() > prefix.len() {
-        Ok(())
+        Ok(from_manifest)
     } else {
         Err(syn::Error::new(
             table.span(),
@@ -222,17 +256,17 @@ fn check_table(table: &LitStr) -> syn::Result<()> {
 /// The module of the crate being compiled: `autoxide-<name>` gives `<name>` (`-` becomes `_`, so
 /// `autoxide-einvoice-sepay` is `einvoice_sepay`); any other crate declares it in its `Cargo.toml`:
 /// `[package.metadata.autoxide] module = "<name>"`.
-fn module_name() -> Result<String, String> {
+fn module_name() -> Result<(String, bool), String> {
     // Cargo đặt các biến này cho mỗi lần biên dịch một crate; macro chạy trong tiến trình đó nên đọc được.
     let package = std::env::var("CARGO_PKG_NAME")
         .map_err(|_| "CARGO_PKG_NAME is not set; build with cargo".to_owned())?;
     if let Some(name) = package.strip_prefix("autoxide-") {
-        return Ok(name.replace('-', "_"));
+        return Ok((name.replace('-', "_"), false));
     }
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_default();
     let manifest = std::fs::read_to_string(std::path::Path::new(&manifest_dir).join("Cargo.toml"))
         .unwrap_or_default();
-    metadata_module(&manifest).ok_or_else(|| {
+    metadata_module(&manifest).map(|name| (name, true)).ok_or_else(|| {
         format!(
             "crate `{package}` is not named `autoxide-<module>`: declare its module in Cargo.toml, \
              `[package.metadata.autoxide]` then `module = \"<name>\"`"
@@ -253,7 +287,9 @@ fn metadata_module(manifest: &str) -> Option<String> {
         if !in_section {
             continue;
         }
-        let (key, value) = line.split_once('=')?;
+        let Some((key, value)) = line.split_once('=') else {
+            continue;
+        };
         if key.trim() == "module" {
             let value = value.trim().trim_matches('"');
             let valid = !value.is_empty()
@@ -262,6 +298,16 @@ fn metadata_module(manifest: &str) -> Option<String> {
         }
     }
     None
+}
+
+/// `Option<…>` (by its last path segment): a nullable column.
+fn is_option(ty: &Type) -> bool {
+    match ty {
+        Type::Path(path) => {
+            path.path.segments.last().is_some_and(|segment| segment.ident == "Option")
+        }
+        _ => false,
+    }
 }
 
 fn is_tenant_key(ty: &Type) -> bool {
@@ -286,7 +332,7 @@ mod tests {
 
     #[test]
     fn doc_ten_module_tu_metadata() {
-        let manifest = "[package]\nname = \"bookmarks\"\n\n[package.metadata.autoxide]\nmodule = \"bookmarks\" # x\n";
+        let manifest = "[package]\nname = \"bookmarks\"\n\n[package.metadata.autoxide]\n\n# chú thích\nmodule = \"bookmarks\" # x\n";
         assert_eq!(metadata_module(manifest).as_deref(), Some("bookmarks"));
         assert_eq!(metadata_module("[package]\nname = \"x\"\n"), None);
         assert_eq!(metadata_module("[package.metadata.autoxide]\nmodule = \"Bad-Name\"\n"), None);

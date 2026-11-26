@@ -53,4 +53,7 @@ pub mod response;
 #[doc(hidden)]
 pub mod __private {
     pub use uuid::Uuid;
+
+    /// Written only by `#[derive(Record)]`: a hand-written `impl Record` cannot exist.
+    pub trait RecordSeal {}
 }

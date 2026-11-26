@@ -17,12 +17,19 @@ pub struct RecordInfo {
     pub tenant: bool,
     /// Column names.
     pub columns: &'static [&'static str],
+    /// Whether each column is an `Option` field.
+    pub nullable: &'static [bool],
 }
 
 impl RecordInfo {
     /// The declaration of record `R`.
     pub fn of<R: Record>() -> Self {
-        RecordInfo { table: R::TABLE, tenant: R::Scope::TENANT, columns: R::COLUMNS }
+        RecordInfo {
+            table: R::TABLE,
+            tenant: R::Scope::TENANT,
+            columns: R::COLUMNS,
+            nullable: R::NULLABLE,
+        }
     }
 }
 
@@ -31,44 +38,56 @@ pub(crate) async fn problems(
     database: &Database,
     module: &str,
     records: &[RecordInfo],
+    control_plane_tables: &[&str],
 ) -> Result<Vec<String>, String> {
     let mut problems = Vec::new();
     for record in records {
+        let table = record.table;
         let prefix = format!("{module}_");
-        if !record.table.starts_with(&prefix) {
+        if !table.starts_with(&prefix) {
             problems.push(format!(
-                "module `{module}` declares record of table `{}`, which is not one of its tables (`{prefix}…`)",
-                record.table
+                "module `{module}` declares record of table `{table}`, which is not one of its tables (`{prefix}…`)"
             ));
             continue;
         }
-        let columns = columns(database, record.table).await?;
+        // Record `global` chỉ cho bảng control-plane mà module khai: bảng của khách không có đường đọc không lọc.
+        if !record.tenant && !control_plane_tables.contains(&table) {
+            problems.push(format!(
+                "record of `{table}` (module `{module}`) is `scope = global`, but `{table}` is not in the module's \
+                 `control_plane_tables`: a tenant table's records are `scope = tenant` with `tenant_id: TenantKey`"
+            ));
+        }
+        let columns = columns(database, table).await?;
         if columns.is_empty() {
             problems.push(format!(
-                "record of `{}` (module `{module}`): the table does not exist; add the migration that creates it",
-                record.table
+                "record of `{table}` (module `{module}`): the table does not exist; add the migration that creates it"
             ));
             continue;
         }
-        for column in record.columns {
-            if !columns.iter().any(|existing| existing == column) {
-                problems.push(format!(
-                    "record of `{}` (module `{module}`): field `{column}` has no column; add it in a migration or \
-                     remove the field",
-                    record.table
-                ));
+        for (index, column) in record.columns.iter().enumerate() {
+            match columns.iter().find(|existing| existing.name == *column) {
+                None => problems.push(format!(
+                    "record of `{table}` (module `{module}`): field `{column}` has no column; add it in a migration \
+                     or remove the field"
+                )),
+                // Cột cho NULL mà trường không phải `Option`: đọc một dòng NULL sẽ lỗi giữa chừng.
+                Some(existing) if existing.nullable && !record.nullable.get(index).copied().unwrap_or(false) => {
+                    problems.push(format!(
+                        "record of `{table}` (module `{module}`): column `{column}` may be NULL, so field `{column}` \
+                         must be an `Option`"
+                    ));
+                }
+                Some(_) => {}
             }
         }
-        let has_tenant = columns.iter().any(|existing| existing == "tenant_id");
+        let has_tenant = columns.iter().any(|existing| existing.name == "tenant_id");
         match (record.tenant, has_tenant) {
             (true, false) => problems.push(format!(
-                "record of `{}` (module `{module}`) is `scope = tenant` but the table has no `tenant_id`",
-                record.table
+                "record of `{table}` (module `{module}`) is `scope = tenant` but the table has no `tenant_id`"
             )),
             (false, true) => problems.push(format!(
-                "record of `{}` (module `{module}`) is `scope = global` but the table has `tenant_id`: declare \
-                 `scope = tenant`",
-                record.table
+                "record of `{table}` (module `{module}`) is `scope = global` but the table has `tenant_id`: declare \
+                 `scope = tenant`"
             )),
             _ => {}
         }
@@ -76,26 +95,39 @@ pub(crate) async fn problems(
     Ok(problems)
 }
 
-/// Column names of `table` (empty when the table does not exist).
-async fn columns(database: &Database, table: &str) -> Result<Vec<String>, String> {
+/// One column of the live schema.
+struct LiveColumn {
+    name: String,
+    nullable: bool,
+}
+
+/// Columns of `table` (empty when the table does not exist).
+async fn columns(database: &Database, table: &str) -> Result<Vec<LiveColumn>, String> {
     let connection = database.read();
     let backend = connection.get_database_backend();
+    // SQLite: `notnull` = 1 khi NOT NULL; khoá chính `pk > 0` cũng không nhận NULL (bảng của module luôn UUID).
     let statement = match backend {
         DbBackend::Sqlite => crate::database::statement(
             backend,
-            "SELECT name FROM pragma_table_info(?) ORDER BY cid",
+            "SELECT name, CASE WHEN \"notnull\" = 1 OR pk > 0 THEN 0 ELSE 1 END AS nullable \
+             FROM pragma_table_info(?) ORDER BY cid",
             [table.into()],
         ),
         DbBackend::Postgres => crate::database::statement(
             backend,
-            "SELECT column_name::text AS name FROM information_schema.columns \
-             WHERE table_schema = current_schema() AND table_name = $1 ORDER BY ordinal_position",
+            "SELECT column_name::text AS name, CASE WHEN is_nullable = 'YES' THEN 1 ELSE 0 END AS nullable \
+             FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = $1 \
+             ORDER BY ordinal_position",
             [table.into()],
         ),
         other => return Err(format!("unsupported database {other:?}")),
     };
     let rows = connection.query_all_raw(statement).await.map_err(|error| error.to_string())?;
     rows.iter()
-        .map(|row| row.try_get::<String>("", "name").map_err(|error| error.to_string()))
+        .map(|row| {
+            let name = row.try_get::<String>("", "name").map_err(|error| error.to_string())?;
+            let nullable = row.try_get::<i32>("", "nullable").map_err(|error| error.to_string())?;
+            Ok(LiveColumn { name, nullable: nullable == 1 })
+        })
         .collect()
 }

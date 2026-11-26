@@ -140,7 +140,7 @@ impl<A: Access> Handle for Read<'_, A> {
         &self.access
     }
     fn connection(&self) -> Connection<'_> {
-        Connection::Read(self.connection)
+        Connection(Inner::Read(self.connection))
     }
 }
 
@@ -150,7 +150,7 @@ impl<A: Access> Handle for Tx<A> {
         &self.access
     }
     fn connection(&self) -> Connection<'_> {
-        Connection::Write(&self.transaction)
+        Connection(Inner::Write(&self.transaction))
     }
 }
 
@@ -178,31 +178,34 @@ impl<A: Access> Tx<A> {
     }
 }
 
+/// The connection behind a handle. Opaque: nothing in it is reachable outside the kernel.
 #[doc(hidden)]
-pub enum Connection<'a> {
+pub struct Connection<'a>(Inner<'a>);
+
+enum Inner<'a> {
     Read(&'a DatabaseConnection),
     Write(&'a DatabaseTransaction),
 }
 
 impl Connection<'_> {
     pub(crate) fn backend(&self) -> DbBackend {
-        match self {
-            Connection::Read(connection) => connection.get_database_backend(),
-            Connection::Write(transaction) => transaction.get_database_backend(),
+        match self.0 {
+            Inner::Read(connection) => connection.get_database_backend(),
+            Inner::Write(transaction) => transaction.get_database_backend(),
         }
     }
 
     pub(crate) async fn all(&self, statement: Statement) -> Result<Vec<QueryResult>, DbErr> {
-        match self {
-            Connection::Read(connection) => connection.query_all_raw(statement).await,
-            Connection::Write(transaction) => transaction.query_all_raw(statement).await,
+        match self.0 {
+            Inner::Read(connection) => connection.query_all_raw(statement).await,
+            Inner::Write(transaction) => transaction.query_all_raw(statement).await,
         }
     }
 
     pub(crate) async fn execute(&self, statement: Statement) -> Result<u64, DbErr> {
-        Ok(match self {
-            Connection::Read(connection) => connection.execute_raw(statement).await?,
-            Connection::Write(transaction) => transaction.execute_raw(statement).await?,
+        Ok(match self.0 {
+            Inner::Read(connection) => connection.execute_raw(statement).await?,
+            Inner::Write(transaction) => transaction.execute_raw(statement).await?,
         }
         .rows_affected())
     }

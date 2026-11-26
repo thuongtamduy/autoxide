@@ -376,9 +376,14 @@ impl Modules {
                 continue;
             }
             problems.extend(
-                crate::db::record_problems(database, module.name(), &records)
-                    .await
-                    .map_err(ModuleError)?,
+                crate::db::record_problems(
+                    database,
+                    module.name(),
+                    &records,
+                    &module.control_plane_tables(),
+                )
+                .await
+                .map_err(ModuleError)?,
             );
         }
         if problems.is_empty() {

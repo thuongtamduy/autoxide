@@ -440,6 +440,15 @@ struct NoteAsGlobal {
     title: String,
 }
 
+/// `notes_note.org_id` cho NULL mà trường không phải `Option`.
+#[derive(autoxide_kernel::db::Record, Debug, Clone)]
+#[record(table = "notes_note", scope = tenant)]
+struct NoteStrictOrg {
+    id: Uuid,
+    tenant_id: autoxide_kernel::db::TenantKey,
+    org_id: Uuid,
+}
+
 /// Bước đối chiếu lúc khởi động (D-20261126-kernel-data-layer): record khớp bảng thì qua; lệch thì báo đủ chỗ lệch.
 #[tokio::test]
 async fn record_lech_schema_thi_khong_khoi_dong() {
@@ -451,11 +460,14 @@ async fn record_lech_schema_thi_khong_khoi_dong() {
         let wrong = Modules::new(vec![Box::new(Declares(vec![
             RecordInfo::of::<NoteWithExtra>(),
             RecordInfo::of::<NoteAsGlobal>(),
+            RecordInfo::of::<NoteStrictOrg>(),
         ]))])
         .unwrap();
         let message = wrong.check_records(app.database()).await.unwrap_err().to_string();
         assert!(message.contains("field `pinned` has no column"), "{message}");
         assert!(message.contains("is `scope = global` but the table has `tenant_id`"), "{message}");
+        assert!(message.contains("is not in the module's `control_plane_tables`"), "{message}");
+        assert!(message.contains("field `org_id` must be an `Option`"), "{message}");
     })
     .await
     .unwrap();

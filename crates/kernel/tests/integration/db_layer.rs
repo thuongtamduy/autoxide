@@ -560,3 +560,63 @@ async fn sql_viet_tay_va_trang_keyset() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn loi_thoat_da_dong_upsert_nhieu_dong_subquery_la_hoa_thuong() {
+    TestDatabase::run(async |test| {
+        let database = open(test).await;
+        let (a, b) = (tenant(&database, 0xA), tenant(&database, 0xB));
+        seed(&a, &b).await;
+
+        // Upsert nhiều dòng của B, một dòng va khoá unique của A: cả lô là lỗi (không lặng lẽ bỏ dòng).
+        let key = TenantKey::new(b.id());
+        let rows = [
+            Level { id: id(0x2201), tenant_id: key, code: "B-NEW".into(), on_hand: 1 },
+            Level { id: id(0x2202), tenant_id: key, code: "L-1000".into(), on_hand: 1 },
+        ];
+        let tx = b.db().begin_write().await.unwrap();
+        let error = tx
+            .insert_many(rows)
+            .on_conflict_update([Level::CODE.key()], [Level::ON_HAND.updated()])
+            .exec()
+            .await
+            .unwrap_err();
+        assert!(is_unique_violation(&error), "{error:?}");
+        tx.rollback().await.unwrap();
+
+        // Subquery dựng từ handle của khách B (hay handle "mọi khách") không dùng được trong query của khách A.
+        let read_a = a.db().read();
+        let read_b = b.db().read();
+        let of_b = read_b.sub(ProductAttr::PRODUCT_ID);
+        let error =
+            read_a.find::<Entry>().filter(Entry::PRODUCT_ID.in_sub(of_b)).all().await.unwrap_err();
+        assert!(error.to_string().contains("another handle"), "{error:?}");
+        let everyone = all_tenants_for_tests(&database);
+        let all_reads = everyone.read();
+        let of_all = all_reads.sub(ProductAttr::PRODUCT_ID);
+        assert!(
+            read_a.find::<Entry>().filter(Entry::PRODUCT_ID.in_sub(of_all)).count().await.is_err()
+        );
+        let tx = a.db().begin_write().await.unwrap();
+        let of_b = read_b.sub(ProductAttr::PRODUCT_ID);
+        assert!(tx.delete::<Entry>().filter(Entry::PRODUCT_ID.in_sub(of_b)).exec().await.is_err());
+        tx.rollback().await.unwrap();
+
+        // `contains` không phân biệt hoa thường, giống nhau trên hai database.
+        assert_eq!(
+            read_a
+                .find::<Translation>()
+                .filter(Translation::SEARCH_KEY.contains("AO THUN"))
+                .count()
+                .await
+                .unwrap(),
+            1
+        );
+        assert_eq!(
+            read_a.find::<Level>().filter(Level::CODE.starts_with("l-1")).count().await.unwrap(),
+            1
+        );
+    })
+    .await
+    .unwrap();
+}

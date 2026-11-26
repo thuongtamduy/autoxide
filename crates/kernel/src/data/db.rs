@@ -28,7 +28,12 @@
 //!   never touches a row of another tenant. The control-plane handle (`StartContext::control_plane`) does
 //!   not compile with tenant records; sweeping every tenant is `control_plane.all_tenants("reason")`.
 //! - **A module only touches its own tables** (architecture rule 1): `#[derive(Record)]` refuses, at compile
-//!   time, a table not named `<module>_…`.
+//!   time, a table not named `<module>_…`. Two modules whose names would share a prefix (`notes`, `notes_extra`)
+//!   cannot be registered together, so the prefix is unambiguous.
+//! - **Every record is checked at startup** against the live schema of the control database (table, columns,
+//!   nullability, `tenant_id` against the scope; a global record only on a table the module lists in
+//!   `control_plane_tables`); `cargo xtask check` makes sure every derived record is declared in
+//!   `Module::records`. Placements built by the same migrations are not checked again.
 //! - **Both databases behave the same**: row locks, bounded `adjust`, integer aggregates, `LIKE` escaping.
 //!
 //! The record must declare its scope and, for a tenant record, a `tenant_id: TenantKey` field:
@@ -59,6 +64,21 @@
 //! #[derive(Record)]
 //! #[record(table = "orders_order", scope = tenant)]
 //! struct Order { id: uuid::Uuid, tenant_id: TenantKey }
+//! ```
+//!
+//! ```compile_fail
+//! # use autoxide_kernel::db::{Record, TenantKey};
+//! #[derive(Record)]
+//! #[record(table = "kernel_doc_note", scope = tenant)]
+//! struct Note { id: uuid::Uuid, r#tenant_id: TenantKey }
+//! ```
+//!
+//! ```compile_fail
+//! # use autoxide_kernel::db::Record;
+//! struct TenantKey(uuid::Uuid);
+//! #[derive(Record)]
+//! #[record(table = "kernel_doc_note", scope = tenant)]
+//! struct Note { id: uuid::Uuid, tenant_id: TenantKey }
 //! ```
 //!
 //! Controls — each differs from one case above by one token, and compiles:

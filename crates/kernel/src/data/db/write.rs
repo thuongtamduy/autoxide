@@ -7,7 +7,7 @@ use sea_orm::sea_query::{self, Alias, ExprTrait as _, OnConflict, Query, Returni
 use sea_orm::{DbErr, SqlErr};
 
 use super::handle::{AcceptedBy, Access, Handle, Tx, tenant_of_handle};
-use super::record::{Col, ColName, Cond, Expr, Record, Updated, table, tenant_filter};
+use super::record::{Col, ColName, Cond, Expr, Record, Updated, foreign_sub, table, tenant_filter};
 use super::value::Settable;
 use crate::error::Error;
 
@@ -75,9 +75,9 @@ impl<A: Access> Tx<A> {
         let mut statement = Query::insert();
         statement.into_table(table::<R>()).columns(R::COLUMNS.iter().map(|c| Alias::new(*c)));
         let mut error = None;
-        let mut empty = true;
+        let mut rows_count: u64 = 0;
         for row in rows {
-            empty = false;
+            rows_count += 1;
             if let (Some(tenant), Some(owner)) = (tenant, row.tenant_of())
                 && owner != tenant
             {
@@ -95,7 +95,15 @@ impl<A: Access> Tx<A> {
                 error.get_or_insert_with(|| Error::internal(failure.to_string()));
             }
         }
-        Insert { tx: self, statement, error, empty, tenant, guarded: false, _marker: PhantomData }
+        Insert {
+            tx: self,
+            statement,
+            error,
+            rows: rows_count,
+            tenant,
+            guarded: false,
+            _marker: PhantomData,
+        }
     }
 
     /// `UPDATE` rows of `R` (filtered by tenant on a tenant handle); needs at least one `set`.
@@ -108,7 +116,7 @@ impl<A: Access> Tx<A> {
         if let Some(tenant) = tenant_of_handle::<Self, R>(self) {
             statement.and_where(tenant_filter::<R>(tenant));
         }
-        Update { tx: self, statement, has_set: false, _marker: PhantomData }
+        Update { tx: self, statement, has_set: false, error: None, _marker: PhantomData }
     }
 
     /// `DELETE` rows of `R` (filtered by tenant on a tenant handle).
@@ -121,7 +129,7 @@ impl<A: Access> Tx<A> {
         if let Some(tenant) = tenant_of_handle::<Self, R>(self) {
             statement.and_where(tenant_filter::<R>(tenant));
         }
-        Delete { tx: self, statement, _marker: PhantomData }
+        Delete { tx: self, statement, error: None, _marker: PhantomData }
     }
 }
 
@@ -130,7 +138,8 @@ pub struct Insert<'t, A, R> {
     tx: &'t Tx<A>,
     statement: sea_query::InsertStatement,
     error: Option<Error>,
-    empty: bool,
+    // Số dòng gửi đi: upsert có điều kiện khách phải đổi đủ chừng ấy dòng.
+    rows: u64,
     tenant: Option<uuid::Uuid>,
     guarded: bool,
     _marker: PhantomData<fn() -> R>,
@@ -193,14 +202,15 @@ impl<A: Access, R: Record> Insert<'_, A, R> {
         if let Some(error) = self.error {
             return Err(error);
         }
-        if self.empty {
+        if self.rows == 0 {
             return Ok(0);
         }
         let connection = self.tx.connection();
         let changed =
             connection.execute(connection.build(&self.statement)).await.map_err(write_error)?;
-        if changed == 0 && self.guarded {
-            // `DO UPDATE … WHERE tenant_id = <khách>` không đổi dòng nào: dòng đụng thuộc khách khác.
+        if self.guarded && changed < self.rows {
+            // `DO UPDATE … WHERE tenant_id = <khách>` bỏ qua dòng nào thì dòng đó đụng dòng của khách khác: báo
+            // lỗi (cả lô rollback cùng transaction), không lặng lẽ bỏ dòng.
             return Err(unique_violation());
         }
         Ok(changed)
@@ -212,6 +222,7 @@ pub struct Update<'t, A, R> {
     tx: &'t Tx<A>,
     statement: sea_query::UpdateStatement,
     has_set: bool,
+    error: Option<Error>,
     _marker: PhantomData<fn() -> R>,
 }
 
@@ -246,6 +257,9 @@ impl<A: Access, R: Record> Update<'_, A, R> {
     /// `SET column = expr` (e.g. `R::COUNT.expr() + Expr::value(1)`).
     #[must_use]
     pub fn set_expr<T: Settable>(mut self, column: Col<R, T>, expr: Expr<R, T>) -> Self {
+        if self.error.is_none() {
+            self.error = foreign_sub(&expr.subs, self.tx.access().tenant());
+        }
         self.statement.value(Alias::new(column.name()), expr.inner);
         self.has_set = true;
         self
@@ -279,12 +293,18 @@ impl<A: Access, R: Record> Update<'_, A, R> {
     /// Adds a condition (AND).
     #[must_use]
     pub fn filter(mut self, condition: Cond<R>) -> Self {
+        if self.error.is_none() {
+            self.error = foreign_sub(&condition.subs, self.tx.access().tenant());
+        }
         self.statement.cond_where(condition.inner);
         self
     }
 
     /// Runs it; the number of rows changed.
     pub async fn exec(self) -> Result<u64, Error> {
+        if let Some(error) = self.error {
+            return Err(error);
+        }
         if !self.has_set {
             return Err(Error::internal("`update` without `set`"));
         }
@@ -294,6 +314,9 @@ impl<A: Access, R: Record> Update<'_, A, R> {
 
     /// Runs it and reads the changed rows back (`RETURNING`, on both databases).
     pub async fn returning(mut self) -> Result<Vec<R>, Error> {
+        if let Some(error) = self.error.take() {
+            return Err(error);
+        }
         if !self.has_set {
             return Err(Error::internal("`update` without `set`"));
         }
@@ -310,6 +333,7 @@ impl<A: Access, R: Record> Update<'_, A, R> {
 pub struct Delete<'t, A, R> {
     tx: &'t Tx<A>,
     statement: sea_query::DeleteStatement,
+    error: Option<Error>,
     _marker: PhantomData<fn() -> R>,
 }
 
@@ -317,12 +341,18 @@ impl<A: Access, R: Record> Delete<'_, A, R> {
     /// Adds a condition (AND).
     #[must_use]
     pub fn filter(mut self, condition: Cond<R>) -> Self {
+        if self.error.is_none() {
+            self.error = foreign_sub(&condition.subs, self.tx.access().tenant());
+        }
         self.statement.cond_where(condition.inner);
         self
     }
 
     /// Runs it; the number of rows deleted.
     pub async fn exec(self) -> Result<u64, Error> {
+        if let Some(error) = self.error {
+            return Err(error);
+        }
         let connection = self.tx.connection();
         Ok(connection.execute(connection.build(&self.statement)).await?)
     }

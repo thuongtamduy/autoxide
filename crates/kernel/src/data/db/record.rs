@@ -41,13 +41,15 @@ impl Scope for Global {
 /// A row of one module table. Written by `#[derive(Record)]`, never by hand: the derive checks at compile
 /// time that the table belongs to the module (`<module>_…`), that the scope is declared, and that a tenant
 /// record has `tenant_id: TenantKey`.
-pub trait Record: Sized + Send + Sync + 'static {
+pub trait Record: crate::__private::RecordSeal + Sized + Send + Sync + 'static {
     /// Table name.
     const TABLE: &'static str;
     /// [`Tenant`] or [`Global`].
     type Scope: Scope;
     /// Column names, in field order.
     const COLUMNS: &'static [&'static str];
+    /// Whether each column is nullable (an `Option` field), in field order.
+    const NULLABLE: &'static [bool];
     /// The primary key column, when declared with `#[record(primary_key)]`.
     const PRIMARY_KEY: Option<&'static str>;
 
@@ -187,7 +189,9 @@ impl<R: Record, T: DbValue> Col<R, T> {
     /// `column IN (subquery)`. The subquery comes from the same handle (`handle.sub(…)`), so it is filtered by
     /// tenant like every other query.
     pub fn in_sub<S: Record>(self, sub: super::query::Sub<S, T>) -> Cond<R> {
-        Cond::wrap(self.sq().in_subquery(sub.statement))
+        let mut condition = Cond::wrap(self.sq().in_subquery(sub.statement));
+        condition.subs = sub.subs;
+        condition
     }
 
     /// Join condition `self = other`.
@@ -211,24 +215,42 @@ pub struct Updated<R> {
 }
 
 impl<R: Record> Col<R, String> {
-    /// Contains `text` (`LIKE '%text%'`), with `%`, `_` and `\` in `text` matched literally; the same on
-    /// both databases. Case sensitivity follows the database (SQLite ignores ASCII case, Postgres does not);
-    /// for accent- and case-insensitive search store a folded column (`autoxide_kernel::search::fold`).
+    /// Contains `text`, ignoring case (`LOWER(column) LIKE '%text%'`), with `%`, `_` and `\` in `text` matched
+    /// literally. Both databases compare lowercased values (SQLite's `LIKE` alone ignores ASCII case, Postgres'
+    /// does not, so the kernel lowers both sides). SQLite's `LOWER` folds only ASCII letters: for text with
+    /// accents, search a column stored folded (`autoxide_kernel::search::fold`), which both databases treat alike.
     pub fn contains(self, text: &str) -> Cond<R> {
-        let pattern = format!("%{}%", crate::search::escape_like(text));
-        Cond::wrap(self.sq().like(LikeExpr::new(pattern).escape('\\')))
+        let pattern = format!("%{}%", crate::search::escape_like(&text.to_lowercase()));
+        Cond::wrap(lowered(self.sq()).like(LikeExpr::new(pattern).escape('\\')))
     }
 
-    /// Starts with `prefix`, matched literally.
+    /// Starts with `prefix`, ignoring case like [`contains`](Self::contains), matched literally.
     pub fn starts_with(self, prefix: &str) -> Cond<R> {
-        let pattern = format!("{}%", crate::search::escape_like(prefix));
-        Cond::wrap(self.sq().like(LikeExpr::new(pattern).escape('\\')))
+        let pattern = format!("{}%", crate::search::escape_like(&prefix.to_lowercase()));
+        Cond::wrap(lowered(self.sq()).like(LikeExpr::new(pattern).escape('\\')))
     }
+}
+
+/// The tenants of the subqueries inside a condition or an expression: `Some(t)` for a subquery of tenant
+/// records built from the handle of tenant `t`, `None` for one built from an "all tenants" handle. A query
+/// refuses a subquery whose tenant is not its own (a subquery of another handle cannot widen it).
+pub(crate) type Subs = Vec<Option<Uuid>>;
+
+/// The error when a condition carries a subquery of another handle.
+pub(crate) fn foreign_sub(subs: &[Option<Uuid>], tenant: Option<Uuid>) -> Option<Error> {
+    subs.iter().any(|sub| *sub != tenant).then(|| {
+        Error::internal("a subquery built from another handle (another tenant, or all tenants) is used in this query")
+    })
+}
+
+fn lowered(expr: sea_query::Expr) -> sea_query::Expr {
+    Func::lower(expr).into()
 }
 
 /// A condition on rows of `R`.
 pub struct Cond<R> {
     pub(crate) inner: sea_query::Condition,
+    pub(crate) subs: Subs,
     _marker: PhantomData<fn() -> R>,
 }
 
@@ -240,33 +262,34 @@ impl<R> std::fmt::Debug for Cond<R> {
 
 impl<R> Clone for Cond<R> {
     fn clone(&self) -> Self {
-        Cond { inner: self.inner.clone(), _marker: PhantomData }
+        Cond { inner: self.inner.clone(), subs: self.subs.clone(), _marker: PhantomData }
     }
 }
 
 impl<R> Cond<R> {
     pub(crate) fn wrap(expr: sea_query::Expr) -> Self {
-        Cond { inner: expr.into_condition(), _marker: PhantomData }
+        Cond { inner: expr.into_condition(), subs: Vec::new(), _marker: PhantomData }
     }
 
     pub(crate) fn from_condition(inner: sea_query::Condition) -> Self {
-        Cond { inner, _marker: PhantomData }
+        Cond { inner, subs: Vec::new(), _marker: PhantomData }
     }
 
     /// Every condition added must hold; with none added, every row matches.
     pub fn all() -> Self {
-        Cond { inner: sea_query::Condition::all(), _marker: PhantomData }
+        Cond::from_condition(sea_query::Condition::all())
     }
 
     /// At least one condition added must hold; with none added, no row matches.
     pub fn any() -> Self {
-        Cond { inner: sea_query::Condition::any(), _marker: PhantomData }
+        Cond::from_condition(sea_query::Condition::any())
     }
 
     /// Adds `other` to the group (as AND under [`all`](Self::all), as OR under [`any`](Self::any)).
     #[must_use]
-    pub fn with(self, other: Cond<R>) -> Self {
-        Cond { inner: self.inner.add(other.inner), _marker: PhantomData }
+    pub fn with(mut self, other: Cond<R>) -> Self {
+        self.subs.extend(other.subs);
+        Cond { inner: self.inner.add(other.inner), subs: self.subs, _marker: PhantomData }
     }
 }
 
@@ -274,7 +297,7 @@ impl<R> Cond<R> {
 impl<R> std::ops::Not for Cond<R> {
     type Output = Cond<R>;
     fn not(self) -> Self {
-        Cond { inner: self.inner.not(), _marker: PhantomData }
+        Cond { inner: self.inner.not(), subs: self.subs, _marker: PhantomData }
     }
 }
 
@@ -287,12 +310,18 @@ pub struct On<R, S> {
 /// A typed expression over rows of `R`: a column, a value, arithmetic, `case_when`.
 pub struct Expr<R, T> {
     pub(crate) inner: sea_query::Expr,
+    pub(crate) subs: Subs,
     _marker: PhantomData<fn() -> (R, T)>,
 }
 
 impl<R, T> Expr<R, T> {
     fn wrap(inner: sea_query::Expr) -> Self {
-        Expr { inner, _marker: PhantomData }
+        Expr { inner, subs: Vec::new(), _marker: PhantomData }
+    }
+
+    fn join(inner: sea_query::Expr, mut subs: Subs, more: Subs) -> Self {
+        subs.extend(more);
+        Expr { inner, subs, _marker: PhantomData }
     }
 }
 
@@ -304,8 +333,12 @@ impl<R: Record, T: DbValue> Expr<R, T> {
 
     /// `CASE WHEN condition THEN then ELSE otherwise END`.
     pub fn case_when(condition: Cond<R>, then: Expr<R, T>, otherwise: Expr<R, T>) -> Self {
-        Expr::wrap(
+        let mut subs = condition.subs;
+        subs.extend(then.subs);
+        Expr::join(
             sea_query::Expr::case(condition.inner, then.inner).finally(otherwise.inner).into(),
+            subs,
+            otherwise.subs,
         )
     }
 }
@@ -321,35 +354,42 @@ impl<R: Record, T: DbValue> From<Col<R, T>> for Expr<R, T> {
 impl<R: Record> std::ops::Add for Expr<R, i64> {
     type Output = Expr<R, i64>;
     fn add(self, other: Self) -> Self {
-        Expr::wrap(self.inner.add(other.inner))
+        Expr::join(self.inner.add(other.inner), self.subs, other.subs)
     }
 }
 
 impl<R: Record> std::ops::Sub for Expr<R, i64> {
     type Output = Expr<R, i64>;
     fn sub(self, other: Self) -> Self {
-        Expr::wrap(self.inner.sub(other.inner))
+        Expr::join(self.inner.sub(other.inner), self.subs, other.subs)
     }
 }
 
 impl<R: Record> std::ops::Mul for Expr<R, i64> {
     type Output = Expr<R, i64>;
     fn mul(self, other: Self) -> Self {
-        Expr::wrap(self.inner.mul(other.inner))
+        Expr::join(self.inner.mul(other.inner), self.subs, other.subs)
     }
 }
 
 impl<R: Record> std::ops::Neg for Expr<R, i64> {
     type Output = Expr<R, i64>;
     fn neg(self) -> Self {
-        Expr::wrap(sea_query::Expr::val(0_i64).sub(self.inner))
+        Expr::join(sea_query::Expr::val(0_i64).sub(self.inner), self.subs, Vec::new())
     }
 }
 
 /// An aggregate over rows of `R`, for `select((…))` with `group_by`.
 pub struct Agg<R, T> {
     pub(crate) inner: sea_query::Expr,
+    pub(crate) subs: Subs,
     _marker: PhantomData<fn() -> (R, T)>,
+}
+
+impl<R, T> Agg<R, T> {
+    fn new(inner: sea_query::Expr, subs: Subs) -> Self {
+        Agg { inner, subs, _marker: PhantomData }
+    }
 }
 
 // `CAST(COALESCE(x, 0) AS BIGINT)`: Postgres trả `numeric` cho `SUM(bigint)`, SQLite trả NULL khi không có dòng —
@@ -360,17 +400,18 @@ fn bigint(expr: sea_query::Expr) -> sea_query::Expr {
 
 /// `SUM(expr)` as `i64` (0 when no row).
 pub fn sum<R: Record>(expr: impl Into<Expr<R, i64>>) -> Agg<R, i64> {
-    Agg { inner: bigint(Func::sum(expr.into().inner).into()), _marker: PhantomData }
+    let expr = expr.into();
+    Agg::new(bigint(Func::sum(expr.inner).into()), expr.subs)
 }
 
 /// `COUNT(*)` as `i64`.
 pub fn count<R: Record>() -> Agg<R, i64> {
-    Agg { inner: bigint(Func::count(sea_query::Expr::cust("*")).into()), _marker: PhantomData }
+    Agg::new(bigint(Func::count(sea_query::Expr::cust("*")).into()), Vec::new())
 }
 
 /// `COUNT(DISTINCT column)` as `i64`.
 pub fn count_distinct<R: Record, T: DbValue>(column: Col<R, T>) -> Agg<R, i64> {
-    Agg { inner: bigint(Func::count_distinct(column.sq()).into()), _marker: PhantomData }
+    Agg::new(bigint(Func::count_distinct(column.sq()).into()), Vec::new())
 }
 
 /// `MAX(column)`; `None` when no row.
@@ -378,7 +419,7 @@ pub fn max<R: Record, T: DbValue>(column: Col<R, T>) -> Agg<R, Option<T>>
 where
     Option<T>: DbValue,
 {
-    Agg { inner: Func::max(column.sq()).into(), _marker: PhantomData }
+    Agg::new(Func::max(column.sq()).into(), Vec::new())
 }
 
 /// `MIN(column)`; `None` when no row.
@@ -386,28 +427,29 @@ pub fn min<R: Record, T: DbValue>(column: Col<R, T>) -> Agg<R, Option<T>>
 where
     Option<T>: DbValue,
 {
-    Agg { inner: Func::min(column.sq()).into(), _marker: PhantomData }
+    Agg::new(Func::min(column.sq()).into(), Vec::new())
 }
 
 /// One item of a `select((…))` list: a column or an aggregate.
 pub trait Selectable<R>: Sized {
     /// The type read back.
     type Out: DbValue;
+    /// The expression and the tenants of the subqueries inside it.
     #[doc(hidden)]
-    fn select_expr(self) -> sea_query::Expr;
+    fn select_expr(self) -> (sea_query::Expr, Vec<Option<Uuid>>);
 }
 
 impl<R: Record, T: DbValue> Selectable<R> for Col<R, T> {
     type Out = T;
-    fn select_expr(self) -> sea_query::Expr {
-        self.sq()
+    fn select_expr(self) -> (sea_query::Expr, Vec<Option<Uuid>>) {
+        (self.sq(), Vec::new())
     }
 }
 
 impl<R: Record, T: DbValue> Selectable<R> for Agg<R, T> {
     type Out = T;
-    fn select_expr(self) -> sea_query::Expr {
-        self.inner
+    fn select_expr(self) -> (sea_query::Expr, Vec<Option<Uuid>>) {
+        (self.inner, self.subs)
     }
 }
 
@@ -416,14 +458,14 @@ pub trait Selection<R> {
     /// The tuple each row is read as.
     type Out;
     #[doc(hidden)]
-    fn exprs(self) -> Vec<sea_query::Expr>;
+    fn exprs(self) -> Vec<(sea_query::Expr, Vec<Option<Uuid>>)>;
 }
 
 macro_rules! selections {
     ($( ($($name:ident $index:tt),+) )*) => {$(
         impl<Rec: Record, $($name: Selectable<Rec>),+> Selection<Rec> for ($($name,)+) {
             type Out = ($($name::Out,)+);
-            fn exprs(self) -> Vec<sea_query::Expr> {
+            fn exprs(self) -> Vec<(sea_query::Expr, Vec<Option<Uuid>>)> {
                 vec![$(self.$index.select_expr()),+]
             }
         }
