@@ -719,6 +719,53 @@ async fn nhap_tinh_lai_thue_theo_ngay_lap() {
         let issued = invoices(&app).issue(&tenant, Actor::system(), found.id).await.unwrap();
         assert_eq!((issued.tax.minor(), issued.total.minor()), (10_000, 110_000));
         assert_eq!(issued.lines.iter().map(|line| line.tax.minor()).sum::<i64>(), 10_000);
+
+        // Sửa dòng cùng lúc với lập (kiểm độc lập #560, điểm A): ảnh chụp thuế giống hệt không được che việc
+        // sửa — hoặc sửa bị từ chối, hoặc lập báo `invoices.draft_changed`, hoặc hoá đơn mang dòng mới; không
+        // bao giờ ghi đè dòng mới bằng dòng cũ.
+        for round in 0..6 {
+            let line = NewDocumentLine::new("Service fee", rust_decimal::Decimal::ONE, vnd(100_000))
+                .service()
+                .tax_category("vat.standard");
+            let draft = NewDocument::new(
+                root_of(DEFAULT_TENANT),
+                "vat_invoice",
+                Currency::VND,
+                Buyer::business("Buyer Co", "0101234567"),
+                vec![line],
+                "demo",
+                format!("R-{round}"),
+            );
+            let found = invoices(&app)
+                .create_document(&tenant, Actor::system(), draft)
+                .await
+                .unwrap()
+                .into_inner();
+            write
+                .execute_raw(autoxide_kernel::database::statement(
+                    backend,
+                    "UPDATE invoices_documents SET tax_snapshot = '{\"tax_point\": \"2026-01-01\"}' WHERE id = $1",
+                    [found.id.into()],
+                ))
+                .await
+                .unwrap();
+            let change = json!({"lines": [{"description": "Service fee", "kind": "service", "quantity": "1",
+                "unit_price": {"amount": "200000", "currency": "VND"}, "tax_category": "vat.standard"}]});
+            let path = format!("/documents/{}", found.id);
+            let service = invoices(&app);
+            let (patched, issued) = tokio::join!(
+                call(&app, "PATCH", &path, Some(change)),
+                service.issue(&tenant, Actor::system(), found.id)
+            );
+            match issued {
+                Ok(issued) if patched.0 == StatusCode::OK => {
+                    assert_eq!(issued.lines[0].unit_price.minor(), 200_000, "round {round}: {issued:?}");
+                    assert_eq!(issued.total.minor(), 220_000, "round {round}");
+                }
+                Ok(issued) => assert_eq!(issued.total.minor(), 110_000, "round {round}: {:?}", patched),
+                Err(error) => assert_eq!(error.code(), "invoices.draft_changed", "round {round}"),
+            }
+        }
     })
     .await
     .unwrap();

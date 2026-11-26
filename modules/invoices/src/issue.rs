@@ -247,9 +247,10 @@ impl InvoicesService {
         } else {
             None
         };
-        let snapshot_seen = current.tax_snapshot.clone();
-        let (outbox, jobs, seller, fx, recomputed, snapshot_seen) =
-            (&self.outbox, &self.jobs, &seller, &fx, &recomputed, &snapshot_seen);
+        // Phiên bản của nháp lúc tính lại (như `If-Match`): ảnh chụp thuế không chứa số tiền nên không đủ.
+        let version_seen = current.updated_at;
+        let (outbox, jobs, seller, fx, recomputed) =
+            (&self.outbox, &self.jobs, &seller, &fx, &recomputed);
         let issued = database
             .write_with_retry(move || async move {
                 let transaction = database.begin_write().await?;
@@ -334,7 +335,7 @@ impl InvoicesService {
                 let mut active: document::ActiveModel = row.clone().into();
                 if let Some(computed) = recomputed {
                     // Nháp bị sửa trong lúc tính lại: thuế vừa tính không còn khớp dòng đã lưu.
-                    if &row.tax_snapshot != snapshot_seen {
+                    if row.updated_at != version_seen {
                         return Err(draft_changed());
                     }
                     active.subtotal_minor = Set(computed.subtotal.minor());
