@@ -30,7 +30,8 @@ pub(super) struct Split<'a> {
 
 /// Không chia được mà mọi ô ≥ 0.
 pub(super) enum Stuck {
-    /// Dòng ở vị trí này có giá thấp hơn thuế theo đơn vị nằm trong nó.
+    /// Không có cách chia hợp lệ nào cho nhóm (thuế theo đơn vị không vừa các dòng có số lượng); vị trí là
+    /// dòng đang sửa khi phát hiện, dùng để chỉ chỗ trong thông báo lỗi.
     Line(usize),
     Error(Error),
 }

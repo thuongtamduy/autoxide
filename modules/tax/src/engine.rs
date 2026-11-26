@@ -280,8 +280,8 @@ fn reverse_split(
 ///    `x − đơn giá × số lượng`. Giá chưa thuế `n = HalfUp(x)` (như trước).
 /// 2. Tính xuôi như hoá đơn ghi: thuế mỗi tầng = `HalfUp(thuế suất × cơ sở đã làm tròn)` — người đọc
 ///    hoá đơn tự kiểm được từng dòng thuế.
-/// 3. Lệch `D = (gross − n) − Σ thuế` (do làm tròn) dồn vào tầng chịu thuế cuối nếu được (hành vi cũ),
-///    không thì sang tầng khác — xem `settle`.
+/// 3. Lệch `D = (gross − n) − Σ thuế` (do làm tròn) dồn vào các tầng theo phần trăm, từ cuối về đầu; tầng
+///    theo đơn vị chỉ nhận khi không còn tầng nào khác — xem `settle`.
 fn inclusive_group(
     chain: &[ResolvedRate],
     gross: Money,
