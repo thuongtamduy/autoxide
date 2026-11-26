@@ -171,8 +171,9 @@ impl KeyCursor {
 
 /// Cursor of a list ordered by something that is not one column (an aggregate such as a `SUM` of a `GROUP BY`):
 /// the module builds a text `key` from the last item that orders the same way as the list, and the next page
-/// starts after it ([`PageRequest::text_key_after`]). `column` names the ordering, so a cursor of another list
-/// is refused.
+/// starts after it ([`PageRequest::text_key_after`]). `column` names the ordering: a cursor whose name differs
+/// is refused, so give each list its own name (e.g. include the dimension it ranks) when cursors must not be
+/// reused across lists.
 pub fn text_key_cursor(column: &str, key: &str) -> String {
     KeyCursor { column: column.to_owned(), value: SortValue::Text(key.to_owned()), id: Uuid::nil() }
         .encode()
