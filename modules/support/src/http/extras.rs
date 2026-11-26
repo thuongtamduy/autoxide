@@ -253,6 +253,8 @@ impl From<SavedReply> for MacroResponse {
 #[derive(Debug, Deserialize, IntoParams)]
 #[into_params(parameter_in = Query)]
 pub(crate) struct MacroQuery {
+    /// The unit (organization node) whose saved replies to list; those of the units above it are
+    /// included.
     org_id: Uuid,
 }
 

@@ -14586,19 +14586,6 @@ export type Data_Vec_ReasonView = {
 };
 
 /** Envelope of a single result. */
-export type Data_Vec_Referrer = {
-  data: {
-    /** How it points: e.g. `featured_media`, `body`, `menu_item`. */
-    field: string;
-    id: string;
-    /** Type of the pointing record, e.g. `content.entry`. */
-    kind: string;
-    /** What staff call it (title, name). */
-    title: string;
-  }[];
-};
-
-/** Envelope of a single result. */
 export type Data_Vec_RoleResponse = {
   data: {
     /**
@@ -25266,6 +25253,21 @@ export type Page_ReferralRule = {
     referrer_points: number;
     /** Voucher promotion for the buyer who shared the code. */
     referrer_promotion_id?: string | null;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_Referrer = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** How it points: e.g. `featured_media`, `body`, `menu_item`. */
+    field: string;
+    id: string;
+    /** Type of the pointing record, e.g. `content.entry`. */
+    kind: string;
+    /** What staff call it (title, name). */
+    title: string;
   }[];
   pagination: Pagination;
 };
@@ -44509,9 +44511,9 @@ export interface paths {
   "/api/v1/kernel/records/{kind}/{id}/usages": {
     /** Get where a record is used. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; path: { kind: string; id: string }; query: { limit?: number }; };
+      parameters: { header: { "Accept-Language"?: string }; path: { kind: string; id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_Referrer;
+        200: Page_Referrer;
         401: Problem;
         404: Problem;
         422: Problem;

@@ -55,8 +55,13 @@ fn fields<T: DeserializeOwned + Validate>(value: Value) -> Result<T, Error> {
 fn page_of(
     limit: Option<u32>,
     cursor: Option<String>,
+    count: Option<bool>,
 ) -> Result<autoxide_kernel::pagination::PageRequest, Error> {
-    page_request(PageQuery::new(limit.map(|limit| limit.to_string()), cursor, None), Vec::new())
+    page_request(
+        PageQuery::new(limit.map(|limit| limit.to_string()), cursor, None)
+            .with_count(count.unwrap_or(false)),
+        Vec::new(),
+    )
 }
 
 /// A block type usable in layouts.
@@ -135,6 +140,8 @@ pub(crate) struct ListInput {
     limit: Option<u32>,
     /// Where to continue: the `next_cursor` of the previous page.
     cursor: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
 }
 
 /// A theme variant to create (as a draft) or replace.
@@ -363,7 +370,7 @@ fn site_tools(service: &Arc<ContentService>) -> Vec<Tool> {
                     let org = input
                         .org_id
                         .unwrap_or_else(|| autoxide_kernel::tenancy::root_of(tenant.id()).as_uuid());
-                    let page = page_of(input.limit, input.cursor)?;
+                    let page = page_of(input.limit, input.cursor, input.count)?;
                     let found = service.list_variants(&tenant, &principal, org, &page).await?;
                     Ok::<Page<ThemeVariantResponse>, Error>(found.map(variant_response))
                 }
@@ -402,7 +409,7 @@ fn site_tools(service: &Arc<ContentService>) -> Vec<Tool> {
             move |tenant: TenantContext, principal: Principal, input: ListInput| {
                 let service = types.clone();
                 async move {
-                    let page = page_of(input.limit, input.cursor)?;
+                    let page = page_of(input.limit, input.cursor, input.count)?;
                     let found = service.list_types(&tenant, &principal, &page).await?;
                     Ok::<Page<ContentTypeResponse>, Error>(found.map(type_response))
                 }
