@@ -1,7 +1,12 @@
-//! PT-13: `x-permissions` của mỗi operation khớp chỗ service kiểm. Với mỗi permission `P` mà một module khai, một
-//! tài khoản chỉ có `P` gọi mọi operation của cùng module mà `P` KHÔNG nằm trong `x-permissions`; service phải từ
-//! chối (403 `permission_denied`, hay 404 khi operation khai `x-hides-existence`). Trả gì khác (2xx, 404, 422…) nghĩa
-//! là service đã cho `P` qua bước kiểm quyền mà tài liệu không nêu — client và agent đọc tài liệu sẽ hiểu sai.
+//! PT-13: `x-permissions` của mỗi operation khớp chỗ service kiểm. App dựng KHÔNG có lớp permission của kernel
+//! (`without_permission_gate`) để thấy service tự nhận gì. Với mỗi permission `P` mà một module khai, một tài khoản
+//! chỉ có `P` gọi mọi operation của cùng module mà `P` KHÔNG nằm trong `x-permissions`: service phải từ chối (403
+//! `permission_denied`, hay 404 khi operation khai `x-hides-existence`). Trả gì khác nghĩa là service nhận `P` mà tài
+//! liệu không nêu — khi bật lớp permission, người giữ `P` bị chặn oan. 422 `validation_failed` (service kiểm dữ liệu
+//! trước quyền; khi có lớp permission thì không xảy ra) không kết luận được nên bỏ qua.
+//!
+//! Chiều ngược lại (permission ĐƯỢC khai mà service vẫn từ chối) không kiểm ở đây: vài operation cần cùng lúc hai
+//! permission, `x-permissions` ("một trong các permission là đủ") không diễn đạt được (D-20261126-permission-gate).
 
 use std::collections::BTreeMap;
 
@@ -10,7 +15,9 @@ use autoxide_kernel::tenancy::TenantContext;
 use autoxide_testkit::{TestApp, TestDatabase};
 use serde_json::{Value, json};
 
-use super::access::{probe, send};
+use axum::http::Method;
+
+use super::access::{Probe, probe, send};
 
 const PASSWORD: &str = "correct horse battery staple";
 
@@ -44,6 +51,7 @@ async fn x_permissions_khop_cho_service_kiem() {
     TestDatabase::run(async |test| {
         let dir = std::env::temp_dir().join(format!("autoxide-xperm-{}", uuid::Uuid::now_v7()));
         let mut builder = TestApp::builder(test)
+            .without_permission_gate()
             .setting("AUTOXIDE_FILES_DIR", &dir.join("files").display().to_string())
             .setting("AUTOXIDE_MAIL_FILE_DIR", &dir.join("mail").display().to_string());
         for module in crate::modules::all() {
@@ -101,7 +109,8 @@ async fn x_permissions_khop_cho_service_kiem() {
                     let (status, body) = send(&app, &probe, Some(token)).await;
                     let refused = status == 403 && body["code"] == "permission_denied"
                         || hides && status == 404;
-                    if !refused {
+                    let inconclusive = status == 422 && body["code"] == "validation_failed";
+                    if !refused && !inconclusive {
                         findings.push(format!(
                             "{} {path}: `{name}` (not in x-permissions {listed:?}) answered {status} {}",
                             method.to_uppercase(),
@@ -119,7 +128,8 @@ async fn x_permissions_khop_cho_service_kiem() {
 
 /// PT-14: người không có permission nào nhận 403 `permission_denied` TRƯỚC mọi bước kiểm khác — kể cả khi request
 /// thiếu `If-Match`, thân sai và ID không có: không học được endpoint cần `ETag`, trường nào sai hay bản ghi nào tồn
-/// tại. (Operation khai `x-hides-existence` thì 404 cũng được.)
+/// tại. (Operation khai `x-hides-existence` thì 404 cũng được.) `HEAD` của operation `GET` cũng vậy; người chưa đăng
+/// nhập nhận 401 trước mọi bước kiểm dữ liệu.
 #[tokio::test]
 async fn kiem_quyen_truoc_du_lieu_va_ban_ghi() {
     TestDatabase::run(async |test| {
@@ -161,6 +171,23 @@ async fn kiem_quyen_truoc_du_lieu_va_ban_ghi() {
                 {
                     findings.push(format!(
                         "{} {path}: answered {status} {}",
+                        method.to_uppercase(),
+                        body["code"]
+                    ));
+                }
+                // `HEAD` chạy handler `get` của axum: cũng phải bị chặn (thân trả lời rỗng, chỉ xem mã).
+                if method == "get" {
+                    let head = Probe { method: Method::HEAD, ..probe.clone() };
+                    let (status, _) = send(&app, &head, Some(&token)).await;
+                    if !(status == 403 || hides && status == 404) {
+                        findings.push(format!("HEAD {path}: answered {status}"));
+                    }
+                }
+                // Không đăng nhập: 401 trước mọi bước kiểm dữ liệu.
+                let (status, body) = send(&app, &probe, None).await;
+                if status != 401 {
+                    findings.push(format!(
+                        "{} {path} without a token: answered {status} {}",
                         method.to_uppercase(),
                         body["code"]
                     ));

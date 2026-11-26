@@ -136,6 +136,7 @@ fn as_text(value: &Value) -> String {
 }
 
 /// Một request mẫu cho operation.
+#[derive(Clone)]
 pub(super) struct Probe {
     pub(super) method: Method,
     pub(super) uri: String,

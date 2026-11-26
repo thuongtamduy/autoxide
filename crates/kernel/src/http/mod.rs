@@ -205,6 +205,9 @@ pub struct Extras {
     /// Syncable record kinds of the modules (`Modules::sync_resources`, step 69 P2): when present the
     /// kernel serves `/api/v1/kernel/sync/...` (a write batch runs commands through these modules' routes).
     pub sync: Vec<(&'static str, crate::sync::SyncResource)>,
+    /// Test audits only: build without the permission layer (see [`Extras::without_permission_gate`]).
+    #[doc(hidden)]
+    pub without_permission_gate: bool,
 }
 
 impl Extras {
@@ -291,6 +294,15 @@ impl Extras {
         self.translations = translations;
         self
     }
+
+    /// Builds the routes WITHOUT the layer that enforces `x-permissions` (D-20261126-permission-gate), so a test can
+    /// see what the services themselves accept and check the documented lists against it. Never use it in a
+    /// running application.
+    #[doc(hidden)]
+    pub fn without_permission_gate(mut self) -> Self {
+        self.without_permission_gate = true;
+        self
+    }
 }
 
 pub fn build(
@@ -362,12 +374,6 @@ pub fn build(
             routes = routes.merge(sync::routes(sync_state.clone()));
         }
         openapi::label_module(name, routes.get_openapi_mut());
-        // Giới hạn request theo khách (tầng thứ ba, D-20261126-tenant-rate-limit), mọi module.
-        if let Some(limiter) = tenant_limiter.clone() {
-            routes = routes.layer(middleware::from_fn(move |request: Request, next: Next| {
-                tenant_rate_limit::limit(limiter.clone(), request, next)
-            }));
-        }
         // Gói của khách (bước 35): đếm request ở mọi module; chặn ở module bị gói chi phối.
         if name != crate::user_flags::ME {
             let always = extras.entitlements.catalog().is_always_enabled(name);
@@ -387,13 +393,20 @@ pub fn build(
                 crate::ops::approvals::gate(approvals.clone(), request, next)
             }));
         }
-        // Kiểm permission trước mọi thứ khác của route (PT-14, D-20261126-permission-gate): lớp ngoài cùng của
-        // module chạy trước gói, duyệt của agent và mọi extractor của handler.
+        // Kiểm permission trước gói, duyệt của agent và mọi extractor của handler (PT-14, D-20261126-permission-gate).
         let permissions = permission_gate::rules(name, routes.get_openapi());
-        if !permissions.is_empty() {
+        if !permissions.is_empty() && !extras.without_permission_gate {
             let permissions = Arc::new(permissions);
             routes = routes.layer(middleware::from_fn(move |request: Request, next: Next| {
                 permission_gate::gate(permissions.clone(), request, next)
+            }));
+        }
+        // Giới hạn request theo khách (tầng thứ ba, D-20261126-tenant-rate-limit), mọi module. Lớp ngoài cùng (thêm
+        // sau cùng): request bị lớp permission hay gói từ chối vẫn trừ ngân sách của khách — dò hàng loạt bằng
+        // request bị 403 cũng bị chặn (D-20261126-permission-gate).
+        if let Some(limiter) = tenant_limiter.clone() {
+            routes = routes.layer(middleware::from_fn(move |request: Request, next: Next| {
+                tenant_rate_limit::limit(limiter.clone(), request, next)
             }));
         }
         if sync_state.resources.iter().any(|(module, _)| *module == name) {

@@ -5,8 +5,9 @@
 //!
 //! The only source is the module's OpenAPI document (like `approvals::rules`): `x-permissions: []` (any signed-in
 //! user) and public operations pass. The layer only checks "has the permission at some unit"; scope, records and
-//! step-up are still checked by the service. A caller that cannot be authenticated reaches the handler, which
-//! answers 401 as before.
+//! step-up are still checked by the service. Every guarded operation needs a signed-in caller, so a caller that
+//! cannot be authenticated gets the authentication error here (401), before any extractor of the handler.
+//! `HEAD` is guarded like `GET` (axum answers `HEAD` with the `GET` handler).
 
 use std::sync::Arc;
 
@@ -38,6 +39,8 @@ impl Rules {
     }
 
     fn find(&self, method: &Method, path: &str) -> Option<&Guard> {
+        // axum chạy handler `get` cho `HEAD` (bỏ thân trả lời) → kiểm như `GET`.
+        let method = if method == Method::HEAD { &Method::GET } else { method };
         self.operations
             .iter()
             .find(|(known, template, _)| known == method && template == path)
@@ -95,9 +98,14 @@ pub(super) async fn gate(rules: Arc<Rules>, request: Request, next: Next) -> Res
         return next.run(request).await;
     };
     let (mut parts, body) = request.into_parts();
-    // Xác thực một lần; kết quả được giữ trong `extensions`, extractor `Principal` của handler dùng lại.
-    if let Ok(principal) = Principal::from_request_parts(&mut parts, &()).await
-        && !(buyers && principal.realm() == Realm::Customer)
+    // Xác thực một lần; kết quả được giữ trong `extensions`, extractor `Principal` của handler dùng lại. Operation có
+    // permission luôn cần đăng nhập: xác thực hỏng thì trả lỗi ngay, không để extractor khác của handler (thân, header)
+    // trả lời trước cho người ẩn danh, và không xác thực (đếm giới hạn API key) lần thứ hai.
+    let principal = match Principal::from_request_parts(&mut parts, &()).await {
+        Ok(principal) => principal,
+        Err(error) => return error.into_response(),
+    };
+    if !(buyers && principal.realm() == Realm::Customer)
         && let Err(error) = principal.require_any_named(&permissions)
     {
         return error.into_response();
