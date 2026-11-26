@@ -556,7 +556,10 @@ thật (P7).
         event và worker còn một câu `EXISTS` mỗi database (D-20261126-idle-polling)
   - [ ] PT-15 triệt để: chỉ mục tìm chữ chạy trên cả hai database (FTS5 / `tsvector` sau một trait) thay cho
         `LIKE '%q%'` quét mọi bài đã đăng — các chốt hiện có chỉ giữ máy chủ không nghẽn, mỗi lượt tìm vẫn quét
-  - [ ] PT-11, PT-12, PT-18 và chỗ vướng cho việc test (bộ mồi dữ liệu thương mại, tool MCP trỏ operationId REST,
+  - [x] PT-11, PT-12, PT-18, PT-19: phân loại công khai chỉ theo bài hiện trên website; trần sự kiện analytics mỗi
+        ngày theo khối mạng; hạn mức mail xác nhận newsletter theo hộp thư; token SCIM sửa tài khoản cần "giữ được"
+        từng membership của nó (D-20261126-scim-covers-scope)
+  - [ ] Chỗ vướng cho việc test (bộ mồi dữ liệu thương mại, tool MCP trỏ operationId REST,
         đếm câu SQL theo request) (PR 4, sau #516)
 
 ## Giai đoạn B — Lớp cho giao diện và phân quyền
