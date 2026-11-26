@@ -1,7 +1,8 @@
 # Website tài liệu có phiên bản (D-20261126-docs-site-mdbook, G13): khi tag phát hành `vX.Y.Z` được đẩy, dựng bộ tài liệu của
 # đúng tag đó bằng mdBook (EN + VI) và đăng vào nhánh `gh-pages`; bản cũ giữ nguyên, `latest` trỏ bản chính thức cao nhất.
-# Bật GitHub Pages (Settings → Pages → nguồn: nhánh gh-pages) là việc của chủ dự án. Chạy tay (workflow_dispatch) để
-# đăng lại một tag, hay để dựng thử trên PR không đăng (không có bước đăng khi không chọn tag).
+# Hai job: `build` (chỉ quyền đọc; cài và chạy công cụ bên thứ ba) → artifact → `publish` (quyền ghi; chỉ chạy script của repo,
+# không cài gì). Bật GitHub Pages (Settings → Pages → nguồn: nhánh gh-pages) là việc của chủ dự án. Chạy tay
+# (workflow_dispatch) với `tag` để đăng lại một tag; không `tag` thì chỉ dựng thử.
 name: Docs site
 
 on:
@@ -25,7 +26,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
-      contents: write # đẩy nhánh gh-pages
+      contents: read
     env:
       TAG: ${{ inputs.tag || (github.ref_type == 'tag' && github.ref_name) || '' }}
     steps:
@@ -38,8 +39,46 @@ jobs:
           tool: mdbook@0.5.4
       - name: Build the books
         run: python3 -I scripts/build-docs-site.py "${TAG:-main}" "$RUNNER_TEMP/site" --repo "$GITHUB_REPOSITORY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: docs-site
+          path: ${{ runner.temp }}/site/*
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    needs: build
+    if: ${{ !github.event.repository.private && (inputs.tag != '' || github.ref_type == 'tag') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write # đẩy nhánh gh-pages
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.tag || github.ref }}
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: docs-site
+          path: ${{ runner.temp }}/site
+      # Nhánh gh-pages đã có chưa (repo công khai: đọc ẩn danh không cần token).
+      - name: Does gh-pages exist?
+        id: pages
+        run: |
+          if git ls-remote --exit-code --heads "https://github.com/$GITHUB_REPOSITORY.git" gh-pages >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+      # Checkout chuẩn với persist-credentials: GITHUB_TOKEN nằm trong cấu hình git của thư mục `site` và `git push` dùng nó —
+      # không có token trong URL hay dòng lệnh. Chưa có gh-pages thì lấy nhánh mặc định; script đăng tạo nhánh gh-pages rỗng.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.pages.outputs.exists == 'true' && 'gh-pages' || github.event.repository.default_branch }}
+          path: site
+          persist-credentials: true # zizmor: ignore[artipacked] — cần để `git push` vào gh-pages; job không tải artifact lên
       - name: Publish to gh-pages
-        if: ${{ env.TAG != '' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: scripts/publish-docs-site.sh "$TAG" "$RUNNER_TEMP/site"
+        run: scripts/publish-docs-site.sh "$TAG" "$RUNNER_TEMP/site" "$GITHUB_WORKSPACE/site"

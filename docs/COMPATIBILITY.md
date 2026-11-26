@@ -190,17 +190,19 @@ new feature never changes the default build.
 
 ### Reproducible builds
 
-The release image is built so that the same source gives the same binary:
+The release image is built with the aim that the same source gives the same binary. This is a goal: no automated test builds
+twice and compares yet, so do not rely on byte-for-byte identity. What is in place:
 
 - `Cargo.lock` is committed and every release build uses `--locked`; the toolchain is pinned (`rust-toolchain.toml`, the
   Docker `RUST_VERSION`), and the base images are pinned by digest.
 - The Dockerfile builds in a fixed directory and passes `--remap-path-prefix` so no build path ends up in the binary,
   and `SOURCE_DATE_EPOCH` (the commit time of the release) is used for every timestamp, including the release archives
   (sorted, with fixed owner and modification time).
-- To check a release, rebuild from the tag with the same Dockerfile and compare the SHA-256 of
-  `/usr/local/bin/autoxide` in your image with the one in `SHA256SUMS`. Differences usually mean a different
-  base image digest or a different target architecture; [`docs/VERIFYING.md`](VERIFYING.md) shows how to verify
-  attestations too.
+- To compare a release with your own build: rebuild from the tag with the same Dockerfile, copy
+  `/usr/local/bin/autoxide` out of your image, unpack the release archive (`tar -xzf autoxide-X.Y.Z-<target>.tar.gz`) and
+  compare `sha256sum` of the two `autoxide` files. (`SHA256SUMS` lists the archives, not the binary inside.) A difference
+  is not proof of tampering: a different base image digest or target architecture also changes the binary.
+  [`docs/VERIFYING.md`](VERIFYING.md) shows how to verify signatures and attestations, which is the supported check.
 
 ### Software bill of materials (SBOM)
 

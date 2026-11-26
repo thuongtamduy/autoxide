@@ -183,16 +183,19 @@ không bao giờ đổi bản build mặc định.
 
 ### Build tái lập
 
-Image phát hành được build để cùng mã nguồn cho ra cùng binary:
+Image phát hành được build với mục tiêu cùng mã nguồn cho ra cùng binary. Đây là mục tiêu: chưa có test tự động nào build hai lần
+rồi so sánh, nên đừng dựa vào việc giống từng byte. Những gì đã có:
 
 - `Cargo.lock` được commit và mọi bản build phát hành dùng `--locked`; toolchain được ghim (`rust-toolchain.toml`,
   `RUST_VERSION` của Docker) và image nền ghim theo digest.
 - Dockerfile build trong một thư mục cố định và truyền `--remap-path-prefix` để không đường dẫn build nào lọt vào
   binary; `SOURCE_DATE_EPOCH` (thời điểm commit của bản phát hành) dùng cho mọi mốc thời gian, kể cả file nén phát hành
   (xếp theo tên, chủ sở hữu và thời gian sửa cố định).
-- Để kiểm một bản phát hành, build lại từ tag bằng cùng Dockerfile rồi so SHA-256 của `/usr/local/bin/autoxide` trong
-  image của bạn với giá trị trong `SHA256SUMS`. Khác nhau thường do digest image nền khác hay kiến trúc đích khác;
-  [`docs/VERIFYING.vi.md`](VERIFYING.vi.md) chỉ cách kiểm cả attestation.
+- Để so một bản phát hành với bản build của bạn: build lại từ tag bằng cùng Dockerfile, chép `/usr/local/bin/autoxide` ra khỏi
+  image của bạn, giải nén file nén phát hành (`tar -xzf autoxide-X.Y.Z-<target>.tar.gz`) rồi so `sha256sum` của hai file
+  `autoxide`. (`SHA256SUMS` liệt kê các file nén, không phải binary bên trong.) Khác nhau chưa phải bằng chứng bị sửa đổi: digest
+  image nền hay kiến trúc đích khác cũng làm binary khác. [`docs/VERIFYING.vi.md`](VERIFYING.vi.md) chỉ cách kiểm chữ ký và
+  attestation, là cách kiểm được hỗ trợ.
 
 ### Bảng kê vật liệu phần mềm (SBOM)
 

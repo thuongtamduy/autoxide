@@ -28,7 +28,7 @@ ENV RUSTUP_TOOLCHAIN=${RUST_VERSION} \
 # cargo-auditable nhúng danh sách crate Rust đúng như lúc build vào binary (đoạn `.dep-v0`), để máy quét lỗ hổng
 # (cargo audit bin, Syft, Trivy) thấy crate trong binary đã strip (SBOM, docs/COMPATIBILITY.md).
 RUN cargo install cargo-chef --locked --version 0.1.78 \
-    && cargo install cargo-auditable --locked --version 0.7.8 \
+    && cargo install cargo-auditable --locked --version 0.7.7 \
     && cargo install cargo-about --locked --version 0.9.3 --features cli
 WORKDIR /src
 

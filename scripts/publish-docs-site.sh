@@ -1,29 +1,24 @@
 #!/usr/bin/env bash
 # Đăng website tài liệu của một bản phát hành lên nhánh `gh-pages` (D-20261126-docs-site-mdbook): thêm thư mục
 # /<tag>/ (en, vi), cập nhật /latest/ khi đây là bản chính thức cao nhất, ghi versions.json và trang chuyển hướng gốc.
-# Bản cũ giữ nguyên. Chạy bởi .github/workflows/docs-site.yml; chạy tay: GH_TOKEN, GITHUB_REPOSITORY, và thư mục đã dựng.
+# Bản cũ giữ nguyên. Chạy bởi .github/workflows/docs-site.yml.
 #
-#   scripts/publish-docs-site.sh <tag> <built-dir>      <built-dir> chứa <tag>/{en,vi} do build-docs-site.py dựng
+#   scripts/publish-docs-site.sh <tag> <built-dir> <site-dir>
+#
+# <built-dir> chứa <tag>/{en,vi} do build-docs-site.py dựng. <site-dir> là một bản checkout git CÓ quyền đẩy (workflow dùng
+# actions/checkout với persist-credentials: không đưa token vào URL hay dòng lệnh): đang ở nhánh `gh-pages`, hoặc ở nhánh khác
+# khi `gh-pages` chưa có (lần đầu) — khi đó script tạo nhánh gh-pages rỗng (orphan). Đẩy bằng `git push origin`.
 set -euo pipefail
 
-tag="${1:?usage: publish-docs-site.sh <tag> <built-dir>}"
-built="${2:?usage: publish-docs-site.sh <tag> <built-dir>}"
-# `DOCS_REMOTE` (URL of any git remote) is for trying the script locally; CI builds the GitHub URL from the token.
-if [ -n "${DOCS_REMOTE:-}" ]; then
-  remote="$DOCS_REMOTE"
-else
-  repo="${GITHUB_REPOSITORY:?GITHUB_REPOSITORY is not set}"
-  remote="https://x-access-token:${GH_TOKEN:?GH_TOKEN is not set}@github.com/${repo}.git"
-fi
-site="$(mktemp -d)"
+tag="${1:?usage: publish-docs-site.sh <tag> <built-dir> <site-dir>}"
+built="$(cd "${2:?usage: publish-docs-site.sh <tag> <built-dir> <site-dir>}" && pwd)"
+cd "${3:?usage: publish-docs-site.sh <tag> <built-dir> <site-dir>}"
 
-# Lấy nhánh gh-pages hiện có, hay bắt đầu nhánh mới (lần đầu).
-if git ls-remote --exit-code --heads "$remote" gh-pages >/dev/null 2>&1; then
-  git clone --quiet --depth 1 --branch gh-pages "$remote" "$site"
-else
-  git -C "$site" init --quiet --initial-branch gh-pages
+if [ "$(git rev-parse --abbrev-ref HEAD)" != gh-pages ]; then
+  git switch --orphan gh-pages
+  git rm -rfq --ignore-unmatch . >/dev/null
+  git clean -fdxq
 fi
-cd "$site"
 
 rm -rf "$tag"
 cp -r "$built/$tag" "$tag"
@@ -54,5 +49,5 @@ if git diff --cached --quiet; then
 fi
 git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
   commit --quiet -m "docs: publish $tag"
-git push --quiet "$remote" HEAD:gh-pages
+git push --quiet origin HEAD:gh-pages
 echo "published $tag"
