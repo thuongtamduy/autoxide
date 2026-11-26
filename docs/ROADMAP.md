@@ -202,15 +202,20 @@ chỉ số của G9 đạt ngưỡng.
 
 ### G8 — Chuẩn cộng đồng mã nguồn mở
 
-- [ ] CodeQL, OpenSSF Scorecard, huy hiệu OpenSSF Best Practices
-- [ ] Chính sách đóng góp do AI viết, DCO, `SUPPORT.md`, `GOVERNANCE.md` / người duy trì, `CODEOWNERS`, liên kết hỏi đáp
-      trong mẫu issue, nhãn good-first-issue
-- [ ] SBOM liệt kê crate Rust (`cargo auditable` / CycloneDX), build tái lập, CI dựng bằng MSRV, chính sách MSRV và bảng
-      feature trong `docs/COMPATIBILITY.md`
-- [ ] Bản tiếng Anh cho người ngoài: lộ trình công khai, đường đề xuất thay đổi (RFC), tóm tắt luật đóng góp
-- [ ] Hệ sinh thái module: quy ước tên và topic, danh sách module cộng đồng, manifest module, bảng tương thích phiên bản,
-      chính sách dùng tên Autoxide
-- [ ] Đầu SPDX / REUSE; fuzz (`cargo-fuzz`) cho bộ phân tích dữ liệu đầu vào không tin cậy
+- [x] CodeQL (Rust, JS/TS, workflow), OpenSSF Scorecard (`codeql.yml`, `scorecard.yml`); huy hiệu OpenSSF Best Practices và
+      branch protection do chủ dự án làm trên web, hướng dẫn ở `docs/OPENSSF.md` (EN + VI)
+- [x] Chính sách đóng góp do AI viết, DCO (`DCO`, job `dco` của CI, `.github/dco-maintainers.txt`), commit convention,
+      `SUPPORT.md`, `GOVERNANCE.md` (vai trò, quyết định, RFC, bộ nhãn), `docs/rfcs/`, `CODEOWNERS`, `contact_links` trong
+      mẫu issue; chủ dự án tạo bộ nhãn trong cài đặt repo (bảng nhãn ở `GOVERNANCE.md`)
+- [x] SBOM (`cargo auditable` trong Dockerfile, CycloneDX `autoxide.cdx.json` trong bản phát hành), build tái lập
+      (`SOURCE_DATE_EPOCH`, `--remap-path-prefix`, tar xếp theo tên), job CI dựng bằng MSRV, mục MSRV / feature / build tái lập /
+      SBOM trong `docs/COMPATIBILITY.md`
+- [x] Bản tiếng Anh cho người ngoài: `docs/ROADMAP.public.md` (lộ trình công khai, tóm tắt luật đóng góp), RFC ở `docs/rfcs/`
+- [x] Hệ sinh thái module: `docs/MODULE_ECOSYSTEM.md` (tên `autoxide-*`, topic `autoxide-module`, manifest
+      `autoxide-module.toml` đề xuất, bảng tương thích, danh sách cộng đồng), `TRADEMARK.md` (EN + VI)
+- [x] `REUSE.toml` + `LICENSES/` (job `reuse`); `fuzz/` (cargo-fuzz: con trỏ trang, header chọn khách, câu tìm kiếm, CSV,
+      số thập phân / tiền, thời gian) + `fuzz.yml` chạy hằng tuần. Chưa phủ: `Idempotency-Key` và thân JSON (hàm riêng của tầng
+      HTTP) — thêm khi phần phân tích đó lộ ra thành hàm công khai
 
 ### G9 — Chất lượng thành quy trình và đo bằng con số
 

@@ -468,3 +468,15 @@ jobs:
           MSRV: ${{ steps.plan.outputs.msrv }}
         # `+$MSRV` thắng `rust-toolchain.toml`. `--locked`: Cargo.lock không được đổi.
         run: cargo "+$MSRV" check --workspace --locked
+
+  # REUSE (REUSE.toml, LICENSES/): mọi file có thông tin bản quyền và giấy phép SPDX. Công cụ ghim phiên bản.
+  reuse:
+    name: REUSE compliance
+    if: ${{ !github.event.repository.private }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: pipx run reuse==6.3.0 lint
