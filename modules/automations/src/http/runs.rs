@@ -28,8 +28,9 @@ use crate::service::runs::{Run, RunFilter};
 pub(crate) struct RunResponse {
     id: Uuid,
     rule_id: Uuid,
-    /// The version of the rule the run uses (changing the rule does not change runs already
-    /// started).
+    /// The version of the rule the run was started with. Editing the rule (even only its name) or
+    /// enabling it again stops runs still in progress or waiting, with
+    /// `automations.rule_changed`.
     rule_version: i32,
     /// The unit of the rule.
     org_id: Uuid,

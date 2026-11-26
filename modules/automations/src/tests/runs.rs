@@ -508,6 +508,78 @@ async fn tam_dung_giua_hai_buoc_tool() {
     .unwrap();
 }
 
+/// Lần chạy đang `running` (không đóng được lúc tạm dừng) mà luật bị tạm dừng rồi người khác bật lại ngay giữa chừng:
+/// trước bước kế tiếp (bước `wait`) runner thấy phiên bản đổi và dừng với `automations.rule_changed` — không bước nào
+/// chạy tiếp, kể cả khi tới hạn.
+#[tokio::test]
+async fn dang_chay_ma_luat_duoc_bat_lai_thi_dung() {
+    TestDatabase::run(async |test| {
+        let harness = Harness::new(test).await;
+        let actions = json!([
+            {"tool": "shop.tag_order", "arguments": {"order_id": "1", "tag": "reenable-rules"}},
+            {"wait": {"minutes": 60}},
+            {"tool": "shop.tag_order", "arguments": {"order_id": "1", "tag": "x"}}
+        ]);
+        let rule = harness.rule(json!({"type": "manual"}), json!(null), actions).await;
+        let run = harness
+            .service
+            .run_rule(&harness.tenant, &harness.owner, rule.id, json!({}))
+            .await
+            .unwrap();
+        harness.settle().await;
+        harness.service.execute(&harness.tenant, run.id).await.unwrap();
+        let stopped =
+            harness.service.get_run(&harness.tenant, &harness.owner, run.id).await.unwrap();
+        assert_eq!(stopped.status, FAILED);
+        assert_eq!(stopped.error_code.as_deref(), Some("automations.rule_changed"));
+        assert_eq!(harness.count(|c| &c.tagged), 1, "chỉ bước đầu chạy");
+    })
+    .await
+    .unwrap();
+}
+
+/// `start_run` xem lại luật dưới khoá: bên gọi cầm bản luật cũ (đọc trễ) của luật vừa tạm dừng thì không có lần chạy
+/// mới; xoá luật thì lần chạy đang chờ kết thúc cùng lúc.
+#[tokio::test]
+async fn khong_tao_lan_chay_cho_luat_vua_tam_dung_va_xoa_luat_dong_lan_chay() {
+    TestDatabase::run(async |test| {
+        let harness = Harness::new(test).await;
+        let actions = json!([
+            {"wait": {"minutes": 60}},
+            {"tool": "shop.tag_order", "arguments": {"order_id": "1", "tag": "x"}}
+        ]);
+        let rule = harness.rule(json!({"type": "manual"}), json!(null), actions).await;
+        let run = harness
+            .service
+            .run_rule(&harness.tenant, &harness.owner, rule.id, json!({}))
+            .await
+            .unwrap();
+        harness.settle().await;
+        harness.service.delete_rule(&harness.tenant, &harness.owner, rule.id, None).await.unwrap();
+        let closed =
+            harness.service.get_run(&harness.tenant, &harness.owner, run.id).await.unwrap();
+        assert_eq!(closed.status, FAILED);
+        assert_eq!(closed.error_code.as_deref(), Some("automations.rule_not_active"));
+
+        let other = harness.rule(on_order(), json!(null), tag_action()).await;
+        let stale_other = harness.reload(other.id).await;
+        harness.service.owner_revoked(&harness.tenant, harness.owner.user_id()).await.unwrap();
+        let start = crate::runner::Start {
+            trigger_key: "manual:stale".to_owned(),
+            event: None,
+            context: json!({}),
+            depth: 1,
+            triggered_by: None,
+            skip: None,
+        };
+        let created =
+            harness.service.start_run(&harness.tenant, &stale_other, start).await.unwrap();
+        assert!(created.is_none(), "luật đã tạm dừng không nhận lần chạy mới");
+    })
+    .await
+    .unwrap();
+}
+
 #[tokio::test]
 async fn vuot_so_lan_chay_tam_dung_luat() {
     TestDatabase::run(async |test| {

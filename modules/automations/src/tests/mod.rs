@@ -375,6 +375,22 @@ mod fixtures {
                             shop.counters.tagged.fetch_add(1, Ordering::SeqCst);
                             // Nhãn `pause-rules`: tạm dừng mọi luật của khách ngay giữa lần chạy (test kiểm runner
                             // xem lại trạng thái luật trước mỗi bước).
+                            // Nhãn `reenable-rules`: như có người tạm dừng rồi bật lại luật (phiên bản tăng, `run_as`
+                            // đổi) ngay giữa lần chạy.
+                            if input.tag == "reenable-rules" {
+                                use crate::entity::rule::Column;
+                                use autoxide_kernel::tenancy::ScopeExt as _;
+                                use sea_orm::{
+                                    EntityTrait as _,
+                                    sea_query::{Expr, ExprTrait as _},
+                                };
+                                crate::entity::rule::Entity::update_many()
+                                    .col_expr(Column::Version, Expr::col(Column::Version).add(1))
+                                    .col_expr(Column::RunAs, Expr::value(uuid::Uuid::from_u128(9)))
+                                    .scoped(&tenant)
+                                    .exec(tenant.database().write())
+                                    .await?;
+                            }
                             if input.tag == "pause-rules" {
                                 use autoxide_kernel::tenancy::ScopeExt as _;
                                 use sea_orm::{EntityTrait as _, sea_query::Expr};
