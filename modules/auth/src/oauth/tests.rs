@@ -69,6 +69,16 @@ async fn form(app: &TestApp, path: &str, pairs: &[(&str, &str)]) -> (StatusCode,
 
 /// Đăng ký động, `/authorize`, người dùng duyệt `permissions`: trả `client_id` và mã.
 async fn approved_code(app: &TestApp, session: &str, permissions: &[&str]) -> (String, String) {
+    approved_code_for(app, session, permissions, &format!("{PUBLIC}/mcp")).await
+}
+
+/// Như [`approved_code`], cho resource `resource`.
+async fn approved_code_for(
+    app: &TestApp,
+    session: &str,
+    permissions: &[&str],
+    resource: &str,
+) -> (String, String) {
     let registration = json!({"redirect_uris": [REDIRECT], "client_name": "Test client"});
     let (status, _, client) = call(app, "POST", "/oauth/register", None, Some(registration)).await;
     assert_eq!(status, StatusCode::CREATED, "{client}");
@@ -78,7 +88,7 @@ async fn approved_code(app: &TestApp, session: &str, permissions: &[&str]) -> (S
          &code_challenge_method=S256&state=xyz&resource={}",
         // Cổng loopback do client chọn lúc chạy: khớp bỏ qua cổng.
         encode("http://127.0.0.1:51234/cb"),
-        encode(&format!("{PUBLIC}/mcp")),
+        encode(resource),
     );
     let answer = app.get(&authorize).send().await.unwrap();
     assert_eq!(answer.status(), StatusCode::FOUND);
@@ -92,7 +102,7 @@ async fn approved_code(app: &TestApp, session: &str, permissions: &[&str]) -> (S
     assert_eq!(request["data"]["client_name"], "Test client");
     assert_eq!(request["data"]["redirect_host"], "127.0.0.1");
     assert_eq!(request["data"]["localhost_redirect"], true);
-    assert_eq!(request["data"]["resource"], format!("{PUBLIC}/mcp"));
+    assert_eq!(request["data"]["resource"], resource);
     let decision = json!({"permissions": permissions});
     let (status, _, approved) = call(
         app,
@@ -121,6 +131,16 @@ async fn exchange(
     code: &str,
     verifier: &str,
 ) -> (StatusCode, Value) {
+    exchange_for(app, client_id, code, verifier, &format!("{PUBLIC}/mcp")).await
+}
+
+async fn exchange_for(
+    app: &TestApp,
+    client_id: &str,
+    code: &str,
+    verifier: &str,
+    resource: &str,
+) -> (StatusCode, Value) {
     form(
         app,
         "/oauth/token",
@@ -130,7 +150,7 @@ async fn exchange(
             ("code_verifier", verifier),
             ("client_id", client_id),
             ("redirect_uri", "http://127.0.0.1:51234/cb"),
-            ("resource", &format!("{PUBLIC}/mcp")),
+            ("resource", resource),
         ],
     )
     .await
@@ -463,6 +483,53 @@ async fn client_nhan_dien_bang_tai_lieu_metadata() {
         .await;
         assert_eq!(status, StatusCode::OK, "{tokens}");
         server.abort();
+    })
+    .await
+    .unwrap();
+}
+
+/// Token OAuth thật (cấp cho REST) không quản lý được API key hay passkey của người dùng: không thấy key nào, thu hồi
+/// thì 404, xoay thì 403, passkey cần phiên đăng nhập (#572, D-20261126-mcp-oauth).
+#[tokio::test]
+async fn token_oauth_that_khong_quan_ly_duoc_api_key_va_passkey() {
+    TestDatabase::run(async |test| {
+        let (app, session) = oauth_app(test).await;
+        let body =
+            json!({"name": "robot", "current_password": PASSWORD, "permissions": ["notes.write"]});
+        let (status, _, created) =
+            call(&app, "POST", "/api-keys", Some(&session), Some(body)).await;
+        assert_eq!(status, StatusCode::CREATED, "{created}");
+        let key_id = created["data"]["id"].as_str().unwrap().to_owned();
+
+        let rest = format!("{PUBLIC}/api/v1");
+        let (client_id, code) = approved_code_for(&app, &session, &["notes.write"], &rest).await;
+        let (status, tokens) = exchange_for(&app, &client_id, &code, VERIFIER, &rest).await;
+        assert_eq!(status, StatusCode::OK, "{tokens}");
+        let oauth = format!("Bearer {}", tokens["access_token"].as_str().unwrap());
+
+        let (status, _, listed) = call(&app, "GET", "/api-keys", Some(&oauth), None).await;
+        assert_eq!(status, StatusCode::OK, "{listed}");
+        assert_eq!(listed["data"], json!([]));
+        let (status, _, _) =
+            call(&app, "DELETE", &format!("/api-keys/{key_id}"), Some(&oauth), None).await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        let rotate = json!({"current_password": PASSWORD});
+        let (status, _, problem) =
+            call(&app, "POST", &format!("/api-keys/{key_id}/rotate"), Some(&oauth), Some(rotate))
+                .await;
+        assert_eq!(
+            (status, problem["code"].as_str()),
+            (StatusCode::FORBIDDEN, Some("auth.api_key_cannot_create_keys")),
+            "{problem}"
+        );
+        let (status, _, problem) = call(&app, "GET", "/me/passkeys", Some(&oauth), None).await;
+        assert_eq!(
+            (status, problem["code"].as_str()),
+            (StatusCode::FORBIDDEN, Some("auth.session_required"))
+        );
+        // Key vẫn còn với chủ của nó.
+        let (_, _, mine) = call(&app, "GET", "/api-keys", Some(&session), None).await;
+        assert_eq!(mine["data"].as_array().unwrap().len(), 1);
     })
     .await
     .unwrap();
