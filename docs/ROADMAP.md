@@ -5,7 +5,8 @@ và Postgres**) bắt buộc xanh trước mỗi lần phát hành (D-300). Chi 
 thư viện: [`STACK.md`](../STACK.md). Cách làm từng bước: [`docs/steps/`](steps/README.md).
 
 Trạng thái: **bước 0–38 và 40 xong** — đã chuyển sang [`docs/roadmap/done.md`](roadmap/done.md) (D-228);
-**kế tiếp bước 70** (core cho cộng đồng, D-20261121-community-first); bước 50 chờ chủ dự án công khai repo (D-199); bản
+**kế tiếp bước 71** (đường tới 1.0, D-20261126-road-to-1-0) cùng phần còn mở của bước 70; đóng băng tính năng mới tới
+1.0; bước 50 chờ chủ dự án công khai repo (D-199); bản
 phát hành mới nhất `v0.19.0`. CI trên GitHub (`.github/workflows/ci.yml`) chạy gate đầy đủ trên mỗi pull request và mỗi lần push lên `main` (D-175, D-197); `./gate.sh` trên máy vẫn là định nghĩa "xong".
 
 **Số bước là mã cố định, không phải thứ tự** (D-228): bước mang số lớn vẫn có thể làm trước. Các bước dưới đây
@@ -13,6 +14,11 @@ xếp theo **thứ tự làm**; bước kế tiếp là bước đầu tiên (t�
 thuộc đã xong. **Bước ghi "tạm dừng tới sau 1.0" không bao giờ là bước kế tiếp** (D-20261121-community-first).
 
 ## Thứ tự làm (D-228, D-20261121-community-first)
+
+**Từ ngày 26/11/2026 (chủ dự án quyết, D-20261126-road-to-1-0):** bước 71 (đường tới 1.0) và các mục còn mở của bước
+70 (P4, P5, P6, P9, P16, P17) làm trước mọi bước khác; không mở tính năng nghiệp vụ mới tới 1.0. Các mục còn mở của 54
+và 52 cũng làm trước 1.0, sau bước 71 G1–G2 (D-20261126-steps-52-54-before-1-0). Điều kiện ra 1.0 ghi ở đầu bước 71. Đoạn "Từ ngày 21/11/2026" dưới đây giữ để tra lịch sử; thứ tự
+1–5 của nó đã được thay.
 
 **Từ ngày 21/11/2026:** bước 70 (P1–P3) làm trước mọi bước còn mở. Sau đó xếp theo kịch bản "một cửa hàng bán online
 chạy thật" (D-20261121-shop-first-order):
@@ -79,6 +85,197 @@ bảng phụ thuộc ngay dưới cho biết bước nào chạy song song đư�
 | 69 Nền cho ứng dụng đa nền tảng (D-20261119-step69-multiplatform) | SDK, hướng dẫn: ngay; ngoại tuyến: 33–34; WebSocket: 40; mua trong ứng dụng: 35, 36 (đều đã xong) | 41–49, 61 |
 
 Bước lớn nhất là 33 (sửa mọi bảng của mọi module): một người làm, không chia song song.
+
+## Giai đoạn G — Đường tới 1.0 (làm trước, chủ dự án quyết ngày 26/11/2026, D-20261126-road-to-1-0)
+
+## 71. Đường tới 1.0: chuẩn tương lai, chuẩn AI agent, nâng cấp một nút, mọi trình độ dùng được, chuẩn cộng đồng, sẵn sàng phát hành
+
+Nguồn: rà soát core ngày 26/11/2026 (bảy hướng). Mọi mục làm trước khi phát hành 1.0, chọn hướng dài hạn (không làm đối
+phó); mục lớn có quyết định thiết kế (skill `record-decision`) trước khi viết code. Mục chạm kernel, bảo mật, tiền, thuế
+qua kiểm độc lập (D-20261126-independent-review).
+
+**Điều kiện ra 1.0:** mọi mục `[ ]` dưới đây, P4, P6, P9, P16, P17 của bước 70 và các mục còn mở của 54, 52 xong; gate đầy đủ xanh trên SQLite và
+Postgres; kiểm thử bảo mật bên ngoài không còn lỗi mức cao trở lên; luật sư đã rà phần dữ liệu cá nhân, hoá đơn, thuế; các
+chỉ số của G9 đạt ngưỡng.
+
+### G1 — Phạm vi và hợp đồng 1.0
+
+- [ ] Hai hạng hợp đồng: kernel tách lõi ổn định khỏi phần thử nghiệm (hoá đơn điện tử, ZNS, thoại, khối trang, phân tích,
+      `bench_seed`… sau feature hay mô-đun `unstable`); module gắn nhãn hạng; `docs/COMPATIBILITY.md` (EN + VI) nói rõ hạng
+      nào được cam kết gì
+- [ ] Hợp đồng `Module` một cách làm cho mỗi việc: gom 49 hàm của trait và ~50 hàm đăng ký của `StartContext` thành một
+      cách khai báo (manifest hay trait con theo nhóm), mỗi khái niệm một đường đăng ký; giữ đường cũ `#[deprecated]` tới khi
+      mọi module đã chuyển; gỡ `TenantContext::legacy_default`
+- [ ] `#[non_exhaustive]` cho enum và struct công khai sẽ còn lớn thêm (kernel, testkit, `api` của module); mọi `#[deprecated]`
+      viết tiếng Anh, nêu cái thay thế
+- [ ] Tách kernel thành các crate theo trách nhiệm để đổi một phần không biên dịch lại tất cả; file trên 880 dòng tách theo
+      trách nhiệm (phần đa khách ~21.700 dòng)
+- [ ] Cách ly khách khi chạy, không chỉ lint đọc mã nguồn: lớp kết nối gắn khách (hay row-level security tuỳ chọn trên
+      Postgres) chặn truy vấn thiếu `tenant_id`; khách của request chưa xác thực không lấy từ gợi ý chưa kiểm cho việc
+      tính hạn mức
+- [ ] Hợp nhất hai hệ cài đặt theo khách (cài đặt khách của kernel và cài đặt theo cây của `organizations`): một hệ, kiểm
+      chéo lúc lưu, có cache
+
+### G2 — Không để thư viện níu chân (D-20261126-library-isolation)
+
+- [ ] Sửa `docs/COMPATIBILITY.md`, `docs/MODULE_GUIDE.md` (EN + VI) theo quyết định: bỏ "thư viện đổi bản lớn thì
+      Autoxide đổi bản lớn"
+- [ ] Quyết định thiết kế lớp của kernel cho: truy vấn và entity, route và schema API, kiểm đầu vào, migration; nêu kiểu nào
+      bọc, kiểu nào để thư viện, đường chuyển
+- [ ] Làm lớp của kernel; chữ ký công khai hạng ổn định của kernel và testkit không còn kiểu của SeaORM, sea-query, axum,
+      utoipa (gate kiểm)
+- [ ] Chuyển 39 module sang lớp của kernel theo cụm; `cargo xtask check` và `check-module` chặn phụ thuộc trực tiếp vào
+      thư viện đã có lớp
+- [ ] Nhịp và công cụ nâng thư viện: `cargo xtask upgrade` hỗ trợ bản lớn (chạy thử, báo chỗ vỡ), giảm crate trùng phiên
+      bản trong `Cargo.lock`, theo dõi hai cảnh báo RUSTSEC đang bỏ qua của `webauthn_rp`
+
+### G3 — Nâng cấp một nút
+
+- [ ] Ngay: `compose.yml`, manifest Kubernetes và `AUTOXIDE_MIGRATE_ON_START` nâng cả database riêng của khách
+      (`--all`); `up_all` thử mọi nơi đặt dữ liệu, lỗi một khách vẫn làm tiếp, báo lỗi từng khách
+- [ ] `autoxide upgrade`: kiểm tương thích theo bảng phiên bản ghi trong binary (nâng từ bản nào được, bước tay bắt buộc),
+      tự sao lưu mọi nơi đặt dữ liệu và kho file (hay từ chối nếu không có `--no-backup`), migrate database chính rồi mọi
+      khách song song kèm báo cáo JSON tiếp tục được, chạy `doctor` kiểm lại, ghi kế hoạch quay về; `doctor` báo có bản mới;
+      compose và Kubernetes dùng lệnh này làm một bước duy nhất
+- [ ] `autoxide rollback --to X.Y.Z`: ghi phiên bản binary cạnh mỗi migration đã chạy; lùi theo bản phát hành qua mọi
+      module và mọi khách đúng thứ tự phụ thuộc; CI kiểm binary cũ chạy lại được sau khi lùi
+- [ ] Ma trận test nâng cấp trong CI: từ bản trước và từ bản cũ nhất còn hỗ trợ, nhiều khách có database riêng, bản cũ và
+      bản mới chạy song song sau migration mở rộng, lùi về bản trước
+- [ ] Luật an toàn migration: `cargo xtask check` cảnh báo xoá cột / bảng, đổi tên, thêm cột NOT NULL không mặc định trong
+      migration mới trừ khi ghi rõ là bước thu hẹp của mở rộng–thu hẹp
+- [ ] Ghi chú nâng cấp hạng nhất: mục changelog "cần làm khi nâng cấp", báo cáo semver nêu đúng item và cách sửa, hướng dẫn
+      chuyển cho người viết module mỗi bản, `Setting::renamed_from` (tên cũ vẫn đọc được, có cảnh báo) như
+      `docs/COMPATIBILITY.md` đã hứa
+
+### G4 — Chuẩn AI agent
+
+- [ ] Đăng nhập chuẩn cho MCP theo đặc tả mới nhất: máy chủ uỷ quyền OAuth 2.1 tích hợp (PKCE, Client ID Metadata
+      Documents / đăng ký động), Protected Resource Metadata (RFC 9728) và `WWW-Authenticate` có `resource_metadata`,
+      `/.well-known/*`; Claude, ChatGPT và các client MCP khác kết nối được không cần dán khoá
+- [ ] Uỷ quyền cho agent: thông tin đăng nhập gắn với một người, phạm vi hẹp, có hạn, thu hồi được (token exchange RFC 8693
+      hay tương đương); hạn mức và ngân sách theo từng agent; nhật ký hành động của agent ghi rõ agent nào làm thay ai
+- [ ] Người duyệt: rà mọi lệnh xoá, lệnh chạm tiền và lệnh không hoàn tác được để gắn `x-approval` khi agent gọi
+- [ ] Chống chèn lệnh qua dữ liệu (prompt injection): kết quả tool và API đánh dấu phần nội dung do người dùng cuối nhập là
+      chưa tin cậy; hướng dẫn cho người viết agent
+- [ ] Hợp đồng tool MCP đủ: `outputSchema` khớp `structuredContent`, `title`, `idempotentHint`, `openWorldHint`; phân
+      trang `tools/list`; báo tiến độ, huỷ, việc chạy lâu (xuất dữ liệu, dời khách, nhập dữ liệu); hỏi lại người dùng
+      (elicitation) khi thiếu thông tin
+- [ ] Cho máy tự khám phá: `llms-full.txt`, `/.well-known` cho OpenAPI và MCP, mô tả quy trình nhiều bước bằng Arazzo; lỗi
+      `Problem` có `type` là URI ổn định cho mỗi mã và gợi ý sửa; khoá chống gọi trùng bắt buộc trên mọi lệnh ghi
+- [ ] Giao tiếp giữa agent (A2A): đánh giá đặc tả, thêm agent card nếu đặc tả đã ổn định; ghi quyết định
+- [ ] Bộ test bằng agent thật: 10–20 việc mẫu làm qua MCP và REST với mô hình cố định, chạy hằng đêm, đo tỉ lệ xong và chi
+      phí; dùng để chấm chất lượng mô tả tool
+- [ ] SDK Python sinh từ OpenAPI, có ví dụ và kiểm trong CI như SDK TypeScript
+
+### G5 — Mở rộng không cần Rust
+
+- [ ] Quyết định thiết kế plugin WebAssembly (WASI component model, giao diện WIT, quyền và hạn mức tài nguyên, cách ly
+      khách, chạy trên cả hai database, nâng cấp plugin độc lập với core)
+- [ ] Máy chạy plugin trong kernel cùng bộ công cụ viết plugin, ví dụ bằng Rust, TypeScript, Python, Go; test trong CI
+- [ ] Đường không viết code: quy tắc tự động (`automations`) thành tính năng chính thức, trường tuỳ biến dùng chung trong
+      core, công thức nhận webhook "nếu A thì làm B"
+
+### G6 — Mọi trình độ dùng được (người mới, người code bằng AI)
+
+- [ ] `autoxide demo` và một dòng `docker run`: có dữ liệu mẫu, in mật khẩu quản trị ra màn hình, bật trang xem API
+- [ ] Binary dựng sẵn cho Linux, macOS, Windows; cấu hình `.devcontainer` / Codespaces
+- [ ] `new-module --minimal` và hướng dẫn "module đầu tiên" dưới 50 dòng, thêm từng phần sau; sổ công thức (thêm trường,
+      thêm danh sách, thêm quyền, thêm việc nền, thêm tool MCP)
+- [ ] Công cụ dòng lệnh độc lập (`autoxide new`, `autoxide check`, cài bằng `cargo install`): tạo và kiểm module không cần
+      tải mã nguồn core
+- [ ] Rào chắn cho AI: `AGENTS.md` tiếng Anh, luật cho Cursor / Copilot ở gốc repo và trong module sinh ra, skill đi kèm;
+      hướng dẫn xử lý các lỗi biên dịch thường gặp
+- [ ] Mỗi vi phạm của `xtask check` / `check-module` có một dòng "cách sửa"; lệnh kiểm môi trường cài đặt cho người phát
+      triển
+
+### G7 — Chuẩn giao thức còn thiếu
+
+- [ ] Header `RateLimit` / `RateLimit-Policy` (bản nháp IETF mới nhất) và 429 kèm `Retry-After` khai trong OpenAPI cho mọi
+      thao tác
+- [ ] ETag: khác nhau khi nén khác nhau (hay dùng ETag yếu); `If-Match` nhận danh sách
+- [ ] OpenAPI: bản mới nhất mà bộ sinh hỗ trợ (3.2), `info.license`, `webhooks` cho payload gửi đi, `components.responses`,
+      cách xác thực API key riêng
+- [ ] OpenTelemetry: tên thuộc tính theo semantic conventions, truyền `traceparent` khi gọi ra ngoài và qua job / event,
+      xuất metrics và log qua OTLP
+- [ ] Mật khẩu: chặn mật khẩu đã lộ theo NIST SP 800-63B-4; HSTS bật mặc định ở môi trường production
+- [ ] Image: nền distroless hay tĩnh, kiểm sức khoẻ bằng chính binary (`HEALTHCHECK`, healthcheck trong compose)
+
+### G8 — Chuẩn cộng đồng mã nguồn mở
+
+- [ ] CodeQL, OpenSSF Scorecard, huy hiệu OpenSSF Best Practices
+- [ ] Chính sách đóng góp do AI viết, DCO, `SUPPORT.md`, `GOVERNANCE.md` / người duy trì, `CODEOWNERS`, liên kết hỏi đáp
+      trong mẫu issue, nhãn good-first-issue
+- [ ] SBOM liệt kê crate Rust (`cargo auditable` / CycloneDX), build tái lập, CI dựng bằng MSRV, chính sách MSRV và bảng
+      feature trong `docs/COMPATIBILITY.md`
+- [ ] Bản tiếng Anh cho người ngoài: lộ trình công khai, đường đề xuất thay đổi (RFC), tóm tắt luật đóng góp
+- [ ] Hệ sinh thái module: quy ước tên và topic, danh sách module cộng đồng, manifest module, bảng tương thích phiên bản,
+      chính sách dùng tên Autoxide
+- [ ] Đầu SPDX / REUSE; fuzz (`cargo-fuzz`) cho bộ phân tích dữ liệu đầu vào không tin cậy
+
+### G9 — Chất lượng thành quy trình và đo bằng con số
+
+- [x] Kiểm độc lập bắt buộc theo D-20261126-independent-review (mẫu pull request có mục kết quả kiểm)
+- [ ] Mutation testing (`cargo-mutants`) cho kernel và phần tiền / thuế, chạy định kỳ
+- [ ] Bất biến tiền, thuế, quyền thành property test chạy hằng đêm
+- [ ] Đo tải trong CI hằng tuần trên cả hai database, chặn khi p95 của đường nóng tệ đi; vài benchmark vi mô cho đường
+      nóng của kernel
+- [ ] Chỉ số đo mỗi bản phát hành, ngưỡng cho 1.0: tải về tới request đầu tiên dưới 5 phút; người mới xong module đầu
+      tiên dưới 30 phút; nâng cấp trong CI 100% thành công kể cả nhiều khách; agent thật làm xong việc mẫu trên 90%; p95
+      đường nóng không tệ đi giữa hai bản
+
+### G10 — Giảm tải cho agent phát triển
+
+- [ ] Rút `CLAUDE.md` còn khoảng một phần ba (giữ luật và chỉ dẫn, quy trình chuyển sang skill); chuyển mục đã xong của
+      lộ trình sang `docs/roadmap/done.md`
+
+### G11 — Ứng dụng tham chiếu
+
+- [ ] Dựng một cửa hàng nhỏ ở repo riêng như người ngoài (module viết ngoài repo, giao diện đơn giản), ghi mọi chỗ vướng
+      thành việc của core — **chờ chủ dự án tạo repo**
+
+### G12 — Con người bên ngoài (chủ dự án lo)
+
+- [ ] Luật sư rà phần dữ liệu cá nhân (Luật 91/2025/QH15, Nghị định 356/2025/NĐ-CP — cần đối chiếu văn bản gốc), hoá
+      đơn điện tử, thuế
+- [ ] Đợt kiểm thử bảo mật bên ngoài trước 1.0; sau 1.0 cân nhắc chương trình thưởng báo lỗi bảo mật
+
+### G13 — Phát hành 1.0 (chủ dự án duyệt ngày 26/11/2026, D-20261126-release-1-0-readiness)
+
+- [ ] Đánh phiên bản mọi hợp đồng, không chỉ REST: tên và payload event giữa module, payload webhook gửi đi, tên và schema
+      tool MCP, schema `x-*` của OpenAPI; quy tắc thêm / đổi / bỏ, cách khai bản cũ sắp bỏ, test giữ hợp đồng (như api-diff)
+- [ ] Thời gian chạy thử trước 1.0: phát hành `1.0.0-rc.N` cho người ngoài dùng 2–4 tuần, kênh nhận phản hồi, tiêu chí
+      chốt (không còn lỗi hợp đồng mở); chỉ sửa lỗi trong thời gian này
+- [ ] Chính sách hỗ trợ dài hạn: bản 1.x nhận vá bảo mật bao lâu, bản lớn trước còn được hỗ trợ bao lâu khi bản lớn mới ra,
+      quy trình vá ngược; ghi vào `docs/COMPATIBILITY.md` và `SECURITY.md` (EN + VI)
+- [ ] Trang tài liệu có phiên bản: website tài liệu chính thức (hướng dẫn, tham chiếu API sinh từ OpenAPI, MCP, docs.rs),
+      có tìm kiếm, mỗi bản phát hành một bộ tài liệu, EN + VI, tự dựng khi phát hành
+- [ ] Chạy nhiều máy chủ cùng lúc: test trong CI 2–3 máy chủ song song không giao trùng việc nền / event, không mất lock
+      migration; tài liệu sức chứa (SQLite chịu tới đâu, khi nào chuyển Postgres, số khách mỗi máy chủ, cấu hình đề xuất)
+- [ ] Mô hình mối đe doạ của core (`docs/THREAT_MODEL.md`, EN + VI) làm đầu vào cho đợt kiểm thử bên ngoài; mã hoá ở mức
+      trường cho dữ liệu cá nhân nhạy cảm (khoá quản lý được, xoay khoá); nhật ký kiểm toán khó sửa lén (chuỗi băm hay tương
+      đương)
+- [ ] Mục tiêu khôi phục sau sự cố: RPO / RTO ghi rõ cho từng cách triển khai; diễn tập khôi phục trong CI cả trường hợp
+      nhiều khách có database riêng và kho file
+- [ ] Rà giấy phép thư viện: `cargo deny` chặn giấy phép không hợp MIT/Apache; danh sách giấy phép của bên thứ ba đi kèm
+      mỗi bản phát hành (binary, image, SDK)
+
+### G14 — Vận hành và cam kết nền (chủ dự án duyệt ngày 26/11/2026, D-20261126-operations-baseline)
+
+- [ ] Cam kết nền tảng: chính sách bản Postgres (các bản lớn còn được hãng hỗ trợ), bản SQLite tối thiểu, hệ điều hành và
+      kiến trúc CPU cho binary và image; CI chạy ma trận các bản Postgres được hỗ trợ (ít nhất bản cũ nhất và mới nhất); ghi
+      vào `docs/COMPATIBILITY.md` (EN + VI); `doctor` cảnh báo khi chạy trên bản ngoài danh sách
+- [ ] Bộ đồ nghề vận hành: sổ tay xử lý sự cố `docs/RUNBOOK.md` (EN + VI) cho các tình huống thường gặp (database đầy hay
+      chậm, hàng đợi việc nền ứ, xoay khoá ký và khoá mã hoá khi lộ, thu hồi hàng loạt API key / phiên, khôi phục một khách
+      từ sao lưu, khách báo mất dữ liệu); mẫu bảng theo dõi và luật cảnh báo dựng sẵn từ số đo OTLP / Prometheus của core;
+      quy trình ứng phó lỗ hổng bảo mật (nhận báo, đánh giá, vá, công bố, xin mã CVE) ghi ở `SECURITY.md`
+- [ ] Thử hỏng có chủ đích trong CI trên cả hai database: mất kết nối database giữa transaction, đầy ổ đĩa, Postgres
+      chuyển máy dự phòng / khởi động lại, tiến trình bị giết giữa việc nền, migration và sao lưu; hệ thống tự hồi phục,
+      không mất hay nhân đôi event / job, không hỏng dữ liệu; kết quả ghi vào tài liệu sức chứa
+- [ ] Mở rộng danh sách hợp đồng được cam kết (bổ sung G13): tên lệnh, tham số và mã thoát của CLI `autoxide`; định dạng
+      file sao lưu và file xuất dữ liệu (bản 1.x đọc được file do mọi bản 1.y trước đó tạo, có số phiên bản định dạng trong
+      file); test giữ hợp đồng như api-diff
+- [ ] Đường chuyển từ 0.x lên 1.0 cho người viết module: hướng dẫn từng bước (EN + VI) và công cụ tự sửa code cũ sang hợp
+      đồng mới (dùng chính nó để chuyển module trong repo); chạy thử trên `examples/external-module`
 
 ## Giai đoạn A — Hợp đồng và nền lõi
 
@@ -422,7 +619,7 @@ chính làm trước bước 33 theo lệnh của chủ dự án; phần theo kh
 - [ ] Gỡ menu cũ của `content` khi qua 2027-05-14: bốn endpoint, trait `LegacyMenus`, bảng `content_menus` và
       `content_menu_items` (migration mới), mục menu trong `docs/CONTENT.md`
 
-## 54. Phân quyền chuẩn hàng đầu (chủ dự án giao ngày 13/11/2026, D-205)
+## 54. Phân quyền chuẩn hàng đầu (chủ dự án giao ngày 13/11/2026, D-205) — làm trước 1.0 (D-20261126-steps-52-54-before-1-0)
 
 Đặc tả: [`docs/steps/54-authorization.md`](steps/54-authorization.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
 
@@ -456,7 +653,7 @@ Google Zanzibar, AWS IAM, GitHub, Microsoft Entra, Salesforce, Shopify, Stripe v
 - [ ] "Xem như" người dùng chỉ đọc thay cho đăng nhập thay (D-232): người mua phải cấp phép, không xem người
       quyền cao hơn, mọi lệnh ghi bị chặn kể cả qua MCP, không trả secret, audit hai id
 
-## 52. Trải nghiệm quản trị nâng cao (D-201)
+## 52. Trải nghiệm quản trị nâng cao (D-201) — làm trước 1.0 (D-20261126-steps-52-54-before-1-0)
 
 Đặc tả: [`docs/steps/52-admin-experience.md`](steps/52-admin-experience.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
 
