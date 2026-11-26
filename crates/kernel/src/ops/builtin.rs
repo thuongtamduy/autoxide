@@ -316,6 +316,8 @@ impl Module for KernelModule {
             Box::new(crate::tenancy::migration_runs::AddMigrationRunActiveKey),
             // Nhiều khách cùng chờ một tên miền, ai xác minh trước được (P-4, D-20261125-domain-claims).
             Box::new(crate::tenancy::domains::ShareClaims),
+            // Index cho danh sách "của tôi" có phân trang: ghim, view đã lưu (bước 70 P9).
+            Box::new(crate::ops::list_indexes::AddListIndexes),
         ]
     }
 

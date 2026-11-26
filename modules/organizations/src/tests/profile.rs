@@ -185,3 +185,84 @@ async fn website_cua_ten_mien_la_cua_hang_duoc_gan() {
     .await
     .unwrap();
 }
+
+/// `GET /public/stores` theo trang (bước 70 P9): theo vị trí, cùng vị trí theo ID nút; nút tạm khoá không vào
+/// (lọc trong cùng câu, trang không hụt); theo `next_cursor` tới hết không trùng không sót, hai chiều; mỗi trang
+/// một `ETag`.
+#[tokio::test]
+async fn cua_hang_cong_khai_phan_trang_theo_vi_tri() {
+    TestDatabase::run(async |test| {
+        let app = app(test).await;
+        let (status, _) = send(
+            &app,
+            "POST",
+            "/unit-types",
+            "admin",
+            Some(json!({"code": "store", "name": "Store"})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::CREATED);
+        let root = root_of(app.tenant("a").await.unwrap().id()).as_uuid();
+        let mut stores = Vec::new();
+        for (name, position) in [("S1", 2), ("S2", 1), ("S3", 1), ("S4", 3), ("S5", 0)] {
+            let unit = json!({"parent_id": root, "unit_type": "store", "name": name});
+            let (status, created) = send(&app, "POST", "/units", "admin", Some(unit)).await;
+            assert_eq!(status, StatusCode::CREATED, "{created}");
+            let id = created["data"]["id"].as_str().unwrap().to_owned();
+            let body = json!({"public": true, "position": position});
+            let (status, saved) =
+                send(&app, "PATCH", &format!("/units/{id}/public-profile"), "admin", Some(body))
+                    .await;
+            assert_eq!(status, StatusCode::OK, "{saved}");
+            stores.push((position, id));
+        }
+        // S5 tạm khoá: không còn trên website.
+        let suspended = stores.pop().unwrap().1;
+        let body = json!({"status": "suspended", "reason": "Closed for repairs"});
+        let (status, _) =
+            send(&app, "POST", &format!("/units/{suspended}/status"), "admin", Some(body)).await;
+        assert_eq!(status, StatusCode::OK);
+        stores.sort();
+        let expected: Vec<String> = stores.into_iter().map(|(_, id)| id).collect();
+
+        let walk = async |query: &str| {
+            let mut ids = Vec::new();
+            let mut etags = Vec::new();
+            let mut uri = format!("/api/v1/organizations/public/stores?limit=1{query}");
+            loop {
+                let answer = app.get(&uri).header("autoxide-tenant", "a").send().await.unwrap();
+                assert_eq!(answer.status(), StatusCode::OK);
+                etags.push(answer.header("etag").to_owned());
+                let page = answer.json();
+                let rows = page["data"].as_array().unwrap();
+                assert_eq!(rows.len(), 1, "{page}");
+                ids.push(rows[0]["unit_id"].as_str().unwrap().to_owned());
+                match page["pagination"]["next_cursor"].as_str() {
+                    Some(cursor) => {
+                        uri = format!(
+                            "/api/v1/organizations/public/stores?limit=1{query}&cursor={cursor}"
+                        )
+                    }
+                    None => return (ids, etags),
+                }
+            }
+        };
+        let (up, etags) = walk("").await;
+        assert_eq!(up, expected);
+        let mut distinct = etags.clone();
+        distinct.sort();
+        distinct.dedup();
+        assert_eq!(distinct.len(), etags.len(), "one ETag per page");
+        let (down, _) = walk("&order=desc").await;
+        assert_eq!(down, expected.iter().rev().cloned().collect::<Vec<_>>());
+        let other = app
+            .get("/api/v1/organizations/public/stores")
+            .header("autoxide-tenant", "b")
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(other.json()["data"], json!([]));
+    })
+    .await
+    .unwrap();
+}

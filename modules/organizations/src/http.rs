@@ -7,7 +7,7 @@ use std::sync::Arc;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
-use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
+use autoxide_kernel::pagination::{NaturalOrderPageQuery, Page, PageQuery, PageRequest, page_of};
 use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, Tagged};
@@ -367,19 +367,21 @@ async fn update_unit(
 
 /// List the units above an organization unit.
 ///
-/// Requires `organizations.units.read` covering the unit. Nearest first, ending with the root.
+/// Requires `organizations.units.read` covering the unit. Nearest first, ending with the root
+/// (`order=desc`: from the root down); paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/units/{id}/ancestors",
     extensions(("x-permissions" = json!(["organizations.units.read"]))),
     operation_id = "list_unit_ancestors",
     security(("bearer" = [])),
-    params(("id" = Uuid, Path, description = "Id of the unit.")),
+    params(("id" = Uuid, Path, description = "Id of the unit."), NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "The units above, nearest first; empty for the root.", body = Data<Vec<UnitResponse>>),
+        (status = 200, description = "One page of the units above, nearest first; empty for the root.", body = Page<UnitResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `organizations.units.read`; code `permission_denied`.", body = Problem),
         (status = 404, description = "No such unit in your scope; code `organizations.unit_not_found`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_ancestors(
@@ -387,10 +389,16 @@ async fn list_ancestors(
     tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
-) -> Result<Data<Vec<UnitResponse>>, Error> {
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<UnitResponse>, Error> {
     principal.require(&UNITS_READ)?;
+    let page = PageRequest::try_from(page)?;
     let rows = service.ancestors(&tenant, &principal, id).await?;
-    Ok(Data { data: rows.into_iter().map(UnitResponse::from).collect() })
+    // Chuỗi tổ tiên có trần theo độ sâu của cây (không lớn dần theo dữ liệu) và thứ tự là khoảng cách
+    // tới nút, không phải cột nào: phân trang trong bộ nhớ, khoá là khoảng cách (D-20261125-list-pages mục 4).
+    let rows: Vec<(String, UnitRow)> =
+        rows.into_iter().enumerate().map(|(step, row)| (format!("{step:05}"), row)).collect();
+    Ok(page_of(rows, |(step, _)| step.clone(), &page)?.map(|(_, row)| UnitResponse::from(row)))
 }
 
 /// Move an organization unit, with everything below it, under another parent.
@@ -461,27 +469,32 @@ async fn change_unit_status(
 
 /// List the unit types of the tenant.
 ///
-/// Requires `organizations.units.read`. Sorted by code; a small fixed set, so not paged.
+/// Requires `organizations.units.read`. By code (in the database's text order) unless
+/// `order=desc`; paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/unit-types",
     extensions(("x-permissions" = json!(["organizations.units.read"]))),
     operation_id = "list_unit_types",
     security(("bearer" = [])),
+    params(NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "Every unit type of the tenant.", body = Data<Vec<UnitTypeResponse>>),
+        (status = 200, description = "One page of the unit types of the tenant, by code.", body = Page<UnitTypeResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `organizations.units.read`; code `permission_denied`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_unit_types(
     State(service): State<Arc<OrgService>>,
     tenant: TenantContext,
     principal: Principal,
-) -> Result<Data<Vec<UnitTypeResponse>>, Error> {
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<UnitTypeResponse>, Error> {
     principal.require(&UNITS_READ)?;
-    let rows = service.list_types(&tenant, &principal).await?;
-    Ok(Data { data: rows.into_iter().map(UnitTypeResponse::from).collect() })
+    let page = PageRequest::try_from(page)?;
+    let rows = service.list_types(&tenant, &principal, &page).await?;
+    Ok(rows.map(UnitTypeResponse::from))
 }
 
 /// Create a unit type.
@@ -629,23 +642,28 @@ pub(crate) struct SettingValueRequest {
 /// List the settings units can set.
 ///
 /// Any signed-in user. Modules declare them; each unit inherits the value of the nearest unit
-/// above that sets it, or the default.
+/// above that sets it, or the default. By key unless `order=desc`; paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/settings",
     extensions(("x-permissions" = json!([]))),
     operation_id = "list_org_settings",
     security(("bearer" = [])),
+    params(NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "Every setting, sorted by key.", body = Data<Vec<SettingResponse>>),
+        (status = 200, description = "One page of the settings, by key.", body = Page<SettingResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_settings(
     State(service): State<Arc<OrgService>>,
     _principal: Principal,
-) -> Result<Data<Vec<SettingResponse>>, Error> {
-    let data = service
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<SettingResponse>, Error> {
+    let page = PageRequest::try_from(page)?;
+    // Sổ cài đặt do module khai trong code: phân trang trong bộ nhớ theo khoá (D-20261125-list-pages mục 4).
+    let data: Vec<SettingResponse> = service
         .catalog
         .iter()
         .map(|setting| SettingResponse {
@@ -655,25 +673,27 @@ async fn list_settings(
             schema: setting.schema(),
         })
         .collect();
-    Ok(Data { data })
+    page_of(data, |setting| setting.key.clone(), &page)
 }
 
 /// Get the settings in force at an organization unit.
 ///
 /// Requires `organizations.units.read` covering the unit. Each value says where it comes from:
-/// this unit, a unit above, or the default.
+/// this unit, a unit above, or the default. By key unless `order=desc`; paged with `limit` /
+/// `cursor`.
 #[utoipa::path(
     get,
     path = "/units/{id}/settings",
     extensions(("x-permissions" = json!(["organizations.units.read"]))),
     operation_id = "get_unit_settings",
     security(("bearer" = [])),
-    params(("id" = Uuid, Path, description = "Id of the unit.")),
+    params(("id" = Uuid, Path, description = "Id of the unit."), NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "Every setting at this unit, sorted by key.", body = Data<Vec<UnitSettingResponse>>),
+        (status = 200, description = "One page of the settings at this unit, by key.", body = Page<UnitSettingResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `organizations.units.read`; code `permission_denied`.", body = Problem),
         (status = 404, description = "No such unit in your scope; code `organizations.unit_not_found`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn get_unit_settings(
@@ -681,10 +701,25 @@ async fn get_unit_settings(
     tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
-) -> Result<Data<Vec<UnitSettingResponse>>, Error> {
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<UnitSettingResponse>, Error> {
     principal.require(&UNITS_READ)?;
-    let found = service.effective_settings(&tenant, &principal, id).await?;
-    Ok(Data { data: found.into_iter().map(UnitSettingResponse::from).collect() })
+    let page = PageRequest::try_from(page)?;
+    unit_settings_page(&service, &tenant, &principal, id, &page).await
+}
+
+/// Một trang cài đặt hiệu lực ở nút `id` (REST và tool `organizations.get_settings`). Không nằm trong
+/// database: mỗi cài đặt module khai (trong code) một dòng, giá trị gộp theo chuỗi tổ tiên — phân trang
+/// trong bộ nhớ theo khoá (D-20261125-list-pages mục 4).
+pub(crate) async fn unit_settings_page(
+    service: &OrgService,
+    tenant: &TenantContext,
+    principal: &Principal,
+    id: Uuid,
+    page: &PageRequest,
+) -> Result<Page<UnitSettingResponse>, Error> {
+    let found = service.effective_settings(tenant, principal, id).await?;
+    Ok(page_of(found, |setting| setting.key.clone(), page)?.map(UnitSettingResponse::from))
 }
 
 /// Set a setting of an organization unit.

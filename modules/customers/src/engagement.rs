@@ -78,6 +78,25 @@ fn variant_key(variant: Option<Uuid>) -> String {
 }
 
 impl CustomersService {
+    /// Một trang yêu thích của người mua, thêm gần nhất trước (theo ID: UUIDv7 cấp lúc thêm, cùng lúc với
+    /// `added_at`; dòng cũ được cấp theo thứ tự `added_at` ở migration `m0013`), keyset trong database
+    /// (index `customers_wishlist_items_page`).
+    pub(crate) async fn wishlist_page(
+        &self,
+        tenant: &TenantContext,
+        user: Uuid,
+        page: &PageRequest,
+    ) -> Result<Page<wishlist_item::Model>, Error> {
+        let profile = self.me(tenant, user).await?;
+        let select = wishlist_item::Entity::find()
+            .filter(wishlist_item::Column::ProfileId.eq(profile.id))
+            .scoped(tenant);
+        let read = tenant.database().read();
+        fetch_page(select, wishlist_item::Column::Id, |row| row.id, page, read).await
+    }
+
+    /// Cả danh sách sau khi thêm / gộp (trả về cho `POST`): có trần `wishlist_max` lúc ghi, đọc bằng
+    /// `ORDER BY` + `LIMIT` trong SQL.
     pub(crate) async fn wishlist(
         &self,
         tenant: &TenantContext,
@@ -87,7 +106,7 @@ impl CustomersService {
         Ok(wishlist_item::Entity::find()
             .filter(wishlist_item::Column::ProfileId.eq(profile.id))
             .scoped(tenant)
-            .order_by_desc(wishlist_item::Column::AddedAt)
+            .order_by_desc(wishlist_item::Column::Id)
             .limit(self.config.wishlist_max)
             .all(tenant.database().read())
             .await?)
@@ -130,6 +149,7 @@ impl CustomersService {
                 break;
             }
             wishlist_item::Entity::insert(wishlist_item::ActiveModel {
+                id: Set(Uuid::now_v7()),
                 tenant_id: Set(tenant.id().as_uuid()),
                 profile_id: Set(profile.id),
                 product_id: Set(entry.product_id),

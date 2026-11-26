@@ -8,7 +8,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::mcp::{NoInput, PageInput, Tool};
-use autoxide_kernel::pagination::Page;
+use autoxide_kernel::pagination::{NaturalOrderPageQuery, Page, PageRequest};
 use autoxide_kernel::tenancy::{TenantContext, TenantId};
 use serde::Deserialize;
 use utoipa::ToSchema;
@@ -17,7 +17,7 @@ use validator::Validate;
 
 use crate::http::{
     EntitlementsResponse, LimitUse, OverrideResponse, PlanRequest, PlanResponse,
-    SubscriptionResponse, describe_entitlements, limit_uses, operator,
+    SubscriptionResponse, describe_entitlements, limit_use_page, operator,
 };
 use crate::permissions::{
     PLANS_MANAGE, PLANS_READ, PROVISION, SUBSCRIPTIONS_MANAGE, SUBSCRIPTIONS_READ,
@@ -35,6 +35,8 @@ pub(crate) struct ListPlansInput {
     cursor: Option<String>,
     /// `desc` (newest first, the default) or `asc`.
     order: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
 }
 
 #[derive(Debug, Deserialize, Validate, ToSchema)]
@@ -49,6 +51,24 @@ pub(crate) struct ListSignupsInput {
     cursor: Option<String>,
     /// `desc` (newest first, the default) or `asc`.
     order: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
+}
+
+/// A tenant and a page of its limits.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct UsageInput {
+    /// Id of the tenant.
+    tenant_id: Uuid,
+    /// Maximum number of items to return, 1 to 200. Defaults to 50.
+    limit: Option<u32>,
+    /// The `next_cursor` of the previous page.
+    cursor: Option<String>,
+    /// `asc` (limit key order, the default) or `desc`.
+    order: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
 }
 
 #[derive(Debug, Deserialize, Validate, ToSchema)]
@@ -196,7 +216,9 @@ pub(crate) fn all(service: &Arc<PlansService>) -> Vec<Tool> {
                 let service = signups.clone();
                 async move {
                     operator(&principal, &SUBSCRIPTIONS_READ)?;
-                    let page = PageInput::new(input.limit, input.cursor, input.order).page()?;
+                    let page = PageInput::new(input.limit, input.cursor, input.order)
+                        .with_count(input.count.unwrap_or(false))
+                        .page()?;
                     let status = crate::signup_http::check_status(input.status)?;
                     let page = service.list_signups(status, &page).await?;
                     Ok::<Page<SignupResponse>, Error>(
@@ -261,7 +283,9 @@ fn plan_tools(service: &Arc<PlansService>) -> Vec<Tool> {
                 let service = list.clone();
                 async move {
                     operator(&principal, &PLANS_READ)?;
-                    let page = PageInput::new(input.limit, input.cursor, input.order).page()?;
+                    let page = PageInput::new(input.limit, input.cursor, input.order)
+                        .with_count(input.count.unwrap_or(false))
+                        .page()?;
                     let page = service.list_plans(&page).await?;
                     Ok::<Page<PlanResponse>, Error>(page.map(PlanResponse::from))
                 }
@@ -413,13 +437,23 @@ fn tenant_tools(service: &Arc<PlansService>) -> Vec<Tool> {
         .requires(SUBSCRIPTIONS_MANAGE),
         Tool::new(
             "list_usage",
-            "Platform staff: a tenant's use of every limit (metered limits: this month).",
-            move |_: TenantContext, principal: Principal, input: TenantInput| {
+            "Platform staff: a tenant's use of every limit (metered limits: this month), by limit \
+             key; follow `pagination.next_cursor`.",
+            move |_: TenantContext, principal: Principal, input: UsageInput| {
                 let service = usage.clone();
                 async move {
                     operator(&principal, &SUBSCRIPTIONS_READ)?;
-                    let found: Vec<LimitUse> =
-                        limit_uses(&service, TenantId::from_uuid(input.tenant_id)).await?;
+                    // Cùng kiểu tham số trang với REST (`NaturalOrderPageQuery`, mặc định `asc`).
+                    let page = PageRequest::try_from(
+                        NaturalOrderPageQuery::new(
+                            input.limit.map(|limit| limit.to_string()),
+                            input.cursor,
+                            input.order,
+                        )
+                        .with_count(input.count.unwrap_or(false)),
+                    )?;
+                    let tenant = TenantId::from_uuid(input.tenant_id);
+                    let found: Page<LimitUse> = limit_use_page(&service, tenant, &page).await?;
                     Ok::<_, Error>(found)
                 }
             },

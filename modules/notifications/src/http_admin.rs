@@ -8,7 +8,7 @@ use std::sync::Arc;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::http::ValidJson;
-use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
+use autoxide_kernel::pagination::{NaturalOrderPageQuery, Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, Query, State};
@@ -24,7 +24,7 @@ use validator::Validate;
 use crate::api::{Notification, Outcome, Recipient};
 use crate::entity::{message, template};
 use crate::messages::MessageFilter;
-use crate::permissions::SEND;
+use crate::permissions::{SEND, TEMPLATES_MANAGE};
 use crate::platform::NewPlatformNotice;
 use crate::service::NotificationsService;
 use crate::templates::TemplateInput;
@@ -88,25 +88,32 @@ pub(crate) struct TemplateRequest {
 /// List the replaced texts of the tenant.
 ///
 /// Requires `notifications.templates.manage`. Kinds and channels without a row use the default text.
+/// By kind, then in the order the texts were first saved (`order=desc` reverses it); paged with
+/// `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/templates",
     extensions(("x-permissions" = json!(["notifications.templates.manage"]))),
     operation_id = "list_notification_templates",
     security(("bearer" = [])),
+    params(NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "Every replaced text.", body = Data<Vec<TemplateResponse>>),
+        (status = 200, description = "One page of the replaced texts, by kind.", body = Page<TemplateResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing `notifications.templates.manage`; code `permission_denied`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_templates(
     State(service): State<Arc<NotificationsService>>,
     tenant: TenantContext,
     principal: Principal,
-) -> Result<Data<Vec<TemplateResponse>>, Error> {
-    let rows = service.list_templates(&tenant, &principal).await?;
-    Ok(Data { data: rows.into_iter().map(TemplateResponse::from).collect() })
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<TemplateResponse>, Error> {
+    principal.require(&TEMPLATES_MANAGE)?;
+    let page = PageRequest::try_from(page)?;
+    let rows = service.list_templates(&tenant, &principal, &page).await?;
+    Ok(rows.map(TemplateResponse::from))
 }
 
 /// Replace the text of a kind on one channel and language.

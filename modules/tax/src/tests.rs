@@ -2,6 +2,8 @@
 //! tới hết 2026 rồi 10%), tách thuế từ giá đã gồm khớp từng đồng, TTĐB rồi GTGT, khấu trừ thay của
 //! sàn, hồ sơ thuế kế thừa theo cây và theo phạm vi, chế độ hộ kinh doanh, gói cũ bị từ chối, doctor.
 
+mod pages;
+
 use autoxide_kernel::access::Scope;
 use autoxide_kernel::tenancy::{DEFAULT_TENANT, OrgId, OrgTree};
 use autoxide_kernel::time::{Date, Timestamp};

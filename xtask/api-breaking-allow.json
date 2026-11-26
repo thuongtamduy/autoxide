@@ -52,5 +52,47 @@
     "rule": "request.constraint_tightened",
     "at": "GET /api/v1/audit/activity query limit",
     "decision": "D-20261125-list-pages"
+  },
+  {
+    "base": "v0.19.0",
+    "rule": "request.type_narrowed",
+    "at": "GET /api/v1/analytics/campaigns query limit",
+    "decision": "D-20261125-list-pages"
+  },
+  {
+    "base": "v0.19.0",
+    "rule": "request.type_narrowed",
+    "at": "GET /api/v1/analytics/objects query limit",
+    "decision": "D-20261125-list-pages"
+  },
+  {
+    "base": "v0.19.0",
+    "rule": "request.type_narrowed",
+    "at": "GET /api/v1/analytics/pages query limit",
+    "decision": "D-20261125-list-pages"
+  },
+  {
+    "base": "v0.19.0",
+    "rule": "request.type_narrowed",
+    "at": "GET /api/v1/analytics/sources query limit",
+    "decision": "D-20261125-list-pages"
+  },
+  {
+    "base": "v0.19.0",
+    "rule": "request.type_narrowed",
+    "at": "GET /api/v1/analytics/types query limit",
+    "decision": "D-20261125-list-pages"
+  },
+  {
+    "base": "v0.19.0",
+    "rule": "tool.parameter_type_changed",
+    "at": "analytics.top_objects $.limit",
+    "decision": "D-20261125-list-pages"
+  },
+  {
+    "base": "v0.19.0",
+    "rule": "tool.parameter_type_changed",
+    "at": "analytics.top_pages $.limit",
+    "decision": "D-20261125-list-pages"
   }
 ]
