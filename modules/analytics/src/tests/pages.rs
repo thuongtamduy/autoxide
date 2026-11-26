@@ -51,7 +51,7 @@ async fn xep_hang_phan_trang_nhieu_nhat_truoc_va_tool_nhu_rest() {
             assert_eq!(walk_by(limit, "&order=desc").await, down, "limit {limit} desc");
         }
         assert_eq!(walk_by(200, "").await, up);
-        let forged = autoxide_kernel::pagination::text_key_cursor("rank", "not-a-number");
+        let forged = autoxide_kernel::pagination::text_key_cursor("rank:page", "not-a-number");
         let tampered = app
             .get(&format!("/api/v1/analytics/pages?{RANGE}&cursor={forged}"))
             .token("boss")
@@ -136,6 +136,60 @@ async fn xep_hang_phan_trang_nhieu_nhat_truoc_va_tool_nhu_rest() {
         let funnels =
             app.get("/api/v1/analytics/funnels?count=true").token("boss").send().await.unwrap();
         assert_eq!(funnels.json()["pagination"]["total"], 1);
+    })
+    .await
+    .unwrap();
+}
+
+/// Bảng xếp hạng theo loại event (`type`) xếp theo số event chứ không theo lượt xem; keyset trong SQL ghép đúng
+/// với một trang lớn, kể cả khi hai loại hoà; con trỏ của bảng khác (`pages`) bị từ chối.
+#[tokio::test]
+async fn xep_hang_theo_loai_event_va_con_tro_cua_bang_khac() {
+    TestDatabase::run(async |test| {
+        let h = harness(test).await;
+        let mut events: Vec<Value> = ["/a", "/b", "/c"].into_iter().map(page).collect();
+        for kind in
+            ["shop.cart_added", "shop.cart_added", "shop.product_viewed", "shop.product_viewed"]
+        {
+            events.push(json!({"type": kind, "path": "/p/1", "object": "shop.product:p-1"}));
+        }
+        h.send(None, &browser("203.0.113.1", CHROME), None, events, at(10, 9)).await;
+        h.service.rollup_tenant(&h.tenant, at(10, 12)).await.unwrap();
+        let app = &h.app;
+        let walk = async |limit: u32| {
+            let mut values = Vec::new();
+            let mut uri = format!("/api/v1/analytics/types?{RANGE}&limit={limit}");
+            loop {
+                let body = app.get(&uri).token("boss").send().await.unwrap().json();
+                values.extend(
+                    body["data"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .map(|row| row["value"].as_str().unwrap().to_owned()),
+                );
+                match body["pagination"]["next_cursor"].as_str() {
+                    Some(cursor) => {
+                        uri =
+                            format!("/api/v1/analytics/types?{RANGE}&limit={limit}&cursor={cursor}")
+                    }
+                    None => return values,
+                }
+            }
+        };
+        let all = walk(200).await;
+        assert_eq!(all, ["analytics.page_view", "shop.cart_added", "shop.product_viewed"]);
+        assert_eq!(walk(1).await, all);
+        assert_eq!(walk(2).await, all);
+        let pages =
+            app.get(&format!("/api/v1/analytics/pages?{RANGE}&limit=1")).token("boss").send();
+        let cursor =
+            pages.await.unwrap().json()["pagination"]["next_cursor"].as_str().unwrap().to_owned();
+        let crossed = app
+            .get(&format!("/api/v1/analytics/types?{RANGE}&limit=1&cursor={cursor}"))
+            .token("boss")
+            .send();
+        assert_eq!(crossed.await.unwrap().status(), StatusCode::UNPROCESSABLE_ENTITY);
     })
     .await
     .unwrap();
