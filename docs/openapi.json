@@ -112882,7 +112882,7 @@
                 }
               }
             },
-            "description": "The provider has not verified the email (code `auth.oidc_email_unverified`), its domain is not allowed (code `auth.oidc_email_domain_not_allowed`), nobody may create an account this way (code `auth.oidc_signup_closed`), the account is disabled (code `auth.user_disabled`), or it must sign in with its passkey (code `auth.passkey_required`, see `POST /api/v1/auth/login`)."
+            "description": "The provider has not verified the email (code `auth.oidc_email_unverified`), its domain is not allowed (code `auth.oidc_email_domain_not_allowed`), nobody may create an account this way (code `auth.oidc_signup_closed`), the provider gives new accounts a role that the person who configured it cannot give now (code `auth.oidc_default_role_unavailable`; an administrator saves the provider again), the account is disabled (code `auth.user_disabled`), or it must sign in with its passkey (code `auth.passkey_required`, see `POST /api/v1/auth/login`)."
           },
           "404": {
             "content": {

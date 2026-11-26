@@ -192,6 +192,8 @@ async fn sua_nha_cung_cap_co_role_mac_dinh_phai_trao_duoc_role_do() {
             "{}",
             response.json()
         );
+        let message = response.json()["errors"][0]["detail"].as_str().unwrap().to_owned();
+        assert!(message.contains("remove the default role"), "{message}");
     })
     .await
     .unwrap();
@@ -227,6 +229,137 @@ async fn tu_dang_ky_voi_role_mac_dinh_kiem_lai_nguoi_cau_hinh() {
         assert_eq!(status, StatusCode::FORBIDDEN, "{body}");
         assert_eq!(body["code"], "auth.oidc_default_role_unavailable", "{body}");
         assert!(services.users.find_by_email(&tenant, "new2@example.com").await.unwrap().is_none());
+    })
+    .await
+    .unwrap();
+}
+
+/// Gói giả: không còn chỗ nhân sự nào (`auth.members`), mọi thứ khác không giới hạn.
+struct NoSeats;
+
+#[async_trait::async_trait]
+impl autoxide_kernel::entitlement::Entitlements for NoSeats {
+    async fn snapshot(
+        &self,
+        _: autoxide_kernel::tenancy::TenantId,
+    ) -> Result<
+        std::sync::Arc<autoxide_kernel::entitlement::TenantEntitlements>,
+        autoxide_kernel::error::Error,
+    > {
+        Ok(std::sync::Arc::new(autoxide_kernel::entitlement::TenantEntitlements {
+            limits: [("auth.members".to_owned(), Some(0))].into(),
+            features: ["auth.oidc".to_owned()].into(),
+            ..autoxide_kernel::entitlement::TenantEntitlements::unrestricted()
+        }))
+    }
+
+    async fn reserve(
+        &self,
+        _: autoxide_kernel::tenancy::TenantId,
+        limit: &autoxide_kernel::entitlement::Limit,
+        _: i64,
+        _: &str,
+    ) -> Result<(), autoxide_kernel::error::Error> {
+        if limit.key() == "auth.members" {
+            return Err(autoxide_kernel::entitlement::limit_exceeded("auth.members", 0, 0));
+        }
+        Ok(())
+    }
+
+    async fn confirm(
+        &self,
+        _: autoxide_kernel::tenancy::TenantId,
+        _: &autoxide_kernel::entitlement::Limit,
+        _: &str,
+    ) -> Result<(), autoxide_kernel::error::Error> {
+        Ok(())
+    }
+
+    async fn release(
+        &self,
+        _: autoxide_kernel::tenancy::TenantId,
+        _: &autoxide_kernel::entitlement::Limit,
+        _: &str,
+    ) -> Result<(), autoxide_kernel::error::Error> {
+        Ok(())
+    }
+
+    async fn record_usage(
+        &self,
+        _: autoxide_kernel::tenancy::TenantId,
+        _: &autoxide_kernel::entitlement::Limit,
+        _: i64,
+        _: &str,
+    ) -> Result<(), autoxide_kernel::error::Error> {
+        Ok(())
+    }
+}
+
+#[tokio::test]
+async fn tu_dang_ky_loi_giua_chung_khong_de_lai_tai_khoan() {
+    // Gói hết chỗ nhân sự: tự đăng ký với role mặc định bị từ chối và không để lại tài khoản không
+    // role, không liên kết. Khách riêng `alpha` (khách mặc định được miễn hạn mức).
+    TestDatabase::run(async |test| {
+        use super::tests::{approve, callback, start};
+        let fake = fake_server().await;
+        let services = crate::testing::services(test).await;
+        let mailer: std::sync::Arc<dyn autoxide_kernel::mail::Mailer> = services.mails.clone();
+        let plan: std::sync::Arc<dyn autoxide_kernel::entitlement::Entitlements> =
+            std::sync::Arc::new(NoSeats);
+        let app = autoxide_testkit::TestApp::builder(test)
+            .tenant("alpha")
+            .setting("AUTOXIDE_AUTH_TOKEN_SECRET", crate::testing::TOKEN_SECRET)
+            .setting("AUTOXIDE_AUTH_OIDC", "true")
+            .setting("AUTOXIDE_AUTH_OIDC_ALLOW_PRIVATE_NETWORKS", "true")
+            .provide::<dyn autoxide_kernel::mail::Mailer>(mailer)
+            .provide::<dyn autoxide_kernel::entitlement::Entitlements>(plan)
+            .module(crate::module())
+            .build()
+            .await
+            .unwrap();
+        let tenant = app.tenant("alpha").await.unwrap();
+        let boss = NewUser {
+            email: "boss@alpha.example".to_owned(),
+            name: "Boss".to_owned(),
+            password: Some(PASSWORD.to_owned()),
+        };
+        services.users.create_with_roles(&tenant, Actor::system(), boss, true).await.unwrap();
+        let response = app
+            .post("/api/v1/auth/login")
+            .header("autoxide-tenant", "alpha")
+            .json(serde_json::json!({"email": "boss@alpha.example", "password": PASSWORD}))
+            .send()
+            .await
+            .unwrap();
+        let admin = response.json()["data"]["access_token"].as_str().unwrap().to_owned();
+        let roles = app
+            .get("/api/v1/auth/roles")
+            .token(&admin)
+            .header("autoxide-tenant", "alpha")
+            .send()
+            .await
+            .unwrap()
+            .json();
+        let mut body = oidc_body(&fake, "staff", true);
+        body["default_role_id"] = roles["data"].as_array().unwrap()[0]["id"].clone();
+        let created = app
+            .post("/api/v1/auth/oidc-providers")
+            .token(&admin)
+            .header("autoxide-tenant", "alpha")
+            .json(body)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(created.status(), StatusCode::CREATED, "{}", created.json());
+
+        let query = start(&app, "staff", Some("alpha")).await;
+        let code = approve(&fake, &query, claims(&fake, "staff", "s-1", "new@alpha.example", true));
+        let (status, body) = callback(&app, "staff", &code, &query["state"]).await;
+        assert_eq!(status, StatusCode::FORBIDDEN, "{body}");
+        assert_eq!(body["code"], "limit_exceeded", "{body}");
+        assert!(
+            services.users.find_by_email(&tenant, "new@alpha.example").await.unwrap().is_none()
+        );
     })
     .await
     .unwrap();
