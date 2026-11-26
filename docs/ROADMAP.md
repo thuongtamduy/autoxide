@@ -95,8 +95,9 @@ phó); mục lớn có quyết định thiết kế (skill `record-decision`) tr
 qua kiểm độc lập (D-20261126-independent-review).
 
 **Điều kiện ra 1.0:** mọi mục `[ ]` dưới đây, P4, P6, P9, P16, P17 của bước 70 và các mục còn mở của 54, 52 xong; gate đầy đủ xanh trên SQLite và
-Postgres; kiểm thử bảo mật bên ngoài không còn lỗi mức cao trở lên; luật sư đã rà phần dữ liệu cá nhân, hoá đơn, thuế; các
-chỉ số của G9 đạt ngưỡng.
+Postgres; vòng kiểm thử bảo mật kiểu bên ngoài cuối cùng không còn lỗi mức cao trở lên; vòng rà pháp lý cuối cùng không còn
+điểm chặn; vòng dùng thử bản RC cuối cùng không còn lỗi hợp đồng mở; các chỉ số của G9 đạt ngưỡng. Ba vòng này do phiên AI
+đóng vai làm (D-20261126-ai-role-reviews); rà bởi luật sư và đội kiểm thử là con người được khuyến nghị nhưng không chặn 1.0.
 
 ### G1 — Phạm vi và hợp đồng 1.0
 
@@ -233,18 +234,24 @@ chỉ số của G9 đạt ngưỡng.
 - [ ] Dựng một cửa hàng nhỏ ở repo riêng như người ngoài (module viết ngoài repo, giao diện đơn giản), ghi mọi chỗ vướng
       thành việc của core — **chờ chủ dự án tạo repo**
 
-### G12 — Con người bên ngoài (chủ dự án lo)
+### G12 — Rà từ bên ngoài bằng phiên AI đóng vai (chủ dự án quyết ngày 26/11/2026, D-20261126-ai-role-reviews)
 
-- [ ] Luật sư rà phần dữ liệu cá nhân (Luật 91/2025/QH15, Nghị định 356/2025/NĐ-CP — cần đối chiếu văn bản gốc), hoá
-      đơn điện tử, thuế
-- [ ] Đợt kiểm thử bảo mật bên ngoài trước 1.0; sau 1.0 cân nhắc chương trình thưởng báo lỗi bảo mật
+- [ ] Rà pháp lý (phiên đóng vai luật sư công nghệ và chuyên gia thuế, hoá đơn): dữ liệu cá nhân (Luật 91/2025/QH15,
+      Nghị định 356/2025/NĐ-CP), thương mại điện tử, hoá đơn điện tử, thuế, thanh toán, an ninh mạng; mỗi điểm nêu căn cứ
+      (văn bản, điều, ngày hiệu lực) hay ghi "cần đối chiếu văn bản gốc / người có chuyên môn pháp lý"; vòng 1 trên `main`
+      hiện tại, vòng cuối trên bản RC
+- [ ] Kiểm thử bảo mật kiểu bên ngoài (phiên đóng vai đội pentest độc lập, chỉ biết tài liệu công khai, chỉ tấn công máy
+      chủ chạy trong chính phiên đó): vòng 1 bây giờ, vòng cuối trên bản RC; lỗi cao trở lên báo kín, công bố sau khi
+      sửa; sau 1.0 cân nhắc chương trình thưởng báo lỗi bảo mật
 
 ### G13 — Phát hành 1.0 (chủ dự án duyệt ngày 26/11/2026, D-20261126-release-1-0-readiness)
 
 - [ ] Đánh phiên bản mọi hợp đồng, không chỉ REST: tên và payload event giữa module, payload webhook gửi đi, tên và schema
       tool MCP, schema `x-*` của OpenAPI; quy tắc thêm / đổi / bỏ, cách khai bản cũ sắp bỏ, test giữ hợp đồng (như api-diff)
-- [ ] Thời gian chạy thử trước 1.0: phát hành `1.0.0-rc.N` cho người ngoài dùng 2–4 tuần, kênh nhận phản hồi, tiêu chí
-      chốt (không còn lỗi hợp đồng mở); chỉ sửa lỗi trong thời gian này
+- [ ] Chạy thử trước 1.0: phát hành `1.0.0-rc.N`; phiên AI đóng vai người dùng (người mới / code bằng AI, người viết
+      module, người nối AI agent qua MCP, người vận hành, chủ cửa hàng dùng API) dùng thử theo tài liệu công khai, vài vòng
+      (dùng thử → sửa → vòng sau, D-20261126-ai-role-reviews); vẫn mở kênh phản hồi cho người ngoài thật; tiêu chí chốt
+      (không còn lỗi hợp đồng mở); chỉ sửa lỗi trong thời gian này
 - [ ] Chính sách hỗ trợ dài hạn: bản 1.x nhận vá bảo mật bao lâu, bản lớn trước còn được hỗ trợ bao lâu khi bản lớn mới ra,
       quy trình vá ngược; ghi vào `docs/COMPATIBILITY.md` và `SECURITY.md` (EN + VI)
 - [ ] Trang tài liệu có phiên bản: website tài liệu chính thức (hướng dẫn, tham chiếu API sinh từ OpenAPI, MCP, docs.rs),
