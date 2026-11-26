@@ -1363,7 +1363,7 @@
         "returns_secret": false
       },
       "deprecation": null,
-      "description": "List your API keys (never their secrets); called with an API key, only that key. Follow `pagination.next_cursor` for more.",
+      "description": "List your API keys (never their secrets); called with an API key, only that key; with an OAuth token, none. Follow `pagination.next_cursor` for more.",
       "input_schema": {
         "additionalProperties": false,
         "description": "Paging of a list: the same as the `limit`, `cursor`, `order` and `count` query parameters\nof the REST list endpoints.",
@@ -1917,7 +1917,7 @@
         "returns_secret": false
       },
       "deprecation": null,
-      "description": "Revoke one of your API keys; it stops working at once. Called with an API key, only that same key can be revoked.",
+      "description": "Revoke one of your API keys; it stops working at once. Called with an API key, only that same key can be revoked; an OAuth token revokes none.",
       "input_schema": {
         "additionalProperties": false,
         "description": "A role or user to act on.",
