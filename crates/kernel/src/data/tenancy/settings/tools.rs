@@ -21,6 +21,14 @@ pub(crate) struct ListSettings {
     /// for every setting.
     #[schema(example = "connection")]
     group: Option<String>,
+    /// Maximum number of items to return, 1 to 200. Defaults to 50.
+    limit: Option<u32>,
+    /// The `next_cursor` of the previous page.
+    cursor: Option<String>,
+    /// `asc` (by name, the default) or `desc`.
+    order: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
 }
 
 // Tool MCP: liệt kê, đặt cấu hình KHÔNG bí mật, bỏ cấu hình. Không có tool ghi secret (đặc tả 33,
@@ -93,7 +101,13 @@ pub(crate) fn tools(service: Arc<SettingsService>) -> Vec<Tool> {
              provider…).",
             move |tenant: TenantContext, _principal: Principal, filter: ListSettings| {
                 let service = service.clone();
-                async move { service.list(&tenant, filter.group.as_deref()).await }
+                async move {
+                    // Cùng kiểu tham số trang và cùng hàm với REST.
+                    let page = crate::mcp::PageInput::new(filter.limit, filter.cursor, filter.order)
+                        .with_count(filter.count.unwrap_or(false))
+                        .natural_page()?;
+                    service.page(&tenant, filter.group.as_deref(), &page).await
+                }
             },
         )
         .requires(SETTINGS_MANAGE)

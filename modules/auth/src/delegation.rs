@@ -9,6 +9,7 @@
 use autoxide_kernel::access::{AccessPath, Grant, Principal, Realm};
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::{Actor, Outbox};
+use autoxide_kernel::pagination::{Order, Page, PageRequest, Pagination, fetch_page};
 use autoxide_kernel::tenancy::{
     DatabaseRegistry, OrgId, OrgTree, ScopeExt, TenantContext, TenantId, root_of,
 };
@@ -216,30 +217,58 @@ impl DelegationService {
         Ok(after)
     }
 
-    /// Uỷ quyền khách `tenant` đã cấp cho các khách con (`outgoing`), mới nhất trước.
-    pub(crate) async fn outgoing(&self, tenant: &TenantContext) -> Result<Vec<Delegation>, Error> {
-        Ok(entity::Entity::find()
-            .scoped(tenant)
-            .order_by_desc(entity::Column::Id)
-            .all(tenant.database().read())
-            .await?)
+    /// Một trang uỷ quyền khách `tenant` đã cấp cho các khách con (`outgoing`), mới nhất trước (trừ
+    /// `order=asc`); keyset theo id trên khoá chính (tenant_id, id).
+    pub(crate) async fn outgoing(
+        &self,
+        tenant: &TenantContext,
+        page: &PageRequest,
+    ) -> Result<Page<Delegation>, Error> {
+        let select = entity::Entity::find().scoped(tenant);
+        fetch_page(select, entity::Column::Id, |row| row.id, page, tenant.database().read()).await
     }
 
-    /// Uỷ quyền các khách cấp trên đã cấp cho khách `tenant` (`incoming`), mới nhất trước.
-    pub(crate) async fn incoming(&self, tenant: &TenantContext) -> Result<Vec<Delegation>, Error> {
+    /// Một trang uỷ quyền các khách cấp trên đã cấp cho khách `tenant` (`incoming`), mới nhất trước (trừ
+    /// `order=asc`). Mỗi khách cấp trên (tối đa 16 tầng, có thể ở database khác) cho một trang keyset theo id
+    /// với cùng con trỏ (index (tenant_id, child_tenant_id, id)); gộp lại theo id: mỗi nguồn đã cho `limit`
+    /// dòng đầu sau con trỏ nên `limit` dòng đầu của bản gộp là trang đúng.
+    pub(crate) async fn incoming(
+        &self,
+        tenant: &TenantContext,
+        page: &PageRequest,
+    ) -> Result<Page<Delegation>, Error> {
         let mut found = Vec::new();
+        let mut more = false;
+        let mut total: Option<u64> = page.wants_total().then_some(0);
         for parent in self.databases.tenant_ancestors(tenant.id()).await? {
             let parent = self.databases.tenant(parent).await?;
-            found.extend(
-                entity::Entity::find()
-                    .filter(entity::Column::ChildTenantId.eq(tenant.id().as_uuid()))
-                    .scoped(&parent)
-                    .all(parent.database().read())
-                    .await?,
-            );
+            let select = entity::Entity::find()
+                .filter(entity::Column::ChildTenantId.eq(tenant.id().as_uuid()))
+                .scoped(&parent);
+            let part = fetch_page(
+                select,
+                entity::Column::Id,
+                |row| row.id,
+                page,
+                parent.database().read(),
+            )
+            .await?;
+            more |= part.pagination.next_cursor.is_some();
+            total = total.zip(part.pagination.total).map(|(sum, part)| sum.saturating_add(part));
+            found.extend(part.data);
         }
-        found.sort_by_key(|row| std::cmp::Reverse(row.id));
-        Ok(found)
+        match page.order() {
+            Order::Asc => found.sort_by_key(|row| row.id),
+            Order::Desc => found.sort_by_key(|row| std::cmp::Reverse(row.id)),
+        }
+        let limit = page.limit() as usize;
+        more |= found.len() > limit;
+        found.truncate(limit);
+        let next_cursor = more.then(|| found.last().map(|row| row.id.to_string())).flatten();
+        Ok(Page {
+            data: found,
+            pagination: Pagination::new(page.limit(), next_cursor).with_total(total),
+        })
     }
 
     /// Uỷ quyền còn hiệu lực cho người dùng `user_id` của khách `home`: những uỷ quyền cho role

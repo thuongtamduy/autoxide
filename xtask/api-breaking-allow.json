@@ -94,5 +94,29 @@
     "rule": "tool.parameter_type_changed",
     "at": "analytics.top_pages $.limit",
     "decision": "D-20261125-list-pages"
+  },
+  {
+    "base": "v0.19.0",
+    "rule": "request.constraint_tightened",
+    "at": "GET /api/v1/kernel/devtools/events query limit",
+    "decision": "D-20261125-list-pages"
+  },
+  {
+    "base": "v0.19.0",
+    "rule": "request.type_narrowed",
+    "at": "GET /api/v1/kernel/jobs query limit",
+    "decision": "D-20261125-list-pages"
+  },
+  {
+    "base": "v0.19.0",
+    "rule": "request.constraint_tightened",
+    "at": "GET /api/v1/kernel/jobs query limit",
+    "decision": "D-20261125-list-pages"
+  },
+  {
+    "base": "v0.19.0",
+    "rule": "request.constraint_tightened",
+    "at": "GET /api/v1/kernel/records/{kind}/{id}/activity query limit",
+    "decision": "D-20261125-list-pages"
   }
 ]

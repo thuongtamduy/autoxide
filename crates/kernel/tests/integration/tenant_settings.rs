@@ -463,6 +463,47 @@ async fn loc_nhom_cho_nhan_su_nen_tang_va_tool_mcp() {
         assert_eq!(only[0]["value"], "acct-1");
         let all = client.call_tool(tool("kernel.list_settings", json!({}))).await.unwrap();
         assert_eq!(all.structured_content.unwrap()["data"].as_array().unwrap().len(), 7);
+
+        // Tool và REST cùng tham số trang: cùng trang, cùng con trỏ; theo `next_cursor` tới hết, theo tên.
+        let rest = app
+            .get("/api/v1/kernel/settings?limit=3&count=true")
+            .token("owner")
+            .header("autoxide-tenant", "shop")
+            .send()
+            .await
+            .unwrap()
+            .json();
+        let first = client
+            .call_tool(tool("kernel.list_settings", json!({"limit": 3, "count": true})))
+            .await
+            .unwrap();
+        let first = first.structured_content.unwrap();
+        assert_eq!(first["data"], rest["data"]);
+        assert_eq!(first["pagination"], rest["pagination"]);
+        assert_eq!(first["pagination"]["total"], 7);
+        let mut names: Vec<String> = Vec::new();
+        let mut page = first;
+        loop {
+            names.extend(
+                page["data"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|s| s["name"].as_str().unwrap().to_owned()),
+            );
+            let Some(cursor) = page["pagination"]["next_cursor"].as_str().map(str::to_owned) else {
+                break;
+            };
+            let next = client
+                .call_tool(tool("kernel.list_settings", json!({"limit": 3, "cursor": cursor})))
+                .await
+                .unwrap();
+            page = next.structured_content.unwrap();
+        }
+        assert_eq!(names.len(), 7);
+        let mut sorted = names.clone();
+        sorted.sort();
+        assert_eq!(names, sorted);
         client.cancel().await.unwrap();
     })
     .await

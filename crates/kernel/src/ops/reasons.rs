@@ -113,10 +113,23 @@ pub(crate) fn check(module: &str, lists: &[ReasonList], problems: &mut Vec<Strin
     }
 }
 
+/// How many reasons of its own a tenant may add to one list.
+pub const TENANT_REASONS_MAX: crate::config::Setting = crate::config::Setting::new(
+    "AUTOXIDE_REASONS_TENANT_MAX",
+    "Most reasons of its own a tenant may add to one reason list (1 to 10000).",
+)
+.with_default("200");
+
+/// Default of [`TENANT_REASONS_MAX`].
+const DEFAULT_TENANT_REASONS_MAX: u64 = 200;
+
 /// Registry of every module's reason lists, filled once at startup. Cheap to clone.
 #[derive(Clone, Default)]
 pub struct ReasonCodes {
     lists: Arc<OnceLock<BTreeMap<&'static str, ReasonList>>>,
+    // Trần lý do riêng của khách mỗi danh sách: danh sách đọc gộp trong bộ nhớ (`page_of`), nên phải có trần
+    // ở chỗ ghi (D-20261125-list-pages mục 3).
+    tenant_max: Arc<OnceLock<u64>>,
 }
 
 /// A code after merging the defaults with the tenant's part.
@@ -134,6 +147,14 @@ struct Merged {
 impl ReasonCodes {
     pub(crate) fn fill(&self, lists: Vec<ReasonList>) {
         let _ = self.lists.set(lists.into_iter().map(|list| (list.name, list)).collect());
+    }
+
+    pub(crate) fn set_tenant_max(&self, max: u64) {
+        let _ = self.tenant_max.set(max);
+    }
+
+    fn tenant_max(&self) -> u64 {
+        self.tenant_max.get().copied().unwrap_or(DEFAULT_TENANT_REASONS_MAX)
     }
 
     fn list(&self, name: &str) -> Option<&ReasonList> {
@@ -318,19 +339,21 @@ impl ReasonsState {
 /// List the reasons of a list.
 ///
 /// Anyone who reads the module that owns the list (`<module>.read`), or holds
-/// `kernel.reasons.manage`. The module's reasons and the tenant's own, in order, with labels in the
-/// language of `Accept-Language`.
+/// `kernel.reasons.manage`. The module's reasons and the tenant's own, by `position` then code
+/// (`order=desc` reverses it; paged with `limit` / `cursor`), with labels in the language of
+/// `Accept-Language`.
 #[utoipa::path(
     get,
     path = "/reasons/{list}",
     extensions(("x-permissions" = json!([]))),
     operation_id = "list_reasons",
     security(("bearer" = [])),
-    params(("list" = String, Path, description = "The list, e.g. `orders.cancel`."), ReasonsQuery),
+    params(("list" = String, Path, description = "The list, e.g. `orders.cancel`."), ReasonsQuery, crate::pagination::NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "The reasons.", body = Data<Vec<ReasonView>>),
+        (status = 200, description = "One page of reasons, by position.", body = crate::pagination::Page<ReasonView>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 404, description = "No such list for you; code `kernel.reason_list_not_found`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_reasons(
@@ -340,11 +363,24 @@ async fn list_reasons(
     language: Language,
     Path(list): Path<String>,
     Query(query): Query<ReasonsQuery>,
-) -> Result<Data<Vec<ReasonView>>, Error> {
+    Query(page): Query<crate::pagination::NaturalOrderPageQuery>,
+) -> Result<crate::pagination::Page<ReasonView>, Error> {
     if !state.may_read(&principal, &list) {
         return Err(list_not_found(&list));
     }
-    Ok(Data { data: state.reasons(&tenant, &list, query.include_inactive, language).await? })
+    let page = crate::pagination::PageRequest::try_from(page)?;
+    let reasons = state.reasons(&tenant, &list, query.include_inactive, language).await?;
+    // Lý do mặc định của module (trong code) gộp với dòng của khách theo mã — thứ tự `position` có thể do
+    // khách đổi, nên chỉ biết sau khi gộp: phân trang trong bộ nhớ (D-20261125-list-pages mục 4). Khoá giữ
+    // đúng thứ tự (vị trí, mã) khi so theo byte: vị trí dời về số không âm, đủ 10 chữ số.
+    crate::pagination::page_of(
+        reasons,
+        |reason| {
+            let position = i64::from(reason.position) - i64::from(i32::MIN);
+            format!("{position:010}\u{1f}{}", reason.code)
+        },
+        &page,
+    )
 }
 
 /// Change or add a reason.
@@ -352,6 +388,8 @@ async fn list_reasons(
 /// Requires `kernel.reasons.manage`. Changes the labels, order or on / off of a reason; a code the
 /// list does not have yet becomes the tenant's own reason. Reasons required by law stay on
 /// (`kernel.reason_legal`). Codes are lower-case letters, digits and `_` (`kernel.reason_invalid`).
+/// A tenant adds at most `AUTOXIDE_REASONS_TENANT_MAX` reasons of its own to one list
+/// (`kernel.reason_limit_reached`).
 #[utoipa::path(
     put,
     path = "/reasons/{list}/{code}",
@@ -368,7 +406,7 @@ async fn list_reasons(
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `kernel.reasons.manage`; code `permission_denied`.", body = Problem),
         (status = 404, description = "No such list; code `kernel.reason_list_not_found`.", body = Problem),
-        (status = 409, description = "Turning off a reason required by law; code `kernel.reason_legal`.", body = Problem),
+        (status = 409, description = "Turning off a reason required by law (code `kernel.reason_legal`), or the list already has `AUTOXIDE_REASONS_TENANT_MAX` reasons of the tenant's own (code `kernel.reason_limit_reached`).", body = Problem),
         (status = 422, description = "The code is malformed (`kernel.reason_invalid`), or a label is invalid; see `errors`.", body = Problem),
     )
 )]
@@ -425,6 +463,15 @@ async fn set_reason(
     }
     if !problems.is_empty() {
         return Err(Error::validation(problems));
+    }
+    let own = merged.iter().filter(|reason| !reason.builtin).count();
+    let max = state.codes.tenant_max();
+    if current.is_none() && <u64 as TryFrom<usize>>::try_from(own).unwrap_or(u64::MAX) >= max {
+        return Err(Error::conflict(
+            "kernel.reason_limit_reached",
+            "This tenant already has {max} reasons of its own in this list.",
+        )
+        .with_param("max", max));
     }
     let active = change.active.or(current.map(|reason| reason.active)).unwrap_or(true);
     let position = change

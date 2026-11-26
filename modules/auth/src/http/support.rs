@@ -7,6 +7,7 @@ use std::sync::Arc;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
+use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::{TenantContext, TenantId};
 use axum::extract::{Path, Query, State};
@@ -117,7 +118,7 @@ pub(crate) struct TenantQuery {
 #[derive(Debug, Deserialize, IntoParams)]
 #[into_params(parameter_in = Query)]
 pub(crate) struct GrantsQuery {
-    /// Only the grants for this tenant; leave out for every tenant (the newest 200).
+    /// Only the grants for this tenant; leave out for every tenant.
     tenant_id: Option<Uuid>,
 }
 
@@ -129,9 +130,6 @@ pub(crate) struct SupportAllowedResponse {
     /// be made (a `support` one is refused with `auth.support_access_disabled`).
     support_access: bool,
 }
-
-/// How many grants the list of every tenant returns at most.
-const ALL_TENANTS_LIMIT: u64 = 200;
 
 /// Câu trả lời kèm tên nhân sự (một câu cho mọi dòng).
 async fn described(
@@ -158,29 +156,42 @@ async fn described_one(
 
 /// List platform staff access to this tenant's data.
 ///
-/// Requires `auth.support_access.read`. Every grant, newest first, with when it was first used
-/// and whether it was revoked. Changes made under a grant are in the audit log with
-/// `access.kind = support`.
+/// Requires `auth.support_access.read`. Every grant, newest first unless `order=asc` (paged with
+/// `limit` / `cursor`), with when it was first used and whether it was revoked. Changes made under
+/// a grant are in the audit log with `access.kind = support`.
 #[utoipa::path(
     get,
     path = "/support-access",
     extensions(("x-permissions" = json!(["auth.support_access.read"]))),
     operation_id = "list_support_access",
     security(("bearer" = [])),
+    params(PageQuery),
     responses(
-        (status = 200, description = "The grants.", body = Data<Vec<SupportGrantResponse>>),
+        (status = 200, description = "One page of grants, newest first.", body = Page<SupportGrantResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `auth.support_access.read`; code `permission_denied`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_support_access(
     State(state): State<Arc<HttpState>>,
     tenant: TenantContext,
     principal: Principal,
-) -> Result<Data<Vec<SupportGrantResponse>>, Error> {
+    Query(page): Query<PageQuery>,
+) -> Result<Page<SupportGrantResponse>, Error> {
     principal.require(&SUPPORT_ACCESS_READ)?;
-    let rows = state.support.for_tenant(tenant.id()).await?;
-    Ok(Data { data: described(&state, rows).await? })
+    let page = PageRequest::try_from(page)?;
+    let rows = state.support.grants_page(Some(tenant.id()), &page).await?;
+    described_page(&state, rows).await
+}
+
+/// A page of grants with the staff names.
+async fn described_page(
+    state: &HttpState,
+    page: Page<SupportGrant>,
+) -> Result<Page<SupportGrantResponse>, Error> {
+    let data = described(state, page.data).await?;
+    Ok(Page { data, pagination: page.pagination })
 }
 
 /// Revoke a platform staff access to this tenant.
@@ -214,33 +225,34 @@ async fn revoke_support_access(
 
 /// List the support access grants (platform).
 ///
-/// Requires `auth.support.grant`, in the platform tenant. With `tenant_id`, every grant for that
-/// tenant; without it, the newest 200 grants for any tenant.
+/// Requires `auth.support.grant`, in the platform tenant. With `tenant_id`, the grants for that
+/// tenant; without it, the grants for every tenant. Newest first unless `order=asc`; paged with
+/// `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/support-grants",
     extensions(("x-permissions" = json!(["auth.support.grant"]))),
     operation_id = "list_support_grants",
     security(("bearer" = [])),
-    params(GrantsQuery),
+    params(GrantsQuery, PageQuery),
     responses(
-        (status = 200, description = "The grants, newest first.", body = Data<Vec<SupportGrantResponse>>),
+        (status = 200, description = "One page of grants, newest first.", body = Page<SupportGrantResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission (`permission_denied`), or not called in the platform tenant (`auth.support_platform_only`).", body = Problem),
+        (status = 422, description = "A filter or paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_support_grants(
     State(state): State<Arc<HttpState>>,
     principal: Principal,
     Query(query): Query<GrantsQuery>,
-) -> Result<Data<Vec<SupportGrantResponse>>, Error> {
+    Query(page): Query<PageQuery>,
+) -> Result<Page<SupportGrantResponse>, Error> {
     principal.require(&SUPPORT_GRANT)?;
     state.support.require_platform(&principal)?;
-    let rows = match query.tenant_id {
-        Some(tenant) => state.support.for_tenant(TenantId::from_uuid(tenant)).await?,
-        None => state.support.grants(None, Some(ALL_TENANTS_LIMIT)).await?,
-    };
-    Ok(Data { data: described(&state, rows).await? })
+    let page = PageRequest::try_from(page)?;
+    let rows = state.support.grants_page(query.tenant_id.map(TenantId::from_uuid), &page).await?;
+    described_page(&state, rows).await
 }
 
 /// Tell whether a tenant lets platform staff in for support (platform).

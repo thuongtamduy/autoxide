@@ -19,7 +19,9 @@ async fn app(test: &TestDatabase) -> TestApp {
 async fn loai_doi_tuong_kem_co_cay_theo_quyen_doc() {
     TestDatabase::run(async |test| {
         let app = app(test).await;
-        let answer = app.get("/api/v1/kernel/records/types").token("editor").send().await.unwrap();
+        // Mọi loại trong một trang (`limit` tối đa): kiểm cả danh sách.
+        let answer =
+            app.get("/api/v1/kernel/records/types?limit=200").token("editor").send().await.unwrap();
         assert_eq!(answer.status(), StatusCode::OK);
         let types: Vec<Value> = answer.json()["data"].as_array().unwrap().clone();
         let find = |kind: &str| types.iter().find(|row| row["kind"] == kind).cloned();

@@ -15,11 +15,9 @@ use crate::migration::prelude::{
     DbErr, Index, MigrationName, MigrationTrait, SchemaManager, Table,
 };
 use crate::migration::schema;
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use sea_orm::entity::prelude::*;
-use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set,
-};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use utoipa_axum::router::OpenApiRouter;
@@ -319,10 +317,20 @@ impl MigrationRuns {
         })
     }
 
-    async fn list(&self) -> Result<Vec<MigrationRun>, Error> {
-        let rows =
-            Entity::find().order_by_desc(Column::Id).limit(50).all(self.control().read()).await?;
-        Ok(rows.into_iter().map(Into::into).collect())
+    /// One page of the runs, newest first unless `order=asc`, keyset on the primary key.
+    async fn page(
+        &self,
+        page: &crate::pagination::PageRequest,
+    ) -> Result<crate::pagination::Page<MigrationRun>, Error> {
+        let rows = crate::pagination::fetch_page(
+            Entity::find(),
+            Column::Id,
+            |row| row.id,
+            page,
+            self.control().read(),
+        )
+        .await?;
+        Ok(rows.map(Into::into))
     }
 
     /// Runs the run `id` (the job runner).
@@ -476,25 +484,30 @@ async fn start_migration_run(
 
 /// List the recent migration runs.
 ///
-/// Platform staff with `kernel.tenants.operate`. Newest first, at most 50.
+/// Platform staff with `kernel.tenants.operate`. Newest first unless `order=asc`; paged with
+/// `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/placements/migrations",
     extensions(("x-permissions" = json!(["kernel.tenants.operate"]))),
     operation_id = "list_placement_migrations",
     security(("bearer" = [])),
+    params(crate::pagination::PageQuery),
     responses(
-        (status = 200, description = "The runs, newest first.", body = Data<Vec<MigrationRun>>),
+        (status = 200, description = "One page of runs, newest first.", body = crate::pagination::Page<MigrationRun>),
         (status = 401, description = "Not signed in; code `unauthorized` or the code of the authentication module.", body = Problem),
         (status = 403, description = "Not platform staff (`tenant_platform_only`) or missing `kernel.tenants.operate` (`permission_denied`).", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_migration_runs(
     State(runs): State<Arc<MigrationRuns>>,
     principal: Principal,
-) -> Result<Data<Vec<MigrationRun>>, Error> {
+    Query(page): Query<crate::pagination::PageQuery>,
+) -> Result<crate::pagination::Page<MigrationRun>, Error> {
     operator(&principal)?;
-    Ok(Data { data: runs.list().await? })
+    let page = crate::pagination::PageRequest::try_from(page)?;
+    runs.page(&page).await
 }
 
 /// Get a migration run.

@@ -293,18 +293,20 @@ fn not_overridable(key: &str) -> Error {
 /// List the texts a tenant may replace.
 ///
 /// Requires `kernel.texts.manage`. The texts modules let tenants replace (with their default in
-/// `locale`) and the tenant's interface texts (`ui.*`), with the tenant's wording when set.
+/// `locale`) and the tenant's interface texts (`ui.*`), with the tenant's wording when set. By key
+/// (`order=desc` reverses it); paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/texts",
     extensions(("x-permissions" = json!(["kernel.texts.manage"]))),
     operation_id = "list_texts",
     security(("bearer" = [])),
-    params(TextsQuery),
+    params(TextsQuery, crate::pagination::NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "The texts.", body = Data<Vec<TextView>>),
+        (status = 200, description = "One page of texts, by key.", body = crate::pagination::Page<TextView>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `kernel.texts.manage`; code `permission_denied`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_texts(
@@ -312,12 +314,16 @@ async fn list_texts(
     tenant: TenantContext,
     principal: Principal,
     Query(query): Query<TextsQuery>,
-) -> Result<Data<Vec<TextView>>, Error> {
+    Query(page): Query<crate::pagination::NaturalOrderPageQuery>,
+) -> Result<crate::pagination::Page<TextView>, Error> {
     principal.require(&TEXTS_MANAGE)?;
+    let page = crate::pagination::PageRequest::try_from(page)?;
     let locale = query.locale.unwrap_or_else(|| "en".to_owned());
-    Ok(Data {
-        data: state.views(&tenant, &locale, query.prefix.as_deref(), query.overridden).await?,
-    })
+    let views = state.views(&tenant, &locale, query.prefix.as_deref(), query.overridden).await?;
+    // Câu chữ module cho thay khai trong code, gộp với bản thay của khách (câu `ui.*` có trần
+    // `AUTOXIDE_TEXT_OVERRIDES_UI_MAX` mỗi khách): phân trang trong bộ nhớ theo khoá, duy nhất trong một ngôn
+    // ngữ (D-20261125-list-pages mục 4).
+    crate::pagination::page_of(views, |view| view.key.clone(), &page)
 }
 
 /// Replace a text.

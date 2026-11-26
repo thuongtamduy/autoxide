@@ -238,6 +238,7 @@
   "kernel.pin_not_found": "Bạn không có ghim nào với ID này.",
   "kernel.reason_invalid": "`{code}` không phải mã hợp lệ: dùng 1 đến 64 chữ thường, số và `_`, bắt đầu bằng chữ.",
   "kernel.reason_legal": "Lý do `{code}` là bắt buộc theo pháp luật, không tắt được.",
+  "kernel.reason_limit_reached": "Khách này đã có {max} lý do riêng trong danh sách này.",
   "kernel.reason_list_not_found": "Không có danh sách lý do `{list}`.",
   "kernel.reason_unknown": "`{code}` không phải lý do đang bật của `{list}`; xem `GET /api/v1/kernel/reasons/{list}`.",
   "kernel.record_not_found": "Không có bản ghi `{kind}` `{id}` nào bạn được xem.",

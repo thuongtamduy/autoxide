@@ -58,10 +58,19 @@ pub(crate) struct PromoteToolInput {
     items: Vec<String>,
 }
 
-/// No input.
+/// Which page of promotable kinds.
 #[derive(Debug, Deserialize, Validate, ToSchema)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct NoInput {}
+pub(crate) struct PromotableInput {
+    /// Maximum number of items to return, 1 to 200. Defaults to 50.
+    limit: Option<u32>,
+    /// The `next_cursor` of the previous page.
+    cursor: Option<String>,
+    /// `asc` (by kind, the default) or `desc`.
+    order: Option<String>,
+    /// `true` to also get `pagination.total` (the number of items) on the first page.
+    count: Option<bool>,
+}
 
 /// A new sandbox of your tenant.
 #[derive(Debug, Deserialize, Validate, ToSchema)]
@@ -154,9 +163,15 @@ pub(crate) fn all(service: Arc<TenantSandboxes>) -> Vec<Tool> {
         Tool::new(
             "list_promotable",
             "List the kinds of records that can be promoted from a sandbox to your tenant.",
-            move |_: TenantContext, principal: Principal, _: NoInput| {
+            move |_: TenantContext, principal: Principal, input: PromotableInput| {
                 let service = kinds.clone();
-                async move { service.promotable(&principal) }
+                async move {
+                    // Cùng kiểu tham số trang và cùng hàm với REST.
+                    let page = PageInput::new(input.limit, input.cursor, input.order)
+                        .with_count(input.count.unwrap_or(false))
+                        .natural_page()?;
+                    super::http::promotable_page(&service, &principal, &page)
+                }
             },
         )
         .requires(SANDBOXES_READ)

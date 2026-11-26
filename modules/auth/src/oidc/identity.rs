@@ -70,6 +70,24 @@ pub(crate) async fn for_user(
     for_user_in(tenant.database().read(), tenant, user_id).await
 }
 
+/// Một trang liên kết của người dùng `user_id`, mới nhất trước trừ `order=asc` (keyset trên index
+/// (tenant_id, user_id, id)).
+pub(crate) async fn page_for_user(
+    tenant: &TenantContext,
+    user_id: Uuid,
+    page: &autoxide_kernel::pagination::PageRequest,
+) -> Result<autoxide_kernel::pagination::Page<Identity>, Error> {
+    let select = entity::Entity::find().filter(entity::Column::UserId.eq(user_id)).scoped(tenant);
+    autoxide_kernel::pagination::fetch_page(
+        select,
+        entity::Column::Id,
+        |row| row.id,
+        page,
+        tenant.database().read(),
+    )
+    .await
+}
+
 /// Như [`for_user`], đọc qua `connection` của bên gọi (vd transaction đã khoá dòng người dùng).
 pub(crate) async fn for_user_in<C: ConnectionTrait>(
     connection: &C,

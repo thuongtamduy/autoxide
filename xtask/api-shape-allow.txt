@@ -17,22 +17,6 @@ api-page-params GET /api/v1/content/search # kết quả xếp theo độ khớp
 # Danh sách `Data<Vec<T>>` có trước luật: tập nhỏ có giới hạn (loại, mức thuế, tỉnh, quyền của tôi…) hay
 # danh sách con của một bản ghi. Chờ rà từng cái (docs/ROADMAP.md, "Để sau"): cái nào không có giới hạn thật thì
 # làm endpoint mới trả `Page<T>` và khai endpoint cũ qua `Module::deprecations` (D-059).
-api-unpaged-list GET /api/v1/auth/delegations # có trước luật
-api-unpaged-list GET /api/v1/auth/delegations/tenants # có trước luật
-api-unpaged-list GET /api/v1/auth/me/identities # có trước luật
-api-unpaged-list GET /api/v1/auth/me/memberships # có trước luật
-api-unpaged-list GET /api/v1/auth/me/tenants # có trước luật
-api-unpaged-list GET /api/v1/auth/memberships/counts # có trước luật
-api-unpaged-list GET /api/v1/auth/oidc-providers # có trước luật
-api-unpaged-list GET /api/v1/auth/oidc/providers # có trước luật
-api-unpaged-list GET /api/v1/auth/permissions # có trước luật
-api-unpaged-list GET /api/v1/auth/roles/counts # có trước luật
-api-unpaged-list GET /api/v1/auth/scim/group-mappings # có trước luật
-api-unpaged-list GET /api/v1/auth/scim/tokens # có trước luật
-api-unpaged-list GET /api/v1/auth/support-access # có trước luật
-api-unpaged-list GET /api/v1/auth/support-grants # có trước luật
-api-unpaged-list GET /api/v1/auth/users/{id}/memberships # có trước luật
-api-unpaged-list GET /api/v1/auth/users/{id}/roles # có trước luật
 api-unpaged-list GET /api/v1/catalog/attributes # có trước luật
 api-unpaged-list GET /api/v1/catalog/categories # có trước luật
 api-unpaged-list GET /api/v1/catalog/categories/{id}/attributes # có trước luật
@@ -61,28 +45,7 @@ api-unpaged-list GET /api/v1/compliance/retention # có trước luật
 api-unpaged-list GET /api/v1/compliance/rules # có trước luật
 api-unpaged-list GET /api/v1/compliance/tracking-providers # có trước luật
 api-unpaged-list GET /api/v1/inventory/public/availability # tra cứu theo biến thể client gửi (tối đa 100) — chờ chủ dự án duyệt ngoại lệ
-api-unpaged-list GET /api/v1/kernel/approvals # có trước luật
-api-unpaged-list GET /api/v1/kernel/blocks # một dòng cho mỗi loại khối mà module đang chạy khai (bước 67): tập nhỏ, cố định theo binary, như sổ module
-api-unpaged-list GET /api/v1/kernel/connections/webhooks # một dòng cho mỗi loại kết nối mà bộ nối đang bật đăng ký (D-20261121-provider-accounts): tập nhỏ, cố định theo binary
-api-unpaged-list GET /api/v1/kernel/custom-fields # có trước luật
-api-unpaged-list GET /api/v1/kernel/devtools/events # có trước luật
-api-unpaged-list GET /api/v1/kernel/jobs # có trước luật
-api-unpaged-list GET /api/v1/kernel/modules # có trước luật
-api-unpaged-list GET /api/v1/kernel/placements # có trước luật
-api-unpaged-list GET /api/v1/kernel/placements/migrations # có trước luật
-api-unpaged-list GET /api/v1/kernel/reasons/{list} # có trước luật
-api-unpaged-list GET /api/v1/kernel/records/types # có trước luật
-api-unpaged-list GET /api/v1/kernel/records/{kind}/{id}/activity # có trước luật
-api-unpaged-list GET /api/v1/kernel/records/{kind}/{id}/notes # có trước luật
-api-unpaged-list GET /api/v1/kernel/records/{kind}/{id}/usages # có trước luật
-api-unpaged-list GET /api/v1/kernel/sandboxes/promotable # có trước luật
-api-unpaged-list GET /api/v1/kernel/settings # có trước luật
-api-unpaged-list GET /api/v1/kernel/sync/resources # có trước luật
-api-unpaged-list GET /api/v1/kernel/tags # có trước luật
-api-unpaged-list GET /api/v1/kernel/tenants/{id}/exports # có trước luật
-api-unpaged-list GET /api/v1/kernel/tenants/{id}/settings # có trước luật
-api-unpaged-list GET /api/v1/kernel/texts # có trước luật
-api-unpaged-list GET /api/v1/kernel/whats-new # có trước luật
+api-unpaged-list GET /api/v1/kernel/records/{kind}/{id}/usages # gộp từ `ReferenceSource` của nhiều module (content, menus) mà hợp đồng chưa có con trỏ: phân trang trong database cần thêm hàm trang vào trait và cài ở từng module — chờ quyết, chưa đổi
 api-unpaged-list GET /api/v1/orders/me/orders/{id}/documents # có trước luật
 api-unpaged-list GET /api/v1/orders/me/warranties # có trước luật
 api-unpaged-list GET /api/v1/orders/public/orders/{id}/documents # có trước luật
@@ -122,9 +85,6 @@ api-param-description GET /api/v1/support/tickets?priority # có trước luật
 # mcp-page-count: tool danh sách có trước luật (26/11/2026) chưa nhận count; thêm trong PR đại trà của module rồi xoá dòng
 mcp-page-count TOOL address.search_units # có trước luật
 mcp-page-count TOOL audit.list_entries # có trước luật
-mcp-page-count TOOL auth.list_invitations # có trước luật
-mcp-page-count TOOL auth.list_memberships # có trước luật
-mcp-page-count TOOL auth.list_users # có trước luật
 mcp-page-count TOOL bookings.list_bookings # có trước luật
 mcp-page-count TOOL catalog.list_collections # có trước luật
 mcp-page-count TOOL catalog.list_products # có trước luật

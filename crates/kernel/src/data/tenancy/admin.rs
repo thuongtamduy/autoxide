@@ -97,6 +97,8 @@ pub fn require_platform(principal: &Principal) -> Result<(), Error> {
     }
 }
 
+mod placement_list;
+
 pub(super) mod tenant {
     //! The `kernel_tenants` table (control plane).
     use crate::time::Timestamp;
@@ -1069,38 +1071,13 @@ async fn update_tenant(
     Ok(Tagged { version: tenant.updated_at, data: tenant })
 }
 
-/// List the placements.
-///
-/// Requires `kernel.placements.read` and an account of the platform tenant. Where tenants' data
-/// is kept; connection URLs are never shown (placements are added with `autoxide placement add`).
-#[utoipa::path(
-    get,
-    path = "/placements",
-    extensions(("x-permissions" = json!(["kernel.placements.read"]))),
-    operation_id = "list_placements",
-    security(("bearer" = [])),
-    responses(
-        (status = 200, description = "Every placement, sorted by name.", body = Data<Vec<Placement>>),
-        (status = 401, description = "Not signed in; code `unauthorized` or the code of the authentication module.", body = Problem),
-        (status = 403, description = "Missing permission `kernel.placements.read` (`permission_denied`), or not an account of the platform tenant (`tenant_platform_only`).", body = Problem),
-    )
-)]
-async fn list_placements(
-    State(admin): State<Arc<TenantAdmin>>,
-    principal: Principal,
-) -> Result<Data<Vec<Placement>>, Error> {
-    principal.require(&PLACEMENTS_READ)?;
-    require_platform(&principal)?;
-    Ok(Data { data: admin.placements().await? })
-}
-
 /// Routes under `/api/v1/kernel`.
 pub(crate) fn routes(admin: Arc<TenantAdmin>) -> OpenApiRouter {
     OpenApiRouter::new()
         .routes(routes!(get_current_tenant))
         .routes(routes!(list_tenants, create_tenant))
         .routes(routes!(get_tenant, update_tenant))
-        .routes(routes!(list_placements))
+        .routes(routes!(placement_list::list_placements))
         .merge(super::erasure::routes())
         .with_state(admin)
 }

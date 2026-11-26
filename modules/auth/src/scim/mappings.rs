@@ -16,7 +16,7 @@ use autoxide_kernel::work::{Severity, WorkItem, WorkSource};
 use sea_orm::sea_query::{Expr, ExprTrait as _, Query};
 use sea_orm::{
     ActiveModelTrait as _, ColumnTrait as _, EntityTrait as _, PaginatorTrait as _,
-    QueryFilter as _, QueryOrder as _, SqlErr,
+    QueryFilter as _, SqlErr,
 };
 use serde_json::json;
 use uuid::Uuid;
@@ -106,16 +106,20 @@ impl ScimService {
         }))
     }
 
-    /// Mọi luật ánh xạ của khách (một khách có ít luật), cũ nhất trước.
-    pub(crate) async fn mappings(
+    /// Một trang luật ánh xạ của khách, mới nhất trước trừ `order=asc` (keyset trên khoá chính).
+    pub(crate) async fn mappings_page(
         &self,
         tenant: &TenantContext,
-    ) -> Result<Vec<GroupMapping>, Error> {
-        Ok(mapping::Entity::find()
-            .scoped(tenant)
-            .order_by_asc(mapping::Column::Id)
-            .all(tenant.database().read())
-            .await?)
+        page: &autoxide_kernel::pagination::PageRequest,
+    ) -> Result<autoxide_kernel::pagination::Page<GroupMapping>, Error> {
+        autoxide_kernel::pagination::fetch_page(
+            mapping::Entity::find().scoped(tenant),
+            mapping::Column::Id,
+            |row| row.id,
+            page,
+            tenant.database().read(),
+        )
+        .await
     }
 
     /// Thêm luật "nhóm `group_id` → role `role_id` ở nút `org_id`", rồi cấp role cho mọi thành

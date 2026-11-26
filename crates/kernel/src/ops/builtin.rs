@@ -318,6 +318,8 @@ impl Module for KernelModule {
             Box::new(crate::tenancy::domains::ShareClaims),
             // Index cho danh sách "của tôi" có phân trang: ghim, view đã lưu (bước 70 P9).
             Box::new(crate::ops::list_indexes::AddListIndexes),
+            // Index cho danh sách của kernel có phân trang ở cụm 3: job, trường tự định nghĩa (bước 70 P9).
+            Box::new(crate::ops::list_indexes::AddListIndexesKernel),
         ]
     }
 
@@ -362,6 +364,9 @@ impl Module for KernelModule {
         let ui_texts = reader.get_with(&crate::ops::texts::UI_MAX, |raw| {
             crate::config::parse_in_range(raw, 1u64, 100_000)
         });
+        let tenant_reasons = reader.get_with(&crate::ops::reasons::TENANT_REASONS_MAX, |raw| {
+            crate::config::parse_in_range(raw, 1u64, 10_000)
+        });
         let stream_config = crate::event::stream::StreamConfig::read(reader);
         let relocation_drain = crate::tenancy::relocate::Wiring::read(reader);
         let sandbox = crate::tenancy::sandbox::Wiring::read(reader);
@@ -400,6 +405,7 @@ impl Module for KernelModule {
         self.relocations.set(relocation_drain?);
         self.sandboxes.set(sandbox?);
         self.catalog.text_overrides().set_ui_max(ui_texts?);
+        self.catalog.reason_codes().set_tenant_max(tenant_reasons?);
         Ok(())
     }
 

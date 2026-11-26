@@ -183,6 +183,27 @@ impl ProviderService {
             .await?)
     }
 
+    /// Một trang nhà cung cấp của khách (`enabled_only`: chỉ cái đang bật), mới nhất trước trừ `order=asc`; keyset trên khoá chính (tenant_id, id) / index (tenant_id, enabled, id).
+    pub(crate) async fn page(
+        &self,
+        tenant: &TenantContext,
+        enabled_only: bool,
+        page: &autoxide_kernel::pagination::PageRequest,
+    ) -> Result<autoxide_kernel::pagination::Page<Provider>, Error> {
+        let mut select = entity::Entity::find().scoped(tenant);
+        if enabled_only {
+            select = select.filter(entity::Column::Enabled.eq(true));
+        }
+        autoxide_kernel::pagination::fetch_page(
+            select,
+            entity::Column::Id,
+            |row| row.id,
+            page,
+            tenant.database().read(),
+        )
+        .await
+    }
+
     pub(crate) async fn get(&self, tenant: &TenantContext, id: Uuid) -> Result<Provider, Error> {
         entity::Entity::find_by_id((tenant.id().as_uuid(), id))
             .scoped(tenant)

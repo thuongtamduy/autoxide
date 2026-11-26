@@ -400,7 +400,36 @@ async fn tool_mcp_tra_cung_ket_qua_voi_rest() {
         assert!(list.allows(&admin) && !list.allows(&writer));
         let listed = list.call(tenant.clone(), admin.clone(), json!({})).await.unwrap();
         let (_, rest) = get(app.clone(), "/api/v1/kernel/modules", Some("admin")).await;
-        assert_eq!(listed, rest["data"]);
+        assert_eq!(listed["data"], rest["data"]);
+        assert_eq!(listed["pagination"], rest["pagination"]);
+        // Cùng tham số trang thì cùng trang và cùng con trỏ; theo `next_cursor` tới hết, đúng thứ tự khởi động.
+        let first = list
+            .call(tenant.clone(), admin.clone(), json!({"limit": 2, "count": true}))
+            .await
+            .unwrap();
+        let (_, rest) =
+            get(app.clone(), "/api/v1/kernel/modules?limit=2&count=true", Some("admin")).await;
+        assert_eq!(first["data"], rest["data"]);
+        assert_eq!(first["pagination"], rest["pagination"]);
+        assert_eq!(first["pagination"]["total"], 3);
+        let cursor = first["pagination"]["next_cursor"].as_str().unwrap().to_owned();
+        let second = list
+            .call(tenant.clone(), admin.clone(), json!({"limit": 2, "cursor": cursor}))
+            .await
+            .unwrap();
+        let names = |page: &Value| -> Vec<String> {
+            page["data"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|m| m["name"].as_str().unwrap().to_owned())
+                .collect()
+        };
+        assert_eq!([names(&first), names(&second)].concat(), ["kernel", "antispam", "notes"]);
+        assert_eq!(second["pagination"]["next_cursor"], Value::Null);
+        let (_, reversed) =
+            get(app.clone(), "/api/v1/kernel/modules?order=desc&limit=1", Some("admin")).await;
+        assert_eq!(names(&reversed), ["notes"]);
 
         let one = tool("kernel.get_module");
         let described =

@@ -18,7 +18,7 @@ use axum::Extension;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use sea_orm::ConnectionTrait;
-use sea_orm::sea_query::{Alias, Expr, Order, Query as SqlQuery};
+use sea_orm::sea_query::{Alias, Expr, Query as SqlQuery};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
@@ -31,6 +31,10 @@ use crate::event::{Actor, EventInfo, Outbox};
 use crate::http::ValidJson;
 use crate::i18n::Language;
 use crate::migration::prelude::*;
+use crate::pagination::{
+    NaturalOrderPageQuery, Page, PageQuery, PageRequest, Pagination, fetch_statement_page,
+    merge_id_pages, page_of, try_map_page, with_filter_problems,
+};
 use crate::resource::{RecordHistory, ResourceDirectory};
 use crate::response::{Created, Data, Problem};
 use crate::tenancy::TenantContext;
@@ -114,14 +118,6 @@ pub(crate) struct ActivityItem {
     pub mentions: Option<Vec<Uuid>>,
 }
 
-/// How much activity.
-#[derive(Debug, Default, Deserialize, IntoParams)]
-#[into_params(parameter_in = Query)]
-pub(crate) struct ActivityQuery {
-    /// At most this many lines, 1 to 200. Defaults to 50.
-    limit: Option<u32>,
-}
-
 #[derive(Clone)]
 pub(crate) struct RecordsState {
     pub resources: ResourceDirectory,
@@ -191,29 +187,36 @@ fn note(row: &sea_orm::QueryResult) -> Result<RecordNote, Error> {
     })
 }
 
-async fn notes_of(
+/// One page of the notes of record `kind` / `id`, by note ID (newest first unless `order=asc`), keyset in the
+/// database on the index `(tenant_id, kind, record_id, id)`.
+async fn notes_page(
     tenant: &TenantContext,
     kind: &str,
     id: &str,
-    limit: u64,
-) -> Result<Vec<RecordNote>, Error> {
+    page: &PageRequest,
+) -> Result<Page<RecordNote>, Error> {
     let select = SqlQuery::select()
         .columns(COLUMNS)
         .from(Alias::new(TABLE))
         .and_where(Expr::col(Alias::new("tenant_id")).eq(tenant.id().as_uuid()))
         .and_where(Expr::col(Alias::new("kind")).eq(kind))
         .and_where(Expr::col(Alias::new("record_id")).eq(id))
-        .order_by(Alias::new("id"), Order::Desc)
-        .limit(limit)
         .to_owned();
-    let rows = tenant.database().read().query_all(&select).await?;
-    rows.iter().map(note).collect()
+    let rows = fetch_statement_page(
+        select,
+        Alias::new("id"),
+        |row| Ok(row.try_get("", "id")?),
+        page,
+        tenant.database().read(),
+    )
+    .await?;
+    try_map_page(rows, note)
 }
 
 /// List the notes of a record.
 ///
 /// Requires being able to read the record (`<module>.read` of the module that owns `kind`). Newest
-/// first, at most 200.
+/// first unless `order=asc`; paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/records/{kind}/{id}/notes",
@@ -223,11 +226,13 @@ async fn notes_of(
     params(
         ("kind" = String, Path, description = "Type of the record, e.g. `content.entry`."),
         ("id" = String, Path, description = "Id of the record."),
+        PageQuery,
     ),
     responses(
-        (status = 200, description = "The notes.", body = Data<Vec<RecordNote>>),
+        (status = 200, description = "One page of notes, newest first.", body = Page<RecordNote>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 404, description = "No such record you may read; code `kernel.record_not_found`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_record_notes(
@@ -235,9 +240,11 @@ async fn list_record_notes(
     tenant: TenantContext,
     principal: Principal,
     Path((kind, id)): Path<(String, String)>,
-) -> Result<Data<Vec<RecordNote>>, Error> {
+    Query(page): Query<PageQuery>,
+) -> Result<Page<RecordNote>, Error> {
     state.require_read(&tenant, &principal, &kind, &id).await?;
-    Ok(Data { data: notes_of(&tenant, &kind, &id, 200).await? })
+    let page = PageRequest::try_from(page)?;
+    notes_page(&tenant, &kind, &id, &page).await
 }
 
 /// Write a note on a record.
@@ -407,7 +414,8 @@ async fn delete_record_note(
 /// Get the activity of a record.
 ///
 /// Requires being able to read the record. Its internal notes and the events recorded about it
-/// (when the program keeps an audit log), newest first.
+/// (when the program keeps an audit log), by when each was recorded (its ID): newest first unless
+/// `order=asc`; paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/records/{kind}/{id}/activity",
@@ -417,13 +425,13 @@ async fn delete_record_note(
     params(
         ("kind" = String, Path, description = "Type of the record, e.g. `content.entry`."),
         ("id" = String, Path, description = "Id of the record."),
-        ActivityQuery,
+        PageQuery,
     ),
     responses(
-        (status = 200, description = "The activity.", body = Data<Vec<ActivityItem>>),
+        (status = 200, description = "One page of the activity, newest first.", body = Page<ActivityItem>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 404, description = "No such record you may read; code `kernel.record_not_found`.", body = Problem),
-        (status = 422, description = "`limit` is not between 1 and 200; see `errors`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn get_record_activity(
@@ -432,49 +440,39 @@ async fn get_record_activity(
     principal: Principal,
     language: Language,
     Path((kind, id)): Path<(String, String)>,
-    Query(query): Query<ActivityQuery>,
-) -> Result<Data<Vec<ActivityItem>>, Error> {
-    let limit = query.limit.unwrap_or(50);
-    if !(1..=200).contains(&limit) {
-        return Err(Error::validation(vec![FieldError::new(
-            "limit",
-            "invalid",
-            "must be between 1 and 200",
-        )]));
-    }
+    Query(page): Query<PageQuery>,
+) -> Result<Page<ActivityItem>, Error> {
     state.require_read(&tenant, &principal, &kind, &id).await?;
-    let mut items: Vec<ActivityItem> = notes_of(&tenant, &kind, &id, u64::from(limit))
-        .await?
-        .into_iter()
-        .map(|note| ActivityItem {
-            kind: "note".to_owned(),
-            id: note.id,
-            at: note.created_at,
-            actor_id: Some(note.author_id),
-            actor_name: None,
-            action: None,
-            text: Some(note.body),
-            mentions: Some(note.mentions),
-        })
-        .collect();
-    if let Some(history) = state.history.get() {
-        let subject = format!("{kind}:{id}");
-        items.extend(history.history(&tenant, &subject, limit, language).await?.into_iter().map(
-            |line| ActivityItem {
-                kind: "event".to_owned(),
-                id: line.id,
-                at: line.at,
-                actor_id: line.actor_user_id,
-                actor_name: line.actor_name,
-                action: Some(line.action),
-                text: line.sentence,
-                mentions: None,
-            },
-        ));
-    }
-    items.sort_by_key(|item| std::cmp::Reverse((item.at, item.id)));
-    items.truncate(usize::try_from(limit).unwrap_or(usize::MAX));
-    Ok(Data { data: items })
+    let page = PageRequest::try_from(page)?;
+    let notes = notes_page(&tenant, &kind, &id, &page).await?.map(|note| ActivityItem {
+        kind: "note".to_owned(),
+        id: note.id,
+        at: note.created_at,
+        actor_id: Some(note.author_id),
+        actor_name: None,
+        action: None,
+        text: Some(note.body),
+        mentions: Some(note.mentions),
+    });
+    let events = match state.history.get() {
+        Some(history) => {
+            let subject = format!("{kind}:{id}");
+            Some(history.history_page(&tenant, &subject, &page, language).await?.map(|line| {
+                ActivityItem {
+                    kind: "event".to_owned(),
+                    id: line.id,
+                    at: line.at,
+                    actor_id: line.actor_user_id,
+                    actor_name: line.actor_name,
+                    action: Some(line.action),
+                    text: line.sentence,
+                    mentions: None,
+                }
+            }))
+        }
+        None => None,
+    };
+    Ok(merge_id_pages(notes, events, &page, |item| item.id))
 }
 
 /// Which record's events.
@@ -484,8 +482,6 @@ pub(crate) struct RecordEventsQuery {
     /// The record, as `<kind>:<id>`, e.g. `content.entry:0190…`.
     #[param(example = "content.entry:0190a4c2-0000-7000-8000-000000000001")]
     object: String,
-    /// At most this many events, 1 to 200. Defaults to 50.
-    limit: Option<u32>,
 }
 
 /// An event recorded about a record.
@@ -506,20 +502,20 @@ pub(crate) struct RecordEvent {
 /// List the events of a record.
 ///
 /// Requires `kernel.devtools.read`. The events recorded about the record in the audit log
-/// (events themselves are removed once delivered), newest first; empty when the program keeps no
-/// audit log.
+/// (events themselves are removed once delivered), newest first unless `order=asc`; paged with
+/// `limit` / `cursor`; empty when the program keeps no audit log.
 #[utoipa::path(
     get,
     path = "/devtools/events",
     extensions(("x-permissions" = json!(["kernel.devtools.read"]))),
     operation_id = "list_record_events",
     security(("bearer" = [])),
-    params(RecordEventsQuery),
+    params(RecordEventsQuery, PageQuery),
     responses(
-        (status = 200, description = "The events, newest first.", body = Data<Vec<RecordEvent>>),
+        (status = 200, description = "One page of events, newest first.", body = Page<RecordEvent>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing `kernel.devtools.read`.", body = Problem),
-        (status = 422, description = "`object` is not `<kind>:<id>` or `limit` is not between 1 and 200; see `errors`.", body = Problem),
+        (status = 422, description = "`object` is not `<kind>:<id>`, or a paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_record_events(
@@ -528,7 +524,8 @@ async fn list_record_events(
     principal: Principal,
     language: Language,
     Query(query): Query<RecordEventsQuery>,
-) -> Result<Data<Vec<RecordEvent>>, Error> {
+    Query(page): Query<PageQuery>,
+) -> Result<Page<RecordEvent>, Error> {
     principal.require(&crate::ops::request_log::DEVTOOLS_READ)?;
     let mut problems = Vec::new();
     let valid = query.object.len() <= 300
@@ -546,30 +543,23 @@ async fn list_record_events(
             "must be `<record kind>:<id>`, e.g. `content.entry:0190…`",
         ));
     }
-    let limit = query.limit.unwrap_or(50);
-    if !(1..=200).contains(&limit) {
-        problems.push(FieldError::new("limit", "invalid", "must be between 1 and 200"));
-    }
-    if !problems.is_empty() {
-        return Err(Error::validation(problems));
-    }
+    let page = with_filter_problems(problems, PageRequest::try_from(page))?;
     let Some(history) = state.history.get() else {
-        return Ok(Data { data: Vec::new() });
+        let total = page.wants_total().then_some(0);
+        return Ok(Page {
+            data: Vec::new(),
+            pagination: Pagination::new(page.limit(), None).with_total(total),
+        });
     };
-    let lines = history.history(&tenant, &query.object, limit, language).await?;
-    Ok(Data {
-        data: lines
-            .into_iter()
-            .map(|line| RecordEvent {
-                id: line.id,
-                at: line.at,
-                name: line.action,
-                actor_id: line.actor_user_id,
-                actor_name: line.actor_name,
-                text: line.sentence,
-            })
-            .collect(),
-    })
+    let lines = history.history_page(&tenant, &query.object, &page, language).await?;
+    Ok(lines.map(|line| RecordEvent {
+        id: line.id,
+        at: line.at,
+        name: line.action,
+        actor_id: line.actor_user_id,
+        actor_name: line.actor_name,
+        text: line.sentence,
+    }))
 }
 
 /// How many usages.
@@ -657,23 +647,28 @@ pub(crate) struct RecordType {
 /// List the types of record that menus, embeds and notes can point to.
 ///
 /// Any signed-in user; only the types of modules whose `<module>.read` you hold. To find records of
-/// a type, use `GET /api/v1/kernel/find?q=…` with the operator `is:<type>`.
+/// a type, use `GET /api/v1/kernel/find?q=…` with the operator `is:<type>`. By name (`order=desc`
+/// reverses it); paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/records/types",
     extensions(("x-permissions" = json!([]))),
     operation_id = "list_record_types",
     security(("bearer" = [])),
+    params(NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "The types, sorted by name.", body = Data<Vec<RecordType>>),
+        (status = 200, description = "One page of types, by name.", body = Page<RecordType>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_record_types(
     State(state): State<Arc<RecordsState>>,
     principal: Principal,
-) -> Result<Data<Vec<RecordType>>, Error> {
-    let mut types: Vec<RecordType> = state
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<RecordType>, Error> {
+    let page = PageRequest::try_from(page)?;
+    let types: Vec<RecordType> = state
         .resources
         .types()
         .into_iter()
@@ -692,8 +687,9 @@ async fn list_record_types(
             })
         })
         .collect();
-    types.sort_by(|a, b| a.kind.cmp(&b.kind));
-    Ok(Data { data: types })
+    // Loại bản ghi do module khai trong code (sổ tài nguyên cố định theo bản build): phân trang trong bộ nhớ
+    // theo tên loại (D-20261125-list-pages mục 4).
+    page_of(types, |kind| kind.kind.clone(), &page)
 }
 
 pub(crate) fn routes(state: RecordsState) -> OpenApiRouter {

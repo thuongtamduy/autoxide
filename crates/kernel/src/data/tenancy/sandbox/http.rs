@@ -15,7 +15,7 @@ use super::service::{NewSandbox, Sandbox, SandboxCreated, TenantSandboxes};
 use crate::access::Principal;
 use crate::error::Error;
 use crate::http::ValidJson;
-use crate::pagination::{Page, PageQuery, PageRequest};
+use crate::pagination::{NaturalOrderPageQuery, Page, PageQuery, PageRequest, page_of};
 use crate::response::{Created, Data, Problem};
 use crate::tenancy::TenantContext;
 
@@ -200,23 +200,39 @@ async fn list_sandbox_messages(
 /// List the kinds of records that can be promoted from a sandbox.
 ///
 /// Requires `kernel.sandboxes.read`. Each module declares its own kinds (pages, mail templates…).
+/// By kind (`order=desc` reverses it); paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/sandboxes/promotable",
     extensions(("x-permissions" = json!(["kernel.sandboxes.read"]))),
     operation_id = "list_sandbox_promotable",
     security(("bearer" = [])),
+    params(NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "Every kind that can be promoted.", body = Data<Vec<PromotableKind>>),
+        (status = 200, description = "One page of kinds that can be promoted, by kind.", body = Page<PromotableKind>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `kernel.sandboxes.read`; code `permission_denied`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_promotable(
     State(service): State<Arc<TenantSandboxes>>,
     principal: Principal,
-) -> Result<Data<Vec<PromotableKind>>, Error> {
-    Ok(Data { data: service.promotable(&principal)? })
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<PromotableKind>, Error> {
+    principal.require(&super::SANDBOXES_READ)?;
+    let page = PageRequest::try_from(page)?;
+    promotable_page(&service, &principal, &page)
+}
+
+/// One page of the promotable kinds, by kind. The kinds are declared in code by the modules (a fixed set per
+/// build), so the page is cut in memory (D-20261125-list-pages item 4).
+pub(super) fn promotable_page(
+    service: &TenantSandboxes,
+    principal: &Principal,
+    page: &PageRequest,
+) -> Result<Page<PromotableKind>, Error> {
+    page_of(service.promotable(principal)?, |kind| kind.kind.clone(), page)
 }
 
 /// Promote records tried in a sandbox to the real tenant, as drafts.
