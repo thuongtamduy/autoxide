@@ -50,7 +50,7 @@ jobs:
         env:
           VERSION: ${{ steps.release.outputs.version }}
         run: scripts/release-time-to-first-request.sh "$VERSION" "$GH_REPO" | tee first-request.json
-      # Bộ eval agent của G4: file kết quả `docs/quality/agent-eval.json` nếu bản này có (cùng commit phát hành).
+      # Bộ eval agent của G4: file kết quả `docs/quality/agent-eval.json` (định dạng agent-eval.schema.json) nếu bản này có.
       - name: Table
         env:
           VERSION: ${{ steps.release.outputs.version }}

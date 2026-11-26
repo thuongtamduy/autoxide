@@ -184,7 +184,7 @@ cả năm đều đã đo và đạt (chủ dự án duyệt lúc chốt, D-2026
 | Tải về → request đầu tiên | dưới 5 phút | `scripts/release-time-to-first-request.sh`: máy sạch làm đúng Quickstart của README (tải `compose.quickstart.yml` của tag, tạo `.env`, `docker compose up`, đọc mật khẩu admin, đăng nhập, `GET /auth/me`), tính giây | Có. Chỉ là **phần máy** (tải image, khởi động, một request): thời gian người đọc tài liệu không nằm ở đây |
 | Người mới xong module đầu tiên | dưới 30 phút | Hai số **riêng, không gộp** (bên dưới): người thật có bấm giờ; agent context sạch | Một phần: bảng đọc `docs/quality/first-module-timing.json`; việc đo thì làm tay mỗi bản |
 | Nâng cấp trong CI | 100% thành công | Job `upgrade` của `ci.yml` trên đúng commit phát hành (ma trận nhiều khách, bản cũ nhất, rollback do G3 dựng): báo cáo chỉ **đọc** kết quả, không dựng job riêng | Có |
-| Agent thật xong việc mẫu | trên 90% | Bộ eval agent của G4: báo cáo chỉ đọc file `{"tasks": N, "passed": M}` (`--agent-eval`); chưa có thì "chờ G4" | Có, khi G4 xuất file |
+| Agent thật xong việc mẫu | trên 90% | Bộ eval agent của G4: báo cáo chỉ đọc file kết quả của một lần chạy (`docs/quality/agent-eval.json` tại commit phát hành, định dạng `docs/quality/agent-eval.schema.json`: model, ngày, số việc, số xong, chi phí, danh sách việc fail); chưa có thì "chờ G4" | Có, khi G4 xuất file |
 | p95 đường nóng không tệ đi | không vượt số gốc × 1.5 + 2 ms | Lần chạy gần nhất của `load.yml` trên `main` (đo tải hằng tuần, số gốc ở `docs/quality/load-baseline.json`) | Có |
 
 ### Đo "người mới xong module đầu tiên" cho trung thực

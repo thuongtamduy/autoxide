@@ -77,8 +77,14 @@ def agent_eval(path: str | None):
     if not path or not Path(path).exists():
         return "chờ G4 (chưa có file kết quả eval)", None
     data = json.loads(Path(path).read_text())
+    # Định dạng: docs/quality/agent-eval.schema.json. Thiếu trường bắt buộc là lỗi (không đoán).
+    for key in ("model", "date", "tasks", "passed", "failed"):
+        if key not in data:
+            raise SystemExit(f"{path}: thiếu trường `{key}` (xem docs/quality/agent-eval.schema.json)")
     ratio = data["passed"] / max(data["tasks"], 1)
-    return f"{data['passed']}/{data['tasks']} việc mẫu = {100 * ratio:.0f}% (ngưỡng > {100 * AGENT_EVAL_MIN_RATIO:.0f}%)", ratio > AGENT_EVAL_MIN_RATIO
+    cost = f", {data['cost_usd']:.2f} USD" if "cost_usd" in data else ""
+    return (f"{data['passed']}/{data['tasks']} việc mẫu = {100 * ratio:.0f}% ({data['model']}, {data['date']}{cost}; "
+            f"ngưỡng > {100 * AGENT_EVAL_MIN_RATIO:.0f}%)"), ratio > AGENT_EVAL_MIN_RATIO
 
 
 def p95(repo: str):
