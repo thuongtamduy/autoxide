@@ -4,7 +4,7 @@
 //! bị từ chối gửi lại cùng số, lập thay cần uỷ nhiệm, hoá đơn máy tính tiền, ghi sổ và huỷ đảo sổ,
 //! điều chỉnh / thay thế.
 
-use autoxide_kernel::time::Timestamp;
+use autoxide_kernel::time::{Date, Timestamp};
 use std::sync::Arc;
 
 use autoxide_kernel::einvoice::EInvoiceProvider;
@@ -719,6 +719,62 @@ async fn nhap_tinh_lai_thue_theo_ngay_lap() {
         let issued = invoices(&app).issue(&tenant, Actor::system(), found.id).await.unwrap();
         assert_eq!((issued.tax.minor(), issued.total.minor()), (10_000, 110_000));
         assert_eq!(issued.lines.iter().map(|line| line.tax.minor()).sum::<i64>(), 10_000);
+
+        // Sửa dòng cùng lúc với lập (kiểm độc lập #560, điểm A): PATCH ghi lại ĐÚNG ảnh chụp thuế cũ (cùng ngày
+        // thuế D) nên so ảnh chụp không thấy; so `updated_at` thì thấy. Kết quả hợp lệ: lập báo `draft_changed`,
+        // PATCH bị từ chối `invoices.not_draft` (lập xong trước), hoặc hoá đơn mang dòng mới — không bao giờ
+        // hoá đơn mang dòng cũ sau khi PATCH đã thành công.
+        let day = Date::new(year, 1, 1).unwrap();
+        let day = if day == Timestamp::now().date_in(&vietnam) { Date::new(year, 1, 2).unwrap() } else { day };
+        let line_of = |price: i64| {
+            json!({"description": "Service fee", "kind": "service", "quantity": "1",
+                   "unit_price": {"amount": price.to_string(), "currency": "VND"}, "tax_category": "vat.standard"})
+        };
+        let (mut changed, mut refused, mut new_lines) = (0, 0, 0);
+        for round in 0..8 {
+            let body = json!({"kind": "vat_invoice", "currency": "VND", "reference": format!("R-{round}"),
+                "buyer": {"kind": "business", "name": "Buyer Co", "tax_code": "0101234567"}, "lines": [line_of(100_000)]});
+            let (status, created) = call(&app, "POST", "/documents", Some(body)).await;
+            assert_eq!(status, StatusCode::CREATED, "{created}");
+            let id: Uuid = created["data"]["id"].as_str().unwrap().parse().unwrap();
+            let path = format!("/documents/{id}");
+            // a. Ảnh chụp thật S, ngày thuế D.
+            let (status, patched) =
+                call(&app, "PATCH", &path, Some(json!({"issue_date": day, "lines": [line_of(100_000)]}))).await;
+            assert_eq!(status, StatusCode::OK, "{patched}");
+            // b. Bỏ ngày lập, giữ S: lúc lập sẽ tính lại theo hôm nay.
+            write
+                .execute_raw(autoxide_kernel::database::statement(
+                    backend,
+                    "UPDATE invoices_documents SET issue_date = NULL WHERE id = $1",
+                    [id.into()],
+                ))
+                .await
+                .unwrap();
+            // c. Chạy đua: PATCH ghi lại đúng S (cùng D) với dòng 200.000.
+            let change = json!({"issue_date": day, "lines": [line_of(200_000)]});
+            let service = invoices(&app);
+            let (patched, issued) =
+                tokio::join!(call(&app, "PATCH", &path, Some(change)), service.issue(&tenant, Actor::system(), id));
+            match issued {
+                Ok(issued) if patched.0 == StatusCode::OK => {
+                    assert_eq!(issued.lines[0].unit_price.minor(), 200_000, "round {round}: {issued:?}");
+                    new_lines += 1;
+                }
+                Ok(issued) => {
+                    assert_eq!(patched.0, StatusCode::CONFLICT, "round {round}: {:?}", patched.1);
+                    assert_eq!(patched.1["code"], "invoices.not_draft", "round {round}");
+                    assert_eq!(issued.lines[0].unit_price.minor(), 100_000, "round {round}");
+                    refused += 1;
+                }
+                Err(error) => {
+                    assert_eq!(error.code(), "invoices.draft_changed", "round {round}");
+                    assert_eq!(patched.0, StatusCode::OK, "round {round}");
+                    changed += 1;
+                }
+            }
+        }
+        assert!(changed + new_lines > 0, "draft_changed {changed}, new lines {new_lines}, refused {refused}");
     })
     .await
     .unwrap();

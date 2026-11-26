@@ -35,7 +35,11 @@ main operations are MCP tools (`promotions.*`).
 `POST /promotions/{id}/activate` runs the same checks and fails with every failed check in `errors`:
 
 - the discount limit in force (50% of the price just before the promotion in Viet Nam, unlimited for a
-  national promotion programme), using the catalog's price history;
+  national promotion programme), using the catalog's price history. Decree 239/2026/ND-CP (26 June 2026)
+  repealed the limits of Decree 81/2018/ND-CP Articles 6 and 7 and left them to the Ministry of Industry and
+  Trade; the circular is not found yet, so pack `vn` version 2 keeps 50% as a cautious default with the new
+  basis, and keeps the 120 discount days a year that one summary says the decree dropped — check the original
+  texts;
 - discount days per programme and per year;
 - the promotion notice recorded for each authority (`PATCH /promotions/{id}/notices/{authority}`; the
   province comes from the unit setting `promotions.notice_province`);

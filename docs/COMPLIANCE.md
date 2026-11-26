@@ -32,8 +32,12 @@ complaints, and tracking tags with cookie consent.
 
 ## The Ministry of Industry and Trade procedure
 
-Vietnamese law (Decree 52/2013/ND-CP as amended by Decree 85/2021/ND-CP; from 1 July 2026 also the
-E-commerce Law 122/2025/QH15 and its decrees — check the originals) requires:
+Vietnamese law (from 1 July 2026 the E-commerce Law 122/2025/QH15 and Decree 248/2026/ND-CP, which
+replaces Decrees 52/2013/ND-CP and 85/2021/ND-CP; before that, those two decrees — check the originals)
+requires the items below. The rules `moit.checklist.*` version 2 apply from 1 July 2026. A website notified or
+registered before then files again under the new decree within the transition period (one summary says 30 June
+2027 — not confirmed); electronic identity checks of sellers and livestreamers apply from 1 January 2027. Which
+authority receives the files, whether online.gov.vn and the logos stay, is not confirmed yet — check.
 
 - a **sales website** (you sell your own goods) to be **notified** to the ministry — it then shows a
   blue "Đã thông báo Bộ Công Thương" logo;
@@ -218,8 +222,10 @@ professional.
 
 ### Data residency
 
-A tenant can be required to keep its data in one country (Cybersecurity Law 116/2025/QH15, Decree
-53/2022/ND-CP — who must keep data in Vietnam needs a legal check):
+A tenant can be required to keep its data in one country (Cybersecurity Law 116/2025/QH15, in force 1 July
+2026, replacing the Cybersecurity Law 2018 and the Network Information Security Law 2015; its implementing
+decree, reported as Decree 333/2026/ND-CP, replaces Decree 53/2022/ND-CP — not confirmed. Who must keep data in
+Vietnam needs a legal check):
 
 ```bash
 autoxide placement country main VN          # record where a placement's servers are
@@ -267,7 +273,10 @@ phone or from an authority is recorded so it is not lost:
 - `POST /subject-requests` with `kind` (`access`, `erasure`, `rectification`, `objection`, `restriction`,
   `withdrawal`), `channel` (`email`, `post`, `phone`, `authority`, `other`), `subject` (a user id, an email
   address or a phone number) and `received_at`. `due_at` comes from the legal rule `privacy.subject_requests`
-  in force when it was received (72 hours by default — check the original texts).
+  in force when it was received: 72 hours, stricter than the 2 working days to answer of Decree 356/2025/ND-CP
+  Article 5 (which replaced Decree 13/2023/ND-CP). Version 2 of the rule also lists the days to carry the
+  request out by kind (`fulfil_within_days`, from secondary sources) for reference; Autoxide does not track
+  that second deadline yet — check the original texts.
 - `POST /subject-requests/{id}/fulfil`: `access` of a user returns the personal data of every module (send
   it to the person; it is not stored); `erasure` / `withdrawal` of an email or phone number empties it from
   the consent ledger (the hashed key and the records stay as proof, so nothing is sent again). Erasing a
@@ -285,7 +294,8 @@ the identity verification result stay for the time the law requires. The persona
 Intellectual property infringements, counterfeits and prohibited goods are reported as **cases**;
 so are consumer complaints. A case goes: intake → (hide the target) → answer of the reported party →
 decision, with deadlines and a log that only grows. Basis — check the original texts: E-commerce Law
-2025, Intellectual Property Law, Decree 85/2021/ND-CP (take-down on request of an authority), Consumer
+122/2025/QH15 and Decree 248/2026/ND-CP (from 1 July 2026; take-down on request of an authority, Decree
+85/2021/ND-CP before), Intellectual Property Law, Consumer
 Protection Law 19/2023/QH15 and Decree 55/2024/ND-CP (complaints).
 
 | Who | Endpoints (under `/api/v1/compliance`) |

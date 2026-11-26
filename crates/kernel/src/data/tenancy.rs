@@ -33,6 +33,7 @@ pub(crate) mod migration_runs;
 pub(crate) mod moves;
 pub(crate) mod org_settings;
 pub(crate) mod org_tree;
+mod placement_health;
 mod placements;
 mod registry;
 pub mod relocate;
@@ -68,12 +69,23 @@ pub use domains::{
 pub use erasure::{TENANTS_DELETE, TenantErasure};
 pub use exports::{DATA_EXPORT, TenantExport, TenantExportLink, TenantExports};
 pub use link_token::{OptionalTenant, link_token, resolve_link_token, split_link_token};
+pub use migration_runs::PlacementMigrationQueue;
+
+/// The `kernel.placements` check of `autoxide doctor`.
+pub(crate) fn placement_health(
+    registry: DatabaseRegistry,
+) -> std::sync::Arc<dyn crate::doctor::Probe> {
+    std::sync::Arc::new(placement_health::PlacementHealth { registry })
+}
 pub use moves::{
     TENANTS_MOVE, TenantMove, TenantMoveBlocker, TenantMovePlan, TenantMoves, TenantTableRows,
 };
 pub use org_settings::{OrgSetting, OrgSettingCatalog, OrgSettingCheck};
 pub use org_tree::{OrgTree, nearest, root_immutable, root_of};
-pub use placements::{NewPlacement, PlacementCheck, PlacementMigrations, Placements, SchemaState};
+pub use placements::{
+    MigrationReport, NewPlacement, PlacementCheck, PlacementFailure, PlacementMigrations,
+    Placements, SchemaState,
+};
 pub use registry::{
     ChildTenant, DatabaseRegistry, FileStore, PLACEMENT_READ_URL, PLACEMENT_STORAGE, PLACEMENT_URL,
 };
@@ -484,6 +496,11 @@ impl TenantContext {
 
     pub fn placement(&self) -> PlacementId {
         self.0.placement
+    }
+
+    /// The tenant's database handles (`crate::db`): every tenant record is filtered by this tenant.
+    pub fn db(&self) -> crate::db::TenantDb<'_> {
+        crate::db::TenantDb::new(self)
     }
 
     /// The database that holds the tenant's data.

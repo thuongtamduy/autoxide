@@ -20,6 +20,7 @@ cargo run -p autoxide -- demo           # a running server with an admin passwor
 
 - What to read: [`docs/GETTING-STARTED.md`](docs/GETTING-STARTED.md), [`STACK.md`](STACK.md) (what is used and why),
   [`docs/MODULE_GUIDE.md`](docs/MODULE_GUIDE.md) (writing a module), [`CONTRIBUTING.md`](CONTRIBUTING.md).
+- A compiler error you do not understand: [`docs/guides/rust-errors.md`](docs/guides/rust-errors.md) covers the seven most common ones.
 - Do not guess a library's API from memory: the libraries here are newer than most models know. Read the
   pinned version's docs, then let `cargo check` confirm.
 

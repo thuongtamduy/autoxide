@@ -247,15 +247,21 @@ impl InvoicesService {
         } else {
             None
         };
-        let snapshot_seen = current.tax_snapshot.clone();
-        let (outbox, jobs, seller, fx, recomputed, snapshot_seen) =
-            (&self.outbox, &self.jobs, &seller, &fx, &recomputed, &snapshot_seen);
+        // Phiên bản của nháp lúc tính lại (như `If-Match`): ảnh chụp thuế không chứa số tiền nên không đủ.
+        let version_seen = current.updated_at;
+        let (outbox, jobs, seller, fx, recomputed) =
+            (&self.outbox, &self.jobs, &seller, &fx, &recomputed);
         let issued = database
             .write_with_retry(move || async move {
                 let transaction = database.begin_write().await?;
                 let row = rows::lock_one(&transaction, document::Entity::find_by_id(id).scoped(tenant))
                     .await?
                     .ok_or_else(document_not_found)?;
+                // Nháp bị sửa sau khi thuế được tính lại ngoài transaction: dòng vừa tính không còn khớp dòng
+                // đã lưu (kiểm ngay sau khi khoá, trước khi cấp số).
+                if recomputed.is_some() && row.status == "draft" && row.updated_at != version_seen {
+                    return Err(draft_changed());
+                }
                 if let Some(principal) = guard {
                     let target = OrgTarget::new(OrgId::from_uuid(row.org_id), None);
                     principal.require_write_at(&transaction, &ISSUE, target).await?;
@@ -333,10 +339,6 @@ impl InvoicesService {
                 let at = now();
                 let mut active: document::ActiveModel = row.clone().into();
                 if let Some(computed) = recomputed {
-                    // Nháp bị sửa trong lúc tính lại: thuế vừa tính không còn khớp dòng đã lưu.
-                    if &row.tax_snapshot != snapshot_seen {
-                        return Err(draft_changed());
-                    }
                     active.subtotal_minor = Set(computed.subtotal.minor());
                     active.tax_minor = Set(computed.tax.minor());
                     active.total_minor = Set(computed.total.minor());
@@ -350,10 +352,18 @@ impl InvoicesService {
                 active.retention_until = Set(Some(retention_until(issue_date)));
                 active.seller = Set(seller.to_string());
                 if let Some(fx) = fx {
+                    // Quy đổi từ đúng tổng sẽ lưu (tính lại, hay tổng đang khoá), không từ tổng đọc ngoài
+                    // transaction — một lần sửa nháp xen giữa không làm sai tổng quy đổi.
+                    let total = recomputed.as_ref().map_or(row.total_minor, |computed| computed.total.minor());
+                    let base_total = Money::new(total, Currency::parse(&row.currency)?).convert(
+                        fx.rate,
+                        fx.base_total.currency(),
+                        autoxide_kernel::decimal::Rounding::HalfUp,
+                    )?;
                     active.exchange_rate = Set(Some(autoxide_kernel::decimal::to_column(fx.rate)));
                     active.exchange_rate_id = Set(Some(fx.rate_id));
-                    active.base_currency = Set(Some(fx.base_total.currency().code().to_owned()));
-                    active.base_total_minor = Set(Some(fx.base_total.minor()));
+                    active.base_currency = Set(Some(base_total.currency().code().to_owned()));
+                    active.base_total_minor = Set(Some(base_total.minor()));
                 }
                 active.issued_by = Set(actor.user_id);
                 active.issued_at = Set(Some(at));

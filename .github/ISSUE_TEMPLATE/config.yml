@@ -1,4 +1,14 @@
 # Issue mới phải đi qua một mẫu. Lỗ hổng bảo mật thì báo riêng: GitHub tự hiện lối "Report a
 # security vulnerability" trong trang chọn mẫu khi repo có SECURITY.md và bật private
-# vulnerability reporting, nên không cần link cứng (link cứng phải ghi tên chủ repo).
+# vulnerability reporting, nên không cần link cứng cho lối đó.
 blank_issues_enabled: false
+contact_links:
+  - name: Question or help using Autoxide
+    url: https://github.com/thuongtamduy/autoxide/discussions
+    about: Ask usage and design questions in GitHub Discussions, not in issues. See SUPPORT.md first.
+  - name: Propose a larger change (RFC)
+    url: https://github.com/thuongtamduy/autoxide/blob/main/GOVERNANCE.md#proposing-a-change-the-rfc-process
+    about: New core capabilities, convention changes and anything costly to undo start as an RFC pull request.
+  - name: Report a code of conduct violation
+    url: https://github.com/thuongtamduy/autoxide/blob/main/CODE_OF_CONDUCT.md
+    about: Conduct reports go to the maintainers privately; do not open a public issue.
