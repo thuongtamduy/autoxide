@@ -548,6 +548,11 @@ impl OrdersService {
             if self.reasons.ensure(tenant, REVIEW_HIDDEN, code).await.is_err() {
                 return Err(errors::moderation_reason_invalid());
             }
+            // Luật chỉ cho ẩn đánh giá vì một số lý do (quy tắc `moderation.hide_reasons` của `compliance`, có
+            // ngày hiệu lực): mã khách tự thêm không ánh xạ được thì bị từ chối (LG-12).
+            if let Some(policy) = &self.moderation {
+                policy.check_hide_reason(tenant.id(), "reviews", legal_hide_reason(code)).await?;
+            }
         }
         let actor = Actor::user(principal.user_id());
         let moderator = principal.user_id();
@@ -1016,5 +1021,17 @@ impl BadgeResolver for VerifiedBuyer {
         } else {
             Ok(Vec::new())
         }
+    }
+}
+
+/// Mã lý do ẩn đánh giá của `orders` → mã của quy tắc luật `moderation.hide_reasons` (`compliance`). Mã khách tự
+/// thêm giữ nguyên — quy tắc không có thì bị từ chối.
+fn legal_hide_reason(code: &str) -> &str {
+    match code {
+        "unlawful_content" => "illegal_content",
+        "abusive_language" => "offensive",
+        "spam_or_advertising" => "spam",
+        "not_about_product" => "unrelated",
+        other => other,
     }
 }

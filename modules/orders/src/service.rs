@@ -42,6 +42,7 @@ pub(crate) struct Parts {
     pub posting: autoxide_kernel::access::PostingVerification,
     pub text_model: Option<Arc<dyn autoxide_kernel::ai::TextModel>>,
     pub custom_fields: autoxide_kernel::custom_fields::CustomFields,
+    pub moderation: Option<Arc<dyn autoxide_kernel::moderation::ModerationPolicy>>,
 }
 
 pub(crate) struct OrdersService {
@@ -73,6 +74,9 @@ pub(crate) struct OrdersService {
     pub text_model: Option<Arc<dyn autoxide_kernel::ai::TextModel>>,
     /// Ô người mua nhập lúc đặt hàng (trường tự định nghĩa, D-235).
     pub custom_fields: autoxide_kernel::custom_fields::CustomFields,
+    /// Quy tắc ẩn đánh giá theo luật (`compliance`, quy tắc `moderation.hide_reasons` có ngày hiệu lực, LG-12);
+    /// chưa cài `compliance`: chỉ danh sách lý do của `orders`.
+    pub moderation: Option<Arc<dyn autoxide_kernel::moderation::ModerationPolicy>>,
     pub config: OrdersConfig,
 }
 
@@ -97,6 +101,7 @@ impl OrdersService {
             invoices: parts.invoices,
             notifier: parts.notifier,
             posting: parts.posting,
+            moderation: parts.moderation,
             text_model: parts.text_model,
             custom_fields: parts.custom_fields,
             config,

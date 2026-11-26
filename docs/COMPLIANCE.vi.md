@@ -327,7 +327,10 @@ Tool MCP: `compliance.list_cases`, `compliance.get_case` (đọc), `compliance.a
 
 - **Ẩn đánh giá.** Nội dung của người tiêu dùng chỉ được ẩn vì các lý do của quy tắc
   `moderation.hide_reasons` (`spam`, `illegal_content`, `personal_data`, `unrelated`, `offensive` — cần
-  đối chiếu). Module kiểm duyệt đánh giá hỏi trait `ModerationPolicy` trước khi ẩn
+  đối chiếu). Module kiểm duyệt đánh giá hỏi trait `ModerationPolicy` (`autoxide_kernel::moderation`) trước khi
+  ẩn — `orders` ánh xạ lý do của mình (`unlawful_content` → `illegal_content`, `abusive_language` → `offensive`,
+  `spam_or_advertising` → `spam`, `not_about_product` → `unrelated`), nên lý do khách tự thêm không ẩn được
+  đánh giá khi đã cài `compliance`
   (`compliance.hide_reason_not_allowed`, 422) và ghi lý do trong event của chính nó; danh sách công khai ở
   `GET /public/moderation-reasons`. Đánh giá tiêu cực mà hợp lệ vẫn hiện.
 - **Điều kiện giao dịch chung** là văn bản pháp lý có phiên bản loại `general_conditions`, công khai ở

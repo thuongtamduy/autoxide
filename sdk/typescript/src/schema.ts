@@ -19460,6 +19460,14 @@ export type OrdersContactRequest = {
 
 /** A document of an order (invoice or adjustment). */
 export type OrdersDocument = {
+  /**
+   * `true`: this invoice's tax or total differs from what was settled on the order — the invoice
+   * computes tax at its own date (the tax point), so a tax rate change between ordering and
+   * invoicing (e.g. the end of the 8% VAT on 2026-12-31) shows here. Check the invoice and settle
+   * the difference with the buyer. Always `false` for an adjustment, or when part of the order was
+   * cancelled.
+   */
+  differs_from_order: boolean;
   document_id: string;
   issue_date?: string | null;
   /** `sales`, `cash_register` or `adjustment` (after a return). */
@@ -24061,6 +24069,14 @@ export type Page_OrdersCodRule = {
 export type Page_OrdersDocument = {
   /** The items of this page, in the requested order. */
   data: {
+    /**
+     * `true`: this invoice's tax or total differs from what was settled on the order — the invoice
+     * computes tax at its own date (the tax point), so a tax rate change between ordering and
+     * invoicing (e.g. the end of the 8% VAT on 2026-12-31) shows here. Check the invoice and settle
+     * the difference with the buyer. Always `false` for an adjustment, or when part of the order was
+     * cancelled.
+     */
+    differs_from_order: boolean;
     document_id: string;
     issue_date?: string | null;
     /** `sales`, `cash_register` or `adjustment` (after a return). */

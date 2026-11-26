@@ -59,7 +59,9 @@ curl -X POST https://api.example.com/api/v1/tax/quote \
 - **The order's tax is an estimate; the invoice decides.** The law ties the VAT tax point to the transfer of
   ownership of goods (delivery) or the completion of a service. An order taxes at the day it is placed; its
   invoice taxes at its own issue date (`orders.invoice_timing`, `on_delivered` by default). When a rate
-  changes in between, the invoice uses the new rate — settle the difference with the buyer. A draft invoice is re-taxed at issue
+  changes in between, the invoice uses the new rate and the order's documents
+  (`GET …/orders/me/orders/{id}/documents`) show `differs_from_order: true` — settle the difference with the
+  buyer. A draft invoice is re-taxed at issue
   when it was computed on another day. Adjustments and replacements keep the tax date (rate) of the invoice
   they correct. Ledger entries of orders and invoices are dated with the same tax date. `autoxide doctor`
   warns when an imported tax jurisdiction declares no `tax_date.time_zone`.

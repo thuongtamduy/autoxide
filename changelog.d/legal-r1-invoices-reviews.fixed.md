@@ -1,0 +1,10 @@
+- Cancelling an e-invoice already sent to the tax authority is refused with `409 invoices.einvoice_not_cancellable`
+  when the seller's tax jurisdiction forbids it (Vietnam since 2025-06-01, Decree 70/2025/ND-CP — tax pack rule
+  `einvoice.cancel_after_submission`, pack `vn` version 3), pointing to an adjustment or a replacement. Before, every
+  cancellation through SePay failed with `not_supported`. An e-invoice the tax authority rejected is cancelled locally.
+- Order documents (`GET …/orders/me/orders/{id}/documents` and the staff and guest variants) have
+  `differs_from_order`: `true` when the invoice's tax or total differs from what the order settled, e.g. when the VAT
+  rate changed between ordering and invoicing.
+- Hiding a product review in `orders` now asks the legal rule `moderation.hide_reasons` (module `compliance`) through
+  `ModerationPolicy`, which moved to `autoxide_kernel::moderation` (still re-exported by `autoxide_compliance::api`);
+  a reason a tenant added to its own list can no longer hide a review.

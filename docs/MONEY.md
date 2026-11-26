@@ -87,7 +87,12 @@ with the bank or service.
   booked in the seller's ledger (receivable, revenue, output VAT).
 - **E-invoices** go to a provider (`EInvoiceProvider`, including invoices from cash registers) in a
   background job; a refused invoice is fixed and sent again with the same number. Issued documents
-  are corrected only by an adjustment or a replacement, or cancelled.
+  are corrected only by an adjustment or a replacement, or cancelled. An e-invoice already sent to the tax
+  authority cannot be cancelled where the seller's tax jurisdiction forbids it (Vietnam since 2025-06-01,
+  Decree 70/2025/ND-CP; tax pack rule `einvoice.cancel_after_submission`): `409
+  invoices.einvoice_not_cancellable` with the legal basis — issue an adjustment (`direction: decrease`) or a
+  replacement. One the tax authority rejected is cancelled locally. Autoxide does not send the error notice
+  form 04/SS; lodge it at the provider's or tax authority's portal when it is required.
 - A unit may issue for a seller under a **mandate** (`/invoices/mandates`).
 
 ## Exchange rates and foreign-currency documents

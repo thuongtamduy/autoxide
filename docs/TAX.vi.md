@@ -57,7 +57,8 @@ curl -X POST https://api.example.com/api/v1/tax/quote \
 - **Thuế của đơn là ước tính; hoá đơn quyết định.** Luật gắn thời điểm xác định thuế GTGT với lúc chuyển
   giao quyền sở hữu hàng (giao hàng) hay hoàn thành dịch vụ. Đơn tính thuế theo ngày đặt; hoá đơn của đơn
   tính theo ngày lập của nó (`orders.invoice_timing`, mặc định `on_delivered`). Thuế suất đổi ở giữa thì hoá
-  đơn dùng thuế suất mới — xử lý chênh lệch với người mua. Nháp hoá đơn tính vào ngày khác được tính lại khi lập. Hoá đơn điều chỉnh, thay thế giữ ngày thuế
+  đơn dùng thuế suất mới và chứng từ của đơn (`GET …/orders/me/orders/{id}/documents`) hiện
+  `differs_from_order: true` — xử lý chênh lệch với người mua. Nháp hoá đơn tính vào ngày khác được tính lại khi lập. Hoá đơn điều chỉnh, thay thế giữ ngày thuế
   (thuế suất) của hoá đơn gốc. Bút toán sổ cái của đơn và hoá đơn ghi theo cùng ngày thuế. `autoxide doctor`
   cảnh báo khi vùng thuế đã nhập không khai `tax_date.time_zone`.
 - Câu trả lời có `snapshot` (thuế suất và ID, phiên bản gói, cách làm tròn): lưu kèm chứng từ.

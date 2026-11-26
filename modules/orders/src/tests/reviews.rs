@@ -9,6 +9,7 @@ use std::sync::Arc;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::ai::TextModel;
 use autoxide_kernel::event::Event;
+use autoxide_kernel::moderation::ModerationPolicy;
 use autoxide_testkit::TestDatabase;
 use autoxide_testkit::ai::FakeTextModel;
 use axum::http::StatusCode;
@@ -31,7 +32,41 @@ impl Event for UserDeleted {
     const NAME: &'static str = autoxide_kernel::privacy::USER_DELETED;
 }
 
+/// Quy tắc ẩn giả (thay `compliance`): chỉ cho `personal_data`, ghi lại mã được hỏi.
+#[derive(Default)]
+struct Policy(std::sync::Mutex<Vec<String>>);
+
+#[async_trait::async_trait]
+impl ModerationPolicy for Policy {
+    async fn hide_reasons(
+        &self,
+        _: autoxide_kernel::tenancy::TenantId,
+        _: &str,
+    ) -> Result<Vec<String>, autoxide_kernel::error::Error> {
+        Ok(vec!["personal_data".to_owned()])
+    }
+    async fn check_hide_reason(
+        &self,
+        _: autoxide_kernel::tenancy::TenantId,
+        surface: &str,
+        reason: &str,
+    ) -> Result<(), autoxide_kernel::error::Error> {
+        self.0.lock().unwrap().push(format!("{surface}:{reason}"));
+        if reason == "personal_data" {
+            return Ok(());
+        }
+        Err(autoxide_kernel::error::Error::validation(vec![
+            autoxide_kernel::error::FieldError::new(
+                "reason",
+                "not_allowed",
+                "is empty, too long or repeated",
+            ),
+        ]))
+    }
+}
+
 struct World {
+    policy: Arc<Policy>,
     shop: Shop,
     auth: Arc<std::sync::Mutex<Option<autoxide_kernel::event::Outbox>>>,
     model: Arc<FakeTextModel>,
@@ -44,16 +79,21 @@ async fn world(test: &TestDatabase) -> World {
     }));
     let (auth, outbox) = Emitter::new("auth", &[autoxide_kernel::privacy::USER_DELETED]);
     let model_in = model.clone();
+    let policy = Arc::new(Policy::default());
+    let policy_in = policy.clone();
     let shop = shop_with(test, move |mut builder, _| {
         for index in 0..VOTERS {
             let name: &'static str = Box::leak(format!("voter{index}").into_boxed_str());
             builder =
                 builder.principal(name, Principal::customer(Uuid::from_u128(500 + index as u128)));
         }
-        builder.module(auth).provide::<dyn TextModel>(model_in)
+        builder
+            .module(auth)
+            .provide::<dyn TextModel>(model_in)
+            .provide::<dyn ModerationPolicy>(policy_in)
     })
     .await;
-    World { shop, auth: outbox, model }
+    World { policy, shop, auth: outbox, model }
 }
 
 /// Đánh giá `rating` sao cho dòng `line` của đơn `order` (người mua `buyer1`).
@@ -136,10 +176,24 @@ async fn chi_nguoi_da_nhan_hang_danh_gia_va_an_can_ly_do_trong_danh_sach() {
             assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{refused}");
             assert_eq!(refused["code"], "orders.moderation_reason_invalid");
         }
+        // Mã có trong danh sách của `orders` mà quy tắc luật không cho (LG-12): bị từ chối.
+        let (status, refused) = boss
+            .send(
+                "POST",
+                &moderation,
+                Some(json!({"action": "hide", "reason": "abusive_language"})),
+            )
+            .await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{refused}");
         let (status, hidden) = boss
             .send("POST", &moderation, Some(json!({"action": "hide", "reason": "personal_data"})))
             .await;
         assert_eq!(status, StatusCode::OK, "{hidden}");
+        // Quy tắc luật được hỏi với mã đã ánh xạ.
+        assert_eq!(
+            world.policy.0.lock().unwrap().clone(),
+            vec!["reviews:offensive".to_owned(), "reviews:personal_data".to_owned()]
+        );
         assert_eq!(hidden["data"]["status"], "hidden");
         let (_, stats) = Call::as_guest(shop, None).send("GET", &stats_uri, None).await;
         assert_eq!(stats["data"]["count"], 0);

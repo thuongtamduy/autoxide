@@ -14,7 +14,9 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::error::Error;
 use crate::event::Delivered;
+use crate::tenancy::TenantId;
 
 /// Target is temporarily hidden (pending case handling, or the case concluded there is a violation).
 pub const TARGET_RESTRICTED: &str = "compliance.target_restricted";
@@ -69,6 +71,27 @@ pub fn restriction(event: &Delivered) -> Option<(RestrictionChange, Restriction)
         _ => return None,
     };
     serde_json::from_value(event.payload.clone()).ok().map(|payload| (change, payload))
+}
+
+/// Consumer content moderation rule (step 37, D-364; Law on Protection of Consumers' Rights 19/2023/QH15,
+/// Decree 55/2024/ND-CP — check against the original text): a platform must not hide reviews contrary to the
+/// rules. Modules that hide buyer reviews / content (e.g. reviews of `orders`) ask before hiding and record the reason in
+/// their own event. The list of reasons is the rule `moderation.hide_reasons` (data with effective dates).
+/// Published by the `compliance` module; when it is not installed, modules fall back to their own reason
+/// lists.
+#[async_trait::async_trait]
+pub trait ModerationPolicy: Send + Sync {
+    /// The reason codes allowed for hiding at `surface` (e.g. `reviews`, `comments`).
+    async fn hide_reasons(&self, tenant: TenantId, surface: &str) -> Result<Vec<String>, Error>;
+
+    /// Whether `reason` is allowed at `surface`; if not → `compliance.hide_reason_not_allowed`
+    /// (422, with `allowed`).
+    async fn check_hide_reason(
+        &self,
+        tenant: TenantId,
+        surface: &str,
+        reason: &str,
+    ) -> Result<(), Error>;
 }
 
 #[cfg(test)]
