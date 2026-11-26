@@ -212,5 +212,6 @@
   "text:Product": "Sản phẩm",
   "text:Use to feature one product with its picture, current price and rating.": "Dùng để giới thiệu một sản phẩm kèm ảnh, giá hiện tại và điểm đánh giá.",
   "text:Collection": "Bộ sưu tập",
-  "text:Use to show the products of a collection the shop prepared, in the collection's order.": "Dùng để hiện sản phẩm của một bộ sưu tập cửa hàng đã soạn, theo thứ tự của bộ sưu tập."
+  "text:Use to show the products of a collection the shop prepared, in the collection's order.": "Dùng để hiện sản phẩm của một bộ sưu tập cửa hàng đã soạn, theo thứ tự của bộ sưu tập.",
+  "field:must be comma-separated language codes like `en` or `pt-BR`": "phải là các mã ngôn ngữ cách nhau bởi dấu phẩy, như `en` hay `pt-BR`"
 }

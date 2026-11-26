@@ -48,7 +48,7 @@ type Lots = HashMap<(TenantId, Uuid), Arc<tokio::sync::Mutex<Lot>>>;
 
 pub(super) struct SharedCounter {
     throttle: Throttle,
-    /// Đầu tên khoá đếm (`api_key`, `tenant`): hai loại giới hạn không đếm chung.
+    /// Prefix of the counter names (`api_key`, `tenant`), so the two limits never share a counter.
     prefix: &'static str,
     registry: DatabaseRegistry,
     lot: u32,
@@ -65,7 +65,7 @@ impl SharedCounter {
         Self::named(limit, registry, "api_key")
     }
 
-    /// Như [`new`](Self::new), khoá đếm mang đầu tên `prefix`.
+    /// Like [`new`](Self::new), with counter names starting with `prefix`.
     pub(super) fn named(
         limit: RateLimit,
         registry: DatabaseRegistry,
