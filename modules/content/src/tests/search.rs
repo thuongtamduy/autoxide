@@ -227,3 +227,67 @@ async fn tim_cong_khai_co_cho_va_gioi_han_theo_dia_chi() {
     .await
     .unwrap();
 }
+
+/// Mô hình vector chậm khi tính vector của câu tìm (nhà cung cấp quá tải); vector của bài thì tính ngay.
+struct SlowQueries(FakeEmbedder);
+
+#[async_trait::async_trait]
+impl autoxide_kernel::ai::Embedder for SlowQueries {
+    fn enabled(&self) -> bool {
+        self.0.enabled()
+    }
+    fn ready(&self) -> Result<(), autoxide_kernel::error::Error> {
+        self.0.ready()
+    }
+    fn model_id(&self) -> &str {
+        self.0.model_id()
+    }
+    fn dimensions(&self) -> usize {
+        self.0.dimensions()
+    }
+    async fn embed(
+        &self,
+        tenant: &TenantContext,
+        purpose: &'static str,
+        texts: &[String],
+        kind: autoxide_kernel::ai::EmbedKind,
+    ) -> Result<Vec<Vec<f32>>, autoxide_kernel::error::Error> {
+        if kind == autoxide_kernel::ai::EmbedKind::Query {
+            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+        }
+        self.0.embed(tenant, purpose, texts, kind).await
+    }
+}
+
+/// PT-15 (rà soát #548): mô hình vector chậm không làm tìm công khai hỏng — phần tìm theo ý nghĩa có trần riêng, quá thì
+/// trả kết quả theo chữ trong thời gian trả lời, không phải 503.
+#[tokio::test]
+async fn mo_hinh_cham_thi_tim_cong_khai_lui_ve_theo_chu() {
+    TestDatabase::run(async |test| {
+        let (content, _, database) = service_with(
+            test,
+            config(&[("AUTOXIDE_CONTENT_PUBLIC_SEMANTIC_SEARCH", "true")]),
+            Arc::new(FakeTextModel::disabled()),
+            Arc::new(SlowQueries(FakeEmbedder::new(64))),
+        )
+        .await;
+        let tenant = TenantContext::default_on(database.clone());
+        let ada = editor();
+        let dalat = content
+            .create(&tenant, &ada, vi_post("Đà Lạt mùa hoa", "Hoa dã quỳ nở vàng đồi thông."))
+            .await
+            .unwrap();
+        content.publish(&tenant, &ada, dalat.id, None, None, false).await.unwrap();
+        content.index_entry(&tenant, dalat.id).await.unwrap();
+        let started = std::time::Instant::now();
+        let hits = content
+            .search_public(&tenant, None, &query("đà lạt"), &Site::whole(&tenant), None)
+            .await
+            .unwrap();
+        assert!(started.elapsed() < crate::ai::public_limits::TIMEOUT, "{:?}", started.elapsed());
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].matched_by, ["text"]);
+    })
+    .await
+    .unwrap();
+}

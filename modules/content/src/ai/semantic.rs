@@ -382,9 +382,9 @@ impl ContentService {
 
     /// Tìm công khai trên website `site` của người đọc ở địa chỉ `ip`, qua các chốt của
     /// [`public_limits`](super::public_limits): tìm công khai tắt thì 404 như [`search`](Self::search); bật thì giới hạn
-    /// theo địa chỉ, số lượt cùng lúc, và trần thời gian.
+    /// theo địa chỉ, số lượt cùng lúc, trần thời gian trả lời, và trần riêng cho phần tìm theo ý nghĩa.
     pub(crate) async fn search_public(
-        &self,
+        self: &Arc<Self>,
         tenant: &TenantContext,
         principal: Option<&Principal>,
         query: &SearchQuery,
@@ -394,22 +394,47 @@ impl ContentService {
         if !self.config.public_semantic_search {
             return self.search(tenant, principal, query, Some(site)).await;
         }
-        let _slot = self.search_cache.public_limits.admit(
+        let slot = self.search_cache.public_limits.admit(
             ip,
             self.config.public_search_per_address,
             self.config.public_search_concurrency,
         )?;
-        // Quá giờ thì future tìm bị huỷ (truy vấn đọc dở được bỏ), chỗ chạy trả lại khi `_slot` bị huỷ.
-        tokio::time::timeout(
-            super::public_limits::TIMEOUT,
-            self.search(tenant, principal, query, Some(site)),
-        )
-        .await
-        .map_err(|_| super::public_limits::timed_out())?
+        // Lượt tìm chạy trong task riêng giữ `slot` tới khi việc xong thật: hết giờ trả lời hay client ngắt chỉ bỏ phần
+        // chờ ở đây; câu truy vấn và việc tính vector đang chạy vẫn chiếm chỗ cho tới khi xong (`tokio::spawn` cần dữ
+        // liệu sở hữu: chép `Arc` của service và các tham số).
+        let (answer, answered) = tokio::sync::oneshot::channel();
+        let service = Arc::clone(self);
+        let (tenant, principal, query, site) =
+            (tenant.clone(), principal.cloned(), query.clone(), site.clone());
+        tokio::spawn(async move {
+            let _slot = slot;
+            let found = service
+                .search_with(
+                    &tenant,
+                    principal.as_ref(),
+                    &query,
+                    Some(&site),
+                    Some(super::public_limits::MEANING_BUDGET),
+                )
+                .await;
+            let warm = found.as_ref().ok().and_then(|(_, warm)| warm.clone());
+            let _ = answer.send(found.map(|(hits, _)| hits));
+            // Phần ý nghĩa quá giờ: nạp xong index của bản đã đăng ở đây (đã trả lời rồi), để lần sau có sẵn trong bộ nhớ
+            // — không thì mọi lần nạp đều bị cắt giữa chừng và index không bao giờ vào bộ nhớ.
+            if let Some(locale) = warm
+                && let Err(error) = service.loaded(&tenant, Scope::Published, &locale).await
+            {
+                tracing::warn!(code = error.code(), "could not load the published search index");
+            }
+        });
+        match tokio::time::timeout(super::public_limits::TIMEOUT, answered).await {
+            Ok(Ok(found)) => found,
+            Ok(Err(_)) => Err(Error::internal("the public search task ended without an answer")),
+            Err(_) => Err(super::public_limits::timed_out()),
+        }
     }
 
-    /// Tìm bản nháp (người biên tập; cần `content.read`) hay bản công khai (`public`, không cần
-    /// đăng nhập, tắt mặc định).
+    /// Tìm bản nháp hay bản công khai — xem [`search_with`](Self::search_with).
     pub(crate) async fn search(
         &self,
         tenant: &TenantContext,
@@ -417,6 +442,21 @@ impl ContentService {
         query: &SearchQuery,
         site: Option<&autoxide_kernel::tenancy::Site>,
     ) -> Result<Vec<Hit>, Error> {
+        Ok(self.search_with(tenant, principal, query, site, None).await?.0)
+    }
+
+    /// Tìm bản nháp (người biên tập; cần `content.read`) hay bản công khai (`public`, không cần
+    /// đăng nhập, tắt mặc định).
+    /// `meaning_budget`: trần của phần tìm theo ý nghĩa; quá thì chỉ trả kết quả theo chữ, và trả kèm ngôn ngữ có index
+    /// chưa nạp xong (`Some(locale)`) để bên gọi nạp sau.
+    async fn search_with(
+        &self,
+        tenant: &TenantContext,
+        principal: Option<&Principal>,
+        query: &SearchQuery,
+        site: Option<&autoxide_kernel::tenancy::Site>,
+        meaning_budget: Option<Duration>,
+    ) -> Result<(Vec<Hit>, Option<String>), Error> {
         // `site`: tìm công khai trên website đó (chỉ bài hiện trên website, D-307); `None`: bản nháp.
         let public = site.is_some();
         if public {
@@ -458,11 +498,22 @@ impl ContentService {
         }
         let scope = if public { Scope::Published } else { Scope::Draft };
         let by_text = self.text_candidates(tenant, scope, q, &locale, query.kind).await?;
+        let mut unloaded = None;
         let by_meaning = if self.embedder.enabled() && (!public || self.spend_public_budget(tenant))
         {
-            match self.meaning_candidates(tenant, scope, q, &locale).await {
-                Ok(found) => found,
-                Err(error) => {
+            let meaning = self.meaning_candidates(tenant, scope, q, &locale);
+            let outcome = match meaning_budget {
+                None => Some(meaning.await),
+                Some(budget) => tokio::time::timeout(budget, meaning).await.ok(),
+            };
+            match outcome {
+                Some(Ok(found)) => found,
+                None => {
+                    tracing::warn!("search by meaning too slow; matching words only");
+                    unloaded = Some(locale.clone());
+                    Vec::new()
+                }
+                Some(Err(error)) => {
                     // Lỗi embedding (hết hạn mức, nhà cung cấp bận): vẫn trả kết quả theo chữ.
                     tracing::warn!(
                         code = error.code(),
@@ -521,7 +572,7 @@ impl ContentService {
         }
         hits.sort_by(|a, b| b.score.total_cmp(&a.score).then(a.entry_id.cmp(&b.entry_id)));
         hits.truncate(limit as usize);
-        Ok(hits)
+        Ok((hits, unloaded))
     }
 
     /// Mục khớp chữ (không dấu, D-104), mới nhất trước.
