@@ -39,9 +39,12 @@ jobs:
           tag="v${INPUT_VERSION#v}"
           [ -n "$INPUT_VERSION" ] || tag="$RUN_HEAD_BRANCH"
           case "$tag" in v[0-9]*) ;; *) echo "::error::not a release tag: $tag"; exit 1 ;; esac
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
-          echo "sha=$(gh api "repos/$GH_REPO/commits/$tag" --jq .sha)" >> "$GITHUB_OUTPUT"
+          sha="$(gh api "repos/$GH_REPO/commits/$tag" --jq .sha)"
+          {
+            echo "tag=$tag"
+            echo "version=${tag#v}"
+            echo "sha=$sha"
+          } >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ steps.release.outputs.tag }}
