@@ -1,7 +1,7 @@
 //! Dormant mode (step 70 P9, D-20261125-dormant-modules): a module that is in the program but turned off
 //! (`AUTOXIDE_MODULES`) still takes part in personal data and the tenant lifecycle, so its data is never
 //! left out when a person asks for their data or for its deletion, or when a tenant is moved or deleted
-//! (Vietnam, Personal Data Protection Law 91/2025/QH15 and Decree 13/2023/ND-CP; check the original texts).
+//! (Vietnam, Personal Data Protection Law 91/2025/QH15 and Decree 356/2025/ND-CP; check the original texts).
 //!
 //! - A turned-off module never starts: no routes, no MCP tools, no jobs, no event other than
 //!   [`USER_DELETED`](crate::privacy::USER_DELETED), no migrations on a database that never had its tables.

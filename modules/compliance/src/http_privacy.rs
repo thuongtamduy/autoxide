@@ -331,8 +331,8 @@ pub(crate) struct ResidencyRequest {
 /// Platform staff with `compliance.privacy.manage`. Refused when the tenant's placement is not in
 /// that country (or its country is unknown): record it with `autoxide placement country` or move the
 /// tenant first. Moving a tenant later to a placement elsewhere is refused too. Cybersecurity Law
-/// 116/2025/QH15, Decree 53/2022/ND-CP — have a legal professional check who must keep data in
-/// Vietnam.
+/// 116/2025/QH15 and its implementing decree (replacing Decree 53/2022/ND-CP) — have a legal professional
+/// check who must keep data in Vietnam.
 #[utoipa::path(
     put,
     path = "/residency",
