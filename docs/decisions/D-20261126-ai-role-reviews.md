@@ -10,7 +10,9 @@ Quyết định:
      rồi mới đọc mã (hộp xám), chỉ tấn công máy chủ chạy trong chính phiên đó;
    - dùng thử bản RC: phiên đóng vai nhiều kiểu người dùng (người mới / code bằng AI, người viết module, người nối AI agent
      qua MCP, người vận hành, chủ cửa hàng dùng API), chỉ theo tài liệu công khai.
-2. Mỗi việc làm vài vòng: vòng 1 trên `main` hiện tại để lộ vấn đề sớm, sửa, rồi vòng sau; vòng cuối trên bản `1.0.0-rc.N`.
+2. Mỗi việc làm vài vòng: vòng 1 sớm để lộ vấn đề (rà pháp lý và dùng thử: trên `main` hiện tại; kiểm thử bảo mật: sau
+   khi phần code lớn của G1–G4 đã merge, vì lớp kernel, đăng nhập OAuth và nâng cấp sắp thay đổi — đợt pentest nội bộ
+   tháng 11/2026 đã phủ bản hiện tại), sửa, rồi vòng sau; vòng cuối trên bản `1.0.0-rc.N`.
    Điều kiện ra 1.0 là vòng cuối không còn điểm chặn (pháp lý), lỗi mức cao trở lên (bảo mật) hay lỗi hợp đồng mở (RC).
 3. Phiên đóng vai độc lập với phiên viết code: không nhận kết luận của tác giả, mỗi vòng một phiên mới.
 4. Nói thật với người dùng: tài liệu (README, `SECURITY.md`, `docs/COMPATIBILITY.md`) ghi rõ các vòng này do AI làm, không

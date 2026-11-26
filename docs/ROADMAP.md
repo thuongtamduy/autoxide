@@ -241,7 +241,8 @@ Postgres; vòng kiểm thử bảo mật kiểu bên ngoài cuối cùng không 
       (văn bản, điều, ngày hiệu lực) hay ghi "cần đối chiếu văn bản gốc / người có chuyên môn pháp lý"; vòng 1 trên `main`
       hiện tại, vòng cuối trên bản RC
 - [ ] Kiểm thử bảo mật kiểu bên ngoài (phiên đóng vai đội pentest độc lập, chỉ biết tài liệu công khai, chỉ tấn công máy
-      chủ chạy trong chính phiên đó): vòng 1 bây giờ, vòng cuối trên bản RC; lỗi cao trở lên báo kín, công bố sau khi
+      chủ chạy trong chính phiên đó): vòng 1 sau khi phần code lớn của G1–G4 đã merge (lớp kernel mới, OAuth, nâng cấp),
+      vòng cuối trên bản RC; lỗi cao trở lên báo kín, công bố sau khi
       sửa; sau 1.0 cân nhắc chương trình thưởng báo lỗi bảo mật
 
 ### G13 — Phát hành 1.0 (chủ dự án duyệt ngày 26/11/2026, D-20261126-release-1-0-readiness)
