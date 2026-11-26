@@ -2,12 +2,28 @@
 
 Chủ đề: Kiến trúc module và kernel
 
-Quyết định: Trước mắt **chỉ tách `autoxide-host`** (server, bộ chạy migration, backup, transfer, logging/metrics/telemetry,
-TLS, route của kernel — chỉ `autoxide` dùng) ra khỏi `autoxide-kernel`. Tách phần còn lại của kernel theo lớp (đích tham khảo:
-`autoxide-values` → `autoxide-data` → `autoxide-web` → `autoxide-platform` → mặt tiền `autoxide-kernel`) **chờ chủ dự án quyết**
-dựa trên số đo của spike (c) (thời gian build lại khi sửa một file kernel, trước và ước tính sau tách) và bản rà orphan rule /
-vòng phụ thuộc — ở §15.3 của tài liệu thiết kế. Mục này nằm trong lộ trình 1.0 do chủ dự án duyệt nên agent không tự dời.
-Nếu tách: module và testkit chỉ khai mặt tiền, đường `autoxide_kernel::x` không đổi.
+Quyết định (chủ dự án giao phiên điều phối quyết, 26/11/2026): Trước 1.0 **chỉ tách `autoxide-host`** (server, bộ chạy
+migration, backup, transfer, logging/metrics/telemetry, TLS, route của kernel — chỉ `autoxide` dùng) ra khỏi `autoxide-kernel`.
+Tách phần còn lại của kernel theo lớp (đích tham khảo: `autoxide-values` → `autoxide-data` → `autoxide-web` →
+`autoxide-platform` → mặt tiền `autoxide-kernel`) **dời sau 1.0**: quy tắc chốt trước là "tiết kiệm < 20% hoặc vướng orphan rule
+→ dời", và số đo của spike (c) là 6–9%. Mặt tiền giữ đường `autoxide_kernel::x`, nên tách sau 1.0 không phá vỡ hợp đồng. Muốn
+làm lại thì đo lại theo cùng cách và ghi mục mới.
+
+Số đo (spike (c), 26/11/2026, máy cloud 4 CPU / 15 GB, `main` `af74d2fb5`, profile dev, build đã ấm, thêm một dòng comment vào
+file rồi chạy lại):
+
+| Lệnh | Sửa file | Tổng | Phần `autoxide-kernel` | Phần ~40 module + binary |
+| --- | --- | --- | --- | --- |
+| `cargo build -p autoxide` | `tenancy/scope.rs` | 455 s | 145 s (phân tích 110 s, sinh mã 34 s) | ~345 s sau khi kernel phân tích xong |
+| `cargo build -p autoxide` | `values/slug.rs` | 455 s | 143 s | như trên |
+| `cargo check -p autoxide` | `tenancy/scope.rs` | 210 s | 56 s | ~154 s |
+| `cargo check -p autoxide` | `access/mod.rs` | 212 s | 57 s | ~155 s |
+| `cargo check -p autoxide` | `http/mod.rs` | 215 s | 58 s | ~157 s |
+
+Ước tính sau tách: dòng kernel theo lớp đích là values 7.499, data 5.214, web 10.064, host 5.235, platform 57.962 (tổng 85.974).
+Sửa một file của `platform` (tenancy, access) chỉ biên dịch lại phần ~67% đó, rút ~38 s của 455 s khi build (~8%) và ~19 s của
+210 s khi check (~9%); sửa `http` (lớp web) biên dịch lại web + platform, rút ~6%; sửa `values` biên dịch lại cả chuỗi, không
+rút gì. Module vẫn biên dịch lại hết vì mọi module phụ thuộc mặt tiền — phần này chiếm 70–75% thời gian.
 
 Lý do: `autoxide-host` đưa phần không phải hợp đồng ra khỏi hợp đồng (D-20261126-contract-tiers) và không vướng gì. Tách theo
 lớp vướng orphan rule (`impl IntoResponse for Error`, `impl From<DbErr> for Error`, `impl ToSchema for Page`), phụ thuộc ngược

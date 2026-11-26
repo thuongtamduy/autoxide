@@ -490,8 +490,8 @@ service hay cấu hình đã đọc → `start` (kiểm lần 1, điểm 6).
 
 ## 6. (d) Tách kernel thành crate
 
-**Sửa sau kiểm lần 1 (điểm 1, chặn):** trước mắt **chỉ tách `autoxide-host`**. Tách phần còn lại theo lớp chờ số đo của spike
-(c) (§15.3) và quyết định của chủ dự án (mục này nằm trong lộ trình 1.0 do chủ dự án duyệt, agent không tự dời). Hai vướng
+**Đã quyết (chủ dự án giao phiên điều phối quyết, 26/11/2026, theo số đo §15.3):** trước 1.0 **chỉ tách `autoxide-host`**;
+tách phần còn lại theo lớp dời **sau 1.0** vì chỉ rút 6–9% thời gian build lại (ngưỡng 20%). Lộ trình G1 đã sửa. Hai vướng
 mắc đã thấy: orphan rule (`impl IntoResponse for Error`, `impl From<DbErr> for Error`, `impl ToSchema for Page/Data` phải nằm ở
 crate có `Error`/`Page` hoặc crate của thư viện) và phụ thuộc ngược (`http`, `mcp` dùng `access`/`tenancy`; `ops/*/http.rs` dùng
 `http`). Lợi ích cũng nhỏ hơn dự tính: module nào cũng phụ thuộc mặt tiền nên sửa một file kernel vẫn biên dịch lại mọi module.
@@ -793,6 +793,66 @@ trong repo gọi qua `cargo xtask migrate-module`):
   0.x (giữ một bản chụp ở `xtask/fixtures/external-module-0x/`) và kiểm kết quả biên dịch + test xanh.
 - Thứ tự: công cụ làm ở PR 6b (sau khi lớp mới của PR 2–5 có đủ, trước cụm module đầu tiên); luật mới thêm theo từng PR lớp
   của kernel nếu lớp đó còn đổi.
+
+## 15. Kết quả ba spike (trước PR 2)
+
+Mã nháp ở nhánh `claude/kernel-contract-spikes` (PR nháp, **không merge**): crate `spikes/db-api` (nguyên mẫu `db`),
+`spikes/macros` (nguyên mẫu `#[derive(Schema)]`), và `content` đổi sang derive nháp.
+
+### 15.1 Spike (a): lớp `db` chạy các truy vấn khó nhất trên cả hai database
+
+Một test (`spikes/db-api/tests/hardest.rs`) dựng lại, chỉ bằng API của `db` (không có kiểu SeaORM/sea-query trong mã
+"module"), các hình dạng khó nhất của bốn module, có dữ liệu của hai khách giống hình dạng nhau, chạy **xanh trên SQLite và
+Postgres 16**:
+
+1. `ledger` — tổng có dấu theo bên nợ: `sum(case_when(SIDE = 'debit', AMOUNT, -AMOUNT))` gom theo tài khoản, lọc khoảng ngày.
+2. `inventory` — lượng đang giữ `sum(QUANTITY - FULFILLED - RELEASED)` gom theo kho, lọc `IN` danh sách.
+3. `reporting` — gom theo (nút, ngày, tiền tệ) với hai `SUM` ép `BIGINT`, lọc `IN` + khoảng ngày; `max(ngày)` trả `Option`.
+4. `catalog` — bộ lọc thuộc tính dựng động (`Cond::any()` nhiều giá trị) qua subquery, cộng tìm chữ trong subquery thứ hai;
+   `%` và `_` trong chữ tìm là chữ thường, không phải ký tự đại diện.
+5. Khoá: `for_share()` trên kỳ kế toán, `for_update()` trên mức tồn, `lock_key` theo tên, `adjust` có cận (trừ quá thì 0 dòng;
+   `MAX + 1` tràn thì 0 dòng, không lỗi, giống nhau hai database).
+6. Upsert trên khoá unique **không** có `tenant_id`: khách B va dòng của khách A → lỗi `db.unique_conflict`, dòng của A không đổi;
+   upsert của chính A vẫn cập nhật; `insert` dòng mang `tenant_id` khác bị từ chối trước khi gửi câu.
+7. SQL viết tay trên handle của khách: thiếu `:tenant` thì lỗi; có thì kernel gắn giá trị.
+8. Cách ly: khách B không đọc, sửa, xoá được dòng của A dù biết ID; `join` cùng module lọc khách ở bảng được nối; `join` sang bảng
+   của module khác bị từ chối.
+
+Hai lối vượt thành **lỗi biên dịch** (doc test `compile_fail`, kèm một doc test đối chứng biên dịch được): truy vấn record cấp
+khách qua handle control-plane, và `update().set(TENANT_ID, …)`.
+
+Điều chỉnh thiết kế rút ra: cột `tenant_id` dùng kiểu `TenantKey` (không `Settable`); ràng buộc handle bằng trait
+`AcceptedBy<Handle>` trên `Scope`; hàm gộp số nguyên luôn `CAST(COALESCE(…, 0) AS BIGINT)`; `on_conflict` nhận danh sách cột đã
+xoá kiểu (`ColName`). Chưa phủ trong spike (để PR 2): `insert_many`, `left_join`, `exists`, `page*`, `count_distinct`, và bộ
+sinh `#[derive(Record)]` thật (spike dùng `macro_rules!` đứng thay).
+
+### 15.2 Spike (b): `#[derive(Schema)]` bản sao bóng giữ `openapi.json` từng byte
+
+- Đổi **toàn bộ** 135 kiểu `ToSchema` của `content` (module có nhiều thuộc tính đặc biệt nhất: 99 chỗ `flatten`/`value_type`/
+  `inline`/`no_recursion`/`deprecated`) sang derive nháp: `docs/openapi.json` (8.807.180 byte) và `docs/mcp-tools.json` (518.613
+  byte) sinh lại **giống từng byte**; module không còn gọi tên `utoipa` ở derive.
+- Kiểu generic (`Wrapped<T>` có doc comment, `#[deprecated]`, `#[serde(flatten)]`, `rename_all`, enum có biến thể dữ liệu):
+  `schema()`, `name()`, `schemas()` giống hệt derive gốc của utoipa.
+- Hai điều chỉnh do spike lộ ra: utoipa 6 còn cài trait ẩn `utoipa::__dev::ComposeSchema` (dùng khi kiểu là tham số generic như
+  `Data<T>`) — bản sao phải chuyển tiếp nó; và `PartialSchema` đến từ impl chung của utoipa cho mọi kiểu có `ComposeSchema`, nên
+  **không** cài `PartialSchema` riêng (trùng impl). Vì đây là API `__dev` (ẩn) của utoipa, test của `autoxide-macros` phải so
+  `openapi.json` mỗi lần nâng utoipa (đã có trong luật nâng ở §4.2).
+- Chi phí biên dịch: `cargo check -p autoxide-content` gia tăng 34,6 s (bản sao) so với 33,2 s (derive gốc), **+4%**, dưới ngưỡng
+  5% — trên module nặng schema nhất.
+
+### 15.3 Spike (c): orphan rule, vòng phụ thuộc, số đo tách crate
+
+- Orphan rule: `Timestamp`/`Date` cài `ValueType`/`TryGetable`/`Nullable` của SeaORM; `Error`, `Data`, `Page`, `Created`, `Tagged`
+  cài `IntoResponse` của axum; `PageQuery`… cài `IntoParams`, `Currency`/`DecimalString` cài `ToSchema` của utoipa;
+  `Principal`, `TenantContext`… cài `FromRequestParts`. Tách lớp vẫn làm được nếu crate "giá trị" phụ thuộc cả SeaORM, axum,
+  utoipa (không phải bỏ `?`/`From`), nhưng khi đó lớp "giá trị" không còn nhẹ.
+- Phụ thuộc ngược (đếm `use crate::…` giữa các nhóm đích): 157 chỗ, trong đó 117 từ `http` (phần server: tầng khách, hạn mức,
+  nhật ký request) sang `access`/`tenancy`/`entitlement`… — phần đó thuộc `autoxide-host`.
+- Số đo và ước tính: bảng ở D-20261126-kernel-crates. Tóm tắt: sửa một file kernel → `cargo build -p autoxide` 455 s, `cargo
+  check` ~210 s; kernel chỉ chiếm 25–30%, còn lại là ~40 module biên dịch lại vì đều phụ thuộc kernel. Tách theo lớp rút 6–9%
+  — dưới ngưỡng 20% → **dời sau 1.0**, trước 1.0 chỉ tách `autoxide-host` (đã quyết).
+- Cái rút thời gian thật nằm ở phía module (70–75%), không ở kernel: ghi để xét sau 1.0 (vd module chỉ phụ thuộc phần kernel
+  mình dùng, hay giảm mã sinh ra của derive).
 
 ## Quyết định đi kèm
 
