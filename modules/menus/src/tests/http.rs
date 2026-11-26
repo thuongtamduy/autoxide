@@ -502,3 +502,54 @@ async fn menu_tro_toi_ban_ghi_hien_o_dang_dung_o_dau() {
     .await
     .unwrap();
 }
+
+/// Ngôn ngữ theo khách (`menus.locales`, `menus.default_locale`): khách `b` dùng `fr` làm mặc định;
+/// khách `a` vẫn theo biến chung (`en,vi`, mặc định `en`); `GET /kernel/client-config` theo khách.
+#[tokio::test]
+async fn ngon_ngu_menu_theo_khach() {
+    TestDatabase::run(async |test| {
+        let media: Arc<dyn Media> = Arc::new(fake_media());
+        let all = ["menus.read", "menus.manage"];
+        let app = TestApp::builder(test)
+            .tenant("a")
+            .tenant("b")
+            .user_in("a", "admin-a", 1, &all)
+            .user_in("b", "admin-b", 2, &["menus.read", "menus.manage", "kernel.settings.manage"])
+            .provide::<dyn Media>(media)
+            .module(Shop)
+            .module(crate::module())
+            .build()
+            .await
+            .unwrap();
+        for (name, value) in [("menus.locales", "fr, vi"), ("menus.default_locale", "fr")] {
+            let set = app
+                .put(&format!("/api/v1/kernel/settings/{name}"))
+                .token("admin-b")
+                .json(json!({"value": value}))
+                .send()
+                .await
+                .unwrap();
+            assert_eq!(set.status(), StatusCode::OK, "{}", set.text());
+        }
+        let body = json!({"key": "main", "items": [{"label": "Accueil", "url": "/"}]});
+        let b = send(&app, "POST", "", Some("admin-b"), &[], Some(body.clone())).await;
+        assert_eq!(b.status(), StatusCode::CREATED, "{}", b.json());
+        assert_eq!(b.json()["data"]["locale"], "fr");
+        let a = send(&app, "POST", "", Some("admin-a"), &[], Some(body)).await;
+        assert_eq!(a.status(), StatusCode::CREATED, "{}", a.json());
+        assert_eq!(a.json()["data"]["locale"], "en");
+        let french = json!({"key": "other", "locale": "fr", "items": []});
+        let refused = send(&app, "POST", "", Some("admin-a"), &[], Some(french)).await;
+        assert_eq!(refused.status(), StatusCode::UNPROCESSABLE_ENTITY);
+        let config = app
+            .get("/api/v1/kernel/client-config")
+            .header("autoxide-tenant", "b")
+            .send()
+            .await
+            .unwrap()
+            .json();
+        assert_eq!(config["data"]["menus"]["default_locale"], "fr", "{config}");
+    })
+    .await
+    .unwrap();
+}

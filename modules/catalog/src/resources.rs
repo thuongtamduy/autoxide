@@ -116,11 +116,17 @@ impl ResourceResolver for ProductResolver {
 pub(crate) struct CategoryResolver(pub(crate) Arc<CatalogService>);
 
 impl CategoryResolver {
-    fn locale_or_default(&self, locale: Option<&str>) -> String {
-        locale
-            .and_then(|locale| self.0.config.locale(locale))
-            .or_else(|| self.0.config.locales.first().cloned())
-            .unwrap_or_else(|| "en".to_owned())
+    async fn locale_or_default(
+        &self,
+        tenant: &TenantContext,
+        locale: Option<&str>,
+    ) -> Result<String, Error> {
+        let locales = self.0.locales(tenant).await?;
+        Ok(locale
+            .and_then(crate::config::canonical_locale)
+            .filter(|locale| locales.contains(locale))
+            .or_else(|| locales.first().cloned())
+            .unwrap_or_else(|| "en".to_owned()))
     }
 }
 
@@ -141,7 +147,7 @@ impl ResourceResolver for CategoryResolver {
         if wanted.is_empty() {
             return Ok(HashMap::new());
         }
-        let locale = self.locale_or_default(locale);
+        let locale = self.locale_or_default(tenant, locale).await?;
         // Một lần đọc cả cây hiện được (danh mục là cấu hình nhỏ của khách).
         let shown = self.0.public_categories(tenant, &locale).await?;
         let mut found = HashMap::new();
@@ -181,7 +187,7 @@ impl ResourceResolver for CategoryResolver {
         limit: usize,
     ) -> Result<Vec<ResourceRef>, Error> {
         let Ok(parent) = id.parse::<Uuid>() else { return Ok(Vec::new()) };
-        let locale = self.locale_or_default(locale);
+        let locale = self.locale_or_default(tenant, locale).await?;
         // `public_categories` đã sắp theo độ sâu rồi thứ tự hiển thị, và bỏ nhánh bị ẩn.
         let shown = self.0.public_categories(tenant, &locale).await?;
         if !shown.iter().any(|row| row.category.id == parent) {

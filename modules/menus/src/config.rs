@@ -74,6 +74,59 @@ impl MenusConfig {
     }
 }
 
+/// Ngôn ngữ menu theo khách (mục 9 của đợt cấu hình theo khách), như `content.locales`.
+pub(crate) const TENANT_LOCALES: autoxide_kernel::tenancy::TenantSetting =
+    autoxide_kernel::tenancy::TenantSetting::new(
+        "menus.locales",
+        "Languages this tenant's website menus may be written in, comma-separated BCP 47 codes \
+         (e.g. `vi,en`), instead of the server's AUTOXIDE_MENUS_LOCALES. Menus already written in \
+         a language left out stay as they are.",
+    )
+    .checked(|raw| tenant_locales(raw).map(|_| ()));
+
+/// Ngôn ngữ mặc định của menu theo khách.
+pub(crate) const TENANT_DEFAULT_LOCALE: autoxide_kernel::tenancy::TenantSetting =
+    autoxide_kernel::tenancy::TenantSetting::new(
+        "menus.default_locale",
+        "Language of a menu when none is given, and of the menu served when one is missing in the \
+         language asked for, instead of the server's AUTOXIDE_MENUS_DEFAULT_LOCALE. When it is not \
+         one of the tenant's languages, the first of them is used.",
+    )
+    .checked(|raw| {
+        canonical_locale(raw.trim()).map(|_| ()).ok_or_else(|| {
+            autoxide_kernel::error::FieldError::new(
+                "value",
+                "invalid",
+                "must be a language code like `en` or `pt-BR`",
+            )
+        })
+    });
+
+/// Danh sách ngôn ngữ (`menus.locales`): ít nhất một mã, bỏ trùng, giữ thứ tự.
+pub(crate) fn tenant_locales(raw: &str) -> Result<Vec<String>, autoxide_kernel::error::FieldError> {
+    let mut locales = Vec::new();
+    for item in raw.split(',').map(str::trim).filter(|item| !item.is_empty()) {
+        let Some(locale) = canonical_locale(item) else {
+            return Err(autoxide_kernel::error::FieldError::new(
+                "value",
+                "invalid",
+                "must be comma-separated language codes like `en` or `pt-BR`",
+            ));
+        };
+        if !locales.contains(&locale) {
+            locales.push(locale);
+        }
+    }
+    if locales.is_empty() {
+        return Err(autoxide_kernel::error::FieldError::new(
+            "value",
+            "invalid",
+            "must be comma-separated language codes like `en` or `pt-BR`",
+        ));
+    }
+    Ok(locales)
+}
+
 /// Mã ngôn ngữ BCP 47 dạng chuẩn (`vi`, `pt-BR`, `zh-Hant-TW`); `None` nếu sai dạng. Cùng luật
 /// với `content`, để menu nhập từ `content` giữ nguyên mã.
 pub(crate) fn canonical_locale(raw: &str) -> Option<String> {

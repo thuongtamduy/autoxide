@@ -288,7 +288,7 @@ impl BlockData for CatalogBlocks {
         items: &[BlockRef],
     ) -> Result<Vec<Option<Value>>, Error> {
         // Ngôn ngữ trang không phải ngôn ngữ của catalog: không có sản phẩm nào để hiện.
-        let Ok(locale) = self.0.locale(request.locale) else {
+        let Ok(locale) = self.0.locale(request.tenant, request.locale).await else {
             return Ok(vec![None; items.len()]);
         };
         match block {

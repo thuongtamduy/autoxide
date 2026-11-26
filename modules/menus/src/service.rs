@@ -53,6 +53,8 @@ pub(crate) struct Dependencies {
     pub legacy: Option<Arc<dyn LegacyMenus>>,
     /// Cây tổ chức: ngôn ngữ của từng website (D-307). `None`: app không có `organizations`.
     pub orgs: Option<Arc<dyn autoxide_organizations::api::OrgDirectory>>,
+    /// Cấu hình theo khách (`menus.locales`, `menus.default_locale`); `None` trong test dựng tay.
+    pub settings: Option<Arc<dyn autoxide_kernel::tenancy::TenantSettings>>,
 }
 
 pub(crate) struct MenuService {
@@ -63,6 +65,7 @@ pub(crate) struct MenuService {
     pub(crate) orgs: Option<Arc<dyn autoxide_organizations::api::OrgDirectory>>,
     pub(crate) config: MenusConfig,
     pub(crate) cache: PublicCache,
+    pub(crate) settings: Option<Arc<dyn autoxide_kernel::tenancy::TenantSettings>>,
 }
 
 impl MenuService {
@@ -75,6 +78,7 @@ impl MenuService {
             orgs: dependencies.orgs,
             config,
             cache: PublicCache::default(),
+            settings: dependencies.settings,
         }
     }
 
@@ -158,7 +162,7 @@ impl MenuService {
         let actor = principal.map_or_else(Actor::system, Actor::from);
         let org = input.org_id.map_or(root_of(tenant.id()), OrgId::from_uuid);
         let mut problems = Vec::new();
-        let locale = self.check_locale(input.locale.as_deref(), &mut problems);
+        let locale = self.check_locale(tenant, input.locale.as_deref(), &mut problems).await?;
         let key = input.key.trim().to_owned();
         if !is_key(&key) {
             problems.push(FieldError::new(
@@ -394,9 +398,49 @@ impl MenuService {
             .ok_or_else(|| menu_not_found(id))
     }
 
-    /// Ngôn ngữ đã chuẩn hoá; không gửi thì ngôn ngữ mặc định.
-    pub(crate) fn check_locale(&self, raw: Option<&str>, problems: &mut Vec<FieldError>) -> String {
-        check_locale(&self.config.locales, &self.config.default_locale, raw, problems)
+    /// Ngôn ngữ của khách `tenant` và ngôn ngữ mặc định: cấu hình `menus.locales` / `menus.default_locale`,
+    /// thiếu thì biến chung. Mặc định không thuộc danh sách thì lấy ngôn ngữ đầu. Đọc qua cache của kernel.
+    pub(crate) async fn tenant_locales(
+        &self,
+        tenant: &TenantContext,
+    ) -> Result<(Vec<String>, String), Error> {
+        let Some(settings) = &self.settings else {
+            return Ok((self.config.locales.clone(), self.config.default_locale.clone()));
+        };
+        let settings = settings.as_ref();
+        let locales = autoxide_kernel::tenancy::parsed_setting(
+            settings,
+            tenant,
+            &crate::config::TENANT_LOCALES,
+            crate::config::tenant_locales,
+        )
+        .await?
+        .unwrap_or_else(|| self.config.locales.clone());
+        let wanted = autoxide_kernel::tenancy::parsed_setting(
+            settings,
+            tenant,
+            &crate::config::TENANT_DEFAULT_LOCALE,
+            |raw| Ok(crate::config::canonical_locale(raw.trim()).unwrap_or_default()),
+        )
+        .await?
+        .unwrap_or_else(|| self.config.default_locale.clone());
+        let default = if locales.contains(&wanted) {
+            wanted
+        } else {
+            locales.first().cloned().unwrap_or(wanted)
+        };
+        Ok((locales, default))
+    }
+
+    /// Ngôn ngữ đã chuẩn hoá trong ngôn ngữ của khách; không gửi thì ngôn ngữ mặc định.
+    pub(crate) async fn check_locale(
+        &self,
+        tenant: &TenantContext,
+        raw: Option<&str>,
+        problems: &mut Vec<FieldError>,
+    ) -> Result<String, Error> {
+        let (locales, default) = self.tenant_locales(tenant).await?;
+        Ok(check_locale(&locales, &default, raw, problems))
     }
 
     /// Ngôn ngữ website `site` đưa ra và ngôn ngữ mặc định của nó (D-307): cài đặt
@@ -407,7 +451,7 @@ impl MenuService {
         tenant: &TenantContext,
         site: &Site,
     ) -> Result<(Vec<String>, String), Error> {
-        let fallback = (self.config.locales.clone(), self.config.default_locale.clone());
+        let fallback = self.tenant_locales(tenant).await?;
         let Some(orgs) = self.orgs.as_ref() else { return Ok(fallback) };
         let wanted: Vec<String> = orgs
             .setting(tenant, site.org(), "organizations.languages")
@@ -416,7 +460,7 @@ impl MenuService {
             .and_then(|value| serde_json::from_value(value).ok())
             .unwrap_or_default();
         let locales: Vec<String> =
-            wanted.into_iter().filter(|locale| self.config.locales.contains(locale)).collect();
+            wanted.into_iter().filter(|locale| fallback.0.contains(locale)).collect();
         Ok(match locales.first().cloned() {
             Some(default) => (locales, default),
             None => fallback,

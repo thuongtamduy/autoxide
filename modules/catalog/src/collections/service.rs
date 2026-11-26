@@ -171,7 +171,7 @@ impl CatalogService {
         let id = Uuid::now_v7();
         let mut problems = Vec::new();
         check_choice(&mut problems, "kind", &input.kind, &["manual", "rule"]);
-        let texts = self.check_texts(&input.texts, id, true, &mut problems)?;
+        let texts = self.check_texts(tenant, &input.texts, id, true, &mut problems).await?;
         fail_if_any(problems)?;
         let rules = self.rules_for(tenant, &input.kind, input.rules.as_ref()).await?;
         let at = now();
@@ -216,7 +216,7 @@ impl CatalogService {
         let found = self.get_collection(tenant, principal, id).await?.collection;
         principal.require(&COLLECTIONS_MANAGE)?;
         let mut problems = Vec::new();
-        let texts = self.check_texts(&patch.texts, id, false, &mut problems)?;
+        let texts = self.check_texts(tenant, &patch.texts, id, false, &mut problems).await?;
         fail_if_any(problems)?;
         let rules = match &patch.rules {
             Some(raw) => self.rules_for(tenant, &found.kind, Some(raw)).await?,
@@ -483,8 +483,9 @@ impl CatalogService {
     }
 
     /// Kiểm chữ theo ngôn ngữ: (ngôn ngữ, chữ đã chuẩn hoá, slug).
-    fn check_texts(
+    async fn check_texts(
         &self,
+        tenant: &TenantContext,
         texts: &BTreeMap<String, CollectionText>,
         id: Uuid,
         required: bool,
@@ -499,7 +500,7 @@ impl CatalogService {
         }
         let mut out = Vec::new();
         for (locale, text) in texts {
-            let locale = self.locale(locale)?;
+            let locale = self.locale(tenant, locale).await?;
             let at = |field: &str| format!("texts.{locale}.{field}");
             let title = text.title.trim().to_owned();
             check_length(problems, &at("title"), &title, 1, 200);

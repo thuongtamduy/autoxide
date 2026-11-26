@@ -66,7 +66,7 @@ impl CatalogService {
         product_id: Uuid,
         locale: &str,
     ) -> Result<suggestion::Model, Error> {
-        let locale = self.locale(locale)?;
+        let locale = self.locale(tenant, locale).await?;
         self.require_feature(tenant, &AI_FEATURE).await?;
         let model = self.text_model.clone().ok_or_else(ai_unavailable)?;
         model.ready()?;

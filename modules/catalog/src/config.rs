@@ -107,11 +107,41 @@ impl CatalogConfig {
             default_grant_days: default_grant_days?,
         })
     }
+}
 
-    /// `locale` đã chuẩn hoá nếu nằm trong ngôn ngữ cấu hình.
-    pub(crate) fn locale(&self, locale: &str) -> Option<String> {
-        canonical_locale(locale).filter(|locale| self.locales.contains(locale))
+/// Ngôn ngữ của văn bản sản phẩm theo khách (mục 9 của đợt cấu hình theo khách), như `content.locales`.
+pub(crate) const TENANT_LOCALES: autoxide_kernel::tenancy::TenantSetting =
+    autoxide_kernel::tenancy::TenantSetting::new(
+        "catalog.locales",
+        "Languages this tenant's product and category texts may be written in, comma-separated \
+         BCP 47 codes (e.g. `vi,en`), instead of the server's AUTOXIDE_CATALOG_LOCALES. Texts \
+         already written in a language left out stay as they are.",
+    )
+    .checked(|raw| tenant_locales(raw).map(|_| ()));
+
+/// Danh sách ngôn ngữ (`catalog.locales`): ít nhất một mã, bỏ trùng, giữ thứ tự.
+pub(crate) fn tenant_locales(raw: &str) -> Result<Vec<String>, autoxide_kernel::error::FieldError> {
+    let mut locales = Vec::new();
+    for item in raw.split(',').map(str::trim).filter(|item| !item.is_empty()) {
+        let Some(locale) = canonical_locale(item) else {
+            return Err(autoxide_kernel::error::FieldError::new(
+                "value",
+                "invalid",
+                "must be comma-separated language codes like `en` or `pt-BR`",
+            ));
+        };
+        if !locales.contains(&locale) {
+            locales.push(locale);
+        }
     }
+    if locales.is_empty() {
+        return Err(autoxide_kernel::error::FieldError::new(
+            "value",
+            "invalid",
+            "must be comma-separated language codes like `en` or `pt-BR`",
+        ));
+    }
+    Ok(locales)
 }
 
 /// Mã ngôn ngữ BCP 47 dạng đơn giản `ll` hay `ll-RR`, chuẩn hoá hoa thường (`pt-br` → `pt-BR`).
