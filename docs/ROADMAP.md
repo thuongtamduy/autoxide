@@ -214,7 +214,7 @@ chỉ số của G9 đạt ngưỡng.
 
 ### G9 — Chất lượng thành quy trình và đo bằng con số
 
-- [ ] Kiểm độc lập bắt buộc theo D-20261126-independent-review (mẫu pull request có mục kết quả kiểm)
+- [x] Kiểm độc lập bắt buộc theo D-20261126-independent-review (mẫu pull request có mục kết quả kiểm)
 - [ ] Mutation testing (`cargo-mutants`) cho kernel và phần tiền / thuế, chạy định kỳ
 - [ ] Bất biến tiền, thuế, quyền thành property test chạy hằng đêm
 - [ ] Đo tải trong CI hằng tuần trên cả hai database, chặn khi p95 của đường nóng tệ đi; vài benchmark vi mô cho đường
