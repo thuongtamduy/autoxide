@@ -290,6 +290,100 @@ fn edge_document() -> impl Strategy<Value = Document> {
     (mode, lines)
 }
 
+/// Giá đã gồm thuế: có lời giải hợp lệ không. Không khi (a) một dòng có giá thấp hơn thuế theo đơn vị
+/// của chính nó (luật của `compute`), (b) giá chưa thuế của cả nhóm âm, hay (c) không có cách chia nhóm về
+/// dòng mà mọi ô ≥ 0 — kiểm bằng max-flow: nguồn → dòng (số tiền dòng) → cột được mang → đích (tổng cột).
+fn inclusive_feasible(lines: &[(TaxableLine, Vec<ResolvedRate>)]) -> bool {
+    let quantity_of =
+        |line: &TaxableLine| line.quantity.map_or(Decimal::ZERO, |quantity| quantity.0);
+    for (line, chain) in lines {
+        let below = reverse_split(chain, line.amount.to_decimal(), quantity_of(line))
+            .and_then(|net| Money::from_decimal(net, Currency::VND, Rounding::HalfUp))
+            .is_ok_and(|net| net.is_negative());
+        if below {
+            return false;
+        }
+    }
+    let mut groups: BTreeMap<Vec<Uuid>, Vec<usize>> = BTreeMap::new();
+    for (index, (_, chain)) in lines.iter().enumerate() {
+        groups.entry(chain.iter().map(|rate| rate.id).collect()).or_default().push(index);
+    }
+    for indexes in groups.values() {
+        let chain = &lines[indexes[0]].1;
+        let total: i64 = indexes.iter().map(|index| lines[*index].0.amount.minor()).sum();
+        let quantity: Decimal = indexes.iter().map(|index| quantity_of(&lines[*index].0)).sum();
+        let Ok((net, taxes)) =
+            inclusive_group(chain, Money::new(total, Currency::VND), quantity, 0)
+        else {
+            return false;
+        };
+        let columns: Vec<i64> = std::iter::once(net).chain(taxes).map(Money::minor).collect();
+        let rows: Vec<(i64, bool)> = indexes
+            .iter()
+            .map(|index| {
+                (lines[*index].0.amount.minor(), quantity_of(&lines[*index].0) > Decimal::ZERO)
+            })
+            .collect();
+        let carries = |column: usize, row: usize| {
+            column == 0 || chain[column - 1].basis != Basis::PerUnit || rows[row].1
+        };
+        if max_flow(&rows.iter().map(|row| row.0).collect::<Vec<_>>(), &columns, carries) != total {
+            return false;
+        }
+    }
+    true
+}
+
+/// Max-flow (Edmonds–Karp) của bài vận tải dòng × cột: lượng chuyển được nhiều nhất.
+fn max_flow(rows: &[i64], columns: &[i64], carries: impl Fn(usize, usize) -> bool) -> i64 {
+    // Đỉnh: 0 = nguồn, 1..=r dòng, r+1..=r+c cột, cuối = đích.
+    let (r, c) = (rows.len(), columns.len());
+    let size = r + c + 2;
+    let sink = size - 1;
+    let mut capacity = vec![vec![0i64; size]; size];
+    for (row, amount) in rows.iter().enumerate() {
+        capacity[0][1 + row] = *amount;
+        for column in 0..c {
+            if carries(column, row) {
+                capacity[1 + row][1 + r + column] = i64::MAX / 4;
+            }
+        }
+    }
+    for (column, total) in columns.iter().enumerate() {
+        capacity[1 + r + column][sink] = *total;
+    }
+    let mut flow = 0;
+    loop {
+        let mut parent = vec![usize::MAX; size];
+        parent[0] = 0;
+        let mut queue = std::collections::VecDeque::from([0usize]);
+        while let Some(node) = queue.pop_front() {
+            for next in 0..size {
+                if parent[next] == usize::MAX && capacity[node][next] > 0 {
+                    parent[next] = node;
+                    queue.push_back(next);
+                }
+            }
+        }
+        if parent[sink] == usize::MAX {
+            return flow;
+        }
+        let mut push = i64::MAX;
+        let mut node = sink;
+        while node != 0 {
+            push = push.min(capacity[parent[node]][node]);
+            node = parent[node];
+        }
+        let mut node = sink;
+        while node != 0 {
+            capacity[parent[node]][node] -= push;
+            capacity[node][parent[node]] += push;
+            node = parent[node];
+        }
+        flow += push;
+    }
+}
+
 /// Kiểm I1–I4 ở cấp dòng và cấp nhóm; trả lời mô tả chỗ sai đầu tiên.
 pub(super) fn check_invariants(
     mode: PriceMode,
@@ -298,15 +392,13 @@ pub(super) fn check_invariants(
     let computed = match compute(mode, Currency::VND, lines) {
         Ok(computed) => computed,
         Err(error) => {
-            // Chỉ một lỗi được phép: giá đã gồm thuế thấp hơn thuế theo đơn vị nằm trong nó.
-            let per_unit = lines
-                .iter()
-                .any(|(_, chain)| chain.iter().any(|rate| rate.basis == Basis::PerUnit));
+            // Chỉ một lỗi được phép, và chỉ khi THẬT SỰ không tính được: giá đã gồm thuế không chứa nổi thuế
+            // theo đơn vị nằm trong nó. Kiểm độc lập, không tin lời báo lỗi.
             let range = error.fields().first().is_some_and(|field| field.code == "range");
-            return if mode == PriceMode::Inclusive && per_unit && range {
+            return if mode == PriceMode::Inclusive && range && !inclusive_feasible(lines) {
                 Ok(())
             } else {
-                Err(format!("lỗi không mong đợi: {error:?}"))
+                Err(format!("lỗi trong khi có lời giải hợp lệ: {error:?}"))
             };
         }
     };
@@ -367,7 +459,64 @@ pub(super) fn check_invariants(
     Ok(())
 }
 
+/// Chuỗi có thuế theo đơn vị, số tiền dòng sát thuế theo đơn vị, nhiều dòng số lượng 0 hay lẻ: nơi chia
+/// nhóm về dòng dễ kẹt (phản ví dụ của bản hoán đổi 2×2 thuần).
+fn per_unit_document() -> impl Strategy<Value = Document> {
+    let percent = prop::sample::select(vec![0i64, 100, 800, 1000, 6500]);
+    let unit = prop::sample::select(vec![1i64, 2, 49, 1000]);
+    let chain = (percent, unit, any::<bool>()).prop_map(|(bp, unit, per_unit_first)| {
+        let percent = ResolvedRate {
+            id: Uuid::from_u128(1),
+            tax_kind: "percent".to_owned(),
+            basis: Basis::Percent,
+            rate_percent: Decimal::new(bp, 2),
+            per_unit: None,
+            stage: 0,
+        };
+        let per_unit = ResolvedRate {
+            id: Uuid::from_u128(2),
+            tax_kind: "unit".to_owned(),
+            basis: Basis::PerUnit,
+            rate_percent: Decimal::ZERO,
+            per_unit: Some(Money::new(unit, Currency::VND)),
+            stage: 1,
+        };
+        if per_unit_first { vec![per_unit, percent] } else { vec![percent, per_unit] }
+    });
+    let quantity = prop::sample::select(vec![
+        Decimal::ZERO,
+        Decimal::ZERO,
+        Decimal::new(1, 1),
+        Decimal::new(5, 1),
+        Decimal::ONE,
+        Decimal::new(15, 1),
+        Decimal::TWO,
+    ]);
+    let amount = prop_oneof![0i64..=3, 0i64..=3_000, 995i64..=1_005, 1_995i64..=2_005];
+    (chain, proptest::collection::vec((amount, quantity), 2..7)).prop_map(|(chain, lines)| {
+        let lines = lines
+            .into_iter()
+            .enumerate()
+            .map(|(index, (amount, quantity))| {
+                let line =
+                    TaxableLine::new(format!("l{index}"), "c", Money::new(amount, Currency::VND))
+                        .with_quantity(quantity);
+                (line, chain.clone())
+            })
+            .collect();
+        (PriceMode::Inclusive, lines)
+    })
+}
+
 proptest! {
+    #[test]
+    fn chia_thue_theo_don_vi_khong_tu_choi_sai(document in per_unit_document()) {
+        let (mode, lines) = document;
+        if let Err(message) = check_invariants(mode, &lines) {
+            prop_assert!(false, "{}", message);
+        }
+    }
+
     #[test]
     fn bat_bien_lam_tron_o_dong_va_nhom(document in edge_document()) {
         let (mode, lines) = document;
@@ -451,7 +600,9 @@ fn thue_theo_don_vi_so_luong_le_cuoi_chuoi_khong_am() {
     let chain = [pct(0, "0.01"), pct(1, "16.07"), stage(2, Basis::PerUnit, Decimal::ZERO, 1)];
     let (nets, _, totals) = inclusive(&chain, &[5804], &[Decimal::new(5, 1)]);
     assert_eq!(nets, [5000]);
-    assert_eq!(totals, [1, 803, 0]);
+    // Thuế theo đơn vị giữ đúng HalfUp(1 × 0,5) = 1 (D-20261126-tax-per-unit-by-quantity): phần thừa 2 trừ ở
+    // tầng phần trăm cuối (804 → 802), không ở tầng theo đơn vị.
+    assert_eq!(totals, [1, 802, 1]);
 }
 
 #[test]
@@ -537,4 +688,41 @@ fn nhieu_dong_phai_hoan_doi_van_nhanh() {
     // 2.600.000 / 1,0201 → 2.548.770; 1% → 25.488; 1% của 2.574.258 → 25.743, thừa 1 trừ ở tầng cuối.
     assert_eq!(totals, [25_488, 25_742]);
     assert!(started.elapsed() < std::time::Duration::from_secs(20), "{:?}", started.elapsed());
+}
+
+#[test]
+fn chia_ve_dong_can_chu_trinh_ba_dong_van_ra_loi_giai() {
+    // Ca A: [8%, 1.000 đ/đơn vị], bốn dòng (1.000 đ, sl 1), (2.921 đ, sl 0), (1.001 đ, sl 1), (1 đ, sl 0).
+    // Hoán đổi 2×2 kẹt (cần dời đơn vị qua ba dòng) nên bản trước từ chối dù có lời giải.
+    let chain = [pct(0, "8"), stage(1, Basis::PerUnit, Decimal::ZERO, 1_000)];
+    let quantities = [Decimal::ONE, Decimal::ZERO, Decimal::ONE, Decimal::ZERO];
+    let (nets, taxes, totals) = inclusive(&chain, &[1_000, 2_921, 1_001, 1], &quantities);
+    // Tổng nhóm (mô hình phân số chính xác): 4.923 / 1,08 sau khi trừ 2.000 → 2.706; thuế theo đơn vị đúng
+    // 1.000 × 2.
+    assert_eq!(nets.iter().sum::<i64>(), 2_706);
+    assert_eq!(totals, [217, 2_000]);
+    // Dòng số lượng 0 không mang thuế theo đơn vị (bất biến còn lại do `inclusive` kiểm).
+    assert_eq!((taxes[1][1], taxes[3][1]), (0, 0));
+}
+
+#[test]
+fn chia_ve_dong_so_luong_le_va_dong_khong_tien_van_ra_loi_giai() {
+    // Ca B: [1%, 1 đ/đơn vị], ba dòng (2 đ, sl 0,1), (0 đ, sl 0,5), (244 đ, sl 0). Bản trước từ chối dòng 1.
+    let chain = [pct(0, "1"), stage(1, Basis::PerUnit, Decimal::ZERO, 1)];
+    let quantities = [Decimal::new(1, 1), Decimal::new(5, 1), Decimal::ZERO];
+    let (nets, taxes, totals) = inclusive(&chain, &[2, 0, 244], &quantities);
+    assert_eq!(nets.iter().sum::<i64>(), 243);
+    assert_eq!(totals, [2, 1]);
+    assert_eq!(taxes[1], [0, 0]);
+    assert_eq!(taxes[2][1], 0);
+}
+
+#[test]
+fn chuoi_khong_co_thue_theo_don_vi_giu_lua_chon_hoan_doi_cu() {
+    // [100%, 8,51%], tám dòng: hoán đổi phải chọn dòng nhận có ô lớn nhất như bản đã phát hành (một bản
+    // chọn dòng đầu tiên từng đổi số dòng 2 và 3 ở đây).
+    let chain = [pct(0, "100"), pct(1, "8.51")];
+    let (nets, taxes, _) = inclusive(&chain, &[1, 1_280, 4_404, 2, 3_218, 0, 3, 5], &[]);
+    assert_eq!((nets[1], &taxes[1]), (590, &vec![590, 100]));
+    assert_eq!((nets[2], &taxes[2]), (2_029, &vec![2_030, 345]));
 }

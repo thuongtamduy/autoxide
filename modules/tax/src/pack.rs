@@ -125,7 +125,6 @@ fn date(text: &str) -> Option<Date> {
     Date::parse_from_str(text, "%Y-%m-%d").ok()
 }
 
-/// Đọc và kiểm một gói; báo mọi chỗ sai một lần (tối đa 20).
 /// Trần thuế suất trong gói (phần trăm). Thuế suất cao nhất trong luật đang biết là vài trăm phần trăm
 /// (TTĐB); một con số lớn vô lý là lỗi nhập liệu và làm tràn số khi tính.
 const MAX_RATE_PERCENT: i64 = 1_000;
@@ -134,6 +133,7 @@ fn rate_in_range(rate: Decimal) -> bool {
     !rate.is_sign_negative() && rate <= Decimal::from(MAX_RATE_PERCENT)
 }
 
+/// Đọc và kiểm một gói; báo mọi chỗ sai một lần (tối đa 20).
 pub(crate) fn parse_pack(text: &str) -> Result<Pack, Error> {
     let pack: Pack =
         serde_json::from_str(text).map_err(|error| pack_invalid(format!("not a pack: {error}")))?;

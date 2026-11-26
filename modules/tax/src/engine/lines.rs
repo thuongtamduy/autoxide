@@ -6,6 +6,9 @@
 //! số lượng của nó), nên thuế theo đơn vị đi theo số lượng — dòng số lượng 0 không mang nó. Mỗi ô là phần
 //! nguyên dưới hay trên của phần đúng tỉ lệ, cột cộng lại đúng tổng nhóm.
 
+use std::cmp::Reverse;
+use std::collections::{BinaryHeap, VecDeque};
+
 use autoxide_kernel::decimal::{Decimal, Rounding};
 use autoxide_kernel::error::Error;
 use autoxide_kernel::money::Money;
@@ -104,15 +107,12 @@ impl<'a> Split<'a> {
     /// tiền của nó, mỗi cột cộng đúng tổng nhóm, mọi ô ≥ 0.
     ///
     /// Cột "phần còn lại" `L` là thuế cuối có tổng khác 0 không theo đơn vị (như trước), không có thì giá
-    /// chưa thuế; ô của nó = số tiền dòng − các ô khác. Ô âm sửa bằng hoán đổi 2×2: dòng `s` có ô `L` âm
-    /// lấy một đơn vị từ cột `j` mà nó có ô > 0, dòng `s'` có ô `L` ≥ 1 (và được mang cột `j`: thuế theo đơn
-    /// vị chỉ ở dòng có số lượng > 0) đổi ngược lại. Tổng dòng, tổng cột giữ nguyên; không ô nào xuống dưới
-    /// 0; tổng phần âm giảm 1 mỗi lượt nên vòng dừng.
+    /// chưa thuế; ô của nó = số tiền dòng − các ô khác, có thể âm vài đơn vị — sửa ở `repair`.
     ///
-    /// Không có thuế theo đơn vị thì luôn hoán đổi được: ô `L` âm nghĩa là các ô khác của dòng cộng lại >
-    /// số tiền dòng ≥ 0, tức có ô > 0; cột `L` cộng lại ≥ 0 mà có ô âm nên có dòng ô `L` ≥ 1, và dòng nào
-    /// cũng được mang cột giá chưa thuế hay thuế theo phần trăm. Có thuế theo đơn vị mà không tìm được dòng
-    /// nhận thì số tiền các dòng có số lượng không đủ chứa thuế theo đơn vị — báo lỗi như giá chưa thuế âm.
+    /// Không có thuế theo đơn vị thì luôn sửa được (hoán đổi 2×2 đủ): ô `L` âm nghĩa là các ô khác của dòng
+    /// cộng lại > số tiền dòng ≥ 0, tức có ô > 0; cột `L` cộng lại ≥ 0 mà có ô âm nên có dòng ô `L` ≥ 1, và
+    /// dòng nào cũng được mang mọi cột. Có thuế theo đơn vị thì chỉ báo lỗi khi thật sự không có cách chia
+    /// nào (thuế theo đơn vị của nhóm không vừa số tiền các dòng có số lượng).
     pub(super) fn inclusive(
         &self,
         net: Money,
@@ -136,7 +136,14 @@ impl<'a> Split<'a> {
             }
             columns[rest][slot] = left;
         }
-        self.repair(&mut columns, rest)?;
+        let mut cells: Vec<Vec<i64>> =
+            columns.iter().map(|column| column.iter().map(|cell| cell.minor()).collect()).collect();
+        self.repair(&mut cells, rest)?;
+        let currency = net.currency();
+        let mut columns: Vec<Vec<Money>> = cells
+            .into_iter()
+            .map(|column| column.into_iter().map(|minor| Money::new(minor, currency)).collect())
+            .collect();
         let nets = columns.remove(0);
         Ok((nets, columns))
     }
@@ -146,51 +153,145 @@ impl<'a> Split<'a> {
         column == 0 || !self.per_unit(column - 1) || self.quantities[slot] > Decimal::ZERO
     }
 
-    fn repair(&self, columns: &mut [Vec<Money>], rest: usize) -> Result<(), Stuck> {
+    /// Sửa các ô âm của cột `rest` mà giữ nguyên tổng dòng và tổng cột, mọi ô ≥ 0.
+    ///
+    /// Mỗi lượt tăng một ô âm `(s, rest)` thêm 1 bằng một chu trình đổi đơn vị:
+    /// 1. Hoán đổi 2×2 (rẻ): cột cho `j` là thuế có ô lớn nhất ở dòng `s` (bằng nhau thì tầng sau), rồi giá
+    ///    chưa thuế; dòng nhận là dòng có ô `rest` lớn nhất (bằng nhau thì dòng trước) được mang cột `j` —
+    ///    đúng lựa chọn của D-20261126-tax-rounding-allocation, nên chuỗi không có thuế theo đơn vị cho số
+    ///    như trước. Heap giữ dòng nhận: ô `rest` của dòng nhận chỉ giảm, dòng âm chỉ tăng tới 0, nên mỗi
+    ///    lượt O(log số dòng).
+    /// 2. Không hoán đổi 2×2 được (chỉ có thể khi có thuế theo đơn vị — cột đó chỉ ở dòng có số lượng):
+    ///    tìm đường tăng bằng BFS trên đồ thị dòng × cột: từ dòng `s` sang cột `j` nếu ô `(s, j)` ≥ 1 (giảm
+    ///    được), từ cột `j` sang dòng `r` nếu `r` được mang `j` (tăng được), tới khi gặp dòng `r ≠ s` có ô
+    ///    `rest` ≥ 1. Đổi dọc đường: tổng dòng, tổng cột giữ nguyên, không ô nào xuống dưới 0.
+    ///
+    /// Đầy đủ: nếu có một cách chia hợp lệ `X` (mọi ô ≥ 0, cùng tổng dòng, tổng cột, cùng chỗ được mang) thì
+    /// `X − M` có tổng dòng, tổng cột bằng 0 và dương ở `(s, rest)`; tách nó thành các chu trình xen kẽ, chu
+    /// trình qua `(s, rest)` đi qua các ô `M` ≥ 1 (chỗ `X − M` âm) và các ô được mang (chỗ `X − M` dương) —
+    /// chính là một đường BFS tìm được. Nên BFS không thấy đường nghĩa là không có cách chia nào: chỉ khi
+    /// đó mới báo lỗi. Mỗi lượt giảm tổng phần âm 1 nên vòng dừng.
+    fn repair(&self, cells: &mut [Vec<i64>], rest: usize) -> Result<(), Stuck> {
         let rows = self.amounts.len();
-        let Some(first) = self.amounts.first() else { return Ok(()) };
-        let unit = Money::new(1, first.currency());
-        // Con trỏ dòng nhận cho mỗi cột cho: một dòng đã không nhận được (ô `rest` < 1 hay không được mang
-        // cột đó) thì không bao giờ nhận được nữa — ô `rest` của dòng nhận chỉ giảm, dòng âm chỉ tăng tới 0.
-        // Nên mỗi con trỏ chỉ tiến, cả vòng O(số dòng × số cột + tổng phần âm × số cột).
-        let mut cursors = vec![0usize; columns.len()];
+        let has_per_unit = self.weights.is_some();
+        // Heap (ô `rest`, dòng): lớn nhất trước, bằng nhau thì dòng trước. Mục cũ (ô đã giảm) bỏ khi lấy ra.
+        let mut all: BinaryHeap<(i64, Reverse<usize>)> = BinaryHeap::new();
+        let mut carrying: BinaryHeap<(i64, Reverse<usize>)> = BinaryHeap::new();
+        for row in 0..rows {
+            if cells[rest][row] >= 1 {
+                all.push((cells[rest][row], Reverse(row)));
+                if has_per_unit && self.quantities[row] > Decimal::ZERO {
+                    carrying.push((cells[rest][row], Reverse(row)));
+                }
+            }
+        }
         for slot in 0..rows {
-            while columns[rest][slot].is_negative() {
-                // Cột cho: thuế có ô lớn nhất ở dòng này (bằng nhau thì tầng sau), rồi tới giá chưa thuế.
-                let mut donors: Vec<usize> = (1..columns.len())
-                    .filter(|column| *column != rest && columns[*column][slot].minor() > 0)
+            while cells[rest][slot] < 0 {
+                let mut donors: Vec<usize> = (1..cells.len())
+                    .filter(|column| *column != rest && cells[*column][slot] >= 1)
                     .collect();
-                donors.sort_by_key(|column| {
-                    std::cmp::Reverse((columns[*column][slot].minor(), *column))
-                });
-                if rest != 0 && columns[0][slot].minor() > 0 {
+                donors.sort_by_key(|column| Reverse((cells[*column][slot], *column)));
+                if rest != 0 && cells[0][slot] >= 1 {
                     donors.push(0);
                 }
                 let mut moved = false;
                 for donor in donors {
-                    let cursor = &mut cursors[donor];
-                    while *cursor < rows
-                        && !(columns[rest][*cursor].minor() >= 1 && self.may_carry(donor, *cursor))
-                    {
-                        *cursor += 1;
-                    }
-                    let Some(receiver) = (*cursor < rows).then_some(*cursor) else {
+                    let heap = if self.everyone_carries(donor) { &mut all } else { &mut carrying };
+                    let Some(receiver) = top(heap, &cells[rest]) else {
                         continue;
                     };
-                    columns[donor][slot] = columns[donor][slot].checked_sub(unit)?;
-                    columns[rest][slot] = columns[rest][slot].checked_add(unit)?;
-                    columns[rest][receiver] = columns[rest][receiver].checked_sub(unit)?;
-                    columns[donor][receiver] = columns[donor][receiver].checked_add(unit)?;
+                    cells[donor][slot] -= 1;
+                    cells[rest][slot] += 1;
+                    cells[rest][receiver] -= 1;
+                    cells[donor][receiver] += 1;
+                    self.requeue(&mut all, &mut carrying, &cells[rest], receiver);
                     moved = true;
                     break;
                 }
-                if !moved {
-                    return Err(Stuck::Line(slot));
+                if moved {
+                    continue;
                 }
+                let receiver = self.augment(cells, rest, slot).ok_or(Stuck::Line(slot))?;
+                self.requeue(&mut all, &mut carrying, &cells[rest], receiver);
             }
         }
         Ok(())
     }
+
+    /// Mọi dòng đều được mang cột này (giá chưa thuế, thuế theo phần trăm).
+    fn everyone_carries(&self, column: usize) -> bool {
+        column == 0 || !self.per_unit(column - 1)
+    }
+
+    /// Đưa dòng vừa giảm ô `rest` trở lại heap nếu còn nhận được.
+    fn requeue(
+        &self,
+        all: &mut BinaryHeap<(i64, Reverse<usize>)>,
+        carrying: &mut BinaryHeap<(i64, Reverse<usize>)>,
+        rest: &[i64],
+        row: usize,
+    ) {
+        if rest[row] >= 1 {
+            all.push((rest[row], Reverse(row)));
+            if self.weights.is_some() && self.quantities[row] > Decimal::ZERO {
+                carrying.push((rest[row], Reverse(row)));
+            }
+        }
+    }
+
+    /// Đường tăng từ dòng `slot` (xem `repair`); trả dòng cuối đường (ô `rest` của nó vừa giảm 1).
+    fn augment(&self, cells: &mut [Vec<i64>], rest: usize, slot: usize) -> Option<usize> {
+        let rows = self.amounts.len();
+        let mut row_from: Vec<Option<usize>> = vec![None; rows];
+        let mut column_from: Vec<Option<usize>> = vec![None; cells.len()];
+        let mut seen = vec![false; rows];
+        seen[slot] = true;
+        let mut queue = VecDeque::from([slot]);
+        let mut end = None;
+        'search: while let Some(row) = queue.pop_front() {
+            for column in 0..cells.len() {
+                if column == rest || column_from[column].is_some() || cells[column][row] < 1 {
+                    continue;
+                }
+                column_from[column] = Some(row);
+                for next in 0..rows {
+                    if seen[next] || !self.may_carry(column, next) {
+                        continue;
+                    }
+                    seen[next] = true;
+                    row_from[next] = Some(column);
+                    if cells[rest][next] >= 1 {
+                        end = Some(next);
+                        break 'search;
+                    }
+                    queue.push_back(next);
+                }
+            }
+        }
+        let end = end?;
+        cells[rest][slot] += 1;
+        cells[rest][end] -= 1;
+        let mut row = end;
+        while row != slot {
+            let column = row_from[row]?;
+            let previous = column_from[column]?;
+            cells[column][row] += 1;
+            cells[column][previous] -= 1;
+            row = previous;
+        }
+        Some(end)
+    }
+}
+
+/// Dòng ở đỉnh heap còn nhận được (ô `rest` ≥ 1 và đúng giá trị đã ghi); bỏ mục cũ.
+fn top(heap: &mut BinaryHeap<(i64, Reverse<usize>)>, rest: &[i64]) -> Option<usize> {
+    while let Some(&(value, Reverse(row))) = heap.peek() {
+        if rest[row] == value && value >= 1 {
+            return Some(row);
+        }
+        heap.pop();
+    }
+    None
 }
 
 /// Chia `total` theo trọng số thập phân: phần nguyên dưới của phần đúng tỉ lệ, rồi phần lẻ lớn

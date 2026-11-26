@@ -213,7 +213,7 @@ pub(crate) fn compute(
         let (line_nets, line_taxes) = match mode {
             PriceMode::Exclusive => (amounts.clone(), split.columns(&taxes)?),
             PriceMode::Inclusive => split.inclusive(net, &taxes).map_err(|error| match error {
-                lines::Stuck::Line(slot) => below_per_unit(indexes[slot]),
+                lines::Stuck::Line(slot) => per_unit_does_not_fit(indexes[slot]),
                 lines::Stuck::Error(error) => error,
             })?,
         };
@@ -325,43 +325,50 @@ fn inclusive_group(
         taxes.push(tax);
         running = running.checked_add(tax)?;
     }
-    let preferred = chain.iter().rposition(|rate| rate.basis != Basis::Exempt);
-    settle(&mut taxes, gross.checked_sub(net)?, &positive, preferred)?;
+    // Thứ tự ưu tiên nhận phần lệch: tầng theo phần trăm từ cuối về đầu, rồi mới tới tầng theo đơn vị
+    // (số cố định theo đơn vị — chỉ nhận khi không còn tầng nào khác). Chuỗi không có thuế theo đơn vị:
+    // đúng thứ tự cũ (tầng chịu thuế cuối trước).
+    let order: Vec<usize> = (0..chain.len())
+        .rev()
+        .filter(|position| chain[*position].basis == Basis::Percent)
+        .chain((0..chain.len()).rev().filter(|position| chain[*position].basis == Basis::PerUnit))
+        .collect();
+    settle(&mut taxes, gross.checked_sub(net)?, &positive, &order)?;
     Ok((net, taxes))
 }
 
 /// Sửa thuế các tầng cho tổng đúng bằng `target` (= tổng − giá chưa thuế, I3), không ra số âm (I1),
 /// không làm tầng có thuế danh nghĩa 0 khác 0 (I2).
 ///
-/// Thiếu (`D > 0`): cộng cả `D` vào tầng `preferred` (tầng chịu thuế cuối — hành vi cũ) nếu thuế chính
-/// xác của nó dương, không thì vào tầng sau cùng có thuế chính xác dương. Luôn có tầng như vậy: mọi thuế
-/// chính xác bằng 0 thì giá chưa thuế chính xác = tổng (số nguyên), `n` = tổng, `target` = 0 = Σ thuế.
+/// Thiếu (`D > 0`): cộng cả `D` vào tầng đầu tiên theo `order` có thuế chính xác dương. Luôn có tầng như
+/// vậy: mọi thuế chính xác bằng 0 thì giá chưa thuế chính xác = tổng (số nguyên), `n` = tổng, `target` = 0
+/// = Σ thuế.
 ///
-/// Thừa (`D < 0`): trừ ở `preferred` tới khi nó về 0, rồi ở các tầng đứng trước gần nhất còn ≥ 1. Luôn
-/// đủ chỗ trừ: `target ≥ 0` (mọi thuế chính xác ≥ 0 nên giá chưa thuế chính xác ≤ tổng, làm tròn vẫn
-/// ≤ tổng vì tổng là số nguyên), nên khi Σ thuế > `target` còn ít nhất một tầng ≥ 1; trừ không xuống
-/// dưới 0. Tầng thuế danh nghĩa 0 có số làm tròn 0 nên không bao giờ bị chọn.
+/// Thừa (`D < 0`): trừ theo `order`, mỗi tầng tới khi về 0. Luôn đủ chỗ trừ: `target ≥ 0` (mọi thuế chính
+/// xác ≥ 0 nên giá chưa thuế chính xác ≤ tổng, làm tròn vẫn ≤ tổng vì tổng là số nguyên), nên khi Σ thuế >
+/// `target` còn ít nhất một tầng ≥ 1 (tầng không chịu thuế luôn 0, không cần có trong `order`); trừ không
+/// xuống dưới 0. Tầng thuế danh nghĩa 0 có số làm tròn 0 nên không bao giờ bị chọn.
 ///
-/// Khi cách cũ (dồn hết vào tầng cuối) đã cho số không âm ở tầng có thuế thực, kết quả trùng cách cũ.
+/// Chuỗi không có thuế theo đơn vị: khi cách cũ (dồn hết vào tầng cuối) đã cho số không âm ở tầng có thuế
+/// thực, kết quả trùng cách cũ.
 fn settle(
     taxes: &mut [Money],
     target: Money,
     positive: &[bool],
-    preferred: Option<usize>,
+    order: &[usize],
 ) -> Result<(), Error> {
     let currency = target.currency();
     let mut gap = target.checked_sub(sum(taxes, currency)?)?.minor();
     if gap > 0 {
-        let pick = preferred
-            .filter(|position| positive[*position])
-            .or_else(|| positive.iter().rposition(|positive| *positive))
+        let pick = order
+            .iter()
+            .copied()
+            .find(|position| positive[*position])
             .ok_or_else(|| Error::internal("tax rounding: no stage can take the remainder"))?;
         taxes[pick] = taxes[pick].checked_add(Money::new(gap, currency))?;
         return Ok(());
     }
-    // Thứ tự trừ: tầng ưu tiên, rồi các tầng từ cuối về đầu.
-    let order = preferred.into_iter().chain((0..taxes.len()).rev());
-    for position in order {
+    for position in order.iter().copied() {
         if gap == 0 {
             break;
         }
@@ -384,6 +391,16 @@ fn below_per_unit(line: usize) -> Error {
         format!("lines[{line}].amount"),
         "range",
         "is lower than the per-unit taxes it includes",
+    )])
+}
+
+/// Không có cách chia nào về dòng mà mọi số ≥ 0: thuế theo đơn vị của nhóm lớn hơn số tiền các dòng có
+/// số lượng chứa được (`lines::Split::inclusive`).
+fn per_unit_does_not_fit(line: usize) -> Error {
+    Error::validation(vec![FieldError::new(
+        format!("lines[{line}].amount"),
+        "range",
+        "together with the other lines that have a quantity, is too low to hold the per-unit taxes of its group",
     )])
 }
 
