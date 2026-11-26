@@ -210,6 +210,8 @@
   "kernel.bulk_count_changed": "Hiện có {found} bản ghi khớp bộ lọc, không phải {expected}; hãy xem lại danh sách rồi thử lại.",
   "kernel.code_not_found": "Không có bản ghi nào bạn được xem mang mã `{code}`.",
   "kernel.setting_secret_rest_only": "Cài đặt `{name}` là bí mật: đặt bằng `PUT /api/v1/kernel/settings/{name}`, không đặt qua tool.",
+  "oauth_token_audience": "Access token này được cấp cho resource khác. Hãy xin máy chủ uỷ quyền token cho đúng địa chỉ này (tham số `resource`) rồi thử lại.",
+  "oauth_unavailable": "Máy chủ này chưa bật đăng nhập OAuth. Hãy kết nối bằng API key, hoặc nhờ người vận hành đặt AUTOXIDE_HTTP_PUBLIC_URL và cấu hình máy chủ uỷ quyền.",
   "provider.not_configured": "Khách này chưa đặt `{setting}`. Đặt bằng `PUT /api/v1/kernel/settings/{setting}`; `GET /api/v1/kernel/settings?group=connection` liệt kê những gì một kết nối cần.",
   "provider.webhook_unknown": "Địa chỉ webhook này không có. Chép lại từ `GET /api/v1/kernel/connections/webhooks`.",
   "kernel.connection_untestable": "Cài đặt `{name}` không thuộc kết nối đối tác nào thử được.",

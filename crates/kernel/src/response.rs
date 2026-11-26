@@ -181,13 +181,19 @@ impl IntoResponse for Error {
         response
             .headers_mut()
             .insert(header::CONTENT_TYPE, HeaderValue::from_static(PROBLEM_CONTENT_TYPE));
-        if self.kind() == ErrorKind::Unauthenticated {
-            // RFC 9110 bắt 401 phải nói cách xác thực; RFC 6750: cách đó là bearer token.
-            let challenge = self
-                .challenge()
-                .and_then(|value| HeaderValue::from_str(value).ok())
-                .unwrap_or(HeaderValue::from_static("Bearer"));
-            response.headers_mut().insert(header::WWW_AUTHENTICATE, challenge);
+        // RFC 9110 bắt 401 phải nói cách xác thực; RFC 6750: cách đó là bearer token. Lỗi khác mang challenge
+        // riêng (403 `insufficient_scope` của token OAuth, RFC 6750 §3.1) cũng gửi nó.
+        let challenge = self.challenge().and_then(|value| HeaderValue::from_str(value).ok());
+        match (self.kind() == ErrorKind::Unauthenticated, challenge) {
+            (_, Some(challenge)) => {
+                response.headers_mut().insert(header::WWW_AUTHENTICATE, challenge);
+            }
+            (true, None) => {
+                response
+                    .headers_mut()
+                    .insert(header::WWW_AUTHENTICATE, HeaderValue::from_static("Bearer"));
+            }
+            (false, None) => {}
         }
         if let Some((_, version)) = self.current()
             && let Ok(value) = HeaderValue::from_str(&crate::version::etag(*version))

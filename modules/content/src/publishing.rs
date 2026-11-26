@@ -67,7 +67,7 @@ impl ContentService {
         ai_reviewed: bool,
     ) -> Result<Entry, Error> {
         permissions::require_some_publish(principal)?;
-        if ai_reviewed && principal.api_key_id().is_some() {
+        if ai_reviewed && !principal.is_session() {
             return Err(Error::forbidden(
                 "content.ai_review_requires_human",
                 "Only a person signed in (not an API key) can confirm that AI-generated content was reviewed.",

@@ -217,7 +217,7 @@ Postgres; vòng kiểm thử bảo mật kiểu bên ngoài cuối cùng không 
 ### G9 — Chất lượng thành quy trình và đo bằng con số
 
 - [x] Kiểm độc lập bắt buộc theo D-20261126-independent-review (mẫu pull request có mục kết quả kiểm)
-- [ ] Mutation testing (`cargo-mutants`) cho kernel và phần tiền / thuế, chạy định kỳ
+- [ ] Mutation testing (`cargo-mutants`) cho kernel và phần tiền / thuế, chạy định kỳ — workflow `mutants.yml` và báo cáo đã có; còn: lần chạy CI đầu tiên để đặt `baseline` trong `docs/quality/mutation.json` (đang `null`, chưa có hồi quy nào làm đỏ được), rồi chỉnh số shard; chạy thêm trên Postgres và test tích hợp (hiện chỉ `--lib` trên SQLite)
 - [x] Bất biến tiền, thuế, quyền thành property test chạy hằng đêm (rà ở `docs/quality/invariants.md`; phần còn thiếu ghi cuối file)
 - [ ] Đo tải trong CI hằng tuần trên cả hai database, chặn khi p95 của đường nóng tệ đi; vài benchmark vi mô cho đường
       nóng của kernel
