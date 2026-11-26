@@ -208,7 +208,11 @@ impl From<&crate::access::Principal> for Actor {
             user_id: Some(principal.user_id()),
             api_key_id: principal.api_key_id(),
             public: false,
-            access: principal.access(),
+            // Client OAuth làm thay người dùng: audit ghi grant của nó (D-20261126-mcp-oauth).
+            access: match principal.oauth() {
+                Some(oauth) => crate::access::AccessPath::OAuthGrant(oauth.grant_id()),
+                None => principal.access(),
+            },
             // Người (`Human`) suy được từ `user_id`: chỉ ghi loại khi khác (agent, service, hỗ trợ…).
             kind: Some(principal.actor_kind())
                 .filter(|kind| *kind != crate::access::ActorKind::Human),
