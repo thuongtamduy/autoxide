@@ -198,7 +198,7 @@ pub(crate) async fn list_placements(
     Query(page): Query<NaturalOrderPageQuery>,
 ) -> Result<Page<PlacementResponse>, Error> {
     // Kiểm quyền trước khi đọc tham số trang: người không có quyền nhận 403, không phải 422 (D-20261126-list-pages-cluster-2).
-    principal.require(&crate::permissions::CONTENT_BANNERS)?;
+    crate::banners::placements::require_read(&principal)?;
     let page = PageRequest::try_from(page)?;
     let rows = service.list_placements(&tenant, &principal, &page).await?;
     Ok(rows.map(placement_response))
