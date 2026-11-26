@@ -334,6 +334,29 @@ mod fixtures {
             vec![FactSource::new("shop.order_placed", vec![REVENUE], revenue)]
         }
 
+        // Bốn mẫu gắn nhãn đơn (lưu được khi có `shop.write`) và một mẫu xoá đơn (`shop.purge` — cũng
+        // `shop.write`); `shop.refund` chỉ người có quyền hoàn tiền mới thấy.
+        fn automation_templates(&self) -> Vec<autoxide_kernel::automation::AutomationTemplate> {
+            let tag = |tag: &str| {
+                json!({
+                    "trigger": {"type": "event", "event": "shop.order_placed"},
+                    "actions": [{"tool": "shop.tag_order", "arguments": {"order_id": "{{ event.code }}", "tag": tag}}],
+                })
+            };
+            let refund = json!({
+                "trigger": {"type": "event", "event": "shop.order_placed"},
+                "actions": [{"tool": "shop.refund"}],
+            });
+            use autoxide_kernel::automation::AutomationTemplate as Template;
+            vec![
+                Template::new("shop.tag_vip", "Tag VIP", "Tag every order VIP.", tag("vip")),
+                Template::new("shop.tag_new", "Tag new", "Tag every order new.", tag("new")),
+                Template::new("shop.refund_all", "Refund", "Refund every order.", refund),
+                Template::new("shop.tag_big", "Tag big", "Tag every order big.", tag("big")),
+                Template::new("shop.tag_gift", "Tag gift", "Tag every order gift.", tag("gift")),
+            ]
+        }
+
         fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
             let _ = self.outbox.set(context.outbox()?);
             context.summary_metric(Arc::new(Pending(self.counters.clone())))

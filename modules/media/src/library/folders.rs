@@ -57,6 +57,17 @@ pub(crate) enum FolderSort {
     Name,
 }
 
+impl FolderSort {
+    // Thứ tự khi client không gửi `order`: thời gian mới nhất trước, tên A→Z.
+    pub(crate) fn default_order(self) -> autoxide_kernel::pagination::Order {
+        use autoxide_kernel::pagination::Order;
+        match self {
+            FolderSort::CreatedAt => Order::Desc,
+            FolderSort::Name => Order::Asc,
+        }
+    }
+}
+
 /// Thay đổi một thư mục; trường `None` giữ nguyên.
 #[derive(Debug, Clone, Default)]
 pub(crate) struct FolderChanges {

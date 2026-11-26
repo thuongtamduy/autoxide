@@ -174,7 +174,9 @@ thật (P7).
   - [ ] 139 endpoint GET trả `Data<Vec<T>>` không phân trang: endpoint mới trả `Page<T>`, khai deprecation cho cái cũ —
         chủ dự án quyết sửa tại chỗ cả 140 (đo lại 25/11), D-20261125-list-pages; làm theo cụm module, mỗi cụm một PR:
     - [x] Kernel (`NaturalOrderPageQuery`, `SortChoicePageQuery::into_request`, `page_of`) + `support`
-    - [ ] Các module còn lại (theo cụm)
+    - [ ] Các module còn lại (theo cụm) — cụm 1 (12 module, 25 endpoint) xong; còn auth, catalog, compliance, plans,
+          orders, promotions, analytics, tax, organizations, `me`, kernel
+    - [ ] `customers/me/wishlist` và `notifications/templates`: thêm cột id UUIDv7 + migration điền dữ liệu rồi phân trang
     - [ ] Luật gate chặn danh sách không phân trang, hướng dẫn nâng cấp EN + VI, danh sách ngoại lệ
   - [ ] `./gate.sh` chưa chạy tsc trên SDK và ví dụ trong `docs/guides` (CI có: `cargo xtask sdk --extract-examples` + `tsc
         --noEmit`); `sdk --check` chỉ so SDK với `docs/openapi.json` nên kiểu SDK hỏng vẫn lọt tới CI (#517). Chạy khi SDK

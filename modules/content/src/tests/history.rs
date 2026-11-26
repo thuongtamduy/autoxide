@@ -138,7 +138,11 @@ async fn hen_gio_dang_va_go() {
             .filter(|name| *name == "content.entry_published")
             .count();
         assert_eq!(published, 1, "running twice publishes once");
-        let rows = content.list_schedules(&tenant, &ada, entry.id).await.unwrap();
+        let rows = content
+            .list_schedules(&tenant, &ada, entry.id, &Default::default())
+            .await
+            .unwrap()
+            .data;
         assert_eq!(rows[0].status, "succeeded");
 
         let take_down = content
@@ -192,7 +196,11 @@ async fn lich_loi_thoi_va_chay_dong_thoi() {
         content.update(&tenant, &ada, entry.id, manual, false, None).await.unwrap();
         content.publish(&tenant, &ada, entry.id, None, None, false).await.unwrap();
         content.run_schedule(&tenant, schedule.id, Timestamp::now()).await.unwrap();
-        let rows = content.list_schedules(&tenant, &ada, entry.id).await.unwrap();
+        let rows = content
+            .list_schedules(&tenant, &ada, entry.id, &Default::default())
+            .await
+            .unwrap()
+            .data;
         assert_eq!(
             (rows[0].status.as_str(), rows[0].error_code.as_deref()),
             ("failed", Some("content.schedule_outdated"))
@@ -237,7 +245,11 @@ async fn lich_loi_thoi_va_chay_dong_thoi() {
             };
             job.await.unwrap().unwrap();
             let manual = manual.await.unwrap();
-            let rows = content.list_schedules(&tenant, &ada, entry.id).await.unwrap();
+            let rows = content
+                .list_schedules(&tenant, &ada, entry.id, &Default::default())
+                .await
+                .unwrap()
+                .data;
             let status = rows[0].status.clone();
             match manual {
                 // Đăng tay trước: lịch lỗi thời (hoặc đã chạy trước nhưng lệnh tay thấy 412).

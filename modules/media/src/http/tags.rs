@@ -7,7 +7,7 @@ use std::sync::Arc;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
-use autoxide_kernel::pagination::{Page, PageQuery};
+use autoxide_kernel::pagination::{Page, SortChoicePageQuery};
 use autoxide_kernel::response::{Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, Tagged};
@@ -54,7 +54,8 @@ impl From<TagWithCount> for TagResponse {
 pub(crate) struct TagsQuery {
     /// Only tags whose name contains this text, ignoring case and accents.
     pub(crate) q: Option<String>,
-    /// `name` (the default) or `created_at`; the direction is `order`.
+    /// `name` (the default; A→Z unless `order` says otherwise) or `created_at` (newest first unless
+    /// `order` says otherwise).
     #[param(value_type = Option<TagSort>, inline)]
     pub(crate) sort: Option<String>,
 }
@@ -78,7 +79,7 @@ pub(crate) struct RenameTagRequest {
     extensions(("x-permissions" = json!(["media.read"]))),
     operation_id = "list_media_tags",
     security(("bearer" = [])),
-    params(TagsQuery, PageQuery),
+    params(TagsQuery, SortChoicePageQuery),
     responses(
         (status = 200, description = "One page of tags.", body = Page<TagResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
@@ -91,11 +92,11 @@ pub(crate) async fn list_tags(
     tenant: TenantContext,
     principal: Principal,
     Query(query): Query<TagsQuery>,
-    Query(paging): Query<PageQuery>,
+    Query(paging): Query<SortChoicePageQuery>,
 ) -> Result<Page<TagResponse>, Error> {
     let mut problems = Vec::new();
     let order: TagSort = sort(query.sort.as_deref(), "`name`, `created_at`", &mut problems);
-    let page = page_request(paging, problems)?;
+    let page = page_request(paging, order.default_order(), problems)?;
     Ok(service
         .list_tags(&tenant, &principal, query.q.as_deref(), order, &page)
         .await?

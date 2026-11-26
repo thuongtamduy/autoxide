@@ -8,9 +8,10 @@ use std::sync::Arc;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::http::ValidJson;
+use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -316,7 +317,8 @@ pub(crate) fn describe_version(row: template_version::Model, live: Option<i32>) 
 /// List the published versions of a template, newest first.
 ///
 /// Requires `notifications.templates.read` or `notifications.templates.manage`. The last 20 versions
-/// are kept; `live` marks the one in use.
+/// are kept; `live` marks the one in use. Newest first unless `order=asc`; paged with `limit` /
+/// `cursor`.
 #[utoipa::path(
     get,
     path = "/templates/{kind}/{channel}/{locale}/versions",
@@ -327,12 +329,13 @@ pub(crate) fn describe_version(row: template_version::Model, live: Option<i32>) 
         ("kind" = String, Path, description = "Key of the kind."),
         ("channel" = String, Path, description = "Channel."),
         ("locale" = String, Path, description = "`en` or `vi`."),
+        PageQuery,
     ),
     responses(
-        (status = 200, description = "The versions (maybe none).", body = Data<Vec<VersionResponse>>),
+        (status = 200, description = "One page of the versions (maybe none), newest first.", body = Page<VersionResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing `notifications.templates.read`; code `permission_denied`.", body = Problem),
-        (status = 422, description = "Unknown kind, channel or language.", body = Problem),
+        (status = 422, description = "Unknown kind, channel or language, or a paging parameter is invalid.", body = Problem),
     )
 )]
 async fn list_versions(
@@ -340,10 +343,13 @@ async fn list_versions(
     tenant: TenantContext,
     principal: Principal,
     Path((kind, channel, locale)): Path<(String, String, String)>,
-) -> Result<Data<Vec<VersionResponse>>, Error> {
-    let found = service.list_versions(&tenant, &principal, (&kind, &channel, &locale)).await?;
+    Query(page): Query<PageQuery>,
+) -> Result<Page<VersionResponse>, Error> {
+    let page = PageRequest::try_from(page)?;
+    let target = (kind.as_str(), channel.as_str(), locale.as_str());
+    let found = service.list_versions(&tenant, &principal, target, &page).await?;
     let live = found.live;
-    Ok(Data { data: found.items.into_iter().map(|row| describe_version(row, live)).collect() })
+    Ok(found.items.map(|row| describe_version(row, live)))
 }
 
 /// Publish the draft of a template.

@@ -6,7 +6,9 @@ use std::collections::HashMap;
 use autoxide_kernel::database::Database;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Outbox;
-use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
+use autoxide_kernel::pagination::{
+    NaturalOrderPageQuery, Page, PageRequest, SortValue, fetch_page, fetch_page_by,
+};
 use autoxide_kernel::tenancy::DatabaseRegistry;
 use sea_orm::{ColumnTrait, Condition, EntityTrait, QueryFilter, QueryOrder};
 
@@ -54,29 +56,31 @@ impl AddressService {
         }
     }
 
+    /// Một trang tỉnh còn hiệu lực ngày `as_of`, theo mã (thứ tự của văn bản); keyset trong database theo
+    /// (mã, id), index `address_unit_page_idx`.
     pub(crate) async fn provinces(
         &self,
         country: &str,
         as_of: Option<&str>,
-    ) -> Result<Vec<AdministrativeUnit>, Error> {
+        page: &PageRequest,
+    ) -> Result<Page<AdministrativeUnit>, Error> {
         let country = self.country(country)?;
         let as_of = as_of_date(as_of)?;
-        let rows = unit::Entity::find()
+        let select = unit::Entity::find()
             .filter(unit::Column::Country.eq(&country))
             .filter(unit::Column::Level.eq(1))
-            .filter(live(&as_of))
-            .order_by_asc(unit::Column::Code)
-            .all(self.control().read())
-            .await?;
-        Ok(rows.into_iter().map(describe).collect())
+            .filter(live(&as_of));
+        Ok(by_code(select, page, self.control().read()).await?.map(describe))
     }
 
+    /// Một trang xã của tỉnh `province`, theo mã; index `address_unit_parent_page_idx`.
     pub(crate) async fn communes(
         &self,
         country: &str,
         province: &str,
         as_of: Option<&str>,
-    ) -> Result<Vec<AdministrativeUnit>, Error> {
+        page: &PageRequest,
+    ) -> Result<Page<AdministrativeUnit>, Error> {
         let country = self.country(country)?;
         let as_of = as_of_date(as_of)?;
         let read = self.control().read();
@@ -90,15 +94,37 @@ impl AddressService {
         if found.is_none() {
             return Err(unit_not_found(province));
         }
-        let rows = unit::Entity::find()
+        let select = unit::Entity::find()
             .filter(unit::Column::Country.eq(&country))
             .filter(unit::Column::Level.eq(2))
             .filter(unit::Column::ParentCode.eq(province))
-            .filter(live(&as_of))
-            .order_by_asc(unit::Column::Code)
-            .all(read)
-            .await?;
-        Ok(rows.into_iter().map(describe).collect())
+            .filter(live(&as_of));
+        Ok(by_code(select, page, read).await?.map(describe))
+    }
+
+    // Hợp đồng `AdministrativeUnits` (cho module khác) trả cả danh sách: gom các trang theo `next_cursor`.
+    // Danh mục có cỡ cố định (34 tỉnh, vài trăm xã một tỉnh), nên vài trang 200 dòng là hết.
+    async fn every_page(
+        &self,
+        country: &str,
+        province: Option<&str>,
+        as_of: Option<&str>,
+    ) -> Result<Vec<AdministrativeUnit>, Error> {
+        let mut units = Vec::new();
+        let mut cursor = None;
+        loop {
+            let limit = Some(autoxide_kernel::pagination::MAX_LIMIT.to_string());
+            let page = PageRequest::try_from(NaturalOrderPageQuery::new(limit, cursor, None))?;
+            let page = match province {
+                None => self.provinces(country, as_of, &page).await?,
+                Some(province) => self.communes(country, province, as_of, &page).await?,
+            };
+            units.extend(page.data);
+            match page.pagination.next_cursor {
+                Some(next) => cursor = Some(next),
+                None => return Ok(units),
+            }
+        }
     }
 
     /// Tìm đơn vị còn hiệu lực theo tên, không dấu ("ha noi" ra "Hà Nội").
@@ -271,7 +297,7 @@ impl crate::api::AdministrativeUnits for AddressService {
         country: &str,
         as_of: Option<&str>,
     ) -> Result<Vec<AdministrativeUnit>, Error> {
-        AddressService::provinces(self, country, as_of).await
+        self.every_page(country, None, as_of).await
     }
 
     async fn communes(
@@ -280,12 +306,30 @@ impl crate::api::AdministrativeUnits for AddressService {
         province: &str,
         as_of: Option<&str>,
     ) -> Result<Vec<AdministrativeUnit>, Error> {
-        AddressService::communes(self, country, province, as_of).await
+        self.every_page(country, Some(province), as_of).await
     }
 
     async fn validate(&self, input: AddressInput, field: &str) -> Result<Address, Vec<FieldError>> {
         self.check(input, field).await
     }
+}
+
+// Trang theo mã đơn vị rồi id: mã chỉ trùng giữa các phiên bản của cùng đơn vị, mà `live` chỉ để lại một.
+async fn by_code(
+    select: sea_orm::Select<unit::Entity>,
+    page: &PageRequest,
+    read: &impl sea_orm::ConnectionTrait,
+) -> Result<Page<unit::Model>, Error> {
+    fetch_page_by(
+        select,
+        unit::Column::Code,
+        |row| SortValue::Text(row.code.clone()),
+        unit::Column::Id,
+        |row| row.id,
+        page,
+        read,
+    )
+    .await
 }
 
 /// Đơn vị còn hiệu lực ngày `as_of` (so chuỗi `YYYY-MM-DD`: đúng thứ tự, không lệch múi giờ).

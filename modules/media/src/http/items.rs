@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
-use autoxide_kernel::pagination::{Page, PageQuery};
+use autoxide_kernel::pagination::{Page, SortChoicePageQuery};
 use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::storage::ByteStream;
 use autoxide_kernel::tenancy::TenantContext;
@@ -59,7 +59,8 @@ pub(crate) struct ItemsQuery {
     /// `uploader`: add `uploaded_by_name`, the display name of who uploaded each item.
     #[param(inline)]
     pub include: Option<ItemInclude>,
-    /// `created_at` (the default), `name` or `size`; the direction is `order`.
+    /// `created_at` (the default; newest first unless `order` says otherwise), `name` or `size` (A→Z /
+    /// smallest first unless `order` says otherwise).
     #[param(value_type = Option<ItemSort>, inline)]
     pub sort: Option<String>,
 }
@@ -261,7 +262,7 @@ pub(super) fn content_type(headers: &HeaderMap) -> Result<Option<&str>, Error> {
     extensions(("x-permissions" = json!(["media.read"]))),
     operation_id = "list_media_items",
     security(("bearer" = [])),
-    params(ItemsQuery, PageQuery),
+    params(ItemsQuery, SortChoicePageQuery),
     responses(
         (status = 200, description = "One page of media items.", body = Page<MediaItemResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
@@ -274,11 +275,11 @@ pub(crate) async fn list_items(
     tenant: TenantContext,
     principal: Principal,
     Query(query): Query<ItemsQuery>,
-    Query(paging): Query<PageQuery>,
+    Query(paging): Query<SortChoicePageQuery>,
 ) -> Result<Page<MediaItemResponse>, Error> {
     let mut problems = Vec::new();
     let filter = query.filter(&mut problems);
-    let page = page_request(paging, problems)?;
+    let page = page_request(paging, filter.sort.default_order(), problems)?;
     let page = page_of(&service, &tenant, service.list(&tenant, &principal, &filter, &page).await?)
         .await?;
     if query.include != Some(ItemInclude::Uploader) {

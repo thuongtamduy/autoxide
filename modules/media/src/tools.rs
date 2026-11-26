@@ -10,7 +10,7 @@ use std::sync::Arc;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::mcp::Tool;
-use autoxide_kernel::pagination::{Page, PageQuery};
+use autoxide_kernel::pagination::{Page, SortChoicePageQuery};
 use autoxide_kernel::tenancy::TenantContext;
 use serde::Deserialize;
 use utoipa::ToSchema;
@@ -59,7 +59,8 @@ pub(crate) struct ListMediaInput {
     limit: Option<u32>,
     /// Where to continue: the `next_cursor` of the previous page.
     cursor: Option<String>,
-    /// `desc` (default) or `asc`.
+    /// `asc` or `desc`. Default: `desc` (newest first) for `created_at`, `asc` (A→Z, smallest first) for
+    /// `name` and `size`.
     order: Option<String>,
 }
 
@@ -192,7 +193,8 @@ pub(crate) fn all(service: &Arc<MediaService>) -> Vec<Tool> {
         Tool::new(
             "list",
             "List media items (images, video, audio, documents), newest first. Filter by \
-             folder, type, visibility, trash, name or missing alt text; sort by `created_at`, `name` or `size`. \
+             folder, type, visibility, trash, name or missing alt text; sort by `created_at` (newest first), \
+             `name` or `size` (A→Z / smallest first); `order` reverses. \
              Follow `pagination.next_cursor` with the same filters for more.",
             move |tenant: TenantContext, principal: Principal, input: ListMediaInput| {
                 let service = list.clone();
@@ -209,10 +211,10 @@ pub(crate) fn all(service: &Arc<MediaService>) -> Vec<Tool> {
                         include: None,
                         sort: input.sort,
                     };
-                    let paging = PageQuery::new(input.limit.map(|limit| limit.to_string()), input.cursor, input.order);
+                    let paging = SortChoicePageQuery::new(input.limit.map(|limit| limit.to_string()), input.cursor, input.order);
                     let mut problems = Vec::new();
                     let filter = query.filter(&mut problems);
-                    let page = crate::http::page_request(paging, problems)?;
+                    let page = crate::http::page_request(paging, filter.sort.default_order(), problems)?;
                     let page = service.list(&tenant, &principal, &filter, &page).await?;
                     crate::http::page_of(&service, &tenant, page).await
                 }
@@ -361,8 +363,8 @@ pub(crate) fn all(service: &Arc<MediaService>) -> Vec<Tool> {
             move |tenant: TenantContext, principal: Principal, input: ListTagsInput| {
                 let service = list_tags.clone();
                 async move {
-                    let paging = PageQuery::new(input.limit.map(|limit| limit.to_string()), input.cursor, Some("asc".to_owned()));
-                    let page = crate::http::page_request(paging, Vec::new())?;
+                    let paging = SortChoicePageQuery::new(input.limit.map(|limit| limit.to_string()), input.cursor, None);
+                    let page = crate::http::page_request(paging, TagSort::Name.default_order(), Vec::new())?;
                     let tags = service
                         .list_tags(&tenant, &principal, input.q.as_deref(), TagSort::Name, &page)
                         .await?;

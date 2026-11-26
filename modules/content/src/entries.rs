@@ -191,6 +191,15 @@ pub(crate) enum EntrySort {
     UpdatedAt,
 }
 
+impl EntrySort {
+    // Thứ tự khi client không gửi `order` (D-20261125-list-pages): cả hai cột là thời gian — mới nhất trước.
+    pub(crate) fn default_order(self) -> autoxide_kernel::pagination::Order {
+        match self {
+            EntrySort::CreatedAt | EntrySort::UpdatedAt => autoxide_kernel::pagination::Order::Desc,
+        }
+    }
+}
+
 /// Bộ lọc của danh sách quản trị.
 #[derive(Debug, Clone, Default)]
 pub(crate) struct EntryFilter {

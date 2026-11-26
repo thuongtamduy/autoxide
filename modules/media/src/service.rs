@@ -99,6 +99,17 @@ pub(crate) enum ItemSort {
     Size,
 }
 
+impl ItemSort {
+    // Thứ tự khi client không gửi `order`: thời gian mới nhất trước, tên / kích thước nhỏ trước.
+    pub(crate) fn default_order(self) -> autoxide_kernel::pagination::Order {
+        use autoxide_kernel::pagination::Order;
+        match self {
+            ItemSort::CreatedAt => Order::Desc,
+            ItemSort::Name | ItemSort::Size => Order::Asc,
+        }
+    }
+}
+
 /// Bộ lọc của danh sách item.
 #[derive(Debug, Clone, Default)]
 pub(crate) struct ItemFilter {

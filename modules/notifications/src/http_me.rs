@@ -9,7 +9,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::http::ValidJson;
-use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
+use autoxide_kernel::pagination::{NaturalOrderPageQuery, Page, PageQuery, PageRequest, page_of};
 use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::{OptionalTenant, TenantContext};
 use axum::extract::{Path, Query, State};
@@ -78,23 +78,37 @@ pub(crate) fn describe_kind(kind: &NotificationKind) -> KindResponse {
 
 /// List the notification kinds.
 ///
-/// Any signed-in user. For a preferences page: every kind, its category and channels.
+/// Any signed-in user. For a preferences page: every kind, its category and channels. By key
+/// unless `order=desc`; paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/kinds",
     extensions(("x-permissions" = json!([]))),
     operation_id = "list_notification_kinds",
     security(("bearer" = [])),
+    params(NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "Every declared kind, by key.", body = Data<Vec<KindResponse>>),
+        (status = 200, description = "One page of the declared kinds, by key.", body = Page<KindResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_kinds(
     State(service): State<Arc<NotificationsService>>,
     _principal: Principal,
-) -> Result<Data<Vec<KindResponse>>, Error> {
-    Ok(Data { data: service.kinds.all().iter().map(describe_kind).collect() })
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<KindResponse>, Error> {
+    kind_page(&service, &PageRequest::try_from(page)?)
+}
+
+/// Một trang loại thông báo theo khoá (REST `GET /kinds` và tool `notifications.list_kinds` cùng gọi). Loại do
+/// module khai trong code (sổ loại), không nằm trong database: `page_of` theo khoá (duy nhất).
+pub(crate) fn kind_page(
+    service: &NotificationsService,
+    page: &PageRequest,
+) -> Result<Page<KindResponse>, Error> {
+    let kinds = service.kinds.all().iter().map(describe_kind).collect();
+    page_of(kinds, |kind: &KindResponse| kind.key.clone(), page)
 }
 
 // ---- Hộp thư -------------------------------------------------------------------------------------
@@ -321,25 +335,32 @@ pub(crate) struct PreferencesRequest {
 
 /// List which notifications you get.
 ///
-/// Any signed-in user. Every kind with each of its channels, on or off.
+/// Any signed-in user. Every kind with each of its channels, on or off. By kind unless
+/// `order=desc`; paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/me/preferences",
     extensions(("x-permissions" = json!([]))),
     operation_id = "list_my_notification_preferences",
     security(("bearer" = [])),
+    params(NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "Your choices per kind and channel.", body = Data<Vec<KindPreference>>),
+        (status = 200, description = "One page of your choices per kind and channel, by kind.", body = Page<KindPreference>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn my_preferences(
     State(service): State<Arc<NotificationsService>>,
     tenant: TenantContext,
     principal: Principal,
-) -> Result<Data<Vec<KindPreference>>, Error> {
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<KindPreference>, Error> {
+    let page = PageRequest::try_from(page)?;
     let rows = service.my_preferences(&tenant, &principal).await?;
-    Ok(Data { data: effective(&service.kinds.all(), &rows) })
+    // Một dòng mỗi loại thông báo (sổ loại trong code), ghép với lựa chọn đã lưu của người gọi (vài dòng):
+    // danh sách dựng từ code nên `page_of` theo khoá loại.
+    page_of(effective(&service.kinds.all(), &rows), |item| item.kind.clone(), &page)
 }
 
 /// Choose which notifications you get.
@@ -545,24 +566,29 @@ impl From<device_token::Model> for DeviceTokenResponse {
 /// List your registered mobile devices.
 ///
 /// Any signed-in user, for their own devices. Tokens are stored encrypted and never returned.
+/// Newest first unless `order=asc`; paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/me/device-tokens",
     extensions(("x-permissions" = json!([]))),
     operation_id = "list_my_device_tokens",
     security(("bearer" = [])),
+    params(PageQuery),
     responses(
-        (status = 200, description = "Your devices, newest first.", body = Data<Vec<DeviceTokenResponse>>),
+        (status = 200, description = "One page of your devices, newest first.", body = Page<DeviceTokenResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_device_tokens(
     State(service): State<Arc<NotificationsService>>,
     tenant: TenantContext,
     principal: Principal,
-) -> Result<Data<Vec<DeviceTokenResponse>>, Error> {
-    let rows = service.my_device_tokens(&tenant, &principal).await?;
-    Ok(Data { data: rows.into_iter().map(DeviceTokenResponse::from).collect() })
+    Query(page): Query<PageQuery>,
+) -> Result<Page<DeviceTokenResponse>, Error> {
+    let page = PageRequest::try_from(page)?;
+    let rows = service.my_device_tokens(&tenant, &principal, &page).await?;
+    Ok(rows.map(DeviceTokenResponse::from))
 }
 
 /// Register this mobile device for push notifications.

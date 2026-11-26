@@ -10,7 +10,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::money::Money;
-use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
+use autoxide_kernel::pagination::{NaturalOrderPageQuery, Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, Query, State};
@@ -688,19 +688,21 @@ async fn replace_schedule(
 
 /// List time off and extra hours of a resource.
 ///
-/// Requires `bookings.services.manage` at its unit. Exceptions that touch the range, oldest first.
+/// Requires `bookings.services.manage` at its unit. Exceptions that touch the range, by start time
+/// (earliest first) unless `order=desc`; paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/exceptions",
     extensions(("x-permissions" = json!(["bookings.services.manage"]))),
     operation_id = "list_booking_exceptions",
     security(("bearer" = [])),
-    params(ExceptionsQuery),
+    params(ExceptionsQuery, NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "The exceptions.", body = Data<Vec<BookingException>>),
+        (status = 200, description = "One page of the exceptions, by start time.", body = Page<BookingException>),
         (status = 401, description = "Not signed in.", body = Problem),
         (status = 403, description = "Missing permission `bookings.services.manage`; code `permission_denied`.", body = Problem),
         (status = 404, description = "No such resource in your units; code `bookings.resource_not_found`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_exceptions(
@@ -708,11 +710,13 @@ async fn list_exceptions(
     tenant: TenantContext,
     principal: Principal,
     Query(query): Query<ExceptionsQuery>,
-) -> Result<Data<Vec<BookingException>>, Error> {
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<BookingException>, Error> {
+    let page = PageRequest::try_from(page)?;
     let from = query.from.unwrap_or_else(Timestamp::now);
     let to = query.to.unwrap_or(from + SignedDuration::from_hours(24 * 90));
-    let rows = service.exceptions(&tenant, &principal, query.resource_id, from, to).await?;
-    Ok(Data { data: rows.into_iter().map(Into::into).collect() })
+    let rows = service.exceptions(&tenant, &principal, query.resource_id, from, to, &page).await?;
+    Ok(rows.map(Into::into))
 }
 
 /// Add time off or extra hours.

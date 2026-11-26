@@ -134,7 +134,7 @@ pub(crate) struct Preview {
 
 /// Danh sách bản đã xuất bản và bản đang dùng.
 pub(crate) struct Versions {
-    pub items: Vec<template_version::Model>,
+    pub items: autoxide_kernel::pagination::Page<template_version::Model>,
     pub live: Option<i32>,
 }
 
@@ -667,18 +667,28 @@ impl NotificationsService {
         tenant: &TenantContext,
         principal: &Principal,
         target: (&str, &str, &str),
+        page: &autoxide_kernel::pagination::PageRequest,
     ) -> Result<Versions, Error> {
         require_read(principal)?;
         let (kind, channel, locale) = self.template_target(target.0, target.1, target.2)?;
         let read = tenant.database().read();
-        let items = template_version::Entity::find()
+        let select = template_version::Entity::find()
             .scoped(tenant)
             .filter(template_version::Column::Kind.eq(kind.key()))
             .filter(template_version::Column::Channel.eq(channel.as_str()))
-            .filter(template_version::Column::Locale.eq(locale))
-            .order_by_desc(template_version::Column::Version)
-            .all(read)
-            .await?;
+            .filter(template_version::Column::Locale.eq(locale));
+        // Theo số phiên bản (duy nhất trong một mẫu) rồi id, keyset trong database (index duy nhất
+        // `notifications_template_versions_key_idx`).
+        let items = autoxide_kernel::pagination::fetch_page_by(
+            select,
+            template_version::Column::Version,
+            |row| autoxide_kernel::pagination::SortValue::Integer(i64::from(row.version)),
+            template_version::Column::Id,
+            |row| row.id,
+            page,
+            read,
+        )
+        .await?;
         let live = template_live::Entity::find_by_id(key_of(tenant, &kind, channel, locale))
             .one(read)
             .await?

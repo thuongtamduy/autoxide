@@ -65,7 +65,11 @@ async fn go_va_luu_tru_huy_lich_dang() {
                 .code(),
             "content.not_found"
         );
-        let rows = content.list_schedules(&tenant, &ada, entry.id).await.unwrap();
+        let rows = content
+            .list_schedules(&tenant, &ada, entry.id, &Default::default())
+            .await
+            .unwrap()
+            .data;
         assert_eq!(rows[0].status, "canceled");
 
         let archived = content.create(&tenant, &ada, post("Archived")).await.unwrap();
@@ -96,9 +100,10 @@ async fn go_va_luu_tru_huy_lich_dang() {
             Resolved::Gone
         ));
         let statuses: Vec<String> = content
-            .list_schedules(&tenant, &ada, archived.id)
+            .list_schedules(&tenant, &ada, archived.id, &Default::default())
             .await
             .unwrap()
+            .data
             .into_iter()
             .map(|row| row.status)
             .collect();

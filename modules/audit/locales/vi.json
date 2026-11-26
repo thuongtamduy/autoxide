@@ -1,6 +1,5 @@
 {
   "audit.entry_not_found": "Không có dòng audit `{id}`.",
-  "field:must be between 1 and 100": "phải từ 1 tới 100",
   "field:must list `user`, `agent`, `service`, `support`, `app`, `scim`, `system` or `public`": "phải liệt kê trong `user`, `agent`, `service`, `support`, `app`, `scim`, `system`, `public`",
   "text:Audit log": "Nhật ký audit",
   "text:Read the audit log: who changed what, when, before and after. The before and after values hold the data of every module (draft content, private media details, user names and emails), so this amounts to reading everything.": "Xem nhật ký audit: ai đổi gì, lúc nào, trước và sau. Giá trị trước và sau chứa dữ liệu của mọi module (bản nháp, thông tin media riêng tư, tên và email người dùng), nên có quyền này là đọc được mọi thứ.",

@@ -265,3 +265,58 @@ async fn self_referral_same_phone_rejected() {
     .await
     .unwrap();
 }
+
+// Duyệt hết danh sách `first` (đã có `?limit=…`) theo `next_cursor`; trả trường `field` theo thứ tự nhận.
+async fn walk(shop: &Shop, first: &str, who: &str, field: &str) -> Vec<String> {
+    let mut seen = Vec::new();
+    let mut uri = first.to_owned();
+    loop {
+        let (status, page) = call(shop, "GET", &uri, who, None).await;
+        assert_eq!(status, StatusCode::OK, "{uri}: {page}");
+        let rows = page["data"].as_array().unwrap();
+        assert!(rows.len() <= 2, "{page}");
+        seen.extend(rows.iter().map(|row| row[field].as_str().unwrap().to_owned()));
+        match page["pagination"]["next_cursor"].as_str() {
+            Some(cursor) => uri = format!("{first}&cursor={cursor}"),
+            None => return seen,
+        }
+    }
+}
+
+/// Bước 70 P9 (D-20261125-list-pages): vừa xem (mới xem trước), quy tắc nhắc giỏ và quy tắc giới thiệu (mới
+/// nhất trước) là một trang; theo `next_cursor` tới hết không trùng không sót, `order=asc` ngược lại.
+#[tokio::test]
+async fn vua_xem_va_quy_tac_phan_trang() {
+    TestDatabase::run(async |test| {
+        let shop = shop(test).await;
+        let products: Vec<Uuid> = (0..5).map(|_| Uuid::now_v7()).collect();
+        for product in &products {
+            let body = Some(json!({"product_id": product}));
+            let (status, _) = call(&shop, "POST", "/me/recently-viewed", "buyer", body).await;
+            assert_eq!(status, StatusCode::NO_CONTENT);
+        }
+        let mut viewed: Vec<String> = products.iter().map(Uuid::to_string).collect();
+        assert_eq!(walk(&shop, "/me/recently-viewed?limit=2&order=asc", "buyer", "product_id").await, viewed);
+        viewed.reverse();
+        assert_eq!(walk(&shop, "/me/recently-viewed?limit=2", "buyer", "product_id").await, viewed);
+
+        for (path, body) in [
+            ("/reminder-rules", json!({"delays_minutes": [60], "enabled": true})),
+            ("/referral-rules", json!({"referrer_points": 5, "referee_points": 1, "min_first_order_minor": 0, "currency": "VND"})),
+        ] {
+            let mut ids = Vec::new();
+            for _ in 0..5 {
+                let (status, made) = call(&shop, "POST", path, "boss", Some(body.clone())).await;
+                assert_eq!(status, StatusCode::CREATED, "{made}");
+                ids.push(made["data"]["id"].as_str().unwrap().to_owned());
+            }
+            assert_eq!(walk(&shop, &format!("{path}?limit=2&order=asc"), "boss", "id").await, ids);
+            ids.reverse();
+            assert_eq!(walk(&shop, &format!("{path}?limit=2"), "boss", "id").await, ids);
+        }
+        let (status, _) = call(&shop, "GET", "/reminder-rules?order=up", "boss", None).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    })
+    .await
+    .unwrap();
+}

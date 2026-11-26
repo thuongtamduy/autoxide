@@ -9,7 +9,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::money::{Currency, Money};
-use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
+use autoxide_kernel::pagination::{NaturalOrderPageQuery, Page, PageQuery, PageRequest, page_of};
 use autoxide_kernel::response::{Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Query, State};
@@ -380,32 +380,43 @@ pub(crate) struct RebuildResponse {
 
 /// List the kinds of report figures.
 ///
-/// Requires `reporting.read`. Each module declares the figures its events produce.
+/// Requires `reporting.read`. Each module declares the figures its events produce. By name unless
+/// `order=desc`; paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/kinds",
     extensions(("x-permissions" = json!(["reporting.read"]))),
     operation_id = "list_report_kinds",
     security(("bearer" = [])),
+    params(NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "Every fact kind, by name.", body = Data<Vec<KindResponse>>),
+        (status = 200, description = "One page of the fact kinds, by name.", body = Page<KindResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `reporting.read`; code `permission_denied`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_kinds(
     State(service): State<Arc<Reporting>>,
     principal: Principal,
-) -> Result<Data<Vec<KindResponse>>, Error> {
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<KindResponse>, Error> {
     principal.require(&REPORTING_READ)?;
-    Ok(Data { data: kind_list(&service) })
+    kind_list(&service, &PageRequest::try_from(page)?)
 }
 
-/// Mọi loại số liệu, theo tên.
-pub(crate) fn kind_list(service: &Reporting) -> Vec<KindResponse> {
-    let mut kinds: Vec<KindResponse> = service.kinds().iter().map(Into::into).collect();
-    kinds.sort_by(|a, b| a.kind.cmp(&b.kind));
-    kinds
+/// Một trang loại số liệu theo tên (REST và tool `reporting.kinds` cùng gọi). Loại do module khai trong code,
+/// không nằm trong database: `page_of` theo tên (duy nhất).
+pub(crate) fn kind_list(
+    service: &Reporting,
+    page: &PageRequest,
+) -> Result<Page<KindResponse>, Error> {
+    // Một loại có thể do nhiều nguồn khai (vd hai event cùng sinh `orders.revenue`): giữ một dòng mỗi loại
+    // (trước đây trả trùng), vì khoá của `page_of` phải duy nhất.
+    let mut seen = std::collections::BTreeSet::new();
+    let kinds: Vec<KindResponse> =
+        service.kinds().iter().filter(|info| seen.insert(info.kind.kind)).map(Into::into).collect();
+    page_of(kinds, |kind| kind.kind.clone(), page)
 }
 
 /// Sum a report figure over a period.
@@ -480,27 +491,32 @@ async fn list_facts(
 
 /// See how far behind the report store is.
 ///
-/// Requires `reporting.manage`. One line for your tenant and each tenant below it.
+/// Requires `reporting.manage`. One line for your tenant and each tenant below it, by tenant id
+/// unless `order=desc`; paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/lag",
     extensions(("x-permissions" = json!(["reporting.manage"]))),
     operation_id = "report_lag",
     security(("bearer" = [])),
+    params(NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "Facts waiting to be pushed, per tenant.", body = Data<Vec<LagResponse>>),
+        (status = 200, description = "One page of the facts waiting to be pushed, per tenant.", body = Page<LagResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `reporting.manage`; code `permission_denied`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn lag(
     State(service): State<Arc<Reporting>>,
     tenant: TenantContext,
     principal: Principal,
-) -> Result<Data<Vec<LagResponse>>, Error> {
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<LagResponse>, Error> {
     principal.require(&REPORTING_MANAGE)?;
-    let lags = service.lag(&tenant, &principal).await?;
-    Ok(Data { data: lags.into_iter().map(Into::into).collect() })
+    let page = PageRequest::try_from(page)?;
+    let lags = service.lag(&tenant, &principal, &page).await?;
+    Ok(lags.map(Into::into))
 }
 
 /// Push the facts of a tenant to the report store again.

@@ -43,6 +43,14 @@ async fn fixture(test: &TestDatabase) -> Fixture {
         .principal_in("shop-a", "shop-a", read(4, None))
         .principal_in("stranger", "stranger", read(5, None))
         .principal_in("parent", "nobody", Principal::new(Uuid::from_u128(6), Vec::<String>::new()))
+        .principal_in(
+            "parent",
+            "manager",
+            Principal::new(
+                Uuid::from_u128(7),
+                ["reporting.read", "reporting.manage"].map(str::to_owned),
+            ),
+        )
         .build()
         .await
         .unwrap();
@@ -234,6 +242,67 @@ async fn mcp_tools_same_visibility_as_rest() {
             assert_eq!(refused.is_error, Some(true));
             client.cancel().await.unwrap();
         }
+    })
+    .await
+    .unwrap();
+}
+
+/// Bước 70 P9 (D-20261125-list-pages): độ trễ là một trang mỗi khách trong cây (theo id khách), loại số liệu một
+/// trang theo tên; theo `next_cursor` tới hết không trùng không sót, hai chiều; tool `reporting.kinds` cùng tham
+/// số trả đúng trang REST trả.
+#[tokio::test]
+async fn do_tre_va_loai_so_lieu_phan_trang() {
+    TestDatabase::run(async |test| {
+        let fixture = fixture(test).await;
+        let walk = async |first: &str, field: &str| {
+            let mut seen = Vec::new();
+            let mut uri = first.to_owned();
+            loop {
+                let response = fixture.app.get(&uri).token("manager").send().await.unwrap();
+                assert_eq!(response.status().as_u16(), 200, "{}", response.json());
+                let page = response.json();
+                let rows = page["data"].as_array().unwrap();
+                assert!(rows.len() <= 1, "{page}");
+                seen.extend(rows.iter().map(|row| row[field].as_str().unwrap().to_owned()));
+                match page["pagination"]["next_cursor"].as_str() {
+                    Some(cursor) => uri = format!("{first}&cursor={cursor}"),
+                    None => return seen,
+                }
+            }
+        };
+        let mut tenants: Vec<String> = [&fixture.parent, &fixture.shop_a, &fixture.shop_b]
+            .iter()
+            .map(|tenant| tenant.id().as_uuid().to_string())
+            .collect();
+        tenants.sort();
+        assert_eq!(walk("/api/v1/reporting/lag?limit=1", "tenant_id").await, tenants);
+        tenants.reverse();
+        assert_eq!(walk("/api/v1/reporting/lag?limit=1&order=desc", "tenant_id").await, tenants);
+        let kinds = walk("/api/v1/reporting/kinds?limit=1", "kind").await;
+        assert_eq!(kinds, ["sales.amount", "sales.count"]);
+
+        let rest = fixture.app.get("/api/v1/reporting/kinds?limit=1&order=desc").token("manager");
+        let rest = rest.send().await.unwrap().json();
+        let client = fixture.app.mcp("manager").await.unwrap();
+        let page = client
+            .call_tool(tool("reporting.kinds", json!({"limit": 1, "order": "desc"})))
+            .await
+            .unwrap();
+        let page = page.structured_content.unwrap();
+        assert_eq!(page["data"], rest["data"]);
+        assert_eq!(page["pagination"], rest["pagination"]);
+        let cursor = page["pagination"]["next_cursor"].clone();
+        let next = client
+            .call_tool(tool(
+                "reporting.kinds",
+                json!({"limit": 1, "order": "desc", "cursor": cursor}),
+            ))
+            .await
+            .unwrap()
+            .structured_content
+            .unwrap();
+        assert_eq!(next["data"][0]["kind"], "sales.amount");
+        client.cancel().await.unwrap();
     })
     .await
     .unwrap();

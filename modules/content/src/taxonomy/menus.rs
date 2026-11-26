@@ -9,6 +9,7 @@ use std::collections::HashMap;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
+use autoxide_kernel::pagination::{Page, PageRequest, SortValue, fetch_page_by};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Set,
@@ -60,14 +61,21 @@ impl ContentService {
         &self,
         tenant: &TenantContext,
         principal: &Principal,
-    ) -> Result<Vec<Menu>, Error> {
+        page: &PageRequest,
+    ) -> Result<Page<Menu>, Error> {
         principal.require(&CONTENT_READ)?;
-        Ok(menu::Entity::find()
-            .scoped(tenant)
-            .order_by_asc(menu::Column::Key)
-            .order_by_asc(menu::Column::Locale)
-            .all(tenant.database().read())
-            .await?)
+        // Theo khoá rồi id (các ngôn ngữ của cùng khoá theo thứ tự tạo), keyset trong database (index
+        // `content_menus_page_idx`, m0035).
+        fetch_page_by(
+            menu::Entity::find().scoped(tenant),
+            menu::Column::Key,
+            |row| SortValue::Text(row.key.clone()),
+            menu::Column::Id,
+            |row| row.id,
+            page,
+            tenant.database().read(),
+        )
+        .await
     }
 
     pub(crate) async fn get_menu(

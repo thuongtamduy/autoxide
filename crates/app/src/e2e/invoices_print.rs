@@ -619,3 +619,43 @@ async fn ban_in_html_tu_mang_csp_sandbox() {
     .await
     .unwrap();
 }
+
+/// Bước 70 P9 (D-20261125-list-pages): hồ sơ xuất là một trang theo tên (dữ liệu trong bản build, `page_of`);
+/// theo `next_cursor` tới hết không trùng không sót, `order=desc` ngược lại.
+#[tokio::test]
+async fn ho_so_xuat_phan_trang_theo_ten() {
+    TestDatabase::run(async |test| {
+        let app = app(test).await;
+        let mut names: Vec<String> = Vec::new();
+        for (order, reverse) in [("asc", false), ("desc", true)] {
+            let first = format!("/api/v1/invoices/export-profiles?limit=2&order={order}");
+            let mut uri = first.clone();
+            let mut seen = Vec::new();
+            loop {
+                let (status, page) = call(&app, "clerk", "GET", &uri, None).await;
+                assert_eq!(status, StatusCode::OK, "{page}");
+                let rows = page["data"].as_array().unwrap();
+                assert!(rows.len() <= 2);
+                seen.extend(rows.iter().map(|row| row["name"].as_str().unwrap().to_owned()));
+                match page["pagination"]["next_cursor"].as_str() {
+                    Some(cursor) => uri = format!("{first}&cursor={cursor}"),
+                    None => break,
+                }
+            }
+            if reverse {
+                names.reverse();
+                assert_eq!(seen, names);
+            } else {
+                let mut sorted = seen.clone();
+                sorted.sort();
+                assert_eq!((seen.len(), &seen), (3, &sorted));
+                names = seen;
+            }
+        }
+        let (status, _) =
+            call(&app, "reader", "GET", "/api/v1/invoices/export-profiles", None).await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+    })
+    .await
+    .unwrap();
+}

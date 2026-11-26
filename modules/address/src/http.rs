@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
-use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
+use autoxide_kernel::pagination::{NaturalOrderPageQuery, Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Data, Problem};
 use axum::extract::{Path, Query, State};
 use axum::http::{HeaderValue, header};
@@ -65,58 +65,64 @@ pub(crate) struct ListQuery {
 
 /// List the provinces.
 ///
-/// No sign-in needed. In code order (the order of the official list). Cached for a day; the
-/// `ETag` changes when a new list is imported.
+/// No sign-in needed. In code order (the order of the official list) unless `order=desc`; paged
+/// with `limit` / `cursor`. Cached for a day; the `ETag` changes when a new list is imported.
 #[utoipa::path(
     get,
     path = "/provinces",
     extensions(("x-public" = json!(true))),
     operation_id = "list_provinces",
     security((), ("bearer" = [])),
-    params(ListQuery),
+    params(ListQuery, NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "The provinces in force.", body = Data<Vec<AdministrativeUnit>>),
+        (status = 200, description = "One page of the provinces in force, in code order.", body = Page<AdministrativeUnit>),
         (status = 304, description = "Not changed since the `ETag` sent in `If-None-Match`."),
-        (status = 422, description = "No list for this country (`address.country_unsupported`), or `as_of` is not a date.", body = Problem),
+        (status = 422, description = "No list for this country (`address.country_unsupported`), `as_of` is not a date, or a paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_provinces(
     State(service): State<Arc<AddressService>>,
     Query(query): Query<ListQuery>,
+    Query(page): Query<NaturalOrderPageQuery>,
 ) -> Result<Response, Error> {
-    let data = service.provinces(&query.country, query.as_of.as_deref()).await?;
-    cached(&service, &query.country, Data { data }.into_response()).await
+    let page = PageRequest::try_from(page)?;
+    let units = service.provinces(&query.country, query.as_of.as_deref(), &page).await?;
+    cached(&service, &query.country, units.into_response()).await
 }
 
 /// List the communes, wards and special zones of a province.
 ///
-/// No sign-in needed. In code order; cached like the provinces.
+/// No sign-in needed. In code order unless `order=desc`; paged with `limit` / `cursor`; cached like
+/// the provinces.
 #[utoipa::path(
     get,
     path = "/provinces/{code}/communes",
     extensions(("x-public" = json!(true))),
     operation_id = "list_communes",
     security((), ("bearer" = [])),
-    params(("code" = String, Path, description = "Code of the province, e.g. `01`."), ListQuery),
+    params(("code" = String, Path, description = "Code of the province, e.g. `01`."), ListQuery, NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "The communes in force.", body = Data<Vec<AdministrativeUnit>>),
+        (status = 200, description = "One page of the communes in force, in code order.", body = Page<AdministrativeUnit>),
         (status = 304, description = "Not changed since the `ETag` sent in `If-None-Match`."),
         (status = 404, description = "No province with this code; code `address.unit_not_found`.", body = Problem),
-        (status = 422, description = "No list for this country, or `as_of` is not a date.", body = Problem),
+        (status = 422, description = "No list for this country, `as_of` is not a date, or a paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_communes(
     State(service): State<Arc<AddressService>>,
     Path(code): Path<String>,
     Query(query): Query<ListQuery>,
+    Query(page): Query<NaturalOrderPageQuery>,
 ) -> Result<Response, Error> {
-    let data = service.communes(&query.country, &code, query.as_of.as_deref()).await?;
-    cached(&service, &query.country, Data { data }.into_response()).await
+    let page = PageRequest::try_from(page)?;
+    let units = service.communes(&query.country, &code, query.as_of.as_deref(), &page).await?;
+    cached(&service, &query.country, units.into_response()).await
 }
 
 #[derive(Debug, Deserialize, Validate, IntoParams)]
 #[into_params(parameter_in = Query)]
 pub(crate) struct SearchQuery {
+    /// ISO country code; only `VN` for now. Defaults to `VN`.
     #[serde(default = "default_country")]
     #[param(example = "VN")]
     country: String,
@@ -175,6 +181,7 @@ pub(crate) struct AdministrativeUnitDetail {
 #[derive(Debug, Deserialize, IntoParams)]
 #[into_params(parameter_in = Query)]
 pub(crate) struct CountryQuery {
+    /// ISO country code; only `VN` for now. Defaults to `VN`.
     #[serde(default = "default_country")]
     #[param(example = "VN")]
     country: String,
