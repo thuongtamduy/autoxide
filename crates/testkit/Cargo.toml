@@ -13,7 +13,7 @@ publish.workspace = true
 
 [dependencies]
 async-trait.workspace = true
-autoxide-kernel = { workspace = true, features = ["permission-audit"] }
+autoxide-kernel = { workspace = true, features = ["permission-audit", "testing"] }
 axum.workspace = true
 # Client MCP cho test (`mcp.rs`): mã hoá header `Mcp-Name`, đọc thân response.
 base64.workspace = true

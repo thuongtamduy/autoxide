@@ -30,7 +30,8 @@ release only; older `0.x` releases are not patched.
 Fixes ship as patch releases (`1.5.2` → `1.5.3`), which change nothing else, so they are safe to
 install right away ([`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md) says what a patch release may
 contain). Update to the latest release of your line before reporting, and say in your report which
-version you tested. The `CHANGELOG.md` lists every release.
+version you tested. The `CHANGELOG.md` lists every release. How a fix reaches an older supported line (the
+backport process) is described in [`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md#support).
 
 ## Security reviews
 
@@ -38,6 +39,9 @@ Before 1.0, the maintainers reviewed the whole code base for security problems i
 It was an **internal review carried out with AI assistance, not an audit by an independent third
 party**. The scope, the method, every finding with its severity and fix, and the parts not yet
 covered are in [`docs/security/review-2026-11.md`](docs/security/review-2026-11.md).
+
+The threat model of the core — trust boundaries, the controls at each one, open items and suggested focus areas
+for outside testers — is in [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md).
 
 ## Reporting a vulnerability
 
@@ -88,6 +92,29 @@ We follow coordinated disclosure:
   report before going public.
 
 Fixes for supported older lines (see the table above) are released at the same time when possible.
+
+## How we handle a report
+
+The steps the maintainers follow, so that reporters know what happens and a second maintainer can take over:
+
+1. **Receive.** A report arrives as a private GitHub security advisory draft. One maintainer owns it and confirms receipt
+   within 7 days (the table above). Nothing about it goes into a public issue, pull request, commit message or chat.
+2. **Assess.** Reproduce it on the latest release, on SQLite and on PostgreSQL where it can differ. Decide whether it is a
+   vulnerability (see "What is not a vulnerability"), which versions are affected (check every supported line), and the
+   severity as a [CVSS v4.0](https://www.first.org/cvss/v4.0/) vector with a short reason. Tell the reporter the outcome
+   within 14 days.
+3. **Fix.** Work in the temporary private fork of the advisory. Write the test that fails without the fix. A change to the
+   kernel, security, money or tax code gets an independent review before it is merged, like any such change. Keep the fix
+   small, and do not mention the problem in commit messages before the release.
+4. **Release.** Ship the fix as a patch release of the current line and of every supported older line
+   ([backporting](docs/COMPATIBILITY.md#support)). The changelog entry goes in the **Security** section. Critical and high
+   severity: immediately and out of the normal schedule; medium and low: in the next patch release, or sooner.
+5. **Publish.** With the release, publish the advisory: affected and fixed versions, severity, a plain description of the
+   impact, workarounds for people who cannot update at once, and credit to the reporter (unless they decline). Request the
+   CVE from GitHub in the same advisory ("Request CVE ID") for accepted reports that affect a released version.
+6. **Learn.** Search the code for the same mistake elsewhere, add a gate rule or a test that keeps it from coming back, and
+   fix the runbook or the documentation if it misled someone. For exposure of personal data, the operators' duties are in
+   [`docs/DEPLOY.md`](docs/DEPLOY.md#personal-data-breaches).
 
 ## Verifying a release
 

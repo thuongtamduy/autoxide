@@ -107356,7 +107356,7 @@
     },
     "/api/v1/auth/all-api-keys/{id}": {
       "delete": {
-        "description": "Requires `auth.api_keys.manage`. The key stops working at once; the audit log records who\nrevoked it.",
+        "description": "Requires `auth.api_keys.manage`, and every permission of the key's owner (a staff member)\nunless you revoke one of your own keys from a password session. The key stops working at once; the audit log records who revoked it.",
         "operationId": "auth_revoke_any_api_key",
         "parameters": [
           {
@@ -107417,7 +107417,7 @@
                 }
               }
             },
-            "description": "Missing permission `auth.api_keys.manage`; code `permission_denied`."
+            "description": "Missing permission `auth.api_keys.manage` (code `permission_denied`), or the key's owner has permissions you do not have (code `auth.target_has_more_permissions`)."
           },
           "404": {
             "content": {
@@ -107573,7 +107573,7 @@
     },
     "/api/v1/auth/api-keys": {
       "get": {
-        "description": "Any signed-in user. Newest first unless `order=asc`. Secrets are never listed.",
+        "description": "Any signed-in user. Newest first unless `order=asc`. Secrets are never listed. Called with\nan API key, the list holds only that key; called with an OAuth token, it is empty.",
         "operationId": "auth_list_api_keys",
         "parameters": [
           {
@@ -107841,7 +107841,7 @@
     },
     "/api/v1/auth/api-keys/{id}": {
       "delete": {
-        "description": "The key stops working at once.",
+        "description": "The key stops working at once. Called with an API key, only that same key can be revoked (a\nleaked key can switch itself off); any other id answers `404`. An OAuth token revokes no key\n(`404`).",
         "operationId": "auth_revoke_api_key",
         "parameters": [
           {
@@ -107902,7 +107902,7 @@
                 }
               }
             },
-            "description": "You have no key with this id; code `auth.api_key_not_found`."
+            "description": "You have no key with this id, or the request used another API key; code `auth.api_key_not_found`."
           },
           "default": {
             "content": {
@@ -112675,7 +112675,7 @@
     },
     "/api/v1/auth/me/passkeys": {
       "get": {
-        "description": "Newest first unless `order=asc`.",
+        "description": "Newest first unless `order=asc`. Signed in with a password session only.",
         "operationId": "auth_list_passkeys",
         "parameters": [
           {
@@ -112757,6 +112757,16 @@
               }
             },
             "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The request used an API key or an OAuth token; code `auth.session_required`. Sign in with `POST /api/v1/auth/login` and use that access token."
           },
           "422": {
             "content": {

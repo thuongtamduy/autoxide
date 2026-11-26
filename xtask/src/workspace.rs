@@ -18,6 +18,8 @@ pub enum Role {
     Testkit,
     /// `crates/app` — binary, nơi đăng ký module.
     App,
+    /// `crates/macros` — macro thủ tục của kernel; module dùng qua `autoxide_kernel`, không khai trực tiếp.
+    Macros,
     /// `modules/<tên>` — một module.
     Module,
     /// `xtask` — công cụ cho người phát triển.
@@ -33,6 +35,7 @@ impl Role {
             "crates/kernel" => Role::Kernel,
             "crates/testkit" => Role::Testkit,
             "crates/app" => Role::App,
+            "crates/macros" => Role::Macros,
             "xtask" => Role::Tool,
             _ => match dir.strip_prefix("modules/") {
                 // Module nằm ngay dưới modules/, không lồng thêm cấp.
