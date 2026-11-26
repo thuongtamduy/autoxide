@@ -1,0 +1,1 @@
+- Thuế: khi giá đã gồm thuế và chuỗi thuế có tầng thuế suất 0% cuối chuỗi, phần dư làm tròn không còn rơi vào tầng 0% (từng ra thuế âm 1 đồng); tầng 0% luôn ra 0, tổng net + thuế vẫn bằng giá gốc.

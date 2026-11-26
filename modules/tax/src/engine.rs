@@ -152,7 +152,17 @@ pub(crate) fn compute(
         let chain = &lines[indexes[0]].1;
         // Giá đã gồm thuế: phần dư làm tròn dồn vào tầng CHỊU thuế cuối cùng. Tầng "không chịu thuế"
         // luôn có số thuế 0 — dồn vào nó thì hoá đơn ghi số thuế khác 0 cho dòng không chịu thuế.
-        let last_taxable = chain.iter().rposition(|rate| rate.basis != Basis::Exempt);
+        // Tầng thuế suất 0% cũng phải ra đúng 0 (nếu nhận phần dư âm 1 đồng do tầng trước làm tròn lên thì
+        // ra thuế âm), nên ưu tiên tầng cuối có thuế suất khác 0; chỉ khi mọi tầng đều 0 mới lùi về
+        // tầng chịu thuế cuối (khi đó phần dư luôn bằng 0).
+        let last_taxable = chain
+            .iter()
+            .rposition(|rate| match rate.basis {
+                Basis::Exempt => false,
+                Basis::Percent => !rate.rate_percent.is_zero(),
+                Basis::PerUnit => rate.per_unit.is_some_and(|unit| !unit.to_decimal().is_zero()),
+            })
+            .or_else(|| chain.iter().rposition(|rate| rate.basis != Basis::Exempt));
         let amounts: Vec<Money> = indexes.iter().map(|index| lines[*index].0.amount).collect();
         // Số lượng do người gọi gửi (tới 28 chữ số): cộng / nhân `Decimal` bằng phép có kiểm tràn —
         // phép `+` / `*` thường của `rust_decimal` panic khi tràn (D-20261123-property-fuzzing).
@@ -332,6 +342,28 @@ mod tests {
         assert_eq!(taxes.iter().sum::<i64>(), 100);
         assert_eq!(computed.totals[0].amount, vnd(100));
         assert_eq!(computed.totals[0].base, vnd(999));
+    }
+
+    #[test]
+    fn gia_da_gom_thue_tang_thue_suat_khong_khong_nhan_phan_du_am() {
+        // Hồi quy (issue #531): tầng 0,01% làm tròn lên, phần dư −1 đ từng rơi vào tầng 0% cuối chuỗi.
+        let rate = |stage: i32, kind: &str, percent: Decimal| ResolvedRate {
+            id: Uuid::from_u128(u128::try_from(stage).unwrap()),
+            tax_kind: kind.to_owned(),
+            basis: Basis::Percent,
+            rate_percent: percent,
+            per_unit: None,
+            stage,
+        };
+        let chain = vec![rate(0, "kind0", Decimal::new(1, 2)), rate(1, "kind1", Decimal::ZERO)];
+        let taxable = line("l0", 454_881_118_563).with_quantity(Decimal::ZERO);
+        let computed = compute(PriceMode::Inclusive, Currency::VND, &[(taxable, chain)]).unwrap();
+        let taxed = &computed.lines[0];
+        assert_eq!(taxed.taxes[1].amount, vnd(0));
+        assert!(!taxed.taxes[0].amount.is_negative());
+        assert_eq!(taxed.gross, vnd(454_881_118_563));
+        let sum: i64 = taxed.taxes.iter().map(|tax| tax.amount.minor()).sum();
+        assert_eq!(taxed.net.minor() + sum, taxed.gross.minor());
     }
 
     #[test]
