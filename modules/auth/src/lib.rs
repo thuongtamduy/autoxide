@@ -192,7 +192,18 @@ impl Module for AuthModule {
     }
 
     fn client_config(&self) -> Result<Option<autoxide_kernel::module::ClientSection>, Error> {
-        self.config.as_ref().map_or(Ok(None), client_config::section)
+        let section = self.config.as_ref().map_or(Ok(None), client_config::section)?;
+        // Passkey và tự đăng ký là cấu hình theo khách: request xác định được khách thì lấy của khách.
+        Ok(match &self.state {
+            Some(state) => section.map(|section| {
+                section.per_tenant(Arc::new(client_config::TenantSignIn {
+                    passkeys: state.passkeys.clone(),
+                    orgs: state.orgs.clone(),
+                    self_registration: state.self_registration,
+                }))
+            }),
+            None => section,
+        })
     }
 
     fn configure(&mut self, reader: &mut ConfigReader<'_>) -> Result<(), Invalid> {
@@ -281,17 +292,21 @@ impl Module for AuthModule {
             )?
             .with_policy(policy),
         );
-        let passkeys = Arc::new(passkey::PasskeyService::new(
-            users.clone(),
-            sessions.clone(),
-            outbox.clone(),
-            config.passkey.as_ref(),
-        )?);
-        // Link trong thư theo khách: `kernel.public_url` và trang riêng `auth.link.*` (kernel kiểm host).
+        // Link trong thư theo khách: `kernel.public_url` và trang riêng `auth.link.*` (kernel kiểm host); cũng đọc
+        // RP ID passkey theo khách (`auth.passkey_rp_id`, tên miền đã xác minh của khách).
         let links = context
             .require::<autoxide_kernel::tenancy::SiteLinks>()
             .map(|links| (*links).clone())
             .unwrap_or_default();
+        let passkeys = Arc::new(
+            passkey::PasskeyService::new(
+                users.clone(),
+                sessions.clone(),
+                outbox.clone(),
+                config.passkey.as_ref(),
+            )?
+            .with_links(links.clone()),
+        );
         let verifications = Arc::new(verify::EmailVerifications {
             users: users.clone(),
             sessions: sessions.clone(),
@@ -515,7 +530,7 @@ impl Module for AuthModule {
     }
 
     fn tenant_settings(&self) -> Vec<autoxide_kernel::tenancy::TenantSetting> {
-        let mut settings = vec![api_key::REQUIRE_APPROVAL, step_up::STEP_UP];
+        let mut settings = vec![api_key::REQUIRE_APPROVAL, step_up::STEP_UP, passkey::TENANT_RP_ID];
         settings.extend(links::ALL);
         settings
     }

@@ -24,7 +24,8 @@ khách qua `organizations`, cùng chỗ với `auth.customer_registration` và `
 Lý do: chủ dự án yêu cầu phục vụ SaaS nhiều khách bằng cấu hình theo khách; chính sách bảo mật mỗi khách tự chọn
 nhưng không được thấp hơn mức an toàn của người vận hành.
 
-Đã cân nhắc: cài đặt khách của kernel (`kernel.settings`) — `auth` đã đặt mọi chính sách theo khách ở cài đặt theo
-cây, thêm nơi thứ hai làm người quản trị phải tìm ở hai chỗ. Cho khách nới (phiên dài hơn, mật khẩu ngắn hơn) — trái
+Đã cân nhắc: cài đặt khách của kernel (`kernel.settings`, nơi `auth` đặt `auth.step_up` và link mẫu) — chính sách
+đăng ký sẵn có (`auth.customer_registration`) ở cài đặt theo cây, để đăng ký nhân sự cạnh nó; chính sách đăng nhập đặt
+cùng chỗ để người quản trị tìm ở một nơi. Cho khách nới (phiên dài hơn, mật khẩu ngắn hơn) — trái
 yêu cầu "chỉ siết hơn". Từ chối lúc lưu khi khách đặt lỏng hơn — cài đặt theo cây kiểm một giá trị đơn lẻ, không biết
 cấu hình máy chủ; bỏ qua lúc dùng và ghi rõ trong mô tả.

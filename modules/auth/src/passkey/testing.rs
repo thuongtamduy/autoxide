@@ -35,6 +35,13 @@ impl SoftAuthenticator {
         }
     }
 
+    /// Authenticator của trang trên tên miền `rp_id` (RP ID và origin `https://<rp_id>`).
+    pub fn on(mut self, rp_id: &str) -> Self {
+        self.rp_id = rp_id.to_owned();
+        self.origin = format!("https://{rp_id}");
+        self
+    }
+
     /// Câu trả lời cho tuỳ chọn đăng ký `options` (JSON máy chủ gửi).
     pub fn register(&mut self, options: &Value) -> Value {
         self.user_handle = B64.decode(options["user"]["id"].as_str().unwrap()).unwrap();

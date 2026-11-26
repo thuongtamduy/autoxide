@@ -46,8 +46,10 @@ pub(crate) struct PasskeyService {
     users: Arc<UserService>,
     sessions: Arc<SessionService>,
     outbox: Outbox,
-    /// `None`: passkey tắt (chưa cấu hình RP ID).
-    engine: Option<Engine>,
+    /// Cấu hình của máy chủ; `None`: passkey tắt ở khách chưa đặt `auth.passkey_rp_id`.
+    server: Option<PasskeyConfig>,
+    /// Đọc `auth.passkey_rp_id` của khách, kiểm còn là tên miền đã xác minh của khách đó.
+    links: autoxide_kernel::tenancy::SiteLinks,
 }
 
 impl PasskeyService {
@@ -57,20 +59,50 @@ impl PasskeyService {
         outbox: Outbox,
         config: Option<&PasskeyConfig>,
     ) -> Result<Self, Error> {
-        let engine = config.map(Engine::new).transpose().map_err(|Rejected(reason)| {
+        // Kiểm cấu hình của máy chủ ngay lúc khởi động: sai thì báo sớm, không đợi lần dùng đầu.
+        config.map(Engine::new).transpose().map_err(|Rejected(reason)| {
             Error::internal(format!("passkey configuration: {reason}"))
         })?;
-        Ok(PasskeyService { users, sessions, outbox, engine })
+        Ok(PasskeyService {
+            users,
+            sessions,
+            outbox,
+            server: config.cloned(),
+            links: autoxide_kernel::tenancy::SiteLinks::default(),
+        })
     }
 
-    fn engine(&self) -> Result<&Engine, Error> {
-        self.engine.as_ref().ok_or_else(|| {
+    /// Đọc RP ID theo khách (`auth.passkey_rp_id`) qua `links` của kernel.
+    pub(crate) fn with_links(mut self, links: autoxide_kernel::tenancy::SiteLinks) -> Self {
+        self.links = links;
+        self
+    }
+
+    /// Cấu hình passkey của khách `tenant`: tên miền đã xác minh của khách (`auth.passkey_rp_id`, origin
+    /// `https://<tên miền>`), không thì của máy chủ; `None` khi cả hai đều không có.
+    pub(crate) async fn config_for(
+        &self,
+        tenant: &TenantContext,
+    ) -> Result<Option<PasskeyConfig>, Error> {
+        Ok(match self.links.own_domain(tenant, &super::TENANT_RP_ID).await? {
+            Some(domain) => {
+                Some(PasskeyConfig { origins: vec![format!("https://{domain}")], rp_id: domain })
+            }
+            None => self.server.clone(),
+        })
+    }
+
+    // Dựng mỗi lần (chỉ đọc tên miền, rẻ): RP ID theo khách và có thể đổi giữa hai lần gọi.
+    async fn engine(&self, tenant: &TenantContext) -> Result<Engine, Error> {
+        let config = self.config_for(tenant).await?.ok_or_else(|| {
             Error::forbidden(
                 "auth.passkeys_disabled",
-                "Passkey sign-in is not enabled on this server. Its operator turns it on by \
-                 setting AUTOXIDE_AUTH_PASSKEY_RP_ID.",
+                "Passkey sign-in is not enabled here. The server's operator turns it on with \
+                 AUTOXIDE_AUTH_PASSKEY_RP_ID, or the tenant with the setting `auth.passkey_rp_id`.",
             )
-        })
+        })?;
+        Engine::new(&config)
+            .map_err(|Rejected(reason)| Error::internal(format!("passkey configuration: {reason}")))
     }
 
     /// Bắt đầu đăng ký một passkey cho người dùng `user_id` (đã đăng nhập).
@@ -82,7 +114,7 @@ impl PasskeyService {
         user_id: Uuid,
         confirm: impl Into<crate::reauth::Confirm<'a>>,
     ) -> Result<Ceremony, Error> {
-        let engine = self.engine()?;
+        let engine = self.engine(tenant).await?;
         confirm.into().check(&self.sessions, tenant, user_id).await?;
         let user = self
             .users
@@ -125,7 +157,7 @@ impl PasskeyService {
         name: &str,
         credential: &Value,
     ) -> Result<super::Passkey, Error> {
-        let engine = self.engine()?;
+        let engine = self.engine(tenant).await?;
         let name = check_name(name)?;
         // Đọc nghi thức, kiểm câu trả lời, rồi dùng nghi thức và lưu passkey trong CÙNG một
         // transaction: đổi / đặt lại mật khẩu xoá nghi thức đang dở trong transaction của nó,
@@ -261,10 +293,10 @@ impl PasskeyService {
 
     /// Bắt đầu đăng nhập bằng passkey (chưa biết là ai).
     pub(crate) async fn start_login(&self, tenant: &TenantContext) -> Result<Ceremony, Error> {
-        let started = self
-            .engine()?
-            .start_login()
-            .map_err(|Rejected(reason)| Error::internal(format!("passkey sign-in: {reason}")))?;
+        let started =
+            self.engine(tenant).await?.start_login().map_err(|Rejected(reason)| {
+                Error::internal(format!("passkey sign-in: {reason}"))
+            })?;
         self.save_ceremony(tenant, None, started.state, started.options).await
     }
 
@@ -308,7 +340,7 @@ impl PasskeyService {
         ceremony_id: Uuid,
         credential: &Value,
     ) -> Result<passkey::Model, Error> {
-        let engine = self.engine()?;
+        let engine = self.engine(tenant).await?;
         // Đọc câu trả lời trước khi dùng nghi thức: JSON hỏng thì nghi thức còn dùng được.
         let assertion = engine.read_assertion(credential).map_err(|Rejected(reason)| {
             Error::validation(vec![

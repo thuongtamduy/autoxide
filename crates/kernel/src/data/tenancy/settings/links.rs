@@ -32,6 +32,12 @@ use crate::tenancy::{DatabaseRegistry, TenancyMode, TenantContext, TenantId};
 /// Group of the per-tenant link settings ([`TenantSetting::link`]).
 pub const LINK_GROUP: &str = "link";
 
+/// Group of the settings whose value is one of the tenant's own verified domains ([`TenantSetting::own_domain`]).
+pub const DOMAIN_GROUP: &str = "domain";
+
+/// Longest domain name (RFC 1035).
+const DOMAIN_MAX: usize = 253;
+
 /// Longest accepted link template.
 const LINK_MAX: usize = 2000;
 
@@ -282,7 +288,57 @@ pub(crate) async fn stored_problem(
         let refused = check_link(trust, settings, tenant, setting, raw).await?.is_err();
         return Ok(refused.then_some("kernel.link_unverified"));
     }
+    if setting.group_name() == Some(DOMAIN_GROUP) {
+        let refused = check_own_domain(trust, tenant, raw).await?.is_err();
+        return Ok(refused.then_some("kernel.domain_unverified"));
+    }
     Ok(None)
+}
+
+/// Shape check of a domain setting ([`TenantSetting::own_domain`]): a bare domain name such as `shop.example`,
+/// lower case, no scheme, port or path; ownership is checked separately because it needs the tenant's domains.
+pub(crate) fn domain_name(raw: &str) -> Result<(), FieldError> {
+    let name = raw.trim();
+    let labels_ok = name.split('.').all(|label| {
+        !label.is_empty()
+            && label.len() <= 63
+            && !label.starts_with('-')
+            && !label.ends_with('-')
+            && label.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+    });
+    if name.len() <= DOMAIN_MAX && name.contains('.') && labels_ok {
+        Ok(())
+    } else {
+        Err(FieldError::new(
+            "value",
+            "kernel.domain_name_invalid",
+            "must be a domain name in lower case such as `shop.example`, without `https://`, port or \
+             path",
+        ))
+    }
+}
+
+/// Full check of a domain setting for tenant `tenant`: shape, and in multi-tenant mode a domain this tenant has
+/// verified right now. `Ok(Err(problem))` when the value is refused.
+pub(crate) async fn check_own_domain(
+    trust: &LinkTrust,
+    tenant: &TenantContext,
+    raw: &str,
+) -> Result<Result<(), FieldError>, Error> {
+    if let Err(problem) = domain_name(raw) {
+        return Ok(Err(problem));
+    }
+    let name = raw.trim();
+    if trust.multi() && trust.owner(name).await? != Some(tenant.id()) {
+        return Ok(Err(FieldError::new(
+            "value",
+            "kernel.domain_not_verified",
+            "`{host}` is not a verified domain of this tenant: add it with `POST \
+             /api/v1/kernel/domains` and verify it first",
+        )
+        .with_param("host", name)));
+    }
+    Ok(Ok(()))
 }
 
 /// The placeholders of `setting` missing from `raw`.
@@ -384,6 +440,32 @@ impl SiteLinks {
         match server {
             Some(template) => Ok(Some(self.rewrite(tenant, template).await?)),
             None => Ok(None),
+        }
+    }
+
+    /// The value of `setting` (a [`TenantSetting::own_domain`]) at tenant `tenant` when set and, in multi-tenant
+    /// mode, still a domain this tenant has verified right now; `None` otherwise (unset, or the domain was lost
+    /// or moved to another tenant — then a warning is logged and the caller falls back to the server's
+    /// configuration).
+    pub async fn own_domain(
+        &self,
+        tenant: &TenantContext,
+        setting: &TenantSetting,
+    ) -> Result<Option<String>, Error> {
+        let Some(settings) = &self.settings else { return Ok(None) };
+        let Some(value) = settings.get(tenant, setting).await? else { return Ok(None) };
+        let raw = value.as_str().trim();
+        match check_own_domain(&self.trust, tenant, raw).await? {
+            Ok(()) => Ok(Some(raw.to_owned())),
+            Err(problem) => {
+                tracing::warn!(
+                    setting = setting.name(),
+                    tenant_id = %tenant.id(),
+                    problem = %problem.code,
+                    "a tenant domain setting is not accepted any more; the server's configuration is used"
+                );
+                Ok(None)
+            }
         }
     }
 }
