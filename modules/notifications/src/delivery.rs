@@ -325,7 +325,15 @@ impl NotificationsService {
         let mut headers = Vec::new();
         let mut footer_html = None;
         if kind.category == Category::Marketing {
-            let Some(page) = &self.config.unsubscribe_url else {
+            let page = self
+                .links
+                .link(
+                    tenant,
+                    &crate::config::UNSUBSCRIBE_LINK,
+                    self.config.unsubscribe_url.as_deref(),
+                )
+                .await?;
+            let Some(page) = page else {
                 return Ok(Sent::Failed("unsubscribe_url_missing".to_owned()));
             };
             let raw = autoxide_kernel::secret::random_token(32)?;

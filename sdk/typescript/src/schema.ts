@@ -5473,11 +5473,18 @@ export type CreatedEndpointResponse = EndpointResponse & {
   secret: string;
 };
 
-/** A mapping rule just created, with the people it gave the role to. */
+/** A mapping rule just created, with what happened to each member of the group. */
 export type CreatedScimGroupMappingResponse = ScimGroupMappingResponse & {
   /**
-   * Every current member of the group, who now holds the role through this rule. Members of a
-   * group without rules may have been added by anyone holding a SCIM token: check this list.
+   * Members who could not be given the role (e.g. the plan's staff limit is reached), with the
+   * error code. The rule stays; they get the role on the next sync that succeeds for them.
+   */
+  failed: ScimSyncFailure[];
+  /**
+   * Members of the group whose roles were brought in line with the rule: they hold the role at
+   * the unit now — through this rule, or because they already had it (by hand, or from another
+   * group). Members of a group without rules may have been added by anyone holding a SCIM token:
+   * check this list.
    */
   granted_user_ids: string[];
 };
@@ -8235,11 +8242,18 @@ export type Data_CreatedEndpointResponse = {
 
 /** Envelope of a single result. */
 export type Data_CreatedScimGroupMappingResponse = {
-  /** A mapping rule just created, with the people it gave the role to. */
+  /** A mapping rule just created, with what happened to each member of the group. */
   data: ScimGroupMappingResponse & {
     /**
-     * Every current member of the group, who now holds the role through this rule. Members of a
-     * group without rules may have been added by anyone holding a SCIM token: check this list.
+     * Members who could not be given the role (e.g. the plan's staff limit is reached), with the
+     * error code. The rule stays; they get the role on the next sync that succeeds for them.
+     */
+    failed: ScimSyncFailure[];
+    /**
+     * Members of the group whose roles were brought in line with the rule: they hold the role at
+     * the unit now — through this rule, or because they already had it (by hand, or from another
+     * group). Members of a group without rules may have been added by anyone holding a SCIM token:
+     * check this list.
      */
     granted_user_ids: string[];
   };
@@ -10315,7 +10329,10 @@ export type Data_NewsletterErased = {
 
 /** Envelope of a single result. */
 export type Data_NewsletterSettingsResponse = {
-  /** The newsletter settings in use (set by the server's operator; no secrets). */
+  /**
+   * The newsletter settings in use for this tenant (the tenant's own settings, otherwise the
+   * server's; no secrets).
+   */
   data: {
     /**
      * Put at the start of the subject of advertising campaigns
@@ -10328,25 +10345,27 @@ export type Data_NewsletterSettingsResponse = {
      */
     advertising_max_per_day: number;
     /**
-     * The website's confirmation page is set (`AUTOXIDE_NEWSLETTER_CONFIRM_URL`); needed by
-     * lists with double opt-in.
+     * The website's confirmation page is set (tenant setting `newsletter.link.confirm` or
+     * `AUTOXIDE_NEWSLETTER_CONFIRM_URL`); needed by lists with double opt-in.
      */
     confirm_url_set: boolean;
     /**
-     * Settings still to set before campaigns can be sent: names of environment variables,
-     * empty when everything needed is set (`AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS` is listed:
-     * only advertising campaigns need it).
+     * Settings still to set before campaigns can be sent: names of the server's environment
+     * variables, empty when everything needed is set (`AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS` is
+     * listed: only advertising campaigns need it). Each can instead be set for this tenant
+     * alone with the tenant setting named in its field above.
      */
     missing: string[];
     /**
-     * The sender's postal address shown in every mail footer
-     * (`AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS`); `null`: not set — advertising campaigns cannot
-     * be sent until it is.
+     * The sender's postal address shown in every mail footer: the tenant setting
+     * `newsletter.postal_address`, otherwise the owner's name and address from the tenant's
+     * legal profile, otherwise `AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS`; `null`: none — advertising
+     * campaigns cannot be sent until one is set.
      */
     postal_address?: string | null;
     /**
-     * The website's preferences page is set (`AUTOXIDE_NEWSLETTER_PREFERENCES_URL`); needed to
-     * send any campaign (the footer link).
+     * The website's preferences page is set (tenant setting `newsletter.link.preferences` or
+     * `AUTOXIDE_NEWSLETTER_PREFERENCES_URL`); needed to send any campaign (the footer link).
      */
     preferences_url_set: boolean;
     /**
@@ -13733,6 +13752,12 @@ export type Data_TenantSettingState = {
      * `<module>.connection.<kind>.<field>`, e.g. `mail.connection.smtp.url`.
      */
     name: string;
+    /**
+     * The stored value is not used any more, and why: `kernel.public_url_unverified` /
+     * `kernel.link_unverified` (its host is not a verified domain of this tenant — verify the domain or
+     * change the value). Omitted when the value is used.
+     */
+    problem?: string | null;
     /** Secret settings are stored encrypted and never returned: `value` is always `null`. */
     secret: boolean;
     updated_at?: string | null;
@@ -15845,9 +15870,12 @@ export type Data_Vec_ScimTokenResponse = {
     /** The user who created it. */
     created_by: string;
     /**
-     * Whether the token still works fully. A SCIM token can do only what its creator can do now:
-     * anything other than `active` means syncs that give, take away or disable will be refused —
-     * create a new token from an account with the needed roles and revoke this one.
+     * State of the token's creator. A SCIM token can do only what its creator can do now. `disabled`
+     * or `deleted`: the token can no longer give, take away, disable or delete anything that needs a
+     * permission; `missing_permission`: the creator lost `auth.scim.manage` but the token keeps the
+     * creator's other roles. In every case other than `active`, create a new token from an account
+     * with the needed roles and revoke this one. `active` does not mean the creator still holds every
+     * role your group mappings give.
      */
     creator_status: ScimTokenCreatorStatus;
     id: string;
@@ -16128,6 +16156,12 @@ export type Data_Vec_TenantSettingState = {
      * `<module>.connection.<kind>.<field>`, e.g. `mail.connection.smtp.url`.
      */
     name: string;
+    /**
+     * The stored value is not used any more, and why: `kernel.public_url_unverified` /
+     * `kernel.link_unverified` (its host is not a verified domain of this tenant — verify the domain or
+     * change the value). Omitted when the value is used.
+     */
+    problem?: string | null;
     /** Secret settings are stored encrypted and never returned: `value` is always `null`. */
     secret: boolean;
     updated_at?: string | null;
@@ -20224,7 +20258,10 @@ export type NewsletterScheduleRequest = {
   at: string;
 };
 
-/** The newsletter settings in use (set by the server's operator; no secrets). */
+/**
+ * The newsletter settings in use for this tenant (the tenant's own settings, otherwise the
+ * server's; no secrets).
+ */
 export type NewsletterSettingsResponse = {
   /**
    * Put at the start of the subject of advertising campaigns
@@ -20237,25 +20274,27 @@ export type NewsletterSettingsResponse = {
    */
   advertising_max_per_day: number;
   /**
-   * The website's confirmation page is set (`AUTOXIDE_NEWSLETTER_CONFIRM_URL`); needed by
-   * lists with double opt-in.
+   * The website's confirmation page is set (tenant setting `newsletter.link.confirm` or
+   * `AUTOXIDE_NEWSLETTER_CONFIRM_URL`); needed by lists with double opt-in.
    */
   confirm_url_set: boolean;
   /**
-   * Settings still to set before campaigns can be sent: names of environment variables,
-   * empty when everything needed is set (`AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS` is listed:
-   * only advertising campaigns need it).
+   * Settings still to set before campaigns can be sent: names of the server's environment
+   * variables, empty when everything needed is set (`AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS` is
+   * listed: only advertising campaigns need it). Each can instead be set for this tenant
+   * alone with the tenant setting named in its field above.
    */
   missing: string[];
   /**
-   * The sender's postal address shown in every mail footer
-   * (`AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS`); `null`: not set — advertising campaigns cannot
-   * be sent until it is.
+   * The sender's postal address shown in every mail footer: the tenant setting
+   * `newsletter.postal_address`, otherwise the owner's name and address from the tenant's
+   * legal profile, otherwise `AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS`; `null`: none — advertising
+   * campaigns cannot be sent until one is set.
    */
   postal_address?: string | null;
   /**
-   * The website's preferences page is set (`AUTOXIDE_NEWSLETTER_PREFERENCES_URL`); needed to
-   * send any campaign (the footer link).
+   * The website's preferences page is set (tenant setting `newsletter.link.preferences` or
+   * `AUTOXIDE_NEWSLETTER_PREFERENCES_URL`); needed to send any campaign (the footer link).
    */
   preferences_url_set: boolean;
   /**
@@ -30069,6 +30108,15 @@ export type ScimPatch = {
   schemas: string[];
 };
 
+/** A member a SCIM sync could not update. */
+export type ScimSyncFailure = {
+  /** Stable error code, e.g. `limit_exceeded`. */
+  code: string;
+  /** What went wrong, in English. */
+  message: string;
+  user_id: string;
+};
+
 /** State of the person who created a SCIM token. */
 export type ScimTokenCreatorStatus = "active" | "disabled" | "deleted" | "missing_permission";
 
@@ -30078,9 +30126,12 @@ export type ScimTokenResponse = {
   /** The user who created it. */
   created_by: string;
   /**
-   * Whether the token still works fully. A SCIM token can do only what its creator can do now:
-   * anything other than `active` means syncs that give, take away or disable will be refused —
-   * create a new token from an account with the needed roles and revoke this one.
+   * State of the token's creator. A SCIM token can do only what its creator can do now. `disabled`
+   * or `deleted`: the token can no longer give, take away, disable or delete anything that needs a
+   * permission; `missing_permission`: the creator lost `auth.scim.manage` but the token keeps the
+   * creator's other roles. In every case other than `active`, create a new token from an account
+   * with the needed roles and revoke this one. `active` does not mean the creator still holds every
+   * role your group mappings give.
    */
   creator_status: ScimTokenCreatorStatus;
   id: string;
@@ -32586,6 +32637,12 @@ export type TenantSettingState = {
    * `<module>.connection.<kind>.<field>`, e.g. `mail.connection.smtp.url`.
    */
   name: string;
+  /**
+   * The stored value is not used any more, and why: `kernel.public_url_unverified` /
+   * `kernel.link_unverified` (its host is not a verified domain of this tenant — verify the domain or
+   * change the value). Omitted when the value is used.
+   */
+  problem?: string | null;
   /** Secret settings are stored encrypted and never returned: `value` is always `null`. */
   secret: boolean;
   updated_at?: string | null;

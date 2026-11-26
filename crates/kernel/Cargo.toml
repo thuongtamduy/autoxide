@@ -50,6 +50,7 @@ tracing-subscriber.workspace = true
 utoipa.workspace = true
 utoipa-axum.workspace = true
 utoipa-scalar.workspace = true
+url.workspace = true
 uuid.workspace = true
 validator.workspace = true
 zeroize.workspace = true

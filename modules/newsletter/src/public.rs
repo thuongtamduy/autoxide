@@ -207,7 +207,7 @@ impl NewsletterService {
             return Err(Error::validation(problems));
         };
         if lists.iter().any(|list| list.row.double_opt_in) {
-            self.confirm_url()?;
+            self.confirm_page(tenant).await?;
         }
 
         // Pha một: chống spam, ngoài transaction. Chỉ tài khoản có `newsletter.subscribe` mới

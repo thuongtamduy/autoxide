@@ -198,6 +198,10 @@ impl Module for CommentsModule {
             resources: context.resources(),
             verification: context.posting_verification(),
             settings: context.require::<dyn autoxide_kernel::tenancy::TenantSettings>()?,
+            links: context
+                .require::<autoxide_kernel::tenancy::SiteLinks>()
+                .map(|links| (*links).clone())
+                .unwrap_or_default(),
         };
         let service = Arc::new(CommentsService::new(parts, config));
         // Vụ việc của `compliance` kiểm đích và bên bị phản ánh qua sổ đối tượng (D-363).
@@ -435,6 +439,7 @@ pub(crate) mod testing {
             translations,
             resources,
             verification: PostingVerification::default(),
+            links: autoxide_kernel::tenancy::SiteLinks::new(settings.clone()),
             settings,
         };
         let tenant = TenantContext::default_on(database.clone());

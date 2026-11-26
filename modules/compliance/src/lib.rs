@@ -202,7 +202,9 @@ impl Module for ComplianceModule {
     }
 
     fn tenant_settings(&self) -> Vec<autoxide_kernel::tenancy::TenantSetting> {
-        sms_templates::all()
+        let mut settings = sms_templates::all();
+        settings.push(config::CASE_TRACKING_LINK);
+        settings
     }
 
     fn configure(&mut self, reader: &mut ConfigReader<'_>) -> Result<(), Invalid> {
@@ -249,6 +251,10 @@ impl Module for ComplianceModule {
             guard: (*context.require::<autoxide_kernel::antispam::SpamGuard>()?).clone(),
             public_reports_per_hour: self.config.public_reports_per_hour,
             case_tracking_url: self.config.case_tracking_url.clone(),
+            links: context
+                .require::<autoxide_kernel::tenancy::SiteLinks>()
+                .map(|links| (*links).clone())
+                .unwrap_or_default(),
         });
         // Chân trang pháp lý mà `content` tự gắn dưới mọi trang dựng từ khối (bước 67).
         context.block_data(

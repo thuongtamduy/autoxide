@@ -72,6 +72,7 @@ mod tenant_admin;
 mod tenant_cors;
 mod tenant_domains;
 mod tenant_exports;
+mod tenant_links;
 mod tenant_logs;
 mod tenant_move;
 mod tenant_settings;

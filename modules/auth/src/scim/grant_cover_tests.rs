@@ -361,7 +361,10 @@ async fn token_cua_nguoi_tao_bi_khoa_hay_bi_xoa() {
             .exec(services.database.write())
             .await
             .unwrap();
-        assert_eq!(creator_status(&app, &admin, gone).await, "deleted");
+        // Xoá tài khoản thu hồi luôn token SCIM nó tạo (D-20261125-durable-grants); khoá thẳng trong
+        // database (không qua service) thì token còn, nhưng người tạo bị khoá nên token không làm được gì.
+        let (status, _) = scim(&app, "GET", "/Users", &gone_token, None).await;
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
         assert_eq!(creator_status(&app, &admin, locked).await, "disabled");
 
         // Liên kết tài khoản `it` (có permission) với SCIM bằng token của admin, để thử khoá.
@@ -369,7 +372,8 @@ async fn token_cua_nguoi_tao_bi_khoa_hay_bi_xoa() {
             scim(&app, "POST", "/Users", &admin_token, Some(user_body("it@example.com", "it")))
                 .await;
         assert_eq!(status, StatusCode::CREATED, "{linked}");
-        for (label, token) in [("deleted", &gone_token), ("disabled", &locked_token)] {
+        {
+            let (label, token) = ("disabled", &locked_token);
             let stranger = scim_user(&app, token, &format!("{label}@example.com")).await;
             let add =
                 patch(json!([{"op": "add", "path": "members", "value": [{"value": stranger}]}]));
@@ -421,6 +425,337 @@ async fn them_thanh_vien_dong_thoi_voi_dat_luat_khong_de_lai_thanh_vien_cho() {
             let granted = mapped.2["data"]["granted_user_ids"].as_array().unwrap();
             assert_eq!(granted.contains(&json!(stranger)), in_group, "vòng {round}: {}", mapped.2);
         }
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn dat_luat_cho_khoa_nhom_cua_lan_ghi_thanh_vien() {
+    // Ép đúng thứ tự xen kẽ: một transaction đóng vai `update_group` của token quyền thấp (khoá dòng
+    // nhóm, thấy nhóm chưa có luật, ghi thành viên X) và CHƯA commit; trong lúc đó admin đặt luật
+    // "nhóm → admin". Đặt luật phải chờ khoá nhóm, rồi thấy X và cấp cho X (có tên trong
+    // `granted_user_ids`). Không chờ thì luật commit trước, không thấy X, X thành thành viên chờ.
+    use sea_orm::{ActiveModelTrait as _, EntityTrait as _, Set};
+    TestDatabase::run(async |test| {
+        let (app, services, admin, admin_token) = setup(test).await;
+        let (_, low_token) = sync_operator(&app, &services, "it@example.com").await;
+        let tenant = &services.tenant;
+        let group = json!({"schemas": [GROUP_SCHEMA], "displayName": "Late"});
+        let (_, group) = scim(&app, "POST", "/Groups", &admin_token, Some(group)).await;
+        let group_id = uuid::Uuid::parse_str(group["id"].as_str().unwrap()).unwrap();
+        let stranger = scim_user(&app, &low_token, "stranger@example.com").await;
+        let stranger_id = uuid::Uuid::parse_str(&stranger).unwrap();
+
+        // Đọc mọi thứ cần trước khi giữ transaction ghi (SQLite một kết nối ghi).
+        let admin_role = admin_role(&app, &admin).await;
+        let body =
+            json!({"group_id": group_id, "org_id": tenant.id().as_uuid(), "role_id": admin_role});
+        let transaction = tenant.database().begin_write().await.unwrap();
+        autoxide_kernel::rows::lock_one(
+            &transaction,
+            super::entity::group::Entity::find_by_id((tenant.id().as_uuid(), group_id)),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        super::entity::member::ActiveModel {
+            tenant_id: Set(tenant.id().as_uuid()),
+            id: Set(uuid::Uuid::now_v7()),
+            group_id: Set(group_id),
+            user_id: Set(stranger_id),
+            created_at: Set(autoxide_kernel::time::Timestamp::now()),
+        }
+        .insert(&transaction)
+        .await
+        .unwrap();
+
+        let mapping = call(&app, "POST", "/scim/group-mappings", Some(&admin), Some(body));
+        let finished = std::sync::atomic::AtomicBool::new(false);
+        let (mapped, ()) = tokio::join!(
+            async {
+                let result = mapping.await;
+                finished.store(true, std::sync::atomic::Ordering::SeqCst);
+                result
+            },
+            async {
+                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                assert!(
+                    !finished.load(std::sync::atomic::Ordering::SeqCst),
+                    "đặt luật không chờ khoá nhóm của lần ghi thành viên"
+                );
+                transaction.commit().await.unwrap();
+            },
+        );
+        let (status, _, mapped) = mapped;
+        assert_eq!(status, StatusCode::CREATED, "{mapped}");
+        assert_eq!(mapped["data"]["granted_user_ids"], json!([stranger]), "{mapped}");
+        assert!(is_admin(&services, &stranger).await);
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn token_quyen_thap_khong_doi_user_name_tai_khoan_quyen_cao() {
+    // PT-19: `userName` / `externalId` là khoá hệ thống danh tính dùng để khớp người.
+    TestDatabase::run(async |test| {
+        let (app, services, _, admin_token) = setup(test).await;
+        let (_, low_token) = sync_operator(&app, &services, "it@example.com").await;
+        let target = scim_user(&app, &admin_token, "chief@example.com").await;
+        let id = uuid::Uuid::parse_str(&target).unwrap();
+        crate::role::grant_admin(services.database.write(), &services.tenant, id).await.unwrap();
+        let path = format!("/Users/{target}");
+        for operation in [
+            json!({"op": "replace", "path": "userName", "value": "attacker@example.com"}),
+            json!({"op": "replace", "path": "externalId", "value": "attacker"}),
+            json!({"op": "replace", "path": "displayName", "value": "Someone else"}),
+        ] {
+            let (status, body) =
+                scim(&app, "PATCH", &path, &low_token, Some(patch(json!([operation])))).await;
+            assert_forbidden(status, &body);
+        }
+        let (_, user) = scim(&app, "GET", &path, &admin_token, None).await;
+        assert_eq!(user["userName"], "chief@example.com", "{user}");
+        assert_eq!(user["externalId"], "chief@example.com", "{user}");
+        assert_eq!(user["displayName"], "Grace Hopper", "{user}");
+        // PUT gửi lại đúng hồ sơ hiện có (không đổi gì): không bị chặn.
+        let same = user_body("chief@example.com", "chief@example.com");
+        let (status, body) = scim(&app, "PUT", &path, &low_token, Some(same)).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        // Tài khoản thường: token quyền thấp đổi được.
+        let plain = scim_user(&app, &low_token, "plain@example.com").await;
+        let rename =
+            patch(json!([{"op": "replace", "path": "userName", "value": "plain2@example.com"}]));
+        let (status, body) =
+            scim(&app, "PATCH", &format!("/Users/{plain}"), &low_token, Some(rename)).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn chiem_truoc_user_name_khong_giu_duoc_tai_khoan_khi_email_doi() {
+    // Token quyền thấp tạo trước User mang `userName` mà hệ thống danh tính SẼ dùng cho một người
+    // (`chief@corp.example`) nhưng với email của kẻ tấn công; kẻ tấn công đặt mật khẩu. Hệ thống
+    // danh tính (token của admin) khớp theo `userName`, đổi email về người thật rồi đưa vào nhóm
+    // admin: kẻ tấn công không còn đường vào nào.
+    TestDatabase::run(async |test| {
+        let (app, services, admin, admin_token) = setup(test).await;
+        let (_, low_token) = sync_operator(&app, &services, "it@example.com").await;
+        let (group_id, _) = admin_group(&app, &services, &admin, &admin_token).await;
+        let mut body = user_body("chief@corp.example", "chief");
+        body["emails"] = json!([{"value": "attacker@evil.example", "type": "work", "primary": true}]);
+        let (status, planted) = scim(&app, "POST", "/Users", &low_token, Some(body)).await;
+        assert_eq!(status, StatusCode::CREATED, "{planted}");
+        let id = planted["id"].as_str().unwrap().to_owned();
+        let user_id = uuid::Uuid::parse_str(&id).unwrap();
+        services
+            .users
+            .write_password(
+                &services.tenant,
+                Actor::system(),
+                user_id,
+                "password",
+                PASSWORD.to_owned(),
+                crate::user::PasswordWrite::Initial,
+            )
+            .await
+            .unwrap();
+        let attacker = bearer(&app, "attacker@evil.example", PASSWORD).await;
+        assert_eq!(call(&app, "GET", "/me", Some(&attacker), None).await.0, StatusCode::OK);
+        // Tạm cấp cho tài khoản cắm sẵn quyền quản lý SCIM, tạo token SCIM T2, rồi gỡ quyền.
+        let input = crate::role::RoleInput {
+            denies: Vec::new(),
+            requires_mfa: false,
+            name: "sync2".to_owned(),
+            description: String::new(),
+            permissions: vec!["auth.scim.manage".to_owned()],
+            grants: Vec::new(),
+        };
+        let sync2 = services.roles.create(&services.tenant, Actor::system(), input).await.unwrap();
+        services
+            .roles
+            .set_user_roles(&services.tenant, Actor::system(), user_id, vec![sync2.id])
+            .await
+            .unwrap();
+        let planted_token = scim_token(&app, &attacker, None).await;
+        services.roles.set_user_roles(&services.tenant, Actor::system(), user_id, vec![]).await.unwrap();
+
+        // Hệ thống danh tính khớp theo `userName`, đổi email về người thật, đưa vào nhóm admin.
+        let email = patch(json!([
+            {"op": "replace", "path": "emails[type eq \"work\"].value", "value": "chief@corp.example"}
+        ]));
+        let (status, body) =
+            scim(&app, "PATCH", &format!("/Users/{id}"), &admin_token, Some(email)).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        let add = patch(json!([{"op": "add", "path": "members", "value": [{"value": id}]}]));
+        let (status, body) =
+            scim(&app, "PATCH", &format!("/Groups/{group_id}"), &admin_token, Some(add)).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        assert!(is_admin(&services, &id).await);
+
+        // Token SCIM tài khoản đó tạo đã bị thu hồi cùng lúc đổi email (không thì nay nó mạnh bằng admin).
+        let (status, _) = scim(&app, "GET", "/Users", &planted_token, None).await;
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
+        // Phiên cũ chết; mật khẩu kẻ tấn công đặt không còn dùng được với email nào.
+        assert_eq!(call(&app, "GET", "/me", Some(&attacker), None).await.0, StatusCode::UNAUTHORIZED);
+        for email in ["attacker@evil.example", "chief@corp.example"] {
+            let login = json!({"email": email, "password": PASSWORD});
+            let (status, _, body) = call(&app, "POST", "/login", None, Some(login)).await;
+            assert_eq!(status, StatusCode::UNAUTHORIZED, "{email}: {body}");
+        }
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn nguoi_tao_mat_quyen_quan_ly_scim_thi_token_khong_cap_duoc_gi() {
+    // Người tạo còn role `editor` nhưng mất `auth.scim.manage`: token không cấp được cả `editor`.
+    TestDatabase::run(async |test| {
+        let (app, services, admin, admin_token) = setup(test).await;
+        let tenant = &services.tenant;
+        let editor = crate::role::RoleInput {
+            denies: Vec::new(),
+            requires_mfa: false,
+            name: "editor".to_owned(),
+            description: String::new(),
+            permissions: vec!["notes.write".to_owned()],
+            grants: Vec::new(),
+        };
+        let editor = services.roles.create(tenant, Actor::system(), editor).await.unwrap();
+        let (_, low_token) = sync_operator(&app, &services, "it@example.com").await;
+        let it = services.users.find_by_email(tenant, "it@example.com").await.unwrap().unwrap();
+        let mut roles: Vec<uuid::Uuid> = services
+            .roles
+            .user_roles(tenant, it.id)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|role| role.id)
+            .collect();
+        roles.push(editor.id);
+        services.roles.set_user_roles(tenant, Actor::system(), it.id, roles).await.unwrap();
+        let group = json!({"schemas": [GROUP_SCHEMA], "displayName": "Editors"});
+        let (_, group) = scim(&app, "POST", "/Groups", &admin_token, Some(group)).await;
+        let group_id = group["id"].as_str().unwrap().to_owned();
+        let body =
+            json!({"group_id": group_id, "org_id": tenant.id().as_uuid(), "role_id": editor.id});
+        let (status, _, mapped) =
+            call(&app, "POST", "/scim/group-mappings", Some(&admin), Some(body)).await;
+        assert_eq!(status, StatusCode::CREATED, "{mapped}");
+        let path = format!("/Groups/{group_id}");
+        let first = scim_user(&app, &low_token, "first@example.com").await;
+        let add = patch(json!([{"op": "add", "path": "members", "value": [{"value": first}]}]));
+        let (status, body) = scim(&app, "PATCH", &path, &low_token, Some(add)).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+
+        // Mất `auth.scim.manage`, còn `editor`.
+        services
+            .roles
+            .set_user_roles(tenant, Actor::system(), it.id, vec![editor.id])
+            .await
+            .unwrap();
+        let second = scim_user(&app, &low_token, "second@example.com").await;
+        let add = patch(json!([{"op": "add", "path": "members", "value": [{"value": second}]}]));
+        let (status, body) = scim(&app, "PATCH", &path, &low_token, Some(add)).await;
+        assert_forbidden(status, &body);
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn khoa_tai_khoan_thu_hoi_token_scim_no_tao() {
+    // Như API key: khoá tài khoản (qua SCIM `active=false` hay qua REST) thu hồi token SCIM người đó
+    // tạo; mở khoá lại không làm token sống lại.
+    TestDatabase::run(async |test| {
+        let (app, services, admin, admin_token) = setup(test).await;
+        let (_, scim_disabled) = sync_operator(&app, &services, "it@example.com").await;
+        let it = services
+            .users
+            .find_by_email(&services.tenant, "it@example.com")
+            .await
+            .unwrap()
+            .unwrap();
+        // Liên kết tài khoản `it` với SCIM (nhận về), khoá rồi mở lại qua SCIM.
+        let (status, linked) =
+            scim(&app, "POST", "/Users", &admin_token, Some(user_body("it@example.com", "it")))
+                .await;
+        assert_eq!(status, StatusCode::CREATED, "{linked}");
+        let path = format!("/Users/{}", it.id);
+        for active in [false, true] {
+            let body = patch(json!([{"op": "replace", "path": "active", "value": active}]));
+            let (status, body) = scim(&app, "PATCH", &path, &admin_token, Some(body)).await;
+            assert_eq!(status, StatusCode::OK, "{body}");
+        }
+        assert_eq!(
+            scim(&app, "GET", "/Users", &scim_disabled, None).await.0,
+            StatusCode::UNAUTHORIZED
+        );
+
+        // Qua REST: token mới, khoá rồi mở lại tài khoản.
+        let access = bearer(&app, "it@example.com", PASSWORD).await;
+        let rest_disabled = scim_token(&app, &access, None).await;
+        for disabled in [true, false] {
+            let (status, _, body) = call(
+                &app,
+                "PATCH",
+                &format!("/users/{}", it.id),
+                Some(&admin),
+                Some(json!({"disabled": disabled})),
+            )
+            .await;
+            assert_eq!(status, StatusCode::OK, "{body}");
+        }
+        assert_eq!(
+            scim(&app, "GET", "/Users", &rest_disabled, None).await.0,
+            StatusCode::UNAUTHORIZED
+        );
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn lay_lai_tai_khoan_hay_xoa_tai_khoan_thu_hoi_token_scim_no_tao() {
+    TestDatabase::run(async |test| {
+        let (app, services, _, _) = setup(test).await;
+        let tenant = &services.tenant;
+        // Lấy lại tài khoản bằng mail (đặt lại mật khẩu kiểu `Recovery`): token SCIM mất.
+        let (_, recovered_token) = sync_operator(&app, &services, "it@example.com").await;
+        let it = services.users.find_by_email(tenant, "it@example.com").await.unwrap().unwrap();
+        services
+            .users
+            .write_password(
+                tenant,
+                Actor::user(it.id),
+                it.id,
+                "password",
+                "a brand new long password".to_owned(),
+                crate::user::PasswordWrite::Recovery,
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            scim(&app, "GET", "/Users", &recovered_token, None).await.0,
+            StatusCode::UNAUTHORIZED
+        );
+
+        // Xoá tài khoản: token SCIM không ở lại mồ côi.
+        let ops = NewUser {
+            email: "ops@example.com".to_owned(),
+            name: "Ops".to_owned(),
+            password: Some(PASSWORD.to_owned()),
+        };
+        let ops =
+            services.users.create_with_roles(tenant, Actor::system(), ops, true).await.unwrap();
+        let ops_token =
+            scim_token(&app, &bearer(&app, "ops@example.com", PASSWORD).await, None).await;
+        services.users.delete(tenant, Actor::system(), ops.id).await.unwrap();
+        assert_eq!(scim(&app, "GET", "/Users", &ops_token, None).await.0, StatusCode::UNAUTHORIZED);
     })
     .await
     .unwrap();

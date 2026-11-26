@@ -134,6 +134,23 @@ pub(crate) fn token_link(url: &str, tenant: &TenantContext, raw: &str) -> String
     url.replace("{token}", &link_token(tenant, raw))
 }
 
+impl InventoryService {
+    /// Trang xác nhận của khách (`inventory.link.restock_confirm`), không có thì biến chung đổi host theo
+    /// `kernel.public_url`; `None` khi cả hai chưa đặt.
+    pub(crate) async fn restock_page(
+        &self,
+        tenant: &TenantContext,
+    ) -> Result<Option<String>, Error> {
+        self.links
+            .link(
+                tenant,
+                &crate::config::RESTOCK_CONFIRM_LINK,
+                self.config.restock_confirm_url.as_deref(),
+            )
+            .await
+    }
+}
+
 pub(crate) fn unavailable() -> Error {
     Error::unavailable(
         "inventory.restock_alerts_unavailable",
@@ -180,7 +197,8 @@ impl InventoryService {
         let who = contact(principal, input.email.as_deref(), input.phone.as_deref(), &mut problems);
         crate::service::fail_if_any(problems)?;
         let Some(notifier) = &self.notifier else { return Err(unavailable()) };
-        let confirm_url = self.config.restock_confirm_url.as_deref();
+        let confirm_url = self.restock_page(tenant).await?;
+        let confirm_url = confirm_url.as_deref();
         let is_user = matches!(who, Contact::User(_));
         if !is_user && confirm_url.is_none() {
             return Err(unavailable());

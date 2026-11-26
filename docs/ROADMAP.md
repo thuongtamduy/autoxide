@@ -276,6 +276,14 @@ thật (P7).
         thì mọi thành viên nhận role (response tạo luật liệt kê ở `granted_user_ids`, hướng dẫn dặn xem trước —
         D-20261125-scim-grant-cover). Chặt hơn: ghi người đưa vào (`added_by`) ở thành viên nhóm và chỉ cấp cho
         thành viên mà người đưa vào cấp được role, còn lại chờ duyệt — cần migration, để sau
+  - [ ] Hạn mức số nhân sự: hai lần đổi role thật cho cùng một người chạy đồng thời có thể làm lệch chỗ (dùng chung
+        mã giữ chỗ `auth.member:<id>`; có từ trước) — khoá dòng người dùng quanh giữ chỗ → đổi → xác nhận, hay job
+        đối soát số nhân sự với `auth_user_role` (D-20261125-scim-sync-report)
+  - [ ] SCIM: khi đồng bộ đưa một tài khoản lên role cao hơn người đã tạo liên kết SCIM của nó (token quyền thấp tạo
+        tài khoản, token của admin cấp role cao), thu hồi mọi cách vào cũ như khi đổi email — cần ghi người tạo liên kết
+        ở `auth_scim_users` (migration) (D-20261125-scim-sync-report mục 7)
+  - [ ] `automations`: luật chạy bằng quyền hiện tại của `run_as` — xem lại khi quyền của người đó đổi: tạm dừng luật
+        khi tài khoản bị khoá (nghe event của `auth`) và / hay giới hạn bằng quyền lúc tạo (D-20261125-durable-grants)
 
 ## Giai đoạn B — Lớp cho giao diện và phân quyền
 
@@ -1180,6 +1188,33 @@ Thứ tự ưu tiên chủ dự án đồng ý; mỗi mục khi làm thì ghi qu
 - [ ] Quét gitleaks định kỳ MỌI nhánh bằng một job riêng không chặn PR (sau D-20261125-gitleaks-scope, nhánh chưa có PR không được quét)
 - [ ] Nợ nhỏ: tách các file `.rs` trên 800 dòng (đang làm); ~~`chrono` không còn bảo trì~~ — đã thay bằng `jiff`
       (D-20261121-time-library)
+
+## Cấu hình theo từng khách (chủ dự án giao ngày 25/11/2026)
+
+SaaS nhiều khách: thứ chỉ đặt được bằng biến môi trường chung (sửa `.env`, khởi động lại) phải đặt được theo từng khách;
+biến chung vẫn là mặc định. Mỗi PR một cụm.
+
+- [x] Link trong thư theo khách: mỗi link là một tenant setting nhóm `link` (`<module>.link.<trang>`, mẫu URL đầy đủ),
+      host ràng vào tên miền đã xác minh / `kernel.public_url`, kiểm lúc đặt và lúc dùng; áp cho auth (5 link),
+      support, compliance, inventory, notifications, comments, newsletter; luật gate `site-links`
+      (D-20261125-tenant-link-templates)
+- [x] Địa chỉ người gửi thư quảng cáo theo khách: cấu hình khách → hồ sơ pháp lý (`compliance`) → biến chung
+      (D-20261125-tenant-postal-address)
+- [x] `content.embed_hosts`, `analytics.allowed_hosts` theo khách (analytics vốn đã nhận tên miền đã xác minh)
+- [ ] `content.embed_hosts` chặn hậu tố công cộng (`com.vn`, `github.io`): repo chưa có danh sách hậu tố công cộng
+      (Public Suffix List); hiện chỉ cảnh báo trong mô tả setting
+- [x] Link bài mới của newsletter mở trên tên miền của khách (`kernel.public_url`), như comments
+- [x] P16: ràng `kernel.public_url` và link mẫu vào tên miền ĐANG xác minh của chính khách (hay host nền tảng) ở chế độ
+      nhiều khách; giá trị cũ không thoả bị bỏ qua và báo trong `GET /kernel/settings` (D-20261125-tenant-site-verified)
+- [ ] Email bị dội: ghi nhận mọi thư (không chỉ newsletter), tra theo địa chỉ, chặn sau nhiều lần dội cứng, gỡ chặn,
+      số liệu theo khách
+- [ ] Hạn mức token AI mỗi ngày theo gói (`Entitlements`)
+- [ ] Giới hạn request mỗi phút theo khách (tầng thứ ba của rate limit, gói nâng được)
+- [ ] Ngôn ngữ của `catalog` và `menus` theo khách (như `content`); múi giờ / tiền tệ đã có theo khách qua
+      `organizations.timezone` / `organizations.currency` của nút gốc — chỉ thống nhất mặc định khi thiếu
+- [ ] Tự đăng ký tài khoản theo khách
+- [ ] Passkey theo khách: RP ID là tên miền đã xác minh của khách
+- [ ] Chính sách đăng nhập theo khách: thời hạn phiên, độ dài mật khẩu tối thiểu, TOTP issuer (chỉ siết hơn mặc định)
 
 ## Chờ chủ dự án
 

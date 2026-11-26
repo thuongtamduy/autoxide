@@ -74,6 +74,8 @@ pub(crate) struct NotificationsService {
     pub legal: Option<Arc<dyn autoxide_compliance::api::LegalProfiles>>,
     /// Giới hạn gửi thử mẫu mỗi người mỗi giờ.
     pub test_throttle: Throttle,
+    /// Link trong thư theo khách (`kernel.public_url`, `notifications.link.unsubscribe`).
+    pub links: autoxide_kernel::tenancy::SiteLinks,
 }
 
 // ---- Lỗi -----------------------------------------------------------------------------------------

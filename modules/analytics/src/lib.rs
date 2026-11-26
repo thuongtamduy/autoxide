@@ -98,6 +98,10 @@ impl Module for AnalyticsModule {
         vec![("vi", include_str!("../locales/vi.json"))]
     }
 
+    fn tenant_settings(&self) -> Vec<autoxide_kernel::tenancy::TenantSetting> {
+        vec![config::TENANT_ALLOWED_HOSTS]
+    }
+
     fn configure(&mut self, reader: &mut ConfigReader<'_>) -> Result<(), Invalid> {
         self.config = Some(AnalyticsConfig::read(reader)?);
         Ok(())
@@ -142,6 +146,7 @@ impl Module for AnalyticsModule {
             secret: (*context.require::<SecretKey>()?).clone(),
             consents: context.require::<dyn autoxide_compliance::api::ConsentLedger>().ok(),
             registry: context.tenancy(),
+            settings: context.require::<dyn autoxide_kernel::tenancy::TenantSettings>().ok(),
         });
         self.listen_consents =
             context.events().contains(autoxide_compliance::api::CONSENT_WITHDRAWN);

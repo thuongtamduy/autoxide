@@ -97,6 +97,10 @@
 #                        `0` trên GitHub Actions (build một lần, chạy một lần: build từ đầu nhanh hơn ~23%,
 #                        D-20261120-build-faster), còn lại để nguyên `opt-level = 1` của Cargo.toml
 #                        (máy dev chạy test nhiều lần). Rỗng: không đổi.
+#   GATE_LOCAL           `on` (mặc định) | `off` — công tắc của gate nhanh (D-20261125-local-gate-switch). `off` cùng `--quick`:
+#                        chỉ chạy các kiểm rẻ (fmt, xtask check, SDK, api-diff, cargo deny, gitleaks) rồi báo xanh;
+#                        KHÔNG clippy, không kiểm file sinh, không test — CI trên pull request kiểm phần đó. Không
+#                        ảnh hưởng gate đầy đủ, `--pr` hay `--only`. Giá trị khác `on`/`off` là lỗi.
 #   GATE_TARGET_MAX_GB   trần dung lượng của target/ (mặc định 40): vượt thì gate dọn trước khi build
 #                        (cache incremental trước, vẫn vượt thì `cargo clean`). 0: không dọn.
 #
@@ -155,6 +159,13 @@ fi
 # Gate nhanh vốn chỉ có SQLite và đã nhanh: không chia.
 [ "$QUICK" = 1 ] && [ -n "$ONLY" ] && usage
 [ "$QUICK" = 1 ] && [ ${#SHARD[@]} -gt 0 ] && usage
+# Công tắc gate nhanh (D-20261125-local-gate-switch): `GATE_LOCAL=off ./gate.sh --quick` chỉ chạy các kiểm rẻ.
+LIGHT=0
+case "${GATE_LOCAL:-on}" in
+  on) ;;
+  off) [ "$QUICK" = 1 ] && LIGHT=1 ;;
+  *) echo "gate: GATE_LOCAL must be 'on' or 'off', got '${GATE_LOCAL}'" >&2; exit 2 ;;
+esac
 # Phần `part` có được chạy không (không có `--only` thì mọi phần đều chạy).
 runs() { [ -z "$ONLY" ] || [ "$ONLY" = "$1" ]; }
 
@@ -269,6 +280,7 @@ fi
 # khỏi lint vì biên dịch bộ mã hoá AV1 (rav1e) làm lint từ ~5 lên ~14 phút trên CI; CI chạy phần này ở job
 # riêng song song. Gate nhanh chỉ chạy khi `media` hay danh sách thư viện đổi so với origin/main.
 avif_needed() {
+  [ "$LIGHT" = 0 ] || return 1
   [ "$QUICK" = 1 ] || return 0
   git rev-parse --verify --quiet "${GATE_BASE:-origin/main}" >/dev/null || return 0
   git diff --name-only "$(git merge-base "${GATE_BASE:-origin/main}" HEAD)" -- \
@@ -290,6 +302,7 @@ fi
 # feature của người ngoài, nên không nằm trong lint hay test của workspace gốc. Thư mục build riêng
 # (`examples/external-module/target`) trừ khi CARGO_TARGET_DIR đã đặt.
 example_needed() {
+  [ "$LIGHT" = 0 ] || return 1
   [ "$QUICK" = 1 ] || return 0
   git rev-parse --verify --quiet "${GATE_BASE:-origin/main}" >/dev/null || return 0
   git diff --name-only "$(git merge-base "${GATE_BASE:-origin/main}" HEAD)" -- examples xtask/src/scaffold.rs | grep -q .
@@ -330,7 +343,9 @@ if runs lint; then
 
 # --- Phần còn lại của lint: lâu hơn (biên dịch) hoặc cần mạng ---------------------------------------------
 
-if [ "$RUST_CHANGED" = true ]; then
+if [ "$LIGHT" = 1 ]; then
+  step "lint (cargo clippy): skipped, GATE_LOCAL=off (CI on the pull request runs it)"
+elif [ "$RUST_CHANGED" = true ]; then
   step "lint (cargo clippy)"
   cargo clippy --workspace --all-targets --locked -- -D warnings
 else
@@ -342,7 +357,7 @@ fi
 # sau clippy để lỗi biên dịch hiện ra bằng thông báo của clippy trước. Lệch thì thông báo ghi `cargo xtask regen`.
 # Trên CI bỏ qua: job lint chỉ có cache của clippy, nên bước này dựng thêm cả workspace (~8 phút trên máy 4 nhân) vào
 # job dài nhất; các bài test giữ tài liệu khớp code vẫn chạy ở các shard test và in cùng lệnh `cargo xtask regen`.
-if [ "$RUST_CHANGED" = true ] && [ -z "${GITHUB_ACTIONS:-}" ]; then
+if [ "$RUST_CHANGED" = true ] && [ "$LIGHT" = 0 ] && [ -z "${GITHUB_ACTIONS:-}" ]; then
   step "generated files match the code (cargo xtask regen --check)"
   cargo xtask regen --check
 fi
@@ -450,6 +465,12 @@ run_archive() {
 
 # --- Gate nhanh: test của crate bị ảnh hưởng, chỉ SQLite ---------------------------
 
+if [ "$LIGHT" = 1 ]; then
+  tree_unchanged
+  printf '\n\033[32mgate --quick (GATE_LOCAL=off): green — fmt, boundaries, SDK, api contract, dependencies, secrets\033[0m\n'
+  printf 'NOT checked on this machine: clippy, generated files, every test. CI on the pull request is the check: do not merge before it is green.\n'
+  exit 0
+fi
 if [ "$QUICK" = 1 ]; then
   step "tests on SQLite, changed crates only (cargo xtask test-affected)"
   cargo xtask test-affected

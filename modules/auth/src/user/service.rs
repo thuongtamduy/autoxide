@@ -317,6 +317,7 @@ impl UserService {
         }
         if changes.disabled == Some(true) {
             SessionService::revoke_user(&transaction, tenant, id).await?;
+            revoke_durable_grants_in(&transaction, tenant, &self.outbox, actor, id).await?;
             if admins_before > 0
                 && crate::role::count_active_admins(&transaction, tenant).await? == 0
             {
@@ -370,6 +371,8 @@ impl UserService {
         crate::oidc::identity::delete_for_user(&transaction, tenant, id).await?;
         // Liên kết SCIM (bước 66): không có foreign key, xoá cùng transaction.
         crate::scim::forget_user(&transaction, tenant, id).await?;
+        // Token SCIM và vai người cấu hình nhà cung cấp đăng nhập: không để lại thứ mồ côi.
+        revoke_durable_grants_in(&transaction, tenant, &self.outbox, actor, id).await?;
         // Chỉ ghi id: audit log không giữ lại email hay tên của người đã xin xoá.
         let event =
             events::UserDeleted { before: Some(serde_json::json!({"id": id})), after: None };
@@ -626,8 +629,24 @@ impl UserService {
             OneTimeTokens::new("auth").revoke(transaction, tenant, purpose, &subject).await?;
         }
         self.forget_identities(transaction, tenant, actor, id).await?;
+        revoke_durable_grants_in(transaction, tenant, &self.outbox, actor, id).await?;
         Ok(())
     }
+}
+
+/// Thu hồi các uỷ quyền BỀN tài khoản `id` đã tạo — thứ có sức mạnh đo bằng quyền hiện tại (hay
+/// sau này) của tài khoản: token SCIM nó tạo, và vai "người cấu hình" của nhà cung cấp đăng nhập ngoài
+/// (tự liên kết). Gọi ở mọi đường khoá hết cửa vào (`lock_out_in`, nhận lại tài khoản chưa xác minh)
+/// và khi khoá tài khoản — không thì mở khoá lại làm chúng sống lại (D-20261125-durable-grants).
+pub(crate) async fn revoke_durable_grants_in<C: sea_orm::ConnectionTrait>(
+    connection: &C,
+    tenant: &TenantContext,
+    outbox: &autoxide_kernel::event::Outbox,
+    actor: Actor,
+    id: Uuid,
+) -> Result<(), Error> {
+    crate::scim::revoke_created_by_in(connection, tenant, outbox, actor, id).await?;
+    crate::oidc::provider::forget_configurer_in(connection, tenant, outbox, actor, id).await
 }
 
 #[async_trait::async_trait]
