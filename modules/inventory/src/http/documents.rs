@@ -563,7 +563,7 @@ async fn open_count(
 #[utoipa::path(
     get,
     path = "/counts/{id}",
-    extensions(("x-permissions" = json!(["inventory.count"]))),
+    extensions(("x-permissions" = json!(["inventory.count", "inventory.read"]))),
     operation_id = "get_inventory_count",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the stock count.")),

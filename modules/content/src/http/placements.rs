@@ -180,7 +180,7 @@ pub(crate) struct CreatePlacementRequest {
 #[utoipa::path(
     get,
     path = "/placements",
-    extensions(("x-permissions" = json!(["content.banners"]))),
+    extensions(("x-permissions" = json!(["content.banners", "content.manage"]))),
     operation_id = "list_content_placements",
     security(("bearer" = [])),
     params(NaturalOrderPageQuery),
@@ -266,7 +266,7 @@ pub(crate) async fn install_presets(
 #[utoipa::path(
     get,
     path = "/placements/{key}",
-    extensions(("x-permissions" = json!(["content.banners"]))),
+    extensions(("x-permissions" = json!(["content.banners", "content.manage"]))),
     operation_id = "get_content_placement",
     security(("bearer" = [])),
     params(("key" = String, Path, description = "Key of the placement, e.g. `home_hero`.")),

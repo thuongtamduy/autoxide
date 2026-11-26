@@ -722,7 +722,7 @@ pub(crate) fn routes(exports: Arc<TenantExports>) -> OpenApiRouter {
 #[utoipa::path(
     post,
     path = "/tenants/{id}/exports",
-    extensions(("x-permissions" = json!(["kernel.data.export"]))),
+    extensions(("x-permissions" = json!(["kernel.data.export", "kernel.tenants.operate"]))),
     operation_id = "request_tenant_export",
     security(("bearer" = [])),
     params(("id" = String, Path, description = "Id or slug of the tenant.")),
@@ -749,7 +749,7 @@ async fn request_export(
 #[utoipa::path(
     get,
     path = "/tenants/{id}/exports",
-    extensions(("x-permissions" = json!(["kernel.data.export"]))),
+    extensions(("x-permissions" = json!(["kernel.data.export", "kernel.tenants.operate"]))),
     operation_id = "list_tenant_exports",
     security(("bearer" = [])),
     params(("id" = String, Path, description = "Id or slug of the tenant.")),
@@ -775,7 +775,7 @@ async fn list_exports(
 #[utoipa::path(
     get,
     path = "/tenants/{id}/exports/{export_id}",
-    extensions(("x-permissions" = json!(["kernel.data.export"]))),
+    extensions(("x-permissions" = json!(["kernel.data.export", "kernel.tenants.operate"]))),
     operation_id = "get_tenant_export",
     security(("bearer" = [])),
     params(("id" = String, Path, description = "Id or slug of the tenant."), ("export_id" = Uuid, Path, description = "Id of the export.")),
@@ -802,7 +802,7 @@ async fn get_export(
 #[utoipa::path(
     get,
     path = "/tenants/{id}/exports/{export_id}/content",
-    extensions(("x-permissions" = json!(["kernel.data.export"]))),
+    extensions(("x-permissions" = json!(["kernel.data.export", "kernel.tenants.operate"]))),
     operation_id = "download_tenant_export",
     security(("bearer" = [])),
     params(("id" = String, Path, description = "Id or slug of the tenant."), ("export_id" = Uuid, Path, description = "Id of the export.")),
@@ -830,7 +830,7 @@ async fn download_export(
 #[utoipa::path(
     post,
     path = "/tenants/{id}/exports/{export_id}/link",
-    extensions(("x-permissions" = json!(["kernel.data.export"]))),
+    extensions(("x-permissions" = json!(["kernel.data.export", "kernel.tenants.operate"]))),
     operation_id = "create_tenant_export_link",
     security(("bearer" = [])),
     params(("id" = String, Path, description = "Id or slug of the tenant."), ("export_id" = Uuid, Path, description = "Id of the export.")),

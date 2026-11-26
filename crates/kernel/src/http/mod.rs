@@ -57,6 +57,7 @@ mod mcp;
 mod metrics;
 mod openapi;
 mod openapi_modules;
+mod permission_gate;
 mod problem;
 mod rate_limit;
 mod rate_limit_store;
@@ -364,6 +365,15 @@ pub fn build(
             let approvals = Arc::new(approvals);
             routes = routes.layer(middleware::from_fn(move |request: Request, next: Next| {
                 crate::ops::approvals::gate(approvals.clone(), request, next)
+            }));
+        }
+        // Kiểm permission trước mọi thứ khác của route (PT-14, D-20261126-permission-gate): lớp ngoài cùng của
+        // module chạy trước gói, duyệt của agent và mọi extractor của handler.
+        let permissions = permission_gate::rules(name, routes.get_openapi());
+        if !permissions.is_empty() {
+            let permissions = Arc::new(permissions);
+            routes = routes.layer(middleware::from_fn(move |request: Request, next: Next| {
+                permission_gate::gate(permissions.clone(), request, next)
             }));
         }
         if sync_state.resources.iter().any(|(module, _)| *module == name) {

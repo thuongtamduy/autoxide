@@ -45,3 +45,4 @@ pub(crate) mod startup;
 pub(crate) mod support;
 pub(crate) mod tenant_move;
 pub(crate) mod usable;
+pub(crate) mod x_permissions;

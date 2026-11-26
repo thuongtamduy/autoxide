@@ -79,7 +79,7 @@ pub(crate) struct TeamDetail {
 #[utoipa::path(
     get,
     path = "/teams",
-    extensions(("x-permissions" = json!(["support.tickets.reply"]))),
+    extensions(("x-permissions" = json!(["support.tickets.reply", "support.settings.manage"]))),
     operation_id = "list_support_teams",
     security(("bearer" = [])),
     params(PageQuery),
@@ -150,7 +150,7 @@ pub(crate) async fn create_team(
 #[utoipa::path(
     get,
     path = "/teams/{id}",
-    extensions(("x-permissions" = json!(["support.tickets.reply"]))),
+    extensions(("x-permissions" = json!(["support.tickets.reply", "support.settings.manage"]))),
     operation_id = "get_support_team",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the team.")),

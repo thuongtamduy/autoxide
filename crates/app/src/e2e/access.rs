@@ -20,7 +20,7 @@ use serde_json::{Map, Value, json};
 
 const SAMPLE_ID: &str = "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11";
 
-fn resolve<'a>(document: &'a Value, value: &'a Value) -> &'a Value {
+pub(super) fn resolve<'a>(document: &'a Value, value: &'a Value) -> &'a Value {
     match value.get("$ref").and_then(Value::as_str) {
         Some(reference) => document.pointer(reference.trim_start_matches('#')).unwrap_or(value),
         None => value,
@@ -28,7 +28,7 @@ fn resolve<'a>(document: &'a Value, value: &'a Value) -> &'a Value {
 }
 
 /// Giá trị tối thiểu hợp lệ theo schema (chỉ trường bắt buộc).
-fn sample(document: &Value, schema: &Value, depth: usize) -> Value {
+pub(super) fn sample(document: &Value, schema: &Value, depth: usize) -> Value {
     let schema = resolve(document, schema);
     if depth > 8 {
         return Value::Null;
@@ -130,14 +130,14 @@ fn as_text(value: &Value) -> String {
 }
 
 /// Một request mẫu cho operation.
-struct Probe {
-    method: Method,
-    uri: String,
-    headers: Vec<(String, String)>,
-    body: Option<(String, Vec<u8>)>,
+pub(super) struct Probe {
+    pub(super) method: Method,
+    pub(super) uri: String,
+    pub(super) headers: Vec<(String, String)>,
+    pub(super) body: Option<(String, Vec<u8>)>,
 }
 
-fn probe(document: &Value, method: &str, path: &str, operation: &Value) -> Probe {
+pub(super) fn probe(document: &Value, method: &str, path: &str, operation: &Value) -> Probe {
     let mut uri = path.to_owned();
     let mut query = Vec::new();
     let mut headers = Vec::new();
@@ -184,7 +184,7 @@ fn probe(document: &Value, method: &str, path: &str, operation: &Value) -> Probe
     }
 }
 
-async fn send(app: &TestApp, probe: &Probe, token: Option<&str>) -> (u16, Value) {
+pub(super) async fn send(app: &TestApp, probe: &Probe, token: Option<&str>) -> (u16, Value) {
     let mut request = app.request(probe.method.clone(), &probe.uri).unchecked();
     if let Some(token) = token {
         request = request.token(token);
