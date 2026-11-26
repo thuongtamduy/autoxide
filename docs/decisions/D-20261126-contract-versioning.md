@@ -6,10 +6,10 @@ Quyết định: Cùng quy tắc với REST (D-059) cho ba hợp đồng: thêm 
 bỏ, đổi kiểu, đổi nghĩa, thêm trường bắt buộc là phá vỡ → bản mới chạy song song, bản cũ khai sắp bỏ kèm sunset và cái thay
 thế. (1) Event: `EventInfo::payload::<T: Schema>()` khai schema payload có kiểu; `Outbox::record` nhận payload có kiểu;
 bản phá vỡ là tên mới hậu tố `.v2`, module phát cả hai tới sunset (`EventInfo::deprecated`); catalog sinh
-`docs/events.json`. (2) Webhook: thêm header `webhook-version: 1` (bản của khung thân Standard Webhooks) và `data.schema`
-(tên event kèm bản); đăng ký chọn tên event có bản; bản cũ tới sunset thì báo trước 30 ngày rồi tắt; payload khai ở mục
-`webhooks` của OpenAPI. (3) Phần mở rộng `x-*`: danh mục ở kernel (tên, JSON Schema giá trị, hạng), `#[endpoint]` chỉ sinh
-phần mở rộng có trong danh mục, xuất `docs/openapi-extensions.json`; tên mới dạng `x-autoxide-<tên>`, 7 tên ngắn cũ giữ
+`docs/events.json`. (2) Webhook: thêm `data.schema` (tên event kèm bản) và `data.envelope_version` trong thân đã ký — nguồn
+đúng; header `webhook-version` chỉ là gợi ý không ký; đăng ký chọn tên event có bản; bản cũ tới sunset thì báo trước 30 ngày rồi tắt; payload khai ở mục
+`webhooks` của OpenAPI. (3) Phần mở rộng `x-*`: danh mục ở kernel (tên, JSON Schema giá trị, hạng), kiểm bằng file sinh ra + `contract-diff`
+(không kiểm lúc biên dịch), xuất `docs/openapi-extensions.json`; tên mới dạng `x-autoxide-<tên>`, 7 tên ngắn cũ giữ
 nguyên. `xtask contract-diff` (mở rộng `api-diff`) so `openapi.json`, `events.json`, danh mục phần mở rộng với bản phát hành
 gần nhất; phần hạng thử nghiệm chỉ báo. Tên và schema tool MCP do phiên AI agent làm theo cùng quy tắc.
 

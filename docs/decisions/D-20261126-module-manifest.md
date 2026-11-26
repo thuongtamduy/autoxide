@@ -4,10 +4,13 @@ Chủ đề: Kiến trúc module và kernel
 
 Quyết định: `Module` còn `manifest() -> Manifest`, `configure`, `start`, `dormant`. Thứ biết được khi chưa khởi động
 (migration, permission, event, cài đặt, bản dịch, hạn mức, phụ thuộc, hạng…) khai bằng builder `Manifest`
-(`#[non_exhaustive]`, mỗi khái niệm một hàm; khái niệm thử nghiệm sau `manifest.unstable()`). Thứ cần service đăng ký trong
-`start`: `routes`, `tools`, `subscribe`, `provide`/`require`/`later`, `contribute::<dyn Trait>` (thay ~20 hàm đăng ký
+(`#[non_exhaustive]`, mỗi khái niệm một hàm; khái niệm thử nghiệm sau `manifest.unstable()`). Thứ giữ `Arc<dyn …>` hay cần cấu hình đã đọc đăng ký trong
+`start` (gồm `jobs`, `tasks`, `checks`, `prompts`, `mcp_resources`, `client_config`, `seed_tenant`, `sample_data`,
+`sandbox_copy`, hook của `relocation`; bảng ánh xạ đủ 45 hàm ở §5.1 của tài liệu thiết kế): `routes`, `tools`, `subscribe`, `provide`/`require`/`later`, `contribute::<dyn Trait>` (thay ~20 hàm đăng ký
 riêng như `work_source`, `summary_metric`, `personal_data`), `kernel::<Handle>()` (thay ~25 getter như `outbox()`,
-`sync_log()`). Chuyển: `manifest()` có cài đặt mặc định dựng từ 45 hàm cũ; hàm cũ `#[deprecated]`; `xtask check` đếm
+`sync_log()`). Chuyển: `manifest()` có cài đặt mặc định dựng từ 45 hàm cũ; `name()` thôi bắt buộc (mặc định `""`, kernel báo lỗi nếu
+manifest không có tên) nên module kiểu mới không cài hàm deprecated nào; hàm cũ `#[deprecated]`; `examples/external-module`
+biên dịch ở mọi PR; `xtask check` đếm
 module còn cài hàm cũ theo baseline chỉ giảm; baseline rỗng thì gỡ hàm cũ (trước 1.0).
 
 Lý do: 49 hàm trait + ~50 hàm của `StartContext` cho nhiều khái niệm hai đường (khai ở trait hay đăng ký trong `start`), và

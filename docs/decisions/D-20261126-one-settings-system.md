@@ -7,7 +7,9 @@ Quyết định: `TenantSetting` và `OrgSetting` thành một kiểu `Setting` 
 gần nhất trên chuỗi tổ tiên (qua trait `OrgTree` do `organizations` cung cấp) → mức khách → mặc định → cấu hình chung; cache
 theo khách như hiện nay. Lưu: checker của cài đặt + phạm vi + quyền tại nút. `organizations` chuyển dữ liệu của bảng mình
 bằng `DataUpgrade` ghi qua API cài đặt của kernel; endpoint cũ thành lớp mỏng rồi deprecate (D-059). Khai bằng
-`manifest.setting(…)` (D-20261126-module-manifest).
+`manifest.setting(…)` (D-20261126-module-manifest). `organizations` tắt mà có giá trị kế thừa: không lặng lẽ rơi về mức
+khách (`doctor` báo, API trả `inherited_unavailable`, đặt ở nút con bị từ chối). `DataUpgrade` chuyển dữ liệu có `down` chạy
+được (G3 rollback). Secret kế thừa niêm phong như secret của khách.
 
 Lý do: hai hệ song song (một ở kernel có cache và secret, một ở `organizations` có kế thừa) cho cùng một nhu cầu "cấu hình
 theo khách"; module phải biết dùng cái nào, giao diện phải gọi hai API, và cài đặt kế thừa không có cache lẫn secret.

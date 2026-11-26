@@ -2,16 +2,17 @@
 
 Chủ đề: Kiến trúc module và kernel
 
-Quyết định: Đích là đồ thị một chiều `autoxide-macros` → `autoxide-values` → `autoxide-data` → `autoxide-web` →
-`autoxide-platform` → `autoxide-kernel` (mặt tiền: `pub use` mọi đường hiện có + `Module`, `Manifest`, `StartContext`),
-và `autoxide-host` (server, bộ chạy migration, backup, transfer, logging/metrics/telemetry, TLS, route của kernel) chỉ
-`autoxide` dùng. Module và testkit chỉ khai `autoxide-kernel`; đường `autoxide_kernel::x` không đổi. Làm: đo đồ thị
-`use crate::…` giữa các nhóm (`cargo xtask kernel-deps`), cắt vòng, tách từ dưới lên mỗi crate một PR (chỉ di chuyển code),
-đo `cargo build --timings` trước/sau. Ranh giới cuối (vd `tenancy` thành crate riêng) quyết bằng mục mới sau khi đo.
+Quyết định: Trước mắt **chỉ tách `autoxide-host`** (server, bộ chạy migration, backup, transfer, logging/metrics/telemetry,
+TLS, route của kernel — chỉ `autoxide` dùng) ra khỏi `autoxide-kernel`. Tách phần còn lại của kernel theo lớp (đích tham khảo:
+`autoxide-values` → `autoxide-data` → `autoxide-web` → `autoxide-platform` → mặt tiền `autoxide-kernel`) **chờ chủ dự án quyết**
+dựa trên số đo của spike (c) (thời gian build lại khi sửa một file kernel, trước và ước tính sau tách) và bản rà orphan rule /
+vòng phụ thuộc — ở §15.3 của tài liệu thiết kế. Mục này nằm trong lộ trình 1.0 do chủ dự án duyệt nên agent không tự dời.
+Nếu tách: module và testkit chỉ khai mặt tiền, đường `autoxide_kernel::x` không đổi.
 
-Lý do: kernel ~86.000 dòng là một đơn vị biên dịch; sửa một file đa khách biên dịch lại cả phần giá trị, database, HTTP. Mặt
-tiền giữ hợp đồng cho người ngoài trong khi bên trong chia nhỏ; `autoxide-host` đưa phần không phải hợp đồng ra khỏi hợp đồng
-(D-20261126-contract-tiers).
+Lý do: `autoxide-host` đưa phần không phải hợp đồng ra khỏi hợp đồng (D-20261126-contract-tiers) và không vướng gì. Tách theo
+lớp vướng orphan rule (`impl IntoResponse for Error`, `impl From<DbErr> for Error`, `impl ToSchema for Page`), phụ thuộc ngược
+(`http`/`mcp` dùng `access`/`tenancy`), và lợi ích nhỏ vì mọi module phụ thuộc mặt tiền nên sửa một file kernel vẫn biên dịch lại
+mọi module (kiểm độc lập lần 1, 26/11/2026).
 
 Đã cân nhắc: module khai từng crate con (lộ cấu trúc nội bộ thành hợp đồng); tách theo nhóm thư mục hiện có
 (`contracts`/`data`/`ops`/`security`/`values` — có vòng phụ thuộc, không theo lớp). Thiết kế đầy đủ, API mẫu và thứ tự PR: `docs/research/kernel-contract-1-0.md`.

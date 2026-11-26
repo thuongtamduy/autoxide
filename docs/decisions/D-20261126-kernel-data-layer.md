@@ -3,16 +3,17 @@
 Chủ đề: Database, dữ liệu, job, event
 
 Quyết định: Module truy vấn qua `autoxide_kernel::db` thay SeaORM/sea-query. (1) `#[derive(Record)]` (crate
-`autoxide-macros`, kernel xuất lại) thay entity SeaORM; cột là hằng có kiểu `Note::TITLE: Col<Note, String>`; không có
-`ActiveModel`. (2) Thao tác: `find`/`filter`/`order_by`/`one`/`all`/`count`/`exists`, `page*` (thay
+`autoxide-macros`, kernel xuất lại) thay entity SeaORM; `scope = tenant|global` bắt buộc; cột là hằng có kiểu
+`Note::TITLE: Col<Note, String>`, cột `tenant_id` kiểu `TenantKey` không `set` được; không có `ActiveModel`. (2) Thao tác: `find`/`filter`/`order_by`/`one`/`all`/`count`/`exists`, `page*` (thay
 `fetch_page*`), `select`+`group_by`+hàm gộp, `join` chỉ giữa record cùng module (kiểm lúc dựng câu), `for_update`
-(SQLite bỏ qua: transaction ghi đã khoá), `insert`/`insert_many`/`on_conflict`, `update().set`, `delete`, `Expr` tập
-nhỏ. Lỗi là `Error` của kernel; unique đọc bằng `error.conflict()`. (3) Handle quyết định khách: `tenant.db()` tự lọc
+(SQLite bỏ qua: transaction ghi đã khoá), `for_share`, `insert`/`insert_many`/`on_conflict` (DO UPDATE tự thêm điều kiện
+khách), `update().set`/`.adjust` có cận, `delete`, `lock_key`, `sub` + `in_sub`, `Cond::any/all`, hàm gộp ép `BIGINT`, `Expr`
+tập nhỏ; `Outbox::record`, `SyncLog`, kiểm quyền ghi nhận `&TenantTx`. Đã chạy trên SQLite và Postgres ở spike (a). Lỗi là `Error` của kernel; unique đọc bằng `error.conflict()`. (3) Handle quyết định khách: `tenant.db()` tự lọc
 record `tenant`; `database.db()` không nhận record `tenant` (lỗi biên dịch); quét mọi khách bằng
-`all_tenants("lý do")` (có metric). (4) SQL viết tay: `db.sql(…)` với `#[derive(FromRow)]`; trên `TenantDb` bắt buộc có
+`all_tenants("lý do")` (có metric); `Db`/`AllTenants` chỉ lấy từ `StartContext`. (4) SQL viết tay: `db.sql(…)` với `#[derive(FromRow)]`; trên `TenantDb` bắt buộc có
 tham số `:tenant`. (5) Migration: trait `Migration` mới với `up/down(&self, plan: &mut Plan)` đồng bộ, ghi bước vào
 `Plan` (bảng, index, `plan.sql`, `plan.data`), kernel dựng SQL cho từng database. (6) Bên trong dựng trên sea-query +
-kết nối SeaORM; không kiểu nào của chúng ở chữ ký công khai. Đường cũ (`Database::read/write/begin_write` trả kiểu SeaORM,
+kết nối SeaORM; không kiểu nào của chúng ở chữ ký công khai. `db` ở hạng thử nghiệm tới khi mọi cụm module đã chuyển, rồi lên ổn định. Đường cũ (`Database::read/write/begin_write` trả kiểu SeaORM,
 `fetch_page*`, `ScopeExt`, `TenantScoped`, `MigrationTrait`, `migration::prelude`, `database::statement`) giữ
 `#[deprecated]` tới khi mọi module chuyển, gỡ trước 1.0.
 

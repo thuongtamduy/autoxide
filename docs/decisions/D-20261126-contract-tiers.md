@@ -11,7 +11,9 @@ nghiệm gồm hợp đồng bộ nối nhà cung cấp (`einvoice`, `zns`, `voi
 `distribution`, `moves`, `domains`…); `bench_seed` sang testkit. Đường dẫn đổi thẳng trước 1.0 (Rust không cảnh báo
 `#[deprecated]` trên `pub use`), ghi ở `### Breaking (Rust)`. Enum/struct công khai sẽ lớn thêm có `#[non_exhaustive]`
 (ngoại lệ liệt kê có lý do); `#[deprecated]` luôn có `note` nêu cái thay thế; gỡ `TenantContext::legacy_default`.
-Lên hạng ổn định là một quyết định mới.
+Lên hạng ổn định là một quyết định mới. Hạng của module tách khỏi hạng của kernel: module ổn định
+được dùng phần thử nghiệm bên trong nhưng `api` của nó không lộ kiểu thử nghiệm (gate kiểm); module thương mại và bộ nối mang
+nhãn thử nghiệm lúc 1.0.
 
 Lý do: 70 mô-đun đều công khai và đều bị coi là hợp đồng (`docs/COMPATIBILITY.md`), kể cả phần chỉ binary dùng (`backup`,
 `transfer`, `logging` — 0 module dùng) và phần mới một người dùng. Hứa SemVer cho tất cả lúc 1.0 sẽ khoá những hình dạng chưa

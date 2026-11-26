@@ -2,7 +2,8 @@
 
 Thiết kế cho bước 71 nhóm G1 và G2 (D-20261126-road-to-1-0, D-20261126-library-isolation). Tài liệu nội bộ: các quyết định
 ngắn gọn nằm ở `docs/decisions/D-20261126-*.md` (liệt kê ở cuối), còn đây là lý lẽ, API mẫu và kế hoạch chuyển. Viết
-ngày 26/11/2026, trước khi có dòng code nào; số liệu đo trên `main` cùng ngày (commit `af74d2fb5`).
+ngày 26/11/2026, trước khi có dòng code nào; số liệu đo trên `main` cùng ngày (commit `af74d2fb5`). Bản này đã sửa theo
+kết quả kiểm độc lập lần 1 (duyệt kèm sửa, 13 điểm) và kết quả ba spike ở §15.
 
 ## 0. Hiện trạng và mục tiêu
 
@@ -33,9 +34,13 @@ Mục tiêu đo được khi xong G1 + G2:
 
 - **Thư viện từ vựng** (vocabulary): được xuất hiện trong chữ ký ổn định và được module khai trực tiếp. Điều kiện: đã
   `1.x`, có lời hứa ổn định dài, là "ngôn ngữ chung" của hệ Rust. Danh sách đóng: `std`, `serde` 1, `serde_json` 1
-  (`Value`), `uuid` 1, `tokio` 1 (chỉ đồng bộ và spawn, không I/O mạng), `tracing` 0.1 (chỉ macro ghi log), `futures-core`
-  (trait `Stream`). Thêm vào danh sách là một quyết định. Bản lớn mới của một thư viện từ vựng (rất hiếm: `serde` 2) mới
-  là thay đổi lớn của Autoxide.
+  (`Value`), `uuid` 1, `tokio` 1, `tracing` 0.1 (chỉ macro ghi log), `futures-core` (trait `Stream`), `bytes` 1. Thêm vào
+  danh sách là một quyết định. Bản lớn mới của một thư viện từ vựng (rất hiếm: `serde` 2) mới là thay đổi lớn của Autoxide.
+  Riêng `tokio`: module được khai và dùng (`Mutex`, `sleep`, `select!`), nhưng **chữ ký ổn định của kernel không có kiểu
+  của tokio**; việc nền của module chạy qua `autoxide_kernel::task::spawn` (mang ngữ cảnh khách và span của tracing) chứ
+  không qua `tokio::spawn`.
+- `futures-util` (6 module): chỉ dùng tiện ích luồng (`StreamExt`, `join_all`) → thư viện riêng của module (nhóm 3), không
+  lọt ra `api`. `tower` (dùng trong test của module) → chỉ ở `[dev-dependencies]`, testkit có hàm gửi request thay nó.
 - **Thư viện có lớp của kernel**: `sea-orm`, `sea-query`, `sqlx`, `axum`, `axum-core`, `http`, `tower`, `utoipa`,
   `utoipa-axum`, `validator`, `jiff`, `async-trait`. Module không khai; kernel và testkit không lộ kiểu của chúng ở hạng ổn
   định. Danh sách nằm ở **một** chỗ (`xtask/wrapped-libraries.txt`) cho cả `xtask check`, `check-module` và kiểm rustdoc.
@@ -101,6 +106,22 @@ người dùng. **Nội bộ** = module không dùng (cột "module dùng" = 0) 
 `storage`, `ai` ổn định vì đã có ≥ 2 cài đặt và được 7–8 module dùng. `custom_fields`, `automation` thử nghiệm tới khi G5
 chốt hình dạng chính thức. Danh sách này là **điểm xuất phát**: lên hạng là một quyết định mới.
 
+Hạng của **module** (`Stability` của manifest) tách khỏi hạng của **kernel**: module ổn định được dùng phần thử nghiệm
+của kernel bên trong, nhưng `api` của nó không được lộ kiểu thử nghiệm (gate `stable-signatures` kiểm cả `api` của module
+ổn định). Lúc ra 1.0 các module thương mại (bước 41–49, 59–65) và bộ nối nhà cung cấp mang nhãn thử nghiệm.
+
+Đề xuất hạng module lúc 1.0 (phiên điều phối quyết thay chủ dự án ngày 26/11/2026 cho nhóm thương mại; phần còn lại là đề
+xuất, chốt bằng quyết định riêng ở PR 6). Tiêu chí "Becoming official" của `docs/MODULES.md`: không còn mục mở trong lộ trình,
+có người dùng thật, API không phải đổi qua vài bản liên tiếp, bộ nối đã chạy thử với tài khoản thật.
+
+| Hạng lúc 1.0 | Module | Lý do |
+| --- | --- | --- |
+| core (giữ) | `mail`, `auth`, `idempotency` | nền của mọi cài đặt |
+| official (giữ) | `ai`, `files`, `address`, `organizations`, `audit`, `webhooks`, `notifications`, `plans`, `media`, `content`, `forms`, `menus` | hạ tầng chung hay nội dung, API đã ổn qua nhiều bản, không phụ thuộc luật chuyên ngành hay đổi |
+| official → **experimental** | `catalog`, `inventory`, `promotions`, `shipping`, `orders`, `customers` | đã quyết (phiên điều phối, 26/11/2026): chưa có người dùng thật |
+| official → **experimental** (đề xuất) | `tax`, `ledger`, `invoices`, `compliance` | chưa có người dùng thật; còn chờ luật sư rà (71-G12) — quy định thuế, hoá đơn, kế toán đổi theo văn bản, API có thể phải đổi sau khi rà; lên hạng khi rà xong và có người dùng |
+| experimental (giữ) | `sepay`, `momo`, `einvoice_sepay`, `esms`, `ghn`, `bookings`, `newsletter`, `comments`, `support`, `conversations`, `analytics`, `reporting`, `automations` | như hiện nay |
+
 ### 2.2 `#[non_exhaustive]` và `#[deprecated]`
 
 - Mọi `pub enum` và `pub struct` có trường công khai của hạng ổn định mà sẽ còn lớn thêm: `#[non_exhaustive]`, kèm hàm dựng
@@ -121,11 +142,11 @@ use uuid::Uuid;
 
 /// Bảng `notes_note`.
 #[derive(Record, Clone, Debug, PartialEq, Eq)]
-#[record(table = "notes_note", tenant)] // `tenant`: bảng cấp khách, có cột `tenant_id`
+#[record(table = "notes_note", scope = tenant)] // bắt buộc: `scope = tenant` hoặc `scope = global`
 pub(crate) struct Note {
     #[record(primary_key)]
     pub id: Uuid,
-    pub tenant_id: Uuid,
+    pub tenant_id: TenantKey,  // kiểu riêng: đọc và so được, không `set` được
     pub org_id: Option<Uuid>,
     pub owner_id: Uuid,
     pub title: String,
@@ -138,7 +159,10 @@ pub(crate) struct Note {
 `#[derive(Record)]` sinh: `impl Record for Note` (tên bảng, danh sách cột, đọc/ghi một dòng), và **cột có kiểu** dạng hằng
 liên kết `Note::ID: Col<Note, Uuid>`, `Note::TITLE: Col<Note, String>`… So với SeaORM (cột không mang kiểu giá trị),
 `Note::TITLE.eq(42)` là lỗi biên dịch. Không có `ActiveModel`: ghi cả dòng bằng struct, ghi một phần bằng `.set(cột, giá
-trị)`. Kiểu trường được nhận: `bool`, `i16`/`i32`/`i64`, `String`, `Uuid`, `Timestamp`, `Date`, `serde_json::Value`,
+trị)`. Thuộc tính `scope` **bắt buộc**: thiếu là lỗi biên dịch, và `scope = global` trên struct có trường `tenant_id` cũng
+là lỗi biên dịch (không có đường "quên khai thành global"). Lúc khởi động kernel đối chiếu mọi `Record` với danh sách
+`TenantTable` của migration: bảng có trong danh sách mà record khai `global` (hay ngược lại) thì không khởi động. Cột
+`tenant_id` có kiểu `TenantKey` không cài `Settable`, nên `update().set(Note::TENANT_ID, …)` không biên dịch. Kiểu trường được nhận: `bool`, `i16`/`i32`/`i64`, `String`, `Uuid`, `Timestamp`, `Date`, `serde_json::Value`,
 `Vec<u8>`, `Option<_>` của các kiểu đó, enum lưu dạng text qua `#[derive(DbEnum)]`, và kiểu của module qua trait
 `DbValue` (của kernel, chuyển sang/từ `db::Value` của kernel). Tiền vẫn là hai cột (số nguyên + mã tiền tệ), như luật dữ
 liệu.
@@ -175,6 +199,16 @@ tx.commit().await?;
   `update().set(cột, Expr)` (gồm `Note::COUNT.add(1)`); `delete`; biểu thức `Expr`: cột, giá trị, `+ - *`, `coalesce`,
   `case_when`, `exists(subquery)`, `is_in`, `like` (thoát ký tự đặc biệt sẵn), `is_null`, `and`/`or`/`not`, `cast` sang
   tập kiểu nhỏ.
+- Các mẫu mà bản đầu thiếu (kiểm lần 1, điểm 4), nay có trong `db` và đã chạy trong spike (a): `for_share()` (thay
+  `rows::lock_one_shared`), `update().adjust(cột, delta, Bounds)` (thay `rows::adjust`, chặn tràn `i64` trên cả hai
+  database), `tx.lock_key("…")` (thay `rows::lock_key`, tên tự gắn khách), `sub(cột).filter(…)` + `cột.in_sub(…)` (thay
+  `Query::select()` tự dựng — 51 file module — mà nay tự lọc khách), `Cond::any()/all()` dựng động (bộ lọc thuộc tính của
+  catalog), `sum`/`count`/`max` luôn ép `BIGINT` qua `COALESCE` (Postgres trả `numeric` cho `SUM(bigint)`).
+- Ghi chung transaction với kernel: `Outbox::record(&TenantTx, …)`, `SyncLog::changed(&TenantTx, …)`,
+  `principal.require_write_at(&TenantTx, …)` — ~125 chữ ký kernel đang generic theo `ConnectionTrait` đổi sang nhận
+  `&impl Handle` (trait niêm phong của `db`), giữ bản cũ `#[deprecated]` trong lúc chuyển.
+- Đọc và ghi tách kết nối như luật dữ liệu: `read()` đi pool đọc (read replica nếu có), `begin_write()` đi pool ghi; handle
+  đọc không có hàm ghi nào (lỗi biên dịch, không phải lỗi lúc chạy).
 - `for_update()`: Postgres `FOR UPDATE`; SQLite bỏ qua vì transaction ghi của SQLite đã giữ khoá cả database (một bên ghi).
   Viết ở một chỗ, có test đồng thời trên cả hai.
 - `join` chỉ giữa record **cùng module** (cùng tiền tố bảng): kernel kiểm lúc dựng câu, sai thì trả lỗi `internal` — luật
@@ -196,9 +230,21 @@ tx.commit().await?;
 `all_tenants("…")` thay 64 chỗ `// tenant-scope:` — lý do nằm trong code, tìm được bằng `grep`, có số đo lúc chạy. Lint
 `tenant-scope` gỡ khi module cuối cùng đã chuyển.
 
+Đóng các lối vượt (kiểm lần 1, điểm 3):
+
+- `Db`, `AllTenants` và `Db::sql` **không** lấy được từ `TenantContext` hay `Database` công khai: chỉ có qua
+  `context.kernel::<ControlPlane>()` trong `start` (module control-plane như `auth`, `plans`) — handle đó giữ tên module để
+  ghi metric. `TenantContext::database()` (trả `&Database` thô) thành `#[deprecated]` rồi gỡ; gate `raw-database` chặn module
+  gọi nó trong lúc chuyển.
+- `on_conflict().do_update(…)` trên `TenantDb`: kernel thêm `WHERE <bảng>.tenant_id = <khách>` vào nhánh `DO UPDATE` (Postgres
+  và SQLite đều hỗ trợ `ON CONFLICT … DO UPDATE … WHERE`); đụng dòng của khách khác thì 0 dòng đổi và kernel trả lỗi
+  `db.unique_conflict` — không ghi đè. Đã chạy trong spike (a) với khoá unique không có `tenant_id`.
+- `join` và `sub`/`exists` lọc khách trên **mọi** record cấp khách tham gia (bảng được nối thêm điều kiện ở `ON`).
+- `insert` từ chối dòng có `tenant_id` khác khách của handle trước khi gửi câu.
+
 ### 3.4 SQL viết tay (phần ngoài lề còn lại)
 
-`db.sql("SELECT … WHERE tenant_id = :tenant AND …").bind("since", since).rows::<Row>()` với `#[derive(FromRow)]` của kernel.
+`db.sql("SELECT … WHERE tenant_id = :tenant AND …").bind("since", since).all::<(A, B)>()` (tuple hay `#[derive(FromRow)]`).
 Câu chạy trên `TenantDb` **phải** có tham số `:tenant` (kernel gắn giá trị); thiếu thì trả lỗi trước khi gửi câu. Câu viết
 tay vẫn phải chạy trên cả hai database và vẫn cần lý do đo được (luật dữ liệu). Thay `autoxide_kernel::database::statement`
 (D-20261121-raw-statement) — giữ đường cũ `#[deprecated]`.
@@ -249,10 +295,25 @@ impl Migration for CreateNote {
   thay vì đọc text; `autoxide rollback` biết trước bước `down` làm gì.
 - `MigrationTrait` + `SchemaManager` + `migration::prelude` (xuất lại sea-query, SeaORM, async-trait) giữ `#[deprecated]` tới
   khi mọi module đã chuyển; kernel chạy được cả hai loại trong cùng một bảng lịch sử (tên migration không đổi).
-- **Viết lại migration đã commit** (để module bỏ được `sea-query`) chỉ được phép khi câu SQL sinh ra **giống từng byte**
-  trên cả SQLite và Postgres: thêm test chụp SQL của mọi migration (`xtask/migration-sql/*.sql`, sinh bằng `cargo xtask regen`)
-  trước khi chuyển; PR chuyển không được làm đổi file chụp. Đây là ngoại lệ có điều kiện cho luật "migration đã commit thì
-  không sửa" (D-20261126-migration-rewrite-proof).
+- **Viết lại migration đã commit** (để module bỏ được `sea-query`) — D-20261126-migration-rewrite-proof, sửa theo kiểm lần 1
+  (điểm 2). Rà 26/11: ~64/236 file migration có bước dữ liệu hay code riêng từng database (vd `auth` `m0019_move_tokens` đọc
+  từng dòng và ghi `Timestamp::now()`), helper dùng chung (`event::outbox_migration`, `tokens_migration`…) và `down` gọi `up`
+  của migration cũ hơn. Vì vậy:
+  - **Cái kiểm lâu dài là schema, không phải câu SQL**: test `migration-schema` chạy, trên cả hai database, `up` của từng
+    migration rồi `up → down → up`, và sau mỗi bước chụp **catalog schema đã chuẩn hoá** (bảng, cột, kiểu, NULL, mặc định,
+    index, ràng buộc — đọc từ `information_schema`/`pg_catalog` và `sqlite_schema`/`pragma`, sắp xếp, bỏ tên tự sinh). File
+    chụp `xtask/migration-schema/<module>.<database>.txt`. Viết lại một migration không được đổi file chụp. Renderer của `Plan`
+    vì vậy không bị trói vào từng byte đầu ra của sea-query.
+  - So từng câu lệnh (byte hay dạng câu) chỉ là công cụ **lúc viết lại** để soát nhanh, không là test lâu dài.
+  - Migration chỉ có DDL: cách rẻ là sinh máy móc `plan.sql_for(Backend::Sqlite, "…")` / `plan.sql_for(Backend::Postgres, "…")`
+    từ câu đã chụp — đóng băng đúng câu cũ, không cần dịch sang builder.
+  - Bước dữ liệu giữ nguyên code Rust thành `DataStep` (trait async của kernel, nhận handle `Db` không kiểu); có test dữ liệu
+    mẫu: nạp dữ liệu trước migration, chạy, so dữ liệu sau — trên cả hai database.
+  - Helper dùng chung của kernel (`outbox_migration`, `tokens_migration`…) chuyển một lần ở kernel, giữ tên migration họ sinh.
+  - `down` gọi `up` của migration cũ hơn: chuyển cả cặp trong cùng PR.
+  - Tên migration không bao giờ đổi (khoá của bảng lịch sử và của manifest migration theo bản phát hành của G3).
+- Thứ tự với G3: PR `Plan` đi sau các PR của G3 chạm bộ chạy migration; "luật an toàn migration" của G3 viết trên `Plan`
+  khi `Plan` đã có (trước đó G3 dùng bản đọc text tạm, rồi chuyển).
 
 ## 4. (b) Lớp HTTP và API
 
@@ -310,6 +371,28 @@ pub(crate) struct NoteResponse { … #[schema(example = "Shopping list")] title:
 (chỉ mô tả), nên không tốn gì lúc chạy; tốn thêm thời gian biên dịch của macro — đo ở PR đầu tiên, ngưỡng chấp nhận: thời gian
 `cargo check` của workspace tăng không quá 5%. `#[derive(Params)]` (thay `IntoParams`) cùng cách.
 
+Bản sao bóng chép **mọi** thuộc tính utoipa đọc: doc comment (`#[doc]`), `#[serde(…)]` (43 `flatten`), `#[schema(…)]` (321
+`value_type`, 53 `inline`…), `#[deprecated]`, `#[cfg]`; bỏ mọi thuộc tính khác; trường thành riêng tư. Không có `as` thì gắn
+`#[schema(as = <tên thật>)]` để tên schema không đổi. `ToSchema::name()` **và** `schemas()` (schema lồng) chuyển tiếp sang bản
+sao; kiểu generic giữ nguyên tham số và thêm ràng buộc `Bóng<T>: ToSchema`. Spike (b) đã chạy trên toàn bộ DTO của module
+khó nhất (§15).
+
+Ba chỗ module đang chạm utoipa/axum ngoài derive (kiểm lần 1, điểm 5):
+
+- `forms` dựng schema bằng builder lúc chạy (`inbox.rs`: schema của câu trả lời phụ thuộc biểu mẫu) → kernel thêm
+  `http::schema::JsonSchema` (giá trị JSON Schema của kernel, dựng bằng `serde_json::json!`) và `Endpoint` nhận schema động
+  dạng đó; kernel tự đổi sang kiểu của utoipa.
+- `auth` dùng `axum::middleware::map_response` (thêm header vào response) → kernel thêm `Module`-level `response_hook` trong
+  `start` (`context.response_hook(fn(&RequestInfo, &mut ResponseHeaders))`), không lộ kiểu axum.
+- `bytes` 1 → thư viện từ vựng (§1.1); `futures-util`, `tower` → như §1.1.
+
+Luật khi nâng utoipa (hay thay bộ sinh): `docs/openapi.json` **không đổi từng byte**; đổi là thay đổi hợp đồng, đi qua
+`contract-diff` như mọi thay đổi REST.
+
+Impl trait của thư viện bọc **trên kiểu ổn định** (vd `impl utoipa::ToSchema for Page<T>`, `impl IntoResponse for Error`)
+không giấu được trong Rust: khai rõ trong `COMPATIBILITY.md` là **ngoài hợp đồng** (có thể biến mất khi kernel đổi thư viện),
+và gate `stable-signatures` bỏ qua impl trait của thư viện trong danh sách bọc, chỉ kiểm chữ ký hàm, trường, kiểu trả về.
+
 Lối thoát: nếu bản lớn sau của utoipa bỏ được cách này, `autoxide-macros` sinh thẳng `ToSchema` bằng builder của utoipa
 (hay của bộ sinh OpenAPI khác) — module không đổi.
 
@@ -362,19 +445,58 @@ pub trait Module: Send + Sync {
   specialization — phải thêm hàm `as_x(&self) -> Option<&dyn X>` cho mỗi nhóm, vẫn là nhiều đường. Manifest là dữ liệu thuần,
   dễ kiểm, dễ cho agent đọc.
 
-### 5.1 Đường chuyển
+### 5.1 Ánh xạ đủ 45 hàm cũ
 
-1. Thêm `manifest()` có **cài đặt mặc định** dựng `Manifest` từ 45 hàm cũ (gọi chúng với `#[allow(deprecated)]`) — module
-   cũ chạy y nguyên. Kernel chỉ đọc `manifest()`.
-2. 45 hàm cũ và các hàm đăng ký riêng của `StartContext`: `#[deprecated(note = "declare it in `Module::manifest`…")]`. Rust
-   không cảnh báo khi *cài* một hàm trait bị deprecated, nên `xtask check` đếm module còn cài hàm cũ, so với
+Tiêu chí: giá trị là **dữ liệu** (tên, danh sách, hằng, con trỏ hàm thuần) → `Manifest`; giá trị **giữ `Arc<dyn …>`** cần
+service hay cấu hình đã đọc → `start` (kiểm lần 1, điểm 6).
+
+| Hàm cũ của `Module` | Đường mới |
+| --- | --- |
+| `name`, `description` | `Manifest::new(name, description)` |
+| `stability`, `essential`, `always_enabled`, `depends_on` | `manifest.stability(…)`, `.essential()`, `.always_enabled()`, `.depends_on([…])` |
+| `migrations`, `upgrades` | `manifest.migrations(…)`, `.upgrades(…)` (bước dữ liệu là đối tượng thuần, nhận ngữ cảnh lúc chạy) |
+| `tenant_settings`, `org_settings` | `manifest.setting(Setting::…)` (một hệ, §8) |
+| `retained_tables`, `retention`, `control_plane_tables` | `manifest.retained_tables(…)`, `.retention(…)`, `.control_plane_tables(…)` |
+| `features`, `limits` | `manifest.feature(…)`, `.limit(…)` |
+| `permissions`, `events`, `resource_events` | `manifest.permissions(…)`, `.events(…)`, `.resource_events(…)` |
+| `schedules`, `deprecations`, `body_limits` | `manifest.schedule(…)`, `.deprecation(…)`, `.body_limit(…)` |
+| `translations`, `navigation`, `reason_lists`, `overridable_texts` | `manifest.translations(…)`, `.navigation(…)`, `.reason_list(…)`, `.overridable_text(…)` |
+| `relocation` | bảng và cột niêm phong: `manifest.relocation(…)`; `switch_hooks` (`Arc<dyn SwitchHook>`): `context.contribute` trong `start` |
+| `custom_field_targets`, `facts`, `analytics_events`, `funnels`, `automation_templates`, `promotable`, `sync_resources`, `blocks` | `manifest.unstable().…` (feature `unstable`) |
+| `subscriptions`, `routes`, `tools` | `start`: `context.subscribe(…)`, `.routes(…)`, `.tools(…)` |
+| `jobs`, `tasks`, `checks` | `start`: `context.job(kind, handler)`, `.task(…)`, `.check(…)` |
+| `prompts`, `mcp_resources` | `start`: `context.prompt(…)`, `.mcp_resource(…)` |
+| `client_config` | `start`: `context.client_config(section)` (đọc cấu hình đã `configure`) |
+| `seed_tenant`, `sample_data` | `start`: `context.contribute::<dyn TenantSeed>(…)`, `::<dyn SampleData>(…)` |
+| `sandbox_copy` | `start`: `context.contribute::<dyn SandboxCopy>(…)` (thử nghiệm) |
+| `configure`, `start`, `dormant` | giữ (3 trong 4 hàm của trait mới) |
+
+`schedules` ở manifest vì chỉ là (tên việc, lịch); handler của việc đăng ký ở `start` cùng tên — kernel kiểm khớp lúc khởi
+động.
+
+### 5.2 Đường chuyển
+
+1. Thêm `manifest()` có **cài đặt mặc định** dựng `Manifest` từ các hàm cũ (gọi với `#[allow(deprecated)]`); `name()` đổi từ
+   bắt buộc thành **có mặc định** trả `""` (`#[deprecated]`). Kernel chỉ đọc `manifest()`; tên rỗng → lỗi đăng ký "implement
+   `Module::manifest`". Nhờ vậy module kiểu mới chỉ cài `manifest()` + `start()` — **không** phải cài hàm deprecated nào, và
+   không có vòng gọi vô hạn giữa hai mặc định.
+2. Các hàm cũ và các hàm đăng ký riêng của `StartContext`: `#[deprecated(note = "use `Module::manifest` …")]`. Rust không cảnh
+   báo khi *cài* một hàm trait bị deprecated, nên `xtask check` đếm module còn cài hàm cũ theo
    `xtask/module-contract-legacy.txt` (chỉ được giảm).
-3. Chuyển module theo cụm (§8). Khi danh sách rỗng: gỡ hàm cũ, `manifest()` thành bắt buộc — trước 1.0, là thay đổi phá
-   vỡ được ghi (D-20261125-api-break-before-1-0).
+3. Chuyển module theo cụm. Khi danh sách rỗng: gỡ hàm cũ; `manifest()` và `start()` thành bắt buộc (không mặc định) — trước
+   1.0, thay đổi phá vỡ có ghi (D-20261125-api-break-before-1-0).
+4. `examples/external-module` biên dịch và chạy test ở **mọi** PR của G1–G2 (CI chạy `./gate.sh --only example` khi PR chạm
+   kernel, testkit hay `crates/app`), không chỉ ở PR cuối: nó là người dùng ngoài đầu tiên của hợp đồng.
 
 ## 6. (d) Tách kernel thành crate
 
-Đích (đồ thị một chiều, mũi tên = phụ thuộc):
+**Sửa sau kiểm lần 1 (điểm 1, chặn):** trước mắt **chỉ tách `autoxide-host`**. Tách phần còn lại theo lớp chờ số đo của spike
+(c) (§15.3) và quyết định của chủ dự án (mục này nằm trong lộ trình 1.0 do chủ dự án duyệt, agent không tự dời). Hai vướng
+mắc đã thấy: orphan rule (`impl IntoResponse for Error`, `impl From<DbErr> for Error`, `impl ToSchema for Page/Data` phải nằm ở
+crate có `Error`/`Page` hoặc crate của thư viện) và phụ thuộc ngược (`http`, `mcp` dùng `access`/`tenancy`; `ops/*/http.rs` dùng
+`http`). Lợi ích cũng nhỏ hơn dự tính: module nào cũng phụ thuộc mặt tiền nên sửa một file kernel vẫn biên dịch lại mọi module.
+
+Đích ban đầu (giữ để tham khảo; chỉ làm nếu §15.3 cho thấy đáng):
 
 ```
 autoxide-macros (proc-macro)
@@ -402,7 +524,13 @@ autoxide-host     : chạy server, `Migrator`, backup, transfer, logging/metrics
 
 ## 7. (e) Cách ly khách lúc chạy
 
-Ba lớp, lớp chính chạy trên cả hai database:
+**Sửa sau kiểm lần 1 (điểm 8):** lớp 1 (chạy trên cả hai database) là cam kết của 1.0 và đủ cho mục lộ trình ("lớp kết nối
+gắn khách **hay** RLS tuỳ chọn"); **RLS dời sau 1.0**. Khi làm RLS: `current_setting` rỗng coi như chưa đặt (chặn, không cho
+qua); `doctor` báo khi role kết nối là superuser hay có `BYPASSRLS`; mọi worker của kernel quét nhiều khách tự đặt cờ bỏ qua;
+policy dựng bằng bước đối chiếu idempotent lúc khởi động (theo danh sách `TenantTable`), không bằng migration phụ thuộc cấu
+hình.
+
+Ba lớp (lớp 2 sau 1.0), lớp chính chạy trên cả hai database:
 
 1. **Lớp kết nối gắn khách (chính, cả hai database)** — §3.3: record `tenant` chỉ truy vấn được qua `TenantDb`; quên khách là
    lỗi biên dịch; quét mọi khách phải gọi `all_tenants("lý do")`; SQL viết tay trên `TenantDb` bắt buộc có `:tenant`;
@@ -436,6 +564,14 @@ kernel, giá trị ở bảng của `organizations`, kế thừa theo cây). Đ�
 - Chuyển dữ liệu: `organizations` có `DataUpgrade` đọc bảng của chính nó và ghi qua API cài đặt của kernel (không module nào
   đọc bảng của module khác); endpoint cũ của `organizations` thành lớp mỏng gọi kernel, rồi `#[deprecated]` theo D-059.
 - `Module::tenant_settings` + `Module::org_settings` thành một: `manifest.setting(Setting::…)`.
+- Sửa sau kiểm lần 1 (điểm 7):
+  - `organizations` tắt (không có `OrgTree`) mà khách có giá trị kế thừa ở nút: đọc **không** lặng lẽ rơi về mức khách —
+    `doctor` báo, API đọc cài đặt trả kèm `inherited_unavailable: true`, và đặt giá trị ở nút con bị từ chối với mã
+    `kernel.settings_tree_unavailable`.
+  - `DataUpgrade` chuyển dữ liệu có `down` chạy được (chép ngược về bảng của `organizations`), để `autoxide rollback` của G3
+    lùi qua bản này.
+  - Secret kế thừa (khai `.secret()` trên cài đặt `Inherited`) niêm phong như secret của khách (`Sealer`, tên cài đặt + nút
+    làm dữ liệu gắn kèm), không bao giờ trả ra API.
 
 ## 9. Luật gate mới
 
@@ -447,7 +583,9 @@ kernel, giá trị ở bảng của `organizations`, kế thừa theo cây). Đ�
 | `exhaustive`                         | enum/struct công khai mới thiếu `#[non_exhaustive]` hay không có trong danh sách cho phép  | `xtask check`                    |
 | `deprecated-note`                    | `#[deprecated]` thiếu `note` nêu cái thay thế                                              | `xtask check`                    |
 | `module-contract-legacy`             | Module còn cài hàm cũ của `Module` (baseline chỉ giảm)                                     | `xtask check`                    |
-| `migration-sql-snapshot`             | SQL sinh từ migration khớp file chụp                                                       | test của `xtask` / regen --check |
+| `migration-schema`                   | Catalog schema chuẩn hoá sau `up` và `up→down→up` của từng migration khớp file chụp, cả hai database | test, chạy trong CI         |
+| `raw-database`                       | Module gọi `TenantContext::database()` / `Database::read()` thô (trong lúc chuyển)          | `xtask check`                    |
+| `module-api-tier`                    | `api` của module ổn định lộ kiểu thử nghiệm của kernel                                     | `xtask check`                    |
 
 Mỗi vi phạm in một dòng "cách sửa" (mục 71-G6).
 
@@ -455,11 +593,15 @@ Mỗi vi phạm in một dòng "cách sửa" (mục 71-G6).
 
 Mỗi dòng một PR, mỗi PR có test trên cả hai database cho phần chạm database và qua kiểm độc lập (D-20261126-independent-review).
 
+Luật của đợt (kiểm lần 1, điểm 9): trong PR 2–5 **đóng băng** việc khác chạm kernel (phiên điều phối giữ); bước 54/52 đi sau
+G1–G2. Mỗi PR chuyển một cụm module bỏ **hết** phụ thuộc thư viện bọc của mọi module trong cụm — không module nào nửa cũ nửa
+mới; baseline của `wrapped-libraries` giảm đúng số module của cụm. Ba spike (§15) xong trước PR 2.
+
 1. Tài liệu: `COMPATIBILITY.md` + `MODULE_GUIDE.md` (EN + VI) theo D-20261126-library-isolation và ba hạng; gỡ
    `legacy_default`.
 2. `autoxide-macros` + `db` (Record, find/insert/update/delete, `TenantDb`/`Db`/`AllTenants`, lỗi `conflict()`), test cách ly
    hai database; chuyển `notes` làm mẫu; luật `wrapped-libraries` với baseline 38 module.
-3. Migration `Plan` + file chụp SQL + `notes` chuyển migration. **Đi sau các PR của G3 (nâng cấp một nút) chạm
+3. Migration `Plan` + test `migration-schema` (chụp catalog schema, §3.6) + `notes` chuyển migration. **Đi sau các PR của G3 (nâng cấp một nút) chạm
    `migration.rs`/`manager.rs`**: G3 dựa vào manifest tên migration theo từng bản phát hành (rollback) và lock của placement
    trong `kernel_migration_runs`, nên PR này giữ nguyên **tên** mọi migration, bảng lịch sử và đường chạy của G3; chỉ thêm
    cách khai mới bên cạnh.
@@ -468,17 +610,20 @@ Mỗi dòng một PR, mỗi PR có test trên cả hai database cho phần chạ
 5. `Manifest` + `StartContext` gọn; `notes` chuyển; luật `module-contract-legacy`.
 5b. Đánh phiên bản event / webhook / `x-*` (§13): `EventInfo::payload`, `docs/events.json`, danh mục phần mở rộng,
    `xtask contract-diff`.
+5c. Hợp đồng CLI và định dạng file (§16): `docs/cli.json`, `format_version`, file mẫu mỗi bản, mở rộng `contract-diff`.
 6. Ba hạng: feature `unstable`, đường `unstable::`, `bench_seed` sang testkit; semver-checks chạy feature mặc định; luật
-   `exhaustive`, `deprecated-note`, `stable-signatures` (baseline).
+   `exhaustive`, `deprecated-note`, `stable-signatures` (baseline); chuyển hạng module (§2.1, quyết định riêng; sửa
+   `docs/MODULES.md` + `.vi.md`).
+6b. Công cụ `migrate-module` + hướng dẫn chuyển 0.x → 1.0 (§17); chạy thử trên `notes` và bản 0.x của `examples/external-module`.
 7–12. Chuyển 38 module còn lại theo cụm phụ thuộc (đáy trước): nền (`auth`, `organizations`, `plans`, `files`, `audit`,
    `webhooks`, `idempotency`, `mail`, `ai`) → liên lạc (`notifications`, `media`, `content`, `forms`, `newsletter`, `comments`,
    `menus`, `address`) → tiền (`ledger`, `tax`, `invoices`, `compliance`, `reporting`) → thương mại 1 (`catalog`, `inventory`,
    `promotions`, `shipping`, `customers`) → thương mại 2 (`orders`, `support`, `bookings`, `conversations`, `analytics`,
-   `automations`) → bộ nối (`sepay`, `momo`, `ghn`, `esms`, `einvoice_sepay`). Mỗi cụm một PR (lớn thì chia đôi); file chụp SQL
-   không đổi.
-13. Cách ly: gỡ lint `tenant-scope`; RLS tuỳ chọn trên Postgres; hạn mức của request chưa xác thực.
+   `automations`) → bộ nối (`sepay`, `momo`, `ghn`, `esms`, `einvoice_sepay`). Mỗi cụm một PR (lớn thì chia đôi); file chụp
+   schema không đổi.
+13. Cách ly: gỡ lint `tenant-scope` và `raw-database`; hạn mức của request chưa xác thực. (RLS: sau 1.0, §7.)
 14. Hợp nhất cài đặt theo khách.
-15. Tách crate (đo trước, §6) + tách file lớn.
+15. Tách `autoxide-host` + tách file lớn. Tách phần còn lại của kernel: chỉ khi chủ dự án quyết theo số đo §15.3.
 16. Gỡ mọi đường cũ `#[deprecated]` (thư viện bọc ra khỏi chữ ký, baseline rỗng), cập nhật `examples/external-module`,
    `new-module` template, `MODULE_GUIDE`.
 
@@ -490,19 +635,23 @@ không chạm cùng file.
 - **Khối lượng**: ~6.000 chỗ gọi đổi. Giữ: API mới trùng từ vựng của SeaORM/utoipa khi được (`find`, `filter`, `one`,
   `#[schema(…)]`), nên phần lớn là đổi `use` và tên; file chụp SQL + test sẵn có của module bắt sai.
 - **Lớp `db` thiếu một mẫu truy vấn**: thêm vào `db` (ổn định) hay tạm qua `db.sql` có lý do; không mở lối gọi thẳng SeaORM.
+  `db` chỉ thành hạng ổn định khi mọi cụm module đã chuyển xong (mẫu thiếu lộ ra trong lúc chuyển thì còn sửa được); trước đó
+  nó nằm ở hạng thử nghiệm dù module trong repo đã dùng.
+- **`OR EXISTS` (chia sẻ bản ghi) phá luật index**: đo query plan trên cả hai database ở bước 54 trước khi chốt; phương án dự
+  phòng là `page()` trộn hai luồng keyset (theo phạm vi nút và theo chia sẻ), mỗi luồng dùng index riêng.
 - **Thời gian biên dịch** của bản sao bóng: đo ở PR 4, vượt ngưỡng thì chuyển sang sinh thẳng bằng builder (§4.2).
 - **Đụng G3 "Nâng cấp một nút"**: PR 3 chạm bộ chạy migration nên làm sau các PR của G3 ở `migration.rs`/`manager.rs`;
   tên migration là khoá của manifest rollback theo bản phát hành, không bao giờ đổi khi viết lại sang `Plan`.
 - **Kiểu SeaORM rò qua `api` của module** (trait giữa module có tham số `&DatabaseTransaction` để ghi chung transaction):
   thay bằng `&TenantTx`/`&Tx` của kernel ở cụm chuyển tương ứng.
 
-## 12. Câu hỏi cho người kiểm độc lập
+## 12. Câu hỏi đã có trả lời (kiểm lần 1)
 
-1. Danh sách thư viện từ vựng (§1.1) có nên gồm `tokio` không, hay kernel bọc luôn phần đồng bộ (`Mutex`, `spawn`)?
-2. Ngưỡng 5% thời gian `cargo check` cho bản sao bóng có hợp lý?
-3. `payment`/`sms`/`push` ở hạng thử nghiệm có làm module thương mại "ổn định" bị kéo xuống không — hay module thương mại
-   cũng vào hạng thử nghiệm lúc 1.0 (D-20261126-road-to-1-0 mục 4 gợi ý vậy)?
-4. RLS mặc định `off` lúc đầu có đủ "hướng dài hạn"?
+1. `tokio`: giữ trong danh sách từ vựng; không để kiểu tokio trong chữ ký ổn định; kernel có `task::spawn` mang ngữ cảnh khách
+   và tracing; không bọc `Mutex` (§1.1).
+2. Ngưỡng 5% `cargo check`: giữ; đo thêm `check` gia tăng của một module lớn (`auth`, `catalog`); đường dự phòng builder sẵn.
+3. Hạng module tách khỏi hạng kernel; module thương mại mang nhãn thử nghiệm lúc 1.0 (§2.1).
+4. RLS: dời sau 1.0, kèm bốn điều kiện khi làm (§7).
 
 ## 13. Đánh phiên bản hợp đồng ngoài REST (71-G13)
 
@@ -531,8 +680,9 @@ bản cũ khai sắp bỏ kèm ngày sunset và cái thay thế, gỡ chỉ ở 
 
 ### 13.2 Webhook gửi đi
 
-- Thân giữ dạng Standard Webhooks, thêm header `webhook-version: 1` và trường `data.schema` = tên event có hậu tố bản
-  (`notes.note_created` hoặc `….v2`). Đăng ký webhook chọn tên event cụ thể (gồm bản), nên webhook nhận bản nào là do người
+- Thân giữ dạng Standard Webhooks, thêm trường `data.schema` = tên event có hậu tố bản (`notes.note_created` hoặc `….v2`) và
+  `data.envelope_version` = `1`. **Nguồn đúng là thân đã ký** (chữ ký Standard Webhooks phủ thân, không phủ header); header
+  `webhook-version: 1` chỉ là gợi ý tiện cho bộ định tuyến, bên nhận phải tin trường trong thân (kiểm lần 1, điểm 13). Đăng ký webhook chọn tên event cụ thể (gồm bản), nên webhook nhận bản nào là do người
   đăng ký quyết; khi bản cũ tới sunset, đăng ký đó nhận thông báo trước 30 ngày (event `webhooks.subscription_deprecated` vào
   hộp việc) rồi tự chuyển tắt.
 - Khung thân (`type`, `timestamp`, `data.{id, module, subject, actor}`) là một hợp đồng riêng, bản `1`; đổi phá vỡ khung =
@@ -541,8 +691,9 @@ bản cũ khai sắp bỏ kèm ngày sunset và cái thay thế, gỡ chỉ ở 
 
 ### 13.3 Phần mở rộng `x-*` của OpenAPI
 
-- Danh mục ở kernel (`http::extensions`): tên, JSON Schema của giá trị, hạng, mô tả; `#[endpoint]` chỉ sinh phần mở rộng có
-  trong danh mục (lỗi biên dịch nếu không). Xuất ra `docs/openapi-extensions.json` và mô tả trong `info.x-autoxide-extensions`
+- Danh mục ở kernel (`http::extensions`): tên, JSON Schema của giá trị, hạng, mô tả. Kiểm bằng file sinh ra +
+  `contract-diff` (phần mở rộng có trong OpenAPI mà không có trong danh mục thì đỏ) — không cần kiểm lúc biên dịch (kiểm lần 1,
+  điểm 8). Xuất ra `docs/openapi-extensions.json` và mô tả trong `info.x-autoxide-extensions`
   của OpenAPI để client tự khám phá.
 - Phần mở rộng mới đặt tên `x-autoxide-<tên>`; 7 tên ngắn cũ (`x-permissions`, `x-public`, `x-stability`, `x-sunset`,
   `x-buyers`, `x-approval`, `x-idempotency`) giữ nguyên vì client đã đọc — đăng ký vào danh mục, không đổi tên.
@@ -555,12 +706,12 @@ Bước 54/52 viết thẳng trên hợp đồng mới, nên hợp đồng phả
 
 | Mục còn mở                                                     | Chỗ cắm trong thiết kế này                                                    |
 | -------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| 54 Quyền theo trường dữ liệu (cá nhân / nhạy cảm / tài chính, che khi thiếu `<module>.read_personal`, đọc có audit) | `#[derive(Schema)]` nhận `#[schema(data_class = personal | sensitive | financial)]` trên trường: sinh `x-autoxide-data-class` trong OpenAPI **và** cài trait `Redact` cho kiểu. Kernel bọc response (`Data`, `Page`, `Tagged`, kết quả tool MCP) bằng bước che theo `principal` trước khi trả: thiếu quyền đọc lớp đó thì trường thành `null` (kiểu đã là `Option` hoặc có giá trị che khai sẵn), có quyền thì ghi event audit "đọc dữ liệu nhạy cảm" (gom theo request). Vì che nằm ở lớp response của kernel, REST và MCP giống nhau, module không viết tay |
-| 54 Chia sẻ bản ghi có hạn (`viewer`/`editor`, không trao quyền mình không có), API key chọn bản ghi | `manifest.relation(Relation::new("notes.note", ["viewer", "editor"]))`; `principal.can::<Note>(&NOTES_READ)` trả `Cond<Note>` của lớp `db` gồm phạm vi nút **hoặc** `EXISTS` trên `kernel_shares` (bảng kernel, cùng database) theo người / nhóm / nút / key — thay `scope_condition` trả `Condition` của sea-query |
+| 54 Quyền theo trường dữ liệu (cá nhân / nhạy cảm / tài chính, che khi thiếu `<module>.read_personal`, đọc có audit) | `#[derive(Schema)]` nhận `#[schema(data_class = personal \| sensitive \| financial)]` trên trường: sinh `x-autoxide-data-class` và cài trait `Redact`. Che ở **mọi lối ra**, không chỉ response — xem §14.1 |
+| 54 Chia sẻ bản ghi có hạn (`viewer`/`editor`, không trao quyền mình không có), API key chọn bản ghi | `manifest.relation(Relation::new("notes.note", ["viewer", "editor"]))`; `principal.can::<Note>(&handle, &NOTES_READ)` trả `Cond<Note>` — **chỉ là predicate**, dựng từ cùng handle nên `EXISTS` vào `kernel_shares` lọc cùng khách. Điều kiện: `kernel_shares` có ở **mọi** placement (bảng cấp khách của kernel, đi theo khách khi dời); `Record` khai cột nút/người sở hữu bằng `#[record(org)]`, `#[record(owner)]`; `count`/`exists`/hàm gộp nhận `Cond` như `find`. Rủi ro index của `OR EXISTS`: §11 |
 | 54 Nâng quyền đúng lúc, tài khoản khẩn cấp, lệnh hai người, cặp quyền xung đột (ngưỡng là dữ liệu) | Khai trong manifest: `manifest.conflicting(PERM_A, PERM_B)`, `manifest.two_person(&PERMISSION)`; `#[endpoint(approval = "…")]` sinh `x-approval` và bọc handler bằng bước duyệt của kernel (REST và MCP như nhau) |
 | 54 Giải thích, mô phỏng, "ai có quyền trên bản ghi này", quyền không dùng 90 ngày | Manifest là dữ liệu: kernel có đủ permission, quan hệ, xung đột của mọi module mà không cần khởi động; số lần dùng permission đo ở bước kiểm `require` |
 | 54 AuthZEN Authorization API 1.0, `on_behalf_of` cho agent | Loại tài nguyên = `manifest.relation`/`resource_type`; `on_behalf_of` là trường của `Principal` và `Actor`, đi vào khung event (§13.1) và webhook (§13.2) |
-| 54 Nhân sự nền tảng xin vào dữ liệu khách, "xem như" chỉ đọc | `TenantDb` mở ở chế độ chỉ đọc khi `principal` là phiên "xem như": `begin_write` trả lỗi trước khi chạm database, áp cho mọi module mà không sửa module; `all_tenants` cấm trong phiên đó |
+| 54 Nhân sự nền tảng xin vào dữ liệu khách, "xem như" chỉ đọc | Ba lớp (kiểm lần 1, điểm 12): (1) lớp route của kernel chỉ cho method an toàn (`GET`/`HEAD`) và tool MCP khai `readOnlyHint`; (2) handle: `begin_write`/`write()`, `JobQueue::enqueue`, gửi mail/SMS, gọi nhà cung cấp qua kernel đều trả `kernel.view_as_read_only` khi `principal` là phiên "xem như"; (3) audit của kernel (cả "đọc dữ liệu nhạy cảm") ghi qua đường riêng của kernel, không qua handle của khách nên không bị chặn; `all_tenants` cấm trong phiên đó |
 | 52 Thông báo theo loại event, lý do nhận, cấu hình kênh | Catalog event có schema (§13.1) cho giao diện liệt kê và lọc loại event |
 | 52 Trợ lý AI chạy tool MCP với quyền người gọi, ghi là nháp / yêu cầu duyệt | Tool đăng ký trong `start` cùng service với REST (luật 8); `approval` ở `#[endpoint]` và tool dùng chung một bước duyệt |
 | 52 Sức khoẻ người bán / tuân thủ, ngưỡng có ngày hiệu lực | Cài đặt hợp nhất (§8) cho ngưỡng theo khách/nút; ngưỡng theo luật là dữ liệu có ngày hiệu lực ở module, không ở hợp đồng |
@@ -569,6 +720,79 @@ Bước 54/52 viết thẳng trên hợp đồng mới, nên hợp đồng phả
 Hệ quả cho thứ tự PR: phần `data_class` của `#[derive(Schema)]` và `Cond<R>` có chia sẻ là **API ổn định từ PR 2 và 4** (để
 54 không phải đổi chữ ký), còn hành vi (che, audit, bảng `kernel_shares`) do bước 54 làm. §13 thành PR 5b (sau manifest, vì
 `EventInfo` khai trong manifest).
+
+### 14.1 Che dữ liệu đã phân loại ở mọi lối ra (kiểm lần 1, điểm 10)
+
+Che ở lớp response là không đủ: dữ liệu còn ra qua xuất file, tải về, outbox (rồi webhook, thông báo), đoạn trích tìm kiếm,
+find/suggest, đầu vào AI, diff audit, thông báo lỗi, ETag/cache, trường tuỳ biến động; event được ghi lúc ghi, khi chưa có
+người đọc; và lọc/sắp theo trường nhạy cảm vẫn lộ giá trị qua thứ tự hay số lượng. Thiết kế:
+
+- **Một bước egress của kernel** cho mọi đầu ra kernel sở hữu: `Data`/`Page`/`Tagged`, kết quả tool MCP (đổi từ `Value` sang
+  kiểu có `Schema`), `ExportPage`/CSV, `Download` có schema, đoạn trích tìm kiếm và find/suggest, payload gửi `TextModel`
+  (`instructions`/`input`), `Problem` (giá trị trong `params`). Bước đó dựa trên `Redact` sinh từ schema, chạy theo `principal`
+  của người nhận.
+- **Schema payload của event, chỉ mục tìm kiếm và webhook** không được chứa trường đã phân loại trừ khi khai lớp của trường đó;
+  lúc giao (webhook, thông báo, SSE) kernel kiểm quyền lớp của **bên nhận** (chủ đăng ký webhook, người nhận thông báo) và che
+  theo đó. Diff audit lưu trường đã phân loại dưới dạng che sẵn (chỉ ghi "đã đổi"), trừ lớp `financial` cần cho đối soát
+  (lưu đủ, đọc audit cần quyền lớp đó).
+- **Lọc/sắp theo trường đã phân loại** đòi quyền lớp: tham số lọc/sắp sinh từ schema mang lớp của trường, kernel từ chối
+  (`permission_denied`) trước khi chạy truy vấn.
+- **ETag tính sau khi che** (hai người khác quyền nhận hai ETag khác nhau); response có trường đã che mang `Vary`/`Cache-Control:
+  private`.
+- **Ngoại lệ có chủ đích**: bản xuất dữ liệu cá nhân cho **chính chủ** (quyền truy cập dữ liệu theo luật bảo vệ dữ liệu cá
+  nhân) không che phần của chính người đó.
+- Trường tuỳ biến (`custom_fields`) khai lớp khi tạo trường; giá trị đi qua cùng bước egress.
+
+## 16. Mở rộng hợp đồng: CLI và định dạng file (71-G14 mục 4, D-20261126-operations-baseline)
+
+`COMPATIBILITY.md` đã hứa về lệnh `autoxide` bằng lời nhưng không có gì kiểm; file sao lưu (`backup.json` ghi bản Autoxide đã
+tạo, không có số bản định dạng) và file xuất dữ liệu (dữ liệu cá nhân, dời khách, xuất danh sách) chưa có lời hứa nào.
+
+- **CLI**: `cargo xtask regen` sinh `docs/cli.json` từ cây lệnh của `clap` (lệnh, tham số, giá trị mặc định, biến môi trường
+  tương ứng) cộng bảng mã thoát khai ở một chỗ (`ExitCode` của `crates/app`, mỗi mã một ý nghĩa ổn định) và JSON Schema của
+  mọi đầu ra `--json`. Quy tắc như REST: thêm lệnh / tham số tuỳ chọn / mã thoát / trường là không phá vỡ; bỏ, đổi tên, đổi
+  nghĩa là phá vỡ — tên cũ giữ làm bí danh có cảnh báo tới bản lớn (như `Setting::renamed_from`). Chữ in cho người đọc không
+  là hợp đồng.
+- **Định dạng file**: mỗi loại file (sao lưu, gói dời khách, xuất dữ liệu cá nhân, xuất danh sách) ghi `format` (tên loại) và
+  `format_version` (số nguyên) ở đầu (`backup.json` / dòng đầu của file xuất). Luật: bản 1.x **đọc** được file của mọi bản
+  1.y ≤ x (đọc bản cũ bằng hàm nâng từng bước `vN → vN+1` trong bộ đọc, không sửa file); ghi luôn bản mới nhất; đọc file mới
+  hơn mình thì báo lỗi rõ (`backup.format_too_new` kèm bản cần có). Bản lớn mới (2.0) đọc được file của bản 1.x cuối.
+- **Kiểm**: mỗi bản phát hành commit một file mẫu cho mỗi loại (`tests/fixtures/formats/<loại>/v<N>.*`, sinh từ dữ liệu mẫu cố
+  định); test đọc mọi file mẫu bằng bản hiện tại, trên cả hai database (khôi phục sao lưu mẫu rồi so dữ liệu). `contract-diff`
+  so `docs/cli.json` và JSON Schema của từng định dạng với bản phát hành gần nhất: schema của định dạng đổi mà `format_version`
+  không tăng → đỏ.
+- Thứ tự: PR 5c (cùng đợt với 5b, sau manifest), vì `contract-diff` dùng chung.
+
+## 17. Đường chuyển 0.x → 1.0 cho người viết module (71-G14 mục 5)
+
+Hướng dẫn `docs/guides/migrating-to-1.0.md` + `.vi.md`, viết theo từng bước, mỗi bước là một thay đổi biên dịch được (thứ tự
+như các cụm trong repo: Cargo.toml → derive/HTTP → manifest → truy vấn → migration), kèm bảng "cũ → mới" sinh từ chính bảng
+luật của công cụ dưới đây (một nguồn).
+
+Công cụ `autoxide migrate-module <đường dẫn>` (trong công cụ dòng lệnh độc lập của 71-G6, dùng được không cần mã nguồn core;
+trong repo gọi qua `cargo xtask migrate-module`):
+
+- **Cách làm**: phân tích cú pháp bằng `syn` (đã là phụ thuộc của `autoxide-macros`) với `proc-macro2` bật `span-locations`
+  để biết vị trí từng nút, rồi **sửa văn bản gốc theo vị trí** (không in lại cả file) — giữ nguyên comment, định dạng, thứ tự;
+  chạy `rustfmt` sau cùng. Không dùng rust-analyzer SSR: cần cả rust-analyzer chạy được trên dự án của người dùng, khó tự động
+  hoá trong CI và khó cài cho người mới. Không in lại bằng `prettyplease`: mất comment.
+- **Luật máy móc** (chắc chắn đúng, áp thẳng): sửa `Cargo.toml` (bỏ thư viện bọc, thêm feature `unstable` nếu dùng đường
+  thử nghiệm); `use` theo bảng đường dẫn; `derive(ToSchema|IntoParams|Validate)` → `derive(Schema|Params|Validate)` của kernel;
+  `#[utoipa::path(` → `#[endpoint(` và gộp `x-permissions` + `security` + 401/403 thành `permission = "…"` khi đúng mẫu chuẩn;
+  `OpenApiRouter::new().routes(routes!(…))…` → `routes![…]`; `StatusCode::NO_CONTENT` → `NoContent`; `jiff::SignedDuration` →
+  `time::Duration`; 45 hàm của `Module` → một hàm `manifest()` (thân mỗi hàm cũ là một biểu thức, chuyển thành một lời gọi
+  builder) và các đăng ký lúc chạy vào `start`; entity `DeriveEntityModel` → `#[derive(Record)]` (trường giữ nguyên, thuộc tính
+  ánh xạ, `scope` suy từ việc có `tenant_id` + `TenantScoped`); chuỗi truy vấn SeaORM theo mẫu thường gặp (`Entity::find()
+  .filter(Column::X.eq(v)).scoped(&tenant).one(conn)` → `tenant.db().read().find::<R>().filter(R::X.eq(v)).one()`).
+- **Phần không chắc**: công cụ không đoán; chèn `// TODO(autoxide-migrate): <luật, đường dẫn tài liệu>` tại chỗ và in danh
+  sách; `cargo check` dẫn phần còn lại. Đích đo: ≥ 80% chỗ gọi của một module điển hình được sửa tự động (đo trên `notes` và
+  `examples/external-module`, ghi số ở PR).
+- **Tự kiểm**: test của công cụ là cặp file trước/sau cho từng luật; chạy lại trên kết quả không đổi gì (idempotent).
+- **Dùng trong repo**: mọi PR chuyển cụm module (7–12) chạy công cụ trước rồi mới sửa tay phần TODO — vừa giảm công, vừa thử
+  công cụ trên ~6.000 chỗ thật trước khi người ngoài dùng. CI chạy công cụ trên bản sao `examples/external-module` ở trạng thái
+  0.x (giữ một bản chụp ở `xtask/fixtures/external-module-0x/`) và kiểm kết quả biên dịch + test xanh.
+- Thứ tự: công cụ làm ở PR 6b (sau khi lớp mới của PR 2–5 có đủ, trước cụm module đầu tiên); luật mới thêm theo từng PR lớp
+  của kernel nếu lớp đó còn đổi.
 
 ## Quyết định đi kèm
 
@@ -580,4 +804,6 @@ Hệ quả cho thứ tự PR: phần `data_class` của `#[derive(Schema)]` và 
 - D-20261126-kernel-crates — tách crate theo lớp, `autoxide-host`
 - D-20261126-tenant-isolation — ba lớp cách ly, RLS tuỳ chọn, hạn mức request chưa xác thực
 - D-20261126-one-settings-system — hợp nhất cài đặt theo khách
-- D-20261126-contract-versioning — đánh phiên bản event, webhook, phần mở rộng `x-*` (§13)
+- D-20261126-contract-versioning — đánh phiên bản event, webhook, phần mở rộng `x-*` (§13), CLI và định dạng file (§16)
+- D-20261126-module-migration-tool — công cụ `migrate-module` và hướng dẫn chuyển 0.x → 1.0 (§17)
+- (sẽ ghi ở PR 6) quyết định chuyển hạng module lúc 1.0 (§2.1)
