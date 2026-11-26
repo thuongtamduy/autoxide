@@ -190,7 +190,7 @@ impl ApiKeyService {
     ) -> Result<CreatedApiKey, Error> {
         // Tính năng theo gói (bước 35): khách bị gói giới hạn cần `auth.api_keys`.
         self.roles.entitlements().require_feature(tenant.id(), &super::API_KEYS_FEATURE).await?;
-        if creator.api_key_id().is_some() {
+        if !creator.is_session() {
             return Err(Error::forbidden(
                 "auth.api_key_cannot_create_keys",
                 "An API key cannot create API keys: a leaked key must not be able to make \
@@ -1056,6 +1056,44 @@ mod tests {
 
             assert_eq!(error.kind(), ErrorKind::Forbidden);
             assert_eq!(error.code(), "auth.api_key_cannot_create_keys");
+        })
+        .await
+        .unwrap();
+    }
+
+    /// Token OAuth của client làm thay người dùng (D-20261126-mcp-oauth) không phải phiên đăng nhập: không tạo,
+    /// không duyệt API key, dù người dùng có quyền.
+    #[tokio::test]
+    async fn token_oauth_khong_tao_khong_duyet_duoc_api_key() {
+        TestDatabase::run(async |test| {
+            let (services, ada) = setup(test).await;
+            let tenant = services.tenant.clone();
+            let oauth = ada.clone().with_oauth(autoxide_kernel::access::OAuthAccess::new(
+                Uuid::now_v7(),
+                "https://client.example/app.json",
+                "https://api.example.com/api/v1",
+            ));
+            let error = services
+                .api_keys
+                .create(&tenant, &oauth, new_key(&["auth.users.read"]))
+                .await
+                .unwrap_err();
+            assert_eq!(error.code(), "auth.api_key_cannot_create_keys");
+            // Người duyệt có đủ quyền nhưng gọi bằng token OAuth.
+            let approver = Principal::with_all_permissions(ada.user_id())
+                .in_tenant(tenant.id())
+                .with_oauth(autoxide_kernel::access::OAuthAccess::new(
+                    Uuid::now_v7(),
+                    "https://client.example/app.json",
+                    "https://api.example.com/api/v1",
+                ));
+            let error =
+                services.api_keys.approve(&tenant, &approver, Uuid::now_v7()).await.unwrap_err();
+            assert_eq!(error.code(), "auth.api_key_cannot_approve_keys");
+            assert_eq!(
+                crate::access::require_session(&oauth).unwrap_err().code(),
+                "auth.session_required"
+            );
         })
         .await
         .unwrap();

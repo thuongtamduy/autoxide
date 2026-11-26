@@ -187,7 +187,8 @@ async fn checked(
         parts.method,
         String::from_utf8_lossy(&bytes)
     ));
-    let api_key = principal.api_key_id();
+    // Credential uỷ quyền (API key hay grant OAuth): lệnh đã duyệt chỉ dùng lại được bằng đúng credential đó.
+    let api_key = principal.credential_id();
     if let Some(approval) = parts.headers.get(&APPROVAL_HEADER) {
         let id = approval.to_str().ok().and_then(|raw| raw.parse::<Uuid>().ok());
         let used = match id {
@@ -372,7 +373,9 @@ fn may_see(principal: &Principal, approval: &ApprovalView) -> bool {
 }
 
 fn may_decide(principal: &Principal, approval: &ApprovalView) -> bool {
-    matches!(principal.actor_kind(), ActorKind::Human | ActorKind::Support)
+    // Duyệt là việc của người trong phiên đăng nhập: không API key, không client OAuth (D-20261126-mcp-oauth).
+    principal.is_session()
+        && matches!(principal.actor_kind(), ActorKind::Human | ActorKind::Support)
         && approval.permissions.iter().any(|permission| principal.allows(permission))
 }
 
