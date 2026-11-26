@@ -310,8 +310,9 @@ async fn list_user_passkeys(
     Path(id): Path<Uuid>,
     Query(query): Query<PageQuery>,
 ) -> Result<Page<PasskeyResponse>, Error> {
-    let page = PageRequest::try_from(query)?;
+    // Quyền trước tham số trang: thiếu quyền là 403, không phải 422 (luật `permission-first` của xtask).
     check_admin(&state, &tenant, &principal, id).await?;
+    let page = PageRequest::try_from(query)?;
     Ok(state.passkeys.list(&tenant, id, &page).await?.map(PasskeyResponse::from))
 }
 

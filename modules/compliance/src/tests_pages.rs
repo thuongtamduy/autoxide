@@ -175,3 +175,28 @@ async fn dong_y_cua_toi_va_so_muc_dich_theo_trang() {
     .await
     .unwrap();
 }
+
+/// Thiếu `compliance.documents.read` thì 403 trước khi tham số trang sai thành 422 (luật `permission-first` của
+/// xtask, D-20261126-permission-before-page). Dựng không kèm lớp `x-permissions` của kernel để thấy chính handler
+/// kiểm; văn bản không cần có vì quyền được kiểm trước khi tìm.
+#[tokio::test]
+async fn thieu_quyen_xem_chap_nhan_la_403_truoc_tham_so_trang() {
+    TestDatabase::run(async |test| {
+        let app = TestApp::builder(test)
+            .without_permission_gate()
+            .user("admin", 1, ADMIN)
+            .user("alice", 2, &[])
+            .module(crate::module())
+            .build()
+            .await
+            .unwrap();
+        let uri = format!("/documents/{}/acceptances?limit=0", Uuid::now_v7());
+        let (status, problem) = call(&app, "GET", &uri, "alice", None).await;
+        assert_eq!(status, StatusCode::FORBIDDEN, "{problem}");
+        assert_eq!(problem["code"], "permission_denied");
+        let (status, problem) = call(&app, "GET", &uri, "admin", None).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{problem}");
+    })
+    .await
+    .unwrap();
+}

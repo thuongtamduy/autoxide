@@ -135,6 +135,8 @@ async fn list_books(
     principal: Principal,
     Query(page): Query<PageQuery>,
 ) -> Result<Page<BookResponse>, Error> {
+    // Quyền trước tham số trang: thiếu quyền là 403, không phải 422 (luật `permission-first` của xtask).
+    principal.require(&crate::permissions::READ)?;
     let page = service.list_books(&tenant, &principal, &PageRequest::try_from(page)?).await?;
     Ok(page.map(BookResponse::from))
 }
@@ -336,6 +338,8 @@ async fn list_accounts(
     Query(filter): Query<AccountsQuery>,
     Query(page): Query<PageQuery>,
 ) -> Result<Page<AccountResponse>, Error> {
+    // Quyền trước tham số trang: thiếu quyền là 403, không phải 422 (luật `permission-first` của xtask).
+    principal.require(&crate::permissions::READ)?;
     let found = AccountFilter {
         purpose: filter.purpose,
         counterparty_kind: filter.counterparty_kind,
@@ -523,6 +527,8 @@ async fn account_lines(
     Path(id): Path<Uuid>,
     Query(page): Query<PageQuery>,
 ) -> Result<Page<LineResponse>, Error> {
+    // Quyền trước tham số trang: thiếu quyền là 403, không phải 422 (luật `permission-first` của xtask).
+    principal.require(&crate::permissions::READ)?;
     let page =
         service.account_lines(&tenant, &principal, id, &PageRequest::try_from(page)?).await?;
     let Page { data, pagination } = page;
@@ -667,6 +673,8 @@ async fn list_entries(
     Query(query): Query<EntriesQuery>,
     Query(page): Query<PageQuery>,
 ) -> Result<Page<Entry>, Error> {
+    // Quyền trước tham số trang: thiếu quyền là 403, không phải 422 (luật `permission-first` của xtask).
+    principal.require(&crate::permissions::READ)?;
     let filter = EntryFilter {
         book_org: query.org_id.map(OrgId::from_uuid),
         source_module: query.source_module,
@@ -861,6 +869,8 @@ async fn list_periods(
     Query(query): Query<BookQuery>,
     Query(page): Query<PageQuery>,
 ) -> Result<Page<PeriodResponse>, Error> {
+    // Quyền trước tham số trang: thiếu quyền là 403, không phải 422 (luật `permission-first` của xtask).
+    principal.require(&crate::permissions::READ)?;
     let page = service
         .list_periods(&tenant, &principal, query.book_id, &PageRequest::try_from(page)?)
         .await?;
