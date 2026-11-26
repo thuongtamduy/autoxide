@@ -586,6 +586,8 @@ pub(crate) struct DeliveriesInput {
     limit: Option<u32>,
     /// `next_cursor` of the previous page.
     cursor: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
 }
 
 /// The delivery to send again.
@@ -608,11 +610,14 @@ pub(crate) fn tools(service: Arc<WebhookService>) -> Vec<autoxide_kernel::mcp::T
             move |tenant: TenantContext, _: Principal, input: DeliveriesInput| {
                 let service = list.clone();
                 async move {
-                    let page = PageRequest::try_from(PageQuery::new(
-                        input.limit.map(|limit| limit.to_string()),
-                        input.cursor,
-                        None,
-                    ))?;
+                    let page = PageRequest::try_from(
+                        PageQuery::new(
+                            input.limit.map(|limit| limit.to_string()),
+                            input.cursor,
+                            None,
+                        )
+                        .with_count(input.count.unwrap_or(false)),
+                    )?;
                     let page = service
                         .all_deliveries(&tenant, input.status.as_deref(), input.endpoint_id, &page)
                         .await?;

@@ -84,6 +84,8 @@ pub(crate) struct ListEntriesInput {
     limit: Option<u32>,
     /// Where to continue: the `next_cursor` of the previous page.
     cursor: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
     /// `desc` (newest first, the default) or `asc`.
     order: Option<String>,
 }
@@ -209,6 +211,8 @@ pub(crate) struct ListRevisionsInput {
     limit: Option<u32>,
     /// Where to continue: the `next_cursor` of the previous page.
     cursor: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
 }
 
 /// A revision to copy back into the draft.
@@ -377,7 +381,8 @@ fn entry_tools(service: &Arc<ContentService>) -> Vec<Tool> {
                         input.limit.map(|limit| limit.to_string()),
                         input.cursor,
                         input.order,
-                    );
+                    )
+                    .with_count(input.count.unwrap_or(false));
                     let mut problems = Vec::new();
                     let filter = query.filter(principal.user_id(), &mut problems);
                     let page = page_request(paging, problems)?;
@@ -515,7 +520,9 @@ fn entry_tools(service: &Arc<ContentService>) -> Vec<Tool> {
             move |tenant: TenantContext, principal: Principal, input: ListRevisionsInput| {
                 let service = revisions.clone();
                 async move {
-                    let page = PageInput::new(input.limit, input.cursor, None).page()?;
+                    let page = PageInput::new(input.limit, input.cursor, None)
+                        .with_count(input.count.unwrap_or(false))
+                        .page()?;
                     let found =
                         service.list_revisions(&tenant, &principal, input.id, &page).await?;
                     Ok::<Page<RevisionResponse>, Error>(found.map(|row| revision(row, false)))
