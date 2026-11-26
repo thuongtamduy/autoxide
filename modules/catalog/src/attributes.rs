@@ -226,7 +226,7 @@ impl CatalogService {
             problems.push(FieldError::new("names", "required", "name the attribute in a language"));
         }
         for (locale, name) in &input.names {
-            self.locale(locale)?;
+            self.locale(tenant, locale).await?;
             check_length(&mut problems, "names", name, 1, 100);
         }
         fail_if_any(problems)?;

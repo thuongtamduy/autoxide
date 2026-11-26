@@ -43,7 +43,7 @@ impl CatalogService {
         alt: &str,
         expected: Option<Timestamp>,
     ) -> Result<ProductDetail, Error> {
-        let locale = self.locale(locale)?;
+        let locale = self.locale(tenant, locale).await?;
         let alt = alt.trim();
         let mut problems = Vec::new();
         check_length(&mut problems, "alt", alt, 1, 500);
@@ -61,7 +61,7 @@ impl CatalogService {
         locale: &str,
         expected: Option<Timestamp>,
     ) -> Result<ProductDetail, Error> {
-        let locale = self.locale(locale)?;
+        let locale = self.locale(tenant, locale).await?;
         self.change_media_alt(tenant, principal, id, media_id, &locale, None, expected).await
     }
 

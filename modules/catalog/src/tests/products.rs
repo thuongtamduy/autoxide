@@ -447,3 +447,45 @@ async fn doi_ngay_dat_truoc_dong_thoi_chi_phat_mot_event() {
     .await
     .unwrap();
 }
+
+/// Ngôn ngữ theo khách (`catalog.locales`): khách `two` chỉ viết bằng `fr`; khách `one` vẫn theo
+/// `AUTOXIDE_CATALOG_LOCALES` (mặc định `en,vi`).
+#[tokio::test]
+async fn ngon_ngu_theo_khach() {
+    TestDatabase::run(async |test| {
+        let app = TestApp::builder(test)
+            .tenant("one")
+            .tenant("two")
+            .user_in("one", "one", 1, &ALL)
+            .user_in("two", "two", 2, &[ALL.as_slice(), &["kernel.settings.manage"]].concat())
+            .module(crate::module())
+            .build()
+            .await
+            .unwrap();
+        let set = app
+            .put("/api/v1/kernel/settings/catalog.locales")
+            .token("two")
+            .json(json!({"value": "fr"}))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(set.status(), StatusCode::OK, "{}", set.text());
+        let product = |locale: &str, sku: &str| {
+            json!({
+                "kind": "physical", "tax_category": "vat.standard", "locale": locale,
+                "text": {"name": "Produit"}, "variant": {"sku": sku},
+            })
+        };
+        let (status, _) = call(&app, "POST", "/products", "two", Some(product("fr", "T-1"))).await;
+        assert_eq!(status, StatusCode::CREATED);
+        let (status, body) =
+            call(&app, "POST", "/products", "two", Some(product("vi", "T-2"))).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{body}");
+        let (status, _) = call(&app, "POST", "/products", "one", Some(product("vi", "O-1"))).await;
+        assert_eq!(status, StatusCode::CREATED);
+        let (status, _) = call(&app, "POST", "/products", "one", Some(product("fr", "O-2"))).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    })
+    .await
+    .unwrap();
+}

@@ -219,7 +219,7 @@ async fn reply_to_header_rieng_va_chong_trung() {
     .unwrap();
 }
 
-async fn failures(database: &Database) -> Vec<String> {
+pub(crate) async fn failures(database: &Database) -> Vec<String> {
     use sea_orm::{ConnectionTrait, Statement};
     let backend = database.read().get_database_backend();
     let sql = "SELECT payload FROM mail_events WHERE name = 'mail.delivery_failed'";

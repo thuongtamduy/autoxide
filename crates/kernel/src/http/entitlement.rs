@@ -6,7 +6,8 @@
 //! - the tenant is read-only due to its subscription (suspended / cancelled): write requests (`POST`,
 //!   `PUT`, `PATCH`, `DELETE`) get 403 `tenant_read_only`; reads still pass.
 //!
-//! The request's tenant is resolved with the same extractor the handlers use (the result is cached in the
+//! Only a signed-in caller acting in its own tenant is counted (see `tenant_rate_limit`). The request's tenant
+//! for the plan checks is resolved with the same extractor the handlers use (the result is cached in the
 //! request, so handlers do not resolve it again). If it cannot be resolved (a public route without a
 //! tenant...), the request passes through: the handler returns its own error.
 
@@ -16,6 +17,10 @@ use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 
 use crate::entitlement::{EntitlementsHandle, TenantAccess, module_not_enabled};
+
+/// Marks a request already counted for `kernel.api_requests`.
+#[derive(Clone, Copy)]
+struct Counted;
 
 pub(crate) async fn gate(
     entitlements: EntitlementsHandle,
@@ -28,9 +33,23 @@ pub(crate) async fn gate(
         return next.run(request).await;
     }
     let (mut parts, body) = request.into_parts();
+    // Đếm request cho hạn mức `kernel.api_requests` (mọi module): chỉ người gọi đã xác thực, vào khách của chính
+    // họ (D-20261126-tenant-rate-limit) — request ẩn danh nêu tên khách không được làm cạn lượng của khách đó.
+    // Lệnh trong một lô ghi mang dấu của lô: lô tính một lần.
+    if parts.extensions.get::<Counted>().is_none() {
+        match super::tenant_rate_limit::signed_in(&mut parts).await {
+            Ok(principal) => {
+                if let Some(tenant) =
+                    principal.as_ref().and_then(super::tenant_rate_limit::budget_tenant)
+                {
+                    entitlements.count_request(tenant);
+                    parts.extensions.insert(Counted);
+                }
+            }
+            Err(error) => return error.into_response(),
+        }
+    }
     if let Ok(tenant) = crate::tenancy::request::tenant(&mut parts).await {
-        // Đếm request theo khách cho hạn mức `kernel.api_requests` (mọi module).
-        entitlements.count_request(tenant.id());
         if always_enabled {
             return next.run(Request::from_parts(parts, body)).await;
         }

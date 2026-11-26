@@ -49,10 +49,25 @@ pub(crate) mod entity {
 
 use entity::{Column, Entity};
 
+/// Hạn mức token mỗi ngày theo gói (mục 7 của đợt cấu hình theo khách). Gói không nêu thì
+/// `AUTOXIDE_AI_DAILY_TOKEN_LIMIT`; gói nêu "không giới hạn" thì không giới hạn.
+pub(crate) const DAILY_TOKENS: autoxide_kernel::entitlement::Limit =
+    autoxide_kernel::entitlement::Limit::amount(
+        "ai.daily_tokens",
+        "Tokens (input plus output, text and embeddings together) the tenant may use per UTC day; \
+         past it, AI features answer 429 `ai.quota_exceeded` until the next day. A plan that does \
+         not set it keeps the server's AUTOXIDE_AI_DAILY_TOKEN_LIMIT (where `0` means no limit); in \
+         a plan `0` allows no tokens and unlimited lifts the limit. Read by module `ai` when it is \
+         called, not reserved.",
+        "tokens per day",
+    );
+
 /// Sổ đếm token. Không giữ database: database là của khách, đi theo `TenantContext`.
 pub(crate) struct UsageBook {
-    /// Hạn mức mỗi khách mỗi ngày; `0`: không giới hạn.
+    /// Hạn mức mặc định mỗi khách mỗi ngày (`AUTOXIDE_AI_DAILY_TOKEN_LIMIT`); `0`: không giới hạn.
     limit: u64,
+    /// Gói của khách (`plans`): hạn mức `ai.daily_tokens` thay mặc định. `None` trong test dựng tay.
+    entitlements: Option<autoxide_kernel::entitlement::EntitlementsHandle>,
 }
 
 pub(crate) fn today() -> String {
@@ -61,11 +76,31 @@ pub(crate) fn today() -> String {
 
 impl UsageBook {
     pub(crate) fn new(limit: u64) -> Self {
-        UsageBook { limit }
+        UsageBook { limit, entitlements: None }
     }
 
-    pub(crate) fn limit(&self) -> u64 {
-        self.limit
+    /// Đọc hạn mức theo gói của khách qua `entitlements`.
+    pub(crate) fn with_entitlements(
+        mut self,
+        entitlements: autoxide_kernel::entitlement::EntitlementsHandle,
+    ) -> Self {
+        self.entitlements = Some(entitlements);
+        self
+    }
+
+    /// Hạn mức mỗi ngày của khách `tenant`; `None`: không giới hạn. Gói nêu `ai.daily_tokens` thì theo gói (kể cả
+    /// "không giới hạn"); không nêu, hay khách không có gói, thì biến chung (`0` = không giới hạn). Ảnh chụp gói
+    /// của `plans` có cache ngắn, không thêm truy vấn mỗi lời gọi.
+    pub(crate) async fn limit_for(&self, tenant: &TenantContext) -> Result<Option<u64>, Error> {
+        if let Some(entitlements) = &self.entitlements {
+            let snapshot = entitlements.snapshot(tenant.id()).await?;
+            if !snapshot.unrestricted
+                && let Some(planned) = snapshot.limits.get(DAILY_TOKENS.key())
+            {
+                return Ok(planned.map(|tokens| u64::try_from(tokens).unwrap_or(0)));
+            }
+        }
+        Ok((self.limit > 0).then_some(self.limit))
     }
 
     /// Tổng token (vào + ra) khách `tenant` đã dùng hôm nay.
@@ -83,7 +118,9 @@ impl UsageBook {
 
     /// Lỗi `ai.quota_exceeded` nếu hôm nay khách `tenant` đã hết hạn mức.
     pub(crate) async fn check(&self, tenant: &TenantContext) -> Result<(), Error> {
-        if self.limit > 0 && self.used_today(tenant).await? >= self.limit {
+        if let Some(limit) = self.limit_for(tenant).await?
+            && self.used_today(tenant).await? >= limit
+        {
             return Err(errors::quota_exceeded());
         }
         Ok(())

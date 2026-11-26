@@ -564,10 +564,14 @@
         "description": "What the AI features of this server can do now.",
         "properties": {
           "daily_token_limit": {
-            "description": "Daily token limit; 0 means no limit.",
+            "description": "Daily token limit of this tenant: its plan's `ai.daily_tokens`, otherwise the server's\n`AUTOXIDE_AI_DAILY_TOKEN_LIMIT`. Read it with `daily_token_limited`: 0 with `daily_token_limited`\nfalse means no limit; 0 with `daily_token_limited` true means the plan allows no AI tokens.",
             "format": "int64",
             "minimum": 0,
             "type": "integer"
+          },
+          "daily_token_limited": {
+            "description": "A daily token limit applies to this tenant (`daily_token_limit` is that limit).",
+            "type": "boolean"
           },
           "embedding_dimensions": {
             "description": "Length of each embedding vector; 0 when off.",
@@ -616,7 +620,8 @@
           "embedding_model",
           "embedding_dimensions",
           "tokens_today",
-          "daily_token_limit"
+          "daily_token_limit",
+          "daily_token_limited"
         ],
         "type": "object"
       },
@@ -8610,12 +8615,12 @@
             "description": "Menu settings an interface needs.",
             "properties": {
               "default_locale": {
-                "description": "Language of a menu when none is given.",
+                "description": "Language of a menu when none is given (tenant setting `menus.default_locale`, otherwise\n`AUTOXIDE_MENUS_DEFAULT_LOCALE`); always one of `locales`.",
                 "example": "en",
                 "type": "string"
               },
               "locales": {
-                "description": "Languages menus may be written in (`AUTOXIDE_MENUS_LOCALES`), the default first.",
+                "description": "Languages menus may be written in (tenant setting `menus.locales`, otherwise\n`AUTOXIDE_MENUS_LOCALES`), in the order they are set.",
                 "example": [
                   "en",
                   "vi"
@@ -17160,10 +17165,14 @@
             "description": "What the AI features of this server can do now.",
             "properties": {
               "daily_token_limit": {
-                "description": "Daily token limit; 0 means no limit.",
+                "description": "Daily token limit of this tenant: its plan's `ai.daily_tokens`, otherwise the server's\n`AUTOXIDE_AI_DAILY_TOKEN_LIMIT`. Read it with `daily_token_limited`: 0 with `daily_token_limited`\nfalse means no limit; 0 with `daily_token_limited` true means the plan allows no AI tokens.",
                 "format": "int64",
                 "minimum": 0,
                 "type": "integer"
+              },
+              "daily_token_limited": {
+                "description": "A daily token limit applies to this tenant (`daily_token_limit` is that limit).",
+                "type": "boolean"
               },
               "embedding_dimensions": {
                 "description": "Length of each embedding vector; 0 when off.",
@@ -17212,7 +17221,8 @@
               "embedding_model",
               "embedding_dimensions",
               "tokens_today",
-              "daily_token_limit"
+              "daily_token_limit",
+              "daily_token_limited"
             ],
             "type": "object"
           }

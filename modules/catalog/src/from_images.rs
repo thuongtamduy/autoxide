@@ -112,7 +112,10 @@ impl CatalogService {
         }
         let media = self.media.clone().ok_or_else(images_unavailable)?;
         let mut problems = Vec::new();
-        let locale = match self.config.locale(&input.locale) {
+        let tenant_locales = self.locales(tenant).await?;
+        let locale = match crate::config::canonical_locale(&input.locale)
+            .filter(|locale| tenant_locales.contains(locale))
+        {
             Some(locale) => locale,
             None => {
                 problems.push(FieldError::new("locale", "locale", "is not a configured language"));

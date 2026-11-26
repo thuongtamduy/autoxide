@@ -89,7 +89,7 @@ async fn suggest(
     _principal: Option<Principal>,
     Query(query): Query<SuggestQuery>,
 ) -> Result<Response, Error> {
-    let locale = service.locale(&query.locale)?;
+    let locale = service.locale(&tenant, &query.locale).await?;
     let mut problems = Vec::new();
     let length = query.q.trim().chars().count();
     if length == 0 || length > QUERY_MAX {
@@ -188,7 +188,7 @@ async fn product_facets(
     Query(raw): Query<Vec<(String, String)>>,
 ) -> Result<Response, Error> {
     let mut paging = PageQuery::default();
-    let filter = parse_filter(&service, query, raw, &mut paging)?;
+    let filter = parse_filter(&service, &tenant, query, raw, &mut paging).await?;
     let facets = service.public_facets(&tenant, &site, &filter).await?;
     let data = FacetsResponse {
         total: facets.total,

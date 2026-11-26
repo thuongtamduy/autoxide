@@ -56,14 +56,15 @@ impl MenuService {
             )
         })?;
         let mut report = ImportReport::default();
+        let (locales, _) = self.tenant_locales(tenant).await?;
         for old in legacy.legacy_menus(tenant).await? {
             let pair = (old.key.clone(), old.locale.clone());
             let Some(locale) =
-                canonical_locale(&old.locale).filter(|locale| self.config.locales.contains(locale))
+                canonical_locale(&old.locale).filter(|locale| locales.contains(locale))
             else {
                 let reason = format!(
-                    "the language is not in AUTOXIDE_MENUS_LOCALES ({})",
-                    self.config.locales.join(", ")
+                    "the language is not one of this tenant's menu languages ({})",
+                    locales.join(", ")
                 );
                 report.failed.push((pair.0, pair.1, reason));
                 continue;
