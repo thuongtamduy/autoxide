@@ -13,7 +13,7 @@ use autoxide_kernel::version::{IfMatch, Tagged};
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use serde::Deserialize;
-use utoipa::ToSchema;
+use autoxide_spike_macros::Schema as ToSchema;
 use uuid::Uuid;
 use validator::Validate;
 

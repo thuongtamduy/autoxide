@@ -181,7 +181,7 @@ pub(crate) fn merge<'a>(
 
 // Một cặp màu không đạt tương phản AA (cảnh báo, không chặn).
 /// A text and background color pair below the WCAG AA contrast (a warning; the theme is saved).
-#[derive(Debug, Clone, PartialEq, serde::Serialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, autoxide_spike_macros::Schema)]
 pub(crate) struct ContrastWarning {
     /// Token of the text color, e.g. `color.text`.
     pub foreground: String,

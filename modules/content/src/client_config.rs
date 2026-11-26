@@ -6,7 +6,7 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::module::{ClientSection, TenantClientSection};
 use autoxide_kernel::tenancy::TenantContext;
 use serde::Serialize;
-use utoipa::ToSchema;
+use autoxide_spike_macros::Schema as ToSchema;
 
 use crate::config::ContentConfig;
 

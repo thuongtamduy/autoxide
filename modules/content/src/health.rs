@@ -24,7 +24,7 @@ use sea_orm::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use utoipa::ToSchema;
+use autoxide_spike_macros::Schema as ToSchema;
 use uuid::Uuid;
 
 use crate::entity::{published, redirect, site_health};

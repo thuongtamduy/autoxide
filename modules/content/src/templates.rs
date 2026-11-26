@@ -19,7 +19,7 @@ use autoxide_kernel::template::Output;
 use autoxide_kernel::tenancy::{OrgId, TenantContext};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
-use utoipa::ToSchema;
+use autoxide_spike_macros::Schema as ToSchema;
 use uuid::Uuid;
 
 use crate::entries::Entry;

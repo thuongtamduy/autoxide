@@ -44,3 +44,9 @@ pub mod job;
 pub mod mcp;
 pub mod module;
 pub mod response;
+
+// SPIKE (không merge): đường riêng cho mã do macro của kernel sinh ra (D-20261126-kernel-web-layer).
+#[doc(hidden)]
+pub mod __private {
+    pub use utoipa;
+}

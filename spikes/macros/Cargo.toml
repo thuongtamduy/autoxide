@@ -13,3 +13,9 @@ proc-macro = true
 proc-macro2 = "1.0.107"
 quote = "1.0.47"
 syn = { version = "2.0.119", features = ["full"] }
+
+[dev-dependencies]
+autoxide-kernel.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+utoipa.workspace = true

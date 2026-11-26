@@ -15,7 +15,7 @@ use jiff::SignedDuration;
 use sea_orm::sea_query::{Expr, OnConflict};
 use sea_orm::{ColumnTrait, Condition, EntityTrait, QueryFilter, Set};
 use serde::Serialize;
-use utoipa::ToSchema;
+use autoxide_spike_macros::Schema as ToSchema;
 use uuid::Uuid;
 
 use crate::entity::edit_lock::{self, Column, Entity};

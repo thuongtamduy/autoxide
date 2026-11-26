@@ -9,7 +9,8 @@ use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::time::Timestamp;
 use axum::extract::{Path, Query, State};
 use serde::{Deserialize, Serialize};
-use utoipa::{IntoParams, ToSchema};
+use utoipa::IntoParams;
+use autoxide_spike_macros::Schema as ToSchema;
 use uuid::Uuid;
 
 use crate::health::{Finding, HealthReport};

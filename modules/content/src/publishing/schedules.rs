@@ -38,7 +38,7 @@ pub(crate) const RUN: &str = "content.run_schedule";
 pub(crate) type Schedule = schedule::Model;
 
 /// What a schedule does: `publish` or `unpublish`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, autoxide_spike_macros::Schema)]
 #[serde(rename_all = "lowercase")]
 pub(crate) enum Action {
     /// Publish the draft as it was when the schedule was made.

@@ -8,7 +8,7 @@
 use autoxide_kernel::error::FieldError;
 use serde::Deserialize;
 use serde_json::Value;
-use utoipa::ToSchema;
+use autoxide_spike_macros::Schema as ToSchema;
 
 /// Số thao tác tối đa của một patch.
 pub(crate) const MAX_OPERATIONS: usize = 200;

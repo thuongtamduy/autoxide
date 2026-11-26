@@ -11,7 +11,7 @@ use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, Query, State};
 use serde::Deserialize;
 use serde_json::Value;
-use utoipa::ToSchema;
+use autoxide_spike_macros::Schema as ToSchema;
 use uuid::Uuid;
 use validator::Validate;
 

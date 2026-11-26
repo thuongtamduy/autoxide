@@ -16,6 +16,7 @@ publish.workspace = true
 bench-seed = []
 
 [dependencies]
+autoxide-spike-macros = { path = "../../spikes/macros" }
 jiff.workspace = true
 metrics.workspace = true
 async-trait.workspace = true

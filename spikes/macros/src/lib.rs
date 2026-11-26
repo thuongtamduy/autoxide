@@ -79,7 +79,15 @@ pub fn derive_schema(input: TokenStream) -> TokenStream {
     }
     let (impl_generics, type_generics, where_clause) = input.generics.split_for_impl();
     let mut where_clause = where_clause.cloned().unwrap_or_else(|| syn::parse_quote!(where));
+    let mut compose_where = where_clause.clone();
+    compose_where
+        .predicates
+        .push(syn::parse_quote!(#shadow_name #type_generics: utoipa::__dev::ComposeSchema));
+    // `ToSchema: PartialSchema`, và `PartialSchema` đến từ `ComposeSchema`: cần cả hai ràng buộc.
     where_clause.predicates.push(syn::parse_quote!(#shadow_name #type_generics: utoipa::ToSchema));
+    where_clause
+        .predicates
+        .push(syn::parse_quote!(#shadow_name #type_generics: utoipa::__dev::ComposeSchema));
     quote! {
         #[allow(deprecated, dead_code, non_camel_case_types, clippy::all, clippy::pedantic)]
         const _: () = {
@@ -87,9 +95,13 @@ pub fn derive_schema(input: TokenStream) -> TokenStream {
             #[derive(utoipa::ToSchema)]
             #shadow
 
-            impl #impl_generics utoipa::PartialSchema for #name #type_generics #where_clause {
-                fn schema() -> utoipa::openapi::RefOr<utoipa::openapi::schema::Schema> {
-                    <#shadow_name #type_generics as utoipa::PartialSchema>::schema()
+            // `PartialSchema` đến từ impl chung của utoipa 6 cho mọi kiểu có `ComposeSchema`.
+            // utoipa 6 dùng trait ẩn này khi kiểu làm tham số generic (`Data<T>`): chuyển tiếp luôn.
+            impl #impl_generics utoipa::__dev::ComposeSchema for #name #type_generics #compose_where {
+                fn compose(
+                    generics: ::std::vec::Vec<utoipa::openapi::RefOr<utoipa::openapi::schema::Schema>>,
+                ) -> utoipa::openapi::RefOr<utoipa::openapi::schema::Schema> {
+                    <#shadow_name #type_generics as utoipa::__dev::ComposeSchema>::compose(generics)
                 }
             }
 

@@ -13,7 +13,8 @@ use axum::http::{HeaderValue, header};
 use axum::response::{IntoResponse, Response};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use utoipa::{IntoParams, ToSchema};
+use utoipa::IntoParams;
+use autoxide_spike_macros::Schema as ToSchema;
 use uuid::Uuid;
 
 use super::BodyNode;
