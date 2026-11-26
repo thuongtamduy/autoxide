@@ -768,7 +768,8 @@ async fn dong_lan_chay_cung_luc_worker_nhan() {
             );
             closed.unwrap();
             worked.unwrap();
-            let done = harness.service.get_run(&harness.tenant, &harness.owner, run.id).await.unwrap();
+            let done =
+                harness.service.get_run(&harness.tenant, &harness.owner, run.id).await.unwrap();
             let failed = run_failed_events(&harness).await - failed_before;
             let tagged = harness.count(|c| &c.tagged) - tagged_before;
             match done.status.as_str() {

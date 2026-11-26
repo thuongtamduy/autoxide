@@ -18,7 +18,10 @@ impl Principal {
         self.require_any_of(names.iter().map(String::as_str))
     }
 
-    fn require_any_of<'a>(&self, names: impl Iterator<Item = &'a str> + Clone) -> Result<(), Error> {
+    fn require_any_of<'a>(
+        &self,
+        names: impl Iterator<Item = &'a str> + Clone,
+    ) -> Result<(), Error> {
         if names.clone().any(|name| self.allows(name)) {
             return Ok(());
         }
