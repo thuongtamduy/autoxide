@@ -107119,7 +107119,7 @@
     },
     "/api/v1/auth/all-api-keys/{id}": {
       "delete": {
-        "description": "Requires `auth.api_keys.manage`. The key stops working at once; the audit log records who\nrevoked it.",
+        "description": "Requires `auth.api_keys.manage`, and every permission of the key's owner when the key is\nsomeone else's. The key stops working at once; the audit log records who revoked it.",
         "operationId": "auth_revoke_any_api_key",
         "parameters": [
           {
@@ -107180,7 +107180,7 @@
                 }
               }
             },
-            "description": "Missing permission `auth.api_keys.manage`; code `permission_denied`."
+            "description": "Missing permission `auth.api_keys.manage` (code `permission_denied`), or the key's owner has permissions you do not have (code `auth.target_has_more_permissions`)."
           },
           "404": {
             "content": {
@@ -107336,7 +107336,7 @@
     },
     "/api/v1/auth/api-keys": {
       "get": {
-        "description": "Any signed-in user. Newest first unless `order=asc`. Secrets are never listed.",
+        "description": "Any signed-in user. Newest first unless `order=asc`. Secrets are never listed. Called with\nan API key, the list holds only that key.",
         "operationId": "auth_list_api_keys",
         "parameters": [
           {
@@ -107604,7 +107604,7 @@
     },
     "/api/v1/auth/api-keys/{id}": {
       "delete": {
-        "description": "The key stops working at once.",
+        "description": "The key stops working at once. Called with an API key, only that same key can be revoked (a\nleaked key can switch itself off); any other id answers `404`.",
         "operationId": "auth_revoke_api_key",
         "parameters": [
           {
@@ -107665,7 +107665,7 @@
                 }
               }
             },
-            "description": "You have no key with this id; code `auth.api_key_not_found`."
+            "description": "You have no key with this id, or the request used another API key; code `auth.api_key_not_found`."
           },
           "default": {
             "content": {

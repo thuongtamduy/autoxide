@@ -383,12 +383,13 @@ fn api_keys(state: &Arc<HttpState>) -> Vec<Tool> {
     vec![
         Tool::new(
             "list_api_keys",
-            "List your API keys (never their secrets); follow `pagination.next_cursor` for more.",
+            "List your API keys (never their secrets); called with an API key, only that key. Follow \
+             `pagination.next_cursor` for more.",
             move |tenant: TenantContext, principal: Principal, input: PageInput| {
                 let state = list.clone();
                 async move {
                     let page =
-                        state.api_keys.list(&tenant, principal.user_id(), &input.page()?).await?;
+                        state.api_keys.list_own(&tenant, &principal, &input.page()?).await?;
                     Ok::<Page<ApiKeyResponse>, Error>(page.map(ApiKeyResponse::from))
                 }
             },
@@ -429,7 +430,8 @@ fn api_keys(state: &Arc<HttpState>) -> Vec<Tool> {
         .returns_secret(),
         Tool::new(
             "revoke_api_key",
-            "Revoke one of your API keys; it stops working at once.",
+            "Revoke one of your API keys; it stops working at once. Called with an API key, only that \
+             same key can be revoked.",
             move |tenant: TenantContext, principal: Principal, input: IdInput| {
                 let state = revoke.clone();
                 async move {

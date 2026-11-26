@@ -375,9 +375,33 @@ impl ApiKeyService {
         user_id: Uuid,
         page: &PageRequest,
     ) -> Result<Page<ApiKey>, Error> {
+        self.list_where(tenant, user_id, None, page).await
+    }
+
+    /// Key của bên gọi (`GET /me/api-keys`, tool `list_api_keys`). Gọi bằng API key: chỉ thấy chính key đó — key quyền
+    /// thấp không dò được tên, quyền, phạm vi của các key khác của cùng chủ (UT-2).
+    pub(crate) async fn list_own(
+        &self,
+        tenant: &TenantContext,
+        caller: &Principal,
+        page: &PageRequest,
+    ) -> Result<Page<ApiKey>, Error> {
+        self.list_where(tenant, caller.user_id(), caller.api_key_id(), page).await
+    }
+
+    async fn list_where(
+        &self,
+        tenant: &TenantContext,
+        user_id: Uuid,
+        only: Option<Uuid>,
+        page: &PageRequest,
+    ) -> Result<Page<ApiKey>, Error> {
         let connection = tenant.database().read();
-        let select =
+        let mut select =
             api_key::Entity::find().filter(api_key::Column::UserId.eq(user_id)).scoped(tenant);
+        if let Some(only) = only {
+            select = select.filter(api_key::Column::Id.eq(only));
+        }
         let page = fetch_page(select, api_key::Column::Id, |row| row.id, page, connection).await?;
         let mut permissions =
             permissions_of(connection, tenant, page.data.iter().map(|row| row.id)).await?;
@@ -432,6 +456,17 @@ impl ApiKeyService {
         id: Uuid,
     ) -> Result<(), Error> {
         caller.require(&crate::permissions::API_KEYS_MANAGE)?;
+        // Key của người khác: bên gọi phải có mọi permission chủ key có (như khoá, xoá tài khoản — D-079), không thì
+        // người quản lý key quyền thấp tắt được key của người quyền cao hơn (UT-2). Không thấy key: 404 như cũ.
+        let owner = api_key::Entity::find_by_id(id)
+            .scoped(tenant)
+            .one(tenant.database().read())
+            .await?
+            .ok_or_else(|| api_key_not_found(id))?
+            .user_id;
+        if owner != caller.user_id() {
+            self.roles.require_covers(tenant, caller, owner).await?;
+        }
         self.revoke_where(tenant, caller, id, None).await
     }
 
@@ -442,6 +477,13 @@ impl ApiKeyService {
         caller: &Principal,
         id: Uuid,
     ) -> Result<(), Error> {
+        // Gọi bằng API key: chỉ thu hồi được chính key đó (key lộ tự tắt được), không thu hồi key khác của cùng chủ —
+        // key quyền tối thiểu không được tắt key quyền cao hơn (UT-2). Key khác: 404 như key không có.
+        if let Some(own) = caller.api_key_id()
+            && own != id
+        {
+            return Err(api_key_not_found(id));
+        }
         self.revoke_where(tenant, caller, id, Some(caller.user_id())).await
     }
 
