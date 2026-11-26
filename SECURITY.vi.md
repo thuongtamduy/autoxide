@@ -40,6 +40,9 @@ nội bộ có AI hỗ trợ, không phải kiểm toán của một bên thứ 
 hiện kèm mức độ và cách sửa, cùng phần chưa rà được ghi ở
 [`docs/security/review-2026-11.md`](docs/security/review-2026-11.md) (tiếng Anh).
 
+Mô hình mối đe doạ của core — các ranh giới tin cậy, control ở từng ranh giới, việc còn mở và trọng tâm đề xuất cho
+người kiểm thử bên ngoài — nằm ở [`docs/THREAT_MODEL.vi.md`](docs/THREAT_MODEL.vi.md).
+
 ## Báo lỗ hổng
 
 **Đừng mở issue, pull request hay discussion công khai cho một vấn đề bảo mật.**

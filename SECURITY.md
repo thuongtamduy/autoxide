@@ -40,6 +40,9 @@ It was an **internal review carried out with AI assistance, not an audit by an i
 party**. The scope, the method, every finding with its severity and fix, and the parts not yet
 covered are in [`docs/security/review-2026-11.md`](docs/security/review-2026-11.md).
 
+The threat model of the core — trust boundaries, the controls at each one, open items and suggested focus areas
+for outside testers — is in [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md).
+
 ## Reporting a vulnerability
 
 **Do not open a public issue, pull request or discussion for a security problem.**
