@@ -245,6 +245,33 @@ chỉ số của G9 đạt ngưỡng.
       tool MCP, schema `x-*` của OpenAPI; quy tắc thêm / đổi / bỏ, cách khai bản cũ sắp bỏ, test giữ hợp đồng (như api-diff)
 - [ ] Thời gian chạy thử trước 1.0: phát hành `1.0.0-rc.N` cho người ngoài dùng 2–4 tuần, kênh nhận phản hồi, tiêu chí
       chốt (không còn lỗi hợp đồng mở); chỉ sửa lỗi trong thời gian này
+- [ ] Chạy thử vòng 1 bằng agent đóng vai người dùng (`docs/trials/rc-trial-r1/`, agent đóng vai, không phải người thật) —
+      các mục dưới đây đều có mã UT-x trong báo cáo; xong hết thì chạy vòng 2 trên `1.0.0-rc.1`
+  - [ ] UT-1 (chặn): giao hàng không ghi dòng `sale` vào kho — `on_hand` không giảm, reservation vẫn `confirmed`, đơn vẫn
+        `unfulfilled` sau `delivered`; có test chạy trên cả hai database; chạm tiền / kho nên qua kiểm độc lập
+  - [ ] UT-2 (chặn): tool MCP `auth.revoke_api_key` cho key quyền tối thiểu thu hồi key khác của cùng người dùng; ghi rõ ai
+        được thu hồi (chính nó, hay cần permission riêng) và test; chạm bảo mật nên qua kiểm độc lập
+  - [ ] UT-3: đường chạy bằng binary không Docker cho người mới: README trỏ tới DEPLOY.md mục B, hai secret ở bước
+        `.env`, `migrate up` trước `serve`, `AUTOXIDE_HTTP_ADDRESS`, mục "binary + PostgreSQL từ đầu", một ví dụ GET có
+        dữ liệu; `config` cảnh báo biến `AUTOXIDE_*` lạ; lỗi đọc `.env` nêu tên biến
+  - [ ] UT-4: thử luồng bán hàng khi chưa có tài khoản nhà cung cấp thật: cách chính thức hoàn tất thanh toán giả trong
+        sandbox, mục "thử không cần tài khoản thật" (chế độ multi, `tenant create`, header `Autoxide-Tenant`), dựng
+        cửa hàng trong sandbox; `shop.md` và `PROMOTIONS.md` thêm bước còn thiếu (phí ship thủ công, hồ sơ thuế, dãy hoá
+        đơn, tạo mã, tỉnh thông báo, luật giá tham chiếu, Order-Token của khách vãng lai)
+  - [ ] UT-5: tool MCP đủ để agent làm việc nhiều bước: mô tả cho mọi tham số (gate kiểm), `catalog.list_price_lists`,
+        kiểm `tax_category`, giá trị lọc sai (`readiness`, `module`, `subject`) báo lỗi, `version` nhận cả hai dạng, thông
+        báo `precondition_failed` riêng cho MCP, ẩn tool luôn lỗi với API key, cách idempotency của MCP ghi trong `mcp.md`,
+        lỗi `Idempotency-Key` trùng thành lỗi tool, gom lỗi của `invoices.create_draft`, tên key trong audit
+  - [ ] UT-6: `payment_id` của checkout / `payment-link` dùng được ở API ledger; header `Idempotent-Replayed` cho checkout
+        và huỷ đơn khách; `payment-link` gọi lại sau lần lỗi; cách gỡ khoản `needs_review`
+  - [ ] UT-7: thời gian build lần đầu của module ngoài repo (đo ~30 phút debug trên 4 lõi): hướng dẫn nêu con số, đường dùng
+        bản dựng sẵn hay cache, một cách gọi `check-module`; đo lại cho G9 trên máy rảnh
+  - [ ] UT-8: thông báo và log cho người vận hành: `--steps 0`, log backup / restore chỉ tóm tắt, `migrate up` tóm tắt,
+        log drain không để mức ERROR, `tenant_id` lặp, lỗi kết nối database nêu nguyên nhân gốc, WARN SMTP chỉ ở lệnh dùng
+        tới, `autoxide backup create` sửa thành `backup <thư mục>`, chữ "required" của `AUTOXIDE_AUTH_TOKEN_SECRET`
+  - [ ] UT-9: tài liệu rate limit khớp hành vi (120/phút/key, thông báo nói key, key đã thu hồi ra 401); bỏ ID quyết định
+        nội bộ ("D-225") khỏi dữ liệu công khai của `promotions`; sửa `sandbox.md` (số hoá đơn) và README của SDK (import,
+        header tenant)
 - [ ] Chính sách hỗ trợ dài hạn: bản 1.x nhận vá bảo mật bao lâu, bản lớn trước còn được hỗ trợ bao lâu khi bản lớn mới ra,
       quy trình vá ngược; ghi vào `docs/COMPATIBILITY.md` và `SECURITY.md` (EN + VI)
 - [ ] Trang tài liệu có phiên bản: website tài liệu chính thức (hướng dẫn, tham chiếu API sinh từ OpenAPI, MCP, docs.rs),
