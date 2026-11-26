@@ -81,6 +81,21 @@ pub(super) struct McpCatalog {
 }
 
 /// The path of the dedicated MCP endpoint of module `module`.
+/// Names of the modules that have an MCP endpoint (`/mcp/<module>`): at least one tool, resource or prompt.
+pub(super) fn endpoint_modules(
+    tools: &[Tool],
+    resources: &[crate::mcp::McpResource],
+    prompts: &[crate::mcp::Prompt],
+) -> std::collections::BTreeSet<String> {
+    let prefix = |name: &str| name.split('.').next().unwrap_or_default().to_owned();
+    tools
+        .iter()
+        .map(|tool| prefix(tool.name()))
+        .chain(resources.iter().map(|resource| resource.module().to_owned()))
+        .chain(prompts.iter().map(|prompt| prefix(prompt.name())))
+        .collect()
+}
+
 pub(super) fn module_path(module: &str) -> String {
     format!("{MCP_PATH}/{module}")
 }
@@ -147,7 +162,10 @@ async fn authenticate(
         }
         Err(error) => {
             let mut response = error.into_response();
-            if response.status().as_u16() == 401 {
+            // Lỗi đã mang challenge riêng (token sai audience…) thì giữ; lớp OAuth thêm `resource_metadata`.
+            if response.status().as_u16() == 401
+                && !response.headers().contains_key(header::WWW_AUTHENTICATE)
+            {
                 response
                     .headers_mut()
                     .insert(header::WWW_AUTHENTICATE, HeaderValue::from_static("Bearer"));
@@ -195,13 +213,7 @@ fn describe(tool: &Tool) -> Value {
 impl McpServer {
     /// The modules that have at least one tool, resource or prompt, by name.
     fn modules(&self) -> std::collections::BTreeSet<String> {
-        let prefix = |name: &str| name.split('.').next().unwrap_or_default().to_owned();
-        self.tools
-            .iter()
-            .map(|tool| prefix(tool.name()))
-            .chain(self.resources.iter().map(|resource| resource.module().to_owned()))
-            .chain(self.prompts.iter().map(|prompt| prefix(prompt.name())))
-            .collect()
+        endpoint_modules(&self.tools, &self.resources, &self.prompts)
     }
 
     /// A copy with only the tools, resources and prompts of `module` (for `/mcp/<module>`).
@@ -279,6 +291,16 @@ impl McpServer {
         let message =
             body.get("message").and_then(Value::as_str).unwrap_or("invalid request").to_owned();
         RpcError::invalid_params(message).with_data(body)
+    }
+
+    /// Remembers an `insufficient_scope` challenge: the HTTP answer becomes 403 with it.
+    fn note_scope_challenge(&self, caller: &Caller, error: &Error) {
+        if let Some(challenge) =
+            error.challenge().filter(|value| value.contains("insufficient_scope"))
+            && let Ok(mut slot) = caller.scope_challenge.lock()
+        {
+            *slot = Some(challenge.to_owned());
+        }
     }
 
     /// Turns a tool error into an error result body that the agent can read (`code`, `message`, `errors`).
@@ -363,6 +385,23 @@ impl McpServer {
         caller: &Caller,
     ) -> Result<Map<String, Value>, RpcError> {
         let name = params.get("name").and_then(Value::as_str).unwrap_or_default();
+        // Token OAuth thiếu scope cho permission người dùng CÓ: trả 403 `insufficient_scope` để client xin người dùng
+        // duyệt thêm (step-up, D-20261126-mcp-oauth) thay vì "không có tool" — tool vẫn ẩn khỏi `tools/list`.
+        if let Some(refusal) = self
+            .tools
+            .iter()
+            .find(|tool| tool.name() == name && !tool.allows(&caller.principal))
+            .and_then(|tool| tool.authorize(&caller.principal).err())
+            .filter(|error| {
+                error.challenge().is_some_and(|value| value.contains("insufficient_scope"))
+            })
+        {
+            self.note_scope_challenge(caller, &refusal);
+            return Ok(protocol::tool_result(
+                self.failure_body(name, &refusal, caller.language),
+                true,
+            ));
+        }
         let tool = self
             .tools
             .iter()
@@ -419,6 +458,7 @@ impl McpServer {
         let mut result = match outcome {
             Ok(value) => protocol::tool_result(envelope(value), false),
             Err(error) => {
+                self.note_scope_challenge(caller, &error);
                 protocol::tool_result(self.failure_body(tool.name(), &error, caller.language), true)
             }
         };

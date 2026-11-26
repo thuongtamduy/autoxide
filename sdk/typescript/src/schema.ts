@@ -33911,6 +33911,61 @@ export interface paths {
       };
     };
   };
+  "/.well-known/oauth-authorization-server": {
+    /** Authorization server metadata. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Record<string, unknown>;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/.well-known/oauth-protected-resource": {
+    /** Protected resource metadata of the whole server. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Record<string, unknown>;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/.well-known/oauth-protected-resource/api/v1": {
+    /** Protected resource metadata of the REST API. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Record<string, unknown>;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/.well-known/oauth-protected-resource/mcp": {
+    /** Protected resource metadata of the MCP endpoint. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Record<string, unknown>;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/.well-known/oauth-protected-resource/mcp/{module}": {
+    /** Protected resource metadata of one module's MCP endpoint. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { module: string }; };
+      responses: {
+        200: Record<string, unknown>;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/address/provinces": {
     /** List the provinces. */
     get: {

@@ -38,6 +38,10 @@ pub(super) struct Caller {
     // `AtomicBool` thay vì `Cell<bool>`: tham chiếu tới nó sống qua `await`, nên phải dùng chung được giữa
     // các thread (`Sync`) — future của handler axum phải `Send`.
     pub(super) secret: AtomicBool,
+    /// A tool was refused because the OAuth grant lacks a permission the user has: the answer becomes HTTP 403
+    /// with this `insufficient_scope` challenge, so the client can ask the user for more (MCP authorization,
+    /// "Runtime Insufficient Scope Errors").
+    pub(super) scope_challenge: std::sync::Mutex<Option<String>>,
 }
 
 /// Serves one HTTP request to `/mcp` or `/mcp/<module>` (already past the authentication layer).
@@ -113,6 +117,7 @@ pub(super) async fn handle(server: McpServer, request: Request) -> Response {
         ),
         modern,
         secret: AtomicBool::new(false),
+        scope_challenge: std::sync::Mutex::new(None),
     };
 
     let outcome = server.dispatch(&method, params, &caller).await;
@@ -125,7 +130,13 @@ pub(super) async fn handle(server: McpServer, request: Request) -> Response {
         }
         Err(error) => (error_status(&error, modern), error.into_message(Some(id))),
     };
+    let challenge = caller.scope_challenge.lock().ok().and_then(|mut slot| slot.take());
+    let status = if challenge.is_some() { StatusCode::FORBIDDEN } else { status };
     let mut response = json_response(status, &message);
+    // Lớp OAuth của kernel thêm `resource_metadata` vào challenge này.
+    if let Some(value) = challenge.and_then(|value| HeaderValue::from_str(&value).ok()) {
+        response.headers_mut().insert(header::WWW_AUTHENTICATE, value);
+    }
     if caller.secret.load(std::sync::atomic::Ordering::Relaxed) {
         // Kết quả có secret chỉ trả một lần: không cho ai lưu lại response (D-149).
         response.headers_mut().insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));

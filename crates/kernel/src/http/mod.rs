@@ -55,6 +55,7 @@ mod llms;
 mod log;
 mod mcp;
 mod metrics;
+mod oauth;
 mod openapi;
 mod openapi_modules;
 mod permission_gate;
@@ -136,6 +137,8 @@ pub(crate) use mcp::{
     tool_allowed as mcp_tool_allowed,
 };
 pub use metrics::metrics_routes;
+pub(crate) use oauth::admit_audience;
+pub use oauth::{AUTHORIZATION_SERVER_PATH, PROTECTED_RESOURCE_PATH};
 pub(crate) use openapi::untranslated_text;
 pub use openapi::{BEARER_AUTH, DOCS_PATH, OPENAPI_PATH, lint};
 pub use problem::StandardErrorBody;
@@ -192,6 +195,9 @@ pub struct Extras {
     pub modules: Vec<(&'static str, &'static str)>,
     /// Public URL of the API (`AUTOXIDE_HTTP_PUBLIC_URL`): `/llms.txt` links are absolute when set.
     pub public_url: Option<String>,
+    /// The OAuth authorization server a module published (step 71 G4): with `public_url` set, the kernel serves
+    /// the discovery documents and accepts OAuth access tokens issued for this server's resources.
+    pub authorization_server: Option<Arc<dyn crate::access::AuthorizationServer>>,
     /// Error message translations (default: to use only the kernel's translations use
     /// `Translations::new(Vec::new())`; empty means every error is in English).
     pub translations: Translations,
@@ -282,6 +288,15 @@ impl Extras {
         self
     }
 
+    /// Sets the OAuth authorization server a module published.
+    pub fn authorization_server(
+        mut self,
+        server: Option<Arc<dyn crate::access::AuthorizationServer>>,
+    ) -> Self {
+        self.authorization_server = server;
+        self
+    }
+
     /// Sets the kinds of records offline apps can keep in sync: `(module name, declaration)`.
     pub fn sync(mut self, sync: Vec<(&'static str, crate::sync::SyncResource)>) -> Self {
         self.sync = sync;
@@ -337,7 +352,19 @@ pub fn build(
         prompts: &extras.prompts,
     });
     let _ = llms_slot.set(llms_text.clone());
+    // Resource server của OAuth (bước 71 G4, D-20261126-mcp-oauth): tài liệu khám phá luôn có mặt khi có MCP (trả
+    // 404 khi chưa bật) để hợp đồng OpenAPI không đổi theo cấu hình.
+    let protected = Arc::new(oauth::ProtectedResources::new(
+        extras.public_url.clone(),
+        extras.tenancy.clone(),
+        extras.authorization_server.clone(),
+        mcp::endpoint_modules(&extras.tools, &resources, &extras.prompts).into_iter().collect(),
+    ));
     let module_documents = openapi_modules::ModuleDocuments::default();
+    let mut root = root;
+    if extras.authenticator.is_some() {
+        root = root.merge(oauth::routes(protected.clone()));
+    }
     let root = root
         .merge(home::routes(config.api_docs, extras.authenticator.is_some()))
         .merge(llms::routes(llms_text))
@@ -487,6 +514,10 @@ pub fn build(
         // `Principal` tìm nó.
         router = router.layer(Extension(authenticator));
     }
+    // Ngoài lớp đặt sổ database và bộ xác thực, trong lớp đọc địa chỉ client (cần `ForwardedHost`).
+    router = router.layer(middleware::from_fn(move |request: Request, next: Next| {
+        oauth::challenge(protected.clone(), request, next)
+    }));
 
     // `None` khi rate limiting bị tắt; lớp vẫn có mặt và cho mọi request đi qua.
     let body_limits = Arc::new(body_limit::BodyLimits::new(config.body_limit, &extras.body_limits));
