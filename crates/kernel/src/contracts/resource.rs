@@ -735,8 +735,10 @@ pub trait RecordHistory: Send + Sync {
     /// recorded): newest first unless `page` asks `asc`; the cursor is the ID of the last line
     /// (D-20261125-list-pages).
     ///
-    /// The default implementation reads every event through [`history`](Self::history) and cuts the page in
-    /// memory; a provider keeping a large log overrides it with a keyset page in its database.
+    /// The default implementation exists only so that providers written before this method keep compiling: it
+    /// reads every event through [`history`](Self::history) and cuts the page in memory, which costs as much as
+    /// the whole history on every page. Providers should override it with a keyset page in their database (the
+    /// `audit` module does).
     async fn history_page(
         &self,
         tenant: &TenantContext,

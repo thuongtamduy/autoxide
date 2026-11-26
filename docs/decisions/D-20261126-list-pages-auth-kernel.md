@@ -45,3 +45,10 @@ cần cùng hành vi trang với bảng có entity; quyền theo dòng không đ
 Đã cân nhắc: lọc quyền trong SQL cho trường tự định nghĩa (`target IN (…)`) — loại: loại con `<target>.<khoá>` của
 loại khai `with_subtypes` chỉ kiểm được trong code; đổi thứ tự hoạt động sang keyset (at, id) — loại: event audit có
 `occurred_at` khác lúc ghi, cần index mới ở `audit` và hai khoá con trỏ cho hai nguồn.
+
+Bổ sung theo vòng kiểm của phiên điều phối (26/11/2026): mặc định của `RecordHistory::history_page` giữ lại (D-038: hàm
+mới của trait công khai phải có cài đặt mặc định) nhưng doc nói rõ nó chỉ để tương thích, đọc hết rồi cắt; bên cài
+ghi đè bằng keyset. Các dòng `xtask/api-breaking-allow.json` cho `limit` của jobs / activity / devtools events trỏ về
+D-20261125-list-pages: tham số riêng của từng endpoint thay bằng tham số trang chung (cùng khoảng 1–200, mặc định 50),
+kiểu số đổi từ int64 sang int32 như mọi `limit` khác. Mỗi thay đổi hành vi có một dòng cũ → mới ở changelog
+`p9-list-pages-cluster-3a-behaviour.changed.md`.

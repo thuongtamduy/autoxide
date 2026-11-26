@@ -1,0 +1,11 @@
+- `GET /api/v1/kernel/whats-new` without `since`: before, the five newest versions; now every version, one page at a
+  time — send `limit=5` for the old answer.
+- `GET /api/v1/auth/me/identities`, `/auth/oidc-providers`, `/auth/oidc/providers`, `/auth/scim/group-mappings`:
+  before, oldest first; now newest first (`order=asc` for the old order).
+- `GET /api/v1/auth/roles/counts`: before, by role id (oldest first); now in the order of `/auth/roles`.
+- `GET /api/v1/kernel/records/{kind}/{id}/activity`: before, ordered by `at`; now by when each line was recorded.
+- `GET /api/v1/kernel/custom-fields`: fields with the same `position` were ordered by key; now by id.
+- `limit` of `GET /api/v1/kernel/jobs`, `/kernel/records/{kind}/{id}/activity` and `/kernel/devtools/events`: before,
+  each endpoint's own parameter; now the shared paging parameter (1–200, default 50), with `cursor` for the next page.
+- `GET /api/v1/auth/support-grants`, `/kernel/approvals`, `/kernel/placements/migrations`, `/kernel/tenants/{id}/exports`
+  and `/kernel/records/{kind}/{id}/notes`: before, silently cut at 50 or 200 rows; now every row, page by page.
