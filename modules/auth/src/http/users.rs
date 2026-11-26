@@ -419,7 +419,7 @@ async fn delete_user(
     request_body = RegisterRequest,
     responses(
         (status = 201, description = "The account was created.", body = Data<UserResponse>),
-        (status = 403, description = "Self-registration of staff is turned off (code `auth.registration_disabled`), or the shop does not let customers create accounts (code `auth.customer_registration_closed`).", body = Problem),
+        (status = 403, description = "Self-registration of staff is turned off for this tenant (setting `auth.staff_registration`, otherwise the server's AUTOXIDE_AUTH_SELF_REGISTRATION; code `auth.registration_disabled`), or the shop does not let customers create accounts (code `auth.customer_registration_closed`).", body = Problem),
         (status = 409, description = "An account has this email; code `auth.email_taken`.", body = Problem),
         (status = 422, description = "A value is invalid, e.g. a password shorter than 12 characters; see `errors`.", body = Problem),
     )
@@ -459,7 +459,7 @@ async fn register(
     request_body = RegisterRequest,
     responses(
         (status = 202, description = "Accepted; a mail went to the email (confirm the new account, or a notice when it already had one).", body = Data<RegistrationResponse>),
-        (status = 403, description = "Self-registration of staff is turned off (code `auth.registration_disabled`), or the shop does not let customers create accounts (code `auth.customer_registration_closed`).", body = Problem),
+        (status = 403, description = "Self-registration of staff is turned off for this tenant (setting `auth.staff_registration`, otherwise the server's AUTOXIDE_AUTH_SELF_REGISTRATION; code `auth.registration_disabled`), or the shop does not let customers create accounts (code `auth.customer_registration_closed`).", body = Problem),
         (status = 422, description = "A value is invalid, e.g. a password shorter than 12 characters; see `errors`.", body = Problem),
     )
 )]
@@ -515,11 +515,18 @@ async fn registration_open(
                 "This shop does not let customers create accounts yet.",
             ));
         }
-    } else if !state.self_registration {
+    } else if !crate::settings::enabled_or(
+        state.orgs.as_ref(),
+        tenant,
+        &crate::settings::STAFF_REGISTRATION,
+        state.self_registration,
+    )
+    .await?
+    {
         return Err(Error::forbidden(
             "auth.registration_disabled",
-            "This server does not let people create their own accounts. Ask an administrator \
-             to create one for you.",
+            "Creating your own account is turned off here. Ask an administrator to create one \
+             for you.",
         ));
     }
     Ok(customer)

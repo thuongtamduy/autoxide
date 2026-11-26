@@ -7,8 +7,8 @@
 //!   request.
 //! - Counted like the limit per API key: in each process's memory (GCRA), or shared by every server through the
 //!   database with `AUTOXIDE_HTTP_RATE_LIMIT_STORE=database` (fixed one-minute windows taken in lots).
-//! - Counts only callers that are signed in (session, API key, MCP token) and act in their own tenant, on
-//!   every module's REST routes and every MCP tool call. A request without credentials or with a credential
+//! - Counts only callers that are signed in (session, API key, MCP token), against the tenant they act in
+//!   (their own, or one that delegated work to them), on every module's REST routes and every MCP tool call. A request without credentials or with a credential
 //!   that does not authenticate is never counted against a tenant, whatever tenant it names (`Autoxide-Tenant`,
 //!   `Host`): it only meets the limit per address, so nobody can drain a tenant's budget from outside, and
 //!   inbound webhooks and public routes are never refused for a tenant at its limit. Platform staff
@@ -156,8 +156,8 @@ pub(crate) fn tenant_rate_limited(wait: Duration) -> Error {
     .with_retry_after(seconds)
 }
 
-/// The tenant whose budget a call by `principal` uses: its own tenant; `None` for platform staff operating in
-/// another tenant and for support access.
+/// The tenant whose budget a call by `principal` uses: the tenant it acts in (its own, or one that delegated
+/// work to it); `None` for platform staff operating in another tenant and for support access.
 pub(crate) fn budget_tenant(principal: &Principal) -> Option<TenantId> {
     if principal.operator_from().is_some() || matches!(principal.access(), AccessPath::Support(_)) {
         return None;

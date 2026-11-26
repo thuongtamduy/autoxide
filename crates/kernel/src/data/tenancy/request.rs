@@ -109,8 +109,13 @@ fn normalize_host(host: &str) -> String {
 #[derive(Clone)]
 pub(crate) struct Authenticated(pub(crate) Principal);
 
-/// Authenticates the request with `authenticator` then checks the tenant (`multi` mode). The result is kept
-/// in the request's extensions.
+/// The failure of authenticating this request, kept so the layers and the handler do not authenticate (and count
+/// against the API key's limit) again.
+#[derive(Clone)]
+pub(crate) struct AuthenticationFailed(Arc<Error>);
+
+/// Authenticates the request with `authenticator` then checks the tenant (`multi` mode). The result, success or
+/// failure, is kept in the request's extensions.
 pub(crate) async fn authenticate(
     authenticator: &Arc<dyn Authenticator>,
     parts: &mut Parts,
@@ -118,6 +123,22 @@ pub(crate) async fn authenticate(
     if let Some(Authenticated(principal)) = parts.extensions.get::<Authenticated>() {
         return Ok(principal.clone());
     }
+    if let Some(AuthenticationFailed(error)) = parts.extensions.get::<AuthenticationFailed>() {
+        return Err(error.replay());
+    }
+    match authenticate_once(authenticator, parts).await {
+        Ok(principal) => Ok(principal),
+        Err(error) => {
+            parts.extensions.insert(AuthenticationFailed(Arc::new(error.replay())));
+            Err(error)
+        }
+    }
+}
+
+async fn authenticate_once(
+    authenticator: &Arc<dyn Authenticator>,
+    parts: &mut Parts,
+) -> Result<Principal, Error> {
     let hint = TenantHint::of_request(&parts.headers, &parts.extensions);
     let authorization =
         parts.headers.get(header::AUTHORIZATION).and_then(|value| value.to_str().ok());
@@ -329,5 +350,34 @@ mod tests {
         let hint = TenantHint::new(Some(" ".to_owned()), Some(" acme ".to_owned()));
         assert_eq!((hint.host(), hint.tenant()), (None, Some("acme")));
         assert_eq!(OPERATE, crate::builtin::TENANTS_OPERATE.name());
+    }
+
+    // Đếm số lần được gọi; luôn từ chối.
+    struct Refuses(std::sync::atomic::AtomicUsize);
+
+    #[async_trait::async_trait]
+    impl Authenticator for Refuses {
+        async fn authenticate(&self, _: Option<&str>, _: &TenantHint) -> Result<Principal, Error> {
+            self.0.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            Err(Error::unauthenticated("wrong", "The token is wrong."))
+        }
+    }
+
+    // Xác thực thất bại được nhớ trong request: lớp và handler gọi lại không xác thực lần nữa (không đếm lại vào
+    // giới hạn theo API key), và nhận cùng lỗi.
+    #[tokio::test]
+    async fn xac_thuc_that_bai_duoc_nho_trong_request() {
+        let refuses = Arc::new(Refuses(std::sync::atomic::AtomicUsize::new(0)));
+        let authenticator: Arc<dyn Authenticator> = refuses.clone();
+        let (mut parts, ()) = axum::http::Request::get("/")
+            .header(header::AUTHORIZATION, "Bearer x")
+            .body(())
+            .unwrap()
+            .into_parts();
+        for _ in 0..3 {
+            let error = authenticate(&authenticator, &mut parts).await.err();
+            assert_eq!(error.map(|error| error.code().to_owned()).as_deref(), Some("wrong"));
+        }
+        assert_eq!(refuses.0.load(std::sync::atomic::Ordering::Relaxed), 1);
     }
 }

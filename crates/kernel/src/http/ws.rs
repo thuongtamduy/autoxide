@@ -335,6 +335,7 @@ impl Session {
     async fn authenticate(&mut self) -> Result<(), Error> {
         let mut parts = self.parts.clone();
         parts.extensions.remove::<crate::tenancy::request::Authenticated>();
+        parts.extensions.remove::<crate::tenancy::request::AuthenticationFailed>();
         self.principal = Principal::from_request_parts(&mut parts, &()).await?;
         Ok(())
     }

@@ -98,7 +98,7 @@ async fn ten_nut_trong_membership_cua_toi_va_client_config() {
         let config = app.get("/api/v1/kernel/client-config").send().await.unwrap();
         assert_eq!(
             config.json()["data"]["auth"],
-            json!({"login_link": true, "passkeys": false, "self_registration": false, "support_access_max_hours": 8}),
+            json!({"login_link": true, "passkeys": false, "passkey_rp_id": "", "self_registration": false, "support_access_max_hours": 8}),
             "{}",
             config.text()
         );

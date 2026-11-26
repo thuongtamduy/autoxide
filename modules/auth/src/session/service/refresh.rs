@@ -45,7 +45,7 @@ impl SessionService {
             return Err(crate::user::user_disabled());
         }
 
-        let expires_at = now + self.refresh_token_ttl;
+        let expires_at = now + self.refresh_token_ttl(tenant).await?;
         // Token mới mang theo thông tin của phiên.
         let started_at = row.session_started_at.unwrap_or(row.created_at);
         let authenticated_at = row.authenticated_at.unwrap_or(started_at);

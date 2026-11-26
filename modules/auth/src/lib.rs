@@ -34,6 +34,8 @@ mod http;
 mod invitation;
 mod links;
 mod login_link;
+#[cfg(test)]
+mod login_policy_tests;
 mod mfa;
 mod migration;
 mod oidc;
@@ -47,9 +49,12 @@ mod permissions;
 mod phone;
 #[cfg(test)]
 mod phone_tests;
+mod policy;
 mod privacy;
 mod reauth;
 mod recovery;
+#[cfg(test)]
+pub(crate) mod registration_tests;
 mod relocation;
 mod reset;
 mod resource;
@@ -187,7 +192,18 @@ impl Module for AuthModule {
     }
 
     fn client_config(&self) -> Result<Option<autoxide_kernel::module::ClientSection>, Error> {
-        self.config.as_ref().map_or(Ok(None), client_config::section)
+        let section = self.config.as_ref().map_or(Ok(None), client_config::section)?;
+        // Passkey và tự đăng ký là cấu hình theo khách: request xác định được khách thì lấy của khách.
+        Ok(match &self.state {
+            Some(state) => section.map(|section| {
+                section.per_tenant(Arc::new(client_config::TenantSignIn {
+                    passkeys: state.passkeys.clone(),
+                    orgs: state.orgs.clone(),
+                    self_registration: state.self_registration,
+                }))
+            }),
+            None => section,
+        })
     }
 
     fn configure(&mut self, reader: &mut ConfigReader<'_>) -> Result<(), Invalid> {
@@ -230,7 +246,14 @@ impl Module for AuthModule {
         let outbox = context.outbox()?;
         self.cleanup = Some(Arc::new(cleanup::Cleanup));
         self.administrator = Some(Arc::new(doctor::Administrator { databases: databases.clone() }));
-        let users = Arc::new(UserService::new(Passwords::new(), outbox.clone()));
+        // Chính sách đăng nhập theo khách (D-20261126-tenant-login-policy): đọc cài đặt ở nút gốc qua `organizations`.
+        let policy = policy::TenantPolicy::new(
+            context.require::<dyn autoxide_organizations::api::OrgDirectory>().ok(),
+        );
+        let users = Arc::new(UserService::new(
+            Passwords::new().with_policy(policy.clone()),
+            outbox.clone(),
+        ));
         let secret = match config.token_secret {
             Some(secret) => secret,
             None => {
@@ -248,32 +271,42 @@ impl Module for AuthModule {
         let mailer = context.require::<dyn Mailer>()?;
         let secrets = context.require::<autoxide_kernel::secret::SecretKey>()?;
 
-        let mfa = Arc::new(MfaService::new(
-            secrets.as_ref().clone(),
-            config.totp_issuer.clone(),
-            LoginThrottle::new(config.login_max_failures, config.login_lock)?,
-            outbox.clone(),
-        ));
-        let sessions = Arc::new(SessionService::new(
-            users.clone(),
-            access_tokens,
-            config.refresh_token_ttl,
-            throttle,
-            mfa.clone(),
-            outbox.clone(),
-            databases.clone(),
-        )?);
-        let passkeys = Arc::new(passkey::PasskeyService::new(
-            users.clone(),
-            sessions.clone(),
-            outbox.clone(),
-            config.passkey.as_ref(),
-        )?);
-        // Link trong thư theo khách: `kernel.public_url` và trang riêng `auth.link.*` (kernel kiểm host).
+        let mfa = Arc::new(
+            MfaService::new(
+                secrets.as_ref().clone(),
+                config.totp_issuer.clone(),
+                LoginThrottle::new(config.login_max_failures, config.login_lock)?,
+                outbox.clone(),
+            )
+            .with_policy(policy.clone()),
+        );
+        let sessions = Arc::new(
+            SessionService::new(
+                users.clone(),
+                access_tokens,
+                config.refresh_token_ttl,
+                throttle,
+                mfa.clone(),
+                outbox.clone(),
+                databases.clone(),
+            )?
+            .with_policy(policy),
+        );
+        // Link trong thư theo khách: `kernel.public_url` và trang riêng `auth.link.*` (kernel kiểm host); cũng đọc
+        // RP ID passkey theo khách (`auth.passkey_rp_id`, tên miền đã xác minh của khách).
         let links = context
             .require::<autoxide_kernel::tenancy::SiteLinks>()
             .map(|links| (*links).clone())
             .unwrap_or_default();
+        let passkeys = Arc::new(
+            passkey::PasskeyService::new(
+                users.clone(),
+                sessions.clone(),
+                outbox.clone(),
+                config.passkey.as_ref(),
+            )?
+            .with_links(links.clone()),
+        );
         let verifications = Arc::new(verify::EmailVerifications {
             users: users.clone(),
             sessions: sessions.clone(),
@@ -497,7 +530,7 @@ impl Module for AuthModule {
     }
 
     fn tenant_settings(&self) -> Vec<autoxide_kernel::tenancy::TenantSetting> {
-        let mut settings = vec![api_key::REQUIRE_APPROVAL, step_up::STEP_UP];
+        let mut settings = vec![api_key::REQUIRE_APPROVAL, step_up::STEP_UP, passkey::TENANT_RP_ID];
         settings.extend(links::ALL);
         settings
     }
