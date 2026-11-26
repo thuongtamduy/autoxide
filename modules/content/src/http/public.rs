@@ -489,8 +489,9 @@ pub(crate) struct PostsQuery {
     term_id: Option<Uuid>,
     /// Only posts by this author.
     author_id: Option<Uuid>,
-    /// Only posts whose title, summary or body contains this text, ignoring case and accents.
-    /// At most 200 characters.
+    /// Only posts whose title, summary or body contain every word of this text, ignoring case and
+    /// accents; a word of 3 letters or more also matches longer words that start with it (`lat` finds
+    /// "Đà Lạt"). Covers the 1,000 newest matching posts. At most 200 characters.
     q: Option<String>,
 }
 
@@ -507,6 +508,7 @@ pub(crate) struct PostsQuery {
     responses(
         (status = 200, description = "One page of published posts.", body = Page<PublicEntryResponse>),
         (status = 422, description = "A parameter is invalid; see `errors`.", body = Problem),
+        (status = 503, description = "The search by `q` took longer than 2 seconds and was stopped (`content.public_search_timeout`); try more specific words.", body = Problem),
     )
 )]
 pub(crate) async fn list_posts(
@@ -524,7 +526,7 @@ pub(crate) async fn list_posts(
         "locale",
         &mut problems,
     );
-    // Câu tìm dài vô hạn thành một câu `LIKE` đắt trên mọi bài, cho bất kỳ ai gọi.
+    // Câu tìm có trần độ dài như tìm công khai (chỉ mục từ chỉ dùng tối đa `TERMS_MAX` từ).
     let max = crate::ai::semantic::QUERY_MAX;
     if query.q.as_deref().is_some_and(|q| q.trim().chars().count() > max) {
         problems.push(

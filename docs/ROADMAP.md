@@ -554,8 +554,10 @@ thật (P7).
         phát event và worker xét lệnh dừng giữa hai lượt cả khi còn việc (tắt nhanh sau đợt tải)
   - [x] PT-15, poll outbox: tìm công khai có trần số lượt cùng lúc, theo địa chỉ và thời gian; lượt rảnh của bộ phát
         event và worker còn một câu `EXISTS` mỗi database (D-20261126-idle-polling)
-  - [ ] PT-15 triệt để: chỉ mục tìm chữ chạy trên cả hai database (FTS5 / `tsvector` sau một trait) thay cho
-        `LIKE '%q%'` quét mọi bài đã đăng — các chốt hiện có chỉ giữ máy chủ không nghẽn, mỗi lượt tìm vẫn quét
+  - [x] PT-15 triệt để: chỉ mục tìm chữ chạy trên cả hai database (FTS5 / `tsvector` sau trait `WordIndex`) thay cho
+        `LIKE '%q%'` ở danh sách bài, tìm công khai và gợi ý tìm; trần thời gian câu lệnh trên cả hai database;
+        nạp index một lần mỗi khoá; không trừ ngân sách khi phần ý nghĩa bị cắt; việc CPU bị huỷ cùng lượt tìm
+        (D-20261126-content-word-index)
   - [ ] PT-11, PT-12, PT-18 và chỗ vướng cho việc test (bộ mồi dữ liệu thương mại, tool MCP trỏ operationId REST,
         đếm câu SQL theo request) (PR 4, sau #516)
 

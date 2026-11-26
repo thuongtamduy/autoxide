@@ -8,6 +8,7 @@ pub(crate) mod preview;
 pub(crate) mod reading;
 pub(crate) mod redirects;
 pub(crate) mod schedules;
+pub(crate) mod words;
 
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
@@ -541,6 +542,7 @@ impl ContentService {
             body_schema_version: version.body_schema_version,
             plain_text: version.plain_text.clone(),
             search_key: version.search_key.clone(),
+            search_words: words::words(&version.search_key),
             word_count: version.word_count,
             reading_time_minutes: version.reading_time_minutes,
             featured_media_id: version.featured_media_id,

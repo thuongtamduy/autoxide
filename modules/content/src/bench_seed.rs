@@ -279,6 +279,7 @@ impl Seed {
                 body_schema_version: row.body_schema_version,
                 plain_text: row.plain_text.clone(),
                 search_key: row.search_key.clone(),
+                search_words: crate::publishing::words::words(&row.search_key),
                 word_count: row.word_count,
                 reading_time_minutes: row.reading_time_minutes,
                 featured_media_id: row.featured_media_id,

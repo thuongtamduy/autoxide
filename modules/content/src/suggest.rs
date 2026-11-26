@@ -2,7 +2,7 @@
 //! và trang đang công khai ở website, đúng ngôn ngữ. Đọc như trang công khai: bản đã đăng, không bị
 //! hạn chế (D-363), không `noindex`, hiện trên website (`on_site`, D-307).
 //!
-//! Lọc trong SQL bằng `search_key` (không dấu, gồm tiêu đề, tóm tắt và thân), rồi xếp hai tầng
+//! Lọc bằng chỉ mục từ của bản công khai (`publishing::words`: tiêu đề, tóm tắt và thân, không dấu), rồi xếp hai tầng
 //! trong ứng dụng: tiêu đề khớp đúng dấu trước, còn lại sau (D-202).
 
 use autoxide_kernel::error::Error;
@@ -13,6 +13,7 @@ use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
 
 use crate::entity::published;
 use crate::publishing::reading::on_site;
+use crate::publishing::words;
 
 /// Bài viết và trang đang công khai.
 pub(crate) struct Entries;
@@ -33,16 +34,23 @@ impl SuggestSource for Entries {
     ) -> Result<Vec<Suggestion>, Error> {
         // Lấy dư một ít để tầng "khớp đúng dấu" có chỗ chen lên trước khi cắt còn `limit`.
         let fetch = u64::from(limit).saturating_mul(2);
+        let read = tenant.database().read();
+        // Chỉ mục từ (PT-15, D-20261126-content-word-index) thay `LIKE '%q%'` trên mọi bài.
+        let matching = words::Matching { tenant: tenant.id().as_uuid(), locale, kind: None };
+        let ids = words::matching_ids(read, matching, &words::WordQuery::parse(q)).await?;
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
         let rows = published::Entity::find()
             .scoped(tenant)
             .filter(published::Column::RestrictedAt.is_null())
             .filter(published::Column::Noindex.eq(false))
             .filter(published::Column::Locale.eq(locale))
             .filter(on_site(&site.lineage_ids()))
-            .filter(search::contains(published::Column::SearchKey, q))
+            .filter(published::Column::EntryId.is_in(ids))
             .order_by_desc(published::Column::PublishedAt)
             .limit(fetch)
-            .all(tenant.database().read())
+            .all(read)
             .await?;
         Ok(rank(rows, q, limit))
     }
