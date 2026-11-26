@@ -65,7 +65,8 @@ async fn tac_gia_chuyen_muc_chuyen_huong_lich_dang_va_duyet_bai() {
         let news = entry(&app, "post", "Tin đầu tiên").await;
         let news = news["id"].as_str().unwrap().to_owned();
         let terms = json!({"term_ids": [term]});
-        write(&app, "PUT", &format!("/api/v1/content/entries/{news}/terms"), Some(terms), 200).await;
+        write(&app, "PUT", &format!("/api/v1/content/entries/{news}/terms"), Some(terms), 200)
+            .await;
         write(&app, "POST", &format!("/api/v1/content/entries/{news}/publish"), None, 200).await;
         expect(&app, "GET", public, ANONYMOUS, None, 200).await;
         write(&app, "DELETE", &path, None, 204).await;
