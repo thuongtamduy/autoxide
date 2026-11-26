@@ -1,6 +1,6 @@
 ## D-20261126-require-any-step-up · `require_any` đòi xác nhận lại chỉ khi mọi permission đang có đều cần — 2026-11-26 — agent quyết
 
-Chủ đề: Phân quyền, bảo mật
+Chủ đề: Xác thực, phân quyền, bảo mật
 
 Quyết định: thay đoạn về step-up của `Principal::require_any` trong D-20261126-permission-audit ("theo permission đầu
 tiên người gọi có"). `require_any(&[&A, &B, …])` cho qua khi người gọi dùng được ít nhất một permission trong danh
