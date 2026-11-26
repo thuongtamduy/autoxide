@@ -249,9 +249,7 @@ impl ContentService {
         principal.require(&CONTENT_READ)?;
         // Tạo trang cần quyền viết (`content.write` hay `content.write_own`, `create` kiểm theo nút): kiểm trước khi
         // tra mẫu để người chỉ đọc không biết mẫu nào tồn tại.
-        if !principal.allows(CONTENT_WRITE.name()) && !principal.allows(CONTENT_WRITE_OWN.name()) {
-            principal.require(&CONTENT_WRITE)?;
-        }
+        principal.require_any(&[&CONTENT_WRITE, &CONTENT_WRITE_OWN])?;
         let read = tenant.database().read();
         let template = self.find_page_template(read, tenant, principal, input.template_id).await?;
         let stored: Value =

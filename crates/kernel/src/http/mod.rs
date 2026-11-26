@@ -205,9 +205,8 @@ pub struct Extras {
     /// Syncable record kinds of the modules (`Modules::sync_resources`, step 69 P2): when present the
     /// kernel serves `/api/v1/kernel/sync/...` (a write batch runs commands through these modules' routes).
     pub sync: Vec<(&'static str, crate::sync::SyncResource)>,
-    /// Test audits only: build without the permission layer (see [`Extras::without_permission_gate`]).
-    #[doc(hidden)]
-    pub without_permission_gate: bool,
+    // Chỉ bật được qua `without_permission_gate` (feature `permission-audit`, testkit); riêng tư để không ai đặt thẳng.
+    without_permission_gate: bool,
 }
 
 impl Extras {
@@ -296,9 +295,9 @@ impl Extras {
     }
 
     /// Builds the routes WITHOUT the layer that enforces `x-permissions` (D-20261126-permission-gate), so a test can
-    /// see what the services themselves accept and check the documented lists against it. Never use it in a
-    /// running application.
-    #[doc(hidden)]
+    /// see what the services themselves accept and check the documented lists against it. Only available with the
+    /// test-only feature `permission-audit` (turned on by `autoxide-testkit`); never use it in a running application.
+    #[cfg(feature = "permission-audit")]
     pub fn without_permission_gate(mut self) -> Self {
         self.without_permission_gate = true;
         self

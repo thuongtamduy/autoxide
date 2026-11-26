@@ -48,6 +48,8 @@ const RUNNING_LEASE_MINUTES: i64 = 15;
 /// Trạng thái của lần chạy.
 pub(crate) const QUEUED: &str = "queued";
 pub(crate) const RUNNING: &str = "running";
+/// Số lần chạy đóng trong một câu UPDATE (`close_pending_runs`).
+const CLOSE_BATCH: usize = 500;
 pub(crate) const WAITING: &str = "waiting";
 pub(crate) const AWAITING_APPROVAL: &str = "awaiting_approval";
 pub(crate) const SUCCEEDED: &str = "succeeded";
@@ -288,32 +290,41 @@ impl Automations {
         rule_id: Uuid,
         status: &str,
     ) -> Result<(), Error> {
-        let pending = run::Entity::find()
-            .filter(run::Column::RuleId.eq(rule_id))
-            .filter(run::Column::Status.is_in([QUEUED, WAITING, AWAITING_APPROVAL]))
-            .scoped(tenant)
-            .all(connection)
-            .await?;
+        // Khoá các lần chạy đang chờ (Postgres `FOR UPDATE`, theo thứ tự id; SQLite: transaction ghi đã giữ cả
+        // database) rồi đóng bằng MỘT câu UPDATE. Worker nhận lần chạy (`claim`) cùng lúc phải chờ khoá, rồi thấy trạng
+        // thái đã đổi và bỏ qua; lần chạy worker nhận trước thì không còn ở trạng thái chờ nên không bị khoá, không bị
+        // ghi đè — runner tự dừng nó trước bước kế tiếp. Mỗi lần chạy bị đóng đúng một event `RunFailed`.
+        let pending = autoxide_kernel::rows::lock(
+            connection,
+            run::Entity::find()
+                .filter(run::Column::RuleId.eq(rule_id))
+                .filter(run::Column::Status.is_in([QUEUED, WAITING, AWAITING_APPROVAL]))
+                .scoped(tenant),
+            run::Column::Id,
+        )
+        .await?;
+        if pending.is_empty() {
+            return Ok(());
+        }
         let error = rule_not_active(status);
-        for run in pending {
-            // Một câu UPDATE có điều kiện trạng thái: lần chạy vừa được worker nhận (`running`) giữa lúc đọc và lúc ghi
-            // không bị ghi đè — runner tự dừng nó trước bước kế tiếp.
-            let at = now();
-            let closed = run::Entity::update_many()
+        let at = now();
+        // Chia lô: mỗi id là một tham số của câu lệnh; SQLite nhận tối đa 32766, Postgres 65535 tham số — luật có
+        // hàng chục nghìn lần chạy chờ vẫn đóng được, trong cùng transaction.
+        for batch in pending.chunks(CLOSE_BATCH) {
+            run::Entity::update_many()
                 .col_expr(run::Column::Status, Expr::value(FAILED))
                 .col_expr(run::Column::ErrorCode, Expr::value(error.code()))
                 .col_expr(run::Column::ErrorMessage, Expr::value(error.message()))
                 .col_expr(run::Column::FinishedAt, Expr::value(Some(at)))
                 .col_expr(run::Column::ResumeAt, Expr::value(Option::<Timestamp>::None))
                 .col_expr(run::Column::UpdatedAt, Expr::value(at))
-                .filter(run::Column::Id.eq(run.id))
+                .filter(run::Column::Id.is_in(batch.iter().map(|run| run.id)))
                 .filter(run::Column::Status.is_in([QUEUED, WAITING, AWAITING_APPROVAL]))
                 .scoped(tenant)
                 .exec(connection)
                 .await?;
-            if closed.rows_affected == 0 {
-                continue;
-            }
+        }
+        for run in pending {
             let failure = json!({
                 "run_id": run.id,
                 "rule_id": run.rule_id,
