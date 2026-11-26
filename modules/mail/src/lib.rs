@@ -84,6 +84,12 @@ impl Module for MailModule {
         ]
     }
 
+    // Tách / gộp khách (bước 38): sổ dội không đi theo — khách mới học lại từ lần dội kế (gộp mà mang theo thì đụng
+    // khoá duy nhất (khách, địa chỉ) khi hai khách cùng có một địa chỉ).
+    fn relocation(&self) -> autoxide_kernel::tenancy::Relocation {
+        autoxide_kernel::tenancy::Relocation::new().ephemeral(&["mail_bounces"])
+    }
+
     fn permissions(&self) -> Vec<autoxide_kernel::access::Permission> {
         vec![bounces::BOUNCES_READ, bounces::BOUNCES_MANAGE]
     }

@@ -418,8 +418,8 @@ trị (secret được giấu) và báo mọi vấn đề cùng một lượt.
 Khi máy chủ nhận từ chối hẳn chính địa chỉ người nhận lúc gửi — SMTP `5xx` với mã mở rộng `5.1.1`
 (không có hộp thư), `5.1.2` (không có tên miền), `5.1.3` (địa chỉ sai), `5.1.6` (hộp thư đã chuyển) hay
 `5.1.10` (tên miền không nhận thư) — địa chỉ có một bản ghi thư bị dội ở khách của nó. Lỗi của bên gửi
-(`5.1.7`, `5.1.8`, địa chỉ người gửi sai hay tài khoản SMTP bị khoá), hộp thư đầy, thư quá cỡ, hay câu trả
-lời không có mã mở rộng không được tính, nên cấu hình gửi sai không bao giờ làm chặn người nhận. Mỗi 24
+(`5.1.7`, `5.1.8`, địa chỉ người gửi sai hay tài khoản SMTP bị khoá), hộp thư bị khoá (`5.2.1`), hộp thư đầy
+(`5.2.2`), thư quá cỡ (`5.2.3`), hay câu trả lời không có mã mở rộng không được tính, nên cấu hình gửi sai không bao giờ làm chặn người nhận. Mỗi 24
 giờ tính tối đa một lần: sau `AUTOXIDE_MAIL_HARD_BOUNCE_LIMIT` (mặc định 3) lần được tính, địa chỉ bị
 **chặn** ở riêng khách đó: thư mới tới nó — kể cả thư đặt lại mật khẩu — không được gửi, và mỗi thư bị bỏ được đếm trên
 bản ghi kèm nguồn (vd `auth.password_reset`), nên câu hỏi "vì sao người này không nhận được thư" có câu

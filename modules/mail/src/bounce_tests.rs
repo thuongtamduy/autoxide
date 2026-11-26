@@ -160,8 +160,8 @@ async fn hai_lan_doi_cung_luc_khong_tao_hai_dong() {
     TestDatabase::run(async |test| {
         let app = TestApp::builder(test).tenant("a").module(crate::module()).build().await.unwrap();
         let a = app.tenant("a").await.unwrap();
-        // Ngưỡng 1: đúng một trong bốn lần dội cùng lúc được tính và làm chặn.
-        let service = std::sync::Arc::new(bounces(1));
+        // Ngưỡng 2: bốn lần dội cùng lúc chỉ được tính MỘT lần (cách nhau chưa đủ 24 giờ), nên chưa chặn.
+        let service = std::sync::Arc::new(bounces(2));
         let address = "race@example.com";
         let tasks: Vec<_> = (0..4)
             .map(|_| {
@@ -175,7 +175,7 @@ async fn hai_lan_doi_cung_luc_khong_tao_hai_dong() {
                 suppressed += 1;
             }
         }
-        assert_eq!(suppressed, 1, "exactly one bounce crosses the limit");
+        assert_eq!(suppressed, 0, "four bounces at once count as one strike");
         let owner =
             autoxide_kernel::access::Principal::with_all_permissions(uuid::Uuid::from_u128(1))
                 .in_tenant(a.id());
@@ -186,7 +186,7 @@ async fn hai_lan_doi_cung_luc_khong_tao_hai_dong() {
             .unwrap()
             .data;
         assert_eq!(rows.len(), 1);
-        assert_eq!(rows[0].row.hard_count, 4);
+        assert_eq!((rows[0].row.hard_count, rows[0].row.strikes), (4, 1));
     })
     .await
     .unwrap();
