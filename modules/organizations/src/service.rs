@@ -15,13 +15,13 @@
 use autoxide_kernel::access::{OrgTarget, Principal};
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::{Actor, Outbox};
-use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
+use autoxide_kernel::pagination::{Page, PageRequest, SortValue, fetch_page, fetch_page_by};
 use autoxide_kernel::search::{self, fold};
 use autoxide_kernel::tenancy::{OrgId, OrgTree, ScopeExt, TenantContext, root_immutable, root_of};
 use autoxide_kernel::time::Timestamp;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, PaginatorTrait,
-    QueryFilter, QueryOrder, Set, SqlErr,
+    QueryFilter, Set, SqlErr,
 };
 use serde_json::{Value, json};
 use uuid::Uuid;
@@ -569,18 +569,28 @@ impl OrgService {
     }
 
     /// Mọi loại nút của khách, theo mã. Cần `organizations.units.read` ở bất kỳ độ sâu nào.
+    /// Loại nút của khách theo mã, keyset trong database. Bảng không có cột ID riêng: khoá chính
+    /// (`tenant_id`, `code`) và mọi câu lọc một khách, nên mã đã duy nhất trong câu — cột phụ phá hoà
+    /// của keyset là `tenant_id` (bằng nhau trên mọi dòng, không bao giờ quyết thứ tự; cursor chỉ mang
+    /// ID của chính khách gọi). Index: khoá chính (`tenant_id`, `code`).
     pub(crate) async fn list_types(
         &self,
         tenant: &TenantContext,
         principal: &Principal,
-    ) -> Result<Vec<UnitTypeRow>, Error> {
+        page: &PageRequest,
+    ) -> Result<Page<UnitTypeRow>, Error> {
         principal.require(&UNITS_READ)?;
         self.ensure_root(tenant).await?;
-        Ok(unit_type::Entity::find()
-            .scoped(tenant)
-            .order_by_asc(unit_type::Column::Code)
-            .all(tenant.database().read())
-            .await?)
+        fetch_page_by(
+            unit_type::Entity::find().scoped(tenant),
+            unit_type::Column::Code,
+            |row| SortValue::Text(row.code.clone()),
+            unit_type::Column::TenantId,
+            |row| row.tenant_id,
+            page,
+            tenant.database().read(),
+        )
+        .await
     }
 
     pub(crate) async fn create_type(

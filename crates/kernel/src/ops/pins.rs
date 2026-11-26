@@ -15,7 +15,7 @@
 use crate::time::Timestamp;
 use std::sync::Arc;
 
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use sea_orm::sea_query::OnConflict;
@@ -33,6 +33,7 @@ use crate::error::{Error, FieldError};
 use crate::i18n::{Language, Translations};
 use crate::migration::prelude::*;
 use crate::ops::module_catalog::ModuleCatalog;
+use crate::pagination::{NaturalOrderPageQuery, Page, PageRequest, SortValue, fetch_page_by};
 use crate::response::{Created, Data, Problem};
 use crate::tenancy::{ScopeExt, TenantContext, TenantScoped};
 
@@ -184,6 +185,33 @@ impl PinsState {
         })
     }
 
+    /// One page of the caller's pins in display order (`position`, then ID), keyset in the database
+    /// (index `kernel_pins_page_idx`). A pinned screen whose module is gone is left out of its page, so a
+    /// page may hold fewer pins than `limit` while `next_cursor` is still set.
+    pub(crate) async fn page(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+        language: Language,
+        page: &PageRequest,
+    ) -> Result<Page<Pin>, Error> {
+        let select = Entity::find().filter(Column::UserId.eq(principal.user_id())).scoped(tenant);
+        let rows = fetch_page_by(
+            select,
+            Column::Position,
+            |row| SortValue::Integer(i64::from(row.position)),
+            Column::Id,
+            |row| row.id,
+            page,
+            tenant.database().read(),
+        )
+        .await?;
+        let pagination = rows.pagination;
+        let data = rows.data.into_iter().filter_map(|row| self.view(row, language)).collect();
+        Ok(Page { data, pagination })
+    }
+
+    /// Every pin of the caller (at most [`MAX_PINS`], capped when pinning): the answer of a reorder.
     pub(crate) async fn list(
         &self,
         tenant: &TenantContext,
@@ -380,17 +408,20 @@ pub(crate) async fn forget_user(tenant: &TenantContext, user_id: Uuid) -> Result
 
 /// List my pins.
 ///
-/// Requires signing in, no permission: the caller's own pins in this tenant, in display order.
-/// A pinned screen whose module is gone is left out.
+/// Requires signing in, no permission: the caller's own pins in this tenant (at most 20), in
+/// display order (`order=desc` reverses it); paged with `limit` / `cursor`. A pinned screen whose
+/// module is gone is left out, so a page may hold fewer pins than `limit`.
 #[utoipa::path(
     get,
     path = "/pins",
     extensions(("x-permissions" = json!([]))),
     operation_id = "list_my_pins",
     security(("bearer" = [])),
+    params(NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "The caller's pins, at most 20.", body = Data<Vec<Pin>>),
+        (status = 200, description = "One page of the caller's pins, in display order.", body = Page<Pin>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_pins(
@@ -398,8 +429,10 @@ async fn list_pins(
     tenant: TenantContext,
     principal: Principal,
     language: Language,
-) -> Result<Data<Vec<Pin>>, Error> {
-    Ok(Data { data: state.list(&tenant, &principal, language).await? })
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<Pin>, Error> {
+    let page = PageRequest::try_from(page)?;
+    state.page(&tenant, &principal, language, &page).await
 }
 
 /// Pin a screen or a record.

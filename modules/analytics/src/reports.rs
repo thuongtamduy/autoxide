@@ -8,6 +8,7 @@
 
 use autoxide_kernel::access::{OrgTarget, Principal};
 use autoxide_kernel::error::Error;
+use autoxide_kernel::pagination::{Page, PageRequest, page_of};
 use autoxide_kernel::tenancy::{OrgId, Site, TenantContext, root_of};
 use autoxide_kernel::time::Date;
 use sea_orm::sea_query::{Alias, Expr, ExprTrait as _, Func, Order, Query};
@@ -24,8 +25,7 @@ use crate::service::{AnalyticsService, day_text, now};
 pub(crate) const RANGE_MAX_DAYS: i64 = 400;
 /// Khoảng mặc định: 30 ngày tới hôm nay.
 const DEFAULT_DAYS: i64 = 30;
-/// Số dòng mặc định / tối đa của danh sách xếp hạng.
-pub(crate) const TOP_DEFAULT: u64 = 10;
+/// Số dòng tối đa của xếp hạng dùng nội bộ (gợi ý của `shared`); danh sách qua API phân trang.
 pub(crate) const TOP_MAX: u64 = 100;
 
 /// Website và khoảng ngày đã kiểm.
@@ -223,8 +223,35 @@ impl AnalyticsService {
         })
     }
 
-    /// Xếp hạng theo một chiều: cộng các ngày, nhiều nhất trước. `prefix`: chỉ giá trị bắt đầu bằng
-    /// chuỗi này (vd `catalog.product:`).
+    /// Một trang của bảng xếp hạng theo một chiều (REST và tool): mọi giá trị trong khoảng ngày, nhiều nhất
+    /// trước, cùng số thì theo giá trị. Phân trang trong bộ nhớ (`page_of`, D-20261125-list-pages mục 4):
+    /// thứ hạng là tổng `GROUP BY` tính lại mỗi lần gọi (không phải cột nào để keyset), database phải cộng
+    /// và sắp mọi nhóm của khoảng ngày cho dù chỉ trả một trang — như giá trị tồn của `inventory`. Khoá:
+    /// `i64::MAX - số` 19 chữ số rồi giá trị (duy nhất trong nhóm), nên thứ tự byte là nhiều trước. Số
+    /// được cộng thêm mỗi giờ: một giá trị đổi hạng trong lúc duyệt có thể lặp hay sót — chấp nhận, như
+    /// mọi danh sách sắp theo giá trị đổi được.
+    pub(crate) async fn ranking_page(
+        &self,
+        tenant: &TenantContext,
+        range: &Range,
+        dimension: Dimension,
+        prefix: Option<&str>,
+        page: &PageRequest,
+    ) -> Result<Page<Ranked>, Error> {
+        let rows = self.ranked(tenant, range, dimension, prefix, None).await?;
+        let by_events = matches!(dimension, Dimension::Type);
+        page_of(
+            rows,
+            |row| {
+                let rank = if by_events { row.events } else { row.views };
+                format!("{:019}\u{1f}{}", i64::MAX - Ord::max(rank, 0), row.value)
+            },
+            page,
+        )
+    }
+
+    /// Xếp hạng theo một chiều: cộng các ngày, nhiều nhất trước, tối đa `limit` dòng (việc nội bộ: gợi ý
+    /// của `shared`). `prefix`: chỉ giá trị bắt đầu bằng chuỗi này (vd `catalog.product:`).
     pub(crate) async fn top(
         &self,
         tenant: &TenantContext,
@@ -232,6 +259,19 @@ impl AnalyticsService {
         dimension: Dimension,
         prefix: Option<&str>,
         limit: u64,
+    ) -> Result<Vec<Ranked>, Error> {
+        self.ranked(tenant, range, dimension, prefix, Some(limit.clamp(1, TOP_MAX))).await
+    }
+
+    /// Các nhóm của chiều `dimension` trong khoảng ngày, nhiều nhất trước; `limit`: `ORDER BY` + `LIMIT`
+    /// trong SQL (không có: mọi nhóm).
+    async fn ranked(
+        &self,
+        tenant: &TenantContext,
+        range: &Range,
+        dimension: Dimension,
+        prefix: Option<&str>,
+        limit: Option<u64>,
     ) -> Result<Vec<Ranked>, Error> {
         let views = sum_bigint(daily::Column::Views);
         let events = sum_bigint(daily::Column::Events);
@@ -250,8 +290,10 @@ impl AnalyticsService {
             .and_where(Expr::col(daily::Column::Day).between(range.first_day(), range.last_day()))
             .group_by_col(daily::Column::Value)
             .order_by_expr(rank, Order::Desc)
-            .order_by(daily::Column::Value, Order::Asc)
-            .limit(limit.clamp(1, TOP_MAX));
+            .order_by(daily::Column::Value, Order::Asc);
+        if let Some(limit) = limit {
+            select.limit(limit);
+        }
         if let Some(prefix) = prefix {
             // `prefix` là loại đối tượng đã kiểm (chữ thường, số, `_`, `.`): không có `%`.
             select.and_where(Expr::col(daily::Column::Value).like(format!("{prefix}%")));

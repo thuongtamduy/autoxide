@@ -5,6 +5,7 @@
 
 mod dormant;
 mod ingest;
+mod pages;
 mod privacy;
 mod reports;
 

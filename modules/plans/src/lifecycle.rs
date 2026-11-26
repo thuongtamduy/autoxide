@@ -10,6 +10,7 @@ use autoxide_kernel::error::{Error, ErrorKind};
 use autoxide_kernel::event::{Actor, Event};
 use autoxide_kernel::mail::MailTemplate;
 use autoxide_kernel::money::Money;
+use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::rows;
 use autoxide_kernel::tenancy::{TenantChanges, TenantId};
 use autoxide_kernel::time::Timestamp;
@@ -684,16 +685,17 @@ impl PlansService {
         Ok(voided)
     }
 
+    /// Kỳ thanh toán của khách `tenant`, theo trang (thứ tự tạo; index
+    /// `plans_billing_period_tenant_page_idx`). Không còn trần 200 dòng: duyệt bằng cursor.
     pub(crate) async fn billing_periods(
         &self,
         tenant: TenantId,
-    ) -> Result<Vec<billing_period::Model>, Error> {
-        Ok(billing_period::Entity::find()
-            .filter(billing_period::Column::TenantId.eq(tenant.as_uuid()))
-            .order_by_desc(billing_period::Column::Id)
-            .limit(200)
-            .all(self.databases.control().read())
-            .await?)
+        page: &PageRequest,
+    ) -> Result<Page<billing_period::Model>, Error> {
+        let select = billing_period::Entity::find()
+            .filter(billing_period::Column::TenantId.eq(tenant.as_uuid()));
+        let read = self.databases.control().read();
+        fetch_page(select, billing_period::Column::Id, |row| row.id, page, read).await
     }
 
     /// Kỳ `id` của khách `tenant` (khách khác: không có).

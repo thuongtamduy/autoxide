@@ -31,6 +31,7 @@ use crate::config::{ConfigReader, Invalid, Setting, parse_in_range};
 use crate::error::{Error, FieldError};
 use crate::event::{Delivered, EventHandler};
 use crate::migration::prelude::*;
+use crate::pagination::{NaturalOrderPageQuery, Page, PageRequest, SortValue, fetch_page_by};
 use crate::privacy::{PersonalData, deleted_user};
 use crate::response::{Data, Problem};
 use crate::tenancy::{ScopeExt, TenantContext, TenantScoped};
@@ -163,26 +164,62 @@ impl UserFlags {
 
     /// The caller's flags, ordered by key; `prefix` (well-formed key, may be empty) filters by
     /// prefix. At most `max` flags, so all are returned at once.
+    /// One page of the caller's flags, by key (keyset in the database on the unique index
+    /// `(tenant_id, user_id, key)`: the key is unique per user, so the ID never breaks a tie). `page` is
+    /// the parsed paging parameters: a wrong `prefix` and wrong paging parameters are reported together.
+    pub(crate) async fn page(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+        prefix: Option<&str>,
+        page: Result<PageRequest, Error>,
+    ) -> Result<Page<Flag>, Error> {
+        let mut problems = Vec::new();
+        let prefix = prefix.filter(|prefix| !prefix.is_empty());
+        if let Some(prefix) = prefix {
+            check_key("prefix", prefix, &mut problems);
+        }
+        let page = match page {
+            Ok(page) => Some(page),
+            Err(error) => {
+                problems.extend_from_slice(error.fields());
+                None
+            }
+        };
+        let page = match page {
+            Some(page) if problems.is_empty() => page,
+            _ => return Err(Error::validation(problems)),
+        };
+        let mut select =
+            Entity::find().filter(Column::UserId.eq(principal.user_id())).scoped(tenant);
+        if let Some(prefix) = prefix {
+            // `_` là ký tự đại diện của `LIKE`: thoát nó (khoá không có `%` hay `\`).
+            let pattern = format!("{}%", prefix.replace('_', "\\_"));
+            select = select.filter(Column::Key.like(LikeExpr::new(pattern).escape('\\')));
+        }
+        let rows = fetch_page_by(
+            select,
+            Column::Key,
+            |row| SortValue::Text(row.key.clone()),
+            Column::Id,
+            |row| row.id,
+            &page,
+            tenant.database().read(),
+        )
+        .await?;
+        Ok(rows.map(Flag::from))
+    }
+
+    /// Every flag of the caller (tests): the largest page.
+    #[cfg(test)]
     pub(crate) async fn list(
         &self,
         tenant: &TenantContext,
         principal: &Principal,
         prefix: Option<&str>,
     ) -> Result<Vec<Flag>, Error> {
-        let mut select =
-            Entity::find().filter(Column::UserId.eq(principal.user_id())).scoped(tenant);
-        if let Some(prefix) = prefix.filter(|prefix| !prefix.is_empty()) {
-            let mut problems = Vec::new();
-            check_key("prefix", prefix, &mut problems);
-            if !problems.is_empty() {
-                return Err(Error::validation(problems));
-            }
-            // `_` là ký tự đại diện của `LIKE`: thoát nó (khoá không có `%` hay `\`).
-            let pattern = format!("{}%", prefix.replace('_', "\\_"));
-            select = select.filter(Column::Key.like(LikeExpr::new(pattern).escape('\\')));
-        }
-        let rows = select.order_by_asc(Column::Key).all(tenant.database().read()).await?;
-        Ok(rows.into_iter().map(Flag::from).collect())
+        let page = PageRequest::first(crate::pagination::MAX_LIMIT, crate::pagination::Order::Asc);
+        Ok(self.page(tenant, principal, prefix, Ok(page)).await?.data)
     }
 
     /// Writes the caller's flag `key` (overwriting if present): however many times it is called, there is one row.
@@ -332,19 +369,20 @@ pub(crate) struct FlagValue {
 
 /// List my interface flags.
 ///
-/// Requires signing in, no permission: only the caller's own flags, sorted by key. Use them to
-/// remember per account (not per browser) which hints were dismissed or which news were seen.
+/// Requires signing in, no permission: only the caller's own flags, by key (`order=desc`
+/// reverses it); paged with `limit` / `cursor`. Use them to remember per account (not per
+/// browser) which hints were dismissed or which news were seen.
 #[utoipa::path(
     get,
     path = "/flags",
     extensions(("x-permissions" = json!([]))),
     operation_id = "list_my_flags",
     security(("bearer" = [])),
-    params(FlagsQuery),
+    params(FlagsQuery, NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "The caller's flags, sorted by key (at most `AUTOXIDE_USER_FLAGS_MAX`).", body = Data<Vec<Flag>>),
+        (status = 200, description = "One page of the caller's flags, by key.", body = Page<Flag>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 422, description = "`prefix` is not a valid key prefix; see `errors`.", body = Problem),
+        (status = 422, description = "`prefix` is not a valid key prefix, or a paging parameter is invalid; every problem in `errors`.", body = Problem),
     )
 )]
 async fn list_flags(
@@ -352,8 +390,10 @@ async fn list_flags(
     tenant: TenantContext,
     principal: Principal,
     Query(query): Query<FlagsQuery>,
-) -> Result<Data<Vec<Flag>>, Error> {
-    Ok(Data { data: service.list(&tenant, &principal, query.prefix.as_deref()).await? })
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<Flag>, Error> {
+    let page = PageRequest::try_from(page);
+    service.page(&tenant, &principal, query.prefix.as_deref(), page).await
 }
 
 /// Set one of my interface flags.

@@ -29,6 +29,8 @@ pub(crate) struct ListGroupsInput {
     cursor: Option<String>,
     /// `desc` (newest first, the default) or `asc`.
     order: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
 }
 
 /// Units to add to a group.
@@ -78,7 +80,9 @@ pub(crate) fn all(service: &Arc<OrgService>) -> Vec<Tool> {
             move |tenant: TenantContext, principal: Principal, input: ListGroupsInput| {
                 let service = list.clone();
                 async move {
-                    let page = PageInput::new(input.limit, input.cursor, input.order).page()?;
+                    let page = PageInput::new(input.limit, input.cursor, input.order)
+                        .with_count(input.count.unwrap_or(false))
+                        .page()?;
                     let found =
                         service.list_groups(&tenant, &principal, input.q.as_deref(), &page).await?;
                     Ok::<Page<GroupResponse>, Error>(found.map(GroupResponse::from))

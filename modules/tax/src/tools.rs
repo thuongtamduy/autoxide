@@ -8,6 +8,7 @@ use autoxide_kernel::decimal::Rounding;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::mcp::Tool;
 use autoxide_kernel::money::{Currency, Money};
+use autoxide_kernel::pagination::{NaturalOrderPageQuery, Page, PageRequest, page_of};
 use autoxide_kernel::tenancy::{OrgId, TenantContext, root_of};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -15,6 +16,7 @@ use uuid::Uuid;
 use validator::Validate;
 
 use crate::api::{PriceMode, TaxQuote, TaxQuoteRequest, TaxableLine};
+use crate::http::rate_sort_key;
 use crate::permissions::READ;
 use crate::service::TaxService;
 
@@ -61,6 +63,14 @@ pub(crate) struct RatesInput {
     jurisdiction: String,
     /// Day, `YYYY-MM-DD`; default today.
     on: Option<Date>,
+    /// Maximum number of items to return, 1 to 200. Defaults to 50.
+    limit: Option<u32>,
+    /// The `next_cursor` of the previous page.
+    cursor: Option<String>,
+    /// `asc` (by category, stage and start date, the default) or `desc`.
+    order: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
 }
 
 /// A rate in force.
@@ -131,15 +141,26 @@ pub(crate) fn all(service: &Arc<TaxService>) -> Vec<Tool> {
         .read_only(),
         Tool::new(
             "rates",
-            "The tax rates in force on a day for a jurisdiction, with their legal basis.",
+            "The tax rates in force on a day for a jurisdiction, with their legal basis; by category, \
+             stage and start date, the same order and pages as `GET /api/v1/tax/rates`; follow \
+             `pagination.next_cursor`.",
             move |_: TenantContext, principal: Principal, input: RatesInput| {
                 let service = rates.clone();
                 async move {
                     principal.require(&READ)?;
+                    // Cùng kiểu tham số trang và cùng khoá với REST, nên cùng trang và cursor.
+                    let page = PageRequest::try_from(
+                        NaturalOrderPageQuery::new(
+                            input.limit.map(|limit| limit.to_string()),
+                            input.cursor,
+                            input.order,
+                        )
+                        .with_count(input.count.unwrap_or(false)),
+                    )?;
                     let on = input.on.unwrap_or_else(|| Timestamp::now().date_utc());
                     let day = on.format("%Y-%m-%d").to_string();
                     let tables = service.tables().await?;
-                    let list: Vec<RateItem> = tables
+                    let list: Vec<(String, RateItem)> = tables
                         .rates
                         .iter()
                         .filter(|row| row.jurisdiction == input.jurisdiction)
@@ -147,18 +168,30 @@ pub(crate) fn all(service: &Arc<TaxService>) -> Vec<Tool> {
                             row.effective_from.as_str() <= day.as_str()
                                 && row.effective_to.as_deref().is_none_or(|to| day.as_str() < to)
                         })
-                        .map(|row| RateItem {
-                            category: row.category_code.clone(),
-                            tax_kind: row.tax_kind.clone(),
-                            basis: row.basis.clone(),
-                            rate_percent: row.rate_percent.clone(),
-                            stage: row.stage,
-                            effective_from: row.effective_from.clone(),
-                            effective_to: row.effective_to.clone(),
-                            legal_basis: row.legal_basis.clone(),
+                        .map(|row| {
+                            let key = rate_sort_key(
+                                &row.jurisdiction,
+                                &row.category_code,
+                                row.stage,
+                                &row.effective_from,
+                                row.id,
+                            );
+                            let item = RateItem {
+                                category: row.category_code.clone(),
+                                tax_kind: row.tax_kind.clone(),
+                                basis: row.basis.clone(),
+                                rate_percent: row.rate_percent.clone(),
+                                stage: row.stage,
+                                effective_from: row.effective_from.clone(),
+                                effective_to: row.effective_to.clone(),
+                                legal_basis: row.legal_basis.clone(),
+                            };
+                            (key, item)
                         })
                         .collect();
-                    Ok::<_, Error>(list)
+                    let found: Page<RateItem> =
+                        page_of(list, |(key, _)| key.clone(), &page)?.map(|(_, item)| item);
+                    Ok::<_, Error>(found)
                 }
             },
         )

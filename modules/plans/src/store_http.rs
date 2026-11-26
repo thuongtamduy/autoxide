@@ -8,11 +8,12 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::http::ValidJson;
+use autoxide_kernel::pagination::{NaturalOrderPageQuery, Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Data, Problem};
 use autoxide_kernel::store::AppStore;
 use autoxide_kernel::tenancy::TenantContext;
 use axum::body::Bytes;
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -74,26 +75,31 @@ pub(crate) struct LinkProductRequest {
 
 /// List the app store products linked to plans.
 ///
-/// Platform staff with `plans.plans.read`.
+/// Platform staff with `plans.plans.read`. By the store's product id (the same id in both
+/// stores side by side), A→Z unless `order=desc`; paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/store/products",
     extensions(("x-permissions" = json!(["plans.plans.read"]))),
     operation_id = "list_store_products",
     security(("bearer" = [])),
+    params(NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "Every linked product, by store and product id.", body = Data<Vec<StoreProductResponse>>),
+        (status = 200, description = "One page of the linked products, by product id.", body = Page<StoreProductResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Not platform staff (`platform_only`) or missing `plans.plans.read` (`permission_denied`).", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_store_products(
     State(service): State<Arc<PlansService>>,
     principal: Principal,
-) -> Result<Data<Vec<StoreProductResponse>>, Error> {
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<StoreProductResponse>, Error> {
     operator(&principal, &PLANS_READ)?;
-    let rows = service.store_products().await?;
-    Ok(Data { data: rows.into_iter().map(StoreProductResponse::from).collect() })
+    let page = PageRequest::try_from(page)?;
+    let rows = service.store_products(&page).await?;
+    Ok(rows.map(StoreProductResponse::from))
 }
 
 /// Link an app store product to a plan.
@@ -246,27 +252,33 @@ impl From<purchase::Model> for StorePurchaseResponse {
 
 /// List the app store purchases of your tenant.
 ///
-/// Requires `plans.billing.read`. Newest change first.
+/// Requires `plans.billing.read`. Most recently changed first (by `updated_at`) unless
+/// `order=asc`; paged with `limit` / `cursor`. A purchase the store updates while you page may
+/// move to another page.
 #[utoipa::path(
     get,
     path = "/store/purchases",
     extensions(("x-permissions" = json!(["plans.billing.read"]))),
     operation_id = "list_store_purchases",
     security(("bearer" = [])),
+    params(PageQuery),
     responses(
-        (status = 200, description = "The purchases.", body = Data<Vec<StorePurchaseResponse>>),
+        (status = 200, description = "One page of the purchases, most recently changed first.", body = Page<StorePurchaseResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing `plans.billing.read`; code `permission_denied`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_store_purchases(
     State(service): State<Arc<PlansService>>,
     tenant: TenantContext,
     principal: Principal,
-) -> Result<Data<Vec<StorePurchaseResponse>>, Error> {
+    Query(page): Query<PageQuery>,
+) -> Result<Page<StorePurchaseResponse>, Error> {
     principal.require(&BILLING_READ)?;
-    let rows = service.store_purchases(tenant.id()).await?;
-    Ok(Data { data: rows.into_iter().map(StorePurchaseResponse::from).collect() })
+    let page = PageRequest::try_from(page)?;
+    let rows = service.store_purchases(tenant.id(), &page).await?;
+    Ok(rows.map(StorePurchaseResponse::from))
 }
 
 /// Receive a server notification from an app store.

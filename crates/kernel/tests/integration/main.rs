@@ -33,6 +33,7 @@ mod job_lease;
 mod job_runs;
 mod mcp;
 mod mcp_resources;
+mod me_pages;
 mod metrics;
 mod migration;
 mod migration_lock;

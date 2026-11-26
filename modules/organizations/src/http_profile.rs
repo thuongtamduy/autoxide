@@ -7,9 +7,10 @@ use autoxide_address::api::{Address, AddressInput};
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
+use autoxide_kernel::pagination::{NaturalOrderPageQuery, Page, PageRequest};
 use autoxide_kernel::response::{Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::http::{HeaderValue, header};
 use axum::response::{IntoResponse, Response};
 use serde::{Deserialize, Deserializer, Serialize};
@@ -207,7 +208,8 @@ async fn get_site_profile(
 /// List the stores of this tenant shown on its websites.
 ///
 /// No sign-in needed; the tenant comes from the domain (or the header `Autoxide-Tenant`). Only
-/// active units whose profile is public, in the order the tenant set. For "stores near you" and
+/// active units whose profile is public, in the order the tenant set (`position`, then the unit
+/// id; `order=desc` reverses it); paged with `limit` / `cursor`. For "stores near you" and
 /// choosing where to pick up an order.
 #[utoipa::path(
     get,
@@ -215,21 +217,26 @@ async fn get_site_profile(
     extensions(("x-public" = json!(true))),
     operation_id = "list_public_stores",
     security((), ("bearer" = [])),
+    params(NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "The public stores.", body = Data<Vec<PublicProfileResponse>>),
+        (status = 200, description = "One page of the public stores, in the order the tenant set.", body = Page<PublicProfileResponse>),
         (status = 304, description = "Not changed since the `ETag` sent in `If-None-Match`."),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_public_stores(
     State(service): State<Arc<OrgService>>,
     tenant: TenantContext,
+    Query(page): Query<NaturalOrderPageQuery>,
 ) -> Result<Response, Error> {
-    let data: Vec<PublicProfileResponse> =
-        service.public_stores(&tenant).await?.into_iter().map(Into::into).collect();
-    let body = serde_json::to_vec(&data).map_err(Error::internal)?;
+    let page = PageRequest::try_from(page)?;
+    let page: Page<PublicProfileResponse> =
+        service.public_store_page(&tenant, &page).await?.map(Into::into);
+    // ETag trên cả trang (dữ liệu và `pagination`): mỗi trang một ETag riêng.
+    let body = serde_json::to_vec(&page).map_err(Error::internal)?;
     let etag =
         format!("\"{}\"", &autoxide_kernel::secret::sha256(&String::from_utf8_lossy(&body))[..22]);
-    let mut response = Data { data }.into_response();
+    let mut response = page.into_response();
     if let Ok(value) = HeaderValue::from_str(&etag) {
         response.headers_mut().insert(header::ETAG, value);
     }

@@ -15,6 +15,9 @@ pub struct Model {
     pub product_id: Uuid,
     #[sea_orm(primary_key, auto_increment = false)]
     pub variant_key: String,
+    /// UUIDv7 cấp khi thêm (dòng cũ: cấp ở migration `m0013`), cho cursor của danh sách; unique trong
+    /// khách (`customers_wishlist_items_id_key`).
+    pub id: Uuid,
     pub variant_id: Option<Uuid>,
     pub added_at: Timestamp,
     pub baseline_price_minor: Option<i64>,

@@ -597,6 +597,7 @@ async fn khong_ro_ri_giua_khach() {
 }
 
 mod groups;
+mod pages;
 mod profile;
 mod settings;
 
