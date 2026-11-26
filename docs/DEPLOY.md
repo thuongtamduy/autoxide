@@ -333,9 +333,10 @@ The rules that matter after that, with `IMAGE` and `RUN` as defined there:
   autoxide migrate up first` (the count and the first few names, not the whole list; `autoxide
   migrate status` lists them all; error code `kernel.migrations_pending`): run `$RUN $IMAGE migrate up`, then start it.
   On a single server you may set `AUTOXIDE_MIGRATE_ON_START=true` instead: `serve` then applies
-  them on start (the main database, then every tenant database like `migrate up --all`; a tenant
-  database that fails is logged and its tenants get 503 until fixed), under a lock so that two
-  servers starting together never both migrate. With
+  them on start (the main database before it opens its port; then every tenant database in the
+  background, as a migration run that `GET /api/v1/kernel/placements/migrations` shows; tenants of
+  a database not migrated yet get 503 until it is), under a lock so that two servers starting
+  together never both migrate. With
   `AUTOXIDE_BOOTSTRAP_ADMIN_EMAIL` it also creates the first administrator, and with
   `AUTOXIDE_STARTUP_TASKS` it loads reference data — what `compose.quickstart.yml` does. For
   several servers, keep running `migrate up` once per deployment: you see what changes, and a

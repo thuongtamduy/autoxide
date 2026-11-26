@@ -73,6 +73,12 @@ impl MigrationLock {
         Ok(MigrationLock { held })
     }
 
+    /// A lock for an installation with nothing to share it with (a registry built without the database
+    /// configuration, in-memory SQLite): holds nothing.
+    pub(crate) fn unshared() -> Self {
+        MigrationLock { held: Held::Nothing }
+    }
+
     /// Releases the lock.
     pub async fn release(self) -> Result<(), MigrationError> {
         match self.held {

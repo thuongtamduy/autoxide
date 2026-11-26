@@ -192,3 +192,69 @@ async fn luot_migrate_lam_tiep_qua_placement_hong() {
     .await
     .unwrap();
 }
+
+/// Job của API và lệnh `migrate up --all` cùng lúc: cùng khoá, cùng chỗ `active` — không bên nào hỏng, lượt đã
+/// xếp được một bên chạy rồi khép lại. Lượt bỏ dở của tiến trình đã chết không chặn lượt mới (không 409 mãi).
+#[tokio::test]
+async fn job_api_va_lenh_cung_luc_va_luot_bo_do() {
+    TestDatabase::run(async |test| {
+        let app = TestApp::builder(test)
+            .tenant_dedicated("alpha")
+            .tenant_dedicated("beta")
+            .user("ops", 1, &["kernel.tenants.operate"])
+            .build()
+            .await
+            .unwrap();
+        let forget = [
+            "DROP TABLE kernel_sequences",
+            "DELETE FROM kernel_migrations WHERE version = 'm0016_create_sequences'",
+        ];
+        for slug in ["alpha", "beta"] {
+            let tenant = app.tenant(slug).await.unwrap();
+            let write = tenant.database().write();
+            let backend = write.get_database_backend();
+            for sql in forget {
+                write.execute_raw(Statement::from_string(backend, sql)).await.unwrap();
+            }
+        }
+        let placements = app.modules().placements(app.registry()).unwrap();
+        placements.check().await.unwrap();
+
+        let (status, run) =
+            call(&app, Method::POST, "/placements/migrations", "ops", Some(json!({}))).await;
+        assert_eq!(status, StatusCode::CREATED, "{run}");
+        let id = run["data"]["id"].as_str().unwrap().to_owned();
+        let worker = app.modules().worker(2).unwrap();
+        let (direct, job) = tokio::join!(placements.up_all(), worker.run_once());
+        direct.unwrap();
+        job.unwrap();
+        for _ in 0..5 {
+            if worker.run_once().await.unwrap() == 0 {
+                break;
+            }
+        }
+        let (_, done) =
+            call(&app, Method::GET, &format!("/placements/migrations/{id}"), "ops", None).await;
+        assert_eq!(done["data"]["status"], "done", "{done}");
+        for check in placements.check().await.unwrap() {
+            assert_eq!(check.state, autoxide_kernel::tenancy::SchemaState::Ready, "{check:?}");
+        }
+
+        // Lượt `running` của tiến trình đã chết: lượt mới vẫn được xếp, lượt cũ thành `failed`.
+        let write = app.registry().control().write();
+        let backend = write.get_database_backend();
+        let run_id: uuid::Uuid = id.parse().unwrap();
+        let sql = "UPDATE kernel_migration_runs SET status = 'running', active_key = 'active' WHERE id = $1";
+        let update = autoxide_kernel::database::statement(backend, sql, [run_id.into()]);
+        write.execute_raw(update).await.unwrap();
+        let (status, again) =
+            call(&app, Method::POST, "/placements/migrations", "ops", Some(json!({}))).await;
+        assert_eq!(status, StatusCode::CREATED, "{again}");
+        let (_, old) =
+            call(&app, Method::GET, &format!("/placements/migrations/{id}"), "ops", None).await;
+        assert_eq!(old["data"]["status"], "failed", "{old}");
+        assert!(old["data"]["error"].as_str().unwrap().starts_with("interrupted"), "{old}");
+    })
+    .await
+    .unwrap();
+}

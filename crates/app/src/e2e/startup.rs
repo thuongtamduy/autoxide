@@ -155,11 +155,17 @@ async fn task_khong_co_thi_tu_choi_khoi_dong() {
     .unwrap();
 }
 
-/// `AUTOXIDE_MIGRATE_ON_START` nâng cả placement (database riêng của khách, bước 71): placement tốt
-/// thành `ready`; placement hỏng (bảng chắn migration đầu của `auth`) thành `behind` mà máy chủ vẫn
-/// khởi động, và lỗi của nó không chặn placement đứng sau.
+/// `AUTOXIDE_MIGRATE_ON_START` nâng cả placement (database riêng của khách, bước 71) — chạy nền, không chặn mở
+/// port: `serve` migrate `main` rồi xếp một lượt `kernel.migrate_placements`. Job chạy: placement tốt thành
+/// `ready`; placement hỏng (bảng chắn migration đầu của `auth`) thành `behind`, lỗi của nó không chặn
+/// placement đứng sau, lượt ghi `failed` nêu đúng placement hỏng.
 #[tokio::test]
 async fn migrate_luc_khoi_dong_nang_ca_placement() {
+    /// Cấu hình chạy worker: cùng database, không tự làm gì lúc khởi động.
+    fn settings_for_worker(url: &str) -> Settings {
+        settings(url, &[("AUTOXIDE_MIGRATE_ON_START", "false")])
+    }
+
     use autoxide_kernel::migration::prelude::{SchemaManager, Table};
     use autoxide_kernel::migration::schema;
     use autoxide_kernel::tenancy::{
@@ -194,6 +200,21 @@ async fn migrate_luc_khoi_dong_nang_ca_placement() {
         SchemaManager::new(blocked.write()).create_table(blocker).await.unwrap();
 
         start_and_stop(settings).await.unwrap();
+        // Placement đi qua một lượt migrate (job nền; worker của chính máy chủ có thể đã chạy nó trước khi dừng),
+        // không phải migrate đồng bộ trước khi mở port.
+        let ids = sea_orm::sea_query::Query::select()
+            .column(sea_orm::sea_query::Alias::new("id"))
+            .from(sea_orm::sea_query::Alias::new("kernel_migration_runs"))
+            .to_owned();
+        let runs = sea_orm::ConnectionTrait::query_all(database.read(), &ids).await.unwrap();
+        assert_eq!(runs.len(), 1);
+
+        let runtime = runtime::start(settings_for_worker(test.url()), Migrations::RequireApplied)
+            .await
+            .unwrap();
+        let worker = runtime.modules.worker(1).unwrap();
+        while worker.run_once().await.unwrap() > 0 {}
+        runtime.database.close().await.unwrap();
 
         let states: Vec<(String, SchemaState)> = placements
             .check()

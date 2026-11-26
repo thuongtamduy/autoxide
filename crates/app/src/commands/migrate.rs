@@ -79,7 +79,7 @@ pub fn run(arguments: &Arguments) -> ExitCode {
         let report = match settings.modules.placements(&registry) {
             Ok(placements) => match &action {
                 Action::Status { all: true } | Action::Up { all: true } => {
-                    report_all(&action, &placements).await
+                    report_all(&action, &placements, lock.as_ref()).await
                 }
                 _ => {
                     let multi = registry.mode() == TenancyMode::Multi;
@@ -155,7 +155,10 @@ pub(crate) async fn execute_all(
     action: &Action,
     placements: &Placements,
 ) -> Result<String, String> {
-    let report = report_all(action, placements).await?;
+    let lock = placements.lock(LOCK_WAIT).await.map_err(|error| super::describe_error(&error))?;
+    let report = report_all(action, placements, Some(&lock)).await;
+    lock.release().await.map_err(|error| error.to_string())?;
+    let report = report?;
     if report.failed.is_empty() {
         Ok(report.output)
     } else {
@@ -163,12 +166,18 @@ pub(crate) async fn execute_all(
     }
 }
 
-/// Như [`execute_all`], nhưng placement hỏng nằm trong báo cáo: `up` thử hết mọi placement.
-pub(crate) async fn report_all(action: &Action, placements: &Placements) -> Result<Report, String> {
+/// Như [`execute_all`], nhưng placement hỏng nằm trong báo cáo: `up` thử hết mọi placement. `held`: khoá
+/// migration chỗ gọi đang giữ — `up` bắt buộc có (mọi đường migrate placement đều giữ nó), `status` không cần.
+pub(crate) async fn report_all(
+    action: &Action,
+    placements: &Placements,
+    held: Option<&MigrationLock>,
+) -> Result<Report, String> {
     let describe = |error: autoxide_kernel::error::Error| super::describe_error(&error);
     let (sections, failed) = match action {
         Action::Up { .. } => {
-            let report = placements.up_all_report().await.map_err(describe)?;
+            let held = held.ok_or("internal: `migrate up` runs without the migration lock")?;
+            let report = placements.up_all_report(held).await.map_err(describe)?;
             (report.done, report.failed)
         }
         _ => (placements.status_all().await.map_err(describe)?, Vec::new()),
@@ -469,7 +478,9 @@ mod tests {
             let blocker = Table::create().table("auth_user").col(schema::pk_uuid("id")).to_owned();
             SchemaManager::new(blocked.write()).create_table(blocker).await.unwrap();
 
-            let report = report_all(&up_all, &placements).await.unwrap();
+            let lock = placements.lock(LOCK_WAIT).await.unwrap();
+            let report = report_all(&up_all, &placements, Some(&lock)).await.unwrap();
+            lock.release().await.unwrap();
             assert!(report.output.contains("== b-good ==\nApplied "), "{}", report.output);
             assert!(!report.output.contains("a-broken"), "{}", report.output);
             let failed: Vec<&str> = report.failed.iter().map(|f| f.name.as_str()).collect();

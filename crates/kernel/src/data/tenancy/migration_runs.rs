@@ -67,6 +67,8 @@ mod entity {
 
 use entity::{Column, Entity, Model};
 
+pub(crate) mod claim;
+
 /// The `kernel_migration_runs` table.
 pub(crate) struct CreateMigrationRuns;
 
@@ -100,6 +102,13 @@ impl MigrationTrait for CreateMigrationRuns {
         manager.drop_table(Table::drop().table("kernel_migration_runs").to_owned()).await
     }
 }
+
+/// Attempts of the job of a run: only a busy lock or a control-database error makes it fail (a migration that
+/// fails is recorded in the run instead), so a few retries are enough.
+const RUN_ATTEMPTS: i32 = 10;
+
+/// How long the job waits for another process that holds the migration lock before trying again later.
+const JOB_LOCK_WAIT: std::time::Duration = std::time::Duration::from_secs(30);
 
 /// Value of `active_key` while the run is unfinished.
 const ACTIVE: &str = "active";
@@ -168,7 +177,9 @@ pub struct PlacementMigrationList {
     pub migrations: Vec<String>,
 }
 
-fn lists(found: Vec<super::placements::PlacementMigrations>) -> Vec<PlacementMigrationList> {
+pub(crate) fn lists(
+    found: Vec<super::placements::PlacementMigrations>,
+) -> Vec<PlacementMigrationList> {
     found
         .into_iter()
         .map(|entry| PlacementMigrationList {
@@ -258,7 +269,19 @@ impl MigrationRuns {
     /// Queues a run. If an unfinished run exists → `kernel.migration_run_busy` (409).
     async fn start(&self, actor: Actor, placement: Option<String>) -> Result<MigrationRun, Error> {
         // Placement phải có (báo ngay thay vì để job hỏng).
-        self.setup.placements()?.pending(placement.as_deref()).await?;
+        let placements = self.setup.placements()?;
+        if let Some(name) = &placement
+            && !placements.list().await?.iter().any(|found| found.name == *name)
+        {
+            return Err(super::errors::tenant_placement_not_found(name));
+        }
+        // Không ai đang migrate (lấy được khoá ngay) thì dọn lượt bỏ dở của tiến trình đã chết, để lượt mới
+        // không bị 409 mãi vì một lượt không còn ai chạy. Đang có người giữ khoá thì để yên.
+        if let Ok(lock) = placements.lock(std::time::Duration::ZERO).await {
+            let recovered = claim::recover(self.control(), None).await;
+            super::placements::release(lock).await;
+            recovered?;
+        }
         let transaction = self.control().begin_write().await?;
         let at = now();
         // Chèn kèm `active_key`: lượt chưa xong khác (kể cả lượt đang được chèn song song) giữ khoá
@@ -301,8 +324,10 @@ impl MigrationRuns {
             }
             Err(error) => return Err(error.into()),
         };
-        // Một lần: migration hỏng thì sửa rồi chạy lượt mới, không tự thử lại.
-        let options = EnqueueOptions { max_attempts: Some(1), ..EnqueueOptions::default() };
+        // Migration hỏng không làm job hỏng (lượt ghi `failed`, sửa rồi chạy lượt mới); job chỉ hỏng khi chưa lấy
+        // được khoá migration hay database điều khiển lỗi — khi đó thử lại.
+        let options =
+            EnqueueOptions { max_attempts: Some(RUN_ATTEMPTS), ..EnqueueOptions::default() };
         self.jobs
             .enqueue_database(&transaction, &MigratePlacements { run_id: row.id }, options)
             .await?;
@@ -334,66 +359,82 @@ impl MigrationRuns {
         Ok(rows.map(Into::into))
     }
 
-    /// Runs the run `id` (the job runner).
+    /// Runs the run `id` (the job runner), holding the migration lock like every other path that migrates
+    /// placements. Lock busy (another process is migrating): an error, so the job runs again later.
     async fn run(&self, id: Uuid) -> Result<(), Error> {
+        let placements = self.setup.placements()?;
+        let lock = placements.lock(JOB_LOCK_WAIT).await?;
+        let outcome = self.run_locked(&placements, id).await;
+        super::placements::release(lock).await;
+        outcome
+    }
+
+    async fn run_locked(&self, placements: &super::Placements, id: Uuid) -> Result<(), Error> {
+        placements.recover_migrating().await?;
+        let Some(id) = claim::claim(self.control(), claim::Claim::Queued(id)).await? else {
+            return Ok(());
+        };
         let Some(row) = Entity::find_by_id(id).one(self.control().write()).await? else {
             return Ok(());
         };
-        if row.status != "pending" {
-            return Ok(());
-        }
-        self.set(id, "running", None, None).await?;
-        let placements = self.setup.placements()?;
         let mut applied = Vec::new();
         let mut failures = Vec::new();
-        // Từng placement một: placement hỏng không chặn các placement sau (khách của chúng vẫn được
-        // nâng), và lượt vẫn ghi phần đã xong.
         let names: Vec<String> = match &row.placement {
             Some(name) => vec![name.clone()],
-            None => placements.pending(None).await?.into_iter().map(|entry| entry.name).collect(),
+            // Mọi placement trừ `main` (đã migrate trước khi máy chủ chạy). Không đọc trạng thái migration ở đây:
+            // placement không kết nối được thì `try_up_named` ghi lỗi của nó, không làm hỏng cả lượt.
+            None => placements
+                .list()
+                .await?
+                .into_iter()
+                .filter(|found| found.id != super::MAIN_PLACEMENT.as_uuid())
+                .map(|found| found.name)
+                .collect(),
         };
+        // Từng placement một: placement hỏng không chặn các placement sau (khách của chúng vẫn được nâng),
+        // và lượt vẫn ghi phần đã xong. Lỗi giữ chi tiết: người xem lượt là nhân sự vận hành, cần biết sửa gì.
         for name in names {
             match placements.try_up_named(&name).await {
                 Ok(Ok(done)) => applied.extend(lists(vec![done])),
-                // Lỗi của riêng placement này (giữ chi tiết: người xem lượt là nhân sự vận hành, cần biết
-                // sửa gì); placement sau vẫn chạy.
                 Ok(Err(error)) => failures.push(format!("placement `{name}`: {error}")),
-                // Placement đã bị xoá giữa chừng, hay database điều khiển hỏng: ghi lại, làm tiếp.
+                // Placement bị xoá giữa chừng, hay database điều khiển hỏng: ghi lại, làm tiếp.
                 Err(error) => failures.push(format!("placement `{name}`: {error}")),
             }
         }
         let failure = (!failures.is_empty()).then(|| failures.join("\n"));
-        let result = serde_json::to_string(&applied).map_err(Error::internal)?;
-        let status = if failure.is_some() { "failed" } else { "done" };
-        tracing::info!(run_id = %id, status, "placement migration run finished");
-        self.set(id, status, Some(result), failure).await
+        claim::finish(self.control(), id, Some(&applied), failure).await
+    }
+}
+
+/// Queues a migration run of every placement as a background job: what `autoxide serve` does on start with
+/// `AUTOXIDE_MIGRATE_ON_START=true`, after migrating the main database (migrating every placement before
+/// opening the port would hold up the start, and other servers waiting for the lock). Cheap to clone.
+#[derive(Clone)]
+pub struct PlacementMigrationQueue(Arc<MigrationRuns>);
+
+impl std::fmt::Debug for PlacementMigrationQueue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PlacementMigrationQueue").finish_non_exhaustive()
+    }
+}
+
+impl PlacementMigrationQueue {
+    pub(crate) fn new(runs: Arc<MigrationRuns>) -> Self {
+        PlacementMigrationQueue(runs)
     }
 
-    async fn set(
-        &self,
-        id: Uuid,
-        status: &str,
-        result: Option<String>,
-        error: Option<String>,
-    ) -> Result<(), Error> {
-        let mut active = entity::ActiveModel {
-            id: Set(id),
-            status: Set(status.to_owned()),
-            updated_at: Set(now()),
-            ..Default::default()
-        };
-        if let Some(result) = result {
-            active.result = Set(result);
+    /// Queues a run of every placement when one is not `ready` (pending migrations, cannot connect, left
+    /// `migrating`). `None` when every placement is ready, or a run is already queued or running.
+    pub async fn queue_pending(&self) -> Result<Option<Uuid>, Error> {
+        let checks = self.0.setup.placements()?.check().await?;
+        if checks.iter().all(|check| check.state == super::SchemaState::Ready) {
+            return Ok(None);
         }
-        if error.is_some() {
-            active.error = Set(error);
+        match self.0.start(Actor::system(), None).await {
+            Ok(run) => Ok(Some(run.id)),
+            Err(error) if error.code() == "kernel.migration_run_busy" => Ok(None),
+            Err(error) => Err(error),
         }
-        if matches!(status, "done" | "failed") {
-            // Lượt xong: nhả khoá cho lượt sau.
-            active.active_key = Set(None);
-        }
-        active.update(self.control().write()).await?;
-        Ok(())
     }
 }
 

@@ -27,7 +27,7 @@ use super::{
 };
 use crate::config::{DatabaseBackend, DatabaseUrl};
 use crate::error::{Error, FieldError};
-use crate::migration::{MigrationState, Migrator};
+use crate::migration::{MigrationLock, MigrationState, Migrator};
 use crate::storage::StorageLocation;
 
 /// Schema state of a placement.
@@ -393,20 +393,87 @@ impl Placements {
 
     /// Applies missing migrations at each placement (except `main`: `serve` does not run while `main` has
     /// pending migrations), or only at placement `only`; like the placement part of [`up_all`](Self::up_all): a
-    /// failed placement does not stop the others, and the error names every failed placement.
+    /// failed placement does not stop the others, and the error names every failed placement. Takes the
+    /// migration lock itself.
     pub async fn up_placements(
         &self,
         only: Option<&str>,
     ) -> Result<Vec<PlacementMigrations>, Error> {
+        let lock = self.lock(LOCK_WAIT).await?;
         let mut report = MigrationReport { done: Vec::new(), failed: Vec::new() };
-        for row in self.selected(only).await? {
-            let name = row.name.clone();
-            match self.try_placement(row).await? {
-                Ok(section) => report.done.push(section),
-                Err(error) => report.failed.push(PlacementFailure { name, error }),
+        let outcome = self.run_placements(only, &mut report).await;
+        release(lock).await;
+        outcome?;
+        report.into_result()
+    }
+
+    /// Takes the migration lock of the control database, waiting up to `wait` for another process. Every path
+    /// that migrates placements holds it (D-20261126-placement-migration-exclusive): the command line, the API
+    /// run, `serve` on start.
+    pub async fn lock(&self, wait: std::time::Duration) -> Result<MigrationLock, Error> {
+        match self.registry.control_config() {
+            Some(config) => MigrationLock::acquire(config, wait)
+                .await
+                .map_err(|error| Error::internal(error.to_string())),
+            None => Ok(MigrationLock::unshared()),
+        }
+    }
+
+    /// Holding the lock: a placement still `migrating` was left so by a process that stopped midway (whoever
+    /// migrates holds the lock); it becomes `behind` (its tenants keep getting 503 until migrated).
+    pub(crate) async fn recover_migrating(&self) -> Result<(), Error> {
+        for row in self.rows().await? {
+            if row.schema_state == SchemaState::Migrating.as_str() {
+                tracing::warn!(placement = %row.name, "placement left `migrating` by a stopped process");
+                self.set_state(
+                    PlacementId::from_uuid(row.id),
+                    &row.schema_state,
+                    SchemaState::Behind,
+                )
+                .await?;
             }
         }
-        report.into_result()
+        Ok(())
+    }
+
+    /// Holding the lock: the placement part of a migration run, recorded as one `kernel_migration_runs` row so
+    /// the API sees it and does not queue a second run.
+    async fn run_placements(
+        &self,
+        only: Option<&str>,
+        report: &mut MigrationReport,
+    ) -> Result<(), Error> {
+        let control = self.registry.control();
+        self.recover_migrating().await?;
+        let claim = super::migration_runs::claim::Claim::Direct { placement: only };
+        let Some(run) = super::migration_runs::claim::claim(control, claim).await? else {
+            return Ok(());
+        };
+        let outcome = async {
+            for row in self.selected(only).await? {
+                let name = row.name.clone();
+                match self.try_placement(row).await? {
+                    Ok(section) => report.done.push(section),
+                    Err(error) => report.failed.push(PlacementFailure { name, error }),
+                }
+            }
+            Ok::<(), Error>(())
+        }
+        .await;
+        let applied = super::migration_runs::lists(
+            report.done.iter().filter(|section| section.name != MAIN_NAME).cloned().collect(),
+        );
+        let mut errors: Vec<String> = report
+            .failed
+            .iter()
+            .map(|failure| format!("placement `{}`: {}", failure.name, failure.error))
+            .collect();
+        if let Err(error) = &outcome {
+            errors.push(error.to_string());
+        }
+        let error = (!errors.is_empty()).then(|| errors.join("\n"));
+        super::migration_runs::claim::finish(control, run, Some(&applied), error).await?;
+        outcome
     }
 
     async fn selected(&self, only: Option<&str>) -> Result<Vec<placement::Model>, Error> {
@@ -468,28 +535,29 @@ impl Placements {
     /// still run; the error names every failed placement. Running again continues from where it stopped (each
     /// database remembers its done part). [`up_all_report`](Self::up_all_report) returns what was applied
     /// alongside the failures.
+    /// Takes the migration lock itself; a caller that holds it already uses `up_all_report`.
     pub async fn up_all(&self) -> Result<Vec<PlacementMigrations>, Error> {
-        self.up_all_report().await?.into_result()
+        let lock = self.lock(LOCK_WAIT).await?;
+        let report = self.up_all_report(&lock).await;
+        release(lock).await;
+        report?.into_result()
     }
 
     /// Like [`up_all`](Self::up_all), but failed placements are part of the report instead of an error. `Err`
-    /// only when the control database (`main`) cannot be migrated or read: then no placement is tried.
-    pub async fn up_all_report(&self) -> Result<MigrationReport, Error> {
+    /// only when the control database (`main`) cannot be migrated or read: then no placement is tried. `held`
+    /// is the migration lock ([`lock`](Self::lock)) the caller holds for the whole run.
+    pub async fn up_all_report(&self, held: &MigrationLock) -> Result<MigrationReport, Error> {
+        // `held` chỉ để buộc chỗ gọi giữ khoá (kiểu dữ liệu làm bằng chứng), không dùng tới.
+        let _ = held;
         let control = self.registry.control();
         let mut report = MigrationReport {
             done: vec![PlacementMigrations {
-                name: "main".to_owned(),
+                name: MAIN_NAME.to_owned(),
                 migrations: self.migrator.up(control).await.map_err(migration_error)?,
             }],
             failed: Vec::new(),
         };
-        for row in self.rows().await? {
-            let name = row.name.clone();
-            match self.try_placement(row).await? {
-                Ok(section) => report.done.push(section),
-                Err(error) => report.failed.push(PlacementFailure { name, error }),
-            }
-        }
+        self.run_placements(None, &mut report).await?;
         Ok(report)
     }
 }
@@ -546,6 +614,20 @@ impl Placements {
                 }
             }
         }
+    }
+}
+
+/// Name of the control database in reports.
+const MAIN_NAME: &str = "main";
+
+/// How long `up_all` / `up_placements` wait for another process that holds the migration lock: a big
+/// migration may take minutes; longer, the other process is likely stuck and the operator needs to know.
+const LOCK_WAIT: std::time::Duration = std::time::Duration::from_secs(15 * 60);
+
+/// Releases the lock; a failure is only logged (the lock is also released when its connection or file closes).
+pub(crate) async fn release(lock: MigrationLock) {
+    if let Err(error) = lock.release().await {
+        tracing::warn!(error = %error, "cannot release the migration lock");
     }
 }
 

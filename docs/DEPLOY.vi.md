@@ -329,9 +329,10 @@ Những luật cần nhớ sau đó, với `IMAGE` và `RUN` như định nghĩa
   `kernel.migrations_pending`): chạy
   `$RUN $IMAGE migrate up` rồi mới khởi động.
   Với một máy chủ, có thể đặt `AUTOXIDE_MIGRATE_ON_START=true` thay vào đó: `serve` tự áp dụng
-  migration lúc khởi động (database chính rồi mọi database riêng của khách như `migrate up --all`;
-  database của khách hỏng thì ghi log, khách trên đó nhận 503 cho tới khi sửa), dưới một khoá để
-  hai máy chủ khởi động cùng lúc không cùng migrate. Kèm
+  migration lúc khởi động (database chính trước khi mở port; rồi mọi database riêng của khách chạy
+  nền, thành một lượt migrate mà `GET /api/v1/kernel/placements/migrations` cho xem; khách trên
+  database chưa xong nhận 503 cho tới khi xong), dưới một khoá để hai máy chủ khởi động cùng lúc
+  không cùng migrate. Kèm
   `AUTOXIDE_BOOTSTRAP_ADMIN_EMAIL` thì tạo luôn quản trị viên đầu tiên, kèm `AUTOXIDE_STARTUP_TASKS`
   thì nạp dữ liệu nền — đúng những gì `compose.quickstart.yml` làm. Nhiều máy chủ thì vẫn chạy
   `migrate up` một lần mỗi lần deploy: thấy rõ cái gì đổi, và migration hỏng thì deploy dừng trước
