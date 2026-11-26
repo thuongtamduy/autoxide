@@ -17,8 +17,15 @@ Quyết định:
    min(lúc tạo, lúc dùng)). Giới hạn theo TÊN permission (`Principal::only`): phạm vi là phạm vi hiện tại của `run_as`
    — chụp cả phạm vi là việc sau (ROADMAP P16). Luật cũ (cột NULL) giữ cách cũ tới lần sửa / bật kế tiếp (changelog
    ghi "Action needed").
-4. Lần chạy đang chờ (hàng đợi, bước `wait`, chờ duyệt) không chạy tiếp khi luật không còn `active`: runner dừng nó với
-   `automations.rule_not_active` — áp cho mọi lý do tạm dừng / tắt, gồm `owner_access_revoked` và `credential_revoked`.
+4. Lần chạy dở không chạy tiếp bằng quyền của người khác, hai lớp:
+   - Luật rời `active` (tạm dừng vì bất kỳ lý do nào, tắt, chuyển sang chờ duyệt): trong CÙNG transaction, mọi lần chạy
+     `queued` / `waiting` / `awaiting_approval` của nó kết thúc với `automations.rule_not_active` (event
+     `automations.run_failed` như lần chạy hỏng khác). `pause` nay luôn chạy trong transaction (trạng thái luật, lần chạy
+     dở, event ghi cùng lúc).
+   - Runner, trước khi chạy VÀ trước mỗi bước, đọc luật qua kết nối ghi: luật phải còn `active` và còn đúng
+     `version` của lúc tạo lần chạy (`automations.rule_changed` nếu không). Bật lại luật nay tăng `version` như sửa luật;
+     mọi lần đổi `run_as` đều đi qua sửa hay bật lại, nên "cùng phiên bản" kéo theo "cùng `run_as`" — không cần lưu
+     `run_as` trên lần chạy (không thêm migration).
 
 Lý do: D-20261125-durable-grants để lại mục này cho `automations` (P16): luật chạy bằng quyền hiện tại của `run_as`,
 nên luật dựng trong lúc tài khoản bị người lạ dùng vẫn chạy sau khi chủ lấy lại tài khoản (khoá tài khoản thì luật đã

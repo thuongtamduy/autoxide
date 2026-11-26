@@ -362,7 +362,7 @@ impl RoleService {
         self.update_checked(tenant, actor, None, id, input, expected).await
     }
 
-    /// Như [`update`](Self::update), do `principal` làm (REST, MCP): không thêm, nới hay mở cấm permission mà
+    /// Như `update` (đường chỉ có trong test), do `principal` làm (REST, MCP): không thêm, nới hay mở cấm permission mà
     /// chính họ không có (PT-9, [`grants::rules_beyond`]).
     pub(crate) async fn update_as(
         &self,
@@ -487,7 +487,7 @@ impl RoleService {
         self.delete_checked(tenant, actor, None, id).await
     }
 
-    /// Như [`delete`](Self::delete), do `principal` làm (REST, MCP): xoá role là gỡ nó khỏi mọi người giữ —
+    /// Như `delete` (đường chỉ có trong test), do `principal` làm (REST, MCP): xoá role là gỡ nó khỏi mọi người giữ —
     /// cùng luật với gỡ role khỏi một người (`grantable`, kể cả permission cấm; D-20261126-no-self-grant).
     pub(crate) async fn delete_as(
         &self,

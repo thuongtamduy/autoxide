@@ -274,8 +274,9 @@ thật (P7).
   - [ ] `automations`: `run_as_limit` chỉ giới hạn theo TÊN permission (`Principal::only` giữ phạm vi hiện tại của chủ
         luật) — chụp cả phạm vi lúc tạo (D-20261126-automation-owner-revoked)
   - [ ] `automations`: event `auth.access_revoked` vào dead-letter thì luật không tạm dừng và không có đường dự phòng
-        (runner chỉ dừng lần chạy khi luật đã `paused`); `pause` ghi cập nhật trạng thái và event `rule_paused` không
-        cùng transaction
+        (runner chỉ dừng lần chạy khi luật đã `paused`)
+  - [ ] Gỡ role có lệnh cấm đòi người gỡ `allows(p)` theo TÊN permission, bỏ qua phạm vi; khách có guardrail: role cấm
+        một permission ngoài rào thì có thể không ai trong khách gỡ được role đó (cần kiểm chứng)
   - [ ] Nhóm SCIM chưa có luật chứa "thành viên chờ": ai giữ token SCIM cũng đưa người vào được; admin đặt luật
         thì mọi thành viên nhận role (response tạo luật liệt kê ở `granted_user_ids`, hướng dẫn dặn xem trước —
         D-20261125-scim-grant-cover). Chặt hơn: ghi người đưa vào (`added_by`) ở thành viên nhóm và chỉ cấp cho

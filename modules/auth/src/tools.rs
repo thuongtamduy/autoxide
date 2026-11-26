@@ -248,8 +248,10 @@ fn roles(state: &Arc<HttpState>) -> Vec<Tool> {
         .requires(ROLES_MANAGE),
         Tool::new(
             "replace_role",
-            "Replace the name, description and permissions of a role. The built-in `admin` \
-             role cannot be changed.",
+            "Replace the name, description and permissions of a role. You cannot add, widen or \
+             unban a permission you do not have as widely (`auth.permission_beyond_you`), nor turn \
+             off `requires_mfa` of a role you could not give (`auth.role_beyond_you`). The built-in \
+             `admin` role only changes `requires_mfa`.",
             move |tenant: TenantContext, principal: Principal, input: ReplaceRoleInput| {
                 let state = replace.clone();
                 async move {
@@ -274,8 +276,9 @@ fn roles(state: &Arc<HttpState>) -> Vec<Tool> {
         .requires(ROLES_MANAGE),
         Tool::new(
             "delete_role",
-            "Delete a role; users who had it lose its permissions. The built-in `admin` role \
-             cannot be deleted.",
+            "Delete a role; users who had it lose its permissions. You can only delete a role you \
+             could take away: you have its permissions as widely, and every permission it bans \
+             (`auth.role_beyond_you`). The built-in `admin` role cannot be deleted.",
             move |tenant: TenantContext, principal: Principal, input: IdInput| {
                 let state = delete.clone();
                 async move {
@@ -301,8 +304,9 @@ fn roles(state: &Arc<HttpState>) -> Vec<Tool> {
         Tool::new(
             "set_user_roles",
             "Replace every role of a user with `role_ids`. You can only give or take away roles \
-             whose permissions you have yourself, as widely (`auth.role_beyond_you`). The last \
-             administrator cannot lose the `admin` role.",
+             whose permissions you have yourself, as widely, and only take away a role whose \
+             banned permissions you all have (`auth.role_beyond_you`). The last administrator \
+             cannot lose the `admin` role.",
             move |tenant: TenantContext, principal: Principal, input: SetUserRolesInput| {
                 let state = set.clone();
                 async move {
@@ -996,7 +1000,8 @@ fn memberships(state: &Arc<HttpState>) -> Vec<Tool> {
         Tool::new(
             "set_memberships",
             "Replace every organization unit a user works in and the roles there. You can only \
-             give roles whose permissions you have, in units you work in.",
+             give or take away roles whose permissions you have, in units you work in, and only \
+             take away a role whose banned permissions you all have (`auth.role_beyond_you`).",
             move |tenant: TenantContext, principal: Principal, input: SetMembershipsInput| {
                 let state = set.clone();
                 async move {

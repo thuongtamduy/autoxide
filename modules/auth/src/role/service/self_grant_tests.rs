@@ -190,3 +190,34 @@ async fn go_role_co_lenh_cam_doi_co_permission_bi_cam() {
     .await
     .unwrap();
 }
+
+/// Role chỉ có permission cấm (không cấp gì): gỡ nó vẫn đòi có mọi permission bị cấm.
+#[tokio::test]
+async fn role_chi_co_lenh_cam() {
+    TestDatabase::run(async |test| {
+        let services = crate::testing::services(test).await;
+        let (roles, tenant) = (services.roles.clone(), services.tenant.clone());
+        let manager = roles
+            .create(
+                &tenant,
+                Actor::system(),
+                input("manager", &["auth.roles.manage", "auth.users.read"]),
+            )
+            .await
+            .unwrap();
+        let mut ban = input("ban", &[]);
+        ban.denies = vec!["auth.users.manage".to_owned()];
+        let ban = roles.create(&tenant, Actor::system(), ban).await.unwrap();
+        let (ann, bob) =
+            (user(&services, "ann@example.com").await, user(&services, "bob@example.com").await);
+        roles.set_user_roles(&tenant, Actor::system(), ann, vec![manager.id]).await.unwrap();
+        roles.set_user_roles(&tenant, Actor::system(), bob, vec![ban.id]).await.unwrap();
+        let ann_p = principal_of(&services, ann).await;
+        let error = roles.set_user_roles_as(&tenant, &ann_p, bob, vec![]).await.unwrap_err();
+        assert_eq!(error.code(), "auth.role_beyond_you");
+        // Cấp role chỉ có lệnh cấm thì được (thu hẹp quyền người nhận).
+        roles.set_user_roles_as(&tenant, &ann_p, ann, vec![manager.id, ban.id]).await.unwrap();
+    })
+    .await
+    .unwrap();
+}

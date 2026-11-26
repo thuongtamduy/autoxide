@@ -17,9 +17,10 @@ trao được các permission cấp của role như trước VÀ có mọi permi
 role. Membership bị bỏ ở `PUT /users/{id}/memberships` nay cũng qua luật này (trước đây chỉ kiểm role được cấp). Nới
 `requires_mfa` của một role (kể cả role `admin`) đòi người sửa trao được role đó; siết thì không cần.
 
-Kiểm ở service (`set_user_roles_as`, `update_as`, `delete_as`, `set_memberships`), trong transaction ghi; đường hệ thống
-(`set_user_roles`, `update` với `Actor::system()`: lệnh CLI, test) giữ như cũ. Tạo role mới với permission mình không có
-vẫn được: role chưa ai giữ, gán nó thì qua luật trên.
+Kiểm ở service (`set_user_roles_as`, `update_as`, `delete_as`, `set_memberships`), trong transaction ghi. Bản không
+kiểm (`set_user_roles`, `update`, `delete` với `Actor::system()`) chỉ còn trong bản build test (`#[cfg(test)]`, để test
+dựng dữ liệu): code chạy thật không gọi nhầm được. Lệnh CLI tạo người dùng đầu tiên dùng `grant_admin` riêng. Tạo role
+mới với permission mình không có vẫn được: role chưa ai giữ, gán nó thì qua luật trên.
 
 Không khoá khách khỏi chính họ: role `admin` (mọi permission, không bị rào) cấp được mọi role; luật "không bỏ admin cuối
 cùng" giữ nguyên. Đổi hành vi của endpoint cũ trước 1.0 theo D-20261125-api-break-before-1-0: ghi ở changelog

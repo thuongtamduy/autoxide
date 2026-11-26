@@ -29,7 +29,7 @@ impl RoleService {
         self.set_user_roles_checked(tenant, actor, None, user_id, role_ids).await
     }
 
-    /// Như [`set_user_roles`](Self::set_user_roles), do `principal` làm (REST, MCP): role được thêm hay bị
+    /// Như `set_user_roles` (đường chỉ có trong test), do `principal` làm (REST, MCP): role được thêm hay bị
     /// gỡ phải là role họ cấp được — cùng luật với membership, lời mời và SCIM (PT-9,
     /// D-20261126-no-self-grant); không thì 403 `auth.role_beyond_you`.
     pub(crate) async fn set_user_roles_as(
