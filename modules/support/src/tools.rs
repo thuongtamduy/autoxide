@@ -38,6 +38,8 @@ pub(crate) struct ListInput {
     limit: Option<u32>,
     /// The `next_cursor` of the previous page.
     cursor: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
 }
 
 /// A ticket to act on.
@@ -121,7 +123,7 @@ pub(crate) fn all(service: &Arc<SupportService>) -> Vec<Tool> {
                         q: input.q,
                         ..TicketFilter::default()
                     };
-                    let page = PageInput::new(input.limit, input.cursor, None).page()?;
+                    let page = PageInput::new(input.limit, input.cursor, None).with_count(input.count.unwrap_or(false)).page()?;
                     let page = service.list(&tenant, &principal, &filter, &page).await?;
                     Ok::<Page<TicketResponse>, Error>(page.map(|ticket| TicketResponse::new(ticket, true)))
                 }

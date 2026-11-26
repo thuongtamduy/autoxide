@@ -1,0 +1,17 @@
+---
+description: Autoxide rules (Rust backend core, SQLite and PostgreSQL)
+alwaysApply: true
+---
+
+Read `AGENTS.md` at the repository root first: it holds the rules and the commands (`cargo xtask doctor`,
+`./gate.sh --quick`).
+
+The ones that decide most reviews:
+
+- Everything that touches the database must work on SQLite AND PostgreSQL, with tests on both.
+- Handlers only parse input, call a service and return an envelope; logic lives in the service layer.
+- A module owns its tables: no other module's tables, no foreign key across modules.
+- Check permissions (`principal.require(&PERMISSION)?`), not role names; tenant tables are queried through `.scoped(&tenant)`.
+- No `unsafe`, no `unwrap()` / `expect()` / `panic!` outside tests; errors carry a stable `code`.
+- Do not guess library APIs: the pinned versions are newer than your training data; read the docs, let `cargo check` confirm.
+- A red gate is fixed in the code, never by loosening a lint or skipping a test.

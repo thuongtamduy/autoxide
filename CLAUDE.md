@@ -1,6 +1,8 @@
 # CLAUDE.md
 
-Luật cho AI agent làm việc trong repo này. `AGENTS.md` là liên kết tới file này.
+Luật cho AI agent làm việc trong repo này (nội bộ, tiếng Việt). `AGENTS.md` là bản tiếng Anh ngắn cho người ngoài và
+agent của công cụ khác (Codex, Cursor, Copilot…), D-20261126-agent-rules-outside; hai file không được mâu thuẫn — luật mới
+ghi ở đây, luật nào người ngoài cần biết thì chép tóm tắt sang `AGENTS.md`.
 File được nạp vào mọi lượt — chỉ giữ LUẬT và CON TRỎ.
 
 ## Dự án

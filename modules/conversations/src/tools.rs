@@ -40,6 +40,8 @@ pub(crate) struct ListInput {
     limit: Option<u32>,
     /// The `next_cursor` of the previous page.
     cursor: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
 }
 
 /// A conversation to act on.
@@ -102,6 +104,8 @@ pub(crate) struct CallbacksInput {
     limit: Option<u32>,
     /// The `next_cursor` of the previous page.
     cursor: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
 }
 
 /// The draft for an agent.
@@ -131,7 +135,7 @@ pub(crate) fn all(service: &Arc<ConversationsService>) -> Vec<Tool> {
                         assignee: input.mine.then_some(Some(principal.user_id())),
                         ..ThreadFilter::default()
                     };
-                    let page = PageInput::new(input.limit, input.cursor, None).page()?;
+                    let page = PageInput::new(input.limit, input.cursor, None).with_count(input.count.unwrap_or(false)).page()?;
                     let page = service.list(&tenant, &principal, &filter, &page).await?;
                     Ok::<Page<ThreadResponse>, Error>(
                         page.map(|thread| ThreadResponse::new(thread, true)),
@@ -200,7 +204,7 @@ pub(crate) fn all(service: &Arc<ConversationsService>) -> Vec<Tool> {
                 let service = callbacks.clone();
                 async move {
                     let filter = CallbackFilter { status: input.status, ..CallbackFilter::default() };
-                    let page = PageInput::new(input.limit, input.cursor, None).page()?;
+                    let page = PageInput::new(input.limit, input.cursor, None).with_count(input.count.unwrap_or(false)).page()?;
                     let page = service.callbacks(&tenant, &principal, &filter, &page).await?;
                     Ok::<Page<CallbackResponse>, Error>(page.map(CallbackResponse::from))
                 }
