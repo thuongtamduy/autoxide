@@ -12527,8 +12527,10 @@ export type Data_RuleResponse = {
      */
     status: string;
     /**
-     * Why the rule paused: `rate_limit`, `permission_lost`, `owner_unavailable`, or
-     * `credential_revoked` (the API key that created or enabled it was revoked).
+     * Why the rule paused: `rate_limit`, `permission_lost`, `owner_unavailable`,
+     * `credential_revoked` (the API key that created or enabled it was revoked), or
+     * `owner_access_revoked` (the account it runs as was locked out, recovered by email,
+     * disabled or deleted; a person must check the rule and enable it again).
      */
     status_reason?: string | null;
     /** IANA time zone of the schedule. */
@@ -25657,8 +25659,10 @@ export type Page_RuleResponse = {
      */
     status: string;
     /**
-     * Why the rule paused: `rate_limit`, `permission_lost`, `owner_unavailable`, or
-     * `credential_revoked` (the API key that created or enabled it was revoked).
+     * Why the rule paused: `rate_limit`, `permission_lost`, `owner_unavailable`,
+     * `credential_revoked` (the API key that created or enabled it was revoked), or
+     * `owner_access_revoked` (the account it runs as was locked out, recovered by email,
+     * disabled or deleted; a person must check the rule and enable it again).
      */
     status_reason?: string | null;
     /** IANA time zone of the schedule. */
@@ -29942,8 +29946,10 @@ export type RuleResponse = {
    */
   status: string;
   /**
-   * Why the rule paused: `rate_limit`, `permission_lost`, `owner_unavailable`, or
-   * `credential_revoked` (the API key that created or enabled it was revoked).
+   * Why the rule paused: `rate_limit`, `permission_lost`, `owner_unavailable`,
+   * `credential_revoked` (the API key that created or enabled it was revoked), or
+   * `owner_access_revoked` (the account it runs as was locked out, recovered by email,
+   * disabled or deleted; a person must check the rule and enable it again).
    */
   status_reason?: string | null;
   /** IANA time zone of the schedule. */

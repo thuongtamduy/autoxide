@@ -37987,7 +37987,7 @@
                 "type": "string"
               },
               "status_reason": {
-                "description": "Why the rule paused: `rate_limit`, `permission_lost`, `owner_unavailable`, or\n`credential_revoked` (the API key that created or enabled it was revoked).",
+                "description": "Why the rule paused: `rate_limit`, `permission_lost`, `owner_unavailable`,\n`credential_revoked` (the API key that created or enabled it was revoked), or\n`owner_access_revoked` (the account it runs as was locked out, recovered by email,\ndisabled or deleted; a person must check the rule and enable it again).",
                 "type": [
                   "string",
                   "null"
@@ -79346,7 +79346,7 @@
                   "type": "string"
                 },
                 "status_reason": {
-                  "description": "Why the rule paused: `rate_limit`, `permission_lost`, `owner_unavailable`, or\n`credential_revoked` (the API key that created or enabled it was revoked).",
+                  "description": "Why the rule paused: `rate_limit`, `permission_lost`, `owner_unavailable`,\n`credential_revoked` (the API key that created or enabled it was revoked), or\n`owner_access_revoked` (the account it runs as was locked out, recovered by email,\ndisabled or deleted; a person must check the rule and enable it again).",
                   "type": [
                     "string",
                     "null"
@@ -92311,7 +92311,7 @@
             "type": "string"
           },
           "status_reason": {
-            "description": "Why the rule paused: `rate_limit`, `permission_lost`, `owner_unavailable`, or\n`credential_revoked` (the API key that created or enabled it was revoked).",
+            "description": "Why the rule paused: `rate_limit`, `permission_lost`, `owner_unavailable`,\n`credential_revoked` (the API key that created or enabled it was revoked), or\n`owner_access_revoked` (the account it runs as was locked out, recovered by email,\ndisabled or deleted; a person must check the rule and enable it again).",
             "type": [
               "string",
               "null"
@@ -114683,7 +114683,7 @@
     },
     "/api/v1/auth/roles/{id}": {
       "delete": {
-        "description": "Requires `auth.roles.manage`. Users who had the role lose it.",
+        "description": "Requires `auth.roles.manage`. Users who had the role lose it, so you can only delete a role\nyou could take away: you have its permissions as widely, and every permission it bans.",
         "operationId": "auth_delete_role",
         "parameters": [
           {
@@ -114744,7 +114744,7 @@
                 }
               }
             },
-            "description": "Missing permission `auth.roles.manage`; code `permission_denied`."
+            "description": "Missing permission `auth.roles.manage` (code `permission_denied`), or the role has permissions you do not have as widely, or bans one you do not have (code `auth.role_beyond_you`)."
           },
           "404": {
             "content": {
@@ -114891,7 +114891,7 @@
         ]
       },
       "put": {
-        "description": "Requires `auth.roles.manage`. Users with the role get the new permissions on\ntheir next request.",
+        "description": "Requires `auth.roles.manage`. You can only add a permission (or widen it, or lift a ban\non it) that you have yourself at least as widely. Users with the role get the new\npermissions on their next request.",
         "operationId": "auth_replace_role",
         "parameters": [
           {
@@ -114989,7 +114989,7 @@
                 }
               }
             },
-            "description": "Missing permission `auth.roles.manage`; code `permission_denied`."
+            "description": "Missing permission `auth.roles.manage` (code `permission_denied`), or the change adds, widens or unbans a permission you do not have as widely (code `auth.permission_beyond_you`), or turns off `requires_mfa` of a role you could not give (code `auth.role_beyond_you`)."
           },
           "404": {
             "content": {
@@ -118900,7 +118900,7 @@
         ]
       },
       "put": {
-        "description": "Requires `auth.roles.manage`. You can only give roles whose permissions you have yourself,\nin units you work in; the built-in `admin` role only at the root unit. Takes effect on the\nuser's next request. The last user with the `admin` role cannot lose it.",
+        "description": "Requires `auth.roles.manage`. You can only give or take away roles whose permissions you have\nyourself (and, to take one away, every permission it bans), in units you work in; the\nbuilt-in `admin` role only at the root unit. Takes effect on the\nuser's next request. The last user with the `admin` role cannot lose it.",
         "operationId": "auth_replace_user_memberships",
         "parameters": [
           {
@@ -118978,7 +118978,7 @@
                 }
               }
             },
-            "description": "Missing permission `auth.roles.manage`; code `permission_denied`."
+            "description": "Missing permission `auth.roles.manage` (code `permission_denied`), or a membership taken away has a role you could not give, or that bans a permission you do not have (code `auth.role_beyond_you`)."
           },
           "404": {
             "content": {
@@ -119726,7 +119726,7 @@
         ]
       },
       "put": {
-        "description": "Requires `auth.roles.manage`. Takes effect on the user's next request. The last\nuser with the `admin` role cannot lose it.",
+        "description": "Requires `auth.roles.manage`. You can only give or take away roles whose permissions you\nhave yourself, at least as widely — for anyone, yourself included. Takes effect on the\nuser's next request. The last user with the `admin` role cannot lose it.",
         "operationId": "auth_replace_user_roles",
         "parameters": [
           {
@@ -119804,7 +119804,7 @@
                 }
               }
             },
-            "description": "Missing permission `auth.roles.manage`; code `permission_denied`."
+            "description": "Missing permission `auth.roles.manage` (code `permission_denied`), or a role given or taken away has permissions you do not have as widely, or a role taken away bans a permission you do not have (code `auth.role_beyond_you`)."
           },
           "404": {
             "content": {

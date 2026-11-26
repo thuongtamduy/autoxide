@@ -32,8 +32,11 @@ pub enum Decision {
 
 /// Units shown to exist in a tenant (`OrgTree::contains`) while checking this caller's permissions, so a request
 /// that checks many permissions at the same unit (navigation, work queue, find, summary) looks the unit up
-/// once. Shared by the clones of one `Principal` (one request, one job run); only "exists" is remembered, which
-/// stays true because units are never deleted. Not part of the caller's identity: never compared.
+/// once. Shared by the clones of one `Principal`, so it lives for one request or one job run; only "exists" is
+/// remembered. Ordinary work never deletes a unit — only moving a tenant's branch out (split / merge of tenants)
+/// removes the source tenant's tree, and a request or job running at that moment may still see the moved unit
+/// until it ends (D-20261126-known-units-memo records the trade-off). Not part of the caller's
+/// identity: never compared.
 #[derive(Clone, Default)]
 pub(super) struct KnownUnits(Arc<Mutex<HashSet<(TenantId, OrgId)>>>);
 

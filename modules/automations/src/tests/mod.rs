@@ -369,10 +369,24 @@ mod fixtures {
                 Tool::new(
                     "tag_order",
                     "Tag an order.",
-                    move |_: TenantContext, _: Principal, input: TagInput| {
+                    move |tenant: TenantContext, _: Principal, input: TagInput| {
                         let shop = tag.clone();
                         async move {
                             shop.counters.tagged.fetch_add(1, Ordering::SeqCst);
+                            // Nhãn `pause-rules`: tạm dừng mọi luật của khách ngay giữa lần chạy (test kiểm runner
+                            // xem lại trạng thái luật trước mỗi bước).
+                            if input.tag == "pause-rules" {
+                                use autoxide_kernel::tenancy::ScopeExt as _;
+                                use sea_orm::{EntityTrait as _, sea_query::Expr};
+                                crate::entity::rule::Entity::update_many()
+                                    .col_expr(
+                                        crate::entity::rule::Column::Status,
+                                        Expr::value("paused"),
+                                    )
+                                    .scoped(&tenant)
+                                    .exec(tenant.database().write())
+                                    .await?;
+                            }
                             Ok::<_, Error>(json!({"order_id": input.order_id, "tag": input.tag}))
                         }
                     },

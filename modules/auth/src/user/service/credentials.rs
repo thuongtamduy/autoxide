@@ -200,7 +200,12 @@ impl UserService {
             // Uỷ quyền bền tài khoản tạo (token SCIM, vai người cấu hình nhà cung cấp đăng nhập): kẻ
             // đã chiếm tài khoản có thể tạo chúng; chủ lấy lại tài khoản thì chúng mất theo
             // (D-20261125-durable-grants).
-            super::revoke_durable_grants_in(&transaction, tenant, &self.outbox, actor, id).await?;
+            let reason = match mode {
+                PasswordWrite::Recovery => "recovered",
+                _ => "sessions_revoked",
+            };
+            super::revoke_durable_grants_in(&transaction, tenant, &self.outbox, actor, id, reason)
+                .await?;
         }
         let event = events::PasswordChanged::default();
         self.outbox.record(&transaction, tenant, actor, events::user_subject(id), &event).await?;
