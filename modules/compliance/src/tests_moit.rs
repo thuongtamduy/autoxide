@@ -248,11 +248,11 @@ async fn danh_sach_kiem_doi_theo_phien_ban_quy_tac() {
         let id = website(&app, "sales", "shop.example").await;
         let (_, before) =
             call(&app, "GET", &format!("/websites/{id}/checklist"), "admin", None).await;
-        assert_eq!(before["data"]["rule_version"], 1);
+        assert_eq!(before["data"]["rule_version"], 2);
         assert!(before["data"]["items"].as_array().unwrap().len() > 10);
         let pack = json!({"pack": {"jurisdiction": "vn", "rules": [{
-            "key": "moit.checklist.sales", "version": 2,
-            "effective_from": "2025-01-01T00:00:00Z", "effective_to": null,
+            "key": "moit.checklist.sales", "version": 3,
+            "effective_from": "2026-08-01T00:00:00Z", "effective_to": null,
             "body": {"registration": "notification", "status_when_done": "notified",
                 "logo": {"color": "blue", "link_hosts": ["online.gov.vn"], "image_hosts": ["online.gov.vn"]},
                 "items": [{"key": "owner.legal_name", "title": {"en": "Name", "vi": "Tên"},
@@ -263,7 +263,7 @@ async fn danh_sach_kiem_doi_theo_phien_ban_quy_tac() {
         let (status, imported) = call(&app, "POST", "/rules", "staff", Some(pack)).await;
         assert_eq!(status, StatusCode::OK, "{imported}");
         let (_, after) = call(&app, "GET", &format!("/websites/{id}/checklist"), "admin", None).await;
-        assert_eq!(after["data"]["rule_version"], 2);
+        assert_eq!(after["data"]["rule_version"], 3);
         assert_eq!(after["data"]["items"].as_array().unwrap().len(), 1);
     })
     .await
@@ -349,7 +349,8 @@ async fn snippet_logo_la_bi_tu_choi_va_badge_cong_khai_theo_ten_mien() {
         )
         .await;
         assert_eq!(status, StatusCode::OK, "{submitted}");
-        assert_eq!(submitted["data"]["checklist_version"], 1);
+        // Phiên bản quy tắc đang hiệu lực: v2 từ 01/7/2026 (NĐ 248/2026).
+        assert_eq!(submitted["data"]["checklist_version"], 2);
         let real = "<a href='http://online.gov.vn/Home/WebDetails/12345'><img alt='' title='' \
                     src='http://online.gov.vn/Content/EndUser/LogoCCDVSaleNoti/logoSaleNoti.png'/></a>";
         let (status, notified) = call(
