@@ -171,12 +171,10 @@ impl TestApp {
     }
 
     /// Runs `work` and returns every SQL statement the app ran meanwhile (D-20261120-step39-hot-paths) —
-    /// so a test can pin the statement count of a request. Only one measurement at a time; with nested
-    /// measurements the inner one takes all the statements.
+    /// so a test can pin the statement count of a request. Only statements run by `work` itself count, not
+    /// those of background tasks; with nested measurements the inner one takes its statements.
     pub async fn statements<T>(&self, work: impl Future<Output = T>) -> (T, Vec<String>) {
-        self.statements.start();
-        let output = work.await;
-        (output, self.statements.stop())
+        self.statements.measure(work).await
     }
 
     /// The app's database registry (mode, placement, tenant lookup).
