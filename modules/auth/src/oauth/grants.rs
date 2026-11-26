@@ -87,8 +87,7 @@ impl OAuthService {
             select = select.filter(grant::Column::UserId.eq(user));
         }
         let page =
-            fetch_page(select, grant::Column::Id, |row| row.id, page, tenant.database().read())
-                .await?;
+            fetch_page(select, grant::Column::Id, |row| row.id, page, &tenant.db().read()).await?;
         Ok(page.map(GrantView::from))
     }
 
@@ -104,20 +103,20 @@ impl OAuthService {
         require_person(principal)?;
         let row = grant::Entity::find_by_id((tenant.id().as_uuid(), id))
             .scoped(tenant)
-            .one(tenant.database().read())
+            .one(&tenant.db().read())
             .await?
             .filter(|row| !own || row.user_id == principal.user_id())
             .ok_or_else(|| grant_not_found(id))?;
         if row.revoked_at.is_some() {
             return Ok(row.into());
         }
-        let transaction = tenant.database().begin_write().await?;
+        let transaction = tenant.db().begin_write().await?;
         revoke_in(&transaction, tenant, &self.outbox, Actor::from(principal), id, "revoked")
             .await?;
         transaction.commit().await?;
         let row = grant::Entity::find_by_id((tenant.id().as_uuid(), id))
             .scoped(tenant)
-            .one(tenant.database().read())
+            .one(&tenant.db().read())
             .await?
             .ok_or_else(|| grant_not_found(id))?;
         Ok(row.into())
@@ -131,7 +130,7 @@ pub(crate) async fn revoke_grant(
     id: Uuid,
     reason: &'static str,
 ) -> Result<(), Error> {
-    let transaction = tenant.database().begin_write().await?;
+    let transaction = tenant.db().begin_write().await?;
     revoke_in(&transaction, tenant, &service.outbox, Actor::system(), id, reason).await?;
     transaction.commit().await?;
     tracing::info!(grant_id = %id, reason, "OAuth grant revoked");

@@ -262,9 +262,10 @@ impl OAuthService {
             expires_at: Timestamp::now() + SignedDuration::from_mins(REQUEST_MINUTES),
         };
         let data = serde_json::to_string(&pending).map_err(Error::internal)?;
+        let transaction = platform.db().begin_write().await?;
         let issued = OneTimeTokens::new("auth")
             .issue(
-                platform.database().write(),
+                &transaction,
                 &platform,
                 PURPOSE,
                 "oauth",
@@ -272,6 +273,7 @@ impl OAuthService {
                 SignedDuration::from_mins(REQUEST_MINUTES),
             )
             .await?;
+        transaction.commit().await?;
         Ok(self.config.consent_url.replace("{token}", &issued.token))
     }
 
@@ -317,8 +319,7 @@ impl OAuthService {
     async fn pending(&self, token: &str) -> Result<(Pending, Timestamp), Error> {
         let platform = self.platform().await?;
         let tokens = OneTimeTokens::new("auth");
-        let found =
-            tokens.peek(platform.database().read(), &platform, PURPOSE, token.trim()).await?;
+        let found = tokens.peek(&platform.db().read(), &platform, PURPOSE, token.trim()).await?;
         let found = found.ok_or_else(request_gone)?;
         let pending: Pending = serde_json::from_str(found.data.as_deref().unwrap_or_default())
             .map_err(|_| request_gone())?;
@@ -363,7 +364,7 @@ impl OAuthService {
             .filter(grant::Column::ExpiresAt.gt(Timestamp::now()))
             .scoped(tenant)
             .order_by_desc(grant::Column::Id)
-            .one(tenant.database().read())
+            .one(&tenant.db().read())
             .await?;
         Ok(RequestView {
             client_host: host_of(&pending.client_id),
@@ -447,16 +448,12 @@ impl OAuthService {
             crate::reauth::consume(tenant, principal.user_id(), reauth).await?;
         }
         // Yêu cầu chỉ dùng một lần: hai lần bấm duyệt đồng thời, đúng một lần thắng.
-        let platform = self.platform().await?;
-        OneTimeTokens::new("auth")
-            .consume(platform.database().write(), &platform, PURPOSE, token.trim())
-            .await?
-            .ok_or_else(request_gone)?;
+        self.consume_request(token).await?;
         let now = Timestamp::now();
         let grant_id = Uuid::now_v7();
         let code = random_token(32)?;
         let scope = chosen.into_iter().collect::<Vec<_>>().join(" ");
-        let transaction = tenant.database().begin_write().await?;
+        let transaction = tenant.db().begin_write().await?;
         grant::ActiveModel {
             tenant_id: Set(tenant.id().as_uuid()),
             id: Set(grant_id),
@@ -514,15 +511,22 @@ impl OAuthService {
         Ok(self.answer(&pending.redirect_uri, &[("code", &code)], pending.state.as_deref()))
     }
 
+    /// Đánh dấu yêu cầu đã quyết (một lần): hai lần bấm đồng thời, đúng một lần thắng.
+    async fn consume_request(&self, token: &str) -> Result<(), Error> {
+        let platform = self.platform().await?;
+        let transaction = platform.db().begin_write().await?;
+        let consumed = OneTimeTokens::new("auth")
+            .consume(&transaction, &platform, PURPOSE, token.trim())
+            .await?;
+        transaction.commit().await?;
+        consumed.map(|_| ()).ok_or_else(request_gone)
+    }
+
     /// `POST /oauth/requests/{token}/deny`.
     pub(crate) async fn deny(&self, principal: &Principal, token: &str) -> Result<String, Error> {
         require_person(principal)?;
         let (pending, _) = self.pending(token).await?;
-        let platform = self.platform().await?;
-        OneTimeTokens::new("auth")
-            .consume(platform.database().write(), &platform, PURPOSE, token.trim())
-            .await?
-            .ok_or_else(request_gone)?;
+        self.consume_request(token).await?;
         Ok(self.answer(
             &pending.redirect_uri,
             &[

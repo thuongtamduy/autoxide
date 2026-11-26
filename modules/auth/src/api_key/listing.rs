@@ -47,7 +47,7 @@ impl ApiKeyService {
         only: Option<Uuid>,
         page: &PageRequest,
     ) -> Result<Page<ApiKey>, Error> {
-        let connection = tenant.database().read();
+        let connection = &tenant.db().read();
         let mut select =
             api_key::Entity::find().filter(api_key::Column::UserId.eq(user_id)).scoped(tenant);
         if let Some(only) = only {
@@ -82,7 +82,7 @@ impl ApiKeyService {
             caller.require(&crate::permissions::API_KEYS_MANAGE)?;
             status
         };
-        let connection = tenant.database().read();
+        let connection = &tenant.db().read();
         let mut select = api_key::Entity::find().scoped(tenant);
         if let Some(owner) = owner {
             select = select.filter(api_key::Column::UserId.eq(owner));

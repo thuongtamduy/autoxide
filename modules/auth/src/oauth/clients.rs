@@ -191,7 +191,7 @@ impl ClientDirectory {
             let row = entity::Entity::find()
                 .filter(entity::Column::ClientId.eq(client_id))
                 .scoped(platform)
-                .one(platform.database().read())
+                .one(&platform.db().read())
                 .await?;
             if let Some(row) = row {
                 touch(platform, &row).await;
@@ -407,12 +407,17 @@ async fn touch(platform: &TenantContext, row: &entity::Model) {
     if row.last_used_at.is_some_and(|last| last + jiff::SignedDuration::from_hours(24) > now) {
         return;
     }
-    let result = entity::Entity::update_many()
-        .col_expr(entity::Column::LastUsedAt, sea_orm::sea_query::Expr::value(Some(now)))
-        .filter(entity::Column::TenantId.eq(platform.id().as_uuid()))
-        .filter(entity::Column::Id.eq(row.id))
-        .exec(platform.database().write())
-        .await;
+    let result: Result<(), Error> = async {
+        let transaction = platform.db().begin_write().await?;
+        entity::Entity::update_many()
+            .col_expr(entity::Column::LastUsedAt, sea_orm::sea_query::Expr::value(Some(now)))
+            .filter(entity::Column::TenantId.eq(platform.id().as_uuid()))
+            .filter(entity::Column::Id.eq(row.id))
+            .exec(&transaction)
+            .await?;
+        transaction.commit().await
+    }
+    .await;
     if let Err(error) = result {
         tracing::warn!(client_id = row.client_id, %error, "could not record the use of an OAuth client");
     }
@@ -574,6 +579,7 @@ pub(crate) async fn register(
     let name = name.unwrap_or_else(|| "Unnamed MCP client".to_owned());
     let id = Uuid::now_v7();
     let client_id = format!("{DYNAMIC_PREFIX}{}", id.simple());
+    let transaction = platform.db().begin_write().await?;
     entity::ActiveModel {
         tenant_id: Set(platform.id().as_uuid()),
         id: Set(id),
@@ -583,8 +589,9 @@ pub(crate) async fn register(
         created_at: Set(Timestamp::now()),
         last_used_at: Set(None),
     }
-    .insert(platform.database().write())
+    .insert(&transaction)
     .await?;
+    transaction.commit().await?;
     tracing::info!(client_id, "OAuth client registered");
     Ok(RegisteredClient { client_id, name, redirect_uris, registration: "dynamic" })
 }

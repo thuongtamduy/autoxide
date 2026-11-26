@@ -133,16 +133,20 @@ impl OAuthService {
             || OAuthError::invalid_grant("The code is not valid, has expired or was already used.");
         let tenant = self.tenant(tenant_of(code, CODE_PREFIX).ok_or_else(invalid)?).await?;
         let secret = code.get(CODE_PREFIX.len() + 33..).unwrap_or_default();
+        // Một transaction ngắn trên kết nối ghi: đọc mã, đánh dấu đã dùng (TRƯỚC mọi kiểm khác — mã chỉ đổi được một
+        // lần, kể cả khi lần này sai), đọc grant.
+        let transaction = tenant.db().begin_write().await?;
         let row = token::Entity::find()
             .filter(token::Column::TokenHash.eq(sha256(secret)))
             .filter(token::Column::Kind.eq(CODE))
             .scoped(&tenant)
-            .one(tenant.database().write())
+            .one(&transaction)
             .await?
             .ok_or_else(invalid)?;
         let now = Timestamp::now();
-        // Đánh dấu đã dùng TRƯỚC mọi kiểm khác: mã chỉ đổi được một lần, kể cả khi lần này sai.
-        let claimed = mark_used(tenant.database().write(), &tenant, row.id, now).await?;
+        let claimed = mark_used(&transaction, &tenant, row.id, now).await?;
+        let grant = self.live_grant(&transaction, &tenant, row.grant_id).await?;
+        transaction.commit().await?;
         if !claimed {
             // Mã dùng lại: có thể đã bị đánh cắp. Thu hồi mọi thứ sinh từ nó.
             super::grants::revoke_grant(self, &tenant, row.grant_id, "code_reused").await?;
@@ -151,10 +155,7 @@ impl OAuthService {
         if row.expires_at <= now {
             return Err(invalid());
         }
-        let grant = self
-            .live_grant(tenant.database().write(), &tenant, row.grant_id)
-            .await?
-            .ok_or_else(invalid)?;
+        let grant = grant.ok_or_else(invalid)?;
         if grant.client_id != client_id {
             return Err(invalid());
         }
@@ -194,19 +195,19 @@ impl OAuthService {
             OAuthError::invalid_grant("The refresh token is not valid, has expired or was revoked.")
         };
         let tenant = self.tenant(tenant_of(presented, REFRESH_PREFIX).ok_or_else(invalid)?).await?;
+        // Đường xoay vòng đọc trên kết nối ghi (transaction ngắn): không đọc bản trễ của read replica.
+        let transaction = tenant.db().begin_write().await?;
         let row = token::Entity::find()
             .filter(token::Column::TokenHash.eq(sha256(presented)))
             .filter(token::Column::Kind.eq(REFRESH))
             .scoped(&tenant)
-            // Đường xoay vòng đọc trên kết nối ghi: không đọc bản trễ của read replica.
-            .one(tenant.database().write())
+            .one(&transaction)
             .await?
             .ok_or_else(invalid)?;
+        let grant = self.live_grant(&transaction, &tenant, row.grant_id).await?;
+        transaction.commit().await?;
         let now = Timestamp::now();
-        let grant = self
-            .live_grant(tenant.database().write(), &tenant, row.grant_id)
-            .await?
-            .ok_or_else(invalid)?;
+        let grant = grant.ok_or_else(invalid)?;
         if grant.client_id != client_id {
             return Err(invalid());
         }
@@ -215,7 +216,10 @@ impl OAuthService {
         }
         // Scope sai không được đốt mất refresh token: kiểm trước khi đánh dấu đã dùng.
         narrower_scope(form.scope.as_deref(), &grant)?;
-        if !mark_used(tenant.database().write(), &tenant, row.id, now).await? {
+        let transaction = tenant.db().begin_write().await?;
+        let claimed = mark_used(&transaction, &tenant, row.id, now).await?;
+        transaction.commit().await?;
+        if !claimed {
             // Refresh token đã dùng bị gửi lại: không phân biệt được kẻ trộm với client gửi trùng, nên thu hồi cả grant
             // (RFC 9700 §4.14.2, OAuth 2.1 §4.3.1). Client phải làm mới tuần tự.
             // Đếm để đo báo nhầm (client làm mới song song) so với đánh cắp thật.
@@ -259,7 +263,7 @@ impl OAuthService {
         let access = format!("{ACCESS_PREFIX}{tenant_hex}_{}", random_token(32)?);
         let refresh = format!("{REFRESH_PREFIX}{tenant_hex}_{}", random_token(32)?);
         let access_expires = now + self.config.access_ttl;
-        let transaction = tenant.database().begin_write().await?;
+        let transaction = tenant.db().begin_write().await?;
         for (kind, value, expires_at) in
             [(ACCESS, &access, access_expires), (REFRESH, &refresh, grant.expires_at)]
         {
@@ -302,11 +306,11 @@ impl OAuthService {
             .filter(token::Column::Kind.eq(ACCESS))
             .filter(token::Column::ExpiresAt.gt(now))
             .scoped(&tenant)
-            .one(tenant.database().read())
+            .one(&tenant.db().read())
             .await?
             .ok_or_else(invalid)?;
         let grant = self
-            .live_grant(tenant.database().read(), &tenant, row.grant_id)
+            .live_grant(&tenant.db().read(), &tenant, row.grant_id)
             .await?
             .ok_or_else(invalid)?;
         let (user, principal) =
@@ -349,12 +353,12 @@ impl OAuthService {
             .filter(token::Column::TokenHash.eq(sha256(token)))
             .filter(token::Column::Kind.is_in([ACCESS, REFRESH]))
             .scoped(&tenant)
-            .one(tenant.database().read())
+            .one(&tenant.db().read())
             .await?;
         let Some(row) = row else { return Ok(()) };
         let grant = grant::Entity::find_by_id((tenant.id().as_uuid(), row.grant_id))
             .scoped(&tenant)
-            .one(tenant.database().read())
+            .one(&tenant.db().read())
             .await?;
         if grant.is_some_and(|grant| client_id.is_none_or(|client| client == grant.client_id)) {
             super::grants::revoke_grant(self, &tenant, row.grant_id, "client_revoked").await?;
@@ -400,12 +404,17 @@ async fn mark_used<C: ConnectionTrait>(
 
 /// Ghi lần dùng gần nhất; hỏng thì chỉ ghi log (không từ chối request hợp lệ vì một dòng thống kê).
 async fn touch(tenant: &TenantContext, id: Uuid, now: Timestamp) {
-    let result = grant::Entity::update_many()
-        .col_expr(grant::Column::LastUsedAt, Expr::value(Some(now)))
-        .filter(grant::Column::TenantId.eq(tenant.id().as_uuid()))
-        .filter(grant::Column::Id.eq(id))
-        .exec(tenant.database().write())
-        .await;
+    let result: Result<(), Error> = async {
+        let transaction = tenant.db().begin_write().await?;
+        grant::Entity::update_many()
+            .col_expr(grant::Column::LastUsedAt, Expr::value(Some(now)))
+            .filter(grant::Column::TenantId.eq(tenant.id().as_uuid()))
+            .filter(grant::Column::Id.eq(id))
+            .exec(&transaction)
+            .await?;
+        transaction.commit().await
+    }
+    .await;
     if let Err(error) = result {
         tracing::warn!(grant_id = %id, %error, "could not record the use of an OAuth grant");
     }
