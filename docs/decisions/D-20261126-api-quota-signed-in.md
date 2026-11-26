@@ -1,6 +1,6 @@
 ## D-20261126-api-quota-signed-in · Hạn mức `kernel.api_requests`: đếm sau giới hạn theo khách, chỉ chặn người gọi của khách — 2026-11-26 — agent quyết
 
-Chủ đề: HTTP, gói
+Chủ đề: Đa khách, tổ chức, gói
 
 Quyết định: Bổ sung D-20261126-tenant-rate-limit cho hạn mức số request mỗi kỳ của gói (`kernel.api_requests`):
 

@@ -352,7 +352,7 @@ mod tests {
         assert_eq!(OPERATE, crate::builtin::TENANTS_OPERATE.name());
     }
 
-    /// Đếm số lần được gọi; luôn từ chối.
+    // Đếm số lần được gọi; luôn từ chối.
     struct Refuses(std::sync::atomic::AtomicUsize);
 
     #[async_trait::async_trait]
