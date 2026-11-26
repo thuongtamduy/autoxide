@@ -206,5 +206,15 @@ Mỗi bản phát hành kèm hai danh sách những gì nằm bên trong:
 
 ## Hỗ trợ
 
-Bản nào được vá, và trong bao lâu, ghi ở [`SECURITY.vi.md`](../SECURITY.vi.md#phiên-bản-được-vá).
+Từ 1.0 mỗi phiên bản major có hỗ trợ dài hạn:
+
+- Bản minor mới nhất nhận mọi bản sửa; bản minor trước nhận vá bảo mật **3 tháng** sau khi bản minor kế tiếp ra; khi có
+  bản major mới, bản minor cuối của major trước nhận vá bảo mật **6 tháng**. Bản cũ hơn không được vá. Bảng ở
+  [`SECURITY.vi.md`](../SECURITY.vi.md#phiên-bản-được-vá).
+- **Vá ngược.** Bản sửa làm trên `main` trước. Với dòng cũ còn được hỗ trợ, người duy trì cherry-pick nó vào nhánh
+  `release/X.Y` cắt từ tag `vX.Y.Z` mới nhất của dòng đó, phát hành thành bản patch kế tiếp (`X.Y.Z+1`) chỉ chứa bản sửa
+  đó, sau khi chạy gate đầy đủ trên cả hai database. Bản patch không bao giờ chứa tính năng mới, cài đặt mới bắt buộc
+  hay thay đổi hợp đồng, nên cài riêng được an toàn.
+- Tương thích **database** giữa các phiên bản (nâng từ bản nào được, bước tay nào cần) ghi trong changelog của từng bản
+  phát hành.
 Cách phát hành ghi ở [`docs/RELEASING.md`](RELEASING.md).

@@ -214,5 +214,16 @@ Every release carries two lists of what is inside:
 
 ## Support
 
-Which releases get fixes, and for how long, is in [`SECURITY.md`](../SECURITY.md#supported-versions).
+From 1.0 each major version has long-term support:
+
+- The latest minor release gets every fix; the previous minor release gets security fixes for **3 months** after the next
+  minor release; when a new major version comes out, the last minor release of the previous major version gets
+  security fixes for **6 months**. Older releases are not patched. The table is in
+  [`SECURITY.md`](../SECURITY.md#supported-versions).
+- **Backporting.** A fix is made on `main` first. For a supported older line, a maintainer cherry-picks it onto a
+  `release/X.Y` branch cut from the latest `vX.Y.Z` tag, ships it as the next patch release (`X.Y.Z+1`) with only that
+  fix, and runs the full gate on both databases first. A patch release never contains new features, new required
+  settings or contract changes, so it is safe to install on its own.
+- Compatibility between versions of the **database** (which version you can upgrade from, manual steps) is stated in
+  the changelog of each release.
 How releases are made is in [`docs/RELEASING.md`](RELEASING.md) (in Vietnamese).

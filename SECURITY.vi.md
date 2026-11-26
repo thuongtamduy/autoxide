@@ -30,7 +30,8 @@ phải cam kết dịch vụ (SLA)**: không có hỗ trợ trả phí, không c
 Bản vá ra dưới dạng bản patch (`1.5.2` → `1.5.3`), không đổi gì khác, nên cài ngay được
 ([`docs/COMPATIBILITY.vi.md`](docs/COMPATIBILITY.vi.md) ghi bản patch được chứa gì). Hãy cập nhật lên
 bản mới nhất của dòng bạn dùng trước khi báo, và ghi trong báo cáo bạn đã thử trên phiên bản nào.
-`CHANGELOG.md` liệt kê mọi bản phát hành.
+`CHANGELOG.md` liệt kê mọi bản phát hành. Cách một bản sửa tới dòng cũ còn được hỗ trợ (quy trình vá ngược) ghi ở
+[`docs/COMPATIBILITY.vi.md`](docs/COMPATIBILITY.vi.md#hỗ-trợ).
 
 ## Rà soát bảo mật
 

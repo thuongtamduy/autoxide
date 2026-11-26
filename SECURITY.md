@@ -30,7 +30,8 @@ release only; older `0.x` releases are not patched.
 Fixes ship as patch releases (`1.5.2` → `1.5.3`), which change nothing else, so they are safe to
 install right away ([`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md) says what a patch release may
 contain). Update to the latest release of your line before reporting, and say in your report which
-version you tested. The `CHANGELOG.md` lists every release.
+version you tested. The `CHANGELOG.md` lists every release. How a fix reaches an older supported line (the
+backport process) is described in [`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md#support).
 
 ## Security reviews
 

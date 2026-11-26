@@ -178,6 +178,13 @@ Bản major là cam kết dài hạn ([`docs/COMPATIBILITY.md`](COMPATIBILITY.md
 `X.0.0-rc.N` trước — lần đầu là `1.0.0-rc.1` (D-20261123-supply-chain). Mở `rc.1` và lên bản chính thức đều do **chủ
 dự án quyết** (`1.0` là lúc chủ dự án tuyên bố API ổn định); agent kiểm tiêu chí bên dưới và báo khi đạt.
 
+**Thời gian và kênh phản hồi** (D-20261126-release-1-0-readiness): giai đoạn bản thử kéo dài **2–4 tuần** (tối thiểu 14
+ngày kể từ bản thử cuối, tiêu chí 1 bên dưới; quá 4 tuần mà còn lỗi nghiêm trọng mở thì chủ dự án quyết kéo dài hay
+lùi). Người ngoài báo phản hồi ở GitHub Discussions (mục "Release candidate") hay mở issue gắn nhãn `rc-feedback`; lỗi
+nghiêm trọng gắn thêm `release-blocker`. Khi ra `rc.1`, ghi trong trang Release và README hai việc: bản thử dành cho ai
+(người muốn thử nâng cấp, người viết module ngoài repo) và phản hồi gửi đi đâu. Agent đọc mọi phản hồi mới mỗi lần
+kiểm tiêu chí; phản hồi không phải lỗi (đề xuất tính năng) ghi lại cho sau 1.0, không làm chậm bản chính thức.
+
 **Phát hành một bản thử** — đúng các bước 1–8 ở trên, với phiên bản `X.0.0-rc.N`:
 
 - `version` của workspace, ghim `=X.0.0-rc.N` của crate nội bộ, `docs/openapi.json`, `sdk/typescript/package.json`
