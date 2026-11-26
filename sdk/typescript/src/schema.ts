@@ -206,9 +206,12 @@ export type AiPageRequest = {
 export type AiStatus = {
   /**
    * Daily token limit of this tenant: its plan's `ai.daily_tokens`, otherwise the server's
-   * `AUTOXIDE_AI_DAILY_TOKEN_LIMIT`; 0 means no limit.
+   * `AUTOXIDE_AI_DAILY_TOKEN_LIMIT`. Read it with `daily_token_limited`: 0 with `daily_token_limited`
+   * false means no limit; 0 with `daily_token_limited` true means the plan allows no AI tokens.
    */
   daily_token_limit: number;
+  /** A daily token limit applies to this tenant (`daily_token_limit` is that limit). */
+  daily_token_limited: boolean;
   /** Length of each embedding vector; 0 when off. */
   embedding_dimensions: number;
   /** Embedding model; empty when off. */
@@ -2938,11 +2941,14 @@ export type ClientConfigResponse = {
   };
   /** Menu settings an interface needs. */
   menus: {
-    /** Language of a menu when none is given. */
+    /**
+     * Language of a menu when none is given (tenant setting `menus.default_locale`, otherwise
+     * `AUTOXIDE_MENUS_DEFAULT_LOCALE`); always one of `locales`.
+     */
     default_locale: string;
     /**
      * Languages menus may be written in (tenant setting `menus.locales`, otherwise
-     * `AUTOXIDE_MENUS_LOCALES`), the default first.
+     * `AUTOXIDE_MENUS_LOCALES`), in the order they are set.
      */
     locales: string[];
   };
@@ -5835,9 +5841,12 @@ export type Data_AiStatus = {
   data: {
     /**
      * Daily token limit of this tenant: its plan's `ai.daily_tokens`, otherwise the server's
-     * `AUTOXIDE_AI_DAILY_TOKEN_LIMIT`; 0 means no limit.
+     * `AUTOXIDE_AI_DAILY_TOKEN_LIMIT`. Read it with `daily_token_limited`: 0 with `daily_token_limited`
+     * false means no limit; 0 with `daily_token_limited` true means the plan allows no AI tokens.
      */
     daily_token_limit: number;
+    /** A daily token limit applies to this tenant (`daily_token_limit` is that limit). */
+    daily_token_limited: boolean;
     /** Length of each embedding vector; 0 when off. */
     embedding_dimensions: number;
     /** Embedding model; empty when off. */
