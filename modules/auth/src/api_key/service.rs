@@ -12,7 +12,6 @@ use std::sync::Arc;
 use autoxide_kernel::access::ActorKind;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
-use autoxide_kernel::pagination::PageRequest;
 use sea_orm::sea_query::Expr;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, Condition, ConnectionTrait, EntityTrait, PaginatorTrait,
@@ -731,7 +730,7 @@ async fn fence_problem(
 mod tests {
     use super::*;
     use autoxide_kernel::error::ErrorKind;
-    use autoxide_kernel::pagination::Order;
+    use autoxide_kernel::pagination::{Order, PageRequest};
     use autoxide_testkit::TestDatabase;
 
     use crate::api::{Accounts, NewAccount};
