@@ -291,7 +291,7 @@ impl Automations {
         status: &str,
     ) -> Result<(), Error> {
         // Khoá các lần chạy đang chờ (Postgres `FOR UPDATE`, theo thứ tự id; SQLite: transaction ghi đã giữ cả
-        // database) rồi đóng bằng MỘT câu UPDATE. Worker nhận lần chạy (`claim`) cùng lúc phải chờ khoá, rồi thấy trạng
+        // database) rồi đóng bằng câu UPDATE theo lô (`CLOSE_BATCH` id mỗi câu). Worker nhận lần chạy (`claim`) cùng lúc phải chờ khoá, rồi thấy trạng
         // thái đã đổi và bỏ qua; lần chạy worker nhận trước thì không còn ở trạng thái chờ nên không bị khoá, không bị
         // ghi đè — runner tự dừng nó trước bước kế tiếp. Mỗi lần chạy bị đóng đúng một event `RunFailed`.
         let pending = autoxide_kernel::rows::lock(
