@@ -185,6 +185,13 @@ pub trait Module: Send + Sync {
         false
     }
 
+    /// The records (`#[derive(Record)]`) of the module, as `RecordInfo::of::<Note>()`: at startup the kernel
+    /// checks each against the live schema (table, columns, `tenant_id` for a tenant record) and refuses to
+    /// start on a mismatch.
+    fn records(&self) -> Vec<crate::db::RecordInfo> {
+        Vec::new()
+    }
+
     /// The names of modules that this module MUST have: every `context.require::<…>()?` to a trait of
     /// another module (and every event of another module that it listens to) is a name here. Enabling this
     /// module enables those modules with it. Things used "if present" (`.require::<…>().ok()`) are NOT
@@ -478,6 +485,12 @@ pub struct StartContext<'a> {
 }
 
 impl StartContext<'_> {
+    /// The control-plane handles of this module (`crate::db`): global records only; sweeping every tenant
+    /// is `all_tenants("reason")`. Tenant data goes through `tenant.db()`.
+    pub fn control_plane(&self) -> crate::db::ControlPlane {
+        crate::db::ControlPlane::new(self.database.clone(), self.module)
+    }
+
     /// The database registry (step 33): the installation's mode and each tenant's database. A service gets
     /// the database for tenant-level data through [`TenantContext`](crate::tenancy::TenantContext), not
     /// through [`database`](Self::database).

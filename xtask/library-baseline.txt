@@ -1,0 +1,40 @@
+# Chỗ cũ chờ chuyển sang lớp của kernel (D-20261126-library-isolation, `cargo xtask check`). Mỗi dòng:
+# `<luật> <số chỗ tối đa> <đường dẫn>` như `security-baseline.txt`. Chỉ được giảm: chuyển xong một module thì
+# xoá dòng của nó (gate chỉ cảnh báo khi số thật nhỏ hơn). Không thêm dòng cho code mới.
+#
+# - `wrapped-libraries`: module còn khai thư viện trong `wrapped-libraries.txt` (đếm theo số thư viện).
+# - `raw-sql`: số chỗ gọi `.sql(` trong mã không phải test của file.
+
+wrapped-libraries 1 modules/address/Cargo.toml
+wrapped-libraries 1 modules/ai/Cargo.toml
+wrapped-libraries 1 modules/analytics/Cargo.toml
+wrapped-libraries 1 modules/audit/Cargo.toml
+wrapped-libraries 1 modules/auth/Cargo.toml
+wrapped-libraries 1 modules/automations/Cargo.toml
+wrapped-libraries 1 modules/bookings/Cargo.toml
+wrapped-libraries 1 modules/catalog/Cargo.toml
+wrapped-libraries 1 modules/comments/Cargo.toml
+wrapped-libraries 1 modules/compliance/Cargo.toml
+wrapped-libraries 1 modules/content/Cargo.toml
+wrapped-libraries 1 modules/conversations/Cargo.toml
+wrapped-libraries 1 modules/customers/Cargo.toml
+wrapped-libraries 1 modules/files/Cargo.toml
+wrapped-libraries 1 modules/forms/Cargo.toml
+wrapped-libraries 1 modules/idempotency/Cargo.toml
+wrapped-libraries 1 modules/inventory/Cargo.toml
+wrapped-libraries 1 modules/invoices/Cargo.toml
+wrapped-libraries 1 modules/ledger/Cargo.toml
+wrapped-libraries 1 modules/mail/Cargo.toml
+wrapped-libraries 1 modules/media/Cargo.toml
+wrapped-libraries 1 modules/menus/Cargo.toml
+wrapped-libraries 1 modules/newsletter/Cargo.toml
+wrapped-libraries 1 modules/notifications/Cargo.toml
+wrapped-libraries 1 modules/orders/Cargo.toml
+wrapped-libraries 1 modules/organizations/Cargo.toml
+wrapped-libraries 1 modules/plans/Cargo.toml
+wrapped-libraries 1 modules/promotions/Cargo.toml
+wrapped-libraries 1 modules/reporting/Cargo.toml
+wrapped-libraries 1 modules/shipping/Cargo.toml
+wrapped-libraries 1 modules/support/Cargo.toml
+wrapped-libraries 1 modules/tax/Cargo.toml
+wrapped-libraries 1 modules/webhooks/Cargo.toml

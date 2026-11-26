@@ -561,6 +561,7 @@ impl<'a> TestAppBuilder<'a> {
         let statements = Arc::new(StatementLog::default());
         database.observe_statements(statements.observer());
         migrator.up(&database).await.map_err(|e| fail("migrations", e))?;
+        modules.check_records(&database).await.map_err(|e| fail("records", e))?;
         let registry = if self.multi {
             // Đặt thẳng chế độ (đặt `AUTOXIDE_TENANCY_MODE=multi` thì phải có cả khoá gốc); các
             // biến `AUTOXIDE_TENANCY_*` khác test đặt bằng `setting` vẫn có tác dụng.

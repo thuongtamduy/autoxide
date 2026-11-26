@@ -486,6 +486,11 @@ impl TenantContext {
         self.0.placement
     }
 
+    /// The tenant's database handles (`crate::db`): every tenant record is filtered by this tenant.
+    pub fn db(&self) -> crate::db::TenantDb<'_> {
+        crate::db::TenantDb::new(self)
+    }
+
     /// The database that holds the tenant's data.
     pub fn database(&self) -> &Database {
         &self.0.database

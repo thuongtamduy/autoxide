@@ -8,10 +8,10 @@ use autoxide_kernel::access::{Grant, Principal, Scope};
 use autoxide_kernel::database::Database;
 use autoxide_kernel::tenancy::{DEFAULT_TENANT, root_of};
 
+use autoxide_kernel::db::Queries as _;
 use autoxide_testkit::mcp::McpClient;
 use autoxide_testkit::{TestApp, TestDatabase, tool};
 use axum::http::{Method, StatusCode};
-use sea_orm::{ConnectionTrait, Statement};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
@@ -68,10 +68,10 @@ async fn mcp(app: &TestApp, who: &str) -> McpClient {
 }
 
 async fn events(database: &Database) -> Vec<String> {
-    let backend = database.read().get_database_backend();
     let sql = "SELECT name FROM notes_events ORDER BY id";
-    let rows = database.read().query_all_raw(Statement::from_string(backend, sql)).await;
-    rows.unwrap().iter().map(|row| row.try_get("", "name").unwrap()).collect()
+    let rows: Vec<(String,)> =
+        autoxide_testkit::all_tenants(database).read().sql(sql).all().await.unwrap();
+    rows.into_iter().map(|(name,)| name).collect()
 }
 
 /// REST và MCP gọi cùng service: ghi bằng đường này, đọc được bằng đường kia.
@@ -405,6 +405,57 @@ async fn permission_cua_toi_kem_mo_ta_va_rui_ro() {
         assert_eq!(english.json()["data"][1]["description"], "Create, change and delete the notes in your scope (with scope `own`: only your own).");
         let anonymous = app.get("/api/v1/me/permissions").send().await.unwrap();
         assert_eq!(anonymous.status(), StatusCode::UNAUTHORIZED);
+    })
+    .await
+    .unwrap();
+}
+
+/// Module giả cùng tên `notes`, khai record lệch với bảng thật mà migration của `notes` dựng.
+struct Declares(Vec<autoxide_kernel::db::RecordInfo>);
+
+impl autoxide_kernel::module::Module for Declares {
+    fn name(&self) -> &'static str {
+        "notes"
+    }
+
+    fn records(&self) -> Vec<autoxide_kernel::db::RecordInfo> {
+        self.0.clone()
+    }
+}
+
+/// `notes_note` không có cột `pinned`.
+#[derive(autoxide_kernel::db::Record, Debug, Clone)]
+#[record(table = "notes_note", scope = tenant)]
+struct NoteWithExtra {
+    id: Uuid,
+    tenant_id: autoxide_kernel::db::TenantKey,
+    pinned: bool,
+}
+
+/// `notes_note` có `tenant_id` mà record khai `global`: derive không thấy bảng thật, kernel chặn lúc khởi động.
+#[derive(autoxide_kernel::db::Record, Debug, Clone)]
+#[record(table = "notes_note", scope = global)]
+struct NoteAsGlobal {
+    id: Uuid,
+    title: String,
+}
+
+/// Bước đối chiếu lúc khởi động (D-20261126-kernel-data-layer): record khớp bảng thì qua; lệch thì báo đủ chỗ lệch.
+#[tokio::test]
+async fn record_lech_schema_thi_khong_khoi_dong() {
+    use autoxide_kernel::db::RecordInfo;
+    use autoxide_kernel::module::Modules;
+    TestDatabase::run(async |test| {
+        // `TestApp` đã chạy chính bước này cho record thật của `notes` (`Module::records`).
+        let app = TestApp::builder(test).module(crate::module()).build().await.unwrap();
+        let wrong = Modules::new(vec![Box::new(Declares(vec![
+            RecordInfo::of::<NoteWithExtra>(),
+            RecordInfo::of::<NoteAsGlobal>(),
+        ]))])
+        .unwrap();
+        let message = wrong.check_records(app.database()).await.unwrap_err().to_string();
+        assert!(message.contains("field `pinned` has no column"), "{message}");
+        assert!(message.contains("is `scope = global` but the table has `tenant_id`"), "{message}");
     })
     .await
     .unwrap();

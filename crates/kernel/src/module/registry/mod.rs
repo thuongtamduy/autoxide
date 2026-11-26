@@ -365,6 +365,32 @@ impl Modules {
         result
     }
 
+    /// Checks the records every module declares (`Module::records`) against the live schema of `database`
+    /// (migrations applied). Call it after the migrations and before serving; a mismatch is an error listing
+    /// every problem.
+    pub async fn check_records(&self, database: &Database) -> Result<(), ModuleError> {
+        let mut problems = Vec::new();
+        for module in &self.modules {
+            let records = module.records();
+            if records.is_empty() {
+                continue;
+            }
+            problems.extend(
+                crate::db::record_problems(database, module.name(), &records)
+                    .await
+                    .map_err(ModuleError)?,
+            );
+        }
+        if problems.is_empty() {
+            Ok(())
+        } else {
+            Err(ModuleError(format!(
+                "records do not match the database schema: {}",
+                problems.join("; ")
+            )))
+        }
+    }
+
     /// Starts each module in registration order, in single-tenant mode on `database`. If a module fails, it
     /// stops and reports that module's name.
     pub fn start(&mut self, database: &Database) -> Result<(), ModuleError> {

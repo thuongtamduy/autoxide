@@ -59,6 +59,10 @@ impl Module for NotesModule {
         migration::all()
     }
 
+    fn records(&self) -> Vec<autoxide_kernel::db::RecordInfo> {
+        vec![autoxide_kernel::db::RecordInfo::of::<entity::Note>()]
+    }
+
     fn permissions(&self) -> Vec<Permission> {
         permissions::all()
     }

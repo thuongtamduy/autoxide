@@ -462,6 +462,15 @@ impl OrgTree {
         roots: &[OrgId],
         column: Col,
     ) -> Condition {
+        Self::subtree_condition_on(tenant, roots, Expr::col((column.entity_name(), column)))
+    }
+
+    /// [`subtree_condition`](Self::subtree_condition) on a column given as an expression (the `db` layer).
+    pub(crate) fn subtree_condition_on(
+        tenant: TenantId,
+        roots: &[OrgId],
+        column: Expr,
+    ) -> Condition {
         let descendants = Query::select()
             .column(closure::Column::DescendantId)
             .from(closure::Entity)

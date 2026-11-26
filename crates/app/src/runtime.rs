@@ -53,6 +53,13 @@ pub async fn start(settings: Settings, migrations: Migrations) -> Result<Runtime
         let _ = database.close().await;
         return Err(error);
     }
+    // Record của module khớp schema thật (D-20261126-kernel-data-layer); chỉ khi migration đã đủ.
+    if migrations == Migrations::RequireApplied
+        && let Err(error) = modules.check_records(&database).await
+    {
+        let _ = database.close().await;
+        return Err(error.to_string());
+    }
     // Sổ database: chế độ (`AUTOXIDE_TENANCY_MODE`) và các placement (bước 33).
     let registry = autoxide_kernel::tenancy::DatabaseRegistry::new(
         database.clone(),
