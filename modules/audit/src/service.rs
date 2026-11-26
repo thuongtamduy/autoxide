@@ -208,18 +208,29 @@ impl autoxide_kernel::resource::RecordHistory for AuditService {
         language: autoxide_kernel::i18n::Language,
     ) -> Result<Vec<autoxide_kernel::resource::HistoryLine>, Error> {
         let page = PageRequest::first(limit, autoxide_kernel::pagination::Order::Desc);
+        Ok(self.history_page(tenant, subject, &page, language).await?.data)
+    }
+
+    // Trang keyset theo id ngay trong database (index (tenant_id, subject, id)), không đọc hết rồi cắt.
+    async fn history_page(
+        &self,
+        tenant: &TenantContext,
+        subject: &str,
+        page: &PageRequest,
+        language: autoxide_kernel::i18n::Language,
+    ) -> Result<Page<autoxide_kernel::resource::HistoryLine>, Error> {
         let select = Entity::find().filter(Column::Subject.eq(subject)).scoped(tenant);
-        let rows = fetch_page(select, Column::Id, |row| row.id, &page, tenant.database().read())
-            .await?
-            .data;
-        let ids: Vec<Uuid> = rows.iter().filter_map(|row| row.actor_user_id).collect();
+        let rows =
+            fetch_page(select, Column::Id, |row| row.id, page, tenant.database().read()).await?;
+        let ids: Vec<Uuid> = rows.data.iter().filter_map(|row| row.actor_user_id).collect();
         let names = self.actor_names(tenant, &ids).await?;
         let sentences: std::collections::HashMap<&str, &str> = self
             .events
             .iter()
             .filter_map(|event| event.activity_line().map(|(sentence, _)| (event.name(), sentence)))
             .collect();
-        Ok(rows
+        let data = rows
+            .data
             .iter()
             .map(|row| {
                 let sentence = sentences
@@ -233,6 +244,7 @@ impl autoxide_kernel::resource::RecordHistory for AuditService {
                 .actor(row.actor_user_id, row.actor_user_id.and_then(|id| names.get(&id).cloned()))
                 .sentence(sentence)
             })
-            .collect())
+            .collect();
+        Ok(Page { data, pagination: rows.pagination })
     }
 }

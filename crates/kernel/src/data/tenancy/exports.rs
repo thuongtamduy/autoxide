@@ -372,6 +372,25 @@ impl TenantExports {
         Ok(rows.into_iter().map(Into::into).collect())
     }
 
+    /// One page of tenant `tenant`'s exports, newest first unless `order=asc`, keyset in the database on the
+    /// index `(tenant_id, id)`.
+    pub(crate) async fn page(
+        &self,
+        tenant: TenantId,
+        page: &crate::pagination::PageRequest,
+    ) -> Result<crate::pagination::Page<TenantExport>, Error> {
+        let select = Entity::find().filter(Column::TenantId.eq(tenant.as_uuid()));
+        let rows = crate::pagination::fetch_page(
+            select,
+            Column::Id,
+            |row| row.id,
+            page,
+            self.control().read(),
+        )
+        .await?;
+        Ok(rows.map(Into::into))
+    }
+
     /// Runs export `id`: writes the file to the tenant's store, then `ready` (or `failed`).
     async fn run(&self, id: Uuid) -> Result<(), Error> {
         let Some(row) = Entity::find_by_id(id).one(self.control().write()).await? else {
@@ -745,28 +764,32 @@ async fn request_export(
 
 /// List the data exports of a tenant.
 ///
-/// Same permissions as `POST /tenants/{id}/exports`. Newest first, at most 50.
+/// Same permissions as `POST /tenants/{id}/exports`. Newest first unless `order=asc`; paged with
+/// `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/tenants/{id}/exports",
     extensions(("x-permissions" = json!(["kernel.data.export", "kernel.tenants.operate"]))),
     operation_id = "list_tenant_exports",
     security(("bearer" = [])),
-    params(("id" = String, Path, description = "Id or slug of the tenant.")),
+    params(("id" = String, Path, description = "Id or slug of the tenant."), crate::pagination::PageQuery),
     responses(
-        (status = 200, description = "The exports, newest first.", body = Data<Vec<TenantExport>>),
+        (status = 200, description = "One page of exports, newest first.", body = crate::pagination::Page<TenantExport>),
         (status = 401, description = "Not signed in; code `unauthorized` or the code of the authentication module.", body = Problem),
         (status = 403, description = "Missing both `kernel.data.export` and `kernel.tenants.operate` (`permission_denied`), or platform staff targeting another tenant without having entered it under a support access grant (`kernel.export_needs_tenant_access`).", body = Problem),
         (status = 404, description = "No such tenant you may export; code `tenant_not_found`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_exports(
     State(exports): State<Arc<TenantExports>>,
     principal: Principal,
     Path(id): Path<String>,
-) -> Result<Data<Vec<TenantExport>>, Error> {
+    Query(page): Query<crate::pagination::PageQuery>,
+) -> Result<crate::pagination::Page<TenantExport>, Error> {
     let tenant = allowed(&exports, &principal, &id).await?;
-    Ok(Data { data: exports.list(tenant).await? })
+    let page = crate::pagination::PageRequest::try_from(page)?;
+    exports.page(tenant, &page).await
 }
 
 /// Get a data export of a tenant.

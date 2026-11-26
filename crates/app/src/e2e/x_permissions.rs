@@ -1,9 +1,10 @@
 //! PT-13: `x-permissions` của mỗi operation khớp chỗ service kiểm. App dựng KHÔNG có lớp permission của kernel
 //! (`without_permission_gate`) để thấy service tự nhận gì. Với mỗi permission `P` mà một module khai, một tài khoản
 //! chỉ có `P` gọi mọi operation của cùng module mà `P` KHÔNG nằm trong `x-permissions`: service phải từ chối (403
-//! `permission_denied`, hay 404 khi operation khai `x-hides-existence`). Trả gì khác nghĩa là service nhận `P` mà tài
+//! `permission_denied`). Trả gì khác nghĩa là service nhận `P` mà tài
 //! liệu không nêu — khi bật lớp permission, người giữ `P` bị chặn oan. 422 `validation_failed` (service kiểm dữ liệu
-//! trước quyền; khi có lớp permission thì không xảy ra) không kết luận được nên bỏ qua.
+//! trước quyền) và 404 của operation khai `x-hides-existence` không kết luận được nên không tính; operation nào không có
+//! lượt nào kết luận được thì test đỏ (bài dò không được qua mà không thử gì).
 //!
 //! Chiều ngược lại (permission ĐƯỢC khai mà service vẫn từ chối) không kiểm ở đây: vài operation cần cùng lúc hai
 //! permission, `x-permissions` ("một trong các permission là đủ") không diễn đạt được (D-20261126-permission-gate).
@@ -89,6 +90,8 @@ async fn x_permissions_khop_cho_service_kiem() {
         }
 
         let mut findings = Vec::new();
+        let mut untested = Vec::new();
+        let mut conclusive_total = 0;
         for (path, item) in document["paths"].as_object().unwrap() {
             for (method, operation) in item.as_object().unwrap() {
                 if !matches!(method.as_str(), "get" | "post" | "put" | "patch" | "delete") {
@@ -101,16 +104,27 @@ async fn x_permissions_khop_cho_service_kiem() {
                 let Some(first) = listed.first() else { continue };
                 let module = module_of(first);
                 let hides = operation.get("x-hides-existence") == Some(&json!(true));
-                let probe = probe(&document, method, path, operation);
+                let mut probe = probe(&document, method, path, operation);
+                // `limit=0` (cố ý sai, cho bài thứ tự PT-14) làm service không có lớp permission trả 422 trước khi
+                // kiểm quyền: bỏ đi để danh sách cũng được dò.
+                probe.uri = probe.uri.replace("?limit=0&", "?").replace("?limit=0", "").replace("&limit=0", "");
+                // Lượt có kết luận: service từ chối bằng 403 `permission_denied` (đã tới bước kiểm quyền), hay nhận.
+                // 422 `validation_failed` (kiểm dữ liệu trước quyền) và 404 của operation ẩn tồn tại (ID ngẫu nhiên
+                // không có, kiểm quyền hay không cũng 404) không nói gì về quyền.
+                let (mut tried, mut conclusive) = (0, 0);
                 for (name, token) in &tokens {
                     if module_of(name) != module || listed.contains(&name.as_str()) {
                         continue;
                     }
+                    tried += 1;
                     let (status, body) = send(&app, &probe, Some(token)).await;
-                    let refused = status == 403 && body["code"] == "permission_denied"
+                    let refused = status == 403 && body["code"] == "permission_denied";
+                    let inconclusive = status == 422 && body["code"] == "validation_failed"
                         || hides && status == 404;
-                    let inconclusive = status == 422 && body["code"] == "validation_failed";
-                    if !refused && !inconclusive {
+                    if refused {
+                        conclusive += 1;
+                    } else if !inconclusive {
+                        conclusive += 1;
                         findings.push(format!(
                             "{} {path}: `{name}` (not in x-permissions {listed:?}) answered {status} {}",
                             method.to_uppercase(),
@@ -118,8 +132,22 @@ async fn x_permissions_khop_cho_service_kiem() {
                         ));
                     }
                 }
+                conclusive_total += conclusive;
+                let key = format!("{} {path}", method.to_uppercase());
+                if tried > 0 && conclusive == 0 {
+                    untested.push(key);
+                }
             }
         }
+        // Tài liệu mất `x-permissions` (hay không còn operation nào được dò) thì bài dò không được xanh.
+        assert!(conclusive_total > 0, "no probe reached a permission check");
+        // Operation không có lượt nào kết luận được thì bài dò không nói gì về nó: đỏ để mẫu request được sửa.
+        assert!(
+            untested.is_empty(),
+            "{} operation(s) never reached a permission check:\n{}",
+            untested.len(),
+            untested.join("\n")
+        );
         assert!(findings.is_empty(), "{} finding(s):\n{}", findings.len(), findings.join("\n"));
     })
     .await

@@ -107,10 +107,11 @@ async fn canh_bao_van_hanh_chi_lieu_buoc_chua_dat() {
 async fn co_gi_moi_doc_tu_changelog() {
     TestDatabase::run(async |test| {
         let app = TestApp::builder(test).build().await.unwrap();
-        let all = app.get("/api/v1/kernel/whats-new").send().await.unwrap();
+        let all = app.get("/api/v1/kernel/whats-new?limit=5").send().await.unwrap();
         assert_eq!(all.status(), StatusCode::OK, "{}", all.json());
         let releases = all.json()["data"].as_array().unwrap().clone();
         assert!(!releases.is_empty() && releases.len() <= 5);
+        assert_eq!(all.json()["pagination"]["limit"], 5);
         assert!(releases[0]["sections"][0]["items"][0].is_string());
         let newer = app.get("/api/v1/kernel/whats-new?since=0.13.0").send().await.unwrap();
         let versions: Vec<String> = newer.json()["data"]
@@ -123,8 +124,16 @@ async fn co_gi_moi_doc_tu_changelog() {
             versions.contains(&"0.14.0".to_owned()) && !versions.contains(&"0.13.0".to_owned()),
             "{versions:?}"
         );
-        let bad = app.get("/api/v1/kernel/whats-new?since=latest").send().await.unwrap();
+        // Lọc sai và tham số trang sai: một lỗi 422 nêu cả hai (D-083).
+        let bad = app.get("/api/v1/kernel/whats-new?since=latest&limit=0").send().await.unwrap();
         assert_eq!(bad.status(), StatusCode::UNPROCESSABLE_ENTITY);
+        let fields: Vec<String> = bad.json()["errors"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|error| error["field"].as_str().unwrap().to_owned())
+            .collect();
+        assert_eq!(fields, ["since", "limit"]);
     })
     .await
     .unwrap();

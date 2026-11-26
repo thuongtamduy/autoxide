@@ -715,6 +715,9 @@ impl HistoryLine {
     }
 }
 
+/// How many events the default [`RecordHistory::history_page`] reads through [`RecordHistory::history`].
+pub const HISTORY_PAGE_FALLBACK_LIMIT: u32 = 10_000;
+
 /// History by record, published by the module that keeps the log (`audit`) with
 /// `context.provide::<dyn RecordHistory>(...)`. The kernel has already checked that the caller can read the
 /// record before asking.
@@ -730,4 +733,44 @@ pub trait RecordHistory: Send + Sync {
         limit: u32,
         language: crate::i18n::Language,
     ) -> Result<Vec<HistoryLine>, Error>;
+
+    /// One page of the events with subject `subject`, ordered by event ID (UUIDv7, so the order they were
+    /// recorded): newest first unless `page` asks `asc`; the cursor is the ID of the last line
+    /// (D-20261125-list-pages).
+    ///
+    /// The default implementation exists only so that providers written before this method keep compiling: it
+    /// reads the newest [`HISTORY_PAGE_FALLBACK_LIMIT`] events through [`history`](Self::history) (a finite
+    /// `limit`, so a provider that checks it does not refuse) and cuts the page in memory — older events are not
+    /// reachable through it, and every page costs as much as that whole read. Providers should override it with a
+    /// keyset page in their database (the `audit` module does).
+    async fn history_page(
+        &self,
+        tenant: &TenantContext,
+        subject: &str,
+        page: &crate::pagination::PageRequest,
+        language: crate::i18n::Language,
+    ) -> Result<crate::pagination::Page<HistoryLine>, Error> {
+        use crate::pagination::{Order, Page, Pagination};
+        let mut lines =
+            self.history(tenant, subject, HISTORY_PAGE_FALLBACK_LIMIT, language).await?;
+        let total = page.wants_total().then(|| u64::try_from(lines.len()).unwrap_or(u64::MAX));
+        match page.order() {
+            Order::Asc => lines.sort_by_key(|line| line.id),
+            Order::Desc => lines.sort_by_key(|line| std::cmp::Reverse(line.id)),
+        }
+        if let Some(cursor) = page.cursor() {
+            lines.retain(|line| match page.order() {
+                Order::Asc => line.id > cursor,
+                Order::Desc => line.id < cursor,
+            });
+        }
+        let limit = page.limit() as usize;
+        let has_more = lines.len() > limit;
+        lines.truncate(limit);
+        let next_cursor = has_more.then(|| lines.last().map(|line| line.id.to_string())).flatten();
+        Ok(Page {
+            data: lines,
+            pagination: Pagination::new(page.limit(), next_cursor).with_total(total),
+        })
+    }
 }

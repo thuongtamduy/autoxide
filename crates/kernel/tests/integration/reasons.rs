@@ -147,3 +147,54 @@ async fn danh_sach_ly_do_theo_khach() {
     .await
     .unwrap();
 }
+
+// Danh sách lý do đọc gộp trong bộ nhớ nên có trần ở chỗ ghi: khách thêm tối đa `AUTOXIDE_REASONS_TENANT_MAX` lý do
+// riêng mỗi danh sách (409 `kernel.reason_limit_reached`); sửa lý do đã có vẫn được. Trang theo vị trí rồi mã,
+// theo `next_cursor` tới hết.
+#[tokio::test]
+async fn tran_ly_do_rieng_va_phan_trang() {
+    TestDatabase::run(async |test| {
+        let app = TestApp::builder(test)
+            .setting("AUTOXIDE_REASONS_TENANT_MAX", "2")
+            .user("manager", 1, &["shop.read", "kernel.reasons.manage"])
+            .module(Shop(Arc::new(Mutex::new(None))))
+            .build()
+            .await
+            .unwrap();
+        let put = async |code: &str| {
+            app.put(&format!("/api/v1/kernel/reasons/shop.cancel/{code}"))
+                .token("manager")
+                .json(json!({"labels": {"en": code}}))
+                .send()
+                .await
+                .unwrap()
+        };
+        assert_eq!(put("damaged").await.status(), StatusCode::OK);
+        assert_eq!(put("late").await.status(), StatusCode::OK);
+        let third = put("wrong_size").await;
+        assert_eq!(
+            (third.status(), third.json()["code"].as_str()),
+            (StatusCode::CONFLICT, Some("kernel.reason_limit_reached"))
+        );
+        assert_eq!(put("late").await.status(), StatusCode::OK, "sửa lý do đã có không tính thêm");
+        assert_eq!(put("out_of_stock").await.status(), StatusCode::OK, "lý do mặc định không tính");
+
+        let mut seen = Vec::new();
+        let mut cursor: Option<String> = None;
+        loop {
+            let mut path = "/api/v1/kernel/reasons/shop.cancel?limit=2".to_owned();
+            if let Some(cursor) = &cursor {
+                path.push_str(&format!("&cursor={cursor}"));
+            }
+            let page = app.get(&path).token("manager").send().await.unwrap().json();
+            seen.extend(codes(&page));
+            match page["pagination"]["next_cursor"].as_str() {
+                Some(next) => cursor = Some(next.to_owned()),
+                None => break,
+            }
+        }
+        assert_eq!(seen, ["customer_request", "out_of_stock", "fraud", "damaged", "late"]);
+    })
+    .await
+    .unwrap();
+}

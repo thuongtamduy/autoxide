@@ -104,6 +104,21 @@ impl PageInput {
                 .with_count(count),
         )
     }
+
+    // Danh sách có thứ tự tự nhiên (tên, vị trí, mã): cùng kiểu tham số với REST (`NaturalOrderPageQuery`,
+    // `order` mặc định `asc`), nên kiểm và lỗi giống hệt endpoint.
+    /// Validated page request of a list in a natural order (`order` defaults to `asc`), like REST's.
+    pub(crate) fn natural_page(self) -> Result<PageRequest, Error> {
+        let count = self.count.unwrap_or(false);
+        PageRequest::try_from(
+            crate::pagination::NaturalOrderPageQuery::new(
+                self.limit.map(|limit| limit.to_string()),
+                self.cursor,
+                self.order,
+            )
+            .with_count(count),
+        )
+    }
 }
 
 /// The body of a tool: receives the tenant, the caller and JSON arguments, returns a JSON result.

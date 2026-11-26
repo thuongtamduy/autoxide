@@ -267,5 +267,6 @@
   "auth.phone_signup_unavailable": "Máy chủ này không có module cấp token xác thực số điện thoại (như tra đơn hàng).",
   "auth.phone_taken": "Số điện thoại này đã có tài khoản. Hãy đăng nhập bằng mã gửi tới số đó.",
   "auth.phone_signup_throttled": "Đã tạo quá nhiều tài khoản từ địa chỉ này. Thử lại sau {retry_after} giây.",
-  "field:is not valid or has expired; look the order up again": "không hợp lệ hoặc đã hết hạn; hãy tra lại đơn hàng"
+  "field:is not valid or has expired; look the order up again": "không hợp lệ hoặc đã hết hạn; hãy tra lại đơn hàng",
+  "field:must be the `next_cursor` value of a previous page, unchanged": "phải là giá trị `next_cursor` nguyên vẹn của một trang trước"
 }

@@ -284,28 +284,26 @@ impl SupportService {
         Ok(rows.into_iter().collect())
     }
 
-    /// Mọi lần cấp cho khách `target` (mới nhất trước) — cho quản trị của khách và của nền tảng.
-    pub(crate) async fn for_tenant(&self, target: TenantId) -> Result<Vec<SupportGrant>, Error> {
-        self.grants(Some(target), None).await
-    }
-
-    /// Lần cấp mới nhất trước, của khách `target` (`None`: mọi khách), tối đa `limit`.
-    pub(crate) async fn grants(
+    /// Một trang lần cấp của khách `target` (`None`: mọi khách), mới nhất trước trừ `order=asc`; keyset theo
+    /// id trên index (tenant_id, target_tenant_id, id) / khoá chính (tenant_id, id) của khách nền tảng.
+    pub(crate) async fn grants_page(
         &self,
         target: Option<TenantId>,
-        limit: Option<u64>,
-    ) -> Result<Vec<SupportGrant>, Error> {
-        use sea_orm::QuerySelect as _;
+        page: &autoxide_kernel::pagination::PageRequest,
+    ) -> Result<autoxide_kernel::pagination::Page<SupportGrant>, Error> {
         let platform = self.platform();
         let mut select = entity::Entity::find().scoped(&platform);
         if let Some(target) = target {
             select = select.filter(entity::Column::TargetTenantId.eq(target.as_uuid()));
         }
-        Ok(select
-            .order_by_desc(entity::Column::Id)
-            .limit(limit)
-            .all(platform.database().read())
-            .await?)
+        autoxide_kernel::pagination::fetch_page(
+            select,
+            entity::Column::Id,
+            |row| row.id,
+            page,
+            platform.database().read(),
+        )
+        .await
     }
 
     /// Thu hồi lần cấp `id` của khách `target`. `by_tenant`: khách tự thu hồi — lần cấp

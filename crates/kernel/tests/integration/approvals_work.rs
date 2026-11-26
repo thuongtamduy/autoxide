@@ -131,3 +131,134 @@ async fn yeu_cau_duyet_vao_hop_viec_va_tool_mcp() {
     .await
     .unwrap();
 }
+
+/// Ghi thẳng một yêu cầu duyệt của `requested_by` cần `permission`, trạng thái `status`.
+async fn insert_request(
+    app: &TestApp,
+    requested_by: u128,
+    permission: &str,
+    status: &str,
+) -> String {
+    use sea_orm::ConnectionTrait;
+    use sea_orm::sea_query::{Alias, Query};
+    let id = Uuid::now_v7();
+    let tenant = autoxide_kernel::tenancy::DatabaseRegistry::single(app.database().clone())
+        .default_tenant()
+        .id()
+        .as_uuid();
+    let now = Timestamp::now();
+    let insert = Query::insert()
+        .into_table(Alias::new("kernel_approval_requests"))
+        .columns(
+            [
+                "id",
+                "tenant_id",
+                "requested_by",
+                "summary",
+                "body_hash",
+                "permissions",
+                "status",
+                "expires_at",
+                "created_at",
+            ]
+            .map(Alias::new),
+        )
+        .values_panic([
+            id.into(),
+            tenant.into(),
+            Uuid::from_u128(requested_by).into(),
+            "DELETE /api/v1/shop/things/1".into(),
+            "h".into(),
+            format!("[\"{permission}\"]").into(),
+            status.into(),
+            (now + SignedDuration::from_hours(1)).into(),
+            now.into(),
+        ])
+        .to_owned();
+    app.database().write().execute(&insert).await.unwrap();
+    id.to_string()
+}
+
+// Danh sách yêu cầu duyệt phân trang trong database: người duyệt chỉ thấy yêu cầu cần permission mình có (lọc
+// trong SQL, không thấy của người khác), theo `next_cursor` tới hết không trùng / sót; trạng thái sai và tham số
+// trang sai báo chung một lỗi 422.
+#[tokio::test]
+async fn yeu_cau_duyet_phan_trang_chi_cai_duoc_xem() {
+    TestDatabase::run(async |test| {
+        let app = TestApp::builder(test)
+            .user("boss", 1, &["kernel.views.share"])
+            .user("other", 2, &[])
+            .build()
+            .await
+            .unwrap();
+        let mut visible = Vec::new();
+        for index in 0..7 {
+            // Xen kẽ: yêu cầu cần permission `boss` có, và yêu cầu cần permission khác (của người khác).
+            visible.push(insert_request(&app, 9, "kernel.views.share", "pending").await);
+            insert_request(
+                &app,
+                8,
+                "shop_x.delete",
+                if index % 2 == 0 { "pending" } else { "rejected" },
+            )
+            .await;
+        }
+        insert_request(&app, 9, "kernel.views.share", "rejected").await;
+        let walk = async |token: &str, query: &str| -> Vec<String> {
+            let mut seen = Vec::new();
+            let mut cursor: Option<String> = None;
+            loop {
+                let mut path = format!("/api/v1/kernel/approvals?limit=3&{query}");
+                if let Some(cursor) = &cursor {
+                    path.push_str(&format!("&cursor={cursor}"));
+                }
+                let page = app.get(&path).token(token).send().await.unwrap().json();
+                seen.extend(
+                    page["data"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .map(|a| a["id"].as_str().unwrap().to_owned()),
+                );
+                match page["pagination"]["next_cursor"].as_str() {
+                    Some(next) => cursor = Some(next.to_owned()),
+                    None => return seen,
+                }
+            }
+        };
+        let mut newest_first = visible.clone();
+        newest_first.reverse();
+        assert_eq!(walk("boss", "status=pending").await, newest_first);
+        assert_eq!(walk("boss", "status=pending&order=asc").await, visible);
+        assert_eq!(walk("boss", "").await.len(), 8, "kể cả yêu cầu đã từ chối");
+        assert!(
+            walk("other", "").await.is_empty(),
+            "không quyết được, không phải của mình: không thấy"
+        );
+        let counted = app
+            .get("/api/v1/kernel/approvals?status=pending&count=true")
+            .token("boss")
+            .send()
+            .await
+            .unwrap()
+            .json();
+        assert_eq!(counted["pagination"]["total"], 7);
+
+        let wrong = app
+            .get("/api/v1/kernel/approvals?status=done&limit=0")
+            .token("boss")
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(wrong.status(), StatusCode::UNPROCESSABLE_ENTITY);
+        let fields: Vec<String> = wrong.json()["errors"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|error| error["field"].as_str().unwrap().to_owned())
+            .collect();
+        assert_eq!(fields, ["status", "limit"]);
+    })
+    .await
+    .unwrap();
+}

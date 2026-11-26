@@ -7,7 +7,7 @@ use std::sync::Arc;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
-use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
+use autoxide_kernel::pagination::{NaturalOrderPageQuery, Page, PageQuery, PageRequest, page_of};
 use autoxide_kernel::response::{Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, Query, State};
@@ -124,7 +124,17 @@ pub(crate) struct MembershipsQuery {
     inherited: bool,
 }
 
-/// Câu trả lời kèm tên nút: một lần tra mỗi nút qua `OrgDirectory` (người dùng làm ở ít nút).
+/// Một trang membership kèm tên nút (như [`memberships`]).
+async fn membership_page(
+    state: &HttpState,
+    tenant: &TenantContext,
+    page: Page<Membership>,
+) -> Result<Page<MembershipResponse>, Error> {
+    let data = memberships(state, tenant, page.data).await?.data;
+    Ok(Page { data, pagination: page.pagination })
+}
+
+/// Câu trả lời kèm tên nút: một lần tra mỗi nút qua `OrgDirectory` (một trang, hay các nút vừa ghi).
 pub(crate) async fn memberships(
     state: &HttpState,
     tenant: &TenantContext,
@@ -147,19 +157,21 @@ pub(crate) async fn memberships(
 
 /// List the organization units a user works in, with the roles there.
 ///
-/// Requires `auth.users.read`.
+/// Requires `auth.users.read`. One entry per unit, by unit id (`order=desc` reverses it); paged
+/// with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/users/{id}/memberships",
     extensions(("x-permissions" = json!(["auth.users.read"]))),
     operation_id = "get_user_memberships",
     security(("bearer" = [])),
-    params(("id" = Uuid, Path, description = "Id of the user.")),
+    params(("id" = Uuid, Path, description = "Id of the user."), NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "One entry per unit, sorted by unit id.", body = Data<Vec<MembershipResponse>>),
+        (status = 200, description = "One page of units, by unit id.", body = Page<MembershipResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `auth.users.read`; code `permission_denied`.", body = Problem),
         (status = 404, description = "No user has this id; code `auth.user_not_found`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn get_user_memberships(
@@ -167,10 +179,12 @@ async fn get_user_memberships(
     tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
-) -> Result<Data<Vec<MembershipResponse>>, Error> {
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<MembershipResponse>, Error> {
     principal.require(&USERS_READ)?;
-    let list = state.roles.memberships(&tenant, id).await?;
-    memberships(&state, &tenant, list).await
+    let page = PageRequest::try_from(page)?;
+    let list = state.roles.memberships_page(&tenant, id, &page).await?;
+    membership_page(&state, &tenant, list).await
 }
 
 /// Replace every organization unit a user works in, and the roles there.
@@ -261,28 +275,52 @@ pub(crate) struct MemberCountResponse {
 
 /// Count the people of every organization unit.
 ///
-/// Requires `auth.users.read`. One entry per unit of the tree, the root first, including units
-/// nobody works in — for showing a number next to each unit without reading every membership.
+/// Requires `auth.users.read`. One entry per unit of the tree, the root first then by unit id
+/// (`order=desc` reverses it; paged with `limit` / `cursor`), including units nobody works in —
+/// for showing a number next to each unit without reading every membership.
 #[utoipa::path(
     get,
     path = "/memberships/counts",
     extensions(("x-permissions" = json!(["auth.users.read"]))),
     operation_id = "count_memberships",
     security(("bearer" = [])),
+    params(NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "The counts, one entry per unit.", body = Data<Vec<MemberCountResponse>>),
+        (status = 200, description = "One page of counts, one entry per unit, the root first.", body = Page<MemberCountResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `auth.users.read`; code `permission_denied`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn count_memberships(
     State(state): State<Arc<HttpState>>,
     tenant: TenantContext,
     principal: Principal,
-) -> Result<Data<Vec<MemberCountResponse>>, Error> {
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<MemberCountResponse>, Error> {
     principal.require(&USERS_READ)?;
-    let counts = state.roles.member_counts(&tenant).await?;
-    Ok(Data { data: counts.into_iter().map(MemberCountResponse::from).collect() })
+    let page = PageRequest::try_from(page)?;
+    member_count_page(&state, &tenant, &page).await
+}
+
+/// One page of the per-unit counts, the root first then by unit id.
+// Số người của mỗi nút tính trên cả cây trong một lượt (`total` của một nút cần người của mọi nút trên nó),
+// như giá trị tồn của `inventory`: phân trang trên kết quả trong bộ nhớ (D-20261125-list-pages mục 4). Khoá:
+// `0` cho nút gốc, `1` + id cho nút khác — mỗi nút một dòng.
+pub(crate) async fn member_count_page(
+    state: &HttpState,
+    tenant: &TenantContext,
+    page: &PageRequest,
+) -> Result<Page<MemberCountResponse>, Error> {
+    let root = autoxide_kernel::tenancy::root_of(tenant.id()).as_uuid();
+    let counts = state.roles.member_counts(tenant).await?;
+    let counts: Vec<MemberCountResponse> =
+        counts.into_iter().map(MemberCountResponse::from).collect();
+    page_of(
+        counts,
+        |count| if count.org_id == root { "0".to_owned() } else { format!("1{}", count.org_id) },
+        page,
+    )
 }
 
 impl From<crate::role::MemberCount> for MemberCountResponse {
@@ -298,28 +336,36 @@ impl From<crate::role::MemberCount> for MemberCountResponse {
 
 /// List the organization units you work in, with your roles there.
 ///
-/// Any signed-in user.
+/// Any signed-in user. One entry per unit, by unit id (`order=desc` reverses it); paged with
+/// `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/me/memberships",
     extensions(("x-permissions" = json!([]))),
     operation_id = "get_my_memberships",
     security(("bearer" = [])),
+    params(NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "One entry per unit, sorted by unit id. Empty in a tenant entered through a delegation or a support grant: what you may do there is in `GET /api/v1/auth/me`.", body = Data<Vec<MembershipResponse>>),
+        (status = 200, description = "One page of units, by unit id. Empty in a tenant entered through a delegation or a support grant: what you may do there is in `GET /api/v1/auth/me`.", body = Page<MembershipResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn get_my_memberships(
     State(state): State<Arc<HttpState>>,
     tenant: TenantContext,
     principal: Principal,
-) -> Result<Data<Vec<MembershipResponse>>, Error> {
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<MembershipResponse>, Error> {
+    let page = PageRequest::try_from(page)?;
     // Đang vào khách khác (uỷ quyền, hỗ trợ): không có membership ở khách đó — quyền đến từ lần
     // uỷ quyền / cấp hỗ trợ (`GET /me` cho permission và `access`).
     if principal.operator_from().is_some() {
-        return Ok(Data { data: Vec::new() });
+        let total = page.wants_total().then_some(0);
+        let pagination =
+            autoxide_kernel::pagination::Pagination::new(page.limit(), None).with_total(total);
+        return Ok(Page { data: Vec::new(), pagination });
     }
-    let list = state.roles.memberships(&tenant, principal.user_id()).await?;
-    memberships(&state, &tenant, list).await
+    let list = state.roles.memberships_page(&tenant, principal.user_id(), &page).await?;
+    membership_page(&state, &tenant, list).await
 }
