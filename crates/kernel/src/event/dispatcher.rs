@@ -342,6 +342,7 @@ fn access_of(kind: Option<&str>, id: Option<Uuid>) -> crate::access::AccessPath 
         (Some("delegation"), Some(id)) => crate::access::AccessPath::Delegation(id),
         (Some("support"), Some(id)) => crate::access::AccessPath::Support(id),
         (Some("automation"), Some(id)) => crate::access::AccessPath::Automation(id),
+        (Some("oauth_grant"), Some(id)) => crate::access::AccessPath::OAuthGrant(id),
         _ => crate::access::AccessPath::Direct,
     }
 }
