@@ -1,1 +1,4 @@
-- Thuế: khi giá đã gồm thuế và chuỗi thuế có tầng thuế suất 0% cuối chuỗi, phần dư làm tròn không còn rơi vào tầng 0% (từng ra thuế âm 1 đồng); tầng 0% luôn ra 0, tổng net + thuế vẫn bằng giá gốc.
+- Module `tax`: for tax-inclusive prices, the rounding remainder no longer lands on a stage whose tax is
+  zero (a 0% rate, or a per-unit tax that rounds to zero), which used to produce a tax of -1 minor unit.
+  For chains such as `[k%, 0%]` the amount of stage k and the totals per (kind, rate) change by one minor
+  unit compared with before, so a stored document that is recomputed can differ from its stored figures.
