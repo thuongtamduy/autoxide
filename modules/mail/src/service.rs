@@ -53,6 +53,10 @@ pub(crate) struct DeliveryFailed {
     to: String,
     dedupe_key: Option<String>,
     code: String,
+    /// Mã trạng thái mở rộng (RFC 3463), vd `5.1.1`; `null` khi máy chủ không trả.
+    enhanced: Option<String>,
+    /// Lỗi chắc chắn của ĐỊA CHỈ NGƯỜI NHẬN (cùng danh sách với sổ dội): bên nghe chỉ chặn địa chỉ khi `true`.
+    hard: bool,
 }
 
 impl Event for DeliveryFailed {
@@ -286,13 +290,20 @@ impl JobHandler for Sender {
                 let transaction = tenant.database().begin_write().await?;
                 // Sổ dội cùng transaction với event: không bao giờ có cái này mà thiếu cái kia.
                 // Chỉ mã chắc chắn về NGƯỜI NHẬN mới vào sổ dội (lỗi của bên gửi không làm chặn oan người nhận).
+                let hard = crate::bounces::counts_as_hard(enhanced.as_deref());
                 if let Some(address) = &address
-                    && crate::bounces::counts_as_hard(enhanced.as_deref())
+                    && hard
                 {
                     let label = enhanced.as_deref().map_or(code.clone(), |e| format!("{code} {e}"));
                     self.bounces.record_hard(&transaction, tenant, address, &label).await?;
                 }
-                let event = DeliveryFailed { to: mail.to, dedupe_key: mail.dedupe_key, code };
+                let event = DeliveryFailed {
+                    to: mail.to,
+                    dedupe_key: mail.dedupe_key,
+                    code,
+                    enhanced,
+                    hard,
+                };
                 self.outbox.record(&transaction, tenant, Actor::system(), None, &event).await?;
                 transaction.commit().await?;
                 metrics::counter!("mail_rejected_total").increment(1);

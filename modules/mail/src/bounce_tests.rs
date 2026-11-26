@@ -257,6 +257,10 @@ async fn loi_ben_gui_khong_vao_so_doi() {
                 .unwrap()
                 .data;
             assert!(rows.is_empty(), "{:?}", String::from_utf8_lossy(reply));
+            // Event vẫn phát (hợp đồng cũ), kèm `hard: false` để bên nghe không chặn người nhận.
+            let events = crate::tests::failures(&database).await;
+            let payload: serde_json::Value = serde_json::from_str(&events[0]).unwrap();
+            assert_eq!(payload["hard"], false, "{payload}");
         })
         .await
         .unwrap();

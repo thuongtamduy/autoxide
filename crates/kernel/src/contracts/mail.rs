@@ -13,8 +13,11 @@ use crate::i18n::{Language, Translations};
 use crate::tenancy::TenantContext;
 
 /// Event emitted when the receiving server flatly rejects a mail. Payload:
-/// `{"to": "<address>", "dedupe_key": "<sender key>" | null, "code": "<SMTP code>"}`.
-/// A module that manages mailing lists (e.g. newsletters) listens to it to stop sending to that address.
+/// `{"to": "<address>", "dedupe_key": "<sender key>" | null, "code": "<SMTP code>",
+/// "enhanced": "<enhanced status>" | null, "hard": <bool>}`. `hard` is true only when the address itself does
+/// not work (enhanced status 5.1.1, 5.1.2, 5.1.3, 5.1.6 or 5.1.10); a mailing-list module (e.g. newsletters)
+/// stops sending to the address only then. Events written before `hard` existed lack it: treat a missing
+/// `hard` as true.
 pub const DELIVERY_FAILED: &str = "mail.delivery_failed";
 
 /// Extra headers that may be set (compared case-insensitively). Other headers are set by the

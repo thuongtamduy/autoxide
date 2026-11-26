@@ -696,3 +696,35 @@ async fn hai_khach_cung_email_cung_key_token_mang_khach() {
     .await
     .unwrap();
 }
+
+/// Lỗi của bên gửi (`hard: false`, vd `5.1.8` — địa chỉ người gửi bị từ chối): lượt gửi `failed` với lỗi
+/// `rejected`, KHÔNG chặn người đăng ký (cấu hình gửi sai không được làm mất cả danh sách).
+#[tokio::test]
+async fn loi_ben_gui_khong_chan_nguoi_dang_ky() {
+    TestDatabase::run(async |test| {
+        let h = service(test, config()).await;
+        let weekly = list(&h, "weekly", true).await;
+        let people = emails("reader", 1);
+        import(&h, weekly.row.id, &people).await;
+        let draft = campaign(&h, weekly.row.id, false).await;
+        send(&h, draft.row.id).await;
+        drain(&h).await;
+        let mail = h.mailer.to(&people[0]).remove(0);
+        let payload = json!({
+            "to": people[0], "dedupe_key": mail.dedupe_key, "code": "550",
+            "enhanced": "5.1.8", "hard": false,
+        });
+        let failed = Delivered::new(
+            h.tenant.clone(),
+            "mail",
+            autoxide_kernel::mail::DELIVERY_FAILED.to_owned(),
+            payload,
+        );
+        DeliveryFailures(h.service.clone()).handle(&failed).await.unwrap();
+        let done = h.service.find_campaign(&h.tenant, draft.row.id).await.unwrap();
+        assert_eq!((done.counts.failed, done.counts.bounced), (1, 0));
+        assert_eq!(count_events(&h.database, "newsletter.suppression_added").await, 0);
+    })
+    .await
+    .unwrap();
+}
