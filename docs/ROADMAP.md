@@ -1275,6 +1275,23 @@ biến chung vẫn là mặc định. Mỗi PR một cụm.
       `auth.totp_issuer` — D-20261126-tenant-login-policy
 - [x] Hạn mức `kernel.api_requests`: đếm sau giới hạn theo khách, chỉ chặn người gọi của khách; nhớ xác thực thất bại
       trong request — D-20261126-api-quota-signed-in
+- [x] Tên miền của khách (`TenantSetting::own_domain`): từ chối địa chỉ IP, cả dạng nhãn cuối hex `0x…` mà trình duyệt
+      đọc thành IPv4
+- [ ] MCP `resources/read` và `prompts/get` chưa tính hạn mức `kernel.api_requests` và giới hạn request theo khách
+      (chỉ `tools/call` tính)
+
+Chỗ trong core làm cấu hình theo khách khó (rút ra khi làm đợt này; mỗi mục là việc nên làm, chưa có quyết định):
+
+- [ ] Hai cơ chế cài đặt theo khách song song — cài đặt khách của kernel (`kernel.settings`) và cài đặt theo cây của
+      `organizations` — chưa có quy tắc chọn: ghi quy tắc (vd cấu hình kỹ thuật ở kernel, chính sách nghiệp vụ theo
+      cây) hay gộp về một chỗ
+- [ ] Kernel chưa kiểm chéo giữa hai cài đặt lúc lưu (vd ngôn ngữ mặc định phải thuộc danh sách ngôn ngữ): hiện bỏ
+      qua lúc dùng thay vì từ chối lúc lưu
+- [ ] Cài đặt theo cây của `organizations` không có cache: mỗi lần đọc (đăng nhập, làm mới phiên…) là một truy vấn
+- [ ] Khách của request trước khi xác thực lấy từ gợi ý chưa xác thực (`Autoxide-Tenant`, `Host`) qua cùng một hàm với
+      khách đã xác thực: dễ dùng nhầm cho hạn mức hay chính sách (lỗi đã sửa ở D-20261126-tenant-rate-limit) — tách hai
+      hàm rõ tên
+- [ ] Passkey không lưu RP ID của nó: không đổi RP mềm được (cùng mục passkey ở trên)
 
 ## Chờ chủ dự án
 
