@@ -61,6 +61,8 @@ pub(crate) struct ListShipmentsInput {
     pub limit: Option<u32>,
     /// The `next_cursor` of the previous page.
     pub cursor: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
 }
 
 /// A shipment to act on.
@@ -93,6 +95,8 @@ pub(crate) struct ListDiscrepanciesInput {
     pub status: Option<String>,
     pub limit: Option<u32>,
     pub cursor: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
 }
 
 pub(crate) fn all(service: &Arc<ShippingService>) -> Vec<Tool> {
@@ -132,7 +136,9 @@ pub(crate) fn all(service: &Arc<ShippingService>) -> Vec<Tool> {
             move |tenant: TenantContext, principal: Principal, input: ListShipmentsInput| {
                 let service = list.clone();
                 async move {
-                    let page = PageInput::new(input.limit, input.cursor, None).page()?;
+                    let page = PageInput::new(input.limit, input.cursor, None)
+                        .with_count(input.count.unwrap_or(false))
+                        .page()?;
                     let filter = ShipmentFilter {
                         order_id: input.order_id,
                         status: input.status,
@@ -211,7 +217,9 @@ pub(crate) fn all(service: &Arc<ShippingService>) -> Vec<Tool> {
                 let service = cod.clone();
                 async move {
                     require_cod_read(&principal)?;
-                    let page = PageInput::new(input.limit, input.cursor, None).page()?;
+                    let page = PageInput::new(input.limit, input.cursor, None)
+                        .with_count(input.count.unwrap_or(false))
+                        .page()?;
                     let found = service.list_discrepancies(&tenant, input.status, &page).await?;
                     Ok::<Page<DiscrepancyBody>, Error>(found.map(discrepancy))
                 }

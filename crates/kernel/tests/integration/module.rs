@@ -203,6 +203,49 @@ async fn can_trait_cua_module_dang_ky_sau_thi_bao_ro_cach_sua() {
     .unwrap();
 }
 
+// Sổ thời hạn lưu được liệt kê theo trang với khoá (module, tên): một module khai hai mục trùng tên thì khởi động
+// dừng, nói rõ module và tên — không để trang `compliance/retention` lỗi 500 mỗi lần đọc. Hai module khác nhau dùng
+// cùng tên thì được (khoá có tên module).
+#[tokio::test]
+async fn hai_muc_thoi_han_luu_trung_ten_trong_mot_module_la_loi() {
+    use autoxide_kernel::privacy::{DataCategory, Keep, RetentionPolicy};
+    TestDatabase::run(async |database| {
+        struct Keeps(&'static str, usize);
+        impl Module for Keeps {
+            fn name(&self) -> &'static str {
+                self.0
+            }
+
+            fn retention(&self) -> Vec<RetentionPolicy> {
+                (0..self.1)
+                    .map(|_| {
+                        RetentionPolicy::new(
+                            "shared.logs",
+                            "Logs.",
+                            DataCategory::Basic,
+                            Keep::Days(30),
+                        )
+                    })
+                    .collect()
+            }
+        }
+        let db = connect(database).await;
+        let mut fine =
+            Modules::new(vec![Box::new(Keeps("one", 1)), Box::new(Keeps("two", 1))]).unwrap();
+        fine.start(&db).unwrap();
+
+        let mut modules = Modules::new(vec![Box::new(Keeps("one", 2))]).unwrap();
+        let error = modules.start(&db).unwrap_err().to_string();
+
+        assert!(
+            error.contains("module `one` declares the retention policy `shared.logs` twice"),
+            "{error}"
+        );
+    })
+    .await
+    .unwrap();
+}
+
 #[tokio::test]
 async fn hai_module_cong_bo_cung_mot_trait_la_loi() {
     TestDatabase::run(async |database| {

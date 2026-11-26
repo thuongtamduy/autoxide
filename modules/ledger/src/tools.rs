@@ -59,6 +59,8 @@ pub(crate) struct EntriesInput {
     limit: Option<u32>,
     /// The `next_cursor` of the previous page.
     cursor: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
 }
 
 /// Which book and days.
@@ -123,6 +125,8 @@ pub(crate) struct ExceptionsInput {
     limit: Option<u32>,
     /// The `next_cursor` of the previous page.
     cursor: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
 }
 
 /// How to resolve an item.
@@ -192,7 +196,7 @@ pub(crate) fn all(service: &Arc<LedgerService>) -> Vec<Tool> {
             move |tenant: TenantContext, principal: Principal, input: ExceptionsInput| {
                 let service = exceptions.clone();
                 async move {
-                    let page = PageInput::new(input.limit, input.cursor, None).page()?;
+                    let page = PageInput::new(input.limit, input.cursor, None).with_count(input.count.unwrap_or(false)).page()?;
                     let status = Some(input.status.unwrap_or_else(|| "open".to_owned()));
                     let found = service.list_exceptions(&tenant, &principal, status, &page).await?;
                     Ok::<Page<ExceptionItem>, Error>(found.map(ExceptionItem::from))
@@ -262,7 +266,7 @@ pub(crate) fn all(service: &Arc<LedgerService>) -> Vec<Tool> {
             move |tenant: TenantContext, principal: Principal, input: EntriesInput| {
                 let service = entries.clone();
                 async move {
-                    let page = PageInput::new(input.limit, input.cursor, None).page()?;
+                    let page = PageInput::new(input.limit, input.cursor, None).with_count(input.count.unwrap_or(false)).page()?;
                     let filter = EntryFilter {
                         book_org: input.org_id.map(OrgId::from_uuid),
                         source_module: input.source_module,

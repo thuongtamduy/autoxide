@@ -507,3 +507,62 @@ async fn cot_sap_duoc_phep_trong_bi_tu_choi() {
     .await
     .unwrap();
 }
+
+/// `RecordHistory` giả chỉ cài `history`: có `events` event (id tăng dần), trả tối đa `limit` event mới nhất trước.
+struct FakeHistory {
+    events: u32,
+}
+
+#[async_trait::async_trait]
+impl autoxide_kernel::resource::RecordHistory for FakeHistory {
+    async fn history(
+        &self,
+        _tenant: &autoxide_kernel::tenancy::TenantContext,
+        _subject: &str,
+        limit: u32,
+        _language: autoxide_kernel::i18n::Language,
+    ) -> Result<Vec<autoxide_kernel::resource::HistoryLine>, autoxide_kernel::error::Error> {
+        let at = autoxide_kernel::time::Timestamp::now();
+        Ok((0..self.events.min(limit))
+            .map(|n| {
+                let id = Uuid::from_u128(u128::from(self.events - n));
+                autoxide_kernel::resource::HistoryLine::new(id, at, "test.happened")
+            })
+            .collect())
+    }
+}
+
+// Cài đặt mặc định của `history_page` (chỉ để tương thích) đọc tối đa `HISTORY_PAGE_FALLBACK_LIMIT` event: đọc ít hơn
+// trần thì `total` đúng; chạm trần thì có thể còn event cũ hơn — bỏ `total` thay vì báo sai. Trang vẫn đi tiếp bằng con
+// trỏ trong phần đã đọc.
+#[tokio::test]
+async fn history_page_mac_dinh_bo_total_khi_cham_tran() {
+    use autoxide_kernel::resource::{HISTORY_PAGE_FALLBACK_LIMIT, RecordHistory};
+    TestDatabase::run(async |database| {
+        let db = connect(database).await;
+        let tenant = autoxide_kernel::tenancy::DatabaseRegistry::single(db).default_tenant();
+        let language = autoxide_kernel::i18n::Language::En;
+        let first = PageRequest::first(3, Order::Desc).counted();
+
+        let few = FakeHistory { events: 7 };
+        let page = few.history_page(&tenant, "x:1", &first, language).await.unwrap();
+        assert_eq!(page.pagination.total, Some(7));
+        assert_eq!(page.data.len(), 3);
+        let next: Uuid = page.pagination.next_cursor.unwrap().parse().unwrap();
+        let after = PageRequest::first(10, Order::Desc).after(next);
+        let rest = few.history_page(&tenant, "x:1", &after, language).await.unwrap();
+        assert_eq!(rest.data.len(), 4, "không trùng không sót");
+
+        let many = FakeHistory { events: HISTORY_PAGE_FALLBACK_LIMIT + 5 };
+        let page = many.history_page(&tenant, "x:1", &first, language).await.unwrap();
+        assert_eq!(page.pagination.total, None, "chạm trần: không báo tổng có thể sai");
+        assert_eq!(page.data.len(), 3);
+        assert!(page.pagination.next_cursor.is_some());
+        // Vừa đúng trần cũng có thể còn event cũ hơn: không báo tổng.
+        let exact = FakeHistory { events: HISTORY_PAGE_FALLBACK_LIMIT };
+        let page = exact.history_page(&tenant, "x:1", &first, language).await.unwrap();
+        assert_eq!(page.pagination.total, None);
+    })
+    .await
+    .unwrap();
+}

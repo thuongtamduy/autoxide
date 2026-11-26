@@ -257,6 +257,73 @@ async fn truong_cong_khai_va_cot_xuat() {
     .unwrap();
 }
 
+/// "Đang dùng ở đâu" là `Page<T>` (bước 70 P9 mục 3): năm bài nhúng cùng một bài, `limit=2` — đi hết bằng
+/// `next_cursor` ra đủ năm bài, mới nhất trước, không trùng không sót; `count=true` cho tổng.
+#[tokio::test]
+async fn dang_dung_o_dau_chia_trang() {
+    TestDatabase::run(async |test| {
+        let app = app(test).await;
+        let target = send(
+            &app,
+            "POST",
+            "/entries",
+            Some("admin"),
+            &[],
+            Some(json!({"kind": "post", "title": "Được nhúng"})),
+        )
+        .await;
+        let target = target.json()["data"]["id"].as_str().unwrap().to_owned();
+        let mut users = Vec::new();
+        for n in 0..5 {
+            let body = embed_body(&[("content.entry", target.as_str())]);
+            let user = send(
+                &app,
+                "POST",
+                "/entries",
+                Some("admin"),
+                &[],
+                Some(json!({"kind": "post", "title": format!("Bài {n}"), "body": body})),
+            )
+            .await;
+            assert_eq!(user.status(), StatusCode::CREATED, "{}", user.json());
+            users.push(user.json()["data"]["id"].as_str().unwrap().to_owned());
+        }
+        let mut seen = Vec::new();
+        let mut cursor: Option<String> = None;
+        loop {
+            let mut uri = format!("/api/v1/kernel/records/content.entry/{target}/usages?limit=2");
+            match &cursor {
+                Some(cursor) => uri.push_str(&format!("&cursor={cursor}")),
+                None => uri.push_str("&count=true"),
+            }
+            let page = app.get(&uri).token("admin").send().await.unwrap();
+            assert_eq!(page.status(), StatusCode::OK, "{}", page.json());
+            let page = page.json();
+            if cursor.is_none() {
+                assert_eq!(page["pagination"]["total"], 5, "{page}");
+            }
+            let rows = page["data"].as_array().unwrap();
+            assert!(rows.len() <= 2, "{page}");
+            seen.extend(rows.iter().map(|row| row["id"].as_str().unwrap().to_owned()));
+            match page["pagination"]["next_cursor"].as_str() {
+                Some(next) => cursor = Some(next.to_owned()),
+                None => break,
+            }
+        }
+        users.reverse();
+        assert_eq!(seen, users, "mới nhất trước, đủ năm bài");
+        let wrong = app
+            .get(&format!("/api/v1/kernel/records/content.entry/{target}/usages?limit=0"))
+            .token("admin")
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(wrong.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    })
+    .await
+    .unwrap();
+}
+
 /// "Đang dùng ở đâu" (bước 51, D-267): bài nhúng bài khác thì bài kia biết mình được dùng ở đâu;
 /// người không đọc được bản ghi được hỏi thì 404.
 #[tokio::test]

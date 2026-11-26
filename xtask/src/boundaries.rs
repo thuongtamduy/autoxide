@@ -52,7 +52,12 @@ pub struct Violation {
 
 impl fmt::Display for Violation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "[{}] {}: {}", self.rule, self.location, self.message)
+        write!(f, "[{}] {}: {}", self.rule, self.location, self.message)?;
+        // Một dòng "cách sửa" dưới vi phạm (`hints.rs`).
+        match crate::hints::fix(self.rule) {
+            Some(fix) => write!(f, "\n    how to fix: {fix}"),
+            None => Ok(()),
+        }
     }
 }
 
