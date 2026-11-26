@@ -1,0 +1,14 @@
+# REUSE (https://reuse.software): cho mỗi file trong repo, một dòng SPDX nói ai giữ bản quyền và theo giấy phép nào —
+# khai ở đây cho cả repo, nên không phải thêm đầu SPDX vào từng file (D-20261126-road-to-1-0, G8). Kiểm: `reuse lint`
+# (job `reuse` của ci.yml). File có đầu SPDX riêng thì thắng dòng ở đây (`precedence = "closest"`).
+# Văn bản giấy phép nằm ở LICENSES/ (tên theo mã SPDX); LICENSE-MIT và LICENSE-APACHE ở gốc là bản cho người đọc và cho Cargo.
+version = 1
+SPDX-PackageName = "Autoxide"
+SPDX-PackageSupplier = "The Autoxide Authors"
+SPDX-PackageDownloadLocation = "https://github.com/thuongtamduy/autoxide"
+
+[[annotations]]
+path = "**"
+precedence = "closest"
+SPDX-FileCopyrightText = "2026 The Autoxide Authors"
+SPDX-License-Identifier = "MIT OR Apache-2.0"

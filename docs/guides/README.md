@@ -35,3 +35,4 @@ older curl, replace `--json '…'` with `-H 'Content-Type: application/json' -H 
 For developers who extend the core:
 
 - [Writing a module in your own repository](writing-a-module.md): your module and your server next to the official modules, tests on both databases, no fork
+- [Common Rust compiler errors when writing a module](rust-errors.md): seven errors from the first week, what they mean here, how to fix them (for developers)

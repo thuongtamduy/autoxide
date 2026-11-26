@@ -154,3 +154,109 @@ async fn task_khong_co_thi_tu_choi_khoi_dong() {
     .await
     .unwrap();
 }
+
+/// `AUTOXIDE_MIGRATE_ON_START` nâng cả placement (database riêng của khách, bước 71) — chạy nền, không chặn mở
+/// port: `serve` migrate `main` rồi xếp một lượt `kernel.migrate_placements`. Job chạy: placement tốt thành
+/// `ready`; placement hỏng (bảng chắn migration đầu của `auth`) thành `behind`, lỗi của nó không chặn
+/// placement đứng sau, lượt ghi `failed` nêu đúng placement hỏng.
+#[tokio::test]
+async fn migrate_luc_khoi_dong_nang_ca_placement() {
+    /// Cấu hình chạy worker: cùng database, không tự làm gì lúc khởi động.
+    fn settings_for_worker(url: &str) -> Settings {
+        settings(url, &[("AUTOXIDE_MIGRATE_ON_START", "false")])
+    }
+    /// Như máy chủ của bản mới khởi động với `AUTOXIDE_MIGRATE_ON_START=true`.
+    fn settings_for_worker_on_start(url: &str) -> Settings {
+        settings(url, &[])
+    }
+
+    use autoxide_kernel::migration::prelude::{SchemaManager, Table};
+    use autoxide_kernel::migration::schema;
+    use autoxide_kernel::tenancy::{
+        DatabaseRegistry, NewPlacement, PlacementKind, SchemaState, TenancyConfig, TenancyMode,
+    };
+
+    TestDatabase::run(async |test| {
+        start_and_stop(settings(test.url(), &[])).await.unwrap();
+        let settings = settings(test.url(), &[]);
+        let database =
+            autoxide_kernel::database::Database::connect(&settings.config.database).await.unwrap();
+        let registry = DatabaseRegistry::new(
+            database.clone(),
+            settings.config.database.clone(),
+            TenancyConfig::with_mode(TenancyMode::Multi),
+        );
+        let placements = settings.modules.placements(&registry).unwrap();
+        let broken = test.extra_database().await.unwrap();
+        let good = test.extra_database().await.unwrap();
+        // Theo tên: `a-broken` chạy trước `b-good`.
+        for (name, url) in [("a-broken", &broken), ("b-good", &good)] {
+            let new = NewPlacement::new(name, PlacementKind::Dedicated, url.parse().unwrap());
+            placements.add(new).await.unwrap();
+        }
+        let source = ConfigSource::from_pairs([("DATABASE_URL", broken.as_str())]);
+        let blocked = autoxide_kernel::database::Database::connect(
+            &crate::settings::read(&source).unwrap().config.database,
+        )
+        .await
+        .unwrap();
+        let blocker = Table::create().table("auth_user").col(schema::pk_uuid("id")).to_owned();
+        SchemaManager::new(blocked.write()).create_table(blocker).await.unwrap();
+
+        start_and_stop(settings).await.unwrap();
+        // Placement đi qua một lượt migrate (job nền; worker của chính máy chủ có thể đã chạy nó trước khi dừng),
+        // không phải migrate đồng bộ trước khi mở port.
+        let ids = sea_orm::sea_query::Query::select()
+            .column(sea_orm::sea_query::Alias::new("id"))
+            .from(sea_orm::sea_query::Alias::new("kernel_migration_runs"))
+            .to_owned();
+        let runs = sea_orm::ConnectionTrait::query_all(database.read(), &ids).await.unwrap();
+        assert_eq!(runs.len(), 1);
+
+        let runtime = runtime::start(settings_for_worker(test.url()), Migrations::RequireApplied)
+            .await
+            .unwrap();
+        let worker = runtime.modules.worker(1).unwrap();
+        while worker.run_once().await.unwrap() > 0 {}
+        runtime.database.close().await.unwrap();
+
+        let states: Vec<(String, SchemaState)> = placements
+            .check()
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|check| (check.name, check.state))
+            .collect();
+        assert_eq!(
+            states,
+            [
+                ("a-broken".to_owned(), SchemaState::Behind),
+                ("b-good".to_owned(), SchemaState::Ready)
+            ]
+        );
+
+        // Nâng bản: `b-good` đang `ready` (trạng thái lưu từ bản cũ) mà bản mới có migration mới (giả lập bằng gỡ
+        // migration cuối của `auth`). Khởi động vẫn xếp lượt, và lượt nâng nó.
+        let source = ConfigSource::from_pairs([("DATABASE_URL", good.as_str())]);
+        let good_database = autoxide_kernel::database::Database::connect(
+            &crate::settings::read(&source).unwrap().config.database,
+        )
+        .await
+        .unwrap();
+        let migrator = settings_for_worker(test.url()).modules.migrator().unwrap();
+        migrator.down(&good_database, "auth", 1).await.unwrap();
+        start_and_stop(settings_for_worker_on_start(test.url())).await.unwrap();
+        let runtime = runtime::start(settings_for_worker(test.url()), Migrations::RequireApplied)
+            .await
+            .unwrap();
+        let worker = runtime.modules.worker(1).unwrap();
+        while worker.run_once().await.unwrap() > 0 {}
+        runtime.database.close().await.unwrap();
+        assert!(migrator.pending(&good_database).await.unwrap().is_empty());
+        good_database.close().await.unwrap();
+        blocked.close().await.unwrap();
+        database.close().await.unwrap();
+    })
+    .await
+    .unwrap();
+}

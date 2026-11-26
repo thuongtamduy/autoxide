@@ -105,15 +105,71 @@ chạy `cargo xtask decisions` để tạo.
 
 ## Commit và pull request
 
-- Mỗi pull request một thay đổi. Tách những thay đổi không liên quan.
-- Dòng tiêu đề commit tóm tắt ngắn điều đã đổi (tiếng Anh hay tiếng Việt), và giải thích
-  *vì sao* trong phần thân khi điều đó không hiển nhiên.
-- Với mọi thứ người dùng Autoxide sẽ nhận ra, thêm một file nhỏ vào
+- Một pull request chỉ làm một thay đổi. Tách các thay đổi không liên quan.
+- Với mọi thứ người dùng Autoxide sẽ thấy, thêm một file nhỏ vào
   [`changelog.d/`](changelog.d/README.md) thay vì sửa `CHANGELOG.md`: đặt tên
-  `<tên>.<mục>.md` (`added`, `changed`, `deprecated`, `removed`, `fixed` hay `security`) và viết các
-  gạch đầu dòng tiếng Anh đúng như sẽ nằm trong changelog. Chúng được gộp vào `CHANGELOG.md` lúc
-  phát hành, nên các pull request song song không bao giờ xung đột ở đó.
-- Trong pull request, nói bạn đã đổi gì, vì sao, và xác nhận `./gate.sh --quick` đã xanh (CI chạy phần còn lại, kể cả PostgreSQL; `./gate.sh` đầy đủ bắt buộc trước khi phát hành).
+  `<tên>.<mục>.md` (`added`, `changed`, `deprecated`, `removed`, `fixed` hoặc `security`) và viết các gạch đầu dòng
+  tiếng Anh đúng như sẽ hiện trong changelog. Chúng được gộp vào `CHANGELOG.md` lúc phát hành, nên các pull request
+  song song không xung đột ở đó.
+- Trong pull request, nói bạn đã đổi gì, vì sao, và xác nhận `./gate.sh --quick` xanh (CI chạy phần còn lại, gồm
+  PostgreSQL; `./gate.sh` đầy đủ bắt buộc trước khi phát hành).
+
+### Commit message
+
+Commit message theo một dạng nhẹ của [Conventional Commits](https://www.conventionalcommits.org):
+
+```text
+<type>(<scope>): <tóm tắt ngắn ở thể mệnh lệnh, tối đa 72 ký tự>
+
+<thân tuỳ chọn: vì sao cần đổi, đã cân nhắc gì, thay đổi không làm gì>
+
+Signed-off-by: Tên Của Bạn <ban@example.com>
+```
+
+- `type` là một trong `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`.
+  `scope` không bắt buộc: tên module hay crate (`orders`, `kernel`).
+- Thay đổi phá vỡ đánh dấu bằng `!` sau scope (`feat(kernel)!: …`) và giải thích trong thân. Thay đổi phá vỡ của hạng hợp
+  đồng ổn định theo [`docs/COMPATIBILITY.vi.md`](docs/COMPATIBILITY.vi.md).
+- Viết bằng tiếng Anh hoặc tiếng Việt. Giải thích *vì sao* trong thân khi không hiển nhiên.
+- Tiêu đề pull request được dùng làm tiêu đề squash-merge, nên theo cùng dạng.
+
+### Ký commit (DCO)
+
+Autoxide dùng [Developer Certificate of Origin](DCO) (DCO) thay cho thoả thuận cấp phép của người đóng góp. Thêm dòng
+`Signed-off-by` nghĩa là bạn cam đoan mình viết thay đổi đó hoặc có quyền gửi nó theo license của dự án. Thêm bằng `-s`:
+
+```bash
+git commit -s -m "fix(notes): reject empty titles"
+```
+
+Để ký các commit đã làm: `git rebase --signoff origin/main` rồi push lại với `--force-with-lease`. Job `DCO sign-off`
+trong CI đỏ khi một commit của pull request không có dòng `Signed-off-by` (khi nhánh mà pull request nhắm tới chưa có `.github/CODEOWNERS` — như nhánh `release/X.Y` cắt từ tag cũ — thì không kiểm gì; commit merge không được kiểm, nên ưu tiên
+rebase hơn là gộp `main` vào nhánh của bạn). Pull request do người duy trì mở
+(login có trong `.github/CODEOWNERS` của nhánh mà pull request nhắm tới, không phải của pull request; GitHub xác thực login) được miễn, kể cả commit do phiên agent của họ viết: người
+duy trì là bên cấp license và chịu trách nhiệm về những gì họ đưa vào.
+
+### Đóng góp có AI hỗ trợ
+
+Bản thân Autoxide được xây bằng AI agent ([`CLAUDE.md`](CLAUDE.md)), nên đóng góp có AI hỗ trợ được chào đón. Các luật này
+để luôn có một người chịu trách nhiệm và để gánh nặng review công bằng:
+
+- **Nói rõ.** Ghi trong mô tả pull request công cụ nào đã giúp và giúp việc gì. Thêm trailer như
+  `Assisted-by: <công cụ hay mô hình>` vào commit nếu công cụ viết phần đáng kể.
+- **Có một người chịu trách nhiệm.** Dòng `Signed-off-by` là của bạn, không phải của công cụ. Bạn đã đọc từng dòng, hiểu và
+  giải thích được khi review, và tự chạy `./gate.sh --quick`.
+- **Kiểm những gì công cụ bịa.** Xác nhận mọi dependency, hàm, API có thật ở đúng phiên bản đang ghim (skill
+  `check-library-api` của repo chỉ cách làm). Gỡ tham chiếu bịa, và không bao giờ dán secret, dữ liệu cá nhân hay dữ
+  liệu khách hàng vào công cụ.
+- **Không gửi thứ bạn không bảo vệ được.** Đầu ra hàng loạt chưa review, nhiều thay đổi không liên quan trong một pull
+  request, hay câu trả lời review chỉ là đầu ra của công cụ có thể bị đóng mà không review chi tiết.
+- **License.** Không gửi đầu ra mà bạn biết là sao chép mã theo license không tương thích.
+
+### Nhãn và nên bắt đầu từ đâu
+
+Người duy trì gắn nhãn cho issue để người mới tìm được việc đầu tiên: `good first issue` (nhỏ, mô tả rõ, có người duy
+trì giúp), `help wanted` (chúng tôi muốn có đóng góp, mọi cỡ) và các nhãn còn lại ở
+[`GOVERNANCE.vi.md`](GOVERNANCE.vi.md#nhãn-issue-và-pull-request). Bình luận vào issue trước khi bắt đầu để hai người
+không làm trùng việc.
 
 ## License của phần đóng góp
 

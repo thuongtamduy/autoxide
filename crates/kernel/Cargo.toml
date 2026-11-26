@@ -13,6 +13,7 @@ publish.workspace = true
 
 [dependencies]
 async-trait.workspace = true
+autoxide-macros.workspace = true
 axum.workspace = true
 base64.workspace = true
 bytes.workspace = true
@@ -59,15 +60,24 @@ zeroize.workspace = true
 # For tests only: turned on by `autoxide-testkit` to build routes WITHOUT the layer that enforces `x-permissions`, so an
 # audit can compare the documented permissions with what the services accept. Never turn it on in an application.
 permission-audit = []
+# For tests only: turned on by `autoxide-testkit` so tests can read and write any table directly
+# (`db::all_tenants_for_tests`). Never turn it on in an application.
+testing = []
 
 [dev-dependencies]
 proptest.workspace = true
+# Benchmark vi mô của đường nóng (benches/hot_paths.rs, chạy hằng tuần ở load.yml); không vào binary.
+divan.workspace = true
 # tests/stack.rs xác nhận các thư viện nền hợp nhau trên cả hai database. Thư viện
 # nào kernel bắt đầu dùng thì chuyển lên [dependencies].
 # Chỉ `path`, không `version` (nên không dùng dòng của workspace): testkit phụ thuộc kernel, và crates.io
 # không nhận vòng phụ thuộc — cargo bỏ dev-dependency không có phiên bản khi đóng gói.
 autoxide-testkit = { path = "../testkit" }
 tokio-tungstenite.workspace = true
+
+[[bench]]
+name = "hot_paths"
+harness = false
 
 [lints]
 workspace = true

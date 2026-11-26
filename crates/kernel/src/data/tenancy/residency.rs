@@ -1,5 +1,5 @@
 //! Per-tenant data residency (step 37, D-360): a tenant can require its data to stay in one country
-//! (`kernel_tenants.data_residency`, e.g. `VN`; Law on Cybersecurity 116/2025/QH15, Decree 53/2022/ND-CP; to be
+//! (`kernel_tenants.data_residency`, e.g. `VN`; Law on Cybersecurity 116/2025/QH15 and its implementing decree; to be
 //! checked against the original texts); each placement records the country where its server is
 //! (`kernel_placements.country_code`).
 //!
