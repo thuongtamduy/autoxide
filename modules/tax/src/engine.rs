@@ -9,7 +9,7 @@
 //!   giá chưa thuế một lần; thuế từng tầng tính xuôi trên cơ sở đã làm tròn; phần lệch do làm tròn dồn
 //!   vào tầng chịu thuế cuối khi được, không thì sang tầng khác sao cho mọi thuế ≥ 0 và tầng thuế danh
 //!   nghĩa 0 ra đúng 0 (`settle`); ở dòng, tầng cuối có thuế lấy phần còn lại của dòng, ô âm sửa bằng
-//!   hoán đổi giữ nguyên tổng dòng và tổng cột (`inclusive_lines`). D-20261126-tax-rounding-allocation.
+//!   hoán đổi giữ nguyên tổng dòng và tổng cột (`lines`). Thuế theo đơn vị chia về dòng theo số lượng. D-20261126-tax-rounding-allocation.
 
 use std::collections::BTreeMap;
 
@@ -138,6 +138,24 @@ pub(crate) fn compute(
                 "is required: this category has a tax per unit",
             ));
         }
+        // Giá đã gồm thuế: thuế theo đơn vị của dòng đi theo số lượng của chính dòng, nên số tiền dòng phải
+        // chứa được nó (cùng luật với cả nhóm ở `inclusive_group`).
+        if mode == PriceMode::Inclusive
+            && chain.iter().any(|rate| rate.basis == Basis::PerUnit)
+            && !line.amount.is_negative()
+        {
+            let quantity = line.quantity.map_or(Decimal::ZERO, |quantity| quantity.0);
+            let below = reverse_split(chain, line.amount.to_decimal(), quantity)
+                .and_then(|net| Money::from_decimal(net, line.amount.currency(), Rounding::HalfUp))
+                .is_ok_and(|net| net.is_negative());
+            if below {
+                problems.push(FieldError::new(
+                    format!("lines[{index}].amount"),
+                    "range",
+                    "is lower than the per-unit taxes it includes",
+                ));
+            }
+        }
     }
     if !problems.is_empty() {
         return Err(Error::validation(problems));
@@ -186,14 +204,18 @@ pub(crate) fn compute(
             entry.1 = entry.1.checked_add(*tax)?;
             running = running.checked_add(*tax)?;
         }
-        // Chia về dòng.
+        // Chia về dòng: theo số tiền dòng, riêng thuế theo đơn vị theo số lượng của dòng.
+        let quantities: Vec<Decimal> = indexes
+            .iter()
+            .map(|index| lines[*index].0.quantity.map_or(Decimal::ZERO, |quantity| quantity.0))
+            .collect();
+        let split = lines::Split::new(mode, chain, &amounts, &shares, &quantities)?;
         let (line_nets, line_taxes) = match mode {
-            PriceMode::Exclusive => {
-                let columns =
-                    taxes.iter().map(|tax| tax.allocate(&shares)).collect::<Result<Vec<_>, _>>()?;
-                (amounts.clone(), columns)
-            }
-            PriceMode::Inclusive => inclusive_lines(net, &taxes, &amounts, &shares)?,
+            PriceMode::Exclusive => (amounts.clone(), split.columns(&taxes)?),
+            PriceMode::Inclusive => split.inclusive(net, &taxes).map_err(|error| match error {
+                lines::Stuck::Line(slot) => per_unit_does_not_fit(indexes[slot]),
+                lines::Stuck::Error(error) => error,
+            })?,
         };
         for (slot, index) in indexes.iter().enumerate() {
             let (line, _) = &lines[*index];
@@ -229,22 +251,14 @@ pub(crate) fn compute(
     Ok(Computed { lines, totals })
 }
 
-/// Giá đã gồm thuế, cấp nhóm: trả (giá chưa thuế, thuế từng tầng) với giá chưa thuế + Σ thuế = `gross`.
-///
-/// 1. Tách ngược chính xác (`Decimal`): `x = gross`, qua từng tầng từ cuối về đầu `x / (1 + r)` hay
-///    `x − đơn giá × số lượng`. Giá chưa thuế `n = HalfUp(x)` (như trước).
-/// 2. Tính xuôi như hoá đơn ghi: thuế mỗi tầng = `HalfUp(thuế suất × cơ sở đã làm tròn)` — người đọc
-///    hoá đơn tự kiểm được từng dòng thuế.
-/// 3. Lệch `D = (gross − n) − Σ thuế` (do làm tròn) dồn vào tầng chịu thuế cuối nếu được (hành vi cũ),
-///    không thì sang tầng khác — xem `settle`.
-fn inclusive_group(
+/// Tách ngược chính xác giá đã gồm thuế qua các tầng (từ cuối về đầu): `x / (1 + r)` hay
+/// `x − đơn giá × số lượng`.
+fn reverse_split(
     chain: &[ResolvedRate],
-    gross: Money,
+    gross: Decimal,
     quantity: Decimal,
-    first_line: usize,
-) -> Result<(Money, Vec<Money>), Error> {
-    let currency = gross.currency();
-    let mut base = gross.to_decimal();
+) -> Result<Decimal, Error> {
+    let mut base = gross;
     for rate in chain.iter().rev() {
         base = match rate.basis {
             Basis::Exempt => base,
@@ -257,15 +271,30 @@ fn inclusive_group(
             }
         };
     }
+    Ok(base)
+}
+
+/// Giá đã gồm thuế, cấp nhóm: trả (giá chưa thuế, thuế từng tầng) với giá chưa thuế + Σ thuế = `gross`.
+///
+/// 1. Tách ngược chính xác (`Decimal`): `x = gross`, qua từng tầng từ cuối về đầu `x / (1 + r)` hay
+///    `x − đơn giá × số lượng`. Giá chưa thuế `n = HalfUp(x)` (như trước).
+/// 2. Tính xuôi như hoá đơn ghi: thuế mỗi tầng = `HalfUp(thuế suất × cơ sở đã làm tròn)` — người đọc
+///    hoá đơn tự kiểm được từng dòng thuế.
+/// 3. Lệch `D = (gross − n) − Σ thuế` (do làm tròn) dồn vào các tầng theo phần trăm, từ cuối về đầu; tầng
+///    theo đơn vị chỉ nhận khi không còn tầng nào khác — xem `settle`.
+fn inclusive_group(
+    chain: &[ResolvedRate],
+    gross: Money,
+    quantity: Decimal,
+    first_line: usize,
+) -> Result<(Money, Vec<Money>), Error> {
+    let currency = gross.currency();
+    let base = reverse_split(chain, gross.to_decimal(), quantity)?;
     let net = Money::from_decimal(base, currency, Rounding::HalfUp)?;
     // Giá đã gồm thuế thấp hơn thuế theo đơn vị nằm trong nó: giá chưa thuế âm là dữ liệu sai (hoá
     // đơn không ghi được), báo cho người gọi thay vì tính tiếp.
     if net.is_negative() {
-        return Err(Error::validation(vec![FieldError::new(
-            format!("lines[{first_line}].amount"),
-            "range",
-            "is lower than the per-unit taxes it includes",
-        )]));
+        return Err(below_per_unit(first_line));
     }
     if chain.is_empty() {
         return Ok((gross, Vec::new()));
@@ -296,43 +325,50 @@ fn inclusive_group(
         taxes.push(tax);
         running = running.checked_add(tax)?;
     }
-    let preferred = chain.iter().rposition(|rate| rate.basis != Basis::Exempt);
-    settle(&mut taxes, gross.checked_sub(net)?, &positive, preferred)?;
+    // Thứ tự ưu tiên nhận phần lệch: tầng theo phần trăm từ cuối về đầu, rồi mới tới tầng theo đơn vị
+    // (số cố định theo đơn vị — chỉ nhận khi không còn tầng nào khác). Chuỗi không có thuế theo đơn vị:
+    // đúng thứ tự cũ (tầng chịu thuế cuối trước).
+    let order: Vec<usize> = (0..chain.len())
+        .rev()
+        .filter(|position| chain[*position].basis == Basis::Percent)
+        .chain((0..chain.len()).rev().filter(|position| chain[*position].basis == Basis::PerUnit))
+        .collect();
+    settle(&mut taxes, gross.checked_sub(net)?, &positive, &order)?;
     Ok((net, taxes))
 }
 
 /// Sửa thuế các tầng cho tổng đúng bằng `target` (= tổng − giá chưa thuế, I3), không ra số âm (I1),
 /// không làm tầng có thuế danh nghĩa 0 khác 0 (I2).
 ///
-/// Thiếu (`D > 0`): cộng cả `D` vào tầng `preferred` (tầng chịu thuế cuối — hành vi cũ) nếu thuế chính
-/// xác của nó dương, không thì vào tầng sau cùng có thuế chính xác dương. Luôn có tầng như vậy: mọi thuế
-/// chính xác bằng 0 thì giá chưa thuế chính xác = tổng (số nguyên), `n` = tổng, `target` = 0 = Σ thuế.
+/// Thiếu (`D > 0`): cộng cả `D` vào tầng đầu tiên theo `order` có thuế chính xác dương. Luôn có tầng như
+/// vậy: mọi thuế chính xác bằng 0 thì giá chưa thuế chính xác = tổng (số nguyên), `n` = tổng, `target` = 0
+/// = Σ thuế.
 ///
-/// Thừa (`D < 0`): trừ ở `preferred` tới khi nó về 0, rồi ở các tầng đứng trước gần nhất còn ≥ 1. Luôn
-/// đủ chỗ trừ: `target ≥ 0` (mọi thuế chính xác ≥ 0 nên giá chưa thuế chính xác ≤ tổng, làm tròn vẫn
-/// ≤ tổng vì tổng là số nguyên), nên khi Σ thuế > `target` còn ít nhất một tầng ≥ 1; trừ không xuống
-/// dưới 0. Tầng thuế danh nghĩa 0 có số làm tròn 0 nên không bao giờ bị chọn.
+/// Thừa (`D < 0`): trừ theo `order`, mỗi tầng tới khi về 0. Luôn đủ chỗ trừ: `target ≥ 0` (mọi thuế chính
+/// xác ≥ 0 nên giá chưa thuế chính xác ≤ tổng, làm tròn vẫn ≤ tổng vì tổng là số nguyên), nên khi Σ thuế >
+/// `target` còn ít nhất một tầng ≥ 1 (tầng không chịu thuế luôn 0, không cần có trong `order`); trừ không
+/// xuống dưới 0. Tầng thuế danh nghĩa 0 có số làm tròn 0 nên không bao giờ bị chọn.
 ///
-/// Khi cách cũ (dồn hết vào tầng cuối) đã cho số không âm ở tầng có thuế thực, kết quả trùng cách cũ.
+/// Chuỗi không có thuế theo đơn vị: khi cách cũ (dồn hết vào tầng cuối) đã cho số không âm ở tầng có thuế
+/// thực, kết quả trùng cách cũ.
 fn settle(
     taxes: &mut [Money],
     target: Money,
     positive: &[bool],
-    preferred: Option<usize>,
+    order: &[usize],
 ) -> Result<(), Error> {
     let currency = target.currency();
     let mut gap = target.checked_sub(sum(taxes, currency)?)?.minor();
     if gap > 0 {
-        let pick = preferred
-            .filter(|position| positive[*position])
-            .or_else(|| positive.iter().rposition(|positive| *positive))
+        let pick = order
+            .iter()
+            .copied()
+            .find(|position| positive[*position])
             .ok_or_else(|| Error::internal("tax rounding: no stage can take the remainder"))?;
         taxes[pick] = taxes[pick].checked_add(Money::new(gap, currency))?;
         return Ok(());
     }
-    // Thứ tự trừ: tầng ưu tiên, rồi các tầng từ cuối về đầu.
-    let order = preferred.into_iter().chain((0..taxes.len()).rev());
-    for position in order {
+    for position in order.iter().copied() {
         if gap == 0 {
             break;
         }
@@ -348,60 +384,24 @@ fn settle(
     Ok(())
 }
 
-/// Giá đã gồm thuế, chia nhóm về dòng: giá chưa thuế và từng thuế chia theo tỉ lệ số tiền dòng
-/// (`Money::allocate`, mỗi ô là phần nguyên dưới hay trên của tỉ lệ đúng); thuế tầng cuối có số khác 0
-/// lấy phần còn lại của dòng để mỗi dòng cộng đúng số tiền của nó (I3, như trước).
-///
-/// Phần còn lại có thể âm ở vài dòng (các cột khác của dòng đó đã làm tròn lên). Sửa bằng hoán đổi 2×2:
-/// dòng `s` có ô âm ở cột cuối `L`, lấy cột `j` mà dòng `s` có ô > 0 và dòng `s'` có ô cột `L` ≥ 1; chuyển
-/// một đơn vị `(s, j) → (s, L)` và `(s', L) → (s', j)`. Tổng mọi dòng và mọi cột giữ nguyên, không ô nào
-/// xuống dưới 0, tổng phần âm giảm 1 — nên vòng lặp dừng và hết âm (I1). Luôn có `j`: giá chưa thuế của
-/// dòng ≤ số tiền dòng (phần trên của `a × n / G` ≤ `a` vì `n ≤ G`), nên các thuế khác của dòng cộng
-/// lại > phần còn lại ≥ 0, tức có ô > 0. Luôn có `s'`: cột `L` cộng lại ≥ 0 mà có ô âm. Cột có tổng 0
-/// (thuế danh nghĩa 0) không bao giờ có ô > 0 nên không bị chọn làm `j`; cuối cùng nó không âm và cộng
-/// lại 0, tức toàn 0 (I2).
-fn inclusive_lines(
-    net: Money,
-    taxes: &[Money],
-    amounts: &[Money],
-    shares: &[u64],
-) -> Result<(Vec<Money>, Vec<Vec<Money>>), Error> {
-    let currency = net.currency();
-    let line_nets = net.allocate(shares)?;
-    let mut columns =
-        taxes.iter().map(|tax| tax.allocate(shares)).collect::<Result<Vec<_>, _>>()?;
-    let Some(last) = taxes.iter().rposition(|tax| !tax.is_zero()) else {
-        // Không có thuế: giá chưa thuế chia theo đúng số tiền dòng, khớp từng dòng.
-        return Ok((line_nets, columns));
-    };
-    for (slot, amount) in amounts.iter().enumerate() {
-        let mut rest = amount.checked_sub(line_nets[slot])?;
-        for (position, column) in columns.iter().enumerate() {
-            if position != last {
-                rest = rest.checked_sub(column[slot])?;
-            }
-        }
-        columns[last][slot] = rest;
-    }
-    let unit = Money::new(1, currency);
-    while let Some(slot) = columns[last].iter().position(|cell| cell.is_negative()) {
-        // Cột khác có ô lớn nhất ở dòng này (bằng nhau thì tầng sau).
-        let donor = (0..columns.len())
-            .filter(|position| *position != last && columns[*position][slot].minor() > 0)
-            .max_by_key(|position| columns[*position][slot].minor())
-            .ok_or_else(|| Error::internal("tax rounding: a line has no tax to move"))?;
-        // Dòng có ô lớn nhất ở cột cuối (bằng nhau thì dòng trước).
-        let receiver = (0..amounts.len())
-            .rev()
-            .max_by_key(|other| columns[last][*other].minor())
-            .filter(|other| columns[last][*other].minor() > 0)
-            .ok_or_else(|| Error::internal("tax rounding: no line can give back a unit"))?;
-        columns[donor][slot] = columns[donor][slot].checked_sub(unit)?;
-        columns[last][slot] = columns[last][slot].checked_add(unit)?;
-        columns[last][receiver] = columns[last][receiver].checked_sub(unit)?;
-        columns[donor][receiver] = columns[donor][receiver].checked_add(unit)?;
-    }
-    Ok((line_nets, columns))
+/// Giá đã gồm thuế của dòng thấp hơn thuế theo đơn vị nằm trong nó: giá chưa thuế âm là dữ liệu sai
+/// (hoá đơn không ghi được), báo cho người gọi thay vì tính tiếp.
+fn below_per_unit(line: usize) -> Error {
+    Error::validation(vec![FieldError::new(
+        format!("lines[{line}].amount"),
+        "range",
+        "is lower than the per-unit taxes it includes",
+    )])
+}
+
+/// Không có cách chia nào về dòng mà mọi số ≥ 0: thuế theo đơn vị của nhóm lớn hơn số tiền các dòng có
+/// số lượng chứa được (`lines::Split::inclusive`).
+fn per_unit_does_not_fit(line: usize) -> Error {
+    Error::validation(vec![FieldError::new(
+        format!("lines[{line}].amount"),
+        "range",
+        "together with the other lines that have a quantity, is too low to hold the per-unit taxes of its group",
+    )])
 }
 
 /// Số lượng hay số tiền vượt giới hạn tính được (28 chữ số của `Decimal`).
@@ -564,5 +564,6 @@ mod tests {
 }
 
 /// Thử phá bộ tính thuế (D-20261123-property-fuzzing) và các bất biến làm tròn (D-20261126-tax-rounding-allocation).
+mod lines;
 #[cfg(test)]
 mod properties;
