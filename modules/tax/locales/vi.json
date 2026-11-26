@@ -1,6 +1,7 @@
 {
   "field:addresses cannot be checked on this server": "máy chủ này không kiểm được địa chỉ",
   "field:is lower than the per-unit taxes it includes": "thấp hơn thuế tính theo đơn vị đã gồm trong giá",
+  "field:together with the other lines that have a quantity, is too low to hold the per-unit taxes of its group": "cộng với các dòng khác có số lượng vẫn không đủ chứa thuế tính theo đơn vị của nhóm",
   "field:is required: this category has a tax per unit": "là bắt buộc: nhóm này có thuế tính theo đơn vị",
   "field:must be 1 to 200 characters long": "phải dài 1 đến 200 ký tự",
   "field:must be 10, 12 or 13 digits, or 10 digits, `-` and 3 digits": "phải là 10, 12 hay 13 chữ số, hoặc 10 chữ số, `-` và 3 chữ số",
