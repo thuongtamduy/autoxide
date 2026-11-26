@@ -207,8 +207,70 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
+  # Binary macOS và Windows (G6, D-20261126-demo-and-native-binaries): người không dùng Docker hay Rust tải về chạy. Build bằng
+  # toolchain đã ghim trên máy runner của từng hệ điều hành (không giả lập). Không chặn phát hành: một nền tảng hỏng thì
+  # bản phát hành vẫn ra với các file còn lại (job `publish` chỉ cần `image` xanh, và đính kèm những gì đã có).
+  # Chưa ký bằng khoá của Apple hay Microsoft (cần chứng chỉ trả phí của chủ dự án): chứng thực SLSA và `SHA256SUMS`
+  # ký bằng cosign vẫn có, cách kiểm ở docs/VERIFYING.md; cách mở file chưa ký ở docs/GETTING-STARTED.md.
+  native:
+    needs: [verify, gate]
+    if: ${{ !cancelled() && needs.verify.result == 'success' && contains(fromJSON('["success","skipped"]'), needs.gate.result) }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            target: aarch64-apple-darwin
+            archive: tar.gz
+          - runner: macos-15-intel
+            target: x86_64-apple-darwin
+            archive: tar.gz
+          - runner: windows-2025
+            target: x86_64-pc-windows-msvc
+            archive: zip
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # `rust-toolchain.toml` ghim phiên bản; rustup tải đúng bản và mục tiêu của máy này.
+      - name: Build the binary
+        shell: bash
+        run: cargo build --release --locked -p autoxide
+      - name: Pack
+        shell: bash
+        env:
+          TARGET: ${{ matrix.target }}
+          TAG: ${{ github.ref_name }}
+          ARCHIVE: ${{ matrix.archive }}
+        run: |
+          name="autoxide-${TAG#v}-$TARGET"
+          mkdir -p "dist/$name"
+          exe=autoxide
+          if [ "$ARCHIVE" = zip ]; then exe=autoxide.exe; fi
+          cp "target/release/$exe" "dist/$name/$exe"
+          cp LICENSE-MIT LICENSE-APACHE README.md "dist/$name/"
+          # Chạy thử ngay trên máy build: binary không khởi động được thì không đính kèm.
+          "dist/$name/$exe" --version
+          if [ "$ARCHIVE" = zip ]; then
+            (cd dist && 7z a -tzip "$name.zip" "$name" >/dev/null)
+          else
+            tar -C dist -czf "dist/$name.tar.gz" "$name"
+          fi
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: binary-native-${{ matrix.target }}
+          path: |
+            dist/*.tar.gz
+            dist/*.zip
+          if-no-files-found: error
+          retention-days: 1
+
   publish:
-    needs: [verify, image]
+    needs: [verify, image, native]
     # Điều kiện mặc định (`success()`) bỏ qua job khi BẤT KỲ job nào phía trên trong chuỗi `needs` bị bỏ qua — kể cả
     # `gate` bị bỏ qua có chủ đích khi dùng lại CI xanh (D-20261121-ci-batch-release-faster). v0.17.0 dính lỗi này:
     # image build xong nhưng không gắn thẻ, không cập nhật trang Release. Chỉ cần `image` xanh.
@@ -343,12 +405,14 @@ jobs:
       - name: Checksums of the release files
         working-directory: dist
         run: |
-          sha256sum -- *.tar.gz *.tgz sbom.spdx.json > SHA256SUMS
+          shopt -s nullglob
+          sha256sum -- *.tar.gz *.zip *.tgz sbom.spdx.json > SHA256SUMS
           cat SHA256SUMS
       - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-path: |
             dist/*.tar.gz
+            dist/*.zip
             dist/*.tgz
             dist/sbom.spdx.json
       - name: Sign the checksums with cosign (keyless)
@@ -369,9 +433,16 @@ jobs:
             "SHA256SUMS#SHA-256 checksums of the release files"
             "SHA256SUMS.sigstore.json#Sigstore bundle: cosign signature of SHA256SUMS"
           )
+          # Linux (từ image) luôn có; macOS và Windows chỉ khi job `native` của nền tảng đó xanh.
           for target in x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu; do
             files+=("autoxide-${TAG#v}-$target.tar.gz#Linux binary ($target)")
           done
+          for target in aarch64-apple-darwin x86_64-apple-darwin; do
+            file="autoxide-${TAG#v}-$target.tar.gz"
+            if [ -f "$file" ]; then files+=("$file#macOS binary ($target, not notarized)"); fi
+          done
+          file="autoxide-${TAG#v}-x86_64-pc-windows-msvc.zip"
+          if [ -f "$file" ]; then files+=("$file#Windows binary (x86_64-pc-windows-msvc, not signed)"); fi
           # Bản thử là pre-release và không bao giờ là "Latest release"; bản vá dòng cũ cũng không (job `verify`).
           flags=("--prerelease=$PRERELEASE" "--latest=$LATEST")
           # Chủ dự án có thể đã tạo trang Release để có tag (agent không đẩy được tag): khi đó cập nhật

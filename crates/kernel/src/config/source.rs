@@ -57,6 +57,16 @@ impl ConfigSource {
         Ok(ConfigSource { values })
     }
 
+    /// Sets `name` to `value` unless it already has a (non-empty) value. For commands that bring their own
+    /// defaults, such as `autoxide demo`: whatever the user set in the environment or `.env` still wins.
+    #[must_use]
+    pub fn with_default(mut self, name: &str, value: impl Into<String>) -> Self {
+        if self.get(name).is_none() {
+            self.values.insert(name.to_owned(), value.into());
+        }
+        self
+    }
+
     /// The value of `name`, trimmed of surrounding whitespace. An empty string counts as unset: `VAR=` in a
     /// `.env` file or compose means "use the default".
     pub fn get(&self, name: &str) -> Option<&str> {
