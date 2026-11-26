@@ -152608,7 +152608,7 @@
         ]
       },
       "put": {
-        "description": "Platform staff with `compliance.privacy.manage`. Refused when the tenant's placement is not in\nthat country (or its country is unknown): record it with `autoxide placement country` or move the\ntenant first. Moving a tenant later to a placement elsewhere is refused too. Cybersecurity Law\n116/2025/QH15, Decree 53/2022/ND-CP — have a legal professional check who must keep data in\nVietnam.",
+        "description": "Platform staff with `compliance.privacy.manage`. Refused when the tenant's placement is not in\nthat country (or its country is unknown): record it with `autoxide placement country` or move the\ntenant first. Moving a tenant later to a placement elsewhere is refused too. Cybersecurity Law\n116/2025/QH15 and its implementing decree (replacing Decree 53/2022/ND-CP) — have a legal professional\ncheck who must keep data in Vietnam.",
         "operationId": "compliance_set_compliance_residency",
         "parameters": [
           {
