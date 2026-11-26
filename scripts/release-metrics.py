@@ -8,7 +8,7 @@
 scripts/release-time-to-first-request.sh), job `upgrade` của CI trên đúng commit phát hành (G3), lần chạy gần nhất
 của load.yml (p95), bộ eval agent (G4, file `{"tasks": N, "passed": M}`), và số đo người mới làm module đầu
 (docs/quality/first-module-timing.json). Thiếu nguồn nào thì ghi rõ "chưa đo" / "chờ …", không bịa số. Ghi bảng Markdown
-ra stdout (và $GITHUB_STEP_SUMMARY); thoát mã 1 khi có chỉ số ĐÃ ĐO mà không đạt ngưỡng (chỉ số chưa đo không làm đỏ:
+ra stdout (và $GITHUB_STEP_SUMMARY); thoát mã 3 khi có chỉ số ĐÃ ĐO mà không đạt ngưỡng (mã 0 nếu không; lỗi một nguồn chỉ làm chỉ số đó "chưa đo") (chỉ số chưa đo không làm đỏ:
 ngưỡng 1.0 do chủ dự án và phiên điều phối kiểm tay lúc chốt 1.0). Cần `gh` đã đăng nhập cho các nguồn trên GitHub.
 """
 import argparse
@@ -31,9 +31,12 @@ def gh_json(*args: str):
 def first_request(path: str | None):
     if not path or not Path(path).exists():
         return "chưa đo", None, "không có file số đo"
-    data = json.loads(Path(path).read_text())
-    seconds = data["seconds"]
-    detail = ", ".join(f"{name} {value}s" for name, value in data["steps"].items())
+    try:
+        data = json.loads(Path(path).read_text())
+        seconds = data["seconds"]
+        detail = ", ".join(f"{name} {value}s" for name, value in data["steps"].items())
+    except (ValueError, KeyError, TypeError):
+        return "chưa đo (file số đo rỗng hoặc hỏng: bước đo thời gian đã lỗi)", None, None
     ok = seconds < FIRST_REQUEST_LIMIT_SECONDS
     return f"{seconds:.0f} s (ngưỡng < {FIRST_REQUEST_LIMIT_SECONDS} s; {detail}; chỉ phần máy)", ok, None
 
@@ -65,12 +68,12 @@ def upgrade(repo: str, sha: str):
     if not ups:
         return "chờ G3 (không thấy job `upgrade`)", None
     passed = sum(1 for job in ups if job["conclusion"] == "success")
-    # Job bị bỏ qua (PR không chạm dữ liệu đã lưu) không phải lần chạy; ở commit phát hành trên main phải chạy thật.
-    skipped = sum(1 for job in ups if job["conclusion"] == "skipped")
-    ran = len(ups) - skipped
-    if ran == 0:
-        return f"{len(ups)} job `upgrade` đều bị bỏ qua — chưa có lần chạy thật", None
-    return f"{passed}/{ran} job nâng cấp thành công (ngưỡng 100%)", passed == ran
+    failed = sum(1 for job in ups if job["conclusion"] == "failure")
+    # Job bị bỏ qua (PR không chạm dữ liệu đã lưu), bị huỷ hay chưa có kết luận không phải một lần chạy xong: "chưa đo",
+    # không tính là không đạt. Ở commit phát hành trên main phải chạy thật.
+    if passed + failed < len(ups):
+        return f"chưa đo: {len(ups) - passed - failed}/{len(ups)} job `upgrade` bị bỏ qua, huỷ hay chưa xong (đạt {passed}, hỏng {failed})", (False if failed else None)
+    return f"{passed}/{len(ups)} job nâng cấp thành công (ngưỡng 100%)", failed == 0
 
 
 def agent_eval(path: str | None):
@@ -93,8 +96,11 @@ def p95(repo: str):
     if not runs:
         return "chưa có lần chạy load.yml", None
     run = runs[0]
+    where = f"lần chạy load.yml gần nhất ({run['createdAt'][:10]}, commit {run['headSha'][:7]})"
+    if run["conclusion"] not in ("success", "failure"):
+        return f"chưa đo: {where} kết thúc là `{run['conclusion']}`", None
     ok = run["conclusion"] == "success"
-    return f"lần chạy load.yml gần nhất ({run['createdAt'][:10]}, commit {run['headSha'][:7]}): {'không tệ đi' if ok else 'TỆ ĐI hoặc lỗi'} (so với docs/quality/load-baseline.json)", ok
+    return f"{where}: {'không tệ đi' if ok else 'TỆ ĐI hoặc lỗi'} (so với docs/quality/load-baseline.json)", ok
 
 
 def main() -> int:
@@ -106,16 +112,25 @@ def main() -> int:
     parser.add_argument("--agent-eval")
     args = parser.parse_args()
 
+    def safe(label, source):
+        """Một nguồn lỗi (mạng, `gh`, file hỏng) chỉ làm chỉ số đó thành "chưa đo", không làm hỏng cả bảng."""
+        try:
+            return source()
+        except (Exception, SystemExit) as error:  # noqa: BLE001 - mọi lỗi của nguồn đều thành "chưa đo"
+            reason = str(error).splitlines()[0][:160] if str(error) else type(error).__name__
+            print(f"cảnh báo: nguồn `{label}` lỗi: {reason}", file=sys.stderr)
+            return f"chưa đo: {reason}", None
+
     rows = []
-    text, ok, _ = first_request(args.first_request)
+    text, ok = safe("first-request", lambda: first_request(args.first_request)[:2])
     rows.append(("Tải về → request đầu tiên < 5 phút", text, ok))
-    text, ok = first_module()
+    text, ok = safe("first-module", first_module)
     rows.append(("Người mới xong module đầu tiên < 30 phút", text, ok))
-    text, ok = upgrade(args.repo, args.sha)
+    text, ok = safe("upgrade", lambda: upgrade(args.repo, args.sha))
     rows.append(("Nâng cấp trong CI 100%", text, ok))
-    text, ok = agent_eval(args.agent_eval)
+    text, ok = safe("agent-eval", lambda: agent_eval(args.agent_eval))
     rows.append(("Agent thật xong việc mẫu > 90%", text, ok))
-    text, ok = p95(args.repo)
+    text, ok = safe("p95", lambda: p95(args.repo))
     rows.append(("p95 đường nóng không tệ đi", text, ok))
 
     mark = {True: "đạt", False: "KHÔNG ĐẠT", None: "chưa có kết luận"}
@@ -128,7 +143,8 @@ def main() -> int:
     if summary:
         with open(summary, "a", encoding="utf-8") as handle:
             handle.write(report + "\n")
-    return 1 if any(ok is False for _, _, ok in rows) else 0
+    # Mã thoát riêng cho "có chỉ số đã đo mà không đạt" (3), để workflow phân biệt với script hỏng (mã khác).
+    return 3 if any(ok is False for _, _, ok in rows) else 0
 
 
 if __name__ == "__main__":

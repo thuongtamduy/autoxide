@@ -20,12 +20,12 @@ compose=(docker compose -f compose.quickstart.yml)
 cleanup() { "${compose[@]}" down -v >/dev/null 2>&1 || true; rm -rf "$work"; }
 trap cleanup EXIT
 
-now() { python3 -c 'import time; print(time.time())'; }
+now() { python3 -I -c 'import time; print(time.time())'; }
 t0="$(now)"
 curl -fsSLO "https://raw.githubusercontent.com/$repo/v$version/compose.quickstart.yml"
 t_download="$(now)"
 printf 'AUTOXIDE_AUTH_TOKEN_SECRET=%s\nAUTOXIDE_SECRET_KEY=%s\nAUTOXIDE_IMAGE=ghcr.io/%s:%s\n' \
-  "$(openssl rand -base64 48 | tr -d '\n')" "$(openssl rand -base64 48 | tr -d '\n')" "$repo" "$version" > .env
+  "$(openssl rand -base64 48 | tr -d '\n')" "$(openssl rand -base64 48 | tr -d '\n')" "${repo,,}" "$version" > .env
 "${compose[@]}" up -d >&2
 t_start="$(now)"
 for _ in $(seq 1 600); do curl -sf "http://127.0.0.1:$port/health/ready" >/dev/null && break; sleep 0.5; done
@@ -35,12 +35,13 @@ t_ready="$(now)"
 creds="$("${compose[@]}" exec -T autoxide cat data/initial-admin-password)"
 email="$(printf '%s\n' "$creds" | sed -n 1p)"
 password="$(printf '%s\n' "$creds" | sed -n 2p)"
-token="$(curl -sf "http://127.0.0.1:$port/api/v1/auth/login" -H 'content-type: application/json' \
-  -d "$(python3 -c 'import json,sys; print(json.dumps({"email": sys.argv[1], "password": sys.argv[2]}))' "$email" "$password")" \
-  | python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["access_token"])')"
+# Mật khẩu đi qua biến môi trường của Python và stdin của curl, không qua đối số dòng lệnh (`ps` thấy được đối số).
+token="$(EMAIL="$email" PASSWORD="$password" python3 -I -c 'import json,os; print(json.dumps({"email": os.environ["EMAIL"], "password": os.environ["PASSWORD"]}))' \
+  | curl -sf "http://127.0.0.1:$port/api/v1/auth/login" -H 'content-type: application/json' -d @- \
+  | python3 -I -c 'import json,sys; print(json.load(sys.stdin)["data"]["access_token"])')"
 curl -sf "http://127.0.0.1:$port/api/v1/auth/me" -H "authorization: Bearer $token" >/dev/null
 t_end="$(now)"
-python3 - "$version" "$t0" "$t_download" "$t_start" "$t_ready" "$t_end" <<'PY'
+python3 -I - "$version" "$t0" "$t_download" "$t_start" "$t_ready" "$t_end" <<'PY'
 import json, sys
 version, *t = sys.argv[1], *map(float, sys.argv[2:])
 t0, download, start, ready, end = t

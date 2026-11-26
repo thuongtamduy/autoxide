@@ -234,12 +234,12 @@ Postgres; vòng kiểm thử bảo mật kiểu bên ngoài cuối cùng không 
 - [ ] Chỉ số đo mỗi bản phát hành, ngưỡng cho 1.0: tải về tới request đầu tiên dưới 5 phút; người mới xong module đầu
       tiên dưới 30 phút; nâng cấp trong CI 100% thành công kể cả nhiều khách; agent thật làm xong việc mẫu trên 90%; p95
       đường nóng không tệ đi giữa hai bản
-
-### G10 — Giảm tải cho agent phát triển
-
       — bảng, ngưỡng và cách đo ở `docs/RELEASING.md` ("Chỉ số của mỗi bản phát hành"), workflow `release-metrics.yml` đã có;
       còn: số đo người mới / agent làm module đầu (`docs/quality/first-module-timing.json`), file kết quả eval của G4,
       và lần chạy đầu của `load.yml` (số gốc p95)
+
+### G10 — Giảm tải cho agent phát triển
+
 - [ ] Rút `CLAUDE.md` còn khoảng một phần ba (giữ luật và chỉ dẫn, quy trình chuyển sang skill); chuyển mục đã xong của
       lộ trình sang `docs/roadmap/done.md`
 

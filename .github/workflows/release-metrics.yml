@@ -2,8 +2,9 @@
 # gian từ tải về tới request đầu tiên trên máy sạch rồi gộp với kết quả đã có của CI (nâng cấp, p95, eval agent), ghi bảng
 # vào trang tóm tắt và ghi chú bản phát hành. Workflow dùng lại (reusable): `release.yml` gọi nó như một job SAU khi đã
 # đăng bản phát hành (không dùng trigger `workflow_run`: zizmor xếp nó là không an toàn); chạy tay cho một tag đã có bằng
-# `workflow_dispatch`. Chỉ số ĐÃ ĐO mà không đạt thì bảng ghi KHÔNG ĐẠT và bước cuối báo cảnh báo (không làm đỏ cả workflow
-# Release: bản đã đăng rồi, đỏ cũng không rút lại được); bản 1.0 chỉ phát hành khi cả năm chỉ số đạt, kiểm tay lúc chốt.
+# `workflow_dispatch`. Mọi bước đo và bước ghi chú đều `continue-on-error`: lỗi đo (docker, `gh`, mạng) chỉ làm chỉ số đó thành "chưa đo"
+# và KHÔNG làm đỏ workflow Release (bản đã đăng rồi, đỏ cũng không rút lại được); chỉ số ĐÃ ĐO mà không đạt thì bảng ghi
+# KHÔNG ĐẠT và có một cảnh báo (::warning::); bản 1.0 chỉ phát hành khi cả năm chỉ số đạt, kiểm tay lúc chốt.
 name: Release metrics
 
 on:
@@ -24,14 +25,14 @@ permissions:
   contents: read
 
 jobs:
-  metrics:
+  # Đo và dựng bảng: chỉ cần ĐỌC (contents, actions). Quyền ghi ghi chú nằm ở job `notes` bên dưới.
+  measure:
     if: ${{ !github.event.repository.private }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
-      contents: write # chỉ để thêm bảng vào ghi chú của bản phát hành (bước cuối)
+      contents: read
       actions: read
-      packages: read
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
@@ -41,7 +42,8 @@ jobs:
         id: release
         run: |
           tag="v${INPUT_TAG#v}"
-          case "$tag" in v[0-9]*) ;; *) echo "::error::not a release tag: $tag"; exit 1 ;; esac
+          # Cùng dạng tag mà job `verify` của release.yml chấp nhận.
+          [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+)?$ ]] || { echo "::error::not a release tag: $tag"; exit 1; }
           sha="$(gh api "repos/$GH_REPO/commits/$tag" --jq .sha)"
           {
             echo "tag=$tag"
@@ -52,13 +54,18 @@ jobs:
         with:
           ref: ${{ steps.release.outputs.tag }}
           persist-credentials: false
+      # Lỗi docker / mạng ở đây chỉ làm chỉ số "tải về → request đầu tiên" thành "chưa đo" (file rỗng).
       - name: Time from download to the first request
+        continue-on-error: true
         env:
           VERSION: ${{ steps.release.outputs.version }}
-        run: scripts/release-time-to-first-request.sh "$VERSION" "$GH_REPO" | tee first-request.json
+        run: |
+          scripts/release-time-to-first-request.sh "$VERSION" "$GH_REPO" > first-request.json || : > first-request.json
+          cat first-request.json
       # Bộ eval agent của G4: file kết quả `docs/quality/agent-eval.json` (định dạng agent-eval.schema.json) nếu bản này có.
       - name: Table
         id: table
+        continue-on-error: true
         env:
           VERSION: ${{ steps.release.outputs.version }}
           SHA: ${{ steps.release.outputs.sha }}
@@ -67,22 +74,52 @@ jobs:
           [ -f docs/quality/agent-eval.json ] && eval_file="--agent-eval docs/quality/agent-eval.json"
           set +e
           # shellcheck disable=SC2086
-          scripts/release-metrics.py --version "$VERSION" --sha "$SHA" --first-request first-request.json $eval_file | tee metrics.md
+          python3 -I scripts/release-metrics.py --version "$VERSION" --sha "$SHA" --first-request first-request.json $eval_file | tee metrics.md
           status="${PIPESTATUS[0]}"
           echo "status=$status" >> "$GITHUB_OUTPUT"
-      # Thêm bảng vào ghi chú bản phát hành (một lần: thay phần cũ nếu chạy lại).
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ always() }}
+        with:
+          name: release-metrics
+          path: metrics.md
+          if-no-files-found: ignore
+      # Mã thoát 3 = có chỉ số đã đo mà không đạt (mã khác = script hỏng: không cảnh báo sai).
+      - name: Warn when a measured metric misses its limit
+        if: ${{ steps.table.outputs.status == '3' }}
+        run: echo "::warning::at least one measured release metric misses its 1.0 limit; see the table in the job summary and the release notes"
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+
+  # Ghi bảng vào ghi chú bản phát hành (một lần: thay phần cũ nếu chạy lại). Chỉ job này có quyền ghi; bỏ qua khi
+  # không có bảng hợp lệ (script hỏng) để không xoá bảng cũ.
+  notes:
+    needs: measure
+    if: ${{ always() && needs.measure.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        continue-on-error: true
+        with:
+          name: release-metrics
       - name: Add the table to the release notes
+        continue-on-error: true
         env:
-          TAG: ${{ steps.release.outputs.tag }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.measure.outputs.tag }}
         run: |
+          if ! grep -q '^## Chỉ số bản ' metrics.md 2>/dev/null; then
+            echo "::warning::no valid metrics table; release notes left as they are"
+            exit 0
+          fi
           gh release view "$TAG" --json body --jq .body > notes.md
-          python3 - <<'PY'
+          python3 -I - <<'PY'
           import re
           notes = open("notes.md").read()
           notes = re.sub(r"\n*## Chỉ số bản .*\Z", "", notes, flags=re.S).rstrip()
           open("notes.md", "w").write(notes + "\n\n" + open("metrics.md").read())
           PY
           gh release edit "$TAG" --notes-file notes.md
-      - name: Warn when a measured metric misses its limit
-        if: ${{ steps.table.outputs.status != '0' }}
-        run: echo "::warning::at least one measured release metric misses its 1.0 limit; see the table in the job summary and the release notes"

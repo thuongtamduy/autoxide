@@ -540,7 +540,6 @@ jobs:
     permissions:
       contents: write
       actions: read
-      packages: read
     uses: ./.github/workflows/release-metrics.yml
     with:
       tag: ${{ github.ref_name }}
