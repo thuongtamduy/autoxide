@@ -31,7 +31,7 @@ pub(crate) fn routes(service: Arc<PromotionsService>) -> OpenApiRouter {
 #[utoipa::path(
     post,
     path = "/public/promotions/{id}/reminders",
-    extensions(("x-permissions" = json!(["promotions.use"]))),
+    extensions(("x-permissions" = json!(["promotions.use"])), ("x-buyers" = json!(true))),
     operation_id = "create_flash_sale_reminder",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the flash sale.")),
@@ -66,7 +66,7 @@ async fn remind_me(
 #[utoipa::path(
     delete,
     path = "/public/promotions/{id}/reminders",
-    extensions(("x-permissions" = json!(["promotions.use"]))),
+    extensions(("x-permissions" = json!(["promotions.use"])), ("x-buyers" = json!(true))),
     operation_id = "delete_flash_sale_reminder",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the flash sale.")),

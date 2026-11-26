@@ -16,12 +16,20 @@ use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use utoipa::openapi::OpenApi;
 
-use crate::access::Principal;
+use crate::access::{Principal, Realm};
 
-/// `(method, full path template)` → permission names (one of them is enough).
+/// One guarded operation: permission names (one of them is enough), and whether buyer accounts pass
+/// (`x-buyers: true`: a buyer account has no permissions; the service decides what it may do).
+#[derive(Debug)]
+struct Guard {
+    permissions: Vec<String>,
+    buyers: bool,
+}
+
+/// `(method, full path template)` → its guard.
 #[derive(Debug, Default)]
 pub(super) struct Rules {
-    operations: Vec<(Method, String, Vec<String>)>,
+    operations: Vec<(Method, String, Guard)>,
 }
 
 impl Rules {
@@ -29,11 +37,11 @@ impl Rules {
         self.operations.is_empty()
     }
 
-    fn find(&self, method: &Method, path: &str) -> Option<&[String]> {
+    fn find(&self, method: &Method, path: &str) -> Option<&Guard> {
         self.operations
             .iter()
             .find(|(known, template, _)| known == method && template == path)
-            .map(|(_, _, permissions)| permissions.as_slice())
+            .map(|(_, _, guard)| guard)
     }
 }
 
@@ -62,9 +70,15 @@ pub(super) fn rules(module: &str, openapi: &OpenApi) -> Rules {
             if permissions.is_empty() {
                 continue;
             }
+            let buyers = operation
+                .extensions
+                .as_ref()
+                .and_then(|extensions| extensions.get("x-buyers"))
+                .is_some_and(|value| value == true);
             // Đường gốc của module là `/` trong tài liệu của nó, `/api/v1/<module>` sau khi ghép (không có `/` cuối).
             let tail = if path == "/" { "" } else { path.as_str() };
-            operations.push((method, format!("{}/{module}{tail}", super::API_PREFIX), permissions));
+            let guard = Guard { permissions, buyers };
+            operations.push((method, format!("{}/{module}{tail}", super::API_PREFIX), guard));
         }
     }
     Rules { operations }
@@ -72,17 +86,18 @@ pub(super) fn rules(module: &str, openapi: &OpenApi) -> Rules {
 
 /// The layer (see the top of the file).
 pub(super) async fn gate(rules: Arc<Rules>, request: Request, next: Next) -> Response {
-    let Some(permissions) = request
+    let Some((permissions, buyers)) = request
         .extensions()
         .get::<MatchedPath>()
         .and_then(|matched| rules.find(request.method(), matched.as_str()))
-        .map(<[String]>::to_vec)
+        .map(|guard| (guard.permissions.clone(), guard.buyers))
     else {
         return next.run(request).await;
     };
     let (mut parts, body) = request.into_parts();
     // Xác thực một lần; kết quả được giữ trong `extensions`, extractor `Principal` của handler dùng lại.
     if let Ok(principal) = Principal::from_request_parts(&mut parts, &()).await
+        && !(buyers && principal.realm() == Realm::Customer)
         && let Err(error) = principal.require_any_named(&permissions)
     {
         return error.into_response();

@@ -12,6 +12,12 @@ operation công khai không bị chặn. Phạm vi (nút), bản ghi, step-up v�
 `x_permissions_khop_cho_service_kiem` (mỗi permission một tài khoản, gọi mọi operation cùng module) giữ hai bên khớp, và
 `kiem_quyen_truoc_du_lieu_va_ban_ghi` giữ thứ tự (thân sai, thiếu `If-Match`, ID không có → vẫn 403).
 
+Endpoint của người mua mà nhân sự cũng gọi được với một permission (ví voucher, nhắc flash sale của `promotions`) khai
+thêm `x-buyers: true`: tài khoản người mua (không bao giờ có permission, D-309) qua lớp này, service quyết phần còn lại;
+nhân sự vẫn cần một permission trong danh sách. Bài dò PT-13 chỉ thử permission CÙNG module với operation (thử mọi cặp
+là hàng trăm nghìn request); operation nhận permission của module khác sẽ lộ ra ở test của module đó — chạy test toàn
+workspace đã bắt hai chỗ như vậy (`promotions` người mua, `support` thành viên tự tắt nhận việc) trước khi bật.
+
 Lý do: pentest 2026-11 (PT-14) — khoảng 210 operation trả 428 / 412 / 422 / 404 trước khi kiểm permission, người không
 quyền học được endpoint cần `ETag`, trường nào sai, bản ghi nào tồn tại; đo lại trên toàn bộ module là 372 operation.
 Sửa từng handler (đổi thứ tự extractor, gọi `require` trước khi tra bản ghi) không giữ được với module mới; một lớp đọc
