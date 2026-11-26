@@ -1,0 +1,2 @@
+- The Docker image is now distroless (Debian 13 `cc` base): no shell, `curl` or package manager, smaller to patch. It still runs as user `10001`, so existing volumes keep working. **Action needed:** anything that used `docker exec … sh` or `curl` inside the container must use `docker debug` / `kubectl debug` instead.
+- New command `autoxide healthcheck` (exit 0 when `/health/ready`, or `/health/live` with `--live`, answers 200): the image's `HEALTHCHECK` and the `app` service of `compose.yml` use it, so `docker compose ps` shows `healthy`.

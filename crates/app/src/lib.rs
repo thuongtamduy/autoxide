@@ -81,6 +81,15 @@ enum Command {
     /// invalid; warnings do not fail.
     Doctor(commands::doctor::Arguments),
 
+    /// Ask the server running on this machine whether it is healthy (for container health checks).
+    ///
+    /// Sends `GET /health/ready` (or `/health/live` with `--live`) to the address of
+    /// `AUTOXIDE_HTTP_ADDRESS` over plain HTTP, using the same settings as `autoxide serve`, and
+    /// exits with status 0 when it answers 200, 1 when it does not answer or answers anything else,
+    /// 2 when the configuration is invalid. It needs no shell, `curl` or `wget`, so it works in an
+    /// image that has none. It does not touch the database itself.
+    Healthcheck(commands::healthcheck::Arguments),
+
     /// Inspect and retry background jobs that failed for good (the dead-letter queue).
     Jobs(commands::jobs::Arguments),
 
@@ -270,6 +279,7 @@ fn dispatch(command: Command) -> ExitCode {
         Command::Copy(arguments) => commands::copy::run(&arguments),
         Command::Demo(arguments) => commands::demo::run(&arguments),
         Command::Doctor(arguments) => commands::doctor::run(&arguments),
+        Command::Healthcheck(arguments) => commands::healthcheck::run(&arguments),
         Command::Jobs(arguments) => commands::jobs::run(&arguments),
         Command::Migrate(arguments) => commands::migrate::run(&arguments),
         Command::Modules(arguments) => commands::modules::run(&arguments),
