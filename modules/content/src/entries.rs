@@ -17,7 +17,6 @@ use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Page, PageRequest, SortValue, fetch_page, fetch_page_by};
 use autoxide_kernel::rows;
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use sea_orm::sea_query::ExprTrait as _;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter,
     QuerySelect, Set, SqlErr,
@@ -471,43 +470,36 @@ async fn slug_taken<C: ConnectionTrait>(
         .is_some())
 }
 
-/// Slug còn trống trong phạm vi của `candidate`: `base`, rồi `base-2`, `base-3`…
+/// Slug còn trống trong phạm vi của `candidate`: `base`, rồi `base-2`, `base-3`… Hỏi từng nhóm ứng viên bằng
+/// `slug IN (…)` — dùng unique index trên cả hai database (PT-16; `LIKE 'base-%'` quét cả bảng trên Postgres).
 async fn free_slug<C: ConnectionTrait>(
     connection: &C,
     tenant: &TenantContext,
     candidate: &Entry,
     base: &str,
 ) -> Result<String, Error> {
-    let taken: BTreeSet<String> = Entity::find()
-        .scoped(tenant)
-        .select_only()
-        .column(Column::Slug)
-        .filter(Column::Locale.eq(candidate.locale.as_str()))
-        .filter(Column::Kind.eq(candidate.kind.as_str()))
-        .filter(Column::ParentKey.eq(candidate.parent_key))
-        .filter(same_site(candidate))
-        .filter(Column::Id.ne(candidate.id))
-        .filter(
-            Column::Slug
-                .eq(base)
-                .or(autoxide_kernel::search::starts_with(Column::Slug, &format!("{base}-"))),
-        )
-        .into_tuple::<String>()
-        .all(connection)
-        .await?
-        .into_iter()
-        .collect();
-    if !taken.contains(base) {
-        return Ok(base.to_owned());
-    }
-    let mut n = 2;
-    loop {
-        let next = autoxide_kernel::slug::with_suffix(base, n);
-        if !taken.contains(&next) {
-            return Ok(next);
+    for window in 0.. {
+        let wanted = autoxide_kernel::slug::candidates(base, window);
+        let taken: BTreeSet<String> = Entity::find()
+            .scoped(tenant)
+            .select_only()
+            .column(Column::Slug)
+            .filter(Column::Locale.eq(candidate.locale.as_str()))
+            .filter(Column::Kind.eq(candidate.kind.as_str()))
+            .filter(Column::ParentKey.eq(candidate.parent_key))
+            .filter(same_site(candidate))
+            .filter(Column::Id.ne(candidate.id))
+            .filter(Column::Slug.is_in(wanted.iter().map(String::as_str)))
+            .into_tuple::<String>()
+            .all(connection)
+            .await?
+            .into_iter()
+            .collect();
+        if let Some(free) = wanted.into_iter().find(|slug| !taken.contains(slug)) {
+            return Ok(free);
         }
-        n += 1;
     }
+    Err(Error::conflict("content.slug_taken", "Could not find a free slug; give one yourself."))
 }
 
 pub(crate) fn is_unique_violation(error: &sea_orm::DbErr) -> bool {

@@ -365,3 +365,39 @@ async fn anh_tac_gia_rieng_tu_khong_lo() {
     .await
     .unwrap();
 }
+
+/// PT-16: tám bài cùng tiêu đề tạo cùng lúc đều được tạo, mỗi bài một slug (`load-test-draft`, `-2` … `-8`); slug đã
+/// có ở nhóm ứng viên đầu thì lấy ở nhóm sau — đụng unique index thì thử hậu tố kế, không trả 409.
+#[tokio::test]
+async fn tao_cung_tieu_de_dong_thoi_moi_bai_mot_slug() {
+    TestDatabase::run(async |test| {
+        let (content, _, database) = service(test, config(&[])).await;
+        let tenant = TenantContext::default_on(database.clone());
+        let ada = editor();
+        let create = || content.create(&tenant, &ada, post("Load test draft"));
+        let (a, b, c, d, e, f, g, h) = tokio::join!(
+            create(),
+            create(),
+            create(),
+            create(),
+            create(),
+            create(),
+            create(),
+            create()
+        );
+        let mut slugs: Vec<String> =
+            [a, b, c, d, e, f, g, h].into_iter().map(|result| result.unwrap().slug).collect();
+        slugs.sort();
+        slugs.dedup();
+        assert_eq!(slugs.len(), 8, "{slugs:?}");
+        assert!(slugs.contains(&"load-test-draft".to_owned()), "{slugs:?}");
+        // Hết nhóm đầu (`base`, `-2` … `-20`): bài thứ 21 lấy `-21`.
+        for _ in 8..20 {
+            content.create(&tenant, &ada, post("Load test draft")).await.unwrap();
+        }
+        let next = content.create(&tenant, &ada, post("Load test draft")).await.unwrap();
+        assert_eq!(next.slug, "load-test-draft-21");
+    })
+    .await
+    .unwrap();
+}
