@@ -222,6 +222,13 @@
         "additionalProperties": false,
         "description": "A search by name.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "country": {
             "type": "string"
           },
@@ -647,6 +654,13 @@
             "format": "uuid",
             "type": [
               "string",
+              "null"
+            ]
+          },
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
               "null"
             ]
           },
@@ -1349,7 +1363,7 @@
         "returns_secret": false
       },
       "deprecation": null,
-      "description": "List your API keys (never their secrets); follow `pagination.next_cursor` for more.",
+      "description": "List your API keys (never their secrets); called with an API key, only that key; with an OAuth token, none. Follow `pagination.next_cursor` for more.",
       "input_schema": {
         "additionalProperties": false,
         "description": "Paging of a list: the same as the `limit`, `cursor`, `order` and `count` query parameters\nof the REST list endpoints.",
@@ -1903,7 +1917,7 @@
         "returns_secret": false
       },
       "deprecation": null,
-      "description": "Revoke one of your API keys; it stops working at once.",
+      "description": "Revoke one of your API keys; it stops working at once. Called with an API key, only that same key can be revoked; an OAuth token revokes none.",
       "input_schema": {
         "additionalProperties": false,
         "description": "A role or user to act on.",
@@ -2737,6 +2751,13 @@
         "additionalProperties": false,
         "description": "Which bookings to list.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "`next_cursor` of the previous page.",
             "type": [
@@ -4346,6 +4367,13 @@
         "additionalProperties": false,
         "description": "Filters and paging of the moderation queue.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "Where to continue: the `next_cursor` of the previous page.",
             "type": [
@@ -4461,6 +4489,13 @@
         "additionalProperties": false,
         "description": "Filters and paging of the unanswered questions.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "Where to continue: the `next_cursor` of the previous page.",
             "type": [
@@ -6146,6 +6181,13 @@
               "null"
             ]
           },
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "Where to continue: the `next_cursor` of the previous page.",
             "type": [
@@ -6236,6 +6278,13 @@
         "additionalProperties": false,
         "description": "Filters and paging of the banner list; omitted fields do not filter.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "The `next_cursor` of the previous page.",
             "type": [
@@ -6334,6 +6383,13 @@
         "additionalProperties": false,
         "description": "Revisions of an entry.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "Where to continue: the `next_cursor` of the previous page.",
             "type": [
@@ -6382,6 +6438,13 @@
         "additionalProperties": false,
         "description": "Paging, optionally for one website.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "Where to continue: the `next_cursor` of the previous page.",
             "type": [
@@ -6429,6 +6492,13 @@
         "additionalProperties": false,
         "description": "Paging, optionally for one website.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "Where to continue: the `next_cursor` of the previous page.",
             "type": [
@@ -7372,6 +7442,13 @@
         "additionalProperties": false,
         "description": "Filters of the call-back list.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "The `next_cursor` of the previous page.",
             "type": [
@@ -7479,6 +7556,13 @@
         "additionalProperties": false,
         "description": "Filters of the conversation list.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "The `next_cursor` of the previous page.",
             "type": [
@@ -8359,6 +8443,13 @@
         "additionalProperties": false,
         "description": "Filters and paging of the form list.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "Where to continue: the `next_cursor` of the previous page.",
             "type": [
@@ -8406,6 +8497,13 @@
         "additionalProperties": false,
         "description": "Filters and paging of a form's submissions.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "Where to continue: the `next_cursor` of the previous page.",
             "type": [
@@ -8925,6 +9023,13 @@
         "additionalProperties": false,
         "description": "Stock levels to list.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "The `next_cursor` of the previous page.",
             "type": [
@@ -8980,6 +9085,13 @@
         "additionalProperties": false,
         "description": "Stock levels to list.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "The `next_cursor` of the previous page.",
             "type": [
@@ -9035,6 +9147,13 @@
         "additionalProperties": false,
         "description": "Ledger lines to list.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "The `next_cursor` of the previous page.",
             "type": [
@@ -9418,6 +9537,13 @@
         "additionalProperties": false,
         "description": "Which documents.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "The `next_cursor` of the previous page.",
             "type": [
@@ -11104,6 +11230,13 @@
         "additionalProperties": false,
         "description": "Which entries.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "The `next_cursor` of the previous page.",
             "type": [
@@ -11181,6 +11314,13 @@
         "additionalProperties": false,
         "description": "Which items.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "The `next_cursor` of the previous page.",
             "type": [
@@ -11299,6 +11439,13 @@
         "additionalProperties": false,
         "description": "Which held amounts.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "The `next_cursor` of the previous page.",
             "type": [
@@ -11398,6 +11545,13 @@
         "additionalProperties": false,
         "description": "Which payouts.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "The `next_cursor` of the previous page.",
             "type": [
@@ -11852,6 +12006,13 @@
               "null"
             ]
           },
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "Where to continue: the `next_cursor` of the previous page.",
             "type": [
@@ -11948,6 +12109,13 @@
         "additionalProperties": false,
         "description": "Which tags to list.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "Where to continue: the `next_cursor` of the previous page.",
             "type": [
@@ -12585,6 +12753,13 @@
               "null"
             ]
           },
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "Where to continue: the `next_cursor` of the previous page.",
             "type": [
@@ -12678,6 +12853,13 @@
         "additionalProperties": false,
         "description": "Paging of the list of lists.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "Where to continue: the `next_cursor` of the previous page.",
             "type": [
@@ -15640,6 +15822,13 @@
         "additionalProperties": false,
         "description": "Which report facts to list.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "The `next_cursor` of the previous page.",
             "type": [
@@ -15960,6 +16149,13 @@
         "additionalProperties": false,
         "description": "Discrepancies to list.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "type": [
               "string",
@@ -16005,6 +16201,13 @@
         "additionalProperties": false,
         "description": "Shipments to list.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "The `next_cursor` of the previous page.",
             "type": [
@@ -16429,6 +16632,13 @@
         "additionalProperties": false,
         "description": "Filters of the ticket list.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "The `next_cursor` of the previous page.",
             "type": [
@@ -16833,6 +17043,13 @@
         "additionalProperties": false,
         "description": "Which deliveries to list.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "`next_cursor` of the previous page.",
             "type": [

@@ -52,7 +52,12 @@ pub struct Violation {
 
 impl fmt::Display for Violation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "[{}] {}: {}", self.rule, self.location, self.message)
+        write!(f, "[{}] {}: {}", self.rule, self.location, self.message)?;
+        // Một dòng "cách sửa" dưới vi phạm (`hints.rs`).
+        match crate::hints::fix(self.rule) {
+            Some(fix) => write!(f, "\n    how to fix: {fix}"),
+            None => Ok(()),
+        }
     }
 }
 
@@ -129,9 +134,10 @@ pub fn check_manifest(package: &Package, manifest: &str) -> Vec<Violation> {
         violations.push(Violation {
             rule: "layout",
             location: location.clone(),
-            message: "crate must live in crates/kernel, crates/testkit, crates/app, \
+            message:
+                "crate must live in crates/kernel, crates/macros, crates/testkit, crates/app, \
                       modules/<name> or xtask"
-                .to_owned(),
+                    .to_owned(),
         });
     }
     if package.license.as_deref() != Some(LICENSE) {
@@ -292,6 +298,10 @@ fn forbidden_dependency(from: Role, to: Role, kind: DepKind) -> Option<&'static 
         (Role::Kernel | Role::Testkit, Role::Module) => {
             Some("kernel and testkit must not know any module (dependencies point inward)")
         }
+        (Role::Macros, _) => Some("the macro crate depends on no workspace crate"),
+        (from, Role::Macros) if from != Role::Kernel => Some(
+            "use the macros through `autoxide_kernel` (`autoxide_kernel::db::Record`), not this crate",
+        ),
         _ => None,
     }
 }

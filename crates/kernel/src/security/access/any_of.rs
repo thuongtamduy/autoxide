@@ -49,24 +49,26 @@ impl Principal {
         let reason = self.denied.get(first).copied().unwrap_or("missing");
         // Ngăn bằng "`, `" để danh sách vẫn nằm gọn trong cặp dấu `…` của câu (cả bản dịch).
         let listed = std::iter::once(first).chain(others).collect::<Vec<_>>().join("`, `");
-        Error::forbidden(
+        let error = Error::forbidden(
             "permission_denied",
             "This action needs one of the permissions `{permission}`. Ask an administrator for a role \
              that has one of them.",
         )
         .with_param("permission", listed)
-        .with_reason(reason)
+        .with_reason(reason);
+        super::oauth::challenge_scope(error, reason, first)
     }
 
     fn refuse_named(&self, name: &str) -> Error {
         let reason = self.denied.get(name).copied().unwrap_or("missing");
-        Error::forbidden(
+        let error = Error::forbidden(
             "permission_denied",
             "This action needs the permission `{permission}`. Ask an administrator for a role that \
              has it.",
         )
         .with_param("permission", name)
-        .with_reason(reason)
+        .with_reason(reason);
+        super::oauth::challenge_scope(error, reason, name)
     }
 }
 

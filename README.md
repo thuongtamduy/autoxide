@@ -17,6 +17,22 @@ OpenAPI contract, with the same permissions as people. The core stays neutral an
 Payment, SMS, shipping and e-invoice providers sit behind interfaces that ship today with
 simulated providers only: connecting a real provider is still to be done.
 
+## Try it in one command
+
+Just looking around? `autoxide demo` needs no setup: it creates a folder, a SQLite database, random
+secrets and an administrator, loads the reference data, and prints the administrator's password on
+screen. The API reference opens at `/api/docs`. Not for production.
+
+```bash
+# With Docker (nothing to install or compile):
+docker run --rm -it -p 127.0.0.1:8080:8080 ghcr.io/thuongtamduy/autoxide:latest demo
+# Or with a downloaded binary (Linux, macOS, Windows: see the release page):
+./autoxide demo
+```
+
+Needs a release made after 0.19.0. [`docs/GETTING-STARTED.md`](docs/GETTING-STARTED.md) has the
+downloads, keeping the demo data, and the next steps.
+
 ## Quickstart
 
 One command, nothing to compile: SQLite in a Docker volume, the tables created, a first
@@ -605,11 +621,17 @@ green on both SQLite and PostgreSQL. Never commit secrets — only `.env.example
 belongs in Git, never `.env`. [`CONTRIBUTING.md`](CONTRIBUTING.md) explains how to set up
 your machine, the rules that matter most and how to send a change.
 
+Every commit carries a `Signed-off-by` line ([DCO](DCO), `git commit -s`). Questions: [`SUPPORT.md`](SUPPORT.md). How
+decisions are made and how to propose a change: [`GOVERNANCE.md`](GOVERNANCE.md). Where the project is going:
+[`docs/ROADMAP.public.md`](docs/ROADMAP.public.md). Building and listing your own module:
+[`docs/MODULE_ECOSYSTEM.md`](docs/MODULE_ECOSYSTEM.md). Using the name: [`TRADEMARK.md`](TRADEMARK.md).
+
 ## Security
 
 Found a vulnerability? Please do not open a public issue: report it privately as
 described in [`SECURITY.md`](SECURITY.md), which also lists the versions that receive
-security fixes.
+security fixes. [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md) describes the trust boundaries of the core,
+the controls at each one and what is still open.
 
 ## License
 

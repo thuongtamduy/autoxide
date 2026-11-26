@@ -52,7 +52,7 @@ impl From<Note> for NoteResponse {
     fn from(note: Note) -> Self {
         NoteResponse {
             id: note.id,
-            org_id: note.org_id.unwrap_or(note.tenant_id),
+            org_id: note.org_id.unwrap_or(note.tenant_id.as_uuid()),
             title: note.title,
             body: note.body,
             created_at: note.created_at,

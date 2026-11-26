@@ -1,0 +1,21 @@
+{
+  "note": "Số đo gốc p95 (mili giây) của các đường nóng, đo bằng `LOADTEST_ONLY=hot scripts/loadtest.sh` trên runner ubuntu-24.04 của CI (.github/workflows/load.yml), mỗi database một cột. null = chưa đo: lần chạy CI đầu in số đo, điền vào đây. Chỉ đo trên CI (máy cloud khác không đại diện). Chỉ được ĐỔI số này khi chủ ý chấp nhận một đường chậm đi, kèm lý do trong PR.",
+  "tolerance": 1.5,
+  "floor_ms": 2,
+  "p95_ms": {
+    "sqlite": {
+      "login": null,
+      "read (auth/me)": null,
+      "list (page of 50)": null,
+      "create (file, 4 KiB)": null,
+      "mcp tools/call": null
+    },
+    "postgres": {
+      "login": null,
+      "read (auth/me)": null,
+      "list (page of 50)": null,
+      "create (file, 4 KiB)": null,
+      "mcp tools/call": null
+    }
+  }
+}

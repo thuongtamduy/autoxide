@@ -18,6 +18,8 @@ Thay `X.Y.Z` dưới đây bằng phiên bản bạn cài (vd `1.0.0` hay `1.0.0
 | Binary Linux `autoxide-X.Y.Z-<target>.tar.gz`                 | có, cho từng file                 | qua `SHA256SUMS`               |
 | SDK TypeScript `autoxide-sdk-X.Y.Z.tgz`                       | có                                | qua `SHA256SUMS`               |
 | SBOM của image `sbom.spdx.json`                               | có                                | qua `SHA256SUMS`               |
+| SBOM của các crate Rust `autoxide.cdx.json` (CycloneDX)       | có                                | qua `SHA256SUMS`               |
+| Văn bản giấy phép crate bên thứ ba `THIRD-PARTY-LICENSES.html` | có                                | qua `SHA256SUMS`               |
 | `SHA256SUMS` (mã băm của các file trên)                       | —                                 | `SHA256SUMS.sigstore.json` (bundle Sigstore) |
 
 Binary Linux, `SHA256SUMS` và chữ ký cosign có từ các bản sau 0.18.0. Bản cũ hơn chỉ có chứng thực của image.

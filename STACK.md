@@ -46,7 +46,8 @@ mới nhất ngày 11/11/2026; **`Cargo.lock` là nguồn sự thật** sau khi 
 | HTTP / REST        | `axum`                          | 0.8       | Do nhóm tokio làm                                   |
 | WebSocket          | `axum` feature `ws` (`tokio-tungstenite` 0.29) | 0.8 | `GET /api/v1/kernel/events/ws` (bước 69); test dùng client `tokio-tungstenite` cùng bản |
 | Middleware HTTP    | `tower-http`                    | 0.7       | Trace, CORS, timeout, giới hạn body, request id, nén response (gzip, brotli — D-20261119-step39-compression) |
-| ORM                | `sea-orm`                       | 2.0       | Một bộ code cho SQLite và Postgres                  |
+| ORM                | `sea-orm`                       | 2.0       | Một bộ code cho SQLite và Postgres. Module mới truy vấn qua lớp `autoxide_kernel::db` của kernel (dựng trên sea-query + kết nối của SeaORM), không khai SeaORM (D-20261126-kernel-data-layer, luật `wrapped-libraries`) |
+| Macro của kernel   | `syn` 2 + `quote` + `proc-macro2` (crate `autoxide-macros`) | 2.0 / 1.0 / 1.0 | `#[derive(Record)]`; module dùng qua `autoxide_kernel::db`, không khai crate này. Đã có trong cây phụ thuộc qua serde, utoipa (D-20261126-kernel-data-layer) |
 | Migration          | Kernel tự chạy (`autoxide_kernel::migration`: `MigrationTrait`, `SchemaManager`, `schema::*` — cùng tên `sea-orm-migration` cũ) | — | Viết bằng Rust, chạy được trên cả hai database; mỗi migration một transaction; thay `sea-orm-migration` (bật bộ feature mặc định của SeaORM, kéo `chrono`; D-20261121-own-migrations) |
 | OpenAPI            | `utoipa` + `utoipa-axum`        | 6.0 / 0.3 | Route và tài liệu đăng ký cùng một lệnh, không lệch |
 | Trang xem API      | `utoipa-scalar`                 | 0.4       | Tắt mặc định; bật bằng `AUTOXIDE_HTTP_API_DOCS=true` |
@@ -62,6 +63,9 @@ mới nhất ngày 11/11/2026; **`Cargo.lock` là nguồn sự thật** sau khi 
 | Gọi router            | `tower` (feature `util`)     | 0.5       | Gửi request thẳng vào router: test, và lô ghi đồng bộ của kernel chạy từng lệnh qua router con (bước 69) |
 | Phục vụ kết nối HTTP | `hyper` + `hyper-util` (feature `server-auto`, `tokio`) | 1.12 / 0.1 | Thay `axum::serve` để gắn timer: timeout đọc header 30 giây, ping HTTP/2 (D-20261123-http-header-timeout). Đã có trong cây phụ thuộc qua axum |
 | Property test      | `proptest` (chỉ `std`)          | 1.12      | Chỉ dùng trong test: sinh đầu vào ngẫu nhiên cho bộ kiểm đầu vào (email, con trỏ, thân bài, slug, CSV, bình luận), thu gọn ca hỏng (đặc tả 31 B3); cũng là công cụ thử phá có chủ đích (webhook, token, tiền, trạng thái) thay cho `cargo-fuzz`, chạy dài hằng đêm bằng `property.yml` (D-20261123-property-fuzzing) |
+| Mutation testing   | `cargo-mutants` (công cụ dòng lệnh, không vào `Cargo.toml`) | 27.1.0 | Chỉ chạy hằng tuần ở `mutants.yml` (và tay khi cần đo): sửa từng chỗ trong code tiền, thuế, quyền rồi chạy lại unit test; mutant sống = chỗ test chưa kiểm thật. Phạm vi, số shard, ngưỡng không được tệ đi ở `docs/quality/mutation.json` (71-G9, D-20261126-independent-review). Chọn vì là công cụ chuẩn cho Rust, không cần sửa code, có `--shard` cho CI |
+| Đo tải             | `oha` (công cụ dòng lệnh, không vào `Cargo.toml`) | 1.17.0 | Có từ D-076: `scripts/loadtest.sh` đo API thật; hằng tuần `load.yml` đo p95 các đường nóng trên SQLite và PostgreSQL, chặn khi tệ hơn số gốc `docs/quality/load-baseline.json` (71-G9) |
+| Benchmark vi mô    | `divan` (chỉ `[dev-dependencies]` của kernel, `benches/hot_paths.rs`) | 0.1.21 | Số đo ns của đường nóng kernel (tiền, làm tròn, kiểm permission, cursor, slug, email), chạy hằng tuần ở `load.yml`, chưa chặn. Trước đó repo chưa có công cụ benchmark nào; chọn divan thay criterion vì nhẹ hơn, API chỉ là một thuộc tính `#[divan::bench]` và hỗ trợ tham số hoá (`args`) sẵn (71-G9) |
 
 Kết nối database dùng TLS của `rustls` (feature `runtime-tokio-rustls` của SeaORM):
 binary không phụ thuộc OpenSSL của hệ điều hành.

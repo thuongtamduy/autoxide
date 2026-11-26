@@ -1,0 +1,45 @@
+# OpenSSF Scorecard: chấm điểm thực hành bảo mật chuỗi cung ứng của repo (branch protection, action ghim SHA, quyền
+# token, review…) và đẩy kết quả lên Code scanning; điểm công khai ở scorecard.dev, dùng cho huy hiệu trong README
+# (D-20261126-road-to-1-0, G8). Quyền tối thiểu: workflow không cấp gì, job chỉ xin đúng ba quyền cần.
+# Chỉ chạy khi repo công khai (D-197): Scorecard publish_results chỉ chấp nhận repo công khai.
+name: OpenSSF Scorecard
+
+on:
+  push:
+    branches: [main]
+  # Branch protection đổi thì điểm đổi mà không có commit: chạy lại khi chủ dự án sửa luật nhánh.
+  branch_protection_rule:
+  schedule:
+    - cron: "23 5 * * 3"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  analysis:
+    name: scorecard
+    if: ${{ !github.event.repository.private }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write # đẩy SARIF lên Code scanning
+      id-token: write # ký kết quả để publish lên scorecard.dev
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ossf/scorecard-action@23f22cd43608bae7a1f1fa2603d7314dee9538a5 # v2.6.0
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          publish_results: true
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: scorecard-sarif
+          path: results.sarif
+          retention-days: 5
+      - uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          sarif_file: results.sarif

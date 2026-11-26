@@ -38,6 +38,10 @@ pub(super) struct Caller {
     // `AtomicBool` thay vì `Cell<bool>`: tham chiếu tới nó sống qua `await`, nên phải dùng chung được giữa
     // các thread (`Sync`) — future của handler axum phải `Send`.
     pub(super) secret: AtomicBool,
+    /// A tool was refused because the OAuth grant lacks a permission the user has: the answer becomes HTTP 403
+    /// with this `insufficient_scope` challenge, so the client can ask the user for more (MCP authorization,
+    /// "Runtime Insufficient Scope Errors").
+    pub(super) scope_challenge: std::sync::Mutex<Option<String>>,
 }
 
 /// Serves one HTTP request to `/mcp` or `/mcp/<module>` (already past the authentication layer).
@@ -113,19 +117,41 @@ pub(super) async fn handle(server: McpServer, request: Request) -> Response {
         ),
         modern,
         secret: AtomicBool::new(false),
+        scope_challenge: std::sync::Mutex::new(None),
     };
 
     let outcome = server.dispatch(&method, params, &caller).await;
+    // Tool bị từ chối vì grant OAuth thiếu scope (D-20261126-mcp-oauth): challenge đủ `resource_metadata`, gửi ở
+    // header 403 (đặc tả MCP) và trong `_meta["mcp/www_authenticate"]` của kết quả (client chỉ đọc thân, như ChatGPT).
+    let challenge = caller.scope_challenge.lock().ok().and_then(|mut slot| slot.take()).map(
+        |value| match parts.extensions.get::<crate::http::oauth::Resources>() {
+            Some(resources) => resources.0.complete(parts.uri.path(), &value),
+            None => value,
+        },
+    );
     let (status, message) = match outcome {
         Ok(mut result) => {
             if modern {
                 decorate(&method, &mut result);
             }
+            if let Some(challenge) = &challenge {
+                let meta = result.entry("_meta").or_insert_with(|| Value::Object(Map::new()));
+                if let Value::Object(meta) = meta {
+                    meta.insert(
+                        "mcp/www_authenticate".to_owned(),
+                        Value::from(vec![challenge.clone()]),
+                    );
+                }
+            }
             (StatusCode::OK, protocol::result_message(id, Value::Object(result)))
         }
         Err(error) => (error_status(&error, modern), error.into_message(Some(id))),
     };
+    let status = if challenge.is_some() { StatusCode::FORBIDDEN } else { status };
     let mut response = json_response(status, &message);
+    if let Some(value) = challenge.and_then(|value| HeaderValue::from_str(&value).ok()) {
+        response.headers_mut().insert(header::WWW_AUTHENTICATE, value);
+    }
     if caller.secret.load(std::sync::atomic::Ordering::Relaxed) {
         // Kết quả có secret chỉ trả một lần: không cho ai lưu lại response (D-149).
         response.headers_mut().insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));

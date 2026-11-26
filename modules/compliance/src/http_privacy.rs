@@ -145,7 +145,7 @@ async fn list_purposes(
         (status = 201, description = "The purpose.", body = Data<Purpose>, headers(("Location" = String, description = "Path of the purposes."))),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing `compliance.privacy.manage`; code `permission_denied`.", body = Problem),
-        (status = 409, description = "The tenant already has this purpose; code `compliance.purpose_exists`.", body = Problem),
+        (status = 409, description = "The tenant already has this purpose (code `compliance.purpose_exists`), or already has `AUTOXIDE_COMPLIANCE_PURPOSES_TENANT_MAX` purposes of its own (code `compliance.purpose_limit_reached`).", body = Problem),
         (status = 422, description = "A value is invalid; every problem in `errors`.", body = Problem),
     )
 )]
@@ -331,8 +331,8 @@ pub(crate) struct ResidencyRequest {
 /// Platform staff with `compliance.privacy.manage`. Refused when the tenant's placement is not in
 /// that country (or its country is unknown): record it with `autoxide placement country` or move the
 /// tenant first. Moving a tenant later to a placement elsewhere is refused too. Cybersecurity Law
-/// 116/2025/QH15, Decree 53/2022/ND-CP — have a legal professional check who must keep data in
-/// Vietnam.
+/// 116/2025/QH15 and its implementing decree (replacing Decree 53/2022/ND-CP) — have a legal professional
+/// check who must keep data in Vietnam.
 #[utoipa::path(
     put,
     path = "/residency",

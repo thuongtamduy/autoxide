@@ -764,3 +764,7 @@ mod tests {
         assert_eq!(month_of(day(2027, 1, 1)), (day(2027, 1, 1), day(2027, 1, 31)));
     }
 }
+
+#[cfg(test)]
+#[path = "posting_properties.rs"]
+mod properties;

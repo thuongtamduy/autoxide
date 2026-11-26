@@ -2,6 +2,7 @@
 
 mod approval;
 mod entity;
+mod listing;
 mod rotate;
 mod rules;
 mod service;

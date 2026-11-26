@@ -10,9 +10,8 @@ use std::collections::{BTreeSet, HashMap};
 use std::sync::Arc;
 
 use autoxide_kernel::access::ActorKind;
-use autoxide_kernel::access::Principal;
+use autoxide_kernel::access::{Credential, Principal};
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
-use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use sea_orm::sea_query::Expr;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, Condition, ConnectionTrait, EntityTrait, PaginatorTrait,
@@ -191,7 +190,7 @@ impl ApiKeyService {
     ) -> Result<CreatedApiKey, Error> {
         // Tính năng theo gói (bước 35): khách bị gói giới hạn cần `auth.api_keys`.
         self.roles.entitlements().require_feature(tenant.id(), &super::API_KEYS_FEATURE).await?;
-        if creator.api_key_id().is_some() {
+        if !creator.is_session() {
             return Err(Error::forbidden(
                 "auth.api_key_cannot_create_keys",
                 "An API key cannot create API keys: a leaked key must not be able to make \
@@ -368,62 +367,6 @@ impl ApiKeyService {
         Ok(CreatedApiKey { key, secret })
     }
 
-    /// Một trang key của người dùng `user_id`, mới tạo trước (mặc định).
-    pub(crate) async fn list(
-        &self,
-        tenant: &TenantContext,
-        user_id: Uuid,
-        page: &PageRequest,
-    ) -> Result<Page<ApiKey>, Error> {
-        let connection = tenant.database().read();
-        let select =
-            api_key::Entity::find().filter(api_key::Column::UserId.eq(user_id)).scoped(tenant);
-        let page = fetch_page(select, api_key::Column::Id, |row| row.id, page, connection).await?;
-        let mut permissions =
-            permissions_of(connection, tenant, page.data.iter().map(|row| row.id)).await?;
-        Ok(page.map(|row| {
-            let granted = permissions.remove(&row.id).unwrap_or_default();
-            to_api_key(row, granted)
-        }))
-    }
-
-    /// Một trang key của mọi người dùng (chỉ của `owner` khi có), mới tạo trước (mặc định). Cần
-    /// `auth.api_keys.manage` (D-272).
-    pub(crate) async fn list_all(
-        &self,
-        tenant: &TenantContext,
-        caller: &Principal,
-        owner: Option<Uuid>,
-        status: Option<&str>,
-        page: &PageRequest,
-    ) -> Result<Page<ApiKey>, Error> {
-        // Người duyệt (không quản lý key) chỉ thấy key đang chờ duyệt (bước 54).
-        let status = if caller.has(&crate::permissions::API_KEYS_MANAGE) {
-            status
-        } else if caller.has(&crate::permissions::API_KEYS_APPROVE) {
-            Some(super::approval::PENDING)
-        } else {
-            // Không có quyền nào: lỗi `permission_denied` nêu quyền quản lý.
-            caller.require(&crate::permissions::API_KEYS_MANAGE)?;
-            status
-        };
-        let connection = tenant.database().read();
-        let mut select = api_key::Entity::find().scoped(tenant);
-        if let Some(owner) = owner {
-            select = select.filter(api_key::Column::UserId.eq(owner));
-        }
-        if let Some(status) = status {
-            select = select.filter(api_key::Column::Status.eq(status));
-        }
-        let page = fetch_page(select, api_key::Column::Id, |row| row.id, page, connection).await?;
-        let mut permissions =
-            permissions_of(connection, tenant, page.data.iter().map(|row| row.id)).await?;
-        Ok(page.map(|row| {
-            let granted = permissions.remove(&row.id).unwrap_or_default();
-            to_api_key(row, granted)
-        }))
-    }
-
     /// Thu hồi key `id` của bất kỳ ai. Cần `auth.api_keys.manage`; event ghi người thu hồi.
     pub(crate) async fn revoke_any(
         &self,
@@ -432,7 +375,41 @@ impl ApiKeyService {
         id: Uuid,
     ) -> Result<(), Error> {
         caller.require(&crate::permissions::API_KEYS_MANAGE)?;
+        // Key của người khác: bên gọi phải có mọi permission chủ key có (như khoá, xoá tài khoản — D-079), không thì
+        // người quản lý key quyền thấp tắt được key của người quyền cao hơn (UT-2). Không thấy key: 404 như cũ.
+        let owner = api_key::Entity::find_by_id(id)
+            .scoped(tenant)
+            .one(tenant.database().read())
+            .await?
+            .ok_or_else(|| api_key_not_found(id))?
+            .user_id;
+        // Chỉ bỏ qua kiểm khi chính chủ gọi bằng phiên đăng nhập. API key hay token OAuth mang
+        // `auth.api_keys.manage` cũng phải bao trùm quyền của chủ key đích — kể cả key khác của cùng chủ, như
+        // `DELETE /api-keys/{id}` (D-20261126-api-key-self-scope).
+        if !(caller.is_session() && owner == caller.user_id()) {
+            self.require_covers_owner(tenant, caller, owner).await?;
+        }
         self.revoke_where(tenant, caller, id, None).await
+    }
+
+    /// `require_covers` với chủ key `owner`. Chủ key không phải nhân sự (người mua): không có gì để so — quyền
+    /// `auth.api_keys.manage` là đủ (`require_covers` chỉ nhận nhân sự và trả `auth.user_not_found` với người khác).
+    async fn require_covers_owner(
+        &self,
+        tenant: &TenantContext,
+        caller: &Principal,
+        owner: Uuid,
+    ) -> Result<(), Error> {
+        let staff = crate::user::entity::Entity::find_by_id(owner)
+            .filter(crate::user::entity::Column::Realm.eq("staff"))
+            .scoped(tenant)
+            .one(tenant.database().read())
+            .await?
+            .is_some();
+        if staff {
+            self.roles.require_covers(tenant, caller, owner).await?;
+        }
+        Ok(())
     }
 
     /// Thu hồi (xoá) key `id` của bên gọi. Key thôi dùng được ngay.
@@ -442,6 +419,15 @@ impl ApiKeyService {
         caller: &Principal,
         id: Uuid,
     ) -> Result<(), Error> {
+        // Gọi bằng API key: chỉ thu hồi được chính key đó (key lộ tự tắt được), không thu hồi key khác của cùng chủ —
+        // key quyền tối thiểu không được tắt key quyền cao hơn (UT-2). Key khác: 404 như key không có.
+        // Token OAuth (hay loại credential khác): không thu hồi key nào — client làm thay người dùng không quản lý
+        // credential của họ. 404 như key không có, không lộ key nào tồn tại.
+        match caller.credential() {
+            Credential::Session => {}
+            Credential::ApiKey(own) if own == id => {}
+            _ => return Err(api_key_not_found(id)),
+        }
         self.revoke_where(tenant, caller, id, Some(caller.user_id())).await
     }
 
@@ -769,7 +755,7 @@ async fn fence_problem(
 mod tests {
     use super::*;
     use autoxide_kernel::error::ErrorKind;
-    use autoxide_kernel::pagination::Order;
+    use autoxide_kernel::pagination::{Order, PageRequest};
     use autoxide_testkit::TestDatabase;
 
     use crate::api::{Accounts, NewAccount};
@@ -1095,6 +1081,44 @@ mod tests {
 
             assert_eq!(error.kind(), ErrorKind::Forbidden);
             assert_eq!(error.code(), "auth.api_key_cannot_create_keys");
+        })
+        .await
+        .unwrap();
+    }
+
+    /// Token OAuth của client làm thay người dùng (D-20261126-mcp-oauth) không phải phiên đăng nhập: không tạo,
+    /// không duyệt API key, dù người dùng có quyền.
+    #[tokio::test]
+    async fn token_oauth_khong_tao_khong_duyet_duoc_api_key() {
+        TestDatabase::run(async |test| {
+            let (services, ada) = setup(test).await;
+            let tenant = services.tenant.clone();
+            let oauth = ada.clone().with_oauth(autoxide_kernel::access::OAuthAccess::new(
+                Uuid::now_v7(),
+                "https://client.example/app.json",
+                "https://api.example.com/api/v1",
+            ));
+            let error = services
+                .api_keys
+                .create(&tenant, &oauth, new_key(&["auth.users.read"]))
+                .await
+                .unwrap_err();
+            assert_eq!(error.code(), "auth.api_key_cannot_create_keys");
+            // Người duyệt có đủ quyền nhưng gọi bằng token OAuth.
+            let approver = Principal::with_all_permissions(ada.user_id())
+                .in_tenant(tenant.id())
+                .with_oauth(autoxide_kernel::access::OAuthAccess::new(
+                    Uuid::now_v7(),
+                    "https://client.example/app.json",
+                    "https://api.example.com/api/v1",
+                ));
+            let error =
+                services.api_keys.approve(&tenant, &approver, Uuid::now_v7()).await.unwrap_err();
+            assert_eq!(error.code(), "auth.api_key_cannot_approve_keys");
+            assert_eq!(
+                crate::access::require_session(&oauth).unwrap_err().code(),
+                "auth.session_required"
+            );
         })
         .await
         .unwrap();

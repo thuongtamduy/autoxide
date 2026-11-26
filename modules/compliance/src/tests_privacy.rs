@@ -105,6 +105,42 @@ async fn muc_dich_mac_dinh_khach_ghi_de_va_cong_khai() {
     .unwrap();
 }
 
+/// Sổ mục đích đọc gộp trong bộ nhớ ở mỗi lần đọc (kể cả trang công khai) nên có trần ở chỗ ghi
+/// (`AUTOXIDE_COMPLIANCE_PURPOSES_TENANT_MAX`, D-20261126-list-pages-done): vượt trần thì 409
+/// `compliance.purpose_limit_reached`; sửa (kể cả ghi đè mục mặc định) vẫn được.
+#[tokio::test]
+async fn muc_dich_rieng_co_tran() {
+    TestDatabase::run(async |test| {
+        let app = TestApp::builder(test)
+            .setting("AUTOXIDE_COMPLIANCE_PURPOSES_TENANT_MAX", "2")
+            .user("admin", 1, PRIVACY)
+            .module(crate::module())
+            .build()
+            .await
+            .unwrap();
+        let purpose = |key: &str| {
+            json!({
+                "key": key, "category": "marketing", "legal_basis": "consent",
+                "data_categories": ["email"], "description": {"en": "Mail."},
+            })
+        };
+        for key in ["one", "two"] {
+            let (status, created) =
+                call(&app, "POST", "/purposes", "admin", Some(purpose(key))).await;
+            assert_eq!(status, StatusCode::CREATED, "{created}");
+        }
+        let (status, problem) =
+            call(&app, "POST", "/purposes", "admin", Some(purpose("three"))).await;
+        assert_eq!(status, StatusCode::CONFLICT, "{problem}");
+        assert_eq!(problem["code"], "compliance.purpose_limit_reached");
+        let (status, changed) =
+            call(&app, "PATCH", "/purposes/one", "admin", Some(json!({"active": false}))).await;
+        assert_eq!(status, StatusCode::OK, "{changed}");
+    })
+    .await
+    .unwrap();
+}
+
 #[tokio::test]
 async fn thoi_han_luu_va_so_hoat_dong_xu_ly() {
     TestDatabase::run(async |test| {

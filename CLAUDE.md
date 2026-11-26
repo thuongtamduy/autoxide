@@ -1,6 +1,8 @@
 # CLAUDE.md
 
-Luật cho AI agent làm việc trong repo này. `AGENTS.md` là liên kết tới file này.
+Luật cho AI agent làm việc trong repo này (nội bộ, tiếng Việt). `AGENTS.md` là bản tiếng Anh ngắn cho người ngoài và
+agent của công cụ khác (Codex, Cursor, Copilot…), D-20261126-agent-rules-outside; hai file không được mâu thuẫn — luật mới
+ghi ở đây, luật nào người ngoài cần biết thì chép tóm tắt sang `AGENTS.md`.
 File được nạp vào mọi lượt — chỉ giữ LUẬT và CON TRỎ.
 
 ## Dự án
@@ -307,7 +309,10 @@ SDK, mục lục quyết định); gate trên máy kiểm sớm bằng `cargo xt
 - **Migration đã commit thì không sửa** — thêm migration mới. Module khai migration
   qua `ModuleMigrations` (`autoxide_kernel::migration`); mọi bảng của module `x` tên
   là `x_…`, kể cả bảng lịch sử `x_migrations`. Migration phải có `down`.
-- **SeaORM là mặc định.** Chỉ viết SQL trực tiếp ở chỗ đã **đo được** là chậm, câu
+- **Truy vấn qua lớp `autoxide_kernel::db`** (D-20261126-kernel-data-layer): `#[derive(Record)]` + `tenant.db()`;
+  module không khai `sea-orm`/`sea-query` (gate `wrapped-libraries`; module chưa chuyển nằm trong
+  `xtask/library-baseline.txt`, chỉ giảm). Module cũ còn SeaORM thì sửa theo kiểu cũ tới khi chuyển cả module.
+  Chỉ viết SQL trực tiếp (`db.sql`) ở chỗ đã **đo được** là chậm, câu
   SQL đó phải chạy trên cả hai database, và ghi lý do bằng skill `record-decision`.
   Câu viết tay (cả trong test) dựng bằng `autoxide_kernel::database::statement`, không bằng
   `Statement::from_sql_and_values`: nó thêm kiểu cho giá trị thời gian mà Postgres cần

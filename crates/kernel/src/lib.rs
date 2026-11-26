@@ -11,6 +11,9 @@
 //! module goes into the group that fits it (each group file records which step 33+ modules belong there)
 //! and is then added to `pub use`; the test `tests/public_paths.rs` guards every public path.
 
+// `#[derive(Record)]` sinh mã gọi `::autoxide_kernel::…`; dòng này cho chính kernel dùng được derive đó.
+extern crate self as autoxide_kernel;
+
 mod contracts;
 mod data;
 mod ops;
@@ -22,7 +25,7 @@ pub use contracts::{
     provider, push, report, resource, sms, storage, store, voice, zns,
 };
 pub use data::{
-    backup, database, migration, numbering, pagination, reference, rows, search, sync, tenancy,
+    backup, database, db, migration, numbering, pagination, reference, rows, search, sync, tenancy,
     transfer, upload, version,
 };
 pub use ops::{
@@ -44,3 +47,13 @@ pub mod job;
 pub mod mcp;
 pub mod module;
 pub mod response;
+
+/// Paths used by the code the kernel's macros generate. Not part of the contract: never write them by hand
+/// (`cargo xtask check` refuses `__private` in module code).
+#[doc(hidden)]
+pub mod __private {
+    pub use uuid::Uuid;
+
+    /// Written only by `#[derive(Record)]`: a hand-written `impl Record` cannot exist.
+    pub trait RecordSeal {}
+}

@@ -37,6 +37,8 @@ pub(crate) struct GetLevelsInput {
     pub limit: Option<u32>,
     /// The `next_cursor` of the previous page.
     pub cursor: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
 }
 
 /// Ledger lines to list.
@@ -56,6 +58,8 @@ pub(crate) struct ListMovementsInput {
     pub limit: Option<u32>,
     /// The `next_cursor` of the previous page.
     pub cursor: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
 }
 
 /// A stock adjustment in one warehouse.
@@ -136,7 +140,9 @@ pub(crate) fn all(service: &Arc<InventoryService>) -> Vec<Tool> {
             move |tenant: TenantContext, principal: Principal, input: GetLevelsInput| {
                 let service = levels.clone();
                 async move {
-                    let page = PageInput::new(input.limit, input.cursor, None).page()?;
+                    let page = PageInput::new(input.limit, input.cursor, None)
+                        .with_count(input.count.unwrap_or(false))
+                        .page()?;
                     let filter = LevelFilter {
                         org_id: input.org_id,
                         variant_id: input.variant_id,
@@ -155,7 +161,9 @@ pub(crate) fn all(service: &Arc<InventoryService>) -> Vec<Tool> {
             move |tenant: TenantContext, principal: Principal, input: GetLevelsInput| {
                 let service = low.clone();
                 async move {
-                    let page = PageInput::new(input.limit, input.cursor, None).page()?;
+                    let page = PageInput::new(input.limit, input.cursor, None)
+                        .with_count(input.count.unwrap_or(false))
+                        .page()?;
                     let filter = LevelFilter {
                         org_id: input.org_id,
                         variant_id: input.variant_id,
@@ -174,7 +182,9 @@ pub(crate) fn all(service: &Arc<InventoryService>) -> Vec<Tool> {
             move |tenant: TenantContext, principal: Principal, input: ListMovementsInput| {
                 let service = movements.clone();
                 async move {
-                    let page = PageInput::new(input.limit, input.cursor, None).page()?;
+                    let page = PageInput::new(input.limit, input.cursor, None)
+                        .with_count(input.count.unwrap_or(false))
+                        .page()?;
                     let filter = MovementFilter {
                         org_id: input.org_id,
                         variant_id: input.variant_id,

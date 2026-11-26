@@ -267,6 +267,9 @@ pub(crate) struct Setup {
     pub(crate) dormant: Vec<(&'static str, Migrator)>,
 }
 
+/// How long a move waits for a migration run that holds the migration lock before it fails (and is retried).
+const DORMANT_LOCK_WAIT: std::time::Duration = std::time::Duration::from_secs(60);
+
 impl MoveSetup {
     pub(crate) fn fill(&self, setup: Setup) {
         let _ = self.0.set(setup);
@@ -281,15 +284,32 @@ impl MoveSetup {
         source: &Database,
         target: &Database,
     ) -> Result<(), Error> {
+        let mut needed = Vec::new();
         for (module, migrator) in &self.get()?.dormant {
-            if !installed_on(module, source).await? && !installed_on(module, target).await? {
-                continue;
-            }
-            for database in [source, target] {
-                migrator.up(database).await.map_err(|error| Error::internal(error.to_string()))?;
+            if installed_on(module, source).await? || installed_on(module, target).await? {
+                needed.push(migrator);
             }
         }
-        Ok(())
+        if needed.is_empty() {
+            return Ok(());
+        }
+        // Cùng khoá với mọi đường migrate placement (D-20261126-placement-migration-exclusive): không chạy chồng
+        // một lượt `migrate up --all` đang áp dụng cùng migration trên cùng database.
+        let lock = self.placements()?.lock(DORMANT_LOCK_WAIT).await?;
+        let applied = async {
+            for migrator in needed {
+                for database in [source, target] {
+                    migrator
+                        .up(database)
+                        .await
+                        .map_err(|error| Error::internal(error.to_string()))?;
+                }
+            }
+            Ok::<(), Error>(())
+        }
+        .await;
+        super::placements::release(lock).await;
+        applied
     }
 
     /// The modules whose tables a DRY RUN reads between `source` and `target` (it changes no schema): the

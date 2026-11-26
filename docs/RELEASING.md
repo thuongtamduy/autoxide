@@ -78,6 +78,17 @@ Ghi cho người ngoài ở [`SECURITY.md`](../SECURITY.md#supported-versions) (
   cập nhật.
 - Hết hạn hỗ trợ của một dòng thì xoá nó khỏi bảng trong `SECURITY.md`.
 
+## Website tài liệu có phiên bản
+
+Mỗi bản phát hành tự đăng bộ tài liệu của đúng tag lên GitHub Pages (nhánh `gh-pages`, D-20261126-docs-site-mdbook): `Auto
+release` tạo tag bằng `GITHUB_TOKEN` (không kích hoạt workflow nào theo `push: tags`) nên gọi tường minh `release.yml` và
+`docs-site.yml` bằng `workflow_dispatch` ở cùng chỗ. Tag đẩy tay thì `docs-site.yml` chạy theo `push: tags`.
+
+- Đăng lại một tag: Actions → "Docs site" → Run workflow, chọn tag (ô `tag`). Chỉ làm được cho tag có `docs-site.yml` và
+  `scripts/build-docs-site.py` — **tag cũ hơn thay đổi này không có chúng**, nên tài liệu của bản cũ không đăng bù được bằng cách này.
+- Chưa bật GitHub Pages (Settings → Pages → nguồn: nhánh `gh-pages`) thì workflow vẫn đăng vào nhánh, chỉ chưa có trang.
+- `latest` luôn là bản chính thức cao nhất; bản thử (`-rc.N`) và bản vá của dòng cũ có thư mục riêng nhưng không giành `latest`.
+
 ## Khi làm việc hằng ngày
 
 Mỗi thay đổi hành vi mà người dùng thấy (API, cấu hình, CLI, migration, Docker) thêm một **file
@@ -177,6 +188,13 @@ bước 7.**
 Bản major là cam kết dài hạn ([`docs/COMPATIBILITY.md`](COMPATIBILITY.md)), nên ra qua một hay nhiều bản thử
 `X.0.0-rc.N` trước — lần đầu là `1.0.0-rc.1` (D-20261123-supply-chain). Mở `rc.1` và lên bản chính thức đều do **chủ
 dự án quyết** (`1.0` là lúc chủ dự án tuyên bố API ổn định); agent kiểm tiêu chí bên dưới và báo khi đạt.
+
+**Thời gian và kênh phản hồi** (D-20261126-release-1-0-readiness): giai đoạn bản thử kéo dài **2–4 tuần** (tối thiểu 14
+ngày kể từ bản thử cuối, tiêu chí 1 bên dưới; quá 4 tuần mà còn lỗi nghiêm trọng mở thì chủ dự án quyết kéo dài hay
+lùi). Người ngoài báo phản hồi ở GitHub Discussions (mục "Release candidate") hay mở issue gắn nhãn `rc-feedback`; lỗi
+nghiêm trọng gắn thêm `release-blocker`. Khi ra `rc.1`, ghi trong trang Release và README hai việc: bản thử dành cho ai
+(người muốn thử nâng cấp, người viết module ngoài repo) và phản hồi gửi đi đâu. Agent đọc mọi phản hồi mới mỗi lần
+kiểm tiêu chí; phản hồi không phải lỗi (đề xuất tính năng) ghi lại cho sau 1.0, không làm chậm bản chính thức.
 
 **Phát hành một bản thử** — đúng các bước 1–8 ở trên, với phiên bản `X.0.0-rc.N`:
 

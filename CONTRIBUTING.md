@@ -3,7 +3,7 @@
 **English** · [Tiếng Việt](CONTRIBUTING.vi.md)
 
 Thank you for helping. This guide is for people; if you work with an AI coding agent, point
-it at [`CLAUDE.md`](CLAUDE.md) (also linked as `AGENTS.md`), which holds the full rules the
+it at [`AGENTS.md`](AGENTS.md) (short, in English; the full internal rules are in [`CLAUDE.md`](CLAUDE.md)), which holds the rules the
 agent follows. The rules below are the same, only shorter. Everyone taking part follows the
 [code of conduct](CODE_OF_CONDUCT.md).
 
@@ -112,8 +112,6 @@ run `cargo xtask decisions` to create it.
 ## Commits and pull requests
 
 - Keep a pull request to one change. Split unrelated changes.
-- Write the commit subject as a short summary of what changed (English or Vietnamese), and
-  explain *why* in the body when it is not obvious.
 - For anything a user of Autoxide would notice, add a small file to
   [`changelog.d/`](changelog.d/README.md) instead of editing `CHANGELOG.md`: name it
   `<name>.<section>.md` (`added`, `changed`, `deprecated`, `removed`, `fixed` or `security`) and write
@@ -121,6 +119,64 @@ run `cargo xtask decisions` to create it.
   at release time, so parallel pull requests never conflict there.
 - In the pull request, say what you changed, why, and confirm that `./gate.sh --quick` is
   green (CI runs the rest, including PostgreSQL; the full `./gate.sh` is required before a release).
+
+### Commit messages
+
+Commit messages follow a light form of [Conventional Commits](https://www.conventionalcommits.org):
+
+```text
+<type>(<scope>): <short summary in the imperative mood, at most 72 characters>
+
+<optional body: why the change is needed, what you considered, what it does not do>
+
+Signed-off-by: Your Name <you@example.com>
+```
+
+- `type` is one of `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`.
+  `scope` is optional: a module or crate name (`orders`, `kernel`).
+- Mark a breaking change with `!` after the scope (`feat(kernel)!: …`) and explain it in the body. Breaking
+  changes of the stable contract tier follow [`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md).
+- Write in English or Vietnamese. Explain *why* in the body when it is not obvious.
+- The pull request title is used as the squash-merge subject, so it follows the same form.
+
+### Sign your commits (DCO)
+
+Autoxide uses the [Developer Certificate of Origin](DCO) (DCO) instead of a contributor license agreement. By adding
+a `Signed-off-by` line you certify that you wrote the change or have the right to submit it under the project license.
+Add it with `-s`:
+
+```bash
+git commit -s -m "fix(notes): reject empty titles"
+```
+
+To sign commits you already made: `git rebase --signoff origin/main` and push again with `--force-with-lease`.
+The `DCO sign-off` job in CI fails when a commit of a pull request has no `Signed-off-by` line (when the branch the pull request targets has no `.github/CODEOWNERS` yet, which is true of old branches such as a `release/X.Y` cut from an old tag, nothing is checked; merge commits are not
+checked, so prefer rebasing over merging `main` into your branch). A pull request
+opened by a maintainer (a login listed in `.github/CODEOWNERS` on the branch the pull request targets, not in the pull request; GitHub authenticates the login) is exempt, including
+commits written by their agent sessions: maintainers are the licensors and answer for what they submit.
+
+### Contributions written with AI assistance
+
+Autoxide is itself built with AI agents ([`CLAUDE.md`](CLAUDE.md)), so AI-assisted contributions are welcome. The rules
+exist to keep a person accountable and the review load fair:
+
+- **Say so.** Tell us in the pull request description which tool helped and for what. Add a trailer such as
+  `Assisted-by: <tool or model>` to the commit if the tool wrote a substantial part.
+- **A person is responsible.** The `Signed-off-by` line is yours, not the tool's. You have read every line, you
+  understand it and can explain it in review, and you ran `./gate.sh --quick` yourself.
+- **Check what the tool made up.** Confirm every dependency, function and API exists in the pinned version
+  (the repository's `check-library-api` skill shows how). Remove invented references, and never paste secrets, personal data
+  or customer data into a tool.
+- **Do not send what you cannot defend.** Unreviewed bulk output, many unrelated changes in one pull request, or
+  replies to review comments that are pasted tool output may be closed without a detailed review.
+- **Licensing.** Do not submit output that you know copies code under an incompatible license.
+
+### Labels and where to start
+
+Maintainers label issues so newcomers can find a first task: `good first issue` (small, well described, a maintainer
+will help), `help wanted` (we would like a contribution, any size) and the rest listed in
+[`GOVERNANCE.md`](GOVERNANCE.md#issue-and-pull-request-labels). Comment on an issue before you start so two people do not
+do the same work.
 
 ## License of your contribution
 

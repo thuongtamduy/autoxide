@@ -17,6 +17,22 @@ với cùng permission như con người. Core giữ trung lập, module cắm v
 vận chuyển và hoá đơn điện tử nằm sau các interface hiện mới đi kèm bộ giả lập: việc nối nhà cung cấp
 thật vẫn chưa làm.
 
+## Chạy thử bằng một lệnh
+
+Chỉ muốn xem thử? `autoxide demo` không cần cài đặt gì: tự tạo một thư mục, database SQLite, secret ngẫu
+nhiên và một quản trị viên, nạp dữ liệu tham chiếu, rồi in mật khẩu quản trị ra màn hình. Trang xem API mở
+ở `/api/docs`. Không dùng cho production.
+
+```bash
+# Bằng Docker (không phải cài hay biên dịch gì):
+docker run --rm -it -p 127.0.0.1:8080:8080 ghcr.io/thuongtamduy/autoxide:latest demo
+# Hoặc bằng binary tải về (Linux, macOS, Windows: xem trang phát hành):
+./autoxide demo
+```
+
+Cần bản phát hành sau 0.19.0. [`docs/GETTING-STARTED.vi.md`](docs/GETTING-STARTED.vi.md) có đường tải về, cách
+giữ dữ liệu demo và các bước tiếp theo.
+
 ## Chạy nhanh
 
 Một lệnh, không phải biên dịch gì: SQLite trong một Docker volume, bảng được tạo, có quản trị viên
@@ -596,10 +612,17 @@ SQLite và PostgreSQL. Không bao giờ commit secret — chỉ `.env.example` �
 trong Git, `.env` thì không. [`CONTRIBUTING.vi.md`](CONTRIBUTING.vi.md) hướng dẫn chuẩn
 bị máy, những luật quan trọng nhất và cách gửi thay đổi.
 
+Mỗi commit có một dòng `Signed-off-by` ([DCO](DCO), `git commit -s`). Câu hỏi: [`SUPPORT.vi.md`](SUPPORT.vi.md). Quyết
+định được đưa ra thế nào và cách đề xuất thay đổi: [`GOVERNANCE.vi.md`](GOVERNANCE.vi.md). Dự án đang đi đâu (tiếng Anh):
+[`docs/ROADMAP.public.md`](docs/ROADMAP.public.md). Xây và đăng module của riêng bạn:
+[`docs/MODULE_ECOSYSTEM.vi.md`](docs/MODULE_ECOSYSTEM.vi.md). Dùng tên dự án: [`TRADEMARK.vi.md`](TRADEMARK.vi.md).
+
 ## Bảo mật
 
 Tìm thấy lỗ hổng? Đừng mở issue công khai: hãy báo riêng theo
 [`SECURITY.vi.md`](SECURITY.vi.md), nơi cũng ghi những phiên bản được vá bảo mật.
+[`docs/THREAT_MODEL.vi.md`](docs/THREAT_MODEL.vi.md) mô tả các ranh giới tin cậy của core, control ở từng
+ranh giới và những gì còn mở.
 
 ## License
 

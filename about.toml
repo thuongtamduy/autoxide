@@ -1,0 +1,19 @@
+# cargo-about: sinh THIRD-PARTY-LICENSES.html (văn bản giấy phép đầy đủ của mọi crate Rust trong binary) cho mỗi bản phát hành
+# (D-20261126-third-party-licenses). Danh sách giấy phép chấp nhận PHẢI giống `[licenses] allow` của deny.toml.
+accepted = [
+  "MIT",
+  "Apache-2.0",
+  "BSD-3-Clause",
+  "BSD-2-Clause",
+  "ISC",
+  "Zlib",
+  "Unicode-3.0",
+  "CDLA-Permissive-2.0",
+  "0BSD",
+]
+# Chỉ phần phụ thuộc của binary phát hành (không tính công cụ phát triển / test).
+ignore-dev-dependencies = true
+ignore-build-dependencies = true
+workarounds = []
+# cargo-about cài với `--features cli` (không có feature `clearlydefined`): chỉ đọc giấy phép từ mã nguồn crate trong cache của cargo,
+# không hỏi trang ngoài, nên kết quả chỉ phụ thuộc Cargo.lock. Crate có giấy phép không nhận ra được thì thêm `[crate.clarify]`.

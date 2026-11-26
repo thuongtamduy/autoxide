@@ -14586,19 +14586,6 @@ export type Data_Vec_ReasonView = {
 };
 
 /** Envelope of a single result. */
-export type Data_Vec_Referrer = {
-  data: {
-    /** How it points: e.g. `featured_media`, `body`, `menu_item`. */
-    field: string;
-    id: string;
-    /** Type of the pointing record, e.g. `content.entry`. */
-    kind: string;
-    /** What staff call it (title, name). */
-    title: string;
-  }[];
-};
-
-/** Envelope of a single result. */
 export type Data_Vec_RoleResponse = {
   data: {
     /**
@@ -25271,6 +25258,21 @@ export type Page_ReferralRule = {
 };
 
 /** One page of a list. */
+export type Page_Referrer = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** How it points: e.g. `featured_media`, `body`, `menu_item`. */
+    field: string;
+    id: string;
+    /** Type of the pointing record, e.g. `content.entry`. */
+    kind: string;
+    /** What staff call it (title, name). */
+    title: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_Release = {
   /** The items of this page, in the requested order. */
   data: {
@@ -33911,6 +33913,50 @@ export interface paths {
       };
     };
   };
+  "/.well-known/oauth-authorization-server": {
+    /** Authorization server metadata. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Record<string, unknown>;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/.well-known/oauth-protected-resource/api/v1": {
+    /** Protected resource metadata of the REST API. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Record<string, unknown>;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/.well-known/oauth-protected-resource/mcp": {
+    /** Protected resource metadata of the MCP endpoint. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Record<string, unknown>;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/.well-known/oauth-protected-resource/mcp/{module}": {
+    /** Protected resource metadata of one module's MCP endpoint. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { module: string }; };
+      responses: {
+        200: Record<string, unknown>;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/address/provinces": {
     /** List the provinces. */
     get: {
@@ -34842,6 +34888,7 @@ export interface paths {
       responses: {
         200: Page_PasskeyResponse;
         401: Problem;
+        403: Problem;
         422: Problem;
         default: Problem;
       };
@@ -40441,6 +40488,8 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
+        503: Problem;
         default: Problem;
       };
     };
@@ -44509,9 +44558,9 @@ export interface paths {
   "/api/v1/kernel/records/{kind}/{id}/usages": {
     /** Get where a record is used. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; path: { kind: string; id: string }; query: { limit?: number }; };
+      parameters: { header: { "Accept-Language"?: string }; path: { kind: string; id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_Referrer;
+        200: Page_Referrer;
         401: Problem;
         404: Problem;
         422: Problem;

@@ -68,3 +68,7 @@ jobs:
           echo "Created tag $tag on $SHA."
           gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref "$tag"
           echo "Started the Release workflow on $tag."
+          # Cùng lý do với Release: tag tạo bằng GITHUB_TOKEN không kích hoạt workflow nào theo `push: tags`, nên trang tài liệu
+          # (docs-site.yml, D-20261126-docs-site-mdbook) cũng phải được gọi tường minh.
+          gh workflow run docs-site.yml --repo "$GITHUB_REPOSITORY" --ref "$tag" -f tag="$tag"
+          echo "Started the Docs site workflow on $tag."

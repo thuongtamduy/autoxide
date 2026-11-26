@@ -38,6 +38,8 @@ pub(crate) struct ListBannersInput {
     limit: Option<u32>,
     /// The `next_cursor` of the previous page.
     cursor: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
     /// `desc` (newest first, the default) or `asc`.
     order: Option<String>,
 }
@@ -249,7 +251,8 @@ pub(crate) fn all(service: &Arc<ContentService>) -> Vec<Tool> {
                         input.limit.map(|limit| limit.to_string()),
                         input.cursor,
                         input.order,
-                    );
+                    )
+                    .with_count(input.count.unwrap_or(false));
                     let page = page_request(paging, Vec::new())?;
                     let filter = BannerFilter {
                         placement: input.placement,
