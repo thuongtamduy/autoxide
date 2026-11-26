@@ -269,8 +269,13 @@ thật (P7).
         — chặn (PT-9, D-20261126-no-self-grant): gán role và sửa role theo "chỉ cấp cái mình có", kể cả cho chính mình
   - [ ] Các chỗ bất nhất còn lại của luật cấp quyền (chưa đổi hành vi): (i) `require_covers` (xoá / khoá / đổi
         email / nhận về tài khoản) so theo tên permission, bỏ qua phạm vi, còn `require_grantable` so cả phạm vi;
-        (ii) `PUT /users/{id}/memberships` chỉ kiểm role được cấp, không kiểm role bị gỡ — SCIM và
-        `PUT /users/{id}/roles` nay chặt hơn; (iii) cùng một luật ánh xạ: tạo vượt quyền trả 422, xoá vượt quyền trả 403
+        (iii) cùng một luật ánh xạ: tạo vượt quyền trả 422, xoá vượt quyền trả 403; (iv) hạ quyền người khác bằng cách
+        thu hẹp permission của role họ giữ không qua luật "gỡ được" như gỡ role (sửa role chỉ chặn thêm / nới / bỏ cấm)
+  - [ ] `automations`: `run_as_limit` chỉ giới hạn theo TÊN permission (`Principal::only` giữ phạm vi hiện tại của chủ
+        luật) — chụp cả phạm vi lúc tạo (D-20261126-automation-owner-revoked)
+  - [ ] `automations`: event `auth.access_revoked` vào dead-letter thì luật không tạm dừng và không có đường dự phòng
+        (runner chỉ dừng lần chạy khi luật đã `paused`); `pause` ghi cập nhật trạng thái và event `rule_paused` không
+        cùng transaction
   - [ ] Nhóm SCIM chưa có luật chứa "thành viên chờ": ai giữ token SCIM cũng đưa người vào được; admin đặt luật
         thì mọi thành viên nhận role (response tạo luật liệt kê ở `granted_user_ids`, hướng dẫn dặn xem trước —
         D-20261125-scim-grant-cover). Chặt hơn: ghi người đưa vào (`added_by`) ở thành viên nhóm và chỉ cấp cho

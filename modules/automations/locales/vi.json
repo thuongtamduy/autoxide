@@ -8,6 +8,7 @@
   "automations.permission_missing": "Người tạo luật không còn dùng được tool `{tool}`; luật đã tạm dừng.",
   "automations.rule_not_found": "Không có luật tự động hoá `{id}`.",
   "automations.rule_paused": "Luật đang ở trạng thái `{status}`, không phải `active`: hãy bật luật trước khi chạy.",
+  "automations.rule_not_active": "Luật chuyển sang trạng thái `{status}` trước khi lần chạy xong, nên lần chạy đã dừng. Hãy xem lại luật, bật lại và chạy lại nếu cần.",
   "automations.run_not_found": "Không có lần chạy `{id}`.",
   "automations.run_state": "Lần chạy đang ở trạng thái `{status}`; việc này cần lần chạy ở trạng thái `{expected}`.",
   "automations.step_changed": "Bước này đã chạy với tham số khác; lần chạy không tiếp tục được.",

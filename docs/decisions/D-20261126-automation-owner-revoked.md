@@ -14,7 +14,11 @@ Quyết định:
    thành `run_as`, luật được kiểm lại với quyền của họ) — mở khoá tài khoản không tự bật lại luật.
 3. Luật tạo / sửa / bật qua phiên đăng nhập nay cũng chụp quyền của người làm vào `run_as_limit` (trước đây chỉ API key):
    luật chạy với quyền HIỆN TẠI của `run_as` nhưng không bao giờ hơn quyền lúc tạo / sửa / bật — như lời mời (sức mạnh ≤
-   min(lúc tạo, lúc dùng)). Luật cũ (cột NULL) giữ cách cũ tới lần sửa / bật kế tiếp.
+   min(lúc tạo, lúc dùng)). Giới hạn theo TÊN permission (`Principal::only`): phạm vi là phạm vi hiện tại của `run_as`
+   — chụp cả phạm vi là việc sau (ROADMAP P16). Luật cũ (cột NULL) giữ cách cũ tới lần sửa / bật kế tiếp (changelog
+   ghi "Action needed").
+4. Lần chạy đang chờ (hàng đợi, bước `wait`, chờ duyệt) không chạy tiếp khi luật không còn `active`: runner dừng nó với
+   `automations.rule_not_active` — áp cho mọi lý do tạm dừng / tắt, gồm `owner_access_revoked` và `credential_revoked`.
 
 Lý do: D-20261125-durable-grants để lại mục này cho `automations` (P16): luật chạy bằng quyền hiện tại của `run_as`,
 nên luật dựng trong lúc tài khoản bị người lạ dùng vẫn chạy sau khi chủ lấy lại tài khoản (khoá tài khoản thì luật đã
@@ -25,8 +29,3 @@ thì đường khoá mới nào gọi hàm đó cũng tự có.
 Đã cân nhắc: dừng luật lúc chạy bằng cách hỏi `auth` "tài khoản có vừa bị khoá không" (cần trait mới, và luật vẫn
 chạy giữa lúc khoá và lúc kiểm); xoá luật (mất cấu hình của chủ thật); tự bật lại khi mở khoá (người lạ dựng luật thì
 chủ phải xem lại trước).
-
-Ghi thêm cho D-20261125-org-must-exist: bộ nhớ đơn vị đã tra (`Principal` nhớ đơn vị có trong cây) chỉ sống trong một
-request hay một lần chạy job. Đơn vị không bị xoá khi người dùng làm việc thường; chỉ tách / gộp khách (relocate) xoá
-cây của khách nguồn — một request hay job đang chạy đúng lúc đó có thể còn nhớ đơn vị vừa bị dời đi tới khi nó kết thúc;
-chấp nhận được vì dữ liệu của đơn vị đó cũng đã dời sang khách khác.

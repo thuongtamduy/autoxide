@@ -24,7 +24,9 @@ curl -sS "$API/api/v1/automations/catalog" -H "Authorization: Bearer $TOKEN"
 
 ## Create a rule
 
-Saving checks everything at once and reports every problem in `errors`: unknown events or tools (`automations.trigger_unknown`, `automations.tool_unknown`), tools you lack the permission for (`automations.permission_missing`), and arguments that do not fit a tool's input schema. A rule runs with the **current** permissions of the person it runs as (`run_as`: the author, or whoever last changed its actions or enabled it); if that person loses a permission the rule needs, the rule pauses itself.
+Saving checks everything at once and reports every problem in `errors`: unknown events or tools (`automations.trigger_unknown`, `automations.tool_unknown`), tools you lack the permission for (`automations.permission_missing`), and arguments that do not fit a tool's input schema. A rule runs with the **current** permissions of the person it runs as (`run_as`: the author, or whoever last changed its actions or enabled it); if that person loses a permission the rule needs, the rule pauses itself. A rule also never uses a permission its `run_as` did not have when they saved or enabled it (the limit is by permission name; the scope is the person's current one). Rules saved before this limit existed get it the next time someone edits or enables them.
+
+When every way into the `run_as` account is cut, the account's rules pause with `status_reason` `owner_access_revoked`, and runs still waiting (a `wait` step, an approval) stop with `automations.rule_not_active` instead of continuing. This happens when the account is locked out (for example its owner reported a sign-in that was not them), recovered by email, disabled or deleted — and also when its owner **changes their password and signs out everywhere**. Unlocking the account does not turn the rules back on: someone with the permissions checks each rule and enables it again (and becomes its `run_as`).
 
 <!-- example: create-rule -->
 ```bash

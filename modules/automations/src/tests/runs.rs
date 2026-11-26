@@ -376,6 +376,35 @@ async fn wait_hen_gio_roi_chay_tiep() {
     .unwrap();
 }
 
+/// D-20261126-automation-owner-revoked: lần chạy đang chờ (`wait`) không chạy tiếp bằng quyền của `run_as` khi luật
+/// đã tạm dừng trong lúc chờ (chủ luật bị cắt cửa vào) — dừng với `automations.rule_not_active`, không gọi tool.
+#[tokio::test]
+async fn lan_chay_dang_cho_dung_khi_luat_tam_dung() {
+    TestDatabase::run(async |test| {
+        let harness = Harness::new(test).await;
+        let actions = json!([
+            {"wait": {"minutes": 60}},
+            {"tool": "shop.tag_order", "arguments": {"order_id": "1", "tag": "x"}}
+        ]);
+        let rule = harness.rule(json!({"type": "manual"}), json!(null), actions).await;
+        let run = harness
+            .service
+            .run_rule(&harness.tenant, &harness.owner, rule.id, json!({}))
+            .await
+            .unwrap();
+        harness.settle().await;
+        harness.service.owner_revoked(&harness.tenant, harness.owner.user_id()).await.unwrap();
+        harness.service.execute(&harness.tenant, run.id).await.unwrap();
+        let stopped =
+            harness.service.get_run(&harness.tenant, &harness.owner, run.id).await.unwrap();
+        assert_eq!(stopped.status, FAILED);
+        assert_eq!(stopped.error_code.as_deref(), Some("automations.rule_not_active"));
+        assert_eq!(harness.count(|c| &c.tagged), 0);
+    })
+    .await
+    .unwrap();
+}
+
 #[tokio::test]
 async fn vuot_so_lan_chay_tam_dung_luat() {
     TestDatabase::run(async |test| {

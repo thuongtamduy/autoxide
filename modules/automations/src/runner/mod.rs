@@ -306,6 +306,12 @@ impl Automations {
                 .finish(tenant, &mut run, FAILED, Some(crate::service::rule_not_found(id)))
                 .await;
         };
+        // Luật đã tạm dừng / tắt trong lúc lần chạy chờ (hàng đợi, bước `wait` nhiều ngày, chờ duyệt): không chạy
+        // tiếp bằng quyền của `run_as` — vd tài khoản vừa bị cắt cửa vào (D-20261126-automation-owner-revoked).
+        if rule.status != crate::service::rules::ACTIVE {
+            let error = rule_not_active(&rule.status);
+            return self.finish(tenant, &mut run, FAILED, Some(error)).await;
+        }
         let definition = parse_json(&run.definition);
         let mut errors = Vec::new();
         let actions =
@@ -513,6 +519,15 @@ fn steps_context(steps: &[StepLog]) -> Value {
     Value::Array(
         steps.iter().map(|step| json!({"status": step.status, "result": step.result})).collect(),
     )
+}
+
+fn rule_not_active(status: &str) -> Error {
+    Error::conflict(
+        "automations.rule_not_active",
+        "The rule became `{status}` before this run finished, so the run stopped. Check the rule, \
+         enable it again and run it if needed.",
+    )
+    .with_param("status", status.to_owned())
 }
 
 fn owner_unavailable() -> Error {
