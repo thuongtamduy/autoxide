@@ -318,19 +318,21 @@ impl ReasonsState {
 /// List the reasons of a list.
 ///
 /// Anyone who reads the module that owns the list (`<module>.read`), or holds
-/// `kernel.reasons.manage`. The module's reasons and the tenant's own, in order, with labels in the
-/// language of `Accept-Language`.
+/// `kernel.reasons.manage`. The module's reasons and the tenant's own, by `position` then code
+/// (`order=desc` reverses it; paged with `limit` / `cursor`), with labels in the language of
+/// `Accept-Language`.
 #[utoipa::path(
     get,
     path = "/reasons/{list}",
     extensions(("x-permissions" = json!([]))),
     operation_id = "list_reasons",
     security(("bearer" = [])),
-    params(("list" = String, Path, description = "The list, e.g. `orders.cancel`."), ReasonsQuery),
+    params(("list" = String, Path, description = "The list, e.g. `orders.cancel`."), ReasonsQuery, crate::pagination::NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "The reasons.", body = Data<Vec<ReasonView>>),
+        (status = 200, description = "One page of reasons, by position.", body = crate::pagination::Page<ReasonView>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 404, description = "No such list for you; code `kernel.reason_list_not_found`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_reasons(
@@ -340,11 +342,24 @@ async fn list_reasons(
     language: Language,
     Path(list): Path<String>,
     Query(query): Query<ReasonsQuery>,
-) -> Result<Data<Vec<ReasonView>>, Error> {
+    Query(page): Query<crate::pagination::NaturalOrderPageQuery>,
+) -> Result<crate::pagination::Page<ReasonView>, Error> {
     if !state.may_read(&principal, &list) {
         return Err(list_not_found(&list));
     }
-    Ok(Data { data: state.reasons(&tenant, &list, query.include_inactive, language).await? })
+    let page = crate::pagination::PageRequest::try_from(page)?;
+    let reasons = state.reasons(&tenant, &list, query.include_inactive, language).await?;
+    // Lý do mặc định của module (trong code) gộp với dòng của khách theo mã — thứ tự `position` có thể do
+    // khách đổi, nên chỉ biết sau khi gộp: phân trang trong bộ nhớ (D-20261125-list-pages mục 4). Khoá giữ
+    // đúng thứ tự (vị trí, mã) khi so theo byte: vị trí dời về số không âm, đủ 10 chữ số.
+    crate::pagination::page_of(
+        reasons,
+        |reason| {
+            let position = i64::from(reason.position) - i64::from(i32::MIN);
+            format!("{position:010}\u{1f}{}", reason.code)
+        },
+        &page,
+    )
 }
 
 /// Change or add a reason.

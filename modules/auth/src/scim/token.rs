@@ -11,7 +11,7 @@ use jiff::SignedDuration;
 use sea_orm::sea_query::Expr;
 use sea_orm::{
     ActiveModelTrait as _, ColumnTrait as _, EntityTrait as _, PaginatorTrait as _,
-    QueryFilter as _, QueryOrder as _,
+    QueryFilter as _,
 };
 use serde_json::json;
 use uuid::Uuid;
@@ -100,13 +100,20 @@ impl ScimService {
         Ok(statuses)
     }
 
-    /// Các token của khách, mới nhất trước.
-    pub(crate) async fn tokens(&self, tenant: &TenantContext) -> Result<Vec<ScimToken>, Error> {
-        Ok(entity::Entity::find()
-            .scoped(tenant)
-            .order_by_desc(entity::Column::Id)
-            .all(tenant.database().read())
-            .await?)
+    /// Một trang token SCIM của khách, mới nhất trước trừ `order=asc` (keyset trên khoá chính).
+    pub(crate) async fn tokens_page(
+        &self,
+        tenant: &TenantContext,
+        page: &autoxide_kernel::pagination::PageRequest,
+    ) -> Result<autoxide_kernel::pagination::Page<ScimToken>, Error> {
+        autoxide_kernel::pagination::fetch_page(
+            entity::Entity::find().scoped(tenant),
+            entity::Column::Id,
+            |row| row.id,
+            page,
+            tenant.database().read(),
+        )
+        .await
     }
 
     /// Tạo token mới tên `name`; cần tính năng `auth.scim` của gói.

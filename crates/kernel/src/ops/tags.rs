@@ -17,7 +17,7 @@ use crate::time::Timestamp;
 use std::collections::{BTreeSet, HashMap};
 use std::sync::{Arc, PoisonError, RwLock};
 
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use sea_orm::sea_query::{Alias, Condition, Expr, Order, Query as SqlQuery};
 use sea_orm::{ColumnTrait, ConnectionTrait};
@@ -292,7 +292,8 @@ fn name_taken(name: &str) -> Error {
         .with_param("name", name.to_owned())
 }
 
-async fn list_views(tenant: &TenantContext) -> Result<Vec<TagView>, Error> {
+/// The tags of tenant `tenant` with how many records carry each (filters only: no ordering).
+fn tag_select(tenant: &TenantContext) -> sea_orm::sea_query::SelectStatement {
     let uses = SqlQuery::select()
         .expr(Expr::col(Alias::new("tag_id")).count())
         .from(Alias::new(RECORD_TAGS))
@@ -301,9 +302,9 @@ async fn list_views(tenant: &TenantContext) -> Result<Vec<TagView>, Error> {
                 .equals((Alias::new(TAGS), Alias::new("id"))),
         )
         .to_owned();
-    let select = SqlQuery::select()
+    SqlQuery::select()
         .columns(
-            ["id", "name", "color", "description", "created_at"]
+            ["id", "name", "normalized", "color", "description", "created_at"]
                 .map(|column| (Alias::new(TAGS), Alias::new(column))),
         )
         .expr_as(
@@ -315,21 +316,47 @@ async fn list_views(tenant: &TenantContext) -> Result<Vec<TagView>, Error> {
         )
         .from(Alias::new(TAGS))
         .and_where(Expr::col((Alias::new(TAGS), Alias::new("tenant_id"))).eq(tenant.id().as_uuid()))
+        .to_owned()
+}
+
+fn tag_view(row: &sea_orm::QueryResult) -> Result<TagView, Error> {
+    Ok(TagView {
+        id: row.try_get("", "id")?,
+        name: row.try_get("", "name")?,
+        color: row.try_get("", "color")?,
+        description: row.try_get("", "description")?,
+        uses: row.try_get("", "uses")?,
+        created_at: row.try_get("", "created_at")?,
+    })
+}
+
+async fn list_views(tenant: &TenantContext) -> Result<Vec<TagView>, Error> {
+    let select = tag_select(tenant)
         .order_by((Alias::new(TAGS), Alias::new("normalized")), Order::Asc)
         .to_owned();
     let rows = tenant.database().read().query_all(&select).await?;
-    rows.iter()
-        .map(|row| {
-            Ok(TagView {
-                id: row.try_get("", "id")?,
-                name: row.try_get("", "name")?,
-                color: row.try_get("", "color")?,
-                description: row.try_get("", "description")?,
-                uses: row.try_get("", "uses")?,
-                created_at: row.try_get("", "created_at")?,
-            })
-        })
-        .collect()
+    rows.iter().map(tag_view).collect()
+}
+
+/// One page of the tags, by normalized name (lower case, without accents; unique in the tenant), keyset in
+/// the database on the unique index `(tenant_id, normalized)`.
+async fn tags_page(
+    tenant: &TenantContext,
+    page: &crate::pagination::PageRequest,
+) -> Result<crate::pagination::Page<TagView>, Error> {
+    let rows = crate::pagination::fetch_statement_page_by(
+        tag_select(tenant),
+        (Alias::new(TAGS), Alias::new("normalized")),
+        "normalized",
+        |value| matches!(value, crate::pagination::SortValue::Text(_)),
+        |row| Ok(crate::pagination::SortValue::Text(row.try_get("", "normalized")?)),
+        (Alias::new(TAGS), Alias::new("id")),
+        |row| Ok(row.try_get("", "id")?),
+        page,
+        tenant.database().read(),
+    )
+    .await?;
+    crate::pagination::try_map_page(rows, tag_view)
 }
 
 async fn find_view(tenant: &TenantContext, id: Uuid) -> Result<TagView, Error> {
@@ -396,23 +423,27 @@ async fn create<C: ConnectionTrait>(
 /// List the tags.
 ///
 /// Any signed-in staff account; customer accounts get 403 `kernel.tags_staff_only`. Every tag of
-/// the tenant, by name, with how many records carry it.
+/// the tenant, by name ignoring case and accents (`order=desc` reverses it; paged with `limit` /
+/// `cursor`), with how many records carry it.
 #[utoipa::path(
     get,
     path = "/tags",
     extensions(("x-permissions" = json!([]))),
     operation_id = "list_tags",
     security(("bearer" = [])),
+    params(crate::pagination::NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "The tags.", body = Data<Vec<TagView>>),
+        (status = 200, description = "One page of tags, by name.", body = crate::pagination::Page<TagView>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "A customer account; code `kernel.tags_staff_only`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_tags(
     tenant: TenantContext,
     principal: Principal,
-) -> Result<Data<Vec<TagView>>, Error> {
+    Query(page): Query<crate::pagination::NaturalOrderPageQuery>,
+) -> Result<crate::pagination::Page<TagView>, Error> {
     // Nhãn là ghi chú nội bộ của nhân sự ("VIP", "nghi gian lận"…): tài khoản người mua của cửa hàng
     // không được đọc (pentest 2026-11).
     if principal.realm() == Realm::Customer {
@@ -421,7 +452,8 @@ async fn list_tags(
             "Tags are for staff accounts; a customer account cannot list them.",
         ));
     }
-    Ok(Data { data: list_views(&tenant).await? })
+    let page = crate::pagination::PageRequest::try_from(page)?;
+    tags_page(&tenant, &page).await
 }
 
 /// Create a tag.

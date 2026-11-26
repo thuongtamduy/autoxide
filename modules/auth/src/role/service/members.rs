@@ -16,6 +16,39 @@ impl RoleService {
         roles_of_user(connection, tenant, user_id).await
     }
 
+    /// Một trang role của người dùng `user_id`, theo tên (trừ `order=desc`); keyset trên unique (tenant_id,
+    /// name) của bảng role.
+    pub(crate) async fn user_roles_page(
+        &self,
+        tenant: &TenantContext,
+        user_id: Uuid,
+        page: &PageRequest,
+    ) -> Result<Page<Role>, Error> {
+        let connection = tenant.database().read();
+        if user::Entity::find_by_id(user_id).scoped(tenant).one(connection).await?.is_none() {
+            return Err(crate::user::user_not_found(user_id));
+        }
+        let select = role::Entity::find()
+            .filter(role::Column::Id.in_subquery(held_roles(tenant, user_id)))
+            .scoped(tenant);
+        let page = fetch_page_by(
+            select,
+            role::Column::Name,
+            |row| SortValue::Text(row.name.clone()),
+            role::Column::Id,
+            |row| row.id,
+            page,
+            connection,
+        )
+        .await?;
+        let mut permissions =
+            permissions_of(connection, tenant, page.data.iter().map(|row| row.id)).await?;
+        Ok(page.map(|row| {
+            let granted = permissions.remove(&row.id).unwrap_or_default();
+            to_role(row, granted)
+        }))
+    }
+
     /// Thay toàn bộ role của người dùng `user_id` bằng `role_ids` (đường hệ thống, không kiểm người gán) — chỉ
     /// để test dựng dữ liệu; code chạy thật dùng [`set_user_roles_as`](Self::set_user_roles_as).
     #[cfg(test)]
@@ -170,7 +203,9 @@ impl RoleService {
         Ok(after)
     }
 
-    /// Mọi membership của người dùng `user_id`: mỗi nút một dòng, kèm role ở nút đó; nút theo ID.
+    /// Mọi membership của người dùng `user_id`: mỗi nút một dòng, kèm role ở nút đó; nút theo ID. Chỉ cho
+    /// test; API dùng [`memberships_page`](Self::memberships_page).
+    #[cfg(test)]
     pub(crate) async fn memberships(
         &self,
         tenant: &TenantContext,
@@ -181,6 +216,98 @@ impl RoleService {
             return Err(crate::user::user_not_found(user_id));
         }
         memberships_of(connection, tenant, user_id).await
+    }
+
+    /// Một trang membership của người dùng `user_id`, mỗi nút một dòng kèm role ở nút đó (role theo tên); nút
+    /// theo id (trừ `order=desc`). Keyset trên các nút khác nhau ngay trong database (unique (tenant_id,
+    /// user_id, org_id, role_id)); con trỏ mang id nút cuối trang.
+    pub(crate) async fn memberships_page(
+        &self,
+        tenant: &TenantContext,
+        user_id: Uuid,
+        page: &PageRequest,
+    ) -> Result<Page<Membership>, Error> {
+        let connection = tenant.database().read();
+        if user::Entity::find_by_id(user_id).scoped(tenant).one(connection).await?.is_none() {
+            return Err(crate::user::user_not_found(user_id));
+        }
+        let after = match page.text_key_after(ORG_CURSOR)? {
+            Some(raw) => Some(raw.parse::<Uuid>().map_err(|_| {
+                Error::validation(vec![FieldError::new(
+                    "cursor",
+                    "invalid",
+                    "must be the `next_cursor` value of a previous page, unchanged",
+                )])
+            })?),
+            None => None,
+        };
+        // Cột `org_id` luôn có giá trị (nút gốc = id của khách, m0029).
+        let units = user_role::Entity::find()
+            .select_only()
+            .column(user_role::Column::OrgId)
+            .distinct()
+            .filter(user_role::Column::UserId.eq(user_id))
+            .filter(user_role::Column::OrgId.is_not_null())
+            .scoped(tenant);
+        let total =
+            if page.wants_total() { Some(units.clone().count(connection).await?) } else { None };
+        let mut select = units;
+        select = match (after, page.order()) {
+            (Some(after), Order::Asc) => select.filter(user_role::Column::OrgId.gt(after)),
+            (Some(after), Order::Desc) => select.filter(user_role::Column::OrgId.lt(after)),
+            (None, _) => select,
+        };
+        select = match page.order() {
+            Order::Asc => select.order_by_asc(user_role::Column::OrgId),
+            Order::Desc => select.order_by_desc(user_role::Column::OrgId),
+        };
+        let mut orgs: Vec<Option<Uuid>> = select
+            .limit(u64::from(page.limit()) + 1)
+            .into_tuple::<Option<Uuid>>()
+            .all(connection)
+            .await?;
+        let limit = page.limit() as usize;
+        let has_more = orgs.len() > limit;
+        orgs.truncate(limit);
+        let orgs: Vec<Uuid> = orgs.into_iter().flatten().collect();
+        let rows = user_role::Entity::find()
+            .filter(user_role::Column::UserId.eq(user_id))
+            .filter(user_role::Column::OrgId.is_in(orgs.iter().copied()))
+            .scoped(tenant)
+            .all(connection)
+            .await?;
+        let roles = role::Entity::find()
+            .filter(role::Column::Id.is_in(rows.iter().map(|row| row.role_id)))
+            .scoped(tenant)
+            .order_by_asc(role::Column::Name)
+            .all(connection)
+            .await?;
+        let mut grants = permissions_of(connection, tenant, roles.iter().map(|row| row.id)).await?;
+        let roles: Vec<Role> = roles
+            .into_iter()
+            .map(|row| {
+                let granted = grants.remove(&row.id).unwrap_or_default();
+                to_role(row, granted)
+            })
+            .collect();
+        let data: Vec<Membership> = orgs
+            .iter()
+            .map(|org_id| Membership {
+                user_id,
+                org_id: *org_id,
+                roles: roles
+                    .iter()
+                    .filter(|role| {
+                        rows.iter().any(|row| row.role_id == role.id && row.org_id == Some(*org_id))
+                    })
+                    .cloned()
+                    .collect(),
+            })
+            .collect();
+        let next_cursor = has_more
+            .then(|| orgs.last().map(|org| text_key_cursor(ORG_CURSOR, &org.to_string())))
+            .flatten();
+        Ok(Page { data, pagination: Pagination::new(page.limit(), next_cursor).with_total(total) })
     }
 
     /// Thay mọi membership của người dùng `user_id` bằng `memberships` (nút → role). Người gán
@@ -378,8 +505,45 @@ impl RoleService {
         }))
     }
 
+    /// Một trang số người giữ mỗi role (ở bất kỳ nút nào, mỗi người một lần), cùng thứ tự với danh sách role
+    /// (mới tạo trước trừ `order=asc`), kể cả role không ai giữ (0). Hai câu: trang role (keyset trên khoá
+    /// chính), rồi `COUNT(DISTINCT user_id)` theo role của trang (index (tenant_id, role_id)).
+    pub(crate) async fn role_member_counts_page(
+        &self,
+        tenant: &TenantContext,
+        page: &PageRequest,
+    ) -> Result<Page<(Uuid, usize)>, Error> {
+        let connection = tenant.database().read();
+        let roles = fetch_page(
+            role::Entity::find().scoped(tenant),
+            role::Column::Id,
+            |row| row.id,
+            page,
+            connection,
+        )
+        .await?;
+        let counts: HashMap<Uuid, i64> = user_role::Entity::find()
+            .select_only()
+            .column(user_role::Column::RoleId)
+            .column_as(Expr::col(user_role::Column::UserId).count_distinct(), "members")
+            .filter(user_role::Column::RoleId.is_in(roles.data.iter().map(|row| row.id)))
+            .scoped(tenant)
+            .group_by(user_role::Column::RoleId)
+            .into_tuple::<(Uuid, i64)>()
+            .all(connection)
+            .await?
+            .into_iter()
+            .collect();
+        Ok(roles.map(|row| {
+            let members = counts.get(&row.id).copied().unwrap_or_default();
+            (row.id, usize::try_from(members).unwrap_or_default())
+        }))
+    }
+
     /// Số người giữ mỗi role của khách (ở bất kỳ nút nào), mỗi người một lần; mọi role, kể cả role
-    /// không ai giữ (0). Hai câu: các role, và các cặp (role, người) khác nhau.
+    /// không ai giữ (0). Hai câu: các role, và các cặp (role, người) khác nhau. Chỉ cho test; API dùng
+    /// [`role_member_counts_page`](Self::role_member_counts_page).
+    #[cfg(test)]
     pub(crate) async fn role_member_counts(
         &self,
         tenant: &TenantContext,
@@ -461,6 +625,19 @@ impl RoleService {
         counts.sort_by_key(|count| (count.org_id != root, count.org_id));
         Ok(counts)
     }
+}
+
+/// Tên thứ tự trong con trỏ của trang membership theo nút.
+const ORG_CURSOR: &str = "org_id";
+
+/// Câu con: id các role người dùng `user_id` giữ ở khách `tenant` (ở bất kỳ nút nào).
+fn held_roles(tenant: &TenantContext, user_id: Uuid) -> sea_orm::sea_query::SelectStatement {
+    Query::select()
+        .column(user_role::Column::RoleId)
+        .from(user_role::Entity)
+        .and_where(user_role::Column::TenantId.eq(tenant.id().as_uuid()))
+        .and_where(user_role::Column::UserId.eq(user_id))
+        .to_owned()
 }
 
 pub(super) async fn roles_of_user<C: ConnectionTrait>(

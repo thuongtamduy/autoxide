@@ -730,4 +730,40 @@ pub trait RecordHistory: Send + Sync {
         limit: u32,
         language: crate::i18n::Language,
     ) -> Result<Vec<HistoryLine>, Error>;
+
+    /// One page of the events with subject `subject`, ordered by event ID (UUIDv7, so the order they were
+    /// recorded): newest first unless `page` asks `asc`; the cursor is the ID of the last line
+    /// (D-20261125-list-pages).
+    ///
+    /// The default implementation reads every event through [`history`](Self::history) and cuts the page in
+    /// memory; a provider keeping a large log overrides it with a keyset page in its database.
+    async fn history_page(
+        &self,
+        tenant: &TenantContext,
+        subject: &str,
+        page: &crate::pagination::PageRequest,
+        language: crate::i18n::Language,
+    ) -> Result<crate::pagination::Page<HistoryLine>, Error> {
+        use crate::pagination::{Order, Page, Pagination};
+        let mut lines = self.history(tenant, subject, u32::MAX, language).await?;
+        let total = page.wants_total().then(|| u64::try_from(lines.len()).unwrap_or(u64::MAX));
+        match page.order() {
+            Order::Asc => lines.sort_by_key(|line| line.id),
+            Order::Desc => lines.sort_by_key(|line| std::cmp::Reverse(line.id)),
+        }
+        if let Some(cursor) = page.cursor() {
+            lines.retain(|line| match page.order() {
+                Order::Asc => line.id > cursor,
+                Order::Desc => line.id < cursor,
+            });
+        }
+        let limit = page.limit() as usize;
+        let has_more = lines.len() > limit;
+        lines.truncate(limit);
+        let next_cursor = has_more.then(|| lines.last().map(|line| line.id.to_string())).flatten();
+        Ok(Page {
+            data: lines,
+            pagination: Pagination::new(page.limit(), next_cursor).with_total(total),
+        })
+    }
 }

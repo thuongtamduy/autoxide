@@ -318,6 +318,8 @@ impl Module for KernelModule {
             Box::new(crate::tenancy::domains::ShareClaims),
             // Index cho danh sách "của tôi" có phân trang: ghim, view đã lưu (bước 70 P9).
             Box::new(crate::ops::list_indexes::AddListIndexes),
+            // Index cho danh sách của kernel có phân trang ở cụm 3: job, trường tự định nghĩa (bước 70 P9).
+            Box::new(crate::ops::list_indexes::AddListIndexesKernel),
         ]
     }
 

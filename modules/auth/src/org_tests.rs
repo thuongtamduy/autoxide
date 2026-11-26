@@ -412,3 +412,107 @@ async fn dem_so_nguoi_giu_moi_role() {
     .await
     .unwrap();
 }
+
+/// Đi hết một danh sách có phân trang: `fetch` đọc một trang theo con trỏ (`None`: trang đầu).
+async fn walk_pages<T>(
+    order: &str,
+    limit: u32,
+    fetch: impl AsyncFn(
+        autoxide_kernel::pagination::PageRequest,
+    ) -> autoxide_kernel::pagination::Page<T>,
+) -> Vec<T> {
+    use autoxide_kernel::pagination::{NaturalOrderPageQuery, PageRequest};
+    let mut found = Vec::new();
+    let mut cursor: Option<String> = None;
+    loop {
+        let query = NaturalOrderPageQuery::new(
+            Some(limit.to_string()),
+            cursor.clone(),
+            Some(order.to_owned()),
+        );
+        let page = fetch(PageRequest::try_from(query).unwrap()).await;
+        assert!(page.data.len() <= limit as usize);
+        found.extend(page.data);
+        match page.pagination.next_cursor {
+            Some(next) => cursor = Some(next),
+            None => return found,
+        }
+    }
+}
+
+/// Membership theo nút, role của người dùng và số người theo role phân trang keyset trong database:
+/// nhiều dòng hơn `limit`, theo `next_cursor` tới hết không trùng / sót, cả hai chiều.
+#[tokio::test]
+async fn membership_role_va_so_nguoi_phan_trang() {
+    use autoxide_kernel::pagination::{Order, PageRequest};
+    TestDatabase::run(async |test| {
+        let services = services(test).await;
+        let tenant = &services.tenant;
+        let tree = tree(&services).await;
+        let ann = user(&services, "ann@example.com").await;
+        let reader = role(&services, "reader", &[], &[("notes.read", Scope::Subtree)]).await;
+        let viewer = role(&services, "viewer", &["auth.users.read"], &[]).await;
+        let alpha = role(&services, "alpha", &["auth.users.read"], &[]).await;
+        let admin = Principal::with_all_permissions(Uuid::now_v7());
+        let wanted = vec![
+            (tree.root.as_uuid(), vec![viewer.id]),
+            (tree.a.as_uuid(), vec![reader.id, viewer.id]),
+            (tree.b.as_uuid(), vec![alpha.id]),
+            (tree.a1.as_uuid(), vec![reader.id]),
+        ];
+        services.roles.set_memberships(tenant, &admin, ann, wanted).await.unwrap();
+
+        // Membership: mỗi nút một dòng, theo id nút; role trong nút theo tên.
+        let mut units =
+            vec![tree.root.as_uuid(), tree.a.as_uuid(), tree.b.as_uuid(), tree.a1.as_uuid()];
+        units.sort();
+        let roles = services.roles.clone();
+        let pages = async |order: &str| {
+            walk_pages(order, 3, async |page| {
+                roles.memberships_page(tenant, ann, &page).await.unwrap()
+            })
+            .await
+        };
+        let ascending = pages("asc").await;
+        assert_eq!(ascending.iter().map(|m| m.org_id).collect::<Vec<_>>(), units);
+        let at_a = ascending.iter().find(|m| m.org_id == tree.a.as_uuid()).unwrap();
+        assert_eq!(
+            at_a.roles.iter().map(|r| r.name.as_str()).collect::<Vec<_>>(),
+            ["reader", "viewer"]
+        );
+        let mut descending: Vec<Uuid> = pages("desc").await.iter().map(|m| m.org_id).collect();
+        descending.reverse();
+        assert_eq!(descending, units);
+        let counted = services
+            .roles
+            .memberships_page(tenant, ann, &PageRequest::first(1, Order::Asc).counted())
+            .await
+            .unwrap();
+        assert_eq!(counted.pagination.total, Some(4));
+
+        // Role của người dùng: theo tên.
+        let names = walk_pages("asc", 2, async |page| {
+            roles.user_roles_page(tenant, ann, &page).await.unwrap()
+        })
+        .await;
+        assert_eq!(
+            names.iter().map(|r| r.name.as_str()).collect::<Vec<_>>(),
+            ["alpha", "reader", "viewer"]
+        );
+        let missing =
+            services.roles.user_roles_page(tenant, Uuid::now_v7(), &PageRequest::default()).await;
+        assert_eq!(missing.unwrap_err().code(), "auth.user_not_found");
+
+        // Số người theo role: cùng thứ tự với danh sách role, đúng bằng bản đếm cả danh sách.
+        let paged = walk_pages("asc", 2, async |page| {
+            roles.role_member_counts_page(tenant, &page).await.unwrap()
+        })
+        .await;
+        let mut whole = services.roles.role_member_counts(tenant).await.unwrap();
+        whole.sort();
+        assert_eq!(paged, whole);
+        assert!(paged.contains(&(alpha.id, 1)) && paged.contains(&(reader.id, 1)));
+    })
+    .await
+    .unwrap();
+}

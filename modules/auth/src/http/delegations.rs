@@ -6,6 +6,7 @@ use std::sync::Arc;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
+use autoxide_kernel::pagination::{NaturalOrderPageQuery, Page, PageQuery, PageRequest, page_of};
 use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::{TenantContext, TenantId};
 use axum::extract::{Path, Query, State};
@@ -105,18 +106,19 @@ pub(crate) struct DelegationRequest {
 /// List the delegations of this tenant.
 ///
 /// Requires `auth.delegations.read`. `outgoing`: given to child tenants; `incoming`: received
-/// from the tenants above. Newest first.
+/// from the tenants above. Newest first unless `order=asc`; paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/delegations",
     extensions(("x-permissions" = json!(["auth.delegations.read"]))),
     operation_id = "list_delegations",
     security(("bearer" = [])),
-    params(DelegationQuery),
+    params(DelegationQuery, PageQuery),
     responses(
-        (status = 200, description = "The delegations.", body = Data<Vec<DelegationResponse>>),
+        (status = 200, description = "One page of delegations, newest first.", body = Page<DelegationResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `auth.delegations.read`; code `permission_denied`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_delegations(
@@ -124,13 +126,15 @@ async fn list_delegations(
     tenant: TenantContext,
     principal: Principal,
     Query(query): Query<DelegationQuery>,
-) -> Result<Data<Vec<DelegationResponse>>, Error> {
+    Query(page): Query<PageQuery>,
+) -> Result<Page<DelegationResponse>, Error> {
     principal.require(&DELEGATIONS_READ)?;
+    let page = PageRequest::try_from(page)?;
     let rows = match query.direction {
-        Direction::Outgoing => state.delegations.outgoing(&tenant).await?,
-        Direction::Incoming => state.delegations.incoming(&tenant).await?,
+        Direction::Outgoing => state.delegations.outgoing(&tenant, &page).await?,
+        Direction::Incoming => state.delegations.incoming(&tenant, &page).await?,
     };
-    Ok(Data { data: rows.into_iter().map(Into::into).collect() })
+    Ok(rows.map(Into::into))
 }
 
 /// A tenant below this one (a child, or a child of a child…).
@@ -150,37 +154,49 @@ pub(crate) struct ChildTenantResponse {
 /// List the tenants below this one, to choose where a delegation goes.
 ///
 /// Requires `auth.delegations.manage`. Children first, then their children, each level sorted
-/// by slug; at most 16 levels down. Only names and states — nothing of their data.
+/// by slug; at most 16 levels down (`order=desc` reverses the whole list); paged with `limit` /
+/// `cursor`. Only names and states — nothing of their data.
 #[utoipa::path(
     get,
     path = "/delegations/tenants",
     extensions(("x-permissions" = json!(["auth.delegations.manage"]))),
     operation_id = "list_child_tenants",
     security(("bearer" = [])),
+    params(NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "The tenants below this one.", body = Data<Vec<ChildTenantResponse>>),
+        (status = 200, description = "One page of the tenants below this one, level by level.", body = Page<ChildTenantResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `auth.delegations.manage`; code `permission_denied`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_child_tenants(
     State(state): State<Arc<HttpState>>,
     tenant: TenantContext,
     principal: Principal,
-) -> Result<Data<Vec<ChildTenantResponse>>, Error> {
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<ChildTenantResponse>, Error> {
     principal.require(&DELEGATIONS_MANAGE)?;
+    let page = PageRequest::try_from(page)?;
+    // Cây khách đọc từng tầng (tối đa 16 tầng) trên sổ khách của mặt điều khiển; thứ tự (tầng, slug) chỉ biết
+    // sau khi đi hết các tầng trên, nên phân trang trong bộ nhớ theo vị trí trong lần đi (D-20261125-list-pages
+    // mục 4, như tổ tiên của nút `organizations`). Khoá là vị trí, đủ 6 chữ số để so theo byte đúng thứ tự.
     let children = state.delegations.databases.tenant_descendants(tenant.id()).await?;
-    let data = children
+    let keyed: Vec<(String, ChildTenantResponse)> = children
         .into_iter()
-        .map(|child| ChildTenantResponse {
-            id: child.id.as_uuid(),
-            parent_id: child.parent_id.as_uuid(),
-            slug: child.slug,
-            name: child.name,
-            status: child.status,
+        .enumerate()
+        .map(|(index, child)| {
+            let response = ChildTenantResponse {
+                id: child.id.as_uuid(),
+                parent_id: child.parent_id.as_uuid(),
+                slug: child.slug,
+                name: child.name,
+                status: child.status,
+            };
+            (format!("{index:06}"), response)
         })
         .collect();
-    Ok(Data { data })
+    Ok(page_of(keyed, |(key, _)| key.clone(), &page)?.map(|(_, child)| child))
 }
 
 /// Let holders of a role work in a child tenant.
@@ -270,23 +286,28 @@ pub(crate) struct MyTenantResponse {
 
 /// List the tenants you can work in.
 ///
-/// Any signed-in user. Your own tenant first, then the ones you may enter (send the header
-/// `Autoxide-Tenant: <id>` with your usual credentials).
+/// Any signed-in user. Your own tenant first, then the ones you may enter through a delegation,
+/// then through a support grant (send the header `Autoxide-Tenant: <id>` with your usual
+/// credentials); `order=desc` reverses the list; paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/me/tenants",
     extensions(("x-permissions" = json!([]))),
     operation_id = "list_my_tenants",
     security(("bearer" = [])),
+    params(NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "The tenants.", body = Data<Vec<MyTenantResponse>>),
+        (status = 200, description = "One page of the tenants, your own first.", body = Page<MyTenantResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn my_tenants(
     State(state): State<Arc<HttpState>>,
     principal: Principal,
-) -> Result<Data<Vec<MyTenantResponse>>, Error> {
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<MyTenantResponse>, Error> {
+    let page = PageRequest::try_from(page)?;
     // Khách nhà: khách của credential, kể cả khi request đang vào khách khác.
     let home_id = principal.operator_from().unwrap_or(principal.tenant_id());
     let home = state.delegations.databases.tenant(home_id).await?;
@@ -336,5 +357,20 @@ async fn my_tenants(
             }
         }
     }
-    Ok(Data { data })
+    // Gộp từ nhiều nguồn và nhiều database (khách nhà, uỷ quyền ở database của khách nhà, lần cấp hỗ trợ ở
+    // khách nền tảng; tên mỗi khách tra sổ khách): phân trang trong bộ nhớ (D-20261125-list-pages mục 4, như
+    // độ trễ `reporting`). Khoá giữ thứ tự: hạng đường vào (0 nhà, 1 uỷ quyền, 2 hỗ trợ) rồi id khách — mỗi
+    // khách chỉ một dòng.
+    page_of(
+        data,
+        |tenant| {
+            let rank = match tenant.access.as_str() {
+                "direct" => 0,
+                "delegation" => 1,
+                _ => 2,
+            };
+            format!("{rank}{}", tenant.id)
+        },
+        &page,
+    )
 }

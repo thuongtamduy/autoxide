@@ -135,37 +135,38 @@ pub(crate) struct CreateScimTokenRequest {
 
 /// List the SCIM tokens of the tenant.
 ///
-/// Requires `auth.scim.manage`. Newest first; secrets are never listed. `creator_status` tells
-/// whether a token's creator was disabled, deleted or lost `auth.scim.manage`: such a token must be
-/// rotated, or the provider's changes are refused.
+/// Requires `auth.scim.manage`. Newest first unless `order=asc`; paged with `limit` / `cursor`;
+/// secrets are never listed. `creator_status` tells whether a token's creator was disabled,
+/// deleted or lost `auth.scim.manage`: such a token must be rotated, or the provider's changes are
+/// refused.
 #[utoipa::path(
     get,
     path = "/scim/tokens",
     extensions(("x-permissions" = json!(["auth.scim.manage"]))),
     operation_id = "list_scim_tokens",
     security(("bearer" = [])),
+    params(PageQuery),
     responses(
-        (status = 200, description = "Every SCIM token of the tenant.", body = Data<Vec<ScimTokenResponse>>),
+        (status = 200, description = "One page of the tenant's SCIM tokens, newest first.", body = Page<ScimTokenResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `auth.scim.manage`; code `permission_denied`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_scim_tokens(
     State(state): State<Arc<HttpState>>,
     tenant: TenantContext,
     principal: Principal,
-) -> Result<Data<Vec<ScimTokenResponse>>, Error> {
+    Query(page): Query<PageQuery>,
+) -> Result<Page<ScimTokenResponse>, Error> {
     principal.require(&SCIM_MANAGE)?;
-    let tokens = state.scim.tokens(&tenant).await?;
-    let statuses = state.scim.creator_statuses(&tenant, &tokens).await?;
-    let data = tokens
-        .into_iter()
-        .map(|token| {
-            let status = statuses.get(&token.id).copied().unwrap_or(CreatorStatus::Deleted);
-            ScimTokenResponse::new(token, status)
-        })
-        .collect();
-    Ok(Data { data })
+    let page = PageRequest::try_from(page)?;
+    let tokens = state.scim.tokens_page(&tenant, &page).await?;
+    let statuses = state.scim.creator_statuses(&tenant, &tokens.data).await?;
+    Ok(tokens.map(|token| {
+        let status = statuses.get(&token.id).copied().unwrap_or(CreatorStatus::Deleted);
+        ScimTokenResponse::new(token, status)
+    }))
 }
 
 /// Create a SCIM token for the tenant's identity provider.
@@ -349,27 +350,31 @@ async fn list_scim_groups(
 
 /// List the mapping rules from SCIM groups to roles.
 ///
-/// Requires `auth.scim.manage`. Oldest first.
+/// Requires `auth.scim.manage`. Newest first unless `order=asc`; paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/scim/group-mappings",
     extensions(("x-permissions" = json!(["auth.scim.manage"]))),
     operation_id = "list_scim_group_mappings",
     security(("bearer" = [])),
+    params(PageQuery),
     responses(
-        (status = 200, description = "Every mapping rule of the tenant.", body = Data<Vec<ScimGroupMappingResponse>>),
+        (status = 200, description = "One page of the tenant's mapping rules, newest first.", body = Page<ScimGroupMappingResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `auth.scim.manage`; code `permission_denied`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_scim_group_mappings(
     State(state): State<Arc<HttpState>>,
     tenant: TenantContext,
     principal: Principal,
-) -> Result<Data<Vec<ScimGroupMappingResponse>>, Error> {
+    Query(page): Query<PageQuery>,
+) -> Result<Page<ScimGroupMappingResponse>, Error> {
     principal.require(&SCIM_MANAGE)?;
-    let rows = state.scim.mappings(&tenant).await?;
-    Ok(Data { data: rows.into_iter().map(ScimGroupMappingResponse::from).collect() })
+    let page = PageRequest::try_from(page)?;
+    let rows = state.scim.mappings_page(&tenant, &page).await?;
+    Ok(rows.map(ScimGroupMappingResponse::from))
 }
 
 /// Map a SCIM group to a role at a unit.

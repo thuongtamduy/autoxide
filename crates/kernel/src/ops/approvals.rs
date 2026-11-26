@@ -380,35 +380,96 @@ pub(crate) struct ApprovalsState {
 /// List approval requests.
 ///
 /// Any signed-in user: the requests of your own agents, and those you may decide (a person holding
-/// one of the command's permissions). Newest first, at most 200.
+/// one of the command's permissions). Newest first unless `order=asc`; paged with `limit` /
+/// `cursor`.
 #[utoipa::path(
     get,
     path = "/approvals",
     extensions(("x-permissions" = json!([]))),
     operation_id = "list_approvals",
     security(("bearer" = [])),
-    params(ApprovalsQuery),
+    params(ApprovalsQuery, crate::pagination::PageQuery),
     responses(
-        (status = 200, description = "The requests.", body = Data<Vec<ApprovalView>>),
+        (status = 200, description = "One page of requests, newest first.", body = crate::pagination::Page<ApprovalView>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 422, description = "`status` is invalid; see `errors`.", body = Problem),
+        (status = 422, description = "`status` or a paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_approvals(
     tenant: TenantContext,
     principal: Principal,
     Query(query): Query<ApprovalsQuery>,
-) -> Result<Data<Vec<ApprovalView>>, Error> {
-    Ok(Data { data: list_for(&tenant, &principal, query.status.as_deref()).await? })
+    Query(page): Query<crate::pagination::PageQuery>,
+) -> Result<crate::pagination::Page<ApprovalView>, Error> {
+    let page = crate::pagination::PageRequest::try_from(page);
+    page_for(&tenant, &principal, query.status.as_deref(), page).await
 }
 
-/// Requests the caller may see, newest first, at most 200; `status` filters by status.
+const STATUSES: [&str; 5] = ["pending", "approved", "rejected", "expired", "used"];
+
+/// One page of the requests the caller may see, by ID (newest first unless `order=asc`); `status` filters by
+/// status. Status and paging problems come back in one 422. Who may see a request depends on its permissions,
+/// which SQL cannot test: the requests are read in batches from the cursor on (keyset in the database, index
+/// `(tenant_id, id)`) and filtered until the page is full.
+pub(crate) async fn page_for(
+    tenant: &TenantContext,
+    principal: &Principal,
+    status: Option<&str>,
+    page: Result<crate::pagination::PageRequest, Error>,
+) -> Result<crate::pagination::Page<ApprovalView>, Error> {
+    use crate::pagination::{fetch_statement_page_filtered, try_map_page, with_filter_problems};
+    use sea_orm::sea_query::IntoColumnRef as _;
+    let mut problems = Vec::new();
+    if status.is_some_and(|status| !STATUSES.contains(&status)) {
+        problems.push(FieldError::new(
+            "status",
+            "invalid",
+            "must be `pending`, `approved`, `rejected`, `expired` or `used`",
+        ));
+    }
+    let page = with_filter_problems(problems, page)?;
+    let mut select = SqlQuery::select()
+        .columns(COLUMNS)
+        .from(Alias::new(TABLE))
+        .and_where(Expr::col(Alias::new("tenant_id")).eq(tenant.id().as_uuid()))
+        .to_owned();
+    // `expired` không lưu: là `pending` đã quá hạn (xem `view`).
+    match status {
+        Some("pending") => {
+            select
+                .and_where(Expr::col(Alias::new("status")).eq("pending"))
+                .and_where(Expr::col(Alias::new("expires_at")).gt(now()));
+        }
+        Some("expired") => {
+            select
+                .and_where(Expr::col(Alias::new("status")).eq("pending"))
+                .and_where(Expr::col(Alias::new("expires_at")).lte(now()));
+        }
+        Some(status) => {
+            select.and_where(Expr::col(Alias::new("status")).eq(status));
+        }
+        None => {}
+    }
+    let rows = fetch_statement_page_filtered(
+        select,
+        None,
+        Alias::new("id").into_column_ref(),
+        |row| Ok(row.try_get("", "id")?),
+        |row| Ok(may_see(principal, &view(row)?)),
+        &page,
+        tenant.database().read(),
+    )
+    .await?;
+    try_map_page(rows, view)
+}
+
+/// Requests the caller may see, newest first, at most 200 (the work inbox's own count); `status` filters by
+/// status.
 pub(crate) async fn list_for(
     tenant: &TenantContext,
     principal: &Principal,
     status: Option<&str>,
 ) -> Result<Vec<ApprovalView>, Error> {
-    const STATUSES: [&str; 5] = ["pending", "approved", "rejected", "expired", "used"];
     if status.is_some_and(|status| !STATUSES.contains(&status)) {
         return Err(Error::validation(vec![FieldError::new(
             "status",
@@ -666,6 +727,14 @@ async fn reject_request(
 pub(crate) struct ListApprovalsInput {
     /// Only `pending`, `approved`, `rejected`, `expired` or `used` requests.
     status: Option<String>,
+    /// Maximum number of items to return, 1 to 200. Defaults to 50.
+    limit: Option<u32>,
+    /// The `next_cursor` of the previous page.
+    cursor: Option<String>,
+    /// `desc` (newest first, the default) or `asc`.
+    order: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
 }
 
 /// A decision on an approval request.
@@ -690,7 +759,11 @@ pub(crate) fn tools(state: ApprovalsState) -> Vec<crate::mcp::Tool> {
             "List approval requests: those of your own AI agents, and those you may decide. An \
              agent sees here whether a person approved its command yet.",
             |tenant: TenantContext, principal: Principal, input: ListApprovalsInput| async move {
-                list_for(&tenant, &principal, input.status.as_deref()).await
+                // Cùng kiểu tham số trang và cùng hàm với REST.
+                let page = crate::mcp::PageInput::new(input.limit, input.cursor, input.order)
+                    .with_count(input.count.unwrap_or(false))
+                    .page();
+                page_for(&tenant, &principal, input.status.as_deref(), page).await
             },
         )
         .for_any_signed_in()

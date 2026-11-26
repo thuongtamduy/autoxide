@@ -51,6 +51,55 @@ pub(crate) struct ListUsersInput {
     cursor: Option<String>,
     /// `desc` (newest first, the default) or `asc` (oldest first).
     order: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
+}
+
+/// A user, and which page of their roles.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct UserRolesInput {
+    /// Id of the user.
+    id: Uuid,
+    /// Maximum number of items to return, 1 to 200. Defaults to 50.
+    limit: Option<u32>,
+    /// The `next_cursor` of the previous page.
+    cursor: Option<String>,
+    /// `asc` (by name, the default) or `desc`.
+    order: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
+}
+
+/// Which page of a list in a natural order (name, unit).
+#[derive(Debug, Default, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct NaturalPageInput {
+    /// Maximum number of items to return, 1 to 200. Defaults to 50.
+    limit: Option<u32>,
+    /// The `next_cursor` of the previous page.
+    cursor: Option<String>,
+    /// `asc` (the list's natural order, the default) or `desc`.
+    order: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
+}
+
+// Cùng kiểu tham số trang với REST (`NaturalOrderPageQuery`, mặc định `asc`), nên kiểm và lỗi giống hệt.
+fn natural_page(
+    limit: Option<u32>,
+    cursor: Option<String>,
+    order: Option<String>,
+    count: Option<bool>,
+) -> Result<autoxide_kernel::pagination::PageRequest, Error> {
+    autoxide_kernel::pagination::PageRequest::try_from(
+        autoxide_kernel::pagination::NaturalOrderPageQuery::new(
+            limit.map(|limit| limit.to_string()),
+            cursor,
+            order,
+        )
+        .with_count(count.unwrap_or(false)),
+    )
 }
 
 /// An API key to replace, and how.
@@ -196,13 +245,12 @@ fn roles(state: &Arc<HttpState>) -> Vec<Tool> {
         Tool::new(
             "count_role_members",
             "Count the people holding each role (at any unit, each person once).",
-            move |tenant: TenantContext, _: Principal, _: autoxide_kernel::mcp::NoInput| {
+            move |tenant: TenantContext, _: Principal, input: PageInput| {
                 let state = count.clone();
                 async move {
-                    let counts = state.roles.role_member_counts(&tenant).await?;
-                    let data: Vec<crate::http::roles::RoleCountResponse> =
-                        counts.into_iter().map(Into::into).collect();
-                    Ok::<_, Error>(autoxide_kernel::response::Data { data })
+                    // Cùng kiểu tham số trang và cùng hàm với REST.
+                    let counts = state.roles.role_member_counts_page(&tenant, &input.page()?).await?;
+                    Ok::<Page<crate::http::roles::RoleCountResponse>, Error>(counts.map(Into::into))
                 }
             },
         )
@@ -291,11 +339,15 @@ fn roles(state: &Arc<HttpState>) -> Vec<Tool> {
         .destructive(),
         Tool::new(
             "get_user_roles",
-            "List the roles of a user (`id` is the user's id).",
-            move |tenant: TenantContext, _: Principal, input: IdInput| {
+            "List the roles of a user (`id` is the user's id), by name; follow \
+             `pagination.next_cursor` for more.",
+            move |tenant: TenantContext, _: Principal, input: UserRolesInput| {
                 let state = of_user.clone();
                 async move {
-                    Ok::<_, Error>(roles_response(state.roles.user_roles(&tenant, input.id).await?))
+                    // Cùng kiểu tham số trang và cùng hàm với REST.
+                    let page = natural_page(input.limit, input.cursor, input.order, input.count)?;
+                    let roles = state.roles.user_roles_page(&tenant, input.id, &page).await?;
+                    Ok::<Page<RoleResponse>, Error>(roles.map(RoleResponse::from))
                 }
             },
         )
@@ -413,14 +465,18 @@ fn users(state: &Arc<HttpState>) -> Vec<Tool> {
         .read_only(),
         Tool::new(
             "list_permissions",
-            "List every permission that roles can grant, with what each allows.",
-            move |_tenant: TenantContext, _: Principal, _: NoInput| {
+            "List every permission that roles can grant, with what each allows, by name; follow \
+             `pagination.next_cursor` for more.",
+            move |_tenant: TenantContext, _: Principal, input: NaturalPageInput| {
                 let state = catalog.clone();
                 async move {
-                    Ok::<_, Error>(PermissionResponse::catalog(
+                    // Cùng kiểu tham số trang và cùng hàm với REST.
+                    let page = natural_page(input.limit, input.cursor, input.order, input.count)?;
+                    PermissionResponse::page(
                         &state.roles,
                         autoxide_kernel::i18n::Language::En,
-                    ))
+                        &page,
+                    )
                 }
             },
         )
@@ -433,7 +489,8 @@ fn users(state: &Arc<HttpState>) -> Vec<Tool> {
             move |tenant: TenantContext, _: Principal, input: ListUsersInput| {
                 let state = list.clone();
                 async move {
-                    let page = PageInput::new(input.limit, input.cursor, input.order);
+                    let page = PageInput::new(input.limit, input.cursor, input.order)
+                        .with_count(input.count.unwrap_or(false));
                     let page = state
                         .users
                         .list(&tenant, input.search.as_deref(), None, &page.page()?)
@@ -758,6 +815,8 @@ pub(crate) struct ListMembershipsInput {
     cursor: Option<String>,
     /// `desc` (newest first, the default) or `asc`.
     order: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
 }
 
 /// A new invitation.
@@ -788,6 +847,8 @@ pub(crate) struct ListInvitationsInput {
     cursor: Option<String>,
     /// `desc` (newest first, the default) or `asc`.
     order: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
 }
 
 /// Tool về nhà cung cấp đăng nhập (bước 40 P3): cùng service và permission với
@@ -803,12 +864,12 @@ fn oidc(state: &Arc<HttpState>) -> Vec<Tool> {
             "list_oidc_providers",
             "List the sign-in providers (Google, Microsoft, GitHub, OpenID Connect) of this \
              tenant, with disabled ones; client secrets are never shown.",
-            move |tenant: TenantContext, _: Principal, _: NoInput| {
+            move |tenant: TenantContext, _: Principal, input: PageInput| {
                 let state = list.clone();
                 async move {
-                    let rows = state.oidc.providers.list(&tenant).await?;
-                    let data: Vec<ProviderResponse> = rows.into_iter().map(Into::into).collect();
-                    Ok::<_, Error>(autoxide_kernel::response::Data { data })
+                    // Cùng kiểu tham số trang và cùng hàm với REST.
+                    let rows = state.oidc.providers.page(&tenant, false, &input.page()?).await?;
+                    Ok::<Page<ProviderResponse>, Error>(rows.map(Into::into))
                 }
             },
         )
@@ -877,12 +938,13 @@ fn oidc(state: &Arc<HttpState>) -> Vec<Tool> {
         Tool::new(
             "list_my_identities",
             "List the outside sign-ins (Google, Microsoft, GitHub…) linked to your own account.",
-            move |tenant: TenantContext, principal: Principal, _: NoInput| {
+            move |tenant: TenantContext, principal: Principal, input: PageInput| {
                 let state = mine.clone();
                 async move {
-                    let linked = state.oidc.identities(&tenant, principal.user_id()).await?;
-                    let data: Vec<IdentityResponse> = linked.into_iter().map(Into::into).collect();
-                    Ok::<_, Error>(autoxide_kernel::response::Data { data })
+                    // Cùng kiểu tham số trang và cùng hàm với REST.
+                    let page = input.page()?;
+                    let linked = state.oidc.identities(&tenant, principal.user_id(), &page).await?;
+                    Ok::<Page<IdentityResponse>, Error>(linked.map(Into::into))
                 }
             },
         )
@@ -927,7 +989,9 @@ fn invitations(state: &Arc<HttpState>) -> Vec<Tool> {
             move |tenant: TenantContext, principal: Principal, input: ListInvitationsInput| {
                 let state = list.clone();
                 async move {
-                    let page = PageInput::new(input.limit, input.cursor, input.order).page()?;
+                    let page = PageInput::new(input.limit, input.cursor, input.order)
+                        .with_count(input.count.unwrap_or(false))
+                        .page()?;
                     let status = input.status.as_deref();
                     let page = state.invitations.list(&tenant, &principal, status, &page).await?;
                     Ok::<_, Error>(page.map(InvitationResponse::from))
@@ -959,13 +1023,12 @@ fn memberships(state: &Arc<HttpState>) -> Vec<Tool> {
             "count_memberships",
             "Count the people of every organization unit: `direct` (memberships on the unit) and \
              `total` (on the unit or a unit above it).",
-            move |tenant: TenantContext, _: Principal, _: autoxide_kernel::mcp::NoInput| {
+            move |tenant: TenantContext, _: Principal, input: NaturalPageInput| {
                 let state = count.clone();
                 async move {
-                    let counts = state.roles.member_counts(&tenant).await?;
-                    let data: Vec<crate::http::memberships::MemberCountResponse> =
-                        counts.into_iter().map(Into::into).collect();
-                    Ok::<_, Error>(autoxide_kernel::response::Data { data })
+                    // Cùng kiểu tham số trang và cùng hàm với REST.
+                    let page = natural_page(input.limit, input.cursor, input.order, input.count)?;
+                    crate::http::memberships::member_count_page(&state, &tenant, &page).await
                 }
             },
         )
@@ -989,6 +1052,7 @@ fn memberships(state: &Arc<HttpState>) -> Vec<Tool> {
                         input.cursor,
                         input.order,
                     )
+                    .with_count(input.count.unwrap_or(false))
                     .page()?;
                     let page = state.roles.list_memberships(&tenant, &filter, &page).await?;
                     Ok::<_, Error>(page.map(crate::http::memberships::MembershipRowResponse::from))

@@ -27,7 +27,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, PoisonError, RwLock};
 use std::time::Duration;
 
-use axum::extract::State;
+use axum::extract::{Query, State};
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use hmac::{Hmac, KeyInit, Mac};
@@ -42,7 +42,7 @@ use crate::access::Principal;
 use crate::error::{Error, ErrorKind};
 use crate::mcp::Tool;
 use crate::public_url::PublicUrl;
-use crate::response::{Data, Problem};
+use crate::response::Problem;
 use crate::secret::SecretKey;
 use crate::tenancy::{
     DatabaseRegistry, SETTINGS_MANAGE, SettingValue, TenantContext, TenantId, TenantSetting,
@@ -244,6 +244,17 @@ impl ProviderAccounts {
         }
         found.sort_by(|a, b| a.path.cmp(&b.path));
         Ok(found)
+    }
+
+    /// One page of [`webhooks_of`](Self::webhooks_of), by path. The webhooks are declared in code by the
+    /// enabled connectors (a fixed set per build), so the page is cut in memory (D-20261125-list-pages
+    /// item 4); the path is unique (it ends with the endpoint's token).
+    async fn webhook_page(
+        &self,
+        tenant: &TenantContext,
+        page: &crate::pagination::PageRequest,
+    ) -> Result<crate::pagination::Page<ConnectionWebhook>, Error> {
+        crate::pagination::page_of(self.webhooks_of(tenant).await?, |hook| hook.path.clone(), page)
     }
 }
 
@@ -530,38 +541,52 @@ pub(crate) struct ConnectionWebhook {
 /// List the webhook addresses of this tenant.
 ///
 /// Requires `kernel.settings.manage`. One line per webhook an installed partner connection
-/// receives (bank transactions, payment results, delivery updates…). Each address is this tenant's
-/// own: paste it into the partner's settings page. The partner's notifications are still checked
-/// with this tenant's secret (signature or API key) before anything is stored.
+/// receives (bank transactions, payment results, delivery updates…), by path (`order=desc`
+/// reverses it); paged with `limit` / `cursor`. Each address is this tenant's own: paste it into
+/// the partner's settings page. The partner's notifications are still checked with this tenant's
+/// secret (signature or API key) before anything is stored.
 #[utoipa::path(
     get,
     path = "/connections/webhooks",
     extensions(("x-permissions" = json!(["kernel.settings.manage"]))),
     operation_id = "list_connection_webhooks",
     security(("bearer" = [])),
+    params(crate::pagination::NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "The webhook addresses, sorted by path.", body = Data<Vec<ConnectionWebhook>>),
+        (status = 200, description = "One page of webhook addresses, by path.", body = crate::pagination::Page<ConnectionWebhook>),
         (status = 401, description = "Not signed in; code `unauthorized` or the code of the authentication module.", body = Problem),
         (status = 403, description = "Missing permission `kernel.settings.manage`; code `permission_denied`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_connection_webhooks(
     State(accounts): State<ProviderAccounts>,
     tenant: TenantContext,
     principal: Principal,
-) -> Result<Data<Vec<ConnectionWebhook>>, Error> {
+    Query(page): Query<crate::pagination::NaturalOrderPageQuery>,
+) -> Result<crate::pagination::Page<ConnectionWebhook>, Error> {
     principal.require(&SETTINGS_MANAGE)?;
-    Ok(Data { data: accounts.webhooks_of(&tenant).await? })
+    let page = crate::pagination::PageRequest::try_from(page)?;
+    accounts.webhook_page(&tenant, &page).await
 }
 
 pub(crate) fn routes(accounts: ProviderAccounts) -> OpenApiRouter {
     OpenApiRouter::new().routes(routes!(list_connection_webhooks)).with_state(accounts)
 }
 
-/// No input.
+/// Which page of webhook addresses.
 #[derive(Debug, Default, Deserialize, Validate, ToSchema)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct ListConnectionWebhooks {}
+pub(crate) struct ListConnectionWebhooks {
+    /// Maximum number of items to return, 1 to 200. Defaults to 50.
+    limit: Option<u32>,
+    /// The `next_cursor` of the previous page.
+    cursor: Option<String>,
+    /// `asc` (by path, the default) or `desc`.
+    order: Option<String>,
+    /// `true` to also get `pagination.total` (the number of items) on the first page.
+    count: Option<bool>,
+}
 
 pub(crate) fn tools(accounts: ProviderAccounts) -> Vec<Tool> {
     vec![
@@ -570,9 +595,15 @@ pub(crate) fn tools(accounts: ProviderAccounts) -> Vec<Tool> {
             "List the webhook addresses of the current tenant: one per webhook an installed \
              partner connection receives (bank transactions, payment results, delivery \
              updates…), to paste into the partner's settings page.",
-            move |tenant: TenantContext, _principal: Principal, _input: ListConnectionWebhooks| {
+            move |tenant: TenantContext, _principal: Principal, input: ListConnectionWebhooks| {
                 let accounts = accounts.clone();
-                async move { accounts.webhooks_of(&tenant).await }
+                async move {
+                    // Cùng kiểu tham số trang và cùng hàm với REST.
+                    let page = crate::mcp::PageInput::new(input.limit, input.cursor, input.order)
+                        .with_count(input.count.unwrap_or(false))
+                        .natural_page()?;
+                    accounts.webhook_page(&tenant, &page).await
+                }
             },
         )
         .requires(SETTINGS_MANAGE)

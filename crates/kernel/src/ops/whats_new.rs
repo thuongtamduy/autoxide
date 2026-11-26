@@ -11,13 +11,11 @@ use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 
 use crate::error::{Error, FieldError};
-use crate::response::{Data, Problem};
+use crate::pagination::{NaturalOrderPageQuery, Page, PageRequest, page_of, with_filter_problems};
+use crate::response::Problem;
 
 /// The workspace's CHANGELOG, embedded at compile time.
 const CHANGELOG: &str = include_str!("../../CHANGELOG.md");
-
-/// Maximum number of versions returned when `since` is not given.
-const DEFAULT_RELEASES: usize = 5;
 
 /// The changes of one version.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
@@ -48,7 +46,7 @@ pub(crate) struct ReleaseSection {
 #[into_params(parameter_in = Query)]
 pub(crate) struct WhatsNewQuery {
     /// Only versions newer than this one (e.g. the last version a user saw), and `unreleased`.
-    /// Omitted: the five newest.
+    /// Omitted: every version (send `limit=5` for the five newest).
     #[param(example = "0.13.0")]
     since: Option<String>,
 }
@@ -105,10 +103,10 @@ fn version_key(version: &str) -> Option<(u64, u64, u64)> {
     Some(key)
 }
 
-/// Versions newer than `since` (with `unreleased`); when `since` is not given: the five newest.
+/// Versions newer than `since` (with `unreleased`); every version when `since` is not given.
 pub(crate) fn select(releases: Vec<Release>, since: Option<&str>) -> Result<Vec<Release>, Error> {
     let Some(since) = since.map(str::trim).filter(|since| !since.is_empty()) else {
-        return Ok(releases.into_iter().take(DEFAULT_RELEASES).collect());
+        return Ok(releases);
     };
     let floor = version_key(since).ok_or_else(|| {
         Error::validation(vec![FieldError::new(
@@ -123,6 +121,18 @@ pub(crate) fn select(releases: Vec<Release>, since: Option<&str>) -> Result<Vec<
         .collect())
 }
 
+/// One page of the selected versions, in the changelog's order (newest first). The changelog is compiled into
+/// the server, so the page is cut in memory (D-20261125-list-pages item 4); the key is the position in the
+/// changelog, zero-padded so that text order is the changelog's order.
+fn release_page(releases: Vec<Release>, page: &PageRequest) -> Result<Page<Release>, Error> {
+    let keyed: Vec<(String, Release)> = releases
+        .into_iter()
+        .enumerate()
+        .map(|(index, release)| (format!("{index:05}"), release))
+        .collect();
+    Ok(page_of(keyed, |(key, _)| key.clone(), page)?.map(|(_, release)| release))
+}
+
 pub(crate) fn routes() -> OpenApiRouter {
     OpenApiRouter::new().routes(routes!(whats_new))
 }
@@ -132,21 +142,31 @@ pub(crate) fn routes() -> OpenApiRouter {
 /// No sign-in needed. The changes of each version of the server that is running, newest first,
 /// from its changelog (in English): what was added, changed, fixed… With `since` (e.g. the last
 /// version a user saw), only the newer versions; `unreleased` lists changes in this build that
-/// have no version number yet. All modules share the server's version.
+/// have no version number yet. All modules share the server's version. Newest first
+/// (`order=desc` gives the oldest first); paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/whats-new",
     extensions(("x-public" = json!(true))),
     operation_id = "get_whats_new",
     security((), ("bearer" = [])),
-    params(WhatsNewQuery),
+    params(WhatsNewQuery, NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "The versions, newest first.", body = Data<Vec<Release>>),
-        (status = 422, description = "`since` is not a version; see `errors`.", body = Problem),
+        (status = 200, description = "One page of versions, newest first.", body = Page<Release>),
+        (status = 422, description = "`since` is not a version, or a paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
-async fn whats_new(Query(query): Query<WhatsNewQuery>) -> Result<Data<Vec<Release>>, Error> {
-    Ok(Data { data: select(parse(CHANGELOG), query.since.as_deref())? })
+async fn whats_new(
+    Query(query): Query<WhatsNewQuery>,
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<Release>, Error> {
+    let selected = select(parse(CHANGELOG), query.since.as_deref());
+    let problems = match &selected {
+        Ok(_) => Vec::new(),
+        Err(error) => error.fields().to_vec(),
+    };
+    let page = with_filter_problems(problems, PageRequest::try_from(page))?;
+    release_page(selected?, &page)
 }
 
 #[cfg(test)]
@@ -176,6 +196,28 @@ mod tests {
         assert_eq!(versions, ["unreleased", "0.2.0"]);
         assert!(select(parse(SAMPLE), Some("abc")).is_err());
         assert_eq!(select(parse(SAMPLE), None).unwrap().len(), 3);
+    }
+
+    // Trang theo thứ tự changelog (mới nhất trước), theo `next_cursor` tới hết, không trùng / sót; `desc` đảo.
+    #[test]
+    fn phan_trang_theo_thu_tu_changelog() {
+        let first = PageRequest::first(2, crate::pagination::Order::Asc);
+        let page = release_page(parse(SAMPLE), &first).unwrap();
+        let versions: Vec<_> = page.data.iter().map(|release| release.version.as_str()).collect();
+        assert_eq!(versions, ["unreleased", "0.2.0"]);
+        let cursor = page.pagination.next_cursor.unwrap();
+        let next = PageRequest::try_from(NaturalOrderPageQuery::new(
+            Some("2".to_owned()),
+            Some(cursor),
+            None,
+        ))
+        .unwrap();
+        let rest = release_page(parse(SAMPLE), &next).unwrap();
+        assert_eq!(rest.data.len(), 1);
+        assert_eq!(rest.data[0].version, "0.1.0");
+        assert!(rest.pagination.next_cursor.is_none());
+        let reversed = PageRequest::first(1, crate::pagination::Order::Desc);
+        assert_eq!(release_page(parse(SAMPLE), &reversed).unwrap().data[0].version, "0.1.0");
     }
 
     #[test]

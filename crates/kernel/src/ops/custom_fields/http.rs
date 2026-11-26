@@ -21,24 +21,76 @@ impl CustomFieldsState {
         }
         Ok(found)
     }
+
+    /// One page of the fields the caller may read (`target`: only that record type; `active_only`: only
+    /// enabled fields), by `position` then ID. Whether the caller reads a field depends on its record type's
+    /// permission, which SQL cannot test: the fields are read in batches from the cursor on (keyset in the
+    /// database on the index `(tenant_id, target, position, id)`) and filtered until the page is full.
+    pub(super) async fn page(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+        target: Option<&str>,
+        active_only: bool,
+        page: &crate::pagination::PageRequest,
+    ) -> Result<crate::pagination::Page<CustomFieldView>, Error> {
+        use crate::pagination::{RawSort, SortValue, fetch_statement_page_filtered, try_map_page};
+        use sea_orm::sea_query::IntoColumnRef as _;
+        if let Some(target) = target {
+            self.require_read(principal, target)?;
+        }
+        let mut select = SqlQuery::select();
+        select
+            .columns(COLUMNS)
+            .from(Alias::new(TABLE))
+            .and_where(Expr::col(Alias::new("tenant_id")).eq(tenant.id().as_uuid()));
+        if let Some(target) = target {
+            select.and_where(Expr::col(Alias::new("target")).eq(target));
+        }
+        if active_only {
+            select.and_where(Expr::col(Alias::new("active")).eq(true));
+        }
+        let sort = RawSort {
+            column: Alias::new("position").into_column_ref(),
+            name: "position",
+            fits: |value| matches!(value, SortValue::Integer(_)),
+            value_of: |row| Ok(SortValue::Integer(i64::from(row.try_get::<i32>("", "position")?))),
+        };
+        let rows = fetch_statement_page_filtered(
+            select,
+            Some(&sort),
+            Alias::new("id").into_column_ref(),
+            |row| Ok(row.try_get("", "id")?),
+            |row| {
+                let field_target: String = row.try_get("", "target")?;
+                Ok(self.require_read(principal, &field_target).is_ok())
+            },
+            page,
+            tenant.database().read(),
+        )
+        .await?;
+        try_map_page(rows, view)
+    }
 }
 
 /// List custom fields.
 ///
 /// `kernel.custom_fields.manage`, or the permission that reads `target`'s records (without
-/// `target`: the fields of every record type you may read). The fields the tenant defined, in order — interfaces and agents build forms and filter chips from them.
+/// `target`: the fields of every record type you may read). The fields the tenant defined, by
+/// `position` (`order=desc` reverses it; paged with `limit` / `cursor`) — interfaces and agents
+/// build forms and filter chips from them.
 #[utoipa::path(
     get,
     path = "/custom-fields",
     extensions(("x-permissions" = json!([]))),
     operation_id = "list_custom_fields",
     security(("bearer" = [])),
-    params(FieldsQuery),
+    params(FieldsQuery, crate::pagination::NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "The fields.", body = Data<Vec<CustomFieldView>>),
+        (status = 200, description = "One page of fields, by position.", body = crate::pagination::Page<CustomFieldView>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission; code `permission_denied`.", body = Problem),
-        (status = 422, description = "`target` takes no custom fields; see `errors`.", body = Problem),
+        (status = 422, description = "`target` takes no custom fields, or a paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 pub(super) async fn list_custom_fields(
@@ -46,17 +98,15 @@ pub(super) async fn list_custom_fields(
     tenant: TenantContext,
     principal: Principal,
     Query(query): Query<FieldsQuery>,
-) -> Result<Data<Vec<CustomFieldView>>, Error> {
+    Query(page): Query<crate::pagination::NaturalOrderPageQuery>,
+) -> Result<crate::pagination::Page<CustomFieldView>, Error> {
+    // Quyền đọc loại bản ghi kiểm trước tham số trang (403 trước 422).
     if let Some(target) = &query.target {
         state.require_read(&principal, target)?;
     }
+    let page = crate::pagination::PageRequest::try_from(page)?;
     // Không nêu loại: chỉ trường của loại bản ghi người gọi đọc được.
-    let fields = list(&tenant, query.target.as_deref())
-        .await?
-        .into_iter()
-        .filter(|field| state.require_read(&principal, &field.target).is_ok())
-        .collect();
-    Ok(Data { data: fields })
+    state.page(&tenant, &principal, query.target.as_deref(), false, &page).await
 }
 
 /// Define a custom field.
@@ -274,6 +324,14 @@ pub(super) async fn delete_custom_field(
 pub(crate) struct ListFieldsInput {
     /// Only the fields of this record type, e.g. `content.entry`.
     target: Option<String>,
+    /// Maximum number of items to return, 1 to 200. Defaults to 50.
+    limit: Option<u32>,
+    /// The `next_cursor` of the previous page.
+    cursor: Option<String>,
+    /// `asc` (by position, the default) or `desc`.
+    order: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
 }
 
 pub(crate) fn tools(fields: CustomFields) -> Vec<crate::mcp::Tool> {
@@ -292,16 +350,11 @@ pub(crate) fn tools(fields: CustomFields) -> Vec<crate::mcp::Tool> {
                     if let Some(target) = &input.target {
                         state.require_read(&principal, target)?;
                     }
-                    Ok::<Vec<CustomFieldView>, Error>(
-                        list(&tenant, input.target.as_deref())
-                            .await?
-                            .into_iter()
-                            .filter(|field| {
-                                field.active
-                                    && state.require_read(&principal, &field.target).is_ok()
-                            })
-                            .collect(),
-                    )
+                    // Cùng kiểu tham số trang và cùng hàm với REST; tool chỉ trả trường đang bật.
+                    let page = crate::mcp::PageInput::new(input.limit, input.cursor, input.order)
+                        .with_count(input.count.unwrap_or(false))
+                        .natural_page()?;
+                    state.page(&tenant, &principal, input.target.as_deref(), true, &page).await
                 }
             },
         )

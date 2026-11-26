@@ -622,6 +622,22 @@ impl SettingsService {
         self.cache.lock().unwrap_or_else(PoisonError::into_inner).remove(&tenant);
     }
 
+    /// One page of [`list`](Self::list), by name. The settings are declared in code by the modules (a fixed
+    /// set per build) and joined with the tenant's few stored values, so the page is cut in memory
+    /// (D-20261125-list-pages item 4).
+    pub(crate) async fn page(
+        &self,
+        tenant: &TenantContext,
+        group: Option<&str>,
+        page: &crate::pagination::PageRequest,
+    ) -> Result<crate::pagination::Page<SettingState>, Error> {
+        crate::pagination::page_of(
+            self.list(tenant, group).await?,
+            |state| state.name.clone(),
+            page,
+        )
+    }
+
     /// Every declared setting, by name, with its state at tenant `tenant`; `group`: only the settings of that
     /// group (a group nobody declares: an empty list).
     pub(crate) async fn list(
@@ -880,18 +896,20 @@ pub(crate) struct SettingFilter {
 /// Requires `kernel.settings.manage`. Every setting the installed modules take per tenant, with
 /// whether this tenant has set it; unset ones use the server-wide configuration. Values of
 /// secret settings are never returned. `?group=connection` lists only the connections to partner
-/// services, named `<module>.connection.<kind>.<field>`.
+/// services, named `<module>.connection.<kind>.<field>`. By name (`order=desc` reverses it);
+/// paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/settings",
     extensions(("x-permissions" = json!(["kernel.settings.manage"]))),
     operation_id = "list_tenant_settings",
     security(("bearer" = [])),
-    params(SettingFilter),
+    params(SettingFilter, crate::pagination::NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "Every setting (of the group, when one is given), sorted by name.", body = Data<Vec<SettingState>>),
+        (status = 200, description = "One page of settings (of the group, when one is given), by name.", body = crate::pagination::Page<SettingState>),
         (status = 401, description = "Not signed in; code `unauthorized` or the code of the authentication module.", body = Problem),
         (status = 403, description = "Missing permission `kernel.settings.manage`; code `permission_denied`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_settings(
@@ -899,9 +917,11 @@ async fn list_settings(
     tenant: TenantContext,
     principal: Principal,
     Query(filter): Query<SettingFilter>,
-) -> Result<Data<Vec<SettingState>>, Error> {
+    Query(page): Query<crate::pagination::NaturalOrderPageQuery>,
+) -> Result<crate::pagination::Page<SettingState>, Error> {
     principal.require(&SETTINGS_MANAGE)?;
-    Ok(Data { data: service.list(&tenant, filter.group.as_deref()).await? })
+    let page = crate::pagination::PageRequest::try_from(page)?;
+    service.page(&tenant, filter.group.as_deref(), &page).await
 }
 
 /// Set one of this tenant's settings.
@@ -992,19 +1012,21 @@ impl PlatformSettings {
 /// Requires `kernel.tenants.read` and an account of the platform tenant. Like
 /// `GET /api/v1/kernel/settings`, for the tenant in the path: every setting the installed modules
 /// take per tenant and whether that tenant has set it. Values of secret settings are never
-/// returned. `?group=connection` lists only the connections to partner services.
+/// returned. `?group=connection` lists only the connections to partner services. By name
+/// (`order=desc` reverses it); paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/tenants/{id}/settings",
     extensions(("x-permissions" = json!(["kernel.tenants.read"]))),
     operation_id = "list_settings_of_tenant",
     security(("bearer" = [])),
-    params(("id" = String, Path, description = "Id or slug of the tenant."), SettingFilter),
+    params(("id" = String, Path, description = "Id or slug of the tenant."), SettingFilter, crate::pagination::NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "Every setting (of the group, when one is given), sorted by name.", body = Data<Vec<SettingState>>),
+        (status = 200, description = "One page of settings (of the group, when one is given), by name.", body = crate::pagination::Page<SettingState>),
         (status = 401, description = "Not signed in; code `unauthorized` or the code of the authentication module.", body = Problem),
         (status = 403, description = "Missing permission `kernel.tenants.read` (`permission_denied`), or not an account of the platform tenant (`tenant_platform_only`).", body = Problem),
         (status = 404, description = "No such tenant; code `tenant_not_found`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_tenant_settings(
@@ -1012,11 +1034,13 @@ async fn list_tenant_settings(
     principal: Principal,
     Path(id): Path<String>,
     Query(filter): Query<SettingFilter>,
-) -> Result<Data<Vec<SettingState>>, Error> {
+    Query(page): Query<crate::pagination::NaturalOrderPageQuery>,
+) -> Result<crate::pagination::Page<SettingState>, Error> {
     principal.require(&super::TENANTS_READ)?;
     super::require_platform(&principal)?;
+    let page = crate::pagination::PageRequest::try_from(page)?;
     let tenant = platform.tenant(&id, false).await?;
-    Ok(Data { data: platform.service.list(&tenant, filter.group.as_deref()).await? })
+    platform.service.page(&tenant, filter.group.as_deref(), &page).await
 }
 
 /// Set a setting of a tenant (platform staff).

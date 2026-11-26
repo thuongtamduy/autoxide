@@ -17,6 +17,25 @@ use serde_json::json;
 
 const SHOP_READ: Permission = Permission::new("shop.read", "See the shop.");
 const SHOP_WRITE: Permission = Permission::new("shop.write", "Change the shop.");
+const VAULT_READ: Permission = Permission::new("vault.read", "See the vault.");
+const VAULT_WRITE: Permission = Permission::new("vault.write", "Change the vault.");
+
+/// Module thứ hai có loại bản ghi nhận trường, đọc bằng permission khác.
+struct Vault;
+
+impl Module for Vault {
+    fn name(&self) -> &'static str {
+        "vault"
+    }
+
+    fn permissions(&self) -> Vec<Permission> {
+        vec![VAULT_READ, VAULT_WRITE]
+    }
+
+    fn custom_field_targets(&self) -> Vec<CustomFieldTarget> {
+        vec![CustomFieldTarget::new("vault.box", VAULT_READ, VAULT_WRITE)]
+    }
+}
 
 struct Shop;
 
@@ -115,6 +134,68 @@ async fn han_muc_truong_tu_dinh_nghia_theo_goi() {
             .unwrap();
         assert_eq!(removed.status(), StatusCode::NO_CONTENT);
         assert_eq!(define("size").await.status(), StatusCode::CREATED, "xoá trả suất");
+    })
+    .await
+    .unwrap();
+}
+
+// Danh sách trường phân trang theo `position` (keyset trong database), chỉ trường của loại bản ghi người gọi
+// đọc được: trường của loại khác bị bỏ khi đọc từng lô, trang vẫn đủ `limit` và con trỏ đi tiếp đúng chỗ.
+#[tokio::test]
+async fn danh_sach_truong_phan_trang_chi_loai_doc_duoc() {
+    TestDatabase::run(async |test| {
+        let app = TestApp::builder(test)
+            .user("admin", 1, &["kernel.custom_fields.manage"])
+            .user("reader", 2, &["shop.read"])
+            .module(Shop)
+            .module(Vault)
+            .build()
+            .await
+            .unwrap();
+        // Xen kẽ hai loại: vị trí 1..=6, loại `vault.box` ở vị trí chẵn.
+        for (position, target) in
+            [(1, "shop.item"), (2, "vault.box"), (3, "shop.item"), (4, "vault.box"), (5, "shop.item"), (6, "shop.item")]
+        {
+            let key = format!("f{position}");
+            let made = app
+                .post("/api/v1/kernel/custom-fields")
+                .token("admin")
+                .json(json!({"target": target, "key": key, "data_type": "text", "labels": {"en": key}, "position": position}))
+                .send()
+                .await
+                .unwrap();
+            assert_eq!(made.status(), StatusCode::CREATED, "{}", made.json());
+        }
+        let walk = async |token: &str, order: &str| -> Vec<String> {
+            let mut keys = Vec::new();
+            let mut cursor: Option<String> = None;
+            loop {
+                let mut path = format!("/api/v1/kernel/custom-fields?limit=2&order={order}");
+                if let Some(cursor) = &cursor {
+                    path.push_str(&format!("&cursor={cursor}"));
+                }
+                let page = app.get(&path).token(token).send().await.unwrap().json();
+                let data = page["data"].as_array().unwrap();
+                if page["pagination"]["next_cursor"].is_string() {
+                    assert_eq!(data.len(), 2, "trang chưa cuối luôn đủ `limit`: {page}");
+                }
+                keys.extend(data.iter().map(|field| field["key"].as_str().unwrap().to_owned()));
+                match page["pagination"]["next_cursor"].as_str() {
+                    Some(next) => cursor = Some(next.to_owned()),
+                    None => return keys,
+                }
+            }
+        };
+        assert_eq!(walk("reader", "asc").await, ["f1", "f3", "f5", "f6"]);
+        assert_eq!(walk("reader", "desc").await, ["f6", "f5", "f3", "f1"]);
+        assert_eq!(walk("admin", "asc").await, ["f1", "f2", "f3", "f4", "f5", "f6"]);
+        let counted =
+            app.get("/api/v1/kernel/custom-fields?limit=1&count=true").token("reader").send().await.unwrap().json();
+        assert_eq!(counted["pagination"]["total"], 4);
+        // Quyền đọc loại bản ghi kiểm trước tham số trang: 403 chứ không phải 422.
+        let refused =
+            app.get("/api/v1/kernel/custom-fields?target=vault.box&limit=0").token("reader").send().await.unwrap();
+        assert_eq!(refused.status(), StatusCode::FORBIDDEN);
     })
     .await
     .unwrap();
