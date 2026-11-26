@@ -18,7 +18,7 @@ use uuid::Uuid;
 
 use crate::entity::page_template;
 use crate::entries::{Entry, EntryFields, Kind, NewEntry, layout};
-use crate::permissions::{CONTENT_READ, CONTENT_WRITE};
+use crate::permissions::{CONTENT_READ, CONTENT_WRITE, CONTENT_WRITE_OWN};
 use crate::service::{ContentService, now};
 
 /// Ngành của mẫu.
@@ -247,6 +247,11 @@ impl ContentService {
         input: FromTemplate,
     ) -> Result<(Entry, Vec<String>), Error> {
         principal.require(&CONTENT_READ)?;
+        // Tạo trang cần quyền viết (`content.write` hay `content.write_own`, `create` kiểm theo nút): kiểm trước khi
+        // tra mẫu để người chỉ đọc không biết mẫu nào tồn tại.
+        if !principal.allows(CONTENT_WRITE.name()) && !principal.allows(CONTENT_WRITE_OWN.name()) {
+            principal.require(&CONTENT_WRITE)?;
+        }
         let read = tenant.database().read();
         let template = self.find_page_template(read, tenant, principal, input.template_id).await?;
         let stored: Value =

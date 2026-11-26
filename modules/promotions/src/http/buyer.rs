@@ -238,7 +238,7 @@ pub(crate) struct WalletQuery {
 #[utoipa::path(
     get,
     path = "/me/vouchers",
-    extensions(("x-permissions" = json!(["promotions.use"]))),
+    extensions(("x-permissions" = json!(["promotions.use"])), ("x-buyers" = json!(true))),
     operation_id = "list_my_vouchers",
     security(("bearer" = [])),
     params(WalletQuery, PageQuery),
@@ -285,7 +285,7 @@ fn voucher_response(submitted: Submitted<Voucher>, location: String) -> Response
 #[utoipa::path(
     post,
     path = "/me/vouchers/claim-code",
-    extensions(("x-permissions" = json!(["promotions.use"]))),
+    extensions(("x-permissions" = json!(["promotions.use"])), ("x-buyers" = json!(true))),
     operation_id = "claim_voucher_code",
     security(("bearer" = [])),
     request_body = ClaimCodeRequest,
@@ -317,7 +317,7 @@ async fn claim_code(
 #[utoipa::path(
     post,
     path = "/public/promotions/{id}/claim",
-    extensions(("x-permissions" = json!(["promotions.use"]))),
+    extensions(("x-permissions" = json!(["promotions.use"])), ("x-buyers" = json!(true))),
     operation_id = "claim_promotion_voucher",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the promotion.")),

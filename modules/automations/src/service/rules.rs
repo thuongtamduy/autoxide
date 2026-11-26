@@ -372,6 +372,8 @@ impl Automations {
             transaction.rollback().await?;
             return Err(autoxide_kernel::version::changed());
         }
+        // Lần chạy đang chờ của luật bị xoá kết thúc cùng transaction (không chờ tới hạn mới hỏng).
+        self.close_pending_runs(&transaction, tenant, id, "deleted").await?;
         let change = Change { before: Some(snapshot(&before)), after: None };
         self.outbox
             .record(
