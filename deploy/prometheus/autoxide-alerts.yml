@@ -82,3 +82,33 @@ groups:
         annotations:
           summary: "A scheduled backup failed in the last day."
           action: "Read the `error` of the failed row of `kernel_backups` (or the log line `backup failed`); see docs/DEPLOY.md, Runbook: backups."
+      # Rules added with docs/RUNBOOK.md: signals that a client, a partner or a mail provider is misbehaving.
+      - alert: AutoxideRateLimitedClients
+        expr: |
+          sum without(instance) (rate(http_rate_limited_total[10m]))
+            + sum without(instance) (rate(http_api_key_rate_limited_total[10m]))
+            + sum without(instance) (rate(http_tenant_rate_limited_total[10m])) > 1
+        for: 15m
+        labels:
+          severity: warn
+        annotations:
+          summary: "More than one request per second is refused with 429 (a client above its rate limit, or a flood)."
+          action: "Find the address, API key or tenant in the logs (`rate_limited` problems); a runaway integration is fixed or its key revoked, a flood is limited in the reverse proxy; see docs/RUNBOOK.md, Mass revocation."
+      - alert: AutoxideWebhooksFailing
+        expr: |
+          sum without(instance) (rate(webhooks_failed_total[30m]))
+            / (sum without(instance) (rate(webhooks_failed_total[30m])) + sum without(instance) (rate(webhooks_delivered_total[30m])))
+            > 0.2
+        for: 30m
+        labels:
+          severity: warn
+        annotations:
+          summary: "More than 20% of outgoing webhook deliveries fail."
+          action: "Look at the failing endpoints of the tenants (`GET /api/v1/webhooks`), and the `webhook delivery failed` log lines; a receiver that is down is the receiver's to fix; see docs/RUNBOOK.md, Monitoring."
+      - alert: AutoxideMailHardBounces
+        expr: sum without(instance) (increase(mail_bounces_total{kind="hard"}[1h])) > 20
+        labels:
+          severity: warn
+        annotations:
+          summary: "More than 20 mails bounced for good in the last hour."
+          action: "Check the sender domain (SPF, DKIM, DMARC) and the SMTP account; see docs/DEPLOY.md, Mail that bounces."

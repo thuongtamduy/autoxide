@@ -1118,6 +1118,8 @@ và dashboard lấy giá trị lớn nhất, không cộng.
 
 ## Sổ tay xử lý sự cố
 
+Sự cố cần quyết định và nhiều bước (lộ key, thu hồi hàng loạt, khôi phục một khách, mất dữ liệu) ở [`RUNBOOK.vi.md`](RUNBOOK.vi.md).
+
 Mỗi tình huống: dấu hiệu, cách kiểm, cách sửa.
 
 ### Lỗi máy chủ
