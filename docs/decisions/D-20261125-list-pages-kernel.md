@@ -46,3 +46,20 @@ khi chốt các điểm này thì phải sửa lại cả trăm chỗ.
 Đã cân nhắc: bước `Modify` của OpenAPI chép mô tả lên parameter — loại: sửa sau khi sinh, xa chỗ khai, và vẫn cần
 derive đúng; đóng trường của `PageQuery` ngay — hoãn: phải sửa `catalog` / `comments` ngoài cụm của PR này; khoá
 `Cow<str>` cho `page_of` — loại: `AsRef<str>` nhận cả `Cow`, `&str`, `String`.
+
+Cụm 1 (PR đại trà đầu: address, audit, automations, bookings, content, conversations, customers, inventory, invoices,
+notifications, reporting, webhooks):
+
+- Chỗ dùng `page_of` (danh sách không nằm trong database): mẫu luật `automations`, mẫu trang `content`, hồ sơ xuất
+  `invoices`, loại thông báo và tuỳ chọn thông báo `notifications` (kind từ code, gộp lựa chọn đã lưu), loại số liệu
+  `reporting`, danh mục event `webhooks`. Hai chỗ dữ liệu từ database được phép, có lý do: giá trị tồn `inventory
+  /reports/valuation` (tổng `GROUP BY` tính lại mỗi lần gọi theo kho + tiền tệ, số dòng theo số kho, phân trang trong
+  database không bớt việc) và độ trễ `reporting /lag` (cây khách gộp từ nhiều database; chỉ đếm cho khách của trang).
+- Ngoại lệ (vẫn `Data<Vec<T>>`, giữ dòng trong `xtask/api-shape-allow.txt`): `GET /api/v1/comments/public/counts` và
+  `GET /api/v1/inventory/public/availability` — một dòng cho mỗi id client gửi (tối đa 100), theo thứ tự client hỏi:
+  kết quả tra cứu theo đầu vào, không phải danh sách lớn dần.
+- Còn nợ (chưa đổi, cần thêm cột id UUIDv7 + migration điền dữ liệu trước): `GET /api/v1/customers/me/wishlist` (khoá
+  (tenant, hồ sơ, sản phẩm, biến thể), gộp có thể ra hai dòng cùng `added_at`) và `GET /api/v1/notifications/templates`
+  (khoá (tenant, kind, kênh, ngôn ngữ)). Làm trong PR cuối của đợt hoặc trước đó.
+- Trait nội bộ `AdministrativeUnits::provinces` / `communes` (module khác dùng) vẫn trả đủ danh sách: nó duyệt các
+  trang bên trong (200 dòng mỗi trang), không cắt.

@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
-use autoxide_kernel::mcp::{NoInput, PageInput, Tool};
+use autoxide_kernel::mcp::{PageInput, Tool};
 use autoxide_kernel::pagination::Page;
 use autoxide_kernel::tenancy::TenantContext;
 use serde::Deserialize;
@@ -16,7 +16,7 @@ use validator::Validate;
 use crate::api::Notification;
 use crate::custom::Source;
 use crate::http_admin::{MessageResponse, RecipientRequest};
-use crate::http_me::{DeviceTokenResponse, InboxItem, KindResponse, describe_kind};
+use crate::http_me::{DeviceTokenResponse, InboxItem, KindResponse, kind_page};
 use crate::http_templates::{
     DraftRequest, DraftResponse, PreviewResponse, SchemaResponse, describe_schema, parse_source,
 };
@@ -49,6 +49,19 @@ pub(crate) struct SendInput {
     locale: Option<String>,
     /// Required: retrying with the same key sends nothing new.
     dedupe_key: String,
+}
+
+/// One page of a list (same parameters as REST).
+#[derive(Debug, Default, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+#[schema(as = NotificationsPageInput)]
+pub(crate) struct ListPage {
+    /// Maximum number of items to return, 1 to 200. Defaults to 50.
+    limit: Option<u32>,
+    /// The `next_cursor` of the previous page.
+    cursor: Option<String>,
+    /// `asc` or `desc`; the default is the list's own (newest first for devices, by key for kinds).
+    order: Option<String>,
 }
 
 /// Which messages.
@@ -152,12 +165,14 @@ pub(crate) fn all(service: &Arc<NotificationsService>) -> Vec<Tool> {
         Tool::new(
             "list_my_devices",
             "List your mobile devices registered for push notifications (platform, app, last use); \
-             tokens are never shown.",
-            move |tenant: TenantContext, principal: Principal, _: NoInput| {
+             tokens are never shown. Newest first; follow `pagination.next_cursor` for more.",
+            move |tenant: TenantContext, principal: Principal, input: ListPage| {
                 let service = devices.clone();
                 async move {
-                    let rows = service.my_device_tokens(&tenant, &principal).await?;
-                    Ok::<Vec<DeviceTokenResponse>, Error>(rows.into_iter().map(DeviceTokenResponse::from).collect())
+                    // Cùng kiểu tham số trang với REST (`PageQuery`, mới trước).
+                    let page = PageInput::new(input.limit, input.cursor, input.order).page()?;
+                    let rows = service.my_device_tokens(&tenant, &principal, &page).await?;
+                    Ok::<Page<DeviceTokenResponse>, Error>(rows.map(DeviceTokenResponse::from))
                 }
             },
         )
@@ -217,11 +232,18 @@ pub(crate) fn all(service: &Arc<NotificationsService>) -> Vec<Tool> {
         Tool::new(
             "list_kinds",
             "List the notification kinds declared by modules: key, category (`security`, \
-             `transactional`, `marketing`) and channels.",
-            move |_tenant: TenantContext, _principal: Principal, _: NoInput| {
+             `transactional`, `marketing`) and channels, by key. Follow `pagination.next_cursor` for more.",
+            move |_tenant: TenantContext, _principal: Principal, input: ListPage| {
                 let service = kinds.clone();
                 async move {
-                    Ok::<Vec<KindResponse>, Error>(service.kinds.all().iter().map(describe_kind).collect())
+                    // Cùng kiểu tham số trang với REST (`NaturalOrderPageQuery`, theo khoá).
+                    let paging = autoxide_kernel::pagination::NaturalOrderPageQuery::new(
+                        input.limit.map(|limit| limit.to_string()),
+                        input.cursor,
+                        input.order,
+                    );
+                    let page = autoxide_kernel::pagination::PageRequest::try_from(paging)?;
+                    kind_page(&service, &page) as Result<Page<KindResponse>, Error>
                 }
             },
         )

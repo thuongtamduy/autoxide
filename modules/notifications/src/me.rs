@@ -528,14 +528,21 @@ impl NotificationsService {
         &self,
         tenant: &TenantContext,
         principal: &Principal,
-    ) -> Result<Vec<device_token::Model>, Error> {
-        use sea_orm::QueryOrder;
-        Ok(device_token::Entity::find()
+        page: &autoxide_kernel::pagination::PageRequest,
+    ) -> Result<autoxide_kernel::pagination::Page<device_token::Model>, Error> {
+        // Một trang theo id (mới trước mặc định), keyset trong database (index
+        // `notifications_device_tokens_user_page_idx`).
+        let select = device_token::Entity::find()
             .scoped(tenant)
-            .filter(device_token::Column::UserId.eq(principal.user_id()))
-            .order_by_desc(device_token::Column::Id)
-            .all(tenant.database().read())
-            .await?)
+            .filter(device_token::Column::UserId.eq(principal.user_id()));
+        autoxide_kernel::pagination::fetch_page(
+            select,
+            device_token::Column::Id,
+            |row| row.id,
+            page,
+            tenant.database().read(),
+        )
+        .await
     }
 
     pub(crate) async fn remove_device_token(

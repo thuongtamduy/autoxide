@@ -6,6 +6,7 @@ use std::sync::Arc;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
+use autoxide_kernel::pagination::{NaturalOrderPageQuery, Page, PageRequest};
 use autoxide_kernel::response::{Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, Tagged};
@@ -109,7 +110,7 @@ pub(crate) struct PutMenuRequest {
 #[derive(Debug, Deserialize, IntoParams)]
 #[into_params(parameter_in = Query)]
 pub(crate) struct MenuQuery {
-    /// Omitted: the default language.
+    /// Language of the menu, e.g. `vi`. Omitted: the default language.
     locale: Option<String>,
 }
 
@@ -124,35 +125,36 @@ pub(crate) struct MenuSummary {
 
 /// List menus.
 ///
-/// Requires `content.read`. Every menu in every language, by key.
+/// Requires `content.read`. Every menu in every language, by key (A→Z unless `order=desc`; the
+/// languages of one key in the order they were made); paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/menus",
     extensions(("x-permissions" = json!(["content.read"]))),
     operation_id = "list_content_menus",
     security(("bearer" = [])),
+    params(NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "The menus.", body = Data<Vec<MenuSummary>>),
+        (status = 200, description = "One page of the menus, by key.", body = Page<MenuSummary>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `content.read`; code `permission_denied`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 pub(crate) async fn list_menus(
     State(service): State<Arc<ContentService>>,
     tenant: TenantContext,
     principal: Principal,
-) -> Result<Data<Vec<MenuSummary>>, Error> {
-    let menus = service.list_menus(&tenant, &principal).await?;
-    let data = menus
-        .into_iter()
-        .map(|menu| MenuSummary {
-            id: menu.id,
-            key: menu.key,
-            locale: menu.locale,
-            updated_at: menu.updated_at,
-        })
-        .collect();
-    Ok(Data { data })
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<MenuSummary>, Error> {
+    let page = PageRequest::try_from(page)?;
+    let menus = service.list_menus(&tenant, &principal, &page).await?;
+    Ok(menus.map(|menu| MenuSummary {
+        id: menu.id,
+        key: menu.key,
+        locale: menu.locale,
+        updated_at: menu.updated_at,
+    }))
 }
 
 /// Get a menu.

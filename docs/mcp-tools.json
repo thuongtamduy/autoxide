@@ -88,7 +88,7 @@
         "returns_secret": false
       },
       "deprecation": null,
-      "description": "List the communes, wards and special zones of a province.",
+      "description": "List the communes, wards and special zones of a province, in code order. Follow `pagination.next_cursor` for more.",
       "input_schema": {
         "additionalProperties": false,
         "description": "The communes of a province.",
@@ -101,6 +101,29 @@
           },
           "country": {
             "type": "string"
+          },
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`asc` (code order, the default) or `desc`.",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "province": {
             "description": "Code of the province, e.g. `01`.",
@@ -125,7 +148,7 @@
         "returns_secret": false
       },
       "deprecation": null,
-      "description": "List the provinces of a country (Vietnam), in the order of the official list.",
+      "description": "List the provinces of a country (Vietnam), in the order of the official list. Follow `pagination.next_cursor` for more.",
       "input_schema": {
         "additionalProperties": false,
         "description": "Which provinces.",
@@ -140,6 +163,29 @@
           "country": {
             "description": "ISO country code; only `VN` for now. Defaults to `VN`.",
             "type": "string"
+          },
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`asc` (code order, the default) or `desc`.",
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "type": "object"
@@ -5541,10 +5587,35 @@
         "returns_secret": false
       },
       "deprecation": null,
-      "description": "List the mandatory page templates for a commerce website in Vietnam (owner information, privacy, returns, shipping, payment, inspection, complaints, terms, general conditions; marketplace regulations, seller agreement, seller information), with the variables each needs. Every text needs review by a legal professional.",
+      "description": "List the mandatory page templates for a commerce website in Vietnam (owner information, privacy, returns, shipping, payment, inspection, complaints, terms, general conditions; marketplace regulations, seller agreement, seller information), with the variables each needs, by key. Every text needs review by a legal professional. Follow `pagination.next_cursor` for more.",
       "input_schema": {
         "additionalProperties": false,
-        "description": "The tool takes no arguments.",
+        "description": "Paging of the template list.",
+        "properties": {
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`asc` (by key, the default) or `desc`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
         "type": "object"
       },
       "name": "content.legal_templates",
@@ -6842,15 +6913,38 @@
         "returns_secret": false
       },
       "deprecation": null,
-      "description": "List the calls of a conversation in your scope, newest first (no phone numbers, no recordings).",
+      "description": "List the calls of a conversation in your scope, newest first (no phone numbers, no recordings). Follow `pagination.next_cursor` for more.",
       "input_schema": {
         "additionalProperties": false,
-        "description": "A conversation to act on.",
+        "description": "The calls of a conversation, one page.",
         "properties": {
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "id": {
             "description": "Id of the conversation.",
             "format": "uuid",
             "type": "string"
+          },
+          "limit": {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`desc` (newest first, the default) or `asc`.",
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
@@ -11997,10 +12091,35 @@
         "returns_secret": false
       },
       "deprecation": null,
-      "description": "List the notification kinds declared by modules: key, category (`security`, `transactional`, `marketing`) and channels.",
+      "description": "List the notification kinds declared by modules: key, category (`security`, `transactional`, `marketing`) and channels, by key. Follow `pagination.next_cursor` for more.",
       "input_schema": {
         "additionalProperties": false,
-        "description": "The tool takes no arguments.",
+        "description": "One page of a list (same parameters as REST).",
+        "properties": {
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`asc` or `desc`; the default is the list's own (newest first for devices, by key for kinds).",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
         "type": "object"
       },
       "name": "notifications.list_kinds",
@@ -12082,10 +12201,35 @@
         "returns_secret": false
       },
       "deprecation": null,
-      "description": "List your mobile devices registered for push notifications (platform, app, last use); tokens are never shown.",
+      "description": "List your mobile devices registered for push notifications (platform, app, last use); tokens are never shown. Newest first; follow `pagination.next_cursor` for more.",
       "input_schema": {
         "additionalProperties": false,
-        "description": "The tool takes no arguments.",
+        "description": "One page of a list (same parameters as REST).",
+        "properties": {
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`asc` or `desc`; the default is the list's own (newest first for devices, by key for kinds).",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
         "type": "object"
       },
       "name": "notifications.list_my_devices",
@@ -14690,10 +14834,35 @@
         "returns_secret": false
       },
       "deprecation": null,
-      "description": "List the kinds of report figures modules declare (kind, unit, dimensions).",
+      "description": "List the kinds of report figures modules declare (kind, unit, dimensions), by name. Follow `pagination.next_cursor` for more.",
       "input_schema": {
         "additionalProperties": false,
-        "description": "No input.",
+        "description": "One page of the kinds (same parameters as REST).",
+        "properties": {
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`asc` (by name, the default) or `desc`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
         "type": "object"
       },
       "name": "reporting.kinds",

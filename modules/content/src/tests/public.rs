@@ -123,9 +123,18 @@ async fn bai_cong_khai_sitemap_feed() {
         );
 
         let feed = content
-            .feed(&tenant, &autoxide_kernel::tenancy::Site::whole(&tenant), "en", 2)
+            .feed(
+                &tenant,
+                &autoxide_kernel::tenancy::Site::whole(&tenant),
+                "en",
+                &autoxide_kernel::pagination::PageRequest::first(
+                    2,
+                    autoxide_kernel::pagination::Order::Desc,
+                ),
+            )
             .await
-            .unwrap();
+            .unwrap()
+            .data;
         assert_eq!(
             feed.iter().map(|row| row.entry_id).collect::<Vec<_>>(),
             [published[2].id, published[1].id]

@@ -5,9 +5,10 @@ use std::sync::Arc;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
+use autoxide_kernel::pagination::{NaturalOrderPageQuery, Page, PageRequest};
 use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use serde::Deserialize;
 use serde_json::Value;
 use utoipa::ToSchema;
@@ -16,31 +17,35 @@ use validator::Validate;
 
 use super::entries::{EntryResponse, tagged};
 use crate::service::ContentService;
-use crate::templates::{TemplateDraft, TemplateSummary, summaries};
+use crate::templates::{TemplateDraft, TemplateSummary};
 
 /// List the mandatory page templates (Vietnam).
 ///
 /// Requires `content.read`. Starting texts in English and Vietnamese for the pages Vietnamese law
 /// requires on a commerce website (owner information, personal data protection, returns, shipping,
 /// payment, inspection, complaints, terms, general conditions; a marketplace adds its regulations,
-/// the seller agreement and seller information). Have a legal professional review every text.
+/// the seller agreement and seller information). Have a legal professional review every text. By
+/// `key` unless `order=desc`; paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/templates",
     extensions(("x-permissions" = json!(["content.read"]))),
     operation_id = "list_content_templates",
     security(("bearer" = [])),
+    params(NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "The templates.", body = Data<Vec<TemplateSummary>>),
+        (status = 200, description = "One page of the templates, by key.", body = Page<TemplateSummary>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `content.read`; code `permission_denied`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 pub(crate) async fn list_templates(
     principal: Principal,
-) -> Result<Data<Vec<TemplateSummary>>, Error> {
-    principal.require(&crate::permissions::CONTENT_READ)?;
-    Ok(Data { data: summaries() })
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<TemplateSummary>, Error> {
+    let page = PageRequest::try_from(page)?;
+    crate::templates::summary_page(&principal, &page)
 }
 
 /// A draft page to make from a template.

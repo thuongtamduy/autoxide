@@ -27,6 +27,7 @@ mod m0030_site_health;
 mod m0031_type_detail_layout;
 mod m0033_campaign_drafts;
 mod m0034_not_found_paths;
+mod m0035_list_indexes;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 use autoxide_kernel::tenancy::migration::TenantTable;
@@ -200,5 +201,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(m0033_campaign_drafts::Migration),
         // Đếm đường dẫn 404 của website, gợi ý chuyển hướng (bước 67).
         Box::new(m0034_not_found_paths::Migration),
+        // Index cho danh sách có phân trang (bước 70 P9).
+        Box::new(m0035_list_indexes::Migration),
     ]
 }

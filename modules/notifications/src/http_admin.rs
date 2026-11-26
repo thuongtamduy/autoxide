@@ -340,11 +340,13 @@ impl From<message::Model> for MessageResponse {
 #[derive(Debug, Deserialize, IntoParams)]
 #[into_params(parameter_in = Query)]
 pub(crate) struct MessageQuery {
+    /// Only messages of this notification kind, e.g. `orders.order_shipped`.
     kind: Option<String>,
     /// `queued`, `deferred`, `sent`, `failed`, `skipped` or `canceled`.
     status: Option<String>,
     /// e.g. `email`.
     channel: Option<String>,
+    /// Only messages to this user.
     user_id: Option<Uuid>,
 }
 

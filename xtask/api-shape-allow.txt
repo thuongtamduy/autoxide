@@ -17,8 +17,6 @@ api-page-params GET /api/v1/content/search # kết quả xếp theo độ khớp
 # Danh sách `Data<Vec<T>>` có trước luật: tập nhỏ có giới hạn (loại, mức thuế, tỉnh, quyền của tôi…) hay
 # danh sách con của một bản ghi. Chờ rà từng cái (docs/ROADMAP.md, "Để sau"): cái nào không có giới hạn thật thì
 # làm endpoint mới trả `Page<T>` và khai endpoint cũ qua `Module::deprecations` (D-059).
-api-unpaged-list GET /api/v1/address/provinces # có trước luật
-api-unpaged-list GET /api/v1/address/provinces/{code}/communes # có trước luật
 api-unpaged-list GET /api/v1/analytics/campaigns # có trước luật
 api-unpaged-list GET /api/v1/analytics/event-types # có trước luật
 api-unpaged-list GET /api/v1/analytics/funnels # có trước luật
@@ -26,7 +24,6 @@ api-unpaged-list GET /api/v1/analytics/objects # có trước luật
 api-unpaged-list GET /api/v1/analytics/pages # có trước luật
 api-unpaged-list GET /api/v1/analytics/sources # có trước luật
 api-unpaged-list GET /api/v1/analytics/types # có trước luật
-api-unpaged-list GET /api/v1/audit/activity # có trước luật
 api-unpaged-list GET /api/v1/auth/delegations # có trước luật
 api-unpaged-list GET /api/v1/auth/delegations/tenants # có trước luật
 api-unpaged-list GET /api/v1/auth/me/identities # có trước luật
@@ -43,9 +40,6 @@ api-unpaged-list GET /api/v1/auth/support-access # có trước luật
 api-unpaged-list GET /api/v1/auth/support-grants # có trước luật
 api-unpaged-list GET /api/v1/auth/users/{id}/memberships # có trước luật
 api-unpaged-list GET /api/v1/auth/users/{id}/roles # có trước luật
-api-unpaged-list GET /api/v1/automations/templates # có trước luật
-api-unpaged-list GET /api/v1/bookings/exceptions # có trước luật
-api-unpaged-list GET /api/v1/bookings/public/services # có trước luật
 api-unpaged-list GET /api/v1/catalog/attributes # có trước luật
 api-unpaged-list GET /api/v1/catalog/categories # có trước luật
 api-unpaged-list GET /api/v1/catalog/categories/{id}/attributes # có trước luật
@@ -73,20 +67,8 @@ api-unpaged-list GET /api/v1/compliance/purposes # có trước luật
 api-unpaged-list GET /api/v1/compliance/retention # có trước luật
 api-unpaged-list GET /api/v1/compliance/rules # có trước luật
 api-unpaged-list GET /api/v1/compliance/tracking-providers # có trước luật
-api-unpaged-list GET /api/v1/content/entries/{id}/schedules # có trước luật
-api-unpaged-list GET /api/v1/content/menus # có trước luật
-api-unpaged-list GET /api/v1/content/placements # có trước luật
-api-unpaged-list GET /api/v1/content/public/feed # có trước luật
-api-unpaged-list GET /api/v1/content/templates # có trước luật
-api-unpaged-list GET /api/v1/conversations/threads/{id}/calls # có trước luật
-api-unpaged-list GET /api/v1/customers/me/gift-cards # có trước luật
-api-unpaged-list GET /api/v1/customers/me/recently-viewed # có trước luật
 api-unpaged-list GET /api/v1/customers/me/wishlist # có trước luật
-api-unpaged-list GET /api/v1/customers/referral-rules # có trước luật
-api-unpaged-list GET /api/v1/customers/reminder-rules # có trước luật
 api-unpaged-list GET /api/v1/inventory/public/availability # có trước luật
-api-unpaged-list GET /api/v1/inventory/reports/valuation # có trước luật
-api-unpaged-list GET /api/v1/invoices/export-profiles # có trước luật
 api-unpaged-list GET /api/v1/kernel/approvals # có trước luật
 api-unpaged-list GET /api/v1/kernel/blocks # một dòng cho mỗi loại khối mà module đang chạy khai (bước 67): tập nhỏ, cố định theo binary, như sổ module
 api-unpaged-list GET /api/v1/kernel/connections/webhooks # một dòng cho mỗi loại kết nối mà bộ nối đang bật đăng ký (D-20261121-provider-accounts): tập nhỏ, cố định theo binary
@@ -113,11 +95,7 @@ api-unpaged-list GET /api/v1/me/flags # có trước luật
 api-unpaged-list GET /api/v1/me/permissions # có trước luật
 api-unpaged-list GET /api/v1/me/pins # có trước luật
 api-unpaged-list GET /api/v1/me/views # có trước luật
-api-unpaged-list GET /api/v1/notifications/kinds # có trước luật
-api-unpaged-list GET /api/v1/notifications/me/device-tokens # có trước luật
-api-unpaged-list GET /api/v1/notifications/me/preferences # có trước luật
 api-unpaged-list GET /api/v1/notifications/templates # có trước luật
-api-unpaged-list GET /api/v1/notifications/templates/{kind}/{channel}/{locale}/versions # có trước luật
 api-unpaged-list GET /api/v1/orders/me/orders/{id}/documents # có trước luật
 api-unpaged-list GET /api/v1/orders/me/warranties # có trước luật
 api-unpaged-list GET /api/v1/orders/public/orders/{id}/documents # có trước luật
@@ -146,36 +124,18 @@ api-unpaged-list GET /api/v1/promotions/promotions/{id}/participations # có tr�
 api-unpaged-list GET /api/v1/promotions/promotions/{id}/stats # có trước luật
 api-unpaged-list GET /api/v1/promotions/promotions/{id}/versions # có trước luật
 api-unpaged-list GET /api/v1/promotions/public/promotions/for-product/{product_id} # có trước luật
-api-unpaged-list GET /api/v1/reporting/kinds # có trước luật
-api-unpaged-list GET /api/v1/reporting/lag # có trước luật
 api-unpaged-list GET /api/v1/tax/categories # có trước luật
 api-unpaged-list GET /api/v1/tax/jurisdictions # có trước luật
 api-unpaged-list GET /api/v1/tax/packs # có trước luật
 api-unpaged-list GET /api/v1/tax/rates # có trước luật
 api-unpaged-list GET /api/v1/tax/rules # có trước luật
 api-unpaged-list GET /api/v1/tax/withholding-rates # có trước luật
-api-unpaged-list GET /api/v1/webhooks/events # có trước luật
 # api-param-description: tham số có sẵn trước luật (25/11/2026); thêm mô tả trong PR đại trà của module rồi xoá dòng
-api-param-description GET /api/v1/address/units?country # có trước luật
-api-param-description GET /api/v1/address/units/{code}?country # có trước luật
 api-param-description GET /api/v1/catalog/products?status # có trước luật
 api-param-description GET /api/v1/catalog/products?kind # có trước luật
 api-param-description GET /api/v1/catalog/variants/{id}/price?customer_group # có trước luật
-api-param-description GET /api/v1/content/public/feed?locale # có trước luật
-api-param-description GET /api/v1/content/public/menus/{key}?locale # có trước luật
-api-param-description GET /api/v1/content/public/terms/{taxonomy}/{slug}?locale # có trước luật
-api-param-description GET /api/v1/inventory/counts?org_id # có trước luật
-api-param-description GET /api/v1/inventory/lots?variant_id # có trước luật
-api-param-description GET /api/v1/inventory/purchase-orders?supplier_id # có trước luật
-api-param-description GET /api/v1/inventory/receipts?supplier_id # có trước luật
-api-param-description GET /api/v1/inventory/suppliers?active # có trước luật
-api-param-description GET /api/v1/invoices/documents?kind # có trước luật
-api-param-description GET /api/v1/invoices/documents?status # có trước luật
-api-param-description GET /api/v1/invoices/documents?source_id # có trước luật
 api-param-description GET /api/v1/newsletter/campaigns?status # có trước luật
 api-param-description GET /api/v1/newsletter/campaigns?list_id # có trước luật
-api-param-description GET /api/v1/notifications/messages?kind # có trước luật
-api-param-description GET /api/v1/notifications/messages?user_id # có trước luật
 api-param-description GET /api/v1/orders/reviews?product_id # có trước luật
 api-param-description GET /api/v1/orders/reviews/count?product_id # có trước luật
 api-param-description GET /api/v1/promotions/me/vouchers?status # có trước luật

@@ -5,9 +5,10 @@ use std::sync::Arc;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
+use autoxide_kernel::pagination::{NaturalOrderPageQuery, Page, PageRequest};
 use autoxide_kernel::response::{Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use serde::Deserialize;
 use serde_json::Value;
 use utoipa::ToSchema;
@@ -57,26 +58,30 @@ pub(crate) async fn get_catalog(
 ///
 /// Requires `automations.read`. Modules declare templates; only those you could save now (their
 /// events, metrics and tools are available to you) are listed. Send a template's `rule` with a
-/// `name` to `POST /rules`.
+/// `name` to `POST /rules`. Ordered by `id` unless `order=desc`; paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/templates",
     extensions(("x-permissions" = json!(["automations.read"]))),
     operation_id = "list_automation_templates",
     security(("bearer" = [])),
+    params(NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "Templates.", body = Data<Vec<TemplateInfo>>),
+        (status = 200, description = "One page of templates, by `id`.", body = Page<TemplateInfo>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `automations.read`; code `permission_denied`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 pub(crate) async fn list_templates(
     State(service): State<Arc<Automations>>,
     tenant: TenantContext,
     principal: Principal,
-) -> Result<Data<Vec<TemplateInfo>>, Error> {
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<TemplateInfo>, Error> {
     principal.require(&AUTOMATIONS_READ)?;
-    Ok(Data { data: service.templates(&tenant, &principal).await? })
+    let page = PageRequest::try_from(page)?;
+    service.templates(&tenant, &principal, &page).await
 }
 
 /// Dry-run an automation rule.

@@ -6,7 +6,7 @@ use std::sync::Arc;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
-use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
+use autoxide_kernel::pagination::{NaturalOrderPageQuery, Page, PageQuery, PageRequest};
 use autoxide_kernel::reference::Submitted;
 use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
@@ -294,6 +294,7 @@ pub(crate) struct LotsQuery {
     /// Only lots in this warehouse or store; its setting `inventory.expiring_days` decides
     /// `expiring` (else the tenant's root setting, default 30 days).
     pub org_id: Option<Uuid>,
+    /// Only lots of this variant.
     pub variant_id: Option<Uuid>,
     /// `ok`, `expiring` or `expired`.
     pub expiry_state: Option<String>,
@@ -390,18 +391,19 @@ pub(crate) struct ValuationResponse {
 /// Value of the stock now: on hand × weighted average cost, per warehouse and currency.
 ///
 /// Requires `inventory.read`; only warehouses in your scope. Units without a known cost are
-/// left out.
+/// left out. By warehouse id then currency unless `order=desc`; paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/reports/valuation",
     extensions(("x-permissions" = json!(["inventory.read"]))),
     operation_id = "inventory_valuation",
     security(("bearer" = [])),
-    params(ValuationQuery),
+    params(ValuationQuery, NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "The value per warehouse and currency.", body = Data<Vec<ValuationResponse>>),
+        (status = 200, description = "One page of the value per warehouse and currency.", body = Page<ValuationResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing `inventory.read`; code `permission_denied`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn valuation(
@@ -409,16 +411,18 @@ async fn valuation(
     tenant: TenantContext,
     principal: Principal,
     Query(query): Query<ValuationQuery>,
-) -> Result<Data<Vec<ValuationResponse>>, Error> {
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<ValuationResponse>, Error> {
     principal.require(&READ)?;
-    let rows = service.valuation(&tenant, &principal, query.org_id).await?;
-    let mut data = Vec::with_capacity(rows.len());
-    for row in rows {
+    let page = PageRequest::try_from(page)?;
+    let rows = service.valuation(&tenant, &principal, query.org_id, &page).await?;
+    let mut data = Vec::with_capacity(rows.data.len());
+    for row in rows.data {
         data.push(ValuationResponse {
             org_id: row.org_id,
             units: row.units,
             value: autoxide_kernel::money::Money::from_columns(row.value_minor, &row.currency)?,
         });
     }
-    Ok(Data { data })
+    Ok(Page { data, pagination: rows.pagination })
 }

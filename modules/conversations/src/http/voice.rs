@@ -488,19 +488,21 @@ pub(crate) async fn close_callback(
 
 /// List the calls of a conversation.
 ///
-/// Requires `conversations.call` at the unit of the conversation. Newest first; no phone numbers.
+/// Requires `conversations.call` at the unit of the conversation. Newest first unless
+/// `order=asc`; paged with `limit` / `cursor`; no phone numbers.
 #[utoipa::path(
     get,
     path = "/threads/{id}/calls",
     extensions(("x-permissions" = json!(["conversations.call"]))),
     operation_id = "list_conversation_calls",
     security(("bearer" = [])),
-    params(("id" = Uuid, Path, description = "Id of the conversation.")),
+    params(("id" = Uuid, Path, description = "Id of the conversation."), PageQuery),
     responses(
-        (status = 200, description = "The calls.", body = Data<Vec<CallResponse>>),
+        (status = 200, description = "One page of the calls, newest first.", body = Page<CallResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `conversations.call`; code `permission_denied`.", body = Problem),
         (status = 404, description = "No conversation with this id in your scope; code `conversations.thread_not_found`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 pub(crate) async fn list_calls(
@@ -508,10 +510,12 @@ pub(crate) async fn list_calls(
     tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
-) -> Result<Data<Vec<CallResponse>>, Error> {
+    Query(page): Query<PageQuery>,
+) -> Result<Page<CallResponse>, Error> {
     principal.require(&CALL)?;
-    let calls = service.calls_of(&tenant, &principal, id).await?;
-    Ok(Data { data: calls.into_iter().map(CallResponse::from).collect() })
+    let page = PageRequest::try_from(page)?;
+    let calls = service.calls_of(&tenant, &principal, id, &page).await?;
+    Ok(calls.map(CallResponse::from))
 }
 
 /// The unit whose line the agent works on.

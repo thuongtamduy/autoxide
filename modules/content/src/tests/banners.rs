@@ -126,7 +126,12 @@ async fn khach_moi_co_bo_vi_tri_chuan() {
         let h = harness(test).await;
         let seed = crate::banners::presets::seed();
         seed.seed(&h.tenant).await.unwrap();
-        let all = h.service.list_placements(&h.tenant, &manager()).await.unwrap();
+        let all = h
+            .service
+            .list_placements(&h.tenant, &manager(), &Default::default())
+            .await
+            .unwrap()
+            .data;
         assert_eq!(all.len(), 9);
         let hero = all.iter().find(|row| row.key == "home_hero").unwrap();
         assert_eq!(
@@ -136,11 +141,27 @@ async fn khach_moi_co_bo_vi_tri_chuan() {
         assert_eq!(hero.preset_key.as_deref(), Some("home_hero"));
         // gieo_lai_khong_trung: chạy lại không thêm dòng nào.
         seed.seed(&h.tenant).await.unwrap();
-        assert_eq!(h.service.list_placements(&h.tenant, &manager()).await.unwrap().len(), 9);
+        assert_eq!(
+            h.service
+                .list_placements(&h.tenant, &manager(), &Default::default())
+                .await
+                .unwrap()
+                .data
+                .len(),
+            9
+        );
         // xoa_vi_tri_chuan_khong_gieo_lai: khách xoá một vị trí, gieo lại không thêm về.
         h.service.delete_placement(&h.tenant, &manager(), "popup").await.unwrap();
         seed.seed(&h.tenant).await.unwrap();
-        assert_eq!(h.service.list_placements(&h.tenant, &manager()).await.unwrap().len(), 8);
+        assert_eq!(
+            h.service
+                .list_placements(&h.tenant, &manager(), &Default::default())
+                .await
+                .unwrap()
+                .data
+                .len(),
+            8
+        );
         // Thêm tay phần còn thiếu thì có lại đúng một vị trí.
         let added = h.service.install_presets(&h.tenant, &manager()).await.unwrap();
         assert_eq!(added.iter().map(|row| row.key.as_str()).collect::<Vec<_>>(), ["popup"]);

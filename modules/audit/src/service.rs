@@ -1,7 +1,7 @@
 //! Đọc audit log: danh sách có lọc và phân trang, và từng dòng.
 
 use autoxide_kernel::error::Error;
-use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
+use autoxide_kernel::pagination::{Page, PageRequest, Pagination, fetch_page};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use sea_orm::{ColumnTrait, Condition, EntityTrait, QueryFilter};
 use uuid::Uuid;
@@ -60,13 +60,14 @@ impl AuditService {
 
     /// Hoạt động gần đây (bước 51 P5): chỉ event có câu hoạt động mà người gọi có permission để
     /// thấy, mới nhất trước, câu đã dịch theo `language` và điền tên người làm, trường của dữ liệu.
+    /// Một trang keyset theo id (index `audit_entry_action_idx`: tenant, action, id).
     pub(crate) async fn recent_activity(
         &self,
         tenant: &TenantContext,
         principal: &autoxide_kernel::access::Principal,
-        limit: u32,
+        page: &PageRequest,
         language: autoxide_kernel::i18n::Language,
-    ) -> Result<Vec<ActivityLine>, Error> {
+    ) -> Result<Page<ActivityLine>, Error> {
         let mut sentences = std::collections::HashMap::new();
         for event in self.events.iter() {
             if let Some((sentence, reader)) = event.activity_line()
@@ -76,24 +77,22 @@ impl AuditService {
             }
         }
         if sentences.is_empty() {
-            return Ok(Vec::new());
+            // Không event nào người gọi được thấy: trang rỗng, khỏi hỏi database.
+            let total = page.wants_total().then_some(0);
+            let pagination = Pagination::new(page.limit(), None).with_total(total);
+            return Ok(Page { data: Vec::new(), pagination });
         }
         let actions: Vec<&str> = sentences.keys().copied().collect();
-        let page = PageRequest::first(limit, autoxide_kernel::pagination::Order::Desc);
         let select = Entity::find().filter(Column::Action.is_in(actions)).scoped(tenant);
-        let rows = fetch_page(select, Column::Id, |row| row.id, &page, tenant.database().read())
-            .await?
-            .data;
-        let ids: Vec<uuid::Uuid> = rows.iter().filter_map(|row| row.actor_user_id).collect();
+        let rows =
+            fetch_page(select, Column::Id, |row| row.id, page, tenant.database().read()).await?;
+        let ids: Vec<uuid::Uuid> = rows.data.iter().filter_map(|row| row.actor_user_id).collect();
         let names = self.actor_names(tenant, &ids).await?;
-        Ok(rows
-            .into_iter()
-            .map(|row| {
-                let template = sentences.get(row.action.as_str()).copied().unwrap_or_default();
-                let sentence = self.sentence(template, &row, &names, language);
-                ActivityLine { row, sentence }
-            })
-            .collect())
+        Ok(rows.map(|row| {
+            let template = sentences.get(row.action.as_str()).copied().unwrap_or_default();
+            let sentence = self.sentence(template, &row, &names, language);
+            ActivityLine { row, sentence }
+        }))
     }
 
     /// Câu của event `action` cho dòng `row`, đã dịch và điền tên người làm, trường trước / sau.

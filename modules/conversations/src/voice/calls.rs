@@ -7,6 +7,7 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::i18n::Language;
 use autoxide_kernel::job::{EnqueueOptions, Job, JobContext, JobHandler};
+use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::rows::lock_one;
 use autoxide_kernel::secret::sha256;
 use autoxide_kernel::sms::PhoneNumber;
@@ -14,9 +15,7 @@ use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext};
 use autoxide_kernel::time::Timestamp;
 use autoxide_kernel::voice::{BrowserSession, BrowserSessionRequest, CallStatus, SessionRole};
 use sea_orm::sea_query::{Expr, OnConflict};
-use sea_orm::{
-    ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder,
-};
+use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use uuid::Uuid;
@@ -246,15 +245,15 @@ impl ConversationsService {
         tenant: &TenantContext,
         principal: &Principal,
         thread_id: Uuid,
-    ) -> Result<Vec<Call>, Error> {
+        page: &PageRequest,
+    ) -> Result<Page<Call>, Error> {
         let thread = self.reload(tenant, thread_id).await?;
         self.require_call(tenant, principal, &thread).await?;
-        Ok(call::Entity::find()
-            .filter(call::Column::ThreadId.eq(thread_id))
-            .scoped(tenant)
-            .order_by_desc(call::Column::Id)
-            .all(tenant.database().read())
-            .await?)
+        // Một trang theo id (mới trước mặc định), keyset trong database (index
+        // `conversations_calls_thread_page_idx`, m0009).
+        let select =
+            call::Entity::find().filter(call::Column::ThreadId.eq(thread_id)).scoped(tenant);
+        fetch_page(select, call::Column::Id, |row| row.id, page, tenant.database().read()).await
     }
 
     /// `conversations.call` ở nút của cuộc trò chuyện; ngoài phạm vi → 404 như không có.

@@ -8,7 +8,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::http::ValidJson;
-use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
+use autoxide_kernel::pagination::{NaturalOrderPageQuery, Page, PageQuery, PageRequest, page_of};
 use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, Tagged};
@@ -221,26 +221,32 @@ impl From<Delivery> for DeliveryResponse {
 
 /// List the kinds of events endpoints can receive.
 ///
-/// Requires `webhooks.manage`. Sorted by name; descriptions follow `Accept-Language`.
+/// Requires `webhooks.manage`. By name unless `order=desc`; paged with `limit` / `cursor`;
+/// descriptions follow `Accept-Language`.
 #[utoipa::path(
     get,
     path = "/events",
     extensions(("x-permissions" = json!(["webhooks.manage"]))),
     operation_id = "list_webhook_event_types",
     security(("bearer" = [])),
+    params(NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "Every event kind.", body = Data<Vec<EventTypeResponse>>),
+        (status = 200, description = "One page of the event kinds, by name.", body = Page<EventTypeResponse>),
         (status = 401, description = "Not signed in.", body = Problem),
         (status = 403, description = "Missing permission `webhooks.manage`; code `permission_denied`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_event_types(
     State(service): State<Arc<WebhookService>>,
     principal: Principal,
     language: autoxide_kernel::i18n::Language,
-) -> Result<Data<Vec<EventTypeResponse>>, Error> {
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<EventTypeResponse>, Error> {
     principal.require(&WEBHOOKS_MANAGE)?;
-    let data = service
+    let page = PageRequest::try_from(page)?;
+    // Sổ event do các module khai trong code, không nằm trong database: `page_of` theo tên (duy nhất).
+    let events = service
         .event_catalog()
         .iter()
         .map(|event| EventTypeResponse {
@@ -248,7 +254,7 @@ async fn list_event_types(
             description: service.describe(event.description(), language),
         })
         .collect();
-    Ok(Data { data })
+    page_of(events, |event: &EventTypeResponse| event.name.clone(), &page)
 }
 
 /// List webhook endpoints.
