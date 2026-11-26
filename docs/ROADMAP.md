@@ -552,9 +552,12 @@ thật (P7).
         dead-letter — chưa có test, chưa có hướng dẫn xử lý cho người vận hành
   - [ ] Luật `address-key` của `cargo xtask check` chỉ bắt `format!("…ip:{…")` trên một dòng; khoá dựng cách khác
         (`ip.to_string()`, nhiều dòng) lọt — cân nhắc kiểm theo kiểu (`IpAddr` vào `Throttle::hit`)
-  - [x] PT-7: theo NIST SP 800-63B-4 — mã sống tối đa 10 phút, lần sai đếm từ lần đúng gần nhất, trần chung là setting
-        riêng (mặc định 20, tối đa 100) thay cho 5×, client đã đăng nhập bằng số không bị trần chung khoá
+  - [x] PT-7: theo NIST SP 800-63B-4 — mã sống tối đa 10 phút; trần cứng 100 lần sai liên tiếp (bộ đếm bền, mọi client);
+        trần chung là setting riêng thay cho 5×; số mã mỗi giờ theo cặp (số, client); client đã đăng nhập bằng số không
+        bị trần "mọi client" khoá
         (D-20261126-otp-nist)
+  - [ ] Mã đăng nhập SMS: token thiết bị có ký, cấp khi đăng nhập đúng, để nhận client quen thay cho địa chỉ (CGNAT di
+        động đổi địa chỉ) — cần đổi hợp đồng `PhoneCodes` của `auth` (D-20261126-otp-nist, rủi ro còn lại)
   - [x] PT-13, PT-14: lớp kiểm permission chung của kernel đọc `x-permissions` (403 trước validation / ETag / tra bản
         ghi), 18 `x-permissions` thiếu đã bổ sung, hai test e2e giữ (D-20261126-permission-gate)
   - [x] PT-16, PT-17: slug tự sinh tìm theo nhóm ứng viên `slug IN (…)` dùng unique index (content, catalog); bộ

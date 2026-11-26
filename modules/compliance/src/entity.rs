@@ -364,11 +364,33 @@ pub(crate) mod phone_known_client {
         #[sea_orm(primary_key, auto_increment = false)]
         pub id: Uuid,
         pub tenant_id: Uuid,
-        /// Dấu (SHA-256 có pepper của khách) của số E.164 — không lưu số.
-        pub phone_hash: String,
+        /// `SecretKey::phone_key` của số (HMAC theo khách) — không lưu số.
+        pub phone_key: String,
         /// Dấu client như `phone_challenge::requester_block`.
         pub requester_block: String,
         pub last_success_at: Timestamp,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+/// Số lần nhập sai liên tiếp mã đăng nhập SMS của một số, kể từ lần đúng gần nhất (PT-7, D-20261126-otp-nist).
+pub(crate) mod phone_failure {
+    use autoxide_kernel::time::Timestamp;
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "compliance_phone_failures")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        /// `SecretKey::phone_key` của số.
+        pub phone_key: String,
+        pub failures: i32,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}

@@ -8,7 +8,7 @@ use autoxide_kernel::migration::prelude::*;
 mod kyc_document_key;
 mod list_indexes;
 mod phone_challenge_block;
-mod phone_known_clients;
+mod phone_otp_state;
 
 pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
     vec![
@@ -49,7 +49,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(kyc_document_key::KycVerifiedDocument),
         Box::new(phone_challenge_block::PhoneChallengeBlock),
         Box::new(list_indexes::ListIndexes),
-        Box::new(phone_known_clients::PhoneKnownClients),
+        Box::new(phone_otp_state::PhoneOtpState),
     ]
 }
 

@@ -36,6 +36,7 @@ mod legal;
 mod migration;
 mod overview;
 mod permissions;
+mod phone_lock;
 mod privacy;
 mod provider;
 mod service;
@@ -168,6 +169,7 @@ impl Module for ComplianceModule {
                 "compliance_kyc_callbacks",
                 "compliance_phone_challenges",
                 "compliance_phone_known_clients",
+                "compliance_phone_failures",
                 "compliance_throttle",
                 "compliance_antispam_nonces",
             ])

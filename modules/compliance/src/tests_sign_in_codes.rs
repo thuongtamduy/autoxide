@@ -35,7 +35,8 @@ async fn app_with(
     let sms = Arc::new(FakeSmsSender::new());
     let capture = Arc::new(Capture::default());
     let sender: Arc<dyn SmsSender> = sms.clone();
-    let mut builder = TestApp::builder(test);
+    // `alice`: người đã đăng nhập, xác thực lại số để mở khoá (D-20261126-otp-nist).
+    let mut builder = TestApp::builder(test).user("alice", 2, &[]);
     for (name, value) in settings {
         builder = builder.setting(name, value);
     }
@@ -256,4 +257,98 @@ fn ma_khong_song_qua_muoi_phut() {
     };
     assert_eq!(read("600").ok(), Some(600));
     assert!(read("601").is_err());
+}
+
+/// Số mã mỗi giờ theo cặp (số, client) — người lạ tiêu hết lượt của họ không làm chủ số hết lượt; trần chung của số
+/// chặn người lạ từ nhiều nơi nhưng không chặn client quen của chủ số.
+#[tokio::test]
+async fn nguoi_la_het_luot_gui_ma_chu_so_van_nhan_duoc() {
+    TestDatabase::run(async |test| {
+        let settings = [
+            ("AUTOXIDE_COMPLIANCE_OTP_PER_PHONE_PER_HOUR", "2"),
+            ("AUTOXIDE_COMPLIANCE_OTP_PER_PHONE_ALL_CLIENTS_PER_HOUR", "3"),
+        ];
+        let (app, codes, sms) = app_with(test, &settings).await;
+        let tenant = app.default_tenant();
+        // Chủ số đăng nhập đúng từ mạng của họ: thành client quen.
+        let own = codes.send(&tenant, "0912000444", ip("2001:db8:7:1::1")).await.unwrap();
+        codes.verify(&tenant, own.id, &code_in(&sms, "+84912000444")).await.unwrap();
+        // Người lạ ở X: 2 mã rồi hết lượt của cặp (số, X).
+        for _ in 0..2 {
+            codes.send(&tenant, "0912000444", ip("203.0.113.20")).await.unwrap();
+        }
+        let error = codes.send(&tenant, "0912000444", ip("203.0.113.20")).await.unwrap_err();
+        assert_eq!(error.code(), "compliance.otp_throttled");
+        // Người lạ ở Y: trần chung của số (3: chủ số lúc còn lạ + 2 của X) đã đủ.
+        let error = codes.send(&tenant, "0912000444", ip("198.51.100.30")).await.unwrap_err();
+        assert_eq!(error.code(), "compliance.otp_throttled");
+        // Chủ số ở mạng quen: vẫn nhận mã và đăng nhập được.
+        let again = codes.send(&tenant, "0912000444", ip("2001:db8:7:1::2")).await.unwrap();
+        codes.verify(&tenant, again.id, &code_in(&sms, "+84912000444")).await.unwrap();
+    })
+    .await
+    .unwrap();
+}
+
+/// NIST SP 800-63B-4 §3.2.2: 100 lần sai liên tiếp (mọi client, không theo cửa sổ thời gian) khoá mã đăng nhập của số
+/// với mọi client, kể cả client quen. Đăng nhập đúng cho hết hạn mọi mã còn mở khác của số. Chủ số xác thực lại số từ
+/// tài khoản đã đăng nhập thì mở khoá.
+#[tokio::test]
+async fn sai_lien_tiep_toi_tran_cung_thi_khoa_den_khi_xac_thuc_lai() {
+    TestDatabase::run(async |test| {
+        use sea_orm::EntityTrait;
+        use sea_orm::sea_query::Expr;
+        let settings = [("AUTOXIDE_COMPLIANCE_OTP_PER_PHONE_PER_HOUR", "100")];
+        let (app, codes, sms) = app_with(test, &settings).await;
+        let tenant = app.default_tenant();
+        let wrong_for = |code: &str| if code == "000000" { "111111" } else { "000000" }.to_owned();
+        let home = ip("2001:db8:8:1::1");
+
+        // Mã của người lạ tạo trước lần đúng của chủ số: hết hạn khi chủ số đăng nhập đúng.
+        let stale = codes.send(&tenant, "0912000555", ip("203.0.113.40")).await.unwrap();
+        let stale_code = code_in(&sms, "+84912000555");
+        let own = codes.send(&tenant, "0912000555", home).await.unwrap();
+        codes.verify(&tenant, own.id, &code_in(&sms, "+84912000555")).await.unwrap();
+        let error = codes.verify(&tenant, stale.id, &stale_code).await.unwrap_err();
+        assert_eq!(
+            error.code(),
+            "compliance.otp_invalid",
+            "codes asked before the right one are closed"
+        );
+
+        // Một lần sai thật, rồi đưa bộ đếm tới 99 (như sau nhiều ngày đoán từ nhiều nơi), rồi một lần sai nữa.
+        let first = codes.send(&tenant, "0912000555", ip("203.0.113.41")).await.unwrap();
+        let wrong = wrong_for(&code_in(&sms, "+84912000555"));
+        codes.verify(&tenant, first.id, &wrong).await.unwrap_err();
+        crate::entity::phone_failure::Entity::update_many()
+            .col_expr(crate::entity::phone_failure::Column::Failures, Expr::value(99))
+            .exec(app.database().write())
+            .await
+            .unwrap();
+        let error = codes.verify(&tenant, first.id, &wrong).await.unwrap_err();
+        assert_eq!(error.code(), "compliance.otp_invalid");
+        // Đủ 100: khoá với mọi client, kể cả mạng quen của chủ số.
+        let error = codes.send(&tenant, "0912000555", home).await.unwrap_err();
+        assert_eq!(error.code(), "compliance.otp_locked");
+
+        // Mở khoá: chủ số đăng nhập cách khác (`alice`) và xác thực lại số trong tài khoản.
+        let (status, sent) = crate::tests::call(
+            &app,
+            "POST",
+            "/me/phone-verifications",
+            "alice",
+            Some(serde_json::json!({"phone": "0912000555"})),
+        )
+        .await;
+        assert_eq!(status, axum::http::StatusCode::CREATED, "{sent}");
+        let id = sent["data"]["id"].as_str().unwrap();
+        let body = serde_json::json!({"code": code_in(&sms, "+84912000555")});
+        let uri = format!("/me/phone-verifications/{id}/confirm");
+        let (status, confirmed) = crate::tests::call(&app, "POST", &uri, "alice", Some(body)).await;
+        assert_eq!(status, axum::http::StatusCode::OK, "{confirmed}");
+        let again = codes.send(&tenant, "0912000555", home).await.unwrap();
+        codes.verify(&tenant, again.id, &code_in(&sms, "+84912000555")).await.unwrap();
+    })
+    .await
+    .unwrap();
 }

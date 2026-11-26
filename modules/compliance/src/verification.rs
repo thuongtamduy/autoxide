@@ -452,6 +452,12 @@ impl ComplianceService {
         if consumed.rows_affected != 1 {
             return Err(otp_invalid());
         }
+        // Chủ số chứng minh lại được số từ tài khoản đã đăng nhập (NIST SP 800-63B-4 §4.1, gắn lại bộ xác thực): mở khoá
+        // mã đăng nhập SMS của số (D-20261126-otp-nist).
+        if let Some(number) = PhoneNumber::parse(&row.phone, "84") {
+            let key = self.secret.phone_key(tenant.id(), &number).await?;
+            crate::phone_lock::succeeded(&transaction, tenant, &row.phone, &key, id, at).await?;
+        }
         account_verification::Entity::insert(account_verification::ActiveModel {
             tenant_id: Set(tenant.id().as_uuid()),
             user_id: Set(user_id),

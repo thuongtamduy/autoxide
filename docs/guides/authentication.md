@@ -42,6 +42,21 @@ Such an account has `email` set to `""` until the buyer adds one. To confirm a s
 (`POST /api/v1/auth/me/reauth`) it uses `"method": "phone_code"` with a fresh `phone_challenge_id`
 and `phone_code` sent to its own number; after that it can add a passkey and sign in with it.
 
+**Limits against guessing codes** (NIST SP 800-63B-4). A code lives at most 10 minutes
+(`AUTOXIDE_COMPLIANCE_OTP_TTL_SECONDS`, 60 to 600) and allows a few wrong tries. Per number:
+
+- codes per hour from one client (one IPv4 address, or one IPv6 /64), and from all clients together;
+- wrong codes per day from one client, and from all clients together (`429 compliance.otp_daily_limit`);
+- 100 wrong codes in a row, with no time window: sign-in codes for the number are locked for every
+  client (`403 compliance.otp_locked`) until the owner signs in another way and verifies the number
+  again in their account.
+
+A client (one IPv4 address, or one IPv6 /64) that signed in with the number in the last 90 days does not
+count toward the limits for all clients together, so strangers cannot lock the owner out of the networks
+they use. **Remaining risk:** mobile networks behind carrier NAT change address often; on a network the
+owner never signed in from, they can be locked out for up to a day when strangers reach those limits.
+Offer buyers a second way to sign in (password or passkey) — NIST requires one for SMS codes.
+
 ## Refresh before the access token expires
 
 `expires_in` says how many seconds the access token lives. Shortly before, exchange the refresh token for a new pair. Each refresh token works **once**: keep the new one.

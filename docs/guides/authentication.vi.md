@@ -41,6 +41,19 @@ Tài khoản như vậy có `email` là `""` cho tới khi người mua thêm em
 (`POST /api/v1/auth/me/reauth`), dùng `"method": "phone_code"` với `phone_challenge_id` và `phone_code`
 mới gửi tới chính số của mình; sau đó thêm được passkey và đăng nhập bằng passkey.
 
+**Giới hạn chống đoán mã** (NIST SP 800-63B-4). Mã sống tối đa 10 phút
+(`AUTOXIDE_COMPLIANCE_OTP_TTL_SECONDS`, 60 tới 600) và chỉ cho nhập sai vài lần. Theo từng số:
+
+- số mã mỗi giờ từ một client (một địa chỉ IPv4, hay một khối IPv6 /64), và từ mọi client cộng lại;
+- số mã sai mỗi ngày từ một client, và từ mọi client cộng lại (`429 compliance.otp_daily_limit`);
+- 100 mã sai liên tiếp, không theo cửa sổ thời gian: mã đăng nhập của số bị khoá với mọi client
+  (`403 compliance.otp_locked`) cho tới khi chủ số đăng nhập bằng cách khác và xác thực lại số trong tài khoản.
+
+Client (một địa chỉ IPv4, hay một khối IPv6 /64) đã đăng nhập bằng số trong 90 ngày không bị tính vào các giới hạn
+của mọi client cộng lại, nên người lạ không khoá được chủ số ở mạng họ hay dùng. **Rủi ro còn lại:** mạng di động sau
+NAT của nhà mạng đổi địa chỉ thường xuyên; ở mạng chủ số chưa từng đăng nhập, họ có thể bị khoá tới một ngày khi người
+lạ chạm các giới hạn đó. Hãy cho người mua thêm một cách đăng nhập (mật khẩu hay passkey) — NIST đòi điều này với mã SMS.
+
 ## Làm mới trước khi access token hết hạn
 
 `expires_in` cho biết access token sống bao nhiêu giây. Trước lúc đó một chút, đổi refresh token lấy cặp mới. Mỗi refresh token chỉ dùng được **một lần**: giữ lại cái mới.

@@ -41,9 +41,17 @@ pub(crate) const OTP_WRONG_PER_PHONE_ALL_CLIENTS_PER_DAY: Setting = Setting::new
 
 pub(crate) const OTP_PER_PHONE_PER_HOUR: Setting = Setting::new(
     "AUTOXIDE_COMPLIANCE_OTP_PER_PHONE_PER_HOUR",
-    "Phone verification codes sent to one phone number per hour, 1 to 100.",
+    "Phone codes sent to one phone number per hour from one client (one IPv4 address, or one IPv6 /64 \
+     block), 1 to 100.",
 )
 .with_default("3");
+
+pub(crate) const OTP_PER_PHONE_ALL_CLIENTS_PER_HOUR: Setting = Setting::new(
+    "AUTOXIDE_COMPLIANCE_OTP_PER_PHONE_ALL_CLIENTS_PER_HOUR",
+    "Sign-in codes sent to one phone number per hour from all clients together, 1 to 1000; a client \
+     that signed in with the number in the last 90 days is not counted against it.",
+)
+.with_default("10");
 
 pub(crate) const OTP_PER_USER_PER_DAY: Setting = Setting::new(
     "AUTOXIDE_COMPLIANCE_OTP_PER_USER_PER_DAY",
@@ -116,6 +124,8 @@ pub(crate) struct Otp {
     pub max_attempts: i32,
     /// `AUTOXIDE_COMPLIANCE_OTP_WRONG_PER_PHONE_PER_DAY`.
     pub wrong_per_phone_per_day: i32,
+    /// Số mã đăng nhập mỗi giờ của một số, mọi client lạ cộng lại (D-20261126-otp-nist).
+    pub per_phone_all_clients_per_hour: u32,
     /// Trần chung của một số cho client lạ (D-20261126-otp-nist).
     pub wrong_per_phone_all_clients_per_day: i32,
     pub per_phone_per_hour: u32,
@@ -130,6 +140,7 @@ impl Default for Otp {
             max_attempts: 5,
             wrong_per_phone_per_day: 10,
             wrong_per_phone_all_clients_per_day: 20,
+            per_phone_all_clients_per_hour: 10,
             per_phone_per_hour: 3,
             per_user_per_day: 10,
             per_ip_per_hour: 20,
@@ -176,6 +187,8 @@ pub(crate) fn read(reader: &mut ConfigReader<'_>) -> Result<Config, Invalid> {
         .get_with(&OTP_WRONG_PER_PHONE_ALL_CLIENTS_PER_DAY, |raw| parse_in_range(raw, 1i32, 100));
     let per_phone_per_hour =
         reader.get_with(&OTP_PER_PHONE_PER_HOUR, |raw| parse_in_range(raw, 1u32, 100));
+    let per_phone_all =
+        reader.get_with(&OTP_PER_PHONE_ALL_CLIENTS_PER_HOUR, |raw| parse_in_range(raw, 1u32, 1000));
     let per_user_per_day =
         reader.get_with(&OTP_PER_USER_PER_DAY, |raw| parse_in_range(raw, 1u32, 1000));
     let per_ip_per_hour =
@@ -198,6 +211,7 @@ pub(crate) fn read(reader: &mut ConfigReader<'_>) -> Result<Config, Invalid> {
             max_attempts: max_attempts?,
             wrong_per_phone_per_day: wrong_per_phone_per_day?,
             wrong_per_phone_all_clients_per_day: wrong_all_clients?,
+            per_phone_all_clients_per_hour: per_phone_all?,
             per_phone_per_hour: per_phone_per_hour?,
             per_user_per_day: per_user_per_day?,
             per_ip_per_hour: per_ip_per_hour?,
