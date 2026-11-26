@@ -172,6 +172,40 @@ bước 7.**
 8. `cargo clean`: mỗi lần đổi phiên bản, cargo build lại cả workspace thành một bộ file mới
    mà không xoá bộ cũ, `target/` phình thêm hàng chục GB.
 
+## Chỉ số của mỗi bản phát hành (ngưỡng cho 1.0, 71-G9)
+
+Mỗi bản phát hành có một bảng năm chỉ số, do workflow `Release metrics` (`.github/workflows/release-metrics.yml`) dựng sau khi
+`Release` xong, ghi vào trang tóm tắt của lần chạy và vào ghi chú bản phát hành (`scripts/release-metrics.py`). Chỉ số
+**đã đo mà không đạt** làm workflow đỏ; **chưa đo** thì ghi "chưa đo" / "chờ …", không bịa số. Bản 1.0 chỉ phát hành khi
+cả năm đều đã đo và đạt (chủ dự án duyệt lúc chốt, D-20261126-road-to-1-0).
+
+| Chỉ số | Ngưỡng 1.0 | Đo bằng gì | Tự động? |
+| ------ | ---------- | ---------- | -------- |
+| Tải về → request đầu tiên | dưới 5 phút | `scripts/release-time-to-first-request.sh`: máy sạch làm đúng Quickstart của README (tải `compose.quickstart.yml` của tag, tạo `.env`, `docker compose up`, đọc mật khẩu admin, đăng nhập, `GET /auth/me`), tính giây | Có. Chỉ là **phần máy** (tải image, khởi động, một request): thời gian người đọc tài liệu không nằm ở đây |
+| Người mới xong module đầu tiên | dưới 30 phút | Hai số **riêng, không gộp** (bên dưới): người thật có bấm giờ; agent context sạch | Một phần: bảng đọc `docs/quality/first-module-timing.json`; việc đo thì làm tay mỗi bản |
+| Nâng cấp trong CI | 100% thành công | Job `upgrade` của `ci.yml` trên đúng commit phát hành (ma trận nhiều khách, bản cũ nhất, rollback do G3 dựng): báo cáo chỉ **đọc** kết quả, không dựng job riêng | Có |
+| Agent thật xong việc mẫu | trên 90% | Bộ eval agent của G4: báo cáo chỉ đọc file `{"tasks": N, "passed": M}` (`--agent-eval`); chưa có thì "chờ G4" | Có, khi G4 xuất file |
+| p95 đường nóng không tệ đi | không vượt số gốc × 1.5 + 2 ms | Lần chạy gần nhất của `load.yml` trên `main` (đo tải hằng tuần, số gốc ở `docs/quality/load-baseline.json`) | Có |
+
+### Đo "người mới xong module đầu tiên" cho trung thực
+
+Số này không thể tự động hoàn toàn: người thật đọc, hiểu, gõ, vướng. Hai cách, ghi thành hai loại số khác nhau
+(`kind` = `human` hay `agent` trong `docs/quality/first-module-timing.json`):
+
+1. **Người thật có bấm giờ (`human`).** Người chưa từng đóng góp cho repo (người ngoài hay thành viên mới; chủ dự án
+   tính nếu chưa làm lần nào) làm theo hướng dẫn công khai (`docs/guides/`, module ngoài repo) và bấm giờ:
+   - **Bắt đầu:** lúc mở README, máy chỉ có Docker, Rust, Git.
+   - **Dừng:** khi module mới (một bảng, một route `GET`, một test) đã được đăng ký, chạy trong server của chính họ, và
+     `GET /api/v1/kernel/modules` liệt kê nó, test của module xanh.
+   - Ghi: số phút, các mốc (cài xong, build lần đầu xong, module chạy), chỗ vướng (mỗi chỗ vướng là một việc của core hay
+     tài liệu). Dừng đồng hồ khi chờ biên dịch **không** được trừ: người dùng thật cũng chờ.
+2. **Agent context sạch (`agent`).** Một agent mới, chỉ có README và các hướng dẫn công khai (không `CLAUDE.md` của repo,
+   không lịch sử trò chuyện), làm cùng việc theo cùng điều kiện dừng. Ghi số phút đồng hồ và số lượt gọi công cụ. Đây là
+   cận dưới của độ rõ của tài liệu cho máy, **không** thay cho số của người thật.
+
+Thêm một dòng vào `runs` của `docs/quality/first-module-timing.json` mỗi lần đo: `{"kind": "human", "version": "…", "date": "…",
+"minutes": N, "notes": "…"}`. Không sửa dòng cũ.
+
 ## Bản thử trước bản major (release candidate)
 
 Bản major là cam kết dài hạn ([`docs/COMPATIBILITY.md`](COMPATIBILITY.md)), nên ra qua một hay nhiều bản thử

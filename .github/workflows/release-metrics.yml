@@ -1,0 +1,79 @@
+# Bảng chỉ số của một bản phát hành (71-G9; mô tả và ngưỡng ở docs/RELEASING.md, "Chỉ số của mỗi bản phát hành"): đo thời
+# gian từ tải về tới request đầu tiên trên máy sạch rồi gộp với kết quả đã có của CI (nâng cấp, p95, eval agent). Chạy khi
+# workflow `Release` xong (không dùng `release: published`: bản phát hành tạo bằng GITHUB_TOKEN không kích hoạt workflow khác).
+name: Release metrics
+
+on:
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version without the leading v, for example 1.0.0
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  metrics:
+    # Chỉ bản phát hành thật đã thành công; tag pre-release (`-rc.N`) cũng được đo.
+    if: ${{ !github.event.repository.private && (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write # chỉ để thêm bảng vào ghi chú của bản phát hành (bước cuối)
+      actions: read
+      packages: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      INPUT_VERSION: ${{ inputs.version }}
+      RUN_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+    steps:
+      - name: Version and commit of the release
+        id: release
+        run: |
+          # Tag phát hành là `vX.Y.Z`; `head_branch` của workflow_run do tag đẩy là chính tên tag.
+          tag="v${INPUT_VERSION#v}"
+          [ -n "$INPUT_VERSION" ] || tag="$RUN_HEAD_BRANCH"
+          case "$tag" in v[0-9]*) ;; *) echo "::error::not a release tag: $tag"; exit 1 ;; esac
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+          echo "sha=$(gh api "repos/$GH_REPO/commits/$tag" --jq .sha)" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.release.outputs.tag }}
+          persist-credentials: false
+      - name: Time from download to the first request
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+        run: scripts/release-time-to-first-request.sh "$VERSION" "$GH_REPO" | tee first-request.json
+      # Bộ eval agent của G4: file kết quả `docs/quality/agent-eval.json` nếu bản này có (cùng commit phát hành).
+      - name: Table
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+          SHA: ${{ steps.release.outputs.sha }}
+        run: |
+          eval_file=""
+          [ -f docs/quality/agent-eval.json ] && eval_file="--agent-eval docs/quality/agent-eval.json"
+          set +e
+          # shellcheck disable=SC2086
+          scripts/release-metrics.py --version "$VERSION" --sha "$SHA" --first-request first-request.json $eval_file | tee metrics.md
+          echo "status=${PIPESTATUS[0]}" >> "$GITHUB_ENV"
+      # Thêm bảng vào ghi chú bản phát hành (một lần: thay phần cũ nếu chạy lại).
+      - name: Add the table to the release notes
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          gh release view "$TAG" --json body --jq .body > notes.md
+          python3 - <<'PY'
+          import re
+          notes = open("notes.md").read()
+          notes = re.sub(r"\n*## Chỉ số bản .*\Z", "", notes, flags=re.S).rstrip()
+          open("notes.md", "w").write(notes + "\n\n" + open("metrics.md").read())
+          PY
+          gh release edit "$TAG" --notes-file notes.md
+      - name: Fail when a measured metric misses its limit
+        run: '[ "$status" = "0" ]'
