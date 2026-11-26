@@ -51,8 +51,11 @@ curl -X POST https://api.example.com/api/v1/tax/quote \
 - Taxes are rounded **once per rate on the whole document**, then shared between the lines: the lines
   always add up to the totals. A later stage (VAT) is computed on the price plus earlier stages
   (special consumption tax).
-- `tax_point` is the day in the seller's time zone. No rate on that day: `422 tax.rate_missing` — the
-  engine never guesses.
+- `tax_point` is a calendar day, not an instant. Orders and invoices compute it with `TaxEngine::tax_date`:
+  the day in the time zone of the seller's tax jurisdiction (pack rule `tax_date.time_zone`; Vietnam:
+  `Asia/Ho_Chi_Minh`), else in the unit's `organizations.timezone`, else in UTC. So an order placed at
+  00:30 on 1 January 2027 Vietnam time (17:30 UTC on 31 December) is taxed at the rate of 1 January. No
+  rate on that day: `422 tax.rate_missing` — the engine never guesses.
 - The answer has a `snapshot` (rates and their ids, pack version, rounding): keep it with the document.
 
 `POST /api/v1/tax/withholding` computes what a platform withholds from a payment to a seller.

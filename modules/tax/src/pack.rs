@@ -233,6 +233,11 @@ pub(crate) fn parse_pack(text: &str) -> Result<Pack, Error> {
         if !jurisdictions.contains(found.jurisdiction.as_str()) {
             problems.push(format!("{what}: unknown jurisdiction"));
         }
+        if found.code == crate::service::TIME_ZONE_RULE
+            && found.value["time_zone"].as_str().and_then(autoxide_kernel::time::zone).is_none()
+        {
+            problems.push(format!("{what}: `value.time_zone` must be an IANA time zone"));
+        }
         window(&found.effective_from, found.effective_to.as_deref(), &what, &mut problems);
     }
     if problems.is_empty() {

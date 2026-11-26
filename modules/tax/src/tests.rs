@@ -235,7 +235,8 @@ async fn goi_cu_bi_tu_choi_goi_trung_khong_doi_va_doctor() {
             .unwrap()
             .format("%Y-%m-%d")
             .to_string();
-        pack["version"] = json!(2);
+        let next = pack["version"].as_i64().unwrap() + 1;
+        pack["version"] = json!(next);
         let rates: Vec<Value> = pack["rates"]
             .as_array()
             .unwrap()
@@ -255,7 +256,7 @@ async fn goi_cu_bi_tu_choi_goi_trung_khong_doi_va_doctor() {
         pack["rates"] = json!(rates);
         let (status, body) = call(&app, "POST", "/packs", "ops", Some(json!({"pack": pack}))).await;
         assert_eq!(status, StatusCode::OK, "{body}");
-        assert_eq!(body["data"]["version"], 2);
+        assert_eq!(body["data"]["version"], next);
         let checks = app.modules().checks();
         let (_, check) = checks.iter().find(|(module, _)| *module == "tax").unwrap();
         let text = format!("{:?}", check.run().await);
@@ -313,6 +314,49 @@ async fn hai_lan_sua_cung_phien_ban_chi_mot_lan_qua() {
                 "round {round}"
             );
         }
+    })
+    .await
+    .unwrap();
+}
+
+/// Ngày thuế theo giờ Việt Nam, không theo UTC (LG-2): 00:00–07:00 giờ Việt Nam ngày 01/01/2027 là
+/// 17:00–24:00 UTC ngày 31/12/2026 — vẫn phải ra ngày 01/01/2027 và thuế suất 10%.
+#[tokio::test]
+async fn ngay_thue_theo_gio_viet_nam_o_ranh_gioi_het_giam_thue() {
+    TestDatabase::run(async |test| {
+        let (app, tree) = app(test).await;
+        let profile = json!({"jurisdiction": "VN", "regime": "vat_credit"});
+        let (status, body) =
+            call(&app, "PUT", &format!("/profiles/{}", tree.root.as_uuid()), "ops", Some(profile)).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        let engine = app.api::<dyn crate::api::TaxEngine>().unwrap();
+        let tenant = app.default_tenant();
+        let at = |text: &str| Timestamp::parse_rfc3339(text).unwrap();
+        let cases = [
+            // 23:30 giờ Việt Nam ngày 31/12/2026: còn 8%.
+            ("2026-12-31T16:30:00Z", Date::new(2026, 12, 31).unwrap(), "8"),
+            // 00:00 giờ Việt Nam ngày 01/01/2027 (17:00 UTC ngày 31/12): hết giảm thuế.
+            ("2026-12-31T17:00:00Z", Date::new(2027, 1, 1).unwrap(), "10"),
+            // 00:30 và 06:59 giờ Việt Nam ngày 01/01/2027: vẫn ngày 31/12 theo UTC.
+            ("2026-12-31T17:30:00Z", Date::new(2027, 1, 1).unwrap(), "10"),
+            ("2026-12-31T23:59:00Z", Date::new(2027, 1, 1).unwrap(), "10"),
+        ];
+        for (instant, expected, rate) in cases {
+            let day = engine.tax_date(&tenant, tree.store, at(instant)).await.unwrap();
+            assert_eq!(day, expected, "{instant}");
+            let quoted = quote(
+                &app,
+                "ops",
+                json!({"jurisdiction": "VN", "tax_point": day, "price_mode": "exclusive", "currency": "VND",
+                       "lines": [line("a", "vat.standard_reducible", 100_000)]}),
+            )
+            .await;
+            assert_eq!(quoted["totals"][0]["rate_percent"].as_str(), Some(rate), "{instant}: {quoted}");
+        }
+        // Nút không có hồ sơ thuế, không có `organizations`: ngày UTC.
+        let outside = OrgId::from_uuid(uuid::Uuid::now_v7());
+        let day = engine.tax_date(&tenant, outside, at("2026-12-31T17:30:00Z")).await.unwrap();
+        assert_eq!(day, Date::new(2026, 12, 31).unwrap());
     })
     .await
     .unwrap();

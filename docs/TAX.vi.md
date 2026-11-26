@@ -49,8 +49,11 @@ curl -X POST https://api.example.com/api/v1/tax/quote \
 - `price_mode`: `exclusive` (giá chưa thuế) hay `inclusive` (tách thuế ra).
 - Thuế làm tròn **một lần cho mỗi thuế suất trên cả chứng từ**, rồi chia lại về dòng: tổng các dòng
   luôn khớp tổng. Tầng sau (GTGT) tính trên giá cộng các tầng trước (TTĐB).
-- `tax_point` là ngày theo múi giờ của người bán. Không có thuế suất ngày đó: `422 tax.rate_missing` —
-  engine không bao giờ đoán.
+- `tax_point` là một ngày theo lịch, không phải một thời điểm. Đơn hàng và hoá đơn tính nó bằng
+  `TaxEngine::tax_date`: ngày theo múi giờ của vùng thuế người bán (quy tắc `tax_date.time_zone` của gói;
+  Việt Nam: `Asia/Ho_Chi_Minh`), không có thì theo `organizations.timezone` của nút, không có nữa thì UTC.
+  Vì vậy đơn đặt lúc 00:30 ngày 01/01/2027 giờ Việt Nam (17:30 UTC ngày 31/12) tính thuế suất của ngày
+  01/01. Không có thuế suất ngày đó: `422 tax.rate_missing` — engine không bao giờ đoán.
 - Câu trả lời có `snapshot` (thuế suất và ID, phiên bản gói, cách làm tròn): lưu kèm chứng từ.
 
 `POST /api/v1/tax/withholding` tính số sàn khấu trừ khi trả tiền cho người bán. Tool MCP: `tax.quote`,

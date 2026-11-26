@@ -1,6 +1,6 @@
 //! `dyn TaxEngine` module `tax` công bố.
 
-use autoxide_kernel::time::Date;
+use autoxide_kernel::time::{Date, Timestamp};
 use std::sync::Arc;
 
 use autoxide_kernel::error::Error;
@@ -47,5 +47,14 @@ impl TaxEngine for Provider {
         on: Date,
     ) -> Result<InvoiceRequirements, Error> {
         self.0.invoice_requirements(tenant, org, on).await
+    }
+
+    async fn tax_date(
+        &self,
+        tenant: &TenantContext,
+        org: OrgId,
+        at: Timestamp,
+    ) -> Result<Date, Error> {
+        self.0.tax_date(tenant, org, at).await
     }
 }

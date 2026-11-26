@@ -345,8 +345,12 @@ impl InvoicesService {
         let Some(reference) = reference else {
             return Err(Error::internal("a checked reference went missing"));
         };
-        let on = draft.issue_date.unwrap_or_else(|| Timestamp::now().date_utc());
         let seller = draft.on_behalf_of.unwrap_or(draft.org);
+        // Ngày lập mặc định: hôm nay theo múi giờ của vùng thuế người bán, không theo UTC (LG-2).
+        let on = match draft.issue_date {
+            Some(day) => day,
+            None => self.tax.tax_date(tenant, seller, Timestamp::now()).await?,
+        };
         let computed = self
             .compute(
                 tenant,
@@ -559,7 +563,10 @@ impl InvoicesService {
         };
         let currency = Currency::parse(&found.currency)?;
         let seller = OrgId::from_uuid(found.on_behalf_of_org_id.unwrap_or(found.org_id));
-        let on = issue_date.unwrap_or_else(|| Timestamp::now().date_utc());
+        let on = match issue_date {
+            Some(day) => day,
+            None => self.tax.tax_date(tenant, seller, Timestamp::now()).await?,
+        };
         let computed = match &lines {
             Some(lines) => Some(
                 self.compute(

@@ -19,7 +19,7 @@ use uuid::Uuid;
 
 use autoxide_invoices::api::{Buyer, Document, Invoices, NewDocument, NewDocumentLine};
 
-const PERMISSIONS: [&str; 9] = [
+const PERMISSIONS: [&str; 10] = [
     "invoices.read",
     "invoices.write",
     "invoices.issue",
@@ -28,6 +28,7 @@ const PERMISSIONS: [&str; 9] = [
     "invoices.mandates_manage",
     "tax.read",
     "tax.packs_manage",
+    "tax.profiles_manage",
     "ledger.read",
 ];
 
@@ -624,6 +625,39 @@ async fn hai_nhap_thay_the_cung_mot_hoa_don_chi_phat_hanh_mot() {
         assert_eq!(balance(&app, &tenant, "receivable.customer").await, issued.total.minor());
         let current = service.document(&tenant, first.id).await.unwrap().unwrap();
         assert_eq!(current.status, "replaced");
+    })
+    .await
+    .unwrap();
+}
+
+/// Ngày lập theo giờ Việt Nam khi người bán thuộc vùng thuế `VN`, không theo UTC (LG-2): hoá đơn lập lúc
+/// 00:30 giờ Việt Nam mang ngày hôm đó, không mang ngày hôm trước.
+#[tokio::test]
+async fn ngay_lap_theo_gio_viet_nam() {
+    TestDatabase::run(async |test| {
+        let Setup { app, .. } = setup(test).await;
+        let root = root_of(DEFAULT_TENANT).as_uuid();
+        let profile = json!({"jurisdiction": "VN", "regime": "vat_credit"});
+        let answer = app
+            .request(Method::PUT, &format!("/api/v1/tax/profiles/{root}"))
+            .token("clerk")
+            .json(profile)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(answer.status(), StatusCode::OK, "{}", answer.text());
+        let vietnam = autoxide_kernel::time::zone("Asia/Ho_Chi_Minh").unwrap();
+        let before = Timestamp::now().date_in(&vietnam);
+        let body = json!({"kind": "vat_invoice", "symbol": "1C26TAA", "year": before.year()});
+        let (status, created) = call(&app, "POST", "/series", Some(body)).await;
+        assert_eq!(status, StatusCode::CREATED, "{created}");
+        let found = draft(&app, "VN-1", 100_000).await;
+        let tenant = app.default_tenant();
+        let issued = invoices(&app).issue(&tenant, Actor::system(), found.id).await.unwrap();
+        // Hai lần đọc giờ có thể vắt qua nửa đêm giờ Việt Nam: nhận một trong hai ngày.
+        let after = Timestamp::now().date_in(&vietnam);
+        let day = issued.issue_date.unwrap();
+        assert!(day == before || day == after, "{day} not in [{before}, {after}]");
     })
     .await
     .unwrap();

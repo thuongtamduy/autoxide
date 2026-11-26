@@ -192,7 +192,8 @@ impl InvoicesService {
         } else {
             Value::Null
         };
-        let today = Timestamp::now().date_utc();
+        // Ngày lập theo múi giờ của vùng thuế người bán (giờ Việt Nam), không theo UTC (LG-2).
+        let today = self.tax.tax_date(tenant, seller_org, Timestamp::now()).await?;
         // Chứng từ ngoại tệ: chụp tỉ giá ngày lập (đọc `ledger` NGOÀI transaction ghi).
         let fx = if current.status == "draft" {
             self.fx_snapshot(tenant, &current, seller_org, current.issue_date.unwrap_or(today))

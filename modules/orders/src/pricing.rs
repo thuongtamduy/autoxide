@@ -510,6 +510,9 @@ async fn apply_tax(
         return Ok((zero, shipping_net));
     };
     let jurisdiction = profile.jurisdiction;
+    // Ngày thuế theo múi giờ của vùng thuế người bán (giờ Việt Nam), không theo UTC (LG-2): đơn đặt lúc
+    // 00:30 ngày 01/01/2027 giờ Việt Nam đã hết GTGT 8%.
+    let tax_point = engine.tax_date(tenant, input.org_id, input.at).await?;
     let mut shipping = (zero, shipping_net);
     // Một lần gọi cho mỗi chế độ giá (bảng giá gồm thuế hay chưa); phí giao coi như gồm thuế.
     for inclusive in [true, false] {
@@ -535,7 +538,7 @@ async fn apply_tax(
         let mode = if inclusive { PriceMode::Inclusive } else { PriceMode::Exclusive };
         let request = TaxQuoteRequest::new(
             jurisdiction.clone(),
-            input.at.date_utc(),
+            tax_point,
             input.org_id,
             mode,
             input.currency,

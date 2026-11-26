@@ -73,9 +73,14 @@ pub(crate) struct TaxService {
     pub tables: TablesCache,
     /// Kiểm địa chỉ của hồ sơ thuế (module `address`).
     pub units: Option<Arc<dyn autoxide_address::api::AdministrativeUnits>>,
+    /// Múi giờ của nút (`organizations.timezone`) cho vùng thuế không khai múi giờ trong gói.
+    pub orgs: Option<Arc<dyn autoxide_organizations::api::OrgDirectory>>,
     /// `AUTOXIDE_TAX_EXPIRY_WARNING_DAYS`.
     pub warning_days: i64,
 }
+
+/// Mã quy tắc trong gói thuế khai múi giờ của vùng thuế: ngày thuế, ngày lập hoá đơn tính theo nó.
+pub(crate) const TIME_ZONE_RULE: &str = "tax_date.time_zone";
 
 pub(crate) const REGIMES: [&str; 4] = ["vat_credit", "vat_direct", "household", "exempt"];
 pub(crate) const BUSINESS_LINES: [&str; 4] = ["goods", "services", "production_transport", "other"];
@@ -117,6 +122,12 @@ pub(crate) fn profile_not_found() -> Error {
 }
 
 /// `from <= on < to` (nửa mở), ngày dạng `YYYY-MM-DD` so sánh như chữ.
+/// Múi giờ trong giá trị JSON (dạng chuỗi) của quy tắc [`TIME_ZONE_RULE`]: `{"time_zone": "…"}`.
+pub(crate) fn rule_time_zone(raw: &str) -> Option<jiff::tz::TimeZone> {
+    let value: serde_json::Value = serde_json::from_str(raw).ok()?;
+    value["time_zone"].as_str().and_then(autoxide_kernel::time::zone)
+}
+
 fn in_force(from: &str, to: Option<&str>, on: &str) -> bool {
     from <= on && to.is_none_or(|to| on < to)
 }
@@ -433,6 +444,53 @@ impl TaxService {
             }
         }
         Ok(InvoiceRequirements { cash_register_required: false, legal_basis: None })
+    }
+
+    /// Ngày thuế của thời điểm `at` với người bán `org` (LG-2, D-20261126-tax-date-time-zone): ngày theo
+    /// múi giờ của vùng thuế trong hồ sơ thuế (quy tắc [`TIME_ZONE_RULE`] của gói, vd `Asia/Ho_Chi_Minh`);
+    /// vùng không khai thì theo `organizations.timezone` của nút; không có gì thì UTC.
+    //
+    // Vùng thuế thắng cài đặt của nút: luật Việt Nam tính ngày theo giờ Việt Nam bất kể nút đặt múi giờ
+    // nào (mặc định của `organizations.timezone` là UTC — chính là lỗi LG-2).
+    pub(crate) async fn tax_date(
+        &self,
+        tenant: &TenantContext,
+        org: OrgId,
+        at: Timestamp,
+    ) -> Result<Date, Error> {
+        if let Some(found) = self.nearest_profile(tenant, org).await? {
+            let tables = self.tables().await?;
+            // Tìm quy tắc theo ngày UTC: múi giờ của một vùng không đổi sát ranh giới ngày.
+            let day = at.date_utc().format("%Y-%m-%d").to_string();
+            let zone = tables
+                .rules
+                .iter()
+                .filter(|rule| {
+                    rule.jurisdiction == found.jurisdiction
+                        && rule.code == TIME_ZONE_RULE
+                        && in_force(&rule.effective_from, rule.effective_to.as_deref(), &day)
+                })
+                .find_map(|rule| rule_time_zone(&rule.value));
+            if let Some(zone) = zone {
+                return Ok(at.date_in(&zone));
+            }
+        }
+        if let Some(orgs) = &self.orgs {
+            match orgs.setting(tenant, org, "organizations.timezone").await {
+                Ok(found) => {
+                    let zone = found
+                        .and_then(|found| found.value)
+                        .and_then(|value| value.as_str().and_then(autoxide_kernel::time::zone));
+                    if let Some(zone) = zone {
+                        return Ok(at.date_in(&zone));
+                    }
+                }
+                Err(error) => {
+                    tracing::warn!(error = %error, "cannot read the unit time zone; tax date in UTC");
+                }
+            }
+        }
+        Ok(at.date_utc())
     }
 
     /// Thuế suất hết hạn trong `warning_days` ngày tính từ `today` mà không có thuế suất nối tiếp

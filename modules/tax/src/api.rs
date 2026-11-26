@@ -8,7 +8,7 @@ use autoxide_kernel::decimal::{Decimal, DecimalString};
 use autoxide_kernel::error::Error;
 use autoxide_kernel::money::{Currency, Money};
 use autoxide_kernel::tenancy::{OrgId, TenantContext};
-use autoxide_kernel::time::Date;
+use autoxide_kernel::time::{Date, Timestamp};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -272,4 +272,18 @@ pub trait TaxEngine: Send + Sync {
         org: OrgId,
         on: Date,
     ) -> Result<InvoiceRequirements, Error>;
+    /// The tax date of instant `at` for seller `org`: the calendar day in the time zone of the seller's tax
+    /// jurisdiction (pack rule `tax_date.time_zone`; Vietnam: `Asia/Ho_Chi_Minh`), else in the unit's time
+    /// zone (`organizations.timezone`), else in UTC. Use it for the tax point of an order and the issue
+    /// date of an invoice — never the UTC day of the instant.
+    ///
+    /// The default implementation returns the UTC day; an engine that knows time zones overrides it.
+    async fn tax_date(
+        &self,
+        _tenant: &TenantContext,
+        _org: OrgId,
+        at: Timestamp,
+    ) -> Result<Date, Error> {
+        Ok(at.date_utc())
+    }
 }

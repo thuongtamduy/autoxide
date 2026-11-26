@@ -123,6 +123,7 @@ impl Module for TaxModule {
             outbox: context.outbox()?,
             tables: TablesCache::new(),
             units: context.require::<dyn autoxide_address::api::AdministrativeUnits>().ok(),
+            orgs: context.require::<dyn autoxide_organizations::api::OrgDirectory>().ok(),
             warning_days: self.warning_days.unwrap_or(60),
         });
         self.service = Some(service.clone());
