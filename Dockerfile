@@ -28,7 +28,8 @@ ENV RUSTUP_TOOLCHAIN=${RUST_VERSION} \
 # cargo-auditable nhúng danh sách crate Rust đúng như lúc build vào binary (đoạn `.dep-v0`), để máy quét lỗ hổng
 # (cargo audit bin, Syft, Trivy) thấy crate trong binary đã strip (SBOM, docs/COMPATIBILITY.md).
 RUN cargo install cargo-chef --locked --version 0.1.78 \
-    && cargo install cargo-auditable --locked --version 0.7.8
+    && cargo install cargo-auditable --locked --version 0.7.8 \
+    && cargo install cargo-about --locked --version 0.9.3 --features cli
 WORKDIR /src
 
 # --- công thức: chỉ danh sách thư viện ngoài -----------------------------------
@@ -49,6 +50,10 @@ ARG SOURCE_DATE_EPOCH=0
 ENV SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH}
 RUN cargo auditable build --release --locked -p autoxide \
     && cp target/release/autoxide /usr/local/bin/autoxide
+# Văn bản giấy phép của mọi crate trong binary (D-20261126-third-party-licenses): nghĩa vụ giữ thông báo bản quyền khi
+# phân phối binary. Đi cùng image, và workflow phát hành lấy từ đây đưa vào tarball và trang Release.
+RUN cargo about generate --manifest-path crates/app/Cargo.toml --locked about.hbs \
+    -o /usr/local/share/THIRD-PARTY-LICENSES.html
 
 # --- chạy ----------------------------------------------------------------------
 FROM debian:trixie-slim@sha256:a72b4433de1cf7d6bae0c4cee74d0547f58601a643b3375f070c51600d63b6b2
@@ -68,6 +73,8 @@ RUN apt-get update \
     && mkdir -p /var/lib/autoxide/data \
     && chown -R autoxide:autoxide /var/lib/autoxide
 COPY --from=build /usr/local/bin/autoxide /usr/local/bin/autoxide
+COPY --from=build /usr/local/share/THIRD-PARTY-LICENSES.html /usr/share/doc/autoxide/THIRD-PARTY-LICENSES.html
+COPY LICENSE-MIT LICENSE-APACHE /usr/share/doc/autoxide/
 USER autoxide
 WORKDIR /var/lib/autoxide
 # Mọi dữ liệu ghi xuống đĩa (SQLite, file tải lên, mail ghi ra file) nằm trong `data/`.

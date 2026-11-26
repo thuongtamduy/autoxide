@@ -203,6 +203,7 @@ jobs:
           mkdir -p "dist/$name"
           container="$(docker create --platform "$PLATFORM" "$IMAGE@$DIGEST")"
           docker cp "$container:/usr/local/bin/autoxide" "dist/$name/autoxide"
+          docker cp "$container:/usr/share/doc/autoxide/THIRD-PARTY-LICENSES.html" "dist/$name/THIRD-PARTY-LICENSES.html"
           docker rm "$container" >/dev/null
           cp LICENSE-MIT LICENSE-APACHE README.md "dist/$name/"
           file "dist/$name/autoxide"
@@ -322,6 +323,12 @@ jobs:
           cargo cyclonedx --manifest-path crates/app/Cargo.toml --format json --spec-version 1.5 \
             --override-filename autoxide.cdx
           cp crates/app/autoxide.cdx.json dist/autoxide.cdx.json
+      # Văn bản giấy phép bên thứ ba (D-20261126-third-party-licenses): lấy từ tarball đã build, đính riêng vào trang Release.
+      - name: Third-party licenses
+        run: |
+          tar -xzf dist/autoxide-*-x86_64-unknown-linux-gnu.tar.gz -O --wildcards '*/THIRD-PARTY-LICENSES.html' \
+            > dist/THIRD-PARTY-LICENSES.html
+          test -s dist/THIRD-PARTY-LICENSES.html
       - name: Release notes from CHANGELOG.md
         env:
           TAG: ${{ github.ref_name }}
@@ -356,6 +363,8 @@ jobs:
       - name: Pack the TypeScript SDK
         working-directory: sdk/typescript
         run: |
+          # Giấy phép của chính SDK đi kèm gói (SDK không có phụ thuộc chạy, nên không có giấy phép bên thứ ba).
+          cp ../../LICENSE-MIT ../../LICENSE-APACHE .
           npm pack
           mv autoxide-sdk-*.tgz ../../dist/
       # Mọi file đính kèm: một `SHA256SUMS` ký bằng cosign (bundle Sigstore), và chứng thực nguồn gốc build (SLSA) cho
@@ -363,7 +372,7 @@ jobs:
       - name: Checksums of the release files
         working-directory: dist
         run: |
-          sha256sum -- *.tar.gz *.tgz sbom.spdx.json autoxide.cdx.json > SHA256SUMS
+          sha256sum -- *.tar.gz *.tgz sbom.spdx.json autoxide.cdx.json THIRD-PARTY-LICENSES.html > SHA256SUMS
           cat SHA256SUMS
       - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
@@ -372,6 +381,7 @@ jobs:
             dist/*.tgz
             dist/sbom.spdx.json
             dist/autoxide.cdx.json
+            dist/THIRD-PARTY-LICENSES.html
       - name: Sign the checksums with cosign (keyless)
         working-directory: dist
         run: cosign sign-blob --yes --bundle SHA256SUMS.sigstore.json SHA256SUMS
@@ -387,6 +397,7 @@ jobs:
           files=(
             "sbom.spdx.json#SBOM (SPDX JSON) of the Docker image"
             "autoxide.cdx.json#SBOM (CycloneDX JSON) of the Rust crates in the binary"
+            "THIRD-PARTY-LICENSES.html#License texts of the third-party Rust crates in the binary"
             "$sdk#TypeScript SDK (npm install <URL of this file>)"
             "SHA256SUMS#SHA-256 checksums of the release files"
             "SHA256SUMS.sigstore.json#Sigstore bundle: cosign signature of SHA256SUMS"

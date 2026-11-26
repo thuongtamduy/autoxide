@@ -19,6 +19,7 @@ Replace `X.Y.Z` below with the version you install (for example `1.0.0` or `1.0.
 | TypeScript SDK `autoxide-sdk-X.Y.Z.tgz`                       | yes                     | through `SHA256SUMS`                     |
 | SBOM of the image `sbom.spdx.json`                            | yes                     | through `SHA256SUMS`                     |
 | SBOM of the Rust crates `autoxide.cdx.json` (CycloneDX)         | yes                     | through `SHA256SUMS`                     |
+| License texts of third-party crates `THIRD-PARTY-LICENSES.html` | yes                     | through `SHA256SUMS`                     |
 | `SHA256SUMS` (checksums of the files above)                   | —                       | `SHA256SUMS.sigstore.json` (Sigstore bundle) |
 
 Linux binaries, `SHA256SUMS` and the cosign signatures are attached to releases after 0.18.0. Older releases have

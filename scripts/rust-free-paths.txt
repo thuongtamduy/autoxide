@@ -42,6 +42,8 @@ TRADEMARK.md
 TRADEMARK.vi.md
 DCO
 REUSE.toml
+about.toml
+about.hbs
 LICENSES/*
 STACK.md
 CLAUDE.md

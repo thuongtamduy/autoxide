@@ -470,6 +470,28 @@ jobs:
         # `+$MSRV` thắng `rust-toolchain.toml`. `--locked`: Cargo.lock không được đổi.
         run: cargo "+$MSRV" check --workspace --locked
 
+  # Giấy phép bên thứ ba (D-20261126-third-party-licenses): `cargo deny check licenses` đã chạy trong gate; ở đây kiểm thêm
+  # mẫu `about.hbs` / `about.toml` còn sinh được văn bản giấy phép (phát hành dựng nó), và gói SDK npm không có phụ thuộc chạy
+  # (danh sách bên thứ ba của SDK rỗng).
+  licenses:
+    name: third-party licenses (cargo-about)
+    if: ${{ !github.event.repository.private }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: licenses
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - run: cargo install cargo-about --locked --version 0.9.3 --features cli
+      - run: cargo about generate --manifest-path crates/app/Cargo.toml --locked about.hbs -o "$RUNNER_TEMP/THIRD-PARTY-LICENSES.html"
+      - name: The SDK has no runtime dependencies
+        run: jq -e '(.dependencies // {}) == {}' sdk/typescript/package.json
+
   # REUSE (REUSE.toml, LICENSES/): mọi file có thông tin bản quyền và giấy phép SPDX. Công cụ ghim phiên bản.
   reuse:
     name: REUSE compliance
