@@ -406,3 +406,38 @@ impl IdempotencyStore for MemoryStore {
         Ok(())
     }
 }
+
+/// Giới hạn request theo khách (D-20261126-tenant-rate-limit): một lô ghi tính MỘT lượt, không một lượt cho mỗi lệnh,
+/// nên lô không bị 429 giữa chừng.
+#[tokio::test]
+async fn lo_ghi_tinh_mot_luot_vao_khach() {
+    TestDatabase::run(async |test| {
+        let own = [("notes.read", Scope::Own), ("notes.write", Scope::Own)];
+        let app = TestApp::builder(test)
+            .setting("AUTOXIDE_HTTP_RATE_LIMIT_TENANT_PER_MINUTE", "2")
+            .setting("AUTOXIDE_HTTP_RATE_LIMIT_TENANT_BURST", "2")
+            .setting("AUTOXIDE_HTTP_RATE_LIMIT_PER_MINUTE", "0")
+            .member("ada", 0xada, root_of(DEFAULT_TENANT), &own)
+            .provide::<dyn IdempotencyStore>(Arc::new(MemoryStore::default()))
+            .module(crate::module())
+            .build()
+            .await
+            .unwrap();
+        let operations: Vec<Value> = (1..=3)
+            .map(|n| {
+                json!({"id": n.to_string(), "method": "POST", "path": "/api/v1/notes",
+                       "idempotency_key": format!("k-{n}"), "body": {"title": format!("Note {n}")}})
+            })
+            .collect();
+        let (status, answer) = batch(&app, "ada", json!(operations)).await;
+        assert_eq!(status, StatusCode::OK, "{answer}");
+        for result in answer["data"].as_array().unwrap() {
+            assert_eq!(result["status"], 201, "{answer}");
+        }
+        let list = || app.get("/api/v1/notes").token("ada").send();
+        assert_eq!(list().await.unwrap().status(), StatusCode::OK);
+        assert_eq!(list().await.unwrap().status(), StatusCode::TOO_MANY_REQUESTS);
+    })
+    .await
+    .unwrap();
+}

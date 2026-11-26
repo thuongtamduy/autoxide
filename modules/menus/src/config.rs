@@ -90,7 +90,8 @@ pub(crate) const TENANT_DEFAULT_LOCALE: autoxide_kernel::tenancy::TenantSetting 
         "menus.default_locale",
         "Language of a menu when none is given, and of the menu served when one is missing in the \
          language asked for, instead of the server's AUTOXIDE_MENUS_DEFAULT_LOCALE. When it is not \
-         one of the tenant's languages, the first of them is used.",
+         one of the tenant's languages, the server's default is used if it is one of them, otherwise \
+         the first of them; `GET /api/v1/kernel/client-config` shows the language in use.",
     )
     .checked(|raw| {
         canonical_locale(raw.trim()).map(|_| ()).ok_or_else(|| {

@@ -238,6 +238,24 @@ mod tests {
         assert_eq!(limiter.check_memory(a, level, now + Duration::from_secs(1)), Decision::Allow);
     }
 
+    /// Nhân sự nền tảng thao tác trong khách khác và quyền hỗ trợ không tính vào khách đích (để hỗ trợ được khách
+    /// đang ở trần); người gọi thường tính vào khách của mình.
+    #[test]
+    fn nhan_su_nen_tang_va_ho_tro_khong_tinh() {
+        let (home, target) =
+            (TenantId::from_uuid(Uuid::from_u128(1)), TenantId::from_uuid(Uuid::from_u128(2)));
+        let user = Principal::new(Uuid::from_u128(9), Vec::<String>::new()).in_tenant(target);
+        assert_eq!(budget_tenant(&user), Some(target));
+        let staff = Principal::new(Uuid::from_u128(9), Vec::<String>::new())
+            .in_tenant(home)
+            .operating(target);
+        assert_eq!(budget_tenant(&staff), None);
+        let support = user.clone().with_access(AccessPath::Support(Uuid::from_u128(3)));
+        assert_eq!(budget_tenant(&support), None);
+        let delegated = user.with_access(AccessPath::Delegation(Uuid::from_u128(4)));
+        assert_eq!(budget_tenant(&delegated), Some(target));
+    }
+
     #[test]
     fn ma_loi_va_retry_after() {
         let error = tenant_rate_limited(Duration::from_millis(1500));

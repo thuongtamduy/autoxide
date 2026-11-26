@@ -1,14 +1,17 @@
 //! Giới hạn request theo khách (D-20261126-tenant-rate-limit): khách A gửi quá mức thì 429 `tenant_rate_limited` kèm
 //! `Retry-After`; khách B không bị khách A làm nghẽn. Đếm trong bộ nhớ và đếm chung qua database.
 
-use autoxide_testkit::{TestApp, TestDatabase};
+use autoxide_testkit::{TestApp, TestDatabase, tool};
 use axum::http::StatusCode;
+use serde_json::json;
 
 async fn app(test: &TestDatabase, store: &str) -> TestApp {
     TestApp::builder(test)
         .setting("AUTOXIDE_HTTP_RATE_LIMIT_TENANT_PER_MINUTE", "2")
         .setting("AUTOXIDE_HTTP_RATE_LIMIT_TENANT_BURST", "2")
         .setting("AUTOXIDE_HTTP_RATE_LIMIT_STORE", store)
+        // Giới hạn theo địa chỉ không là thứ được đo ở đây.
+        .setting("AUTOXIDE_HTTP_RATE_LIMIT_PER_MINUTE", "0")
         .tenant("a")
         .tenant("b")
         .user_in("a", "owner-a", 1, &["kernel.settings.manage"])
@@ -36,6 +39,73 @@ async fn moi_khach_mot_muc_rieng() {
         .await
         .unwrap();
     }
+}
+
+/// Request không đăng nhập (hay mang token sai) nêu tên khách `a` bằng `Autoxide-Tenant` không trừ vào hạn mức của
+/// `a`: người ngoài không làm cạn được hạn mức của khách; route công khai (và webhook gửi đến, cùng là request không
+/// có thông tin xác thực của Autoxide) không bao giờ bị 429 vì khách ở trần.
+#[tokio::test]
+async fn an_danh_khong_lam_can_han_muc_cua_khach() {
+    for store in ["memory", "database"] {
+        TestDatabase::run(async |test| {
+            let app = app(test, store).await;
+            for _ in 0..5 {
+                let public = app
+                    .get("/api/v1/kernel/client-config")
+                    .header("autoxide-tenant", "a")
+                    .send()
+                    .await
+                    .unwrap();
+                assert_eq!(public.status(), StatusCode::OK, "{store}");
+                let forged = app
+                    .get("/api/v1/kernel/settings")
+                    .header("autoxide-tenant", "a")
+                    .header("authorization", "Bearer khong-hop-le")
+                    .send()
+                    .await
+                    .unwrap();
+                assert_eq!(forged.status(), StatusCode::UNAUTHORIZED, "{store}");
+            }
+            let get = || app.get("/api/v1/kernel/settings").token("owner-a").send();
+            assert_eq!(get().await.unwrap().status(), StatusCode::OK, "{store}");
+            assert_eq!(get().await.unwrap().status(), StatusCode::OK, "{store}");
+            // Khách đã ở trần: route công khai vẫn trả lời.
+            assert_eq!(get().await.unwrap().status(), StatusCode::TOO_MANY_REQUESTS, "{store}");
+            let public = app
+                .get("/api/v1/kernel/client-config")
+                .header("autoxide-tenant", "a")
+                .send()
+                .await
+                .unwrap();
+            assert_eq!(public.status(), StatusCode::OK, "{store}");
+        })
+        .await
+        .unwrap();
+    }
+}
+
+/// Lời gọi tool MCP đi qua cùng bộ đếm với REST: hết lượt thì tool trả `tenant_rate_limited`.
+#[tokio::test]
+async fn tool_mcp_tinh_chung_voi_rest() {
+    TestDatabase::run(async |test| {
+        let app = app(test, "memory").await;
+        let rest = app.get("/api/v1/kernel/settings").token("owner-a").send().await.unwrap();
+        assert_eq!(rest.status(), StatusCode::OK);
+        let mcp = app.mcp("owner-a").await.unwrap();
+        let first = mcp.call_tool(tool("kernel.navigation", json!({}))).await.unwrap();
+        assert_eq!(first.is_error, Some(false), "{first:?}");
+        let second = mcp.call_tool(tool("kernel.navigation", json!({}))).await.unwrap();
+        assert_eq!(second.is_error, Some(true), "{second:?}");
+        assert_eq!(second.structured_content.unwrap()["code"], "tenant_rate_limited");
+        // REST của khách cũng hết lượt; khách `b` không sao.
+        let rest = app.get("/api/v1/kernel/settings").token("owner-a").send().await.unwrap();
+        assert_eq!(rest.status(), StatusCode::TOO_MANY_REQUESTS);
+        let other = app.mcp("owner-b").await.unwrap();
+        let call = other.call_tool(tool("kernel.navigation", json!({}))).await.unwrap();
+        assert_eq!(call.is_error, Some(false), "{call:?}");
+    })
+    .await
+    .unwrap();
 }
 
 /// Gói giả: khách `limited` có `kernel.api_rate_per_minute` = 1; khách khác có gói "không giới hạn" mức này.

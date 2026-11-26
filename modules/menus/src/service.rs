@@ -399,7 +399,9 @@ impl MenuService {
     }
 
     /// Ngôn ngữ của khách `tenant` và ngôn ngữ mặc định: cấu hình `menus.locales` / `menus.default_locale`,
-    /// thiếu thì biến chung. Mặc định không thuộc danh sách thì lấy ngôn ngữ đầu. Đọc qua cache của kernel.
+    /// thiếu thì biến chung. Mặc định không thuộc danh sách thì lấy mặc định của máy chủ nếu nó thuộc danh sách,
+    /// không thì ngôn ngữ đầu — như `content` (hai cài đặt lưu riêng nên không từ chối lúc lưu: đổi bộ ngôn ngữ
+    /// sẽ phải lưu hai lần theo đúng thứ tự). Đọc qua cache của kernel.
     pub(crate) async fn tenant_locales(
         &self,
         tenant: &TenantContext,
@@ -426,6 +428,8 @@ impl MenuService {
         .unwrap_or_else(|| self.config.default_locale.clone());
         let default = if locales.contains(&wanted) {
             wanted
+        } else if locales.contains(&self.config.default_locale) {
+            self.config.default_locale.clone()
         } else {
             locales.first().cloned().unwrap_or(wanted)
         };

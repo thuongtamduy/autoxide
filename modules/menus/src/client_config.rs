@@ -12,10 +12,11 @@ use crate::config::MenusConfig;
 #[schema(as = MenusClientConfig)]
 struct MenusClientConfig {
     /// Languages menus may be written in (tenant setting `menus.locales`, otherwise
-    /// `AUTOXIDE_MENUS_LOCALES`), the default first.
+    /// `AUTOXIDE_MENUS_LOCALES`), in the order they are set.
     #[schema(example = json!(["en", "vi"]))]
     locales: Vec<String>,
-    /// Language of a menu when none is given.
+    /// Language of a menu when none is given (tenant setting `menus.default_locale`, otherwise
+    /// `AUTOXIDE_MENUS_DEFAULT_LOCALE`); always one of `locales`.
     #[schema(example = "en")]
     default_locale: String,
 }
