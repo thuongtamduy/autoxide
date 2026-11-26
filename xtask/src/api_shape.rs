@@ -1,6 +1,6 @@
 //! Hình dạng thống nhất của `/api/v1`, kiểm trên `docs/openapi.json` (D-20261121-api-shape).
 //!
-//! Học một endpoint là biết các endpoint còn lại (CLAUDE.md, "Thân thiện với AI"). Năm luật:
+//! Học một endpoint là biết các endpoint còn lại (CLAUDE.md, "Thân thiện với AI"). Sáu luật:
 //!
 //! - `api-closed-body`: thân request JSON là object thì đóng (`additionalProperties: false`, tức
 //!   kiểu Rust có `#[serde(deny_unknown_fields)]`): trường lạ hay gõ sai tên bị trả 422
@@ -10,6 +10,8 @@
 //! - `api-unpaged-list`: `GET` trả mảng phải là `Page<T>` (`data` + `pagination`, lấy bằng
 //!   `fetch_page`); `Data<Vec<T>>` chỉ cho tập nhỏ có giới hạn, ghi trong [`ALLOW_FILE`].
 //! - `api-page-params`: endpoint trả `Page<T>` nhận `limit` và `cursor`.
+//! - `mcp-page-count`: tool MCP nhận `cursor` (tool danh sách) cũng nhận `count`, như tham số `count` của REST
+//!   (D-20261125-list-pages mục 3b); kiểm trên `docs/mcp-tools.json`, dòng cho phép ghi `mcp-page-count TOOL <tên>`.
 //! - `api-param-description`: mọi tham số (đường dẫn, query, header) có `description` ở chính tham số — chỗ
 //!   Swagger UI / Scalar hiển thị và agent đọc để gọi đúng (D-20261125-list-pages-kernel). Dòng cho phép của luật
 //!   này ghi `<đường dẫn>?<tên tham số>`.
@@ -30,6 +32,7 @@ use serde_json::{Map, Value};
 use crate::boundaries::Violation;
 
 const OPENAPI_FILE: &str = "docs/openapi.json";
+const MCP_FILE: &str = "docs/mcp-tools.json";
 pub const ALLOW_FILE: &str = "xtask/api-shape-allow.txt";
 const SCIM_PREFIX: &str = "/api/v1/auth/scim/v2/";
 const METHODS: &[&str] = &["get", "post", "put", "patch", "delete"];
@@ -47,7 +50,13 @@ pub fn check(root: &Path) -> Result<Report, String> {
         serde_json::from_str(&text).map_err(|error| format!("{OPENAPI_FILE}: {error}"))?;
     let allow_text = fs::read_to_string(root.join(ALLOW_FILE)).unwrap_or_default();
     let allowed = parse_allow(&allow_text)?;
-    let found = find(&document);
+    let mut found = find(&document);
+    // Thiếu file tool (repo chưa sinh) thì bỏ qua luật của tool; test giữ tài liệu khớp code bắt file cũ.
+    if let Ok(text) = fs::read_to_string(root.join(MCP_FILE)) {
+        let tools: Value =
+            serde_json::from_str(&text).map_err(|error| format!("{MCP_FILE}: {error}"))?;
+        found.extend(find_tools(&tools));
+    }
     let mut used = BTreeSet::new();
     let mut violations = Vec::new();
     for (key, message) in found {
@@ -82,6 +91,7 @@ const RULES: &[&str] = &[
     "api-unpaged-list",
     "api-page-params",
     "api-param-description",
+    "mcp-page-count",
 ];
 
 fn parse_allow(text: &str) -> Result<BTreeSet<Key>, String> {
@@ -173,6 +183,27 @@ fn find(document: &Value) -> Vec<(Key, String)> {
         }
     }
     found
+}
+
+/// Tool danh sách (nhận `cursor`) thiếu `count`.
+fn find_tools(document: &Value) -> Vec<(Key, String)> {
+    let tools = document.get("tools").and_then(Value::as_array).map(Vec::as_slice).unwrap_or(&[]);
+    tools
+        .iter()
+        .filter_map(|tool| {
+            let name = tool.get("name")?.as_str()?;
+            let properties = tool.pointer("/input_schema/properties")?.as_object()?;
+            (properties.contains_key("cursor") && !properties.contains_key("count")).then(|| {
+                (
+                    ("mcp-page-count", "TOOL".to_owned(), name.to_owned()),
+                    format!(
+                        "tool `{name}` pages a list (`cursor`) but has no `count` input; add \
+                         `count: Option<bool>` and pass it to the page query (`with_count`), like REST"
+                    ),
+                )
+            })
+        })
+        .collect()
 }
 
 /// Câu báo lỗi khi thân request JSON là object mà không đóng.
@@ -377,6 +408,17 @@ mod tests {
         let found = find(&page);
         assert_eq!(found.len(), 2);
         assert!(found[0].1.contains("`cursor`"));
+    }
+
+    #[test]
+    fn tool_danh_sach_thieu_count_bi_bao() {
+        let tools = json!({"tools": [
+            {"name": "a.list", "input_schema": {"properties": {"cursor": {}, "limit": {}}}},
+            {"name": "a.full", "input_schema": {"properties": {"cursor": {}, "count": {}}}},
+            {"name": "a.get", "input_schema": {"properties": {"id": {}}}}
+        ]});
+        let found: Vec<Key> = find_tools(&tools).into_iter().map(|(key, _)| key).collect();
+        assert_eq!(found, vec![("mcp-page-count", "TOOL".to_owned(), "a.list".to_owned())]);
     }
 
     #[test]

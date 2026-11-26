@@ -56,7 +56,7 @@ api-unpaged-list GET /api/v1/catalog/rounding-rules # có trước luật
 api-unpaged-list GET /api/v1/catalog/variants # có trước luật
 api-unpaged-list GET /api/v1/catalog/variants/{id}/attributes # có trước luật
 api-unpaged-list GET /api/v1/catalog/variants/{id}/digital-assets # có trước luật
-api-unpaged-list GET /api/v1/comments/public/counts # có trước luật
+api-unpaged-list GET /api/v1/comments/public/counts # tra cứu theo id client gửi (tối đa 100), giữ thứ tự hỏi — chờ chủ dự án duyệt ngoại lệ
 api-unpaged-list GET /api/v1/compliance/documents # có trước luật
 api-unpaged-list GET /api/v1/compliance/documents/{id}/acceptance-stats # có trước luật
 api-unpaged-list GET /api/v1/compliance/me/consents # có trước luật
@@ -68,7 +68,7 @@ api-unpaged-list GET /api/v1/compliance/retention # có trước luật
 api-unpaged-list GET /api/v1/compliance/rules # có trước luật
 api-unpaged-list GET /api/v1/compliance/tracking-providers # có trước luật
 api-unpaged-list GET /api/v1/customers/me/wishlist # có trước luật
-api-unpaged-list GET /api/v1/inventory/public/availability # có trước luật
+api-unpaged-list GET /api/v1/inventory/public/availability # tra cứu theo biến thể client gửi (tối đa 100) — chờ chủ dự án duyệt ngoại lệ
 api-unpaged-list GET /api/v1/kernel/approvals # có trước luật
 api-unpaged-list GET /api/v1/kernel/blocks # một dòng cho mỗi loại khối mà module đang chạy khai (bước 67): tập nhỏ, cố định theo binary, như sổ module
 api-unpaged-list GET /api/v1/kernel/connections/webhooks # một dòng cho mỗi loại kết nối mà bộ nối đang bật đăng ký (D-20261121-provider-accounts): tập nhỏ, cố định theo binary

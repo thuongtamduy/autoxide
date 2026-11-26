@@ -345,6 +345,8 @@ async fn list_versions(
     Path((kind, channel, locale)): Path<(String, String, String)>,
     Query(page): Query<PageQuery>,
 ) -> Result<Page<VersionResponse>, Error> {
+    // Kiểm quyền trước khi đọc tham số trang: người không có quyền nhận 403, không phải 422 (D-20261126-list-pages-cluster-2).
+    principal.require(&crate::permissions::TEMPLATES_READ)?;
     let page = PageRequest::try_from(page)?;
     let target = (kind.as_str(), channel.as_str(), locale.as_str());
     let found = service.list_versions(&tenant, &principal, target, &page).await?;

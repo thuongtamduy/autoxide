@@ -26,6 +26,8 @@ pub(crate) struct KindsInput {
     cursor: Option<String>,
     /// `asc` (by name, the default) or `desc`.
     order: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
 }
 
 /// Which report figures to sum, and how.
@@ -94,7 +96,8 @@ pub(crate) fn all(service: &Arc<Reporting>) -> Vec<Tool> {
                         input.limit.map(|limit| limit.to_string()),
                         input.cursor,
                         input.order,
-                    );
+                    )
+                    .with_count(input.count.unwrap_or(false));
                     kind_list(
                         &service,
                         &autoxide_kernel::pagination::PageRequest::try_from(paging)?,

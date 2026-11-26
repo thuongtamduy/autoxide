@@ -64,6 +64,8 @@ pub(crate) struct CallsInput {
     cursor: Option<String>,
     /// `desc` (newest first, the default) or `asc`.
     order: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
 }
 
 /// A message to send.
@@ -214,7 +216,9 @@ pub(crate) fn all(service: &Arc<ConversationsService>) -> Vec<Tool> {
                 let service = calls.clone();
                 async move {
                     // Cùng kiểu tham số trang với REST (`PageQuery`, mới trước).
-                    let page = PageInput::new(input.limit, input.cursor, input.order).page()?;
+                    let page = PageInput::new(input.limit, input.cursor, input.order)
+                        .with_count(input.count.unwrap_or(false))
+                        .page()?;
                     let rows = service.calls_of(&tenant, &principal, input.id, &page).await?;
                     Ok::<Page<CallResponse>, Error>(rows.map(CallResponse::from))
                 }

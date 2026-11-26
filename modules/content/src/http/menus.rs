@@ -147,6 +147,8 @@ pub(crate) async fn list_menus(
     principal: Principal,
     Query(page): Query<NaturalOrderPageQuery>,
 ) -> Result<Page<MenuSummary>, Error> {
+    // Kiểm quyền trước khi đọc tham số trang: người không có quyền nhận 403, không phải 422 (D-20261126-list-pages-cluster-2).
+    principal.require(&crate::permissions::CONTENT_READ)?;
     let page = PageRequest::try_from(page)?;
     let menus = service.list_menus(&tenant, &principal, &page).await?;
     Ok(menus.map(|menu| MenuSummary {

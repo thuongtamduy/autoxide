@@ -49,12 +49,17 @@ impl Reporting {
         sources: &[(&'static str, FactSource)],
         config: ReportingConfig,
     ) -> Self {
-        let kinds = sources
-            .iter()
-            .flat_map(|(module, source)| {
-                source.kinds().iter().map(|kind| KindInfo { module, kind: *kind })
-            })
-            .collect();
+        // Một module có thể khai cùng một loại ở nhiều nguồn (hai event cùng sinh một loại), giống hệt nhau:
+        // giữ một dòng. Khai khác nhau, hay hai module cùng tên, đã bị `FactCatalog::new` của kernel chặn lúc
+        // khởi động — không có trường hợp nào bị bỏ trong im lặng.
+        let mut kinds: Vec<KindInfo> = Vec::new();
+        for (module, source) in sources {
+            for kind in source.kinds() {
+                if !kinds.iter().any(|known| known.kind.kind == kind.kind) {
+                    kinds.push(KindInfo { module, kind: *kind });
+                }
+            }
+        }
         Reporting { databases, directory, groups: None, ledger, kinds, config }
     }
 }

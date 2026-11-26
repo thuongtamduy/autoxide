@@ -283,6 +283,8 @@ pub(crate) struct LegalTemplatesInput {
     cursor: Option<String>,
     /// `asc` (by key, the default) or `desc`.
     order: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
 }
 
 /// Tool của mẫu trang bắt buộc (D-359): cùng service, cùng permission với REST.
@@ -302,7 +304,8 @@ fn template_tools(service: &Arc<ContentService>) -> Vec<Tool> {
                     input.limit.map(|limit| limit.to_string()),
                     input.cursor,
                     input.order,
-                );
+                )
+                .with_count(input.count.unwrap_or(false));
                 let page = autoxide_kernel::pagination::PageRequest::try_from(paging)?;
                 crate::templates::summary_page(&principal, &page)
             },
