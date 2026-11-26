@@ -348,11 +348,37 @@ impl RoleService {
         self.get(tenant, id).await
     }
 
-    /// Thay toàn bộ tên, mô tả và permission của role `id`.
+    /// Thay toàn bộ tên, mô tả và permission của role `id` (đường hệ thống, không kiểm người sửa).
     pub(crate) async fn update(
         &self,
         tenant: &TenantContext,
         actor: Actor,
+        id: Uuid,
+        input: RoleInput,
+        expected: Option<Timestamp>,
+    ) -> Result<Role, Error> {
+        self.update_checked(tenant, actor, None, id, input, expected).await
+    }
+
+    /// Như [`update`](Self::update), do `principal` làm (REST, MCP): không thêm, nới hay mở cấm permission mà
+    /// chính họ không có (PT-9, [`grants::rules_beyond`]).
+    pub(crate) async fn update_as(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+        id: Uuid,
+        input: RoleInput,
+        expected: Option<Timestamp>,
+    ) -> Result<Role, Error> {
+        self.update_checked(tenant, Actor::from(principal), Some(principal), id, input, expected)
+            .await
+    }
+
+    async fn update_checked(
+        &self,
+        tenant: &TenantContext,
+        actor: Actor,
+        authority: Option<&Principal>,
         id: Uuid,
         input: RoleInput,
         expected: Option<Timestamp>,
@@ -374,6 +400,17 @@ impl RoleService {
             && permissions.denies.is_empty();
         if current.all_permissions && !only_mfa {
             return Err(builtin_role());
+        }
+        if let Some(authority) = authority {
+            let mut rules = permissions_of(&transaction, tenant, [id]).await?;
+            let held = rules.remove(&id).unwrap_or_default();
+            if let Some(permission) =
+                grants::rules_beyond(authority, root_of(tenant.id()), &held, &permissions)
+            {
+                transaction.rollback().await?;
+                tracing::warn!(role_id = %id, permission, "role change beyond the editor refused");
+                return Err(grants::permission_beyond_you(&permission));
+            }
         }
         let before = role_snapshot(&transaction, tenant, &current).await?;
         // Thêm permission cấm cho role đang được quản trị viên cuối cùng giữ thì không còn ai đủ
@@ -771,5 +808,7 @@ pub(crate) async fn role_by_name(
         .map(|row| row.id))
 }
 
+#[cfg(test)]
+mod self_grant_tests;
 #[cfg(test)]
 mod tests;

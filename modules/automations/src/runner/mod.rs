@@ -235,6 +235,29 @@ impl Automations {
         Ok(())
     }
 
+    /// Mọi cửa vào tài khoản `user` bị cắt (event `auth.access_revoked`): tạm dừng mọi luật đang bật chạy bằng
+    /// quyền của họ (lý do `owner_access_revoked`); bật lại cần một người có quyền (người bật thành `run_as`).
+    /// Nhận lại cùng event thì không còn luật nào đang bật: không làm gì.
+    pub(crate) async fn owner_revoked(
+        &self,
+        tenant: &TenantContext,
+        user: Uuid,
+    ) -> Result<(), Error> {
+        let rules = rule::Entity::find()
+            .filter(rule::Column::RunAs.eq(user))
+            .filter(rule::Column::Status.eq(ACTIVE))
+            .scoped(tenant)
+            .all(tenant.database().read())
+            .await?;
+        for rule in &rules {
+            self.pause(tenant.database().write(), tenant, rule, "owner_access_revoked").await?;
+        }
+        if !rules.is_empty() {
+            tracing::info!(user_id = %user, rules = rules.len(), "automation rules paused: owner access revoked");
+        }
+        Ok(())
+    }
+
     pub(crate) async fn pause<C: sea_orm::ConnectionTrait>(
         &self,
         connection: &C,

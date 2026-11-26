@@ -256,6 +256,7 @@
   "auth.scim_mapping_not_found": "Không có luật ánh xạ nhóm SCIM `{id}`.",
   "auth.scim_mapping_taken": "Nhóm này đã cấp role này ở nút này rồi.",
   "auth.role_beyond_you": "Role `{role_id}` ở nút `{org_id}` có permission mà bạn không có (với token SCIM: mà người tạo token hiện không có), hoặc có rộng hơn bạn; bạn không cấp hay gỡ nó theo cách này được. Hãy nhờ người có đủ mọi permission của role đó ở nút đó.",
+  "auth.permission_beyond_you": "Bạn không thêm được permission `{permission}` cho role (hay nới rộng nó, hay bỏ cấm nó): chính bạn không có nó rộng như vậy. Hãy nhờ người có permission đó.",
   "text:The identity provider created a SCIM group (`after`: id, name, member ids).": "Hệ thống danh tính tạo một nhóm SCIM (`after`: id, tên, id thành viên).",
   "text:The identity provider renamed a SCIM group or changed its members (`after`: name, `added`, `removed` user ids).": "Hệ thống danh tính đổi tên hay đổi thành viên một nhóm SCIM (`after`: tên, id người `added`, `removed`).",
   "text:The identity provider deleted a SCIM group; its mapping rules went with it.": "Hệ thống danh tính xoá một nhóm SCIM; các luật ánh xạ của nó bị xoá theo.",

@@ -136,6 +136,45 @@ pub(crate) fn role_beyond_you(org_id: Uuid, role_id: Uuid) -> Error {
     .with_param("org_id", org_id)
 }
 
+/// PT-9 (D-20261126-no-self-grant): sửa luật của role có hiệu lực ngay với mọi người đang giữ role — kể cả người
+/// sửa. Permission được THÊM hay NỚI rộng (`before` → `after`) phải là thứ `actor` đang có, đủ rộng, ở nút gốc
+/// (role có thể được giữ ở bất kỳ nút nào); bỏ một permission cấm cũng là mở thêm quyền, cần `actor` có
+/// permission đó. Trả permission đầu tiên vượt quyền (`None`: được).
+pub(crate) fn rules_beyond(
+    actor: &Principal,
+    root: OrgId,
+    before: &RoleRules,
+    after: &RoleRules,
+) -> Option<String> {
+    let rank = |scope: Scope| match scope {
+        Scope::Own => 0,
+        Scope::Unit => 1,
+        Scope::Subtree => 2,
+        Scope::Tenant => 3,
+    };
+    for (permission, scope) in &after.grants {
+        let had = before.grants.iter().find(|(old, _)| old == permission).map(|(_, old)| *old);
+        let widened = had.is_none_or(|old| rank(*scope) > rank(old));
+        if widened && !actor_covers(actor, root, &[root], permission, *scope) {
+            return Some(permission.clone());
+        }
+    }
+    before
+        .denies
+        .iter()
+        .find(|permission| !after.denies.contains(permission) && !actor.allows(permission))
+        .cloned()
+}
+
+pub(crate) fn permission_beyond_you(permission: &str) -> Error {
+    Error::forbidden(
+        "auth.permission_beyond_you",
+        "You cannot give a role permission `{permission}` (or give it more widely, or lift a ban \
+         on it): you do not have it that widely yourself. Ask someone who has it.",
+    )
+    .with_param("permission", permission)
+}
+
 /// Người gán `actor` có `permission` với phạm vi bao được grant độ sâu `needed` khi gán ở nút
 /// `target` (`chain`: các nút tổ tiên của `target`, gồm chính nó và gốc).
 fn actor_covers(

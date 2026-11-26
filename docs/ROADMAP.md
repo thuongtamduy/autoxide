@@ -263,13 +263,12 @@ thật (P7).
         được khi mở WebSocket) — kiểm cùng nguồn `OriginGrant` như MCP
   - [ ] Test cho lượt đọc ảnh chụp tên miền verified bị treo quá `READ_TIMEOUT` (3 giây,
         `tenancy::verified_domains`, D-20261125-tenant-cors): cần database giả treo được
-  - [ ] Chủ dự án quyết: `PUT /api/v1/auth/users/{id}/roles` (`auth.roles.manage`) cho tự gán mọi role kể cả `admin`
-        (cố ý theo mô tả permission), trong khi membership, lời mời và SCIM theo "chỉ cấp cái mình có"
-        (D-20261125-scim-grant-cover) — giữ, hay đưa đường cũ về cùng luật? Cùng lượt xem các chỗ bất nhất khác
-        (chưa đổi hành vi): (i) `require_covers` (xoá / khoá / đổi email / nhận về tài khoản) so theo tên
-        permission, bỏ qua phạm vi, còn `require_grantable` so cả phạm vi; (ii) `PUT /users/{id}/memberships` chỉ
-        kiểm role được cấp, không kiểm role bị gỡ — SCIM nay chặt hơn đường gán tay; (iii) cùng một luật ánh xạ:
-        tạo vượt quyền trả 422, xoá vượt quyền trả 403
+  - [x] Chủ dự án quyết: `PUT /api/v1/auth/users/{id}/roles` (`auth.roles.manage`) cho tự gán mọi role kể cả `admin`
+        — chặn (PT-9, D-20261126-no-self-grant): gán role và sửa role theo "chỉ cấp cái mình có", kể cả cho chính mình
+  - [ ] Các chỗ bất nhất còn lại của luật cấp quyền (chưa đổi hành vi): (i) `require_covers` (xoá / khoá / đổi
+        email / nhận về tài khoản) so theo tên permission, bỏ qua phạm vi, còn `require_grantable` so cả phạm vi;
+        (ii) `PUT /users/{id}/memberships` chỉ kiểm role được cấp, không kiểm role bị gỡ — SCIM và
+        `PUT /users/{id}/roles` nay chặt hơn; (iii) cùng một luật ánh xạ: tạo vượt quyền trả 422, xoá vượt quyền trả 403
   - [ ] Nhóm SCIM chưa có luật chứa "thành viên chờ": ai giữ token SCIM cũng đưa người vào được; admin đặt luật
         thì mọi thành viên nhận role (response tạo luật liệt kê ở `granted_user_ids`, hướng dẫn dặn xem trước —
         D-20261125-scim-grant-cover). Chặt hơn: ghi người đưa vào (`added_by`) ở thành viên nhóm và chỉ cấp cho
@@ -280,8 +279,8 @@ thật (P7).
   - [ ] SCIM: khi đồng bộ đưa một tài khoản lên role cao hơn người đã tạo liên kết SCIM của nó (token quyền thấp tạo
         tài khoản, token của admin cấp role cao), thu hồi mọi cách vào cũ như khi đổi email — cần ghi người tạo liên kết
         ở `auth_scim_users` (migration) (D-20261125-scim-sync-report mục 7)
-  - [ ] `automations`: luật chạy bằng quyền hiện tại của `run_as` — xem lại khi quyền của người đó đổi: tạm dừng luật
-        khi tài khoản bị khoá (nghe event của `auth`) và / hay giới hạn bằng quyền lúc tạo (D-20261125-durable-grants)
+  - [x] `automations`: luật chạy bằng quyền hiện tại của `run_as` — luật tạm dừng khi tài khoản bị cắt cửa vào
+        (event `auth.access_revoked`) và không có hơn quyền lúc tạo (D-20261126-automation-owner-revoked)
 
 - [ ] P17 — Sửa lỗi đợt test bảo mật + hiệu năng độc lập 2026-11 (29.584 case, cả hai database; PT-1..3 ở #515,
       PT-9 ở P16, PT-19 phiên khác):

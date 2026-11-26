@@ -48,6 +48,12 @@ impl EventHandler for EventTrigger {
         {
             self.0.credential_revoked(tenant, key).await?;
         }
+        // Mọi cửa vào tài khoản `run_as` vừa bị cắt (khoá, lấy lại bằng mail, khoá hẳn, xoá — có thể vì kẻ lạ
+        // đã chiếm nó): luật của nó tạm dừng tới khi một người có quyền xem lại và bật lại
+        // (D-20261126-automation-owner-revoked).
+        if let Some(user) = autoxide_kernel::accounts::revoked_user(event) {
+            self.0.owner_revoked(tenant, user).await?;
+        }
         let rules = rule::Entity::find()
             .filter(rule::Column::TriggerType.eq("event"))
             .filter(rule::Column::TriggerRef.eq(event.name.as_str()))

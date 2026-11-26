@@ -92,18 +92,14 @@ pub(crate) fn bounded(
     Ok(bounded.with_actor_kind(limit.actor_kind()))
 }
 
-/// Cột `run_as_api_key`, `run_as_limit` cho người đang lưu / bật luật: API key thì chụp quyền của
-/// key, người dùng đăng nhập thì cả hai `None`.
+/// Cột `run_as_api_key`, `run_as_limit` cho người đang lưu / bật luật: luôn chụp quyền của người làm lúc
+/// này (`run_as_limit`), nên luật không bao giờ có hơn quyền lúc tạo / sửa / bật — kể cả khi tài khoản sau đó
+/// được thêm quyền (D-20261126-automation-owner-revoked); API key thì kèm ID key.
 pub(crate) fn credential(
     principal: &autoxide_kernel::access::Principal,
 ) -> Result<(Option<Uuid>, Option<String>), Error> {
-    match principal.api_key_id() {
-        None => Ok((None, None)),
-        Some(key) => {
-            let limit = serde_json::to_string(&principal.snapshot()).map_err(Error::internal)?;
-            Ok((Some(key), Some(limit)))
-        }
-    }
+    let limit = serde_json::to_string(&principal.snapshot()).map_err(Error::internal)?;
+    Ok((principal.api_key_id(), Some(limit)))
 }
 
 /// Bây giờ, cắt tới micro giây (hai database lưu cùng một giá trị — dùng làm phiên bản).

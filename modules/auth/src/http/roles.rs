@@ -345,8 +345,9 @@ async fn get_role(
 
 /// Replace a role: its name, description and permissions.
 ///
-/// Requires `auth.roles.manage`. Users with the role get the new permissions on
-/// their next request.
+/// Requires `auth.roles.manage`. You can only add a permission (or widen it, or lift a ban
+/// on it) that you have yourself at least as widely. Users with the role get the new
+/// permissions on their next request.
 #[utoipa::path(
     put,
     path = "/roles/{id}",
@@ -358,7 +359,7 @@ async fn get_role(
     responses(
         (status = 200, description = "The role after the change.", body = Data<RoleResponse>, headers(("ETag" = String, description = "Version of the record: send it back in `If-Match` when changing it."))),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "Missing permission `auth.roles.manage`; code `permission_denied`.", body = Problem),
+        (status = 403, description = "Missing permission `auth.roles.manage` (code `permission_denied`), or the change adds, widens or unbans a permission you do not have as widely (code `auth.permission_beyond_you`).", body = Problem),
         (status = 404, description = "No role has this id; code `auth.role_not_found`.", body = Problem),
         (status = 409, description = "Another role has this name (`auth.role_name_taken`), or the role is the built-in `admin` (`auth.role_builtin`).", body = Problem),
         (status = 422, description = "A value is invalid, e.g. an unknown permission; see `errors`.", body = Problem),
@@ -375,8 +376,7 @@ async fn replace_role(
 ) -> Result<Tagged<RoleResponse>, Error> {
     principal.require(&ROLES_MANAGE)?;
     let expected = if_match.expected()?;
-    let role =
-        state.roles.update(&tenant, Actor::from(&principal), id, input.into(), expected).await?;
+    let role = state.roles.update_as(&tenant, &principal, id, input.into(), expected).await?;
     Ok(Tagged { version: role.updated_at, data: role.into() })
 }
 
@@ -438,8 +438,9 @@ async fn get_user_roles(
 
 /// Replace the roles of a user.
 ///
-/// Requires `auth.roles.manage`. Takes effect on the user's next request. The last
-/// user with the `admin` role cannot lose it.
+/// Requires `auth.roles.manage`. You can only give or take away roles whose permissions you
+/// have yourself, at least as widely — for anyone, yourself included. Takes effect on the
+/// user's next request. The last user with the `admin` role cannot lose it.
 #[utoipa::path(
     put,
     path = "/users/{id}/roles",
@@ -451,7 +452,7 @@ async fn get_user_roles(
     responses(
         (status = 200, description = "The user's roles after the change, sorted by name.", body = Data<Vec<RoleResponse>>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "Missing permission `auth.roles.manage`; code `permission_denied`.", body = Problem),
+        (status = 403, description = "Missing permission `auth.roles.manage` (code `permission_denied`), or a role given or taken away has permissions you do not have as widely (code `auth.role_beyond_you`).", body = Problem),
         (status = 404, description = "No user has this id; code `auth.user_not_found`.", body = Problem),
         (status = 409, description = "No user would keep the `admin` role; code `auth.last_admin`.", body = Problem),
         (status = 422, description = "A role id does not exist, or the list is too long; see `errors`.", body = Problem),
@@ -465,9 +466,7 @@ async fn replace_user_roles(
     ValidJson(input): ValidJson<UserRolesRequest>,
 ) -> Result<Data<Vec<RoleResponse>>, Error> {
     principal.require(&ROLES_MANAGE)?;
-    Ok(roles(
-        state.roles.set_user_roles(&tenant, Actor::from(&principal), id, input.role_ids).await?,
-    ))
+    Ok(roles(state.roles.set_user_roles_as(&tenant, &principal, id, input.role_ids).await?))
 }
 
 #[cfg(test)]
@@ -642,6 +641,42 @@ mod tests {
                 .await
                 .unwrap();
             assert_eq!(status().await, StatusCode::FORBIDDEN);
+        })
+        .await
+        .unwrap();
+    }
+
+    // PT-9 (D-20261126-no-self-grant): người quản lý role không tự gán `admin` cho mình qua REST.
+    #[tokio::test]
+    async fn quan_ly_role_khong_tu_gan_admin() {
+        TestDatabase::run(async |test| {
+            let (app, services) = app(test).await;
+            let tenant = services.tenant.clone();
+            let manager = crate::role::RoleInput {
+                denies: Vec::new(),
+                requires_mfa: false,
+                grants: Vec::new(),
+                name: "manager".to_owned(),
+                description: String::new(),
+                permissions: vec!["auth.roles.manage".to_owned(), "auth.roles.read".to_owned()],
+            };
+            let manager = services.roles.create(&tenant, Actor::system(), manager).await.unwrap();
+            let page =
+                services.roles.list(&tenant, &PageRequest::first(10, Order::Asc)).await.unwrap();
+            let admin = page.data.iter().find(|role| role.all_permissions).unwrap().id;
+            let ada =
+                services.users.find_by_email(&tenant, "ada@example.com").await.unwrap().unwrap();
+            services
+                .roles
+                .set_user_roles(&tenant, Actor::system(), ada.id, vec![manager.id])
+                .await
+                .unwrap();
+            let token = bearer(&app, "ada@example.com", PASSWORD).await;
+            let body = json!({"role_ids": [manager.id, admin]});
+            let path = format!("/users/{}/roles", ada.id);
+            let (status, _, problem) = call(&app, "PUT", &path, Some(&token), Some(body)).await;
+            assert_eq!(status, StatusCode::FORBIDDEN, "{problem}");
+            assert_eq!(problem["code"], "auth.role_beyond_you");
         })
         .await
         .unwrap();

@@ -145,3 +145,47 @@ async fn hai_admin_cuoi_xoa_nhau_cung_luc_van_con_mot() {
     .await
     .unwrap();
 }
+
+/// D-20261126-automation-owner-revoked: mọi đường cắt cửa vào tài khoản ghi `auth.access_revoked` (hợp đồng
+/// `autoxide_kernel::accounts`) kèm lý do — khoá hết cửa vào, khoá tài khoản, xoá.
+#[tokio::test]
+async fn cat_cua_vao_tai_khoan_ghi_event_access_revoked() {
+    use sea_orm::ConnectionTrait;
+
+    TestDatabase::run(async |test| {
+        let services = crate::testing::services(test).await;
+        let tenant = services.tenant.clone();
+        let users = &services.users;
+        Accounts::create(users.as_ref(), &tenant, account("root@example.com", true)).await.unwrap();
+        let ada = Accounts::create(users.as_ref(), &tenant, account("ada@example.com", false))
+            .await
+            .unwrap();
+        let transaction = tenant.database().begin_write().await.unwrap();
+        users.lock_out_in(&tenant, &transaction, Actor::system(), ada.id).await.unwrap();
+        transaction.commit().await.unwrap();
+        users.update(&tenant, Actor::system(), ada.id, disable(true), None).await.unwrap();
+
+        let backend = services.database.write().get_database_backend();
+        let rows = services
+            .database
+            .write()
+            .query_all_raw(sea_orm::Statement::from_string(
+                backend,
+                "SELECT payload FROM auth_events WHERE name = 'auth.access_revoked' ORDER BY id",
+            ))
+            .await
+            .unwrap();
+        let reasons: Vec<serde_json::Value> = rows
+            .iter()
+            .map(|row| {
+                let raw: String = row.try_get("", "payload").unwrap();
+                let payload: serde_json::Value = serde_json::from_str(&raw).unwrap();
+                assert_eq!(payload["after"]["user_id"], ada.id.to_string());
+                payload["after"]["reason"].clone()
+            })
+            .collect();
+        assert_eq!(reasons, vec![serde_json::json!("locked_out"), serde_json::json!("disabled")]);
+    })
+    .await
+    .unwrap();
+}

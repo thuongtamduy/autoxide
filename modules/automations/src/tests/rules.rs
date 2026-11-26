@@ -296,3 +296,38 @@ async fn luat_theo_event_doi_quyen_xem_event() {
     .await
     .unwrap();
 }
+
+/// D-20261126-automation-owner-revoked: mọi cửa vào tài khoản `run_as` bị cắt (khoá vì bị chiếm, lấy lại bằng mail,
+/// khoá hẳn, xoá — event `auth.access_revoked`) thì luật của họ tạm dừng tới khi một người bật lại; luật tạo qua phiên
+/// đăng nhập không bao giờ có hơn quyền lúc tạo, kể cả khi tài khoản được thêm quyền sau.
+#[tokio::test]
+async fn luat_dung_khi_tai_khoan_run_as_bi_cat_quyen_vao() {
+    TestDatabase::run(async |test| {
+        let harness = Harness::new(test).await;
+        let actions =
+            json!([{"tool": "shop.tag_order", "arguments": {"order_id": "1", "tag": "x"}}]);
+        let mine = harness.rule(on_order(), json!(null), actions.clone()).await;
+        let other = person(7, &super::OWNER);
+        harness.people.set(other.clone());
+        let theirs = harness.rule_by(&other, on_order(), json!(null), actions).await.unwrap();
+
+        // Tài khoản được thêm quyền sau khi tạo luật: luật không có quyền mới.
+        let mut wider = super::OWNER.to_vec();
+        wider.push("shop.refund");
+        harness.people.set(person(1, &wider));
+        let runner = harness.service.rule_principal(&harness.tenant, &mine).await.unwrap().unwrap();
+        assert!(runner.allows("shop.write"));
+        assert!(!runner.allows("shop.refund"), "the rule never gets more than at creation");
+
+        // Cửa vào của chủ luật bị cắt: luật của họ tạm dừng (nhận lại event không đổi gì), luật người khác chạy.
+        for _ in 0..2 {
+            harness.service.owner_revoked(&harness.tenant, harness.owner.user_id()).await.unwrap();
+        }
+        let paused = harness.reload(mine.id).await;
+        assert_eq!(paused.status, crate::service::rules::PAUSED);
+        assert_eq!(paused.status_reason.as_deref(), Some("owner_access_revoked"));
+        assert_eq!(harness.reload(theirs.id).await.status, ACTIVE);
+    })
+    .await
+    .unwrap();
+}

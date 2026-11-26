@@ -265,10 +265,8 @@ fn roles(state: &Arc<HttpState>) -> Vec<Tool> {
                             .collect(),
                         denies: input.denies,
                     };
-                    let role = state
-                        .roles
-                        .update(&tenant, Actor::from(&principal), input.id, role, None)
-                        .await?;
+                    let role =
+                        state.roles.update_as(&tenant, &principal, input.id, role, None).await?;
                     Ok::<_, Error>(RoleResponse::from(role))
                 }
             },
@@ -302,14 +300,18 @@ fn roles(state: &Arc<HttpState>) -> Vec<Tool> {
         .read_only(),
         Tool::new(
             "set_user_roles",
-            "Replace every role of a user with `role_ids`. The last administrator cannot lose \
-             the `admin` role.",
+            "Replace every role of a user with `role_ids`. You can only give or take away roles \
+             whose permissions you have yourself, as widely (`auth.role_beyond_you`). The last \
+             administrator cannot lose the `admin` role.",
             move |tenant: TenantContext, principal: Principal, input: SetUserRolesInput| {
                 let state = set.clone();
                 async move {
-                    let actor = Actor::from(&principal);
-                    let roles =
-                        state.roles.set_user_roles(&tenant, actor, input.user_id, input.role_ids);
+                    let roles = state.roles.set_user_roles_as(
+                        &tenant,
+                        &principal,
+                        input.user_id,
+                        input.role_ids,
+                    );
                     Ok::<_, Error>(roles_response(roles.await?))
                 }
             },
