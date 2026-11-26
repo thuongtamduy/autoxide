@@ -45,10 +45,11 @@ services:
       retries: 20
     restart: unless-stopped
 
-  # Áp dụng migration rồi thoát; máy chủ chỉ khởi động khi bước này xong.
+  # Áp dụng migration (database chính rồi mọi database riêng của khách) rồi thoát; máy chủ chỉ
+  # khởi động khi bước này xong. Một khách hỏng thì các khách khác vẫn được nâng, bước báo lỗi.
   migrate:
     <<: *autoxide
-    command: ["migrate", "up"]
+    command: ["migrate", "up", "--all"]
     depends_on:
       postgres:
         condition: service_healthy

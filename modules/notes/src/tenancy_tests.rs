@@ -3,14 +3,13 @@
 //! ghi và giao đúng khách. Chạy trên cả SQLite và Postgres.
 
 use autoxide_kernel::access::Principal;
+use autoxide_kernel::db::Queries as _;
 use autoxide_kernel::event::{Delivered, EventHandler, Outbox};
 use autoxide_kernel::migration::Migrator;
 use autoxide_kernel::tenancy::{DEFAULT_TENANT, TenantContext};
 use autoxide_kernel::time::Timestamp;
 use autoxide_testkit::{TestApp, TestDatabase, leak_check};
 use axum::http::StatusCode;
-use sea_orm::sea_query::{Alias, Query};
-use sea_orm::{ConnectionTrait, Statement};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
@@ -40,14 +39,8 @@ async fn create(app: &TestApp, token: &str, title: &str) -> (StatusCode, Value) 
 
 /// Tên và ID của event trong bảng `notes_events` của `tenant` (database của khách).
 async fn events(tenant: &TenantContext) -> Vec<(String, Uuid)> {
-    let database = tenant.database();
-    let backend = database.read().get_database_backend();
     let sql = "SELECT name, tenant_id FROM notes_events ORDER BY id";
-    let rows = database.read().query_all_raw(Statement::from_string(backend, sql)).await;
-    rows.unwrap()
-        .iter()
-        .map(|row| (row.try_get("", "name").unwrap(), row.try_get("", "tenant_id").unwrap()))
-        .collect()
+    autoxide_testkit::all_tenants(tenant.database()).read().sql(sql).all().await.unwrap()
 }
 
 #[tokio::test]
@@ -149,25 +142,23 @@ async fn nang_cap_gan_du_lieu_cu_cho_khach_mac_dinh() {
         // `m0005_tenancy`), ghi một ghi chú kiểu cũ, rồi nâng lại.
         migrator.down(app.database(), "notes", 4).await.unwrap();
         let database = app.database();
-        let backend = database.write().get_database_backend();
         let id = Uuid::now_v7();
         let at = Timestamp::now();
-        // `sea_query` đổi UUID, thời gian sang dạng lưu của từng database (như SeaORM ghi).
-        let insert = Query::insert()
-            .into_table(Alias::new("notes_note"))
-            .columns(
-                ["id", "owner_id", "title", "body", "created_at", "updated_at"].map(Alias::new),
-            )
-            .values_panic([
-                id.into(),
-                Uuid::from_u128(ADA).into(),
-                "Old".into(),
-                "from before".into(),
-                at.into(),
-                at.into(),
-            ])
-            .to_owned();
-        database.write().execute(&insert).await.unwrap();
+        // Dòng kiểu cũ (chưa có `tenant_id`), ghi thẳng vào bảng; kernel đổi UUID, thời gian sang dạng lưu
+        // của từng database như khi service ghi.
+        let insert = "INSERT INTO notes_note (id, owner_id, title, body, created_at, updated_at) \
+                      VALUES (:id, :owner, :title, :body, :at, :at)";
+        let tx = autoxide_testkit::all_tenants(database).begin_write().await.unwrap();
+        tx.sql(insert)
+            .bind("id", id)
+            .bind("owner", Uuid::from_u128(ADA))
+            .bind("title", "Old".to_owned())
+            .bind("body", "from before".to_owned())
+            .bind("at", at)
+            .execute()
+            .await
+            .unwrap();
+        tx.commit().await.unwrap();
         migrator.up(app.database()).await.unwrap();
 
         let answer = app.get(&format!("/api/v1/notes/{id}")).token("ada").send().await.unwrap();
@@ -176,10 +167,9 @@ async fn nang_cap_gan_du_lieu_cu_cho_khach_mac_dinh() {
         // Bước 34: ghi chú cũ thuộc nút gốc (= ID của khách).
         assert_eq!(answer.json()["data"]["org_id"], DEFAULT_TENANT.as_uuid().to_string());
         let select = "SELECT tenant_id FROM notes_note";
-        let rows = database.read().query_all_raw(Statement::from_string(backend, select)).await;
-        let owners: Vec<Uuid> =
-            rows.unwrap().iter().map(|row| row.try_get("", "tenant_id").unwrap()).collect();
-        assert_eq!(owners, [DEFAULT_TENANT.as_uuid()]);
+        let owners: Vec<(Uuid,)> =
+            autoxide_testkit::all_tenants(database).read().sql(select).all().await.unwrap();
+        assert_eq!(owners, [(DEFAULT_TENANT.as_uuid(),)]);
     })
     .await
     .unwrap();

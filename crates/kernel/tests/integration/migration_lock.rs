@@ -59,3 +59,51 @@ async fn nha_bang_drop_cung_duoc() {
     .await
     .unwrap();
 }
+
+/// Khoá của placement tách khỏi khoá chính (D-20261126-placement-migration-exclusive): lượt chạy nền giữ khoá
+/// placement thì máy chủ khởi động (chỉ cần khoá chính) không phải chờ; hai bên khoá placement vẫn loại trừ nhau.
+#[tokio::test]
+async fn khoa_placement_tach_khoi_khoa_chinh() {
+    TestDatabase::run(async |database| {
+        let config = config_for(database.url());
+        let placements =
+            MigrationLock::acquire_placements(&config, Duration::from_secs(5)).await.unwrap();
+        let main = MigrationLock::acquire(&config, Duration::from_millis(500)).await.unwrap();
+        MigrationLock::acquire_placements(&config, Duration::from_millis(300)).await.unwrap_err();
+        main.release().await.unwrap();
+        placements.release().await.unwrap();
+    })
+    .await
+    .unwrap();
+}
+
+/// `verify`: còn giữ thì đạt; trên Postgres, kết nối giữ khoá bị cắt (proxy, failover) thì báo mất khoá để lượt dừng.
+#[tokio::test]
+async fn verify_bao_khi_mat_khoa() {
+    TestDatabase::run(async |database| {
+        let config = config_for(database.url());
+        let mut lock =
+            MigrationLock::acquire_placements(&config, Duration::from_secs(5)).await.unwrap();
+        lock.verify().await.unwrap();
+        if database.url().starts_with("postgres") {
+            let other = autoxide_kernel::database::Database::connect(&config).await.unwrap();
+            let write = other.write();
+            let backend = sea_orm::ConnectionTrait::get_database_backend(write);
+            let key = i64::from_be_bytes(*b"autoxplc");
+            let sql = "SELECT pg_terminate_backend(pid) FROM pg_locks WHERE locktype = 'advisory' \
+                       AND classid::bigint = $1 AND objid::bigint = $2 AND objsubid = 1";
+            let statement = autoxide_kernel::database::statement(
+                backend,
+                sql,
+                [i64::from((key >> 32) as u32).into(), i64::from(key as u32).into()],
+            );
+            sea_orm::ConnectionTrait::execute_raw(write, statement).await.unwrap();
+            let error = lock.verify().await.unwrap_err();
+            assert!(error.to_string().contains("migration lock was lost"), "{error}");
+            other.close().await.unwrap();
+        }
+        let _ = lock.release().await;
+    })
+    .await
+    .unwrap();
+}

@@ -1,6 +1,6 @@
 //! Chân trang pháp lý cho trang dựng từ khối (bước 67, D-229): thông tin chủ sở hữu website và logo
-//! đã thông báo / đăng ký với Bộ Công Thương — NĐ 52/2013 sửa bởi NĐ 85/2021, Luật Thương mại điện
-//! tử 122/2025 (cần đối chiếu văn bản gốc / người có chuyên môn pháp lý). `content` TỰ GẮN khối này
+//! đã thông báo / đăng ký với Bộ Công Thương — Luật Thương mại điện tử 122/2025 và NĐ 248/2026 (thay
+//! NĐ 52/2013, NĐ 85/2021 từ 01/7/2026) (cần đối chiếu văn bản gốc / người có chuyên môn pháp lý). `content` TỰ GẮN khối này
 //! dưới mọi trang công khai của website (không nằm trong bố cục nên không xoá được); dữ liệu như
 //! `GET /public/owner` và `GET /public/badge` của website đang xem. Chưa có hồ sơ pháp lý → `None`.
 

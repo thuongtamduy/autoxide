@@ -33,7 +33,10 @@ tính giỏ, giữ lượt dùng khi đặt, xác nhận khi đã trả tiền v
 chạy cùng bộ kiểm và báo mọi mục không đạt trong `errors`:
 
 - trần giảm đang hiệu lực (Việt Nam: 50% giá ngay trước khuyến mại, không giới hạn với chương trình khuyến mại
-  tập trung quốc gia), dùng lịch sử giá của catalog;
+  tập trung quốc gia), dùng lịch sử giá của catalog. NĐ 239/2026/NĐ-CP (26/6/2026) bãi bỏ hạn mức ở Điều 6, 7
+  của NĐ 81/2018/NĐ-CP và giao Bộ Công Thương quy định; chưa tra được thông tư, nên gói `vn` phiên bản 2 giữ 50%
+  làm mặc định thận trọng với căn cứ mới, và giữ 120 ngày giảm giá mỗi năm mà một bản tổng hợp nêu nghị định đã bỏ —
+  cần đối chiếu văn bản gốc;
 - số ngày giảm giá mỗi chương trình và mỗi năm;
 - thông báo khuyến mại đã ghi nhận cho từng nơi nhận (`PATCH /promotions/{id}/notices/{authority}`; tỉnh lấy từ
   cài đặt của nút `promotions.notice_province`);

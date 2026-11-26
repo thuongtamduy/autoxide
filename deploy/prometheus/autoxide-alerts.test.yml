@@ -1,0 +1,64 @@
+# Series trong test mang `job` và `instance` như Prometheus thật gắn (lần trước thiếu `job` nên test xanh mà luật không bao giờ bắn).
+# Test của autoxide-alerts.yml: `promtool test rules deploy/prometheus/autoxide-alerts.test.yml` (job `alert rules` của CI).
+# Mỗi luật có ca "series chưa tồn tại": bộ đếm chưa tăng lần nào thì Prometheus không có series đó, và biểu thức `a + b`
+# hay `a / (a + b)` của series thiếu ra rỗng — luật phải vẫn bắn khi vế còn lại có dữ liệu.
+rule_files:
+  - autoxide-alerts.yml
+evaluation_interval: 1m
+
+tests:
+  # Webhook hỏng ngay từ đầu: `webhooks_delivered_total` chưa từng tăng nên không tồn tại; chỉ `webhooks_failed_total` có.
+  - interval: 1m
+    input_series:
+      - series: 'webhooks_failed_total{job="autoxide",instance="a"}'
+        values: "0+10x90"
+    alert_rule_test:
+      - eval_time: 80m
+        alertname: AutoxideWebhooksFailing
+        exp_alerts:
+          - exp_labels:
+              severity: warn
+            exp_annotations:
+              summary: "More than 20% of outgoing webhook deliveries fail."
+              action: "Look at the failing endpoints of the tenants (`GET /api/v1/webhooks`), and the `webhook delivery failed` log lines; a receiver that is down is the receiver's to fix; see docs/RUNBOOK.md, Monitoring."
+
+  # Giao đều không lỗi (`webhooks_failed_total` không tồn tại): không bắn.
+  - interval: 1m
+    input_series:
+      - series: 'webhooks_delivered_total{job="autoxide",instance="a"}'
+        values: "0+10x90"
+    alert_rule_test:
+      - eval_time: 80m
+        alertname: AutoxideWebhooksFailing
+        exp_alerts: []
+
+  # Chưa có webhook nào (cả hai không tồn tại): không bắn, không lỗi biểu thức.
+  - interval: 1m
+    input_series: []
+    alert_rule_test:
+      - eval_time: 80m
+        alertname: AutoxideWebhooksFailing
+        exp_alerts: []
+
+  # Chỉ tầng theo API key bị giới hạn, hai tầng kia chưa từng tăng (không tồn tại): vẫn bắn.
+  - interval: 1m
+    input_series:
+      - series: 'http_api_key_rate_limited_total{job="autoxide",instance="a"}'
+        values: "0+120x60"
+    alert_rule_test:
+      - eval_time: 45m
+        alertname: AutoxideRateLimitedClients
+        exp_alerts:
+          - exp_labels:
+              severity: warn
+            exp_annotations:
+              summary: "More than one request per second is refused with 429 (a client above its rate limit, or a flood)."
+              action: "Find the address, API key or tenant in the logs (`rate_limited` problems); a runaway integration is fixed or its key revoked, a flood is limited in the reverse proxy; see docs/RUNBOOK.md, Mass revocation."
+
+  # Không có 429 nào: không bắn.
+  - interval: 1m
+    input_series: []
+    alert_rule_test:
+      - eval_time: 45m
+        alertname: AutoxideRateLimitedClients
+        exp_alerts: []

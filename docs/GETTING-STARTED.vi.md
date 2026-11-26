@@ -36,6 +36,8 @@ Rồi mở `http://127.0.0.1:8080/api/docs` xem tài liệu API và đăng nhậ
 
 Demo luôn dùng file SQLite riêng trong thư mục demo: nó bỏ qua `DATABASE_URL` trong môi trường và `.env`, nên không thể chạm vào database thật. `--database-url <url>` trỏ nó tới database khác khi bạn chủ ý.
 
+Demo cũng tắt các dịch vụ bên ngoài lấy từ môi trường (mail SMTP, kho file S3, OpenTelemetry, nhà cung cấp AI, module bộ nối): thư được ghi ra file và file tải lên nằm trong thư mục demo. `--keep-external-services` giữ chúng khi bạn chủ ý.
+
 Không dùng cho production: secret nằm trong một file thường ở thư mục demo, và trang tài liệu API nạp
 script xem từ một CDN công cộng.
 
