@@ -170,9 +170,10 @@ Hai mức (D-173), các bước và biến môi trường ghi ở đầu `gate.s
 
 > **Công tắc gate nhanh** (chủ dự án quyết, D-20261125-local-gate-switch): biến môi trường `GATE_LOCAL` = `on` (mặc
 > định) | `off`. Chủ dự án chọn — đặt biến ở cấu hình môi trường cloud, hoặc nói "tắt gate" / "bật gate" trong phiên
-> (phiên điều phối chuyển lời cho phiên con); agent không tự tắt. Lệnh vẫn là một: `./gate.sh --quick`. Khi `off` nó chỉ
-> chạy kiểm rẻ (fmt, `xtask check`, SDK, api-diff, deny, gitleaks), không clippy, không test; agent chạy thêm các bài test
-> vừa viết hay sửa (bài chạm database thêm trên Postgres) rồi push. Khi `off`, **CI xanh trên pull request thay "gate
+> (phiên điều phối chuyển lời cho phiên con); agent không tự tắt. Lệnh vẫn là một: `./gate.sh --quick`. Khi `off` nó chạy
+> fmt, `xtask check`, SDK, clippy, api-diff, deny, gitleaks, không test (D-20261126-light-gate-clippy); agent chạy thêm
+> `cargo xtask regen --check` khi đổi API hay cấu hình, các bài test vừa viết hay sửa (bài chạm database thêm trên
+> Postgres) và `cargo test -p autoxide` khi thêm bảng, index, setting, event hay endpoint, rồi push. Khi `off`, **CI xanh trên pull request thay "gate
 > nhanh xanh"** ở mọi luật bên dưới: không merge khi CI chưa xanh, không push thẳng `main`. Gate đầy đủ trước phát hành không đổi.
 
 - **`./gate.sh --quick`** — trước mỗi commit, và đủ để đánh dấu một bước xong và merge vào
