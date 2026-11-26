@@ -404,8 +404,8 @@ jobs:
           docker run --rm -v "$PWD:/repo" "$image" \
             git /repo --no-banner --redact --config /repo/.gitleaks.toml --log-opts=HEAD
 
-  # DCO (D-20261126-road-to-1-0, G8): mỗi commit của pull request có `Signed-off-by`, trừ người duy trì
-  # (`.github/dco-maintainers.txt`). Chỉ chạy trên pull request: push main đã đi qua PR.
+  # DCO (D-20261126-road-to-1-0, G8): mỗi commit của pull request có `Signed-off-by`, trừ khi người mở PR là người duy trì
+  # (login trong CODEOWNERS; login do GitHub xác thực, không giả được). Chỉ chạy trên pull request: push main đã đi qua PR.
   dco:
     name: DCO sign-off
     if: ${{ github.event_name == 'pull_request' && !github.event.repository.private }}
@@ -420,7 +420,8 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: scripts/check-dco.sh "$BASE_SHA" "$HEAD_SHA"
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+        run: scripts/check-dco.sh "$BASE_SHA" "$HEAD_SHA" "$PR_AUTHOR"
 
   # MSRV (D-20261126-road-to-1-0, G8; docs/COMPATIBILITY.md, "Minimum supported Rust version"): biên dịch cả workspace
   # bằng đúng `rust-version` của Cargo.toml — thấp hơn toolchain ghim — để một tính năng ngôn ngữ mới không lọt vào mà

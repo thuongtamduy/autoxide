@@ -15,8 +15,8 @@ Autoxide là dự án mã nguồn mở do một nhóm nhỏ người duy trì (m
 
 Người đóng góp thành người duy trì sau một thời gian dài có thay đổi và review tốt, khi một người duy trì đang có đề cử và
 không người duy trì nào phản đối trong bảy ngày. Người duy trì không hoạt động sáu tháng chuyển sang "danh dự" (emeritus)
-và quay lại được khi xin. Danh sách người duy trì là file CODEOWNERS; khi nó đổi thì `.github/dco-maintainers.txt` đổi trong
-cùng pull request.
+và quay lại được khi xin. Danh sách người duy trì là file CODEOWNERS; người duy trì được nhận diện bằng
+login GitHub, và login đó cũng là thứ miễn kiểm DCO cho pull request của họ.
 
 ## Quyết định được đưa ra thế nào
 

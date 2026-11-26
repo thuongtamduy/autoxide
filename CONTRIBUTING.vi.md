@@ -143,8 +143,9 @@ git commit -s -m "fix(notes): reject empty titles"
 ```
 
 Để ký các commit đã làm: `git rebase --signoff origin/main` rồi push lại với `--force-with-lease`. Job `DCO sign-off`
-trong CI đỏ khi một commit của pull request không có dòng `Signed-off-by`. Người duy trì và các phiên agent của họ
-(liệt kê trong `.github/dco-maintainers.txt`) được miễn: họ là bên cấp license.
+trong CI đỏ khi một commit của pull request không có dòng `Signed-off-by`. Pull request do người duy trì mở
+(login có trong `.github/CODEOWNERS`; GitHub xác thực login) được miễn, kể cả commit do phiên agent của họ viết: người
+duy trì là bên cấp license và chịu trách nhiệm về những gì họ đưa vào.
 
 ### Đóng góp có AI hỗ trợ
 

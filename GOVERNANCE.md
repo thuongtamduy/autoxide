@@ -15,8 +15,8 @@ you can change the project.
 
 A contributor becomes a maintainer after a sustained record of good changes and reviews, when an existing maintainer
 proposes it and no maintainer objects within seven days. A maintainer who is inactive for six months is moved to
-"emeritus" and can return by asking. The list of maintainers is the CODEOWNERS file; when it changes,
-`.github/dco-maintainers.txt` changes in the same pull request.
+"emeritus" and can return by asking. The list of maintainers is the CODEOWNERS file; a maintainer
+is identified by GitHub login, which is also what exempts their pull requests from the DCO check.
 
 ## How decisions are made
 

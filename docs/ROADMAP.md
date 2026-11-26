@@ -204,7 +204,7 @@ chỉ số của G9 đạt ngưỡng.
 
 - [x] CodeQL (Rust, JS/TS, workflow), OpenSSF Scorecard (`codeql.yml`, `scorecard.yml`); huy hiệu OpenSSF Best Practices và
       branch protection do chủ dự án làm trên web, hướng dẫn ở `docs/OPENSSF.md` (EN + VI)
-- [x] Chính sách đóng góp do AI viết, DCO (`DCO`, job `dco` của CI, `.github/dco-maintainers.txt`), commit convention,
+- [x] Chính sách đóng góp do AI viết, DCO (`DCO`, job `dco` của CI, CODEOWNERS), commit convention,
       `SUPPORT.md`, `GOVERNANCE.md` (vai trò, quyết định, RFC, bộ nhãn), `docs/rfcs/`, `CODEOWNERS`, `contact_links` trong
       mẫu issue; chủ dự án tạo bộ nhãn trong cài đặt repo (bảng nhãn ở `GOVERNANCE.md`)
 - [x] SBOM (`cargo auditable` trong Dockerfile, CycloneDX `autoxide.cdx.json` trong bản phát hành), build tái lập
