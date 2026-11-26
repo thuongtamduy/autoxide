@@ -57,6 +57,10 @@ Hệ quả cho agent:
   (đơn hàng, kho, bệnh nhân…) vào core. Thứ đó thuộc về module.
 - Người lạ phải tự cài và dùng được: cấu hình có giá trị mặc định hợp lý, thông báo
   lỗi rõ, tài liệu cài đặt đủ để làm theo mà không cần hỏi ai.
+- **Đường tới 1.0** (chủ dự án quyết, D-20261126-road-to-1-0): đóng băng tính năng nghiệp vụ mới; làm bước 71 của lộ trình
+  (chuẩn AI agent, nâng cấp một nút, không để thư viện níu chân — D-20261126-library-isolation, mọi trình độ dùng được,
+  chuẩn cộng đồng) theo hướng dài hạn, không làm đối phó; thay đổi chạm kernel, bảo mật, tiền, thuế phải qua kiểm độc lập
+  (D-20261126-independent-review).
 - **Không dựng module mới trước bản 1.0** (D-20261121-community-first): bước 70 của lộ trình (bật/tắt module, module
   viết ngoài repo, hai hạng module, cam kết 1.0) đi trước; ngoại lệ duy nhất là bộ nối nhà cung cấp thật
   (SePay, MoMo, Giao Hàng Nhanh, eSMS, SePay eInvoice; tài khoản do từng khách tự cấu hình — D-20261121-vn-providers).
