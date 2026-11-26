@@ -165392,7 +165392,7 @@
     },
     "/api/v1/content/public/search": {
       "get": {
-        "description": "No sign-in needed; off unless the server sets `AUTOXIDE_CONTENT_PUBLIC_SEMANTIC_SEARCH=true`\n(then `404` with code `content.semantic_search_disabled`). Like `GET /search`, but only\npublished entries, each with its `path`. Searches by meaning have a budget per minute\n(`AUTOXIDE_CONTENT_PUBLIC_SEARCH_PER_MINUTE`); past it, results match words only.",
+        "description": "No sign-in needed; off unless the server sets `AUTOXIDE_CONTENT_PUBLIC_SEMANTIC_SEARCH=true`\n(then `404` with code `content.semantic_search_disabled`). Like `GET /search`, but only\npublished entries, each with its `path`. Searches by meaning have a budget per minute\n(`AUTOXIDE_CONTENT_PUBLIC_SEARCH_PER_MINUTE`); past it, results match words only. Searches\nare also limited per client address and per server, and stopped after 3 seconds.",
         "operationId": "content_search_public_content",
         "parameters": [
           {
@@ -165504,6 +165504,26 @@
               }
             },
             "description": "A parameter is invalid; see `errors`."
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Too many searches from your network this minute (`content.public_search_rate_limited`, `AUTOXIDE_CONTENT_PUBLIC_SEARCH_PER_ADDRESS_PER_MINUTE`), or too many searches running on the server (`content.public_search_busy`, `AUTOXIDE_CONTENT_PUBLIC_SEARCH_CONCURRENCY`); wait `Retry-After` seconds."
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The search took longer than 3 seconds and was stopped (`content.public_search_timeout`); try a more specific query."
           },
           "default": {
             "content": {
