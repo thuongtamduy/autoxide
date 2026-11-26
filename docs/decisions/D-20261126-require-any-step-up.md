@@ -15,3 +15,5 @@ Lý do: rà soát độc lập #541 — theo "permission đầu tiên người g
 sách: người có cả `x.delete` (rủi ro cao) lẫn `x.delete_own` bị đòi xác nhận lại hay không tuỳ cái nào đứng trước.
 
 Đã cân nhắc: đòi xác nhận lại khi BẤT KỲ permission đang có nào cần — chặn oan người chỉ dùng phần quyền thường.
+
+Thay: phần step-up của `require_any` trong D-20261126-permission-audit
