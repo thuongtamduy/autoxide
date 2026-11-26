@@ -243,8 +243,9 @@ impl McpServer {
         tenant: TenantContext,
         principal: Principal,
         arguments: Value,
+        budget: Option<crate::tenancy::TenantId>,
     ) -> Result<Value, Error> {
-        call_tool(&self.entitlements, tool, tenant, principal, arguments).await
+        call_tool(&self.entitlements, tool, tenant, principal, arguments, budget).await
     }
 
     /// Whether the tool's module (`<module>.<name>`) may be used by tenant `tenant`, and whether the tenant
@@ -395,14 +396,13 @@ impl McpServer {
             },
             _ => None,
         };
-        // Lời gọi bị 429 không tiêu lượng `kernel.api_requests` của gói.
-        if let (None, Some(tenant)) = (&limited, budget) {
-            self.entitlements.count_request(tenant);
-        }
+        // Hạn mức `kernel.api_requests` kiểm và đếm trong `call_tool`, sau các chốt của gói: lời gọi bị từ chối
+        // (429 ở đây, gói thiếu module, khách chỉ đọc) không tiêu lượng.
         let outcome = match limited {
             Some(error) => Err(error),
             None => {
-                self.run(tool, caller.tenant.clone(), caller.principal.clone(), arguments).await
+                let (tenant, principal) = (caller.tenant.clone(), caller.principal.clone());
+                self.run(tool, tenant, principal, arguments, budget).await
             }
         };
         // Nhật ký lệnh của agent (D-202): tên tool và mã lỗi, không bao giờ tham số.
@@ -561,20 +561,34 @@ fn object(value: Value) -> Map<String, Value> {
 
 /// Runs a tool after checking the plan and the tenant's read-only state (no permission check - the caller
 /// checks with `Tool::allows`). The `/mcp` endpoint and the automation tool registry (step 58) share it, so
-/// an automation rule cannot do what MCP cannot.
+/// an automation rule cannot do what MCP cannot. `budget`: the tenant whose `kernel.api_requests` quota the
+/// call uses (see `tenant_rate_limit::budget_tenant`) — like REST, it is refused with `quota_exhausted` once
+/// that quota is used up (in a module the plan governs) and counted only when the call gets through the plan's
+/// checks; `None` neither counts nor refuses.
 pub(crate) async fn call_tool(
     entitlements: &crate::entitlement::EntitlementsHandle,
     tool: &Tool,
     tenant: TenantContext,
     principal: Principal,
     arguments: Value,
+    budget: Option<crate::tenancy::TenantId>,
 ) -> Result<Value, Error> {
     // Như REST: permission nhạy cảm cần xác nhận lại gần đây (step-up), không chỉ "có permission".
     tool.authorize(&principal)?;
+    let module = tool.name().split('.').next().unwrap_or_default();
+    // Hết lượng request của kỳ: như REST, module nền vẫn chạy.
+    if entitlements.is_enforced()
+        && !entitlements.catalog().is_always_enabled(module)
+        && let Some(wait) = budget.and_then(|budget| entitlements.request_quota_wait(budget))
+    {
+        return Err(crate::entitlement::quota_exhausted(
+            crate::entitlement::API_REQUESTS.key(),
+            wait,
+        ));
+    }
     // Gói của khách không có module của tool: cùng lỗi như REST.
     let (enabled, plan_read_only) = tool_allowed(entitlements, tool, tenant.id()).await?;
     if !enabled {
-        let module = tool.name().split('.').next().unwrap_or_default();
         metrics::counter!("entitlement_denials_total", "kind" => "module").increment(1);
         return Err(crate::entitlement::module_not_enabled(module));
     }
@@ -582,6 +596,9 @@ pub(crate) async fn call_tool(
     // như REST.
     if (tenant.read_only() || plan_read_only) && !tool.is_read_only() {
         return Err(crate::tenancy::errors::tenant_read_only());
+    }
+    if let Some(budget) = budget {
+        entitlements.count_request(budget);
     }
     // Span của tool mang khách (bước 39 B7, D-190); tên tool là tập cố định do code khai.
     let span = tracing::info_span!("mcp_tool", tool = tool.name(), tenant_id = %tenant.id());

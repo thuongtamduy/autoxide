@@ -84,7 +84,7 @@
   "auth.passkey_not_found": "Bạn không có passkey `{id}`.",
   "auth.passkey_rejected": "Passkey không được chấp nhận: {reason}. Hãy thử thêm lại.",
   "auth.passkey_sign_in_failed": "Đăng nhập bằng passkey này không thành công: passkey chưa đăng ký ở đây, thuộc tài khoản khác, hoặc câu trả lời không hợp lệ. Hãy đăng nhập bằng mật khẩu, hoặc thêm lại passkey.",
-  "auth.passkeys_disabled": "Máy chủ này chưa bật đăng nhập bằng passkey. Người vận hành bật nó bằng cách đặt AUTOXIDE_AUTH_PASSKEY_RP_ID.",
+  "auth.passkeys_disabled": "Ở đây chưa bật đăng nhập bằng passkey. Người vận hành máy chủ bật bằng AUTOXIDE_AUTH_PASSKEY_RP_ID, hay khách bật bằng cài đặt `auth.passkey_rp_id`.",
   "auth.password_already_set": "Tài khoản này đã có mật khẩu. Chỉ chủ tài khoản đổi được, hoặc đặt lại qua email.",
   "auth.reauth_token_invalid": "Token xác nhận không đúng, đã hết hạn, đã dùng hoặc không phải của bạn. Hãy lấy token mới bằng `POST /api/v1/auth/me/reauth`.",
   "auth.refresh_token_reused": "Refresh token này đã được dùng. Phiên đăng nhập đã bị kết thúc để an toàn; hãy đăng nhập lại. Mỗi refresh token chỉ dùng một lần, và chỉ giữ token mới nhất.",

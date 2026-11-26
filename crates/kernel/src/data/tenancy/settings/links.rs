@@ -306,7 +306,9 @@ pub(crate) fn domain_name(raw: &str) -> Result<(), FieldError> {
             && !label.ends_with('-')
             && label.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
     });
-    if name.len() <= DOMAIN_MAX && name.contains('.') && labels_ok {
+    // Địa chỉ IP (`1.2.3.4`) không phải tên miền: nhãn cuối (đuôi) không toàn chữ số.
+    let ip = name.rsplit('.').next().is_some_and(|top| top.chars().all(|c| c.is_ascii_digit()));
+    if name.len() <= DOMAIN_MAX && name.contains('.') && labels_ok && !ip {
         Ok(())
     } else {
         Err(FieldError::new(

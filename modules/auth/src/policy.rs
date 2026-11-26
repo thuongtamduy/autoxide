@@ -48,7 +48,11 @@ impl TenantPolicy {
         server: SignedDuration,
     ) -> Result<SignedDuration, Error> {
         let set = settings::value(self.orgs.as_ref(), tenant, &settings::SESSION_DAYS).await?;
-        let days = set.and_then(|value| value.as_i64()).filter(|days| *days >= 1);
+        // Kẹp vào 1..=365 dù giá trị lưu đi đường khác (chuyển dữ liệu) không qua kiểm lúc ghi: nhân không tràn.
+        let days = set
+            .and_then(|value| value.as_i64())
+            .filter(|days| *days >= 1)
+            .map(|days| days.min(365));
         Ok(days.map_or(server, |days| server.min(SignedDuration::from_hours(days * 24))))
     }
 

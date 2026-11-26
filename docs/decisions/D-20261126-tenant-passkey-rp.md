@@ -15,6 +15,15 @@ Quyết định:
   đó, 403 `auth.passkeys_disabled`). Động cơ WebAuthn dựng theo khách mỗi nghi thức (chỉ đọc tên miền, rẻ).
 - `GET /kernel/client-config` phần `auth` theo khách: `passkeys`, `passkey_rp_id` (mới), `self_registration`.
 
+Hệ quả cần biết:
+
+- Chế độ một khách: RP ID nhận mọi tên miền đúng dạng, không kiểm sở hữu (không có bảng tên miền). An toàn vì trình
+  duyệt vẫn ép RP ID phải là hậu tố của origin trang đang mở, và chỉ có một khách nên không ai mượn được passkey của
+  khách khác. Địa chỉ IP (`1.2.3.4`) bị từ chối ở cả hai chế độ.
+- Sở hữu tên miền đọc từ ảnh chụp có cache (như CORS): tên miền vừa chuyển khách thì khách cũ còn được nhận tới hết
+  thời hạn ảnh chụp (`AUTOXIDE_TENANCY_CACHE_SECONDS`) trên máy chủ khác; trên máy chủ làm việc chuyển, thu hồi và xác
+  minh làm mới ngay.
+
 Lý do: WebAuthn gắn passkey với RP ID; trình duyệt chỉ cho trang có origin thuộc RP ID dùng passkey đó. Nếu khách A
 giữ RP `shop.vn` sau khi `shop.vn` về tay khách B, trang của B lấy được chữ ký passkey của người dùng A và gửi tới
 endpoint đăng nhập của A. Kiểm "đang xác minh, của chính khách" ngay lúc dùng chặn đúng chỗ đó; test chứng minh

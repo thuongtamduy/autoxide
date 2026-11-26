@@ -3,13 +3,13 @@
 //! Postgres.
 
 use autoxide_kernel::tenancy::TenantId;
-use autoxide_testkit::{TestApp, TestDatabase};
+use autoxide_testkit::{TestApp, TestDatabase, tool};
 use axum::body::Body;
 use axum::http::{Method, StatusCode};
 use sea_orm::ConnectionTrait;
 use serde_json::{Value, json};
 
-const OWNER: [&str; 7] = [
+const OWNER: [&str; 8] = [
     "kernel.data.export",
     "organizations.units.read",
     "organizations.units.write",
@@ -17,6 +17,7 @@ const OWNER: [&str; 7] = [
     "organizations.types.manage",
     "files.upload",
     "forms.read",
+    "content.read",
 ];
 
 async fn app(test: &TestDatabase) -> TestApp {
@@ -176,6 +177,29 @@ async fn dem_request_api_va_het_quota_tra_429() {
         let anonymous =
             app.request(Method::GET, "/api/v1/forms").header("autoxide-tenant", "acme").send();
         assert_eq!(anonymous.await.unwrap().status(), StatusCode::UNAUTHORIZED);
+        // MCP như REST: tool của module bị gói chi phối cũng bị chặn khi hết lượng.
+        let mcp = app.mcp("owner").await.unwrap();
+        let refused = mcp.call_tool(tool("forms.list", json!({}))).await.unwrap();
+        assert_eq!(refused.structured_content.unwrap()["code"], "quota_exhausted");
+    })
+    .await
+    .unwrap();
+}
+
+/// Tool MCP bị gói từ chối (module không có trong gói) không tiêu lượng `kernel.api_requests`.
+#[tokio::test]
+async fn tool_bi_goi_tu_choi_khong_tieu_quota() {
+    TestDatabase::run(async |test| {
+        let app = app(test).await;
+        let acme = put_on(&app, "metered", &["forms"], json!({"kernel.api_requests": 1})).await;
+        let mcp = app.mcp("owner").await.unwrap();
+        for _ in 0..3 {
+            let refused = mcp.call_tool(tool("content.legal_templates", json!({}))).await.unwrap();
+            assert_eq!(refused.structured_content.unwrap()["code"], "module_not_enabled");
+        }
+        let entitlements = app.modules().entitlements();
+        entitlements.flush_usage("test-node", 1).await;
+        assert!(entitlements.request_quota_wait(acme).is_none());
     })
     .await
     .unwrap();

@@ -62,6 +62,7 @@ async fn rp_id_la_ten_mien_dang_xac_minh_cua_khach() {
             ("evil.test", "kernel.domain_not_verified"),
             ("https://shop-a.test", "kernel.domain_name_invalid"),
             ("Shop-A.test", "kernel.domain_name_invalid"),
+            ("1.2.3.4", "kernel.domain_name_invalid"),
         ] {
             let (status, body) = put_rp(&app, &admin, value).await;
             assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{value}: {body}");
