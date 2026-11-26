@@ -222,7 +222,7 @@ async fn migrate_all_chay_lai_tu_cho_dung() {
         assert!(error.contains("migrate up --all"), "{error}");
         assert_eq!(stored(&setup, "schema_state", "p1").await, "behind");
         assert_eq!(stored(&setup, "schema_state", "p2").await, "ready");
-        let lock = setup.placements.lock(std::time::Duration::from_secs(60)).await.unwrap();
+        let lock = setup.placements.lock_main(std::time::Duration::from_secs(60)).await.unwrap();
         let report = setup.placements.up_all_report(&lock).await.unwrap();
         lock.release().await.unwrap();
         let done: Vec<&str> = report.done.iter().map(|section| section.name.as_str()).collect();

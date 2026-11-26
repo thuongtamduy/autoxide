@@ -76,7 +76,7 @@ impl PlacementHealth {
         let Some(config) = self.registry.control_config() else {
             return true;
         };
-        match MigrationLock::acquire(config, std::time::Duration::ZERO).await {
+        match MigrationLock::acquire_placements(config, std::time::Duration::ZERO).await {
             Ok(lock) => {
                 super::placements::release(lock).await;
                 true

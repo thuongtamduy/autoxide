@@ -1272,6 +1272,19 @@ Each case: what you see, how to check, how to fix it.
   and prints its password. For an administrator who only lost their second factor or passkeys:
   `autoxide user reset-mfa` / `autoxide user remove-passkeys`.
 
+### Migration locks
+
+Only one process migrates at a time. There are two locks: one for the main database (`migrate up`, a
+server starting with `AUTOXIDE_MIGRATE_ON_START`) and one for the tenant databases (`migrate up --all`
+takes it after the first, the background migration runs and tenant moves take only it), so a long run
+over the tenant databases never holds up a server that starts. On PostgreSQL each lock is an advisory
+lock on its own connection; if a proxy or a failover cuts that connection the lock is gone, and the
+run stops before the next tenant database (run it again). Keep PgBouncer in session mode for the
+command, or point it straight at the database. On SQLite the locks are files next to the database
+(`.migrate-lock`, `.placements-lock`); an in-memory SQLite database has no lock (one process only).
+During a rolling update from a release older than this lock, servers of the old version may still run
+a migration run without it: let the update finish before starting runs from the API.
+
 ### Updating while two versions run
 
 During a rolling update, old and new servers run side by side on the same database, so a release

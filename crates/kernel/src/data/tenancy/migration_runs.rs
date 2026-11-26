@@ -363,13 +363,18 @@ impl MigrationRuns {
     /// placements. Lock busy (another process is migrating): an error, so the job runs again later.
     async fn run(&self, id: Uuid) -> Result<(), Error> {
         let placements = self.setup.placements()?;
-        let lock = placements.lock(JOB_LOCK_WAIT).await?;
-        let outcome = self.run_locked(&placements, id).await;
+        let mut lock = placements.lock(JOB_LOCK_WAIT).await?;
+        let outcome = self.run_locked(&placements, id, &mut lock).await;
         super::placements::release(lock).await;
         outcome
     }
 
-    async fn run_locked(&self, placements: &super::Placements, id: Uuid) -> Result<(), Error> {
+    async fn run_locked(
+        &self,
+        placements: &super::Placements,
+        id: Uuid,
+        lock: &mut crate::migration::MigrationLock,
+    ) -> Result<(), Error> {
         placements.recover_migrating().await?;
         let Some(id) = claim::claim(self.control(), claim::Claim::Queued(id)).await? else {
             return Ok(());
@@ -394,6 +399,11 @@ impl MigrationRuns {
         // Từng placement một: placement hỏng không chặn các placement sau (khách của chúng vẫn được nâng),
         // và lượt vẫn ghi phần đã xong. Lỗi giữ chi tiết: người xem lượt là nhân sự vận hành, cần biết sửa gì.
         for name in names {
+            // Khoá mất (kết nối Postgres đứt): dừng, ghi lại; lượt sau làm tiếp phần còn lại.
+            if let Err(error) = lock.verify().await {
+                failures.push(error.to_string());
+                break;
+            }
             match placements.try_up_named(&name).await {
                 Ok(Ok(done)) => applied.extend(lists(vec![done])),
                 Ok(Err(error)) => failures.push(format!("placement `{name}`: {error}")),
@@ -426,8 +436,15 @@ impl PlacementMigrationQueue {
     /// Queues a run of every placement when one is not `ready` (pending migrations, cannot connect, left
     /// `migrating`). `None` when every placement is ready, or a run is already queued or running.
     pub async fn queue_pending(&self) -> Result<Option<Uuid>, Error> {
-        let checks = self.0.setup.placements()?.check().await?;
-        if checks.iter().all(|check| check.state == super::SchemaState::Ready) {
+        // Theo trạng thái đã lưu ở database điều khiển (như `doctor`), không mở kết nối tới từng placement: lúc
+        // khởi động, một placement không trả lời không được làm chậm việc mở port. `serve` kiểm định kỳ sẽ cập
+        // nhật trạng thái; placement đã `ready` mà bản mới có migration thì lần kiểm đó đặt `behind`.
+        let placements = self.0.setup.placements()?.list().await?;
+        let ready = super::SchemaState::Ready.as_str();
+        if placements
+            .iter()
+            .all(|found| found.id == super::MAIN_PLACEMENT.as_uuid() || found.schema_state == ready)
+        {
             return Ok(None);
         }
         match self.0.start(Actor::system(), None).await {

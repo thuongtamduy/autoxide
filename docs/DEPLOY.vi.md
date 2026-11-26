@@ -1225,6 +1225,18 @@ Mỗi tình huống: dấu hiệu, cách kiểm, cách sửa.
   mật khẩu. Quản trị viên chỉ mất bước xác thực thứ hai hay passkey:
   `autoxide user reset-mfa` / `autoxide user remove-passkeys`.
 
+### Khoá migration
+
+Mỗi lúc chỉ một tiến trình migrate. Có hai khoá: một cho database chính (`migrate up`, máy chủ khởi
+động với `AUTOXIDE_MIGRATE_ON_START`) và một cho database của khách (`migrate up --all` lấy nó sau khoá
+đầu, lượt migrate chạy nền và việc chuyển khách chỉ lấy khoá này), nên một lượt dài qua database của
+khách không bao giờ làm máy chủ đang khởi động phải chờ. Trên PostgreSQL mỗi khoá là một advisory lock
+trên kết nối riêng; proxy hay failover cắt kết nối đó thì khoá mất, và lượt dừng trước database của
+khách kế tiếp (chạy lại). Dùng PgBouncer ở chế độ session cho lệnh này, hoặc trỏ thẳng vào database.
+Trên SQLite khoá là các file cạnh database (`.migrate-lock`, `.placements-lock`); SQLite trong bộ nhớ
+không có khoá (chỉ một tiến trình). Trong lúc cập nhật cuốn chiếu từ một bản cũ hơn khoá này, máy chủ
+bản cũ còn có thể chạy lượt migrate mà không giữ khoá: chờ cập nhật xong rồi mới chạy lượt từ API.
+
 ### Cập nhật khi hai phiên bản cùng chạy
 
 Lúc cập nhật cuốn chiếu, máy chủ cũ và mới cùng chạy trên một database, nên một bản phát hành đổi

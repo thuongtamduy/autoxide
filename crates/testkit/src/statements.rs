@@ -13,7 +13,8 @@
 //! Only statements run by the measured work itself count: the work runs inside a task-local scope, and a
 //! statement run by another task — a background task such as the request log writer, a job, a dispatcher — is
 //! not counted even when it lands exactly in a measurement (it used to turn hot-path tests red at random on a
-//! slow machine). Work the measured code hands to `tokio::spawn` is not counted either.
+//! slow machine). Work the measured code hands to `tokio::spawn` is not counted either, so a test that pins a
+//! count also checks it is not zero (a measurement that sees nothing proves nothing).
 
 use std::future::Future;
 use std::sync::atomic::{AtomicU64, Ordering};

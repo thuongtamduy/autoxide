@@ -155,7 +155,8 @@ pub(crate) async fn execute_all(
     action: &Action,
     placements: &Placements,
 ) -> Result<String, String> {
-    let lock = placements.lock(LOCK_WAIT).await.map_err(|error| super::describe_error(&error))?;
+    let lock =
+        placements.lock_main(LOCK_WAIT).await.map_err(|error| super::describe_error(&error))?;
     let report = report_all(action, placements, Some(&lock)).await;
     lock.release().await.map_err(|error| error.to_string())?;
     let report = report?;
@@ -478,7 +479,7 @@ mod tests {
             let blocker = Table::create().table("auth_user").col(schema::pk_uuid("id")).to_owned();
             SchemaManager::new(blocked.write()).create_table(blocker).await.unwrap();
 
-            let lock = placements.lock(LOCK_WAIT).await.unwrap();
+            let lock = placements.lock_main(LOCK_WAIT).await.unwrap();
             let report = report_all(&up_all, &placements, Some(&lock)).await.unwrap();
             lock.release().await.unwrap();
             assert!(report.output.contains("== b-good ==\nApplied "), "{}", report.output);

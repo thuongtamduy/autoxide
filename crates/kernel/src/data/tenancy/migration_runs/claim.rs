@@ -57,8 +57,17 @@ pub(crate) async fn claim(control: &Database, claim: Claim<'_>) -> Result<Option
             }
             Ok(Some(running(control, id, None).await?))
         }
-        // Lượt khác đang chờ job (chưa cũ): job của lượt này đợi tới lượt sau.
-        (Claim::Queued(_), Some(row)) => Err(busy(row.id)),
+        // Lượt khác đang giữ chỗ: lượt của job này đã xong (bị lượt dòng lệnh nhận rồi khép) thì thôi; còn chờ thì
+        // job thử lại sau.
+        (Claim::Queued(id), Some(row)) => {
+            let own = Entity::find_by_id(id).one(control.write()).await?;
+            match own {
+                Some(own) if matches!(own.status.as_str(), "pending" | "running") => {
+                    Err(busy(row.id))
+                }
+                _ => Ok(None),
+            }
+        }
         (Claim::Direct { placement }, Some(row))
             if placement.is_none() || row.placement.as_deref() == placement =>
         {
@@ -66,24 +75,58 @@ pub(crate) async fn claim(control: &Database, claim: Claim<'_>) -> Result<Option
             Ok(Some(running(control, row.id, Some(scope)).await?))
         }
         (Claim::Direct { .. }, Some(row)) => Err(busy(row.id)),
-        (Claim::Direct { placement }, None) => {
-            let at = now();
-            let row = entity::ActiveModel {
-                id: Set(Uuid::now_v7()),
-                placement: Set(placement.map(str::to_owned)),
-                status: Set("running".to_owned()),
-                requested_by: Set(None),
-                result: Set("[]".to_owned()),
-                error: Set(None),
-                created_at: Set(at),
-                updated_at: Set(at),
-                active_key: Set(Some(ACTIVE.to_owned())),
-            }
-            .insert(control.write())
-            .await?;
-            Ok(Some(row.id))
-        }
+        (Claim::Direct { placement }, None) => insert_direct(control, placement).await,
     }
+}
+
+// Lượt `Direct` mới. Va khoá unique `active_key` (API vừa xếp một lượt giữa lúc đọc và lúc chèn): nhận lại theo luật
+// trên — một lần là đủ, vì API chỉ chèn được khi chưa có lượt `active`.
+async fn insert_direct(control: &Database, placement: Option<&str>) -> Result<Option<Uuid>, Error> {
+    match try_insert_direct(control, placement).await {
+        Err(error) if error.code() == UNIQUE_CLASH => {
+            let active =
+                Entity::find().filter(Column::ActiveKey.eq(ACTIVE)).one(control.write()).await?;
+            match active {
+                Some(row) if placement.is_none() || row.placement.as_deref() == placement => {
+                    let scope = placement.map(str::to_owned);
+                    Ok(Some(running(control, row.id, Some(scope)).await?))
+                }
+                Some(row) => Err(busy(row.id)),
+                None => try_insert_direct(control, placement).await,
+            }
+        }
+        other => other,
+    }
+}
+
+const UNIQUE_CLASH: &str = "kernel.migration_run_busy";
+
+async fn try_insert_direct(
+    control: &Database,
+    placement: Option<&str>,
+) -> Result<Option<Uuid>, Error> {
+    let at = now();
+    let row = entity::ActiveModel {
+        id: Set(Uuid::now_v7()),
+        placement: Set(placement.map(str::to_owned)),
+        status: Set("running".to_owned()),
+        requested_by: Set(None),
+        result: Set("[]".to_owned()),
+        error: Set(None),
+        created_at: Set(at),
+        updated_at: Set(at),
+        active_key: Set(Some(ACTIVE.to_owned())),
+    }
+    .insert(control.write())
+    .await
+    .map_err(|error| {
+        if matches!(error.sql_err(), Some(sea_orm::SqlErr::UniqueConstraintViolation(_))) {
+            busy(Uuid::nil())
+        } else {
+            Error::from(error)
+        }
+    })?;
+    Ok(Some(row.id))
 }
 
 // Đang giữ khoá: kết thúc lượt `active` bỏ dở (trừ lượt `keep`), trả lượt `active` còn lại.
