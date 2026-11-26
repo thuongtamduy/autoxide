@@ -38,6 +38,8 @@ pub(crate) struct CasesInput {
     limit: Option<u32>,
     /// The `next_cursor` of the previous page.
     cursor: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
 }
 
 /// One case.
@@ -76,7 +78,9 @@ pub(crate) fn all(service: &Arc<ComplianceService>) -> Vec<Tool> {
             move |tenant: TenantContext, principal: Principal, input: CasesInput| {
                 let service = list.clone();
                 async move {
-                    let page = PageInput::new(input.limit, input.cursor, None).page()?;
+                    let page = PageInput::new(input.limit, input.cursor, None)
+                        .with_count(input.count.unwrap_or(false))
+                        .page()?;
                     let filter = CaseFilter {
                         status: input.status,
                         kind: input.kind,

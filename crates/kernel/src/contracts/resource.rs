@@ -741,8 +741,9 @@ pub trait RecordHistory: Send + Sync {
     /// The default implementation exists only so that providers written before this method keep compiling: it
     /// reads the newest [`HISTORY_PAGE_FALLBACK_LIMIT`] events through [`history`](Self::history) (a finite
     /// `limit`, so a provider that checks it does not refuse) and cuts the page in memory — older events are not
-    /// reachable through it, and every page costs as much as that whole read. Providers should override it with a
-    /// keyset page in their database (the `audit` module does).
+    /// reachable through it, and every page costs as much as that whole read; when the read reaches that limit,
+    /// `pagination.total` is left out (it could be wrong). Providers should override it with a keyset page in their
+    /// database (the `audit` module does).
     async fn history_page(
         &self,
         tenant: &TenantContext,
@@ -753,7 +754,11 @@ pub trait RecordHistory: Send + Sync {
         use crate::pagination::{Order, Page, Pagination};
         let mut lines =
             self.history(tenant, subject, HISTORY_PAGE_FALLBACK_LIMIT, language).await?;
-        let total = page.wants_total().then(|| u64::try_from(lines.len()).unwrap_or(u64::MAX));
+        // Đọc đúng trần: có thể còn event cũ hơn, tổng không chắc đúng — bỏ `total` thay vì báo sai.
+        let complete =
+            u32::try_from(lines.len()).is_ok_and(|read| read < HISTORY_PAGE_FALLBACK_LIMIT);
+        let total = (page.wants_total() && complete)
+            .then(|| u64::try_from(lines.len()).unwrap_or(u64::MAX));
         match page.order() {
             Order::Asc => lines.sort_by_key(|line| line.id),
             Order::Desc => lines.sort_by_key(|line| std::cmp::Reverse(line.id)),

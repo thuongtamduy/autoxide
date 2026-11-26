@@ -7,9 +7,10 @@ use std::sync::Arc;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
+use autoxide_kernel::pagination::{NaturalOrderPageQuery, Page, PageRequest};
 use autoxide_kernel::response::{Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::ToSchema;
@@ -86,16 +87,18 @@ impl From<variant_attribute::Model> for VariantAttributeResponse {
 
 /// List the attribute values of a variant.
 ///
-/// Requires `catalog.products.read` covering the product.
+/// Requires `catalog.products.read` covering the product. In the order of the last replace
+/// (`PUT`) unless `order=desc`; paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/variants/{id}/attributes",
     extensions(("x-permissions" = json!(["catalog.products.read"]))),
     operation_id = "get_catalog_variant_attributes",
     security(("bearer" = [])),
-    params(("id" = Uuid, Path, description = "Id of the variant.")),
+    params(("id" = Uuid, Path, description = "Id of the variant."), NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "The values.", body = Data<Vec<VariantAttributeResponse>>),
+        (status = 200, description = "One page of the values.", body = Page<VariantAttributeResponse>),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing `catalog.products.read`; code `permission_denied`.", body = Problem),
         (status = 404, description = "No variant with this id in your scope; code `catalog.variant_not_found`.", body = Problem),
@@ -106,10 +109,12 @@ async fn get_variant_attributes(
     tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
-) -> Result<Data<Vec<VariantAttributeResponse>>, Error> {
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<VariantAttributeResponse>, Error> {
     principal.require(&PRODUCTS_READ)?;
-    let rows = service.get_variant_attributes(&tenant, &principal, id).await?;
-    Ok(Data { data: rows.into_iter().map(Into::into).collect() })
+    let page = PageRequest::try_from(page)?;
+    let rows = service.get_variant_attributes(&tenant, &principal, id, &page).await?;
+    Ok(rows.map(Into::into))
 }
 
 /// Replace the attribute values of a variant.

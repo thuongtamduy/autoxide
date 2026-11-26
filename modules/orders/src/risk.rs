@@ -25,6 +25,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::{Actor, Delivered, EventHandler, Subscription};
 use autoxide_kernel::money::Money;
+use autoxide_kernel::pagination::{Page, PageRequest, SortValue, fetch_page, fetch_page_by};
 use autoxide_kernel::sms::PhoneNumber;
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext};
 use sea_orm::sea_query::{Expr, OnConflict};
@@ -270,15 +271,13 @@ impl OrdersService {
         &self,
         tenant: &TenantContext,
         principal: &Principal,
-    ) -> Result<Vec<cod_rule::Model>, Error> {
+        page: &PageRequest,
+    ) -> Result<Page<cod_rule::Model>, Error> {
         Self::require_risk(principal)?;
         let scope = principal.scope_condition(&RISK_MANAGE, cod_rule::Column::OrgId, None)?;
-        Ok(cod_rule::Entity::find()
-            .filter(scope)
-            .scoped(tenant)
-            .order_by_desc(cod_rule::Column::Id)
-            .all(tenant.database().read())
-            .await?)
+        // Theo thứ tự tạo (id UUIDv7), keyset trong database (index `orders_cod_rules_page_idx`).
+        let select = cod_rule::Entity::find().filter(scope).scoped(tenant);
+        fetch_page(select, cod_rule::Column::Id, |row| row.id, page, tenant.database().read()).await
     }
 
     /// `POST /risk/cod-rules`: thêm quy tắc (không sửa quy tắc cũ — kết thúc nó rồi thêm mới).
@@ -358,15 +357,25 @@ impl OrdersService {
         &self,
         tenant: &TenantContext,
         principal: &Principal,
-    ) -> Result<Vec<cod_block::Model>, Error> {
+        page: &PageRequest,
+    ) -> Result<Page<cod_block::Model>, Error> {
         Self::require_risk(principal)?;
-        Ok(cod_block::Entity::find()
+        // Hết hạn sớm nhất trước: keyset theo (`expires_at`, id) trong database (index
+        // `orders_cod_blocks_page_idx`).
+        let select = cod_block::Entity::find()
             .filter(cod_block::Column::ExpiresAt.gt(now()))
             .filter(cod_block::Column::LiftedAt.is_null())
-            .scoped(tenant)
-            .order_by_asc(cod_block::Column::ExpiresAt)
-            .all(tenant.database().read())
-            .await?)
+            .scoped(tenant);
+        fetch_page_by(
+            select,
+            cod_block::Column::ExpiresAt,
+            |row| SortValue::Time(row.expires_at),
+            cod_block::Column::Id,
+            |row| row.id,
+            page,
+            tenant.database().read(),
+        )
+        .await
     }
 
     /// `POST /risk/cod-blocks`: chặn COD của một số điện thoại, có lý do và hạn (tối đa 365 ngày).

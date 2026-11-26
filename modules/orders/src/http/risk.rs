@@ -7,6 +7,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::money::{Currency, Money};
+use autoxide_kernel::pagination::{NaturalOrderPageQuery, Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::{OrgId, TenantContext};
 use axum::extract::{Path, Query, State};
@@ -116,25 +117,33 @@ impl RuleResponse {
 
 /// List cash-on-delivery rules.
 ///
-/// Requires `orders.risk.manage` (rules of nodes in your scope), newest first.
+/// Requires `orders.risk.manage` (rules of nodes in your scope). Newest first unless `order=asc`;
+/// paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/risk/cod-rules",
     extensions(("x-permissions" = json!(["orders.risk.manage"]))),
     operation_id = "list_cod_rules",
+    params(PageQuery),
     responses(
-        (status = 200, description = "The rules, ended ones included.", body = Data<Vec<RuleResponse>>),
+        (status = 200, description = "One page of the rules, ended ones included.", body = Page<RuleResponse>),
         (status = 401, description = "Not signed in; code `unauthenticated`.", body = Problem),
         (status = 403, description = "Missing `orders.risk.manage`; code `permission_denied`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 pub(crate) async fn list_rules(
     State(service): State<Arc<OrdersService>>,
     tenant: TenantContext,
     principal: Principal,
-) -> Result<Data<Vec<RuleResponse>>, Error> {
-    let rows = service.cod_rules(&tenant, &principal).await?;
-    Ok(Data { data: rows.into_iter().map(RuleResponse::new).collect::<Result<_, _>>()? })
+    Query(page): Query<PageQuery>,
+) -> Result<Page<RuleResponse>, Error> {
+    principal.require(&crate::permissions::RISK_MANAGE)?;
+    let page = PageRequest::try_from(page)?;
+    let rows = service.cod_rules(&tenant, &principal, &page).await?;
+    let pagination = rows.pagination;
+    let data = rows.data.into_iter().map(RuleResponse::new).collect::<Result<_, _>>()?;
+    Ok(Page { data, pagination })
 }
 
 /// A new cash-on-delivery rule.
@@ -248,25 +257,31 @@ impl From<cod_block::Model> for BlockResponse {
 
 /// List active cash-on-delivery blocks.
 ///
-/// Requires `orders.risk.manage`. Blocks of this tenant only, expiring soonest first.
+/// Requires `orders.risk.manage`. Blocks of this tenant only, expiring soonest first (`order=desc`
+/// reverses it); paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/risk/cod-blocks",
     extensions(("x-permissions" = json!(["orders.risk.manage"]))),
     operation_id = "list_cod_blocks",
+    params(NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "The active blocks.", body = Data<Vec<BlockResponse>>),
+        (status = 200, description = "One page of the active blocks.", body = Page<BlockResponse>),
         (status = 401, description = "Not signed in; code `unauthenticated`.", body = Problem),
         (status = 403, description = "Missing `orders.risk.manage`; code `permission_denied`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 pub(crate) async fn list_blocks(
     State(service): State<Arc<OrdersService>>,
     tenant: TenantContext,
     principal: Principal,
-) -> Result<Data<Vec<BlockResponse>>, Error> {
-    let rows = service.cod_blocks(&tenant, &principal).await?;
-    Ok(Data { data: rows.into_iter().map(BlockResponse::from).collect() })
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<BlockResponse>, Error> {
+    principal.require(&crate::permissions::RISK_MANAGE)?;
+    let page = PageRequest::try_from(page)?;
+    let rows = service.cod_blocks(&tenant, &principal, &page).await?;
+    Ok(rows.map(BlockResponse::from))
 }
 
 /// Block a buyer from paying on delivery.
@@ -385,18 +400,20 @@ pub(crate) struct SalesRowResponse {
 /// Sales report.
 ///
 /// Requires `orders.reports.read`; only shops in your scope count. Orders placed in `[from, to)`,
-/// neither waiting for payment nor cancelled.
+/// neither waiting for payment nor cancelled. By shop, channel or product: biggest `gross` first,
+/// then by `key` (`order=desc` reverses it). By day or month: oldest first (`order=desc`: newest
+/// first). Paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/reports/sales",
     extensions(("x-permissions" = json!(["orders.reports.read"]))),
     operation_id = "sales_report",
-    params(SalesQuery),
+    params(SalesQuery, NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "The rows (biggest first; days and months in order).", body = Data<Vec<SalesRowResponse>>),
+        (status = 200, description = "One page of the rows.", body = Page<SalesRowResponse>),
         (status = 401, description = "Not signed in; code `unauthenticated`.", body = Problem),
         (status = 403, description = "Missing `orders.reports.read`; code `permission_denied`.", body = Problem),
-        (status = 422, description = "Invalid values (see `errors`).", body = Problem),
+        (status = 422, description = "Invalid values or paging parameters (see `errors`).", body = Problem),
     )
 )]
 pub(crate) async fn sales_report(
@@ -404,10 +421,19 @@ pub(crate) async fn sales_report(
     tenant: TenantContext,
     principal: Principal,
     Query(query): Query<SalesQuery>,
-) -> Result<Data<Vec<SalesRowResponse>>, Error> {
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<SalesRowResponse>, Error> {
     // Không có quyền thì 403 trước khi xét tham số.
     principal.require(&crate::permissions::REPORTS_READ)?;
     let mut problems = Vec::new();
+    // Lỗi tham số trang gom chung với lỗi bộ lọc: một lần 422 (D-083).
+    let page = match PageRequest::try_from(page) {
+        Ok(page) => Some(page),
+        Err(error) => {
+            problems.extend(error.fields().iter().cloned());
+            None
+        }
+    };
     let group_by = GroupBy::parse(&query.group_by);
     if group_by.is_none() {
         problems.push(FieldError::new(
@@ -420,24 +446,20 @@ pub(crate) async fn sales_report(
     if currency.is_none() {
         problems.push(FieldError::new("currency", "invalid", "is not a currency code"));
     }
-    let (Some(group_by), Some(currency)) = (group_by, currency) else {
+    let (Some(group_by), Some(currency), Some(page)) = (group_by, currency, page) else {
         return Err(Error::validation(problems));
     };
-    let rows =
-        service.sales_report(&tenant, &principal, group_by, query.from, query.to, currency).await?;
+    let rows = service
+        .sales_report(&tenant, &principal, group_by, query.from, query.to, currency, &page)
+        .await?;
     let money = |minor: i64| Money::new(minor, currency);
-    Ok(Data {
-        data: rows
-            .into_iter()
-            .map(|row| SalesRowResponse {
-                key: row.key,
-                orders: row.orders,
-                quantity: row.quantity,
-                gross: money(row.gross),
-                discount: money(row.discount),
-                tax: money(row.tax),
-                refunded: money(row.refunded),
-            })
-            .collect(),
-    })
+    Ok(rows.map(|row| SalesRowResponse {
+        key: row.key,
+        orders: row.orders,
+        quantity: row.quantity,
+        gross: money(row.gross),
+        discount: money(row.discount),
+        tax: money(row.tax),
+        refunded: money(row.refunded),
+    }))
 }

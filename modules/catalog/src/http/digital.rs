@@ -167,19 +167,21 @@ pub(crate) struct RevokedResponse {
 
 /// List the files of a digital variant.
 ///
-/// Requires `catalog.products.read` on the unit owning the product.
+/// Requires `catalog.products.read` on the unit owning the product. Newest first unless
+/// `order=asc`; paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/variants/{id}/digital-assets",
     extensions(("x-permissions" = json!(["catalog.products.read"]))),
     operation_id = "list_catalog_digital_assets",
     security(("bearer" = [])),
-    params(("id" = Uuid, Path, description = "Id of the variant.")),
+    params(("id" = Uuid, Path, description = "Id of the variant."), PageQuery),
     responses(
-        (status = 200, description = "The files, oldest first.", body = Data<Vec<AssetResponse>>),
+        (status = 200, description = "One page of the files.", body = Page<AssetResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing `catalog.products.read`; code `permission_denied`.", body = Problem),
         (status = 404, description = "No variant with this id in your scope; code `catalog.variant_not_found`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_assets(
@@ -187,9 +189,12 @@ async fn list_assets(
     tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
-) -> Result<Data<Vec<AssetResponse>>, Error> {
-    let rows = service.list_assets(&tenant, &principal, id).await?;
-    Ok(Data { data: rows.into_iter().map(AssetResponse::from).collect() })
+    Query(page): Query<PageQuery>,
+) -> Result<Page<AssetResponse>, Error> {
+    principal.require(&crate::permissions::PRODUCTS_READ)?;
+    let page = PageRequest::try_from(page)?;
+    let rows = service.list_assets(&tenant, &principal, id, &page).await?;
+    Ok(rows.map(AssetResponse::from))
 }
 
 /// Attach a file to a variant of a digital product.
@@ -265,18 +270,20 @@ async fn remove_asset(
 ///
 /// Requires `catalog.downloads.manage` on the unit owning the products; only the rights you
 /// manage are listed. Tokens are never shown here: use the reissue endpoint to send new ones.
+/// Newest first unless `order=asc`; paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/orders/{id}/downloads",
     extensions(("x-permissions" = json!(["catalog.downloads.manage"]))),
     operation_id = "list_catalog_order_downloads",
     security(("bearer" = [])),
-    params(("id" = Uuid, Path, description = "Id of the order (module `orders`).")),
+    params(("id" = Uuid, Path, description = "Id of the order (module `orders`)."), PageQuery),
     responses(
-        (status = 200, description = "The rights.", body = Data<Vec<GrantResponse>>),
+        (status = 200, description = "One page of the rights.", body = Page<GrantResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing `catalog.downloads.manage`; code `permission_denied`.", body = Problem),
         (status = 404, description = "The order has no download right you manage; code `catalog.download_not_found`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_order_downloads(
@@ -284,9 +291,12 @@ async fn list_order_downloads(
     tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
-) -> Result<Data<Vec<GrantResponse>>, Error> {
-    let rows = service.order_grants(&tenant, &principal, id).await?;
-    Ok(Data { data: rows.into_iter().map(GrantResponse::from).collect() })
+    Query(page): Query<PageQuery>,
+) -> Result<Page<GrantResponse>, Error> {
+    principal.require(&crate::permissions::DOWNLOADS_MANAGE)?;
+    let page = PageRequest::try_from(page)?;
+    let rows = service.order_grants(&tenant, &principal, id, &page).await?;
+    Ok(rows.map(GrantResponse::from))
 }
 
 /// Revoke the download rights of an order.

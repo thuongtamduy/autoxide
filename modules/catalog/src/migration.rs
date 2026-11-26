@@ -10,6 +10,7 @@ mod collection_ai;
 mod collections;
 mod digital;
 mod image_drafts;
+mod list_indexes;
 mod media_alts;
 mod net_content;
 mod recommend;
@@ -57,6 +58,8 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(digital::CreateDigital),
         // Tạo sản phẩm nháp từ ảnh bằng AI (D-229).
         Box::new(image_drafts::CreateImageDrafts),
+        // Index cho danh sách có phân trang (bước 70 P9 mục 3).
+        Box::new(list_indexes::CreateListIndexes),
     ]
 }
 

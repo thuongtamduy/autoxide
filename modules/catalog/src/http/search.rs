@@ -6,7 +6,7 @@ use std::sync::Arc;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::http::ValidJson;
-use autoxide_kernel::pagination::PageQuery;
+use autoxide_kernel::pagination::{NaturalOrderPageQuery, Page, PageQuery, PageRequest, page_of};
 use autoxide_kernel::response::{Data, Problem};
 use autoxide_kernel::suggest::MAX_SUGGESTIONS;
 use autoxide_kernel::tenancy::{Site, SiteQuery, TenantContext};
@@ -42,8 +42,6 @@ pub(crate) struct SuggestQuery {
     /// Language of the suggestions.
     #[param(example = "vi")]
     pub locale: String,
-    /// At most this many suggestions, 1 to 10 (default 10; 8 suits a phone).
-    pub limit: Option<u16>,
 }
 
 /// A search suggestion.
@@ -70,16 +68,18 @@ pub(crate) struct SuggestionResponse {
 /// No sign-in needed. Products on sale on the website asking, categories, and what other modules
 /// add (posts, stores…), gathered in one list: matches with the exact accents first, then matches
 /// ignoring accents; the tenant's synonyms count. A module that fails is left out of the answer.
+/// At most 10 suggestions in all (8 suit a phone: `limit=8`); paged with `limit` / `cursor`
+/// (`order=desc` reverses the order).
 #[utoipa::path(
     get,
     path = "/public/search/suggest",
     extensions(("x-public" = json!(true))),
     operation_id = "suggest_public_catalog_search",
     security((), ("bearer" = [])),
-    params(SuggestQuery, SiteQuery),
+    params(SuggestQuery, SiteQuery, NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "Suggestions, best first.", body = Data<Vec<SuggestionResponse>>, headers(("ETag" = String, description = "Fingerprint of the whole answer; send it in `If-None-Match` to get 304."))),
-        (status = 422, description = "`q` is empty or too long, `limit` is out of range, or the language is not supported; see `errors`.", body = Problem),
+        (status = 200, description = "One page of the suggestions, best first.", body = Page<SuggestionResponse>, headers(("ETag" = String, description = "Fingerprint of the whole answer; send it in `If-None-Match` to get 304."))),
+        (status = 422, description = "`q` is empty or too long, a paging parameter is invalid, or the language is not supported; see `errors`.", body = Problem),
     )
 )]
 async fn suggest(
@@ -88,6 +88,7 @@ async fn suggest(
     site: Site,
     _principal: Option<Principal>,
     Query(query): Query<SuggestQuery>,
+    Query(page): Query<NaturalOrderPageQuery>,
 ) -> Result<Response, Error> {
     let locale = service.locale(&tenant, &query.locale).await?;
     let mut problems = Vec::new();
@@ -98,29 +99,32 @@ async fn suggest(
                 .with_param("max", QUERY_MAX),
         );
     }
-    let limit = query.limit.unwrap_or(MAX_SUGGESTIONS);
-    if !(1..=MAX_SUGGESTIONS).contains(&limit) {
-        problems.push(
-            FieldError::new("limit", "range", "must be 1 to {max}")
-                .with_param("max", MAX_SUGGESTIONS),
-        );
-    }
-    if !problems.is_empty() {
+    // Lỗi tham số trang gom chung với lỗi của `q`: một lần 422 (D-083).
+    let page = match PageRequest::try_from(page) {
+        Ok(page) => Some(page),
+        Err(error) => {
+            problems.extend(error.fields().iter().cloned());
+            None
+        }
+    };
+    let (true, Some(page)) = (problems.is_empty(), page) else {
         return Err(Error::validation(problems));
-    }
-    let found = service.suggestions.suggest(&tenant, &site, &locale, &query.q, limit).await;
-    let data: Vec<SuggestionResponse> = found
-        .into_iter()
-        .map(|item| SuggestionResponse {
-            kind: item.kind,
-            label: item.label,
-            path: item.path,
-            id: item.id,
-            exact: item.exact,
-            context: item.context,
-        })
-        .collect();
-    cached(&tenant, Data { data })
+    };
+    // Một trang (`page_of`): gợi ý gộp từ mọi module cung cấp (không nằm trong một bảng), bị chặn theo cấu trúc ở
+    // `MAX_SUGGESTIONS` (top-N theo thiết kế). Khoá là thứ hạng (đệm 0) nên giữ thứ tự tốt nhất trước.
+    let found =
+        service.suggestions.suggest(&tenant, &site, &locale, &query.q, MAX_SUGGESTIONS).await;
+    let ranked =
+        page_of(found.into_iter().enumerate().collect(), |(rank, _)| format!("{rank:04}"), &page)?;
+    let data = ranked.map(|(_, item)| SuggestionResponse {
+        kind: item.kind,
+        label: item.label,
+        path: item.path,
+        id: item.id,
+        exact: item.exact,
+        context: item.context,
+    });
+    cached(&tenant, data)
 }
 
 /// A filter value and how many products match it.

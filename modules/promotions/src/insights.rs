@@ -5,8 +5,9 @@ use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
+use autoxide_kernel::pagination::{Page, PageRequest, SortValue, fetch_page_by, page_of};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde::Serialize;
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -84,6 +85,20 @@ pub(crate) fn check_range(from: Date, to: Date) -> Result<(), Error> {
     Ok(())
 }
 
+/// Kiểm khoảng ngày và tham số trang cùng lúc: sai cả hai thì một lỗi 422 gom mọi ô (D-083).
+pub(crate) fn range_and_page<Q>(from: Date, to: Date, page: Q) -> Result<PageRequest, Error>
+where
+    Q: TryInto<PageRequest, Error = Error>,
+{
+    match (page.try_into(), check_range(from, to)) {
+        (Ok(page), Ok(())) => Ok(page),
+        (Err(paging), Err(range)) => {
+            Err(Error::validation(range.fields().iter().chain(paging.fields()).cloned().collect()))
+        }
+        (Err(error), Ok(())) | (Ok(_), Err(error)) => Err(error),
+    }
+}
+
 impl PromotionsService {
     /// Tính từng giỏ có và không có chương trình `id` (kể cả bản nháp). Không ghi gì.
     pub(crate) async fn simulate(
@@ -119,10 +134,14 @@ impl PromotionsService {
         tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
-    ) -> Result<Vec<Conflict>, Error> {
+        page: &PageRequest,
+    ) -> Result<Page<Conflict>, Error> {
         let view = self.promotion(tenant, principal, id).await?;
         let program = program_of(&view);
-        Ok(self
+        // Một trang (`page_of`): xung đột do luật `clashes` tính trong code trên các chương trình cùng nút trùng
+        // thời gian — không viết được thành điều kiện SQL. Khoá là id (UUIDv7, chữ thường đệm đủ: so theo byte
+        // đúng thứ tự tạo), như `PageQuery` của danh sách theo thời điểm tạo.
+        let found: Vec<Conflict> = self
             .overlapping_programs(tenant, &program, true)
             .await?
             .into_iter()
@@ -135,7 +154,8 @@ impl PromotionsService {
                 starts_at: other.starts_at,
                 ends_at: other.ends_at,
             })
-            .collect())
+            .collect();
+        page_of(found, |conflict| conflict.id.to_string(), page)
     }
 
     /// Số liệu từng ngày của chương trình `id` trong [from, to] (ngày Việt Nam), ngày cũ trước;
@@ -147,19 +167,31 @@ impl PromotionsService {
         id: Uuid,
         from: Date,
         to: Date,
-    ) -> Result<Vec<DailyStats>, Error> {
+        page: &PageRequest,
+    ) -> Result<Page<DailyStats>, Error> {
         check_range(from, to)?;
         let view = self.promotion(tenant, principal, id).await?;
-        // `day` lưu dạng chữ `YYYY-MM-DD`: so sánh chữ đúng thứ tự ngày trên cả hai database.
-        let rows = stats::Entity::find()
+        // `day` lưu dạng chữ `YYYY-MM-DD`: so sánh chữ đúng thứ tự ngày trên cả hai database. Keyset trong
+        // database theo (`day`, id); `day` duy nhất trong một chương trình nên index unique
+        // `promotions_stats_daily_unique` (tenant_id, promotion_id, day) đã đủ cho trang.
+        let select = stats::Entity::find()
             .filter(stats::Column::PromotionId.eq(view.row.id))
             .filter(stats::Column::Day.gte(from.to_string()))
             .filter(stats::Column::Day.lte(to.to_string()))
-            .scoped(tenant)
-            .order_by_asc(stats::Column::Day)
-            .all(tenant.database().read())
-            .await?;
-        Ok(rows
+            .scoped(tenant);
+        let rows = fetch_page_by(
+            select,
+            stats::Column::Day,
+            |row| SortValue::Text(row.day.clone()),
+            stats::Column::Id,
+            |row| row.id,
+            page,
+            tenant.database().read(),
+        )
+        .await?;
+        let pagination = rows.pagination;
+        let data = rows
+            .data
             .into_iter()
             .filter_map(|row| {
                 Some(DailyStats {
@@ -171,6 +203,7 @@ impl PromotionsService {
                     seller_funded_minor: row.seller_funded_minor,
                 })
             })
-            .collect())
+            .collect();
+        Ok(Page { data, pagination })
     }
 }

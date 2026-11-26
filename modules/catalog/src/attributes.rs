@@ -8,6 +8,7 @@ use std::collections::{BTreeMap, HashMap};
 
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
+use autoxide_kernel::pagination::{Page, PageRequest, SortValue, fetch_page_by};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, Set,
@@ -282,6 +283,41 @@ impl CatalogService {
                 AttributeDetail { attribute, options }
             })
             .collect())
+    }
+
+    /// Một trang thuộc tính theo mã (duy nhất trong khách: index unique `catalog_attributes_code_unique` đủ cho
+    /// keyset), kèm lựa chọn của các thuộc tính trên trang.
+    pub(crate) async fn list_attributes_page(
+        &self,
+        tenant: &TenantContext,
+        page: &PageRequest,
+    ) -> Result<Page<AttributeDetail>, Error> {
+        let read = tenant.database().read();
+        let rows = fetch_page_by(
+            attribute::Entity::find().scoped(tenant),
+            attribute::Column::Code,
+            |row| SortValue::Text(row.code.clone()),
+            attribute::Column::Id,
+            |row| row.id,
+            page,
+            read,
+        )
+        .await?;
+        let ids: Vec<Uuid> = rows.data.iter().map(|row| row.id).collect();
+        let options = attribute_option::Entity::find()
+            .filter(attribute_option::Column::AttributeId.is_in(ids))
+            .scoped(tenant)
+            .order_by_asc(attribute_option::Column::Position)
+            .all(read)
+            .await?;
+        Ok(rows.map(|attribute| {
+            let options = options
+                .iter()
+                .filter(|option| option.attribute_id == attribute.id)
+                .cloned()
+                .collect();
+            AttributeDetail { attribute, options }
+        }))
     }
 
     pub(crate) async fn attribute_details<C: ConnectionTrait>(

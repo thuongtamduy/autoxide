@@ -13,6 +13,7 @@ use std::time::{Duration, Instant};
 
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::event::Actor;
+use autoxide_kernel::pagination::{Page, PageRequest, page_of};
 use autoxide_kernel::task::{Task, TaskArgs, TaskArgument, TaskRun};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set};
 use serde::{Deserialize, Serialize};
@@ -641,40 +642,59 @@ impl autoxide_kernel::doctor::Probe for LegalCheck {
 
 impl PromotionsService {
     /// Hạn mức hiệu lực ngày `day` (mặc định hôm nay theo giờ Việt Nam).
+    ///
+    /// Một trang (`page_of`): dữ liệu luật dùng chung mọi khách, nạp bằng task của người vận hành (một gói vài
+    /// chục dòng), không lớn dần theo dữ liệu khách — như bảng thuế (D-20261126-list-pages-cluster-3). Theo loại
+    /// khuyến mại, loại chương trình, vùng; khoá kèm id nên duy nhất.
     pub(crate) async fn legal_limits_at(
         &self,
         day: Option<Date>,
-    ) -> Result<Vec<legal_limit::Model>, Error> {
+        page: &PageRequest,
+    ) -> Result<Page<legal_limit::Model>, Error> {
         let day = day.unwrap_or_else(|| crate::compliance::legal_day(Timestamp::now())).to_string();
-        Ok(legal_limit::Entity::find()
+        let rows = legal_limit::Entity::find()
             .filter(legal_limit::Column::EffectiveFrom.lte(day.clone()))
             .filter(
                 sea_orm::Condition::any()
                     .add(legal_limit::Column::EffectiveTo.is_null())
                     .add(legal_limit::Column::EffectiveTo.gt(day)),
             )
-            .order_by_asc(legal_limit::Column::PromotionKind)
-            .order_by_asc(legal_limit::Column::ProgramKind)
             .all(self.databases.control().read())
-            .await?)
+            .await?;
+        page_of(
+            rows,
+            |row| {
+                format!(
+                    "{}\u{1f}{}\u{1f}{}\u{1f}{}",
+                    row.promotion_kind, row.program_kind, row.jurisdiction, row.id
+                )
+            },
+            page,
+        )
     }
 
-    /// Quy tắc thông báo hiệu lực ngày `day`.
+    /// Quy tắc thông báo hiệu lực ngày `day`: một trang (`page_of`, cùng lý do với
+    /// [`Self::legal_limits_at`]), theo loại khuyến mại rồi vùng.
     pub(crate) async fn notice_rules_at(
         &self,
         day: Option<Date>,
-    ) -> Result<Vec<notice_rule::Model>, Error> {
+        page: &PageRequest,
+    ) -> Result<Page<notice_rule::Model>, Error> {
         let day = day.unwrap_or_else(|| crate::compliance::legal_day(Timestamp::now())).to_string();
-        Ok(notice_rule::Entity::find()
+        let rows = notice_rule::Entity::find()
             .filter(notice_rule::Column::EffectiveFrom.lte(day.clone()))
             .filter(
                 sea_orm::Condition::any()
                     .add(notice_rule::Column::EffectiveTo.is_null())
                     .add(notice_rule::Column::EffectiveTo.gt(day)),
             )
-            .order_by_asc(notice_rule::Column::PromotionKind)
             .all(self.databases.control().read())
-            .await?)
+            .await?;
+        page_of(
+            rows,
+            |row| format!("{}\u{1f}{}\u{1f}{}", row.promotion_kind, row.jurisdiction, row.id),
+            page,
+        )
     }
 }
 

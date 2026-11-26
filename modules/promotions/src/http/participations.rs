@@ -5,10 +5,11 @@ use std::sync::Arc;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
+use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
 use autoxide_kernel::reference::Submitted;
 use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::response::{IntoResponse, Response};
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
@@ -77,19 +78,21 @@ async fn participate(
 /// List the applications to a platform promotion.
 ///
 /// Requires `promotions.read` on the promotion's unit (every application) or
-/// `promotions.participate` (the applications of your units).
+/// `promotions.participate` (the applications of your units). Newest first unless `order=asc`;
+/// paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/promotions/{id}/participations",
     extensions(("x-permissions" = json!(["promotions.read", "promotions.participate"]))),
     operation_id = "list_promotion_participations",
     security(("bearer" = [])),
-    params(("id" = Uuid, Path, description = "Id of the platform promotion.")),
+    params(("id" = Uuid, Path, description = "Id of the platform promotion."), PageQuery),
     responses(
-        (status = 200, description = "The applications, oldest first.", body = Data<Vec<ParticipationView>>),
+        (status = 200, description = "One page of the applications.", body = Page<ParticipationView>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing both `promotions.read` and `promotions.participate`; code `permission_denied`.", body = Problem),
         (status = 404, description = "No such promotion; code `promotions.not_found`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_participations(
@@ -97,11 +100,13 @@ async fn list_participations(
     tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
-) -> Result<Data<Vec<ParticipationView>>, Error> {
+    Query(page): Query<PageQuery>,
+) -> Result<Page<ParticipationView>, Error> {
     if principal.require(&READ).is_err() {
         principal.require(&PARTICIPATE)?;
     }
-    Ok(Data { data: service.participations(&tenant, &principal, id).await? })
+    let page = PageRequest::try_from(page)?;
+    service.participations(&tenant, &principal, id, &page).await
 }
 
 /// Approve a seller's application.

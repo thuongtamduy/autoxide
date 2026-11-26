@@ -56,6 +56,8 @@ mod tests_cases;
 #[cfg(test)]
 mod tests_moit;
 #[cfg(test)]
+mod tests_pages;
+#[cfg(test)]
 mod tests_privacy;
 #[cfg(test)]
 mod tests_sign_in_codes;

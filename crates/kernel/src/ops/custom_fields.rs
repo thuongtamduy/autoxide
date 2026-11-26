@@ -185,6 +185,24 @@ impl CustomFields {
             self.targets.set(targets.into_iter().map(|target| (target.target, target)).collect());
     }
 
+    /// The registered kinds `readable` accepts: `(kinds, kinds with sub-kinds)`.
+    fn kinds(
+        &self,
+        readable: impl Fn(&CustomFieldTarget) -> bool,
+    ) -> (Vec<&'static str>, Vec<&'static str>) {
+        let mut exact = Vec::new();
+        let mut parents = Vec::new();
+        for target in self.targets.get().into_iter().flat_map(BTreeMap::values) {
+            if readable(target) {
+                exact.push(target.target);
+                if target.subtypes {
+                    parents.push(target.target);
+                }
+            }
+        }
+        (exact, parents)
+    }
+
     fn target(&self, name: &str) -> Option<CustomFieldTarget> {
         let targets = self.targets.get()?;
         if let Some(found) = targets.get(name) {

@@ -5,6 +5,7 @@
 mod blocks;
 mod evaluate;
 mod insights;
+mod pages;
 mod participations;
 mod programs;
 mod redemption;

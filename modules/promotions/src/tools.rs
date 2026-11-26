@@ -39,6 +39,8 @@ pub(crate) struct ListInput {
     pub limit: Option<u32>,
     /// The `next_cursor` of the previous page.
     pub cursor: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    pub count: Option<bool>,
 }
 
 /// A promotion to act on.
@@ -152,7 +154,9 @@ pub(crate) fn all(service: &Arc<PromotionsService>) -> Vec<Tool> {
             move |tenant: TenantContext, principal: Principal, input: ListInput| {
                 let service = list.clone();
                 async move {
-                    let page = PageInput::new(input.limit, input.cursor, None).page()?;
+                    let page = PageInput::new(input.limit, input.cursor, None)
+                        .with_count(input.count.unwrap_or(false))
+                        .page()?;
                     let filter = PromotionFilter {
                         status: input.status,
                         kind: input.kind,

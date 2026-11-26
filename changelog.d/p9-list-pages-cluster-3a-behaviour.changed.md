@@ -18,3 +18,6 @@
 - Upgrading runs migration `auth` m0047: a membership row without a unit (`org_id` empty, from old or hand-edited data)
   is attached to the root unit, where it already granted its role; duplicates of an existing root membership are
   removed.
+- `GET /api/v1/kernel/custom-fields` (and `kernel.list_custom_fields`) filters the record types you may read in the
+  database, so a page cursor never points at a field of a record type you cannot read. The default
+  `RecordHistory::history_page` leaves `pagination.total` out when it reads its full fallback of 10 000 events.

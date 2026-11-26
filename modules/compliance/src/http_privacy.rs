@@ -9,7 +9,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::i18n::Language;
-use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
+use autoxide_kernel::pagination::{NaturalOrderPageQuery, Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, Tagged};
@@ -23,6 +23,7 @@ use validator::Validate;
 
 use crate::entity::{incident, incident_entry, subject_request};
 use crate::incidents::{IncidentChange, NewIncident};
+use crate::permissions::PRIVACY_READ;
 use crate::privacy::{
     ProcessingRegister, Purpose, PurposeInput, PurposeWithCounts, Recipient, ResidencyView,
     RetentionItem,
@@ -103,25 +104,30 @@ where
 ///
 /// Requires `compliance.privacy.read`. The defaults of the legal rules (`privacy.default_purposes`)
 /// merged with the purposes the tenant added or changed, each with the number of people who
-/// consented and who withdrew.
+/// consented and who withdrew. By key (A→Z unless `order=desc`); paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/purposes",
     extensions(("x-permissions" = json!(["compliance.privacy.read"]))),
     operation_id = "list_compliance_purposes",
     security(("bearer" = [])),
+    params(NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "Every purpose, with how many people consented and withdrew.", body = Data<Vec<PurposeWithCounts>>),
+        (status = 200, description = "One page of the purposes, with how many people consented and withdrew.", body = Page<PurposeWithCounts>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing `compliance.privacy.read`; code `permission_denied`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_purposes(
     State(service): State<Arc<ComplianceService>>,
     tenant: TenantContext,
     principal: Principal,
-) -> Result<Data<Vec<PurposeWithCounts>>, Error> {
-    Ok(Data { data: service.list_purposes(&tenant, &principal).await? })
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<PurposeWithCounts>, Error> {
+    principal.require(&PRIVACY_READ)?;
+    let page = PageRequest::try_from(page)?;
+    service.list_purposes(&tenant, &principal, &page).await
 }
 
 /// Add a processing purpose.
@@ -207,21 +213,26 @@ async fn update_purpose(
 ///
 /// No sign-in (the tenant comes from the domain). Only purposes in use; the advertising and
 /// analytics providers active on the tenant's websites are listed as recipients, with the country
-/// that receives the data (transfers abroad).
+/// that receives the data (transfers abroad). By key (A→Z unless `order=desc`); paged with
+/// `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/public/purposes",
     extensions(("x-public" = json!(true))),
     operation_id = "list_public_compliance_purposes",
+    params(NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "The purposes in use.", body = Data<Vec<Purpose>>),
+        (status = 200, description = "One page of the purposes in use.", body = Page<Purpose>),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn public_purposes(
     State(service): State<Arc<ComplianceService>>,
     tenant: TenantContext,
-) -> Result<Data<Vec<Purpose>>, Error> {
-    Ok(Data { data: service.public_purposes(&tenant).await? })
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<Purpose>, Error> {
+    let page = PageRequest::try_from(page)?;
+    service.public_purposes_page(&tenant, &page).await
 }
 
 // ---- Thời hạn lưu, sổ xử lý, nơi lưu ---------------------------------------------------------
@@ -229,25 +240,31 @@ async fn public_purposes(
 /// List how long each kind of personal data is kept.
 ///
 /// Requires `compliance.privacy.read`. Every module declares the personal data it keeps; each item
-/// is compared with the limits of the legal rule `privacy.retention_limits`.
+/// is compared with the limits of the legal rule `privacy.retention_limits`. By module, then name
+/// (A→Z unless `order=desc`); paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/retention",
     extensions(("x-permissions" = json!(["compliance.privacy.read"]))),
     operation_id = "list_compliance_retention",
     security(("bearer" = [])),
+    params(NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "Every kind of personal data.", body = Data<Vec<RetentionItem>>),
+        (status = 200, description = "One page of the kinds of personal data.", body = Page<RetentionItem>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing `compliance.privacy.read`; code `permission_denied`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn retention(
     State(service): State<Arc<ComplianceService>>,
     tenant: TenantContext,
     principal: Principal,
-) -> Result<Data<Vec<RetentionItem>>, Error> {
-    Ok(Data { data: service.retention(&tenant, &principal).await? })
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<RetentionItem>, Error> {
+    principal.require(&PRIVACY_READ)?;
+    let page = PageRequest::try_from(page)?;
+    service.retention(&tenant, &principal, &page).await
 }
 
 /// Get the register of processing activities.

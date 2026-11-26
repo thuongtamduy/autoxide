@@ -9,6 +9,7 @@ use std::collections::{BTreeMap, HashMap};
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
+use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, Set,
@@ -37,7 +38,8 @@ impl CatalogService {
         tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
-    ) -> Result<Vec<variant_attribute::Model>, Error> {
+        page: &PageRequest,
+    ) -> Result<Page<variant_attribute::Model>, Error> {
         let read = tenant.database().read();
         let not_found = || crate::errors::variant_not_found(id);
         let row = crate::entity::variant::Entity::find_by_id(id)
@@ -58,7 +60,12 @@ impl CatalogService {
             not_found,
         )
         .await?;
-        rows_of(read, tenant, &[id]).await
+        // Theo thứ tự của lần thay gần nhất (`PUT` ghi lại cả tập), keyset trong database (index
+        // `catalog_variant_attributes_page_idx`).
+        let select = variant_attribute::Entity::find()
+            .filter(variant_attribute::Column::VariantId.eq(id))
+            .scoped(tenant);
+        fetch_page(select, variant_attribute::Column::Id, |row| row.id, page, read).await
     }
 
     /// Thay cả tập giá trị thuộc tính của biến thể `id`.

@@ -7,7 +7,7 @@ use std::sync::Arc;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
-use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
+use autoxide_kernel::pagination::{NaturalOrderPageQuery, Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, Query, State};
@@ -54,7 +54,9 @@ pub(crate) fn routes(service: Arc<PromotionsService>) -> OpenApiRouter {
 /// Filters of the promotion list.
 #[derive(Debug, Deserialize, IntoParams)]
 pub(crate) struct PromotionsQuery {
+    /// Only promotions in this state: `draft`, `scheduled`, `active`, `paused`, `ended` or `cancelled`.
     pub status: Option<Status>,
+    /// Only promotions of this kind (see `PromotionsKind`).
     pub kind: Option<Kind>,
     /// Only promotions of this unit.
     pub org_id: Option<Uuid>,
@@ -684,19 +686,21 @@ async fn grant_voucher(
 
 /// Get the audit trail of a promotion: one entry per change after it was turned on.
 ///
-/// Requires `promotions.read`.
+/// Requires `promotions.read`. By version number, oldest first unless `order=desc`; paged with
+/// `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/promotions/{id}/versions",
     extensions(("x-permissions" = json!(["promotions.read"]))),
     operation_id = "list_promotion_versions",
     security(("bearer" = [])),
-    params(("id" = Uuid, Path, description = "Id of the promotion.")),
+    params(("id" = Uuid, Path, description = "Id of the promotion."), NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "The versions, oldest first.", body = Data<Vec<VersionDto>>),
+        (status = 200, description = "One page of the versions.", body = Page<VersionDto>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing `promotions.read`; code `permission_denied`.", body = Problem),
         (status = 404, description = "No such promotion in your scope; code `promotions.not_found`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn versions(
@@ -704,10 +708,12 @@ async fn versions(
     tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
-) -> Result<Data<Vec<VersionDto>>, Error> {
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<VersionDto>, Error> {
     principal.require(&READ)?;
-    let rows = service.versions(&tenant, &principal, id).await?;
-    Ok(Data { data: rows.iter().map(VersionDto::from).collect() })
+    let page = PageRequest::try_from(page)?;
+    let rows = service.versions(&tenant, &principal, id, &page).await?;
+    Ok(rows.map(|row| VersionDto::from(&row)))
 }
 
 /// A promotion notice recorded for one authority.

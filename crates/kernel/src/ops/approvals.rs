@@ -781,7 +781,9 @@ pub(crate) fn tools(state: ApprovalsState) -> Vec<crate::mcp::Tool> {
         Tool::new(
             "list_approvals",
             "List approval requests: those of your own AI agents, and those you may decide. An \
-             agent sees here whether a person approved its command yet.",
+             agent sees here whether a person approved its command yet. A page may hold fewer items \
+             than `limit`, even none, and still have `pagination.next_cursor`: keep following it \
+             until it is null.",
             |tenant: TenantContext, principal: Principal, input: ListApprovalsInput| async move {
                 // Cùng kiểu tham số trang và cùng hàm với REST.
                 let page = crate::mcp::PageInput::new(input.limit, input.cursor, input.order)

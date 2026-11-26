@@ -5,7 +5,7 @@ use std::sync::Arc;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::mcp::{NoInput, PageInput, Tool};
-use autoxide_kernel::pagination::Page;
+use autoxide_kernel::pagination::{NaturalOrderPageQuery, Page, PageRequest};
 use autoxide_kernel::tenancy::TenantContext;
 use serde::Deserialize;
 use utoipa::ToSchema;
@@ -33,6 +33,37 @@ pub(crate) struct ProfilesInput {
     limit: Option<u32>,
     /// The `next_cursor` of the previous page.
     cursor: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
+}
+
+/// One page of a list in its natural order (kind, key…): the same as the `limit`, `cursor`, `order`
+/// and `count` query parameters of the REST endpoint.
+#[derive(Debug, Default, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct NaturalPageInput {
+    /// Maximum number of items, 1 to 200. Defaults to 50.
+    limit: Option<u32>,
+    /// The `next_cursor` of the previous page.
+    cursor: Option<String>,
+    /// `asc` (the default, A→Z) or `desc`.
+    order: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
+}
+
+impl NaturalPageInput {
+    /// Cùng kiểu tham số trang với REST (`NaturalOrderPageQuery`, mặc định `asc`).
+    pub(crate) fn page(self) -> Result<PageRequest, Error> {
+        PageRequest::try_from(
+            NaturalOrderPageQuery::new(
+                self.limit.map(|limit| limit.to_string()),
+                self.cursor,
+                self.order,
+            )
+            .with_count(self.count.unwrap_or(false)),
+        )
+    }
 }
 
 /// A version to publish.
@@ -69,6 +100,8 @@ pub(crate) struct ListInput {
     limit: Option<u32>,
     /// The `next_cursor` of the previous page.
     cursor: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    count: Option<bool>,
 }
 
 /// Which website.
@@ -114,7 +147,9 @@ fn moit(service: &Arc<ComplianceService>) -> Vec<Tool> {
             move |tenant: TenantContext, principal: Principal, input: ListInput| {
                 let service = profiles.clone();
                 async move {
-                    let page = PageInput::new(input.limit, input.cursor, None).page()?;
+                    let page = PageInput::new(input.limit, input.cursor, None)
+                        .with_count(input.count.unwrap_or(false))
+                        .page()?;
                     let found = service.list_profiles_legal(&tenant, &principal, &page).await?;
                     Ok::<Page<LegalProfileResponse>, Error>(found.map(LegalProfileResponse::from))
                 }
@@ -129,7 +164,9 @@ fn moit(service: &Arc<ComplianceService>) -> Vec<Tool> {
             move |tenant: TenantContext, principal: Principal, input: ListInput| {
                 let service = websites.clone();
                 async move {
-                    let page = PageInput::new(input.limit, input.cursor, None).page()?;
+                    let page = PageInput::new(input.limit, input.cursor, None)
+                        .with_count(input.count.unwrap_or(false))
+                        .page()?;
                     let found = service.list_websites(&tenant, &principal, &page).await?;
                     Ok::<Page<WebsiteResponse>, Error>(found.map(|row| describe_website(row, None)))
                 }
@@ -232,7 +269,9 @@ fn base(service: &Arc<ComplianceService>) -> Vec<Tool> {
             move |tenant: TenantContext, principal: Principal, input: ProfilesInput| {
                 let service = profiles.clone();
                 async move {
-                    let page = PageInput::new(input.limit, input.cursor, None).page()?;
+                    let page = PageInput::new(input.limit, input.cursor, None)
+                        .with_count(input.count.unwrap_or(false))
+                        .page()?;
                     let found =
                         service.list_profiles(&tenant, &principal, input.status, &page).await?;
                     Ok::<Page<ProfileResponse>, Error>(found.map(ProfileResponse::from))
@@ -244,13 +283,14 @@ fn base(service: &Arc<ComplianceService>) -> Vec<Tool> {
         Tool::new(
             "documents",
             "List the legal documents of the tenant (terms of use, privacy policy…) with their \
-             current version number.",
-            move |tenant: TenantContext, principal: Principal, _: NoInput| {
+             current version number, by kind; follow `pagination.next_cursor` for more.",
+            move |tenant: TenantContext, principal: Principal, input: NaturalPageInput| {
                 let service = documents.clone();
                 async move {
-                    let rows = service.list_documents(&tenant, &principal).await?;
-                    Ok::<Vec<DocumentResponse>, Error>(
-                        rows.into_iter().map(|row| describe_document(row, None)).collect(),
+                    let page = input.page()?;
+                    let rows = service.list_documents(&tenant, &principal, &page).await?;
+                    Ok::<Page<DocumentResponse>, Error>(
+                        rows.map(|row| describe_document(row, None)),
                     )
                 }
             },
@@ -281,23 +321,21 @@ fn base(service: &Arc<ComplianceService>) -> Vec<Tool> {
         .requires(DOCUMENTS_MANAGE),
         Tool::new(
             "pending_acceptances",
-            "The legal documents you must accept (again) before going on.",
-            move |tenant: TenantContext, principal: Principal, _: NoInput| {
+            "The legal documents you must accept (again) before going on, by kind; follow \
+             `pagination.next_cursor` for more.",
+            move |tenant: TenantContext, principal: Principal, input: NaturalPageInput| {
                 let service = pending.clone();
                 async move {
+                    let page = input.page()?;
                     let rows = service
-                        .pending_acceptances(&tenant, &Subject::User(principal.user_id()))
+                        .pending_acceptances(&tenant, &Subject::User(principal.user_id()), &page)
                         .await?;
-                    Ok::<Vec<Pending>, Error>(
-                        rows.into_iter()
-                            .map(|(doc, current)| Pending {
-                                document_id: doc.id,
-                                kind: doc.kind,
-                                title: doc.title,
-                                version: current.into(),
-                            })
-                            .collect(),
-                    )
+                    Ok::<Page<Pending>, Error>(rows.map(|(doc, current)| Pending {
+                        document_id: doc.id,
+                        kind: doc.kind,
+                        title: doc.title,
+                        version: current.into(),
+                    }))
                 }
             },
         )

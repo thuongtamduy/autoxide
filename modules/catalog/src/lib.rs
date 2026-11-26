@@ -9,6 +9,7 @@ mod blocks;
 mod bulk;
 mod card;
 mod categories;
+mod category_pages;
 mod collections;
 mod config;
 mod copywriting;

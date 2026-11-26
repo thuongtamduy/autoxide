@@ -17,6 +17,11 @@ changelog `p9-list-pages-cluster-3a`), bổ sung D-20261125-list-pages:
    thể rỗng) với con trỏ ở **dòng cuối đã quét** — trang ngắn hơn `limit`, kể cả rỗng, mà vẫn có `next_cursor` là
    hợp lệ với hai danh sách này (mô tả endpoint nói rõ). `count=true` đếm trong lúc đi từ đầu với cùng ngân sách;
    dài hơn thì bỏ `total` (không báo sai). Không lấy hết rồi cắt, không quét không giới hạn.
+   Con trỏ đọc được (base64 của JSON), nên dòng cuối đã quét lộ giá trị sắp và id của nó: mọi quy tắc xem phải
+   nằm trong SQL, phần kiểm từng dòng chỉ tinh chỉnh dòng người gọi đã được biết. Trường tự định nghĩa: loại bản ghi
+   đọc được lọc trong SQL (`target IN (…)`, loại có loại con thêm `target LIKE '<loại>.%'`, `_` thoát); kiểm từng
+   dòng chỉ còn bỏ loại con sai dạng của một loại đọc được. Yêu cầu duyệt: cùng quy tắc trong SQL. Nên con trỏ khi
+   hết ngân sách không bao giờ nêu trường của loại người gọi không đọc được, hay yêu cầu người gọi không được xem.
 3. **Danh sách gộp từ nhiều nguồn cùng khoá UUIDv7**: mỗi nguồn đọc một trang keyset với cùng con trỏ id rồi gộp
    theo id (`merge_id_pages` của kernel; `auth` làm tương tự cho uỷ quyền nhận từ các khách cấp trên — tối đa 16
    tầng, có thể ở database khác): mỗi nguồn cho `limit` dòng đầu sau con trỏ nên `limit` dòng đầu của bản gộp là

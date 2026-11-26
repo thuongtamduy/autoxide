@@ -426,6 +426,7 @@ pub(crate) struct StaffReviewQuery {
     status: Option<String>,
     /// Only reviews written after this time (e.g. the time you last looked).
     created_after: Option<Timestamp>,
+    /// Only reviews of this product.
     product_id: Option<Uuid>,
 }
 

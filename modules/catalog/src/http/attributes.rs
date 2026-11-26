@@ -8,6 +8,7 @@ use std::sync::Arc;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
+use autoxide_kernel::pagination::{NaturalOrderPageQuery, Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, Query, State};
@@ -100,27 +101,32 @@ impl From<AttributeDetail> for AttributeResponse {
 
 /// List every attribute of the tenant.
 ///
-/// Requires `catalog.products.read`.
+/// Requires `catalog.products.read`. By code (A→Z unless `order=desc`); paged with `limit` /
+/// `cursor`.
 #[utoipa::path(
     get,
     path = "/attributes",
     extensions(("x-permissions" = json!(["catalog.products.read"]))),
     operation_id = "list_catalog_attributes",
     security(("bearer" = [])),
+    params(NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "Every attribute, by code.", body = Data<Vec<AttributeResponse>>),
+        (status = 200, description = "One page of the attributes, by code.", body = Page<AttributeResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing `catalog.products.read`; code `permission_denied`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_attributes(
     State(service): State<Arc<CatalogService>>,
     tenant: TenantContext,
     principal: Principal,
-) -> Result<Data<Vec<AttributeResponse>>, Error> {
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<AttributeResponse>, Error> {
     principal.require(&PRODUCTS_READ)?;
-    let rows = service.list_attributes(&tenant).await?;
-    Ok(Data { data: rows.into_iter().map(AttributeResponse::from).collect() })
+    let page = PageRequest::try_from(page)?;
+    let rows = service.list_attributes_page(&tenant, &page).await?;
+    Ok(rows.map(AttributeResponse::from))
 }
 
 /// A new attribute.
@@ -327,18 +333,20 @@ pub(crate) struct CategoryAttributesRequest {
 
 /// List the attributes of a category.
 ///
-/// Requires `catalog.products.read`.
+/// Requires `catalog.products.read`. In the order of the last replace (`PUT`) unless `order=desc`;
+/// paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/categories/{id}/attributes",
     extensions(("x-permissions" = json!(["catalog.products.read"]))),
     operation_id = "get_catalog_category_attributes",
     security(("bearer" = [])),
-    params(("id" = Uuid, Path, description = "Id of the category.")),
+    params(("id" = Uuid, Path, description = "Id of the category."), NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "The attributes of the category.", body = Data<Vec<CategoryAttributeDto>>),
+        (status = 200, description = "One page of the attributes of the category.", body = Page<CategoryAttributeDto>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing `catalog.products.read`; code `permission_denied`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn get_category_attributes(
@@ -346,10 +354,12 @@ async fn get_category_attributes(
     tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
-) -> Result<Data<Vec<CategoryAttributeDto>>, Error> {
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<CategoryAttributeDto>, Error> {
     principal.require(&PRODUCTS_READ)?;
-    let rows = service.category_attributes(&tenant, id).await?;
-    Ok(Data { data: rows.into_iter().map(Into::into).collect() })
+    let page = PageRequest::try_from(page)?;
+    let rows = service.category_attributes_page(&tenant, id, &page).await?;
+    Ok(rows.map(Into::into))
 }
 
 /// Replace the attributes of a category.
@@ -506,26 +516,32 @@ impl From<restriction_rule::Model> for RestrictionRuleResponse {
 /// List the rules of prohibited and conditional goods.
 ///
 /// Requires `catalog.products.read`. Loaded by the operator with `autoxide task
-/// catalog.load_restrictions`; check the legal basis of each rule against the source text.
+/// catalog.load_restrictions`; check the legal basis of each rule against the source text. By
+/// jurisdiction, code, then effective date (A→Z unless `order=desc`); paged with `limit` /
+/// `cursor`.
 #[utoipa::path(
     get,
     path = "/restriction-rules",
     extensions(("x-permissions" = json!(["catalog.products.read"]))),
     operation_id = "list_catalog_restriction_rules",
     security(("bearer" = [])),
+    params(NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "Every rule.", body = Data<Vec<RestrictionRuleResponse>>),
+        (status = 200, description = "One page of the rules.", body = Page<RestrictionRuleResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing `catalog.products.read`; code `permission_denied`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_restriction_rules(
     State(service): State<Arc<CatalogService>>,
     principal: Principal,
-) -> Result<Data<Vec<RestrictionRuleResponse>>, Error> {
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<RestrictionRuleResponse>, Error> {
     principal.require(&PRODUCTS_READ)?;
-    let rows = service.restriction_rules().await?;
-    Ok(Data { data: rows.into_iter().map(Into::into).collect() })
+    let page = PageRequest::try_from(page)?;
+    let rows = service.restriction_rules(&page).await?;
+    Ok(rows.map(Into::into))
 }
 
 /// A value of an attribute on a product.
@@ -574,16 +590,18 @@ impl From<product_attribute::Model> for StoredValueResponse {
 
 /// List the attribute values of a product.
 ///
-/// Requires `catalog.products.read` covering the product.
+/// Requires `catalog.products.read` covering the product. In the order of the last replace
+/// (`PUT`) unless `order=desc`; paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/products/{id}/attributes",
     extensions(("x-permissions" = json!(["catalog.products.read"]))),
     operation_id = "get_catalog_product_attributes",
     security(("bearer" = [])),
-    params(("id" = Uuid, Path, description = "Id of the product.")),
+    params(("id" = Uuid, Path, description = "Id of the product."), NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "The values.", body = Data<Vec<StoredValueResponse>>),
+        (status = 200, description = "One page of the values.", body = Page<StoredValueResponse>),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing `catalog.products.read`; code `permission_denied`.", body = Problem),
         (status = 404, description = "No product with this id in your scope; code `catalog.product_not_found`.", body = Problem),
@@ -594,10 +612,12 @@ async fn get_product_attributes(
     tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
-) -> Result<Data<Vec<StoredValueResponse>>, Error> {
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<StoredValueResponse>, Error> {
     principal.require(&PRODUCTS_READ)?;
-    let rows = service.get_product_attributes(&tenant, &principal, id).await?;
-    Ok(Data { data: rows.into_iter().map(Into::into).collect() })
+    let page = PageRequest::try_from(page)?;
+    let rows = service.get_product_attributes(&tenant, &principal, id, &page).await?;
+    Ok(rows.map(Into::into))
 }
 
 /// Replace the attribute values of a product.
@@ -671,16 +691,18 @@ impl From<product_document::Model> for DocumentResponse {
 
 /// List the documents of a product.
 ///
-/// Requires `catalog.documents.manage` covering the product.
+/// Requires `catalog.documents.manage` covering the product. Newest first unless `order=asc`;
+/// paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/products/{id}/documents",
     extensions(("x-permissions" = json!(["catalog.documents.manage"]))),
     operation_id = "list_catalog_product_documents",
     security(("bearer" = [])),
-    params(("id" = Uuid, Path, description = "Id of the product.")),
+    params(("id" = Uuid, Path, description = "Id of the product."), PageQuery),
     responses(
-        (status = 200, description = "The documents.", body = Data<Vec<DocumentResponse>>),
+        (status = 200, description = "One page of the documents.", body = Page<DocumentResponse>),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing `catalog.documents.manage`, or it does not cover the product; codes `permission_denied`, `org_out_of_scope`.", body = Problem),
         (status = 404, description = "No product with this id in your scope; code `catalog.product_not_found`.", body = Problem),
@@ -691,10 +713,12 @@ async fn list_product_documents(
     tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
-) -> Result<Data<Vec<DocumentResponse>>, Error> {
+    Query(page): Query<PageQuery>,
+) -> Result<Page<DocumentResponse>, Error> {
     principal.require(&DOCUMENTS_MANAGE)?;
-    let rows = service.list_documents(&tenant, &principal, id).await?;
-    Ok(Data { data: rows.into_iter().map(Into::into).collect() })
+    let page = PageRequest::try_from(page)?;
+    let rows = service.list_documents(&tenant, &principal, id, &page).await?;
+    Ok(rows.map(Into::into))
 }
 
 /// A new document.
@@ -799,19 +823,21 @@ pub(crate) struct CountResponse {
 
 /// Count the products in your scope by status or readiness.
 ///
-/// Requires `catalog.products.read`. Every key is listed, with 0 when there is no product.
+/// Requires `catalog.products.read`. Every key is listed, with 0 when there is no product, in a
+/// fixed order (`draft`, `active`, `inactive`, `archived`; or `ready`, `missing_attributes`,
+/// `missing_documents`, `restricted`; `order=desc` reverses it); paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/products/counts",
     extensions(("x-permissions" = json!(["catalog.products.read"]))),
     operation_id = "count_catalog_products",
     security(("bearer" = [])),
-    params(CountsQuery),
+    params(CountsQuery, NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "One count per key.", body = Data<Vec<CountResponse>>),
+        (status = 200, description = "One page of the counts, one per key.", body = Page<CountResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing `catalog.products.read`; code `permission_denied`.", body = Problem),
-        (status = 422, description = "`group_by` is not `status` or `readiness`; see `errors`.", body = Problem),
+        (status = 422, description = "`group_by` is not `status` or `readiness`, or a paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn count_products(
@@ -819,9 +845,11 @@ async fn count_products(
     tenant: TenantContext,
     principal: Principal,
     Query(query): Query<CountsQuery>,
-) -> Result<Data<Vec<CountResponse>>, Error> {
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<CountResponse>, Error> {
     principal.require(&PRODUCTS_READ)?;
+    let page = PageRequest::try_from(page)?;
     let group_by = query.group_by.unwrap_or_else(|| "status".to_owned());
-    let counts = service.count_products(&tenant, &principal, &group_by).await?;
-    Ok(Data { data: counts.into_iter().map(|(key, count)| CountResponse { key, count }).collect() })
+    let counts = service.count_products(&tenant, &principal, &group_by, &page).await?;
+    Ok(counts.map(|(key, count)| CountResponse { key, count }))
 }

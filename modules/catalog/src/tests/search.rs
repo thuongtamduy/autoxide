@@ -79,10 +79,15 @@ async fn goi_y_khop_dung_dau_truoc() {
         assert_eq!(found["data"][0]["path"], "/products/dau-an");
         let (_, few, _) = public(&app, &format!("{uri}&limit=1"), None).await;
         assert_eq!(few["data"].as_array().unwrap().len(), 1);
-        let (status, _, _) = public(&app, "/search/suggest?locale=vi&q=", None).await;
+        // Trang sau theo `next_cursor`: đúng các gợi ý còn lại, cùng thứ tự (top-N gộp, `page_of`).
+        let cursor = few["pagination"]["next_cursor"].as_str().unwrap().to_owned();
+        let (_, rest, _) = public(&app, &format!("{uri}&limit=2&cursor={cursor}"), None).await;
+        assert_eq!(rest["data"].as_array().unwrap()[..], found["data"].as_array().unwrap()[1..]);
+        assert!(rest["pagination"]["next_cursor"].is_null(), "{rest}");
+        // `q` trống và `limit` sai: một lỗi 422 nêu cả hai ô.
+        let (status, problem, _) = public(&app, "/search/suggest?locale=vi&q=&limit=0", None).await;
         assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
-        let (status, _, _) = public(&app, &format!("{uri}&limit=11"), None).await;
-        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(problem["errors"].as_array().unwrap().len(), 2, "{problem}");
     })
     .await
     .unwrap();

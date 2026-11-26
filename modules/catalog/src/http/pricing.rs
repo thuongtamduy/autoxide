@@ -8,7 +8,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::money::{Currency, Money};
-use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
+use autoxide_kernel::pagination::{NaturalOrderPageQuery, Page, PageQuery, PageRequest};
 use autoxide_kernel::reference::Reference;
 use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::{OrgId, TenantContext};
@@ -51,27 +51,32 @@ pub(crate) fn routes(service: Arc<CatalogService>) -> OpenApiRouter {
 
 /// List every category of the tenant.
 ///
-/// Requires `catalog.products.read`. Ordered by depth, then display order.
+/// Requires `catalog.products.read`. Ordered by depth, then display order, then id: parents before
+/// children (`order=desc` reverses it); paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/categories",
     extensions(("x-permissions" = json!(["catalog.products.read"]))),
     operation_id = "list_catalog_categories",
     security(("bearer" = [])),
+    params(NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "Every category.", body = Data<Vec<CategoryResponse>>),
+        (status = 200, description = "One page of the categories.", body = Page<CategoryResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing `catalog.products.read`; code `permission_denied`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn list_categories(
     State(service): State<Arc<CatalogService>>,
     tenant: TenantContext,
     principal: Principal,
-) -> Result<Data<Vec<CategoryResponse>>, Error> {
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<CategoryResponse>, Error> {
     principal.require(&PRODUCTS_READ)?;
-    let rows = service.list_categories(&tenant).await?;
-    Ok(Data { data: rows.into_iter().map(CategoryResponse::from).collect() })
+    let page = PageRequest::try_from(page)?;
+    let rows = service.list_categories_page(&tenant, &page).await?;
+    Ok(rows.map(CategoryResponse::from))
 }
 
 /// A new category.
@@ -574,6 +579,7 @@ pub(crate) struct ResolveQuery {
     pub org_id: Uuid,
     /// ISO 4217 code.
     pub currency: String,
+    /// The buyer's customer group, for prices set for a group; omit for the price everyone gets.
     pub customer_group: Option<String>,
     /// Default: now.
     pub at: Option<Timestamp>,

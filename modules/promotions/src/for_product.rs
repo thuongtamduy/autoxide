@@ -4,6 +4,7 @@
 use autoxide_catalog::api::PriceQuery;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::money::{Currency, Money};
+use autoxide_kernel::pagination::{Page, PageRequest, page_of};
 use autoxide_kernel::tenancy::{ScopeExt, Site, TenantContext};
 use autoxide_kernel::time::Timestamp;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
@@ -40,6 +41,12 @@ pub(crate) struct ProductCode {
     pub ends_at: Timestamp,
 }
 
+/// Giá (có thể âm) thành chữ so theo byte đúng thứ tự số: dời về `u64` (lật bit dấu) rồi đệm 0 đủ 20 chữ số.
+fn price_key(minor: i64) -> String {
+    // `cast_unsigned` giữ nguyên bit; lật bit cao nhất thì số âm nhỏ hơn số dương khi so như số không dấu.
+    format!("{:020}", minor.cast_unsigned() ^ (1 << 63))
+}
+
 /// Biến thể không thuộc sản phẩm (hay không có) — một lỗi cho cả hai, không lộ biến thể của ai.
 fn product_not_found(product: Uuid) -> Error {
     Error::not_found(
@@ -52,6 +59,11 @@ fn product_not_found(product: Uuid) -> Error {
 impl PromotionsService {
     /// Mã `public` đang chạy áp được cho biến thể `variant_id` của sản phẩm `product_id` trên
     /// website `site`, mỗi mã một giá sau mã cho số lượng 1. Mã không giảm thêm gì thì vắng.
+    ///
+    /// Một trang (`page_of`): giá sau mã do bộ máy khuyến mại tính lại cho từng mã ở mỗi lần gọi (không lưu
+    /// trong database, không sắp được bằng SQL), và tập này bị chặn theo cấu trúc — tối đa
+    /// [`CODES_PER_PROGRAM`] mã cho mỗi chương trình công khai đang chạy của chuỗi nút website. Rẻ nhất trước
+    /// (khoá: giá sau mã đổi thành số không âm đệm 0 để so theo byte đúng thứ tự số, rồi mã).
     pub(crate) async fn codes_for_product(
         &self,
         tenant: &TenantContext,
@@ -59,7 +71,8 @@ impl PromotionsService {
         product_id: Uuid,
         variant_id: Uuid,
         locale: &str,
-    ) -> Result<Vec<ProductCode>, Error> {
+        page: &PageRequest,
+    ) -> Result<Page<ProductCode>, Error> {
         let found = self.catalog.variants(tenant, &[variant_id], None).await?;
         if !found.iter().any(|variant| variant.product_id == product_id) {
             return Err(product_not_found(product_id));
@@ -140,7 +153,10 @@ impl PromotionsService {
             }
         }
         // Rẻ nhất trước: mã giảm nhiều nhất là dòng người mua đọc đầu tiên.
-        out.sort_by_key(|row| (row.price_with_code.minor(), row.code.clone()));
-        Ok(out)
+        page_of(
+            out,
+            |row| format!("{}\u{1f}{}", price_key(row.price_with_code.minor()), row.code),
+            page,
+        )
     }
 }

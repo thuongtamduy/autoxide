@@ -6,6 +6,7 @@ use std::sync::Arc;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
+use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::{OrgId, TenantContext};
 use axum::extract::{Path, Query, State};
@@ -117,18 +118,19 @@ pub(crate) struct WarrantyQuery {
 /// Look up warranties.
 ///
 /// Requires `orders.warranty.manage`; only warranties of nodes in your scope. Give `serial`,
-/// `phone` or both (either matches), newest first.
+/// `phone` or both (either matches). Newest first unless `order=asc`; paged with `limit` /
+/// `cursor`.
 #[utoipa::path(
     get,
     path = "/warranties",
     extensions(("x-permissions" = json!(["orders.warranty.manage"]))),
     operation_id = "find_warranties",
-    params(WarrantyQuery),
+    params(WarrantyQuery, PageQuery),
     responses(
-        (status = 200, description = "The matching warranties.", body = Data<Vec<WarrantyResponse>>),
+        (status = 200, description = "One page of the matching warranties.", body = Page<WarrantyResponse>),
         (status = 401, description = "Not signed in; code `unauthenticated`.", body = Problem),
         (status = 403, description = "Missing `orders.warranty.manage`; code `permission_denied`.", body = Problem),
-        (status = 422, description = "Neither `serial` nor `phone`, or not a phone number (see `errors`).", body = Problem),
+        (status = 422, description = "Neither `serial` nor `phone`, not a phone number, or a paging parameter is invalid (see `errors`).", body = Problem),
     )
 )]
 pub(crate) async fn find_warranties(
@@ -136,33 +138,47 @@ pub(crate) async fn find_warranties(
     tenant: TenantContext,
     principal: Principal,
     Query(query): Query<WarrantyQuery>,
-) -> Result<Data<Vec<WarrantyResponse>>, Error> {
+    Query(page): Query<PageQuery>,
+) -> Result<Page<WarrantyResponse>, Error> {
+    principal.require(&crate::permissions::WARRANTY_MANAGE)?;
+    let page = PageRequest::try_from(page)?;
     let rows = service
-        .find_warranties(&tenant, &principal, query.serial.as_deref(), query.phone.as_deref())
+        .find_warranties(
+            &tenant,
+            &principal,
+            query.serial.as_deref(),
+            query.phone.as_deref(),
+            &page,
+        )
         .await?;
-    Ok(Data { data: rows.into_iter().map(WarrantyResponse::new).collect() })
+    Ok(rows.map(WarrantyResponse::new))
 }
 
 /// Your warranties.
 ///
-/// Signed in: warranties of products you ordered with your account, newest first.
+/// Signed in: warranties of products you ordered with your account. Newest first unless
+/// `order=asc`; paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/me/warranties",
     extensions(("x-permissions" = json!([]))),
     operation_id = "list_my_warranties",
+    params(PageQuery),
     responses(
-        (status = 200, description = "Your warranties.", body = Data<Vec<WarrantyResponse>>),
+        (status = 200, description = "One page of your warranties.", body = Page<WarrantyResponse>),
         (status = 401, description = "Not signed in; code `unauthenticated`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 pub(crate) async fn my_warranties(
     State(service): State<Arc<OrdersService>>,
     tenant: TenantContext,
     principal: Principal,
-) -> Result<Data<Vec<WarrantyResponse>>, Error> {
-    let rows = service.my_warranties(&tenant, principal.user_id()).await?;
-    Ok(Data { data: rows.into_iter().map(WarrantyResponse::new).collect() })
+    Query(page): Query<PageQuery>,
+) -> Result<Page<WarrantyResponse>, Error> {
+    let page = PageRequest::try_from(page)?;
+    let rows = service.my_warranties(&tenant, principal.user_id(), &page).await?;
+    Ok(rows.map(WarrantyResponse::new))
 }
 
 /// A warranty claim.

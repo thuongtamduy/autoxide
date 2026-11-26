@@ -626,18 +626,20 @@ pub(crate) async fn refund_order(
 
 /// Refunds of an order.
 ///
-/// Requires `orders.read` at the order's shop. Oldest first.
+/// Requires `orders.read` at the order's shop. Newest first unless `order=asc`; paged with `limit`
+/// / `cursor`.
 #[utoipa::path(
     get,
     path = "/{id}/refunds",
     extensions(("x-permissions" = json!(["orders.read"]))),
     operation_id = "list_order_refunds",
-    params(("id" = Uuid, Path, description = "Id of the order.")),
+    params(("id" = Uuid, Path, description = "Id of the order."), PageQuery),
     responses(
-        (status = 200, description = "The refunds of the order.", body = Data<Vec<RefundResponse>>),
+        (status = 200, description = "One page of the refunds of the order.", body = Page<RefundResponse>),
         (status = 401, description = "Not signed in; code `unauthenticated`.", body = Problem),
         (status = 403, description = "Missing `orders.read` at the order's shop; code `permission_denied`.", body = Problem),
         (status = 404, description = "No such order; code `orders.order_not_found`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 pub(crate) async fn order_refunds(
@@ -645,8 +647,12 @@ pub(crate) async fn order_refunds(
     tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
-) -> Result<Data<Vec<RefundResponse>>, Error> {
-    let rows = service.order_refunds(&tenant, &principal, id).await?;
-    let data = rows.into_iter().map(RefundResponse::new).collect::<Result<_, _>>()?;
-    Ok(Data { data })
+    Query(page): Query<PageQuery>,
+) -> Result<Page<RefundResponse>, Error> {
+    principal.require(&crate::permissions::READ)?;
+    let page = PageRequest::try_from(page)?;
+    let rows = service.order_refunds(&tenant, &principal, id, &page).await?;
+    let pagination = rows.pagination;
+    let data = rows.data.into_iter().map(RefundResponse::new).collect::<Result<_, _>>()?;
+    Ok(Page { data, pagination })
 }

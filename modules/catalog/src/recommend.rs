@@ -18,6 +18,7 @@ use std::sync::Arc;
 
 use autoxide_kernel::error::Error;
 use autoxide_kernel::job::{JobContext, JobHandler};
+use autoxide_kernel::pagination::{Page, PageRequest, page_of};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext, TenantId};
 use sea_orm::sea_query::{Alias, Expr, ExprTrait as _, Func, JoinType, OnConflict, Order, Query};
 use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QuerySelect, Set};
@@ -399,7 +400,7 @@ pub(crate) enum Recommendation {
 }
 
 impl CatalogService {
-    /// Gợi ý cho trang của `product` trên website `site`, tối đa `limit` thẻ. `product` phải đang
+    /// Gợi ý cho trang của `product` trên website `site`, một trang. `product` phải đang
     /// hiện ở website đó (không thì 404); gợi ý chỉ gồm sản phẩm đang hiện ở website đó.
     pub(crate) async fn recommendations(
         &self,
@@ -408,8 +409,8 @@ impl CatalogService {
         product: Uuid,
         locale: &str,
         kind: Recommendation,
-        limit: usize,
-    ) -> Result<Vec<crate::public::PublicCard>, Error> {
+        page: &PageRequest,
+    ) -> Result<Page<crate::public::PublicCard>, Error> {
         let read = tenant.database().read();
         let visible = self.visible_on(tenant, site).await?;
         let shown = storefront_entry::Entity::find()
@@ -426,7 +427,8 @@ impl CatalogService {
             Recommendation::Similar => {
                 let found = self.similar_products(tenant, product, locale).await?;
                 if found.is_empty() {
-                    return self.same_category(tenant, visible, product, locale, limit).await;
+                    let cards = self.same_category(tenant, visible, product, locale).await?;
+                    return ranked_page(cards, page);
                 }
                 found
             }
@@ -441,8 +443,8 @@ impl CatalogService {
             .map(|row| (row.product_id, row))
             .collect();
         let ordered: Vec<storefront_entry::Model> =
-            ids.iter().filter_map(|id| entries.remove(id)).take(limit).collect();
-        self.cards(tenant, locale, ordered).await
+            ids.iter().filter_map(|id| entries.remove(id)).collect();
+        ranked_page(self.cards(tenant, locale, ordered).await?, page)
     }
 
     /// Sản phẩm cùng danh mục với `product` (bán chạy trước): khi chưa có danh sách tương tự.
@@ -452,7 +454,6 @@ impl CatalogService {
         visible: sea_orm::Condition,
         product: Uuid,
         locale: &str,
-        limit: usize,
     ) -> Result<Vec<crate::public::PublicCard>, Error> {
         use sea_orm::QueryOrder as _;
         let read = tenant.database().read();
@@ -480,9 +481,22 @@ impl CatalogService {
             .scoped(tenant)
             .order_by_desc(storefront_entry::Column::BestSelling)
             .order_by_asc(storefront_entry::Column::ProductId)
-            .limit(u64::try_from(limit).unwrap_or(u64::MAX))
+            // Gợi ý thay cho danh sách tương tự: cùng trần `TOP` như danh sách đó.
+            .limit(crate::similar::TOP as u64)
             .all(read)
             .await?;
         self.cards(tenant, locale, entries).await
     }
+}
+
+/// Một trang (`page_of`) của danh sách gợi ý đã xếp hạng: tập bị chặn theo cấu trúc — thường mua cùng tối đa
+/// [`MAX_PAIRS`] cặp lưu sẵn, tương tự (hay bán chạy cùng danh mục khi chưa có) tối đa `similar::TOP` — là top-N theo
+/// thiết kế, không phải danh sách lớn dần. Khoá là thứ hạng (đệm 0) nên giữ thứ tự xếp hạng.
+fn ranked_page(
+    cards: Vec<crate::public::PublicCard>,
+    page: &PageRequest,
+) -> Result<Page<crate::public::PublicCard>, Error> {
+    let ranked =
+        page_of(cards.into_iter().enumerate().collect(), |(rank, _)| format!("{rank:04}"), page)?;
+    Ok(ranked.map(|(_, card)| card))
 }

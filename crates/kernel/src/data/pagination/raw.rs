@@ -188,6 +188,12 @@ pub(crate) const SCAN_BATCHES: usize = 10;
 ///   row, so the next request goes on from there. A page shorter than `limit`, even empty, with a `next_cursor`
 ///   is therefore normal for these lists: keep following the cursor until it is `null`.
 ///
+/// The cursor is readable (base64 of JSON), so the last scanned row's sort value and id reach the caller even
+/// when `keep` refused that row. Callers must therefore put the whole visibility rule into `select` and use
+/// `keep` only to refine rows the caller may already know of (approvals: the same rule in SQL; custom fields:
+/// the readable kinds in SQL, `keep` only rejects a malformed sub-kind of a readable kind). Never pass a `select`
+/// that lets through rows the caller must not learn about.
+///
 /// With `count=true` the first page also counts the kept rows while walking from the start, within the same
 /// budget; `pagination.total` is left out when the list is longer than the budget.
 #[allow(clippy::too_many_arguments)]
@@ -318,7 +324,8 @@ impl<K: Fn(&QueryResult) -> Result<bool, Error>> Walker<'_, K> {
                 _ => return Ok((found, None, kept)),
             }
         }
-        // Hết ngân sách quét: trang sau đi tiếp từ dòng cuối đã quét (có thể trả trang ngắn, kể cả rỗng).
+        // Hết ngân sách quét: trang sau đi tiếp từ dòng cuối đã quét (có thể trả trang ngắn, kể cả rỗng). Dòng đó
+        // đã qua bộ lọc quyền trong SQL của bên gọi, nên con trỏ không nêu dòng người gọi không được biết.
         Ok((found, batch.position, kept))
     }
 }

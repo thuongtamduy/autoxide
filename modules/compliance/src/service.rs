@@ -10,6 +10,7 @@ use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::event::{Actor, Outbox};
 use autoxide_kernel::identity::IdentityVerifier;
 use autoxide_kernel::job::JobQueue;
+use autoxide_kernel::pagination::{Page, PageRequest, page_of};
 use autoxide_kernel::tenancy::{DatabaseRegistry, ScopeExt, TenantContext, TenantId};
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set};
@@ -159,6 +160,19 @@ pub(crate) fn describe_rule(row: &rule::Model) -> Rule {
         legal_basis: row.legal_basis.clone(),
         needs_legal_review: row.needs_legal_review,
     }
+}
+
+/// Khoá trang của quy tắc pháp lý (`page_of`): vùng, khoá, rồi hiệu lực và phiên bản MỚI trước (đảo số để so theo
+/// byte đúng thứ tự giảm dần), cuối là id cho duy nhất. Quy tắc là dữ liệu luật dùng chung mọi khách ở mặt điều khiển,
+/// nạp bằng gói của nhân sự nền tảng — không lớn dần theo dữ liệu khách (như bảng thuế,
+/// D-20261126-list-pages-cluster-3).
+fn rule_key(row: &rule::Model) -> String {
+    let from = i64::MAX.saturating_sub(row.effective_from.as_unix_micros().max(0));
+    let version = i64::MAX.saturating_sub(row.version.max(0));
+    format!(
+        "{}\u{1f}{}\u{1f}{from:020}\u{1f}{version:020}\u{1f}{}",
+        row.jurisdiction, row.key, row.id
+    )
 }
 
 impl ComplianceService {
@@ -323,7 +337,8 @@ impl ComplianceService {
         &self,
         principal: &Principal,
         filter: RuleFilter,
-    ) -> Result<Vec<rule::Model>, Error> {
+        page: &PageRequest,
+    ) -> Result<Page<rule::Model>, Error> {
         principal.require(&crate::permissions::RULES_READ)?;
         let mut select = rule::Entity::find();
         if let Some(jurisdiction) = filter.jurisdiction {
@@ -343,7 +358,7 @@ impl ComplianceService {
             .all(self.databases.control().read())
             .await?;
         let Some(at) = filter.as_of else {
-            return Ok(rows);
+            return page_of(rows, rule_key, page);
         };
         // Đã sắp theo khoá rồi theo hiệu lực / phiên bản giảm dần: bản đầu tiên còn hiệu lực của
         // mỗi khoá là bản cần.
@@ -356,7 +371,7 @@ impl ComplianceService {
                 effective.push(row);
             }
         }
-        Ok(effective)
+        page_of(effective, rule_key, page)
     }
 
     pub(crate) async fn tenant(&self, id: TenantId) -> Result<TenantContext, Error> {
@@ -380,9 +395,13 @@ impl ComplianceService {
         &self,
         tenant: &TenantContext,
         principal: &Principal,
-    ) -> Result<Vec<policy::Model>, Error> {
+        page: &PageRequest,
+    ) -> Result<Page<policy::Model>, Error> {
         principal.require(&POLICIES_MANAGE)?;
-        Ok(policy::Entity::find().scoped(tenant).all(tenant.database().read()).await?)
+        // Một trang (`page_of`): khoá chính sách là tập cố định trong code (`set_policy`), nên mỗi khách có tối đa
+        // vài dòng — bị chặn theo cấu trúc. Theo khoá.
+        let rows = policy::Entity::find().scoped(tenant).all(tenant.database().read()).await?;
+        page_of(rows, |row| row.key.clone(), page)
     }
 
     pub(crate) async fn set_policy(

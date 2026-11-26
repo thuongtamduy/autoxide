@@ -14256,47 +14256,6 @@ export type Data_Vec_CanAnswer = {
 };
 
 /** Envelope of a single result. */
-export type Data_Vec_CatalogAttribute = {
-  data: {
-    code: string;
-    /** `text`, `integer`, `decimal`, `boolean`, `date`, `option` or `options`. */
-    data_type: string;
-    /** Offered as a storefront filter. */
-    filterable: boolean;
-    id: string;
-    /** Law the attribute comes from, for legally required label contents. */
-    legal_basis?: string | null;
-    names: {
-      [key: string]: string;
-    };
-    options: CatalogAttributeOption[];
-    /** Decimal places of a `decimal` attribute. */
-    scale: number;
-    unit?: string | null;
-    updated_at: string;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_CatalogCategory = {
-  data: {
-    /** 0 for a top category. */
-    depth: number;
-    id: string;
-    parent_id?: string | null;
-    /** Display order among siblings. */
-    position: number;
-    /** Name and slug per language. */
-    texts: {
-      [key: string]: CatalogCategoryText;
-    };
-    updated_at: string;
-    /** Shown on the storefront. */
-    visible: boolean;
-  }[];
-};
-
-/** Envelope of a single result. */
 export type Data_Vec_CatalogCategoryAttribute = {
   data: {
     /** Also for products of the subcategories. */
@@ -14318,27 +14277,6 @@ export type Data_Vec_CatalogComponent = {
   data: {
     /** Units of the component in one bundle, 1 to 10000. */
     quantity: number;
-    variant_id: string;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_CatalogDigitalAsset = {
-  data: {
-    content_type: string;
-    created_at: string;
-    /** Downloads each buyer gets for each order line. */
-    download_limit: number;
-    /** Name the buyer's download is saved as. */
-    file_name: string;
-    /** Days a buyer can download after paying. */
-    grant_days: number;
-    id: string;
-    product_id: string;
-    /** SHA-256 of the content, lower-case hex. */
-    sha256: string;
-    /** Size in bytes. */
-    size: number;
     variant_id: string;
   }[];
 };
@@ -14367,122 +14305,6 @@ export type Data_Vec_CatalogDownloadGrant = {
 };
 
 /** Envelope of a single result. */
-export type Data_Vec_CatalogProductCount = {
-  data: {
-    count: number;
-    /**
-     * A status (`draft`, `active`, `inactive`, `archived`) or a readiness (`ready`,
-     * `missing_attributes`, `missing_documents`, `restricted`).
-     */
-    key: string;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_CatalogProductDocument = {
-  data: {
-    created_at: string;
-    document_type: string;
-    /** The document is valid until the end of this day; `null`: no end. */
-    expires_on?: string | null;
-    /** Key of the scanned file in storage. */
-    file_key?: string | null;
-    id: string;
-    issued_by: string;
-    issued_on: string;
-    number: string;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_CatalogPublicCategory = {
-  data: {
-    /** Depth in the tree (top level is 0). */
-    depth: number;
-    id: string;
-    name: string;
-    parent_id?: string | null;
-    position: number;
-    slug: string;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_CatalogPublicProductCard = {
-  data: {
-    /**
-     * Some text was written from an AI suggestion: label it (Vietnam's Law on Artificial
-     * Intelligence 134/2025/QH15).
-     */
-    ai_assisted: boolean;
-    /** Brand (the attribute with code `brand`); `null` without one. */
-    brand?: string | null;
-    compare_at?: Money | null;
-    id: string;
-    image?: CatalogPublicImage | null;
-    /** `physical`, `digital`, `service` or `bundle`. */
-    kind: string;
-    name: string;
-    /** Address of the product page on the website, without language prefix. */
-    path: string;
-    /** Lowest current price over the variants (no customer group, no code needed). */
-    price_from: Money;
-    /** Highest current price over the variants: show "from" when it differs from `price_from`. */
-    price_to: Money;
-    /** Average rating out of 5 (two decimals); `null` before the first rating. */
-    rating?: number | null;
-    rating_count: number;
-    /** When `sale_price` ends; `null`: no end set. */
-    sale_ends_at?: string | null;
-    sale_price?: Money | null;
-    seller: CatalogPublicSeller;
-    short_description: string;
-    slug: string;
-    unit_price?: CatalogUnitPrice | null;
-    /** Number of variants on sale. */
-    variant_count: number;
-    /**
-     * The product's options and how many values each has, e.g. `[{"name": "Size", "count": 3}]`
-     * ("3 sizes").
-     */
-    variant_summary: CatalogOptionSummary[];
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_CatalogRestrictionRule = {
-  data: {
-    code: string;
-    effective_from: string;
-    effective_to?: string | null;
-    jurisdiction: string;
-    legal_basis: string;
-    /** `prohibited` or `conditional`. */
-    level: string;
-    names: {
-      [key: string]: string;
-    };
-    pack_version: string;
-    /** Document types a conditional product needs, valid on the day. */
-    required_documents: string[];
-    source_url: string;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_CatalogRoundingRule = {
-  data: {
-    created_at: string;
-    ending_minor?: number | null;
-    id: string;
-    /** `up`, `down` or `nearest`. */
-    mode: string;
-    name: string;
-    step_minor: number;
-  }[];
-};
-
-/** Envelope of a single result. */
 export type Data_Vec_CatalogStoredAttributeValue = {
   data: {
     attribute_id: string;
@@ -14491,29 +14313,6 @@ export type Data_Vec_CatalogStoredAttributeValue = {
     value_date?: string | null;
     value_integer?: number | null;
     value_text?: string | null;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_CatalogSuggestion = {
-  data: {
-    /** Short context, e.g. the parent category; may be empty. */
-    context: string;
-    /**
-     * Matches with the exact Vietnamese accents (listed first); `false`: matches only once accents
-     * are ignored.
-     */
-    exact: boolean;
-    id?: string | null;
-    /**
-     * Type, `<module>.<type>`: `catalog.product`, `catalog.category`, `content.entry`,
-     * `organizations.unit`… (any module may add its own).
-     */
-    kind: string;
-    /** Text to show. */
-    label: string;
-    /** Address on the website (no domain, no language prefix); `null`: open the record by `id`. */
-    path?: string | null;
   }[];
 };
 
@@ -14571,164 +14370,6 @@ export type Data_Vec_CommentCount = {
     target_id: string;
     /** Shown top-level comments only (e.g. the number of questions on a product tab). */
     thread_count: number;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_ComplianceAcceptanceCount = {
-  data: {
-    accepted: number;
-    version: number;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_ComplianceConsent = {
-  data: {
-    channel: string;
-    granted_at?: string | null;
-    id: string;
-    purpose: string;
-    scope: string;
-    /** `granted` or `withdrawn`. */
-    state: string;
-    /** The email or phone number (`null` for a user, or after erasure). */
-    subject_value?: string | null;
-    withdrawn_at?: string | null;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_ComplianceDocument = {
-  data: {
-    /** `user`, `buyer` or `seller`. */
-    audience: string;
-    created_at: string;
-    current_version?: number | null;
-    id: string;
-    /**
-     * `terms_of_use`, `privacy_policy`, `general_conditions`, `platform_rules`, `seller_agreement`
-     * or `developer_agreement`.
-     */
-    kind: string;
-    title: string;
-    updated_at: string;
-    /** Every version and translation, newest first (only on `GET /documents/{id}`). */
-    versions?: ComplianceDocumentVersion[] | null;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_CompliancePendingAcceptance = {
-  data: {
-    document_id: string;
-    kind: string;
-    title: string;
-    version: ComplianceDocumentVersion;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_CompliancePolicy = {
-  data: {
-    key: string;
-    updated_at: string;
-    /** Any JSON value, checked by the policy (see `PUT /policies/{key}`). */
-    value: unknown;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_CompliancePurpose = {
-  data: {
-    active: boolean;
-    /** `service`, `marketing`, `analytics`, `legal` or `kyc`. */
-    category: string;
-    /** Kinds of personal data processed, e.g. `["email", "name"]`. */
-    data_categories: string[];
-    /** Description by language, e.g. `{"en": "…", "vi": "…"}`. */
-    description: Record<string, unknown>;
-    /** e.g. `marketing`. */
-    key: string;
-    /** `consent`, `contract`, `legal_obligation`, `vital_interest` or `public_interest`. */
-    legal_basis: string;
-    /** Who receives the data. */
-    recipients: ComplianceDataRecipient[];
-    /** How long the data is kept, in words. */
-    retention?: string | null;
-    /** `default` (from the legal rules) or `tenant` (added or changed by the tenant). */
-    source: string;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_CompliancePurposeWithCounts = {
-  data: (CompliancePurpose & {
-    /**
-     * People (distinct email, phone or account) with a consent to this purpose now given, on at
-     * least one channel.
-     */
-    consented: number;
-    /** People with a consent to this purpose withdrawn, on at least one channel. */
-    withdrawn: number;
-  })[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_ComplianceRetentionItem = {
-  data: {
-    /** `basic`, `sensitive`, `security` or `accounting`. */
-    category: DataCategory;
-    /** Days, when `keep` is `days`. */
-    days?: number | null;
-    description: string;
-    /** `days`, `until_deleted` or `forever`. */
-    keep: string;
-    /** Longest the legal rule `privacy.retention_limits` allows for the category, in days. */
-    limit_days?: number | null;
-    /** Module that keeps the data. */
-    module: string;
-    /** `<module>.<kind>`, e.g. `forms.submissions`. */
-    name: string;
-    /** Server setting that sets it, if any. */
-    setting?: string | null;
-    /**
-     * `ok`, `exceeds_limit` (kept longer than the limit) or `forever_not_allowed` (kept forever
-     * although the category should not be).
-     */
-    status: string;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_ComplianceRule = {
-  data: {
-    body: Record<string, unknown>;
-    effective_from: string;
-    effective_to?: string | null;
-    jurisdiction: string;
-    key: string;
-    legal_basis: string;
-    /** Check against the original text before relying on it. */
-    needs_legal_review: boolean;
-    version: number;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_ComplianceTrackingProvider = {
-  data: {
-    /** Consent category it needs: `analytics` or `marketing`. */
-    category: string;
-    /** Country that receives the data (ISO 3166-1 alpha-2). */
-    country: string;
-    /** Hosts to allow in the Content-Security-Policy when it loads. */
-    csp_hosts: string[];
-    /** Form of the tracking ID, e.g. `G-XXXXXXXXXX`. */
-    example: string;
-    /** Key to use in `provider`, e.g. `ga4`. */
-    key: string;
-    name: string;
   }[];
 };
 
@@ -14795,58 +14436,6 @@ export type Data_Vec_NotificationKindPreference = {
 };
 
 /** Envelope of a single result. */
-export type Data_Vec_OrdersCodBlock = {
-  data: {
-    created_at: string;
-    created_by: string;
-    expires_at: string;
-    id: string;
-    lifted_at?: string | null;
-    note?: string | null;
-    /** Code of the list `orders.cod_block`. */
-    reason_code: string;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_OrdersCodRule = {
-  data: {
-    /** `require_prepayment`. */
-    action: string;
-    effective_from: string;
-    effective_to?: string | null;
-    id: string;
-    max_fail_ratio_bp: number;
-    max_order_value?: Money | null;
-    min_orders: number;
-    org_id: string;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_OrdersDocument = {
-  data: {
-    document_id: string;
-    issue_date?: string | null;
-    /** `sales`, `cash_register` or `adjustment` (after a return). */
-    kind: string;
-    /** Code to look the invoice up at the tax authority's portal. */
-    lookup_code?: string | null;
-    number?: number | null;
-    /** The return of an adjustment. */
-    return_id?: string | null;
-    /**
-     * Status at `invoices`: `issued`, `submitting`, `accepted`, `rejected`, `cancelled`,
-     * `replaced`, `adjusted`.
-     */
-    status: string;
-    /** Symbol and number printed on the invoice. */
-    symbol?: string | null;
-    total?: Money | null;
-  }[];
-};
-
-/** Envelope of a single result. */
 export type Data_Vec_OrdersPaymentAction = {
   data: {
     amount: Money;
@@ -14868,63 +14457,6 @@ export type Data_Vec_OrdersPaymentAction = {
     status_token: string;
     /** Transfer content the bank transfer must carry. */
     transfer_code?: string | null;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_OrdersRefund = {
-  data: {
-    amount: Money;
-    created_at: string;
-    id: string;
-    order_id: string;
-    /** The payment of the order it comes from. */
-    payment_id: string;
-    reason: string;
-    reference: string;
-    /** The return it pays back, if any. */
-    return_id?: string | null;
-    /**
-     * `pending` (the payment partner is refunding), `succeeded`, `failed`, or `manual` (paid
-     * back by the shop outside the payment partner, e.g. cash).
-     */
-    status: string;
-    updated_at: string;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_OrdersSalesRow = {
-  data: {
-    discount: Money;
-    /** What buyers paid: after discounts, taxes included. */
-    gross: Money;
-    /** Shop id, channel code, product id, `YYYY-MM-DD` or `YYYY-MM`. */
-    key: string;
-    orders: number;
-    /** Units sold (by product only). */
-    quantity?: number | null;
-    /** Refunded so far (not by product). */
-    refunded: Money;
-    tax: Money;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_OrdersWarranty = {
-  data: {
-    ends_at: string;
-    id: string;
-    order_id: string;
-    order_line_id: string;
-    org_id: string;
-    product_id: string;
-    serial?: string | null;
-    /** When the order was delivered. */
-    starts_at: string;
-    /** `active` or `expired`. */
-    status: string;
-    variant_id: string;
   }[];
 };
 
@@ -15020,109 +14552,6 @@ export type Data_Vec_PlacementResponse = {
 };
 
 /** Envelope of a single result. */
-export type Data_Vec_PromotionsConflict = {
-  data: {
-    ends_at: string;
-    exclusivity: "none" | "class" | "global";
-    id: string;
-    /** Kind of promotion. */
-    kind: "percent_off" | "amount_off" | "fixed_price" | "buy_x_get_y" | "free_shipping" | "flash_sale" | "tiered" | "bundle_price" | "add_on" | "gift_choice";
-    starts_at: string;
-    status: "draft" | "scheduled" | "active" | "paused" | "ended" | "cancelled";
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_PromotionsDailyStats = {
-  data: {
-    day: string;
-    /** Discount given, in minor units. */
-    discount_minor: number;
-    /** Value of the orders that used it, in minor units. */
-    order_value_minor: number;
-    platform_funded_minor: number;
-    /** Confirmed uses. */
-    redemptions: number;
-    seller_funded_minor: number;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_PromotionsLegalLimit = {
-  data: {
-    effective_from: string;
-    effective_to?: string | null;
-    jurisdiction: string;
-    legal_basis: string;
-    /** Most discount, in basis points of the price just before the promotion. */
-    max_bp: number;
-    max_days_per_program?: number | null;
-    max_days_per_year?: number | null;
-    /** Notes, including "to be checked against the original text". */
-    note: string;
-    /** `regular` or `national_focus`. */
-    program_kind: string;
-    /** `price_reduction`, `gift_value`, `free_shipping`. */
-    promotion_kind: string;
-    source_url: string;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_PromotionsNoticeRule = {
-  data: {
-    /** `province_of_store` (department of the province where the promotion runs) or an authority code. */
-    authority: string;
-    days_before: number;
-    effective_from: string;
-    effective_to?: string | null;
-    jurisdiction: string;
-    legal_basis: string;
-    note: string;
-    notice_required: boolean;
-    promotion_kind: string;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_PromotionsParticipation = {
-  data: {
-    created_at: string;
-    id: string;
-    items: PromotionsParticipationItem[];
-    promotion_id: string;
-    reviewed_at?: string | null;
-    reviewed_by?: string | null;
-    seller_org_id: string;
-    /** `pending`, `approved` or `rejected`. */
-    status: string;
-    updated_at: string;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_PromotionsProductCode = {
-  data: {
-    /** The coupon to enter at checkout. */
-    code: string;
-    /** Discount on one unit. */
-    discount: Money;
-    ends_at: string;
-    /**
-     * Price of one unit with the coupon. The listed price stays the price without it: show
-     * this as "X with code …", not as a discounted price.
-     */
-    price_with_code: Money;
-    promotion_id: string;
-    /** Conditions, in full (the same as in `GET /public/promotions`). */
-    terms: string;
-    title: string;
-    /** Uses left, only when the coupon or promotion has a real limit; `null` otherwise. */
-    uses_left?: number | null;
-  }[];
-};
-
-/** Envelope of a single result. */
 export type Data_Vec_PromotionsSimulation = {
   data: {
     /**
@@ -15134,19 +14563,6 @@ export type Data_Vec_PromotionsSimulation = {
     with: PromotionsEvaluation;
     /** Without it. */
     without: PromotionsEvaluation;
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_PromotionsVersion = {
-  data: {
-    /** `activated`, `updated`, `translation`, `paused`, `ended`… */
-    action: string;
-    changed_at: string;
-    changed_by?: string | null;
-    /** The promotion as it was after the change. */
-    snapshot: Record<string, unknown>;
-    version: number;
   }[];
 };
 
@@ -21445,6 +20861,70 @@ export type Page_CampaignResponse = {
 };
 
 /** One page of a list. */
+export type Page_CatalogAttribute = {
+  /** The items of this page, in the requested order. */
+  data: {
+    code: string;
+    /** `text`, `integer`, `decimal`, `boolean`, `date`, `option` or `options`. */
+    data_type: string;
+    /** Offered as a storefront filter. */
+    filterable: boolean;
+    id: string;
+    /** Law the attribute comes from, for legally required label contents. */
+    legal_basis?: string | null;
+    names: {
+      [key: string]: string;
+    };
+    options: CatalogAttributeOption[];
+    /** Decimal places of a `decimal` attribute. */
+    scale: number;
+    unit?: string | null;
+    updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_CatalogCategory = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** 0 for a top category. */
+    depth: number;
+    id: string;
+    parent_id?: string | null;
+    /** Display order among siblings. */
+    position: number;
+    /** Name and slug per language. */
+    texts: {
+      [key: string]: CatalogCategoryText;
+    };
+    updated_at: string;
+    /** Shown on the storefront. */
+    visible: boolean;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_CatalogCategoryAttribute = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** Also for products of the subcategories. */
+    applies_to_descendants?: boolean;
+    attribute_id: string;
+    /** The rule applies from this day (e.g. when a new labelling rule takes effect). */
+    effective_from: string;
+    /** The rule stops applying on this day. */
+    effective_to?: string | null;
+    /** Law the rule comes from. */
+    legal_basis?: string | null;
+    /** Products in the category cannot go on sale without a value. */
+    required?: boolean;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_CatalogCollection = {
   /** The items of this page, in the requested order. */
   data: {
@@ -21473,6 +20953,29 @@ export type Page_CatalogCollection = {
       [key: string]: CatalogCollectionText;
     };
     updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_CatalogDigitalAsset = {
+  /** The items of this page, in the requested order. */
+  data: {
+    content_type: string;
+    created_at: string;
+    /** Downloads each buyer gets for each order line. */
+    download_limit: number;
+    /** Name the buyer's download is saved as. */
+    file_name: string;
+    /** Days a buyer can download after paying. */
+    grant_days: number;
+    id: string;
+    product_id: string;
+    /** SHA-256 of the content, lower-case hex. */
+    sha256: string;
+    /** Size in bytes. */
+    size: number;
+    variant_id: string;
   }[];
   pagination: Pagination;
 };
@@ -21575,6 +21078,38 @@ export type Page_CatalogPriceList = {
 };
 
 /** One page of a list. */
+export type Page_CatalogProductCount = {
+  /** The items of this page, in the requested order. */
+  data: {
+    count: number;
+    /**
+     * A status (`draft`, `active`, `inactive`, `archived`) or a readiness (`ready`,
+     * `missing_attributes`, `missing_documents`, `restricted`).
+     */
+    key: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_CatalogProductDocument = {
+  /** The items of this page, in the requested order. */
+  data: {
+    created_at: string;
+    document_type: string;
+    /** The document is valid until the end of this day; `null`: no end. */
+    expires_on?: string | null;
+    /** Key of the scanned file in storage. */
+    file_key?: string | null;
+    id: string;
+    issued_by: string;
+    issued_on: string;
+    number: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_CatalogProductListItem = {
   /** The items of this page, in the requested order. */
   data: {
@@ -21589,6 +21124,21 @@ export type Page_CatalogProductListItem = {
     status: CatalogStatus;
     updated_at: string;
     variant_count: number;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_CatalogPublicCategory = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** Depth in the tree (top level is 0). */
+    depth: number;
+    id: string;
+    name: string;
+    parent_id?: string | null;
+    position: number;
+    slug: string;
   }[];
   pagination: Pagination;
 };
@@ -21638,6 +21188,43 @@ export type Page_CatalogPublicProductCard = {
 };
 
 /** One page of a list. */
+export type Page_CatalogRestrictionRule = {
+  /** The items of this page, in the requested order. */
+  data: {
+    code: string;
+    effective_from: string;
+    effective_to?: string | null;
+    jurisdiction: string;
+    legal_basis: string;
+    /** `prohibited` or `conditional`. */
+    level: string;
+    names: {
+      [key: string]: string;
+    };
+    pack_version: string;
+    /** Document types a conditional product needs, valid on the day. */
+    required_documents: string[];
+    source_url: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_CatalogRoundingRule = {
+  /** The items of this page, in the requested order. */
+  data: {
+    created_at: string;
+    ending_minor?: number | null;
+    id: string;
+    /** `up`, `down` or `nearest`. */
+    mode: string;
+    name: string;
+    step_minor: number;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_CatalogSitemapItem = {
   /** The items of this page, in the requested order. */
   data: {
@@ -21646,6 +21233,63 @@ export type Page_CatalogSitemapItem = {
     modified_at: string;
     /** Address of the product in each of its languages. */
     translations: CatalogPublicTranslation[];
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_CatalogStoredAttributeValue = {
+  /** The items of this page, in the requested order. */
+  data: {
+    attribute_id: string;
+    option_id?: string | null;
+    value_boolean?: boolean | null;
+    value_date?: string | null;
+    value_integer?: number | null;
+    value_text?: string | null;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_CatalogSuggestion = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** Short context, e.g. the parent category; may be empty. */
+    context: string;
+    /**
+     * Matches with the exact Vietnamese accents (listed first); `false`: matches only once accents
+     * are ignored.
+     */
+    exact: boolean;
+    id?: string | null;
+    /**
+     * Type, `<module>.<type>`: `catalog.product`, `catalog.category`, `content.entry`,
+     * `organizations.unit`… (any module may add its own).
+     */
+    kind: string;
+    /** Text to show. */
+    label: string;
+    /** Address on the website (no domain, no language prefix); `null`: open the record by `id`. */
+    path?: string | null;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_CatalogVariantAttributeStored = {
+  /** The items of this page, in the requested order. */
+  data: {
+    attribute_id: string;
+    option_id?: string | null;
+    /** Translations of `value_text`. */
+    texts: {
+      [key: string]: string;
+    };
+    value_boolean?: boolean | null;
+    value_date?: string | null;
+    value_integer?: number | null;
+    value_text?: string | null;
   }[];
   pagination: Pagination;
 };
@@ -21811,6 +21455,16 @@ export type Page_ComplianceAcceptance = {
 };
 
 /** One page of a list. */
+export type Page_ComplianceAcceptanceCount = {
+  /** The items of this page, in the requested order. */
+  data: {
+    accepted: number;
+    version: number;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_ComplianceCase = {
   /** The items of this page, in the requested order. */
   data: {
@@ -21874,6 +21528,24 @@ export type Page_ComplianceCase = {
 };
 
 /** One page of a list. */
+export type Page_ComplianceConsent = {
+  /** The items of this page, in the requested order. */
+  data: {
+    channel: string;
+    granted_at?: string | null;
+    id: string;
+    purpose: string;
+    scope: string;
+    /** `granted` or `withdrawn`. */
+    state: string;
+    /** The email or phone number (`null` for a user, or after erasure). */
+    subject_value?: string | null;
+    withdrawn_at?: string | null;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_ComplianceDisclosure = {
   /** The items of this page, in the requested order. */
   data: {
@@ -21892,6 +21564,28 @@ export type Page_ComplianceDisclosure = {
     subject: string;
     /** The values given — only in the answer that recorded the disclosure. */
     values?: Record<string, unknown> | null;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_ComplianceDocument = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** `user`, `buyer` or `seller`. */
+    audience: string;
+    created_at: string;
+    current_version?: number | null;
+    id: string;
+    /**
+     * `terms_of_use`, `privacy_policy`, `general_conditions`, `platform_rules`, `seller_agreement`
+     * or `developer_agreement`.
+     */
+    kind: string;
+    title: string;
+    updated_at: string;
+    /** Every version and translation, newest first (only on `GET /documents/{id}`). */
+    versions?: ComplianceDocumentVersion[] | null;
   }[];
   pagination: Pagination;
 };
@@ -22002,6 +21696,70 @@ export type Page_ComplianceLegalProfile = {
 };
 
 /** One page of a list. */
+export type Page_CompliancePendingAcceptance = {
+  /** The items of this page, in the requested order. */
+  data: {
+    document_id: string;
+    kind: string;
+    title: string;
+    version: ComplianceDocumentVersion;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_CompliancePolicy = {
+  /** The items of this page, in the requested order. */
+  data: {
+    key: string;
+    updated_at: string;
+    /** Any JSON value, checked by the policy (see `PUT /policies/{key}`). */
+    value: unknown;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_CompliancePurpose = {
+  /** The items of this page, in the requested order. */
+  data: {
+    active: boolean;
+    /** `service`, `marketing`, `analytics`, `legal` or `kyc`. */
+    category: string;
+    /** Kinds of personal data processed, e.g. `["email", "name"]`. */
+    data_categories: string[];
+    /** Description by language, e.g. `{"en": "…", "vi": "…"}`. */
+    description: Record<string, unknown>;
+    /** e.g. `marketing`. */
+    key: string;
+    /** `consent`, `contract`, `legal_obligation`, `vital_interest` or `public_interest`. */
+    legal_basis: string;
+    /** Who receives the data. */
+    recipients: ComplianceDataRecipient[];
+    /** How long the data is kept, in words. */
+    retention?: string | null;
+    /** `default` (from the legal rules) or `tenant` (added or changed by the tenant). */
+    source: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_CompliancePurposeWithCounts = {
+  /** The items of this page, in the requested order. */
+  data: (CompliancePurpose & {
+    /**
+     * People (distinct email, phone or account) with a consent to this purpose now given, on at
+     * least one channel.
+     */
+    consented: number;
+    /** People with a consent to this purpose withdrawn, on at least one channel. */
+    withdrawn: number;
+  })[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_ComplianceRespondentCase = {
   /** The items of this page, in the requested order. */
   data: {
@@ -22025,6 +21783,51 @@ export type Page_ComplianceRespondentCase = {
     rights: Record<string, unknown>[];
     status: string;
     target: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_ComplianceRetentionItem = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** `basic`, `sensitive`, `security` or `accounting`. */
+    category: DataCategory;
+    /** Days, when `keep` is `days`. */
+    days?: number | null;
+    description: string;
+    /** `days`, `until_deleted` or `forever`. */
+    keep: string;
+    /** Longest the legal rule `privacy.retention_limits` allows for the category, in days. */
+    limit_days?: number | null;
+    /** Module that keeps the data. */
+    module: string;
+    /** `<module>.<kind>`, e.g. `forms.submissions`. */
+    name: string;
+    /** Server setting that sets it, if any. */
+    setting?: string | null;
+    /**
+     * `ok`, `exceeds_limit` (kept longer than the limit) or `forever_not_allowed` (kept forever
+     * although the category should not be).
+     */
+    status: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_ComplianceRule = {
+  /** The items of this page, in the requested order. */
+  data: {
+    body: Record<string, unknown>;
+    effective_from: string;
+    effective_to?: string | null;
+    jurisdiction: string;
+    key: string;
+    legal_basis: string;
+    /** Check against the original text before relying on it. */
+    needs_legal_review: boolean;
+    version: number;
   }[];
   pagination: Pagination;
 };
@@ -22055,6 +21858,25 @@ export type Page_ComplianceSubjectRequest = {
     /** `user`, `email` or `phone`. */
     subject_kind: string;
     updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_ComplianceTrackingProvider = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** Consent category it needs: `analytics` or `marketing`. */
+    category: string;
+    /** Country that receives the data (ISO 3166-1 alpha-2). */
+    country: string;
+    /** Hosts to allow in the Content-Security-Policy when it loads. */
+    csp_hosts: string[];
+    /** Form of the tracking ID, e.g. `G-XXXXXXXXXX`. */
+    example: string;
+    /** Key to use in `provider`, e.g. `ga4`. */
+    key: string;
+    name: string;
   }[];
   pagination: Pagination;
 };
@@ -24216,6 +24038,64 @@ export type Page_OrdersCartSummary = {
 };
 
 /** One page of a list. */
+export type Page_OrdersCodBlock = {
+  /** The items of this page, in the requested order. */
+  data: {
+    created_at: string;
+    created_by: string;
+    expires_at: string;
+    id: string;
+    lifted_at?: string | null;
+    note?: string | null;
+    /** Code of the list `orders.cod_block`. */
+    reason_code: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_OrdersCodRule = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** `require_prepayment`. */
+    action: string;
+    effective_from: string;
+    effective_to?: string | null;
+    id: string;
+    max_fail_ratio_bp: number;
+    max_order_value?: Money | null;
+    min_orders: number;
+    org_id: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_OrdersDocument = {
+  /** The items of this page, in the requested order. */
+  data: {
+    document_id: string;
+    issue_date?: string | null;
+    /** `sales`, `cash_register` or `adjustment` (after a return). */
+    kind: string;
+    /** Code to look the invoice up at the tax authority's portal. */
+    lookup_code?: string | null;
+    number?: number | null;
+    /** The return of an adjustment. */
+    return_id?: string | null;
+    /**
+     * Status at `invoices`: `issued`, `submitting`, `accepted`, `rejected`, `cancelled`,
+     * `replaced`, `adjusted`.
+     */
+    status: string;
+    /** Symbol and number printed on the invoice. */
+    symbol?: string | null;
+    total?: Money | null;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_OrdersOrder = {
   /** The items of this page, in the requested order. */
   data: {
@@ -24266,6 +24146,30 @@ export type Page_OrdersOrder = {
     totals: OrdersOrderTotals;
     /** Changes on every update (for `If-Match`). */
     version: number;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_OrdersRefund = {
+  /** The items of this page, in the requested order. */
+  data: {
+    amount: Money;
+    created_at: string;
+    id: string;
+    order_id: string;
+    /** The payment of the order it comes from. */
+    payment_id: string;
+    reason: string;
+    reference: string;
+    /** The return it pays back, if any. */
+    return_id?: string | null;
+    /**
+     * `pending` (the payment partner is refunding), `succeeded`, `failed`, or `manual` (paid
+     * back by the shop outside the payment partner, e.g. cash).
+     */
+    status: string;
+    updated_at: string;
   }[];
   pagination: Pagination;
 };
@@ -24330,6 +24234,45 @@ export type Page_OrdersReview = {
     verified_buyer: boolean;
     /** Signed in: whether you voted "helpful" for it. */
     voted_by_me?: boolean | null;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_OrdersSalesRow = {
+  /** The items of this page, in the requested order. */
+  data: {
+    discount: Money;
+    /** What buyers paid: after discounts, taxes included. */
+    gross: Money;
+    /** Shop id, channel code, product id, `YYYY-MM-DD` or `YYYY-MM`. */
+    key: string;
+    orders: number;
+    /** Units sold (by product only). */
+    quantity?: number | null;
+    /** Refunded so far (not by product). */
+    refunded: Money;
+    tax: Money;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_OrdersWarranty = {
+  /** The items of this page, in the requested order. */
+  data: {
+    ends_at: string;
+    id: string;
+    order_id: string;
+    order_line_id: string;
+    org_id: string;
+    product_id: string;
+    serial?: string | null;
+    /** When the order was delivered. */
+    starts_at: string;
+    /** `active` or `expired`. */
+    status: string;
+    variant_id: string;
   }[];
   pagination: Pagination;
 };
@@ -24662,6 +24605,121 @@ export type Page_PromotionsCode = {
 };
 
 /** One page of a list. */
+export type Page_PromotionsConflict = {
+  /** The items of this page, in the requested order. */
+  data: {
+    ends_at: string;
+    exclusivity: "none" | "class" | "global";
+    id: string;
+    /** Kind of promotion. */
+    kind: "percent_off" | "amount_off" | "fixed_price" | "buy_x_get_y" | "free_shipping" | "flash_sale" | "tiered" | "bundle_price" | "add_on" | "gift_choice";
+    starts_at: string;
+    status: "draft" | "scheduled" | "active" | "paused" | "ended" | "cancelled";
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_PromotionsDailyStats = {
+  /** The items of this page, in the requested order. */
+  data: {
+    day: string;
+    /** Discount given, in minor units. */
+    discount_minor: number;
+    /** Value of the orders that used it, in minor units. */
+    order_value_minor: number;
+    platform_funded_minor: number;
+    /** Confirmed uses. */
+    redemptions: number;
+    seller_funded_minor: number;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_PromotionsLegalLimit = {
+  /** The items of this page, in the requested order. */
+  data: {
+    effective_from: string;
+    effective_to?: string | null;
+    jurisdiction: string;
+    legal_basis: string;
+    /** Most discount, in basis points of the price just before the promotion. */
+    max_bp: number;
+    max_days_per_program?: number | null;
+    max_days_per_year?: number | null;
+    /** Notes, including "to be checked against the original text". */
+    note: string;
+    /** `regular` or `national_focus`. */
+    program_kind: string;
+    /** `price_reduction`, `gift_value`, `free_shipping`. */
+    promotion_kind: string;
+    source_url: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_PromotionsNoticeRule = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** `province_of_store` (department of the province where the promotion runs) or an authority code. */
+    authority: string;
+    days_before: number;
+    effective_from: string;
+    effective_to?: string | null;
+    jurisdiction: string;
+    legal_basis: string;
+    note: string;
+    notice_required: boolean;
+    promotion_kind: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_PromotionsParticipation = {
+  /** The items of this page, in the requested order. */
+  data: {
+    created_at: string;
+    id: string;
+    items: PromotionsParticipationItem[];
+    promotion_id: string;
+    reviewed_at?: string | null;
+    reviewed_by?: string | null;
+    seller_org_id: string;
+    /** `pending`, `approved` or `rejected`. */
+    status: string;
+    updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_PromotionsProductCode = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** The coupon to enter at checkout. */
+    code: string;
+    /** Discount on one unit. */
+    discount: Money;
+    ends_at: string;
+    /**
+     * Price of one unit with the coupon. The listed price stays the price without it: show
+     * this as "X with code …", not as a discounted price.
+     */
+    price_with_code: Money;
+    promotion_id: string;
+    /** Conditions, in full (the same as in `GET /public/promotions`). */
+    terms: string;
+    title: string;
+    /** Uses left, only when the coupon or promotion has a real limit; `null` otherwise. */
+    uses_left?: number | null;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_PromotionsPromotionListItem = {
   /** The items of this page, in the requested order. */
   data: {
@@ -24747,6 +24805,21 @@ export type Page_PromotionsRedemptionItem = {
     org_id: string;
     status: string;
     total_discount_minor: number;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_PromotionsVersion = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** `activated`, `updated`, `translation`, `paused`, `ended`… */
+    action: string;
+    changed_at: string;
+    changed_by?: string | null;
+    /** The promotion as it was after the change. */
+    snapshot: Record<string, unknown>;
+    version: number;
   }[];
   pagination: Pagination;
 };
@@ -36436,11 +36509,12 @@ export interface paths {
   "/api/v1/catalog/attributes": {
     /** List every attribute of the tenant. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_CatalogAttribute;
+        200: Page_CatalogAttribute;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -36492,11 +36566,12 @@ export interface paths {
   "/api/v1/catalog/categories": {
     /** List every category of the tenant. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_CatalogCategory;
+        200: Page_CatalogCategory;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -36546,11 +36621,12 @@ export interface paths {
   "/api/v1/catalog/categories/{id}/attributes": {
     /** List the attributes of a category. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_CatalogCategoryAttribute;
+        200: Page_CatalogCategoryAttribute;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -36818,12 +36894,13 @@ export interface paths {
   "/api/v1/catalog/orders/{id}/downloads": {
     /** List the download rights of an order. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_CatalogDownloadGrant;
+        200: Page_CatalogDownloadGrant;
         401: Problem;
         403: Problem;
         404: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -37049,9 +37126,9 @@ export interface paths {
   "/api/v1/catalog/products/counts": {
     /** Count the products in your scope by status or readiness. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { group_by?: string | null }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { group_by?: string | null; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_CatalogProductCount;
+        200: Page_CatalogProductCount;
         401: Problem;
         403: Problem;
         422: Problem;
@@ -37129,12 +37206,13 @@ export interface paths {
   "/api/v1/catalog/products/{id}/attributes": {
     /** List the attribute values of a product. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_CatalogStoredAttributeValue;
+        200: Page_CatalogStoredAttributeValue;
         401: Problem;
         403: Problem;
         404: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -37170,12 +37248,13 @@ export interface paths {
   "/api/v1/catalog/products/{id}/documents": {
     /** List the documents of a product. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_CatalogProductDocument;
+        200: Page_CatalogProductDocument;
         401: Problem;
         403: Problem;
         404: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -37346,9 +37425,9 @@ export interface paths {
   "/api/v1/catalog/public/categories": {
     /** List the category tree (public). */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { locale: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { locale: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_CatalogPublicCategory;
+        200: Page_CatalogPublicCategory;
         403: Problem;
         422: Problem;
         default: Problem;
@@ -37449,9 +37528,9 @@ export interface paths {
   "/api/v1/catalog/public/products/{id}/frequently-bought-together": {
     /** List products frequently bought together with a product (public). */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { locale: string; limit?: number; site?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { locale: string; site?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_CatalogPublicProductCard;
+        200: Page_CatalogPublicProductCard;
         403: Problem;
         404: Problem;
         422: Problem;
@@ -37462,9 +37541,9 @@ export interface paths {
   "/api/v1/catalog/public/products/{id}/similar": {
     /** List products similar to a product (public). */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { locale: string; limit?: number; site?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { locale: string; site?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_CatalogPublicProductCard;
+        200: Page_CatalogPublicProductCard;
         403: Problem;
         404: Problem;
         422: Problem;
@@ -37475,9 +37554,9 @@ export interface paths {
   "/api/v1/catalog/public/search/suggest": {
     /** Suggest as the shopper types (public). */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { q: string; locale: string; limit?: number; site?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { q: string; locale: string; site?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_CatalogSuggestion;
+        200: Page_CatalogSuggestion;
         403: Problem;
         422: Problem;
         default: Problem;
@@ -37499,11 +37578,12 @@ export interface paths {
   "/api/v1/catalog/restriction-rules": {
     /** List the rules of prohibited and conditional goods. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_CatalogRestrictionRule;
+        200: Page_CatalogRestrictionRule;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -37511,11 +37591,12 @@ export interface paths {
   "/api/v1/catalog/rounding-rules": {
     /** List the rounding rules of the tenant. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_CatalogRoundingRule;
+        200: Page_CatalogRoundingRule;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -37645,12 +37726,13 @@ export interface paths {
   "/api/v1/catalog/variants/{id}/attributes": {
     /** List the attribute values of a variant. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_CatalogVariantAttributeStored;
+        200: Page_CatalogVariantAttributeStored;
         401: Problem;
         403: Problem;
         404: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -37686,12 +37768,13 @@ export interface paths {
   "/api/v1/catalog/variants/{id}/digital-assets": {
     /** List the files of a digital variant. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_CatalogDigitalAsset;
+        200: Page_CatalogDigitalAsset;
         401: Problem;
         403: Problem;
         404: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -38285,11 +38368,12 @@ export interface paths {
   "/api/v1/compliance/documents": {
     /** List the legal documents of the tenant. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_ComplianceDocument;
+        200: Page_ComplianceDocument;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -38323,12 +38407,13 @@ export interface paths {
   "/api/v1/compliance/documents/{id}/acceptance-stats": {
     /** Count acceptances per version of a document. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_ComplianceAcceptanceCount;
+        200: Page_ComplianceAcceptanceCount;
         401: Problem;
         403: Problem;
         404: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -38673,10 +38758,11 @@ export interface paths {
   "/api/v1/compliance/me/consents": {
     /** List your consents. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_ComplianceConsent;
+        200: Page_ComplianceConsent;
         401: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -38748,10 +38834,11 @@ export interface paths {
   "/api/v1/compliance/me/pending-acceptances": {
     /** List the legal documents you must accept (again). */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_CompliancePendingAcceptance;
+        200: Page_CompliancePendingAcceptance;
         401: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -38836,11 +38923,12 @@ export interface paths {
   "/api/v1/compliance/policies": {
     /** List the compliance policies set by the tenant. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_CompliancePolicy;
+        200: Page_CompliancePolicy;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -38975,9 +39063,10 @@ export interface paths {
   "/api/v1/compliance/public/purposes": {
     /** List the processing purposes, for the public privacy notice. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_CompliancePurpose;
+        200: Page_CompliancePurpose;
+        422: Problem;
         default: Problem;
       };
     };
@@ -38999,11 +39088,12 @@ export interface paths {
   "/api/v1/compliance/purposes": {
     /** List the processing purposes of the tenant. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_CompliancePurposeWithCounts;
+        200: Page_CompliancePurposeWithCounts;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -39077,11 +39167,12 @@ export interface paths {
   "/api/v1/compliance/retention": {
     /** List how long each kind of personal data is kept. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_ComplianceRetentionItem;
+        200: Page_ComplianceRetentionItem;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -39089,9 +39180,9 @@ export interface paths {
   "/api/v1/compliance/rules": {
     /** List the legal rules: every version, or those in effect at a time. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { jurisdiction?: string; key?: string; as_of?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { jurisdiction?: string; key?: string; as_of?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_ComplianceRule;
+        200: Page_ComplianceRule;
         401: Problem;
         403: Problem;
         422: Problem;
@@ -39184,11 +39275,12 @@ export interface paths {
   "/api/v1/compliance/tracking-providers": {
     /** List the built-in tracking providers. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_ComplianceTrackingProvider;
+        200: Page_ComplianceTrackingProvider;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -47568,12 +47660,13 @@ export interface paths {
   "/api/v1/orders/me/orders/{id}/documents": {
     /** Documents of one of your orders. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_OrdersDocument;
+        200: Page_OrdersDocument;
         401: Problem;
         403: Problem;
         404: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -47731,11 +47824,12 @@ export interface paths {
   "/api/v1/orders/me/warranties": {
     /** Your warranties. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_OrdersWarranty;
+        200: Page_OrdersWarranty;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -47941,12 +48035,13 @@ export interface paths {
   "/api/v1/orders/public/orders/{id}/documents": {
     /** Documents of a guest order. */
     get: {
-      parameters: { header: { "Order-Token": string; "Accept-Language"?: string }; path: { id: string }; };
+      parameters: { header: { "Order-Token": string; "Accept-Language"?: string }; path: { id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_OrdersDocument;
+        200: Page_OrdersDocument;
         401: Problem;
         403: Problem;
         404: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -48061,9 +48156,9 @@ export interface paths {
   "/api/v1/orders/reports/sales": {
     /** Sales report. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { group_by: string; from: string; to: string; currency?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { group_by: string; from: string; to: string; currency?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_OrdersSalesRow;
+        200: Page_OrdersSalesRow;
         401: Problem;
         403: Problem;
         422: Problem;
@@ -48212,11 +48307,12 @@ export interface paths {
   "/api/v1/orders/risk/cod-blocks": {
     /** List active cash-on-delivery blocks. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_OrdersCodBlock;
+        200: Page_OrdersCodBlock;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -48249,11 +48345,12 @@ export interface paths {
   "/api/v1/orders/risk/cod-rules": {
     /** List cash-on-delivery rules. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_OrdersCodRule;
+        200: Page_OrdersCodRule;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -48286,9 +48383,9 @@ export interface paths {
   "/api/v1/orders/warranties": {
     /** Look up warranties. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { serial?: string; phone?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { serial?: string; phone?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_OrdersWarranty;
+        200: Page_OrdersWarranty;
         401: Problem;
         403: Problem;
         422: Problem;
@@ -48419,12 +48516,13 @@ export interface paths {
   "/api/v1/orders/{id}/refunds": {
     /** Refunds of an order. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_OrdersRefund;
+        200: Page_OrdersRefund;
         401: Problem;
         403: Problem;
         404: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -49509,11 +49607,12 @@ export interface paths {
   "/api/v1/promotions/legal-limits": {
     /** List the legal promotion limits in force on a day. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { at?: string | null }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { at?: string | null; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_PromotionsLegalLimit;
+        200: Page_PromotionsLegalLimit;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -49551,11 +49650,12 @@ export interface paths {
   "/api/v1/promotions/notice-rules": {
     /** List the promotion notice rules in force on a day. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { at?: string | null }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { at?: string | null; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_PromotionsNoticeRule;
+        200: Page_PromotionsNoticeRule;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -49722,12 +49822,13 @@ export interface paths {
   "/api/v1/promotions/promotions/{id}/conflicts": {
     /** List the promotions that may clash with this one. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_PromotionsConflict;
+        200: Page_PromotionsConflict;
         401: Problem;
         403: Problem;
         404: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -49793,12 +49894,13 @@ export interface paths {
   "/api/v1/promotions/promotions/{id}/participations": {
     /** List the applications to a platform promotion. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_PromotionsParticipation;
+        200: Page_PromotionsParticipation;
         401: Problem;
         403: Problem;
         404: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -49892,9 +49994,9 @@ export interface paths {
   "/api/v1/promotions/promotions/{id}/stats": {
     /** Get the daily counts of a promotion. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { from: string; to: string }; };
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { from: string; to: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_PromotionsDailyStats;
+        200: Page_PromotionsDailyStats;
         401: Problem;
         403: Problem;
         404: Problem;
@@ -49938,12 +50040,13 @@ export interface paths {
   "/api/v1/promotions/promotions/{id}/versions": {
     /** Get the audit trail of a promotion: one entry per change after it was turned on. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_PromotionsVersion;
+        200: Page_PromotionsVersion;
         401: Problem;
         403: Problem;
         404: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -49994,11 +50097,12 @@ export interface paths {
   "/api/v1/promotions/public/promotions/for-product/{product_id}": {
     /** List the public coupons that lower the price of a product (public). */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; path: { product_id: string }; query: { variant_id: string; locale?: string; site?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; path: { product_id: string }; query: { variant_id: string; locale?: string; site?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
-        200: Data_Vec_PromotionsProductCode;
+        200: Page_PromotionsProductCode;
         403: Problem;
         404: Problem;
+        422: Problem;
         default: Problem;
       };
     };
