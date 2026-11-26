@@ -1,7 +1,7 @@
 - Module `content`: public categories and tags (`GET /api/v1/content/public/terms` and
   `GET /api/v1/content/public/terms/{taxonomy}/{slug}`) only show a term that at least one entry shown on the
   website carries — not one used only by drafts, by entries hidden while a report is handled, or by another
-  website of the tenant (PT-11).
+  website of the tenant (PT-11). A menu item pointing to an empty category leads to a 404 until a post carries it.
 - Module `analytics`: a new daily limit per network block, `AUTOXIDE_ANALYTICS_EVENTS_PER_DAY` (default 20000), on
   top of the per-minute one, bounds how much one network can skew the reports (PT-12).
 - Module `newsletter`: the daily cap on confirmation mails counts per mailbox: letter case, a `+tag` after the name
