@@ -377,6 +377,7 @@ pub fn lint(openapi: &OpenApi) -> Vec<String> {
             }
             problems.extend(access_problems(&endpoint, operation));
         }
+        problems.extend(head_problems(path, item));
     }
     match serde_json::to_value(openapi) {
         Ok(document) => {
@@ -386,6 +387,49 @@ pub fn lint(openapi: &OpenApi) -> Vec<String> {
         Err(error) => problems.push(format!("the document cannot be serialized: {error}")),
     }
     problems
+}
+
+/// A `HEAD` declared next to a `GET` follows its own `x-permissions` in the permission layer
+/// (D-20261126-permission-gate), so it must not be more open than that `GET`: when the `GET` lists permissions, the
+/// `HEAD` lists permissions too, each of them also opening the `GET`, and lets buyer accounts in (`x-buyers`) only
+/// when the `GET` does. Both public is fine.
+fn head_problems(path: &str, item: &PathItem) -> Option<String> {
+    let (Some(get), Some(head)) = (&item.get, &item.head) else { return None };
+    let listed = |operation: &Operation| -> Vec<String> {
+        operation
+            .extensions
+            .as_ref()
+            .and_then(|extensions| extensions.get("x-permissions"))
+            .and_then(|value| value.as_array())
+            .into_iter()
+            .flatten()
+            .filter_map(|value| value.as_str().map(str::to_owned))
+            .collect()
+    };
+    let buyers = |operation: &Operation| {
+        operation
+            .extensions
+            .as_ref()
+            .and_then(|extensions| extensions.get("x-buyers"))
+            .is_some_and(|value| value == true)
+    };
+    if buyers(head) && !buyers(get) {
+        return Some(format!(
+            "HEAD {path}: lets buyer accounts in (`x-buyers`) but GET {path} does not — remove `x-buyers` from the HEAD"
+        ));
+    }
+    let (get, head) = (listed(get), listed(head));
+    if get.is_empty() {
+        return None;
+    }
+    let wider: Vec<&String> = head.iter().filter(|name| !get.contains(name)).collect();
+    if head.is_empty() || !wider.is_empty() {
+        return Some(format!(
+            "HEAD {path}: is more open than GET {path} — list in `x-permissions` only permissions of the GET \
+             ({get:?}), at least one"
+        ));
+    }
+    None
 }
 
 /// The names of schemas that two places in `documents` (place name, that place's document) declare with
@@ -579,6 +623,36 @@ mod tests {
     use serde_json::json;
 
     use super::*;
+
+    fn item(get: serde_json::Value, head: serde_json::Value) -> PathItem {
+        let operation = |permissions: serde_json::Value| {
+            let mut operation = json!({"responses": {}});
+            if permissions == json!("buyers") {
+                operation["x-permissions"] = json!(["m.read"]);
+                operation["x-buyers"] = json!(true);
+            } else if !permissions.is_null() {
+                operation["x-permissions"] = permissions;
+            }
+            operation
+        };
+        serde_json::from_value(json!({"get": operation(get), "head": operation(head)})).unwrap()
+    }
+
+    #[test]
+    fn head_khong_mo_hon_get() {
+        // Cả hai công khai, hay HEAD hẹp bằng / hẹp hơn GET: được.
+        assert!(head_problems("/p", &item(json!(null), json!(null))).is_none());
+        assert!(
+            head_problems("/p", &item(json!(["m.read", "m.list"]), json!(["m.read"]))).is_none()
+        );
+        // GET cần permission mà HEAD công khai, hay HEAD nhận permission GET không nhận: lỗi.
+        assert!(head_problems("/p", &item(json!(["m.read"]), json!(null))).is_some());
+        assert!(head_problems("/p", &item(json!(["m.read"]), json!([]))).is_some());
+        assert!(head_problems("/p", &item(json!(["m.read"]), json!(["m.peek"]))).is_some());
+        // HEAD cho tài khoản người mua vào mà GET không: lỗi; cả hai cho thì được.
+        assert!(head_problems("/p", &item(json!(["m.read"]), json!("buyers"))).is_some());
+        assert!(head_problems("/p", &item(json!("buyers"), json!("buyers"))).is_none());
+    }
 
     #[test]
     fn bat_ref_tro_vao_khoang_khong() {

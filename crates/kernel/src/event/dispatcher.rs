@@ -132,6 +132,11 @@ impl Dispatcher {
                 }
             };
             if handled > 0 {
+                // Còn event: chạy lượt kế ngay, nhưng vẫn xét lệnh dừng giữa hai lượt — tồn đọng lớn (sau một đợt tải)
+                // không được giữ tiến trình sống tới khi giao hết (PT-17). Event chưa giao nằm lại, lần chạy sau giao.
+                if (&mut shutdown).now_or_never().is_some() {
+                    return;
+                }
                 continue;
             }
             tokio::select! {

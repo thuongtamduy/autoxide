@@ -213,6 +213,10 @@ impl Worker {
                 }
             };
             if claimed > 0 {
+                // Còn job: nhận tiếp ngay, nhưng vẫn xét lệnh dừng giữa hai lượt (PT-17) — job chưa nhận nằm lại.
+                if (&mut shutdown).now_or_never().is_some() {
+                    break;
+                }
                 continue;
             }
             // Không có gì mới: chờ một job xong (có chỗ), hết giờ chờ, hay lệnh dừng.
