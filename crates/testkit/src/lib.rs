@@ -83,6 +83,15 @@ pub use template::{
     TEST_DATABASE_TEMPLATE, enabled as template_enabled, prepare as prepare_from_template,
 };
 pub use tenancy::{FakeTenantSettings, schema_tenancy_violations};
+
+/// Handles across every tenant of `database`, for a test that reads or writes tables directly (look at rows
+/// a service wrote, put an old-format row back before a migration): `all_tenants(&db).read().sql(…)`.
+/// Tests only — services go through `tenant.db()`.
+pub fn all_tenants(
+    database: &autoxide_kernel::database::Database,
+) -> autoxide_kernel::db::AllTenants<'_> {
+    autoxide_kernel::db::all_tenants_for_tests(database)
+}
 pub use voice::{FAKE_RECORDING, FAKE_VOICE_PROVIDER, FakeVoiceProvider};
 
 use std::fmt;

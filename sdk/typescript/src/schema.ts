@@ -35185,6 +35185,7 @@ export interface paths {
       responses: {
         200: Page_PasskeyResponse;
         401: Problem;
+        403: Problem;
         422: Problem;
         default: Problem;
       };
