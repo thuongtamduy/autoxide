@@ -154,3 +154,64 @@ async fn task_khong_co_thi_tu_choi_khoi_dong() {
     .await
     .unwrap();
 }
+
+/// `AUTOXIDE_MIGRATE_ON_START` nâng cả placement (database riêng của khách, bước 71): placement tốt
+/// thành `ready`; placement hỏng (bảng chắn migration đầu của `auth`) thành `behind` mà máy chủ vẫn
+/// khởi động, và lỗi của nó không chặn placement đứng sau.
+#[tokio::test]
+async fn migrate_luc_khoi_dong_nang_ca_placement() {
+    use autoxide_kernel::migration::prelude::{SchemaManager, Table};
+    use autoxide_kernel::migration::schema;
+    use autoxide_kernel::tenancy::{
+        DatabaseRegistry, NewPlacement, PlacementKind, SchemaState, TenancyConfig, TenancyMode,
+    };
+
+    TestDatabase::run(async |test| {
+        start_and_stop(settings(test.url(), &[])).await.unwrap();
+        let settings = settings(test.url(), &[]);
+        let database =
+            autoxide_kernel::database::Database::connect(&settings.config.database).await.unwrap();
+        let registry = DatabaseRegistry::new(
+            database.clone(),
+            settings.config.database.clone(),
+            TenancyConfig::with_mode(TenancyMode::Multi),
+        );
+        let placements = settings.modules.placements(&registry).unwrap();
+        let broken = test.extra_database().await.unwrap();
+        let good = test.extra_database().await.unwrap();
+        // Theo tên: `a-broken` chạy trước `b-good`.
+        for (name, url) in [("a-broken", &broken), ("b-good", &good)] {
+            let new = NewPlacement::new(name, PlacementKind::Dedicated, url.parse().unwrap());
+            placements.add(new).await.unwrap();
+        }
+        let source = ConfigSource::from_pairs([("DATABASE_URL", broken.as_str())]);
+        let blocked = autoxide_kernel::database::Database::connect(
+            &crate::settings::read(&source).unwrap().config.database,
+        )
+        .await
+        .unwrap();
+        let blocker = Table::create().table("auth_user").col(schema::pk_uuid("id")).to_owned();
+        SchemaManager::new(blocked.write()).create_table(blocker).await.unwrap();
+
+        start_and_stop(settings).await.unwrap();
+
+        let states: Vec<(String, SchemaState)> = placements
+            .check()
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|check| (check.name, check.state))
+            .collect();
+        assert_eq!(
+            states,
+            [
+                ("a-broken".to_owned(), SchemaState::Behind),
+                ("b-good".to_owned(), SchemaState::Ready)
+            ]
+        );
+        blocked.close().await.unwrap();
+        database.close().await.unwrap();
+    })
+    .await
+    .unwrap();
+}

@@ -4,7 +4,8 @@
 //! - `dry_run: true`: immediately returns the pending migrations of each placement, changing nothing.
 //! - Otherwise: one `kernel_migration_runs` row (control plane) and one `kernel.migrate_placements` job of the
 //!   control database; the job runs like the placement part of `migrate up --all` (each placement by name,
-//!   `migrating` → `ready`, on failure `behind` and stop). Only one run at a time.
+//!   `migrating` → `ready`, on failure `behind`; the other placements still run and the run ends `failed`
+//!   naming every failed placement). Only one run at a time.
 //! - The control database (`main`) is not migrated through the API: `serve` does not run while `main` has
 //!   pending migrations, so when the server is answering the API, `main` is already done.
 
@@ -344,21 +345,24 @@ impl MigrationRuns {
         self.set(id, "running", None, None).await?;
         let placements = self.setup.placements()?;
         let mut applied = Vec::new();
-        let mut failure = None;
-        // Từng placement một, để lượt hỏng giữa chừng vẫn ghi phần đã xong.
+        let mut failures = Vec::new();
+        // Từng placement một: placement hỏng không chặn các placement sau (khách của chúng vẫn được
+        // nâng), và lượt vẫn ghi phần đã xong.
         let names: Vec<String> = match &row.placement {
             Some(name) => vec![name.clone()],
             None => placements.pending(None).await?.into_iter().map(|entry| entry.name).collect(),
         };
         for name in names {
-            match placements.up_placements(Some(&name)).await {
-                Ok(done) => applied.extend(lists(done)),
-                Err(error) => {
-                    failure = Some(error.message());
-                    break;
-                }
+            match placements.try_up_named(&name).await {
+                Ok(Ok(done)) => applied.extend(lists(vec![done])),
+                // Lỗi của riêng placement này (giữ chi tiết: người xem lượt là nhân sự vận hành, cần biết
+                // sửa gì); placement sau vẫn chạy.
+                Ok(Err(error)) => failures.push(format!("placement `{name}`: {error}")),
+                // Placement đã bị xoá giữa chừng, hay database điều khiển hỏng: ghi lại, làm tiếp.
+                Err(error) => failures.push(format!("placement `{name}`: {error}")),
             }
         }
+        let failure = (!failures.is_empty()).then(|| failures.join("\n"));
         let result = serde_json::to_string(&applied).map_err(Error::internal)?;
         let status = if failure.is_some() { "failed" } else { "done" };
         tracing::info!(run_id = %id, status, "placement migration run finished");

@@ -141,3 +141,54 @@ async fn migrate_placement_bang_api() {
     .await
     .unwrap();
 }
+
+/// Lượt migrate mọi placement không dừng ở placement hỏng (bước 71): placement sau vẫn được nâng,
+/// lượt kết thúc `failed` và lỗi nêu placement hỏng.
+#[tokio::test]
+async fn luot_migrate_lam_tiep_qua_placement_hong() {
+    TestDatabase::run(async |test| {
+        let app = TestApp::builder(test)
+            .tenant_dedicated("alpha")
+            .tenant_dedicated("beta")
+            .user("ops", 1, &["kernel.tenants.operate"])
+            .build()
+            .await
+            .unwrap();
+        // alpha: chỉ xoá dòng lịch sử — chạy lại migration thì bảng đã có, hỏng. beta: thiếu thật.
+        let alpha = app.tenant("alpha").await.unwrap();
+        let beta = app.tenant("beta").await.unwrap();
+        let forget = "DELETE FROM kernel_migrations WHERE version = 'm0016_create_sequences'";
+        for (tenant, sqls) in
+            [(&alpha, vec![forget]), (&beta, vec!["DROP TABLE kernel_sequences", forget])]
+        {
+            let write = tenant.database().write();
+            let backend = write.get_database_backend();
+            for sql in sqls {
+                write.execute_raw(Statement::from_string(backend, sql)).await.unwrap();
+            }
+        }
+
+        let (status, run) =
+            call(&app, Method::POST, "/placements/migrations", "ops", Some(json!({}))).await;
+        assert_eq!(status, StatusCode::CREATED, "{run}");
+        let id = run["data"]["id"].as_str().unwrap().to_owned();
+        let worker = app.modules().worker(2).unwrap();
+        for _ in 0..5 {
+            if worker.run_once().await.unwrap() == 0 {
+                break;
+            }
+        }
+        let (status, done) =
+            call(&app, Method::GET, &format!("/placements/migrations/{id}"), "ops", None).await;
+        assert_eq!(status, StatusCode::OK, "{done}");
+        assert_eq!(done["data"]["status"], "failed", "{done}");
+        let applied = done["data"]["applied"].as_array().unwrap();
+        assert_eq!(applied.len(), 1, "{done}");
+        assert_eq!(applied[0]["migrations"], json!(["kernel/m0016_create_sequences"]));
+        let error = done["data"]["error"].as_str().unwrap();
+        assert!(error.contains("placement `alpha"), "{error}");
+        assert!(!error.contains(applied[0]["placement"].as_str().unwrap()), "{error}");
+    })
+    .await
+    .unwrap();
+}

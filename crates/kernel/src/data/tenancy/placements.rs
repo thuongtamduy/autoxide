@@ -392,16 +392,21 @@ impl Placements {
     }
 
     /// Applies missing migrations at each placement (except `main`: `serve` does not run while `main` has
-    /// pending migrations), or only at placement `only`; like the placement part of [`up_all`](Self::up_all).
+    /// pending migrations), or only at placement `only`; like the placement part of [`up_all`](Self::up_all): a
+    /// failed placement does not stop the others, and the error names every failed placement.
     pub async fn up_placements(
         &self,
         only: Option<&str>,
     ) -> Result<Vec<PlacementMigrations>, Error> {
-        let mut all = Vec::new();
+        let mut report = MigrationReport { done: Vec::new(), failed: Vec::new() };
         for row in self.selected(only).await? {
-            all.push(self.up_placement(row).await?);
+            let name = row.name.clone();
+            match self.try_placement(row).await? {
+                Ok(section) => report.done.push(section),
+                Err(error) => report.failed.push(PlacementFailure { name, error }),
+            }
         }
-        Ok(all)
+        report.into_result()
     }
 
     async fn selected(&self, only: Option<&str>) -> Result<Vec<placement::Model>, Error> {
@@ -419,8 +424,25 @@ impl Placements {
         }
     }
 
-    /// One placement: `migrating` → migrate + data upgrade → `ready`; on failure `behind`.
-    async fn up_placement(&self, row: placement::Model) -> Result<PlacementMigrations, Error> {
+    /// Migrates the placement `name` like `try_placement` (the API run, one placement at a time). A placement
+    /// that does not exist: `placement_not_found`.
+    pub(crate) async fn try_up_named(
+        &self,
+        name: &str,
+    ) -> Result<Result<PlacementMigrations, String>, Error> {
+        match self.selected(Some(name)).await?.into_iter().next() {
+            Some(row) => self.try_placement(row).await,
+            None => Err(super::errors::tenant_placement_not_found(name)),
+        }
+    }
+
+    /// One placement: `migrating` → migrate + data upgrade → `ready`; on failure `behind`. A failure of the
+    /// placement itself (cannot connect, a migration fails) is the inner `Err`, so the caller can go on with the
+    /// next placement; the outer `Err` is a failure of the control database, which stops everything.
+    async fn try_placement(
+        &self,
+        row: placement::Model,
+    ) -> Result<Result<PlacementMigrations, String>, Error> {
         let id = PlacementId::from_uuid(row.id);
         self.set_state(id, &row.schema_state, SchemaState::Migrating).await?;
         let migrating = SchemaState::Migrating.as_str();
@@ -431,35 +453,80 @@ impl Placements {
         match applied {
             Ok(migrations) => {
                 self.set_state(id, migrating, SchemaState::Ready).await?;
-                Ok(PlacementMigrations { name: row.name, migrations })
+                Ok(Ok(PlacementMigrations { name: row.name, migrations }))
             }
             Err(error) => {
                 self.set_state(id, migrating, SchemaState::Behind).await?;
-                Err(Error::internal(format!(
-                    "placement `{}`: {error}. Fix it and run the migrations again (`autoxide \
-                     migrate up --all`, or `POST /api/v1/kernel/placements/migrations`): what \
-                     is already applied is skipped",
-                    row.name
-                )))
+                tracing::warn!(placement = %row.name, error = %error, "placement migrations failed");
+                Ok(Err(error))
             }
         }
     }
 
-    /// Applies missing migrations: the control database first, then each placement by name (sets
-    /// `migrating` → migrate + data upgrade → `ready`). If one placement fails, stops, sets it `behind` and
-    /// reports its name; running again continues from where it stopped (each database remembers its done part).
+    /// Applies missing migrations: the control database first, then every placement by name (sets
+    /// `migrating` → migrate + data upgrade → `ready`). A placement that fails becomes `behind` and the others
+    /// still run; the error names every failed placement. Running again continues from where it stopped (each
+    /// database remembers its done part). [`up_all_report`](Self::up_all_report) returns what was applied
+    /// alongside the failures.
     pub async fn up_all(&self) -> Result<Vec<PlacementMigrations>, Error> {
+        self.up_all_report().await?.into_result()
+    }
+
+    /// Like [`up_all`](Self::up_all), but failed placements are part of the report instead of an error. `Err`
+    /// only when the control database (`main`) cannot be migrated or read: then no placement is tried.
+    pub async fn up_all_report(&self) -> Result<MigrationReport, Error> {
         let control = self.registry.control();
-        let mut all = vec![PlacementMigrations {
-            name: "main".to_owned(),
-            migrations: self.migrator.up(control).await.map_err(migration_error)?,
-        }];
+        let mut report = MigrationReport {
+            done: vec![PlacementMigrations {
+                name: "main".to_owned(),
+                migrations: self.migrator.up(control).await.map_err(migration_error)?,
+            }],
+            failed: Vec::new(),
+        };
         for row in self.rows().await? {
-            all.push(self.up_placement(row).await?);
+            let name = row.name.clone();
+            match self.try_placement(row).await? {
+                Ok(section) => report.done.push(section),
+                Err(error) => report.failed.push(PlacementFailure { name, error }),
+            }
         }
-        Ok(all)
+        Ok(report)
     }
 }
+
+/// Result of [`Placements::up_all_report`]: the databases migrated (`main` first) and the placements that failed.
+#[derive(Clone, Debug)]
+pub struct MigrationReport {
+    pub done: Vec<PlacementMigrations>,
+    pub failed: Vec<PlacementFailure>,
+}
+
+/// A placement whose migrations failed; it is left `behind` (its tenants get `503 tenant_maintenance`).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PlacementFailure {
+    pub name: String,
+    pub error: String,
+}
+
+impl MigrationReport {
+    /// `Ok` with the migrated databases when nothing failed; otherwise one error naming every failed placement.
+    pub fn into_result(self) -> Result<Vec<PlacementMigrations>, Error> {
+        if self.failed.is_empty() {
+            return Ok(self.done);
+        }
+        let failures: Vec<String> = self
+            .failed
+            .iter()
+            .map(|failure| format!("placement `{}`: {}", failure.name, failure.error))
+            .collect();
+        Err(Error::internal(format!("{}. {RETRY_HINT}", failures.join("; "))))
+    }
+}
+
+/// What to do after a failed placement: shared by every error that names one.
+const RETRY_HINT: &str = "Fix it and run the migrations again (`autoxide migrate up --all`, or \
+                          `POST /api/v1/kernel/placements/migrations`): what is already applied is \
+                          skipped";
 
 impl Placements {
     /// Checks every placement now, then every `every` (spec: every minute) until `stop` completes: a

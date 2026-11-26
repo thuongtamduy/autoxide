@@ -131,7 +131,7 @@ chỉ số của G9 đạt ngưỡng.
 
 ### G3 — Nâng cấp một nút
 
-- [ ] Ngay: `compose.yml`, manifest Kubernetes và `AUTOXIDE_MIGRATE_ON_START` nâng cả database riêng của khách
+- [x] Ngay: `compose.yml`, manifest Kubernetes và `AUTOXIDE_MIGRATE_ON_START` nâng cả database riêng của khách
       (`--all`); `up_all` thử mọi nơi đặt dữ liệu, lỗi một khách vẫn làm tiếp, báo lỗi từng khách
 - [ ] `autoxide upgrade`: kiểm tương thích theo bảng phiên bản ghi trong binary (nâng từ bản nào được, bước tay bắt buộc),
       tự sao lưu mọi nơi đặt dữ liệu và kho file (hay từ chối nếu không có `--no-backup`), migrate database chính rồi mọi

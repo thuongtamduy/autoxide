@@ -329,7 +329,9 @@ Những luật cần nhớ sau đó, với `IMAGE` và `RUN` như định nghĩa
   `kernel.migrations_pending`): chạy
   `$RUN $IMAGE migrate up` rồi mới khởi động.
   Với một máy chủ, có thể đặt `AUTOXIDE_MIGRATE_ON_START=true` thay vào đó: `serve` tự áp dụng
-  migration lúc khởi động, dưới một khoá để hai máy chủ khởi động cùng lúc không cùng migrate. Kèm
+  migration lúc khởi động (database chính rồi mọi database riêng của khách như `migrate up --all`;
+  database của khách hỏng thì ghi log, khách trên đó nhận 503 cho tới khi sửa), dưới một khoá để
+  hai máy chủ khởi động cùng lúc không cùng migrate. Kèm
   `AUTOXIDE_BOOTSTRAP_ADMIN_EMAIL` thì tạo luôn quản trị viên đầu tiên, kèm `AUTOXIDE_STARTUP_TASKS`
   thì nạp dữ liệu nền — đúng những gì `compose.quickstart.yml` làm. Nhiều máy chủ thì vẫn chạy
   `migrate up` một lần mỗi lần deploy: thấy rõ cái gì đổi, và migration hỏng thì deploy dừng trước
@@ -340,12 +342,14 @@ Những luật cần nhớ sau đó, với `IMAGE` và `RUN` như định nghĩa
 - `docker run -p 8080:8080` mở cổng trên mọi giao diện mạng của máy; hãy dùng
   `-p 127.0.0.1:8080:8080` và một reverse proxy ([A.4](#4-đưa-lên-internet)). Thêm cấu hình vào
   `autoxide.env` (mỗi dòng một `TÊN=giá trị`, không có dấu nháy).
-- Cập nhật: kéo image mới, áp dụng migration của nó, thay container.
+- Cập nhật: kéo image mới, áp dụng migration của nó, thay container. `--all` nâng thêm mọi
+  database riêng của khách (placement) ở chế độ nhiều khách, ngoài chế độ đó không đổi gì; một
+  placement hỏng không chặn các placement khác, lệnh nêu tên nó và thoát với mã 1.
 
 ```bash
 IMAGE=ghcr.io/thuongtamduy/autoxide:<phiên bản mới>
 docker pull $IMAGE
-$RUN $IMAGE migrate up
+$RUN $IMAGE migrate up --all
 docker rm -f autoxide
 docker run -d --name autoxide --restart unless-stopped --env-file autoxide.env \
   -v autoxide-data:/var/lib/autoxide/data -p 127.0.0.1:8080:8080 $IMAGE serve
@@ -1229,8 +1233,9 @@ database theo hai bước ("mở rộng trước, thu hẹp sau"):
    cả dạng cũ lẫn dạng mới. Bản cũ vẫn chạy: nó không biết cột mới.
 2. **Thu hẹp:** một bản phát hành sau, khi không còn máy chủ nào chạy bản cũ, thôi ghi dạng cũ và bỏ nó.
 
-`autoxide serve` không khởi động khi còn thiếu migration, nên chạy `autoxide migrate up` (thêm `--all` ở
-chế độ nhiều khách) trước khi bật máy chủ mới, rồi thay máy chủ cũ như mục "Cập nhật không làm rơi
+`autoxide serve` không khởi động khi còn thiếu migration, nên chạy `autoxide migrate up --all`
+(database chính rồi mọi database riêng của khách; ở chế độ một khách giống `migrate up`) trước khi
+bật máy chủ mới, rồi thay máy chủ cũ như mục "Cập nhật không làm rơi
 request".
 
 ## Kiểm trước khi chạy thật

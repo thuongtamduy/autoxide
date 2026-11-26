@@ -1,7 +1,9 @@
 //! Việc `autoxide serve` làm lúc khởi động, trước khi nhận request — đều TẮT mặc định
 //! (D-20261121-migrate-on-start):
 //!
-//! 1. `AUTOXIDE_MIGRATE_ON_START=true`: áp dụng migration còn chờ của database chính.
+//! 1. `AUTOXIDE_MIGRATE_ON_START=true`: áp dụng migration còn chờ của database chính rồi của mọi
+//!    placement (database riêng của khách), như `autoxide migrate up --all`. Placement hỏng chỉ ghi
+//!    log cảnh báo: khách trên đó nhận 503 `tenant_maintenance`, các khách khác vẫn chạy.
 //! 2. `AUTOXIDE_BOOTSTRAP_ADMIN_EMAIL`: khách mặc định chưa có quản trị viên nào thì tạo một tài
 //!    khoản quản trị (qua trait `Accounts` của module `auth`, như `autoxide user create`).
 //! 3. `AUTOXIDE_STARTUP_TASKS`: chạy các lệnh quản trị của module (vd nạp đơn vị hành chính).
@@ -19,17 +21,19 @@ use autoxide_auth::api::{Accounts, NewAccount, TenantAdmins};
 use autoxide_kernel::config::{ConfigReader, Invalid, Setting};
 use autoxide_kernel::database::Database;
 use autoxide_kernel::migration::MigrationLock;
+use autoxide_kernel::tenancy::{DatabaseRegistry, MigrationReport};
 
 use crate::runtime::Runtime;
 use crate::settings::Settings;
 
 pub const MIGRATE_ON_START: Setting = Setting::new(
     "AUTOXIDE_MIGRATE_ON_START",
-    "Apply the pending migrations of the main database when `autoxide serve` starts (`true` or \
-     `false`). Servers starting at the same time take turns (a lock), so only one applies them. \
-     Handy for one server or a first try; in production prefer running `autoxide migrate up` \
-     once per deployment, before starting the servers. Placements (AUTOXIDE_TENANCY_MODE=multi) \
-     still need `autoxide migrate up --all`.",
+    "Apply the pending migrations when `autoxide serve` starts (`true` or `false`): the main \
+     database, then every placement (tenant database), like `autoxide migrate up --all`. A \
+     placement that fails is logged and left behind (its tenants get 503 until fixed); the \
+     server still starts. Servers starting at the same time take turns (a lock), so only one \
+     applies them. Handy for one server or a first try; in production prefer running \
+     `autoxide migrate up --all` once per deployment, before starting the servers.",
 )
 .with_default("false");
 
@@ -196,22 +200,24 @@ pub async fn before_start(settings: &Settings) -> Result<Prepared, String> {
         .map_err(|error| error.to_string())?;
     if startup.migrate {
         let migrated = async {
-            let migrator = settings.modules.migrator().map_err(|error| error.to_string())?;
             let database =
                 Database::connect(database_config).await.map_err(|error| error.to_string())?;
-            let applied = migrator.up(&database).await.map_err(|error| error.to_string());
+            let registry = DatabaseRegistry::new(
+                database.clone(),
+                database_config.clone(),
+                settings.config.tenancy.clone(),
+            );
+            let report = match settings.modules.placements(&registry) {
+                Ok(placements) => placements
+                    .up_all_report()
+                    .await
+                    .map_err(|error| crate::commands::describe_error(&error)),
+                Err(error) => Err(error.to_string()),
+            };
             let closed = database.close().await.map_err(|error| format!("database: {error}"));
-            let applied = applied?;
+            let report = report?;
             closed?;
-            if applied.is_empty() {
-                tracing::info!("migrations: nothing to apply");
-            } else {
-                let names: Vec<String> = applied
-                    .iter()
-                    .map(|state| format!("{}/{}", state.module, state.name))
-                    .collect();
-                tracing::info!(count = applied.len(), applied = ?names, "migrations applied");
-            }
+            log_migrations(&report);
             Ok::<(), String>(())
         }
         .await;
@@ -221,6 +227,35 @@ pub async fn before_start(settings: &Settings) -> Result<Prepared, String> {
         }
     }
     Ok(Prepared(Some(lock)))
+}
+
+/// Ghi log kết quả migrate lúc khởi động: phần đã áp dụng của từng database, và từng placement hỏng
+/// (cảnh báo, không chặn khởi động: khách trên `main` và placement khác vẫn cần máy chủ chạy).
+fn log_migrations(report: &MigrationReport) {
+    for section in &report.done {
+        if section.migrations.is_empty() {
+            tracing::info!(placement = %section.name, "migrations: nothing to apply");
+        } else {
+            let names: Vec<String> = section
+                .migrations
+                .iter()
+                .map(|state| format!("{}/{}", state.module, state.name))
+                .collect();
+            tracing::info!(
+                placement = %section.name,
+                count = names.len(),
+                applied = ?names,
+                "migrations applied"
+            );
+        }
+    }
+    for failure in &report.failed {
+        tracing::warn!(
+            placement = %failure.name,
+            error = %failure.error,
+            "placement migrations failed; its tenants get 503 until `autoxide migrate up --all` succeeds"
+        );
+    }
 }
 
 /// Phần sau khi dựng chương trình: quản trị viên đầu tiên, rồi các task. Nhả khoá dù thành công

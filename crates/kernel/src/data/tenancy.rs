@@ -73,7 +73,10 @@ pub use moves::{
 };
 pub use org_settings::{OrgSetting, OrgSettingCatalog, OrgSettingCheck};
 pub use org_tree::{OrgTree, nearest, root_immutable, root_of};
-pub use placements::{NewPlacement, PlacementCheck, PlacementMigrations, Placements, SchemaState};
+pub use placements::{
+    MigrationReport, NewPlacement, PlacementCheck, PlacementFailure, PlacementMigrations,
+    Placements, SchemaState,
+};
 pub use registry::{
     ChildTenant, DatabaseRegistry, FileStore, PLACEMENT_READ_URL, PLACEMENT_STORAGE, PLACEMENT_URL,
 };

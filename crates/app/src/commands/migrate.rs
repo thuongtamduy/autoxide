@@ -2,16 +2,18 @@
 //!
 //! `--all` (bước 33): database điều khiển rồi từng placement theo tên (`Placements`). Không có
 //! `--all` thì chỉ database điều khiển; ở chế độ `multi`, `up` in thêm placement còn chờ.
+//! `up --all` làm tiếp qua placement hỏng (bước 71): phần đã xong in ra stdout, từng placement hỏng
+//! in ra stderr, mã thoát 1 — script deploy biết phải dừng mà các khách khác vẫn được nâng.
 
 use std::process::ExitCode;
 
 use autoxide_kernel::database::Database;
 use autoxide_kernel::migration::{MigrationLock, MigrationState, Migrator};
 use autoxide_kernel::tenancy::{
-    DatabaseRegistry, PlacementMigrations, Placements, SchemaState, TenancyMode,
+    DatabaseRegistry, PlacementFailure, PlacementMigrations, Placements, SchemaState, TenancyMode,
 };
 
-use super::{report_failure, report_invalid_configuration, run_with_observability};
+use super::{EXIT_FAILURE, report_failure, report_invalid_configuration, run_with_observability};
 use crate::settings;
 use crate::startup::LOCK_WAIT;
 
@@ -31,8 +33,9 @@ pub enum Action {
     },
     /// Apply every migration that has not been applied yet, for all modules.
     Up {
-        /// Also every placement, by name, after the main database; safe to run again after a
-        /// failure (what is applied is skipped).
+        /// Also every placement, by name, after the main database. A failed placement does not
+        /// stop the others; each failure is reported and the exit code is 1. Safe to run again
+        /// after a failure (what is applied is skipped).
         #[arg(long)]
         all: bool,
     },
@@ -76,11 +79,13 @@ pub fn run(arguments: &Arguments) -> ExitCode {
         let report = match settings.modules.placements(&registry) {
             Ok(placements) => match &action {
                 Action::Status { all: true } | Action::Up { all: true } => {
-                    execute_all(&action, &placements).await
+                    report_all(&action, &placements).await
                 }
                 _ => {
                     let multi = registry.mode() == TenancyMode::Multi;
-                    execute_main(&action, &migrator, &database, multi.then_some(&placements)).await
+                    execute_main(&action, &migrator, &database, multi.then_some(&placements))
+                        .await
+                        .map(|output| Report { output, failed: Vec::new() })
                 }
             },
             Err(error) => Err(error.to_string()),
@@ -98,11 +103,21 @@ pub fn run(arguments: &Arguments) -> ExitCode {
     });
     match outcome {
         Ok(report) => {
-            print!("{report}");
-            ExitCode::SUCCESS
+            print!("{}", report.output);
+            if report.failed.is_empty() {
+                return ExitCode::SUCCESS;
+            }
+            eprint!("{}", render_failures(&report.failed));
+            ExitCode::from(EXIT_FAILURE)
         }
         Err(error) => report_failure(&error),
     }
+}
+
+/// Kết quả của lệnh: phần in ra stdout, và placement hỏng (chỉ `up --all`) in ra stderr.
+pub(crate) struct Report {
+    pub(crate) output: String,
+    pub(crate) failed: Vec<PlacementFailure>,
 }
 
 /// Chạy một hành động trên database điều khiển; `placements` (chế độ `multi`): sau `up`, in thêm
@@ -133,17 +148,45 @@ async fn execute_main(
     Ok(report)
 }
 
-/// `status --all` / `up --all`: database điều khiển (`main`) rồi từng placement.
+/// `status --all` / `up --all`: database điều khiển (`main`) rồi từng placement; placement hỏng
+/// thành `Err` (cho test chỉ cần biết thành hay hỏng).
+#[cfg(test)]
 pub(crate) async fn execute_all(
     action: &Action,
     placements: &Placements,
 ) -> Result<String, String> {
-    let sections = match action {
-        Action::Up { .. } => placements.up_all().await,
-        _ => placements.status_all().await,
+    let report = report_all(action, placements).await?;
+    if report.failed.is_empty() {
+        Ok(report.output)
+    } else {
+        Err(format!("{}{}", report.output, render_failures(&report.failed)))
+    }
+}
+
+/// Như [`execute_all`], nhưng placement hỏng nằm trong báo cáo: `up` thử hết mọi placement.
+pub(crate) async fn report_all(action: &Action, placements: &Placements) -> Result<Report, String> {
+    let describe = |error: autoxide_kernel::error::Error| super::describe_error(&error);
+    let (sections, failed) = match action {
+        Action::Up { .. } => {
+            let report = placements.up_all_report().await.map_err(describe)?;
+            (report.done, report.failed)
+        }
+        _ => (placements.status_all().await.map_err(describe)?, Vec::new()),
     };
-    let sections = sections.map_err(|error| super::describe_error(&error))?;
-    Ok(render_all(action, &sections))
+    Ok(Report { output: render_all(action, &sections), failed })
+}
+
+/// Từng placement hỏng một dòng, kèm cách làm tiếp.
+fn render_failures(failed: &[PlacementFailure]) -> String {
+    let mut output = format!("{} placement(s) failed and are left behind:\n", failed.len());
+    for failure in failed {
+        output.push_str(&format!("  {}: {}\n", failure.name, failure.error));
+    }
+    output.push_str(
+        "Their tenants get 503 tenant_maintenance until fixed. Fix the cause and run \
+         `autoxide migrate up --all` again: what is already applied is skipped.\n",
+    );
+    output
 }
 
 fn render_all(action: &Action, sections: &[PlacementMigrations]) -> String {
@@ -383,6 +426,59 @@ mod tests {
             );
             let status = execute_all(&Action::Status { all: true }, &placements).await.unwrap();
             assert_eq!(status.matches(", 0 pending\n").count(), 2, "{status}");
+            database.close().await.unwrap();
+        })
+        .await
+        .unwrap();
+    }
+
+    /// `up --all` làm tiếp qua placement hỏng: phần đã xong vào stdout, placement hỏng nêu tên kèm
+    /// cách làm tiếp; `execute_all` thành `Err` để chỗ gọi biết lệnh chưa trọn.
+    #[tokio::test]
+    async fn up_all_lam_tiep_qua_placement_hong() {
+        use autoxide_kernel::migration::prelude::{SchemaManager, Table};
+        use autoxide_kernel::migration::schema;
+
+        TestDatabase::run(async |test| {
+            let source = ConfigSource::from_pairs([("DATABASE_URL", test.url())]);
+            let settings = crate::settings::read(&source).unwrap();
+            let database = Database::connect(&settings.config.database).await.unwrap();
+            let registry = DatabaseRegistry::new(
+                database.clone(),
+                settings.config.database.clone(),
+                settings.config.tenancy.clone(),
+            );
+            let placements = settings.modules.placements(&registry).unwrap();
+            let up_all = Action::Up { all: true };
+            execute_all(&up_all, &placements).await.unwrap();
+            let broken = test.extra_database().await.unwrap();
+            let good = test.extra_database().await.unwrap();
+            for (name, url) in [("a-broken", &broken), ("b-good", &good)] {
+                let new = autoxide_kernel::tenancy::NewPlacement::new(
+                    name,
+                    autoxide_kernel::tenancy::PlacementKind::Dedicated,
+                    url.parse().unwrap(),
+                );
+                placements.add(new).await.unwrap();
+            }
+            let source = ConfigSource::from_pairs([("DATABASE_URL", broken.as_str())]);
+            let blocked =
+                Database::connect(&crate::settings::read(&source).unwrap().config.database)
+                    .await
+                    .unwrap();
+            let blocker = Table::create().table("auth_user").col(schema::pk_uuid("id")).to_owned();
+            SchemaManager::new(blocked.write()).create_table(blocker).await.unwrap();
+
+            let report = report_all(&up_all, &placements).await.unwrap();
+            assert!(report.output.contains("== b-good ==\nApplied "), "{}", report.output);
+            assert!(!report.output.contains("a-broken"), "{}", report.output);
+            let failed: Vec<&str> = report.failed.iter().map(|f| f.name.as_str()).collect();
+            assert_eq!(failed, ["a-broken"]);
+            let error = execute_all(&up_all, &placements).await.unwrap_err();
+            assert!(error.contains("1 placement(s) failed"), "{error}");
+            assert!(error.contains("\n  a-broken: "), "{error}");
+            assert!(error.contains("autoxide migrate up --all"), "{error}");
+            blocked.close().await.unwrap();
             database.close().await.unwrap();
         })
         .await

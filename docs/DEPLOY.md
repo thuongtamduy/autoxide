@@ -333,7 +333,9 @@ The rules that matter after that, with `IMAGE` and `RUN` as defined there:
   autoxide migrate up first` (the count and the first few names, not the whole list; `autoxide
   migrate status` lists them all; error code `kernel.migrations_pending`): run `$RUN $IMAGE migrate up`, then start it.
   On a single server you may set `AUTOXIDE_MIGRATE_ON_START=true` instead: `serve` then applies
-  them on start, under a lock so that two servers starting together never both migrate. With
+  them on start (the main database, then every tenant database like `migrate up --all`; a tenant
+  database that fails is logged and its tenants get 503 until fixed), under a lock so that two
+  servers starting together never both migrate. With
   `AUTOXIDE_BOOTSTRAP_ADMIN_EMAIL` it also creates the first administrator, and with
   `AUTOXIDE_STARTUP_TASKS` it loads reference data — what `compose.quickstart.yml` does. For
   several servers, keep running `migrate up` once per deployment: you see what changes, and a
@@ -344,12 +346,14 @@ The rules that matter after that, with `IMAGE` and `RUN` as defined there:
 - `docker run -p 8080:8080` publishes the port on every network interface of the machine; use
   `-p 127.0.0.1:8080:8080` and a reverse proxy ([A.4](#4-put-it-on-the-internet)). Put more
   settings in `autoxide.env` (one `NAME=value` per line, no quotes).
-- Update: pull the new image, apply its migrations, replace the container.
+- Update: pull the new image, apply its migrations, replace the container. `--all` also migrates
+  every tenant database (placement) in multi-tenant mode and changes nothing otherwise; a placement
+  that fails does not stop the others, the command names it and exits with code 1.
 
 ```bash
 IMAGE=ghcr.io/thuongtamduy/autoxide:<new version>
 docker pull $IMAGE
-$RUN $IMAGE migrate up
+$RUN $IMAGE migrate up --all
 docker rm -f autoxide
 docker run -d --name autoxide --restart unless-stopped --env-file autoxide.env \
   -v autoxide-data:/var/lib/autoxide/data -p 127.0.0.1:8080:8080 $IMAGE serve
@@ -1278,8 +1282,9 @@ changes the database in two steps ("expand, then contract"):
 2. **Contract:** a later release, once no server of the old version runs, stops writing the old shape
    and drops it.
 
-`autoxide serve` refuses to start while migrations are missing, so run `autoxide migrate up` (with
-`--all` in multi-tenant mode) before starting the new servers, then replace the old ones as in
+`autoxide serve` refuses to start while migrations are missing, so run `autoxide migrate up --all`
+(the main database, then every tenant database; the same as `migrate up` in single-tenant mode)
+before starting the new servers, then replace the old ones as in
 "Updating without dropping requests".
 
 ## Checklist before going live

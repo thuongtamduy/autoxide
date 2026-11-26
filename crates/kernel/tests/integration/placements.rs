@@ -210,16 +210,22 @@ async fn migrate_all_chay_lai_tu_cho_dung() {
             let new = NewPlacement::new(name, PlacementKind::Dedicated, url.parse().unwrap());
             setup.placements.add(new).await.unwrap();
         }
-        // p2 có thứ làm migration thứ hai chết.
-        let blocked = connect(&second).await;
+        // p1 có thứ làm migration thứ hai chết; p1 đứng trước p2 theo tên.
+        let blocked = connect(&first).await;
         let blocker = Table::create().table("shop_blocker").col(schema::pk_uuid("id")).to_owned();
         SchemaManager::new(blocked.write()).create_table(blocker).await.unwrap();
 
+        // p1 hỏng không chặn p2: p2 vẫn được nâng, lỗi nêu đúng p1.
         let error = setup.placements.up_all().await.unwrap_err().to_string();
-        assert!(error.contains("placement `p2`"), "{error}");
+        assert!(error.contains("placement `p1`"), "{error}");
+        assert!(!error.contains("p2"), "{error}");
         assert!(error.contains("migrate up --all"), "{error}");
-        assert_eq!(stored(&setup, "schema_state", "p1").await, "ready");
-        assert_eq!(stored(&setup, "schema_state", "p2").await, "behind");
+        assert_eq!(stored(&setup, "schema_state", "p1").await, "behind");
+        assert_eq!(stored(&setup, "schema_state", "p2").await, "ready");
+        let report = setup.placements.up_all_report().await.unwrap();
+        let done: Vec<&str> = report.done.iter().map(|section| section.name.as_str()).collect();
+        let failed: Vec<&str> = report.failed.iter().map(|failure| failure.name.as_str()).collect();
+        assert_eq!((done, failed), (vec!["main", "p2"], vec!["p1"]));
 
         // Gỡ chỗ hỏng rồi chạy lại: `main` và p1 không còn gì, p2 chạy nốt phần còn thiếu.
         let drop = Table::drop().table("shop_blocker").to_owned();
@@ -234,7 +240,7 @@ async fn migrate_all_chay_lai_tu_cho_dung() {
             .collect();
         assert_eq!(
             applied,
-            [("main", vec![]), ("p1", vec![]), ("p2", vec!["m0002_create_order".to_owned()])]
+            [("main", vec![]), ("p1", vec!["m0002_create_order".to_owned()]), ("p2", vec![])]
         );
         for section in setup.placements.status_all().await.unwrap() {
             assert!(section.migrations.iter().all(|m| m.applied), "{}", section.name);
