@@ -1,0 +1,6 @@
+# Email tác giả được miễn Signed-off-by ở job `dco` của CI (scripts/check-dco.sh): người duy trì (bên cấp license, xem
+# GOVERNANCE.md) và phiên agent làm việc dưới tên họ. Một email mỗi dòng, so khớp không phân biệt hoa thường.
+# Người đóng góp khác phải ký (git commit -s). Thêm người duy trì mới thì sửa file này trong cùng PR với GOVERNANCE.md.
+44599403+thuongtamduy@users.noreply.github.com
+noreply@anthropic.com
+49699333+dependabot[bot]@users.noreply.github.com
