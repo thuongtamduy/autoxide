@@ -310,9 +310,8 @@ thật (P7).
         dead-letter — chưa có test, chưa có hướng dẫn xử lý cho người vận hành
   - [ ] Luật `address-key` của `cargo xtask check` chỉ bắt `format!("…ip:{…")` trên một dòng; khoá dựng cách khác
         (`ip.to_string()`, nhiều dòng) lọt — cân nhắc kiểm theo kiểu (`IpAddr` vào `Throttle::hit`)
-  - [ ] PT-7: trần chung 5× (mặc định 50 lần sai mỗi số mỗi ngày) làm chống đoán mã yếu đi 5 lần, và kẻ phá vẫn khoá
-        chủ số ở mọi nơi với khoảng 10 SMS từ 5 client — cân nhắc trần chung thấp hơn, mã dài hơn, hay đếm theo người
-        nhập mã (đổi `PhoneCodes::verify`)
+  - [ ] PT-7: trần chung 5× nới giới hạn đoán mã mỗi số mỗi ngày, và trần chung còn cho phép khoá chủ số từ nhiều
+        client — cân nhắc trần chung thấp hơn, mã dài hơn, hay đếm theo người nhập mã (đổi `PhoneCodes::verify`)
   - [ ] PT-13, PT-14: `x-permissions` khớp chỗ kiểm; kiểm permission trước validation / ETag / tra bản ghi; test quét
         mọi operation bằng token không quyền (PR 2)
   - [ ] PT-15, PT-16, PT-17, poll outbox: tìm công khai không làm nghẽn server, slug theo khoảng dùng index, tắt
