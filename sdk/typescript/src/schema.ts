@@ -33922,17 +33922,6 @@ export interface paths {
       };
     };
   };
-  "/.well-known/oauth-protected-resource": {
-    /** Protected resource metadata of the whole server. */
-    get: {
-      parameters: { header: { "Accept-Language"?: string }; };
-      responses: {
-        200: Record<string, unknown>;
-        404: Problem;
-        default: Problem;
-      };
-    };
-  };
   "/.well-known/oauth-protected-resource/api/v1": {
     /** Protected resource metadata of the REST API. */
     get: {
