@@ -609,7 +609,8 @@ your machine, the rules that matter most and how to send a change.
 
 Found a vulnerability? Please do not open a public issue: report it privately as
 described in [`SECURITY.md`](SECURITY.md), which also lists the versions that receive
-security fixes.
+security fixes. [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md) describes the trust boundaries of the core,
+the controls at each one and what is still open.
 
 ## License
 

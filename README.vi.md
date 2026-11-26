@@ -600,6 +600,8 @@ bị máy, những luật quan trọng nhất và cách gửi thay đổi.
 
 Tìm thấy lỗ hổng? Đừng mở issue công khai: hãy báo riêng theo
 [`SECURITY.vi.md`](SECURITY.vi.md), nơi cũng ghi những phiên bản được vá bảo mật.
+[`docs/THREAT_MODEL.vi.md`](docs/THREAT_MODEL.vi.md) mô tả các ranh giới tin cậy của core, control ở từng
+ranh giới và những gì còn mở.
 
 ## License
 
