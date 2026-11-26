@@ -80,3 +80,24 @@ async fn chinh_sach_cua_khach_chi_ap_cho_khach_do() {
     .await
     .unwrap();
 }
+
+/// `auth.session_days` lưu bằng đường khác (chuyển dữ liệu) vượt 365 hay rất lớn: kẹp, không tràn phép tính, không
+/// dài hơn máy chủ.
+#[tokio::test]
+async fn session_days_luu_ngoai_khoang_bi_kep() {
+    TestDatabase::run(async |test| {
+        let services = crate::testing::services(test).await;
+        let orgs = Arc::new(OrgValues::default());
+        let provided: Arc<dyn OrgDirectory> = orgs.clone();
+        let policy = crate::policy::TenantPolicy::new(Some(provided));
+        let tenant = &services.tenant;
+        let server = jiff::SignedDuration::from_hours(400 * 24);
+        for (stored, days) in [(json!(400), 365), (json!(i64::MAX), 365), (json!(0), 400)] {
+            orgs.set(tenant.id(), "auth.session_days", stored.clone());
+            let ttl = policy.session_ttl(tenant, server).await.unwrap();
+            assert_eq!(ttl, jiff::SignedDuration::from_hours(days * 24), "{stored}");
+        }
+    })
+    .await
+    .unwrap();
+}

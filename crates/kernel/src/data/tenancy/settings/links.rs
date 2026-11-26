@@ -306,16 +306,20 @@ pub(crate) fn domain_name(raw: &str) -> Result<(), FieldError> {
             && !label.ends_with('-')
             && label.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
     });
-    // Địa chỉ IP (`1.2.3.4`) không phải tên miền: nhãn cuối (đuôi) không toàn chữ số.
-    let ip = name.rsplit('.').next().is_some_and(|top| top.chars().all(|c| c.is_ascii_digit()));
+    // Địa chỉ IP không phải tên miền. Trình duyệt (chuẩn URL của WHATWG) đọc tên có nhãn cuối là số — thập phân
+    // (`1.2.3.4`, `0177.1`) hay hex (`a.0x7f`, `0x`) — thành địa chỉ IPv4, nên từ chối cả hai dạng.
+    let ip = name.rsplit('.').next().is_some_and(|top| {
+        top.chars().all(|c| c.is_ascii_digit())
+            || top.strip_prefix("0x").is_some_and(|hex| hex.chars().all(|c| c.is_ascii_hexdigit()))
+    });
     if name.len() <= DOMAIN_MAX && name.contains('.') && labels_ok && !ip {
         Ok(())
     } else {
         Err(FieldError::new(
             "value",
             "kernel.domain_name_invalid",
-            "must be a domain name in lower case such as `shop.example`, without `https://`, port or \
-             path",
+            "must be a domain name in lower case such as `shop.example`, not an IP address, without \
+             `https://`, port or path",
         ))
     }
 }
@@ -501,6 +505,26 @@ mod tests {
         assert!(site_origin("https://shop.acme.vn/vi").is_err());
         assert!(site_origin("ftp://shop").is_err());
         assert!(site_origin("https://{token}.shop.example").is_err());
+    }
+
+    #[test]
+    fn ten_mien_khong_nhan_dia_chi_ip() {
+        for good in ["shop.example", "123.example.com", "a-b.shop.vn", "xn--viet-nam.vn"] {
+            assert!(domain_name(good).is_ok(), "{good}");
+        }
+        for bad in [
+            "1.2.3.4",
+            "0177.0.0.1",
+            "a.0x7f",
+            "shop.0x",
+            "Shop.example",
+            "https://shop.example",
+            "shop.example:443",
+            "localhost",
+            "-shop.example",
+        ] {
+            assert!(domain_name(bad).is_err(), "{bad}");
+        }
     }
 
     #[test]
