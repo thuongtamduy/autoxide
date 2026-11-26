@@ -74,6 +74,10 @@ pub(crate) struct PosPayment {
     pub tendered: Option<i64>,
     /// Mã chuẩn chi của máy POS thẻ / mã giao dịch VietQR.
     pub approval_code: Option<String>,
+    /// Mã tiền tệ người gọi gửi kèm `amount` và `tendered` (phải là tiền của ca). Không vào dấu của lượt
+    /// bán (`serde(skip)`): dấu cũ đã lưu vẫn khớp khi gửi lại.
+    #[serde(skip)]
+    pub currencies: Vec<String>,
 }
 
 /// Giỏ ở quầy.
@@ -178,7 +182,15 @@ impl OrdersService {
             .into_tuple()
             .all(connection)
             .await?;
-        Ok(shift.opening_cash_minor + sales.iter().sum::<i64>())
+        // Cộng có kiểm tràn (PT-5): tiền đầu ca do client gửi, không có trần.
+        let currency = Currency::parse(&shift.currency)?;
+        let total = Money::sum(
+            currency,
+            std::iter::once(shift.opening_cash_minor)
+                .chain(sales)
+                .map(|minor| Money::new(minor, currency)),
+        )?;
+        Ok(total.minor())
     }
 
     /// `POST /pos/shifts/{id}/close`: đóng ca với tiền đếm được. Chênh lệch khác 0 cần lý do và ghi
@@ -188,7 +200,7 @@ impl OrdersService {
         tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
-        counted: i64,
+        counted: Money,
         reason: Option<String>,
         note: Option<String>,
     ) -> Result<pos_shift::Model, Error> {
@@ -200,6 +212,18 @@ impl OrdersService {
             .await?;
         if shift.status != OPEN {
             return Err(errors::shift_not_open());
+        }
+        // Tiền đếm được phải là tiền của ca (PT-6), và không âm trước khi trừ (PT-5: `i64::MIN − x` tràn).
+        if counted.currency().code() != shift.currency {
+            return Err(errors::cash_currency_mismatch("counted_cash", &shift.currency));
+        }
+        let counted = counted.minor();
+        if counted < 0 {
+            return Err(Error::validation(vec![FieldError::new(
+                "counted_cash",
+                "negative",
+                "must not be negative",
+            )]));
         }
         let reason = reason.map(|reason| reason.trim().to_owned()).filter(|r| !r.is_empty());
         let note = note.map(|note| note.trim().to_owned()).filter(|n| !n.is_empty());
@@ -541,6 +565,13 @@ impl OrdersService {
         if !problems.is_empty() {
             return Err(Error::validation(problems));
         }
+        // Tiền khác tiền của ca (vd JPY ở ca VND) không được ghi như tiền của ca (PT-6).
+        if let Some(index) = paid
+            .iter()
+            .position(|payment| payment.currencies.iter().any(|code| *code != shift.currency))
+        {
+            return Err(errors::payment_currency_mismatch(index, &shift.currency));
+        }
         let print = fingerprint(&json!({"lines": cart.lines, "codes": cart.codes,
             "customer_id": cart.customer_id, "payments": paid}))?;
         if let Some(sold) = self.pos_replay(tenant, shift_id, reference, &print).await? {
@@ -552,19 +583,30 @@ impl OrdersService {
         if let Some(error) = quote.lines.iter().find_map(pricing::line_error) {
             return Err(error);
         }
-        let total: i64 = paid.iter().map(|payment| payment.amount).sum();
-        if total != quote.total.minor() {
-            return Err(errors::payments_mismatch(Money::new(total, currency), quote.total));
+        // Cộng có kiểm tràn (PT-5): số tiền do client gửi, tổng vượt `i64` là lỗi `money.overflow`
+        // (422), không phải panic.
+        let total =
+            Money::sum(currency, paid.iter().map(|payment| Money::new(payment.amount, currency)))?;
+        if total != quote.total {
+            return Err(errors::payments_mismatch(total, quote.total));
         }
-        let change: i64 = paid
-            .iter()
-            .filter_map(|payment| payment.tendered.map(|tendered| tendered - payment.amount))
-            .sum();
-        let cash: i64 = paid
-            .iter()
-            .filter(|payment| payment.method == "cash")
-            .map(|payment| payment.amount)
-            .sum();
+        let change = Money::sum(
+            currency,
+            paid.iter()
+                .filter_map(|payment| payment.tendered.map(|tendered| (tendered, payment.amount)))
+                .map(|(tendered, amount)| {
+                    Money::new(tendered, currency).checked_sub(Money::new(amount, currency))
+                })
+                .collect::<Result<Vec<_>, _>>()?,
+        )?
+        .minor();
+        let cash = Money::sum(
+            currency,
+            paid.iter()
+                .filter(|payment| payment.method == "cash")
+                .map(|payment| Money::new(payment.amount, currency)),
+        )?
+        .minor();
 
         // Giữ tồn ở kho của cửa hàng và lượt khuyến mại, ngoài transaction (như đặt hàng online).
         let order_id = Uuid::now_v7();

@@ -70,6 +70,8 @@ struct World {
     users: Vec<Uuid>,
     /// (id, nút, người sở hữu)
     records: Vec<(Uuid, OrgId, Uuid)>,
+    /// Bản ghi gắn với nút KHÔNG có trong cây (dữ liệu cũ, trước D-20261125-org-must-exist).
+    outside: BTreeSet<Uuid>,
 }
 
 async fn build(database: &Database, rng: &mut Rng) -> World {
@@ -99,8 +101,14 @@ async fn build(database: &Database, rng: &mut Rng) -> World {
     database.write().execute_raw(backend.build(&table)).await.unwrap();
     let users: Vec<Uuid> = (0..USERS).map(|_| Uuid::now_v7()).collect();
     let mut records = Vec::with_capacity(RECORDS);
-    for _ in 0..RECORDS {
-        let (id, org, owner) = (Uuid::now_v7(), rng.pick(&orgs), rng.pick(&users));
+    let mut outside = BTreeSet::new();
+    for index in 0..RECORDS {
+        // Một phần tư số bản ghi ở nút không có trong cây (ID bịa).
+        let org = if index % 4 == 3 { OrgId::from_uuid(Uuid::now_v7()) } else { rng.pick(&orgs) };
+        let (id, owner) = (Uuid::now_v7(), rng.pick(&users));
+        if !orgs.contains(&org) {
+            outside.insert(id);
+        }
         record::ActiveModel {
             id: Set(id),
             tenant_id: Set(DEFAULT_TENANT.as_uuid()),
@@ -112,7 +120,7 @@ async fn build(database: &Database, rng: &mut Rng) -> World {
         .unwrap();
         records.push((id, org, owner));
     }
-    World { orgs, users, records }
+    World { orgs, users, records, outside }
 }
 
 /// Người gọi ngẫu nhiên: thường là vài grant của `demo.read`; đôi khi admin, đôi khi chỉ có
@@ -201,8 +209,18 @@ async fn loc_danh_sach_khop_kiem_tung_ban_ghi() {
             for round in 0..ROUNDS {
                 let principal = principal(&world, &mut rng);
                 for with_owner in [true, false] {
-                    let list = listed(&database, &principal, with_owner).await;
+                    // Bản ghi ở nút ngoài cây: kiểm từng bản ghi không bao giờ cho qua (PT-8); danh sách
+                    // vẫn có thể hiện chúng (nợ ghi ở ROADMAP P17) — so hai bên trên bản ghi trong cây.
+                    let list = listed(&database, &principal, with_owner)
+                        .await
+                        .map(|set| &set - &world.outside);
                     let each = checked(&database, &world, &principal, with_owner).await;
+                    if let Some(each) = &each {
+                        assert!(
+                            each.is_disjoint(&world.outside),
+                            "hạt {seed}, vòng {round}: nút ngoài cây được cho qua: {principal:?}"
+                        );
+                    }
                     assert_eq!(
                         list, each,
                         "hạt {seed}, vòng {round}, cột người sở hữu {with_owner}: {principal:?}"

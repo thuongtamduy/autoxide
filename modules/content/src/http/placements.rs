@@ -7,10 +7,11 @@ use std::sync::Arc;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
+use autoxide_kernel::pagination::{NaturalOrderPageQuery, Page, PageRequest};
 use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, Tagged};
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
@@ -174,26 +175,31 @@ pub(crate) struct CreatePlacementRequest {
 
 /// List display placements.
 ///
-/// Requires `content.manage` or `content.banners`. Every placement of the tenant, by key.
+/// Requires `content.manage` or `content.banners`. Every placement of the tenant, by key (A→Z
+/// unless `order=desc`); paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/placements",
     extensions(("x-permissions" = json!(["content.banners"]))),
     operation_id = "list_content_placements",
     security(("bearer" = [])),
+    params(NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "The placements.", body = Data<Vec<PlacementResponse>>),
+        (status = 200, description = "One page of the placements, by key.", body = Page<PlacementResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `content.banners` or `content.manage`; code `permission_denied`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 pub(crate) async fn list_placements(
     State(service): State<Arc<ContentService>>,
     tenant: TenantContext,
     principal: Principal,
-) -> Result<Data<Vec<PlacementResponse>>, Error> {
-    let rows = service.list_placements(&tenant, &principal).await?;
-    Ok(Data { data: rows.into_iter().map(placement_response).collect() })
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<PlacementResponse>, Error> {
+    let page = PageRequest::try_from(page)?;
+    let rows = service.list_placements(&tenant, &principal, &page).await?;
+    Ok(rows.map(placement_response))
 }
 
 /// Create a display placement.

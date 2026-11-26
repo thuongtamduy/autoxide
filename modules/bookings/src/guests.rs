@@ -11,7 +11,7 @@ use autoxide_kernel::sms::{
     sms_disabled, tenant_sms_text,
 };
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext, TenantSetting};
-use autoxide_kernel::throttle::{Outcome, Throttle};
+use autoxide_kernel::throttle::{Outcome, Throttle, address_key};
 use autoxide_kernel::time::Timestamp;
 use jiff::SignedDuration;
 use sea_orm::sea_query::{Expr, ExprTrait as _};
@@ -132,7 +132,7 @@ impl BookingsService {
             let hour = std::time::Duration::from_secs(3600);
             let by_client = Throttle::new("bookings", PER_CLIENT_PER_HOUR, hour)?;
             if let Outcome::Limited { retry_after } =
-                by_client.hit(tenant, &format!("otp-ip:{ip}")).await?
+                by_client.hit(tenant, &address_key("otp-ip", ip)).await?
             {
                 return Err(too_many_codes(retry_after));
             }

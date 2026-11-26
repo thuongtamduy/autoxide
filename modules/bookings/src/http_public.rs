@@ -7,6 +7,7 @@ use std::sync::Arc;
 
 use autoxide_kernel::error::Error;
 use autoxide_kernel::money::Money;
+use autoxide_kernel::pagination::{NaturalOrderPageQuery, Page, PageRequest};
 use autoxide_kernel::response::{Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Query, State};
@@ -173,27 +174,31 @@ impl From<AvailabilityParams> for AvailabilityQuery {
 
 /// List bookable services (public).
 ///
-/// Active services, by name. No sign-in needed.
+/// Active services, by name (A→Z unless `order=desc`); paged with `limit` / `cursor`. No sign-in
+/// needed.
 #[utoipa::path(
     get,
     path = "/public/services",
     extensions(("x-public" = json!(true))),
     operation_id = "list_public_booking_services",
     security((), ("bearer" = [])),
-    params(PublicServicesQuery),
+    params(PublicServicesQuery, NaturalOrderPageQuery),
     responses(
-        (status = 200, description = "The services.", body = Data<Vec<PublicBookingService>>),
+        (status = 200, description = "One page of the services, by name.", body = Page<PublicBookingService>),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 async fn public_services(
     State(service): State<Arc<BookingsService>>,
     tenant: TenantContext,
     Query(query): Query<PublicServicesQuery>,
-) -> Result<Data<Vec<PublicBookingService>>, Error> {
-    let views = service.public_services(&tenant, query.org_id).await?;
-    Ok(Data {
-        data: views.into_iter().map(PublicBookingService::from_view).collect::<Result<_, _>>()?,
-    })
+    Query(page): Query<NaturalOrderPageQuery>,
+) -> Result<Page<PublicBookingService>, Error> {
+    let page = PageRequest::try_from(page)?;
+    let views = service.public_services(&tenant, query.org_id, &page).await?;
+    let data =
+        views.data.into_iter().map(PublicBookingService::from_view).collect::<Result<_, _>>()?;
+    Ok(Page { data, pagination: views.pagination })
 }
 
 /// Find free times (public).

@@ -300,7 +300,10 @@ async fn ban_xuat_cua_khach_khac_nam_rieng() {
         );
         // Cùng `key` ở hai khách: không đụng nhau.
         service.create_form(&default, &admin(), contact("contact")).await.unwrap();
-        let form = service.create_form(&other, &admin(), contact("contact")).await.unwrap();
+        let form = service
+            .create_form(&other, &admin().in_tenant(other.id()), contact("contact"))
+            .await
+            .unwrap();
         send(
             &other,
             &service,
@@ -310,7 +313,7 @@ async fn ban_xuat_cua_khach_khac_nam_rieng() {
         )
         .await
         .unwrap();
-        let exporter = user(&["export"]);
+        let exporter = user(&["export"]).in_tenant(other.id());
         let view = service.request_export(&other, &exporter, form.row.id, None).await.unwrap();
         FormsService::run_export(&service, &other, view.row.id).await.unwrap();
 

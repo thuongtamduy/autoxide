@@ -312,7 +312,7 @@ impl ComplianceService {
         if let Some(ip) = ip {
             limits.push((
                 Throttle::new("compliance", otp.per_ip_per_hour, HOUR)?,
-                format!("otp-ip:{ip}"),
+                autoxide_kernel::throttle::address_key("otp-ip", ip),
             ));
         }
         for (throttle, key) in &limits {
@@ -335,6 +335,7 @@ impl ComplianceService {
             expires_at: Set(at + SignedDuration::from_secs(otp.ttl_seconds)),
             consumed_at: Set(None),
             created_at: Set(at),
+            requester_block: Set(None),
         };
         let saved = phone_challenge::Entity::insert(row)
             .exec_with_returning(tenant.database().write())

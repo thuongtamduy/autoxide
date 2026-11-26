@@ -47,6 +47,36 @@ pub fn prefix(ip: IpAddr) -> IpAddr {
     }
 }
 
+/// The client that `ip` stands for when counting requests: one IPv4 address, or the /64 block of an IPv6 address
+/// (an IPv4 address written as IPv6 counts as IPv4). An IPv6 client usually owns a whole /64 and can change
+/// address on every request; an IPv4 address is a real resource, and grouping by /24 would make customers behind
+/// a mobile carrier's shared NAT block each other (D-20261125-address-keys). Used by
+/// [`crate::throttle::address_key`] and [`client_fingerprint`].
+pub fn client(ip: IpAddr) -> IpAddr {
+    match ip.to_canonical() {
+        IpAddr::V6(v6) => {
+            let s = v6.segments();
+            IpAddr::V6(Ipv6Addr::new(s[0], s[1], s[2], s[3], 0, 0, 0, 0))
+        }
+        v4 => v4,
+    }
+}
+
+/// Like [`fingerprint`], for the client [`client`] groups `ip` into (one IPv4 address, or one IPv6 /64)
+/// instead of its /24 or /64 block: to tell clients apart where an IPv4 /24 is too coarse.
+pub async fn client_fingerprint(
+    secret: &SecretKey,
+    scope: &str,
+    ip: IpAddr,
+) -> Result<String, Error> {
+    let key = secret.derive(&format!("autoxide/ip-hash/client/v1/{scope}")).await?;
+    let mut mac = <Hmac<Sha256> as KeyInit>::new_from_slice(&key)
+        .map_err(|error| Error::internal(format!("hmac key: {error}")))?;
+    mac.update(client(ip).to_string().as_bytes());
+    let bytes = mac.finalize().into_bytes();
+    Ok(URL_SAFE_NO_PAD.encode(&bytes[..16]))
+}
+
 fn v4_block(v4: Ipv4Addr) -> Ipv4Addr {
     let [a, b, c, _] = v4.octets();
     Ipv4Addr::new(a, b, c, 0)

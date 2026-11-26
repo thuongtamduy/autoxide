@@ -4,6 +4,8 @@
 
 use autoxide_kernel::migration::prelude::*;
 
+mod m0010_list_indexes;
+
 pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
     vec![
         Box::new(CreateNotifications),
@@ -27,6 +29,8 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         ),
         // Mẫu khách tự soạn có nháp / xuất bản / quay lại và thương hiệu của mail (D-206, D-366).
         Box::new(CreateTemplateVersions),
+        // Index cho danh sách có phân trang (bước 70 P9).
+        Box::new(m0010_list_indexes::Migration),
     ]
 }
 

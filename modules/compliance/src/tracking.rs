@@ -765,6 +765,7 @@ impl ComplianceService {
                     std::time::Duration::from_secs(3600),
                 )?;
                 if let Outcome::Limited { retry_after } =
+                    // address-key: `bucket` là dấu của khối /24 hay /64 (`ip_hash::bucket`).
                     throttle.hit(tenant, &format!("cookie-ip:{bucket}")).await?
                 {
                     return Err(consents_throttled(retry_after));

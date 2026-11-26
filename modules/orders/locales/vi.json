@@ -120,6 +120,8 @@
   "orders.payment_retry_too_many": "Đơn đã được mở lại thanh toán quá nhiều lần. Hãy thử lại sau {retry_after} giây.",
   "orders.payment_method_unavailable": "Phương thức thanh toán {method} không dùng được cho đơn này.",
   "orders.payment_token_invalid": "Không có thanh toán với mã này, hoặc đã quá hạn thanh toán.",
+  "orders.cash_currency_mismatch": "`{field}` phải bằng {currency}, tiền tệ của ca.",
+  "orders.payment_currency_mismatch": "Khoản thanh toán {index} không dùng {currency}, tiền tệ của ca.",
   "orders.payments_mismatch": "Tổng các khoản thanh toán ({paid}) khác tổng đơn ({total}).",
   "orders.pickup_code_invalid": "Mã nhận, hoặc tên và số điện thoại của người nhận hộ, không khớp với đơn.",
   "orders.pickup_not_allowed": "Đơn này không nhận tại cửa hàng, hoặc không giao được khi đang {status}.",

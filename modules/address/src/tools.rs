@@ -5,6 +5,7 @@ use std::sync::Arc;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::mcp::{PageInput, Tool};
+use autoxide_kernel::pagination::{NaturalOrderPageQuery, PageRequest};
 use autoxide_kernel::tenancy::TenantContext;
 use serde::Deserialize;
 use utoipa::ToSchema;
@@ -26,6 +27,12 @@ pub(crate) struct ProvincesInput {
     country: String,
     /// The list in force on this day (`YYYY-MM-DD`); defaults to today.
     as_of: Option<String>,
+    /// Maximum number of items to return, 1 to 200. Defaults to 50.
+    limit: Option<u32>,
+    /// The `next_cursor` of the previous page.
+    cursor: Option<String>,
+    /// `asc` (code order, the default) or `desc`.
+    order: Option<String>,
 }
 
 /// The communes of a province.
@@ -37,6 +44,25 @@ pub(crate) struct CommunesInput {
     /// Code of the province, e.g. `01`.
     province: String,
     as_of: Option<String>,
+    /// Maximum number of items to return, 1 to 200. Defaults to 50.
+    limit: Option<u32>,
+    /// The `next_cursor` of the previous page.
+    cursor: Option<String>,
+    /// `asc` (code order, the default) or `desc`.
+    order: Option<String>,
+}
+
+// Cùng kiểu tham số trang với REST (`NaturalOrderPageQuery`, mặc định `asc`), nên kiểm và lỗi giống hệt.
+fn natural_page(
+    limit: Option<u32>,
+    cursor: Option<String>,
+    order: Option<String>,
+) -> Result<PageRequest, Error> {
+    PageRequest::try_from(NaturalOrderPageQuery::new(
+        limit.map(|limit| limit.to_string()),
+        cursor,
+        order,
+    ))
 }
 
 /// A search by name.
@@ -76,12 +102,13 @@ pub(crate) fn all(service: &Arc<AddressService>) -> Vec<Tool> {
     vec![
         Tool::new(
             "list_provinces",
-            "List the provinces of a country (Vietnam), in the order of the official list.",
+            "List the provinces of a country (Vietnam), in the order of the official list. \
+             Follow `pagination.next_cursor` for more.",
             move |_: TenantContext, _: Principal, input: ProvincesInput| {
                 let service = provinces.clone();
                 async move {
-                    let data = service.provinces(&input.country, input.as_of.as_deref()).await?;
-                    Ok::<_, Error>(serde_json::json!({ "data": data }))
+                    let page = natural_page(input.limit, input.cursor, input.order)?;
+                    service.provinces(&input.country, input.as_of.as_deref(), &page).await
                 }
             },
         )
@@ -89,14 +116,15 @@ pub(crate) fn all(service: &Arc<AddressService>) -> Vec<Tool> {
         .read_only(),
         Tool::new(
             "list_communes",
-            "List the communes, wards and special zones of a province.",
+            "List the communes, wards and special zones of a province, in code order. Follow \
+             `pagination.next_cursor` for more.",
             move |_: TenantContext, _: Principal, input: CommunesInput| {
                 let service = communes.clone();
                 async move {
-                    let data = service
-                        .communes(&input.country, &input.province, input.as_of.as_deref())
-                        .await?;
-                    Ok::<_, Error>(serde_json::json!({ "data": data }))
+                    let page = natural_page(input.limit, input.cursor, input.order)?;
+                    service
+                        .communes(&input.country, &input.province, input.as_of.as_deref(), &page)
+                        .await
                 }
             },
         )

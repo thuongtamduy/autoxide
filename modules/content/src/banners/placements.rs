@@ -4,12 +4,13 @@
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
+use autoxide_kernel::pagination::{Page, PageRequest, SortValue, fetch_page_by};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use autoxide_kernel::time::Timestamp;
 use sea_orm::sea_query::Expr;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, PaginatorTrait, QueryFilter,
-    QueryOrder, SqlErr,
+    SqlErr,
 };
 use serde_json::{Map, Value, json};
 use uuid::Uuid;
@@ -56,13 +57,20 @@ impl ContentService {
         &self,
         tenant: &TenantContext,
         principal: &Principal,
-    ) -> Result<Vec<Placement>, Error> {
+        page: &PageRequest,
+    ) -> Result<Page<Placement>, Error> {
         require_read(principal)?;
-        Ok(placement::Entity::find()
-            .scoped(tenant)
-            .order_by_asc(placement::Column::Key)
-            .all(tenant.database().read())
-            .await?)
+        // Theo khoá (duy nhất trong khách) rồi id, keyset trong database (index `content_placements_page_idx`).
+        fetch_page_by(
+            placement::Entity::find().scoped(tenant),
+            placement::Column::Key,
+            |row| SortValue::Text(row.key.clone()),
+            placement::Column::Id,
+            |row| row.id,
+            page,
+            tenant.database().read(),
+        )
+        .await
     }
 
     pub(crate) async fn get_placement(

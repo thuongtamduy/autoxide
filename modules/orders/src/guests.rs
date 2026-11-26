@@ -279,7 +279,7 @@ impl OrdersService {
         if let Some(ip) = client {
             let by_ip = Throttle::new("orders", self.config.lookup_ip_per_hour, hour)?;
             if let autoxide_kernel::throttle::Outcome::Limited { retry_after } =
-                by_ip.hit(tenant, &format!("lookup-ip:{ip}")).await?
+                by_ip.hit(tenant, &autoxide_kernel::throttle::address_key("lookup-ip", ip)).await?
             {
                 return Err(errors::lookup_too_many(retry_after));
             }

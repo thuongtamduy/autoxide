@@ -15,10 +15,18 @@ use crate::http::{FilterQuery, SummaryOptions, SummaryResponse, checked, fact_pa
 use crate::permissions::REPORTING_READ;
 use crate::service::Reporting;
 
-/// No input.
+/// One page of the kinds (same parameters as REST).
 #[derive(Debug, Deserialize, Validate, ToSchema)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct Empty {}
+#[schema(as = ReportKindsInput)]
+pub(crate) struct KindsInput {
+    /// Maximum number of items to return, 1 to 200. Defaults to 50.
+    limit: Option<u32>,
+    /// The `next_cursor` of the previous page.
+    cursor: Option<String>,
+    /// `asc` (by name, the default) or `desc`.
+    order: Option<String>,
+}
 
 /// Which report figures to sum, and how.
 #[derive(Debug, Deserialize, Validate, ToSchema)]
@@ -75,12 +83,22 @@ pub(crate) fn all(service: &Arc<Reporting>) -> Vec<Tool> {
     vec![
         Tool::new(
             "kinds",
-            "List the kinds of report figures modules declare (kind, unit, dimensions).",
-            move |_tenant: TenantContext, principal: Principal, _input: Empty| {
+            "List the kinds of report figures modules declare (kind, unit, dimensions), by name. \
+             Follow `pagination.next_cursor` for more.",
+            move |_tenant: TenantContext, principal: Principal, input: KindsInput| {
                 let service = kinds.clone();
                 async move {
                     principal.require(&REPORTING_READ)?;
-                    Ok::<_, Error>(kind_list(&service))
+                    // Cùng kiểu tham số trang với REST (`NaturalOrderPageQuery`, theo tên).
+                    let paging = autoxide_kernel::pagination::NaturalOrderPageQuery::new(
+                        input.limit.map(|limit| limit.to_string()),
+                        input.cursor,
+                        input.order,
+                    );
+                    kind_list(
+                        &service,
+                        &autoxide_kernel::pagination::PageRequest::try_from(paging)?,
+                    )
                 }
             },
         )

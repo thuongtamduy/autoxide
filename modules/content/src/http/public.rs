@@ -655,6 +655,7 @@ fn menu_items(nodes: Vec<crate::taxonomy::menus::PublicNode>) -> Vec<PublicMenuI
 #[derive(Debug, Deserialize, IntoParams)]
 #[into_params(parameter_in = Query)]
 pub(crate) struct LocaleQuery {
+    /// Language, e.g. `vi`; one the website writes in.
     #[param(example = "vi")]
     locale: String,
 }
@@ -883,26 +884,25 @@ pub(crate) async fn sitemap(
 #[derive(Debug, Deserialize, IntoParams)]
 #[into_params(parameter_in = Query)]
 pub(crate) struct FeedQuery {
+    /// Language of the posts, e.g. `vi`; one the website writes in.
     #[param(example = "vi")]
     locale: String,
-    /// How many posts, 1 to 100. Defaults to 20.
-    #[param(minimum = 1, maximum = 100)]
-    limit: Option<u32>,
 }
 
 /// The newest posts of a language, for RSS, Atom or JSON Feed (public).
 ///
 /// No sign-in needed. Each post has its body, summary, authors and images; use its `id` (a
-/// UUID that never changes) as the feed item id.
+/// UUID that never changes) as the feed item id. Newest published first unless `order=asc`; paged
+/// with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/public/feed",
     extensions(("x-public" = json!(true))),
     operation_id = "get_public_content_feed",
     security((), ("bearer" = [])),
-    params(FeedQuery, SiteQuery),
+    params(FeedQuery, SiteQuery, PageQuery),
     responses(
-        (status = 200, description = "The newest posts, newest first.", body = Data<Vec<PublicEntryResponse>>),
+        (status = 200, description = "One page of the posts, newest published first.", body = Page<PublicEntryResponse>),
         (status = 422, description = "A parameter is invalid; see `errors`.", body = Problem),
     )
 )]
@@ -912,6 +912,7 @@ pub(crate) async fn feed(
     site: Site,
     _principal: Option<Principal>,
     Query(query): Query<FeedQuery>,
+    Query(paging): Query<PageQuery>,
 ) -> Result<Response, Error> {
     let mut problems = Vec::new();
     let locale = service.check_locale(
@@ -920,21 +921,11 @@ pub(crate) async fn feed(
         "locale",
         &mut problems,
     );
-    let limit = query.limit.unwrap_or(20);
-    if !(1..=100).contains(&limit) {
-        problems.push(autoxide_kernel::error::FieldError::new(
-            "limit",
-            "range",
-            "must be 1 to 100",
-        ));
-    }
-    if !problems.is_empty() {
-        return Err(Error::validation(problems));
-    }
-    let rows = service.feed(&tenant, &site, &locale, limit).await?;
+    let page = page_request(paging, problems)?;
+    let rows = service.feed(&tenant, &site, &locale, &page).await?;
     let data: Vec<PublicEntryResponse> =
-        service.public_views(&tenant, rows).await?.into_iter().map(public_entry).collect();
-    Ok(public_cache(Data { data }.into_response()))
+        service.public_views(&tenant, rows.data).await?.into_iter().map(public_entry).collect();
+    Ok(public_cache(Page { data, pagination: rows.pagination }.into_response()))
 }
 
 /// A preview link.

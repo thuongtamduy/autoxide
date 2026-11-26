@@ -363,6 +363,11 @@ async fn menu_theo_website_va_nhanh() {
         let made = send(&app, "POST", "", Some("admin"), &[], Some(menu("Whole", None))).await;
         assert_eq!(made.status(), StatusCode::CREATED, "{}", made.json());
         assert_eq!(made.json()["data"]["org_id"], root.as_uuid().to_string());
+        // PT-8: quyền toàn khách không gắn được menu vào nút không có ở khách (ID bịa).
+        let made =
+            send(&app, "POST", "", Some("admin"), &[], Some(menu("Ghost", Some(org())))).await;
+        assert_eq!(made.status(), StatusCode::FORBIDDEN, "{}", made.json());
+        assert_eq!(made.json()["code"], "org_out_of_scope");
         let made = send(&app, "POST", "", Some("admin"), &[], Some(menu("Shop A", Some(a)))).await;
         assert_eq!(made.status(), StatusCode::CREATED, "{}", made.json());
         let menu_a = made.json()["data"]["id"].as_str().unwrap().to_owned();

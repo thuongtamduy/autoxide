@@ -65,7 +65,8 @@ pub(crate) const LOOKUP_PER_HOUR: Setting = Setting::new(
 
 pub(crate) const LOOKUP_IP_PER_HOUR: Setting = Setting::new(
     "AUTOXIDE_ORDERS_LOOKUP_IP_PER_HOUR",
-    "Guest order lookups allowed per hour from one client address (1 to 1000).",
+    "Guest order lookups allowed per hour from one client: one IPv4 address, or one IPv6 /64 block \
+     (1 to 1000).",
 )
 .with_default("20");
 

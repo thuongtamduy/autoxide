@@ -138,6 +138,13 @@ async fn bang_ke_khop_ghi_so_cai() {
         let (app, store, account, method) = cod_shop(test, &[]).await;
         let (id, tracking) = booked(&app, store, &method, "a").await;
         deliver(&app, &id).await;
+        // PT-5: tổng các dòng vượt `i64` là 422 `money.overflow`, không panic.
+        let huge = format!(
+            "tracking_number,cod_amount,fee\n{tracking},5000000000000000000,0\nX2,5000000000000000000,0\n"
+        );
+        let (status, problem) = import(&app, &account, "BK-HUGE", &huge).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{problem}");
+        assert_eq!(problem["code"], "money.overflow");
         let csv = format!("tracking_number,cod_amount,fee\n{tracking},520000,20000\n");
         let (status, statement) = import(&app, &account, "BK-1", &csv).await;
         assert_eq!(status, StatusCode::CREATED, "{statement}");

@@ -9,7 +9,7 @@ use autoxide_kernel::access::{Principal, Scope};
 use autoxide_kernel::decimal::Rounding;
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::money::{Currency, Money};
-use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
+use autoxide_kernel::pagination::{Page, PageRequest, fetch_page, page_of};
 use autoxide_kernel::report::{FactKind, FactSource};
 use autoxide_kernel::tenancy::{
     DatabaseRegistry, OrgId, OrgTree, TenantContext, TenantId, root_of,
@@ -633,12 +633,17 @@ impl Reporting {
         &self,
         viewer: &TenantContext,
         principal: &Principal,
-    ) -> Result<Vec<Lag>, Error> {
+        page: &PageRequest,
+    ) -> Result<Page<Lag>, Error> {
         principal.require(&REPORTING_MANAGE)?;
         let root = self.root_of(viewer.id()).await?;
         let store = self.store(root).await.ok();
+        // Cây khách trải trên nhiều database: chia trang danh sách khách (`page_of` theo id) trước, rồi chỉ
+        // đếm cho các khách của trang này. Khách không mở được bị bỏ (trang có thể ngắn hơn `limit`).
+        let tenants =
+            page_of(self.tree(viewer).await?, |tenant| tenant.as_uuid().to_string(), page)?;
         let mut lags = Vec::new();
-        for tenant in self.tree(viewer).await? {
+        for tenant in tenants.data {
             let context = match self.databases.tenant(tenant).await {
                 Ok(context) => context,
                 Err(_) => continue,
@@ -675,7 +680,7 @@ impl Reporting {
                 last_received_at: last,
             });
         }
-        Ok(lags)
+        Ok(Page { data: lags, pagination: tenants.pagination })
     }
 
     /// Đẩy lại mọi số liệu cục bộ còn giữ của khách `tenant` (trong cây của `viewer`): đặt lại

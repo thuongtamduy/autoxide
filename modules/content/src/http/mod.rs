@@ -41,7 +41,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use autoxide_kernel::error::{Error, FieldError};
-use autoxide_kernel::pagination::{PageQuery, PageRequest};
+use autoxide_kernel::pagination::{Order, PageQuery, PageRequest, SortChoicePageQuery};
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 use utoipa::ToSchema;
@@ -225,9 +225,25 @@ fn parent_filter(
 /// Yêu cầu trang, gộp lỗi của nó với lỗi của bộ lọc để báo một lần.
 pub(crate) fn page_request(
     query: PageQuery,
+    problems: Vec<FieldError>,
+) -> Result<PageRequest, Error> {
+    gather(PageRequest::try_from(query), problems)
+}
+
+// Danh sách có `sort`: `default` là thứ tự khi client không gửi `order`, theo cột sắp (D-20261125-list-pages).
+pub(crate) fn sorted_page_request(
+    query: SortChoicePageQuery,
+    default: Order,
+    problems: Vec<FieldError>,
+) -> Result<PageRequest, Error> {
+    gather(query.into_request(default), problems)
+}
+
+// Gộp lỗi tham số trang với lỗi bộ lọc để báo một lần (D-083).
+fn gather(
+    page: Result<PageRequest, Error>,
     mut problems: Vec<FieldError>,
 ) -> Result<PageRequest, Error> {
-    let page = PageRequest::try_from(query);
     if let Err(error) = &page {
         problems.extend(error.fields().iter().cloned());
     }

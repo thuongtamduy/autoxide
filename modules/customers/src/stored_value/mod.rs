@@ -13,13 +13,13 @@ use autoxide_kernel::entitlement::Feature;
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::money::{Currency, Money};
+use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::rows::{self, Bounds};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use autoxide_kernel::throttle::{Outcome, Throttle};
 use sea_orm::sea_query::{Expr, OnConflict};
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, Condition, ConnectionTrait, EntityTrait, QueryFilter,
-    QueryOrder, Set,
+    ActiveModelTrait, ColumnTrait, Condition, ConnectionTrait, EntityTrait, QueryFilter, Set,
 };
 use uuid::Uuid;
 
@@ -408,15 +408,17 @@ impl CustomersService {
         &self,
         tenant: &TenantContext,
         user: Uuid,
-    ) -> Result<Vec<gift_card::Model>, Error> {
+        page: &PageRequest,
+    ) -> Result<Page<gift_card::Model>, Error> {
         self.stored_value_allowed(tenant, &GIFT_CARDS).await?;
         let profile = self.me(tenant, user).await?;
-        Ok(gift_card::Entity::find()
+        // `created_at` đặt cùng lúc sinh id UUIDv7 (`issue`): thứ tự id là thứ tự phát hành; keyset theo id
+        // (index `customers_gift_cards_owner_page`).
+        let select = gift_card::Entity::find()
             .filter(gift_card::Column::OwnerProfileId.eq(profile.id))
-            .scoped(tenant)
-            .order_by_desc(gift_card::Column::CreatedAt)
-            .all(tenant.database().read())
-            .await?)
+            .scoped(tenant);
+        fetch_page(select, gift_card::Column::Id, |row| row.id, page, tenant.database().read())
+            .await
     }
 
     pub(crate) async fn store_credit_of(
@@ -531,6 +533,19 @@ impl CustomersService {
             .one(tenant.database().write())
             .await?
             .ok_or_else(|| Error::internal("store credit vanished"))
+    }
+
+    /// Tiền tệ của số dư của `profile` (`None`: chưa có số dư).
+    pub(super) async fn credit_currency<C: ConnectionTrait>(
+        &self,
+        connection: &C,
+        tenant: &TenantContext,
+        profile: Uuid,
+    ) -> Result<Option<String>, Error> {
+        Ok(store_credit::Entity::find_by_id((tenant.id().as_uuid(), profile))
+            .one(connection)
+            .await?
+            .map(|row| row.currency))
     }
 
     pub(super) async fn credit_balance<C: ConnectionTrait>(

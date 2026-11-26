@@ -51,6 +51,21 @@ pub(crate) struct ThreadId {
     id: Uuid,
 }
 
+/// The calls of a conversation, one page.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[schema(as = ConversationCallsInput)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct CallsInput {
+    /// Id of the conversation.
+    id: Uuid,
+    /// Maximum number of items to return, 1 to 200. Defaults to 50.
+    limit: Option<u32>,
+    /// The `next_cursor` of the previous page.
+    cursor: Option<String>,
+    /// `desc` (newest first, the default) or `asc`.
+    order: Option<String>,
+}
+
 /// A message to send.
 #[derive(Debug, Deserialize, Validate, ToSchema)]
 #[schema(as = ConversationReplyInput)]
@@ -193,12 +208,15 @@ pub(crate) fn all(service: &Arc<ConversationsService>) -> Vec<Tool> {
         .read_only(),
         Tool::new(
             "list_calls",
-            "List the calls of a conversation in your scope, newest first (no phone numbers, no recordings).",
-            move |tenant: TenantContext, principal: Principal, input: ThreadId| {
+            "List the calls of a conversation in your scope, newest first (no phone numbers, no recordings). \
+             Follow `pagination.next_cursor` for more.",
+            move |tenant: TenantContext, principal: Principal, input: CallsInput| {
                 let service = calls.clone();
                 async move {
-                    let rows = service.calls_of(&tenant, &principal, input.id).await?;
-                    Ok::<Vec<CallResponse>, Error>(rows.into_iter().map(CallResponse::from).collect())
+                    // Cùng kiểu tham số trang với REST (`PageQuery`, mới trước).
+                    let page = PageInput::new(input.limit, input.cursor, input.order).page()?;
+                    let rows = service.calls_of(&tenant, &principal, input.id, &page).await?;
+                    Ok::<Page<CallResponse>, Error>(rows.map(CallResponse::from))
                 }
             },
         )

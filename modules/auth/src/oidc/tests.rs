@@ -276,7 +276,11 @@ pub(super) fn claims(fake: &Fake, slug: &str, subject: &str, email: &str, verifi
 }
 
 /// `POST /oidc/{slug}/start`: trả `state`, `nonce`, challenge trong `authorization_url`.
-async fn start(app: &TestApp, slug: &str, tenant: Option<&str>) -> HashMap<String, String> {
+pub(super) async fn start(
+    app: &TestApp,
+    slug: &str,
+    tenant: Option<&str>,
+) -> HashMap<String, String> {
     let mut request = app.post(&format!("/api/v1/auth/oidc/{slug}/start"));
     if let Some(tenant) = tenant {
         request = request.header("autoxide-tenant", tenant);
@@ -289,7 +293,7 @@ async fn start(app: &TestApp, slug: &str, tenant: Option<&str>) -> HashMap<Strin
 }
 
 /// Nhà cung cấp "chấp nhận" lượt `query` với `claims`; trả `code`.
-fn approve(fake: &Fake, query: &HashMap<String, String>, claims: Value) -> String {
+pub(super) fn approve(fake: &Fake, query: &HashMap<String, String>, claims: Value) -> String {
     let code = format!("code-{}", uuid::Uuid::now_v7());
     let pending = Pending {
         nonce: query["nonce"].clone(),
@@ -300,7 +304,12 @@ fn approve(fake: &Fake, query: &HashMap<String, String>, claims: Value) -> Strin
     code
 }
 
-async fn callback(app: &TestApp, slug: &str, code: &str, state: &str) -> (StatusCode, Value) {
+pub(super) async fn callback(
+    app: &TestApp,
+    slug: &str,
+    code: &str,
+    state: &str,
+) -> (StatusCode, Value) {
     let response = app
         .post(&format!("/api/v1/auth/oidc/{slug}/callback"))
         .json(json!({"code": code, "state": state}))

@@ -6,7 +6,7 @@ use std::sync::Arc;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
-use autoxide_kernel::pagination::{Page, PageQuery};
+use autoxide_kernel::pagination::{Page, SortChoicePageQuery};
 use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, Tagged};
@@ -17,7 +17,7 @@ use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 use validator::Validate;
 
-use super::{BodyNode, choice, page_request, parent_filter, present};
+use super::{BodyNode, choice, parent_filter, present, sorted_page_request};
 use crate::entries::{Entry, EntryFields, EntryFilter, EntrySort, Kind, NewEntry, Status};
 use crate::service::ContentService;
 
@@ -242,7 +242,7 @@ pub(crate) struct EntriesQuery {
     pub author_id: Option<Uuid>,
     /// Only the translations of one entry (its `translation_group_id`).
     pub translation_group_id: Option<Uuid>,
-    /// `created_at` (the default) or `updated_at`; the direction is `order`.
+    /// `created_at` (the default) or `updated_at`; newest first unless `order` says otherwise.
     #[param(value_type = Option<EntrySort>, inline)]
     pub sort: Option<String>,
     /// `true`: only entries waiting for a review (`review_requested_at` set); `false`: only the
@@ -458,7 +458,7 @@ pub(crate) struct UpdateEntryRequest {
     extensions(("x-permissions" = json!(["content.read"]))),
     operation_id = "list_content_entries",
     security(("bearer" = [])),
-    params(EntriesQuery, PageQuery),
+    params(EntriesQuery, SortChoicePageQuery),
     responses(
         (status = 200, description = "One page of entries.", body = Page<EntryResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
@@ -471,7 +471,7 @@ pub(crate) async fn list_entries(
     tenant: TenantContext,
     principal: Principal,
     Query(query): Query<EntriesQuery>,
-    Query(paging): Query<PageQuery>,
+    Query(paging): Query<SortChoicePageQuery>,
     Query(raw): Query<std::collections::HashMap<String, String>>,
 ) -> Result<Page<EntryResponse>, Error> {
     let mut problems = Vec::new();
@@ -481,7 +481,7 @@ pub(crate) async fn list_entries(
         .into_iter()
         .filter_map(|(name, value)| name.strip_prefix("cf.").map(|key| (key.to_owned(), value)))
         .collect();
-    let page = page_request(paging, problems)?;
+    let page = sorted_page_request(paging, filter.sort.default_order(), problems)?;
     let page = service.list(&tenant, &principal, &filter, &page).await?;
     let autoxide_kernel::pagination::Page { data, pagination } = page;
     Ok(Page { data: describe(&service, &tenant, data).await?, pagination })

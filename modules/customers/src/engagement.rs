@@ -13,6 +13,7 @@ use autoxide_compliance::api::{ConsentKey, ConsentSubject};
 use autoxide_kernel::error::{Error, ErrorKind};
 use autoxide_kernel::event::{Actor, Delivered, EventHandler};
 use autoxide_kernel::job::{EnqueueOptions, Job, JobContext, JobHandler};
+use autoxide_kernel::pagination::{Page, PageRequest, SortValue, fetch_page, fetch_page_by};
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext, root_of};
 use autoxide_notifications::api::{
     Category, Channel, Notification, NotificationKind, NotificationTemplate, Recipient,
@@ -185,19 +186,30 @@ impl CustomersService {
         &self,
         tenant: &TenantContext,
         user: Uuid,
-    ) -> Result<Vec<recent_view::Model>, Error> {
+        page: &PageRequest,
+    ) -> Result<Page<recent_view::Model>, Error> {
         let profile = self.me(tenant, user).await?;
-        Ok(recent_view::Entity::find()
+        let select = recent_view::Entity::find()
             .filter(recent_view::Column::ProfileId.eq(profile.id))
             .filter(
                 recent_view::Column::ViewedAt
                     .gte(now() - SignedDuration::from_hours(24 * self.config.recent_views_days)),
             )
-            .scoped(tenant)
-            .order_by_desc(recent_view::Column::ViewedAt)
-            .limit(self.config.recent_views_max)
-            .all(tenant.database().read())
-            .await?)
+            .scoped(tenant);
+        // Theo lúc xem rồi sản phẩm (duy nhất trong danh sách của một hồ sơ: khoá chính tenant, hồ sơ, sản
+        // phẩm), keyset trong database (index `customers_recent_views_page`). Số dòng đã có trần lúc ghi
+        // (`record_view` giữ tối đa `recent_views_max`). Xem lại một sản phẩm đưa nó lên đầu: trong lúc
+        // duyệt nó có thể nhảy trang — chấp nhận, như mọi danh sách sắp theo giá trị đổi được.
+        fetch_page_by(
+            select,
+            recent_view::Column::ViewedAt,
+            |row| SortValue::Time(row.viewed_at),
+            recent_view::Column::ProductId,
+            |row| row.product_id,
+            page,
+            tenant.database().read(),
+        )
+        .await
     }
 
     /// Ghi một lần xem (xem lại: đưa lên đầu); giữ tối đa `RECENT_VIEWS_MAX` sản phẩm.
@@ -310,13 +322,13 @@ impl CustomersService {
     pub(crate) async fn reminder_rules(
         &self,
         tenant: &TenantContext,
-    ) -> Result<Vec<reminder_rule::Model>, Error> {
-        Ok(reminder_rule::Entity::find()
-            .scoped(tenant)
-            .order_by_desc(reminder_rule::Column::EffectiveFrom)
-            .limit(50)
-            .all(tenant.database().read())
-            .await?)
+        page: &PageRequest,
+    ) -> Result<Page<reminder_rule::Model>, Error> {
+        // Mỗi phiên bản có hiệu lực từ lúc tạo (`effective_from` = `created_at`, đặt cùng lúc sinh id
+        // UUIDv7), nên thứ tự id là thứ tự hiệu lực: keyset theo id (index `customers_reminder_rules_page`).
+        let select = reminder_rule::Entity::find().scoped(tenant);
+        fetch_page(select, reminder_rule::Column::Id, |row| row.id, page, tenant.database().read())
+            .await
     }
 
     async fn has_marketing_consent(

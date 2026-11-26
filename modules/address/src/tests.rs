@@ -39,12 +39,22 @@ fn manifest(from: &str) -> Manifest {
 }
 
 async fn app(test: &TestDatabase) -> (TestApp, Arc<AddressService>) {
-    let app = TestApp::builder(test).module(crate::module()).build().await.unwrap();
+    let app =
+        TestApp::builder(test).module(crate::module()).user("ann", 1, &[]).build().await.unwrap();
     let service = Arc::new(AddressService {
         databases: app.modules().tenancy().unwrap(),
         outbox: autoxide_kernel::event::Outbox::standalone("address"),
     });
     (app, service)
+}
+
+// Một trang đủ lớn cho bộ dữ liệu nhỏ của test, theo mã.
+fn all() -> PageRequest {
+    PageRequest::first(200, Order::Asc)
+}
+
+fn codes(page: &autoxide_kernel::pagination::Page<crate::api::AdministrativeUnit>) -> Vec<&str> {
+    page.data.iter().map(|unit| unit.code.as_str()).collect()
 }
 
 async fn import(service: &AddressService, csv: &str, from: &str) -> crate::import::Imported {
@@ -63,19 +73,16 @@ async fn tim_khong_dau_ra_co_dau() {
         let found =
             service.search("vn", Some("Đông Anh"), Some("01"), Some(2), &page).await.unwrap();
         assert_eq!(found.data[0].code, "00008");
-        let provinces = service.provinces("VN", None).await.unwrap();
+        let provinces = service.provinces("VN", None, &all()).await.unwrap();
+        assert_eq!(codes(&provinces), ["01", "79"]);
+        let communes = service.communes("VN", "01", None, &all()).await.unwrap();
+        assert_eq!(communes.data.len(), 2);
         assert_eq!(
-            provinces.iter().map(|unit| unit.code.as_str()).collect::<Vec<_>>(),
-            ["01", "79"]
-        );
-        let communes = service.communes("VN", "01", None).await.unwrap();
-        assert_eq!(communes.len(), 2);
-        assert_eq!(
-            service.communes("VN", "99", None).await.unwrap_err().code(),
+            service.communes("VN", "99", None, &all()).await.unwrap_err().code(),
             "address.unit_not_found"
         );
         assert_eq!(
-            service.provinces("US", None).await.unwrap_err().code(),
+            service.provinces("US", None, &all()).await.unwrap_err().code(),
             "address.country_unsupported"
         );
     })
@@ -106,12 +113,12 @@ async fn bo_moi_dong_don_vi_cu_va_mo_don_vi_moi() {
         let second = import(&service, SECOND, "2026-01-01").await;
         // Đông Anh đổi tên (đóng + mở), Sài Gòn bỏ (đóng), Côn Đảo mới (mở).
         assert_eq!((second.opened, second.closed), (2, 2));
-        let before = service.communes("VN", "79", Some("2025-12-31")).await.unwrap();
-        assert_eq!(before.iter().map(|unit| unit.code.as_str()).collect::<Vec<_>>(), ["26734"]);
-        let after = service.communes("VN", "79", Some("2026-01-01")).await.unwrap();
-        assert_eq!(after.iter().map(|unit| unit.code.as_str()).collect::<Vec<_>>(), ["26999"]);
-        let renamed = service.communes("VN", "01", Some("2026-02-01")).await.unwrap();
-        assert!(renamed.iter().any(|unit| unit.name == "Xã Đông Anh Mới"));
+        let before = service.communes("VN", "79", Some("2025-12-31"), &all()).await.unwrap();
+        assert_eq!(codes(&before), ["26734"]);
+        let after = service.communes("VN", "79", Some("2026-01-01"), &all()).await.unwrap();
+        assert_eq!(codes(&after), ["26999"]);
+        let renamed = service.communes("VN", "01", Some("2026-02-01"), &all()).await.unwrap();
+        assert!(renamed.data.iter().any(|unit| unit.name == "Xã Đông Anh Mới"));
     })
     .await
     .unwrap();
@@ -189,9 +196,105 @@ async fn du_lieu_goc_du_34_tinh_3321_xa() {
         let (manifest, sha) = crate::import::bundled().unwrap();
         let imported = service.import(&manifest, &rows, &sha).await.unwrap();
         assert_eq!((imported.provinces, imported.communes), (34, 3321));
-        assert_eq!(service.provinces("VN", None).await.unwrap().len(), 34);
-        let hanoi = service.communes("VN", "01", None).await.unwrap();
-        assert!(hanoi.iter().any(|unit| unit.name == "Phường Ba Đình"));
+        assert_eq!(service.provinces("VN", None, &all()).await.unwrap().data.len(), 34);
+        let hanoi = service.communes("VN", "01", None, &all()).await.unwrap();
+        assert!(hanoi.data.iter().any(|unit| unit.name == "Phường Ba Đình"));
+    })
+    .await
+    .unwrap();
+}
+
+// Duyệt hết một danh sách REST theo `next_cursor`; trả mã đơn vị theo thứ tự nhận.
+async fn walk(app: &TestApp, first: &str) -> Vec<String> {
+    let mut codes = Vec::new();
+    let mut uri = first.to_owned();
+    loop {
+        let answer = app.get(&uri).send().await.unwrap();
+        assert_eq!(answer.status(), StatusCode::OK, "{}", answer.json());
+        let body = answer.json();
+        let page = body["data"].as_array().unwrap();
+        assert!(page.len() <= 10);
+        codes.extend(page.iter().map(|unit| unit["code"].as_str().unwrap().to_owned()));
+        match body["pagination"]["next_cursor"].as_str() {
+            Some(cursor) => uri = format!("{first}&cursor={cursor}"),
+            None => return codes,
+        }
+    }
+}
+
+/// Bộ đóng gói 34 tỉnh: trang 10 theo mã, theo `next_cursor` tới hết không trùng không sót, hai chiều; xã
+/// của Hà Nội cũng vậy; con trỏ hỏng là 422 ở ô `cursor`.
+#[tokio::test]
+async fn tinh_va_xa_phan_trang_theo_ma() {
+    TestDatabase::run(async |test| {
+        let (app, service) = app(test).await;
+        let rows = parse(crate::import::BUNDLED_UNITS).unwrap();
+        let (manifest, sha) = crate::import::bundled().unwrap();
+        service.import(&manifest, &rows, &sha).await.unwrap();
+
+        let up = walk(&app, "/api/v1/address/provinces?limit=10").await;
+        let mut sorted = up.clone();
+        sorted.sort();
+        sorted.dedup();
+        assert_eq!((up.len(), &up), (34, &sorted));
+        let down = walk(&app, "/api/v1/address/provinces?limit=10&order=desc").await;
+        assert_eq!(down, up.iter().rev().cloned().collect::<Vec<_>>());
+
+        let communes = walk(&app, "/api/v1/address/provinces/01/communes?limit=10").await;
+        let expected = service.communes("VN", "01", None, &all()).await.unwrap();
+        assert!(communes.len() > 10);
+        assert_eq!(communes, codes(&expected));
+
+        let wrong = app.get("/api/v1/address/provinces?cursor=nope").send().await.unwrap();
+        assert_eq!(wrong.status(), StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(wrong.json()["errors"][0]["field"], "cursor");
+    })
+    .await
+    .unwrap();
+}
+
+/// Tool `address.list_provinces` / `address.list_communes` cùng tham số với REST trả cùng trang và cùng
+/// `next_cursor`.
+#[tokio::test]
+async fn tool_danh_sach_tra_dung_trang_nhu_rest() {
+    TestDatabase::run(async |test| {
+        let (app, service) = app(test).await;
+        import(&service, FIRST, "2025-07-01").await;
+        let client = app.mcp("ann").await.unwrap();
+        for (uri, name, arguments) in [
+            (
+                "/api/v1/address/provinces?limit=1",
+                "address.list_provinces",
+                serde_json::json!({"limit": 1}),
+            ),
+            (
+                "/api/v1/address/provinces/01/communes?limit=1&order=desc",
+                "address.list_communes",
+                serde_json::json!({"province": "01", "limit": 1, "order": "desc"}),
+            ),
+        ] {
+            let rest = app.get(uri).send().await.unwrap().json();
+            let first = client
+                .call_tool(autoxide_testkit::tool(name, arguments.clone()))
+                .await
+                .unwrap()
+                .structured_content
+                .unwrap();
+            assert_eq!(first["data"], rest["data"], "{name}");
+            assert_eq!(first["pagination"], rest["pagination"], "{name}");
+            let mut arguments = arguments;
+            arguments["cursor"] = first["pagination"]["next_cursor"].clone();
+            let second = client
+                .call_tool(autoxide_testkit::tool(name, arguments))
+                .await
+                .unwrap()
+                .structured_content
+                .unwrap();
+            assert_eq!(second["data"].as_array().unwrap().len(), 1, "{name}");
+            assert_ne!(second["data"], first["data"], "{name}");
+            assert!(second["pagination"]["next_cursor"].is_null(), "{name}");
+        }
+        client.cancel().await.unwrap();
     })
     .await
     .unwrap();

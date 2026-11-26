@@ -760,3 +760,43 @@ async fn lay_lai_tai_khoan_hay_xoa_tai_khoan_thu_hoi_token_scim_no_tao() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn token_con_ma_nguoi_tao_da_mat_thi_creator_status_deleted() {
+    // Dữ liệu cũ (trước khi xoá tài khoản thu hồi token): token còn mà người tạo không còn — danh
+    // sách báo `deleted` và token không làm được gì cần permission.
+    use sea_orm::{ColumnTrait as _, EntityTrait as _, QueryFilter as _};
+    TestDatabase::run(async |test| {
+        let (app, services, admin, admin_token) = setup(test).await;
+        let tenant = &services.tenant;
+        let (group_id, _) = admin_group(&app, &services, &admin, &admin_token).await;
+        let input = NewUser {
+            email: "gone@example.com".to_owned(),
+            name: "Gone".to_owned(),
+            password: Some(PASSWORD.to_owned()),
+        };
+        let gone =
+            services.users.create_with_roles(tenant, Actor::system(), input, true).await.unwrap();
+        let gone_token =
+            scim_token(&app, &bearer(&app, "gone@example.com", PASSWORD).await, None).await;
+        crate::role::entity::user_role::Entity::delete_many()
+            .filter(crate::role::entity::user_role::Column::UserId.eq(gone.id))
+            .exec(services.database.write())
+            .await
+            .unwrap();
+        crate::user::entity::Entity::delete_many()
+            .filter(crate::user::entity::Column::Id.eq(gone.id))
+            .exec(services.database.write())
+            .await
+            .unwrap();
+        assert_eq!(creator_status(&app, &admin, gone.id).await, "deleted");
+        let stranger = scim_user(&app, &gone_token, "stranger@example.com").await;
+        let add = patch(json!([{"op": "add", "path": "members", "value": [{"value": stranger}]}]));
+        let (status, body) =
+            scim(&app, "PATCH", &format!("/Groups/{group_id}"), &gone_token, Some(add)).await;
+        assert_forbidden(status, &body);
+        assert!(!is_admin(&services, &stranger).await);
+    })
+    .await
+    .unwrap();
+}

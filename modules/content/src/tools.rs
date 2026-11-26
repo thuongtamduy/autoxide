@@ -273,6 +273,18 @@ pub(crate) struct TemplateDraftInput {
     org_id: Option<Uuid>,
 }
 
+/// Paging of the template list.
+#[derive(Debug, Default, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct LegalTemplatesInput {
+    /// Maximum number of items to return, 1 to 200. Defaults to 50.
+    limit: Option<u32>,
+    /// The `next_cursor` of the previous page.
+    cursor: Option<String>,
+    /// `asc` (by key, the default) or `desc`.
+    order: Option<String>,
+}
+
 /// Tool của mẫu trang bắt buộc (D-359): cùng service, cùng permission với REST.
 fn template_tools(service: &Arc<ContentService>) -> Vec<Tool> {
     let draft = service.clone();
@@ -282,10 +294,17 @@ fn template_tools(service: &Arc<ContentService>) -> Vec<Tool> {
             "List the mandatory page templates for a commerce website in Vietnam (owner \
              information, privacy, returns, shipping, payment, inspection, complaints, terms, \
              general conditions; marketplace regulations, seller agreement, seller information), \
-             with the variables each needs. Every text needs review by a legal professional.",
-            move |_tenant: TenantContext, principal: Principal, _: autoxide_kernel::mcp::NoInput| async move {
-                principal.require(&CONTENT_READ)?;
-                Ok::<_, Error>(crate::templates::summaries())
+             with the variables each needs, by key. Every text needs review by a legal professional. \
+             Follow `pagination.next_cursor` for more.",
+            move |_tenant: TenantContext, principal: Principal, input: LegalTemplatesInput| async move {
+                // Cùng kiểu tham số trang với REST (`NaturalOrderPageQuery`), cùng hàm dựng trang.
+                let paging = autoxide_kernel::pagination::NaturalOrderPageQuery::new(
+                    input.limit.map(|limit| limit.to_string()),
+                    input.cursor,
+                    input.order,
+                );
+                let page = autoxide_kernel::pagination::PageRequest::try_from(paging)?;
+                crate::templates::summary_page(&principal, &page)
             },
         )
         .requires(CONTENT_READ)

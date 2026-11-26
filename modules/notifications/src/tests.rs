@@ -548,6 +548,15 @@ async fn day_bi_mat_thi_xoa_dang_ky() {
         let (status, problem) = call(&fx.app, "POST", "/me/push-subscriptions", "alice", Some(bad)).await;
         assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
         assert_eq!(problem["code"], "notifications.push_subscription_invalid");
+        // PT-10: máy chủ nội bộ (loopback, metadata của cloud, mạng riêng, localhost) bị từ chối khi lưu.
+        for internal in ["https://127.0.0.1/send", "https://169.254.169.254/latest/meta-data",
+            "https://[::1]:8443/x", "https://10.0.0.5/x", "https://localhost/x", "https://push.localhost/x"]
+        {
+            let bad = json!({"endpoint": internal, "keys": {"p256dh": p256dh, "auth": "a".repeat(22)}});
+            let (status, problem) = call(&fx.app, "POST", "/me/push-subscriptions", "alice", Some(bad)).await;
+            assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{internal}: {problem}");
+            assert_eq!(problem["code"], "notifications.push_subscription_invalid");
+        }
         let good = json!({"endpoint": endpoint, "keys": {"p256dh": p256dh, "auth": "a".repeat(22)}, "expirationTime": null});
         let (status, created) = call(&fx.app, "POST", "/me/push-subscriptions", "alice", Some(good.clone())).await;
         assert_eq!(status, StatusCode::CREATED, "{created}");

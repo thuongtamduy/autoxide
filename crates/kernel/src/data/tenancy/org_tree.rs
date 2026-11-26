@@ -295,6 +295,37 @@ impl OrgTree {
         Ok(rows.into_iter().map(|row| OrgId::from_uuid(row.ancestor_id)).collect())
     }
 
+    /// Whether `id` is a unit of `tenant`: the tenant's root (which exists even before a tree is built) or a
+    /// node of its tree. A permission decision uses it so that a caller with a tenant-wide grant cannot
+    /// attach a record to a unit that does not exist or belongs to another tenant (D-20261125-org-must-exist).
+    pub async fn contains<C: ConnectionTrait>(
+        connection: &C,
+        tenant: TenantId,
+        id: OrgId,
+    ) -> Result<bool, Error> {
+        if id == root_of(tenant) {
+            return Ok(true);
+        }
+        let count = closure::Entity::find()
+            .filter(closure::Column::TenantId.eq(tenant.as_uuid()))
+            .filter(closure::Column::DescendantId.eq(id.as_uuid()))
+            .filter(closure::Column::AncestorId.eq(id.as_uuid()))
+            .count(connection)
+            .await?;
+        Ok(count > 0)
+    }
+
+    /// Like [`contains`](Self::contains), as an error: 404 `org_not_found` when `id` is not a unit of `tenant`.
+    /// For a module that takes a unit from the caller outside a permission decision (a public endpoint, a
+    /// unit used only as a label).
+    pub async fn ensure_exists<C: ConnectionTrait>(
+        connection: &C,
+        tenant: TenantId,
+        id: OrgId,
+    ) -> Result<(), Error> {
+        if Self::contains(connection, tenant, id).await? { Ok(()) } else { Err(org_not_found(id)) }
+    }
+
     /// Whether node `id` belongs to the branch of one of `roots` (including those nodes themselves).
     pub async fn is_within<C: ConnectionTrait>(
         connection: &C,

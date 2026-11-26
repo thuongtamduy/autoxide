@@ -9,9 +9,10 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::money::Money;
+use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -243,25 +244,30 @@ pub(crate) async fn adjust_store_credit(
 
 /// List your gift cards.
 ///
-/// Any signed-in buyer, when gift cards are on.
+/// Any signed-in buyer, when gift cards are on. Newest first unless `order=asc`; paged with
+/// `limit` / `cursor`.
 #[utoipa::path(
     get, path = "/me/gift-cards", extensions(("x-permissions" = json!([]))),
     operation_id = "list_my_gift_cards", security(("bearer" = [])),
+    params(PageQuery),
     responses(
-        (status = 200, description = "Gift cards attached to your account.", body = Data<Vec<GiftCard>>),
+        (status = 200, description = "One page of the gift cards attached to your account, newest first.", body = Page<GiftCard>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Gift cards are off; code `customers.stored_value_disabled`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 pub(crate) async fn my_gift_cards(
     State(service): State<Arc<CustomersService>>,
     tenant: TenantContext,
     principal: Principal,
-) -> Result<Data<Vec<GiftCard>>, Error> {
-    let rows = service.my_gift_cards(&tenant, principal.user_id()).await?;
-    Ok(Data {
-        data: rows.into_iter().map(|row| GiftCard::new(row, None)).collect::<Result<_, _>>()?,
-    })
+    Query(page): Query<PageQuery>,
+) -> Result<Page<GiftCard>, Error> {
+    let page = PageRequest::try_from(page)?;
+    let rows = service.my_gift_cards(&tenant, principal.user_id(), &page).await?;
+    let data =
+        rows.data.into_iter().map(|row| GiftCard::new(row, None)).collect::<Result<_, _>>()?;
+    Ok(Page { data, pagination: rows.pagination })
 }
 
 /// Attach a gift card to your account.

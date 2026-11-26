@@ -45,6 +45,7 @@
 //! - Hai lệnh test trên nhận thêm `--shard <k>/<n>` ở cuối: chỉ chạy phần thứ k trong n phần của
 //!   mọi test, để CI chạy n phần trên n máy cùng lúc (`./gate.sh --shard`, D-20261119-ci-faster).
 
+mod address_keys;
 mod affected;
 mod api_diff;
 mod api_shape;
@@ -354,6 +355,8 @@ fn check() -> ExitCode {
         violations.extend(decisions::check(&workspace.root)?);
         violations.extend(changelog::check(&workspace.root)?);
         violations.extend(metric_labels::check(&workspace.root)?);
+        // Khoá giới hạn theo địa chỉ client gom theo khối (D-20261125-address-keys).
+        violations.extend(address_keys::check(&workspace.root)?);
         // Link giao diện trong thư theo khách (D-20261125-tenant-link-templates).
         violations.extend(site_links::check(&workspace.root)?);
         violations.extend(deploy_metrics::check(&workspace.root)?);

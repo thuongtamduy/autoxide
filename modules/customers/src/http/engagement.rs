@@ -7,9 +7,10 @@ use std::sync::Arc;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
+use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use sea_orm::Set;
 use serde::{Deserialize, Serialize};
@@ -278,22 +279,27 @@ pub(crate) async fn remove_wishlist(
 
 /// List the products you looked at recently, newest first.
 ///
-/// Any signed-in buyer. Guests keep this list in the browser.
+/// Any signed-in buyer. Guests keep this list in the browser. Newest first unless `order=asc`;
+/// paged with `limit` / `cursor`.
 #[utoipa::path(
     get, path = "/me/recently-viewed", extensions(("x-permissions" = json!([]))),
     operation_id = "list_my_recently_viewed", security(("bearer" = [])),
+    params(PageQuery),
     responses(
-        (status = 200, description = "Recently viewed products.", body = Data<Vec<RecentlyViewed>>),
+        (status = 200, description = "One page of recently viewed products, newest first.", body = Page<RecentlyViewed>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 pub(crate) async fn list_views(
     State(service): State<Arc<CustomersService>>,
     tenant: TenantContext,
     principal: Principal,
-) -> Result<Data<Vec<RecentlyViewed>>, Error> {
-    let rows = service.recently_viewed(&tenant, principal.user_id()).await?;
-    Ok(Data { data: rows.into_iter().map(RecentlyViewed::from).collect() })
+    Query(page): Query<PageQuery>,
+) -> Result<Page<RecentlyViewed>, Error> {
+    let page = PageRequest::try_from(page)?;
+    let rows = service.recently_viewed(&tenant, principal.user_id(), &page).await?;
+    Ok(rows.map(RecentlyViewed::from))
 }
 
 /// Record that you looked at a product.
@@ -366,25 +372,28 @@ pub(crate) async fn apply_referral(
 
 /// List abandoned cart reminder rules, newest first.
 ///
-/// Requires `customers.engagement.manage`.
+/// Requires `customers.engagement.manage`. Paged with `limit` / `cursor`; `order=asc` for oldest
+/// first.
 #[utoipa::path(
     get, path = "/reminder-rules", extensions(("x-permissions" = json!(["customers.engagement.manage"]))),
     operation_id = "list_cart_reminder_rules", security(("bearer" = [])),
+    params(PageQuery),
     responses(
-        (status = 200, description = "Rule versions.", body = Data<Vec<ReminderRule>>),
+        (status = 200, description = "One page of rule versions, newest first.", body = Page<ReminderRule>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `customers.engagement.manage`; code `permission_denied`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 pub(crate) async fn list_reminder_rules(
     State(service): State<Arc<CustomersService>>,
     tenant: TenantContext,
     principal: Principal,
-) -> Result<Data<Vec<ReminderRule>>, Error> {
+    Query(page): Query<PageQuery>,
+) -> Result<Page<ReminderRule>, Error> {
     principal.require(&ENGAGEMENT_MANAGE)?;
-    Ok(Data {
-        data: service.reminder_rules(&tenant).await?.into_iter().map(ReminderRule::from).collect(),
-    })
+    let page = PageRequest::try_from(page)?;
+    Ok(service.reminder_rules(&tenant, &page).await?.map(ReminderRule::from))
 }
 
 /// Set abandoned cart reminders.
@@ -415,25 +424,28 @@ pub(crate) async fn create_reminder_rule(
 
 /// List referral reward rules, newest first.
 ///
-/// Requires `customers.engagement.manage`.
+/// Requires `customers.engagement.manage`. Paged with `limit` / `cursor`; `order=asc` for oldest
+/// first.
 #[utoipa::path(
     get, path = "/referral-rules", extensions(("x-permissions" = json!(["customers.engagement.manage"]))),
     operation_id = "list_referral_rules", security(("bearer" = [])),
+    params(PageQuery),
     responses(
-        (status = 200, description = "Rule versions.", body = Data<Vec<ReferralRule>>),
+        (status = 200, description = "One page of rule versions, newest first.", body = Page<ReferralRule>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `customers.engagement.manage`; code `permission_denied`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 pub(crate) async fn list_referral_rules(
     State(service): State<Arc<CustomersService>>,
     tenant: TenantContext,
     principal: Principal,
-) -> Result<Data<Vec<ReferralRule>>, Error> {
+    Query(page): Query<PageQuery>,
+) -> Result<Page<ReferralRule>, Error> {
     principal.require(&ENGAGEMENT_MANAGE)?;
-    Ok(Data {
-        data: service.referral_rules(&tenant).await?.into_iter().map(ReferralRule::from).collect(),
-    })
+    let page = PageRequest::try_from(page)?;
+    Ok(service.referral_rules(&tenant, &page).await?.map(ReferralRule::from))
 }
 
 /// Set referral rewards.

@@ -175,3 +175,70 @@ async fn cau_hinh_can_quyen_va_bao_moi_loi_mot_lan() {
 fn uuid_of(n: u128) -> uuid::Uuid {
     uuid::Uuid::from_u128(n)
 }
+
+// Duyệt hết một danh sách theo `next_cursor`; trả trường `field` của từng dòng theo thứ tự nhận.
+async fn walk(
+    app: &autoxide_testkit::TestApp,
+    first: &str,
+    who: Option<&str>,
+    field: &str,
+) -> Vec<String> {
+    let mut seen = Vec::new();
+    let mut uri = first.to_owned();
+    loop {
+        let (status, body) = call(app, "GET", &uri, who, None).await;
+        assert_eq!(status, StatusCode::OK, "{uri}: {body}");
+        let page = body["data"].as_array().unwrap();
+        assert!(page.len() <= 2, "{body}");
+        seen.extend(page.iter().map(|row| row[field].as_str().unwrap().to_owned()));
+        match body["pagination"]["next_cursor"].as_str() {
+            Some(cursor) => uri = format!("{first}&cursor={cursor}"),
+            None => return seen,
+        }
+    }
+}
+
+/// Bước 70 P9 (D-20261125-list-pages): ngày nghỉ theo giờ bắt đầu (hai ngày nghỉ cùng giờ: thứ tự theo id), dịch
+/// vụ công khai theo tên (hai dịch vụ trùng tên); trang 2 dòng, theo `next_cursor` tới hết không trùng không sót,
+/// `order=desc` ngược lại.
+#[tokio::test]
+async fn ngay_nghi_va_dich_vu_cong_khai_phan_trang() {
+    TestDatabase::run(async |test| {
+        let app = app(test).await;
+        let lan = staff(&app, "Lan").await;
+        let monday = next_monday();
+        let mut exceptions = Vec::new();
+        for hour in [5, 1, 3, 3, 2] {
+            let off = json!({
+                "resource_id": lan, "kind": "closed",
+                "starts_at": utc(monday, hour, 0), "ends_at": utc(monday, hour, 30),
+            });
+            let created =
+                admin(&app, "POST", "/bookings/exceptions", Some(off), StatusCode::CREATED).await;
+            exceptions.push((hour, created["data"]["id"].as_str().unwrap().to_owned()));
+        }
+        exceptions.sort();
+        let expected: Vec<String> = exceptions.into_iter().map(|(_, id)| id).collect();
+        let first = format!("/bookings/exceptions?resource_id={lan}&limit=2");
+        assert_eq!(walk(&app, &first, Some("admin"), "id").await, expected);
+        let first = format!("/bookings/exceptions?resource_id={lan}&limit=2&order=desc");
+        let reversed: Vec<String> = expected.iter().rev().cloned().collect();
+        assert_eq!(walk(&app, &first, Some("admin"), "id").await, reversed);
+
+        let mut services = Vec::new();
+        for name in ["Nail", "Massage", "Haircut", "Massage", "Facial"] {
+            let id = service(&app, 30, 0, json!({"name": name}), &[&lan]).await;
+            services.push((name, id));
+        }
+        services.sort();
+        let expected: Vec<String> = services.into_iter().map(|(_, id)| id).collect();
+        assert_eq!(walk(&app, "/bookings/public/services?limit=2", None, "id").await, expected);
+        let reversed: Vec<String> = expected.iter().rev().cloned().collect();
+        let first = "/bookings/public/services?limit=2&order=desc";
+        assert_eq!(walk(&app, first, None, "id").await, reversed);
+        let (status, _) = call(&app, "GET", "/bookings/public/services?limit=0", None, None).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    })
+    .await
+    .unwrap();
+}

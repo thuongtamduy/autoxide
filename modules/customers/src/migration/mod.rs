@@ -6,6 +6,7 @@ mod m0006_loyalty;
 mod m0007_engagement;
 mod m0008_stored_value;
 mod m0011_wishlist_alerts;
+mod m0012_list_indexes;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 
@@ -39,5 +40,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         ),
         // Báo yêu thích có hàng lại / giảm giá (bước 47, D-233).
         Box::new(m0011_wishlist_alerts::Migration),
+        // Index cho danh sách có phân trang (bước 70 P9).
+        Box::new(m0012_list_indexes::Migration),
     ]
 }

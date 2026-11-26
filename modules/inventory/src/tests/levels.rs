@@ -48,6 +48,14 @@ async fn dieu_chinh_co_ly_do_ghi_so_va_chay_mot_lan() {
         assert_eq!(problem["code"], "inventory.reason_required");
         assert_eq!(problem["errors"].as_array().unwrap().len(), 2, "{problem}");
 
+        // PT-5: số lượng `i64::MIN` là lỗi 422 của trường, không panic (500).
+        let body = json!({"org_id": a, "reference": "adj-min", "lines": [
+            {"variant_id": item, "quantity": i64::MIN, "reason_code": "damaged"},
+        ]});
+        let (status, problem) = call(&shop, "POST", "/adjustments", "boss", Some(body)).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{problem}");
+        assert_eq!(problem["errors"][0]["field"], "lines[0].quantity", "{problem}");
+
         // Lý do không có trong danh sách.
         let body = json!({"org_id": a, "reference": "adj-1", "lines": [
             {"variant_id": item, "quantity": -2, "reason_code": "eaten"},
@@ -328,6 +336,45 @@ async fn tool_mcp_nhu_rest() {
             .unwrap();
         let text = format!("{found:?}");
         assert!(text.contains("\\\"on_hand\\\":4"), "{text}");
+    })
+    .await
+    .unwrap();
+}
+
+/// Bước 70 P9 (D-20261125-list-pages): giá trị tồn là một trang theo kho rồi tiền tệ; theo `next_cursor` tới
+/// hết không trùng không sót, `order=desc` ngược lại.
+#[tokio::test]
+async fn gia_tri_ton_phan_trang_theo_kho() {
+    TestDatabase::run(async |test| {
+        let shop = shop(test).await;
+        let item = shop.catalog.item();
+        for org in [shop.tree.a, shop.tree.b, shop.tree.store] {
+            stock_in(&shop, org, item, 2, Some(1000)).await;
+        }
+        let mut orgs: Vec<String> = [shop.tree.a, shop.tree.b, shop.tree.store]
+            .iter()
+            .map(|org| org.as_uuid().to_string())
+            .collect();
+        orgs.sort();
+        for (order, expected) in
+            [("asc", orgs.clone()), ("desc", orgs.iter().rev().cloned().collect())]
+        {
+            let first = format!("/reports/valuation?limit=2&order={order}");
+            let mut uri = first.clone();
+            let mut seen = Vec::new();
+            loop {
+                let (status, page) = call(&shop, "GET", &uri, "boss", None).await;
+                assert_eq!(status, StatusCode::OK, "{page}");
+                let rows = page["data"].as_array().unwrap();
+                assert!(rows.len() <= 2);
+                seen.extend(rows.iter().map(|row| row["org_id"].as_str().unwrap().to_owned()));
+                match page["pagination"]["next_cursor"].as_str() {
+                    Some(cursor) => uri = format!("{first}&cursor={cursor}"),
+                    None => break,
+                }
+            }
+            assert_eq!(seen, expected, "{order}");
+        }
     })
     .await
     .unwrap();

@@ -6,7 +6,7 @@ use std::sync::Arc;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
-use autoxide_kernel::pagination::{Page, PageQuery};
+use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, Tagged};
@@ -276,18 +276,20 @@ pub(crate) async fn list_all_schedules(
 
 /// List the schedules of an entry.
 ///
-/// Requires `content.read`. Newest first.
+/// Requires `content.read`. Newest first unless `order=asc`; paged with `limit` / `cursor`.
 #[utoipa::path(
     get,
     path = "/entries/{id}/schedules",
     extensions(("x-permissions" = json!(["content.read"]))),
     operation_id = "list_content_schedules",
     security(("bearer" = [])),
-    params(("id" = Uuid, Path, description = "Id of the entry.")),
+    params(("id" = Uuid, Path, description = "Id of the entry."), PageQuery),
     responses(
-        (status = 200, description = "The schedules.", body = Data<Vec<ScheduleResponse>>),
+        (status = 200, description = "One page of the schedules, newest first.", body = Page<ScheduleResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `content.read`; code `permission_denied`.", body = Problem),
+        (status = 404, description = "No entry has this id; code `content.not_found`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 pub(crate) async fn list_schedules(
@@ -295,9 +297,11 @@ pub(crate) async fn list_schedules(
     tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
-) -> Result<Data<Vec<ScheduleResponse>>, Error> {
-    let rows = service.list_schedules(&tenant, &principal, id).await?;
-    Ok(Data { data: rows.into_iter().map(ScheduleResponse::from).collect() })
+    Query(paging): Query<PageQuery>,
+) -> Result<Page<ScheduleResponse>, Error> {
+    let page = PageRequest::try_from(paging)?;
+    let rows = service.list_schedules(&tenant, &principal, id, &page).await?;
+    Ok(rows.map(ScheduleResponse::from))
 }
 
 /// Schedule a publish or take-down.

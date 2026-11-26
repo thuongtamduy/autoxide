@@ -81,6 +81,12 @@ pub trait WebPushSender: Send + Sync {
     fn public_key(&self) -> String;
 
     /// The `Unavailable` error is temporary (retry); `Validation` is permanent.
+    ///
+    /// `subscription.endpoint` was written by a browser user, so the sender must treat it as an untrusted
+    /// address: connect only to public IPs, resolving the host right before connecting
+    /// ([`crate::net::resolve_target`] or an HTTP client built with [`crate::net::PublicOnly`]) — never
+    /// to a private, loopback or link-local address (cloud metadata). `notifications` already refuses
+    /// such endpoints when saving, but a domain name can point anywhere later.
     async fn send(
         &self,
         tenant: TenantId,

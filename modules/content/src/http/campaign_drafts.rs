@@ -156,7 +156,7 @@ impl From<CampaignDraftsRequest> for CampaignRequest {
         (status = 202, description = "Queued.", body = Data<CampaignDraftsResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission (`permission_denied`), or the plan lacks `content.ai_suggestions`.", body = Problem),
-        (status = 404, description = "No promotion has this id in your scope; code `promotions.not_found`.", body = Problem),
+        (status = 404, description = "No promotion has this id in your scope (code `promotions.not_found`), or `org_id` is not a unit of this tenant (code `org_not_found`).", body = Problem),
         (status = 422, description = "A channel is unknown or misses its `banner_placement` / `newsletter_list_id`, the language or the instruction is invalid; see `errors`.", body = Problem),
         (status = 429, description = "The plan's monthly AI page builds are used up; code `quota_exhausted`.", body = Problem),
         (status = 503, description = "AI is off on this server (`ai.disabled`), or the `promotions` / `newsletter` module is not installed (`content.campaign_module_unavailable`).", body = Problem),

@@ -36,7 +36,7 @@ use sea_orm::{
     Select,
 };
 use serde::{Deserialize, Serialize};
-use utoipa::{IntoParams, ToSchema};
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 use axum::Json;
@@ -46,7 +46,7 @@ use crate::error::{Error, FieldError};
 
 mod memory;
 mod natural;
-mod order_param;
+mod params;
 mod sort_choice;
 pub use memory::page_of;
 pub use natural::NaturalOrderPageQuery;
@@ -72,25 +72,18 @@ pub enum Order {
 // Tham số query của mọi endpoint danh sách, đúng như client gửi (toàn chuỗi).
 // Nhận chuỗi rồi tự kiểm ở `PageRequest::try_from` để lỗi nói rõ từng tham số sai
 // gì, thay vì một câu chung của bộ phân tích query.
-/// Query parameters shared by every list endpoint.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, IntoParams)]
-#[into_params(parameter_in = Query)]
+// Tài liệu OpenAPI của bốn tham số dựng tay ở `params.rs` (chung cho ba kiểu query), không bằng derive.
+/// Query parameters shared by every list endpoint whose only order is creation time (newest first by default).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
 #[non_exhaustive]
 pub struct PageQuery {
     /// Maximum number of items to return, 1 to 200. Defaults to 50.
-    #[param(value_type = Option<u32>, minimum = 1, maximum = 200, example = 50)]
     pub limit: Option<String>,
-    /// Where to continue: the `next_cursor` of the previous page. Omit for the
-    /// first page. Treat the value as opaque.
-    #[param(value_type = Option<String>)]
+    /// Where to continue: the `next_cursor` of the previous page. Omit for the first page.
     pub cursor: Option<String>,
-    // Mô tả của tham số này cho OpenAPI nằm ở `order_param.rs` (`schema_with` bỏ qua doc comment).
     /// `desc` (newest first, the default) or `asc` (oldest first).
-    #[param(schema_with = order_param::newest_first)]
     pub order: Option<String>,
-    /// `true` to also get `pagination.total`, the number of items matching the filters, on the
-    /// first page (without `cursor`). Costs one more query; leave it out when not needed.
-    #[param(value_type = Option<bool>, example = true)]
+    /// `true` to also get `pagination.total` on the first page.
     pub count: Option<String>,
 }
 
