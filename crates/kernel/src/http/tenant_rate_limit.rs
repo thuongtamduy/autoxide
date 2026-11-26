@@ -7,9 +7,14 @@
 //!   request.
 //! - Counted like the limit per API key: in each process's memory (GCRA), or shared by every server through the
 //!   database with `AUTOXIDE_HTTP_RATE_LIMIT_STORE=database` (fixed one-minute windows taken in lots).
-//! - Applied to every module's REST routes once the request's tenant is resolved (the same cached resolution
-//!   the handlers use) and to every MCP tool call. A request whose tenant cannot be resolved (a public page with
-//!   no tenant) only meets the limit per address.
+//! - Counts only callers that are signed in (session, API key, MCP token) and act in their own tenant, on
+//!   every module's REST routes and every MCP tool call. A request without credentials or with a credential
+//!   that does not authenticate is never counted against a tenant, whatever tenant it names (`Autoxide-Tenant`,
+//!   `Host`): it only meets the limit per address, so nobody can drain a tenant's budget from outside, and
+//!   inbound webhooks and public routes are never refused for a tenant at its limit. Platform staff
+//!   operating in a tenant and support access are not counted either, so support can help a tenant that is
+//!   at its limit.
+//! - A write batch (`/kernel/sync/batch`) counts once, not once per command.
 //! - Over the limit: 429 `tenant_rate_limited` with `Retry-After`.
 
 use std::collections::HashMap;
@@ -19,23 +24,27 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
 use axum::extract::Request;
+use axum::http::header;
+use axum::http::request::Parts;
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use uuid::Uuid;
 
 use super::rate_limit::Decision;
 use super::rate_limit_store::SharedCounter;
+use crate::access::{AccessPath, Authenticator, Principal};
 use crate::config::RateLimit;
 use crate::entitlement::{EntitlementsHandle, Limit};
-use crate::error::Error;
+use crate::error::{Error, ErrorKind};
 use crate::tenancy::{DatabaseRegistry, TenantId};
 
 /// The plan's request rate of a tenant (declared by the kernel).
 pub const API_RATE: Limit = Limit::amount(
     "kernel.api_rate_per_minute",
     "API requests (REST and MCP) a tenant may make per minute, all its users and API keys together; \
-     more are answered with 429 `tenant_rate_limited`. A plan that does not set it keeps the server's \
-     AUTOXIDE_HTTP_RATE_LIMIT_TENANT_PER_MINUTE.",
+     more are answered with 429 `tenant_rate_limited`. `0` blocks every request; unlimited lifts the \
+     limit. A plan that does not set it keeps the server's AUTOXIDE_HTTP_RATE_LIMIT_TENANT_PER_MINUTE \
+     (where `0` means off).",
     "requests per minute",
 );
 
@@ -147,15 +156,60 @@ pub(crate) fn tenant_rate_limited(wait: Duration) -> Error {
     .with_retry_after(seconds)
 }
 
+/// The tenant whose budget a call by `principal` uses: its own tenant; `None` for platform staff operating in
+/// another tenant and for support access.
+pub(crate) fn budget_tenant(principal: &Principal) -> Option<TenantId> {
+    if principal.operator_from().is_some() || matches!(principal.access(), AccessPath::Support(_)) {
+        return None;
+    }
+    Some(principal.tenant_id())
+}
+
+/// The caller of a request that carries a credential that authenticates (`Ok(None)` without one, or when it does
+/// not authenticate: the handler reports that itself). The result is kept in the request, as for the handlers.
+/// A refusal by the limit per API key is returned as is.
+pub(crate) async fn signed_in(parts: &mut Parts) -> Result<Option<Principal>, Error> {
+    if let Some(crate::tenancy::request::Authenticated(principal)) =
+        parts.extensions.get::<crate::tenancy::request::Authenticated>()
+    {
+        return Ok(Some(principal.clone()));
+    }
+    if !parts.headers.contains_key(header::AUTHORIZATION) {
+        return Ok(None);
+    }
+    let Some(authenticator) = parts.extensions.get::<Arc<dyn Authenticator>>().cloned() else {
+        return Ok(None);
+    };
+    match crate::tenancy::request::authenticate(&authenticator, parts).await {
+        Ok(principal) => Ok(Some(principal)),
+        // Vượt giới hạn theo API key: trả ngay (handler xác thực lại sẽ đếm thêm một lần nữa).
+        Err(error) if error.kind() == ErrorKind::TooManyRequests => Err(error),
+        Err(_) => Ok(None),
+    }
+}
+
+/// Marks a request already counted, so the commands of a write batch (which carry the batch's extensions) are
+/// not counted again.
+#[derive(Clone, Copy)]
+struct Counted;
+
 /// The HTTP layer of a module's routes.
 pub(crate) async fn limit(limiter: Arc<TenantLimiter>, request: Request, next: Next) -> Response {
     let (mut parts, body) = request.into_parts();
-    // Khách giải như handler (kết quả được giữ trong request). Không giải được: chỉ chịu tầng theo địa chỉ.
-    if let Ok(tenant) = crate::tenancy::request::tenant(&mut parts).await {
-        match limiter.check(tenant.id()).await {
-            Ok(Decision::Allow) => {}
-            Ok(Decision::Deny(wait)) => return tenant_rate_limited(wait).into_response(),
+    if parts.extensions.get::<Counted>().is_none() {
+        // Chỉ người gọi đã xác thực mới tính vào khách: request ẩn danh nêu tên khách (header, tên miền) không
+        // được làm cạn hạn mức của khách đó.
+        let tenant = match signed_in(&mut parts).await {
+            Ok(principal) => principal.as_ref().and_then(budget_tenant),
             Err(error) => return error.into_response(),
+        };
+        if let Some(tenant) = tenant {
+            match limiter.check(tenant).await {
+                Ok(Decision::Allow) => {}
+                Ok(Decision::Deny(wait)) => return tenant_rate_limited(wait).into_response(),
+                Err(error) => return error.into_response(),
+            }
+            parts.extensions.insert(Counted);
         }
     }
     next.run(Request::from_parts(parts, body)).await

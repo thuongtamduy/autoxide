@@ -140,10 +140,13 @@ pub const TENANT_RATE_LIMIT_PER_MINUTE: Setting = Setting::new(
     "Requests one tenant may make per minute, on average (REST and MCP, every user and API key of \
      the tenant together), on top of the limits per client address and per API key; more are \
      answered with 429 `tenant_rate_limited` and a `Retry-After` header, so one busy tenant cannot \
-     crowd out the others. A plan may set its own level with the limit `kernel.api_rate_per_minute`. \
-     Requests whose tenant is not known yet (public pages without a tenant) only meet the limit \
-     per address. `0` turns it off (unless a plan sets a level). Counted like the limit per API key \
-     (AUTOXIDE_HTTP_RATE_LIMIT_STORE).",
+     crowd out the others. A plan may set its own level with the limit `kernel.api_rate_per_minute` \
+     (where `0` blocks every request of the tenant). Only signed-in callers acting in their own \
+     tenant are counted: requests without a valid credential (public pages, inbound webhooks), \
+     platform staff and support access only meet the limit per address. `0` here turns it off \
+     (unless a plan sets a level). Counted like the limit per API key \
+     (AUTOXIDE_HTTP_RATE_LIMIT_STORE); with `database` and a small burst nearly every request \
+     writes to the database, so prefer `memory` for low levels on a single server.",
 )
 .with_default("0");
 
@@ -156,7 +159,7 @@ pub const TENANT_RATE_LIMIT_BURST: Setting = Setting::new(
 
 pub const RATE_LIMIT_STORE: Setting = Setting::new(
     "AUTOXIDE_HTTP_RATE_LIMIT_STORE",
-    "Where the limit per API key is counted: `memory` (each server process counts on its own; \
+    "Where the limit per API key and the limit per tenant are counted: `memory` (each server process counts on its own; \
      exact with SQLite, which runs one server) or `database` (shared by every server through the \
      database, for several servers on PostgreSQL). `database` counts in fixed one-minute windows \
      of at most max(per minute, burst) requests and takes them in lots of max(1, burst / 4), so \

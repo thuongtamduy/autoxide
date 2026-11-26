@@ -53,14 +53,18 @@ pub(crate) struct AiStatus {
     /// Tokens used today (UTC), text and embeddings together.
     tokens_today: u64,
     /// Daily token limit of this tenant: its plan's `ai.daily_tokens`, otherwise the server's
-    /// `AUTOXIDE_AI_DAILY_TOKEN_LIMIT`; 0 means no limit.
+    /// `AUTOXIDE_AI_DAILY_TOKEN_LIMIT`. Read it with `daily_token_limited`: 0 with `daily_token_limited`
+    /// false means no limit; 0 with `daily_token_limited` true means the plan allows no AI tokens.
     daily_token_limit: u64,
+    /// A daily token limit applies to this tenant (`daily_token_limit` is that limit).
+    daily_token_limited: bool,
 }
 
 impl Status {
     async fn read(&self, tenant: &TenantContext, principal: &Principal) -> Result<AiStatus, Error> {
         principal.require(&AI_VIEW)?;
         let capabilities = self.text.capabilities();
+        let limit = self.book.limit_for(tenant).await?;
         Ok(AiStatus {
             enabled: capabilities.enabled,
             provider: capabilities.provider,
@@ -70,7 +74,8 @@ impl Status {
             embedding_model: self.embeddings.model_id().to_owned(),
             embedding_dimensions: self.embeddings.dimensions(),
             tokens_today: self.book.used_today(tenant).await?,
-            daily_token_limit: self.book.limit_for(tenant).await?.unwrap_or(0),
+            daily_token_limit: limit.unwrap_or(0),
+            daily_token_limited: limit.is_some(),
         })
     }
 }

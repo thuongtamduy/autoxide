@@ -136,7 +136,8 @@ impl SharedCounter {
                 metrics::counter!("http_rate_limit_store_errors_total").increment(1);
                 tracing::warn!(
                     error = %error,
-                    "counting the API key rate limit in the database failed; letting the request through"
+                    limit = self.prefix,
+                    "counting a rate limit in the database failed; letting the request through"
                 );
                 Decision::Allow
             }
@@ -152,11 +153,12 @@ impl SharedCounter {
         }
         *last = Some(now);
         let throttle = self.throttle.clone();
+        let prefix = self.prefix;
         let database = self.registry.default_tenant().database().clone();
         tokio::spawn(async move {
             let before = Timestamp::now() - SignedDuration::from_mins(10);
             if let Err(error) = throttle.purge(&database, before).await {
-                tracing::warn!(error = %error, "purging old API key rate limit counters failed");
+                tracing::warn!(error = %error, limit = prefix, "purging old rate limit counters failed");
             }
         });
     }

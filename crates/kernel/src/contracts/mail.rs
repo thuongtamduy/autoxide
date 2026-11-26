@@ -17,7 +17,7 @@ use crate::tenancy::TenantContext;
 /// "enhanced": "<enhanced status>" | null, "hard": <bool>}`. `hard` is true only when the address itself does
 /// not work (enhanced status 5.1.1, 5.1.2, 5.1.3, 5.1.6 or 5.1.10); a mailing-list module (e.g. newsletters)
 /// stops sending to the address only then. Events written before `hard` existed lack it: treat a missing
-/// `hard` as true.
+/// `hard` as false (mark that one mail failed, do not stop sending to the address).
 pub const DELIVERY_FAILED: &str = "mail.delivery_failed";
 
 /// Extra headers that may be set (compared case-insensitively). Other headers are set by the

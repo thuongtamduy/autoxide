@@ -303,8 +303,9 @@ impl EventHandler for DeliveryFailures {
         let email = autoxide_kernel::email::normalize(address);
         let code = event.payload.get("code").and_then(|code| code.as_str()).map(str::to_owned);
         // Chỉ lỗi chắc chắn của địa chỉ người nhận mới chặn (D-20261125-mail-bounces); lỗi của bên gửi (5.1.7,
-        // 5.1.8…), hộp thư đầy, thư quá cỡ thì chỉ ghi thư đó hỏng. Event cũ chưa có `hard`: hiểu như trước (chặn).
-        let hard = event.payload.get("hard").and_then(serde_json::Value::as_bool).unwrap_or(true);
+        // 5.1.8…), hộp thư đầy, thư quá cỡ thì chỉ ghi thư đó hỏng. Event thiếu `hard` (ghi trước khi nâng cấp, hay
+        // module ngoài theo hợp đồng cũ): không chắc lỗi thuộc địa chỉ nên không chặn, chỉ ghi thư hỏng.
+        let hard = event.payload.get("hard").and_then(serde_json::Value::as_bool).unwrap_or(false);
         let delivery_id = event
             .payload
             .get("dedupe_key")

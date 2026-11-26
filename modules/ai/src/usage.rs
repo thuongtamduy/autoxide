@@ -56,8 +56,9 @@ pub(crate) const DAILY_TOKENS: autoxide_kernel::entitlement::Limit =
         "ai.daily_tokens",
         "Tokens (input plus output, text and embeddings together) the tenant may use per UTC day; \
          past it, AI features answer 429 `ai.quota_exceeded` until the next day. A plan that does \
-         not set it keeps the server's AUTOXIDE_AI_DAILY_TOKEN_LIMIT. Read by module `ai` when it \
-         is called, not reserved.",
+         not set it keeps the server's AUTOXIDE_AI_DAILY_TOKEN_LIMIT (where `0` means no limit); in \
+         a plan `0` allows no tokens and unlimited lifts the limit. Read by module `ai` when it is \
+         called, not reserved.",
         "tokens per day",
     );
 

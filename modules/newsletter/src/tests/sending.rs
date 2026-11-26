@@ -347,7 +347,7 @@ async fn bounce_chan_dia_chi() {
         send(&h, draft.row.id).await;
         drain(&h).await;
         let mail = h.mailer.to(&people[0]).remove(0);
-        let failed = Delivered::new(h.tenant.clone(), "mail", autoxide_kernel::mail::DELIVERY_FAILED.to_owned(), json!({"to": format!("Reader <{}>", people[0]), "dedupe_key": mail.dedupe_key, "code": "550"}));
+        let failed = Delivered::new(h.tenant.clone(), "mail", autoxide_kernel::mail::DELIVERY_FAILED.to_owned(), json!({"to": format!("Reader <{}>", people[0]), "dedupe_key": mail.dedupe_key, "code": "550", "enhanced": "5.1.1", "hard": true}));
         let handler = DeliveryFailures(h.service.clone());
         handler.handle(&failed).await.unwrap();
         handler.handle(&failed).await.unwrap();
@@ -697,32 +697,39 @@ async fn hai_khach_cung_email_cung_key_token_mang_khach() {
     .unwrap();
 }
 
-/// Lỗi của bên gửi (`hard: false`, vd `5.1.8` — địa chỉ người gửi bị từ chối): lượt gửi `failed` với lỗi
-/// `rejected`, KHÔNG chặn người đăng ký (cấu hình gửi sai không được làm mất cả danh sách).
+/// Lỗi của bên gửi (`hard: false`, vd `5.1.8` — địa chỉ người gửi bị từ chối) và event thiếu `hard` (ghi trước
+/// khi nâng cấp, hay module ngoài theo hợp đồng cũ): lượt gửi `failed` với lỗi `rejected`, KHÔNG chặn người đăng ký
+/// (cấu hình gửi sai không được làm mất cả danh sách).
 #[tokio::test]
 async fn loi_ben_gui_khong_chan_nguoi_dang_ky() {
     TestDatabase::run(async |test| {
         let h = service(test, config()).await;
         let weekly = list(&h, "weekly", true).await;
-        let people = emails("reader", 1);
+        let people = emails("reader", 2);
         import(&h, weekly.row.id, &people).await;
         let draft = campaign(&h, weekly.row.id, false).await;
         send(&h, draft.row.id).await;
         drain(&h).await;
-        let mail = h.mailer.to(&people[0]).remove(0);
-        let payload = json!({
-            "to": people[0], "dedupe_key": mail.dedupe_key, "code": "550",
-            "enhanced": "5.1.8", "hard": false,
-        });
-        let failed = Delivered::new(
-            h.tenant.clone(),
-            "mail",
-            autoxide_kernel::mail::DELIVERY_FAILED.to_owned(),
-            payload,
-        );
-        DeliveryFailures(h.service.clone()).handle(&failed).await.unwrap();
+        let sender_side = h.mailer.to(&people[0]).remove(0);
+        let old_event = h.mailer.to(&people[1]).remove(0);
+        let payloads = [
+            json!({
+                "to": people[0], "dedupe_key": sender_side.dedupe_key, "code": "550",
+                "enhanced": "5.1.8", "hard": false,
+            }),
+            json!({"to": people[1], "dedupe_key": old_event.dedupe_key, "code": "550"}),
+        ];
+        for payload in payloads {
+            let failed = Delivered::new(
+                h.tenant.clone(),
+                "mail",
+                autoxide_kernel::mail::DELIVERY_FAILED.to_owned(),
+                payload,
+            );
+            DeliveryFailures(h.service.clone()).handle(&failed).await.unwrap();
+        }
         let done = h.service.find_campaign(&h.tenant, draft.row.id).await.unwrap();
-        assert_eq!((done.counts.failed, done.counts.bounced), (1, 0));
+        assert_eq!((done.counts.failed, done.counts.bounced), (2, 0));
         assert_eq!(count_events(&h.database, "newsletter.suppression_added").await, 0);
     })
     .await

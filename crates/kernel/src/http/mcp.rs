@@ -381,19 +381,22 @@ impl McpServer {
             Some(_) => return Err(RpcError::invalid_params("`arguments` must be an object")),
         };
         metrics::counter!("mcp_tool_calls_total").increment(1);
-        // Đếm cho hạn mức `kernel.api_requests` (REST và MCP), như lớp HTTP.
-        self.entitlements.count_request(caller.tenant.id());
+        // Đếm cho hạn mức `kernel.api_requests` và giới hạn theo khách, như lớp REST: người gọi đã xác thực,
+        // không tính nhân sự nền tảng hay quyền hỗ trợ (D-20261126-tenant-rate-limit).
+        let budget = super::tenant_rate_limit::budget_tenant(&caller.principal);
+        if let Some(tenant) = budget {
+            self.entitlements.count_request(tenant);
+        }
         let started = std::time::Instant::now();
-        // Giới hạn theo khách, như lớp REST: lời gọi tool bị từ chối trả lỗi `tenant_rate_limited`.
-        let limited = match &self.tenant_limiter {
-            Some(limiter) => match limiter.check(caller.tenant.id()).await {
+        let limited = match (&self.tenant_limiter, budget) {
+            (Some(limiter), Some(tenant)) => match limiter.check(tenant).await {
                 Ok(super::rate_limit::Decision::Deny(wait)) => {
                     Some(super::tenant_rate_limit::tenant_rate_limited(wait))
                 }
                 Ok(super::rate_limit::Decision::Allow) => None,
                 Err(error) => Some(error),
             },
-            None => None,
+            _ => None,
         };
         let outcome = match limited {
             Some(error) => Err(error),
