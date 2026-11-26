@@ -62,6 +62,7 @@ mới nhất ngày 11/11/2026; **`Cargo.lock` là nguồn sự thật** sau khi 
 | Gọi router            | `tower` (feature `util`)     | 0.5       | Gửi request thẳng vào router: test, và lô ghi đồng bộ của kernel chạy từng lệnh qua router con (bước 69) |
 | Phục vụ kết nối HTTP | `hyper` + `hyper-util` (feature `server-auto`, `tokio`) | 1.12 / 0.1 | Thay `axum::serve` để gắn timer: timeout đọc header 30 giây, ping HTTP/2 (D-20261123-http-header-timeout). Đã có trong cây phụ thuộc qua axum |
 | Property test      | `proptest` (chỉ `std`)          | 1.12      | Chỉ dùng trong test: sinh đầu vào ngẫu nhiên cho bộ kiểm đầu vào (email, con trỏ, thân bài, slug, CSV, bình luận), thu gọn ca hỏng (đặc tả 31 B3); cũng là công cụ thử phá có chủ đích (webhook, token, tiền, trạng thái) thay cho `cargo-fuzz`, chạy dài hằng đêm bằng `property.yml` (D-20261123-property-fuzzing) |
+| Mutation testing   | `cargo-mutants` (công cụ dòng lệnh, không vào `Cargo.toml`) | 27.1.0 | Chỉ chạy hằng tuần ở `mutants.yml` (và tay khi cần đo): sửa từng chỗ trong code tiền, thuế, quyền rồi chạy lại unit test; mutant sống = chỗ test chưa kiểm thật. Phạm vi, số shard, ngưỡng không được tệ đi ở `docs/quality/mutation.json` (71-G9, D-20261126-independent-review). Chọn vì là công cụ chuẩn cho Rust, không cần sửa code, có `--shard` cho CI |
 
 Kết nối database dùng TLS của `rustls` (feature `runtime-tokio-rustls` của SeaORM):
 binary không phụ thuộc OpenSSL của hệ điều hành.
