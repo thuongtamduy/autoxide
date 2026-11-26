@@ -227,6 +227,13 @@ impl Banner {
                 "  No administrator is created (AUTOXIDE_BOOTSTRAP_ADMIN_EMAIL is empty).\n\n",
             ),
         }
+        if self.external_services {
+            text.push_str("WARNING: --keep-external-services is on: mail, file storage, telemetry and AI providers\n");
+            text.push_str("from your configuration are ACTIVE. Invitations and uploads reach the real services.\n\n");
+        } else {
+            text.push_str("Mail is written to files (data/mail) and uploads stay in data/files: no real email is sent,\n");
+            text.push_str("no bucket is touched, nothing is exported (pass --keep-external-services to change that).\n\n");
+        }
         text.push_str(
             "The reference data (addresses, taxes, promotion limits) is loaded on start.\n",
         );
@@ -347,6 +354,12 @@ mod tests {
             external_services: false,
         }
         .render()
+    }
+
+    #[test]
+    fn banner_noi_ro_dich_vu_ngoai() {
+        let text = banner(None, false);
+        assert!(text.contains("no real email is sent"), "{text}");
     }
 
     #[test]
