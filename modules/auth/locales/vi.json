@@ -88,7 +88,7 @@
   "auth.password_already_set": "Tài khoản này đã có mật khẩu. Chỉ chủ tài khoản đổi được, hoặc đặt lại qua email.",
   "auth.reauth_token_invalid": "Token xác nhận không đúng, đã hết hạn, đã dùng hoặc không phải của bạn. Hãy lấy token mới bằng `POST /api/v1/auth/me/reauth`.",
   "auth.refresh_token_reused": "Refresh token này đã được dùng. Phiên đăng nhập đã bị kết thúc để an toàn; hãy đăng nhập lại. Mỗi refresh token chỉ dùng một lần, và chỉ giữ token mới nhất.",
-  "auth.registration_disabled": "Máy chủ này không cho tự tạo tài khoản. Hãy nhờ quản trị viên tạo cho bạn.",
+  "auth.registration_disabled": "Ở đây không cho tự tạo tài khoản. Hãy nhờ quản trị viên tạo cho bạn.",
   "auth.role_builtin": "Role `admin` dựng sẵn không sửa hay xoá được. Hãy tạo một role khác.",
   "auth.role_name_taken": "Đã có role tên `{name}`. Hãy chọn tên khác.",
   "auth.role_not_found": "Không có role `{id}`.",

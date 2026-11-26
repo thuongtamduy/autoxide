@@ -138,7 +138,8 @@ pub(crate) const SELF_REGISTRATION: Setting = Setting::new(
     "AUTOXIDE_AUTH_SELF_REGISTRATION",
     "Let anyone create an account with `POST /api/v1/auth/register` (`true` or `false`). New \
      accounts get no role. When `false`, only users with the `auth.users.manage` permission \
-     create accounts.",
+     create accounts. A tenant may decide for itself with the setting \
+     `auth.staff_registration` at its root unit.",
 )
 .with_default("false");
 

@@ -20,10 +20,6 @@ const OWNER: [&str; 7] = [
 ];
 
 async fn app(test: &TestDatabase) -> TestApp {
-    app_with(test, &[]).await
-}
-
-async fn app_with(test: &TestDatabase, settings: &[(&str, &str)]) -> TestApp {
     let dir = std::env::temp_dir().join(format!("autoxide-plans-{}", uuid::Uuid::now_v7()));
     let mut builder = TestApp::builder(test)
         .setting("AUTOXIDE_FILES_DIR", &dir.join("files").display().to_string())
@@ -46,9 +42,6 @@ async fn app_with(test: &TestDatabase, settings: &[(&str, &str)]) -> TestApp {
         .user_in("acme", "owner", 2, &OWNER)
         .tenant("beta")
         .user_in("beta", "stranger", 3, &["kernel.data.export"]);
-    for (name, value) in settings {
-        builder = builder.setting(name, value);
-    }
     for module in crate::modules::all() {
         builder = builder.boxed_module(module);
     }
@@ -193,15 +186,10 @@ async fn dem_request_api_va_het_quota_tra_429() {
 #[tokio::test]
 async fn request_bi_429_khong_tieu_quota() {
     TestDatabase::run(async |test| {
-        let app = app_with(
-            test,
-            &[
-                ("AUTOXIDE_HTTP_RATE_LIMIT_TENANT_PER_MINUTE", "1"),
-                ("AUTOXIDE_HTTP_RATE_LIMIT_PER_MINUTE", "0"),
-            ],
-        )
-        .await;
-        let acme = put_on(&app, "metered", &["forms"], json!({"kernel.api_requests": 2})).await;
+        let app = app(test).await;
+        // Gói của `acme`: 1 request mỗi phút (giới hạn theo khách) và 2 request mỗi kỳ.
+        let limits = json!({"kernel.api_requests": 2, "kernel.api_rate_per_minute": 1});
+        let acme = put_on(&app, "metered", &["forms"], limits).await;
         let (status, body) = call(&app, Method::GET, "/api/v1/forms", "owner", None).await;
         assert_eq!(status, StatusCode::OK, "{body}");
         for _ in 0..4 {

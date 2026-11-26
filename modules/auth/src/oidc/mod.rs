@@ -725,7 +725,16 @@ impl OidcService {
             }
             // Role mặc định nghĩa là quản trị khách chủ động mở cửa cho người của nhà cung cấp
             // này (vd nhân viên trong Entra của công ty) dù đăng ký công khai đóng.
-            Realm::Staff => self.self_registration || provider.default_role_id.is_some(),
+            Realm::Staff => {
+                provider.default_role_id.is_some()
+                    || crate::settings::enabled_or(
+                        self.orgs.as_ref(),
+                        tenant,
+                        &crate::settings::STAFF_REGISTRATION,
+                        self.self_registration,
+                    )
+                    .await?
+            }
         };
         if !provider.allow_signup || !open {
             return Err(Error::forbidden(

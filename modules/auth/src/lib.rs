@@ -50,6 +50,8 @@ mod phone_tests;
 mod privacy;
 mod reauth;
 mod recovery;
+#[cfg(test)]
+pub(crate) mod registration_tests;
 mod relocation;
 mod reset;
 mod resource;
