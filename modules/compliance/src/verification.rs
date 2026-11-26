@@ -534,11 +534,21 @@ impl ComplianceService {
     ) -> Result<u64, Error> {
         let before = Timestamp::now() - SignedDuration::from_hours(CHALLENGE_KEEP_HOURS);
         // tenant-scope: việc nền / kiểm tra quét mọi khách của database, chủ ý không lọc khách (rà soát bảo mật 2026-11)
-        Ok(phone_challenge::Entity::delete_many()
+        let challenges = phone_challenge::Entity::delete_many()
             .filter(phone_challenge::Column::CreatedAt.lt(before))
             .exec(database.write())
             .await?
-            .rows_affected)
+            .rows_affected;
+        // Client quen của số (D-20261126-otp-nist): giữ `KNOWN_CLIENT_DAYS` ngày kể từ lần đăng nhập đúng cuối.
+        let forgotten = Timestamp::now()
+            - SignedDuration::from_hours(crate::sign_in_codes::KNOWN_CLIENT_DAYS * 24);
+        // tenant-scope: việc nền quét mọi khách của database, chủ ý không lọc khách
+        let clients = crate::entity::phone_known_client::Entity::delete_many()
+            .filter(crate::entity::phone_known_client::Column::LastSuccessAt.lt(forgotten))
+            .exec(database.write())
+            .await?
+            .rows_affected;
+        Ok(challenges + clients)
     }
 }
 

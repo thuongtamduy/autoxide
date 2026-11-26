@@ -167,6 +167,7 @@ impl Module for ComplianceModule {
             .ephemeral(&[
                 "compliance_kyc_callbacks",
                 "compliance_phone_challenges",
+                "compliance_phone_known_clients",
                 "compliance_throttle",
                 "compliance_antispam_nonces",
             ])

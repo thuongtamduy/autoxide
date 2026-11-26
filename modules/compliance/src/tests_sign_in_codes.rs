@@ -201,14 +201,16 @@ async fn xoay_dia_chi_trong_khoi_khong_gui_them_ma() {
     .unwrap();
 }
 
-/// PT-7: người lạ xin mã cho số của người khác rồi nhập sai cho đủ hạn mức ngày không khoá được chủ số
-/// ở địa chỉ khác; chính khối của họ thì bị khoá. Đoán sai từ đủ nhiều khối (trần chung = 5 × hạn mức)
-/// vẫn khoá số ở mọi nơi — chống đoán mã phân tán.
+/// PT-7 (D-20261126-otp-nist): người lạ xin mã cho số của người khác rồi nhập sai cho đủ hạn mức ngày không khoá được
+/// chủ số ở địa chỉ khác; chính khối của họ thì bị khoá. Lần đúng xoá các lần sai trước (NIST SP 800-63B-4 §3.2.2). Đoán
+/// sai từ nhiều khối chạm trần chung → số bị khoá với mọi client lạ, nhưng client đã đăng nhập đúng bằng số (client quen)
+/// vẫn xin và dùng mã được.
 #[tokio::test]
 async fn doan_sai_tu_khoi_khac_khong_khoa_chu_so() {
     TestDatabase::run(async |test| {
         let settings = [
             ("AUTOXIDE_COMPLIANCE_OTP_WRONG_PER_PHONE_PER_DAY", "2"),
+            ("AUTOXIDE_COMPLIANCE_OTP_WRONG_PER_PHONE_ALL_CLIENTS_PER_DAY", "4"),
             ("AUTOXIDE_COMPLIANCE_OTP_PER_PHONE_PER_HOUR", "100"),
         ];
         let (app, codes, sms) = app_with(test, &settings).await;
@@ -226,17 +228,32 @@ async fn doan_sai_tu_khoi_khac_khong_khoa_chu_so() {
         // Khối của kẻ nhập sai: bị khoá.
         let error = codes.send(&tenant, "0912000333", ip("203.0.113.10")).await.unwrap_err();
         assert_eq!(error.code(), "compliance.otp_daily_limit");
-        // Chủ số ở khối khác: vẫn xin và dùng mã được.
+        // Chủ số ở khối khác: vẫn xin và dùng mã được; khối của họ thành client quen.
         let own = codes.send(&tenant, "0912000333", ip("2001:db8:9:1::1")).await.unwrap();
         codes.verify(&tenant, own.id, &code_in(&sms, "+84912000333")).await.unwrap();
 
-        // Đủ 5 khối × 2 lần sai = 10: số bị khoá ở mọi nơi.
-        for block in 1..5 {
+        // Sau lần đúng: 2 khối × 2 lần sai = 4 = trần chung → client lạ bị khoá ở mọi nơi.
+        for block in 1..3 {
             burn(&format!("198.51.{block}.1")).await;
         }
-        let error = codes.send(&tenant, "0912000333", ip("2001:db8:9:1::2")).await.unwrap_err();
+        let error = codes.send(&tenant, "0912000333", ip("2001:db8:9:2::1")).await.unwrap_err();
         assert_eq!(error.code(), "compliance.otp_daily_limit");
+        // Client quen của chủ số (cùng khối /64): không bị trần chung chặn.
+        let again = codes.send(&tenant, "0912000333", ip("2001:db8:9:1::2")).await.unwrap();
+        codes.verify(&tenant, again.id, &code_in(&sms, "+84912000333")).await.unwrap();
     })
     .await
     .unwrap();
+}
+
+/// NIST SP 800-63B-4 §3.1.3.2: mã chỉ có hiệu lực tối đa 10 phút — cấu hình dài hơn bị từ chối khi khởi động.
+#[test]
+fn ma_khong_song_qua_muoi_phut() {
+    use autoxide_kernel::config::{ConfigReader, ConfigSource};
+    let read = |ttl: &str| {
+        let source = ConfigSource::from_pairs([("AUTOXIDE_COMPLIANCE_OTP_TTL_SECONDS", ttl)]);
+        crate::config::read(&mut ConfigReader::new(&source)).map(|config| config.otp.ttl_seconds)
+    };
+    assert_eq!(read("600").ok(), Some(600));
+    assert!(read("601").is_err());
 }

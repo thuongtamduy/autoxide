@@ -25,7 +25,7 @@ use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
 use serde_json::json;
 use uuid::Uuid;
 
-use crate::entity::{account_verification, phone_challenge};
+use crate::entity::{account_verification, phone_challenge, phone_known_client};
 use crate::events;
 use crate::service::{ComplianceService, now};
 use crate::verification::{
@@ -37,10 +37,11 @@ use crate::verification::{
 const NOBODY: Uuid = Uuid::nil();
 /// Cửa sổ đếm lần nhập sai của một số.
 const WRONG_WINDOW: SignedDuration = SignedDuration::from_hours(CHALLENGE_KEEP_HOURS);
-/// Trần chung của một số (mọi khối địa chỉ cộng lại) = hệ số này × hạn mức của một khối
-/// (D-20261125-otp-wrong-by-block): người lạ phải xin mã từ nhiều khối mới khoá được chủ số, còn kẻ đoán mã
-/// phân tán vẫn bị chặn ở một trần hữu hạn.
-const ALL_BLOCKS_FACTOR: i64 = 5;
+/// Số ngày nhớ một client đã đăng nhập đúng bằng mã của một số (D-20261126-otp-nist): client quen không bị trần
+/// chung của số chặn.
+pub(crate) const KNOWN_CLIENT_DAYS: i64 = 90;
+/// Phạm vi của dấu số trong bảng client quen.
+const KNOWN_PHONE_PURPOSE: &str = "compliance.otp.known-phone";
 /// Phạm vi khoá dấu khối địa chỉ.
 const BLOCK_SCOPE: &str = "compliance.otp";
 
@@ -82,7 +83,8 @@ impl ComplianceService {
             .scoped(tenant)
             .all(tenant.database().read())
             .await?;
-        self.check_wrong_today(&recent, block.as_deref(), now())?;
+        let known = self.known_client(tenant, phone.as_str(), block.as_deref()).await?;
+        self.check_wrong_today(&recent, block.as_deref(), known, now())?;
         let mut limits = vec![(
             Throttle::new("compliance", otp.per_phone_per_hour, HOUR)?,
             format!("otp-phone:{}", phone.as_str()),
@@ -180,8 +182,9 @@ impl ComplianceService {
             return Err(otp_attempts_exceeded());
         }
         // Hạn mức sai mỗi ngày của số (cộng mọi mã của số trong 24 giờ xin từ cùng khối địa chỉ với mã
-        // này, và trần chung của mọi khối; đã khoá ở trên): xin mã mới liên tục không mở thêm lượt đoán.
-        self.check_wrong_today(&locked, row.requester_block.as_deref(), at)?;
+        // này, và trần chung của mọi client lạ; đã khoá ở trên): xin mã mới liên tục không mở thêm lượt đoán.
+        let known = self.known_client(tenant, &row.phone, row.requester_block.as_deref()).await?;
+        self.check_wrong_today(&locked, row.requester_block.as_deref(), known, at)?;
         let digits: String = code.chars().filter(|c| !c.is_whitespace()).collect();
         if !same(&code_hash(&pepper, id, &digits), &row.code_hash) {
             phone_challenge::Entity::update_many()
@@ -210,38 +213,98 @@ impl ComplianceService {
         if consumed.rows_affected != 1 {
             return Err(otp_invalid());
         }
+        // Client vừa đăng nhập đúng thành client quen của số (NIST SP 800-63B-4 §3.2.2: sau khi xác thực đúng, bỏ qua
+        // các lần sai trước — `check_wrong_today` chỉ đếm mã tạo sau lần đúng gần nhất).
+        if let Some(block) = &row.requester_block {
+            let phone_hash = self.known_phone_hash(tenant, &row.phone).await?;
+            phone_known_client::Entity::insert(phone_known_client::ActiveModel {
+                id: Set(Uuid::now_v7()),
+                tenant_id: Set(tenant.id().as_uuid()),
+                phone_hash: Set(phone_hash),
+                requester_block: Set(block.clone()),
+                last_success_at: Set(at),
+            })
+            .on_conflict(
+                OnConflict::columns([
+                    phone_known_client::Column::TenantId,
+                    phone_known_client::Column::PhoneHash,
+                    phone_known_client::Column::RequesterBlock,
+                ])
+                .update_column(phone_known_client::Column::LastSuccessAt)
+                .to_owned(),
+            )
+            .exec_without_returning(&transaction)
+            .await?;
+        }
         transaction.commit().await?;
         PhoneNumber::parse(&row.phone, "84")
             .ok_or_else(|| Error::internal("stored phone is not E.164"))
     }
 
-    /// Báo [`otp_daily_limit`] khi các mã `rows` (của cùng một số) tạo trong 24 giờ trước `at` đã bị
-    /// nhập sai `AUTOXIDE_COMPLIANCE_OTP_WRONG_PER_PHONE_PER_DAY` lần trên những mã xin từ khối địa chỉ
-    /// `block` (trống: không biết địa chỉ — một nhóm riêng), hoặc [`ALL_BLOCKS_FACTOR`] lần chừng ấy trên
-    /// mọi mã của số. Tính từ bảng mã (giữ [`CHALLENGE_KEEP_HOURS`] giờ) nên chạy như nhau trên cả hai
-    /// database, không thêm bảng đếm.
+    /// Dấu của số `phone` trong bảng client quen: SHA-256 có pepper riêng của khách — không lưu số.
+    async fn known_phone_hash(&self, tenant: &TenantContext, phone: &str) -> Result<String, Error> {
+        let pepper = self.secret.derive_for(tenant.id(), KNOWN_PHONE_PURPOSE).await?;
+        let pepper: String = pepper.iter().map(|byte| format!("{byte:02x}")).collect();
+        Ok(sha256(&format!("{pepper}|{phone}")))
+    }
+
+    /// Client `block` đã đăng nhập đúng bằng mã của số `phone` trong [`KNOWN_CLIENT_DAYS`] ngày qua.
+    async fn known_client(
+        &self,
+        tenant: &TenantContext,
+        phone: &str,
+        block: Option<&str>,
+    ) -> Result<bool, Error> {
+        let Some(block) = block else { return Ok(false) };
+        let phone_hash = self.known_phone_hash(tenant, phone).await?;
+        let since = now() - SignedDuration::from_hours(KNOWN_CLIENT_DAYS * 24);
+        Ok(phone_known_client::Entity::find()
+            .filter(phone_known_client::Column::PhoneHash.eq(phone_hash))
+            .filter(phone_known_client::Column::RequesterBlock.eq(block))
+            .filter(phone_known_client::Column::LastSuccessAt.gt(since))
+            .scoped(tenant)
+            .one(tenant.database().read())
+            .await?
+            .is_some())
+    }
+
+    /// Báo [`otp_daily_limit`] khi các mã `rows` (của cùng một số) tạo trong 24 giờ trước `at` — và sau lần đăng nhập
+    /// đúng gần nhất của số (NIST SP 800-63B-4 §3.2.2) — đã bị nhập sai:
+    ///
+    /// - `AUTOXIDE_COMPLIANCE_OTP_WRONG_PER_PHONE_PER_DAY` lần trên những mã xin từ client `block` (trống: không biết
+    ///   địa chỉ — một nhóm riêng); hoặc
+    /// - `AUTOXIDE_COMPLIANCE_OTP_WRONG_PER_PHONE_ALL_CLIENTS_PER_DAY` lần trên mọi mã của số, trừ khi `block` là client
+    ///   quen (`known`): người lạ nhập sai từ nhiều nơi không khoá được chủ số ở mạng họ đã đăng nhập.
+    ///
+    /// Tạo mã mới không xoá lần sai đã đếm (§3.1.3.2). Tính từ bảng mã (giữ [`CHALLENGE_KEEP_HOURS`] giờ) nên chạy như
+    /// nhau trên cả hai database.
     fn check_wrong_today(
         &self,
         rows: &[phone_challenge::Model],
         block: Option<&str>,
+        known: bool,
         at: Timestamp,
     ) -> Result<(), Error> {
         let since = at - WRONG_WINDOW;
-        let limit = i64::from(self.otp.wrong_per_phone_per_day);
-        let recent: Vec<&phone_challenge::Model> =
-            rows.iter().filter(|row| row.created_at > since && row.attempts > 0).collect();
+        // `Iterator::max` / `min` viết rõ: `ExprTrait` (sea-query) dùng trong file cũng có hàm `max` / `min`.
+        let last_success = Iterator::max(rows.iter().filter_map(|row| row.consumed_at));
+        let recent: Vec<&phone_challenge::Model> = rows
+            .iter()
+            .filter(|row| row.created_at > since && row.attempts > 0)
+            .filter(|row| last_success.is_none_or(|success| row.created_at > success))
+            .collect();
         let same_block: Vec<&phone_challenge::Model> =
             recent.iter().copied().filter(|row| row.requester_block.as_deref() == block).collect();
-        for (group, cap) in
-            [(&same_block, limit), (&recent, limit.saturating_mul(ALL_BLOCKS_FACTOR))]
-        {
+        let mut groups = vec![(&same_block, i64::from(self.otp.wrong_per_phone_per_day))];
+        if !known {
+            groups.push((&recent, i64::from(self.otp.wrong_per_phone_all_clients_per_day)));
+        }
+        for (group, cap) in groups {
             let wrong: i64 = group.iter().map(|row| i64::from(row.attempts)).sum();
             if wrong < cap {
                 continue;
             }
             // Chờ tới khi mã cũ nhất có lần sai ra khỏi cửa sổ 24 giờ.
-            // `Iterator::min` / `Ord::max` viết rõ: `ExprTrait` (sea-query) dùng trong file cũng có
-            // hàm `min` / `max`.
             let oldest = Iterator::min(group.iter().map(|row| row.created_at)).unwrap_or(at);
             let wait = Ord::max((oldest + WRONG_WINDOW - at).as_secs(), 1);
             return Err(otp_daily_limit(u64::try_from(wait).unwrap_or(1)));
