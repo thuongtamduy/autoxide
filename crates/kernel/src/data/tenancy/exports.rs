@@ -729,7 +729,7 @@ pub(crate) fn routes(exports: Arc<TenantExports>) -> OpenApiRouter {
     responses(
         (status = 201, description = "The export, `pending`; `Location` is its status.", body = Data<TenantExport>),
         (status = 401, description = "Not signed in; code `unauthorized` or the code of the authentication module.", body = Problem),
-        (status = 403, description = "Missing permission `kernel.data.export` (`permission_denied`), or platform staff targeting another tenant without having entered it under a support access grant (`kernel.export_needs_tenant_access`).", body = Problem),
+        (status = 403, description = "Missing both `kernel.data.export` and `kernel.tenants.operate` (`permission_denied`), or platform staff targeting another tenant without having entered it under a support access grant (`kernel.export_needs_tenant_access`).", body = Problem),
         (status = 404, description = "No such tenant you may export; code `tenant_not_found`.", body = Problem),
     )
 )]
@@ -756,7 +756,7 @@ async fn request_export(
     responses(
         (status = 200, description = "The exports, newest first.", body = Data<Vec<TenantExport>>),
         (status = 401, description = "Not signed in; code `unauthorized` or the code of the authentication module.", body = Problem),
-        (status = 403, description = "Missing permission `kernel.data.export` (`permission_denied`), or platform staff targeting another tenant without having entered it under a support access grant (`kernel.export_needs_tenant_access`).", body = Problem),
+        (status = 403, description = "Missing both `kernel.data.export` and `kernel.tenants.operate` (`permission_denied`), or platform staff targeting another tenant without having entered it under a support access grant (`kernel.export_needs_tenant_access`).", body = Problem),
         (status = 404, description = "No such tenant you may export; code `tenant_not_found`.", body = Problem),
     )
 )]
@@ -782,7 +782,7 @@ async fn list_exports(
     responses(
         (status = 200, description = "The export.", body = Data<TenantExport>),
         (status = 401, description = "Not signed in; code `unauthorized` or the code of the authentication module.", body = Problem),
-        (status = 403, description = "Missing permission `kernel.data.export` (`permission_denied`), or platform staff targeting another tenant without having entered it under a support access grant (`kernel.export_needs_tenant_access`).", body = Problem),
+        (status = 403, description = "Missing both `kernel.data.export` and `kernel.tenants.operate` (`permission_denied`), or platform staff targeting another tenant without having entered it under a support access grant (`kernel.export_needs_tenant_access`).", body = Problem),
         (status = 404, description = "No such tenant or export; code `tenant_not_found` or `kernel.export_not_found`.", body = Problem),
     )
 )]
@@ -809,7 +809,7 @@ async fn get_export(
     responses(
         (status = 200, description = "The file.", body = String, content_type = "application/x-ndjson"),
         (status = 401, description = "Not signed in; code `unauthorized` or the code of the authentication module.", body = Problem),
-        (status = 403, description = "Missing permission `kernel.data.export` (`permission_denied`), or platform staff targeting another tenant without having entered it under a support access grant (`kernel.export_needs_tenant_access`).", body = Problem),
+        (status = 403, description = "Missing both `kernel.data.export` and `kernel.tenants.operate` (`permission_denied`), or platform staff targeting another tenant without having entered it under a support access grant (`kernel.export_needs_tenant_access`).", body = Problem),
         (status = 404, description = "No such tenant or export; code `tenant_not_found` or `kernel.export_not_found`.", body = Problem),
         (status = 409, description = "The export is not `ready`; code `kernel.export_not_ready`.", body = Problem),
     )
@@ -837,7 +837,7 @@ async fn download_export(
     responses(
         (status = 200, description = "The link.", body = Data<TenantExportLink>),
         (status = 401, description = "Not signed in; code `unauthorized` or the code of the authentication module.", body = Problem),
-        (status = 403, description = "Missing permission `kernel.data.export` (`permission_denied`), or platform staff targeting another tenant without having entered it under a support access grant (`kernel.export_needs_tenant_access`).", body = Problem),
+        (status = 403, description = "Missing both `kernel.data.export` and `kernel.tenants.operate` (`permission_denied`), or platform staff targeting another tenant without having entered it under a support access grant (`kernel.export_needs_tenant_access`).", body = Problem),
         (status = 404, description = "No such tenant or export; code `tenant_not_found` or `kernel.export_not_found`.", body = Problem),
         (status = 409, description = "The export is not `ready`; code `kernel.export_not_ready`.", body = Problem),
     )

@@ -38120,7 +38120,7 @@
                 "type": "string"
               },
               "rule_version": {
-                "description": "The version of the rule the run uses (changing the rule does not change runs already\nstarted).",
+                "description": "The version of the rule the run was started with. Editing the rule (even only its name) or\nenabling it again stops runs still in progress or waiting, with\n`automations.rule_changed`.",
                 "format": "int32",
                 "type": "integer"
               },
@@ -79487,7 +79487,7 @@
                   "type": "string"
                 },
                 "rule_version": {
-                  "description": "The version of the rule the run uses (changing the rule does not change runs already\nstarted).",
+                  "description": "The version of the rule the run was started with. Editing the rule (even only its name) or\nenabling it again stops runs still in progress or waiting, with\n`automations.rule_changed`.",
                   "format": "int32",
                   "type": "integer"
                 },
@@ -92435,7 +92435,7 @@
             "type": "string"
           },
           "rule_version": {
-            "description": "The version of the rule the run uses (changing the rule does not change runs already\nstarted).",
+            "description": "The version of the rule the run was started with. Editing the rule (even only its name) or\nenabling it again stops runs still in progress or waiting, with\n`automations.rule_changed`.",
             "format": "int32",
             "type": "integer"
           },
@@ -153190,7 +153190,8 @@
         ],
         "x-autoxide-list": "content.list_content_banners",
         "x-permissions": [
-          "content.banners"
+          "content.banners",
+          "content.read"
         ]
       },
       "post": {
@@ -160076,7 +160077,8 @@
         ],
         "x-autoxide-list": "content.list_content_placements",
         "x-permissions": [
-          "content.banners"
+          "content.banners",
+          "content.manage"
         ]
       },
       "post": {
@@ -160500,7 +160502,8 @@
           "content"
         ],
         "x-permissions": [
-          "content.banners"
+          "content.banners",
+          "content.manage"
         ]
       },
       "put": {
@@ -174899,7 +174902,8 @@
         ],
         "x-autoxide-list": "customers.list_customer_groups",
         "x-permissions": [
-          "customers.read"
+          "customers.read",
+          "customers.segments.manage"
         ]
       },
       "post": {
@@ -175681,7 +175685,8 @@
           "customers"
         ],
         "x-permissions": [
-          "customers.read"
+          "customers.read",
+          "customers.segments.manage"
         ]
       }
     },
@@ -183912,7 +183917,8 @@
           "inventory"
         ],
         "x-permissions": [
-          "inventory.count"
+          "inventory.count",
+          "inventory.read"
         ]
       }
     },
@@ -187014,7 +187020,8 @@
           "inventory"
         ],
         "x-permissions": [
-          "inventory.receive"
+          "inventory.receive",
+          "inventory.read"
         ]
       }
     },
@@ -202776,7 +202783,7 @@
                 }
               }
             },
-            "description": "Missing permission `kernel.data.export` (`permission_denied`), or platform staff targeting another tenant without having entered it under a support access grant (`kernel.export_needs_tenant_access`)."
+            "description": "Missing both `kernel.data.export` and `kernel.tenants.operate` (`permission_denied`), or platform staff targeting another tenant without having entered it under a support access grant (`kernel.export_needs_tenant_access`)."
           },
           "404": {
             "content": {
@@ -202809,7 +202816,8 @@
           "kernel"
         ],
         "x-permissions": [
-          "kernel.data.export"
+          "kernel.data.export",
+          "kernel.tenants.operate"
         ]
       },
       "post": {
@@ -202888,7 +202896,7 @@
                 }
               }
             },
-            "description": "Missing permission `kernel.data.export` (`permission_denied`), or platform staff targeting another tenant without having entered it under a support access grant (`kernel.export_needs_tenant_access`)."
+            "description": "Missing both `kernel.data.export` and `kernel.tenants.operate` (`permission_denied`), or platform staff targeting another tenant without having entered it under a support access grant (`kernel.export_needs_tenant_access`)."
           },
           "404": {
             "content": {
@@ -202921,7 +202929,8 @@
           "kernel"
         ],
         "x-permissions": [
-          "kernel.data.export"
+          "kernel.data.export",
+          "kernel.tenants.operate"
         ]
       }
     },
@@ -202991,7 +203000,7 @@
                 }
               }
             },
-            "description": "Missing permission `kernel.data.export` (`permission_denied`), or platform staff targeting another tenant without having entered it under a support access grant (`kernel.export_needs_tenant_access`)."
+            "description": "Missing both `kernel.data.export` and `kernel.tenants.operate` (`permission_denied`), or platform staff targeting another tenant without having entered it under a support access grant (`kernel.export_needs_tenant_access`)."
           },
           "404": {
             "content": {
@@ -203024,7 +203033,8 @@
           "kernel"
         ],
         "x-permissions": [
-          "kernel.data.export"
+          "kernel.data.export",
+          "kernel.tenants.operate"
         ]
       }
     },
@@ -203094,7 +203104,7 @@
                 }
               }
             },
-            "description": "Missing permission `kernel.data.export` (`permission_denied`), or platform staff targeting another tenant without having entered it under a support access grant (`kernel.export_needs_tenant_access`)."
+            "description": "Missing both `kernel.data.export` and `kernel.tenants.operate` (`permission_denied`), or platform staff targeting another tenant without having entered it under a support access grant (`kernel.export_needs_tenant_access`)."
           },
           "404": {
             "content": {
@@ -203137,7 +203147,8 @@
           "kernel"
         ],
         "x-permissions": [
-          "kernel.data.export"
+          "kernel.data.export",
+          "kernel.tenants.operate"
         ]
       }
     },
@@ -203220,7 +203231,7 @@
                 }
               }
             },
-            "description": "Missing permission `kernel.data.export` (`permission_denied`), or platform staff targeting another tenant without having entered it under a support access grant (`kernel.export_needs_tenant_access`)."
+            "description": "Missing both `kernel.data.export` and `kernel.tenants.operate` (`permission_denied`), or platform staff targeting another tenant without having entered it under a support access grant (`kernel.export_needs_tenant_access`)."
           },
           "404": {
             "content": {
@@ -203263,7 +203274,8 @@
           "kernel"
         ],
         "x-permissions": [
-          "kernel.data.export"
+          "kernel.data.export",
+          "kernel.tenants.operate"
         ]
       }
     },
@@ -222186,7 +222198,9 @@
           "notifications"
         ],
         "x-permissions": [
-          "notifications.templates.read"
+          "notifications.templates.read",
+          "notifications.templates.manage",
+          "notifications.branding.manage"
         ]
       },
       "put": {
@@ -224802,7 +224816,8 @@
           "notifications"
         ],
         "x-permissions": [
-          "notifications.templates.read"
+          "notifications.templates.read",
+          "notifications.templates.manage"
         ]
       },
       "put": {
@@ -225078,7 +225093,8 @@
           "notifications"
         ],
         "x-permissions": [
-          "notifications.templates.read"
+          "notifications.templates.read",
+          "notifications.templates.manage"
         ]
       }
     },
@@ -225803,7 +225819,8 @@
         ],
         "x-autoxide-list": "notifications.list_notification_template_versions",
         "x-permissions": [
-          "notifications.templates.read"
+          "notifications.templates.read",
+          "notifications.templates.manage"
         ]
       }
     },
@@ -258280,7 +258297,8 @@
           "support"
         ],
         "x-permissions": [
-          "support.tickets.reply"
+          "support.tickets.reply",
+          "support.settings.manage"
         ],
         "x-stability": "experimental"
       },
@@ -259853,7 +259871,8 @@
         ],
         "x-autoxide-list": "support.list_support_teams",
         "x-permissions": [
-          "support.tickets.reply"
+          "support.tickets.reply",
+          "support.settings.manage"
         ],
         "x-stability": "experimental"
       },
@@ -260171,7 +260190,8 @@
           "support"
         ],
         "x-permissions": [
-          "support.tickets.reply"
+          "support.tickets.reply",
+          "support.settings.manage"
         ],
         "x-stability": "experimental"
       }
