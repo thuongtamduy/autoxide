@@ -52,6 +52,8 @@ pub mod response;
 /// (`cargo xtask check` refuses `__private` in module code).
 #[doc(hidden)]
 pub mod __private {
+    pub use axum;
+    pub use utoipa;
     pub use uuid::Uuid;
 
     /// Written only by `#[derive(Record)]`: a hand-written `impl Record` cannot exist.

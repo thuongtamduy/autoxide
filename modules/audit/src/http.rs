@@ -5,15 +5,14 @@ use std::sync::Arc;
 
 use autoxide_kernel::access::{Permission, Principal};
 use autoxide_kernel::error::Error;
+use autoxide_kernel::http::{Params, Routes, Schema, endpoint};
+use autoxide_kernel::routes;
 use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, Query, State};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use utoipa::{IntoParams, ToSchema};
-use utoipa_axum::router::OpenApiRouter;
-use utoipa_axum::routes;
 use uuid::Uuid;
 
 use crate::entity;
@@ -26,16 +25,12 @@ pub(crate) const AUDIT_READ: Permission = Permission::new(
          names and emails), so this amounts to reading everything.",
 );
 
-pub(crate) fn routes(service: Arc<AuditService>) -> OpenApiRouter {
-    OpenApiRouter::new()
-        .routes(routes!(list_entries))
-        .routes(routes!(list_activity))
-        .routes(routes!(get_entry))
-        .with_state(service)
+pub(crate) fn routes(service: Arc<AuditService>) -> Routes {
+    routes![list_entries, list_activity, get_entry].with_state(service)
 }
 
 /// One change, as recorded in the audit log.
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Serialize, Deserialize, Schema)]
 pub(crate) struct AuditEntryResponse {
     /// Id of the event that recorded the change; ids sort by time.
     id: Uuid,
@@ -100,7 +95,7 @@ impl From<entity::Model> for AuditEntryResponse {
 }
 
 /// Narrow the audit log. Filters combine with AND.
-#[derive(Debug, Default, Deserialize, IntoParams)]
+#[derive(Debug, Default, Deserialize, Params)]
 #[into_params(parameter_in = Query)]
 pub(crate) struct AuditFilter {
     /// Only changes made by this user.
@@ -121,14 +116,14 @@ pub(crate) struct AuditFilter {
 }
 
 /// Extra data to add to each entry.
-#[derive(Debug, Clone, Copy, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Copy, Deserialize, Schema)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum AuditInclude {
     Actor,
 }
 
 /// One line of recent activity.
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Serialize, Deserialize, Schema)]
 pub(crate) struct ActivityResponse {
     /// Id of the audit entry.
     id: Uuid,
@@ -151,11 +146,10 @@ pub(crate) struct ActivityResponse {
 /// published entries need `content.read`). Unlike `GET /api/v1/audit` it needs no `audit.read`
 /// and shows no before / after values. Paged with `limit` / `cursor`; `order=asc` for oldest
 /// first.
-#[utoipa::path(
+#[endpoint(
     get,
     path = "/activity",
     extensions(("x-permissions" = json!([]))),
-    operation_id = "list_activity",
     security(("bearer" = [])),
     params(PageQuery),
     responses(
@@ -187,12 +181,10 @@ async fn list_activity(
 ///
 /// Requires `audit.read`. Newest first unless `order=asc`. Changes appear a moment
 /// after they happen. With `include=actor`, each entry carries the name of who made it.
-#[utoipa::path(
+#[endpoint(
     get,
     path = "/",
-    extensions(("x-permissions" = json!(["audit.read"]))),
-    operation_id = "list_entries",
-    security(("bearer" = [])),
+    permission = "audit.read",
     params(AuditFilter, PageQuery),
     responses(
         (status = 200, description = "One page of audit entries.", body = Page<AuditEntryResponse>),
@@ -251,12 +243,10 @@ async fn list_entries(
 /// Get one audit entry.
 ///
 /// Requires `audit.read`.
-#[utoipa::path(
+#[endpoint(
     get,
     path = "/{id}",
-    extensions(("x-permissions" = json!(["audit.read"]))),
-    operation_id = "get_entry",
-    security(("bearer" = [])),
+    permission = "audit.read",
     params(("id" = Uuid, Path, description = "Id of the entry.")),
     responses(
         (status = 200, description = "The entry.", body = Data<AuditEntryResponse>),

@@ -378,8 +378,6 @@ dependencies = [
  "serde_json",
  "tokio",
  "tracing",
- "utoipa",
- "utoipa-axum",
  "uuid",
  "validator",
 ]
@@ -1008,8 +1006,6 @@ dependencies = [
  "tokio",
  "tower",
  "tracing",
- "utoipa",
- "utoipa-axum",
  "uuid",
  "validator",
 ]

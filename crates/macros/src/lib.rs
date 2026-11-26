@@ -7,7 +7,9 @@
 // trả về token mới. Lỗi không `panic!` mà thành `compile_error!` gắn đúng chỗ, nên người viết module thấy câu
 // báo lỗi ngay dưới dòng sai.
 
+mod endpoint;
 mod record;
+mod shadow;
 
 use proc_macro::TokenStream;
 
@@ -27,4 +29,28 @@ use proc_macro::TokenStream;
 pub fn derive_record(input: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(input as syn::DeriveInput);
     record::expand(&input).unwrap_or_else(syn::Error::into_compile_error).into()
+}
+
+/// SPIKE F9 (never merged): an OpenAPI schema for a type, written in utoipa's attribute grammar without naming
+/// `utoipa`.
+#[proc_macro_derive(Schema, attributes(schema))]
+pub fn derive_schema(input: TokenStream) -> TokenStream {
+    let input = syn::parse_macro_input!(input as syn::DeriveInput);
+    shadow::expand(shadow::Kind::Schema, &input).unwrap_or_else(syn::Error::into_compile_error).into()
+}
+
+/// SPIKE F9 (never merged): query / path parameters of an endpoint, written in utoipa's attribute grammar
+/// without naming `utoipa`.
+#[proc_macro_derive(Params, attributes(param, into_params))]
+pub fn derive_params(input: TokenStream) -> TokenStream {
+    let input = syn::parse_macro_input!(input as syn::DeriveInput);
+    shadow::expand(shadow::Kind::Params, &input).unwrap_or_else(syn::Error::into_compile_error).into()
+}
+
+/// SPIKE F9 (never merged): an HTTP endpoint with its OpenAPI description (the grammar of `utoipa::path`, plus
+/// `permission = "…"`, a default `operation_id` and `etag` on a response).
+#[proc_macro_attribute]
+pub fn endpoint(args: TokenStream, item: TokenStream) -> TokenStream {
+    let function = syn::parse_macro_input!(item as syn::ItemFn);
+    endpoint::expand(args.into(), function).unwrap_or_else(syn::Error::into_compile_error).into()
 }

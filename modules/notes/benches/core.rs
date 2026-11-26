@@ -66,7 +66,7 @@ async fn app(test: &TestDatabase) -> (Router, Modules, Database) {
     let routes = modules.routes();
     let router = autoxide_kernel::http::build(
         &config.http,
-        utoipa_axum::router::OpenApiRouter::new(),
+        autoxide_kernel::http::ModuleRouter::new(),
         routes,
         extras,
     )

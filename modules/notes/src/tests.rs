@@ -511,3 +511,20 @@ async fn khai_bang_control_plane_khong_lach_duoc_chot_global() {
     .await
     .unwrap();
 }
+
+/// SPIKE F9: tài liệu OpenAPI của app có `notes` sau khi đổi sang `#[endpoint]` / `derive(Schema)` giống TỪNG BYTE bản
+/// chụp từ mã cũ (`#[utoipa::path]` / `derive(ToSchema)`, commit gốc của nhánh). Cả hai qua `serde_json::Value` để
+/// khoá được sắp theo tên, như `autoxide openapi` làm (extension của utoipa nằm trong `HashMap`).
+#[tokio::test]
+async fn spike_f9_openapi_giong_tung_byte() {
+    TestDatabase::run(async |test| {
+        let app = app(test).await;
+        let now = serde_json::to_string_pretty(&serde_json::to_value(app.openapi()).unwrap()).unwrap();
+        let before: serde_json::Value =
+            serde_json::from_str(include_str!("snapshots/spike-f9-openapi.json")).unwrap();
+        let before = serde_json::to_string_pretty(&before).unwrap();
+        assert!(now == before, "openapi của notes đã đổi");
+    })
+    .await
+    .unwrap();
+}

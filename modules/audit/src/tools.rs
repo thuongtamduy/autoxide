@@ -4,11 +4,11 @@ use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
+use autoxide_kernel::http::Schema;
 use autoxide_kernel::mcp::{PageInput, Tool};
 use autoxide_kernel::pagination::Page;
 use autoxide_kernel::tenancy::TenantContext;
 use serde::Deserialize;
-use utoipa::ToSchema;
 use uuid::Uuid;
 use validator::Validate;
 
@@ -16,7 +16,7 @@ use crate::http::{AUDIT_READ, AuditEntryResponse};
 use crate::service::{AuditService, Filter};
 
 /// Which entries to list; every filter is optional. Paging as for every list.
-#[derive(Debug, Default, Deserialize, Validate, ToSchema)]
+#[derive(Debug, Default, Deserialize, Validate, Schema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ListEntriesInput {
     /// Only changes made by this user.
@@ -39,7 +39,7 @@ pub(crate) struct ListEntriesInput {
 }
 
 /// An entry to get.
-#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[derive(Debug, Deserialize, Validate, Schema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct EntryId {
     /// Id of the entry.

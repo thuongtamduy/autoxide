@@ -26,7 +26,7 @@ use autoxide_kernel::module::{Module, StartContext};
 
 use crate::recorder::Recorder;
 use crate::service::AuditService;
-use utoipa_axum::router::OpenApiRouter;
+use autoxide_kernel::http::ModuleRouter;
 
 /// Module `audit`, để binary đăng ký trong `crates/app/src/modules.rs`.
 pub fn module() -> impl Module {
@@ -106,8 +106,8 @@ impl Module for AuditModule {
         vec![http::AUDIT_READ]
     }
 
-    fn routes(&self) -> OpenApiRouter {
-        self.service.clone().map_or_else(OpenApiRouter::new, http::routes)
+    fn routes(&self) -> ModuleRouter {
+        self.service.clone().map_or_else(ModuleRouter::new, |service| http::routes(service).into())
     }
 
     fn tools(&self) -> Vec<autoxide_kernel::mcp::Tool> {
