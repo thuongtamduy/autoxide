@@ -1,0 +1,112 @@
+# Mutation testing hằng tuần (71-G9, D-20261126-independent-review): `cargo-mutants` sửa từng chỗ trong code tiền, thuế,
+# quyền của kernel rồi chạy lại unit test; mutant mà test không bắt ("sống") nghĩa là chỗ đó chưa có test thật sự kiểm.
+# Phạm vi, số shard và ngưỡng nằm ở `docs/quality/mutation.json` (một nguồn); job `plan` dựng matrix từ đó. Không chặn PR;
+# đỏ khi (a) số mutant sống của một nhóm tệ hơn ngưỡng, hoặc (b) thiếu shard (quá giờ / bị huỷ không được tính là đạt).
+# Chỉ chạy khi repo công khai (D-197). Đo thử trên máy 4 core: kernel ≈ 3 phút mỗi mutant (build lại kernel và
+# testkit), module nhỏ như `tax` ≈ 10 giây — số shard chọn theo đó, mỗi job dưới ~3 giờ.
+name: Mutation testing
+
+on:
+  schedule:
+    - cron: "17 20 * * 6"
+  workflow_dispatch:
+    inputs:
+      unit:
+        description: Only this unit of docs/quality/mutation.json (empty = all)
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    if: ${{ !github.event.repository.private }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: matrix
+        env:
+          ONLY: ${{ inputs.unit }}
+        run: |
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json, os
+          only = os.environ.get("ONLY", "")
+          config = json.load(open("docs/quality/mutation.json"))
+          include = []
+          for unit in config["units"]:
+              if only and unit["name"] != only:
+                  continue
+              files = " ".join(f"-f '{path}'" for path in unit["files"])
+              for shard in range(unit["shards"]):
+                  include.append({"unit": unit["name"], "package": unit["package"], "files": files,
+                                  "shard": shard, "shards": unit["shards"]})
+          print("matrix=" + json.dumps({"include": include}))
+          PY
+
+  mutants:
+    needs: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 330
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.plan.outputs.matrix) }}
+    name: ${{ matrix.unit }} ${{ matrix.shard }}/${{ matrix.shards }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          save-if: false
+      - run: cargo install cargo-mutants --version 27.1.0 --locked
+      # Mã thoát của cargo-mutants: 0 không còn mutant sống; 2 có mutant sống; 3 có mutant quá giờ — cả ba đều là kết
+      # quả hợp lệ (script gộp mới phán đạt hay không). Mã khác (1 dùng sai, 4 baseline hỏng…) là lỗi thật.
+      - name: Run cargo-mutants
+        env:
+          PACKAGE: ${{ matrix.package }}
+          FILES: ${{ matrix.files }}
+          SHARD: ${{ matrix.shard }}/${{ matrix.shards }}
+        run: |
+          status=0
+          eval "cargo mutants --package \"$PACKAGE\" $FILES --shard \"$SHARD\" --output out -- --lib --locked" || status=$?
+          case "$status" in 0|2|3) exit 0 ;; *) exit "$status" ;; esac
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ always() }}
+        with:
+          name: mutants-${{ matrix.unit }}-${{ matrix.shard }}
+          path: out/mutants.out
+          retention-days: 30
+
+  report:
+    if: ${{ always() && needs.plan.result == 'success' }}
+    needs: [plan, mutants]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: mutants-*
+          path: results
+      # Ghi báo cáo vào trang tóm tắt của lần chạy; thoát mã 1 khi tệ đi hay thiếu shard.
+      - id: gather
+        run: scripts/mutants-report.py results docs/quality/mutation.json
+      - run: scripts/nightly-issue.sh "$TITLE" "$RESULT" "$RUN_URL"
+        if: ${{ always() && github.event_name == 'schedule' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TITLE: "Weekly mutation testing got worse"
+          RESULT: ${{ steps.gather.outcome }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
