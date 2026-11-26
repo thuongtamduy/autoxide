@@ -16,8 +16,8 @@ thuộc đã xong. **Bước ghi "tạm dừng tới sau 1.0" không bao giờ l
 ## Thứ tự làm (D-228, D-20261121-community-first)
 
 **Từ ngày 26/11/2026 (chủ dự án quyết, D-20261126-road-to-1-0):** bước 71 (đường tới 1.0) và các mục còn mở của bước
-70 (P4, P5, P6, P9, P16, P17) làm trước mọi bước khác; không mở tính năng nghiệp vụ mới tới 1.0. Các mục còn mở của 52 và
-54 chuyển sang sau 1.0. Điều kiện ra 1.0 ghi ở đầu bước 71. Đoạn "Từ ngày 21/11/2026" dưới đây giữ để tra lịch sử; thứ tự
+70 (P4, P5, P6, P9, P16, P17) làm trước mọi bước khác; không mở tính năng nghiệp vụ mới tới 1.0. Các mục còn mở của 54
+và 52 cũng làm trước 1.0, sau bước 71 G1–G2 (D-20261126-steps-52-54-before-1-0). Điều kiện ra 1.0 ghi ở đầu bước 71. Đoạn "Từ ngày 21/11/2026" dưới đây giữ để tra lịch sử; thứ tự
 1–5 của nó đã được thay.
 
 **Từ ngày 21/11/2026:** bước 70 (P1–P3) làm trước mọi bước còn mở. Sau đó xếp theo kịch bản "một cửa hàng bán online
@@ -94,7 +94,7 @@ Nguồn: rà soát core ngày 26/11/2026 (bảy hướng). Mọi mục làm trư
 phó); mục lớn có quyết định thiết kế (skill `record-decision`) trước khi viết code. Mục chạm kernel, bảo mật, tiền, thuế
 qua kiểm độc lập (D-20261126-independent-review).
 
-**Điều kiện ra 1.0:** mọi mục `[ ]` dưới đây và P4, P6, P9, P16, P17 của bước 70 xong; gate đầy đủ xanh trên SQLite và
+**Điều kiện ra 1.0:** mọi mục `[ ]` dưới đây, P4, P6, P9, P16, P17 của bước 70 và các mục còn mở của 54, 52 xong; gate đầy đủ xanh trên SQLite và
 Postgres; kiểm thử bảo mật bên ngoài không còn lỗi mức cao trở lên; luật sư đã rà phần dữ liệu cá nhân, hoá đơn, thuế; các
 chỉ số của G9 đạt ngưỡng.
 
@@ -581,7 +581,7 @@ chính làm trước bước 33 theo lệnh của chủ dự án; phần theo kh
 - [ ] Gỡ menu cũ của `content` khi qua 2027-05-14: bốn endpoint, trait `LegacyMenus`, bảng `content_menus` và
       `content_menu_items` (migration mới), mục menu trong `docs/CONTENT.md`
 
-## 54. Phân quyền chuẩn hàng đầu (chủ dự án giao ngày 13/11/2026, D-205) — mục còn mở **tạm dừng tới sau 1.0** (D-20261126-road-to-1-0)
+## 54. Phân quyền chuẩn hàng đầu (chủ dự án giao ngày 13/11/2026, D-205) — làm trước 1.0 (D-20261126-steps-52-54-before-1-0)
 
 Đặc tả: [`docs/steps/54-authorization.md`](steps/54-authorization.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
 
@@ -615,7 +615,7 @@ Google Zanzibar, AWS IAM, GitHub, Microsoft Entra, Salesforce, Shopify, Stripe v
 - [ ] "Xem như" người dùng chỉ đọc thay cho đăng nhập thay (D-232): người mua phải cấp phép, không xem người
       quyền cao hơn, mọi lệnh ghi bị chặn kể cả qua MCP, không trả secret, audit hai id
 
-## 52. Trải nghiệm quản trị nâng cao (D-201) — mục còn mở **tạm dừng tới sau 1.0** (D-20261126-road-to-1-0)
+## 52. Trải nghiệm quản trị nâng cao (D-201) — làm trước 1.0 (D-20261126-steps-52-54-before-1-0)
 
 Đặc tả: [`docs/steps/52-admin-experience.md`](steps/52-admin-experience.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
 
