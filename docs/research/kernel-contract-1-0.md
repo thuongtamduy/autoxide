@@ -97,7 +97,7 @@ người dùng. **Nội bộ** = module không dùng (cột "module dùng" = 0) 
 
 | Hạng | Mô-đun |
 | --- | --- |
-| Ổn định | `error`, `i18n`, `config`, `response`, `http` (phần §4), `module` (phần §5), `event`, `job`, `mcp`, `access`, `db` (mới, §3), `migration` (bản mới, §3.6), `pagination`, `tenancy` (tập con: `TenantContext`, `TenantId`, `OrgId`, `OrgTree`, `TenantSeed`, `Relocation`, `settings`), `time`, `money`, `decimal`, `email`, `slug`, `public_url`, `csv`, `template`, `secret`, `idempotency`, `entitlement`, `privacy`, `version`, `reference`, `rows`, `numbering`, `upload`, `search`, `task`, `doctor`, `throttle`, `antispam`, `ip_hash`, `net`, `tokens`, `storage`, `mail`, `ai`, `identity`, `accounts`, `resource`, `provider` |
+| Ổn định | `error`, `i18n`, `config`, `response`, `http` (phần §4), `module` (phần §5), `event`, `job`, `mcp`, `access`, `db` (mới, §3; đường ổn định ngay, cam kết từ 1.0 khi PR 16 xong — xem dưới), `migration` (bản mới, §3.6), `pagination`, `tenancy` (tập con: `TenantContext`, `TenantId`, `OrgId`, `OrgTree`, `TenantSeed`, `Relocation`, `settings`), `time`, `money`, `decimal`, `email`, `slug`, `public_url`, `csv`, `template`, `secret`, `idempotency`, `entitlement`, `privacy`, `version`, `reference`, `rows`, `numbering`, `upload`, `search`, `task`, `doctor`, `throttle`, `antispam`, `ip_hash`, `net`, `tokens`, `storage`, `mail`, `ai`, `identity`, `accounts`, `resource`, `provider` |
 | Thử nghiệm | `einvoice`, `zns`, `voice`, `sms`, `push`, `payment`, `blocks`, `analytics`, `report`, `automation`, `custom_fields`, `sync`, `moderation`, `store`, `find`, `suggest`, `summary`, `work`, `usages`, `texts`, `reasons`, `tags`, `bulk`, `list_exports`, `connections`, `resolve`, `tenancy::{sandbox, distribution, moves, domains, site, link_token}` |
 | Nội bộ (sang `autoxide-host`) | `backup`, `transfer`, `logging`, `metrics`, `telemetry`, `tls`, `setup`, `builtin`, `module_catalog`, `user_flags`, phần chạy của `migration` (`Migrator`, khoá), `Database::connect`, các route của kernel |
 | Sang testkit | `bench_seed` |
@@ -105,6 +105,10 @@ người dùng. **Nội bộ** = module không dùng (cột "module dùng" = 0) 
 `payment`, `sms`, `push` vào thử nghiệm vì đó là hợp đồng của bộ nối nhà cung cấp (D-20261126-road-to-1-0 mục 4); `mail`,
 `storage`, `ai` ổn định vì đã có ≥ 2 cài đặt và được 7–8 module dùng. `custom_fields`, `automation` thử nghiệm tới khi G5
 chốt hình dạng chính thức. Danh sách này là **điểm xuất phát**: lên hạng là một quyết định mới.
+
+**`db` và `migration` (bản mới)**: nằm ngay ở đường ổn định `autoxide_kernel::db` / `autoxide_kernel::migration`, không qua
+`unstable::` (nâng hạng sau này sẽ là dời đường dẫn, tức phá vỡ). Trước 1.0 chúng còn đổi được như mọi thứ ở bản `0.x`; cam
+kết SemVer bắt đầu từ 1.0, và 1.0 chỉ phát hành khi PR 16 xong (mọi module đã chuyển, mẫu truy vấn thiếu đã lộ ra hết).
 
 Hạng của **module** (`Stability` của manifest) tách khỏi hạng của **kernel**: module ổn định được dùng phần thử nghiệm
 của kernel bên trong, nhưng `api` của nó không được lộ kiểu thử nghiệm (gate `stable-signatures` kiểm cả `api` của module
@@ -119,8 +123,19 @@ có người dùng thật, API không phải đổi qua vài bản liên tiếp,
 | core (giữ) | `mail`, `auth`, `idempotency` | nền của mọi cài đặt |
 | official (giữ) | `ai`, `files`, `address`, `organizations`, `audit`, `webhooks`, `notifications`, `plans`, `media`, `content`, `forms`, `menus` | hạ tầng chung hay nội dung, API đã ổn qua nhiều bản, không phụ thuộc luật chuyên ngành hay đổi |
 | official → **experimental** | `catalog`, `inventory`, `promotions`, `shipping`, `orders`, `customers` | đã quyết (phiên điều phối, 26/11/2026): chưa có người dùng thật |
-| official → **experimental** (đề xuất) | `tax`, `ledger`, `invoices`, `compliance` | chưa có người dùng thật; còn chờ luật sư rà (71-G12) — quy định thuế, hoá đơn, kế toán đổi theo văn bản, API có thể phải đổi sau khi rà; lên hạng khi rà xong và có người dùng |
+| official → **experimental** (đã quyết, kiểm lần 2) | `tax`, `ledger`, `invoices` | chưa có người dùng thật; còn chờ luật sư rà (71-G12) — quy định thuế, hoá đơn, kế toán đổi theo văn bản; lên hạng khi rà xong và có người dùng |
+| official (giữ, đã quyết) | `compliance` | giữ quy trình yêu cầu dữ liệu cá nhân và báo sự cố trong 72 giờ — nghĩa vụ theo luật số hai với mọi bản cài; `plans`, `content`, `notifications` dùng nó. Thao tác nào còn chưa chắc về pháp lý gắn `x-stability: experimental` theo từng operation |
 | experimental (giữ) | `sepay`, `momo`, `einvoice_sepay`, `esms`, `ghn`, `bookings`, `newsletter`, `comments`, `support`, `conversations`, `analytics`, `reporting`, `automations` | như hiện nay |
+
+Hai hệ quả phải làm cùng PR chuyển hạng (PR 6):
+
+- `plans` (official) đang dùng API của `invoices`/`ledger` (experimental): `plans` **giảm tính năng rõ ràng** khi hai module đó
+  tắt — thao tác cần hoá đơn/sổ trả `plans.invoicing_unavailable` có hướng dẫn bật, OpenAPI ghi rõ phụ thuộc — kèm ghi chú
+  Breaking; cấu hình mẫu (`compose.yml`, `.env.example`, `autoxide demo`) bật sẵn `tax,ledger,invoices` để người mới không mất
+  tính năng.
+- **Không lặng lẽ tắt module đang có dữ liệu**: lúc khởi động và trong `doctor`, module có migration đã chạy (bảng lịch sử
+  có dòng) mà không còn được chọn (vd vì nâng lên 1.0 đổi hạng sang experimental, không bật mặc định) thì báo **lỗi** kèm đúng
+  dòng `AUTOXIDE_MODULES=…` cần thêm; muốn tắt thật thì khai rõ (`-<module>` hay chế độ "nghỉ" D-20261125-dormant-modules).
 
 ### 2.2 `#[non_exhaustive]` và `#[deprecated]`
 
@@ -211,8 +226,14 @@ tx.commit().await?;
   đọc không có hàm ghi nào (lỗi biên dịch, không phải lỗi lúc chạy).
 - `for_update()`: Postgres `FOR UPDATE`; SQLite bỏ qua vì transaction ghi của SQLite đã giữ khoá cả database (một bên ghi).
   Viết ở một chỗ, có test đồng thời trên cả hai.
-- `join` chỉ giữa record **cùng module** (cùng tiền tố bảng): kernel kiểm lúc dựng câu, sai thì trả lỗi `internal` — luật
-  kiến trúc 1 có cái kiểm thật.
+- **Luật kiến trúc 1 kiểm lúc biên dịch** (kiểm lần 2, F2): `#[derive(Record)]` đọc tên module từ `CARGO_PKG_NAME` (bỏ tiền
+  tố `autoxide-`, `-` thành `_`: `autoxide-einvoice-sepay` → `einvoice_sepay`) và đòi `table` bắt đầu bằng `<module>_` —
+  khai `Record` cho bảng của module khác là lỗi biên dịch, nên `find`/`sub`/`in_sub`/`join` trên bảng lạ không thể viết.
+  Tiền tố so **trọn tên module + `_`**, không tách ở dấu `_` đầu tiên (spike tách sai `einvoice_sepay_*` thành `einvoice`).
+  Kernel còn kiểm lúc khởi động: mọi `Record` một module khai có bảng nằm trong danh sách bảng của migration của chính module
+  đó. Crate ngoài repo (tên crate tuỳ ý, không theo mẫu `autoxide-<tên>`) khai tên module ở `Cargo.toml`:
+  `[package.metadata.autoxide] module = "…"`; derive đọc file đó qua `CARGO_MANIFEST_DIR`, thiếu thì lỗi biên dịch nêu cách khai.
+  Không có thuộc tính `module = …` trên từng `Record` (một chỗ khai, không thể khai lệch giữa các record).
 - Lỗi: module không thấy `DbErr`. `insert(...).await` trả `Result<_, Error>` của kernel; vi phạm unique đọc bằng
   `error.conflict()` → `Option<Conflict>` (tên ràng buộc nếu database cho biết) để module đổi sang mã của mình
   (`notes.title_taken`). Lỗi tạm thời (khoá bận, mất kết nối) vẫn đi qua `write_with_retry`.
@@ -245,8 +266,10 @@ tx.commit().await?;
 ### 3.4 SQL viết tay (phần ngoài lề còn lại)
 
 `db.sql("SELECT … WHERE tenant_id = :tenant AND …").bind("since", since).all::<(A, B)>()` (tuple hay `#[derive(FromRow)]`).
-Câu chạy trên `TenantDb` **phải** có tham số `:tenant` (kernel gắn giá trị); thiếu thì trả lỗi trước khi gửi câu. Câu viết
-tay vẫn phải chạy trên cả hai database và vẫn cần lý do đo được (luật dữ liệu). Thay `autoxide_kernel::database::statement`
+Câu chạy trên `TenantDb` **phải** có tham số `:tenant` (kernel gắn giá trị); thiếu thì trả lỗi trước khi gửi câu. Đây chỉ là
+**rào phụ**, không phải cam kết cách ly của lớp 1: kiểm dò chuỗi không thấy `OR 1=1` hay `:tenant` nằm trong comment. Vì vậy
+số chỗ gọi `db.sql` của mỗi module đếm theo baseline chỉ được giảm (`xtask/raw-sql-baseline.txt`), mỗi chỗ có lý do đo được
+và test cách ly khách riêng. Câu viết tay vẫn phải chạy trên cả hai database (luật dữ liệu). Thay `autoxide_kernel::database::statement`
 (D-20261121-raw-statement) — giữ đường cũ `#[deprecated]`.
 
 ### 3.5 Bên trong
@@ -445,9 +468,9 @@ pub trait Module: Send + Sync {
   specialization — phải thêm hàm `as_x(&self) -> Option<&dyn X>` cho mỗi nhóm, vẫn là nhiều đường. Manifest là dữ liệu thuần,
   dễ kiểm, dễ cho agent đọc.
 
-### 5.1 Ánh xạ đủ 45 hàm cũ
+### 5.1 Ánh xạ đủ 49 hàm của trait cũ
 
-Tiêu chí: giá trị là **dữ liệu** (tên, danh sách, hằng, con trỏ hàm thuần) → `Manifest`; giá trị **giữ `Arc<dyn …>`** cần
+49 hàm = 45 hàm khai báo + `name`/`configure`/`start`/`dormant` (đã nằm trong bảng). Tiêu chí: giá trị là **dữ liệu** (tên, danh sách, hằng, con trỏ hàm thuần) → `Manifest`; giá trị **giữ `Arc<dyn …>`** cần
 service hay cấu hình đã đọc → `start` (kiểm lần 1, điểm 6).
 
 | Hàm cũ của `Module` | Đường mới |
@@ -530,20 +553,14 @@ qua); `doctor` báo khi role kết nối là superuser hay có `BYPASSRLS`; mọ
 policy dựng bằng bước đối chiếu idempotent lúc khởi động (theo danh sách `TenantTable`), không bằng migration phụ thuộc cấu
 hình.
 
-Ba lớp (lớp 2 sau 1.0), lớp chính chạy trên cả hai database:
+Các lớp (lớp 2 sau 1.0), lớp chính chạy trên cả hai database:
 
 1. **Lớp kết nối gắn khách (chính, cả hai database)** — §3.3: record `tenant` chỉ truy vấn được qua `TenantDb`; quên khách là
-   lỗi biên dịch; quét mọi khách phải gọi `all_tenants("lý do")`; SQL viết tay trên `TenantDb` bắt buộc có `:tenant`;
+   lỗi biên dịch; quét mọi khách phải gọi `all_tenants("lý do")`; SQL viết tay trên `TenantDb` bắt buộc có `:tenant` (rào phụ, §3.4);
    `insert` kiểm `tenant_id` khớp. Test: mỗi thao tác của `db` có test "khách A không thấy/không sửa được dòng của khách B"
    trên cả hai database; `testkit::leak_check` sẵn có chạy lại trên mọi module đã chuyển.
-2. **Row-level security tuỳ chọn trên Postgres (phòng thủ thêm)** — `AUTOXIDE_POSTGRES_ROW_SECURITY=off|on` (mặc định `off`
-   tới khi đo xong chi phí, rồi quyết bật mặc định cho database dùng chung). Khi `on`: migration tạo policy cho mọi bảng đã khai
-   `migration::TenantTable` (`USING (tenant_id = current_setting('autoxide.tenant', true)::uuid OR
-   current_setting('autoxide.all_tenants', true) = 'on')`, `FORCE ROW LEVEL SECURITY`); `TenantDb` mở mỗi đơn vị việc trong
-   một transaction và đặt `set_config('autoxide.tenant', …, true)` (chỉ sống trong transaction, không rò sang kết nối khác
-   của pool); `all_tenants` và migration đặt `autoxide.all_tenants`. SQLite không có RLS: nhánh đó là "không làm gì", giấu sau
-   trait `RowSecurity` của kernel, test cả hai nhánh (luật số một: cam kết cách ly đến từ lớp 1, chạy trên cả hai; lớp 2 chỉ
-   chặn thêm câu SQL viết tay sai). Chi phí đo: một `BEGIN … COMMIT` thêm cho mỗi lượt đọc gom.
+2. **Row-level security trên Postgres (phòng thủ thêm) — sau 1.0**; thiết kế chi tiết làm lúc đó, theo bốn điều kiện ở đầu
+   mục này. SQLite không có RLS nên cam kết cách ly luôn đến từ lớp 1.
 3. **Lint `tenant-scope`** giữ tới khi module cuối cùng chuyển sang `db`, rồi gỡ.
 
 Kèm theo (mục 71-G1): hạn mức theo khách của request **chưa xác thực** chỉ lấy khách từ thứ đã kiểm (tên miền đã xác minh,
@@ -600,13 +617,21 @@ mới; baseline của `wrapped-libraries` giảm đúng số module của cụm.
 1. Tài liệu: `COMPATIBILITY.md` + `MODULE_GUIDE.md` (EN + VI) theo D-20261126-library-isolation và ba hạng; gỡ
    `legacy_default`.
 2. `autoxide-macros` + `db` (Record, find/insert/update/delete, `TenantDb`/`Db`/`AllTenants`, lỗi `conflict()`), test cách ly
-   hai database; chuyển `notes` làm mẫu; luật `wrapped-libraries` với baseline 38 module.
+   hai database; chuyển `notes` làm mẫu; luật `wrapped-libraries` với baseline 38 module. Kèm (kiểm lần 2, F3): các ca của
+   spike (a) thành test tích hợp chạy trong CI trên cả hai database; test lỗi biên dịch bằng `trybuild` ghim thông báo lỗi (thêm
+   vào `STACK.md`) cho: record cấp khách qua handle control-plane, `set(TENANT_ID, …)`, thiếu `scope`, `scope = global` mà có
+   `tenant_id`, `scope = tenant` mà thiếu `tenant_id: TenantKey`, `TENANT_ID` trong danh sách cập nhật của
+   `on_conflict_update`, `Record` cho bảng của module khác (F2); bước đối chiếu lúc khởi động `Record` ↔ `TenantTable` ↔ bảng
+   của migration của module; số chỗ `db.sql` theo baseline.
 3. Migration `Plan` + test `migration-schema` (chụp catalog schema, §3.6) + `notes` chuyển migration. **Đi sau các PR của G3 (nâng cấp một nút) chạm
    `migration.rs`/`manager.rs`**: G3 dựa vào manifest tên migration theo từng bản phát hành (rollback) và lock của placement
    trong `kernel_migration_runs`, nên PR này giữ nguyên **tên** mọi migration, bảng lịch sử và đường chạy của G3; chỉ thêm
    cách khai mới bên cạnh.
 4. HTTP: `endpoint`, `routes!`, `Schema`, `Params`, `Validate`, extractor, `NoContent`/`Download`; `time::Duration…`;
-   `async_trait` xuất lại; `notes` chuyển hết → `notes` không còn khai thư viện bọc nào. Đo thời gian biên dịch (§4.2).
+   `async_trait` xuất lại; `notes` chuyển hết → `notes` không còn khai thư viện bọc nào. Đo thời gian biên dịch (§4.2) ít nhất 3
+   lần, lấy trung vị. Có test khẳng định rõ `openapi.json` sinh ra bằng đúng bản đã commit sau khi đổi derive (không chỉ dựa
+   vào việc file sinh lại không đổi). **Trước PR 4** (kiểm lần 2, F9): spike `#[endpoint]` + `Params` trên một module trọn vẹn
+   không còn khai `utoipa`/`utoipa-axum`, `openapi.json` giống từng byte.
 5. `Manifest` + `StartContext` gọn; `notes` chuyển; luật `module-contract-legacy`.
 5b. Đánh phiên bản event / webhook / `x-*` (§13): `EventInfo::payload`, `docs/events.json`, danh mục phần mở rộng,
    `xtask contract-diff`.
@@ -623,7 +648,7 @@ mới; baseline của `wrapped-libraries` giảm đúng số module của cụm.
    schema không đổi.
 13. Cách ly: gỡ lint `tenant-scope` và `raw-database`; hạn mức của request chưa xác thực. (RLS: sau 1.0, §7.)
 14. Hợp nhất cài đặt theo khách.
-15. Tách `autoxide-host` + tách file lớn. Tách phần còn lại của kernel: chỉ khi chủ dự án quyết theo số đo §15.3.
+15. Tách `autoxide-host` + tách file lớn. Tách phần còn lại của kernel theo lớp: sau 1.0 (D-20261126-kernel-crates).
 16. Gỡ mọi đường cũ `#[deprecated]` (thư viện bọc ra khỏi chữ ký, baseline rỗng), cập nhật `examples/external-module`,
    `new-module` template, `MODULE_GUIDE`.
 
@@ -635,8 +660,8 @@ không chạm cùng file.
 - **Khối lượng**: ~6.000 chỗ gọi đổi. Giữ: API mới trùng từ vựng của SeaORM/utoipa khi được (`find`, `filter`, `one`,
   `#[schema(…)]`), nên phần lớn là đổi `use` và tên; file chụp SQL + test sẵn có của module bắt sai.
 - **Lớp `db` thiếu một mẫu truy vấn**: thêm vào `db` (ổn định) hay tạm qua `db.sql` có lý do; không mở lối gọi thẳng SeaORM.
-  `db` chỉ thành hạng ổn định khi mọi cụm module đã chuyển xong (mẫu thiếu lộ ra trong lúc chuyển thì còn sửa được); trước đó
-  nó nằm ở hạng thử nghiệm dù module trong repo đã dùng.
+  `db` ở đường ổn định ngay từ đầu (§2.1); trước 1.0 còn đổi được như mọi thứ của `0.x`, cam kết SemVer từ 1.0 — và 1.0
+  đòi PR 16 xong, nên mẫu thiếu lộ ra trong lúc chuyển 39 module vẫn sửa được trước khi khoá.
 - **`OR EXISTS` (chia sẻ bản ghi) phá luật index**: đo query plan trên cả hai database ở bước 54 trước khi chốt; phương án dự
   phòng là `page()` trộn hai luồng keyset (theo phạm vi nút và theo chia sẻ), mỗi luồng dùng index riêng.
 - **Thời gian biên dịch** của bản sao bóng: đo ở PR 4, vượt ngưỡng thì chuyển sang sinh thẳng bằng builder (§4.2).
@@ -743,57 +768,6 @@ người đọc; và lọc/sắp theo trường nhạy cảm vẫn lộ giá tr�
   nhân) không che phần của chính người đó.
 - Trường tuỳ biến (`custom_fields`) khai lớp khi tạo trường; giá trị đi qua cùng bước egress.
 
-## 16. Mở rộng hợp đồng: CLI và định dạng file (71-G14 mục 4, D-20261126-operations-baseline)
-
-`COMPATIBILITY.md` đã hứa về lệnh `autoxide` bằng lời nhưng không có gì kiểm; file sao lưu (`backup.json` ghi bản Autoxide đã
-tạo, không có số bản định dạng) và file xuất dữ liệu (dữ liệu cá nhân, dời khách, xuất danh sách) chưa có lời hứa nào.
-
-- **CLI**: `cargo xtask regen` sinh `docs/cli.json` từ cây lệnh của `clap` (lệnh, tham số, giá trị mặc định, biến môi trường
-  tương ứng) cộng bảng mã thoát khai ở một chỗ (`ExitCode` của `crates/app`, mỗi mã một ý nghĩa ổn định) và JSON Schema của
-  mọi đầu ra `--json`. Quy tắc như REST: thêm lệnh / tham số tuỳ chọn / mã thoát / trường là không phá vỡ; bỏ, đổi tên, đổi
-  nghĩa là phá vỡ — tên cũ giữ làm bí danh có cảnh báo tới bản lớn (như `Setting::renamed_from`). Chữ in cho người đọc không
-  là hợp đồng.
-- **Định dạng file**: mỗi loại file (sao lưu, gói dời khách, xuất dữ liệu cá nhân, xuất danh sách) ghi `format` (tên loại) và
-  `format_version` (số nguyên) ở đầu (`backup.json` / dòng đầu của file xuất). Luật: bản 1.x **đọc** được file của mọi bản
-  1.y ≤ x (đọc bản cũ bằng hàm nâng từng bước `vN → vN+1` trong bộ đọc, không sửa file); ghi luôn bản mới nhất; đọc file mới
-  hơn mình thì báo lỗi rõ (`backup.format_too_new` kèm bản cần có). Bản lớn mới (2.0) đọc được file của bản 1.x cuối.
-- **Kiểm**: mỗi bản phát hành commit một file mẫu cho mỗi loại (`tests/fixtures/formats/<loại>/v<N>.*`, sinh từ dữ liệu mẫu cố
-  định); test đọc mọi file mẫu bằng bản hiện tại, trên cả hai database (khôi phục sao lưu mẫu rồi so dữ liệu). `contract-diff`
-  so `docs/cli.json` và JSON Schema của từng định dạng với bản phát hành gần nhất: schema của định dạng đổi mà `format_version`
-  không tăng → đỏ.
-- Thứ tự: PR 5c (cùng đợt với 5b, sau manifest), vì `contract-diff` dùng chung.
-
-## 17. Đường chuyển 0.x → 1.0 cho người viết module (71-G14 mục 5)
-
-Hướng dẫn `docs/guides/migrating-to-1.0.md` + `.vi.md`, viết theo từng bước, mỗi bước là một thay đổi biên dịch được (thứ tự
-như các cụm trong repo: Cargo.toml → derive/HTTP → manifest → truy vấn → migration), kèm bảng "cũ → mới" sinh từ chính bảng
-luật của công cụ dưới đây (một nguồn).
-
-Công cụ `autoxide migrate-module <đường dẫn>` (trong công cụ dòng lệnh độc lập của 71-G6, dùng được không cần mã nguồn core;
-trong repo gọi qua `cargo xtask migrate-module`):
-
-- **Cách làm**: phân tích cú pháp bằng `syn` (đã là phụ thuộc của `autoxide-macros`) với `proc-macro2` bật `span-locations`
-  để biết vị trí từng nút, rồi **sửa văn bản gốc theo vị trí** (không in lại cả file) — giữ nguyên comment, định dạng, thứ tự;
-  chạy `rustfmt` sau cùng. Không dùng rust-analyzer SSR: cần cả rust-analyzer chạy được trên dự án của người dùng, khó tự động
-  hoá trong CI và khó cài cho người mới. Không in lại bằng `prettyplease`: mất comment.
-- **Luật máy móc** (chắc chắn đúng, áp thẳng): sửa `Cargo.toml` (bỏ thư viện bọc, thêm feature `unstable` nếu dùng đường
-  thử nghiệm); `use` theo bảng đường dẫn; `derive(ToSchema|IntoParams|Validate)` → `derive(Schema|Params|Validate)` của kernel;
-  `#[utoipa::path(` → `#[endpoint(` và gộp `x-permissions` + `security` + 401/403 thành `permission = "…"` khi đúng mẫu chuẩn;
-  `OpenApiRouter::new().routes(routes!(…))…` → `routes![…]`; `StatusCode::NO_CONTENT` → `NoContent`; `jiff::SignedDuration` →
-  `time::Duration`; 45 hàm của `Module` → một hàm `manifest()` (thân mỗi hàm cũ là một biểu thức, chuyển thành một lời gọi
-  builder) và các đăng ký lúc chạy vào `start`; entity `DeriveEntityModel` → `#[derive(Record)]` (trường giữ nguyên, thuộc tính
-  ánh xạ, `scope` suy từ việc có `tenant_id` + `TenantScoped`); chuỗi truy vấn SeaORM theo mẫu thường gặp (`Entity::find()
-  .filter(Column::X.eq(v)).scoped(&tenant).one(conn)` → `tenant.db().read().find::<R>().filter(R::X.eq(v)).one()`).
-- **Phần không chắc**: công cụ không đoán; chèn `// TODO(autoxide-migrate): <luật, đường dẫn tài liệu>` tại chỗ và in danh
-  sách; `cargo check` dẫn phần còn lại. Đích đo: ≥ 80% chỗ gọi của một module điển hình được sửa tự động (đo trên `notes` và
-  `examples/external-module`, ghi số ở PR).
-- **Tự kiểm**: test của công cụ là cặp file trước/sau cho từng luật; chạy lại trên kết quả không đổi gì (idempotent).
-- **Dùng trong repo**: mọi PR chuyển cụm module (7–12) chạy công cụ trước rồi mới sửa tay phần TODO — vừa giảm công, vừa thử
-  công cụ trên ~6.000 chỗ thật trước khi người ngoài dùng. CI chạy công cụ trên bản sao `examples/external-module` ở trạng thái
-  0.x (giữ một bản chụp ở `xtask/fixtures/external-module-0x/`) và kiểm kết quả biên dịch + test xanh.
-- Thứ tự: công cụ làm ở PR 6b (sau khi lớp mới của PR 2–5 có đủ, trước cụm module đầu tiên); luật mới thêm theo từng PR lớp
-  của kernel nếu lớp đó còn đổi.
-
 ## 15. Kết quả ba spike (trước PR 2)
 
 Mã nháp ở nhánh `claude/kernel-contract-spikes` (PR nháp, **không merge**): crate `spikes/db-api` (nguyên mẫu `db`),
@@ -853,6 +827,78 @@ sinh `#[derive(Record)]` thật (spike dùng `macro_rules!` đứng thay).
   — dưới ngưỡng 20% → **dời sau 1.0**, trước 1.0 chỉ tách `autoxide-host` (đã quyết).
 - Cái rút thời gian thật nằm ở phía module (70–75%), không ở kernel: ghi để xét sau 1.0 (vd module chỉ phụ thuộc phần kernel
   mình dùng, hay giảm mã sinh ra của derive).
+
+## 16. Mở rộng hợp đồng: CLI và định dạng file (71-G14 mục 4, D-20261126-operations-baseline)
+
+`COMPATIBILITY.md` đã hứa về lệnh `autoxide` bằng lời nhưng không có gì kiểm; file sao lưu (`backup.json` ghi bản Autoxide đã
+tạo, không có số bản định dạng) và file xuất dữ liệu (dữ liệu cá nhân, dời khách, xuất danh sách) chưa có lời hứa nào.
+
+- **CLI**: `cargo xtask regen` sinh `docs/cli.json` từ cây lệnh của `clap` (lệnh, tham số, giá trị mặc định, biến môi trường
+  tương ứng) cộng bảng mã thoát khai ở một chỗ (`ExitCode` của `crates/app`, mỗi mã một ý nghĩa ổn định) và JSON Schema của
+  mọi đầu ra `--json`. Quy tắc như REST: thêm lệnh / tham số tuỳ chọn / mã thoát / trường là không phá vỡ; bỏ, đổi tên, đổi
+  nghĩa là phá vỡ — tên cũ giữ làm bí danh có cảnh báo tới bản lớn (như `Setting::renamed_from`). Chữ in cho người đọc không
+  là hợp đồng.
+- **Định dạng file**: mỗi loại file (sao lưu, gói dời khách, xuất dữ liệu cá nhân, xuất danh sách) ghi `format` (tên loại) và
+  `format_version` (số nguyên) ở đầu (`backup.json` / dòng đầu của file xuất). Luật: bản 1.x **đọc** được file của mọi bản
+  1.y ≤ x (đọc bản cũ bằng hàm nâng từng bước `vN → vN+1` trong bộ đọc, không sửa file); ghi luôn bản mới nhất; đọc file mới
+  hơn mình thì báo lỗi rõ (`backup.format_too_new` kèm bản cần có). Bản lớn mới (2.0) đọc được file của bản 1.x cuối.
+- Sửa sau kiểm lần 2 (F6):
+  - File của bản `0.x` (chưa có `format_version`) là **v0**; bộ đọc có bước nâng `v0 → v1` (suy loại file từ cấu trúc
+    `backup.json` hiện có), có test bằng file mẫu do bản `0.x` đã phát hành tạo ra.
+  - File mẫu **do binary đã phát hành tạo ra** (bước phát hành chạy binary vừa dựng trên dữ liệu mẫu cố định rồi commit kết
+    quả), không bao giờ sửa tay — gate giữ như migration đã commit (đổi nội dung file mẫu đã có là đỏ).
+  - Khôi phục: dựng database ở đúng trạng thái migration mà file sao lưu ghi (tập migration của bản đã tạo nó), nạp dữ liệu,
+    rồi chạy `up` tới bản hiện tại; so kết quả **qua API** (đọc lại bản ghi mẫu bằng REST), không so bảng.
+  - Khôi phục chéo: sao lưu là dữ liệu độc lập database (không phải dump SQL), nên SQLite → Postgres và Postgres → SQLite
+    **được hỗ trợ** và có test trong CI theo cả hai chiều; giới hạn duy nhất là cỡ (SQLite theo `docs/` sức chứa của G14).
+- **Kiểm**: mỗi bản phát hành commit một file mẫu cho mỗi loại (`tests/fixtures/formats/<loại>/v<N>.*`, sinh từ dữ liệu mẫu cố
+  định); test đọc mọi file mẫu bằng bản hiện tại, trên cả hai database (khôi phục sao lưu mẫu rồi so dữ liệu). `contract-diff`
+  so `docs/cli.json` và JSON Schema của từng định dạng với bản phát hành gần nhất: schema của định dạng đổi mà `format_version`
+  không tăng → đỏ.
+- Thứ tự: PR 5c (cùng đợt với 5b, sau manifest), vì `contract-diff` dùng chung.
+
+## 17. Đường chuyển 0.x → 1.0 cho người viết module (71-G14 mục 5)
+
+Hướng dẫn `docs/guides/migrating-to-1.0.md` + `.vi.md`, viết theo từng bước, mỗi bước là một thay đổi biên dịch được (thứ tự
+như các cụm trong repo: Cargo.toml → derive/HTTP → manifest → truy vấn → migration), kèm bảng "cũ → mới" sinh từ chính bảng
+luật của công cụ dưới đây (một nguồn).
+
+Công cụ `autoxide migrate-module <đường dẫn>` (trong công cụ dòng lệnh độc lập của 71-G6, dùng được không cần mã nguồn core;
+trong repo gọi qua `cargo xtask migrate-module`):
+
+- **Cách làm**: phân tích cú pháp bằng `syn` (đã là phụ thuộc của `autoxide-macros`) với `proc-macro2` bật `span-locations`
+  để biết vị trí từng nút, rồi **sửa văn bản gốc theo vị trí** (không in lại cả file) — giữ nguyên comment, định dạng, thứ tự;
+  chạy `rustfmt` sau cùng. Không dùng rust-analyzer SSR: cần cả rust-analyzer chạy được trên dự án của người dùng, khó tự động
+  hoá trong CI và khó cài cho người mới. Không in lại bằng `prettyplease`: mất comment.
+- **Luật máy móc** (chắc chắn đúng, áp thẳng): sửa `Cargo.toml` (bỏ thư viện bọc, thêm feature `unstable` nếu dùng đường
+  thử nghiệm); `use` theo bảng đường dẫn; `derive(ToSchema|IntoParams|Validate)` → `derive(Schema|Params|Validate)` của kernel;
+  `#[utoipa::path(` → `#[endpoint(` và gộp `x-permissions` + `security` + 401/403 thành `permission = "…"` khi đúng mẫu chuẩn;
+  `OpenApiRouter::new().routes(routes!(…))…` → `routes![…]`; `StatusCode::NO_CONTENT` → `NoContent`; `jiff::SignedDuration` →
+  `time::Duration`; 45 hàm của `Module` → một hàm `manifest()` (thân mỗi hàm cũ là một biểu thức, chuyển thành một lời gọi
+  builder) và các đăng ký lúc chạy vào `start`; entity `DeriveEntityModel` → `#[derive(Record)]` (trường giữ nguyên, thuộc tính
+  ánh xạ, `scope` suy từ việc có `tenant_id` + `TenantScoped`); chuỗi truy vấn SeaORM theo mẫu thường gặp (`Entity::find()
+  .filter(Column::X.eq(v)).scoped(&tenant).one(conn)` → `tenant.db().read().find::<R>().filter(R::X.eq(v)).one()`).
+- **Phần không chắc**: công cụ không đoán; chèn `// TODO(autoxide-migrate): <luật, đường dẫn tài liệu>` tại chỗ và in danh
+  sách; `cargo check` dẫn phần còn lại.
+- Sửa sau kiểm lần 2 (F7):
+  - `syn` không nhìn vào thân macro (`macro_rules!`, `json!`, `select!`, `vec!`…): công cụ quét token của thân macro tìm đường
+    dẫn thư viện đã bọc (`sea_orm::`, `utoipa::`, `axum::`…) và chèn TODO tại chỗ, không sửa.
+  - Vị trí: cột của `span-locations` đếm theo ký tự; công cụ đổi (dòng, cột) sang byte offset bằng bảng đầu dòng của file và
+    đếm ký tự UTF-8 (comment tiếng Việt), có test riêng cho dòng có chữ có dấu trước chỗ sửa.
+  - Chỉ định dạng lại phần đã sửa (chạy `rustfmt` trên file rồi chỉ giữ thay đổi nằm trong khoảng đã sửa; file người dùng không
+    đổi gì ngoài chỗ sửa).
+  - Chuỗi gọi SeaORM không có thông tin kiểu (công cụ chỉ thấy cú pháp): luật truy vấn chỉ áp cho mẫu nhận ra chắc chắn từ cú
+    pháp (`<path>::Entity::find()` … `.one/.all(...)` với `Column::X` cùng đường dẫn entity); còn lại là TODO.
+  - Đích đo: ≥ 80% chỗ gọi được sửa tự động, đo trên **một module thật cỡ vừa** của repo (vd `forms` hay `support`) ngoài `notes`
+    và `examples/external-module`, báo số đếm theo từng luật (áp được / TODO) trong PR.
+- Đích đo ban đầu: ≥ 80% chỗ gọi của một module điển hình được sửa tự động (đo trên `notes` và
+  `examples/external-module`, ghi số ở PR).
+- **Tự kiểm**: test của công cụ là cặp file trước/sau cho từng luật; chạy lại trên kết quả không đổi gì (idempotent).
+- **Dùng trong repo**: mọi PR chuyển cụm module (7–12) chạy công cụ trước rồi mới sửa tay phần TODO — vừa giảm công, vừa thử
+  công cụ trên ~6.000 chỗ thật trước khi người ngoài dùng. CI chạy công cụ trên bản sao `examples/external-module` ở trạng thái
+  0.x (giữ một bản chụp ở `xtask/fixtures/external-module-0x/`) và kiểm kết quả biên dịch + test xanh.
+- Thứ tự: công cụ làm ở PR 6b (sau khi lớp mới của PR 2–5 có đủ, trước cụm module đầu tiên); luật mới thêm theo từng PR lớp
+  của kernel nếu lớp đó còn đổi.
 
 ## Quyết định đi kèm
 

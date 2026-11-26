@@ -13,7 +13,7 @@ record `tenant`; `database.db()` không nhận record `tenant` (lỗi biên dị
 `all_tenants("lý do")` (có metric); `Db`/`AllTenants` chỉ lấy từ `StartContext`. (4) SQL viết tay: `db.sql(…)` với `#[derive(FromRow)]`; trên `TenantDb` bắt buộc có
 tham số `:tenant`. (5) Migration: trait `Migration` mới với `up/down(&self, plan: &mut Plan)` đồng bộ, ghi bước vào
 `Plan` (bảng, index, `plan.sql`, `plan.data`), kernel dựng SQL cho từng database. (6) Bên trong dựng trên sea-query +
-kết nối SeaORM; không kiểu nào của chúng ở chữ ký công khai. `db` ở hạng thử nghiệm tới khi mọi cụm module đã chuyển, rồi lên ổn định. Đường cũ (`Database::read/write/begin_write` trả kiểu SeaORM,
+kết nối SeaORM; không kiểu nào của chúng ở chữ ký công khai. `db` nằm ngay ở đường ổn định `autoxide_kernel::db` (không qua `unstable::`, vì nâng hạng sau này là dời đường dẫn); cam kết SemVer từ 1.0, và 1.0 đòi mọi module đã chuyển. `#[derive(Record)]` kiểm lúc biên dịch tiền tố bảng = tên module (từ `CARGO_PKG_NAME`, hay `[package.metadata.autoxide] module` cho crate ngoài) — luật kiến trúc 1 thành lỗi biên dịch cho mọi thao tác. Kiểm `:tenant` của `db.sql` là rào phụ (dò chuỗi), số chỗ dùng theo baseline chỉ giảm. Đường cũ (`Database::read/write/begin_write` trả kiểu SeaORM,
 `fetch_page*`, `ScopeExt`, `TenantScoped`, `MigrationTrait`, `migration::prelude`, `database::statement`) giữ
 `#[deprecated]` tới khi mọi module chuyển, gỡ trước 1.0.
 

@@ -1,4 +1,4 @@
-## D-20261126-migration-rewrite-proof · Viết lại migration đã commit sang `Plan` chỉ khi SQL sinh ra giống từng byte trên cả hai database — 2026-11-26 — agent quyết
+## D-20261126-migration-rewrite-proof · Viết lại migration đã commit sang `Plan` chỉ khi catalog schema sau `up` và `up→down→up` không đổi trên cả hai database — 2026-11-26 — agent quyết
 
 Chủ đề: Database, dữ liệu, job, event
 
