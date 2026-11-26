@@ -244292,6 +244292,7 @@
           }
         ],
         "x-autoxide-list": "promotions.list_my_vouchers",
+        "x-buyers": true,
         "x-permissions": [
           "promotions.use"
         ]
@@ -244437,6 +244438,7 @@
         "tags": [
           "promotions"
         ],
+        "x-buyers": true,
         "x-permissions": [
           "promotions.use"
         ]
@@ -248866,6 +248868,7 @@
         "tags": [
           "promotions"
         ],
+        "x-buyers": true,
         "x-permissions": [
           "promotions.use"
         ]
@@ -248956,6 +248959,7 @@
         "tags": [
           "promotions"
         ],
+        "x-buyers": true,
         "x-permissions": [
           "promotions.use"
         ]
@@ -249089,6 +249093,7 @@
         "tags": [
           "promotions"
         ],
+        "x-buyers": true,
         "x-permissions": [
           "promotions.use"
         ]
@@ -260405,7 +260410,7 @@
                 }
               }
             },
-            "description": "Missing permission `support.settings.manage` (`permission_denied`), or it does not cover the team (`org_out_of_scope`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+            "description": "Missing permission `support.settings.manage` (`permission_denied`; a member with `support.tickets.reply` may only switch their own `accepting`), or it does not cover the team (`org_out_of_scope`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -260448,7 +260453,8 @@
           "support"
         ],
         "x-permissions": [
-          "support.settings.manage"
+          "support.settings.manage",
+          "support.tickets.reply"
         ],
         "x-stability": "experimental"
       }
