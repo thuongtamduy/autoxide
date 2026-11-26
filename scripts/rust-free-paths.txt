@@ -34,6 +34,17 @@ SECURITY.md
 SECURITY.vi.md
 CODE_OF_CONDUCT.md
 CODE_OF_CONDUCT.vi.md
+SUPPORT.md
+SUPPORT.vi.md
+GOVERNANCE.md
+GOVERNANCE.vi.md
+TRADEMARK.md
+TRADEMARK.vi.md
+DCO
+REUSE.toml
+about.toml
+about.hbs
+LICENSES/*
 STACK.md
 CLAUDE.md
 
@@ -49,6 +60,8 @@ docs/*.md
 .github/ISSUE_TEMPLATE/*
 .github/pull_request_template.md
 .github/dependabot.yml
+# Danh sách người duy trì: GitHub và scripts/check-dco.sh đọc.
+.github/CODEOWNERS
 # Image gitleaks ghim theo digest: gate bước 6 (vẫn chạy) đọc, không phải Rust.
 .github/gitleaks/Dockerfile
 

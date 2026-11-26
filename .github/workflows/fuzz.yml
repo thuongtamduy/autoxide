@@ -1,0 +1,78 @@
+# Fuzz (cargo-fuzz / libFuzzer, G8): mỗi tuần cho từng bộ phân tích dữ liệu đầu vào không tin cậy (fuzz/fuzz_targets/)
+# chạy vài phút với đầu vào ngẫu nhiên có hướng dẫn bởi độ phủ. Không chặn PR; đỏ thì file gây lỗi được đính kèm
+# (artifact `fuzz-crash-<target>`) — chép nó vào test của hàm bị lỗi, sửa, rồi thêm vào corpus. Chỉ chạy khi repo công
+# khai (D-197). Cách chạy trên máy: fuzz/README.md.
+name: Fuzz
+
+on:
+  schedule:
+    - cron: "17 2 * * 0"
+  workflow_dispatch:
+    inputs:
+      seconds:
+        description: Seconds per target
+        default: "300"
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz:
+    name: fuzz (${{ matrix.target }})
+    if: ${{ !github.event.repository.private }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [page_query, tenant_hint, search_query, csv_read, decimal_money, timestamp]
+    env:
+      CARGO_INCREMENTAL: "0"
+      # libFuzzer cần nightly (cờ sanitizer); ghim ngày để một bản nightly hỏng không làm đỏ cả lịch.
+      NIGHTLY: nightly-2026-11-20
+      FUZZ_SECONDS: ${{ inputs.seconds || '300' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install "$NIGHTLY" --profile minimal
+      - uses: taiki-e/install-action@25f51f6b1bf4e18876107cece836f4f77ac17c8c # v2.90.7
+        with:
+          tool: cargo-fuzz@0.13.1
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: fuzz
+          shared-key: fuzz
+          save-if: ${{ github.event_name == 'schedule' }}
+      - name: Fuzz ${{ matrix.target }}
+        env:
+          TARGET: ${{ matrix.target }}
+        run: cargo "+$NIGHTLY" fuzz run "$TARGET" -- "-max_total_time=$FUZZ_SECONDS" -rss_limit_mb=2048
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: failure()
+        with:
+          name: fuzz-crash-${{ matrix.target }}
+          path: fuzz/artifacts/${{ matrix.target }}/
+          if-no-files-found: ignore
+          retention-days: 30
+
+  # Đỏ thì mở (hay cập nhật) một issue, xanh lại thì đóng — như property.yml.
+  report:
+    if: ${{ always() && github.event_name == 'schedule' && !github.event.repository.private }}
+    needs: fuzz
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: scripts/nightly-issue.sh "$TITLE" "$RESULT" "$RUN_URL"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TITLE: "Weekly fuzzing found a crash"
+          RESULT: ${{ needs.fuzz.result }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

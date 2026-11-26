@@ -621,6 +621,11 @@ green on both SQLite and PostgreSQL. Never commit secrets — only `.env.example
 belongs in Git, never `.env`. [`CONTRIBUTING.md`](CONTRIBUTING.md) explains how to set up
 your machine, the rules that matter most and how to send a change.
 
+Every commit carries a `Signed-off-by` line ([DCO](DCO), `git commit -s`). Questions: [`SUPPORT.md`](SUPPORT.md). How
+decisions are made and how to propose a change: [`GOVERNANCE.md`](GOVERNANCE.md). Where the project is going:
+[`docs/ROADMAP.public.md`](docs/ROADMAP.public.md). Building and listing your own module:
+[`docs/MODULE_ECOSYSTEM.md`](docs/MODULE_ECOSYSTEM.md). Using the name: [`TRADEMARK.md`](TRADEMARK.md).
+
 ## Security
 
 Found a vulnerability? Please do not open a public issue: report it privately as

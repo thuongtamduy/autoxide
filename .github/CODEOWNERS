@@ -1,0 +1,15 @@
+# Người duy trì (GOVERNANCE.md): GitHub tự yêu cầu họ review pull request chạm file tương ứng. Khi thêm người duy trì,
+# thêm họ ở đây (login này cũng là danh sách miễn của job `dco`, scripts/check-dco.sh).
+# Dòng sau khớp thắng dòng trước: các dòng cụ thể hơn đặt cuối.
+
+*                          @thuongtamduy
+
+# Vùng cần review độc lập (D-20261126-independent-review): kernel, bảo mật, tiền, thuế, quy trình phát hành.
+/crates/kernel/            @thuongtamduy
+/.github/                  @thuongtamduy
+/scripts/                  @thuongtamduy
+/SECURITY.md               @thuongtamduy
+/SECURITY.vi.md            @thuongtamduy
+/GOVERNANCE.md             @thuongtamduy
+/GOVERNANCE.vi.md          @thuongtamduy
+/docs/decisions/           @thuongtamduy

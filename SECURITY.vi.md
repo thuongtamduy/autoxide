@@ -30,7 +30,8 @@ phải cam kết dịch vụ (SLA)**: không có hỗ trợ trả phí, không c
 Bản vá ra dưới dạng bản patch (`1.5.2` → `1.5.3`), không đổi gì khác, nên cài ngay được
 ([`docs/COMPATIBILITY.vi.md`](docs/COMPATIBILITY.vi.md) ghi bản patch được chứa gì). Hãy cập nhật lên
 bản mới nhất của dòng bạn dùng trước khi báo, và ghi trong báo cáo bạn đã thử trên phiên bản nào.
-`CHANGELOG.md` liệt kê mọi bản phát hành.
+`CHANGELOG.md` liệt kê mọi bản phát hành. Cách một bản sửa tới dòng cũ còn được hỗ trợ (quy trình vá ngược) ghi ở
+[`docs/COMPATIBILITY.vi.md`](docs/COMPATIBILITY.vi.md#hỗ-trợ).
 
 ## Rà soát bảo mật
 
@@ -87,6 +88,28 @@ Chúng tôi công bố có phối hợp:
   công khai.
 
 Bản sửa cho các dòng cũ còn được hỗ trợ (bảng ở trên) ra cùng lúc khi có thể.
+
+## Cách chúng tôi xử lý một báo cáo
+
+Các bước người duy trì làm theo, để người báo biết điều gì xảy ra và một người duy trì khác tiếp quản được:
+
+1. **Nhận.** Báo cáo đến dưới dạng bản nháp GitHub security advisory riêng. Một người duy trì phụ trách và xác nhận đã nhận
+   trong 7 ngày (bảng ở trên). Không có gì về nó được đưa vào issue, pull request, commit message hay chat công khai.
+2. **Đánh giá.** Tái hiện trên bản phát hành mới nhất, trên SQLite và trên PostgreSQL nơi có thể khác nhau. Quyết định nó có
+   phải lỗ hổng không (xem "Những gì không tính là lỗ hổng"), phiên bản nào bị ảnh hưởng (kiểm mọi dòng còn hỗ trợ), và mức
+   nghiêm trọng bằng vector [CVSS v4.0](https://www.first.org/cvss/v4.0/) kèm lý do ngắn. Báo kết quả cho người báo trong 14 ngày.
+3. **Sửa.** Làm trong fork riêng tạm thời của advisory. Viết test thất bại khi chưa có bản sửa. Thay đổi chạm kernel, bảo mật,
+   tiền hay thuế được review độc lập trước khi merge, như mọi thay đổi loại đó. Giữ bản sửa nhỏ, và không nhắc tới vấn đề
+   trong commit message trước khi phát hành.
+4. **Phát hành.** Phát hành bản sửa thành bản patch của dòng hiện tại và của mọi dòng cũ còn hỗ trợ
+   ([vá ngược](docs/COMPATIBILITY.vi.md#hỗ-trợ)). Mục changelog nằm ở phần **Security**. Mức nghiêm trọng và cao: ngay lập tức, ngoài
+   lịch thường; trung bình và thấp: ở bản patch kế tiếp, hoặc sớm hơn.
+5. **Công bố.** Cùng lúc phát hành, công bố advisory: phiên bản bị ảnh hưởng và đã sửa, mức nghiêm trọng, mô tả tác động bằng
+   lời thường, cách tạm tránh cho người chưa cập nhật được ngay, và ghi công người báo (trừ khi họ từ chối). Xin CVE từ GitHub
+   ngay trong advisory đó ("Request CVE ID") cho báo cáo được nhận và ảnh hưởng một bản đã phát hành.
+6. **Rút kinh nghiệm.** Tìm trong code cùng lỗi ở chỗ khác, thêm một luật gate hay một test để nó không quay lại, và sửa runbook
+   hay tài liệu nếu nó đã dẫn ai đó đi sai. Với dữ liệu cá nhân bị lộ, nghĩa vụ của bên vận hành ở
+   [`docs/DEPLOY.vi.md`](docs/DEPLOY.vi.md#sự-cố-dữ-liệu-cá-nhân).
 
 ## Kiểm một bản phát hành
 

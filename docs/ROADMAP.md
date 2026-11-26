@@ -204,15 +204,20 @@ Postgres; vòng kiểm thử bảo mật kiểu bên ngoài cuối cùng không 
 
 ### G8 — Chuẩn cộng đồng mã nguồn mở
 
-- [ ] CodeQL, OpenSSF Scorecard, huy hiệu OpenSSF Best Practices
-- [ ] Chính sách đóng góp do AI viết, DCO, `SUPPORT.md`, `GOVERNANCE.md` / người duy trì, `CODEOWNERS`, liên kết hỏi đáp
-      trong mẫu issue, nhãn good-first-issue
-- [ ] SBOM liệt kê crate Rust (`cargo auditable` / CycloneDX), build tái lập, CI dựng bằng MSRV, chính sách MSRV và bảng
-      feature trong `docs/COMPATIBILITY.md`
-- [ ] Bản tiếng Anh cho người ngoài: lộ trình công khai, đường đề xuất thay đổi (RFC), tóm tắt luật đóng góp
-- [ ] Hệ sinh thái module: quy ước tên và topic, danh sách module cộng đồng, manifest module, bảng tương thích phiên bản,
-      chính sách dùng tên Autoxide
-- [ ] Đầu SPDX / REUSE; fuzz (`cargo-fuzz`) cho bộ phân tích dữ liệu đầu vào không tin cậy
+- [x] CodeQL (Rust, JS/TS, workflow), OpenSSF Scorecard (`codeql.yml`, `scorecard.yml`); huy hiệu OpenSSF Best Practices và
+      branch protection do chủ dự án làm trên web, hướng dẫn ở `docs/OPENSSF.md` (EN + VI)
+- [x] Chính sách đóng góp do AI viết, DCO (`DCO`, job `dco` của CI, CODEOWNERS), commit convention,
+      `SUPPORT.md`, `GOVERNANCE.md` (vai trò, quyết định, RFC, bộ nhãn), `docs/rfcs/`, `CODEOWNERS`, `contact_links` trong
+      mẫu issue; chủ dự án tạo bộ nhãn trong cài đặt repo (bảng nhãn ở `GOVERNANCE.md`)
+- [x] SBOM (`cargo auditable` trong Dockerfile, CycloneDX `autoxide.cdx.json` trong bản phát hành), build tái lập
+      (`SOURCE_DATE_EPOCH`, `--remap-path-prefix`, tar xếp theo tên), job CI dựng bằng MSRV, mục MSRV / feature / build tái lập /
+      SBOM trong `docs/COMPATIBILITY.md`
+- [x] Bản tiếng Anh cho người ngoài: `docs/ROADMAP.public.md` (lộ trình công khai, tóm tắt luật đóng góp), RFC ở `docs/rfcs/`
+- [x] Hệ sinh thái module: `docs/MODULE_ECOSYSTEM.md` (tên `autoxide-*`, topic `autoxide-module`, manifest
+      `autoxide-module.toml` đề xuất, bảng tương thích, danh sách cộng đồng), `TRADEMARK.md` (EN + VI)
+- [x] `REUSE.toml` + `LICENSES/` (job `reuse`); `fuzz/` (cargo-fuzz: con trỏ trang, header chọn khách, câu tìm kiếm, CSV,
+      số thập phân / tiền, thời gian) + `fuzz.yml` chạy hằng tuần. Chưa phủ: `Idempotency-Key` và thân JSON (hàm riêng của tầng
+      HTTP) — thêm khi phần phân tích đó lộ ra thành hàm công khai
 
 ### G9 — Chất lượng thành quy trình và đo bằng con số
 
@@ -276,10 +281,10 @@ Việc từ rà pháp lý vòng 1 do AI đóng vai (`docs/legal/review-2026-11-r
       module, người nối AI agent qua MCP, người vận hành, chủ cửa hàng dùng API) dùng thử theo tài liệu công khai, vài vòng
       (dùng thử → sửa → vòng sau, D-20261126-ai-role-reviews); vẫn mở kênh phản hồi cho người ngoài thật; tiêu chí chốt
       (không còn lỗi hợp đồng mở); chỉ sửa lỗi trong thời gian này
-- [ ] Chính sách hỗ trợ dài hạn: bản 1.x nhận vá bảo mật bao lâu, bản lớn trước còn được hỗ trợ bao lâu khi bản lớn mới ra,
-      quy trình vá ngược; ghi vào `docs/COMPATIBILITY.md` và `SECURITY.md` (EN + VI)
-- [ ] Trang tài liệu có phiên bản: website tài liệu chính thức (hướng dẫn, tham chiếu API sinh từ OpenAPI, MCP, docs.rs),
-      có tìm kiếm, mỗi bản phát hành một bộ tài liệu, EN + VI, tự dựng khi phát hành
+- [x] Chính sách hỗ trợ dài hạn: bản 1.x nhận vá bảo mật bao lâu, bản lớn trước còn được hỗ trợ bao lâu khi bản lớn mới ra,
+      quy trình vá ngược; ghi vào `docs/COMPATIBILITY.md` và `SECURITY.md` (EN + VI) — quy trình vá ngược và bảng ở `COMPATIBILITY.md` / `SECURITY.md`
+- [x] Trang tài liệu có phiên bản: website tài liệu chính thức (hướng dẫn, tham chiếu API sinh từ OpenAPI, MCP, docs.rs),
+      có tìm kiếm, mỗi bản phát hành một bộ tài liệu, EN + VI, tự dựng khi phát hành — mdBook, `scripts/build-docs-site.py`, workflow `docs-site.yml` (D-20261126-docs-site-mdbook); **chủ dự án bật GitHub Pages (nguồn: nhánh `gh-pages`)**
 - [ ] Chạy nhiều máy chủ cùng lúc: test trong CI 2–3 máy chủ song song không giao trùng việc nền / event, không mất lock
       migration; tài liệu sức chứa (SQLite chịu tới đâu, khi nào chuyển Postgres, số khách mỗi máy chủ, cấu hình đề xuất)
 - [ ] Mô hình mối đe doạ của core (`docs/THREAT_MODEL.md`, EN + VI) làm đầu vào cho đợt kiểm thử bên ngoài; mã hoá ở mức
@@ -287,18 +292,18 @@ Việc từ rà pháp lý vòng 1 do AI đóng vai (`docs/legal/review-2026-11-r
       đương)
 - [ ] Mục tiêu khôi phục sau sự cố: RPO / RTO ghi rõ cho từng cách triển khai; diễn tập khôi phục trong CI cả trường hợp
       nhiều khách có database riêng và kho file
-- [ ] Rà giấy phép thư viện: `cargo deny` chặn giấy phép không hợp MIT/Apache; danh sách giấy phép của bên thứ ba đi kèm
-      mỗi bản phát hành (binary, image, SDK)
+- [x] Rà giấy phép thư viện: `cargo deny` chặn giấy phép không hợp MIT/Apache; danh sách giấy phép của bên thứ ba đi kèm
+      mỗi bản phát hành (binary, image, SDK) — `cargo deny` (đã có) + `THIRD-PARTY-LICENSES.html` bằng cargo-about (D-20261126-third-party-licenses)
 
 ### G14 — Vận hành và cam kết nền (chủ dự án duyệt ngày 26/11/2026, D-20261126-operations-baseline)
 
 - [ ] Cam kết nền tảng: chính sách bản Postgres (các bản lớn còn được hãng hỗ trợ), bản SQLite tối thiểu, hệ điều hành và
       kiến trúc CPU cho binary và image; CI chạy ma trận các bản Postgres được hỗ trợ (ít nhất bản cũ nhất và mới nhất); ghi
       vào `docs/COMPATIBILITY.md` (EN + VI); `doctor` cảnh báo khi chạy trên bản ngoài danh sách
-- [ ] Bộ đồ nghề vận hành: sổ tay xử lý sự cố `docs/RUNBOOK.md` (EN + VI) cho các tình huống thường gặp (database đầy hay
+- [x] Bộ đồ nghề vận hành: sổ tay xử lý sự cố `docs/RUNBOOK.md` (EN + VI) cho các tình huống thường gặp (database đầy hay
       chậm, hàng đợi việc nền ứ, xoay khoá ký và khoá mã hoá khi lộ, thu hồi hàng loạt API key / phiên, khôi phục một khách
       từ sao lưu, khách báo mất dữ liệu); mẫu bảng theo dõi và luật cảnh báo dựng sẵn từ số đo OTLP / Prometheus của core;
-      quy trình ứng phó lỗ hổng bảo mật (nhận báo, đánh giá, vá, công bố, xin mã CVE) ghi ở `SECURITY.md`
+      quy trình ứng phó lỗ hổng bảo mật (nhận báo, đánh giá, vá, công bố, xin mã CVE) ghi ở `SECURITY.md` — `docs/RUNBOOK.md`, thêm 3 luật cảnh báo vào `deploy/prometheus/autoxide-alerts.yml`, mục "How we handle a report" ở `SECURITY.md`
 - [ ] Thử hỏng có chủ đích trong CI trên cả hai database: mất kết nối database giữa transaction, đầy ổ đĩa, Postgres
       chuyển máy dự phòng / khởi động lại, tiến trình bị giết giữa việc nền, migration và sao lưu; hệ thống tự hồi phục,
       không mất hay nhân đôi event / job, không hỏng dữ liệu; kết quả ghi vào tài liệu sức chứa

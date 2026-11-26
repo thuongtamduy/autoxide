@@ -1169,7 +1169,8 @@ rules and the dashboard take the largest value, not the sum.
 
 ## Runbook
 
-Each case: what you see, how to check, how to fix it.
+Each case: what you see, how to check, how to fix it. Incidents that need decisions and several steps (a leaked key,
+mass revocation, restoring one tenant, lost data) are in [`RUNBOOK.md`](RUNBOOK.md).
 
 ### Server errors
 
