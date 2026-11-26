@@ -147,3 +147,40 @@ async fn han_muc_luat_theo_trang() {
     .await
     .unwrap();
 }
+
+/// Lần đăng ký tham gia của một chương trình là `Page<T>` (keyset theo id trong database): năm lần, `limit=2` — đi
+/// hết bằng `next_cursor` ra đủ năm, không trùng không sót, mới nhất trước (mặc định) và cũ nhất trước.
+#[tokio::test]
+async fn tham_gia_theo_trang_ca_hai_chieu() {
+    TestDatabase::run(async |test| {
+        let setup = setup(test, true).await;
+        let id = running(&setup, body(setup.tree.a, json!({}))).await;
+        let tenant = setup.tenant();
+        let mut made = Vec::new();
+        for _ in 0..5 {
+            let row = crate::entity::participation::ActiveModel {
+                id: Set(Uuid::now_v7()),
+                tenant_id: Set(tenant.id().as_uuid()),
+                promotion_id: Set(id),
+                seller_org_id: Set(Uuid::now_v7()),
+                status: Set("pending".to_owned()),
+                items: Set("[]".to_owned()),
+                reviewed_by: Set(None),
+                reviewed_at: Set(None),
+                created_at: Set(Timestamp::now()),
+                updated_at: Set(Timestamp::now()),
+            }
+            .insert(tenant.database().write())
+            .await
+            .unwrap();
+            made.push(json!(row.id.to_string()));
+        }
+        let uri = format!("/promotions/{id}/participations?limit=2&order=asc");
+        assert_eq!(walk(&setup, &uri, "id").await, made);
+        made.reverse();
+        let uri = format!("/promotions/{id}/participations?limit=2");
+        assert_eq!(walk(&setup, &uri, "id").await, made);
+    })
+    .await
+    .unwrap();
+}

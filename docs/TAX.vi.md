@@ -54,6 +54,12 @@ curl -X POST https://api.example.com/api/v1/tax/quote \
   Việt Nam: `Asia/Ho_Chi_Minh`), không có thì theo `organizations.timezone` của nút, không có nữa thì UTC.
   Vì vậy đơn đặt lúc 00:30 ngày 01/01/2027 giờ Việt Nam (17:30 UTC ngày 31/12) tính thuế suất của ngày
   01/01. Không có thuế suất ngày đó: `422 tax.rate_missing` — engine không bao giờ đoán.
+- **Thuế của đơn là ước tính; hoá đơn quyết định.** Luật gắn thời điểm xác định thuế GTGT với lúc chuyển
+  giao quyền sở hữu hàng (giao hàng) hay hoàn thành dịch vụ. Đơn tính thuế theo ngày đặt; hoá đơn của đơn
+  tính theo ngày lập của nó (`orders.invoice_timing`, mặc định `on_delivered`). Thuế suất đổi ở giữa thì hoá
+  đơn dùng thuế suất mới — xử lý chênh lệch với người mua. Nháp hoá đơn tính vào ngày khác được tính lại khi lập. Hoá đơn điều chỉnh, thay thế giữ ngày thuế
+  (thuế suất) của hoá đơn gốc. Bút toán sổ cái của đơn và hoá đơn ghi theo cùng ngày thuế. `autoxide doctor`
+  cảnh báo khi vùng thuế đã nhập không khai `tax_date.time_zone`.
 - Câu trả lời có `snapshot` (thuế suất và ID, phiên bản gói, cách làm tròn): lưu kèm chứng từ.
 
 `POST /api/v1/tax/withholding` tính số sàn khấu trừ khi trả tiền cho người bán. Tool MCP: `tax.quote`,

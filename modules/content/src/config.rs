@@ -93,6 +93,20 @@ pub(crate) const PUBLIC_SEARCH_PER_MINUTE: Setting = Setting::new(
 )
 .with_default("30");
 
+pub(crate) const PUBLIC_SEARCH_CONCURRENCY: Setting = Setting::new(
+    "AUTOXIDE_CONTENT_PUBLIC_SEARCH_CONCURRENCY",
+    "Public searches (`/api/v1/content/public/search`) one server process runs at the same time (1 to \
+     1000); more are refused with 429 `content.public_search_busy` instead of slowing every other request.",
+)
+.with_default("8");
+
+pub(crate) const PUBLIC_SEARCH_PER_ADDRESS_PER_MINUTE: Setting = Setting::new(
+    "AUTOXIDE_CONTENT_PUBLIC_SEARCH_PER_ADDRESS_PER_MINUTE",
+    "Public searches per minute from one client address (an IPv4 address or an IPv6 /64) in one server \
+     process (1 to 10000); past it, 429 `content.public_search_rate_limited`.",
+)
+.with_default("20");
+
 pub(crate) const SITE_HEALTH_NOT_FOUND_MIN_HITS: Setting = Setting::new(
     "AUTOXIDE_CONTENT_SITE_HEALTH_NOT_FOUND_MIN_HITS",
     "Requests in the last 7 days (1 to 100000) after which a missing address of a website is listed \
@@ -114,6 +128,8 @@ pub(crate) struct ContentConfig {
     pub translate_batch_tokens: u32,
     pub public_semantic_search: bool,
     pub public_search_per_minute: u32,
+    pub public_search_concurrency: u32,
+    pub public_search_per_address: u32,
     pub theme_variants_max: u32,
     pub not_found_min_hits: i64,
 }
@@ -178,6 +194,12 @@ impl ContentConfig {
             });
         let public_search_per_minute =
             reader.get_with(&PUBLIC_SEARCH_PER_MINUTE, |raw| parse_in_range(raw, 1u32, 10_000));
+        let public_search_concurrency =
+            reader.get_with(&PUBLIC_SEARCH_CONCURRENCY, |raw| parse_in_range(raw, 1u32, 1000));
+        let public_search_per_address = reader
+            .get_with(&PUBLIC_SEARCH_PER_ADDRESS_PER_MINUTE, |raw| {
+                parse_in_range(raw, 1u32, 10_000)
+            });
         let theme_variants_max =
             reader.get_with(&THEME_VARIANTS_MAX, |raw| parse_in_range(raw, 1u32, 500));
         let not_found_min_hits = reader
@@ -202,6 +224,8 @@ impl ContentConfig {
             translate_batch_tokens: translate_batch_tokens?,
             public_semantic_search: public_semantic_search?,
             public_search_per_minute: public_search_per_minute?,
+            public_search_concurrency: public_search_concurrency?,
+            public_search_per_address: public_search_per_address?,
             theme_variants_max: theme_variants_max?,
             not_found_min_hits: not_found_min_hits?,
         })

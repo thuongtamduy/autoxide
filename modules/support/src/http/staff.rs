@@ -28,13 +28,17 @@ use crate::tickets::{Opening, TicketChanges, TicketFilter, Who};
 #[derive(Debug, Deserialize, IntoParams)]
 #[into_params(parameter_in = Query)]
 pub(crate) struct TicketQuery {
+    /// Only tickets in this status.
     status: Option<Status>,
     /// `me`, `none` or a user id.
     assignee: Option<String>,
+    /// Only tickets assigned to this team.
     team_id: Option<Uuid>,
     /// Only tickets of this unit (not the units below it).
     org_id: Option<Uuid>,
+    /// Only tickets of this category (its key).
     category: Option<String>,
+    /// Only tickets of this priority.
     priority: Option<Priority>,
     /// Only tickets that missed (`true`) or kept (`false`) their response-time target.
     breached: Option<bool>,

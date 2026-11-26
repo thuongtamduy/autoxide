@@ -663,6 +663,67 @@ async fn ngay_lap_theo_gio_viet_nam() {
     .unwrap();
 }
 
+/// Nháp tính thuế theo ngày khác ngày lập (vd tạo 31/12/2026, lập 02/01/2027): lúc lập tính lại theo ngày
+/// lập, không giữ thuế suất của ngày tạo nháp (kiểm độc lập #560, điểm 1).
+#[tokio::test]
+async fn nhap_tinh_lai_thue_theo_ngay_lap() {
+    use sea_orm::ConnectionTrait as _;
+    TestDatabase::run(async |test| {
+        let Setup { app, .. } = setup(test).await;
+        let root = root_of(DEFAULT_TENANT).as_uuid();
+        let profile = json!({"jurisdiction": "VN", "regime": "vat_credit"});
+        let answer = app
+            .request(Method::PUT, &format!("/api/v1/tax/profiles/{root}"))
+            .token("clerk")
+            .json(profile)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(answer.status(), StatusCode::OK, "{}", answer.text());
+        let vietnam = autoxide_kernel::time::zone("Asia/Ho_Chi_Minh").unwrap();
+        let year = Timestamp::now().date_in(&vietnam).year();
+        let body = json!({"kind": "vat_invoice", "symbol": "1C26TAA", "year": year});
+        let (status, created) = call(&app, "POST", "/series", Some(body)).await;
+        assert_eq!(status, StatusCode::CREATED, "{created}");
+        let line = NewDocumentLine::new("Service fee", rust_decimal::Decimal::ONE, vnd(100_000))
+            .service()
+            .tax_category("vat.standard");
+        let draft = NewDocument::new(
+            root_of(DEFAULT_TENANT),
+            "vat_invoice",
+            Currency::VND,
+            Buyer::business("Buyer Co", "0101234567"),
+            vec![line],
+            "demo",
+            "T-1",
+        );
+        let tenant = app.default_tenant();
+        let found = invoices(&app)
+            .create_document(&tenant, Actor::system(), draft)
+            .await
+            .unwrap()
+            .into_inner();
+        assert_eq!(found.tax.minor(), 10_000);
+        // Giả như nháp được tính vào một ngày khác, với thuế khác (8%).
+        let write = app.database().write();
+        let backend = write.get_database_backend();
+        write
+            .execute_raw(autoxide_kernel::database::statement(
+                backend,
+                "UPDATE invoices_documents SET tax_minor = 8000, total_minor = 108000, \
+                 tax_snapshot = '{\"tax_point\": \"2026-01-01\"}' WHERE id = $1",
+                [found.id.into()],
+            ))
+            .await
+            .unwrap();
+        let issued = invoices(&app).issue(&tenant, Actor::system(), found.id).await.unwrap();
+        assert_eq!((issued.tax.minor(), issued.total.minor()), (10_000, 110_000));
+        assert_eq!(issued.lines.iter().map(|line| line.tax.minor()).sum::<i64>(), 10_000);
+    })
+    .await
+    .unwrap();
+}
+
 /// Người bán vùng thuế `VN`: hoá đơn điện tử đã gửi cơ quan thuế không huỷ được (NĐ 70/2025, LG-9) — lỗi
 /// nêu căn cứ, hướng sang điều chỉnh / thay thế, không gọi nhà cung cấp; hoá đơn bị cơ quan thuế từ chối
 /// thì huỷ được mà không báo nhà cung cấp.
@@ -698,7 +759,7 @@ async fn hoa_don_dien_tu_da_gui_khong_huy_duoc_o_viet_nam() {
         assert!(refused["detail"].as_str().unwrap().contains("70/2025"), "{refused}");
         assert!(provider.cancelled.lock().unwrap().is_empty());
         // Điều chỉnh giảm vẫn làm được.
-        let decrease = json!({"direction": "decrease", "lines": [{"description": "Service fee", "kind": "service",
+        let decrease = json!({"direction": "decrease", "reference": "ADJ-1", "lines": [{"description": "Service fee", "kind": "service",
             "quantity": "1", "unit_price": {"amount": "100000", "currency": "VND"}, "tax_category": "vat.standard"}]});
         let (status, adjusted) =
             call(&app, "POST", &format!("/documents/{}/adjust", sent.id), Some(decrease)).await;

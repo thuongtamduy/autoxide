@@ -18,6 +18,7 @@
 //!   dạng thống nhất của API trên `docs/openapi.json` (`api_shape.rs`: thân request đóng, lỗi
 //!   `Problem`, danh sách `Page<T>`).
 //!   `./gate.sh` gọi lệnh này; vi phạm thì gate đỏ.
+//! - `doctor` — máy của người phát triển đã đủ công cụ chưa, kèm lệnh cài từng thứ thiếu (xem `doctor.rs`).
 //! - `check-module <thư mục>` — các luật của `check` áp cho một module, chạy trên crate nằm ngoài
 //!   repo này (module ở repo riêng; xem `external.rs`).
 //! - `publish-check [--no-verify]` — đóng gói mọi crate như `cargo publish` rồi build thử
@@ -57,7 +58,9 @@ mod decisions;
 mod deploy_metrics;
 mod doc_language;
 mod docs;
+mod doctor;
 mod external;
+mod hints;
 mod i18n;
 mod lengths;
 mod mcp_principal;
@@ -79,6 +82,7 @@ mod workspace;
 use std::process::ExitCode;
 
 const USAGE: &str = "usage: cargo xtask check
+       cargo xtask doctor                        is this machine ready to work on Autoxide? (read-only)
        cargo xtask check-module <dir>            the module rules of `check`, on a crate outside this repository
        cargo xtask coverage-api [--run]          endpoints and MCP tools no test calls successfully
        cargo xtask decisions                     regenerate docs/decisions/INDEX.md
@@ -125,6 +129,7 @@ fn main() -> ExitCode {
     // số mà không phải tự kiểm độ dài.
     match args.iter().map(String::as_str).collect::<Vec<_>>().as_slice() {
         ["check"] => check(),
+        ["doctor"] => doctor::run(),
         ["check-module", dir] => check_module(dir),
         ["coverage-api"] => coverage_api(false),
         ["coverage-api", "--run"] => coverage_api(true),

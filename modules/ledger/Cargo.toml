@@ -38,6 +38,7 @@ validator.workspace = true
 [dev-dependencies]
 autoxide-testkit.workspace = true
 futures-util.workspace = true
+proptest.workspace = true
 tokio.workspace = true
 
 [lints]

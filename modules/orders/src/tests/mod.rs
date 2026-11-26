@@ -20,6 +20,7 @@ mod returns;
 mod reviews;
 mod risk_reports;
 mod statements;
+mod tax_point;
 mod tenders;
 mod warranty_fields;
 

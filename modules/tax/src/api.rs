@@ -286,6 +286,18 @@ pub trait TaxEngine: Send + Sync {
     ) -> Result<Option<String>, Error> {
         Ok(None)
     }
+    /// The tax date of instant `at` in tax jurisdiction `jurisdiction` (pack rule `tax_date.time_zone`), for a
+    /// caller that already holds the seller's [`TaxProfile`] — saves looking the profile up again. `None`: the
+    /// jurisdiction has no time zone rule; use [`TaxEngine::tax_date`] (the unit's time zone) then.
+    ///
+    /// The default implementation returns `None`.
+    async fn tax_date_in(
+        &self,
+        _jurisdiction: &str,
+        _at: Timestamp,
+    ) -> Result<Option<Date>, Error> {
+        Ok(None)
+    }
     /// The tax date of instant `at` for seller `org`: the calendar day in the time zone of the seller's tax
     /// jurisdiction (pack rule `tax_date.time_zone`; Vietnam: `Asia/Ho_Chi_Minh`), else in the unit's time
     /// zone (`organizations.timezone`), else in UTC. Use it for the tax point of an order and the issue

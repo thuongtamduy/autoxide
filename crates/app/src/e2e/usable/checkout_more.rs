@@ -319,6 +319,13 @@ async fn khach_vang_lai_tra_don_bang_ma_sms_roi_xem_va_tai_hoa_don() {
         let document = documents["data"][0]["document_id"].as_str().unwrap_or_else(|| panic!("{documents}")).to_owned();
         // Cùng ngày, cùng hồ sơ thuế: hoá đơn khớp thuế và tổng tiền đã chốt của đơn (LG-10).
         assert_eq!(documents["data"][0]["differs_from_order"], false, "{documents}");
+        // Bút toán của đơn ghi theo ngày thuế (giờ Việt Nam), trùng ngày lập hoá đơn — không theo UTC.
+        let entries = get(&app, "/api/v1/ledger/entries?source_module=orders").await;
+        let today = autoxide_kernel::time::Timestamp::now().date_in(&vietnam).to_string();
+        let dates: Vec<&str> =
+            entries["data"].as_array().unwrap().iter().filter_map(|entry| entry["effective_date"].as_str()).collect();
+        assert!(!dates.is_empty() && dates.iter().all(|day| *day == today), "{entries}");
+        assert_eq!(documents["data"][0]["issue_date"], today.as_str(), "{documents}");
         let answer = app
             .get(&format!("/api/v1/orders/public/orders/{order}/documents/{document}"))
             .header("order-token", &access)

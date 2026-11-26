@@ -66,4 +66,8 @@ impl TaxEngine for Provider {
     ) -> Result<Option<String>, Error> {
         self.0.einvoice_cancel_forbidden(tenant, org, on).await
     }
+
+    async fn tax_date_in(&self, jurisdiction: &str, at: Timestamp) -> Result<Option<Date>, Error> {
+        self.0.jurisdiction_date(jurisdiction, at).await
+    }
 }
