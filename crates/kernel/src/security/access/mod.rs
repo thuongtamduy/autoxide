@@ -213,16 +213,20 @@ pub enum AccessPath {
     /// its creator, and the events it produces carry the run so the `automations` module can prevent loops
     /// between rules.
     Automation(Uuid),
+    /// An OAuth client acting for the user through the grant with this ID (step 71 G4). Only in events
+    /// (`Actor::access`): the caller itself entered the tenant directly.
+    OAuthGrant(Uuid),
 }
 
 impl AccessPath {
-    /// Stable name: `direct`, `delegation`, `support`, `automation`.
+    /// Stable name: `direct`, `delegation`, `support`, `automation`, `oauth_grant`.
     pub const fn as_str(self) -> &'static str {
         match self {
             AccessPath::Direct => "direct",
             AccessPath::Delegation(_) => "delegation",
             AccessPath::Support(_) => "support",
             AccessPath::Automation(_) => "automation",
+            AccessPath::OAuthGrant(_) => "oauth_grant",
         }
     }
 
@@ -230,9 +234,10 @@ impl AccessPath {
     pub const fn id(self) -> Option<Uuid> {
         match self {
             AccessPath::Direct => None,
-            AccessPath::Delegation(id) | AccessPath::Support(id) | AccessPath::Automation(id) => {
-                Some(id)
-            }
+            AccessPath::Delegation(id)
+            | AccessPath::Support(id)
+            | AccessPath::Automation(id)
+            | AccessPath::OAuthGrant(id) => Some(id),
         }
     }
 }
@@ -449,6 +454,9 @@ pub struct PrincipalSnapshot {
     kind: ActorKind,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     denied: Vec<String>,
+    /// OAuth grant and client when the caller was an OAuth client: the job keeps acting as that client.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    oauth: Option<(Uuid, String)>,
 }
 
 impl PrincipalSnapshot {
@@ -484,7 +492,10 @@ impl PrincipalSnapshot {
             // Job không có phiên để xác nhận lại: đã kiểm lúc yêu cầu.
             step_up: None,
             known_units: decision::KnownUnits::default(),
-            oauth: None,
+            // Job không qua HTTP nên không có resource để kiểm audience: chỉ giữ loại credential.
+            oauth: self.oauth.as_ref().map(|(grant, client)| {
+                Arc::new(OAuthAccess::new(*grant, client.clone(), String::new()))
+            }),
         }
     }
 
@@ -520,6 +531,10 @@ impl Principal {
             access: self.access,
             kind: self.kind,
             denied: self.denied.keys().cloned().collect(),
+            oauth: self
+                .oauth
+                .as_ref()
+                .map(|access| (access.grant_id(), access.client_id().to_owned())),
         }
     }
 }
@@ -533,6 +548,10 @@ impl Principal {
 
     /// Kind of actor: `Support` when entering through a support access grant, otherwise by credential.
     pub fn actor_kind(&self) -> ActorKind {
+        // Client OAuth luôn là agent, dù bộ xác thực có quên đặt loại (D-20261126-mcp-oauth).
+        if self.oauth.is_some() {
+            return ActorKind::Agent;
+        }
         match self.access {
             AccessPath::Support(_) => ActorKind::Support,
             _ => self.kind,

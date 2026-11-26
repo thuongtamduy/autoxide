@@ -88,7 +88,8 @@ pub fn canonical_resource(raw: &str) -> Option<String> {
     if scheme != "https" && scheme != "http" {
         return None;
     }
-    if rest.contains(['#', '?', ' ']) {
+    // Ký tự có nghĩa trong header `WWW-Authenticate` (`"`, `\`, `,`) không bao giờ có trong resource của ta.
+    if rest.contains(['#', '?', ' ', '"', '\\', ',']) {
         return None;
     }
     let (authority, path) =
@@ -188,7 +189,8 @@ impl Principal {
         };
         let (kept, withheld): (BTreeMap<_, _>, BTreeMap<_, _>) =
             held.into_iter().partition(|(name, _)| allows(name));
-        if withheld.is_empty() && matches!(self.grants, Grants::Only(_)) {
+        // Không giữ lại gì (vd scope `*`): giữ nguyên, kể cả "mọi permission" và lối tắt của nó.
+        if withheld.is_empty() {
             return self;
         }
         self.grants = Grants::Only(Arc::new(kept));
@@ -204,7 +206,11 @@ impl Principal {
 /// Adds the RFC 6750 `insufficient_scope` challenge to a `permission_denied` error when the refused permission
 /// is outside the grant's scope (`reason`); the kernel's HTTP layer adds `resource_metadata` to it.
 pub(super) fn challenge_scope(error: Error, reason: &str, permission: &str) -> Error {
-    if reason != OUTSIDE_GRANT_SCOPE {
+    // Tên permission luôn là định danh (`a-z0-9_` nối bằng `.`): không ký tự nào thoát được khỏi chuỗi trong ngoặc.
+    let identifier = permission.bytes().all(|byte| {
+        byte.is_ascii_lowercase() || byte.is_ascii_digit() || matches!(byte, b'_' | b'.')
+    });
+    if reason != OUTSIDE_GRANT_SCOPE || permission.is_empty() || !identifier {
         return error;
     }
     error.with_challenge(format!(
@@ -301,5 +307,29 @@ mod tests {
         let principal =
             Principal::with_all_permissions(Uuid::now_v7()).within_scope(&scopes(&["*"]), &catalog);
         assert!(principal.require(&OTHER).is_ok());
+        assert!(principal.has_all_permissions(), "scope `*` giữ lối tắt toàn quyền");
+        let narrowed = Principal::with_all_permissions(Uuid::now_v7())
+            .within_scope(&scopes(&["notes.*"]), &catalog);
+        assert!(!narrowed.has_all_permissions());
+    }
+
+    #[test]
+    fn client_oauth_la_agent_va_giu_loai_qua_ban_chup() {
+        let principal = Principal::new(Uuid::now_v7(), ["notes.read".to_owned()]).with_oauth(
+            OAuthAccess::new(Uuid::now_v7(), "https://c.example/app.json", "https://a.example/mcp"),
+        );
+        assert_eq!(principal.actor_kind(), super::super::ActorKind::Agent);
+        let restored = principal.snapshot().restore();
+        assert!(!restored.is_session());
+        assert_eq!(restored.credential(), principal.credential());
+        assert_eq!(restored.actor_kind(), super::super::ActorKind::Agent);
+    }
+
+    #[test]
+    fn challenge_khong_nhan_ten_la() {
+        let error = challenge_scope(Error::forbidden("x", "y"), OUTSIDE_GRANT_SCOPE, "a\",b");
+        assert!(error.challenge().is_none());
+        assert_eq!(canonical_resource("https://a.example/m\"cp"), None);
+        assert_eq!(canonical_resource("https://a.example/a,b"), None);
     }
 }

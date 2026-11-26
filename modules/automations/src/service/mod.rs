@@ -86,7 +86,11 @@ pub(crate) fn bounded(
     if let Some(fence) = limit.fence() {
         bounded = bounded.with_fence(fence);
     }
-    if let Some(key) = rule.run_as_api_key {
+    // `run_as_api_key` giữ ID credential uỷ quyền; với client OAuth, bản chụp `limit` đã mang grant (loại credential
+    // giữ nguyên, D-20261126-mcp-oauth) — không gắn nhầm thành API key.
+    if let Some(key) = rule.run_as_api_key
+        && bounded.oauth().is_none()
+    {
         bounded = bounded.via_api_key(key);
     }
     Ok(bounded.with_actor_kind(limit.actor_kind()))

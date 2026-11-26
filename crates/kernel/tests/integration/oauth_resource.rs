@@ -325,9 +325,25 @@ async fn token_chi_dung_duoc_o_resource_duoc_cap() {
         .await;
         assert_eq!(mcp_at_rest.status, StatusCode::UNAUTHORIZED);
         assert_eq!(mcp_at_rest.body["code"], "oauth_token_audience");
-        // Đường dẫn ngoài các resource (vd `/mcp/<module lạ>`) không bao giờ nhận token OAuth.
-        let unknown = mcp(app.clone(), "/mcp/unknown", Some("mcp"), list_tools()).await;
-        assert_ne!(unknown.status, StatusCode::OK);
+        // Biến thể đường dẫn: `/` cuối, ký tự mã hoá — hoặc không tới được route, hoặc bị từ chối; không bao giờ
+        // 200 với token sai audience.
+        let slash = mcp(app.clone(), "/mcp/notes/", Some("rest-read"), list_tools()).await;
+        assert_ne!(slash.status, StatusCode::OK);
+        let encoded = mcp(app.clone(), "/mcp/%6eotes", Some("rest-read"), list_tools()).await;
+        assert_ne!(encoded.status, StatusCode::OK);
+        let rest_slash = send(
+            app.clone(),
+            Request::post("/api/v1/notes/")
+                .header(header::HOST, "api.example.test")
+                .header(header::AUTHORIZATION, "Bearer notes-only")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await;
+        assert_ne!(rest_slash.status, StatusCode::OK);
+        // `/mcp/notes/` với token đúng resource vẫn dùng được nếu router nhận nó.
+        let ok = mcp(app.clone(), "/mcp/notes", Some("notes-only"), list_tools()).await;
+        assert_eq!(ok.status, StatusCode::OK);
         // Phiên đăng nhập (không audience) vẫn như cũ.
         assert_eq!(mcp(app, "/mcp", Some("session"), list_tools()).await.status, StatusCode::OK);
     })

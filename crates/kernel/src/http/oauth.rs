@@ -101,16 +101,25 @@ impl ProtectedResources {
     pub(crate) fn complete(&self, path: &str, challenge: &str) -> String {
         let resource = self.resource_path(path);
         let Some(origin) = self.issuer() else { return challenge.to_owned() };
-        if resource.is_empty()
-            || !challenge.starts_with("Bearer")
-            || challenge.contains("resource_metadata=")
-        {
+        if resource.is_empty() || !challenge.starts_with("Bearer") {
             return challenge.to_owned();
         }
         let metadata = format!("resource_metadata=\"{origin}{PROTECTED_RESOURCE_PATH}{resource}\"");
-        match challenge.strip_prefix("Bearer").map(str::trim) {
-            Some("") | None => format!("Bearer {metadata}"),
-            Some(rest) => format!("Bearer {rest}, {metadata}"),
+        if challenge.contains(&metadata) {
+            return challenge.to_owned();
+        }
+        // Một `resource_metadata` khác (không phải của resource này) không được giữ: bỏ nó rồi thêm của mình.
+        let rest: Vec<&str> = challenge
+            .strip_prefix("Bearer")
+            .unwrap_or_default()
+            .split(", ")
+            .map(str::trim)
+            .filter(|part| !part.is_empty() && !part.starts_with("resource_metadata="))
+            .collect();
+        if rest.is_empty() {
+            format!("Bearer {metadata}")
+        } else {
+            format!("Bearer {}, {metadata}", rest.join(", "))
         }
     }
 }
@@ -119,22 +128,27 @@ impl ProtectedResources {
 /// validate the audience). Fail-closed: a request path that is no resource (`/mcp`, `/mcp/<module>`, `/api/v1`)
 /// never accepts an OAuth token. Credentials without an audience (sessions, API keys) pass.
 pub(crate) fn admit_audience(parts: &Parts, principal: &Principal) -> Result<(), Error> {
-    let Some(access) = principal.oauth() else { return Ok(()) };
-    let Some(resources) = parts.extensions.get::<Resources>().map(|resources| resources.0.clone())
-    else {
-        return Err(wrong_audience());
-    };
-    let Some(origin) = resources.issuer() else { return Err(wrong_audience()) };
+    if principal.oauth().is_none() {
+        return Ok(());
+    }
+    let Some(resources) = parts.extensions.get::<Resources>() else { return Err(wrong_audience()) };
     // Router lồng (`nest`) cắt tiền tố khỏi `uri`; `OriginalUri` giữ đường dẫn đầy đủ.
     let path = parts
         .extensions
         .get::<axum::extract::OriginalUri>()
         .map_or_else(|| parts.uri.path(), |original| original.0.path());
-    let resource = resources.resource_path(path);
-    if resource.is_empty() || !access.covers(&format!("{origin}{resource}")) {
-        return Err(wrong_audience());
+    if resources.0.admits(path, principal) { Ok(()) } else { Err(wrong_audience()) }
+}
+
+impl ProtectedResources {
+    /// Whether `principal` may call `path` (full request path): always for credentials without an audience; for
+    /// an OAuth token only when its audience covers the resource `path` belongs to.
+    pub(crate) fn admits(&self, path: &str, principal: &Principal) -> bool {
+        let Some(access) = principal.oauth() else { return true };
+        let Some(origin) = self.issuer() else { return false };
+        let resource = self.resource_path(path);
+        !resource.is_empty() && access.covers(&format!("{origin}{resource}"))
     }
-    Ok(())
 }
 
 fn wrong_audience() -> Error {

@@ -16,7 +16,10 @@ kiểm độc lập (bảo mật và đối chiếu đặc tả) trước khi vi
 2. **Phân loại credential.** `Principal::credential()` = phiên đăng nhập | API key | grant OAuth. Mọi việc chỉ dành cho
    phiên của chính người dùng (tạo / duyệt credential, duyệt grant, xác nhận đã xem nội dung AI, vào khách khác qua uỷ
    quyền hay hỗ trợ) kiểm `Principal::is_session()`, không bao giờ kiểm "không có API key". Hạn mức, khoá chống gọi
-   trùng và lệnh chờ duyệt gắn với `credential_id()` (API key hay grant).
+   trùng và lệnh chờ duyệt gắn với `credential_id()` (API key hay grant). Principal có grant OAuth luôn có loại người
+   gọi `agent` (kernel bảo đảm), chỉ phiên đăng nhập được quyết lệnh chờ duyệt; bản chụp cho job giữ grant và client;
+   event ghi đường vào `oauth_grant` (`Actor::access`) để audit thấy client nào làm thay ai; luật tự động tạo qua
+   client OAuth giữ loại credential trong bản chụp.
 3. **Một issuer, resource chặt.** Bản đầu có một issuer cho cả nền tảng: `AUTOXIDE_HTTP_PUBLIC_URL` (dạng chuẩn, không
    path; có path thì OAuth tắt và log cảnh báo). Khách của grant là khách của phiên đăng nhập lúc consent. Resource
    canonical (chữ thường scheme/host, không `/` cuối): `{issuer}/mcp`, `{issuer}/mcp/<module>`, `{issuer}/api/v1`; PRM ở

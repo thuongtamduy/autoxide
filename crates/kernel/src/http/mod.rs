@@ -514,8 +514,9 @@ pub fn build(
         router = router.layer(Extension(authenticator));
     }
     // Ngoài lớp đặt sổ database và bộ xác thực, trong lớp đọc địa chỉ client (cần `ForwardedHost`).
+    let challenged = protected.clone();
     router = router.layer(middleware::from_fn(move |request: Request, next: Next| {
-        oauth::challenge(protected.clone(), request, next)
+        oauth::challenge(challenged.clone(), request, next)
     }));
 
     // `None` khi rate limiting bị tắt; lớp vẫn có mặt và cho mọi request đi qua.
@@ -527,6 +528,7 @@ pub fn build(
             body_limits: body_limits.clone(),
             request_timeout: config.request_timeout,
             databases: databases.clone(),
+            resources: protected.clone(),
         })
     });
     let _ = sync_state.router.set(sync_router(

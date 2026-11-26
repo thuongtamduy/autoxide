@@ -80,7 +80,6 @@ pub(super) struct McpCatalog {
     pub(super) tenant_limiter: Option<Arc<super::tenant_rate_limit::TenantLimiter>>,
 }
 
-/// The path of the dedicated MCP endpoint of module `module`.
 /// Names of the modules that have an MCP endpoint (`/mcp/<module>`): at least one tool, resource or prompt.
 pub(super) fn endpoint_modules(
     tools: &[Tool],
@@ -96,6 +95,7 @@ pub(super) fn endpoint_modules(
         .collect()
 }
 
+/// The path of the dedicated MCP endpoint of module `module`.
 pub(super) fn module_path(module: &str) -> String {
     format!("{MCP_PATH}/{module}")
 }

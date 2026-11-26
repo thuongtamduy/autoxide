@@ -373,7 +373,9 @@ fn may_see(principal: &Principal, approval: &ApprovalView) -> bool {
 }
 
 fn may_decide(principal: &Principal, approval: &ApprovalView) -> bool {
-    matches!(principal.actor_kind(), ActorKind::Human | ActorKind::Support)
+    // Duyệt là việc của người trong phiên đăng nhập: không API key, không client OAuth (D-20261126-mcp-oauth).
+    principal.is_session()
+        && matches!(principal.actor_kind(), ActorKind::Human | ActorKind::Support)
         && approval.permissions.iter().any(|permission| principal.allows(permission))
 }
 

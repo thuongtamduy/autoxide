@@ -55,6 +55,8 @@ pub(super) struct Settings {
     /// The database registry: idempotency records live in the database of the caller's tenant. `None`: the
     /// app has no database registry (only in tests that build the router by hand) - idempotency is skipped.
     pub databases: Option<crate::tenancy::DatabaseRegistry>,
+    /// The OAuth resources: a token used outside its audience is never served from the store (D-20261126-mcp-oauth).
+    pub resources: Arc<super::oauth::ProtectedResources>,
 }
 
 pub(super) async fn idempotency(
@@ -111,7 +113,10 @@ async fn run(
         }
         None => None,
     };
-    let Some(principal) = principal else {
+    // Token OAuth dùng sai resource: không đọc hay lưu gì, lớp xác thực bên trong trả 401 (D-20261126-mcp-oauth).
+    let Some(principal) =
+        principal.filter(|principal| settings.resources.admits(request.uri().path(), principal))
+    else {
         return Ok(next.run(request).await);
     };
     let Some(databases) = &settings.databases else {
