@@ -3,7 +3,13 @@
 # Phạm vi, số shard và ngưỡng nằm ở `docs/quality/mutation.json` (một nguồn); job `plan` dựng matrix từ đó. Không chặn PR;
 # đỏ khi (a) số mutant sống của một nhóm tệ hơn ngưỡng, hoặc (b) thiếu shard (quá giờ / bị huỷ không được tính là đạt).
 # Chỉ chạy khi repo công khai (D-197). Đo thử trên máy 4 core: kernel ≈ 3 phút mỗi mutant (build lại kernel và
-# testkit), module nhỏ như `tax` ≈ 10 giây — số shard chọn theo đó, mỗi job dưới ~3 giờ.
+# testkit), module nhỏ như `tax` ≈ 7 giây — số shard chọn theo đó để mỗi job dự kiến dưới ~3 giờ, còn giới hạn cứng là
+# 330 phút (`timeout-minutes` của job `mutants`); shard hết giờ bị đánh dấu dở dang và báo đỏ, không bị bỏ qua.
+#
+# GIỚI HẠN CẦN BIẾT: chỉ chạy `--lib` (unit test) trên SQLite. Mutant mà chỉ test tích hợp (thư mục `tests/`) hay đường
+# riêng của PostgreSQL mới bắt được sẽ hiện là "sống" sai; ngược lại mutant sống ở đây không có nghĩa là hai database
+# đều thiếu test. Đọc danh sách mutant sống như danh sách chỗ cần xem, không phải kết luận. Chạy thêm trên Postgres và
+# test tích hợp là việc để sau (ghi ở docs/ROADMAP.md, 71-G9).
 name: Mutation testing
 
 on:
@@ -64,7 +70,10 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           save-if: false
-      - run: cargo install cargo-mutants --version 27.1.0 --locked
+      # Tải bản dựng sẵn (ghim phiên bản) thay vì `cargo install` ở từng shard: nhiều shard, mỗi cái biên dịch lại ~2 phút.
+      - uses: taiki-e/install-action@25f51f6b1bf4e18876107cece836f4f77ac17c8c # v2.90.7
+        with:
+          tool: cargo-mutants@27.1.0
       # Mã thoát của cargo-mutants: 0 không còn mutant sống; 2 có mutant sống; 3 có mutant quá giờ — cả ba đều là kết
       # quả hợp lệ (script gộp mới phán đạt hay không). Mã khác (1 dùng sai, 4 baseline hỏng…) là lỗi thật.
       - name: Run cargo-mutants

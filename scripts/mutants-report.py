@@ -5,7 +5,7 @@
 
 Mỗi thư mục con là một artifact `mutants.out` của một shard (có `outcomes.json`). Chỉ dùng thư viện chuẩn.
 Ghi báo cáo Markdown ra stdout (và vào $GITHUB_STEP_SUMMARY nếu có). Thoát mã 1 khi: một nhóm thiếu shard
-(job bị huỷ / quá giờ, không được tính là đạt), hoặc số mutant sống vượt ngưỡng `baseline`. Ngưỡng `null`
+(job bị huỷ / quá giờ, kết quả dở dang — không được tính là đạt), hoặc số mutant sống vượt ngưỡng `baseline`. Ngưỡng `null`
 (chưa đo) không làm đỏ, nhưng in số đo để điền vào file cấu hình.
 """
 import json
@@ -20,7 +20,14 @@ def main() -> int:
     config = json.loads(config_path.read_text())
     totals = {}
     for unit in config["units"]:
-        totals[unit["name"]] = {"shards": set(), "missed": [], "caught": 0, "timeout": 0, "unviable": 0}
+        totals[unit["name"]] = {
+            "shards": set(),
+            "incomplete": [],
+            "missed": [],
+            "caught": 0,
+            "timeout": 0,
+            "unviable": 0,
+        }
     for outcomes_file in sorted(results_dir.glob("**/outcomes.json")):
         # Tên thư mục artifact: mutants-<nhóm>-<k>
         parts = outcomes_file.relative_to(results_dir).parts
@@ -30,13 +37,22 @@ def main() -> int:
         unit, _, shard = label.removeprefix("mutants-").rpartition("-")
         if unit not in totals:
             continue
+        # Shard bị huỷ / quá giờ vẫn upload được `mutants.out` dở dang: `outcomes.json` chỉ có phần đã chạy xong, đếm
+        # nó là báo xanh sai. Shard chỉ được tính khi số kết quả (không kể baseline) bằng số mutant của shard đó.
+        try:
+            outcomes = json.loads(outcomes_file.read_text())["outcomes"]
+            expected = len(json.loads((outcomes_file.parent / "mutants.json").read_text()))
+        except (OSError, ValueError, KeyError):
+            totals[unit]["incomplete"].append(f"{shard} (không đọc được kết quả)")
+            continue
+        results = [outcome for outcome in outcomes if outcome["scenario"] != "Baseline"]
+        if len(results) != expected:
+            totals[unit]["incomplete"].append(f"{shard} ({len(results)}/{expected} mutant)")
+            continue
         totals[unit]["shards"].add(shard)
-        for outcome in json.loads(outcomes_file.read_text())["outcomes"]:
+        for outcome in results:
             summary = outcome["summary"]
-            scenario = outcome["scenario"]
-            if scenario == "Baseline":
-                continue
-            name = scenario["Mutant"]["name"]
+            name = outcome["scenario"]["Mutant"]["name"]
             if summary == "MissedMutant":
                 totals[unit]["missed"].append(name)
             elif summary == "CaughtMutant":
@@ -57,7 +73,9 @@ def main() -> int:
         measured[name] = missed
         limit = config["baseline"].get(name)
         if len(data["shards"]) < unit["shards"]:
-            verdict = f"THIẾU SHARD ({len(data['shards'])}/{unit['shards']})"
+            verdict = f"THIẾU SHARD ({len(data['shards'])}/{unit['shards']} đủ kết quả)"
+            if data["incomplete"]:
+                verdict += "; dở dang: " + ", ".join(sorted(data["incomplete"]))
             failed = True
         elif limit is None:
             verdict = "chưa có ngưỡng"
