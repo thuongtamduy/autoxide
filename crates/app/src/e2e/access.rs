@@ -54,8 +54,6 @@ const PAGE_BEFORE_PERMISSION: &[&str] = &[
     "GET /api/v1/invoices/documents",
     "GET /api/v1/invoices/mandates",
     "GET /api/v1/invoices/series",
-    "GET /api/v1/kernel/sandbox/messages",
-    "GET /api/v1/kernel/tenants/{id}/sandboxes",
     "GET /api/v1/ledger/accounts",
     "GET /api/v1/ledger/accounts/{id}/lines",
     "GET /api/v1/ledger/bank-accounts",
@@ -77,7 +75,6 @@ const PAGE_BEFORE_PERMISSION: &[&str] = &[
     "GET /api/v1/orders/carts",
     "GET /api/v1/orders/returns",
     "GET /api/v1/orders/reviews",
-    "GET /api/v1/tax/profiles",
 ];
 
 const SAMPLE_ID: &str = "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11";

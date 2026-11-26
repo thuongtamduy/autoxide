@@ -613,6 +613,8 @@ async fn list_profiles(
     principal: Principal,
     Query(page): Query<PageQuery>,
 ) -> Result<Page<ProfileResponse>, Error> {
+    // Quyền trước tham số trang: người không có quyền nhận 403, không phải 422 (D-20261126-list-pages-cluster-2).
+    reader(&principal)?;
     let page = service.list_profiles(&tenant, &principal, &PageRequest::try_from(page)?).await?;
     Ok(page.map(|row| respond(&row, None)))
 }
