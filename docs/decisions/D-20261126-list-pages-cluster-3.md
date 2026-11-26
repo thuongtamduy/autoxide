@@ -2,6 +2,10 @@
 
 Chủ đề: HTTP, REST, OpenAPI
 
+Cách đánh số: "cụm" đếm các lượt chuyển module (cụm 1 = #527, cụm 2 = PR này, changelog
+`p9-list-pages-cluster-2`); hậu tố của ID quyết định đếm các quyết định của đợt (D-20261126-list-pages-cluster-2 là
+quyết định của #529, không chuyển module nào), nên quyết định của cụm 2 mang hậu tố `cluster-3`.
+
 Quyết định: ghi lại các lựa chọn của PR đại trà cụm 2 (bước 70 P9 mục 3: plans, tax, organizations, analytics, kernel
 `/me/*`, `customers/me/wishlist`, `notifications/templates`), bổ sung D-20261125-list-pages:
 
@@ -15,10 +19,13 @@ Quyết định: ghi lại các lựa chọn của PR đại trà cụm 2 (bư�
      `kernel` `/me/permissions`;
    - bị chặn theo cấu trúc: tổ tiên của nút `organizations` (độ sâu cây);
    - dữ liệu từ database, có lý do: năm bảng thuế (`tax` jurisdictions / categories / rates / withholding-rates /
-     rules — dữ liệu nền chung đã nằm trọn trong bộ nhớ đệm của bộ máy tính thuế) và năm bảng xếp hạng `analytics`
-     (pages / sources / campaigns / types / objects — tổng `GROUP BY` của khoảng ngày tính lại mỗi lần, như
-     `inventory` valuation; khoá `(MAX - số đếm, giá trị)` nên nhiều nhất trước). Giới hạn đã biết: một trang xếp hạng
-     vẫn kéo mọi nhóm của khoảng ngày về bộ nhớ; nếu đo được chậm thì chuyển sang bảng tổng hợp có index.
+     rules — dữ liệu nền chung đã nằm trọn trong bộ nhớ đệm của bộ máy tính thuế).
+   - Năm bảng xếp hạng `analytics` (pages / sources / campaigns / types / objects) KHÔNG dùng `page_of`: keyset ngay
+     trong SQL trên tổng của nhóm — `HAVING SUM(x) < n OR (SUM(x) = n AND value > v) ORDER BY SUM(x) DESC, value
+     LIMIT limit + 1` (đảo chiều khi `order=desc`), chạy được trên cả hai database; `count=true` đếm trên subquery
+     `GROUP BY`. Con trỏ dựng bằng `text_key_cursor` / `PageRequest::text_key_after` mới của kernel (khoá chữ
+     `<tổng>\u{1f}<giá trị>`) — dùng cho mọi danh sách sắp theo một biểu thức không phải cột. Số nhóm của khoảng ngày
+     theo dữ liệu khách (đường dẫn trang, đối tượng — có thể hàng trăm nghìn) nên không được kéo hết về bộ nhớ.
 3. **Thứ tự đổi có chủ đích** (changelog `p9-list-pages-cluster-2.changed.md`): `plans` overrides mới nhất trước,
    store products theo product_id; `tax` packs gói nhập gần nhất trước; `organizations` cửa hàng công khai cùng
    `position` thì theo id nút; mẫu thông báo theo loại rồi thứ tự ghi lần đầu; xếp hạng `analytics` `limit` theo quy

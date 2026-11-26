@@ -20,30 +20,43 @@ async fn xep_hang_phan_trang_nhieu_nhat_truoc_va_tool_nhu_rest() {
         h.send(None, &browser("203.0.113.1", CHROME), None, events, at(10, 9)).await;
         h.service.rollup_tenant(&h.tenant, at(10, 12)).await.unwrap();
         let app = &h.app;
-        let walk = async |query: &str| {
+        let walk_by = async |limit: u32, query: &str| {
             let mut values = Vec::new();
-            let mut uri = format!("/api/v1/analytics/pages?{RANGE}&limit=2{query}");
+            let mut uri = format!("/api/v1/analytics/pages?{RANGE}&limit={limit}{query}");
             loop {
                 let answer = app.get(&uri).token("boss").send().await.unwrap();
                 assert_eq!(answer.status(), StatusCode::OK, "{}", answer.text());
                 let body = answer.json();
                 let rows = body["data"].as_array().unwrap();
-                assert!(rows.len() <= 2);
+                assert!(rows.len() <= limit as usize);
                 values.extend(rows.iter().map(|row| row["value"].as_str().unwrap().to_owned()));
                 match body["pagination"]["next_cursor"].as_str() {
                     Some(cursor) => {
                         uri = format!(
-                            "/api/v1/analytics/pages?{RANGE}&limit=2{query}&cursor={cursor}"
+                            "/api/v1/analytics/pages?{RANGE}&limit={limit}{query}&cursor={cursor}"
                         );
                     }
                     None => return values,
                 }
             }
         };
-        let up = walk("").await;
+        let up = walk_by(2, "").await;
         assert_eq!(up, ["/a", "/c", "/d", "/b", "/e"]);
-        let down = walk("&order=desc").await;
+        let down = walk_by(2, "&order=desc").await;
         assert_eq!(down, up.iter().rev().cloned().collect::<Vec<_>>());
+        // Keyset trong SQL (`HAVING` trên tổng): mọi cỡ trang, kể cả trang cắt giữa hai giá trị hoà, ghép lại
+        // đúng bằng một trang lớn.
+        for limit in [1, 3, 4] {
+            assert_eq!(walk_by(limit, "").await, up, "limit {limit}");
+            assert_eq!(walk_by(limit, "&order=desc").await, down, "limit {limit} desc");
+        }
+        assert_eq!(walk_by(200, "").await, up);
+        let forged = autoxide_kernel::pagination::text_key_cursor("rank", "not-a-number");
+        let tampered = app
+            .get(&format!("/api/v1/analytics/pages?{RANGE}&cursor={forged}"))
+            .token("boss")
+            .send();
+        assert_eq!(tampered.await.unwrap().status(), StatusCode::UNPROCESSABLE_ENTITY);
         let wrong =
             app.get(&format!("/api/v1/analytics/pages?{RANGE}&limit=0")).token("boss").send();
         assert_eq!(wrong.await.unwrap().status(), StatusCode::UNPROCESSABLE_ENTITY);

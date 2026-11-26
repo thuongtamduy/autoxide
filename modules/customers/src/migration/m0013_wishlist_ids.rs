@@ -65,6 +65,8 @@ impl MigrationTrait for Migration {
             if rows.is_empty() {
                 break;
             }
+            // Lô phải tiến: không dòng nào được cập nhật thì vòng sẽ lặp mãi trên cùng các dòng — báo lỗi thay vì treo.
+            let mut updated = 0;
             for row in rows {
                 let tenant: Uuid = row.try_get("", "tenant_id")?;
                 let profile: Uuid = row.try_get("", "profile_id")?;
@@ -78,7 +80,14 @@ impl MigrationTrait for Migration {
                     .and_where(Expr::col("product_id").eq(product))
                     .and_where(Expr::col("variant_key").eq(variant))
                     .to_owned();
-                connection.execute(&update).await?;
+                updated += connection.execute(&update).await?.rows_affected();
+            }
+            if updated == 0 {
+                return Err(DbErr::Custom(
+                    "filling the new `id` column made no progress: a batch of rows without an id matched no \
+                     update"
+                        .to_owned(),
+                ));
             }
         }
         if manager.get_database_backend() == DbBackend::Postgres {

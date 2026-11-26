@@ -169,6 +169,15 @@ impl KeyCursor {
     }
 }
 
+/// Cursor of a list ordered by something that is not one column (an aggregate such as a `SUM` of a `GROUP BY`):
+/// the module builds a text `key` from the last item that orders the same way as the list, and the next page
+/// starts after it ([`PageRequest::text_key_after`]). `column` names the ordering, so a cursor of another list
+/// is refused.
+pub fn text_key_cursor(column: &str, key: &str) -> String {
+    KeyCursor { column: column.to_owned(), value: SortValue::Text(key.to_owned()), id: Uuid::nil() }
+        .encode()
+}
+
 fn wrong_cursor() -> Error {
     Error::validation(vec![FieldError::new(
         "cursor",
@@ -216,6 +225,19 @@ impl PageRequest {
 
     pub fn order(&self) -> Order {
         self.order
+    }
+
+    /// The key of a [`text_key_cursor`] for the ordering `column`: `None` on the first page; a cursor of another
+    /// list or ordering is a 422 on `cursor`.
+    pub fn text_key_after(&self, column: &str) -> Result<Option<String>, Error> {
+        match &self.position {
+            None => Ok(None),
+            Some(Position::Key(cursor)) if cursor.column == column => match &cursor.value {
+                SortValue::Text(key) => Ok(Some(key.clone())),
+                _ => Err(wrong_cursor()),
+            },
+            Some(_) => Err(wrong_cursor()),
+        }
     }
 }
 
@@ -619,6 +641,18 @@ where
 mod tests {
     use super::*;
     use crate::error::ErrorKind;
+
+    // Con trỏ khoá chữ (danh sách sắp theo tổng): đọc lại đúng khoá; con trỏ của thứ tự khác hay của id là 422.
+    #[test]
+    fn con_tro_khoa_chu_doc_lai_dung_va_tu_choi_thu_tu_khac() {
+        let cursor = text_key_cursor("rank", "42\u{1f}/a");
+        let request = PageRequest::try_from(query(None, Some(&cursor), None)).unwrap();
+        assert_eq!(request.text_key_after("rank").unwrap().as_deref(), Some("42\u{1f}/a"));
+        assert_eq!(request.text_key_after("other").unwrap_err().fields()[0].field, "cursor");
+        assert_eq!(PageRequest::default().text_key_after("rank").unwrap(), None);
+        let by_id = PageRequest::default().after(Uuid::now_v7());
+        assert!(by_id.text_key_after("rank").is_err());
+    }
 
     fn query(limit: Option<&str>, cursor: Option<&str>, order: Option<&str>) -> PageQuery {
         PageQuery {

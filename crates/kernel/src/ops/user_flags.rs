@@ -162,8 +162,7 @@ impl UserFlags {
         UserFlags { max }
     }
 
-    /// The caller's flags, ordered by key; `prefix` (well-formed key, may be empty) filters by
-    /// prefix. At most `max` flags, so all are returned at once.
+    /// `prefix` (well-formed key, may be empty) filters by prefix.
     /// One page of the caller's flags, by key (keyset in the database on the unique index
     /// `(tenant_id, user_id, key)`: the key is unique per user, so the ID never breaks a tie). `page` is
     /// the parsed paging parameters: a wrong `prefix` and wrong paging parameters are reported together.

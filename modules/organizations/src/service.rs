@@ -568,7 +568,7 @@ impl OrgService {
         Ok(after)
     }
 
-    /// Mọi loại nút của khách, theo mã. Cần `organizations.units.read` ở bất kỳ độ sâu nào.
+    /// Cần `organizations.units.read` ở bất kỳ độ sâu nào.
     /// Loại nút của khách theo mã, keyset trong database. Bảng không có cột ID riêng: khoá chính
     /// (`tenant_id`, `code`) và mọi câu lọc một khách, nên mã đã duy nhất trong câu — cột phụ phá hoà
     /// của keyset là `tenant_id` (bằng nhau trên mọi dòng, không bao giờ quyết thứ tự; cursor chỉ mang
