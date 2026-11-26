@@ -34,3 +34,4 @@ Ví dụ `curl` gửi JSON bằng `--json '…'`, cần curl 7.82 trở lên (`c
 Cho lập trình viên mở rộng core:
 
 - [Viết module ở repo riêng của bạn](writing-a-module.vi.md): module và máy chủ của bạn bên cạnh các module chính thức, test trên cả hai database, không cần fork
+- [Lỗi biên dịch Rust hay gặp khi viết module](rust-errors.vi.md): bảy lỗi của tuần đầu, nghĩa của chúng ở đây và cách sửa (cho người phát triển)

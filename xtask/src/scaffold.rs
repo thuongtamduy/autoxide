@@ -441,6 +441,8 @@ mod tests {
             "README.vi.md",
             "AGENTS.md",
             "CLAUDE.md",
+            ".cursor/rules/module.mdc",
+            ".github/copilot-instructions.md",
             ".github/workflows/ci.yml",
         ] {
             assert!(relative.contains(&expected.to_owned()), "{expected} missing: {relative:?}");
