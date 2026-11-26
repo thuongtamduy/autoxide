@@ -107,6 +107,8 @@ pub(crate) struct SearchCache {
     /// Ngân sách tìm công khai theo ý nghĩa của từng khách: (đầu phút, số lần đã dùng trong
     /// phút đó). Khách này tiêu hết không làm khách kia mất tìm theo ý nghĩa.
     public_budget: Mutex<HashMap<TenantId, (Instant, u32)>>,
+    /// Chốt của tìm công khai: số lượt cùng lúc, số lượt mỗi phút theo địa chỉ (PT-15).
+    pub(crate) public_limits: super::public_limits::PublicLimits,
 }
 
 impl SearchCache {
@@ -376,6 +378,34 @@ impl ContentService {
         transaction.commit().await?;
         tracing::info!(entries = missing.len(), "content entries queued for the search index");
         Ok(missing.len())
+    }
+
+    /// Tìm công khai trên website `site` của người đọc ở địa chỉ `ip`, qua các chốt của
+    /// [`public_limits`](super::public_limits): tìm công khai tắt thì 404 như [`search`](Self::search); bật thì giới hạn
+    /// theo địa chỉ, số lượt cùng lúc, và trần thời gian.
+    pub(crate) async fn search_public(
+        &self,
+        tenant: &TenantContext,
+        principal: Option<&Principal>,
+        query: &SearchQuery,
+        site: &autoxide_kernel::tenancy::Site,
+        ip: Option<std::net::IpAddr>,
+    ) -> Result<Vec<Hit>, Error> {
+        if !self.config.public_semantic_search {
+            return self.search(tenant, principal, query, Some(site)).await;
+        }
+        let _slot = self.search_cache.public_limits.admit(
+            ip,
+            self.config.public_search_per_address,
+            self.config.public_search_concurrency,
+        )?;
+        // Quá giờ thì future tìm bị huỷ (truy vấn đọc dở được bỏ), chỗ chạy trả lại khi `_slot` bị huỷ.
+        tokio::time::timeout(
+            super::public_limits::TIMEOUT,
+            self.search(tenant, principal, query, Some(site)),
+        )
+        .await
+        .map_err(|_| super::public_limits::timed_out())?
     }
 
     /// Tìm bản nháp (người biên tập; cần `content.read`) hay bản công khai (`public`, không cần

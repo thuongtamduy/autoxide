@@ -186,3 +186,44 @@ async fn embedding_tat_chi_tim_theo_chu() {
     .await
     .unwrap();
 }
+
+/// PT-15: tìm công khai qua các chốt — hết chỗ chạy thì 429 `content.public_search_busy` ngay (không chờ, không làm chậm
+/// request khác), một địa chỉ tìm quá số lượt mỗi phút thì 429 `content.public_search_rate_limited`; địa chỉ khác vẫn tìm
+/// được. Tìm công khai tắt thì vẫn 404 như trước, không bị tính lượt.
+#[tokio::test]
+async fn tim_cong_khai_co_cho_va_gioi_han_theo_dia_chi() {
+    TestDatabase::run(async |test| {
+        let (content, _, database) = service_with(
+            test,
+            config(&[
+                ("AUTOXIDE_CONTENT_PUBLIC_SEMANTIC_SEARCH", "true"),
+                ("AUTOXIDE_CONTENT_PUBLIC_SEARCH_CONCURRENCY", "2"),
+                ("AUTOXIDE_CONTENT_PUBLIC_SEARCH_PER_ADDRESS_PER_MINUTE", "3"),
+            ]),
+            Arc::new(FakeTextModel::disabled()),
+            Arc::new(FakeEmbedder::disabled()),
+        )
+        .await;
+        let tenant = TenantContext::default_on(database.clone());
+        let site = Site::whole(&tenant);
+        let reader: Option<std::net::IpAddr> = "203.0.113.7".parse().ok();
+        let other: Option<std::net::IpAddr> = "198.51.100.9".parse().ok();
+        let q = query("đà lạt");
+        let search = |ip| content.search_public(&tenant, None, &q, &site, ip);
+        // Hai lượt đang chạy giữ hết chỗ: lượt mới bị từ chối ngay.
+        let limits = &content.search_cache.public_limits;
+        let held = (limits.admit(None, 100, 2).unwrap(), limits.admit(None, 100, 2).unwrap());
+        assert_eq!(search(other).await.unwrap_err().code(), "content.public_search_busy");
+        drop(held);
+        // Theo địa chỉ: 3 lượt mỗi phút (lượt bị từ chối vì hết chỗ ở trên là của địa chỉ khác).
+        for _ in 0..3 {
+            search(reader).await.unwrap();
+        }
+        let limited = search(reader).await.unwrap_err();
+        assert_eq!(limited.code(), "content.public_search_rate_limited");
+        assert!(limited.retry_after().is_some());
+        search(other).await.unwrap();
+    })
+    .await
+    .unwrap();
+}

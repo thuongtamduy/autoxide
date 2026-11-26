@@ -4,6 +4,7 @@
 //! Step 33+ adds `tenancy` here; step 36 adds `numbering` (gap-free sequential numbering).
 
 pub mod backup;
+pub(crate) mod busy;
 pub mod database;
 pub mod migration;
 pub mod numbering;

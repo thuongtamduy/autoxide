@@ -17,6 +17,7 @@ pub(crate) mod einvoice_sepay;
 pub(crate) mod ghn;
 pub(crate) mod guides;
 pub(crate) mod guides_endpoints;
+pub(crate) mod idle_polling;
 pub(crate) mod inventory;
 pub(crate) mod invoices;
 pub(crate) mod invoices_print;

@@ -324,7 +324,10 @@ thật (P7).
         ghi), 18 `x-permissions` thiếu đã bổ sung, hai test e2e giữ (D-20261126-permission-gate)
   - [x] PT-16, PT-17: slug tự sinh tìm theo nhóm ứng viên `slug IN (…)` dùng unique index (content, catalog); bộ
         phát event và worker xét lệnh dừng giữa hai lượt cả khi còn việc (tắt nhanh sau đợt tải)
-  - [ ] PT-15, poll outbox: tìm công khai không làm nghẽn server, giảm câu SQL nền khi rảnh (PR 3c)
+  - [x] PT-15, poll outbox: tìm công khai có trần số lượt cùng lúc, theo địa chỉ và thời gian; lượt rảnh của bộ phát
+        event và worker còn một câu `EXISTS` mỗi database (D-20261126-idle-polling)
+  - [ ] PT-15 triệt để: chỉ mục tìm chữ chạy trên cả hai database (FTS5 / `tsvector` sau một trait) thay cho
+        `LIKE '%q%'` quét mọi bài đã đăng — các chốt hiện có chỉ giữ máy chủ không nghẽn, mỗi lượt tìm vẫn quét
   - [ ] PT-11, PT-12, PT-18 và chỗ vướng cho việc test (bộ mồi dữ liệu thương mại, tool MCP trỏ operationId REST,
         đếm câu SQL theo request) (PR 4, sau #516)
 
