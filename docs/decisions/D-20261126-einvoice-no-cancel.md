@@ -16,6 +16,13 @@ Căn cứ (rà pháp lý vòng 1, LG-9): NĐ 123/2020/NĐ-CP Điều 19 sửa b�
 ([MISA](https://amis.misa.vn/?p=80258), [einvoice.vn](https://einvoice.vn/tin-tuc/huong-dan-xu-ly-hoa-don-dien-tu-co-sai-sot-theo-nghi-dinh-70-2025-nd-cp)).
 Nguồn thứ cấp — **cần đối chiếu văn bản gốc**: các trường hợp còn được huỷ (vd huỷ giao dịch) và khi nào bắt buộc 04/SS.
 
+Sau kiểm độc lập: quy tắc tra theo **ngày thuế lúc huỷ** (`TaxEngine::tax_date(người bán, bây giờ)`), không theo ngày lập
+— chặt hơn: hoá đơn lập trước 01/6/2025 cũng không huỷ được sau mốc (**cần đối chiếu quy định chuyển tiếp của NĐ
+70/2025**). Trạng thái được so lại trong transaction đã khoá; đổi giữa chừng thì `invoices.not_cancellable`, gọi lại.
+`plans` huỷ kỳ thu phí gặp `invoices.einvoice_not_cancellable` thì lập điều chỉnh giảm toàn bộ (`reference`
+`plans:<kỳ>:void`, chạy lại không lập hai lần) rồi phát hành. Hoá đơn điều chỉnh, thay thế (cả khi sửa nháp) tính thuế
+theo ngày của hoá đơn gốc.
+
 Lý do: trước đây `invoices` gọi `cancel` của nhà cung cấp, SePay luôn trả `not_supported`, người dùng nhận lỗi khó hiểu
 và không biết phải làm gì. Từ chối sớm với căn cứ và hướng đi đúng luật thì rõ hơn, và đóng luôn khe hở huỷ khi job gửi
 hoá đơn chưa chạy (trạng thái `issued`).

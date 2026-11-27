@@ -229,7 +229,7 @@ impl InvoicesService {
         let recomputed = if current.status == "draft" {
             // Điều chỉnh / thay thế: thuế theo ngày của chứng từ gốc, không theo ngày lập.
             let original = match current.related_document_id {
-                Some(original) => self.original_tax_date(tenant, original).await?,
+                Some(original) => self.original_tax_date(database.read(), tenant, original).await?,
                 None => None,
             };
             let on = original.or(current.issue_date).unwrap_or(today);
@@ -799,7 +799,9 @@ impl InvoicesService {
         };
         if let Some(name) = provider.filter(|_| row.status != "rejected") {
             let seller = OrgId::from_uuid(row.on_behalf_of_org_id.unwrap_or(row.org_id));
-            let on = row.issue_date.unwrap_or_else(|| Timestamp::now().date_utc());
+            // Luật áp ở thời điểm huỷ (chặt hơn: hoá đơn lập trước mốc vẫn không huỷ được sau mốc) — ngày
+            // thuế của lúc này, theo múi giờ vùng thuế (cần đối chiếu quy định chuyển tiếp của NĐ 70/2025).
+            let on = self.tax.tax_date(tenant, seller, Timestamp::now()).await?;
             if let Some(basis) = self.tax.einvoice_cancel_forbidden(tenant, seller, on).await? {
                 return Err(einvoice_not_cancellable(basis));
             }
@@ -810,7 +812,7 @@ impl InvoicesService {
                     .await?;
             }
         }
-        let outbox = &self.outbox;
+        let (outbox, seen) = (&self.outbox, &row.status);
         let saved = database
             .write_with_retry(move || async move {
                 let transaction = database.begin_write().await?;
@@ -819,6 +821,15 @@ impl InvoicesService {
                     .ok_or_else(document_not_found)?;
                 if row.status == "cancelled" {
                     return Ok(row);
+                }
+                // Trạng thái đã đổi từ lúc kiểm (vd `rejected` vừa được gửi lại): quyết định ở trên không còn
+                // đúng — từ chối, người gọi thử lại.
+                if &row.status != seen {
+                    return Err(Error::conflict(
+                        "invoices.not_cancellable",
+                        "A document in status `{status}` cannot be cancelled.",
+                    )
+                    .with_param("status", row.status));
                 }
                 let mut active: document::ActiveModel = row.into();
                 active.status = Set("cancelled".to_owned());
@@ -998,7 +1009,7 @@ impl JobHandler for PollJob {
 fn einvoice_not_cancellable(legal_basis: String) -> Error {
     Error::conflict(
         "invoices.einvoice_not_cancellable",
-        "This e-invoice was sent to the tax authority and the law of the seller's tax jurisdiction does not \
+        "This e-invoice was sent (or is being sent) to the tax authority and the law of the seller's tax jurisdiction does not \
          allow cancelling it ({legal_basis}). Issue an adjustment instead (`POST .../documents/<id>/adjust`, \
          `direction` `decrease` to cancel the whole amount) or a replacement (`POST .../documents/<id>/replace`).",
     )

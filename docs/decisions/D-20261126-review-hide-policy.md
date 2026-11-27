@@ -6,7 +6,9 @@ Quyết định: Trait `ModerationPolicy` chuyển từ `autoxide_compliance::ap
 re-export, cùng một trait, không phá vỡ). `orders` lấy nó bằng `require().ok()`; khi có, ẩn đánh giá phải qua
 `check_hide_reason(tenant, "reviews", mã)` sau khi mã có trong danh sách lý do của `orders`. Ánh xạ mã: `unlawful_content`
 → `illegal_content`, `abusive_language` → `offensive`, `spam_or_advertising` → `spam`, `not_about_product` → `unrelated`,
-`personal_data` giữ nguyên; mã khách tự thêm giữ nguyên nên bị quy tắc luật từ chối. Chưa cài `compliance`: như cũ.
+`personal_data` giữ nguyên; mã khách tự thêm giữ nguyên nên bị quy tắc luật từ chối. Chưa cài `compliance`, hay vùng pháp lý của khách không có quy tắc
+`moderation.hide_reasons` đang hiệu lực: không giới hạn theo luật, chỉ danh sách của `orders` (luật không cấm thì không
+chặn).
 
 Căn cứ (rà pháp lý vòng 1, LG-12): Luật Bảo vệ quyền lợi người tiêu dùng 19/2023/QH15 và NĐ 55/2024/NĐ-CP (không ẩn đánh
 giá của người tiêu dùng trái quy định) — cần đối chiếu điều cụ thể.

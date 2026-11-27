@@ -521,6 +521,27 @@ mod tests {
     }
 
     #[test]
+    fn goi_tu_choi_quy_tac_mui_gio_va_huy_hoa_don_sai_dang() {
+        let text = r#"{"code": "x", "version": 1, "checked_on": "2026-01-01", "source_note": "",
+            "jurisdictions": [{"code": "XX", "name": "X", "default_currency": "VND"}],
+            "categories": [], "rates": [],
+            "rules": [
+              {"jurisdiction": "XX", "code": "einvoice.cancel_after_submission", "value": {"allowed": "no"}, "effective_from": "2026-01-01", "effective_to": null, "legal_basis": ""},
+              {"jurisdiction": "XX", "code": "tax_date.time_zone", "value": {"time_zone": "Mars/Base"}, "effective_from": "2026-01-01", "effective_to": null, "legal_basis": ""}
+            ]}"#;
+        let error = parse_pack(text).unwrap_err();
+        let messages: Vec<&str> =
+            error.fields().iter().map(|field| field.message.as_str()).collect();
+        assert!(
+            messages
+                .iter()
+                .any(|message| message.contains("`value.allowed` must be true or false")),
+            "{messages:?}"
+        );
+        assert!(messages.iter().any(|message| message.contains("IANA time zone")), "{messages:?}");
+    }
+
+    #[test]
     fn goi_tu_choi_thue_theo_don_vi_am_va_thue_suat_qua_tran() {
         let text = r#"{"code": "x", "version": 1, "checked_on": "2026-01-01", "source_note": "",
             "jurisdictions": [{"code": "XX", "name": "X", "default_currency": "VND"}],

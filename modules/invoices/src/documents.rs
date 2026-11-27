@@ -315,12 +315,13 @@ impl InvoicesService {
     /// Ngày tính thuế của chứng từ gốc `id` (điều chỉnh, thay thế giữ thuế suất của nó): ngày lập của nó.
     pub(crate) async fn original_tax_date(
         &self,
+        connection: &impl ConnectionTrait,
         tenant: &TenantContext,
         id: Uuid,
     ) -> Result<Option<Date>, Error> {
         Ok(document::Entity::find_by_id(id)
             .scoped(tenant)
-            .one(tenant.database().read())
+            .one(connection)
             .await?
             .and_then(|found| found.issue_date))
     }
@@ -359,10 +360,13 @@ impl InvoicesService {
             return Err(Error::internal("a checked reference went missing"));
         };
         let seller = draft.on_behalf_of.unwrap_or(draft.org);
+        let database = tenant.database();
         // Ngày tính thuế: điều chỉnh / thay thế theo ngày của chứng từ gốc (thuế suất của hoá đơn bị điều
         // chỉnh); không thì ngày lập đã nêu, hay hôm nay theo múi giờ của vùng thuế người bán (LG-2).
         let original_date = match &related {
-            Some((original, _, _)) => self.original_tax_date(tenant, *original).await?,
+            Some((original, _, _)) => {
+                self.original_tax_date(database.read(), tenant, *original).await?
+            }
             None => None,
         };
         let on = match (original_date, draft.issue_date) {
@@ -390,7 +394,6 @@ impl InvoicesService {
             "buyer": draft.buyer, "lines": draft.lines, "source_id": draft.source_id,
             "related": related.as_ref().map(|(id, relation, direction)| json!([id, relation, direction])),
         }))?;
-        let database = tenant.database();
         let (reference, fingerprint, draft, computed, related) =
             (&reference, &fingerprint, &draft, &computed, &related);
         let outcome = reference::submit_once(database, move || async move {
@@ -581,9 +584,15 @@ impl InvoicesService {
         };
         let currency = Currency::parse(&found.currency)?;
         let seller = OrgId::from_uuid(found.on_behalf_of_org_id.unwrap_or(found.org_id));
-        let on = match issue_date {
-            Some(day) => day,
-            None => self.tax.tax_date(tenant, seller, Timestamp::now()).await?,
+        let database = tenant.database();
+        // Nháp điều chỉnh / thay thế: thuế theo ngày của chứng từ gốc, như lúc tạo (kiểm độc lập #575, C).
+        let original_date = match found.related_document_id {
+            Some(original) => self.original_tax_date(database.read(), tenant, original).await?,
+            None => None,
+        };
+        let on = match (original_date, issue_date) {
+            (Some(day), _) | (None, Some(day)) => day,
+            (None, None) => self.tax.tax_date(tenant, seller, Timestamp::now()).await?,
         };
         let computed = match &lines {
             Some(lines) => Some(
@@ -603,7 +612,6 @@ impl InvoicesService {
             ),
             None => None,
         };
-        let database = tenant.database();
         let transaction = database.begin_write().await?;
         principal
             .require_write_at(

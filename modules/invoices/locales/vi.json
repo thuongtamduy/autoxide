@@ -40,7 +40,7 @@
   "invoices.mandate_not_found": "Không tìm thấy uỷ nhiệm này.",
   "invoices.draft_changed": "Nháp vừa bị sửa trong lúc phát hành; phát hành lại.",
   "invoices.not_cancellable": "Chứng từ ở trạng thái `{status}` không huỷ được.",
-  "invoices.einvoice_not_cancellable": "Hoá đơn điện tử này đã gửi cơ quan thuế và luật của vùng thuế người bán không cho huỷ ({legal_basis}). Lập hoá đơn điều chỉnh (`POST .../documents/<id>/adjust`, `direction` `decrease` để giảm toàn bộ) hay hoá đơn thay thế (`POST .../documents/<id>/replace`).",
+  "invoices.einvoice_not_cancellable": "Hoá đơn điện tử này đã gửi (hoặc đang gửi) cơ quan thuế và luật của vùng thuế người bán không cho huỷ ({legal_basis}). Lập hoá đơn điều chỉnh (`POST .../documents/<id>/adjust`, `direction` `decrease` để giảm toàn bộ) hay hoá đơn thay thế (`POST .../documents/<id>/replace`).",
   "invoices.not_correctable": "Chỉ điều chỉnh hay thay thế được chứng từ đã phát hành (chứng từ này đang `{status}`).",
   "invoices.not_draft": "Chỉ sửa hay xoá được chứng từ nháp. Chứng từ đã phát hành thì lập chứng từ điều chỉnh hoặc thay thế.",
   "invoices.provider_not_configured": "Máy chủ này chưa cấu hình nhà cung cấp hoá đơn điện tử `{provider}`.",

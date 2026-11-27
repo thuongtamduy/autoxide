@@ -5,24 +5,34 @@
 use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
+use autoxide_kernel::einvoice::EInvoiceProvider;
 use autoxide_kernel::money::{Currency, Money};
 use autoxide_kernel::payment::PaymentGateway;
-use autoxide_testkit::{FakePaymentGateway, TestApp, TestDatabase};
+use autoxide_testkit::{FakeEInvoiceProvider, FakePaymentGateway, TestApp, TestDatabase};
 use axum::http::{Method, StatusCode};
 use serde_json::{Value, json};
 
-const OPS: [&str; 8] = [
+const OPS: [&str; 9] = [
     "plans.plans.manage",
     "plans.subscriptions.manage",
     "plans.subscriptions.read",
     "invoices.read",
     "invoices.series_manage",
     "tax.packs_manage",
+    "tax.profiles_manage",
     "ledger.read",
     "kernel.tenants.read",
 ];
 
 async fn app(test: &TestDatabase, gateway: Arc<FakePaymentGateway>) -> TestApp {
+    app_with(test, gateway, None).await
+}
+
+async fn app_with(
+    test: &TestDatabase,
+    gateway: Arc<FakePaymentGateway>,
+    einvoice: Option<Arc<FakeEInvoiceProvider>>,
+) -> TestApp {
     // Thư và file ghi vào thư mục tạm, không vào `crates/app/data/` của repo.
     let dir = std::env::temp_dir().join(format!("autoxide-billing-{}", uuid::Uuid::now_v7()));
     let mut builder = TestApp::builder(test)
@@ -35,6 +45,9 @@ async fn app(test: &TestDatabase, gateway: Arc<FakePaymentGateway>) -> TestApp {
         .domain("default", "pay.operator.example")
         .user("ops", 1, &OPS)
         .user_in("acme", "owner", 2, &["plans.billing.read", "plans.billing.manage"]);
+    if let Some(provider) = einvoice {
+        builder = builder.contribute::<dyn EInvoiceProvider>(provider);
+    }
     // Bài này thu qua cổng giả; bộ nối thật `momo` cũng góp `dyn PaymentGateway`, mà có hai cổng thì
     // mỗi thanh toán phải nêu đối tác, nên không nạp nó ở đây.
     for module in crate::modules::all().into_iter().filter(|module| module.name() != "momo") {
@@ -182,6 +195,63 @@ async fn ky_thanh_toan_thanh_hoa_don_tra_qua_cong_thi_da_tra() {
         // Trả kỳ đã trả: 409.
         let (status, _) = call(&app, Method::POST, &format!("/plans/billing-periods/{id}/pay"), "owner", Some(json!({}))).await;
         assert_eq!(status, StatusCode::CONFLICT);
+    })
+    .await
+    .unwrap();
+}
+
+/// Khách vận hành ở Việt Nam, hoá đơn qua nhà cung cấp hoá đơn điện tử: huỷ kỳ thì không huỷ được hoá đơn đã gửi
+/// cơ quan thuế (NĐ 70/2025) — `plans` lập điều chỉnh giảm toàn bộ, một lần (kiểm độc lập #575).
+#[tokio::test]
+async fn huy_ky_co_hoa_don_dien_tu_thi_dieu_chinh_giam() {
+    TestDatabase::run(async |test| {
+        let provider = Arc::new(FakeEInvoiceProvider::new());
+        let app = app_with(test, Arc::new(FakePaymentGateway::new()), Some(provider.clone())).await;
+        let pack: Value = serde_json::from_str(include_str!("../../../../modules/tax/packs/vn.json")).unwrap();
+        ok(&app, Method::POST, "/tax/packs", "ops", Some(json!({"pack": pack}))).await;
+        let root = autoxide_kernel::tenancy::root_of(autoxide_kernel::tenancy::DEFAULT_TENANT).as_uuid();
+        ok(&app, Method::PUT, &format!("/tax/profiles/{root}"), "ops", Some(json!({"jurisdiction": "VN", "regime": "vat_credit"}))).await;
+        let vietnam = autoxide_kernel::time::zone("Asia/Ho_Chi_Minh").unwrap();
+        let year = Timestamp::now().date_in(&vietnam).year();
+        let series = json!({"kind": "vat_invoice", "symbol": "1C26SAS", "year": year, "einvoice_provider": "fake"});
+        ok(&app, Method::POST, "/invoices/series", "ops", Some(series)).await;
+        let plan = ok(
+            &app,
+            Method::POST,
+            "/plans/plans",
+            "ops",
+            Some(json!({"code": "pro", "name": "Pro", "status": "active", "grace_days": 7, "suspend_days": 30, "retention_days": 90})),
+        )
+        .await;
+        let plan_id = plan["data"]["id"].as_str().unwrap().to_owned();
+        let price = json!({"kind": "recurring", "interval": "month", "amount": {"amount": "199000", "currency": "VND"}});
+        let plan = ok(&app, Method::POST, &format!("/plans/plans/{plan_id}/prices"), "ops", Some(price)).await;
+        let price_id = plan["data"]["prices"][0]["id"].as_str().unwrap().to_owned();
+        let acme = app.tenant("acme").await.unwrap().id();
+        let subscription = json!({"plan_id": plan_id, "price_id": price_id, "trial": false});
+        ok(&app, Method::PUT, &format!("/plans/tenants/{acme}/subscription"), "ops", Some(subscription)).await;
+        sql(&app, "UPDATE plans_subscription SET current_period_end = '2000-01-01T00:00:00Z'").await;
+        settle(&app).await;
+        let period = open_period(&app).await;
+        let id = period["id"].as_str().unwrap().to_owned();
+        let invoice = period["invoice_id"].as_str().unwrap().to_owned();
+        let voided = ok(&app, Method::POST, &format!("/plans/billing-periods/{id}/void"), "ops", None).await;
+        assert_eq!(voided["data"]["status"], "void", "{voided}");
+        settle(&app).await;
+        // Hoá đơn gốc không bị huỷ ở nhà cung cấp; có một hoá đơn điều chỉnh giảm toàn bộ.
+        assert!(provider.cancelled.lock().unwrap().is_empty());
+        let original = ok(&app, Method::GET, &format!("/invoices/documents/{invoice}"), "ops", None).await;
+        assert_eq!(original["data"]["status"], "adjusted", "{original}");
+        let adjustments = ok(&app, Method::GET, "/invoices/documents", "ops", None).await;
+        let decrease: Vec<&Value> = adjustments["data"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|document| document["related_document_id"] == invoice.as_str())
+            .collect();
+        assert_eq!(decrease.len(), 1, "{adjustments}");
+        assert_eq!(decrease[0]["direction"], "decrease");
+        assert_eq!(decrease[0]["total"]["amount"], "199000");
     })
     .await
     .unwrap();

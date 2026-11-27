@@ -119,12 +119,11 @@ async fn requested(
 ) -> Result<Data<InvoiceRequestedResponse>, Error> {
     let id = row.id;
     let link = service.request_invoice(tenant, row, body.into()).await?;
-    let settled = service.settled_amounts(tenant, id).await?;
     let document = match link {
         Some(link) => service
             .order_document(tenant, id, link.id)
             .await?
-            .map(|(link, document)| document_response(settled, link, document)),
+            .map(|(link, document, settled)| document_response(settled, link, document)),
         None => None,
     };
     Ok(Data { data: InvoiceRequestedResponse { document } })
@@ -196,8 +195,7 @@ async fn documents(
     id: Uuid,
     page: &PageRequest,
 ) -> Result<Page<DocumentResponse>, Error> {
-    let found = service.order_documents(tenant, id, page).await?;
-    let settled = service.settled_amounts(tenant, id).await?;
+    let (found, settled) = service.order_documents(tenant, id, page).await?;
     Ok(found.map(|(link, document)| document_response(settled, link, document)))
 }
 

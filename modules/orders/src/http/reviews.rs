@@ -520,8 +520,10 @@ pub(crate) struct ModerationRequest {
 /// Hide or reopen a review.
 ///
 /// Requires `orders.reviews.moderate` at the shop. A review is hidden only for a reason of the list
-/// `orders.review_hidden` (Consumer Protection Law 19/2023: reviews are not blocked or hidden
-/// otherwise); the author is told. Votes are kept and come back on reopening.
+/// `orders.review_hidden` that the legal rule `moderation.hide_reasons` also allows, when the
+/// `compliance` module is installed and the tenant's jurisdiction has that rule (Consumer Protection
+/// Law 19/2023: reviews are not blocked or hidden otherwise); the author is told. Votes are kept and
+/// come back on reopening.
 #[utoipa::path(
     post,
     path = "/reviews/{id}/moderation",
@@ -534,7 +536,7 @@ pub(crate) struct ModerationRequest {
         (status = 401, description = "Not signed in; code `unauthenticated`.", body = Problem),
         (status = 403, description = "Missing `orders.reviews.moderate`; code `permission_denied`.", body = Problem),
         (status = 404, description = "No such review in your scope; code `orders.review_not_found`.", body = Problem),
-        (status = 422, description = "Reason missing or not listed (`orders.moderation_reason_invalid`) or bad action (see `errors`).", body = Problem),
+        (status = 422, description = "Reason missing or not listed (`orders.moderation_reason_invalid`), not allowed by the legal rule `moderation.hide_reasons` (`compliance.hide_reason_not_allowed`, with `allowed`), or bad action (see `errors`).", body = Problem),
     )
 )]
 pub(crate) async fn moderate(

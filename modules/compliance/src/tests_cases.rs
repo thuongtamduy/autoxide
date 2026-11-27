@@ -421,6 +421,22 @@ async fn disclosure_ghi_audit_khong_ghi_gia_tri() {
     .unwrap();
 }
 
+/// Vùng pháp lý không có quy tắc `moderation.hide_reasons`: luật không giới hạn lý do ẩn (kiểm độc lập #575).
+#[tokio::test]
+async fn vung_khong_co_quy_tac_an_thi_khong_gioi_han() {
+    TestDatabase::run(async |test| {
+        let app = app(test).await;
+        let (status, set) =
+            call(&app, "PUT", "/policies/jurisdiction", "admin", Some(json!({"value": "xx"})))
+                .await;
+        assert_eq!(status, StatusCode::OK, "{set}");
+        let policy = app.api::<dyn ModerationPolicy>().unwrap();
+        policy.check_hide_reason(DEFAULT_TENANT, "reviews", "negative").await.unwrap();
+    })
+    .await
+    .unwrap();
+}
+
 #[tokio::test]
 async fn ly_do_an_danh_gia_va_kenh_khieu_nai() {
     TestDatabase::run(async |test| {

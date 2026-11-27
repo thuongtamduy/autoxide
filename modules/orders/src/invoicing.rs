@@ -25,7 +25,7 @@ use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::reference::Submitted;
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext};
 use sea_orm::sea_query::Expr;
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set};
+use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, Set};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use uuid::Uuid;
@@ -158,6 +158,25 @@ fn tax_category(row: &line::Model) -> String {
 }
 
 /// Dòng hoá đơn cho `quantity` đơn vị của dòng đơn `row` (khoản giảm chia theo số lượng).
+/// Thuế và tổng tiền đã chốt của đơn `id` để so với hoá đơn (LG-10, D-20261126-invoice-tax-difference):
+/// `None` khi đơn có dòng huỷ một phần — hoá đơn khi đó chỉ gồm phần còn lại, không so được nguyên đơn.
+async fn settled_amounts(
+    read: &impl ConnectionTrait,
+    tenant: &TenantContext,
+    id: Uuid,
+) -> Result<Option<(i64, i64)>, Error> {
+    let Some(row) = order::Entity::find_by_id(id).scoped(tenant).one(read).await? else {
+        return Ok(None);
+    };
+    let cancelled = line::Entity::find()
+        .filter(line::Column::OrderId.eq(id))
+        .filter(line::Column::CancelledQuantity.gt(0))
+        .scoped(tenant)
+        .one(read)
+        .await?;
+    Ok(cancelled.is_none().then_some((row.tax_minor, row.total_minor)))
+}
+
 /// Loại dòng liên kết của một hoá đơn bán theo loại chứng từ.
 fn link_kind_of(kind: &str) -> String {
     if kind == "cash_register_invoice" { "cash_register" } else { "sales" }.to_owned()
@@ -303,7 +322,11 @@ impl OrdersService {
         let issued = invoices.issue(tenant, Actor::system(), document.id).await?;
         // Hoá đơn tính thuế theo ngày lập (thời điểm xác định thuế); đơn đã chốt thuế theo ngày đặt. Qua mốc
         // đổi thuế suất thì hai số khác nhau: không sửa lặng lẽ, báo cho người dùng (LG-10).
-        if let Some(settled) = self.settled_amounts(tenant, id).await?
+        let settled = lines
+            .iter()
+            .all(|line| line.cancelled_quantity == 0)
+            .then_some((row.tax_minor, row.total_minor));
+        if let Some(settled) = settled
             && differs_from_order(Some(settled), &link_kind_of(&kind), Some(&issued))
         {
             tracing::warn!(
@@ -545,26 +568,21 @@ impl OrdersService {
         tenant: &TenantContext,
         id: Uuid,
         page: &PageRequest,
-    ) -> Result<Page<(invoice_link::Model, Option<Document>)>, Error> {
+    ) -> Result<(Page<(invoice_link::Model, Option<Document>)>, Option<(i64, i64)>), Error> {
+        let read = tenant.database().read();
         // Theo thứ tự tạo (id UUIDv7 sinh cùng lúc `created_at`), keyset trong database (index
         // `orders_invoice_links_order_page_idx`).
         let select = invoice_link::Entity::find()
             .filter(invoice_link::Column::OrderId.eq(id))
             .filter(invoice_link::Column::Status.ne("draft"))
             .scoped(tenant);
-        let links = fetch_page(
-            select,
-            invoice_link::Column::Id,
-            |row| row.id,
-            page,
-            tenant.database().read(),
-        )
-        .await?;
+        let links = fetch_page(select, invoice_link::Column::Id, |row| row.id, page, read).await?;
         let mut found = Vec::with_capacity(links.data.len());
         for link in links.data {
             found.push(self.with_document(tenant, link).await?);
         }
-        Ok(Page { data: found, pagination: links.pagination })
+        let settled = settled_amounts(read, tenant, id).await?;
+        Ok((Page { data: found, pagination: links.pagination }, settled))
     }
 
     /// Một chứng từ (đã phát hành, không còn nháp) của đơn `id`, đọc lại từ database.
@@ -573,34 +591,21 @@ impl OrdersService {
         tenant: &TenantContext,
         id: Uuid,
         link_id: Uuid,
-    ) -> Result<Option<(invoice_link::Model, Option<Document>)>, Error> {
+    ) -> Result<Option<(invoice_link::Model, Option<Document>, Option<(i64, i64)>)>, Error> {
+        let read = tenant.database().read();
         let found = invoice_link::Entity::find_by_id(link_id)
             .filter(invoice_link::Column::OrderId.eq(id))
             .filter(invoice_link::Column::Status.ne("draft"))
             .scoped(tenant)
-            .one(tenant.database().read())
+            .one(read)
             .await?;
         match found {
-            Some(link) => Ok(Some(self.with_document(tenant, link).await?)),
+            Some(link) => {
+                let (link, document) = self.with_document(tenant, link).await?;
+                Ok(Some((link, document, settled_amounts(read, tenant, id).await?)))
+            }
             None => Ok(None),
         }
-    }
-
-    /// Thuế và tổng tiền đã chốt của đơn `id` để so với hoá đơn (LG-10, D-20261126-invoice-tax-difference):
-    /// `None` khi đơn có dòng huỷ một phần — hoá đơn khi đó chỉ gồm phần còn lại, không so được nguyên đơn.
-    pub(crate) async fn settled_amounts(
-        &self,
-        tenant: &TenantContext,
-        id: Uuid,
-    ) -> Result<Option<(i64, i64)>, Error> {
-        let row = self.order(tenant, id).await?;
-        let cancelled = line::Entity::find()
-            .filter(line::Column::OrderId.eq(id))
-            .filter(line::Column::CancelledQuantity.gt(0))
-            .scoped(tenant)
-            .one(tenant.database().read())
-            .await?;
-        Ok(cancelled.is_none().then_some((row.tax_minor, row.total_minor)))
     }
 
     /// Chứng từ của `invoices` gắn với một dòng liên kết (không có khi chưa bật hoá đơn điện tử).

@@ -284,10 +284,52 @@ impl PlansService {
         let (Some(invoices), Some(document)) = (&self.invoices, period.invoice_id) else {
             return Ok(());
         };
-        invoices
-            .cancel(&self.operator(), Actor::system(), document, "Billing period voided".to_owned())
+        let operator = self.operator();
+        match invoices
+            .cancel(&operator, Actor::system(), document, "Billing period voided".to_owned())
             .await
-            .map(|_| ())
+        {
+            Ok(_) => Ok(()),
+            // Hoá đơn điện tử đã gửi cơ quan thuế mà luật không cho huỷ (Việt Nam từ 01/6/2025): lập điều
+            // chỉnh giảm toàn bộ. `reference` cố định nên job chạy lại không lập hai lần.
+            Err(error) if error.code() == "invoices.einvoice_not_cancellable" => {
+                let Some(original) = invoices.document(&operator, document).await? else {
+                    return Ok(());
+                };
+                let lines = original
+                    .lines
+                    .iter()
+                    .map(|line| {
+                        let quantity = line
+                            .quantity
+                            .parse::<rust_decimal::Decimal>()
+                            .map_err(|_| Error::internal("an invoice line has a bad quantity"))?;
+                        let mut back = NewDocumentLine::new(
+                            line.description.clone(),
+                            quantity,
+                            line.unit_price,
+                        );
+                        if line.kind == "service" {
+                            back = back.service();
+                        }
+                        if let Some(category) = &line.tax_category {
+                            back = back.tax_category(category.clone());
+                        }
+                        if line.discount.is_positive() {
+                            back.discount = Some(line.discount);
+                        }
+                        Ok(back)
+                    })
+                    .collect::<Result<Vec<_>, Error>>()?;
+                let reference = format!("plans:{}:void", period.id);
+                let adjustment = invoices
+                    .adjust(&operator, Actor::system(), document, "decrease", lines, reference)
+                    .await?
+                    .into_inner();
+                invoices.issue(&operator, Actor::system(), adjustment.id).await.map(|_| ())
+            }
+            Err(error) => Err(error),
+        }
     }
 }
 

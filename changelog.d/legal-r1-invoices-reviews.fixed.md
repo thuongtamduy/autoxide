@@ -8,3 +8,7 @@
 - Hiding a product review in `orders` now asks the legal rule `moderation.hide_reasons` (module `compliance`) through
   `ModerationPolicy`, which moved to `autoxide_kernel::moderation` (still re-exported by `autoxide_compliance::api`);
   a reason a tenant added to its own list can no longer hide a review.
+- Voiding a billing period of `plans` whose e-invoice cannot be cancelled issues a full decrease adjustment instead
+  (once, reference `plans:<period>:void`). Adjustments and replacements, also when their draft is edited, are taxed
+  at the date of the invoice they correct. A tenant whose jurisdiction has no `moderation.hide_reasons` rule is not
+  limited when hiding reviews.

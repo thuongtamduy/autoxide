@@ -363,3 +363,34 @@ async fn ngay_thue_theo_gio_viet_nam_o_ranh_gioi_het_giam_thue() {
     .await
     .unwrap();
 }
+
+/// Có huỷ được hoá đơn điện tử đã gửi cơ quan thuế không (LG-9): theo vùng thuế của hồ sơ gần nhất và ngày —
+/// trước 01/6/2025 được, từ đó Việt Nam cấm; nút không có hồ sơ thuế thì không cấm; nút con kế thừa hồ sơ.
+#[tokio::test]
+async fn huy_hoa_don_dien_tu_theo_vung_thue_va_ngay() {
+    TestDatabase::run(async |test| {
+        let (app, tree) = app(test).await;
+        let profile = json!({"jurisdiction": "VN", "regime": "vat_credit"});
+        let (status, body) =
+            call(&app, "PUT", &format!("/profiles/{}", tree.north.as_uuid()), "ops", Some(profile))
+                .await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        let engine = app.api::<dyn crate::api::TaxEngine>().unwrap();
+        let tenant = app.default_tenant();
+        let before = Date::new(2025, 5, 31).unwrap();
+        let after = Date::new(2025, 6, 1).unwrap();
+        assert_eq!(
+            engine.einvoice_cancel_forbidden(&tenant, tree.store, before).await.unwrap(),
+            None
+        );
+        let basis = engine.einvoice_cancel_forbidden(&tenant, tree.store, after).await.unwrap();
+        assert!(basis.is_some_and(|basis| basis.contains("70/2025")));
+        // Nhánh không có hồ sơ thuế: không cấm.
+        assert_eq!(
+            engine.einvoice_cancel_forbidden(&tenant, tree.south, after).await.unwrap(),
+            None
+        );
+    })
+    .await
+    .unwrap();
+}

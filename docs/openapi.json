@@ -238835,7 +238835,7 @@
     },
     "/api/v1/orders/reviews/{id}/moderation": {
       "post": {
-        "description": "Requires `orders.reviews.moderate` at the shop. A review is hidden only for a reason of the list\n`orders.review_hidden` (Consumer Protection Law 19/2023: reviews are not blocked or hidden\notherwise); the author is told. Votes are kept and come back on reopening.",
+        "description": "Requires `orders.reviews.moderate` at the shop. A review is hidden only for a reason of the list\n`orders.review_hidden` that the legal rule `moderation.hide_reasons` also allows, when the\n`compliance` module is installed and the tenant's jurisdiction has that rule (Consumer Protection\nLaw 19/2023: reviews are not blocked or hidden otherwise); the author is told. Votes are kept and\ncome back on reopening.",
         "operationId": "orders_moderate_review",
         "parameters": [
           {
@@ -238920,7 +238920,7 @@
                 }
               }
             },
-            "description": "Reason missing or not listed (`orders.moderation_reason_invalid`) or bad action (see `errors`)."
+            "description": "Reason missing or not listed (`orders.moderation_reason_invalid`), not allowed by the legal rule `moderation.hide_reasons` (`compliance.hide_reason_not_allowed`, with `allowed`), or bad action (see `errors`)."
           },
           "default": {
             "content": {

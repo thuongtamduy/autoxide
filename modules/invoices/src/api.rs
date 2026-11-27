@@ -378,6 +378,12 @@ pub trait Invoices: Send + Sync {
     ) -> Result<Submitted<Document>, Error>;
 
     /// Cancels an issued document (reports the error to the provider, reverses the journal entry).
+    ///
+    /// Errors: `invoices.not_cancellable` (a draft, a corrected document, or the status changed meanwhile —
+    /// call again); `invoices.einvoice_not_cancellable` (409, param `legal_basis`) when the document was sent,
+    /// or is being sent, to the tax authority through an e-invoice provider and the seller's tax jurisdiction
+    /// forbids cancelling it (Vietnam since 2025-06-01) — issue an adjustment with direction `decrease`
+    /// ([`Invoices::adjust`]) or a replacement instead. A document the tax authority rejected is cancelled.
     async fn cancel(
         &self,
         tenant: &TenantContext,
