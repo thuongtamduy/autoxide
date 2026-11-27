@@ -109,7 +109,7 @@ A client that cannot do OAuth still connects with an API key in the `Authorizati
 ## 5. Seeing and revoking approvals
 
 - The person: `GET /api/v1/auth/me/oauth-grants` lists their approvals (newest first, including revoked and expired); `DELETE /api/v1/auth/me/oauth-grants/{id}` revokes one. Tokens stop working at the next request.
-- Administrators with `auth.oauth_grants.manage`: `GET /api/v1/auth/oauth-grants` and `DELETE /api/v1/auth/oauth-grants/{id}` for everyone in the tenant.
+- Administrators with `auth.oauth_grants.manage`: `GET /api/v1/auth/oauth-grants` and `DELETE /api/v1/auth/oauth-grants/{id}` for everyone in the tenant. Revoking (both endpoints) needs the person's own signed-in session, working directly in their own tenant: an API key or an OAuth token gets `403 auth.session_required`.
 - The client itself: `POST /api/v1/auth/oauth/revoke` (RFC 7009) with the access or refresh token revokes the whole approval.
 - Automatically: locking, disabling or deleting the account, account recovery, a password change that signs out other sessions, and "sign out everywhere" revoke every approval of the person. Automation rules created through a client pause when its approval is revoked.
 
@@ -125,7 +125,7 @@ Every approval and revocation is an event in the audit log (`auth.oauth_granted`
 | `400 auth.oauth_request_invalid` | A parameter is missing or wrong (`code_challenge_method` must be `S256`, `resource` must be `…/mcp`, `…/mcp/<module>` or `…/api/v1` of this server). |
 | The consent page gets `404 auth.oauth_request_not_found` | More than 10 minutes passed, or the request was already decided. Start connecting again from the client. |
 | The consent page gets `403 auth.session_required` / `auth.oauth_staff_only` | Call with the person's own signed-in session, not an API key; only staff accounts approve clients. |
-| `422` on approve | A permission was not offered, or a sensitive one needs `reauth_token`. The request still waits. |
+| `422` on approve | A permission was not offered, `days` is outside 1 to `AUTOXIDE_AUTH_OAUTH_GRANT_DAYS`, or a sensitive permission needs `reauth_token`. The request still waits. |
 | The client is signed out after a while, `/token` answers `invalid_grant` | The approval expired or was revoked, the person can no longer sign in, or the client refreshed twice at once (a reused refresh token revokes the approval). Connect again. |
 | A tool answers `403 insufficient_scope` | The person has the permission but did not approve it for this client. Reconnect and approve it. |
 | `auth.oauth_rate_limited` | Too many authorization requests from one address; wait a minute. |

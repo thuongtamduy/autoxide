@@ -46,7 +46,7 @@ run() {
   AUTOXIDE_AUTH_TOKEN_SECRET="$(od -An -N32 -tx1 /dev/urandom | tr -d ' \n')"
   (cd "$WORK" && "$BINARY" migrate up >/dev/null)
   printf '%s' "$PASSWORD" | (cd "$WORK" && "$BINARY" user create --email admin@example.com --name Admin \
-    --admin --password-stdin >/dev/null 2>&1)
+    --admin --password-stdin >/dev/null)
   (cd "$WORK" && exec "$BINARY" serve >"$WORK/serve.log" 2>&1) &
   SERVER=$!
   for _ in $(seq 1 600); do curl -sf "$BASE/health/ready" >/dev/null && break; sleep 0.1; done
@@ -54,7 +54,7 @@ run() {
   local registration
   for registration in dynamic metadata-document; do
     if ! AUTOXIDE_URL="$BASE" ADMIN_EMAIL=admin@example.com ADMIN_PASSWORD="$PASSWORD" REGISTRATION="$registration" \
-      node "$REPO/scripts/mcp-oauth/client.mjs"; then
+      timeout 300 node "$REPO/scripts/mcp-oauth/client.mjs"; then
       echo "mcp-oauth: lỗi ($label, $registration); log máy chủ:" >&2
       tail -40 "$WORK/serve.log" >&2
       exit 1

@@ -109,7 +109,7 @@ Client không làm được OAuth vẫn kết nối bằng API key trong header 
 ## 5. Xem và thu hồi lần duyệt
 
 - Người dùng: `GET /api/v1/auth/me/oauth-grants` liệt kê các lần duyệt của mình (mới nhất trước, kể cả đã thu hồi và hết hạn); `DELETE /api/v1/auth/me/oauth-grants/{id}` thu hồi một lần. Token ngừng chạy từ request kế tiếp.
-- Quản trị có `auth.oauth_grants.manage`: `GET /api/v1/auth/oauth-grants` và `DELETE /api/v1/auth/oauth-grants/{id}` cho mọi người trong khách.
+- Quản trị có `auth.oauth_grants.manage`: `GET /api/v1/auth/oauth-grants` và `DELETE /api/v1/auth/oauth-grants/{id}` cho mọi người trong khách. Thu hồi (cả hai endpoint) cần phiên đăng nhập của chính người đó, làm trực tiếp trong khách của mình: API key hay token OAuth nhận `403 auth.session_required`.
 - Chính client: `POST /api/v1/auth/oauth/revoke` (RFC 7009) với access token hay refresh token thu hồi cả lần duyệt.
 - Tự động: khoá, vô hiệu hay xoá tài khoản, lấy lại tài khoản, đổi mật khẩu kèm đăng xuất các phiên khác, và "đăng xuất khắp nơi" thu hồi mọi lần duyệt của người đó. Luật tự động tạo qua một client tạm dừng khi lần duyệt của client đó bị thu hồi.
 
@@ -125,7 +125,7 @@ Mỗi lần duyệt và thu hồi là một event trong audit log (`auth.oauth_g
 | `400 auth.oauth_request_invalid` | Thiếu hay sai tham số (`code_challenge_method` phải là `S256`, `resource` phải là `…/mcp`, `…/mcp/<module>` hay `…/api/v1` của máy chủ này). |
 | Trang consent nhận `404 auth.oauth_request_not_found` | Đã quá 10 phút, hoặc yêu cầu đã được quyết. Kết nối lại từ client. |
 | Trang consent nhận `403 auth.session_required` / `auth.oauth_staff_only` | Gọi bằng phiên đăng nhập của chính người dùng, không bằng API key; chỉ tài khoản nhân sự được duyệt client. |
-| `422` khi duyệt | Một permission không nằm trong danh sách được mời, hoặc permission nhạy cảm cần `reauth_token`. Yêu cầu vẫn chờ. |
+| `422` khi duyệt | Một permission không nằm trong danh sách được mời, `days` nằm ngoài khoảng 1 tới `AUTOXIDE_AUTH_OAUTH_GRANT_DAYS`, hoặc permission nhạy cảm cần `reauth_token`. Yêu cầu vẫn chờ. |
 | Client bị đăng xuất sau một lúc, `/token` trả `invalid_grant` | Lần duyệt hết hạn hay bị thu hồi, người dùng không còn đăng nhập được, hoặc client làm mới hai lần cùng lúc (refresh token dùng lại làm thu hồi lần duyệt). Kết nối lại. |
 | Tool trả `403 insufficient_scope` | Người dùng có permission nhưng chưa duyệt cho client này. Kết nối lại và duyệt thêm. |
 | `auth.oauth_rate_limited` | Quá nhiều yêu cầu uỷ quyền từ một địa chỉ; đợi một phút. |
