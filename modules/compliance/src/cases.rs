@@ -11,7 +11,7 @@
 //!   `compliance.cases.respond` trên nút bị phản ánh.
 //!
 //! Căn cứ — cần đối chiếu văn bản gốc / người có chuyên môn pháp lý: Luật Thương mại điện tử 2025, Luật
-//! Sở hữu trí tuệ, NĐ 85/2021/NĐ-CP (gỡ khi cơ quan yêu cầu), Luật Bảo vệ quyền lợi người tiêu dùng
+//! Sở hữu trí tuệ, NĐ 248/2026/NĐ-CP (từ 01/7/2026, thay NĐ 85/2021/NĐ-CP; gỡ khi cơ quan yêu cầu), Luật Bảo vệ quyền lợi người tiêu dùng
 //! 19/2023/QH15 và NĐ 55/2024/NĐ-CP (khiếu nại).
 
 use autoxide_kernel::time::{Date, Timestamp};

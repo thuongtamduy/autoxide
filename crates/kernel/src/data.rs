@@ -6,6 +6,7 @@
 pub mod backup;
 pub(crate) mod busy;
 pub mod database;
+pub mod db;
 pub mod migration;
 pub mod numbering;
 pub mod pagination;

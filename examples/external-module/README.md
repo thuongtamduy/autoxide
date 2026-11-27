@@ -9,7 +9,7 @@ server `acme` that runs it next to the official modules. [Tiếng Việt](README
 | `server/` | the binary: the official modules plus this one |
 | `check.sh` | format, lints, and every test on SQLite and PostgreSQL |
 | `.github/workflows/ci.yml` | CI that runs `check.sh` on both databases |
-| `AGENTS.md` | rules for AI agents working here (`CLAUDE.md` links to it) |
+| `AGENTS.md` | rules for AI agents working here (`CLAUDE.md` links to it); short versions for Cursor (`.cursor/rules/`) and Copilot (`.github/copilot-instructions.md`) |
 
 ## Run it
 

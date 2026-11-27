@@ -13,7 +13,7 @@ Hướng dẫn này đi từ một thư mục trống tới một module chạy 
 
 ## 1. Workspace
 
-Một repo, hai crate: module và máy chủ. Muốn sinh sẵn cả bố cục này — một bản sao của ví dụ với tên của bạn — chạy `cargo xtask new-module --external <dir> <module> <entity>` trong một bản checkout của Autoxide (ví dụ `cargo xtask new-module --external ../acme bookmarks bookmark`), rồi đọc tiếp để biết từng phần làm gì. Thư mục mới build và qua test ngay; nó còn có `README.md` + `README.vi.md`, `AGENTS.md` ghi luật cho AI agent làm việc trong đó (`CLAUDE.md` liên kết tới nó), và `.github/workflows/ci.yml` chạy `check.sh` trên SQLite và PostgreSQL khi bạn push. Thêm `--core-path <checkout>` để phụ thuộc vào một bản checkout Autoxide trên máy thay cho tag phát hành (để thử một thay đổi của core).
+Một repo, hai crate: module và máy chủ. Muốn sinh sẵn cả bố cục này — một bản sao của ví dụ với tên của bạn — chạy `cargo xtask new-module --external <dir> <module> <entity>` trong một bản checkout của Autoxide (ví dụ `cargo xtask new-module --external ../acme bookmarks bookmark`), rồi đọc tiếp để biết từng phần làm gì. Thư mục mới build và qua test ngay; nó còn có `README.md` + `README.vi.md`, `AGENTS.md` ghi luật cho AI agent làm việc trong đó (`CLAUDE.md` liên kết tới nó, bản ngắn cho Cursor và Copilot ở `.cursor/rules/` và `.github/copilot-instructions.md`), và `.github/workflows/ci.yml` chạy `check.sh` trên SQLite và PostgreSQL khi bạn push. Thêm `--core-path <checkout>` để phụ thuộc vào một bản checkout Autoxide trên máy thay cho tag phát hành (để thử một thay đổi của core).
 
 ```text
 acme/

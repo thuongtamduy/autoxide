@@ -39,6 +39,8 @@ async fn measure(test: &TestDatabase, lines: usize) -> Vec<(&'static str, usize)
     let step = async |name: &'static str, method: &str, uri: String, input| {
         let ((status, answer), statements) = app.statements(buyer.send(method, &uri, input)).await;
         assert!(status.is_success(), "{name}: {answer}");
+        // Bộ đếm chỉ thấy câu của chính request (testkit): 0 câu nghĩa là phép đo mù.
+        assert!(own(&statements) > 0, "{name}: no statement counted");
         counted.borrow_mut().push((name, own(&statements)));
         answer
     };
@@ -58,6 +60,7 @@ async fn measure(test: &TestDatabase, lines: usize) -> Vec<(&'static str, usize)
     let (placed, statements) = app.statements(request.send()).await;
     let placed = placed.unwrap();
     assert!(placed.status().is_success(), "{}", placed.text());
+    assert!(own(&statements) > 0, "POST checkout: no statement counted");
     counted.borrow_mut().push(("POST checkout", own(&statements)));
     let order = placed.json()["data"]["orders"][0]["id"].as_str().unwrap().to_owned();
     step("GET me/order", "GET", format!("/me/orders/{order}"), None).await;

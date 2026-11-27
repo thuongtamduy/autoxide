@@ -1,7 +1,10 @@
 //! Việc `autoxide serve` làm lúc khởi động, trước khi nhận request — đều TẮT mặc định
 //! (D-20261121-migrate-on-start):
 //!
-//! 1. `AUTOXIDE_MIGRATE_ON_START=true`: áp dụng migration còn chờ của database chính.
+//! 1. `AUTOXIDE_MIGRATE_ON_START=true`: áp dụng migration còn chờ của database chính, rồi xếp một lượt
+//!    migrate mọi placement (database riêng của khách) chạy nền — job `kernel.migrate_placements`, giữ
+//!    cùng khoá như `autoxide migrate up --all` (D-20261126-placement-migration-exclusive). Khách trên
+//!    placement chưa xong nhận 503 `tenant_maintenance`, các khách khác vẫn chạy.
 //! 2. `AUTOXIDE_BOOTSTRAP_ADMIN_EMAIL`: khách mặc định chưa có quản trị viên nào thì tạo một tài
 //!    khoản quản trị (qua trait `Accounts` của module `auth`, như `autoxide user create`).
 //! 3. `AUTOXIDE_STARTUP_TASKS`: chạy các lệnh quản trị của module (vd nạp đơn vị hành chính).
@@ -19,17 +22,20 @@ use autoxide_auth::api::{Accounts, NewAccount, TenantAdmins};
 use autoxide_kernel::config::{ConfigReader, Invalid, Setting};
 use autoxide_kernel::database::Database;
 use autoxide_kernel::migration::MigrationLock;
+use autoxide_kernel::tenancy::PlacementMigrationQueue;
 
 use crate::runtime::Runtime;
 use crate::settings::Settings;
 
 pub const MIGRATE_ON_START: Setting = Setting::new(
     "AUTOXIDE_MIGRATE_ON_START",
-    "Apply the pending migrations of the main database when `autoxide serve` starts (`true` or \
-     `false`). Servers starting at the same time take turns (a lock), so only one applies them. \
-     Handy for one server or a first try; in production prefer running `autoxide migrate up` \
-     once per deployment, before starting the servers. Placements (AUTOXIDE_TENANCY_MODE=multi) \
-     still need `autoxide migrate up --all`.",
+    "Apply the pending migrations when `autoxide serve` starts (`true` or `false`): the main \
+     database before the server opens its port, then every placement (tenant database) in the \
+     background, as a migration run (`GET /api/v1/kernel/placements/migrations` shows it); \
+     tenants of a placement not migrated yet get 503 until it is. Servers starting at the same \
+     time take turns (a lock), so only one applies them. Handy for one server or a first try; in \
+     production prefer running `autoxide migrate up --all` once per deployment, before starting \
+     the servers.",
 )
 .with_default("false");
 
@@ -233,6 +239,9 @@ pub async fn after_start(
     prepared: Prepared,
 ) -> Result<(), String> {
     let outcome = async {
+        if startup.migrate {
+            queue_placement_migrations(runtime).await;
+        }
         if let Some(admin) = &startup.admin {
             bootstrap_admin(runtime, admin).await?;
         }
@@ -241,6 +250,24 @@ pub async fn after_start(
     .await;
     release(prepared).await;
     outcome
+}
+
+/// `AUTOXIDE_MIGRATE_ON_START`: sau database chính, xếp một lượt migrate mọi placement chạy nền (job
+/// `kernel.migrate_placements`, cùng đường với API) thay vì chạy đồng bộ: nhiều khách thì migrate hết trước khi mở
+/// port làm khởi động chậm, probe hỏng, máy chủ khác chờ khoá rồi khởi động lại liên tục. Khách trên placement chưa
+/// xong nhận 503 `tenant_maintenance` như trước. Lỗi chỉ ghi log: không chặn khởi động.
+async fn queue_placement_migrations(runtime: &Runtime) {
+    let Some(queue) = runtime.modules.api::<PlacementMigrationQueue>() else {
+        return;
+    };
+    match queue.queue_pending().await {
+        Ok(Some(run)) => tracing::info!(run_id = %run, "placement migrations queued"),
+        Ok(None) => {}
+        Err(error) => tracing::warn!(
+            error = %crate::commands::describe_error(&error),
+            "cannot queue the placement migrations; run `autoxide migrate up --all`"
+        ),
+    }
 }
 
 /// Nhả khoá; lỗi lúc nhả chỉ ghi log (khoá cũng tự nhả khi kết nối / file đóng).

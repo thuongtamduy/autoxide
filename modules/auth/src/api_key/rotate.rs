@@ -49,6 +49,15 @@ impl ApiKeyService {
         id: Uuid,
         rotation: Rotation,
     ) -> Result<CreatedApiKey, Error> {
+        // Kiểm credential TRƯỚC khi tra key: API key hay token OAuth nhận cùng một lỗi dù id có là key của chủ hay
+        // không — không dò được key nào tồn tại (UT-2).
+        if !caller.is_session() {
+            return Err(Error::forbidden(
+                "auth.api_key_cannot_create_keys",
+                "An API key cannot create API keys: a leaked key must not be able to make \
+                 more. Sign in with a password to create keys.",
+            ));
+        }
         let read = tenant.database().read();
         let old = api_key::Entity::find_by_id(id)
             .filter(api_key::Column::UserId.eq(caller.user_id()))

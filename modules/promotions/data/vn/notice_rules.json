@@ -1,7 +1,7 @@
 {
   "code": "vn",
-  "version": 1,
-  "checked_on": "2026-11-13",
+  "version": 2,
+  "checked_on": "2026-11-26",
   "source_note": "Compiled from secondary sources on 2026-11-13. Must be checked against the original legal texts or by a legal professional before real use (D-186). / Cần đối chiếu văn bản gốc / người có chuyên môn pháp lý.",
   "rules": [
     {
@@ -11,9 +11,20 @@
       "days_before": 0,
       "authority": "province_of_store",
       "effective_from": "2018-05-22",
-      "effective_to": null,
+      "effective_to": "2026-06-26",
       "legal_basis": "Nghị định 81/2018/NĐ-CP, Điều 17 (thông báo hoạt động khuyến mại tới Sở Công Thương nơi tổ chức, trước khi thực hiện), sửa đổi bởi Nghị định 128/2024/NĐ-CP",
       "note": "Bán trực tuyến: nơi nhận là Sở Công Thương nơi thương nhân đặt trụ sở — cần đối chiếu. Một số trường hợp miễn thông báo (giá trị giải thưởng nhỏ, chỉ bán trên website) — cần đối chiếu."
+    },
+    {
+      "jurisdiction": "VN",
+      "promotion_kind": "price_reduction",
+      "notice_required": true,
+      "days_before": 0,
+      "authority": "province_of_store",
+      "effective_from": "2026-06-26",
+      "effective_to": null,
+      "legal_basis": "Nghị định 81/2018/NĐ-CP, Điều 17 (thông báo hoạt động khuyến mại tới Sở Công Thương nơi tổ chức, trước khi thực hiện), sửa đổi bởi Nghị định 128/2024/NĐ-CP; Nghị định 239/2026/NĐ-CP (từ 26/6/2026: hồ sơ đăng ký mới; một nguồn nêu miễn thông báo cho giảm giá, tặng quà, hàng mẫu)",
+      "note": "Giữ yêu cầu thông báo là cách an toàn cho tới khi đối chiếu được trường hợp miễn thông báo theo NĐ 239/2026 — cần đối chiếu văn bản gốc. Bán trực tuyến: nơi nhận là Sở Công Thương nơi thương nhân đặt trụ sở — cần đối chiếu. Một số trường hợp miễn thông báo (giá trị giải thưởng nhỏ, chỉ bán trên website) — cần đối chiếu."
     },
     {
       "jurisdiction": "VN",
@@ -22,9 +33,20 @@
       "days_before": 0,
       "authority": "province_of_store",
       "effective_from": "2018-05-22",
-      "effective_to": null,
+      "effective_to": "2026-06-26",
       "legal_basis": "Nghị định 81/2018/NĐ-CP, Điều 17",
       "note": "Cần đối chiếu."
+    },
+    {
+      "jurisdiction": "VN",
+      "promotion_kind": "gift_value",
+      "notice_required": true,
+      "days_before": 0,
+      "authority": "province_of_store",
+      "effective_from": "2026-06-26",
+      "effective_to": null,
+      "legal_basis": "Nghị định 81/2018/NĐ-CP, Điều 17; Nghị định 239/2026/NĐ-CP (từ 26/6/2026: hồ sơ đăng ký mới; một nguồn nêu miễn thông báo cho giảm giá, tặng quà, hàng mẫu)",
+      "note": "Giữ yêu cầu thông báo là cách an toàn cho tới khi đối chiếu được trường hợp miễn thông báo theo NĐ 239/2026 — cần đối chiếu văn bản gốc. Cần đối chiếu."
     },
     {
       "jurisdiction": "VN",
@@ -33,9 +55,20 @@
       "days_before": 0,
       "authority": "province_of_store",
       "effective_from": "2018-05-22",
-      "effective_to": null,
+      "effective_to": "2026-06-26",
       "legal_basis": "Luật Thương mại 36/2005/QH11, Điều 92 (phiếu mua hàng); Nghị định 81/2018/NĐ-CP, Điều 17",
       "note": "Voucher cấp sau khi mua thuộc hình thức phiếu mua hàng (D-222) — cần đối chiếu."
+    },
+    {
+      "jurisdiction": "VN",
+      "promotion_kind": "purchase_voucher",
+      "notice_required": true,
+      "days_before": 0,
+      "authority": "province_of_store",
+      "effective_from": "2026-06-26",
+      "effective_to": null,
+      "legal_basis": "Luật Thương mại 36/2005/QH11, Điều 92 (phiếu mua hàng); Nghị định 81/2018/NĐ-CP, Điều 17; Nghị định 239/2026/NĐ-CP (từ 26/6/2026: hồ sơ đăng ký mới; một nguồn nêu miễn thông báo cho giảm giá, tặng quà, hàng mẫu)",
+      "note": "Giữ yêu cầu thông báo là cách an toàn cho tới khi đối chiếu được trường hợp miễn thông báo theo NĐ 239/2026 — cần đối chiếu văn bản gốc. Voucher cấp sau khi mua thuộc hình thức phiếu mua hàng (D-222) — cần đối chiếu."
     },
     {
       "jurisdiction": "VN",
@@ -44,9 +77,20 @@
       "days_before": 0,
       "authority": "province_of_store",
       "effective_from": "2018-05-22",
-      "effective_to": null,
+      "effective_to": "2026-06-26",
       "legal_basis": "Nghị định 81/2018/NĐ-CP, Điều 17",
       "note": "Chưa rõ miễn phí giao có phải thông báo — mặc định an toàn là có (D-225), cần đối chiếu."
+    },
+    {
+      "jurisdiction": "VN",
+      "promotion_kind": "free_shipping",
+      "notice_required": true,
+      "days_before": 0,
+      "authority": "province_of_store",
+      "effective_from": "2026-06-26",
+      "effective_to": null,
+      "legal_basis": "Nghị định 81/2018/NĐ-CP, Điều 17; Nghị định 239/2026/NĐ-CP (từ 26/6/2026: hồ sơ đăng ký mới; một nguồn nêu miễn thông báo cho giảm giá, tặng quà, hàng mẫu)",
+      "note": "Giữ yêu cầu thông báo là cách an toàn cho tới khi đối chiếu được trường hợp miễn thông báo theo NĐ 239/2026 — cần đối chiếu văn bản gốc. Chưa rõ miễn phí giao có phải thông báo — mặc định an toàn là có (D-225), cần đối chiếu."
     }
   ]
 }

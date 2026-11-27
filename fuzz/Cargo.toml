@@ -1,0 +1,62 @@
+# Fuzz targets (cargo-fuzz / libFuzzer) for the code that reads untrusted input: pagination cursors, search queries, CSV,
+# decimals and money, timestamps, tenant headers. A separate Cargo workspace (like examples/external-module) because
+# libFuzzer needs a nightly compiler and sanitizer flags that must not touch the normal build.
+# Run: see fuzz/README.md. CI: .github/workflows/fuzz.yml.
+[package]
+name = "autoxide-fuzz"
+version = "0.0.0"
+edition = "2024"
+publish = false
+license = "MIT OR Apache-2.0"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+autoxide-kernel = { path = "../crates/kernel" }
+libfuzzer-sys = "0.4"
+http = "1"
+
+[workspace]
+
+[[bin]]
+name = "page_query"
+path = "fuzz_targets/page_query.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "tenant_hint"
+path = "fuzz_targets/tenant_hint.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "search_query"
+path = "fuzz_targets/search_query.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "csv_read"
+path = "fuzz_targets/csv_read.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "decimal_money"
+path = "fuzz_targets/decimal_money.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "timestamp"
+path = "fuzz_targets/timestamp.rs"
+test = false
+doc = false
+bench = false

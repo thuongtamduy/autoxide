@@ -13,6 +13,8 @@ async fn count(app: &TestApp, uri: &str) -> usize {
         app.statements(app.get(&format!("/api/v1/catalog{uri}")).send()).await;
     let answer = answer.unwrap();
     assert_eq!(answer.status(), StatusCode::OK, "{uri}: {}", answer.text());
+    // Bộ đếm chỉ thấy câu của chính request (testkit): 0 câu nghĩa là việc chạy ở task khác, phép đo mù.
+    assert!(!statements.is_empty(), "{uri}: no statement counted");
     statements.len()
 }
 

@@ -201,6 +201,46 @@ async fn nhan_vien_dinh_danh_to_chuc_qua_dang_ky_kinh_doanh() {
     .unwrap();
 }
 
+/// Rà pháp lý vòng 1 (D-20261126-legal-rules-r1-update): căn cứ mới là phiên bản quy tắc mới có ngày hiệu lực,
+/// phiên bản cũ vẫn áp cho thời điểm trước — ranh giới 00:00 ngày 01/7/2026 giờ Việt Nam.
+#[tokio::test]
+async fn quy_tac_ra_phap_ly_vong_1_theo_ngay_hieu_luc() {
+    TestDatabase::run(async |test| {
+        let (app, _) = app(test).await;
+        let rules = app.api::<dyn ComplianceRules>().unwrap();
+        let before = Timestamp::from_utc(2026, 6, 30, 16, 59, 0).unwrap();
+        let after = Timestamp::from_utc(2026, 6, 30, 17, 0, 0).unwrap();
+        for key in ["moit.checklist.sales", "moit.checklist.platform", "cases.deadlines"] {
+            let old = rules.effective(DEFAULT_TENANT, key, before).await.unwrap().unwrap();
+            assert_eq!(old.version, 1, "{key}");
+            let new = rules.effective(DEFAULT_TENANT, key, after).await.unwrap().unwrap();
+            assert_eq!(new.version, 2, "{key}");
+            assert!(new.legal_basis.contains("248/2026"), "{key}: {}", new.legal_basis);
+            assert!(new.needs_legal_review, "{key}");
+        }
+        let checklist =
+            rules.effective(DEFAULT_TENANT, "moit.checklist.sales", after).await.unwrap().unwrap();
+        let items = checklist.body["items"].as_array().unwrap();
+        assert!(
+            items
+                .iter()
+                .all(|item| !item["legal_basis"].as_str().unwrap().contains("52/2013/NĐ-CP về"))
+        );
+        let requests = rules
+            .effective(DEFAULT_TENANT, "privacy.subject_requests", after)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(requests.version, 2);
+        assert!(requests.legal_basis.contains("356/2025"));
+        // Hạn trả lời giữ 72 giờ (chặt hơn nghị định); hạn thực hiện để tham khảo.
+        assert_eq!(requests.body["respond_within_hours"]["erasure"], 72);
+        assert_eq!(requests.body["fulfil_within_days"]["erasure"], 20);
+    })
+    .await
+    .unwrap();
+}
+
 #[tokio::test]
 async fn quy_tac_theo_ngay_hieu_luc_va_nhap_chi_them() {
     TestDatabase::run(async |test| {

@@ -1,0 +1,6 @@
+# Thư viện đã có (hay đang có) lớp của kernel: module KHÔNG khai trực tiếp (D-20261126-library-isolation, luật
+# `wrapped-libraries` của `cargo xtask check`). Module chưa chuyển xong ghi ở `library-baseline.txt`, chỉ được giảm.
+# Một tên crate mỗi dòng. Thêm tên khi kernel có lớp thay cho thư viện đó.
+sea-orm
+sea-query
+sqlx
