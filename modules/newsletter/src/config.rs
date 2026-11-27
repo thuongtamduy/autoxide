@@ -38,8 +38,9 @@ pub(crate) const CONFIRM_HOURS: Setting = Setting::new(
 
 pub(crate) const CONFIRM_MAILS_PER_DAY: Setting = Setting::new(
     "AUTOXIDE_NEWSLETTER_CONFIRM_MAILS_PER_DAY",
-    "Sign-up requests per address per day that may send a confirmation mail (1 to 100); every \
-     request for the address counts, and later ones are answered as usual but send nothing.",
+    "Sign-up requests per mailbox per day that may send a confirmation mail (1 to 100); every \
+     request for the mailbox counts (letter case, a `+tag` after the name and dots in a Gmail name \
+     are ignored), and later ones are answered as usual but send nothing.",
 )
 .with_default("3");
 

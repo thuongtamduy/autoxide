@@ -30,8 +30,29 @@ const NEVER_STARTED: &str = "never started: its job is gone; start a new run";
 pub(crate) enum Claim<'a> {
     // Lượt đã xếp qua API (job chạy nó).
     Queued(Uuid),
-    // Lượt mới chạy ngay (lệnh, `Placements::up_all`): `placement` như cột cùng tên.
-    Direct { placement: Option<&'a str> },
+    // Lượt mới chạy ngay (lệnh, `Placements::up_all`, rollback): `placement` như cột cùng tên.
+    Direct { placement: Option<&'a str>, kind: RunKind<'a> },
+}
+
+// Loại lượt và phiên bản đi / đến (cột `kind`, `from_version`, `to_version`).
+#[derive(Clone, Copy)]
+pub(crate) struct RunKind<'a> {
+    pub(crate) name: &'a str,
+    pub(crate) from: Option<&'a str>,
+    pub(crate) to: Option<&'a str>,
+}
+
+impl RunKind<'_> {
+    pub(crate) const PLACEMENTS: RunKind<'static> =
+        RunKind { name: super::kind::PLACEMENTS, from: None, to: None };
+}
+
+// Lượt `Direct` nhận được lượt `row` đang chờ: cùng là migrate placement, cùng phạm vi (hay chính nó chạy mọi
+// placement). Lượt rollback không nhận lượt nào.
+fn adoptable(row: &entity::Model, placement: Option<&str>, kind: RunKind<'_>) -> bool {
+    kind.name == super::kind::PLACEMENTS
+        && row.kind == super::kind::PLACEMENTS
+        && (placement.is_none() || row.placement.as_deref() == placement)
 }
 
 // Dọn lượt của tiến trình đã chết, rồi giữ chỗ `active` cho lượt `claim`. Trả id của lượt đang giữ; `None`
@@ -68,31 +89,33 @@ pub(crate) async fn claim(control: &Database, claim: Claim<'_>) -> Result<Option
                 _ => Ok(None),
             }
         }
-        (Claim::Direct { placement }, Some(row))
-            if placement.is_none() || row.placement.as_deref() == placement =>
-        {
+        (Claim::Direct { placement, kind }, Some(row)) if adoptable(&row, placement, kind) => {
             let scope = placement.map(str::to_owned);
             Ok(Some(running(control, row.id, Some(scope)).await?))
         }
         (Claim::Direct { .. }, Some(row)) => Err(busy(row.id)),
-        (Claim::Direct { placement }, None) => insert_direct(control, placement).await,
+        (Claim::Direct { placement, kind }, None) => insert_direct(control, placement, kind).await,
     }
 }
 
 // Lượt `Direct` mới. Va khoá unique `active_key` (API vừa xếp một lượt giữa lúc đọc và lúc chèn): nhận lại theo luật
 // trên — một lần là đủ, vì API chỉ chèn được khi chưa có lượt `active`.
-async fn insert_direct(control: &Database, placement: Option<&str>) -> Result<Option<Uuid>, Error> {
-    match try_insert_direct(control, placement).await {
+async fn insert_direct(
+    control: &Database,
+    placement: Option<&str>,
+    kind: RunKind<'_>,
+) -> Result<Option<Uuid>, Error> {
+    match try_insert_direct(control, placement, kind).await {
         Err(error) if error.code() == UNIQUE_CLASH => {
             let active =
                 Entity::find().filter(Column::ActiveKey.eq(ACTIVE)).one(control.write()).await?;
             match active {
-                Some(row) if placement.is_none() || row.placement.as_deref() == placement => {
+                Some(row) if adoptable(&row, placement, kind) => {
                     let scope = placement.map(str::to_owned);
                     Ok(Some(running(control, row.id, Some(scope)).await?))
                 }
                 Some(row) => Err(busy(row.id)),
-                None => try_insert_direct(control, placement).await,
+                None => try_insert_direct(control, placement, kind).await,
             }
         }
         other => other,
@@ -104,6 +127,7 @@ const UNIQUE_CLASH: &str = "kernel.migration_run_busy";
 async fn try_insert_direct(
     control: &Database,
     placement: Option<&str>,
+    kind: RunKind<'_>,
 ) -> Result<Option<Uuid>, Error> {
     let at = now();
     let row = entity::ActiveModel {
@@ -116,6 +140,9 @@ async fn try_insert_direct(
         created_at: Set(at),
         updated_at: Set(at),
         active_key: Set(Some(ACTIVE.to_owned())),
+        kind: Set(kind.name.to_owned()),
+        from_version: Set(kind.from.map(str::to_owned)),
+        to_version: Set(kind.to.map(str::to_owned)),
     }
     .insert(control.write())
     .await

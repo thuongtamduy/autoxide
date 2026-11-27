@@ -162,6 +162,27 @@ async fn bot_bi_loai() {
         let second = limited.ingest(&h.tenant, &site, visitor(), events(), at(10, 9)).await;
         assert_eq!(first.unwrap(), Ingested { accepted: 2, dropped: 0 });
         assert_eq!(second.unwrap(), Ingested { accepted: 1, dropped: 1 });
+
+        // Trần mỗi ngày của khối mạng (PT-12), tính cả khi user agent đổi (client giả).
+        let daily = crate::service::AnalyticsService {
+            config: crate::config::AnalyticsConfig {
+                events_per_day: 3,
+                ..crate::config::AnalyticsConfig::default()
+            },
+            catalog: h.service.catalog.clone(),
+            secret: h.service.secret.clone(),
+            consents: None,
+            registry: h.service.registry.clone(),
+            settings: None,
+        };
+        let chrome = super::browser("198.51.100.7", CHROME);
+        let safari = super::browser("198.51.100.8", SAFARI);
+        let as_visitor =
+            |client| crate::ingest::Visitor { client, host: Some(HOST), user_id: None };
+        let first = daily.ingest(&h.tenant, &site, as_visitor(&chrome), events(), at(10, 9)).await;
+        let second = daily.ingest(&h.tenant, &site, as_visitor(&safari), events(), at(10, 9)).await;
+        assert_eq!(first.unwrap(), Ingested { accepted: 2, dropped: 0 });
+        assert_eq!(second.unwrap(), Ingested { accepted: 1, dropped: 1 });
     })
     .await
     .unwrap();

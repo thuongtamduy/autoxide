@@ -320,6 +320,8 @@ impl Module for KernelModule {
             Box::new(crate::ops::list_indexes::AddListIndexes),
             // Index cho danh sách của kernel có phân trang ở cụm 3: job, trường tự định nghĩa (bước 70 P9).
             Box::new(crate::ops::list_indexes::AddListIndexesKernel),
+            // Loại lượt và phiên bản đi / đến trên `kernel_migration_runs` (bước 71 G3, D-20261126-upgrade-rollback).
+            Box::new(crate::tenancy::migration_runs::kind::AddMigrationRunKind),
         ]
     }
 
