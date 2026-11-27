@@ -434,8 +434,10 @@ thật (P7).
     - [ ] Module tắt: dọn dữ liệu theo thời hạn lưu (job của module chưa chạy khi tắt)
     - [ ] Module tắt: gieo dữ liệu khởi đầu cho khách tạo trong lúc module tắt
     - [ ] `copy` / `backup create` / `backup restore` gồm cả bảng của module tắt (hiện từ chối khi còn dữ liệu)
-    - [ ] `conversations` đang bật mà bộ nối nhà cung cấp thoại tắt: `erase_recording` bỏ qua xoá ở nhà cung cấp nhưng
-          vẫn xoá `provider_recording_id` (bản ghi nằm lại không dấu vết) — làm như đường "nghỉ": báo lỗi, thử lại
+    - [x] `conversations` đang bật mà bộ nối nhà cung cấp thoại tắt: `erase_recording` bỏ qua xoá ở nhà cung cấp nhưng
+          vẫn xoá `provider_recording_id` (bản ghi nằm lại không dấu vết) — làm như đường "nghỉ": báo lỗi, thử lại —
+          báo 503 `conversations.voice_provider_unavailable` trước khi đụng tới gì, job dọn theo hạn bỏ qua dòng lỗi
+          rồi báo lỗi để thử lại
     - [ ] `forms` tắt: job dọn file CSV xuất theo `expires_at` không chạy (cần xác minh; thuộc mục dọn theo thời hạn lưu)
     - [ ] Kế hoạch tách / gộp (dry run) đếm cả dòng của module tắt chỉ có bảng ở nguồn (dời đã đếm)
     - [ ] Test chiều ngược cho tách / gộp, test lệch phiên bản migration của module tắt giữa hai database
@@ -455,9 +457,12 @@ thật (P7).
           tra cứu theo khoá client gửi (`catalog/variants?code=`, `comments/public/counts`,
           `inventory/public/availability`) được cho phép (chủ dự án giao phiên điều phối quyết, 26/11/2026,
           D-20261126-list-pages-done mục 2)
-  - [ ] `./gate.sh` chưa chạy tsc trên SDK và ví dụ trong `docs/guides` (CI có: `cargo xtask sdk --extract-examples` + `tsc
+  - [x] `./gate.sh` chưa chạy tsc trên SDK và ví dụ trong `docs/guides` (CI có: `cargo xtask sdk --extract-examples` + `tsc
         --noEmit`); `sdk --check` chỉ so SDK với `docs/openapi.json` nên kiểu SDK hỏng vẫn lọt tới CI (#517). Chạy khi SDK
-        hay ví dụ đổi và có Node; còn hai kiểu `& Record<string, unknown>` có sẵn trên `main` (`realm`, một kiểu tiền)
+        hay ví dụ đổi và có Node; còn hai kiểu `& Record<string, unknown>` có sẵn trên `main` (`realm`, một kiểu tiền) —
+        gate (cả gate nhẹ) chạy `sdk --extract-examples` + `tsc --noEmit` khi có Node và SDK, hợp đồng hay
+        `docs/guides` đổi; hai kiểu sai do `///` trên trường `#[schema(inline)]` (thành `allOf` chuỗi giao object,
+        `realm` không gán được giá trị nào) — bỏ doc ở trường, mô tả chuyển lên kiểu
   - [x] Rustdoc tiếng Anh cho phần công khai của kernel, testkit, `autoxide` và `api` của module (docs.rs); gate
         `doc-language` giữ phần viết mới là tiếng Anh (D-20261123-english-rustdoc)
   - [ ] Chạy thử năm bộ nối của P7 bằng tài khoản thử thật; đối chiếu các điểm "(?)" của MoMo với trang tài liệu gốc

@@ -61,7 +61,8 @@
 #                           định, D-20261121-avif-feature); phần riêng `--only avif`, CI chạy job riêng
 #   3. ranh giới workspace  cargo xtask check
 #   4. hợp đồng API         cargo xtask api-diff: không phá vỡ /api/v1 so với tag phát hành gần nhất;
-#                           cargo xtask sdk --check: SDK TypeScript khớp docs/openapi.json
+#                           cargo xtask sdk --check: SDK TypeScript khớp docs/openapi.json;
+#                           có Node thì `tsc --noEmit` trên SDK và ví dụ của docs/guides (gate nhanh: khi chúng đổi)
 #   5. thư viện             cargo deny check (license, lỗ hổng, nguồn)
 #   6. secret               gitleaks: toàn bộ lịch sử đi tới được từ HEAD (không quét nhánh khác), thay đổi chưa commit và file mới chưa track
 #   7. test trên SQLite
@@ -257,6 +258,18 @@ fi
 # clippy / AVIF / ví dụ module. Thuộc nhóm `lint`; số thứ tự ở chú thích đầu file là nhóm, không phải thứ tự chạy.
 # `--pr` / `--quick`: thay đổi không chạm Rust (mọi file nằm trong scripts/rust-free-paths.txt) thì clippy và kiểm file
 # sinh cho đúng kết quả như ở base — bỏ, vì trên máy mới nó là cả một lần biên dịch workspace (D-20261125-ci-skip-rust).
+tsc_needed() {
+  [ "$QUICK" = 1 ] || return 0
+  git rev-parse --verify --quiet "${GATE_BASE:-origin/main}" >/dev/null || return 0
+  # Gom ra biến rồi mới kiểm: `… | grep -q .` dưới `pipefail` thành sai khi grep thoát sớm và git nhận SIGPIPE.
+  local changed
+  changed="$(
+    git diff --name-only "$(git merge-base "${GATE_BASE:-origin/main}" HEAD)" -- \
+      sdk/typescript docs/openapi.json docs/guides xtask/src/sdk.rs gate.sh
+    git status --porcelain -- sdk/typescript docs/openapi.json docs/guides
+  )"
+  [ -n "$changed" ]
+}
 RUST_CHANGED=true
 if runs lint && { [ "$QUICK" = 1 ] || [ "$PR" = 1 ]; }; then
   RUST_CHANGED="$(scripts/rust-changed.sh "${GATE_BASE:-origin/main}")"
@@ -273,6 +286,24 @@ if runs lint; then
   # Kiểu TypeScript của SDK sinh từ docs/openapi.json; không cần Node (D-243).
   step "TypeScript SDK matches the contract (cargo xtask sdk --check)"
   cargo xtask sdk --check
+
+  # `sdk --check` chỉ so SDK với docs/openapi.json: kiểu SDK sinh ra mà hỏng (hay ví dụ TypeScript trong docs/guides
+  # gọi sai SDK) vẫn lọt tới CI (#517). Có Node thì kiểm kiểu như job `sdk` của CI: tách ví dụ của docs/guides rồi
+  # `tsc --noEmit` (bước 70 P9). Gate nhanh chỉ chạy khi SDK, hợp đồng hay hướng dẫn đổi so với origin/main; không
+  # có Node thì bỏ và nói rõ (CI vẫn chạy). Bản TypeScript thấp nhất cam kết hỗ trợ chỉ kiểm trên CI (cần tải gói).
+  if tsc_needed; then
+    if command -v npm >/dev/null 2>&1; then
+      step "TypeScript SDK and guide examples type-check (tsc --noEmit)"
+      cargo xtask sdk --extract-examples sdk/typescript/examples/guides
+      (
+        cd sdk/typescript
+        [ -d node_modules ] || npm ci --no-audit --no-fund
+        npx tsc --noEmit
+      )
+    else
+      step "TypeScript SDK and guide examples type-check: skipped, Node.js is not installed (CI runs it)"
+    fi
+  fi
 fi
 
 # --- AVIF: phần riêng (`--only avif`), không nằm trong lint ------------------------------------------

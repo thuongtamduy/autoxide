@@ -516,6 +516,52 @@ async fn ban_ghi_het_han_thi_xoa() {
     .unwrap();
 }
 
+/// Bản ghi còn ở nhà cung cấp mà bộ nối của nhà cung cấp đó tắt: không xoá dấu vết (`provider_recording_id`), báo
+/// lỗi để job thử lại; bật lại bộ nối thì lần sau xoá được (bước 70 P9).
+#[tokio::test]
+async fn ban_ghi_o_nha_cung_cap_tat_thi_bao_loi_va_giu_dau_vet() {
+    TestDatabase::run(async |test| {
+        let v = voice(test, true, true).await;
+        let (_, call_id) = recorded_call(&v).await;
+        let tenant = v.h.app.default_tenant();
+        let transaction = tenant.db().begin_write().await.unwrap();
+        call_entity::Entity::update_many()
+            .col_expr(
+                call_entity::Column::RecordingExpiresAt,
+                Expr::value(Some(Timestamp::now() - SignedDuration::from_hours(24))),
+            )
+            .col_expr(call_entity::Column::ProviderRecordingId, Expr::value(Some("rec-left")))
+            .filter(call_entity::Column::Id.eq(call_id))
+            .scoped(&tenant)
+            .exec(&transaction)
+            .await
+            .unwrap();
+        transaction.commit().await.unwrap();
+        let provider_of = async || {
+            call_entity::Entity::find_by_id(call_id)
+                .one(&tenant.db().read())
+                .await
+                .unwrap()
+                .unwrap()
+                .provider_recording_id
+        };
+        // Bộ nối tắt: lỗi, bản ghi trong nơi lưu cũng chưa bị đụng tới.
+        let mut off = Arc::try_unwrap(with_storage(&v)).ok().unwrap();
+        off.parts.voice = Vec::new();
+        let error = off.purge_recordings(&tenant, Timestamp::now()).await.unwrap_err();
+        assert_eq!(error.code(), "conversations.voice_provider_unavailable");
+        assert_eq!(provider_of().await.as_deref(), Some("rec-left"));
+        assert_eq!(recordings(&v).await.len(), 1);
+        // Bật lại: xoá ở nơi lưu và ở nhà cung cấp, xoá dấu vết.
+        assert_eq!(with_storage(&v).purge_recordings(&tenant, Timestamp::now()).await.unwrap(), 1);
+        assert_eq!(provider_of().await, None);
+        assert!(recordings(&v).await.is_empty());
+        assert!(!v.fake.has_recording("rec-left"));
+    })
+    .await
+    .unwrap();
+}
+
 /// Khoá bản ghi âm trong nơi lưu.
 async fn recordings(v: &Voice) -> Vec<String> {
     let keys = v.storage.keys().await.unwrap();

@@ -32,6 +32,7 @@
   "conversations.thread_not_found": "Không có cuộc trò chuyện `{id}` mà bạn xem được.",
   "conversations.too_many_messages": "Bạn gửi tin quá nhanh ({limit} tin mỗi phút). Hãy chờ {retry_after} giây.",
   "conversations.verification_required": "Hãy xác thực tài khoản (số điện thoại) trước khi nhắn cho cửa hàng này.",
+  "conversations.voice_provider_unavailable": "Bản ghi âm cuộc gọi còn nằm ở nhà cung cấp thoại `{provider}` mà bộ nối của nhà cung cấp này chưa bật: bật bộ nối để xoá được bản ghi ở đó.",
   "conversations.voice_unavailable": "Cửa hàng chưa bật gọi điện.",
   "conversations.voice_webhook_too_large": "Thông báo lớn hơn {max} byte.",
   "field:at most {max} images per message": "tối đa {max} ảnh mỗi tin",

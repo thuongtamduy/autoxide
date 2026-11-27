@@ -201,12 +201,20 @@ impl ConversationsService {
         if row.recording_ref.is_none() && row.provider_recording_id.is_none() {
             return Ok(false);
         }
+        // Còn bản ghi ở nhà cung cấp mà bộ nối của nhà cung cấp đó không bật: báo lỗi trước khi đụng tới gì, để
+        // `provider_recording_id` còn nguyên và lần sau (job, event xoá tài khoản được thử lại) xoá được — không xoá
+        // dấu vết khi bản ghi còn nằm ở nhà cung cấp (bước 70 P9, như đường "nghỉ" của `RecordingEraser`).
+        let provider = match &row.provider_recording_id {
+            Some(id) => Some((
+                id,
+                self.provider(&row.provider).ok_or_else(|| provider_unavailable(&row.provider))?,
+            )),
+            None => None,
+        };
         if let Some(key) = &row.recording_ref {
             self.store(tenant)?.delete(key).await?;
         }
-        if let (Some(id), Some(provider)) =
-            (&row.provider_recording_id, self.provider(&row.provider))
-        {
+        if let Some((id, provider)) = provider {
             provider.delete_recording(tenant.id(), id).await?;
         }
         let transaction = tenant.database().begin_write().await?;
@@ -241,14 +249,35 @@ impl ConversationsService {
             .scoped(tenant)
             .all(tenant.database().read())
             .await?;
+        // Một bản ghi không xoá được (vd bộ nối nhà cung cấp đang tắt) không chặn các bản ghi khác; báo lỗi đầu tiên
+        // ở cuối để job được thử lại.
         let mut count = 0;
+        let mut failed = None;
         for row in expired {
-            if self.erase_recording(tenant, Actor::system(), &row, "retention").await? {
-                count += 1;
+            match self.erase_recording(tenant, Actor::system(), &row, "retention").await {
+                Ok(true) => count += 1,
+                Ok(false) => {}
+                Err(error) => {
+                    tracing::warn!(call_id = %row.id, code = error.code(), "call recording purge failed");
+                    failed.get_or_insert(error);
+                }
             }
         }
-        Ok(count)
+        match failed {
+            Some(error) => Err(error),
+            None => Ok(count),
+        }
     }
+}
+
+/// Bộ nối của nhà cung cấp thoại `provider` không bật nên chưa xoá được bản ghi ở đó.
+fn provider_unavailable(provider: &str) -> Error {
+    Error::unavailable(
+        "conversations.voice_provider_unavailable",
+        "The call recording is still kept by the voice provider `{provider}`, whose connector is not on: \
+         turn the connector on so the recording can be deleted there.",
+    )
+    .with_param("provider", provider)
 }
 
 /// Ai xoá bản ghi cuộc gọi khi tài khoản bị xoá: service (module đang bật, ghi cả event), hay phần "nghỉ" của

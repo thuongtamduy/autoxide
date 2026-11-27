@@ -214,7 +214,7 @@ impl From<Provider> for ProviderResponse {
     }
 }
 
-/// A new sign-in provider.
+/// A new sign-in provider. `realm` is `staff` (default) or `customer`.
 #[derive(Debug, Deserialize, Validate, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ProviderRequest {
@@ -247,7 +247,9 @@ pub(crate) struct ProviderRequest {
     /// `default_role_id`). Default `false`.
     #[serde(default)]
     allow_signup: bool,
-    /// `staff` (default) or `customer`.
+    // `staff` (mặc định) hay `customer`. Không viết `///` ở đây: trường `inline` có doc thành `allOf` sai kiểu
+    // (chuỗi giao với object, SDK sinh `& Record<string, unknown>`); mô tả lấy từ chính `Realm`, mặc định ghi ở
+    // mô tả của `ProviderRequest` (như `RoleGrant::scope`).
     #[serde(default)]
     #[schema(inline)]
     realm: Realm,
