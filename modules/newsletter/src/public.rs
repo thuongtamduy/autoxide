@@ -418,7 +418,7 @@ impl NewsletterService {
         email: &str,
     ) -> Result<bool, Error> {
         let throttle = Throttle::new(MODULE, self.config.confirm_mails_per_day, DAY)?;
-        Ok(throttle.hit(tenant, &format!("confirm:{email}")).await?.is_allowed())
+        Ok(throttle.hit(tenant, &format!("confirm:{}", mailbox(email))).await?.is_allowed())
     }
 
     /// Giới hạn số lần đăng ký (theo IP băm, email, người dùng), trên bảng `newsletter_throttle`.
@@ -801,4 +801,35 @@ async fn mark_unsubscribed<C: ConnectionTrait>(
         .exec(connection)
         .await?;
     Ok(())
+}
+
+/// Hộp thư thật của `email` cho hạn mức mail xác nhận (PT-18): nhiều cách viết cùng giao tới một hộp thư thì chung một
+/// lượt đếm — chữ hoa / thường, phần `+nhãn` sau tên (hầu hết nhà cung cấp giao về hộp chính), dấu chấm trong tên và
+/// tên miền `googlemail.com` của Gmail. Chỉ dùng làm khoá đếm; địa chỉ lưu và gửi giữ nguyên như người dùng nhập.
+pub(crate) fn mailbox(email: &str) -> String {
+    let email = autoxide_kernel::email::normalize(email);
+    let Some((local, domain)) = email.rsplit_once('@') else { return email };
+    let local = local.split('+').next().unwrap_or(local);
+    match domain {
+        "gmail.com" | "googlemail.com" => format!("{}@gmail.com", local.replace('.', "")),
+        _ => format!("{local}@{domain}"),
+    }
+}
+
+#[cfg(test)]
+mod mailbox_tests {
+    use super::mailbox;
+
+    #[test]
+    fn cung_hop_thu_cung_khoa() {
+        assert_eq!(mailbox(" Ann.Lee+news@GoogleMail.com "), "annlee@gmail.com");
+        assert_eq!(mailbox("annlee@gmail.com"), "annlee@gmail.com");
+        assert_eq!(mailbox("Ann+x@Example.VN"), "ann@example.vn");
+        assert_eq!(
+            mailbox("ann.lee@example.vn"),
+            "ann.lee@example.vn",
+            "dots matter outside Gmail"
+        );
+        assert_eq!(mailbox("+tag@example.vn"), "@example.vn");
+    }
 }

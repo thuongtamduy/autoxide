@@ -200,6 +200,10 @@ Không cần đăng nhập. Chỉ trả bản đã đăng — không bao giờ t
 
 (Tất cả dưới `/api/v1/content`.)
 
+Danh mục hay thẻ chỉ công khai khi đã có bài đang hiện trên website mang nó: trước đó trang của term trả
+`404 content.term_not_found` và danh sách term không có nó. Đây là có chủ ý — term đang soạn không bị lộ — nên mục
+menu trỏ tới danh mục rỗng sẽ ra trang 404 cho tới khi có bài mang danh mục đó.
+
 **Nhiều site trên một máy chủ.** Máy chủ có nhiều khách thì mỗi khách là một site riêng: endpoint
 công khai trả lời cho khách của request — tên miền riêng của khách, hay header `Autoxide-Tenant`
 (tên rút gọn của khách). Hai khách được dùng cùng slug, cùng địa chỉ, cùng slug tác giả và term,
