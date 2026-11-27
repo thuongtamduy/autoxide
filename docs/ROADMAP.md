@@ -234,6 +234,9 @@ Postgres; vòng kiểm thử bảo mật kiểu bên ngoài cuối cùng không 
 - [ ] Chỉ số đo mỗi bản phát hành, ngưỡng cho 1.0: tải về tới request đầu tiên dưới 5 phút; người mới xong module đầu
       tiên dưới 30 phút; nâng cấp trong CI 100% thành công kể cả nhiều khách; agent thật làm xong việc mẫu trên 90%; p95
       đường nóng không tệ đi giữa hai bản
+      — bảng, ngưỡng và cách đo ở `docs/RELEASING.md` ("Chỉ số của mỗi bản phát hành"), workflow `release-metrics.yml` đã có;
+      còn: số đo người mới / agent làm module đầu (`docs/quality/first-module-timing.json`), file kết quả eval của G4,
+      và lần chạy đầu của `load.yml` (số gốc p95)
 
 ### G10 — Giảm tải cho agent phát triển
 
@@ -265,21 +268,30 @@ Việc từ rà pháp lý vòng 1 do AI đóng vai (`docs/legal/review-2026-11-r
 - [ ] LG-3: tài liệu nói rõ cổng KYC người bán chưa chặn đăng bán; cài `ListingGate` gọi `KycGate` là điều kiện của module
       sàn; đối chiếu trường KYC với NĐ 248 Điều 18 (từ 01/01/2027)
 - [x] LG-4: quy tắc `privacy.subject_requests` v2 theo NĐ 356/2025 Điều 5 (hạn xác nhận và hạn thực hiện, ngày làm việc)
-- [ ] LG-5: dữ liệu cá nhân của trẻ em — tự khai tuổi khi đăng ký (cấu hình được), sổ đồng ý ghi người giám hộ
-- [ ] LG-6: module khai bên xử lý và nước nhận dữ liệu (AI, mail, SMS, lưu trữ) vào sổ xử lý; `doctor` cảnh báo bên nhận
+- [x] LG-5 (phần tài liệu xong; code là dòng nợ **sau 1.0** bên dưới): dữ liệu cá nhân của trẻ em — tự khai tuổi khi đăng ký (cấu hình được), sổ đồng ý ghi người giám hộ
+- [x] LG-6 (phần tài liệu xong; code là dòng nợ **sau 1.0** bên dưới): module khai bên xử lý và nước nhận dữ liệu (AI, mail, SMS, lưu trữ) vào sổ xử lý; `doctor` cảnh báo bên nhận
       ngoài Việt Nam; `docs/AI.md` thêm mục dữ liệu cá nhân
 - [ ] LG-7: gói thuế `vn` v2 theo NĐ 68/2026 (ngưỡng hộ kinh doanh, tỉ lệ khấu trừ); `orders` hỏi
       `TaxEngine::invoice_requirements` thay vì quyết theo kênh `pos`
-- [ ] LG-8: tài liệu tách phần khấu trừ thay đã có và chưa có; phát `TaxWithheld`, chứng từ khấu trừ, dữ liệu tờ khai là điều
+- [x] LG-8 (phần tài liệu xong; code là dòng nợ **sau 1.0** bên dưới): tài liệu tách phần khấu trừ thay đã có và chưa có; phát `TaxWithheld`, chứng từ khấu trừ, dữ liệu tờ khai là điều
       kiện của module sàn
 - [ ] LG-9: huỷ hoá đơn đã gửi SePay — lỗi rõ hướng sang điều chỉnh / thay thế; xác định nghĩa vụ 04/SS sau NĐ 70/2025
 - [ ] LG-10: phát hiện và báo chênh lệch thuế giữa đơn và hoá đơn khi qua mốc đổi thuế suất
 - [x] LG-11: hạn mức và thủ tục khuyến mại theo NĐ 239/2026 và thông tư của Bộ Công Thương (thay căn cứ NĐ 81/2018 Điều 6, 7)
 - [ ] LG-12: `orders` ẩn đánh giá qua `ModerationPolicy` (ánh xạ mã lý do) hoặc sửa `COMPLIANCE.md` cho khớp code
 - [x] LG-13: căn cứ Luật An ninh mạng 116/2025 và nghị định hướng dẫn thay NĐ 53/2022 trong tài liệu lưu dữ liệu trong nước
+- [x] LG-3/5/6/8 tài liệu: `COMPLIANCE.md` mục "Chưa làm (trước 1.0)", `AI.md` dữ liệu gửi ra nước ngoài, `TAX.md` /
+      `MONEY.md` phần khấu trừ thay đã có và chưa có (EN + VI)
+- [ ] LG-5 code (**sau 1.0**): cấu hình theo khách "dịch vụ hướng tới trẻ em", tự khai tuổi khi đăng ký, sổ đồng ý ghi
+      người đồng ý thay (vai, quan hệ) — cần người có chuyên môn xác nhận điều luật và độ tuổi
+- [ ] LG-6 code (**sau 1.0**): `Module::processors()` (mặc định rỗng, D-038) khai bên xử lý và nước nhận theo cấu hình
+      đang chạy (ai, mail, SMS, lưu trữ); sổ xử lý gộp tự động; `doctor` cảnh báo bên nhận ngoài Việt Nam
+- [ ] LG-8 code (**sau 1.0**, cùng module sàn): phát `TaxWithheld` khi chi trả cho hộ kinh doanh, lập
+      `withholding_certificate`, dữ liệu tờ khai khấu trừ thay
 - [ ] LG-1b: khi có văn bản gốc NĐ 248/2026 — thêm mục kiểm mới (tiêu chí xếp hạng, quy tắc điểm thưởng, báo cáo
       định kỳ), xác nhận cơ quan tiếp nhận / online.gov.vn và hạn chuyển tiếp (D-20261126-legal-rules-r1-update)
-- [ ] LG-4b: tính hạn thực hiện yêu cầu của chủ thể dữ liệu theo `fulfil_within_days` (ngày làm việc, bên xử lý thứ ba)
+- [ ] LG-4b: tính hạn thực hiện yêu cầu của chủ thể dữ liệu theo `fulfil_within_days` (đơn vị: ngày theo bản phân tích,
+      chưa xác nhận ngày làm việc hay ngày thường; bên xử lý thứ ba)
 
 ### G13 — Phát hành 1.0 (chủ dự án duyệt ngày 26/11/2026, D-20261126-release-1-0-readiness)
 
@@ -289,6 +301,33 @@ Việc từ rà pháp lý vòng 1 do AI đóng vai (`docs/legal/review-2026-11-r
       module, người nối AI agent qua MCP, người vận hành, chủ cửa hàng dùng API) dùng thử theo tài liệu công khai, vài vòng
       (dùng thử → sửa → vòng sau, D-20261126-ai-role-reviews); vẫn mở kênh phản hồi cho người ngoài thật; tiêu chí chốt
       (không còn lỗi hợp đồng mở); chỉ sửa lỗi trong thời gian này
+- [ ] Chạy thử vòng 1 bằng agent đóng vai người dùng (`docs/trials/rc-trial-r1/`, agent đóng vai, không phải người thật) —
+      các mục dưới đây đều có mã UT-x trong báo cáo; xong hết thì chạy vòng 2 trên `1.0.0-rc.1`
+  - [ ] UT-1 (chặn): giao hàng không ghi dòng `sale` vào kho — `on_hand` không giảm, reservation vẫn `confirmed`, đơn vẫn
+        `unfulfilled` sau `delivered`; có test chạy trên cả hai database; chạm tiền / kho nên qua kiểm độc lập
+  - [ ] UT-2 (chặn): phân quyền khi quản lý API key qua MCP chưa đúng phạm vi (đã báo kín, công bố sau khi sửa); có test;
+        chạm bảo mật nên qua kiểm độc lập
+  - [ ] UT-3: đường chạy bằng binary không Docker cho người mới: README trỏ tới DEPLOY.md mục B, hai secret ở bước
+        `.env`, `migrate up` trước `serve`, `AUTOXIDE_HTTP_ADDRESS`, mục "binary + PostgreSQL từ đầu", một ví dụ GET có
+        dữ liệu; `config` cảnh báo biến `AUTOXIDE_*` lạ; lỗi đọc `.env` nêu tên biến
+  - [ ] UT-4: thử luồng bán hàng khi chưa có tài khoản nhà cung cấp thật: cách chính thức hoàn tất thanh toán giả trong
+        sandbox, mục "thử không cần tài khoản thật" (chế độ multi, `tenant create`, header `Autoxide-Tenant`), dựng
+        cửa hàng trong sandbox; `shop.md` và `PROMOTIONS.md` thêm bước còn thiếu (phí ship thủ công, hồ sơ thuế, dãy hoá
+        đơn, tạo mã, tỉnh thông báo, luật giá tham chiếu, Order-Token của khách vãng lai)
+  - [ ] UT-5: tool MCP đủ để agent làm việc nhiều bước: mô tả cho mọi tham số (gate kiểm), `catalog.list_price_lists`,
+        kiểm `tax_category`, giá trị lọc sai (`readiness`, `module`, `subject`) báo lỗi, `version` nhận cả hai dạng, thông
+        báo `precondition_failed` riêng cho MCP, ẩn tool luôn lỗi với API key, cách idempotency của MCP ghi trong `mcp.md`,
+        lỗi `Idempotency-Key` trùng thành lỗi tool, gom lỗi của `invoices.create_draft`, tên key trong audit
+  - [ ] UT-6: `payment_id` của checkout / `payment-link` dùng được ở API ledger; header `Idempotent-Replayed` cho checkout
+        và huỷ đơn khách; `payment-link` gọi lại sau lần lỗi; cách gỡ khoản `needs_review`
+  - [ ] UT-7: thời gian build lần đầu của module ngoài repo (đo ~30 phút debug trên 4 lõi): hướng dẫn nêu con số, đường dùng
+        bản dựng sẵn hay cache, một cách gọi `check-module`; đo lại cho G9 trên máy rảnh
+  - [ ] UT-8: thông báo và log cho người vận hành: `--steps 0`, log backup / restore chỉ tóm tắt, `migrate up` tóm tắt,
+        log drain không để mức ERROR, `tenant_id` lặp, lỗi kết nối database nêu nguyên nhân gốc, WARN SMTP chỉ ở lệnh dùng
+        tới, `autoxide backup create` sửa thành `backup <thư mục>`, chữ "required" của `AUTOXIDE_AUTH_TOKEN_SECRET`
+  - [ ] UT-9: tài liệu rate limit khớp hành vi (120/phút/key, thông báo nói key, key đã thu hồi ra 401); bỏ ID quyết định
+        nội bộ ("D-225") khỏi dữ liệu công khai của `promotions`; sửa `sandbox.md` (số hoá đơn) và README của SDK (import,
+        header tenant)
 - [x] Chính sách hỗ trợ dài hạn: bản 1.x nhận vá bảo mật bao lâu, bản lớn trước còn được hỗ trợ bao lâu khi bản lớn mới ra,
       quy trình vá ngược; ghi vào `docs/COMPATIBILITY.md` và `SECURITY.md` (EN + VI) — quy trình vá ngược và bảng ở `COMPATIBILITY.md` / `SECURITY.md`
 - [x] Trang tài liệu có phiên bản: website tài liệu chính thức (hướng dẫn, tham chiếu API sinh từ OpenAPI, MCP, docs.rs),

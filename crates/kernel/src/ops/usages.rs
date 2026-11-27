@@ -67,7 +67,8 @@ pub trait ReferenceSource: Send + Sync {
     ///
     /// The default implementation exists only so that sources written before this method keep compiling: it
     /// reads at most [`REFERRERS_PAGE_FALLBACK_LIMIT`] referrers through [`referrers`](Self::referrers), keys
-    /// each one by a hash of its fields (stable, but not creation order) and cuts the page in memory — every
+    /// each one by a hash of its fields (stable, but **not** creation order, so the "newest first" promise of
+    /// this method and of the usages endpoint does not hold for such a source) and cuts the page in memory — every
     /// page costs as much as that whole read, referrers past that limit are not reachable, and
     /// `pagination.total` is left out when the read reaches it. Sources should override it with a keyset page
     /// in their database.
@@ -110,11 +111,21 @@ pub trait ReferenceSource: Send + Sync {
 }
 
 /// A [`Referrer`] with the key that orders it in a paged list: see [`ReferenceSource::referrers_page`].
+/// Build it with [`KeyedReferrer::new`]: it is `#[non_exhaustive]` so fields can be added later without
+/// breaking sources written outside this repository.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct KeyedReferrer {
     /// Unique within its source; the ID of the pointing row when the source has one.
     pub key: Uuid,
     pub referrer: Referrer,
+}
+
+impl KeyedReferrer {
+    /// `referrer` ordered by `key` (unique within its source; the ID of the pointing row when it has one).
+    pub fn new(key: Uuid, referrer: Referrer) -> Self {
+        KeyedReferrer { key, referrer }
+    }
 }
 
 /// Key of the default [`ReferenceSource::referrers_page`]: the first 16 bytes of a SHA-256 of the fields.

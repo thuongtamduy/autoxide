@@ -344,6 +344,8 @@ async fn list_menus(
     Query(filter): Query<MenusQuery>,
     Query(query): Query<PageQuery>,
 ) -> Result<Page<SiteMenuSummary>, Error> {
+    // Quyền trước tham số trang: thiếu quyền là 403, không phải 422 (luật `permission-first` của xtask).
+    principal.require(&crate::permissions::MENUS_READ)?;
     let page = PageRequest::try_from(query)?;
     let page = service.list(&tenant, &principal, filter.owner_org, &page).await?;
     Ok(page.map(|(menu, items)| SiteMenuSummary::new(menu, items)))
