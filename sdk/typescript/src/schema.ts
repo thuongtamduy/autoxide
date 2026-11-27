@@ -11474,6 +11474,15 @@ export type Data_PhoneCodeResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_PhoneUnlocked = {
+  /** The result of an unlock. */
+  data: {
+    /** `true` when the number was locked and is now unlocked; `false` when it was not locked. */
+    unlocked: boolean;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_Pin = {
   /** A shortcut the signed-in user pinned: a screen of the navigation or a record. */
   data: {
@@ -27074,6 +27083,12 @@ export type PhoneSignupRequest = {
   name?: string | null;
 };
 
+/** The result of an unlock. */
+export type PhoneUnlocked = {
+  /** `true` when the number was locked and is now unlocked; `false` when it was not locked. */
+  unlocked: boolean;
+};
+
 /** A shortcut the signed-in user pinned: a screen of the navigation or a record. */
 export type Pin = {
   created_at: string;
@@ -33334,6 +33349,12 @@ export type UnitTypeResponse = {
   updated_at: string;
 };
 
+/** A phone number whose sign-in codes should be unlocked. */
+export type UnlockPhone = {
+  /** The number, e.g. `0912345678`; outside Vietnam `+` and the country code (`+6591234567`). */
+  phone: string;
+};
+
 /** Stop reply mails. */
 export type UnsubscribeRequest = {
   /** Stop mails about every comment followed with this address, not just this one. */
@@ -35231,6 +35252,7 @@ export interface paths {
       requestBody: PhoneCodeRequest;
       responses: {
         202: Data_PhoneCodeResponse;
+        403: Problem;
         422: Problem;
         429: Problem;
         503: Problem;
@@ -35250,6 +35272,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -38981,6 +39004,20 @@ export interface paths {
       responses: {
         200: Data_ComplianceOverview;
         401: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/phone-locks/unlock": {
+    /** Unlock sign-in codes for a phone number. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: UnlockPhone;
+      responses: {
+        200: Data_PhoneUnlocked;
+        401: Problem;
+        403: Problem;
+        422: Problem;
         default: Problem;
       };
     };

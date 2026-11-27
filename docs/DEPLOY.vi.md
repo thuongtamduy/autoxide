@@ -261,6 +261,31 @@ Ba lệnh này làm việc với khách mặc định. Khi có nhiều khách (`
 sudo -u autoxide autoxide user create --tenant acme --email owner@acme.example --name "Owner" --admin
 ```
 
+### 3b. Chạy thử bằng tay
+
+Trước khi dựng service, chạy ở foreground và đọc lại một thứ gì đó. Thứ tự quan trọng: `migrate up` (bước 3) tạo bảng,
+và `serve` từ chối khởi động khi còn migration chưa áp dụng (lần đầu có khoảng bốn trăm migration, chừng hai mươi giây).
+
+```bash
+cd /var/lib/autoxide
+sudo -u autoxide autoxide task address.import        # dữ liệu tham chiếu: đơn vị hành chính Việt Nam
+sudo -u autoxide autoxide serve                      # nghe ở 127.0.0.1:8080
+```
+
+Ở terminal khác:
+
+```bash
+curl http://127.0.0.1:8080/health/ready
+curl "http://127.0.0.1:8080/api/v1/address/provinces?limit=2"    # dữ liệu thật, không cần đăng nhập
+```
+
+Đổi cổng hay địa chỉ: `AUTOXIDE_HTTP_ADDRESS=0.0.0.0:9000` trong `.env` (tên đúng là vậy: không có
+`AUTOXIDE_PORT`). Biến `AUTOXIDE_…` gõ sai tên bị bỏ qua, nhưng `autoxide config` và log khởi động giờ nêu tên
+nó và gợi ý tên đúng.
+
+Giá trị có dấu cách hay ký tự đặc biệt trong `.env` phải nằm trong dấu nháy kép (`NAME="giá trị"`); khi một dòng
+không đọc được, thông báo lỗi nêu tên biến.
+
 ### 4. Chạy như một service
 
 `/etc/systemd/system/autoxide.service`:
@@ -321,6 +346,21 @@ mọi file ở nơi lưu file chung, nhưng không có database của các place
 file riêng của placement; lệnh in cảnh báo nêu tên chúng. Backup những thứ đó bằng công cụ của chính
 database (và của nơi lưu). Cất `AUTOXIDE_SECRET_KEY` ở nơi an toàn, tách khỏi bản
 backup: thiếu nó thì secret đã mã hoá trong bản backup không đọc được.
+
+## B+. Một binary với PostgreSQL, từ đầu
+
+Như B, với một máy chủ PostgreSQL bạn đã có (gói cài, database trên cloud; không cần Docker). Tạo database và
+người dùng, rồi đặt URL vào `.env` thay cho file SQLite:
+
+```bash
+sudo -u postgres psql -c "CREATE USER autoxide WITH PASSWORD 'chon-mat-khau-dai'" \
+  -c "CREATE DATABASE autoxide OWNER autoxide"
+printf 'DATABASE_URL=postgres://autoxide:chon-mat-khau-dai@127.0.0.1:5432/autoxide\n' >> /var/lib/autoxide/.env
+```
+
+Rồi làm các bước 3, 3b và 4 của B như đã viết (`migrate up`, tạo quản trị viên, `serve`). Nếu máy chủ không kết nối
+được, lỗi giờ nói lý do (ví dụ "connection refused" khi sai cổng) cạnh thông báo của pool; `autoxide doctor` kiểm
+kết nối và nói cần sửa gì.
 
 ## C. Một container với SQLite
 
@@ -398,7 +438,7 @@ database mới.
 | --- | --- |
 | `DATABASE_URL` | `sqlite://data/autoxide.sqlite` (mặc định) hoặc `postgres://user:password@host:5432/db` |
 | `AUTOXIDE_MODULES` | Module nào chạy: `official` (mặc định), `core`, `all`, tên để thêm, `-tên` để bỏ. Module thử nghiệm phải nêu tên. Xem [MODULES.vi.md](MODULES.vi.md) |
-| `AUTOXIDE_AUTH_TOKEN_SECRET` | Ký access token; bắt buộc ở production, giống nhau trên mọi máy chủ |
+| `AUTOXIDE_AUTH_TOKEN_SECRET` | Ký access token; nên đặt ở production (không đặt thì mỗi lần khởi động tạo khoá ngẫu nhiên và token hết hiệu lực khi khởi động lại), giống nhau trên mọi máy chủ |
 | `AUTOXIDE_SECRET_KEY` | Ký các token sống ngắn của mọi module và làm khoá băm địa chỉ IP của người lạ; không bắt buộc: không đặt thì máy chủ sinh một lần và lưu trong database. Khi chạy thật nên đặt (ngoài database, giống nhau trên mọi máy chủ): khoá nằm trong database thì ai có bản backup database cũng mở được các secret đã mã hoá và tính ngược được khối IP từ các bản băm đã lưu |
 | `AUTOXIDE_SECRET_KEY_PREVIOUS` | Các giá trị cũ của `AUTOXIDE_SECRET_KEY`, cách nhau dấu phẩy, trong lúc xoay khoá; bỏ đi sau khi chạy `autoxide secrets reseal` |
 | `AUTOXIDE_AUTH_TOKEN_SECRET_PREVIOUS` | Các giá trị cũ của `AUTOXIDE_AUTH_TOKEN_SECRET`, cách nhau dấu phẩy, trong lúc xoay khoá; chỉ dùng để kiểm token, bỏ đi sau thời gian sống của access token |

@@ -42,6 +42,29 @@ Such an account has `email` set to `""` until the buyer adds one. To confirm a s
 (`POST /api/v1/auth/me/reauth`) it uses `"method": "phone_code"` with a fresh `phone_challenge_id`
 and `phone_code` sent to its own number; after that it can add a passkey and sign in with it.
 
+**Limits against guessing codes** (NIST SP 800-63B-4). A code lives at most 10 minutes
+(`AUTOXIDE_COMPLIANCE_OTP_TTL_SECONDS`, 60 to 600) and allows a few wrong tries. Per number:
+
+- codes per hour from one client (one IPv4 address, or one IPv6 /64) and from all clients together, and
+  codes per day — sign-in codes and phone verification codes counted apart, so asking for sign-in codes
+  never uses up the owner's way to verify the number again (`429 compliance.otp_throttled`);
+- wrong codes per day (`429 compliance.otp_daily_limit`): for sign-in codes, from one client and from all
+  clients together; for phone verification codes, only on the signed-in user's own codes for the number
+  (no "all clients" cap, so nobody else's wrong codes block it);
+- wrong codes in a row, with no time window: from 90 the number is locked for clients that never signed
+  in with it, and from 100 for every client (`403 compliance.otp_locked`).
+
+A client that signed in with the number in the last 90 days does not count toward the "all clients"
+limits and keeps the last 10 tries of the 100, so strangers cannot lock the owner out of the networks
+they use. A right code resets the count. A locked number is unlocked when the owner signs in another way
+and verifies the number again in their account, or when the shop unlocks it — which also restarts the
+daily limit of wrong codes, while the limits on sending codes still apply
+(`POST /api/v1/compliance/phone-locks/unlock`, permission `compliance.phone_locks.manage`; MCP tool
+`compliance.unlock_phone`; `autoxide task compliance.unlock_phone phone=…`) — the way back in for an
+account that signs in only with its number. **Remaining risk:** mobile networks behind carrier NAT change
+address often; on a network the owner never signed in from, they can be locked out when strangers reach
+those limits. Offer buyers a second way to sign in (password or passkey) — NIST requires one for SMS codes.
+
 ## Refresh before the access token expires
 
 `expires_in` says how many seconds the access token lives. Shortly before, exchange the refresh token for a new pair. Each refresh token works **once**: keep the new one.

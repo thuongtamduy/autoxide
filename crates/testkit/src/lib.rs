@@ -43,6 +43,7 @@ mod identity;
 mod leak;
 mod mail;
 pub mod mcp;
+mod openapi_snapshot;
 mod ownership;
 mod payment;
 mod postgres;
@@ -66,6 +67,7 @@ pub use einvoice::{FAKE_EINVOICE_PROVIDER, FakeEInvoiceProvider};
 pub use identity::{FAKE_IDENTITY_PROVIDER, FakeIdentityVerifier, FakeSmsSender};
 pub use leak::{branch_leak_check, cursor_leak_check, leak_check};
 pub use mail::FakeMailer;
+pub use openapi_snapshot::{check_openapi_snapshot, module_openapi};
 pub use ownership::schema_ownership_violations;
 pub use payment::{
     FAKE_PROVIDER, FAKE_RATE_PROVIDER, FakeBankFeed, FakeExchangeRateSource, FakePaymentGateway,

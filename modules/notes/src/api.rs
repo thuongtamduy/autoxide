@@ -24,7 +24,7 @@ pub struct NoteSummary {
 //
 // `#[async_trait]`: Rust chưa cho gọi hàm `async` của trait qua `dyn Trait`; macro này
 // đổi hàm `async` thành hàm trả về `Box<dyn Future>` để gọi được.
-#[async_trait::async_trait]
+#[autoxide_kernel::async_trait]
 pub trait Notes: Send + Sync {
     /// The note with ID `id` of tenant `tenant`, or `None` if there is none.
     async fn find(&self, tenant: &TenantContext, id: Uuid) -> Result<Option<NoteSummary>, Error>;

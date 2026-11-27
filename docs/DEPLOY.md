@@ -265,6 +265,32 @@ for example its first administrator:
 sudo -u autoxide autoxide user create --tenant acme --email owner@acme.example --name "Owner" --admin
 ```
 
+### 3b. Try it by hand
+
+Before setting up a service, run it in the foreground and read something back. Order matters: `migrate up`
+(step 3) creates the tables, and `serve` refuses to start while migrations are pending (a first start applies
+about four hundred of them, around twenty seconds).
+
+```bash
+cd /var/lib/autoxide
+sudo -u autoxide autoxide task address.import        # reference data: the administrative units of Vietnam
+sudo -u autoxide autoxide serve                      # listens on 127.0.0.1:8080
+```
+
+In another terminal:
+
+```bash
+curl http://127.0.0.1:8080/health/ready
+curl "http://127.0.0.1:8080/api/v1/address/provinces?limit=2"    # real data, no sign-in needed
+```
+
+Another port or address: `AUTOXIDE_HTTP_ADDRESS=0.0.0.0:9000` in `.env` (the name is exactly that: there is no
+`AUTOXIDE_PORT`). A misspelled `AUTOXIDE_…` variable is ignored, but `autoxide config` and the start-up log now
+name it and suggest the right one.
+
+A value with spaces or special characters in `.env` goes in double quotes (`NAME="my value"`); the error names
+the variable when a line cannot be read.
+
 ### 4. Run as a service
 
 `/etc/systemd/system/autoxide.service`:
@@ -326,6 +352,21 @@ placements nor a placement's own file storage; the command prints a warning nami
 those up with the database's (and the storage's) own tools. Keep
 `AUTOXIDE_SECRET_KEY` in a safe place apart from the backups: without it, the encrypted secrets in
 a backup cannot be read.
+
+## B+. One binary with PostgreSQL, from scratch
+
+Same as B, with a PostgreSQL server you already run (a package, a cloud database; Docker is not needed). Create
+a database and a user, then put the URL in `.env` instead of the SQLite file:
+
+```bash
+sudo -u postgres psql -c "CREATE USER autoxide WITH PASSWORD 'choose-a-long-password'" \
+  -c "CREATE DATABASE autoxide OWNER autoxide"
+printf 'DATABASE_URL=postgres://autoxide:choose-a-long-password@127.0.0.1:5432/autoxide\n' >> /var/lib/autoxide/.env
+```
+
+Then B steps 3, 3b and 4 as written (`migrate up`, create the administrator, `serve`). If the server cannot connect,
+the error now says why (for example "connection refused" for a wrong port) next to the pool message; `autoxide
+doctor` checks the connection and says what to fix.
 
 ## C. One container with SQLite
 
@@ -402,7 +443,7 @@ into a new database.
 | --- | --- |
 | `DATABASE_URL` | `sqlite://data/autoxide.sqlite` (default) or `postgres://user:password@host:5432/db` |
 | `AUTOXIDE_MODULES` | Which modules run: `official` (default), `core`, `all`, names to add, `-name` to leave out. Experimental modules must be named. See [MODULES.md](MODULES.md) |
-| `AUTOXIDE_AUTH_TOKEN_SECRET` | Signs access tokens; required in production, the same on every server |
+| `AUTOXIDE_AUTH_TOKEN_SECRET` | Signs access tokens; recommended in production (without it a random key is made at start and tokens stop working after a restart), the same on every server |
 | `AUTOXIDE_SECRET_KEY` | Signs short-lived tokens of every module and keys the hashes of visitors' IP addresses; optional: when unset, one is generated once and kept in the database. Set it (outside the database, the same on every server) in production: with the key in the database, anyone holding a database backup can open the secrets stored encrypted and work the IP blocks back out of the stored hashes |
 | `AUTOXIDE_SECRET_KEY_PREVIOUS` | Old values of `AUTOXIDE_SECRET_KEY`, separated by commas, while rotating the key; remove them after `autoxide secrets reseal` |
 | `AUTOXIDE_AUTH_TOKEN_SECRET_PREVIOUS` | Old values of `AUTOXIDE_AUTH_TOKEN_SECRET`, separated by commas, while rotating it; only used to check tokens, remove after the access token lifetime |

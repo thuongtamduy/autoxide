@@ -35,7 +35,7 @@ const CONCURRENCY: usize = 16;
 
 struct Writer;
 
-#[async_trait::async_trait]
+#[autoxide_kernel::async_trait]
 impl Authenticator for Writer {
     async fn authenticate(
         &self,
@@ -64,13 +64,8 @@ async fn app(test: &TestDatabase) -> (Router, Modules, Database) {
         .authenticator(Some(Arc::new(Writer)))
         .translations(modules.translations().clone());
     let routes = modules.routes();
-    let router = autoxide_kernel::http::build(
-        &config.http,
-        utoipa_axum::router::OpenApiRouter::new(),
-        routes,
-        extras,
-    )
-    .router;
+    let router =
+        autoxide_kernel::http::build(&config.http, Default::default(), routes, extras).router;
     (router, modules, database)
 }
 

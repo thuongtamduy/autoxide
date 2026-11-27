@@ -23,6 +23,7 @@ mod db_layer;
 mod db_within;
 mod distribution;
 mod dormant;
+mod endpoint;
 mod event;
 mod event_stream;
 mod event_ws;

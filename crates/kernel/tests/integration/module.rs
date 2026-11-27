@@ -581,3 +581,158 @@ fn khai_deprecated_sai_bi_tu_choi_luc_dang_ky() {
     assert!(error.contains("`since` must be a YYYY-MM-DD date"), "{error}");
     assert!(error.contains("`sunset` must come after `since`"), "{error}");
 }
+
+/// `GET /` khai bằng `#[endpoint]` (lớp HTTP của kernel).
+#[autoxide_kernel::http::endpoint(get, path = "/", public, responses((status = 200, description = "Hello.")))]
+async fn hello() -> &'static str {
+    "hello"
+}
+
+/// `GET /other` khai bằng `#[endpoint]`.
+#[autoxide_kernel::http::endpoint(get, path = "/other", public, responses((status = 200, description = "Other.")))]
+async fn other() -> &'static str {
+    "other"
+}
+
+/// Module khai cùng một route ở cả `routes` (cách cũ) và `endpoints` (cách mới) khi `twice`.
+struct Both {
+    twice: bool,
+}
+
+impl Module for Both {
+    fn name(&self) -> &'static str {
+        "both"
+    }
+
+    fn routes(&self) -> OpenApiRouter {
+        OpenApiRouter::new().routes(routes!(list_notes))
+    }
+
+    fn endpoints(&self) -> autoxide_kernel::http::Routes {
+        if self.twice {
+            autoxide_kernel::routes![hello, other]
+        } else {
+            autoxide_kernel::routes![other]
+        }
+    }
+}
+
+/// `Module::routes` và `Module::endpoints` trùng path + method: không khởi động, báo đúng route trùng (thay vì axum
+/// dừng tiến trình lúc ghép router); không trùng thì hai cách cùng chạy.
+#[tokio::test]
+async fn route_trung_giua_routes_va_endpoints_thi_khong_khoi_dong() {
+    TestDatabase::run(async |database| {
+        let db = connect(database).await;
+        let mut modules = Modules::new(vec![Box::new(Both { twice: true })]).unwrap();
+        let error = modules.start(&db).unwrap_err().to_string();
+        assert!(error.contains("both: GET /"), "{error}");
+        assert!(!error.contains("/other"), "{error}");
+
+        let mut modules = Modules::new(vec![Box::new(Both { twice: false })]).unwrap();
+        modules.start(&db).unwrap();
+        let routes = modules.routes();
+        let (_, router) = routes.iter().find(|(name, _)| *name == "both").unwrap();
+        let paths: Vec<&String> = router.get_openapi().paths.paths.keys().collect();
+        assert_eq!(paths, ["/", "/other"]);
+    })
+    .await
+    .unwrap();
+}
+
+/// Get one item by `id` (cách cũ).
+#[utoipa::path(get, path = "/{id}", params(("id" = String, Path, description = "Id.")), responses((status = 200, description = "Item.")))]
+async fn item_by_id() -> &'static str {
+    "id"
+}
+
+/// Delete one item by `key` (cách mới): cùng route `/{…}` với tên tham số khác.
+#[autoxide_kernel::http::endpoint(delete, path = "/{key}", public, params(("key" = String, Path, description = "Key.")), responses((status = 204, description = "Deleted.")))]
+async fn item_by_key() -> autoxide_kernel::http::NoContent {
+    autoxide_kernel::http::NoContent
+}
+
+struct Renamed;
+
+impl Module for Renamed {
+    fn name(&self) -> &'static str {
+        "renamed"
+    }
+
+    fn routes(&self) -> OpenApiRouter {
+        OpenApiRouter::new().routes(routes!(item_by_id))
+    }
+
+    fn endpoints(&self) -> autoxide_kernel::http::Routes {
+        autoxide_kernel::routes![item_by_key]
+    }
+}
+
+/// Cùng route mà tên tham số khác (`/{id}` và `/{key}`), dù khác method: axum dừng tiến trình khi ghép, nên kernel báo
+/// lỗi rõ lúc khởi động.
+#[tokio::test]
+async fn route_cung_dang_khac_ten_tham_so_thi_khong_khoi_dong() {
+    TestDatabase::run(async |database| {
+        let db = connect(database).await;
+        let mut modules = Modules::new(vec![Box::new(Renamed)]).unwrap();
+        let error = modules.start(&db).unwrap_err().to_string();
+        assert!(error.contains("renamed: DELETE /{key} (endpoints) conflicts"), "{error}");
+    })
+    .await
+    .unwrap();
+}
+
+/// Every file under a path (cách cũ, tham số đuôi).
+#[utoipa::path(get, path = "/{*rest}", params(("rest" = String, Path, description = "Path.")), responses((status = 200, description = "File.")))]
+async fn any_file() -> &'static str {
+    "file"
+}
+
+/// Old way to delete; kept for clients that still call it.
+#[deprecated(note = "use `DELETE /v2/{id}` instead")]
+#[autoxide_kernel::http::endpoint(delete, path = "/{id}", public, params(("id" = String, Path, description = "Id.")), responses((status = 204, description = "Deleted.")))]
+async fn old_delete() -> autoxide_kernel::http::NoContent {
+    autoxide_kernel::http::NoContent
+}
+
+struct Wildcard {
+    nested: bool,
+}
+
+impl Module for Wildcard {
+    fn name(&self) -> &'static str {
+        "wildcard"
+    }
+
+    fn routes(&self) -> OpenApiRouter {
+        let files = OpenApiRouter::new().routes(routes!(any_file));
+        if self.nested { OpenApiRouter::new().nest("/files", files) } else { files }
+    }
+
+    // Test cố ý dùng endpoint `#[deprecated]` để kiểm tài liệu có `deprecated: true`.
+    #[allow(deprecated)]
+    fn endpoints(&self) -> autoxide_kernel::http::Routes {
+        autoxide_kernel::routes![old_delete]
+    }
+}
+
+/// `/{*rest}` (tham số đuôi) và `/{id}` xung đột với bộ khớp route của axum: báo lỗi rõ lúc khởi động thay vì để axum
+/// dừng tiến trình. Đặt `/{*rest}` dưới `/files` thì hết xung đột; endpoint `#[deprecated]` mang `deprecated: true`.
+#[tokio::test]
+async fn tham_so_duoi_xung_dot_va_endpoint_cu_co_dau_deprecated() {
+    TestDatabase::run(async |database| {
+        let db = connect(database).await;
+        let mut modules = Modules::new(vec![Box::new(Wildcard { nested: false })]).unwrap();
+        let error = modules.start(&db).unwrap_err().to_string();
+        assert!(error.contains("wildcard: DELETE /{id} (endpoints) conflicts"), "{error}");
+
+        let mut modules = Modules::new(vec![Box::new(Wildcard { nested: true })]).unwrap();
+        modules.start(&db).unwrap();
+        let routes = modules.routes();
+        let (_, router) = routes.iter().find(|(name, _)| *name == "wildcard").unwrap();
+        let document = serde_json::to_value(router.get_openapi()).unwrap();
+        assert_eq!(document["paths"]["/{id}"]["delete"]["deprecated"], serde_json::json!(true));
+        assert!(document["paths"]["/files/{*rest}"]["get"].is_object());
+    })
+    .await
+    .unwrap();
+}
