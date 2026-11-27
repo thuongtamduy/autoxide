@@ -183,10 +183,20 @@ async fn gia_lap_mac_dinh_tat() {
         let payment = pay(&app, &sandbox, "S-1").await;
         let body = Some(json!({"outcome": "succeeded"}));
         let (status, _, refused) =
-            call(&app, Method::POST, &simulate_path(&payment), &token, &id, None, body).await;
+            call(&app, Method::POST, &simulate_path(&payment), &token, &id, None, body.clone())
+                .await;
         assert_eq!(
             (status, refused["code"].as_str()),
             (StatusCode::NOT_FOUND, Some("ledger.simulation_disabled")),
+            "{refused}"
+        );
+        // Thiếu `ledger.reconcile`: 403, không phải 404 — người không có quyền không biết tính năng bật hay tắt.
+        let clerk = account(&app, &shop, "clerk@shop.example", false).await;
+        let (status, _, refused) =
+            call(&app, Method::POST, &simulate_path(&payment), &clerk, "shop", None, body).await;
+        assert_eq!(
+            (status, refused["code"].as_str()),
+            (StatusCode::FORBIDDEN, Some("permission_denied")),
             "{refused}"
         );
     })
@@ -293,6 +303,24 @@ async fn gia_lap_chi_trong_sandbox_va_di_duong_cua_webhook() {
         let stored = ledger.payment(&sandbox, by_agent.id).await.unwrap().unwrap();
         assert_eq!(stored.status, "succeeded");
 
+        // Đầu vào sai: mọi lỗi báo một lần (D-083), lượt thu vẫn `pending`.
+        let invalid = pay(&app, &sandbox, "S-invalid").await;
+        let body =
+            Some(json!({"outcome": "paid", "amount": {"amount": "150000", "currency": "USD"}}));
+        let (status, _, refused) =
+            call(&app, Method::POST, &simulate_path(&invalid), &token, &id, None, body).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{refused}");
+        let mut fields: Vec<&str> = refused["errors"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|error| error["field"].as_str())
+            .collect();
+        fields.sort_unstable();
+        assert_eq!(fields, ["amount", "outcome"], "{refused}");
+        let stored = ledger.payment(&sandbox, invalid.id).await.unwrap().unwrap();
+        assert_eq!(stored.status, "pending");
+
         // Người mua không trả: `failed`.
         let other = pay(&app, &sandbox, "S-2").await;
         let failed = Some(json!({"outcome": "failed"}));
@@ -340,6 +368,64 @@ async fn gia_lap_chi_trong_sandbox_va_di_duong_cua_webhook() {
                 (StatusCode::CONFLICT, Some("ledger.payment_not_simulated")),
                 "{refused}"
             );
+        }
+    })
+    .await
+    .unwrap();
+}
+
+/// Hai lệnh giả lập cùng lúc cho một lượt thu (một "đã thu", một "hỏng", khoá khác nhau): đúng một thông báo được
+/// lưu, lượt thu có đúng một kết quả, không bao giờ hai bút toán hay hai event `ledger.payment_succeeded`.
+#[tokio::test]
+async fn hai_lenh_gia_lap_dong_thoi_chi_mot_ket_qua() {
+    TestDatabase::run(async |test| {
+        let app = app(test, true).await;
+        let shop = app.tenant("shop").await.unwrap();
+        let token = owner(&app, &shop).await;
+        let (id, sandbox) = sandbox(&app, &token, &shop).await;
+        let payment = pay(&app, &sandbox, "S-race").await;
+        let path = simulate_path(&payment);
+        let succeeded = call(
+            &app,
+            Method::POST,
+            &path,
+            &token,
+            &id,
+            Some("race-1"),
+            Some(json!({"outcome": "succeeded"})),
+        );
+        let failed = call(
+            &app,
+            Method::POST,
+            &path,
+            &token,
+            &id,
+            Some("race-2"),
+            Some(json!({"outcome": "failed"})),
+        );
+        let ((first, _, one), (second, _, two)) = tokio::join!(succeeded, failed);
+        // Mỗi lệnh: 200 (đã trả lời, hay thấy lượt thu như đang có) hoặc 409 (lượt thu đã hết `pending`).
+        for (status, answer) in [(first, &one), (second, &two)] {
+            assert!(
+                status == StatusCode::OK
+                    || status == StatusCode::CONFLICT && answer["code"] == "ledger.payment_state",
+                "{status} {answer}"
+            );
+        }
+        settle(&app).await;
+        let notice = format!("sandbox:{}", payment.id);
+        assert_eq!(count(&sandbox, "ledger_gateway_events", "provider_event_id", &notice).await, 1);
+        let ledger = app.api::<dyn Ledger>().unwrap();
+        let stored = ledger.payment(&sandbox, payment.id).await.unwrap().unwrap();
+        let captured = format!("payment:{}:captured", payment.id);
+        let (entries, events) = (
+            count(&sandbox, "ledger_entries", "reference", &captured).await,
+            succeeded_events(&sandbox, payment.id).await,
+        );
+        match stored.status.as_str() {
+            "succeeded" => assert_eq!((entries, events), (1, 1)),
+            "failed" => assert_eq!((entries, events), (0, 0)),
+            other => panic!("unexpected status {other}"),
         }
     })
     .await

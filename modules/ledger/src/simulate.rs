@@ -136,8 +136,11 @@ impl LedgerService {
             Outcome::Failed => NotificationKind::PaymentFailed { reason: "simulated".to_owned() },
         };
         let provider_ref = row.provider_ref.clone().unwrap_or_default();
+        // Mã thông báo cố định theo lượt thu: mỗi lượt thu chỉ được trả lời giả một lần. Hai lệnh chạy cùng lúc
+        // (cùng qua bước `pending` ở trên) gặp nhau ở ràng buộc duy nhất của `ledger_gateway_events`: lệnh sau
+        // không lưu gì (`None`) và chỉ trả lượt thu như đang có — không bao giờ hai kết quả cho một lượt thu.
         let notification = GatewayNotification::new(
-            format!("sandbox:{}", Uuid::now_v7()),
+            format!("sandbox:{}", row.id),
             kind,
             provider_ref,
             received,

@@ -12,7 +12,9 @@ thiếu một là từ chối: (1) biến `AUTOXIDE_LEDGER_SANDBOX_SIMULATION=tr
 bao giờ dùng được; (3) lượt thu có cờ `sandbox` (cột mới `ledger_payments.sandbox`, m0013, ghi lúc tạo theo
 `TenantContext::is_sandbox`) VÀ `provider_ref` có tiền tố `SANDBOX-` của bộ giả kernel (409
 `ledger.payment_not_simulated`); (4) lượt thu còn `pending` (409 `ledger.payment_state`). Lệnh đi qua lớp idempotency
-chuẩn của kernel (route có xác thực).
+chuẩn của kernel (route có xác thực). Mã thông báo giả cố định theo lượt thu (`sandbox:<id lượt thu>`): mỗi lượt thu chỉ
+được trả lời giả một lần, hai lệnh đồng thời gặp nhau ở ràng buộc duy nhất của `ledger_gateway_events` (lệnh sau không
+ghi gì, chỉ trả lượt thu như đang có).
 
 Lý do: Trong sandbox kernel bọc mọi `PaymentGateway` (D-232, D-20261119-step38-sandbox-isolation): lượt thu được tạo ở
 bộ giả, không đối tác nào gửi webhook về, nên khoản đứng `pending` mãi; người thử từng phải tự ký thông báo MoMo bằng
