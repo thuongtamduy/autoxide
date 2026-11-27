@@ -467,7 +467,8 @@ async fn price_history(
 pub(crate) struct PriceRequest {
     pub variant_id: Uuid,
     // Theo tiền tệ của bảng giá, không âm (ghi ở mô tả của kiểu): không viết `///` trên trường `inline` — doc ở
-    // đây thành `allOf` sai kiểu, SDK sinh `& Record<string, unknown>` (như `RoleGrant::scope`).
+    // đây thành `allOf` sai kiểu, SDK sinh `& Record<string, unknown>` (như `RoleGrant::scope`;
+    // D-20261127-inline-field-docs). `compare_at` là `Option<Money>` nên giữ `///` được.
     #[schema(inline)]
     pub amount: Money,
     /// Struck-through price, higher than `amount`; display only.

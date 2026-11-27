@@ -65,6 +65,9 @@ impl JobHandler for Purger {
             .into_tuple()
             .all(job.database.read())
             .await?;
+        // Một khách lỗi (vd bộ nối nhà cung cấp đang tắt) không chặn các khách sau trên cùng database; báo lỗi đầu
+        // tiên ở cuối để job được thử lại (D-20261127-voice-recording-provider-off).
+        let mut failed = None;
         for id in tenants {
             let tenant = match self.1.tenant(TenantId::from_uuid(id)).await {
                 Ok(tenant) => tenant,
@@ -73,9 +76,15 @@ impl JobHandler for Purger {
                     continue;
                 }
             };
-            self.0.purge_recordings(&tenant, at).await?;
+            if let Err(error) = self.0.purge_recordings(&tenant, at).await {
+                tracing::warn!(tenant_id = %id, code = error.code(), "recording purge failed for a tenant");
+                failed.get_or_insert(error);
+            }
         }
-        Ok(())
+        match failed {
+            Some(error) => Err(error),
+            None => Ok(()),
+        }
     }
 }
 
@@ -104,6 +113,11 @@ impl ConversationsService {
         let Some(provider_id) = row.provider_recording_id.clone() else {
             return Ok(());
         };
+        // Không có bản sao trong nơi lưu mà đã có hạn lưu: bản sao đã bị xoá khi tài khoản bị xoá lúc bộ nối tắt
+        // (`defer_provider_copy`) — không tải lại dữ liệu của tài khoản đã xoá; job dọn theo hạn xoá ở nhà cung cấp.
+        if row.recording_ref.is_none() && row.recording_expires_at.is_some() {
+            return Ok(());
+        }
         let provider = self.provider(&row.provider).ok_or_else(super::lines::voice_unavailable)?;
         if row.recording_ref.is_none() {
             // Ngoài transaction ghi: tải từ nhà cung cấp, ghi vào nơi lưu.
@@ -202,8 +216,9 @@ impl ConversationsService {
             return Ok(false);
         }
         // Còn bản ghi ở nhà cung cấp mà bộ nối của nhà cung cấp đó không bật: báo lỗi trước khi đụng tới gì, để
-        // `provider_recording_id` còn nguyên và lần sau (job, event xoá tài khoản được thử lại) xoá được — không xoá
-        // dấu vết khi bản ghi còn nằm ở nhà cung cấp (bước 70 P9, như đường "nghỉ" của `RecordingEraser`).
+        // `provider_recording_id` còn nguyên và lần sau (job thử lại) xoá được — không xoá dấu vết khi bản ghi còn
+        // nằm ở nhà cung cấp (D-20261127-voice-recording-provider-off). Xoá tài khoản không đi đường này khi bộ nối
+        // tắt: xem `RecordingEraser::erase`.
         let provider = match &row.provider_recording_id {
             Some(id) => Some((
                 id,
@@ -291,39 +306,53 @@ pub(crate) enum RecordingEraser<'a> {
 }
 
 impl RecordingEraser<'_> {
+    /// Xoá bản ghi của `row` khi tài khoản bị xoá. Bộ nối của nhà cung cấp giữ bản ghi không bật thì không báo
+    /// lỗi cho event (lỗi chặn event ở mọi module đăng ký sau, xem `dispatcher.rs`): xoá bản sao trong nơi lưu, giữ
+    /// `provider_recording_id`, đưa hạn lưu về bây giờ để job dọn theo hạn xoá nốt ở nhà cung cấp và báo lỗi (thử
+    /// lại, rồi `jobs_dead`) tới khi bộ nối bật lại (D-20261127-voice-recording-provider-off).
     async fn erase(&self, tenant: &TenantContext, row: &Call) -> Result<(), Error> {
+        if row.recording_ref.is_none() && row.provider_recording_id.is_none() {
+            return Ok(());
+        }
         match self {
             RecordingEraser::Service(service) => {
+                if row.provider_recording_id.is_some() && service.provider(&row.provider).is_none()
+                {
+                    let storage = match row.recording_ref {
+                        Some(_) => Some(service.store(tenant)?),
+                        None => None,
+                    };
+                    return defer_provider_copy(tenant, storage, row).await;
+                }
                 service.erase_recording(tenant, Actor::system(), row, "account_deleted").await?;
             }
             RecordingEraser::Dormant { storage, voice } => {
-                if row.recording_ref.is_none() && row.provider_recording_id.is_none() {
-                    return Ok(());
-                }
-                // Thiếu kho hay bộ nối thì báo lỗi: event xoá tài khoản được thử lại, không báo xong khi bản
-                // ghi còn nằm lại.
-                if let Some(key) = &row.recording_ref {
-                    let storage = storage.clone().ok_or_else(|| {
-                        Error::internal(
-                            "module `conversations` is turned off and no file storage is available \
-                             (module `files` and AUTOXIDE_FILES_*): a call recording of a deleted \
-                             account cannot be deleted yet",
-                        )
-                    })?;
-                    TenantStorage::new(storage, tenant).delete(key).await?;
-                }
-                if let Some(id) = &row.provider_recording_id {
-                    let provider = voice
-                        .iter()
-                        .find(|found| found.provider() == row.provider)
-                        .ok_or_else(|| {
-                            Error::internal(format!(
-                                "module `conversations` is turned off and the voice provider \
-                                     `{}` is not on: a call recording of a deleted account cannot \
-                                     be deleted at the provider yet",
-                                row.provider
-                            ))
+                // Thiếu kho thì báo lỗi: event xoá tài khoản được thử lại, không báo xong khi bản sao trong kho còn
+                // nằm lại mà không ai dọn (module tắt thì job dọn theo hạn cũng không chạy).
+                let storage = match row.recording_ref {
+                    Some(_) => {
+                        let storage = storage.clone().ok_or_else(|| {
+                            Error::internal(
+                                "module `conversations` is turned off and no file storage is available \
+                                 (module `files` and AUTOXIDE_FILES_*): a call recording of a deleted \
+                                 account cannot be deleted yet",
+                            )
                         })?;
+                        Some(TenantStorage::new(storage, tenant))
+                    }
+                    None => None,
+                };
+                let provider = match &row.provider_recording_id {
+                    Some(id) => match voice.iter().find(|found| found.provider() == row.provider) {
+                        Some(provider) => Some((id, provider)),
+                        None => return defer_provider_copy(tenant, storage, row).await,
+                    },
+                    None => None,
+                };
+                if let (Some(key), Some(storage)) = (&row.recording_ref, &storage) {
+                    storage.delete(key).await?;
+                }
+                if let Some((id, provider)) = provider {
                     provider.delete_recording(tenant.id(), id).await?;
                 }
                 // Không ghi event `recording_deleted`: không ai giao event của module đang tắt.
@@ -348,8 +377,43 @@ impl RecordingEraser<'_> {
     }
 }
 
+/// Tài khoản bị xoá mà bộ nối của nhà cung cấp giữ bản ghi của `row` không bật: xoá bản sao trong nơi lưu (nội
+/// dung trước, cột sau), giữ `provider_recording_id`, hạn lưu thành bây giờ (hạn sớm hơn thì giữ) để job dọn theo
+/// hạn xoá ở nhà cung cấp khi bộ nối bật lại. Không ghi event `recording_deleted`: bản ghi chưa xoá xong — job dọn
+/// ghi khi xoá xong.
+async fn defer_provider_copy(
+    tenant: &TenantContext,
+    storage: Option<TenantStorage>,
+    row: &Call,
+) -> Result<(), Error> {
+    if let (Some(key), Some(storage)) = (&row.recording_ref, &storage) {
+        storage.delete(key).await?;
+    }
+    let at = now();
+    let expires = row.recording_expires_at.map_or(at, |expires| expires.min(at));
+    let transaction = tenant.db().begin_write().await?;
+    call::Entity::update_many()
+        .col_expr(call::Column::RecordingRef, Expr::value(Option::<String>::None))
+        .col_expr(call::Column::RecordingExpiresAt, Expr::value(Some(expires)))
+        .col_expr(call::Column::UpdatedAt, Expr::value(at))
+        .filter(call::Column::Id.eq(row.id))
+        .scoped(tenant)
+        .exec(&transaction)
+        .await?;
+    transaction.commit().await?;
+    tracing::warn!(
+        tenant_id = %tenant.id(),
+        call_id = %row.id,
+        provider = %row.provider,
+        "call recording of a deleted account is still kept by a voice provider whose connector is not on: \
+         left to the retention purge"
+    );
+    Ok(())
+}
+
 /// Tài khoản `user` bị xoá: xoá bản ghi các cuộc gọi của người đó (nội dung trước, cột sau: lỗi thì trả lỗi khi
-/// dòng còn nguyên), xoá số trong yêu cầu gọi lại.
+/// dòng còn nguyên; bộ nối nhà cung cấp tắt thì để job dọn theo hạn, xem `RecordingEraser::erase`), xoá số trong yêu
+/// cầu gọi lại.
 pub(crate) async fn forget_calls(
     eraser: &RecordingEraser<'_>,
     tenant: &TenantContext,

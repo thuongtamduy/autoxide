@@ -261,15 +261,18 @@ fi
 tsc_needed() {
   [ "$QUICK" = 1 ] || return 0
   git rev-parse --verify --quiet "${GATE_BASE:-origin/main}" >/dev/null || return 0
+  # Không tìm được điểm rẽ nhánh (clone nông): chạy tsc thay vì lặng lẽ bỏ (D-20261127-gate-tsc).
+  local base changed
+  base="$(git merge-base "${GATE_BASE:-origin/main}" HEAD 2>/dev/null)" || return 0
   # Gom ra biến rồi mới kiểm: `… | grep -q .` dưới `pipefail` thành sai khi grep thoát sớm và git nhận SIGPIPE.
-  local changed
   changed="$(
-    git diff --name-only "$(git merge-base "${GATE_BASE:-origin/main}" HEAD)" -- \
+    git diff --name-only "$base" -- \
       sdk/typescript docs/openapi.json docs/guides xtask/src/sdk.rs gate.sh
     git status --porcelain -- sdk/typescript docs/openapi.json docs/guides
   )"
   [ -n "$changed" ]
 }
+TSC=""
 RUST_CHANGED=true
 if runs lint && { [ "$QUICK" = 1 ] || [ "$PR" = 1 ]; }; then
   RUST_CHANGED="$(scripts/rust-changed.sh "${GATE_BASE:-origin/main}")"
@@ -289,17 +292,25 @@ if runs lint; then
 
   # `sdk --check` chỉ so SDK với docs/openapi.json: kiểu SDK sinh ra mà hỏng (hay ví dụ TypeScript trong docs/guides
   # gọi sai SDK) vẫn lọt tới CI (#517). Có Node thì kiểm kiểu như job `sdk` của CI: tách ví dụ của docs/guides rồi
-  # `tsc --noEmit` (bước 70 P9). Gate nhanh chỉ chạy khi SDK, hợp đồng hay hướng dẫn đổi so với origin/main; không
-  # có Node thì bỏ và nói rõ (CI vẫn chạy). Bản TypeScript thấp nhất cam kết hỗ trợ chỉ kiểm trên CI (cần tải gói).
+  # `tsc --noEmit` (D-20261127-gate-tsc). Gate nhanh chỉ chạy khi SDK, hợp đồng hay hướng dẫn đổi so với origin/main;
+  # không có Node thì bỏ và nói rõ (CI vẫn chạy). Bản TypeScript thấp nhất cam kết hỗ trợ chỉ kiểm trên CI (cần tải
+  # gói). Xoá ví dụ tách lần trước (ví dụ của khối đã xoá khỏi hướng dẫn không được nằm lại); cài lại node_modules khi
+  # package-lock.json đổi so với lần cài (dấu băm ghi trong node_modules).
   if tsc_needed; then
     if command -v npm >/dev/null 2>&1; then
       step "TypeScript SDK and guide examples type-check (tsc --noEmit)"
+      rm -rf sdk/typescript/examples/guides
       cargo xtask sdk --extract-examples sdk/typescript/examples/guides
       (
         cd sdk/typescript
-        [ -d node_modules ] || npm ci --no-audit --no-fund
+        lock_hash="$(git hash-object package-lock.json)"
+        if [ ! -d node_modules ] || [ "$(cat node_modules/.autoxide-lock-hash 2>/dev/null)" != "$lock_hash" ]; then
+          npm ci --no-audit --no-fund
+          printf '%s\n' "$lock_hash" >node_modules/.autoxide-lock-hash
+        fi
         npx tsc --noEmit
       )
+      TSC=", tsc"
     else
       step "TypeScript SDK and guide examples type-check: skipped, Node.js is not installed (CI runs it)"
     fi
@@ -497,7 +508,7 @@ run_archive() {
 
 if [ "$LIGHT" = 1 ]; then
   tree_unchanged
-  printf '\n\033[32mgate --quick (GATE_LOCAL=off): green — fmt, %s, boundaries, SDK, api contract, dependencies, secrets\033[0m\n' "$CLIPPY"
+  printf '\n\033[32mgate --quick (GATE_LOCAL=off): green — fmt, %s, boundaries, SDK%s, api contract, dependencies, secrets\033[0m\n' "$CLIPPY" "$TSC"
   printf 'NOT checked on this machine: generated files, every test. CI on the pull request is the check: do not merge before it is green.\n'
   exit 0
 fi

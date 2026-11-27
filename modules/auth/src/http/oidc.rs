@@ -249,7 +249,7 @@ pub(crate) struct ProviderRequest {
     allow_signup: bool,
     // `staff` (mặc định) hay `customer`. Không viết `///` ở đây: trường `inline` có doc thành `allOf` sai kiểu
     // (chuỗi giao với object, SDK sinh `& Record<string, unknown>`); mô tả lấy từ chính `Realm`, mặc định ghi ở
-    // mô tả của `ProviderRequest` (như `RoleGrant::scope`).
+    // mô tả của `ProviderRequest` (như `RoleGrant::scope`; D-20261127-inline-field-docs).
     #[serde(default)]
     #[schema(inline)]
     realm: Realm,
