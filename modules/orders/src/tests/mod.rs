@@ -468,6 +468,7 @@ macro_rules! shipping_event {
 }
 
 shipping_event!(ShipmentDelivered, autoxide_shipping::api::events::SHIPMENT_DELIVERED);
+shipping_event!(ShipmentStatusChanged, autoxide_shipping::api::events::SHIPMENT_STATUS_CHANGED);
 shipping_event!(CodCollected, autoxide_shipping::api::events::COD_COLLECTED);
 shipping_event!(PreorderAllocated, crate::preorders::PREORDER_ALLOCATED);
 shipping_event!(PreorderDateChanged, crate::preorders::PREORDER_DATE_CHANGED);

@@ -242,3 +242,68 @@ async fn giao_hang_xuat_ca_lo_qua_han() {
     .await
     .unwrap();
 }
+
+/// Nhiều tiến trình giao event cùng lúc (D-054): hai lần giao lẻ và `orders.order_delivered`, mỗi event
+/// phát hai lần (hãng báo lại), bốn dispatcher chạy song song — kho xuất đúng một lần mỗi phần, không thừa,
+/// không thiếu; chỗ giữ `fulfilled`, sổ khớp tồn.
+#[tokio::test]
+async fn giao_hang_dong_thoi_xuat_dung_mot_lan() {
+    TestDatabase::run(async |test| {
+        let (orders, outbox) = Emitter::new("orders", &EVENTS);
+        let shop = shop_with(test, |builder, _| builder.module(orders)).await;
+        // Lịch chạy mỗi ngày của module chạy trước, để lượt song song bên dưới chỉ còn event giao hàng.
+        drain(&shop).await;
+        let item = shop.catalog.item();
+        let other = shop.catalog.item();
+        stock_in(&shop, shop.tree.a, item, 10, None).await;
+        stock_in(&shop, shop.tree.a, other, 5, None).await;
+        let order = Uuid::now_v7();
+        reserve(&shop, order, vec![ReserveLine::new("1", item, 6), ReserveLine::new("2", other, 3)])
+            .await;
+
+        let first = FulfillmentDelivered(json!({"after": {
+            "order_id": order, "fulfillment_id": Uuid::now_v7(),
+            "lines": [{"line_key": "1", "quantity": 2, "serials": []}],
+        }}));
+        let second = FulfillmentDelivered(json!({"after": {
+            "order_id": order, "fulfillment_id": Uuid::now_v7(),
+            "lines": [{"line_key": "1", "quantity": 1, "serials": []}, {"line_key": "2", "quantity": 1, "serials": []}],
+        }}));
+        let rest = OrderDelivered(json!({"after": {
+            "order_id": order, "lines": [{"line_key": "1"}, {"line_key": "2"}],
+            "delivered_lines": [
+                {"line_key": "1", "quantity": 3, "serials": []},
+                {"line_key": "2", "quantity": 2, "serials": []},
+            ],
+        }}));
+        for _ in 0..2 {
+            emit(&shop, &outbox, None, &first).await;
+            emit(&shop, &outbox, None, &rest).await;
+            emit(&shop, &outbox, None, &second).await;
+        }
+        let dispatchers: Vec<_> = (0..4).map(|_| shop.modules().dispatcher().unwrap()).collect();
+        // Mỗi dispatcher nhận (claim) event trước khi giao: các event khác nhau chạy song song.
+        for outcome in futures_util::future::join_all(
+            dispatchers.iter().map(|dispatcher| dispatcher.run_once()),
+        )
+        .await
+        {
+            outcome.unwrap();
+        }
+        drain(&shop).await;
+
+        assert_eq!(stock(&shop, item).await, (4, 0));
+        assert_eq!(stock(&shop, other).await, (2, 0));
+        assert_eq!(status(&shop, order).await, "fulfilled");
+        for (variant, total) in [(item, -6), (other, -3)] {
+            let uri = format!("/movements?variant_id={variant}&kind=sale");
+            let (_, sales) = call(&shop, "GET", &uri, "boss", None).await;
+            let sold: i64 =
+                sales["data"].as_array().unwrap().iter().filter_map(|m| m["quantity"].as_i64()).sum();
+            assert_eq!(sold, total, "{sales}");
+        }
+        assert_consistent(&shop).await;
+    })
+    .await
+    .unwrap();
+}

@@ -373,7 +373,8 @@ impl OrdersService {
                 )
                 .await?;
         }
-        if !complete {
+        // `partial` chỉ khi đã có đơn vị tới tay người mua: kiện đang đi đường hay giao hỏng chưa giao gì.
+        if !complete && delivered_units(&rows).values().any(|quantity| *quantity > 0) {
             order::Entity::update_many()
                 .col_expr(order::Column::FulfillmentStatus, "partial".into())
                 .filter(order::Column::Id.eq(order_id))

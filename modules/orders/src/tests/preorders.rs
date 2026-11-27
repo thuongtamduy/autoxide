@@ -17,8 +17,8 @@ use super::checkout::{body, checkout};
 use super::lifecycle::{count_events, status_of};
 use super::{
     Call, CodCollected, PaymentSucceeded, PreorderAllocated, PreorderDateChanged,
-    ShipmentDelivered, Shop, VariantUpdated, drain, emit, emit_from, keyed_shipment_event, minor,
-    shop,
+    ShipmentDelivered, ShipmentStatusChanged, Shop, VariantUpdated, drain, emit, emit_from,
+    keyed_shipment_event, minor, shop,
 };
 use crate::entity::line;
 
@@ -126,6 +126,13 @@ async fn don_tron_hang_san_va_dat_truoc_tach_hai_lan_giao() {
         // Gửi lại: cùng yêu cầu.
         let (_, again) = ship(&shop, id).await;
         assert_eq!(again["data"]["request_key"], key.as_str());
+        // Kiện đang đi đường: chưa đơn vị nào tới tay người mua, đơn chưa giao một phần.
+        let moving = keyed_shipment_event(id, &key, "in_transit", None);
+        emit_from(&shop, &shop.shipping_outbox, &ShipmentStatusChanged(moving)).await;
+        drain(&shop).await;
+        assert_eq!(status_of(&shop, id).await, "shipping");
+        let (_, found) = Call::as_user(&shop, "boss").send("GET", &format!("/{id}"), None).await;
+        assert_eq!(found["data"]["fulfillment_status"], "unfulfilled", "{found}");
         deliver(&shop, id, &key, Some(100_000)).await;
         // Còn hàng đặt trước chưa giao: đơn chưa `delivered`.
         assert_eq!(status_of(&shop, id).await, "shipping");
@@ -235,14 +242,13 @@ async fn ngung_dat_truoc_huy_va_hoan_tien_tu_dong() {
 async fn fulfillment_delivered(shop: &Shop) -> serde_json::Value {
     use sea_orm::ConnectionTrait as _;
     let read = shop.database().read();
-    let row = read
-        .query_one_raw(sea_orm::Statement::from_string(
-            read.get_database_backend(),
-            "SELECT payload FROM orders_events WHERE name = 'orders.fulfillment_delivered'",
-        ))
-        .await
-        .unwrap()
-        .unwrap();
+    let sql = "SELECT payload FROM orders_events WHERE name = $1";
+    let statement = autoxide_kernel::database::statement(
+        read.get_database_backend(),
+        sql,
+        ["orders.fulfillment_delivered".into()],
+    );
+    let row = read.query_one_raw(statement).await.unwrap().unwrap();
     let payload: serde_json::Value =
         serde_json::from_str(&row.try_get_by_index::<String>(0).unwrap()).unwrap();
     payload["after"].clone()

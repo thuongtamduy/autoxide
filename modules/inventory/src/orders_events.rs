@@ -9,7 +9,7 @@
 //! | `orders.preorder_cancelled` | `release_lines(order_id, reference = event id)` — trả riêng các dòng | `order_id`, `lines[{line_key, quantity}]` (phần huỷ lần đó) |
 //! | `orders.fulfillment_delivered` | xuất (`delivery`), `fulfilment_key = fulfillment:<fulfillment_id>` — một lần giao tới tay người mua | `order_id`, `fulfillment_id`, `lines[{line_key, quantity, serials[]}]` |
 //! | `orders.order_delivered` | xuất (`delivery`) `delivered_lines` (event cũ không có: phần còn giữ của mọi dòng), `fulfilment_key = order:<order_id>:delivered` (UT-1) | `order_id`, `delivered_lines[{line_key, quantity, serials[]}]` |
-//! | `orders.line_serials_recorded` | xuất (`delivery`) phần đã giao của dòng mà trước đó thiếu serial, `fulfilment_key = serials:<line_id>:<số serial>` | `order_id`, `line_id`, `line_key`, `delivered_quantity`, `serials[]` |
+//! | `orders.line_serials_recorded` | xuất (`delivery`) phần đã giao của dòng mà trước đó thiếu serial, `fulfilment_key = serials:<event id>` | `order_id`, `line_id`, `line_key`, `delivered_quantity`, `serials[]` |
 //! | `orders.return_received` | `restock`, `reference = return:<return_id>` | `return_id`, `order_id`, `warehouse_org_id`, `lines[{variant_id, quantity, sellable, lot_code?, serials[]}]` |
 
 use std::sync::Arc;
@@ -126,7 +126,6 @@ struct OrderArrived {
 #[derive(Debug, Deserialize)]
 struct SerialsRecorded {
     order_id: Uuid,
-    line_id: Uuid,
     line_key: String,
     delivered_quantity: i64,
     serials: Vec<String>,
@@ -233,8 +232,10 @@ impl EventHandler for OrderEvents {
                     tracing::warn!(event_id = %event.id, "orders.line_serials_recorded without the fields inventory reads; ignored");
                     return Ok(());
                 };
-                // Serial chỉ thêm, không xoá: số serial sau lần ghi định danh lần xuất này.
-                let key = format!("serials:{}:{}", recorded.line_id, recorded.serials.len());
+                // Khoá theo event: nhận lại cùng event thì không xuất lại. Hai lần ghi khác nhau (kể cả ghi đồng
+                // thời, hay cùng số serial mà phần đã giao khác) là hai event, không đụng khoá của nhau; `UpTo`
+                // tự kẹp theo phần đã xuất nên lần sau không xuất thừa.
+                let key = format!("serials:{}", event.id);
                 let wanted = [DeliveredLine::new(
                     recorded.line_key,
                     Want::UpTo(recorded.delivered_quantity),
