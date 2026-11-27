@@ -104,7 +104,7 @@ pub const BUSINESS_MODEL: TenantSetting = TenantSetting::new(
      `independent` (one shop), `multi_store` (one business, several stores), `chain` (a parent \
      with child tenants), `marketplace` (sellers sell on the tenant's site) or `saas` (the tenant \
      sells software by plan). What the tenant may use still comes from its plan; `marketplace` also makes \
-     `catalog` require a verified identity of a seller before listing its goods (when `compliance` is installed).",
+     `catalog` require a verified identity of a seller before listing its goods.",
 )
 .checked(business_model);
 

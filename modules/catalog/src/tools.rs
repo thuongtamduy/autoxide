@@ -259,7 +259,9 @@ pub(crate) fn all(service: &Arc<CatalogService>) -> Vec<Tool> {
         Tool::new(
             "set_product_status",
             "Put a product on sale (`active`), stop it (`inactive`), archive it, or reopen an \
-             archived product as a `draft`.",
+             archived product as a `draft`. On a marketplace, goods of a seller go on sale only once \
+             the seller has verified its identity (`compliance.kyc_required`, \
+             `catalog.seller_verification_unavailable`).",
             move |tenant: TenantContext, principal: Principal, input: SetStatusInput| {
                 let service = status.clone();
                 async move {

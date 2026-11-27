@@ -3701,7 +3701,7 @@
         "returns_secret": false
       },
       "deprecation": null,
-      "description": "Put a product on sale (`active`), stop it (`inactive`), archive it, or reopen an archived product as a `draft`.",
+      "description": "Put a product on sale (`active`), stop it (`inactive`), archive it, or reopen an archived product as a `draft`. On a marketplace, goods of a seller go on sale only once the seller has verified its identity (`compliance.kyc_required`, `catalog.seller_verification_unavailable`).",
       "input_schema": {
         "additionalProperties": false,
         "description": "The new sale status of a product.",

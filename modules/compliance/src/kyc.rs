@@ -53,7 +53,7 @@ fn kyc_required(activity: Activity, status: &str) -> Error {
     Error::new(
         ErrorKind::Forbidden,
         "compliance.kyc_required",
-        "Verify your identity before you {activity} (your verification is `{profile_status}`).",
+        "A verified identity is required to {activity}; the verification profile is `{profile_status}`.",
     )
     .with_param("activity", activity.as_str())
     .with_param("profile_status", status)

@@ -91,12 +91,35 @@ async fn chi_san_hoi_dinh_danh_dung_nguoi_ban() {
     }
 }
 
-/// Sàn không cài `compliance` (tự ghép module): không có gì để hỏi, mở bán được (máy chủ ghi log cảnh báo).
+/// Sàn mà không có `KycGate` (module `compliance` tắt, vd `AUTOXIDE_MODULES=official,-compliance`): không kiểm
+/// được định danh nên hàng của người bán không mở bán được (`catalog.seller_verification_unavailable`); hàng
+/// của nút gốc vẫn được. Khách không phải sàn không bị ảnh hưởng.
 #[tokio::test]
-async fn san_khong_co_compliance_khong_chan() {
+async fn san_khong_co_compliance_chan_hang_nguoi_ban() {
     TestDatabase::run(async |test| {
         let (app, tree) = super::app(test).await;
         business_model(&app, "marketplace").await;
+        let (seller, _) = create_product(&app, "boss", tree.a, "K-1", "Hàng người bán").await;
+        let (status, problem) = publish(&app, &seller).await;
+        assert_eq!(status, StatusCode::FORBIDDEN, "{problem}");
+        assert_eq!(problem["code"], "catalog.seller_verification_unavailable");
+        let (_, still) = call(&app, "GET", &format!("/products/{seller}"), "boss", None).await;
+        assert_eq!(still["data"]["status"], "draft");
+        let root = autoxide_kernel::tenancy::root_of(DEFAULT_TENANT);
+        let (own, _) = create_product(&app, "boss", root, "K-2", "Hàng của sàn").await;
+        let (status, sold) = publish(&app, &own).await;
+        assert_eq!(status, StatusCode::OK, "{sold}");
+    })
+    .await
+    .unwrap();
+}
+
+/// Khách không phải sàn, không có `compliance`: mở bán như thường.
+#[tokio::test]
+async fn khong_phai_san_khong_co_compliance_mo_ban_duoc() {
+    TestDatabase::run(async |test| {
+        let (app, tree) = super::app(test).await;
+        business_model(&app, "independent").await;
         let (product, _) = create_product(&app, "boss", tree.a, "K-1", "Hàng").await;
         let (status, sold) = publish(&app, &product).await;
         assert_eq!(status, StatusCode::OK, "{sold}");

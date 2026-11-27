@@ -3,8 +3,9 @@
 Chủ đề: Pháp luật và tuân thủ
 
 Quyết định: Khi khách đặt `kernel.business_model = marketplace` và có module `compliance`, `catalog` hỏi
-`KycGate::require_verified(khách, Subject::Org(nút sở hữu sản phẩm), Activity::Sell)` trước khi chuyển sản phẩm sang
-`active`. Sản phẩm của nút gốc (chính sàn) không hỏi. Có cần định danh hay không do quy tắc `kyc.required_activities`
+`KycGate::require_verified(khách, Subject::Org(nút), Activity::Sell)` trước khi chuyển sản phẩm sang `active`, với nút
+là nút sở hữu sản phẩm rồi lần lượt các nút phía trên nó (trừ gốc): một nút đã định danh là đủ (D-185: sàn → người bán
+→ kho / cửa hàng). Sản phẩm của nút gốc (chính sàn) không hỏi. Có cần định danh hay không do quy tắc `kyc.required_activities`
 (dữ liệu có ngày hiệu lực) của `compliance` quyết; thiếu thì lỗi `compliance.kyc_required` (403). `catalog` giữ
 `KycGate` riêng, không chiếm chỗ `ListingGate` (một chỗ, dành cho module sàn sau này). `kernel.business_model` vì vậy
 không còn chỉ là thông tin.
@@ -24,10 +25,14 @@ biết khách là sàn qua `kernel.business_model`. Nút khác gốc trên sàn 
 - Hỏi định danh cho mọi khách: chặn cửa hàng độc lập không có nghĩa vụ này.
 - Cấu hình riêng `catalog.seller_kyc`: thêm một nút bật trùng nghĩa với mô hình kinh doanh.
 
-Không có `compliance` (chỉ khi tự ghép module; binary chính thức luôn có): không chặn, ghi log cảnh báo mỗi lần mở bán
-trên sàn — không chặn cứng vì `catalog` không tự định danh được, chặn thì sàn tự ghép không bán được gì.
+Không có `KycGate` (module `compliance` tắt, vd `AUTOXIDE_MODULES=official,-compliance` hay `core,catalog`; không
+module nào `depends_on` nó): trên sàn từ chối mở bán hàng của người bán với `catalog.seller_verification_unavailable`
+(403); hàng của nút gốc vẫn mở bán được. Lý do: không kiểm được thì không được coi là đã kiểm — cho qua là trái luật
+số hai. Sàn cho mỗi người bán một khách con (chuỗi cha-con) thì không được kiểm theo cách này — ghi trong
+`docs/COMPLIANCE.md`.
 
-Còn mở (phiên điều phối chép vào ROADMAP mục LG-3): hồ sơ KYC chưa ghi đủ mục Điều 18 (ngày sinh, địa chỉ, người đại
+Còn mở (phiên điều phối chép vào lộ trình): hồ sơ KYC chưa ghi đủ mục Điều 18 (ngày sinh, địa chỉ, người đại
 diện, nước cấp và hạn hộ chiếu ≥ 6 tháng lúc xét duyệt) — cần quyết giữ ở core hay để nhà cung cấp eKYC giữ; hàng đang
 bán không bị kiểm lại khi khách chuyển thành sàn, quy tắc bắt đầu áp dụng hay định danh hết hạn / bị thu hồi (cần job
-hay event của `compliance` dừng hàng); livestream và tiếp thị liên kết chưa hỏi `KycGate` (chưa có module).
+hay event của `compliance` dừng hàng); livestream và tiếp thị liên kết chưa hỏi `KycGate` (chưa có module); quyền `kernel.settings.manage` theo nhánh đổi được
+`kernel.business_model` cấp khách.

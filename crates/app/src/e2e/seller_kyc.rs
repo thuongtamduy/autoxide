@@ -23,10 +23,12 @@ const GRANTS: [&str; 5] = [
     "compliance.kyc.submit",
 ];
 
-/// Hai người bán (`a`, `b`) dưới gốc của khách mặc định.
+/// Hai người bán (`a`, `b`) dưới gốc của khách mặc định; `a` có một cửa hàng con `store` (sàn → người bán →
+/// cửa hàng, D-185).
 struct Sellers {
     a: OrgId,
     b: OrgId,
+    store: OrgId,
 }
 
 async fn app(test: &TestDatabase, model: &str) -> (TestApp, Sellers, Arc<FakeIdentityVerifier>) {
@@ -43,12 +45,13 @@ async fn app(test: &TestDatabase, model: &str) -> (TestApp, Sellers, Arc<FakeIde
         builder = builder.boxed_module(module);
     }
     let app = builder.build().await.unwrap();
-    let sellers =
-        Sellers { a: OrgId::from_uuid(Uuid::now_v7()), b: OrgId::from_uuid(Uuid::now_v7()) };
+    let org = || OrgId::from_uuid(Uuid::now_v7());
+    let sellers = Sellers { a: org(), b: org(), store: org() };
     let write = app.database().begin_write().await.unwrap();
     let root = OrgTree::insert_root(&write, DEFAULT_TENANT).await.unwrap();
     OrgTree::insert(&write, DEFAULT_TENANT, sellers.a, root, 8).await.unwrap();
     OrgTree::insert(&write, DEFAULT_TENANT, sellers.b, root, 8).await.unwrap();
+    OrgTree::insert(&write, DEFAULT_TENANT, sellers.store, sellers.a, 8).await.unwrap();
     write.commit().await.unwrap();
     business_model(&app, model).await;
     (app, sellers, verifier)
@@ -122,7 +125,8 @@ async fn verify_seller(app: &TestApp, verifier: &FakeIdentityVerifier, org: OrgI
 
 /// Sàn: sản phẩm của người bán chưa định danh không mở bán được — qua REST lẫn tool MCP — với mã
 /// `compliance.kyc_required` (403), sản phẩm vẫn `draft`; hàng của chính sàn (nút gốc) không cần; định danh
-/// xong thì mở bán được, người bán khác vẫn bị chặn.
+/// xong thì mở bán được, kể cả hàng ở cửa hàng con của người bán (định danh ở nút cha là đủ); người bán khác
+/// vẫn bị chặn.
 #[tokio::test]
 async fn san_chan_hang_cua_nguoi_ban_chua_dinh_danh() {
     TestDatabase::run(async |test| {
@@ -139,6 +143,10 @@ async fn san_chan_hang_cua_nguoi_ban_chua_dinh_danh() {
             client.call_tool(tool("catalog.set_product_status", input.clone())).await.unwrap();
         assert_eq!(refused.structured_content.unwrap()["code"], "compliance.kyc_required");
 
+        let in_store = product(&app, sellers.store, "K-4").await;
+        let (status, problem) = publish(&app, &in_store).await;
+        assert_eq!(problem["code"], "compliance.kyc_required", "{status}");
+
         let (_, still) = call(&app, "GET", &format!("/catalog/products/{seller}"), None).await;
         assert_eq!(still["data"]["status"], "draft");
 
@@ -151,6 +159,13 @@ async fn san_chan_hang_cua_nguoi_ban_chua_dinh_danh() {
         assert_eq!(listed.is_error, Some(false), "{listed:?}");
         assert_eq!(listed.structured_content.unwrap()["data"]["status"], "active");
         client.cancel().await.unwrap();
+
+        let (status, sold) = publish(&app, &in_store).await;
+        assert_eq!(
+            status,
+            StatusCode::OK,
+            "hàng ở cửa hàng con của người bán đã định danh: {sold}"
+        );
 
         let other = product(&app, sellers.b, "K-3").await;
         let (status, problem) = publish(&app, &other).await;

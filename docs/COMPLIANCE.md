@@ -229,11 +229,15 @@ not handle yet. Until they are done, the deployer covers them:
   livestreamers and affiliates (E-commerce Law 122/2025/QH15; Decree 248/2026/ND-CP Article 18, electronic identity
   of sellers from 1 January 2027 — check the originals). When the tenant is a marketplace
   (`kernel.business_model = marketplace`), `catalog` asks `KycGate` before a product of a seller (any branch other
-  than the tenant's root) goes `active`: an unverified seller gets `compliance.kyc_required` (403); goods of the
-  root and stores that sell their own goods are not asked. Only the change to `active` is checked: goods already on sale
-  stay on sale when the tenant becomes a marketplace, the rule starts to apply or a seller's verification expires or is
-  revoked — stop them yourself (`POST /api/v1/catalog/products/{id}/status`). Without module `compliance` (only when
-  you assemble modules yourself) nothing is checked and the server logs a warning on each listing. Still open: livestream and affiliate flows (no module
+  than the tenant's root) goes `active`. The seller is the owning branch or a branch above it, below the root
+  (marketplace → seller → store): one verified branch in that chain is enough. An unverified seller gets
+  `compliance.kyc_required` (403); goods of the root and tenants that sell their own goods are not asked. If module
+  `compliance` is turned off (for example `AUTOXIDE_MODULES=official,-compliance`), identity cannot be checked, so
+  goods of a seller cannot go on sale on a marketplace (`catalog.seller_verification_unavailable`, 403). Only the
+  change to `active` is checked: goods already on sale stay on sale when the tenant becomes a marketplace, the rule
+  starts to apply or a seller's verification expires or is revoked — stop them yourself
+  (`POST /api/v1/catalog/products/{id}/status`). A marketplace that gives each seller its own child tenant instead
+  of a branch is not checked this way: each child tenant sells its own goods. Still open: livestream and affiliate flows (no module
   yet), and the profile does not record every item Article 18 lists — individuals: full name, date of birth,
   personal identification number (one source adds residential address); organisations and household businesses:
   name, head office, identification number, legal representative; foreign individuals: passport (or equivalent)

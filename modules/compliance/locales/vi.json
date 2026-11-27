@@ -27,7 +27,7 @@
   "compliance.hide_reason_not_allowed": "Không được ẩn nội dung của người tiêu dùng vì lý do `{reason}`; lý do được phép: {allowed}.",
   "compliance.incident_not_found": "Không có sự cố dữ liệu cá nhân này.",
   "compliance.kyc_not_found": "Không có hồ sơ định danh này.",
-  "compliance.kyc_required": "Hãy định danh trước khi {activity} (hồ sơ định danh của bạn đang là `{profile_status}`).",
+  "compliance.kyc_required": "Cần định danh trước khi {activity}; hồ sơ định danh đang là `{profile_status}`.",
   "compliance.kyc_state_invalid": "Hồ sơ định danh đang là `{status}`; lúc này không làm được việc này.",
   "compliance.logo_snippet_invalid": "Đoạn mã logo không đúng dạng do Bộ Công Thương cấp ({reason}). Dán nguyên văn, hoặc gửi `link_url` và `image_url`.",
   "compliance.mail.case_decided.subject": "Quyết định về phản ánh {reference} của bạn",
