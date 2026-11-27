@@ -84,7 +84,7 @@ enum Command {
     /// Ask the server running on this machine whether it is healthy (for container health checks).
     ///
     /// Sends `GET /health/ready` (or `/health/live` with `--live`) to the address of
-    /// `AUTOXIDE_HTTP_ADDRESS` over plain HTTP, using the same settings as `autoxide serve`, and
+    /// `AUTOXIDE_HTTP_ADDRESS` over plain HTTP (it reads only that one setting, so it needs no other configuration), and
     /// exits with status 0 when it answers 200, 1 when it does not answer or answers anything else,
     /// 2 when the configuration is invalid. It needs no shell, `curl` or `wget`, so it works in an
     /// image that has none. It does not touch the database itself.

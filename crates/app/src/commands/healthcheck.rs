@@ -11,6 +11,8 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, TcpStream};
 use std::process::ExitCode;
 use std::time::Duration;
 
+use autoxide_kernel::config::HttpConfig;
+
 use super::{EXIT_FAILURE, report_invalid_configuration};
 use crate::settings;
 
@@ -26,12 +28,16 @@ pub struct Arguments {
 }
 
 pub fn run(arguments: &Arguments) -> ExitCode {
-    let settings = match settings::load() {
-        Ok(settings) => settings,
+    // Chỉ đọc địa chỉ nghe (`AUTOXIDE_HTTP_ADDRESS`), cùng khai báo `Setting` mà `serve` dùng: lệnh chạy được cả khi cấu hình khác
+    // thiếu hay sai, và không đi qua cấu trúc cài đặt có chứa secret.
+    let address = match settings::source()
+        .and_then(|source| settings::read_one(&source, HttpConfig::read_address))
+    {
+        Ok(address) => address,
         Err(errors) => return report_invalid_configuration(&errors),
     };
     let path = if arguments.live { "/health/live" } else { "/health/ready" };
-    let target = loopback_of(settings.config.http.address);
+    let target = loopback_of(address);
     match probe(target, path, Duration::from_secs(arguments.timeout)) {
         Ok(200) => ExitCode::SUCCESS,
         Ok(status) => {

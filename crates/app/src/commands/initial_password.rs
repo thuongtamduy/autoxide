@@ -6,11 +6,12 @@
 //! bao giờ vào log. Đường dẫn lấy từ đúng cài đặt mà `serve` dùng để ghi.
 
 use std::io::Write;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use super::{EXIT_FAILURE, report_invalid_configuration};
 use crate::settings;
+use crate::startup::BOOTSTRAP_ADMIN_PASSWORD_OUT;
 
 #[derive(Debug, clap::Args)]
 pub struct Arguments {
@@ -20,11 +21,15 @@ pub struct Arguments {
 }
 
 pub fn run(arguments: &Arguments) -> ExitCode {
-    let settings = match settings::load() {
-        Ok(settings) => settings,
+    // Chỉ đọc đúng `AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD_OUT`, cùng khai báo `Setting` mà `serve` dùng để ghi file: lệnh chạy được cả
+    // khi cấu hình khác thiếu, và không đi qua cấu trúc cài đặt có chứa secret.
+    let path = match settings::source().and_then(|source| {
+        settings::read_one(&source, |reader| reader.get::<PathBuf>(&BOOTSTRAP_ADMIN_PASSWORD_OUT))
+    }) {
+        Ok(path) => path,
         Err(errors) => return report_invalid_configuration(&errors),
     };
-    let path = &settings.startup.password_out;
+    let path = path.as_path();
     if arguments.remove {
         match remove(path) {
             Ok(()) => {

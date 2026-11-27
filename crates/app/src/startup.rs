@@ -96,9 +96,6 @@ pub struct StartupConfig {
     pub migrate: bool,
     pub admin: Option<AdminBootstrap>,
     pub tasks: Vec<String>,
-    /// Where `serve` writes the generated password of the first administrator (`AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD_OUT`),
-    /// also when no administrator is bootstrapped: `autoxide initial-password` reads it from here.
-    pub password_out: PathBuf,
 }
 
 /// Quản trị viên đầu tiên cần tạo.
@@ -156,7 +153,7 @@ impl StartupConfig {
             (Some(email), password) => Some(AdminBootstrap {
                 email,
                 password: password.unwrap_or(PasswordSource::Generate),
-                password_out: password_out.clone(),
+                password_out,
             }),
             (None, Some(_)) => {
                 return reader.reject(
@@ -167,7 +164,7 @@ impl StartupConfig {
             }
             (None, None) => None,
         };
-        Ok(StartupConfig { migrate, admin, tasks: tasks.unwrap_or_default(), password_out })
+        Ok(StartupConfig { migrate, admin, tasks: tasks.unwrap_or_default() })
     }
 
     /// Có việc nào phải làm dưới khoá không.
