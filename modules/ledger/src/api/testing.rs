@@ -226,6 +226,16 @@ impl FakeLedger {
             .sum()
     }
 
+    /// The partner reports `payment` failed (declined, abandoned): marks it `failed`, as the real `ledger`
+    /// does on a failure notification. No event (the source module reads the status when it needs it).
+    pub fn fail(&self, payment: Uuid) {
+        let mut state = lock(&self.state);
+        if let Some(found) = state.payments.iter_mut().find(|found| found.id == payment) {
+            found.status = "failed".to_owned();
+            found.updated_at = Timestamp::now();
+        }
+    }
+
     /// The partner reports `payment` fully collected: marks it collected and records the event
     /// `ledger.payment_succeeded` in the outbox (not delivered: the test runs the dispatcher). Needs an app
     /// built with [`FakeLedger::module`].

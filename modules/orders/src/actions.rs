@@ -279,6 +279,8 @@ impl OrdersService {
             return Err(errors::payment_expired());
         }
         if Method::parse(&row.payment_method) != Method::Cod {
+            // Lượt thu trước đã hỏng / hết hạn ở `ledger`: lần thử mới thay vì trả lại link cũ (UT-6 L4).
+            self.replace_ended_attempt(tenant, id).await?;
             self.start_payment(tenant, id, return_url).await?;
         }
         self.pending_payments(tenant, id).await

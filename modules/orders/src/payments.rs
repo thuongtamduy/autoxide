@@ -300,6 +300,10 @@ impl OrdersService {
         else {
             return Ok(());
         };
+        if row.status == crate::payment_attempts::SUPERSEDED {
+            // Lượt thu của một lần thử đã bị thay: không tính vào đơn, hoàn qua đối tác (UT-6 L4).
+            return self.refund_superseded(tenant, &row, ledger_payment, amount).await;
+        }
         let (database, outbox) = (tenant.database(), &self.outbox);
         let payment_id = row.id;
         let late = database
