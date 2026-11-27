@@ -847,10 +847,12 @@ async fn token_quyen_o_nhanh_khac_khong_doi_tai_khoan_ngoai_nhanh() {
             grants: Vec::new(),
         };
         let sync_role = services.roles.create(tenant, Actor::system(), input).await.unwrap();
+        // Mật khẩu sinh mới cho mỗi lần chạy: test không mang mật khẩu viết cứng.
+        let password = format!("scim-operator-{}", uuid::Uuid::now_v7());
         let input = NewUser {
             email: "it@example.com".to_owned(),
             name: "Sync".to_owned(),
-            password: Some(PASSWORD.to_owned()),
+            password: Some(password.clone()),
         };
         let operator = services.users.create(tenant, Actor::system(), input).await.unwrap().id;
         services
@@ -863,7 +865,7 @@ async fn token_quyen_o_nhanh_khac_khong_doi_tai_khoan_ngoai_nhanh() {
             )
             .await
             .unwrap();
-        let access = bearer(&app, "it@example.com", PASSWORD).await;
+        let access = bearer(&app, "it@example.com", &password).await;
         let low_token = scim_token(&app, &access, None).await;
 
         // Tài khoản ở nhánh B giữ `writer`: token không đổi được.

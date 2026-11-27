@@ -734,6 +734,7 @@ impl ContentService {
         if !problems.is_empty() {
             return Err(Error::validation(problems));
         }
+        let read = tenant.database().read();
         let mut found = None;
         for language in [locale.as_str(), languages.default.as_str()] {
             found = term_translation::Entity::find()
@@ -741,7 +742,7 @@ impl ContentService {
                 .filter(term_translation::Column::Taxonomy.eq(taxonomy.as_str()))
                 .filter(term_translation::Column::Locale.eq(language))
                 .filter(term_translation::Column::Slug.eq(slug))
-                .one(tenant.database().read())
+                .one(read)
                 .await?;
             if found.is_some() {
                 break;
@@ -759,7 +760,7 @@ impl ContentService {
             .filter(published::Column::RestrictedAt.is_null())
             .filter(crate::publishing::reading::on_site(&site.lineage_ids()))
             .filter(published_has_term(tenant, text.term_id))
-            .one(tenant.database().read())
+            .one(read)
             .await?;
         if shown_post.is_none() {
             return Err(not_found());
