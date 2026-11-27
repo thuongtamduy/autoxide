@@ -1144,7 +1144,10 @@ impl LedgerService {
                 // Tiền vẫn ở đối tác mà lượt hoàn hỏng: người vận hành phải thấy (UT-6). Mục `late_payment`
                 // của thanh toán còn mở thì nó đã bảo hoàn tay — không mở mục thứ hai cho cùng khoản tiền.
                 let late_open = exception::Entity::find()
-                    .filter(exception::Column::DedupeKey.eq(crate::reconcile::late_payment_key(payment_id)))
+                    .filter(
+                        exception::Column::DedupeKey
+                            .eq(crate::reconcile::late_payment_key(payment_id)),
+                    )
                     .filter(exception::Column::Status.eq("open"))
                     .scoped(tenant)
                     .one(&transaction)
