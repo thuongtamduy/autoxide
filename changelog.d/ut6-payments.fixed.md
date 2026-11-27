@@ -6,3 +6,5 @@
   the money is refunded through the partner once, and `orders.payment_recorded` notes it.
 - Module `ledger`: money collected for a payment the partner had reported failed opens a `late_payment`
   item in the reconciliation queue, as money arriving after the deadline already did.
+- Module `ledger`: a `late_payment` item closes on its own (`resolved`, resolution `refunded`) once the
+  payment is refunded in full through the partner, so the queue shows only payments to refund by hand.
