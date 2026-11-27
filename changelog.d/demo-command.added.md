@@ -10,3 +10,5 @@
   and rules for Cursor (`.cursor/rules`) and Copilot (`.github/copilot-instructions.md`).
 - `autoxide demo` always uses its own SQLite file and ignores `DATABASE_URL` from the environment and `.env`, so it
   cannot touch a real database; `--database-url` points it at another database on purpose.
+- `autoxide demo` also turns off outside services from the environment (SMTP, S3, OpenTelemetry, AI providers, provider
+  modules), so a try-out never sends a real email or writes to a real bucket; `--keep-external-services` keeps them.

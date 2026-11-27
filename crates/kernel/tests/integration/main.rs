@@ -19,6 +19,7 @@ mod client_config;
 mod compression;
 mod custom_fields_limit;
 mod database;
+mod db_layer;
 mod distribution;
 mod dormant;
 mod event;

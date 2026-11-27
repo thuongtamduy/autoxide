@@ -1,17 +1,18 @@
-//! Entity của bảng `notes_note` (SeaORM). Chỉ dùng trong module này.
+//! Bảng `notes_note` (lớp `db` của kernel, D-20261126-kernel-data-layer). Chỉ dùng trong module này.
 
+use autoxide_kernel::db::{Record, TenantKey};
 use autoxide_kernel::time::Timestamp;
-use sea_orm::entity::prelude::*;
+use uuid::Uuid;
 
-#[sea_orm::model]
-#[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-#[sea_orm(table_name = "notes_note")]
-pub struct Model {
+/// Một ghi chú.
+#[derive(Record, Clone, Debug, PartialEq, Eq)]
+#[record(table = "notes_note", scope = tenant)]
+pub(crate) struct Note {
     // UUIDv7 sinh trong ứng dụng, không để database tự tăng.
-    #[sea_orm(primary_key, auto_increment = false)]
+    #[record(primary_key)]
     pub id: Uuid,
-    /// Khách sở hữu ghi chú (bước 33): mọi truy vấn lọc theo cột này (`.scoped`).
-    pub tenant_id: Uuid,
+    /// Khách sở hữu ghi chú (bước 33): handle `tenant.db()` tự lọc theo cột này.
+    pub tenant_id: TenantKey,
     /// Nút sở hữu ghi chú (bước 34); nút gốc = ID của khách. Luôn có giá trị (cột NULL được).
     pub org_id: Option<Uuid>,
     pub owner_id: Uuid,
@@ -19,12 +20,4 @@ pub struct Model {
     pub body: String,
     pub created_at: Timestamp,
     pub updated_at: Timestamp,
-}
-
-impl ActiveModelBehavior for ActiveModel {}
-
-impl autoxide_kernel::tenancy::TenantScoped for Entity {
-    fn tenant_column() -> Self::Column {
-        Column::TenantId
-    }
 }
