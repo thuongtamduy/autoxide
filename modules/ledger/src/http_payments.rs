@@ -177,6 +177,8 @@ async fn list_payments(
     Query(query): Query<PaymentsQuery>,
     Query(page): Query<PageQuery>,
 ) -> Result<Page<Payment>, Error> {
+    // Quyền trước tham số trang: thiếu quyền là 403, không phải 422 (luật `permission-first` của xtask).
+    principal.require(&crate::permissions::READ)?;
     let mut problems = Vec::new();
     let amount_minor = query.amount.as_deref().map(str::trim).and_then(|raw| {
         raw.parse::<i64>().ok().or_else(|| {
@@ -452,6 +454,8 @@ async fn list_exceptions(
     Query(query): Query<ExceptionsQuery>,
     Query(page): Query<PageQuery>,
 ) -> Result<Page<ExceptionResponse>, Error> {
+    // Quyền trước tham số trang: thiếu quyền là 403, không phải 422 (luật `permission-first` của xtask).
+    principal.require(&crate::permissions::READ)?;
     let page = service
         .list_exceptions(&tenant, &principal, query.status, &PageRequest::try_from(page)?)
         .await?;
@@ -599,6 +603,8 @@ async fn list_reconciliations(
     principal: Principal,
     Query(page): Query<PageQuery>,
 ) -> Result<Page<ReconciliationResponse>, Error> {
+    // Quyền trước tham số trang: thiếu quyền là 403, không phải 422 (luật `permission-first` của xtask).
+    principal.require(&crate::permissions::RECONCILE)?;
     let page =
         service.list_reconciliations(&tenant, &principal, &PageRequest::try_from(page)?).await?;
     Ok(page.map(ReconciliationResponse::from))
