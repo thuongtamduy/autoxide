@@ -29415,7 +29415,7 @@
                 "type": "string"
               },
               "kind": {
-                "description": "`amount_mismatch`, `unmatched_credit`, `duplicate_payment`, `missing_in_statement`,\n`unknown_in_statement` or `late_payment`.",
+                "description": "`amount_mismatch`, `unmatched_credit`, `duplicate_payment`, `missing_in_statement`,\n`unknown_in_statement`, `late_payment` (money arrived after the payment's deadline or after the\npartner reported it failed) or `refund_failed` (the partner refused a refund: the money is still\nto be returned by hand, then resolve with `refunded_outside`; it closes on its own once the\npayment is refunded in full through the partner).",
                 "type": "string"
               },
               "note": {
@@ -51957,7 +51957,7 @@
             "type": "string"
           },
           "kind": {
-            "description": "`amount_mismatch`, `unmatched_credit`, `duplicate_payment`, `missing_in_statement`,\n`unknown_in_statement` or `late_payment`.",
+            "description": "`amount_mismatch`, `unmatched_credit`, `duplicate_payment`, `missing_in_statement`,\n`unknown_in_statement`, `late_payment` (money arrived after the payment's deadline or after the\npartner reported it failed) or `refund_failed` (the partner refused a refund: the money is still\nto be returned by hand, then resolve with `refunded_outside`; it closes on its own once the\npayment is refunded in full through the partner).",
             "type": "string"
           },
           "note": {
@@ -71586,7 +71586,7 @@
                   "type": "string"
                 },
                 "kind": {
-                  "description": "`amount_mismatch`, `unmatched_credit`, `duplicate_payment`, `missing_in_statement`,\n`unknown_in_statement` or `late_payment`.",
+                  "description": "`amount_mismatch`, `unmatched_credit`, `duplicate_payment`, `missing_in_statement`,\n`unknown_in_statement`, `late_payment` (money arrived after the payment's deadline or after the\npartner reported it failed) or `refund_failed` (the partner refused a refund: the money is still\nto be returned by hand, then resolve with `refunded_outside`; it closes on its own once the\npayment is refunded in full through the partner).",
                   "type": "string"
                 },
                 "note": {
