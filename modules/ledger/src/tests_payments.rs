@@ -484,6 +484,7 @@ async fn expires_by_rut_han_va_tien_ve_sau_han_vao_hang_cho() {
         assert_eq!(refused.code(), "validation_failed");
 
         // Hạn đã qua mà job hết hạn chưa chạy (còn `pending`): tiền về vẫn là muộn.
+        let write = tenant.db().begin_write().await.unwrap();
         payment::Entity::update_many()
             .col_expr(
                 payment::Column::ExpiresAt,
@@ -491,9 +492,10 @@ async fn expires_by_rut_han_va_tien_ve_sau_han_vao_hang_cho() {
             )
             .filter(payment::Column::Id.eq(made.id))
             .scoped(&tenant)
-            .exec(tenant.database().write())
+            .exec(&write)
             .await
             .unwrap();
+        write.commit().await.unwrap();
         assert_eq!(status(&app, made.id).await, "pending");
         assert_eq!(
             webhook(&app, gateway.paid(made.id, vnd(100_000), "evt-c")).await,
