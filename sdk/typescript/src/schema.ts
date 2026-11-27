@@ -10323,12 +10323,18 @@ export type Data_MigrationRun = {
      * applied is skipped.
      */
     error?: string | null;
+    /** The release a rollback goes from; `null` for a placement run. */
+    from_version?: string | null;
     id: string;
+    /** `placements` (migrations of the tenant databases) or `rollback` (`autoxide rollback --to`). */
+    kind: string;
     /** The placement it runs on; `null`: every placement, by name. */
     placement?: string | null;
     requested_by?: string | null;
     /** `pending`, `running`, `done` or `failed`. */
     status: string;
+    /** The release a rollback goes to; `null` for a placement run. */
+    to_version?: string | null;
     updated_at: string;
   };
 };
@@ -18084,12 +18090,18 @@ export type MigrationRun = {
    * applied is skipped.
    */
   error?: string | null;
+  /** The release a rollback goes from; `null` for a placement run. */
+  from_version?: string | null;
   id: string;
+  /** `placements` (migrations of the tenant databases) or `rollback` (`autoxide rollback --to`). */
+  kind: string;
   /** The placement it runs on; `null`: every placement, by name. */
   placement?: string | null;
   requested_by?: string | null;
   /** `pending`, `running`, `done` or `failed`. */
   status: string;
+  /** The release a rollback goes to; `null` for a placement run. */
+  to_version?: string | null;
   updated_at: string;
 };
 
@@ -23780,12 +23792,18 @@ export type Page_MigrationRun = {
      * applied is skipped.
      */
     error?: string | null;
+    /** The release a rollback goes from; `null` for a placement run. */
+    from_version?: string | null;
     id: string;
+    /** `placements` (migrations of the tenant databases) or `rollback` (`autoxide rollback --to`). */
+    kind: string;
     /** The placement it runs on; `null`: every placement, by name. */
     placement?: string | null;
     requested_by?: string | null;
     /** `pending`, `running`, `done` or `failed`. */
     status: string;
+    /** The release a rollback goes to; `null` for a placement run. */
+    to_version?: string | null;
     updated_at: string;
   }[];
   pagination: Pagination;
