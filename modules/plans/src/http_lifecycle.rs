@@ -457,7 +457,9 @@ async fn mark_paid(
 
 /// Void an unpaid billing period.
 ///
-/// Platform staff with `plans.subscriptions.manage`.
+/// Platform staff with `plans.subscriptions.manage`. When the period already has an invoice, it is cancelled
+/// afterwards by a background job, not within this request: an e-invoice the tax rules no longer let cancel
+/// (Vietnam since 2025-06-01) gets a full decrease adjustment instead. Read the invoice later to see the result.
 #[utoipa::path(
     post,
     path = "/billing-periods/{id}/void",
@@ -466,7 +468,7 @@ async fn mark_paid(
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the billing period.")),
     responses(
-        (status = 200, description = "The billing period, now `void`.", body = Data<BillingPeriodResponse>),
+        (status = 200, description = "The billing period, now `void`; its invoice is cancelled or adjusted asynchronously.", body = Data<BillingPeriodResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Not platform staff (`tenant_platform_only`) or missing `plans.subscriptions.manage` (`permission_denied`).", body = Problem),
         (status = 404, description = "No such billing period; code `plans.billing_period_not_found`.", body = Problem),

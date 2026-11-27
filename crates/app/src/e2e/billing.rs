@@ -266,22 +266,7 @@ async fn huy_ky_co_hoa_don_dien_tu_thi_dieu_chinh_giam() {
         assert_eq!(decrease.len(), 1, "{adjustments}");
         assert_eq!(decrease[0]["direction"], "decrease");
         assert_eq!(decrease[0]["total"]["amount"], "199000");
-        // Chạy lại bước hoá đơn (như retry sau khi lần trước đã phát hành điều chỉnh nhưng lỗi ở bước sau): gốc đã
-        // `adjusted` → đi lại đường điều chỉnh, trả lại đúng điều chỉnh đó; không lập thêm.
-        // Job xong thì hàng đợi xoá payload, nên đặt lại đúng job huỷ với payload của nó.
-        sql(
-            &app,
-            &format!(
-                "UPDATE plans_jobs SET payload = '{{\"period_id\":\"{id}\"}}', completed_at = NULL, failed_at = NULL, \
-                 claimed_by = NULL, claimed_until = NULL, attempts = 0, run_at = '2000-01-01T00:00:00Z' \
-                 WHERE unique_key = 'void-invoice:{id}'"
-            ),
-        )
-        .await;
-        run_jobs(&app).await;
-        let again = ok(&app, Method::GET, "/invoices/documents", "ops", None).await;
-        let count = again["data"].as_array().unwrap().iter().filter(|d| d["related_document_id"] == invoice.as_str()).count();
-        assert_eq!(count, 1, "{again}");
+        // Chạy lại sau lỗi giữa chừng: test `huy_ky_dieu_chinh_giam_mot_lan_du_chay_lai` của module `plans`.
         let jobs = app.registry().control().read();
         use sea_orm::ConnectionTrait as _;
         let open = jobs

@@ -49,6 +49,7 @@
   "invoices.series_exists": "Nút này đã có ký hiệu `{symbol}` cho loại và năm này.",
   "invoices.series_inactive": "Ký hiệu `{symbol}` đã ngừng dùng.",
   "invoices.series_not_found": "Không tìm thấy ký hiệu chứng từ này.",
+  "invoices.no_active_series": "Không có dãy số đang hoạt động cho đơn vị, loại chứng từ và năm {year}; tạo dãy bằng POST /api/v1/invoices/series.",
   "invoices.storage_unavailable": "Xuất dữ liệu và lưu trữ cần nơi lưu file; module `files` chưa được cài.",
   "invoices.template_exists": "Nút này đã có mẫu in cho loại chứng từ và ngôn ngữ này; sửa bằng `PUT`.",
   "invoices.template_not_found": "Không tìm thấy mẫu in này.",

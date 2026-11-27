@@ -193,6 +193,14 @@ async fn chung_tu_ngoai_te_chup_ti_gia_khi_phat_hanh() {
                 call(&app, "clerk", "PATCH", &path, Some(draft_line(20_000))),
                 invoices.issue(&tenant, Actor::system(), draft.id)
             );
+            // PATCH thắng (200) hay thua vì nháp đã lập (409 `invoices.not_draft`) — không kết quả nào khác.
+            assert!(
+                patched.0 == StatusCode::OK
+                    || (patched.0 == StatusCode::CONFLICT && patched.1["code"] == "invoices.not_draft"),
+                "round {round}: {:?} {}",
+                patched.0,
+                patched.1
+            );
             let issued = match issued {
                 Ok(issued) => issued,
                 Err(error) => {

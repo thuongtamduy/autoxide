@@ -835,6 +835,14 @@ async fn nhap_dieu_chinh_sua_cung_luc_voi_lap_giu_thue_suat_goc() {
                 call(&app, "PATCH", &path, Some(json!({"lines": [line(60_000)]}))),
                 service.issue(&tenant, Actor::system(), draft)
             );
+            // PATCH thắng (200) hay thua vì nháp đã lập (409 `invoices.not_draft`) — không kết quả nào khác.
+            assert!(
+                patched.0 == StatusCode::OK
+                    || (patched.0 == StatusCode::CONFLICT && patched.1["code"] == "invoices.not_draft"),
+                "round {round}: {:?} {}",
+                patched.0,
+                patched.1
+            );
             match issued {
                 Ok(issued) => {
                     assert_eq!(issued.lines[0].rate_percent.as_deref(), Some(original_rate), "round {round}: {issued:?}");
@@ -1014,6 +1022,57 @@ async fn dieu_chinh_nam_sau_tu_chon_day_so_dung_nam() {
         let (status, issued) = call(&app, "POST", &format!("/documents/{draft}/issue"), None).await;
         assert_eq!(status, StatusCode::OK, "{issued}");
         assert_eq!(issued["data"]["symbol"], new_symbol.as_str(), "{issued}");
+    })
+    .await
+    .unwrap();
+}
+
+/// Huỷ ghi `cancelled` rồi đảo bút toán SAU commit; đảo hỏng (lỗi tạm của sổ cái) thì gọi huỷ lại phải đảo
+/// (kiểm độc lập #575, M1) — đúng một bút toán đảo dù gọi bao nhiêu lần.
+#[tokio::test]
+async fn huy_lai_sau_khi_dao_but_toan_hong_van_dao_dung_mot_lan() {
+    TestDatabase::run(async |test| {
+        let ledger = Arc::new(autoxide_ledger::api::testing::FakeLedger::new());
+        let mut builder =
+            TestApp::builder(test).user("clerk", 1, &PERMISSIONS).module(ledger.module());
+        for module in crate::modules::all() {
+            if module.name() != "ledger" {
+                builder = builder.boxed_module(module);
+            }
+        }
+        let app = builder.build().await.unwrap();
+        let pack: Value =
+            serde_json::from_str(include_str!("../../../../modules/tax/packs/vn.json")).unwrap();
+        let answer = app
+            .post("/api/v1/tax/packs")
+            .token("clerk")
+            .json(json!({"pack": pack}))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(answer.status(), StatusCode::OK, "{}", answer.text());
+        series(&app, "vat_invoice", "1C26TAA", None).await;
+        let tenant = app.default_tenant();
+        let first = draft(&app, "C-1", 100_000).await;
+        invoices(&app).issue(&tenant, Actor::system(), first.id).await.unwrap();
+        let reference = format!("invoices:{}:cancelled", first.id);
+        ledger.fail_next_posts(1);
+        let failed = invoices(&app)
+            .cancel(&tenant, Actor::system(), first.id, "Wrong buyer".to_owned())
+            .await;
+        assert!(failed.is_err(), "{failed:?}");
+        let found = invoices(&app).document(&tenant, first.id).await.unwrap().unwrap();
+        assert_eq!(found.status, "cancelled");
+        assert!(ledger.entry_by_reference(&reference).is_none(), "chưa đảo");
+        for _ in 0..2 {
+            let again = invoices(&app)
+                .cancel(&tenant, Actor::system(), first.id, "Wrong buyer".to_owned())
+                .await
+                .unwrap();
+            assert_eq!(again.status, "cancelled");
+        }
+        let reversals = ledger.references().iter().filter(|found| **found == reference).count();
+        assert_eq!(reversals, 1, "{:?}", ledger.references());
     })
     .await
     .unwrap();

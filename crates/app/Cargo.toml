@@ -82,6 +82,8 @@ uuid.workspace = true
 autoxide-address = { workspace = true, features = ["testing"] }
 async-trait.workspace = true
 autoxide-testkit.workspace = true
+# Sổ cái giả (`autoxide_ledger::api::testing`): cho lỗi tạm của sổ cái khi test đường chạy lại.
+autoxide-ledger = { workspace = true, features = ["testing"] }
 # Module mẫu, không đăng ký trong binary: test migration chạy cả migration của nó.
 autoxide-notes.workspace = true
 # Client HTTP thật cho test nâng cấp (gọi máy chủ chạy trong container).

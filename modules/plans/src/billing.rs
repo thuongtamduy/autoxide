@@ -194,7 +194,12 @@ impl PlansService {
             invoices.create_document(&operator, Actor::system(), draft).await?.into_inner();
         let issued = match invoices.issue(&operator, Actor::system(), document.id).await {
             Ok(issued) => issued,
-            Err(error) if error.code() == "invoices.series_not_found" => {
+            Err(error)
+                if matches!(
+                    error.code(),
+                    "invoices.series_not_found" | "invoices.no_active_series"
+                ) =>
+            {
                 tracing::warn!(
                     period_id = %period_id,
                     "no invoice series for subscription invoices; create one with POST /api/v1/invoices/series"
@@ -322,8 +327,16 @@ impl PlansService {
                 let Some(original) = invoices.document(&operator, document).await? else {
                     return Ok(());
                 };
+                // Gốc đã thay thế (hay ở trạng thái khác không huỷ, không điều chỉnh được): chạy lại không đổi được
+                // gì — lỗi vĩnh viễn, báo người vận hành qua log thay vì thử lại tới dead-letter queue.
                 if error.code() == "invoices.not_cancellable" && original.status != "adjusted" {
-                    return Err(error);
+                    tracing::warn!(
+                        period_id = %period.id,
+                        document_id = %document,
+                        status = original.status.as_str(),
+                        "voided period: its invoice can be neither cancelled nor adjusted; correct it by hand"
+                    );
+                    return Ok(());
                 }
                 // Dòng ghi chú (`note`) không có tiền: không điều chỉnh.
                 let lines = original
@@ -359,10 +372,23 @@ impl PlansService {
                     })
                     .collect::<Result<Vec<_>, Error>>()?;
                 let reference = format!("plans:{}:void", period.id);
-                let adjustment = invoices
+                let adjustment = match invoices
                     .adjust(&operator, Actor::system(), document, "decrease", lines, reference)
-                    .await?
-                    .into_inner();
+                    .await
+                {
+                    Ok(adjustment) => adjustment.into_inner(),
+                    // Gốc đã được điều chỉnh bằng một chứng từ khác (không phải của lần chạy trước — lần đó cùng
+                    // `reference` nên được trả lại ở trên): không tự điều chỉnh thêm, báo người vận hành.
+                    Err(error) if error.code() == "invoices.not_correctable" => {
+                        tracing::warn!(
+                            period_id = %period.id,
+                            document_id = %document,
+                            "voided period: its invoice was already corrected by another document; check it by hand"
+                        );
+                        return Ok(());
+                    }
+                    Err(error) => return Err(error),
+                };
                 invoices.issue(&operator, Actor::system(), adjustment.id).await.map(|_| ())
             }
             Err(error) => Err(error),

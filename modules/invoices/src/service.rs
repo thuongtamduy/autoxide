@@ -69,6 +69,16 @@ pub(crate) fn series_not_found() -> Error {
     Error::not_found("invoices.series_not_found", "There is no such document series.")
 }
 
+/// Không có dãy số đang hoạt động cho nút, loại chứng từ và năm phát hành (kể cả khi bỏ dãy ghim của bản gốc
+/// năm trước — điều chỉnh / thay thế).
+pub(crate) fn no_active_series(year: i16) -> Error {
+    Error::conflict(
+        "invoices.no_active_series",
+        "No active series for this unit, kind and year {year}; create one with POST /api/v1/invoices/series.",
+    )
+    .with_param("year", year)
+}
+
 pub(crate) fn series_inactive(symbol: &str) -> Error {
     Error::conflict("invoices.series_inactive", "The series `{symbol}` is no longer in use.")
         .with_param("symbol", symbol)

@@ -313,7 +313,7 @@ async fn delete_document(
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing `invoices.issue` (`permission_denied`), the unit is frozen (`org_frozen`), or no mandate for the seller (`invoices.mandate_missing`).", body = Problem),
         (status = 404, description = "No such document (`invoices.document_not_found`) or no series for it (`invoices.series_not_found`).", body = Problem),
-        (status = 409, description = "The series is retired (`invoices.series_inactive`), the booking day is in a closed period (`ledger.period_closed`), or the draft was edited while being issued (`invoices.draft_changed`; issue again).", body = Problem),
+        (status = 409, description = "No active series for the unit, kind and year of issue (`invoices.no_active_series`; create one), the series is retired (`invoices.series_inactive`), the booking day is in a closed period (`ledger.period_closed`), or the draft was edited while being issued (`invoices.draft_changed`; issue again).", body = Problem),
         (status = 422, description = "The series does not fit the document; every problem in `errors`.", body = Problem),
     )
 )]

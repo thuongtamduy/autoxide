@@ -35,8 +35,8 @@ use crate::entity::{document, line, series};
 use crate::events;
 use crate::permissions::{CORRECT, ISSUE, READ};
 use crate::service::{
-    InvoicesService, describe, document_not_found, mandate_missing, money, now, retention_until,
-    series_inactive, series_not_found,
+    InvoicesService, describe, document_not_found, mandate_missing, money, no_active_series, now,
+    retention_until, series_inactive, series_not_found,
 };
 
 pub(crate) const SUBMIT_EINVOICE: &str = "invoices.submit_einvoice";
@@ -208,9 +208,11 @@ impl InvoicesService {
         guard: Option<&Principal>,
     ) -> Result<Document, Error> {
         let database = tenant.database();
+        // Đường ghi, không qua read replica: `version_seen` lấy từ đây, replica trễ sẽ cho `draft_changed` giả
+        // ngay sau một PATCH (hay sau `adjust` / `create_document` của job).
         let current = document::Entity::find_by_id(id)
             .scoped(tenant)
-            .one(database.read())
+            .one(database.write())
             .await?
             .ok_or_else(document_not_found)?;
         let seller_org = OrgId::from_uuid(current.on_behalf_of_org_id.unwrap_or(current.org_id));
@@ -317,7 +319,7 @@ impl InvoicesService {
                             .await?;
                         match found.as_slice() {
                             [only] => only.clone(),
-                            [] => return Err(series_not_found()),
+                            [] => return Err(no_active_series(issue_date.year())),
                             _ => {
                                 return Err(Error::validation(vec![FieldError::new(
                                     "series_id",
@@ -787,7 +789,12 @@ impl InvoicesService {
             .await?
             .ok_or_else(document_not_found)?;
         match row.status.as_str() {
-            "cancelled" => return describe(database.read(), tenant, row).await,
+            "cancelled" => {
+                // Lần trước đã ghi `cancelled` nhưng đảo bút toán (sau commit) có thể đã hỏng (lỗi tạm, kỳ sổ đã
+                // khoá…): gọi lại mỗi lần — `ledger` trả lại theo `reference`, `already_reversed` là xong.
+                self.reverse_posting(tenant, id, &format!("invoices:{id}:cancelled")).await?;
+                return describe(database.read(), tenant, row).await;
+            }
             "issued" | "submitting" | "accepted" | "rejected" => {}
             _ => {
                 return Err(Error::conflict(
