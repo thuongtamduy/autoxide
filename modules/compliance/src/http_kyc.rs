@@ -338,6 +338,8 @@ async fn list_profiles(
     Query(query): Query<ProfilesQuery>,
     Query(page): Query<PageQuery>,
 ) -> Result<Page<ProfileResponse>, Error> {
+    // Quyền trước tham số trang: thiếu quyền là 403, không phải 422 (luật `permission-first` của xtask).
+    principal.require(&crate::permissions::KYC_READ)?;
     let page = service
         .list_profiles(&tenant, &principal, query.status, &PageRequest::try_from(page)?)
         .await?;

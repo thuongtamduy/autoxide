@@ -56,15 +56,15 @@ async fn referrers_of(
             let menu = menus.get(&item.menu_id)?;
             let field =
                 if item.ref_id.as_deref() == Some(id) { "menu_item" } else { "menu_feature" };
-            Some(KeyedReferrer {
-                key: item.id,
-                referrer: Referrer::new(
+            Some(KeyedReferrer::new(
+                item.id,
+                Referrer::new(
                     "menus.menu",
                     menu.id.to_string(),
                     format!("{} ({}) · {}", menu.key, menu.locale, item.label),
                     field,
                 ),
-            })
+            ))
         })
         .collect())
 }
