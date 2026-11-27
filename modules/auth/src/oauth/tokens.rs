@@ -287,6 +287,23 @@ impl OAuthService {
         let refresh = format!("{REFRESH_PREFIX}{tenant_hex}_{}", random_token(32)?);
         let access_expires = now + self.config.access_ttl;
         let transaction = tenant.db().begin_write().await?;
+        // Giữ grant trước khi ghi token: câu `UPDATE … WHERE revoked_at IS NULL` khoá dòng grant (Postgres) hay chạy
+        // trong lúc giữ quyền ghi (SQLite), nên một lần thu hồi đồng thời (lượt thua của cuộc đua refresh, người dùng
+        // bấm thu hồi) hoặc xong trước — ta thấy 0 dòng và không cấp — hoặc chờ ta commit rồi mới xoá token, thấy luôn
+        // token vừa ghi. Không bao giờ còn token sống của một grant đã thu hồi, và client không nhận token chết.
+        let held = grant::Entity::update_many()
+            .col_expr(grant::Column::LastUsedAt, Expr::value(Some(now)))
+            .filter(grant::Column::TenantId.eq(tenant.id().as_uuid()))
+            .filter(grant::Column::Id.eq(grant.id))
+            .filter(grant::Column::RevokedAt.is_null())
+            .filter(grant::Column::ExpiresAt.gt(now))
+            .exec(&transaction)
+            .await?;
+        if held.rows_affected != 1 {
+            return Err(OAuthError::invalid_grant(
+                "The approval was revoked or has expired; ask the person to connect again.",
+            ));
+        }
         for (kind, value, expires_at) in
             [(ACCESS, &access, access_expires), (REFRESH, &refresh, grant.expires_at)]
         {

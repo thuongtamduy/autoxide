@@ -18,6 +18,7 @@
 .claude/worktrees/
 
 /sdk/node_modules/
+/scripts/mcp-oauth/node_modules/
 /docs/decisions/INDEX.md
 __pycache__/
 # Bản OpenAPI mới mà `check_openapi_snapshot` của testkit ghi cạnh bản chụp khi lệch: xem rồi thay, không commit.
