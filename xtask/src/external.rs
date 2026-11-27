@@ -46,6 +46,8 @@ pub fn check(dir: &Path) -> Result<(String, Vec<Violation>), String> {
     violations.extend(tenancy::check_entities(&workspace)?);
     violations.extend(tenant_scope::check(&workspace)?);
     violations.extend(mcp_principal::check(&workspace)?);
+    // Đường riêng của kernel (`__private`, hàm dựng ẩn của lớp HTTP): module ngoài repo cũng không được gọi.
+    violations.extend(crate::library_layer::check_private_paths(&workspace)?);
     // `modules/<tên>/src/x.rs:12` → `src/x.rs:12`, tính từ crate người dùng chỉ.
     let prefix = format!("modules/{module}/");
     for violation in &mut violations {

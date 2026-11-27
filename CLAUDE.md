@@ -270,11 +270,13 @@ SDK, mục lục quyết định); gate trên máy kiểm sớm bằng `cargo xt
    bảng người dùng.
 5. **Logic ở service layer.** Handler chỉ: lấy dữ liệu vào → gọi service → trả
    envelope. Không truy vấn database trong handler. Thân JSON nhận bằng
-   `ValidJson<T>` (đã kiểm bằng `validator`), không dùng `Json<T>` trần. Trường nào
+   `ValidJson<T>` (đã kiểm bằng `#[derive(Validate)]` của kernel), không dùng `Json<T>` trần. Trường nào
    service kiểm thì chỉ service kiểm (không thêm `#[validate]`), và service gom mọi lỗi
    của đầu vào để báo **một lần** (D-083). Tạo mới trả `Created` (201 + `Location`).
-6. **Mọi route có tài liệu OpenAPI**, đăng ký qua `utoipa-axum` cùng lúc với route
-   (`OpenApiRouter::routes(routes!(…))`, không dùng `.route(…)` trần). Route của
+6. **Mọi route có tài liệu OpenAPI**, khai cùng lúc với route: handler mang `#[endpoint(…)]` (khai rõ ai được gọi:
+   `permission = "…"`, `signed_in` hay `public`), liệt kê trong `routes![…]` của kernel, trả qua `Module::endpoints`
+   (D-20261126-kernel-web-layer); module chưa chuyển còn `#[utoipa::path]` + `OpenApiRouter::routes(…)`. Không dùng
+   `.route(…)` trần. Route của
    module `x` nằm dưới `/api/v1/x`; module chỉ khai phần đuôi (`/`, `/{id}`). Thay
    đổi phá vỡ thì làm endpoint mới, khai endpoint cũ qua `Module::deprecations` (kèm
    ngày sunset và endpoint thay thế), không sửa hành vi endpoint cũ (D-059). Trước 1.0, phá vỡ
@@ -343,7 +345,7 @@ SDK, mục lục quyết định); gate trên máy kiểm sớm bằng `cargo xt
   phải NOT NULL và có index khớp (cột lọc + cột sắp + id); không trần đọc ngầm, không tự viết `OFFSET`. `page_of`
   chỉ cho danh sách không nằm trong database. Tool MCP danh sách dùng cùng tham số và trả `pagination` như REST.
 - Doc comment `///` trên kiểu có `ToSchema` / `IntoParams` và trên handler có
-  `#[utoipa::path]` được chép vào tài liệu OpenAPI: viết **tiếng Anh**, cho người
+  `#[endpoint]` (hay `#[utoipa::path]`) được chép vào tài liệu OpenAPI: viết **tiếng Anh**, cho người
   gọi API. Giải thích cho người đọc code thì dùng `//`.
 - Doc comment (`///`, `//!`) của phần công khai — `crates/kernel/src`, `crates/testkit/src`,
   `crates/app/src/lib.rs`, `modules/<tên>/src/api.rs` và `api/…` — viết **tiếng Anh** (người lạ đọc

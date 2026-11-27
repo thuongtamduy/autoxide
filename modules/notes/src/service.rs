@@ -280,7 +280,7 @@ impl NoteService {
 }
 
 /// Mọi ghi chú của người dùng, cho bản xuất dữ liệu cá nhân.
-#[async_trait::async_trait]
+#[autoxide_kernel::async_trait]
 impl PersonalData for NoteService {
     async fn export(&self, tenant: &TenantContext, user_id: Uuid) -> Result<Value, Error> {
         export_notes(tenant, user_id).await
@@ -288,7 +288,7 @@ impl PersonalData for NoteService {
 }
 
 /// Tài khoản bị xoá thì xoá mọi ghi chú của người đó.
-#[async_trait::async_trait]
+#[autoxide_kernel::async_trait]
 impl EventHandler for NoteService {
     async fn handle(&self, event: &Delivered) -> Result<(), Error> {
         forget_user(&self.sync, event).await
@@ -301,14 +301,14 @@ pub(crate) struct DormantNotes {
     pub sync: SyncLog,
 }
 
-#[async_trait::async_trait]
+#[autoxide_kernel::async_trait]
 impl PersonalData for DormantNotes {
     async fn export(&self, tenant: &TenantContext, user_id: Uuid) -> Result<Value, Error> {
         export_notes(tenant, user_id).await
     }
 }
 
-#[async_trait::async_trait]
+#[autoxide_kernel::async_trait]
 impl EventHandler for DormantNotes {
     async fn handle(&self, event: &Delivered) -> Result<(), Error> {
         forget_user(&self.sync, event).await
@@ -358,7 +358,7 @@ async fn forget_user(sync: &SyncLog, event: &Delivered) -> Result<(), Error> {
     Ok(())
 }
 
-#[async_trait::async_trait]
+#[autoxide_kernel::async_trait]
 impl Notes for NoteService {
     async fn find(&self, tenant: &TenantContext, id: Uuid) -> Result<Option<NoteSummary>, Error> {
         let note = tenant.db().read().find::<Note>().filter(Note::ID.eq(id)).one().await?;
@@ -488,7 +488,7 @@ fn now() -> Timestamp {
 /// Bộ đếm thật cho job đối soát: số ghi chú của khách.
 pub(crate) struct NoteCounter;
 
-#[async_trait::async_trait]
+#[autoxide_kernel::async_trait]
 impl autoxide_kernel::entitlement::UsageCounter for NoteCounter {
     async fn count(&self, tenant: &TenantContext) -> Result<i64, Error> {
         tenant.db().read().find::<Note>().count().await

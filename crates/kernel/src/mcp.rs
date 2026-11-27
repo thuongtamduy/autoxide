@@ -196,7 +196,7 @@ impl Tool {
     /// description `description` for AI agents to read, input type `I`, body `handler`.
     pub fn new<I, O, F, Fut>(name: &'static str, description: &'static str, handler: F) -> Self
     where
-        I: DeserializeOwned + Validate + ToSchema + Send + 'static,
+        I: DeserializeOwned + crate::http::Validate + ToSchema + Send + 'static,
         O: Serialize + Send + 'static,
         F: Fn(TenantContext, Principal, I) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<O, Error>> + Send + 'static,
@@ -424,7 +424,7 @@ struct Typed<I, F> {
 #[async_trait::async_trait]
 impl<I, O, F, Fut> ToolHandler for Typed<I, F>
 where
-    I: DeserializeOwned + Validate + Send + 'static,
+    I: DeserializeOwned + crate::http::Validate + Send + 'static,
     O: Serialize + Send + 'static,
     F: Fn(TenantContext, Principal, I) -> Fut + Send + Sync + 'static,
     Fut: Future<Output = Result<O, Error>> + Send + 'static,
@@ -448,7 +448,7 @@ where
                     .with_param("reason", error),
             ])
         })?;
-        input.validate()?;
+        crate::http::Validate::check(&input)?;
         let output = (self.handler)(tenant, principal, input).await?;
         serde_json::to_value(output).map_err(Error::internal)
     }
