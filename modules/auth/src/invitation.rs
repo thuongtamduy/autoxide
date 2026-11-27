@@ -772,6 +772,32 @@ mod tests {
         last_token(services)
     }
 
+    /// Bước 71 G7: tài khoản mới tạo từ lời mời không nhận mật khẩu đã lộ; lời mời vẫn dùng được.
+    #[tokio::test]
+    async fn nhan_loi_moi_chan_mat_khau_da_lo() {
+        TestDatabase::run(async |test| {
+            let services = services(test).await;
+            let tenant = &services.tenant;
+            let role = role(&services, &["auth.users.read"]).await;
+            let invitations = invitations(&services);
+            let boss = admin(&services).await;
+            let input = invite("new@example.com", role);
+            invitations.create(tenant, Some(&boss), input, Language::En).await.unwrap();
+            let token = deliver(&services, &invitations).await;
+            let breached = Some("Password123456789".to_owned());
+            let refused =
+                invitations.accept(Some(tenant), &token, None, breached, None, None).await;
+            let error = refused.err().unwrap();
+            assert_eq!(error.code(), "validation_failed");
+            assert_eq!(error.fields()[0].code, crate::password::COMMON_PASSWORD);
+            let good = Some("a long and unusual passphrase".to_owned());
+            let accepted = invitations.accept(Some(tenant), &token, None, good, None, None).await;
+            assert!(accepted.unwrap().tokens.is_some());
+        })
+        .await
+        .unwrap();
+    }
+
     #[tokio::test]
     async fn chap_nhan_loi_moi_dong_thoi() {
         TestDatabase::run(async |test| {

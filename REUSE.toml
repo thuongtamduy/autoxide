@@ -12,3 +12,13 @@ path = "**"
 precedence = "closest"
 SPDX-FileCopyrightText = "2026 The Autoxide Authors"
 SPDX-License-Identifier = "MIT OR Apache-2.0"
+
+# Danh sách mật khẩu phổ biến / đã lộ nhúng trong module `auth` (bước 71 G7, D-20261127-breached-passwords): lấy từ
+# `Passwords/Common-Credentials/xato-net-10-million-passwords.txt` của SecLists (giấy phép MIT), chỉ lọc,
+# đổi chữ thường và sắp lại; ghi công trong bản phân phối ở mục "Bundled data" của about.hbs. Bảng sau cùng khớp file
+# thì thắng bảng `**` ở trên (REUSE 3.2).
+[[annotations]]
+path = "modules/auth/data/common-passwords.txt"
+precedence = "override"
+SPDX-FileCopyrightText = ["2018 Daniel Miessler", "2015 Mark Burnett (xato.net)"]
+SPDX-License-Identifier = "MIT"

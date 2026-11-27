@@ -2,12 +2,15 @@
 //! consent của người dùng, đổi mã lấy token, gọi MCP, xoay refresh token, mã dùng lại thu hồi grant.
 
 use autoxide_kernel::event::Actor;
+use autoxide_kernel::tenancy::{ScopeExt as _, TenantContext};
 use autoxide_testkit::{TestApp, TestDatabase};
 use axum::http::{StatusCode, header};
 use serde_json::{Value, json};
 
 use crate::http::test_support::{PASSWORD, app_built, bearer, call};
 use crate::user::NewUser;
+
+use super::entity::{grant, token};
 
 const PUBLIC: &str = "https://api.example.test";
 const CONSENT: &str = "https://app.example.test/connect?request={token}";
@@ -34,6 +37,12 @@ fn pkce_challenge() -> &'static str {
 }
 
 async fn oauth_app(test: &TestDatabase) -> (TestApp, String) {
+    let (app, session, _) = oauth_setup(test).await;
+    (app, session)
+}
+
+/// Như [`oauth_app`], kèm khách của app để test đọc thẳng bảng của module.
+async fn oauth_setup(test: &TestDatabase) -> (TestApp, String, TenantContext) {
     let (app, services) = app_built(test, false, |builder| {
         builder
             .setting("AUTOXIDE_HTTP_PUBLIC_URL", PUBLIC)
@@ -49,7 +58,27 @@ async fn oauth_app(test: &TestDatabase) -> (TestApp, String) {
     };
     services.users.create_with_roles(&services.tenant, Actor::system(), boss, true).await.unwrap();
     let session = bearer(&app, "boss@example.com", PASSWORD).await;
-    (app, session)
+    (app, session, services.tenant)
+}
+
+/// Số access / refresh token còn lưu của khách và số grant đã thu hồi.
+async fn stored(tenant: &TenantContext) -> (usize, usize) {
+    use sea_orm::{ColumnTrait as _, EntityTrait as _, QueryFilter as _};
+    let tokens = token::Entity::find()
+        .filter(token::Column::Kind.is_in(["access", "refresh"]))
+        .scoped(tenant)
+        .all(&tenant.db().read())
+        .await
+        .unwrap()
+        .len();
+    let revoked = grant::Entity::find()
+        .filter(grant::Column::RevokedAt.is_not_null())
+        .scoped(tenant)
+        .all(&tenant.db().read())
+        .await
+        .unwrap()
+        .len();
+    (tokens, revoked)
 }
 
 /// Query của một URL thành bảng tên → giá trị.
@@ -398,7 +427,7 @@ async fn ma_sai_pkce_khong_dung_lai_duoc_va_refresh_dung_lai_thu_hoi_truoc_moi_k
 #[tokio::test]
 async fn hai_lan_doi_cung_refresh_token_dong_thoi_chi_mot_lan_thang() {
     TestDatabase::run(async |test| {
-        let (app, session) = oauth_app(test).await;
+        let (app, session, tenant) = oauth_setup(test).await;
         let (client_id, code) = approved_code(&app, &session, &["notes.write"]).await;
         let (_, tokens) = exchange(&app, &client_id, &code, pkce_verifier()).await;
         let refresh = tokens["refresh_token"].as_str().unwrap().to_owned();
@@ -409,15 +438,53 @@ async fn hai_lan_doi_cung_refresh_token_dong_thoi_chi_mot_lan_thang() {
         ];
         let (first, second) =
             tokio::join!(form(&app, "/oauth/token", &pairs), form(&app, "/oauth/token", &pairs));
-        let wins = [first.0, second.0].iter().filter(|status| **status == StatusCode::OK).count();
-        assert_eq!(wins, 1, "{first:?} {second:?}");
-        // Lượt thua là "dùng lại" (không phân biệt được với kẻ trộm): grant bị thu hồi, token của lượt thắng cũng ngừng.
-        let won = if first.0 == StatusCode::OK { first.1 } else { second.1 };
-        let access = won["access_token"].as_str().unwrap();
-        assert_eq!(mcp_status(&app, access).await, StatusCode::UNAUTHORIZED);
+        assert_only_dead_tokens(&app, &tenant, [first, second]).await;
     })
     .await
     .unwrap();
+}
+
+/// Hai lượt đổi CÙNG một mã đồng thời: mã dùng lại → grant bị thu hồi, kể cả khi lượt thắng đang cấp token.
+#[tokio::test]
+async fn hai_lan_doi_cung_ma_dong_thoi_khong_de_lai_token_song() {
+    TestDatabase::run(async |test| {
+        let (app, session, tenant) = oauth_setup(test).await;
+        let (client_id, code) = approved_code(&app, &session, &["notes.write"]).await;
+        let (first, second) = tokio::join!(
+            exchange(&app, &client_id, &code, pkce_verifier()),
+            exchange(&app, &client_id, &code, pkce_verifier()),
+        );
+        assert_only_dead_tokens(&app, &tenant, [first, second]).await;
+    })
+    .await
+    .unwrap();
+}
+
+/// Sau cuộc đua của hai lượt dùng cùng một mã hay refresh token: nhiều nhất một lượt nhận token (tuỳ lượt thua thu
+/// hồi trước hay sau lúc lượt thắng cấp), lượt còn lại `invalid_grant`; grant bị thu hồi, token đã trả (nếu có) không
+/// dùng được và KHÔNG còn token nào lưu lại — kể cả token lượt thắng ghi sau lúc lượt thua thu hồi.
+async fn assert_only_dead_tokens(
+    app: &TestApp,
+    tenant: &TenantContext,
+    answers: [(StatusCode, Value); 2],
+) {
+    let wins: Vec<&Value> = answers
+        .iter()
+        .filter(|(status, _)| *status == StatusCode::OK)
+        .map(|(_, body)| body)
+        .collect();
+    assert!(wins.len() <= 1, "{answers:?}");
+    for (status, body) in &answers {
+        if *status != StatusCode::OK {
+            assert_eq!(*status, StatusCode::BAD_REQUEST, "{body}");
+            assert_eq!(body["error"], "invalid_grant", "{body}");
+        }
+    }
+    for won in wins {
+        let access = won["access_token"].as_str().unwrap();
+        assert_eq!(mcp_status(app, access).await, StatusCode::UNAUTHORIZED);
+    }
+    assert_eq!(stored(tenant).await, (0, 1));
 }
 
 /// Mở `/authorize` cho `client_id`, trả token của yêu cầu đang chờ.

@@ -42,8 +42,8 @@ pub(crate) const SUPPORT_ACCESS: OrgSetting = OrgSetting::new(
 /// hơn cấu hình của máy chủ, không nới.
 pub(crate) const PASSWORD_MIN_LENGTH: OrgSetting = OrgSetting::new(
     "auth.password_min_length",
-    "Shortest password this tenant accepts, 12 to 128 characters, when a password is set or \
-     changed (existing passwords keep working). It can only raise the server's minimum of 12. \
+    "Shortest password this tenant accepts, 15 to 128 characters, when a password is set or \
+     changed (existing passwords keep working). It can only raise the server's minimum of 15. \
      Read at the root unit.",
 )
 .with_schema(r#"{"type":"integer"}"#)
@@ -83,11 +83,14 @@ pub(crate) fn all() -> Vec<OrgSetting> {
 }
 
 fn password_length(value: &Value) -> Result<Value, String> {
+    // Cùng khoảng với luật của server: một giá trị dưới mức tối thiểu không có tác dụng gì nên báo sai.
+    const MIN: u64 = crate::password::MIN_LENGTH as u64;
+    const MAX: u64 = crate::password::MAX_LENGTH as u64;
     value
         .as_u64()
-        .filter(|length| (12..=128).contains(length))
+        .filter(|length| (MIN..=MAX).contains(length))
         .map(Value::from)
-        .ok_or_else(|| "must be a whole number from 12 to 128".to_owned())
+        .ok_or_else(|| format!("must be a whole number from {MIN} to {MAX}"))
 }
 
 fn session_days(value: &Value) -> Result<Value, String> {

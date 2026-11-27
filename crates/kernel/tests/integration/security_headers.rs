@@ -1,6 +1,7 @@
 //! Header bảo mật cho mọi response (bước 40 P1, D-320): có trên 200, 404 của router, preflight
 //! CORS, `/health/live`, `/mcp`; handler đặt CSP riêng thì giữ; trang tài liệu có CSP riêng; HSTS
-//! chỉ khi cấu hình; tắt được bằng cấu hình; `Referrer-Policy` sai bị từ chối lúc đọc cấu hình.
+//! khi cấu hình, và tự bật khi URL công khai là `https` (production, D-20261127-hsts-production) trừ khi
+//! đặt `0`; tắt được bằng cấu hình; `Referrer-Policy` sai bị từ chối lúc đọc cấu hình.
 
 // File trong `tests/` toàn là code test: hỏng thì phải dừng ngay và báo rõ chỗ.
 // Clippy chỉ tự miễn cho hàm `#[test]`, không miễn cho hàm phụ, nên khai ở đây.
@@ -143,6 +144,30 @@ async fn hsts_chi_khi_cau_hinh() {
     .unwrap();
 }
 
+/// Bước 71 G7: production (URL công khai `https`) có HSTS một năm mà không cần đặt gì; máy phát triển
+/// (`http://localhost`) không có; đặt `0` thì tắt cả ở production.
+#[tokio::test]
+async fn hsts_bat_mac_dinh_o_production() {
+    TestDatabase::run(async |test| {
+        let https = ("AUTOXIDE_HTTP_PUBLIC_URL", "https://api.example.com");
+        let production = app(test, &[https]).await;
+        let live = production.get("/health/live").send().await.unwrap();
+        assert_eq!(live.header(header::STRICT_TRANSPORT_SECURITY), "max-age=31536000");
+        let missing = production.get("/api/v1/nothing-here").send().await.unwrap();
+        assert_eq!(missing.header(header::STRICT_TRANSPORT_SECURITY), "max-age=31536000");
+
+        let off = app(test, &[https, ("AUTOXIDE_HTTP_HSTS_SECONDS", "0")]).await;
+        let live = off.get("/health/live").send().await.unwrap();
+        assert!(!live.headers().contains_key(header::STRICT_TRANSPORT_SECURITY));
+
+        let development = app(test, &[("AUTOXIDE_HTTP_PUBLIC_URL", "http://localhost:8080")]).await;
+        let live = development.get("/health/live").send().await.unwrap();
+        assert!(!live.headers().contains_key(header::STRICT_TRANSPORT_SECURITY));
+    })
+    .await
+    .unwrap();
+}
+
 #[tokio::test]
 async fn tat_header_bang_cau_hinh() {
     TestDatabase::run(async |test| {
@@ -177,4 +202,13 @@ fn cau_hinh_referrer_policy_sai_bi_tu_choi() {
     assert!(config.security_headers.enabled);
     assert_eq!(config.security_headers.referrer_policy, "no-referrer");
     assert_eq!(config.security_headers.hsts_seconds, 0);
+
+    let https = ("AUTOXIDE_HTTP_PUBLIC_URL", "https://api.example.com");
+    assert_eq!(read(&[https]).unwrap().security_headers.hsts_seconds, 31_536_000);
+    let shorter = read(&[https, ("AUTOXIDE_HTTP_HSTS_SECONDS", "600")]).unwrap();
+    assert_eq!(shorter.security_headers.hsts_seconds, 600);
+    let off = read(&[https, ("AUTOXIDE_HTTP_HSTS_SECONDS", "0")]).unwrap();
+    assert_eq!(off.security_headers.hsts_seconds, 0);
+    let local = read(&[("AUTOXIDE_HTTP_PUBLIC_URL", "http://localhost:8080")]).unwrap();
+    assert_eq!(local.security_headers.hsts_seconds, 0);
 }

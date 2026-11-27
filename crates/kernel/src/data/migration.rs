@@ -107,6 +107,16 @@ impl fmt::Display for MigrationError {
 
 impl std::error::Error for MigrationError {}
 
+/// Words of the error for a migration recorded in the database but unknown to this program.
+const UNKNOWN_APPLIED: &str = "its file is missing";
+
+impl MigrationError {
+    /// The database holds migrations this program does not know: a newer version of the program migrated it.
+    pub fn is_from_newer_program(&self) -> bool {
+        self.0.contains(UNKNOWN_APPLIED)
+    }
+}
+
 /// The migrations of one module, in the order they are applied.
 #[derive(Clone)]
 pub struct ModuleMigrations {
@@ -345,6 +355,17 @@ impl Migrator {
     /// Applies every missing migration of every module. Returns the migrations just applied. Stops on
     /// error; earlier migrations stay applied.
     pub async fn up(&self, database: &Database) -> Result<Vec<MigrationState>, MigrationError> {
+        self.up_where(database, &|_, _| true).await
+    }
+
+    /// Like [`up`](Self::up), but applies only the migrations `wanted(module, name)` accepts, in the usual
+    /// order: a backup rebuilds the exact schema of its source this way, without the newer migrations of this
+    /// program (D-20261126-upgrade-rollback).
+    pub async fn up_where(
+        &self,
+        database: &Database,
+        wanted: &(dyn Fn(&str, &str) -> bool + Sync),
+    ) -> Result<Vec<MigrationState>, MigrationError> {
         let mut done = Vec::new();
         let context = self.context(database);
         for set in &self.modules {
@@ -352,8 +373,11 @@ impl Migrator {
                 continue;
             }
             let applied = applied_names(set, database.read()).await?;
-            let pending: Vec<Entry> =
-                set.entries().into_iter().filter(|entry| !applied.contains(entry.name())).collect();
+            let pending: Vec<Entry> = set
+                .entries()
+                .into_iter()
+                .filter(|entry| !applied.contains(entry.name()) && wanted(set.module, entry.name()))
+                .collect();
             if pending.is_empty() {
                 continue;
             }
@@ -434,7 +458,7 @@ async fn applied_names<C: sea_orm::ConnectionTrait>(
         .map(|name| {
             format!(
                 "Migration file of version '{name}' is missing, this migration has been applied but \
-                 its file is missing"
+                 {UNKNOWN_APPLIED}"
             )
         })
         .collect();
