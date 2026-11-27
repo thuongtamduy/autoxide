@@ -564,6 +564,13 @@ impl Module for AuthModule {
         ]
     }
 
+    fn records(&self) -> Vec<autoxide_kernel::db::RecordInfo> {
+        vec![
+            autoxide_kernel::db::RecordInfo::of::<api_key::listing::KeyRow>(),
+            autoxide_kernel::db::RecordInfo::of::<api_key::listing::KeyPermissionRow>(),
+        ]
+    }
+
     fn permissions(&self) -> Vec<Permission> {
         permissions::all()
     }

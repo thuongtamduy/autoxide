@@ -1,15 +1,76 @@
 //! Danh sách API key (tách khỏi `service.rs` theo trách nhiệm, D-20261118-file-length): key của bên gọi và key của mọi
-//! người cho người quản lý.
+//! người cho người quản lý. Đọc qua lớp `db` của kernel (D-20261126-kernel-data-layer): handle `tenant.db()` tự lọc theo
+//! khách.
+
+use std::collections::HashMap;
 
 use autoxide_kernel::access::{Credential, Principal};
+use autoxide_kernel::db::{Queries, Record, TenantKey, TenantRead};
 use autoxide_kernel::error::Error;
-use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
-use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+use autoxide_kernel::pagination::{Page, PageRequest};
+use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::time::Timestamp;
 use uuid::Uuid;
 
 use super::entity::api_key;
-use super::service::{ApiKey, ApiKeyService, permissions_of, to_api_key};
+use super::service::{ApiKey, ApiKeyService, to_api_key};
+
+/// Một dòng của `auth_api_key`, như danh sách cần.
+#[derive(Record, Clone, Debug, PartialEq, Eq)]
+#[record(table = "auth_api_key", scope = tenant)]
+pub(crate) struct KeyRow {
+    #[record(primary_key)]
+    pub id: Uuid,
+    pub tenant_id: TenantKey,
+    pub user_id: Uuid,
+    pub name: String,
+    pub prefix: String,
+    pub key_hash: String,
+    pub expires_at: Option<Timestamp>,
+    pub allowed_ips: Option<String>,
+    pub rotated_from: Option<Uuid>,
+    pub org_id: Option<Uuid>,
+    pub last_used_at: Option<Timestamp>,
+    pub created_at: Timestamp,
+    pub kind: String,
+    pub status: String,
+    pub approved_by: Option<Uuid>,
+    pub approved_at: Option<Timestamp>,
+}
+
+/// Một permission đã trao cho một key (`auth_api_key_permission`).
+#[derive(Record, Clone, Debug, PartialEq, Eq)]
+#[record(table = "auth_api_key_permission", scope = tenant)]
+pub(crate) struct KeyPermissionRow {
+    #[record(primary_key)]
+    pub id: Uuid,
+    pub tenant_id: TenantKey,
+    pub api_key_id: Uuid,
+    pub permission: String,
+}
+
+impl From<KeyRow> for api_key::Model {
+    fn from(row: KeyRow) -> Self {
+        api_key::Model {
+            id: row.id,
+            tenant_id: row.tenant_id.as_uuid(),
+            user_id: row.user_id,
+            name: row.name,
+            prefix: row.prefix,
+            key_hash: row.key_hash,
+            expires_at: row.expires_at,
+            allowed_ips: row.allowed_ips,
+            rotated_from: row.rotated_from,
+            org_id: row.org_id,
+            last_used_at: row.last_used_at,
+            created_at: row.created_at,
+            kind: row.kind,
+            status: row.status,
+            approved_by: row.approved_by,
+            approved_at: row.approved_at,
+        }
+    }
+}
 
 impl ApiKeyService {
     /// Một trang key của người dùng `user_id`, mới tạo trước (mặc định).
@@ -47,19 +108,13 @@ impl ApiKeyService {
         only: Option<Uuid>,
         page: &PageRequest,
     ) -> Result<Page<ApiKey>, Error> {
-        let connection = &tenant.db().read();
-        let mut select =
-            api_key::Entity::find().filter(api_key::Column::UserId.eq(user_id)).scoped(tenant);
+        let read = tenant.db().read();
+        let mut find = read.find::<KeyRow>().filter(KeyRow::USER_ID.eq(user_id));
         if let Some(only) = only {
-            select = select.filter(api_key::Column::Id.eq(only));
+            find = find.filter(KeyRow::ID.eq(only));
         }
-        let page = fetch_page(select, api_key::Column::Id, |row| row.id, page, connection).await?;
-        let mut permissions =
-            permissions_of(connection, tenant, page.data.iter().map(|row| row.id)).await?;
-        Ok(page.map(|row| {
-            let granted = permissions.remove(&row.id).unwrap_or_default();
-            to_api_key(row, granted)
-        }))
+        let page = find.page(KeyRow::ID, page).await?;
+        with_permissions(&read, page).await
     }
 
     /// Một trang key của mọi người dùng (chỉ của `owner` khi có), mới tạo trước (mặc định). Cần
@@ -82,20 +137,37 @@ impl ApiKeyService {
             caller.require(&crate::permissions::API_KEYS_MANAGE)?;
             status
         };
-        let connection = &tenant.db().read();
-        let mut select = api_key::Entity::find().scoped(tenant);
+        let read = tenant.db().read();
+        let mut find = read.find::<KeyRow>();
         if let Some(owner) = owner {
-            select = select.filter(api_key::Column::UserId.eq(owner));
+            find = find.filter(KeyRow::USER_ID.eq(owner));
         }
         if let Some(status) = status {
-            select = select.filter(api_key::Column::Status.eq(status));
+            find = find.filter(KeyRow::STATUS.eq(status.to_owned()));
         }
-        let page = fetch_page(select, api_key::Column::Id, |row| row.id, page, connection).await?;
-        let mut permissions =
-            permissions_of(connection, tenant, page.data.iter().map(|row| row.id)).await?;
-        Ok(page.map(|row| {
-            let granted = permissions.remove(&row.id).unwrap_or_default();
-            to_api_key(row, granted)
-        }))
+        let page = find.page(KeyRow::ID, page).await?;
+        with_permissions(&read, page).await
     }
+}
+
+/// Gắn permission đã trao vào từng key của trang (một truy vấn cho cả trang, sắp theo tên permission).
+async fn with_permissions(
+    read: &TenantRead<'_>,
+    page: Page<KeyRow>,
+) -> Result<Page<ApiKey>, Error> {
+    let ids: Vec<Uuid> = page.data.iter().map(|row| row.id).collect();
+    let rows = read
+        .find::<KeyPermissionRow>()
+        .filter(KeyPermissionRow::API_KEY_ID.is_in(ids))
+        .order_asc(KeyPermissionRow::PERMISSION)
+        .all()
+        .await?;
+    let mut granted: HashMap<Uuid, Vec<String>> = HashMap::new();
+    for row in rows {
+        granted.entry(row.api_key_id).or_default().push(row.permission);
+    }
+    Ok(page.map(|row| {
+        let permissions = granted.remove(&row.id).unwrap_or_default();
+        to_api_key(row.into(), permissions)
+    }))
 }
