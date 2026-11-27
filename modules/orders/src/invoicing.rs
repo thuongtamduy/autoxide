@@ -157,7 +157,6 @@ fn tax_category(row: &line::Model) -> String {
         .unwrap_or_else(|| "vat.standard".to_owned())
 }
 
-/// Dòng hoá đơn cho `quantity` đơn vị của dòng đơn `row` (khoản giảm chia theo số lượng).
 /// Thuế và tổng tiền đã chốt của đơn `id` để so với hoá đơn (LG-10, D-20261126-invoice-tax-difference):
 /// `None` khi đơn có dòng huỷ một phần — hoá đơn khi đó chỉ gồm phần còn lại, không so được nguyên đơn.
 async fn settled_amounts(
@@ -168,8 +167,10 @@ async fn settled_amounts(
     let Some(row) = order::Entity::find_by_id(id).scoped(tenant).one(read).await? else {
         return Ok(None);
     };
+    // Cùng phép kiểm với lúc lập hoá đơn: chỉ dòng cấp trên (dòng con của combo đi theo dòng cha).
     let cancelled = line::Entity::find()
         .filter(line::Column::OrderId.eq(id))
+        .filter(line::Column::ParentLineId.is_null())
         .filter(line::Column::CancelledQuantity.gt(0))
         .scoped(tenant)
         .one(read)
@@ -183,7 +184,7 @@ fn link_kind_of(kind: &str) -> String {
 }
 
 /// Hoá đơn bán (không phải điều chỉnh) có thuế hay tổng tiền khác số đã chốt của đơn (LG-10). `settled`:
-/// [`OrdersService::settled_amounts`]; không so được thì `false`.
+/// [`settled_amounts`]; không so được thì `false`.
 pub(crate) fn differs_from_order(
     settled: Option<(i64, i64)>,
     link_kind: &str,
@@ -197,6 +198,7 @@ pub(crate) fn differs_from_order(
     }
 }
 
+/// Dòng hoá đơn cho `quantity` đơn vị của dòng đơn `row` (khoản giảm chia theo số lượng).
 fn document_line(row: &line::Model, quantity: i64, currency: Currency) -> NewDocumentLine {
     let mut document_line = NewDocumentLine::new(
         description(row),

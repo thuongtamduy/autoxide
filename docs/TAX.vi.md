@@ -22,7 +22,11 @@ thuế qua `autoxide_tax::api::TaxEngine`.
 | `excise.beer` | thuế TTĐB 65%, rồi GTGT 10% trên giá đã có TTĐB | mẫu |
 
 Sàn có chức năng thanh toán khấu trừ thay cho hộ kinh doanh (NĐ 117/2025/NĐ-CP): hàng hoá 1% GTGT +
-0,5% TNCN, dịch vụ 5% + 2%, sản xuất – vận tải 3% + 1,5%. Doanh nghiệp tự kê khai: không khấu trừ.
+0,5% TNCN, dịch vụ 5% + 2%, sản xuất – vận tải 3% + 1,5%. Doanh nghiệp tự kê khai: không khấu trừ. Core hiện làm:
+tính số tiền (`POST /api/v1/tax/withholding`) và ghi sổ khi một lần quyết toán yêu cầu (`ledger`, bút toán
+`TaxWithheld`). Core **chưa** làm (cùng module sàn, sau 1.0): tự khấu trừ ở mỗi lần chi trả cho người bán là hộ kinh
+doanh, lập chứng từ khấu trừ (loại chứng từ `withholding_certificate` có nhưng chưa ai tạo), và chuẩn bị dữ liệu tờ
+khai thay — tới lúc đó sàn tự làm.
 
 Gói tự được nhập trong vòng một giờ sau khi máy chủ chạy (và mỗi khi bản cập nhật có gói mới hơn).
 Muốn nhập ngay, hay nhập gói khác:

@@ -334,6 +334,8 @@ pub(crate) async fn list_orders(
     Query(query): Query<OrderListQuery>,
     Query(page): Query<PageQuery>,
 ) -> Result<Page<OrderResponse>, Error> {
+    // Quyền trước tham số trang: thiếu quyền là 403, không phải 422 (luật `permission-first` của xtask).
+    principal.require(&crate::permissions::READ)?;
     let filter = OrderFilter {
         status: query.status,
         payment_status: query.payment_status,

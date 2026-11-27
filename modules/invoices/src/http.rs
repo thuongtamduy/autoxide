@@ -113,6 +113,8 @@ async fn list_series(
     principal: Principal,
     Query(page): Query<PageQuery>,
 ) -> Result<Page<SeriesResponse>, Error> {
+    // Quyền trước tham số trang: thiếu quyền là 403, không phải 422 (luật `permission-first` của xtask).
+    principal.require(&crate::permissions::READ)?;
     let page = service.list_series(&tenant, &principal, &PageRequest::try_from(page)?).await?;
     Ok(page.map(SeriesResponse::from))
 }
@@ -264,6 +266,8 @@ async fn list_mandates(
     principal: Principal,
     Query(page): Query<PageQuery>,
 ) -> Result<Page<MandateResponse>, Error> {
+    // Quyền trước tham số trang: thiếu quyền là 403, không phải 422 (luật `permission-first` của xtask).
+    principal.require(&crate::permissions::READ)?;
     let page = service.list_mandates(&tenant, &principal, &PageRequest::try_from(page)?).await?;
     Ok(page.map(MandateResponse::from))
 }

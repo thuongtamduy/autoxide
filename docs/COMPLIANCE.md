@@ -15,7 +15,7 @@ What the module covers:
 
 | Part | Endpoints (under `/api/v1/compliance`) |
 | --- | --- |
-| Identity verification (KYC) of sellers, livestreamers, affiliates | `/kyc/…`, `/me/kyc…` |
+| Identity verification (KYC) of sellers, livestreamers, affiliates — profiles, checks and the gate `KycGate`; listing goods is **not blocked yet** by it (see below) | `/kyc/…`, `/me/kyc…` |
 | Account verification for posting (phone / identity) | `/me/verification`, `/me/phone-verifications…` |
 | Versioned legal documents and proof of acceptance | `/documents…`, `/me/acceptances`, `/public/documents/{kind}` |
 | Consent ledger | `/me/consents` |
@@ -220,10 +220,33 @@ forever). The limits shipped are cautious defaults, not numbers from the law. `a
 data is kept — the input of a data protection impact assessment, whose official form needs a legal
 professional.
 
+### Not covered yet (before 1.0)
+
+Findings of the first legal review (AI-performed, not legal advice; `docs/legal/review-2026-11-r1/`) that core does
+not handle yet. Until they are done, the deployer covers them:
+
+- **Seller identity before selling.** The legal rule `kyc.required_activities` asks for verified sellers,
+  livestreamers and affiliates (E-commerce Law 122/2025/QH15; Decree 248/2026/ND-CP Article 18, electronic identity
+  of sellers from 1 January 2027 — check the originals). `compliance` keeps the profiles and offers `KycGate`, but
+  `catalog` does not ask it yet: a product can be listed by an unverified seller. Wiring `catalog`'s `ListingGate`
+  to `KycGate` is planned before 1.0; until then, verify sellers before giving them `catalog.write`.
+- **Personal data of children.** Law 91/2025/QH15 sets special rules for children and persons under guardianship
+  (consent of a parent or guardian; from age 7 also the child's — the article and ages need checking). Core has no
+  birth date, age check or guardian consent: a service aimed at children must collect and keep the guardian's
+  consent itself. Planned after 1.0: a per-tenant setting, self-declared age at sign-up and consent given on
+  someone's behalf in the consent ledger.
+- **Data sent abroad by providers.** The AI providers of module `ai`, mail, SMS and file storage may process
+  personal data outside Vietnam; they are not added to the processing register by themselves. Add each provider
+  as a recipient (name, country) of the purposes that use it (`POST /purposes`, `PATCH /purposes/{key}`), and
+  prepare the impact assessment for transfers abroad (Decree 356/2025/ND-CP — form and exemptions for small
+  businesses need checking). Planned after 1.0: modules declare their processors (`Module::processors`) and
+  `autoxide doctor` warns about recipients abroad.
+
 ### Data residency
 
 A tenant can be required to keep its data in one country (Cybersecurity Law 116/2025/QH15, in force 1 July
-2026, replacing the Cybersecurity Law 2018 and the Network Information Security Law 2015; its implementing
+2026, replacing the Cybersecurity Law 2018 and the Network Information Security Law 2015 — secondary sources,
+to check; its implementing
 decree, reported as Decree 333/2026/ND-CP, replaces Decree 53/2022/ND-CP — not confirmed. Who must keep data in
 Vietnam needs a legal check):
 

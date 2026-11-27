@@ -779,6 +779,77 @@ async fn nhap_tinh_lai_thue_theo_ngay_lap() {
     .unwrap();
 }
 
+/// Nháp điều chỉnh bị sửa cùng lúc với lập (kiểm độc lập #560, F3): thuế luôn theo ngày của hoá đơn gốc — lập
+/// báo `invoices.draft_changed`, hoặc hoá đơn mang thuế suất của gốc; không bao giờ thuế suất của hôm nay.
+#[tokio::test]
+async fn nhap_dieu_chinh_sua_cung_luc_voi_lap_giu_thue_suat_goc() {
+    use sea_orm::ConnectionTrait as _;
+    TestDatabase::run(async |test| {
+        let Setup { app, .. } = setup(test).await;
+        let root = root_of(DEFAULT_TENANT).as_uuid();
+        let profile = json!({"jurisdiction": "VN", "regime": "vat_credit"});
+        let answer =
+            app.request(Method::PUT, &format!("/api/v1/tax/profiles/{root}")).token("clerk").json(profile).send().await.unwrap();
+        assert_eq!(answer.status(), StatusCode::OK, "{}", answer.text());
+        let vietnam = autoxide_kernel::time::zone("Asia/Ho_Chi_Minh").unwrap();
+        let today = Timestamp::now().date_in(&vietnam);
+        // Ngày của gốc ở phía kia mốc hết giảm GTGT so với hôm nay.
+        let (original_day, original_rate) = if today < Date::new(2027, 1, 1).unwrap() {
+            (Date::new(2027, 1, 5).unwrap(), "10")
+        } else {
+            (Date::new(2025, 8, 1).unwrap(), "8")
+        };
+        let body = json!({"kind": "vat_invoice", "symbol": "1C26TAA", "year": today.year()});
+        let (status, created) = call(&app, "POST", "/series", Some(body)).await;
+        assert_eq!(status, StatusCode::CREATED, "{created}");
+        let line = |price: i64| {
+            json!({"description": "Goods", "kind": "goods", "quantity": "1",
+                   "unit_price": {"amount": price.to_string(), "currency": "VND"}, "tax_category": "vat.standard_reducible"})
+        };
+        let tenant = app.default_tenant();
+        let write = app.database().write();
+        let backend = write.get_database_backend();
+        for round in 0..6 {
+            let body = json!({"kind": "vat_invoice", "currency": "VND", "reference": format!("O-{round}"),
+                "buyer": {"kind": "business", "name": "Buyer Co", "tax_code": "0101234567"}, "lines": [line(100_000)]});
+            let (status, created) = call(&app, "POST", "/documents", Some(body)).await;
+            assert_eq!(status, StatusCode::CREATED, "{created}");
+            let id = created["data"]["id"].as_str().unwrap().to_owned();
+            let (status, issued) = call(&app, "POST", &format!("/documents/{id}/issue"), None).await;
+            assert_eq!(status, StatusCode::OK, "{issued}");
+            write
+                .execute_raw(autoxide_kernel::database::statement(
+                    backend,
+                    "UPDATE invoices_documents SET issue_date = $1 WHERE id = $2",
+                    [original_day.into(), id.parse::<Uuid>().unwrap().into()],
+                ))
+                .await
+                .unwrap();
+            let adjust = json!({"direction": "decrease", "reference": format!("A-{round}"), "lines": [line(50_000)]});
+            let (status, adjusted) = call(&app, "POST", &format!("/documents/{id}/adjust"), Some(adjust)).await;
+            assert_eq!(status, StatusCode::CREATED, "{adjusted}");
+            let draft: Uuid = adjusted["data"]["id"].as_str().unwrap().parse().unwrap();
+            let path = format!("/documents/{draft}");
+            let service = invoices(&app);
+            let (patched, issued) = tokio::join!(
+                call(&app, "PATCH", &path, Some(json!({"lines": [line(60_000)]}))),
+                service.issue(&tenant, Actor::system(), draft)
+            );
+            match issued {
+                Ok(issued) => {
+                    assert_eq!(issued.lines[0].rate_percent.as_deref(), Some(original_rate), "round {round}: {issued:?}");
+                    if patched.0 == StatusCode::OK {
+                        assert_eq!(issued.lines[0].unit_price.minor(), 60_000, "round {round}");
+                    }
+                }
+                Err(error) => assert_eq!(error.code(), "invoices.draft_changed", "round {round}"),
+            }
+        }
+    })
+    .await
+    .unwrap();
+}
+
 /// Người bán vùng thuế `VN`: hoá đơn điện tử đã gửi cơ quan thuế không huỷ được (NĐ 70/2025, LG-9) — lỗi
 /// nêu căn cứ, hướng sang điều chỉnh / thay thế, không gọi nhà cung cấp; hoá đơn bị cơ quan thuế từ chối
 /// thì huỷ được mà không báo nhà cung cấp.
@@ -858,9 +929,10 @@ async fn dieu_chinh_theo_thue_suat_cua_hoa_don_goc() {
         let (original_day, today_rate, original_rate) = if today < Date::new(2027, 1, 1).unwrap() {
             (Date::new(2027, 1, 5).unwrap(), "8", "10")
         } else {
-            (Date::new(2026, 12, 30).unwrap(), "10", "8")
+            (Date::new(2025, 8, 1).unwrap(), "10", "8")
         };
-        let body = json!({"kind": "vat_invoice", "symbol": "1C26TAA", "year": today.year()});
+        let symbol = format!("1C{:02}TAA", today.year() % 100);
+        let body = json!({"kind": "vat_invoice", "symbol": symbol, "year": today.year()});
         let (status, created) = call(&app, "POST", "/series", Some(body)).await;
         assert_eq!(status, StatusCode::CREATED, "{created}");
         let line = |price: i64| {
@@ -895,16 +967,53 @@ async fn dieu_chinh_theo_thue_suat_cua_hoa_don_goc() {
         assert_eq!(edited["data"]["lines"][0]["rate_percent"], original_rate, "{edited}");
         let tax = if original_rate == "10" { "6000" } else { "4800" };
         assert_eq!(edited["data"]["tax"]["amount"], tax);
-        // Gốc khác năm: điều chỉnh không giữ dãy số của gốc, phát hành tự chọn dãy của năm lập.
-        assert_eq!(edited["data"]["series_id"], Value::Null, "{edited}");
+        // Gốc khác năm (dãy số của gốc mang năm của gốc): phát hành tự chọn dãy của năm lập.
         let (status, issued) = call(&app, "POST", &format!("{path}/issue"), None).await;
         assert_eq!(status, StatusCode::OK, "{issued}");
-        assert_eq!(issued["data"]["symbol"], "1C26TAA");
+        assert_eq!(issued["data"]["symbol"], symbol.as_str());
         // Gọi lại cùng điều chỉnh sau khi gốc đã `adjusted`: trả lại đúng điều chỉnh đó, không lỗi.
         let again = json!({"direction": "decrease", "reference": "ADJ-G-1", "lines": [line(50_000)]});
         let (status, replayed) = call(&app, "POST", &format!("/documents/{id}/adjust"), Some(again)).await;
         assert!(status.is_success(), "{status} {replayed}");
         assert_eq!(replayed["data"]["id"], adjusted["data"]["id"]);
+    })
+    .await
+    .unwrap();
+}
+
+/// Hoá đơn gốc năm trước (dãy số năm trước), điều chỉnh lập năm nay: phát hành tự chọn dãy của năm nay, không lỗi
+/// lệch năm (kiểm độc lập #575 — vd huỷ sau 01/01 một kỳ đã xuất hoá đơn tháng 12).
+#[tokio::test]
+async fn dieu_chinh_nam_sau_tu_chon_day_so_dung_nam() {
+    TestDatabase::run(async |test| {
+        let Setup { app, .. } = setup(test).await;
+        let vietnam = autoxide_kernel::time::zone("Asia/Ho_Chi_Minh").unwrap();
+        let today = Timestamp::now().date_in(&vietnam);
+        let last = today.year() - 1;
+        let old = json!({"kind": "vat_invoice", "symbol": format!("1C{:02}TAA", last % 100), "year": last});
+        let (status, old_series) = call(&app, "POST", "/series", Some(old)).await;
+        assert_eq!(status, StatusCode::CREATED, "{old_series}");
+        let new_symbol = format!("1C{:02}TAA", today.year() % 100);
+        let new = json!({"kind": "vat_invoice", "symbol": new_symbol, "year": today.year()});
+        let (status, _) = call(&app, "POST", "/series", Some(new)).await;
+        assert_eq!(status, StatusCode::CREATED);
+        let line = json!({"description": "Service", "kind": "service", "quantity": "1",
+            "unit_price": {"amount": "100000", "currency": "VND"}, "tax_category": "vat.standard"});
+        let body = json!({"kind": "vat_invoice", "currency": "VND", "reference": "Y-1", "issue_date": format!("{last}-12-20"),
+            "series_id": old_series["data"]["id"], "buyer": {"kind": "business", "name": "Buyer Co", "tax_code": "0101234567"},
+            "lines": [line.clone()]});
+        let (status, created) = call(&app, "POST", "/documents", Some(body)).await;
+        assert_eq!(status, StatusCode::CREATED, "{created}");
+        let id = created["data"]["id"].as_str().unwrap().to_owned();
+        let (status, issued) = call(&app, "POST", &format!("/documents/{id}/issue"), None).await;
+        assert_eq!(status, StatusCode::OK, "{issued}");
+        let adjust = json!({"direction": "decrease", "reference": "Y-1-ADJ", "lines": [line]});
+        let (status, adjusted) = call(&app, "POST", &format!("/documents/{id}/adjust"), Some(adjust)).await;
+        assert_eq!(status, StatusCode::CREATED, "{adjusted}");
+        let draft = adjusted["data"]["id"].as_str().unwrap();
+        let (status, issued) = call(&app, "POST", &format!("/documents/{draft}/issue"), None).await;
+        assert_eq!(status, StatusCode::OK, "{issued}");
+        assert_eq!(issued["data"]["symbol"], new_symbol.as_str(), "{issued}");
     })
     .await
     .unwrap();

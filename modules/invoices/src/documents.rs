@@ -596,7 +596,7 @@ impl InvoicesService {
         let currency = Currency::parse(&found.currency)?;
         let seller = OrgId::from_uuid(found.on_behalf_of_org_id.unwrap_or(found.org_id));
         let database = tenant.database();
-        // Nháp điều chỉnh / thay thế: thuế theo ngày của chứng từ gốc, như lúc tạo (kiểm độc lập #575, C).
+        // Nháp điều chỉnh / thay thế: thuế theo ngày của chứng từ gốc, như lúc tạo.
         let original_date = match found.related_document_id {
             Some(original) => self.original_tax_date(database.read(), tenant, original).await?,
             None => None,

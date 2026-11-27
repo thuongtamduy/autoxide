@@ -257,12 +257,9 @@ impl InvoicesService {
                 let row = rows::lock_one(&transaction, document::Entity::find_by_id(id).scoped(tenant))
                     .await?
                     .ok_or_else(document_not_found)?;
-                // Nháp bị sửa sau khi thuế được tính lại hay tỉ giá được chụp ngoài transaction (theo ngày lập của
-                // nháp lúc đọc): kết quả không còn khớp nháp đang lưu (kiểm ngay sau khi khoá, trước khi cấp số).
-                if (recomputed.is_some() || fx.is_some())
-                    && row.status == "draft"
-                    && row.updated_at != version_seen
-                {
+                // Nháp bị sửa sau khi đọc (thuế tính lại, tỉ giá chụp, ngày lập — mọi thứ quyết ngoài transaction
+                // theo bản đọc): kết quả không còn khớp nháp đang lưu. Kiểm ngay sau khi khoá, trước khi cấp số.
+                if row.status == "draft" && row.updated_at != version_seen {
                     return Err(draft_changed());
                 }
                 if let Some(principal) = guard {
@@ -291,12 +288,23 @@ impl InvoicesService {
                     _ => return Ok(row),
                 }
                 let issue_date = row.issue_date.unwrap_or(today);
-                let symbol_row = match row.series_id {
-                    Some(series_id) => series::Entity::find_by_id(series_id)
-                        .scoped(tenant)
-                        .one(&transaction)
-                        .await?
-                        .ok_or_else(series_not_found)?,
+                let pinned = match row.series_id {
+                    Some(series_id) => Some(
+                        series::Entity::find_by_id(series_id)
+                            .scoped(tenant)
+                            .one(&transaction)
+                            .await?
+                            .ok_or_else(series_not_found)?,
+                    ),
+                    None => None,
+                };
+                // Điều chỉnh / thay thế mang dãy số của gốc: gốc năm trước thì dãy đó khác năm lập — chọn dãy
+                // đang hoạt động cùng nút, loại, năm lập như chứng từ không ghim dãy (kiểm độc lập #575).
+                let pinned = pinned.filter(|found| {
+                    row.related_document_id.is_none() || found.year == i32::from(issue_date.year())
+                });
+                let symbol_row = match pinned {
+                    Some(found) => found,
                     None => {
                         let found = series::Entity::find()
                             .scoped(tenant)
@@ -908,11 +916,8 @@ impl InvoicesService {
         )
         .source_id(original.id.to_string());
         draft.on_behalf_of = original.on_behalf_of_org_id.map(OrgId::from_uuid);
-        // Giữ dãy số của chứng từ gốc khi cùng năm; khác năm thì để phát hành tự chọn dãy của năm lập.
-        let year_now = self.tax.tax_date(tenant, OrgId::from_uuid(original.org_id), Timestamp::now()).await?.year();
-        draft.series = original
-            .series_id
-            .filter(|_| original.issue_date.is_some_and(|day| day.year() == year_now));
+        // Giữ dãy số của chứng từ gốc; lúc phát hành, dãy khác năm lập thì tự chọn dãy của năm lập.
+        draft.series = original.series_id;
         draft.prices_include_tax = original.prices_include_tax;
         draft.booked_by_source = original.booked_by_source;
         let direction = if relation == "replacement" { "increase".to_owned() } else { direction };

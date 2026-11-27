@@ -90,6 +90,11 @@ async fn sql(app: &TestApp, text: &str) {
 /// Chạy job và phát event tới khi hết việc.
 async fn settle(app: &TestApp) {
     sql(app, "DELETE FROM plans_jobs").await;
+    run_jobs(app).await;
+}
+
+/// Chạy job đang chờ (không xoá job nào) và phát event tới khi hết việc; job lỗi được chạy lại ngay.
+async fn run_jobs(app: &TestApp) {
     let worker = app.modules().worker(4).unwrap().blocked_delay(std::time::Duration::ZERO);
     let dispatcher = app.modules().dispatcher().unwrap();
     for _ in 0..6 {
@@ -235,9 +240,18 @@ async fn huy_ky_co_hoa_don_dien_tu_thi_dieu_chinh_giam() {
         let period = open_period(&app).await;
         let id = period["id"].as_str().unwrap().to_owned();
         let invoice = period["invoice_id"].as_str().unwrap().to_owned();
+        // Lần đầu bước hoá đơn lỗi (dãy số đang tắt): kỳ vẫn huỷ, job xếp trong cùng transaction còn chờ.
+        let series_id = ok(&app, Method::GET, "/invoices/series", "ops", None).await["data"][0]["id"].as_str().unwrap().to_owned();
+        ok(&app, Method::PATCH, &format!("/invoices/series/{series_id}"), "ops", Some(json!({"status": "inactive"}))).await;
         let voided = ok(&app, Method::POST, &format!("/plans/billing-periods/{id}/void"), "ops", None).await;
         assert_eq!(voided["data"]["status"], "void", "{voided}");
-        settle(&app).await;
+        run_jobs(&app).await;
+        let original = ok(&app, Method::GET, &format!("/invoices/documents/{invoice}"), "ops", None).await;
+        assert_ne!(original["data"]["status"], "adjusted", "{original}");
+        // Bật lại dãy số: job thử lại thì xong (một điều chỉnh, kiểm bên dưới).
+        ok(&app, Method::PATCH, &format!("/invoices/series/{series_id}"), "ops", Some(json!({"status": "active"}))).await;
+        sql(&app, "UPDATE plans_jobs SET run_at = '2000-01-01T00:00:00Z'").await;
+        run_jobs(&app).await;
         // Hoá đơn gốc không bị huỷ ở nhà cung cấp; có một hoá đơn điều chỉnh giảm toàn bộ.
         assert!(provider.cancelled.lock().unwrap().is_empty());
         let original = ok(&app, Method::GET, &format!("/invoices/documents/{invoice}"), "ops", None).await;
@@ -252,6 +266,37 @@ async fn huy_ky_co_hoa_don_dien_tu_thi_dieu_chinh_giam() {
         assert_eq!(decrease.len(), 1, "{adjustments}");
         assert_eq!(decrease[0]["direction"], "decrease");
         assert_eq!(decrease[0]["total"]["amount"], "199000");
+        // Chạy lại bước hoá đơn (như retry sau khi lần trước đã phát hành điều chỉnh nhưng lỗi ở bước sau): gốc đã
+        // `adjusted` → đi lại đường điều chỉnh, trả lại đúng điều chỉnh đó; không lập thêm.
+        // Job xong thì hàng đợi xoá payload, nên đặt lại đúng job huỷ với payload của nó.
+        sql(
+            &app,
+            &format!(
+                "UPDATE plans_jobs SET payload = '{{\"period_id\":\"{id}\"}}', completed_at = NULL, failed_at = NULL, \
+                 claimed_by = NULL, claimed_until = NULL, attempts = 0, run_at = '2000-01-01T00:00:00Z' \
+                 WHERE unique_key = 'void-invoice:{id}'"
+            ),
+        )
+        .await;
+        run_jobs(&app).await;
+        let again = ok(&app, Method::GET, "/invoices/documents", "ops", None).await;
+        let count = again["data"].as_array().unwrap().iter().filter(|d| d["related_document_id"] == invoice.as_str()).count();
+        assert_eq!(count, 1, "{again}");
+        let jobs = app.registry().control().read();
+        use sea_orm::ConnectionTrait as _;
+        let open = jobs
+            .query_all_raw(autoxide_kernel::database::statement(
+                jobs.get_database_backend(),
+                "SELECT kind, last_error FROM plans_jobs WHERE completed_at IS NULL",
+                Vec::<sea_orm::Value>::new(),
+            ))
+            .await
+            .unwrap();
+        let open: Vec<(String, Option<String>)> = open
+            .iter()
+            .map(|row| (row.try_get("", "kind").unwrap(), row.try_get("", "last_error").unwrap()))
+            .collect();
+        assert!(open.is_empty(), "job huỷ chạy lại phải xong: {open:?}");
     })
     .await
     .unwrap();

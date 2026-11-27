@@ -172,9 +172,9 @@ async fn chung_tu_ngoai_te_chup_ti_gia_khi_phat_hanh() {
         assert_eq!(base.currency(), Currency::VND);
         // total USD (đơn vị cent) × 25000 / 100.
         assert_eq!(base.minor(), document.total.minor() * 250);
-        // Sửa nháp xen giữa lúc lập (kiểm độc lập #560, điểm 2): tổng quy đổi luôn từ đúng tổng được lưu. Khe hở
-        // (giữa đọc tỉ giá và khoá dòng) rất hẹp nên vòng chạy đua này không bắt chắc được bản cũ; bản sửa đúng vì
-        // cấu trúc — quy đổi trong transaction từ dòng đang khoá. Bài này giữ bất biến `base = total × tỉ giá`.
+        // Sửa nháp xen giữa lúc lập (kiểm độc lập #560): lập báo `invoices.draft_changed` khi PATCH chen giữa lúc đọc
+        // tỉ giá và khoá dòng; lập được thì tổng quy đổi luôn từ đúng tổng được lưu (`base = total × tỉ giá`), và
+        // PATCH đã xong trước thì hoá đơn mang tổng mới.
         let draft_line = |price: i64| {
             json!({"lines": [{"description": "Tư vấn", "kind": "service", "quantity": "1",
                 "unit_price": {"amount": format!("{}.{:02}", price / 100, price % 100), "currency": "USD"},
@@ -193,9 +193,19 @@ async fn chung_tu_ngoai_te_chup_ti_gia_khi_phat_hanh() {
                 call(&app, "clerk", "PATCH", &path, Some(draft_line(20_000))),
                 invoices.issue(&tenant, Actor::system(), draft.id)
             );
-            let issued = issued.unwrap();
+            let issued = match issued {
+                Ok(issued) => issued,
+                Err(error) => {
+                    assert_eq!(error.code(), "invoices.draft_changed", "round {round}");
+                    assert_eq!(patched.0, StatusCode::OK, "round {round}");
+                    continue;
+                }
+            };
             let base = issued.base_total.unwrap();
             assert_eq!(base.minor(), issued.total.minor() * 250, "round {round}: {:?}", patched.0);
+            if patched.0 == StatusCode::OK {
+                assert_eq!(issued.lines[0].unit_price.minor(), 20_000, "round {round}");
+            }
         }
         // Tỉ giá mới không đổi chứng từ đã phát hành; bút toán ghi cùng tỉ giá.
         let newer = json!({"base": "USD", "quote": "VND", "rate": "26000", "effective_date": today});

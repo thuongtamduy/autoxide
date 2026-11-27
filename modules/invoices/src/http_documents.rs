@@ -147,6 +147,8 @@ async fn list_documents(
     Query(query): Query<DocumentsQuery>,
     Query(page): Query<PageQuery>,
 ) -> Result<Page<Document>, Error> {
+    // Quyền trước tham số trang: thiếu quyền là 403, không phải 422 (luật `permission-first` của xtask).
+    principal.require(&crate::permissions::READ)?;
     let filter = DocumentFilter {
         org: query.org_id.map(OrgId::from_uuid),
         kind: query.kind,

@@ -83,7 +83,8 @@ impl PlansService {
     }
 
     /// Xếp job xử lý hoá đơn của kỳ vừa huỷ (trong transaction huỷ kỳ): job `plans.invoice_period` thấy kỳ
-    /// `void` có hoá đơn thì huỷ / điều chỉnh giảm nó; lỗi giữa chừng thì job thử lại. Khoá `void:<kỳ>`: một job.
+    /// `void` có hoá đơn thì huỷ / điều chỉnh giảm nó; lỗi giữa chừng thì job thử lại. Khoá `void-invoice:<kỳ>`: một
+    /// job.
     pub(crate) async fn enqueue_void_invoice<C: ConnectionTrait>(
         &self,
         connection: &C,
@@ -96,7 +97,7 @@ impl PlansService {
             .enqueue_database(
                 connection,
                 &InvoicePeriod { period_id },
-                EnqueueOptions::default().unique_key(format!("void:{period_id}")),
+                EnqueueOptions::default().unique_key(format!("void-invoice:{period_id}")),
             )
             .await
             .map(|_| ())
@@ -324,9 +325,11 @@ impl PlansService {
                 if error.code() == "invoices.not_cancellable" && original.status != "adjusted" {
                     return Err(error);
                 }
+                // Dòng ghi chú (`note`) không có tiền: không điều chỉnh.
                 let lines = original
                     .lines
                     .iter()
+                    .filter(|line| line.kind != "note")
                     .map(|line| {
                         let quantity = line
                             .quantity
@@ -342,6 +345,12 @@ impl PlansService {
                         }
                         if let Some(category) = &line.tax_category {
                             back = back.tax_category(category.clone());
+                        }
+                        if let Some(unit) = &line.unit {
+                            back = back.unit(unit.clone());
+                        }
+                        if let Some(item) = &line.item_ref {
+                            back = back.item_ref(item.clone());
                         }
                         if line.discount.is_positive() {
                             back.discount = Some(line.discount);
