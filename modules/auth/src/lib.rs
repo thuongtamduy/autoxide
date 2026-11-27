@@ -652,6 +652,10 @@ impl Module for AuthModule {
         self.state.clone().map_or_else(Vec::new, |state| tools::all(&Arc::new(state)))
     }
 
+    fn body_limits(&self) -> Vec<autoxide_kernel::http::BodyLimit> {
+        http::oauth::body_limits()
+    }
+
     fn routes(&self) -> OpenApiRouter {
         // Clone trạng thái chỉ là clone vài `Arc`: tăng bộ đếm tham chiếu, không chép
         // service.

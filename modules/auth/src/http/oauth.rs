@@ -30,8 +30,23 @@ use crate::oauth::{
 use crate::permissions::OAUTH_GRANTS_MANAGE;
 
 /// Trần thân request của các endpoint OAuth nhận body thô (đăng ký, token, thu hồi): siêu dữ liệu RFC 7591 và form
-/// RFC 6749 chỉ vài trăm byte; 16 KiB dư cho mọi client thật mà chặn sớm đầu vào quá cỡ.
+/// RFC 6749 chỉ vài trăm byte; 16 KiB dư cho mọi client thật. Handler kiểm trần này để trả lỗi đúng định dạng RFC
+/// (`{error, error_description}`).
 const MAX_BODY: usize = 16 * 1024;
+
+/// Trần đọc của lớp HTTP cho ba route đó (khai qua `Module::body_limits`): kernel ngừng đọc thân lớn hơn mức này và
+/// trả 413 (`payload_too_large`) trước khi tới handler. Đặt trên [`MAX_BODY`] để thân hơi quá cỡ vẫn nhận lỗi theo
+/// RFC từ handler; chỉ thân quá xa mới gặp 413 của kernel.
+const READ_LIMIT: usize = 64 * 1024;
+
+/// Giới hạn thân request của các endpoint OAuth (đường dẫn trong module `auth`).
+pub(crate) fn body_limits() -> Vec<autoxide_kernel::http::BodyLimit> {
+    use axum::http::Method;
+    ["/oauth/token", "/oauth/revoke", "/oauth/register"]
+        .into_iter()
+        .map(|path| autoxide_kernel::http::BodyLimit::new(Method::POST, path, READ_LIMIT))
+        .collect()
+}
 
 pub(super) fn routes() -> OpenApiRouter<Arc<HttpState>> {
     OpenApiRouter::new()

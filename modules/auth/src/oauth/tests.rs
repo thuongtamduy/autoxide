@@ -353,6 +353,48 @@ async fn dang_ky_va_form_qua_co_bi_tu_choi_theo_rfc() {
     .unwrap();
 }
 
+/// Mã đã thử với verifier sai thì đã bị dùng: gửi lại với verifier đúng cũng bị từ chối (và grant bị thu hồi).
+/// Refresh token đã dùng gửi lại với `client_id` khác vẫn thu hồi grant: phát hiện dùng lại đứng trước mọi kiểm khác.
+#[tokio::test]
+async fn ma_sai_pkce_khong_dung_lai_duoc_va_refresh_dung_lai_thu_hoi_truoc_moi_kiem() {
+    TestDatabase::run(async |test| {
+        let (app, session) = oauth_app(test).await;
+        let (client_id, code) = approved_code(&app, &session, &["notes.write"]).await;
+        let wrong = autoxide_kernel::secret::random_token(32).unwrap();
+        let (status, answer) = exchange(&app, &client_id, &code, &wrong).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{answer}");
+        let (status, answer) = exchange(&app, &client_id, &code, pkce_verifier()).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{answer}");
+        assert_eq!(answer["error"], "invalid_grant");
+
+        let (client_id, code) = approved_code(&app, &session, &["notes.write"]).await;
+        let (_, tokens) = exchange(&app, &client_id, &code, pkce_verifier()).await;
+        let refresh = tokens["refresh_token"].as_str().unwrap().to_owned();
+        let refreshing = [
+            ("grant_type", "refresh_token"),
+            ("refresh_token", refresh.as_str()),
+            ("client_id", client_id.as_str()),
+        ];
+        let (status, renewed) = form(&app, "/oauth/token", &refreshing).await;
+        assert_eq!(status, StatusCode::OK, "{renewed}");
+        let renewed_access = renewed["access_token"].as_str().unwrap().to_owned();
+        let stranger = [
+            ("grant_type", "refresh_token"),
+            ("refresh_token", refresh.as_str()),
+            ("client_id", "https://other.example/client"),
+        ];
+        assert_eq!(form(&app, "/oauth/token", &stranger).await.0, StatusCode::BAD_REQUEST);
+        assert_eq!(mcp_status(&app, &renewed_access).await, StatusCode::UNAUTHORIZED);
+
+        // Thân quá trần đọc của lớp HTTP: kernel trả 413 trước khi tới handler.
+        let huge = "p".repeat(65 * 1024);
+        let (status, _) = form(&app, "/oauth/token", &[("pad", &huge)]).await;
+        assert_eq!(status, StatusCode::PAYLOAD_TOO_LARGE);
+    })
+    .await
+    .unwrap();
+}
+
 #[tokio::test]
 async fn hai_lan_doi_cung_refresh_token_dong_thoi_chi_mot_lan_thang() {
     TestDatabase::run(async |test| {

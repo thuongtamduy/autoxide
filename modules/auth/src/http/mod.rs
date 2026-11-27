@@ -12,7 +12,7 @@ pub(crate) mod invitations;
 mod login_link;
 pub(crate) mod memberships;
 mod mfa;
-mod oauth;
+pub(crate) mod oauth;
 pub(crate) mod oidc;
 mod passkeys;
 mod phone;

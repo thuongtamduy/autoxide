@@ -138,7 +138,7 @@ pub(crate) async fn revoke_grant(
 }
 
 /// Thu hồi một grant trong transaction của bên gọi: đánh dấu, xoá mọi token của nó, ghi event (một lần).
-async fn revoke_in<C: ConnectionTrait>(
+pub(crate) async fn revoke_in<C: ConnectionTrait>(
     connection: &C,
     tenant: &TenantContext,
     outbox: &Outbox,

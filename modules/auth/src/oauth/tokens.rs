@@ -9,6 +9,7 @@
 
 use autoxide_kernel::access::{ActorKind, OAuthAccess, Principal};
 use autoxide_kernel::error::Error;
+use autoxide_kernel::event::Actor;
 use autoxide_kernel::secret::random_token;
 use autoxide_kernel::tenancy::{ScopeExt as _, TenantContext, TenantId};
 use autoxide_kernel::time::Timestamp;
@@ -145,13 +146,16 @@ impl OAuthService {
             .ok_or_else(invalid)?;
         let now = Timestamp::now();
         let claimed = mark_used(&transaction, &tenant, row.id, now).await?;
-        let grant = self.live_grant(&transaction, &tenant, row.grant_id).await?;
-        transaction.commit().await?;
         if !claimed {
-            // Mã dùng lại: có thể đã bị đánh cắp. Thu hồi mọi thứ sinh từ nó.
-            super::grants::revoke_grant(self, &tenant, row.grant_id, "code_reused").await?;
+            // Mã dùng lại: có thể đã bị đánh cắp. Thu hồi mọi thứ sinh từ nó trong CÙNG transaction với lúc phát hiện:
+            // tiến trình chết giữa chừng thì không có trạng thái "đã phát hiện mà grant vẫn sống".
+            reuse_detected(&transaction, &tenant, &self.outbox, row.grant_id, "code_reused")
+                .await?;
+            transaction.commit().await?;
             return Err(invalid());
         }
+        let grant = self.live_grant(&transaction, &tenant, row.grant_id).await?;
+        transaction.commit().await?;
         if row.expires_at <= now {
             return Err(invalid());
         }
@@ -204,6 +208,14 @@ impl OAuthService {
             .one(&transaction)
             .await?
             .ok_or_else(invalid)?;
+        if row.used_at.is_some() {
+            // Refresh token đã dùng bị gửi lại: thu hồi ngay, trước mọi kiểm khác (client, scope), cùng transaction.
+            metrics::counter!("auth_oauth_refresh_reused_total").increment(1);
+            reuse_detected(&transaction, &tenant, &self.outbox, row.grant_id, "refresh_reused")
+                .await?;
+            transaction.commit().await?;
+            return Err(invalid());
+        }
         let grant = self.live_grant(&transaction, &tenant, row.grant_id).await?;
         transaction.commit().await?;
         let now = Timestamp::now();
@@ -218,15 +230,26 @@ impl OAuthService {
         narrower_scope(form.scope.as_deref(), &grant)?;
         let transaction = tenant.db().begin_write().await?;
         let claimed = mark_used(&transaction, &tenant, row.id, now).await?;
-        transaction.commit().await?;
         if !claimed {
-            // Refresh token đã dùng bị gửi lại: không phân biệt được kẻ trộm với client gửi trùng, nên thu hồi cả grant
-            // (RFC 9700 §4.14.2, OAuth 2.1 §4.3.1). Client phải làm mới tuần tự.
-            // Đếm để đo báo nhầm (client làm mới song song) so với đánh cắp thật.
-            metrics::counter!("auth_oauth_refresh_reused_total").increment(1);
-            super::grants::revoke_grant(self, &tenant, grant.id, "refresh_reused").await?;
+            // Không đánh dấu được: hoặc một request khác vừa dùng token này (dùng lại), hoặc grant vừa bị thu hồi và
+            // dòng token đã bị xoá. Chỉ ca thứ nhất là dùng lại.
+            let still_there = token::Entity::find_by_id((tenant.id().as_uuid(), row.id))
+                .scoped(&tenant)
+                .one(&transaction)
+                .await?
+                .is_some();
+            if still_there {
+                // Không phân biệt được kẻ trộm với client gửi trùng, nên thu hồi cả grant (RFC 9700 §4.14.2, OAuth
+                // 2.1 §4.3.1), cùng transaction với lúc phát hiện. Client phải làm mới tuần tự. Đếm để đo báo nhầm
+                // (client làm mới song song) so với đánh cắp thật; grant bị thu hồi giữa chừng không bị đếm.
+                metrics::counter!("auth_oauth_refresh_reused_total").increment(1);
+                reuse_detected(&transaction, &tenant, &self.outbox, grant.id, "refresh_reused")
+                    .await?;
+            }
+            transaction.commit().await?;
             return Err(invalid());
         }
+        transaction.commit().await?;
         self.issue(&tenant, &grant, now).await
     }
 
@@ -438,6 +461,21 @@ fn pkce_matches(verifier: &str, challenge: &str) -> bool {
             .zip(challenge.bytes())
             .fold(0u8, |acc, (left, right)| acc | (left ^ right))
             == 0
+}
+
+/// Phát hiện mã hay refresh token bị dùng lại: thu hồi grant `grant_id` trong transaction `transaction` của bên gọi,
+/// để phát hiện và thu hồi cùng commit.
+async fn reuse_detected<C: ConnectionTrait>(
+    transaction: &C,
+    tenant: &TenantContext,
+    outbox: &autoxide_kernel::event::Outbox,
+    grant_id: Uuid,
+    reason: &'static str,
+) -> Result<(), Error> {
+    super::grants::revoke_in(transaction, tenant, outbox, Actor::system(), grant_id, reason)
+        .await?;
+    tracing::info!(grant_id = %grant_id, reason, "OAuth grant revoked");
+    Ok(())
 }
 
 #[cfg(test)]
