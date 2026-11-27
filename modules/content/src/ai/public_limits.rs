@@ -176,7 +176,10 @@ mod tests {
         let limits = PublicLimits::default();
         let other = PlacementId::from_uuid(uuid::Uuid::from_u128(7));
         let held = limits.admit(MAIN, None, 100, 1).unwrap();
-        assert_eq!(limits.admit(MAIN, None, 100, 1).err().unwrap().code(), "content.public_search_busy");
+        assert_eq!(
+            limits.admit(MAIN, None, 100, 1).err().unwrap().code(),
+            "content.public_search_busy"
+        );
         // Database khác (placement khác, pool riêng) không bị ảnh hưởng.
         assert!(limits.admit(other, None, 100, 1).is_ok());
         drop(held);
@@ -237,7 +240,10 @@ mod tests {
             let _ = wait.await;
         });
         // Task còn chạy (request có thể đã trả 503): chỗ vẫn bị giữ.
-        assert_eq!(limits.admit(MAIN, None, 10, 1).err().unwrap().code(), "content.public_search_busy");
+        assert_eq!(
+            limits.admit(MAIN, None, 10, 1).err().unwrap().code(),
+            "content.public_search_busy"
+        );
         release.send(()).unwrap();
         task.await.unwrap();
         assert!(limits.admit(MAIN, None, 10, 1).is_ok());

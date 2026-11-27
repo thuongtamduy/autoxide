@@ -150,7 +150,8 @@ async fn sqlite(
     let stop = Arc::new(AtomicBool::new(false));
     // Hạn tính từ lúc gọi: chờ kết nối của pool cũng tính vào trần (pool đầy thì không chờ quá `limit`).
     let deadline = Instant::now() + limit;
-    let acquired = tokio::time::timeout(limit, pool.acquire()).await.map_err(|_| query_timeout())?;
+    let acquired =
+        tokio::time::timeout(limit, pool.acquire()).await.map_err(|_| query_timeout())?;
     let mut guard = Guard { connection: Some(acquired.map_err(sqlx_error)?), stop: stop.clone() };
     let Some(pooled) = guard.connection.as_mut() else {
         return Err(Error::internal("time-limited read lost its connection"));
