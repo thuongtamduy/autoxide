@@ -114,6 +114,9 @@ pub(crate) struct SearchCache {
     public_budget: Mutex<HashMap<TenantId, (Instant, u32)>>,
     /// Chốt của tìm công khai: số lượt cùng lúc, số lượt mỗi phút theo địa chỉ (PT-15).
     pub(crate) public_limits: super::public_limits::PublicLimits,
+    /// Chỗ chạy riêng của gợi ý tìm (cùng sức chứa, bộ đếm riêng): endpoint gợi ý không đếm theo địa chỉ, nên gợi ý
+    /// không được lấy chỗ của tìm kiếm — một địa chỉ gọi gợi ý dồn dập chỉ làm gợi ý bỏ nguồn `content`.
+    pub(crate) suggest_limits: super::public_limits::PublicLimits,
     /// Số lần thật sự đọc vector từ database (cho test single-flight).
     #[cfg(test)]
     pub(crate) loads: std::sync::atomic::AtomicUsize,
@@ -417,6 +420,15 @@ impl ContentService {
         )
     }
 
+    /// Giữ một chỗ của gợi ý tìm công khai (bộ đếm riêng, không đếm theo địa chỉ): 429 khi hết chỗ.
+    pub(crate) fn admit_public_suggest(&self) -> Result<super::public_limits::Slot, Error> {
+        self.search_cache.suggest_limits.admit(
+            None,
+            self.config.public_search_per_address,
+            self.config.public_search_concurrency,
+        )
+    }
+
     /// Tìm công khai trên website `site` của người đọc ở địa chỉ `ip`, qua các chốt của
     /// [`public_limits`](super::public_limits): tìm công khai tắt thì 404 như [`search`](Self::search); bật thì giới hạn
     /// theo địa chỉ, số lượt cùng lúc, trần thời gian trả lời, và trần riêng cho phần tìm theo ý nghĩa.
@@ -652,6 +664,8 @@ impl ContentService {
                     kind: kind.map(Kind::as_str),
                     site,
                     indexable_only: false,
+                    term: None,
+                    author: None,
                 };
                 let mut ids =
                     words::matching_ids(tenant, matching, &words::WordQuery::parse(q)).await?;

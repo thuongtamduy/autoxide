@@ -13,7 +13,9 @@
 use std::collections::HashSet;
 use std::time::{Duration, Instant};
 
-use autoxide_kernel::db::{Cond, QUERY_TIMEOUT, Queries as _, Record, TenantKey, is_query_timeout};
+use autoxide_kernel::db::{
+    Cond, QUERY_TIMEOUT, Queries as _, Record, TenantKey, TenantRead, is_query_timeout,
+};
 use autoxide_kernel::error::Error;
 use autoxide_kernel::tenancy::{ScopeExt as _, TenantContext};
 use autoxide_kernel::time::Timestamp;
@@ -139,6 +141,10 @@ pub(crate) struct Matching<'a> {
     pub site: Option<&'a [Uuid]>,
     /// Bỏ bài đặt `noindex` (gợi ý tìm kiếm).
     pub indexable_only: bool,
+    /// Chỉ bài gắn chuyên mục / thẻ này.
+    pub term: Option<Uuid>,
+    /// Chỉ bài của tác giả này.
+    pub author: Option<Uuid>,
 }
 
 /// Các cột của `content_published` mà câu tìm cần (lớp `db` của kernel; ghi vẫn qua entity SeaORM của module).
@@ -165,19 +171,37 @@ pub(crate) struct IndexedWord {
     pub locale: String,
 }
 
+/// Bài gắn chuyên mục / thẻ (đọc qua lớp `db`, cho lọc trước khi cắt trần).
+#[derive(Record, Clone, Debug)]
+#[record(table = "content_entry_terms", scope = tenant)]
+pub(crate) struct EntryTermLink {
+    pub tenant_id: TenantKey,
+    pub entry_id: Uuid,
+    pub term_id: Uuid,
+}
+
+/// Bài của tác giả (đọc qua lớp `db`, cho lọc trước khi cắt trần).
+#[derive(Record, Clone, Debug)]
+#[record(table = "content_entry_authors", scope = tenant)]
+pub(crate) struct EntryAuthorLink {
+    pub tenant_id: TenantKey,
+    pub entry_id: Uuid,
+    pub author_id: Uuid,
+}
+
 /// ID của tối đa [`MATCH_CAP`] bài công khai (không bị ẩn) của khách `tenant` khớp `query`, mới đăng trước, theo
 /// `filter`. Câu rỗng thì không chạm database. Mọi câu của một lần tìm chung trần [`DEADLINE`], database dừng câu
 /// quá trần: lỗi `503 content.public_search_timeout`.
 ///
-/// Mỗi bước đọc có trần số dòng, để từ rất phổ biến không làm câu đọc hết chỉ mục của khách:
+/// Kết quả luôn là các bài mới đăng nhất khớp mọi từ (không cắt theo số bài đã duyệt); hết hạn trước khi xong thì là
+/// lỗi, không trả thiếu. Mỗi câu đọc có trần số dòng, để từ rất phổ biến không làm một câu đọc hết chỉ mục của khách:
 ///
 /// 1. Mỗi từ của câu: ID bài có từ đó, tối đa [`TERM_ROWS_MAX`] dòng chỉ mục (index `(tenant_id, locale, word,
 ///    entry_id)`). Từ nào không có dòng nào: không có kết quả. Từ nào vượt trần là "phổ biến".
 /// 2. Có ít nhất một từ không phổ biến: giao các tập đã đủ, rồi kiểm từ phổ biến bằng khoá chính `(tenant_id,
 ///    entry_id, word)` trên chính các bài còn lại; cuối cùng lọc bài theo `filter`, mới đăng trước.
 /// 3. Mọi từ đều phổ biến: duyệt bài theo `filter`, mới đăng trước, từng trang [`SCAN_PAGE`] bài, kiểm mọi từ bằng khoá
-///    chính, tới khi đủ [`MATCH_CAP`] bài hay đã duyệt [`SCAN_ENTRIES_MAX`] bài — kết quả là các bài khớp trong chừng
-///    ấy bài mới nhất (từ phổ biến khớp phần lớn bài).
+///    chính, tới khi đủ [`MATCH_CAP`] bài hay hết bài.
 pub(crate) async fn matching_ids(
     tenant: &TenantContext,
     filter: Matching<'_>,
@@ -197,11 +221,9 @@ pub(crate) async fn matching_ids(
 }
 
 /// Số dòng chỉ mục tối đa đọc cho một từ của câu tìm; từ có nhiều dòng hơn là từ phổ biến.
-pub(crate) const TERM_ROWS_MAX: u64 = 5_000;
+pub(crate) const TERM_ROWS_MAX: u64 = 20_000;
 /// Số bài mỗi trang khi duyệt bài mới nhất (mọi từ đều phổ biến).
 const SCAN_PAGE: u64 = 1_000;
-/// Số bài mới nhất tối đa duyệt khi mọi từ đều phổ biến.
-pub(crate) const SCAN_ENTRIES_MAX: u64 = 5_000;
 /// Số ID tối đa của một danh sách `IN (…)`: dưới trần tham số bind của cả hai database.
 const IDS_PER_QUERY: usize = 500;
 
@@ -312,7 +334,7 @@ impl Search<'_> {
 
     /// Bài công khai theo `filter`: đúng ngôn ngữ, không bị ẩn, đúng loại, ở các nút của website, bỏ `noindex` khi là
     /// gợi ý.
-    fn visible(&self) -> Cond<PublishedHit> {
+    fn visible(&self, read: &TenantRead<'_>) -> Cond<PublishedHit> {
         let mut visible = Cond::all()
             .with(PublishedHit::LOCALE.eq(self.filter.locale.to_owned()))
             .with(PublishedHit::RESTRICTED_AT.is_null());
@@ -325,6 +347,17 @@ impl Search<'_> {
         if let Some(lineage) = self.filter.site {
             visible = visible.with(PublishedHit::ORG_ID.is_in(lineage.iter().copied().map(Some)));
         }
+        // Chuyên mục và tác giả lọc ở đây, trước khi cắt `MATCH_CAP`: không thì bài khớp mới hơn ở chuyên mục khác lấp
+        // hết trần (index `(tenant_id, term_id, entry_id)` / `(tenant_id, author_id, entry_id)`).
+        if let Some(term) = self.filter.term {
+            let linked = read.sub(EntryTermLink::ENTRY_ID).filter(EntryTermLink::TERM_ID.eq(term));
+            visible = visible.with(PublishedHit::ENTRY_ID.in_sub(linked));
+        }
+        if let Some(author) = self.filter.author {
+            let linked =
+                read.sub(EntryAuthorLink::ENTRY_ID).filter(EntryAuthorLink::AUTHOR_ID.eq(author));
+            visible = visible.with(PublishedHit::ENTRY_ID.in_sub(linked));
+        }
         visible
     }
 
@@ -333,10 +366,10 @@ impl Search<'_> {
         let mut found: Vec<(Timestamp, Uuid)> = Vec::new();
         for chunk in ids.chunks(IDS_PER_QUERY) {
             let db = self.tenant.db();
-            let rows: Vec<(Uuid, Timestamp)> = db
-                .read()
+            let read = db.read();
+            let rows: Vec<(Uuid, Timestamp)> = read
                 .find::<PublishedHit>()
-                .filter(self.visible())
+                .filter(self.visible(&read))
                 .filter(PublishedHit::ENTRY_ID.is_in(chunk.iter().copied()))
                 .order_desc(PublishedHit::PUBLISHED_AT)
                 .order_desc(PublishedHit::ENTRY_ID)
@@ -352,18 +385,19 @@ impl Search<'_> {
         Ok(found.into_iter().map(|(_, id)| id).collect())
     }
 
-    /// Mọi từ đều phổ biến: duyệt bài theo `filter`, mới đăng trước, giữ bài có mọi từ.
+    /// Mọi từ đều phổ biến: duyệt bài theo `filter`, mới đăng trước, giữ bài có mọi từ, tới khi đủ `MATCH_CAP` hay hết
+    /// bài.
     async fn scan(&self, terms: &[&Term]) -> Result<Vec<Uuid>, Error> {
         let cap = usize::try_from(MATCH_CAP).unwrap_or(usize::MAX);
         let mut found = Vec::new();
         let mut after: Option<(Timestamp, Uuid)> = None;
-        let mut scanned = 0;
-        while scanned < SCAN_ENTRIES_MAX && found.len() < cap {
+        // Không trần số bài duyệt: dừng khi đủ hay hết bài; hạn chung của lần tìm chặn chi phí (hết hạn là lỗi 503).
+        while found.len() < cap {
             let db = self.tenant.db();
             let read = db.read();
             let mut page = read
                 .find::<PublishedHit>()
-                .filter(self.visible())
+                .filter(self.visible(&read))
                 .order_desc(PublishedHit::PUBLISHED_AT)
                 .order_desc(PublishedHit::ENTRY_ID)
                 .limit(SCAN_PAGE);
@@ -383,7 +417,6 @@ impl Search<'_> {
                 .all()
                 .await?;
             let Some(&(last_id, last_at)) = rows.last() else { break };
-            scanned += rows.len() as u64;
             let mut kept: Vec<Uuid> = rows.iter().map(|(id, _)| *id).collect();
             for term in terms {
                 kept = self.having(term, &kept).await?;

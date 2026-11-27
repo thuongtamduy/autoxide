@@ -32,16 +32,23 @@ impl SuggestSource for Entries {
         q: &str,
         limit: u16,
     ) -> Result<Vec<Suggestion>, Error> {
-        // Chung chốt số lượt cùng lúc với tìm công khai (nguồn gợi ý không biết địa chỉ người đọc nên không đếm theo
-        // địa chỉ). Hết chỗ thì lỗi: bộ gợi ý bỏ nguồn này, không chờ.
-        let _slot = self.0.admit_public_search(None)?;
+        // Chỗ chạy riêng của gợi ý (nguồn gợi ý không biết địa chỉ người đọc nên không đếm theo địa chỉ, và không lấy
+        // chỗ của tìm kiếm). Hết chỗ thì lỗi: bộ gợi ý bỏ nguồn này, không chờ.
+        let _slot = self.0.admit_public_suggest()?;
         // Lấy dư một ít để tầng "khớp đúng dấu" có chỗ chen lên trước khi cắt còn `limit`.
         let fetch = u64::from(limit).saturating_mul(2);
         let read = tenant.database().read();
         // Chỉ mục từ (PT-15, D-20261126-content-word-index) thay `LIKE '%q%'` trên mọi bài.
         let lineage = site.lineage_ids();
         let matching =
-            words::Matching { locale, kind: None, site: Some(&lineage), indexable_only: true };
+            words::Matching {
+            locale,
+            kind: None,
+            site: Some(&lineage),
+            indexable_only: true,
+            term: None,
+            author: None,
+        };
         let ids = words::matching_ids(tenant, matching, &words::WordQuery::parse(q)).await?;
         if ids.is_empty() {
             return Ok(Vec::new());

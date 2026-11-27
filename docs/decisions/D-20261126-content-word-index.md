@@ -20,43 +20,39 @@ Thay bằng chỉ mục đảo `content_published_words` — bảng thường c�
   `entry_id IN (…)` trên chỉ mục); từ từ 3 ký tự trở lên khớp **tiền tố** bằng khoảng `word >= w AND word < w_next`
   (`next_prefix`: tăng ký tự cuối lên ký tự kế tiếp, bỏ qua vùng surrogate, ký tự cuối là `char::MAX` thì tăng ký tự
   trước), từ 1–2 ký tự khớp nguyên từ. Câu không còn từ nào thì không có kết quả.
-- **Các bước của một lần tìm** (`matching_ids`), mỗi bước đọc có trần số dòng để từ rất phổ biến không làm câu đọc hết
-  chỉ mục của khách (review của #573):
-  1. Mỗi từ: ID bài có từ đó, tối đa `TERM_ROWS_MAX` (5 000) dòng chỉ mục. Từ không có dòng nào: không có kết quả. Từ
-     vượt trần là "phổ biến".
+- **Các bước của một lần tìm** (`matching_ids`). Kết quả luôn là các bài mới đăng nhất khớp mọi từ, tối đa
+  `MATCH_CAP` (1 000), không cắt theo số bài đã duyệt; hết hạn trước khi xong thì trả `503`, không trả thiếu. Mỗi câu
+  đọc có trần số dòng để từ rất phổ biến không làm một câu đọc hết chỉ mục của khách (review của #573):
+  1. Mỗi từ: ID bài có từ đó, tối đa `TERM_ROWS_MAX` (20 000) dòng chỉ mục. Từ không có dòng nào: không có kết quả.
+     Từ vượt trần là "phổ biến".
   2. Có ít nhất một từ không phổ biến: giao các tập đủ (từ nhỏ nhất), kiểm từ phổ biến bằng khoá chính
-     `(tenant_id, entry_id, word)` trên chính các bài còn lại (danh sách `IN` tối đa 500 ID mỗi câu), rồi lọc bài theo
-     website / ngôn ngữ / loại / bị ẩn / `noindex`, lấy tối đa `MATCH_CAP` (1 000) bài mới đăng trước.
+     `(tenant_id, entry_id, word)` trên chính các bài còn lại (danh sách `IN` tối đa 500 ID mỗi câu), rồi lọc bài,
+     mới đăng trước.
   3. Mọi từ đều phổ biến: duyệt bài hiện trên website, mới đăng trước, từng trang 1 000 bài (keyset theo ngày đăng và
-     ID), kiểm mọi từ bằng khoá chính, tới khi đủ `MATCH_CAP` bài hay đã duyệt `SCAN_ENTRIES_MAX` (5 000) bài. Kết quả
-     là các bài khớp trong chừng ấy bài mới nhất — từ phổ biến vốn khớp phần lớn bài.
+     ID), kiểm mọi từ bằng khoá chính, tới khi đủ `MATCH_CAP` bài hay hết bài.
 
-  Lọc website trước khi cắt trần: nếu không, 1 000 bài khớp mới hơn ở website khác của cùng khách lấp hết trần và
-  website này không thấy gì. Sau bước này, câu thường như cũ (điều kiện "hiện trên website" đầy đủ `reading::on_site`
-  với bài bị che ở nút gần hơn, phân loại, tác giả, keyset pagination) thêm `entry_id IN (…)`. Số câu tối đa một lần
-  tìm: chừng 100 (bước 2) / 85 (bước 3), mỗi câu đi theo index; mọi câu chung một hạn.
+  Lọc bài (website / ngôn ngữ / loại / bị ẩn / `noindex` / chuyên mục / tác giả) trước khi cắt trần: nếu không, 1 000
+  bài khớp mới hơn ở website hay chuyên mục khác lấp hết trần. Chuyên mục và tác giả là subquery trên
+  `content_entry_terms` / `content_entry_authors` (index `(tenant_id, term_id | author_id, entry_id)`). Sau bước này,
+  câu thường như cũ (điều kiện "hiện trên website" đầy đủ `reading::on_site` với bài bị che ở nút gần hơn, keyset
+  pagination) thêm `entry_id IN (…)`. Mọi câu chung một hạn 2 s.
 
-  Số đo (2026-11-27, máy phát triển 4 nhân, bản release, một khách 50 000 bài, mỗi bài `pho` `ga`, ba bài thêm
-  `hiem`; thời gian của `matching_ids`):
+  Rủi ro còn lại: câu gồm toàn từ rất phổ biến (mỗi từ ở hơn 20 000 bài) mà chỉ cùng có ở rất ít bài cũ thì bước 3
+  duyệt gần hết bài của website và có thể hết hạn (`503`, "thử từ cụ thể hơn"). Không trả kết quả sai hay thiếu.
 
-  | Câu tìm                       | Đường đi              | SQLite  | Postgres 16 |
-  | ----------------------------- | --------------------- | ------- | ----------- |
-  | `hiem` (3 bài)                | bước 2                | 0,7 ms  | 23 ms       |
-  | `pho hiem` / `ga pho hiem`    | bước 2 + khoá chính   | 19–21 ms | 43–53 ms   |
-  | `pho` (50 000 bài)            | bước 3                | 73 ms   | 63 ms       |
-  | `pho ga` (50 000 bài)         | bước 3                | 109 ms  | 85 ms       |
-  | `khongco` / `pho khongco`     | bước 1 dừng sớm       | 0,4–6 ms | 1–6 ms     |
-
-  Chi phí của từ phổ biến không còn theo số bài của khách (trần dòng mỗi bước), xa dưới hạn 2 s.
+MEASUREMENTS
 - **Không SQL viết tay**: bước (1) dựng bằng bộ dựng câu của lớp `db` của kernel (`tenant.db().read()`, `Record`
   `PublishedHit` và `IndexedWord` chỉ để đọc; ghi vẫn qua entity SeaORM của module cho tới khi chuyển cả module), nên
   lọc khách do handle của kernel làm, cả trong subquery của từng từ.
 - **Trần thời gian** (điểm còn lại của #548): `Find::within` của kernel (D-20261127-db-read-within), mọi câu của một
   lần tìm chung hạn 2 s — database dừng câu khi quá hạn và khi người gọi thôi chờ; quá hạn → `503
   content.public_search_timeout` (mã đã có).
-- **Chốt tìm công khai**: danh sách bài có `q` và gợi ý tìm đi qua cùng chốt với `GET /public/search`
-  (`AUTOXIDE_CONTENT_PUBLIC_SEARCH_CONCURRENCY`, `…_PER_ADDRESS_PER_MINUTE`): 429 khi vượt. Gợi ý không biết địa chỉ
-  người đọc nên chỉ tính số lượt cùng lúc; hết chỗ thì bộ gợi ý bỏ nguồn `content`.
+- **Chốt tìm công khai**: danh sách bài có `q` đi qua cùng chốt với `GET /public/search`
+  (`AUTOXIDE_CONTENT_PUBLIC_SEARCH_CONCURRENCY`, `…_PER_ADDRESS_PER_MINUTE`): 429 khi vượt. Gợi ý tìm có bộ đếm số
+  lượt cùng lúc **riêng** (cùng sức chứa): nguồn gợi ý không biết địa chỉ người đọc, nên nếu dùng chung chỗ, một địa
+  chỉ gọi gợi ý dồn dập sẽ làm tìm kiếm của mọi khách trả 429. Hết chỗ thì bộ gợi ý bỏ nguồn `content`. Rủi ro còn
+  lại: một địa chỉ vẫn có thể giữ hết chỗ của gợi ý (gợi ý bài viết tạm vắng; tìm kiếm không ảnh hưởng). Việc sau:
+  truyền địa chỉ người đọc tới nguồn gợi ý qua kernel (`SuggestSource`) để đếm theo địa chỉ.
 - **Ghi**: mỗi câu `INSERT` tối đa 200 dòng (800 tham số bind), cả khi đăng lẫn trong backfill, dưới trần của SQLite
   (999 ở bản cũ) và Postgres (65 535). Migration xoá bảng nếu còn từ lần chạy hỏng trước rồi dựng lại (dữ liệu dẫn
   xuất), nên chạy lại được.

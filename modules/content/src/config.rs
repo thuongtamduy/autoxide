@@ -95,8 +95,10 @@ pub(crate) const PUBLIC_SEARCH_PER_MINUTE: Setting = Setting::new(
 
 pub(crate) const PUBLIC_SEARCH_CONCURRENCY: Setting = Setting::new(
     "AUTOXIDE_CONTENT_PUBLIC_SEARCH_CONCURRENCY",
-    "Public searches (`/api/v1/content/public/search`) one server process runs at the same time (1 to \
-     1000); more are refused with 429 `content.public_search_busy` instead of slowing every other request.",
+    "Public searches one server process runs at the same time (1 to 1000): `/api/v1/content/public/search` and \
+     `/api/v1/content/public/posts` with `q` share this count; more are refused with 429 \
+     `content.public_search_busy` instead of slowing every other request. Content suggestions of the shared \
+     search box have a separate count of the same size: past it, suggestions leave out posts and pages.",
 )
 .with_default("8");
 

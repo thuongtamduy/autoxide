@@ -228,9 +228,9 @@ async fn tim_cong_khai_co_cho_va_gioi_han_theo_dia_chi() {
     .unwrap();
 }
 
-/// PT-15: danh sách bài công khai có `q` và gợi ý tìm dùng chung chốt của tìm công khai — hết chỗ chạy thì 429
-/// `content.public_search_busy` (gợi ý: nguồn `content` bị bỏ), một địa chỉ quá số lượt mỗi phút thì 429
-/// `content.public_search_rate_limited`. Danh sách không có `q` không bị tính.
+/// PT-15: danh sách bài công khai có `q` dùng chung chốt của tìm công khai — hết chỗ chạy thì 429
+/// `content.public_search_busy`, một địa chỉ quá số lượt mỗi phút thì 429 `content.public_search_rate_limited`; danh
+/// sách không có `q` không bị tính. Gợi ý tìm có chỗ chạy riêng: hai bên không chặn nhau.
 #[tokio::test]
 async fn danh_sach_co_q_va_goi_y_qua_cung_chot() {
     TestDatabase::run(async |test| {
@@ -268,10 +268,19 @@ async fn danh_sach_co_q_va_goi_y_qua_cung_chot() {
         let held = (limits.admit(None, 100, 2).unwrap(), limits.admit(None, 100, 2).unwrap());
         let busy = content.public_posts_for(&tenant, &searching, &first, reader).await;
         assert_eq!(busy.unwrap_err().code(), "content.public_search_busy");
-        let busy = suggest.suggest(&tenant, &site, "en", "da lat", 5).await;
-        assert_eq!(busy.unwrap_err().code(), "content.public_search_busy");
         let plain = content.public_posts_for(&tenant, &filter, &first, reader).await.unwrap();
         assert_eq!(plain.data.len(), 1);
+        // Gợi ý có chỗ riêng: tìm kiếm hết chỗ không chặn gợi ý…
+        let found = suggest.suggest(&tenant, &site, "en", "da lat", 5).await.unwrap();
+        assert_eq!(found.len(), 1);
+        drop(held);
+        // …và gợi ý hết chỗ không chặn tìm kiếm.
+        let suggesting = &content.search_cache.suggest_limits;
+        let held = (suggesting.admit(None, 100, 2).unwrap(), suggesting.admit(None, 100, 2).unwrap());
+        let busy = suggest.suggest(&tenant, &site, "en", "da lat", 5).await;
+        assert_eq!(busy.unwrap_err().code(), "content.public_search_busy");
+        let page = content.public_posts_for(&tenant, &searching, &first, None).await.unwrap();
+        assert_eq!(page.data.len(), 1);
         drop(held);
 
         // Có chỗ: tìm được; theo địa chỉ, 2 lượt mỗi phút (lượt bị từ chối vì hết chỗ không tính).

@@ -17,7 +17,7 @@ fn titles(page: &autoxide_kernel::pagination::Page<published::Model>) -> Vec<&st
 
 /// Mọi nút của khách, mọi loại, kể cả `noindex`.
 fn anywhere(locale: &str) -> Matching<'_> {
-    Matching { locale, kind: None, site: None, indexable_only: false }
+    Matching { locale, kind: None, site: None, indexable_only: false, term: None, author: None }
 }
 
 #[tokio::test]
@@ -357,16 +357,17 @@ async fn migration_nap_nhieu_bai_nhieu_tu() {
     .unwrap();
 }
 
-/// Từ phổ biến (hơn [`TERM_ROWS_MAX`](words::TERM_ROWS_MAX) bài) không làm câu đọc hết chỉ mục: có một từ hiếm thì
-/// đi từ từ hiếm và kiểm từ phổ biến trên chính các bài đó; mọi từ đều phổ biến thì duyệt bài mới nhất và vẫn trả đủ
-/// [`MATCH_CAP`] bài khớp mới nhất, đúng thứ tự.
+/// Từ phổ biến (hơn [`TERM_ROWS_MAX`](words::TERM_ROWS_MAX) bài) không làm một câu đọc hết chỉ mục, và kết quả vẫn
+/// là các bài mới nhất khớp mọi từ: có từ hiếm thì đi từ từ hiếm; mọi từ đều phổ biến nhưng chỉ cùng có ở bài cũ thì
+/// vẫn tìm ra (duyệt tới khi đủ, không cắt theo số bài đã duyệt). Lọc chuyên mục / tác giả trước khi cắt trần: bài cũ
+/// của tác giả vẫn ra dù hàng nghìn bài khớp mới hơn.
 #[tokio::test]
 async fn tu_pho_bien_khong_quet_het_chi_muc() {
     TestDatabase::run(async |test| {
         let (content, _, database) = service(test, config(&[])).await;
         let tenant = TenantContext::default_on(database.clone());
         let ada = editor();
-        let seed = content.create(&tenant, &ada, post("Phở gà mẫu")).await.unwrap();
+        let seed = content.create(&tenant, &ada, post("Mẫu")).await.unwrap();
         content.publish(&tenant, &ada, seed.id, None, None, false).await.unwrap();
         let template = published::Entity::find()
             .filter(published::Column::EntryId.eq(seed.id))
@@ -375,8 +376,9 @@ async fn tu_pho_bien_khong_quet_het_chi_muc() {
             .await
             .unwrap()
             .unwrap();
-        // Chép thẳng vào hai bảng (nhanh, như đã đăng): mỗi bài một giây, bài sau mới hơn.
-        let total = words::TERM_ROWS_MAX + 20;
+        // Chép thẳng vào các bảng (nhanh, như đã đăng): mỗi bài một giây, bài sau mới hơn.
+        let total = usize::try_from(words::TERM_ROWS_MAX).unwrap() + 20;
+        let old = total - 10; // `pho` chỉ ở các bài cũ nhất này — vẫn là từ phổ biến.
         let ids: Vec<Uuid> = (0..total).map(|_| Uuid::now_v7()).collect();
         let rows: Vec<published::ActiveModel> = ids
             .iter()
@@ -386,7 +388,7 @@ async fn tu_pho_bien_khong_quet_het_chi_muc() {
                     entry_id: *id,
                     path: format!("/p/{n}"),
                     slug: format!("p-{n}"),
-                    title: format!("Phở gà {n}"),
+                    title: format!("Bài {n}"),
                     published_at: template.published_at
                         + jiff::SignedDuration::from_secs(i64::try_from(n).unwrap() + 1),
                     ..template.clone()
@@ -396,11 +398,14 @@ async fn tu_pho_bien_khong_quet_het_chi_muc() {
         for chunk in rows.chunks(200) {
             published::Entity::insert_many(chunk.to_vec()).exec(database.write()).await.unwrap();
         }
-        // Ba bài có thêm từ hiếm `hiem`.
+        // `ga` ở mọi bài, `pho` ở các bài cũ, `hiem` ở ba bài.
         let rare = [ids[3], ids[2_000], ids[4_000]];
         let mut index: Vec<crate::entity::published_word::ActiveModel> = Vec::new();
-        for id in &ids {
-            let mut row_words = vec!["pho", "ga"];
+        for (n, id) in ids.iter().enumerate() {
+            let mut row_words = vec!["ga"];
+            if n < old {
+                row_words.push("pho");
+            }
             if rare.contains(id) {
                 row_words.push("hiem");
             }
@@ -422,17 +427,56 @@ async fn tu_pho_bien_khong_quet_het_chi_muc() {
         let find = async |q: &str| {
             words::matching_ids(&tenant, anywhere("en"), &WordQuery::parse(q)).await.unwrap()
         };
+        let cap = usize::try_from(MATCH_CAP).unwrap();
 
         // Từ hiếm cùng từ phổ biến: đúng ba bài, mới nhất trước.
         assert_eq!(find("pho hiem").await, [rare[2], rare[1], rare[0]]);
         assert_eq!(find("hiem ga pho").await, [rare[2], rare[1], rare[0]]);
-        // Mọi từ đều phổ biến: `MATCH_CAP` bài mới nhất, đúng thứ tự.
-        let found = find("pho ga").await;
-        let newest: Vec<Uuid> =
-            ids.iter().rev().take(usize::try_from(MATCH_CAP).unwrap()).copied().collect();
-        assert_eq!(found, newest);
+        // Một từ phổ biến: `MATCH_CAP` bài mới nhất.
+        let newest: Vec<Uuid> = ids.iter().rev().take(cap).copied().collect();
+        assert_eq!(find("ga").await, newest);
+        // Hai từ phổ biến chỉ cùng có ở bài cũ: vẫn là `MATCH_CAP` bài mới nhất khớp cả hai.
+        let both: Vec<Uuid> = ids[..old].iter().rev().take(cap).copied().collect();
+        assert_eq!(find("ga pho").await, both);
         // Từ phổ biến cùng một từ không có ở bài nào: không có kết quả.
         assert!(find("pho khongco").await.is_empty());
+
+        // Chuyên mục / tác giả lọc trước khi cắt trần: một bài cũ (ngoài `MATCH_CAP` bài mới nhất có `ga`).
+        let (term, author) = (Uuid::now_v7(), Uuid::now_v7());
+        let tagged = ids[5];
+        crate::entity::entry_term::Entity::insert(crate::entity::entry_term::ActiveModel {
+            tenant_id: sea_orm::Set(tenant.id().as_uuid()),
+            entry_id: sea_orm::Set(tagged),
+            term_id: sea_orm::Set(term),
+            sort_order: sea_orm::Set(0),
+        })
+        .exec_without_returning(database.write())
+        .await
+        .unwrap();
+        crate::entity::entry_author::Entity::insert(crate::entity::entry_author::ActiveModel {
+            tenant_id: sea_orm::Set(tenant.id().as_uuid()),
+            entry_id: sea_orm::Set(tagged),
+            author_id: sea_orm::Set(author),
+            sort_order: sea_orm::Set(0),
+        })
+        .exec_without_returning(database.write())
+        .await
+        .unwrap();
+        let filter = PostFilter {
+            locale: "en".into(),
+            site: Site::whole(&tenant).lineage_ids(),
+            search: Some("ga".into()),
+            ..Default::default()
+        };
+        let first = PageRequest::first(10, Order::Desc);
+        for filter in [
+            PostFilter { term_id: Some(term), ..filter.clone() },
+            PostFilter { author_id: Some(author), ..filter.clone() },
+        ] {
+            let page = content.public_posts(&tenant, &filter, &first).await.unwrap();
+            let found: Vec<Uuid> = page.data.iter().map(|row| row.entry_id).collect();
+            assert_eq!(found, [tagged]);
+        }
     })
     .await
     .unwrap();

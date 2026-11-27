@@ -276,12 +276,15 @@ impl ContentService {
         }
         let read = tenant.database().read();
         if let Some(search) = filter.search.as_deref().filter(|search| !search.trim().is_empty()) {
-            // Chỉ mục từ (PT-15): tối đa `MATCH_CAP` bài khớp mới nhất, rồi lọc tiếp như mọi trang.
+            // Chỉ mục từ (PT-15): tối đa `MATCH_CAP` bài khớp mới nhất — đã lọc website, chuyên mục, tác giả trước khi
+            // cắt — rồi lọc tiếp như mọi trang.
             let matching = super::words::Matching {
                 locale: &filter.locale,
                 kind: Some("post"),
                 site: Some(&filter.site),
                 indexable_only: false,
+                term: filter.term_id,
+                author: filter.author_id,
             };
             let query = super::words::WordQuery::parse(search);
             let ids = super::words::matching_ids(tenant, matching, &query).await?;
