@@ -96,13 +96,15 @@ fn origin_of(url: &str) -> Option<&str> {
 }
 
 /// Business model of a tenant (D-185): the UI picks the setup steps and default screen accordingly.
-/// Informational only; what may be used is still decided by the plan (step 35).
+/// What may be used is still decided by the plan (step 35); `marketplace` also turns on the seller
+/// identity check before listing (D-20261127-seller-kyc-listing).
 pub const BUSINESS_MODEL: TenantSetting = TenantSetting::new(
     "kernel.business_model",
     "How this tenant does business, so interfaces show the right setup steps and screens: \
      `independent` (one shop), `multi_store` (one business, several stores), `chain` (a parent \
      with child tenants), `marketplace` (sellers sell on the tenant's site) or `saas` (the tenant \
-     sells software by plan). Information only: what the tenant may use comes from its plan.",
+     sells software by plan). What the tenant may use still comes from its plan; `marketplace` also makes \
+     `catalog` require a verified identity of a seller before listing its goods (when `compliance` is installed).",
 )
 .checked(business_model);
 

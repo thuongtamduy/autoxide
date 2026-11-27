@@ -289,7 +289,7 @@ pub(crate) struct StatusRequest {
     responses(
         (status = 200, description = "The product after the change.", body = Data<ProductResponse>, headers(("ETag" = String, description = "Version of the record."))),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "Missing `catalog.products.publish` (`permission_denied`), it does not cover this product (`org_out_of_scope`), or the unit is not active (`org_frozen`).", body = Problem),
+        (status = 403, description = "Missing `catalog.products.publish` (`permission_denied`), it does not cover this product (`org_out_of_scope`), the unit is not active (`org_frozen`), or on a marketplace the seller has not verified its identity (`compliance.kyc_required`).", body = Problem),
         (status = 404, description = "No product with this id in your scope; code `catalog.product_not_found`.", body = Problem),
         (status = 409, description = "The change is not allowed (`catalog.invalid_status_transition`), the goods are prohibited (`catalog.prohibited_goods`) or need valid documents (`catalog.documents_required`).", body = Problem),
         (status = 412, description = "`If-Match` does not match; code `precondition_failed`.", body = Problem),

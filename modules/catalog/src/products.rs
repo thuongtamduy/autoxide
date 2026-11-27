@@ -778,8 +778,13 @@ impl CatalogService {
         principal: &Principal,
         id: Uuid,
     ) -> Result<(), Error> {
-        let Some(gate) = self.listing_gate.get() else { return Ok(()) };
+        let gate = self.listing_gate.get();
+        if gate.is_none() && self.kyc.is_none() {
+            return Ok(());
+        }
         let detail = self.get_product(tenant, principal, id).await?;
+        self.check_seller_identity(tenant, detail.product.org_id).await?;
+        let Some(gate) = gate else { return Ok(()) };
         let candidate = crate::api::ListingCandidate::new(
             id,
             autoxide_kernel::tenancy::OrgId::from_uuid(detail.product.org_id),
@@ -792,6 +797,30 @@ impl CatalogService {
                 Err(errors::listing_denied(&code, &message))
             }
         }
+    }
+
+    /// Sàn (`kernel.business_model = marketplace`, D-185): sản phẩm của người bán (nút không phải gốc của
+    /// khách) chỉ mở bán khi người bán đã định danh — Luật TMĐT 122/2025/QH15, NĐ 248/2026/NĐ-CP Điều 18 (chủ
+    /// nền tảng trung gian xác thực danh tính người bán; áp dụng 01/01/2027, cần đối chiếu văn bản gốc).
+    /// Có cần hay không do quy tắc `kyc.required_activities` của `compliance` (dữ liệu có ngày hiệu lực)
+    /// quyết; thiếu thì `compliance.kyc_required` (403). Cửa hàng tự bán hàng của mình không qua bước này.
+    async fn check_seller_identity(&self, tenant: &TenantContext, org: Uuid) -> Result<(), Error> {
+        let Some(kyc) = &self.kyc else { return Ok(()) };
+        let root = autoxide_kernel::tenancy::root_of(tenant.id());
+        if org == root.as_uuid() {
+            return Ok(());
+        }
+        let model = match &self.settings {
+            Some(settings) => {
+                settings.get(tenant, &autoxide_kernel::tenancy::BUSINESS_MODEL).await?
+            }
+            None => None,
+        };
+        if model.as_ref().is_none_or(|value| value.as_str().trim() != "marketplace") {
+            return Ok(());
+        }
+        let seller = autoxide_compliance::api::Subject::Org(OrgId::from_uuid(org));
+        kyc.require_verified(tenant.id(), seller, autoxide_compliance::api::Activity::Sell).await
     }
 
     pub(crate) async fn set_status(

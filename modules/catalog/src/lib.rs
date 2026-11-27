@@ -149,6 +149,7 @@ impl Module for CatalogModule {
             organizations: context.require::<dyn autoxide_organizations::api::OrgDirectory>().ok(),
             sale_prices: std::sync::OnceLock::new(),
             listing_gate: std::sync::OnceLock::new(),
+            kyc: context.require::<dyn autoxide_compliance::api::KycGate>().ok(),
             suggestions: context.suggest_sources(),
             embedder: context.require::<dyn autoxide_kernel::ai::Embedder>().ok(),
             storage: context.require::<dyn autoxide_kernel::storage::Storage>().ok(),

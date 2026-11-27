@@ -136097,7 +136097,7 @@
                 }
               }
             },
-            "description": "Missing `catalog.products.publish` (`permission_denied`), it does not cover this product (`org_out_of_scope`), or the unit is not active (`org_frozen`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+            "description": "Missing `catalog.products.publish` (`permission_denied`), it does not cover this product (`org_out_of_scope`), the unit is not active (`org_frozen`), or on a marketplace the seller has not verified its identity (`compliance.kyc_required`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
