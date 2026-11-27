@@ -102109,7 +102109,7 @@
         "description": "A phone number whose sign-in codes should be unlocked.",
         "properties": {
           "phone": {
-            "description": "The number, e.g. `0912345678` or `+84912345678`.",
+            "description": "The number, e.g. `0912345678`; outside Vietnam `+` and the country code (`+6591234567`).",
             "example": "0912345678",
             "type": "string"
           }
@@ -151231,7 +151231,7 @@
     },
     "/api/v1/compliance/phone-locks/unlock": {
       "post": {
-        "description": "Requires `compliance.phone_locks.manage`. After 100 wrong sign-in codes in a row for a number\nits sign-in codes are locked (`compliance.otp_locked`); this clears the count so the owner can\nsign in with a code again — the way back in for an account that signs in only with its number.\nCheck who you are talking to first. The audit log records who unlocked it.",
+        "description": "Requires `compliance.phone_locks.manage`. After 90 wrong sign-in codes in a row for a number\n(100 from a device its owner signed in from before) its sign-in codes are locked\n(`compliance.otp_locked`). This clears the count so the owner can sign in with a code again —\nthe way back in for an account that signs in only with its number — and restarts the daily\nlimit of wrong codes as a correct code would. The hourly and daily limits on sending codes\nstill apply. A number that is not locked is left as it is (`unlocked: false`). Write numbers\noutside Vietnam as `+` and the country code (E.164). Check who you are talking to first; the\naudit log records who unlocked it.",
         "operationId": "compliance_unlock_compliance_phone",
         "parameters": [
           {
@@ -151309,7 +151309,7 @@
                 }
               }
             },
-            "description": "`phone` is not a phone number; see `errors`."
+            "description": "`phone` is not a phone number this tenant accepts; see `errors`."
           },
           "default": {
             "content": {

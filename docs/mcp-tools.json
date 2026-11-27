@@ -5547,13 +5547,13 @@
         "returns_secret": false
       },
       "deprecation": null,
-      "description": "Unlock sign-in codes for a phone number locked after 100 wrong codes in a row, so its owner can sign in with a code again. Check who asks first; the audit log records who unlocked it.",
+      "description": "Unlock sign-in codes for a phone number locked after too many wrong codes in a row, so its owner can sign in with a code again; a number that is not locked is left as it is. Write numbers outside Vietnam as + and the country code. Check who asks first; the audit log records who unlocked it.",
       "input_schema": {
         "additionalProperties": false,
         "description": "A phone number whose sign-in codes should be unlocked.",
         "properties": {
           "phone": {
-            "description": "The number, e.g. `0912345678` or `+84912345678`.",
+            "description": "The number, e.g. `0912345678`; outside Vietnam `+` and the country code (`+6591234567`).",
             "example": "0912345678",
             "type": "string"
           }

@@ -33333,7 +33333,7 @@ export type UnitTypeResponse = {
 
 /** A phone number whose sign-in codes should be unlocked. */
 export type UnlockPhone = {
-  /** The number, e.g. `0912345678` or `+84912345678`. */
+  /** The number, e.g. `0912345678`; outside Vietnam `+` and the country code (`+6591234567`). */
   phone: string;
 };
 
