@@ -129,6 +129,8 @@ Postgres; vòng kiểm thử bảo mật kiểu bên ngoài cuối cùng không 
       - [ ] Chặn 1.0: gỡ cầu tạm `ConnectionTrait` trên handle của `db` (các hàm kernel nhận handle thay connection) và
             `TenantContext::database()` thô; baseline `raw-database` của `xtask/library-baseline.txt` về rỗng
             (D-20261126-kernel-data-layer)
+      - [ ] Thêm mẫu tìm toàn văn (Postgres `@@`, SQLite FTS5 `MATCH`) vào lớp `db` để bỏ chỗ `db.sql` của content
+            (`publishing/words.rs`, D-20261126-content-word-index)
 - [ ] Chuyển 39 module sang lớp của kernel theo cụm; `cargo xtask check` và `check-module` chặn phụ thuộc trực tiếp vào
       thư viện đã có lớp
 - [ ] Nhịp và công cụ nâng thư viện: `cargo xtask upgrade` hỗ trợ bản lớn (chạy thử, báo chỗ vỡ), giảm crate trùng phiên

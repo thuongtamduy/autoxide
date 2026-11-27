@@ -211,6 +211,8 @@ raw-database 1 modules/content/src/publishing/preview.rs
 raw-database 7 modules/content/src/publishing/reading.rs
 raw-database 8 modules/content/src/publishing/redirects.rs
 raw-database 13 modules/content/src/publishing/schedules.rs
+# Câu chạm chỉ mục tìm chữ (`MATCH` / `@@` không có trong bộ dựng câu), D-20261126-content-word-index.
+raw-sql 1 modules/content/src/publishing/words.rs
 raw-database 3 modules/content/src/resource.rs
 raw-database 1 modules/content/src/restriction.rs
 raw-database 2 modules/content/src/sandbox.rs
