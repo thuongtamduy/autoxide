@@ -33,12 +33,20 @@ use autoxide_kernel::backup::{
 pub struct BackupArguments {
     /// Directory to write the backup into; created when missing, must be empty.
     directory: PathBuf,
+    /// Also back up every tenant database (placement), and its own file storage, into
+    /// `placements/<name>/` of the directory (multi-tenant mode).
+    #[arg(long)]
+    all: bool,
 }
 
 #[derive(Debug, Clone, clap::Args)]
 pub struct RestoreArguments {
-    /// Directory made by `autoxide backup`.
+    /// Directory made by `autoxide backup` (for `--placement`: its `placements/<name>/`).
     directory: PathBuf,
+    /// Restore into this tenant database (placement), which must be empty, instead of the main database;
+    /// the files go to its own file storage, or the shared one.
+    #[arg(long)]
+    placement: Option<String>,
 }
 
 pub fn backup(arguments: &BackupArguments) -> ExitCode {
@@ -47,7 +55,10 @@ pub fn backup(arguments: &BackupArguments) -> ExitCode {
         Err(errors) => return report_invalid_configuration(&errors),
     };
     let config = settings.config.clone();
-    finish(run_with_observability(&config, run_backup(settings, arguments.directory.clone())))
+    finish(run_with_observability(
+        &config,
+        run_backup(settings, arguments.directory.clone(), arguments.all),
+    ))
 }
 
 pub fn restore(arguments: &RestoreArguments) -> ExitCode {
@@ -56,7 +67,14 @@ pub fn restore(arguments: &RestoreArguments) -> ExitCode {
         Err(errors) => return report_invalid_configuration(&errors),
     };
     let config = settings.config.clone();
-    finish(run_with_observability(&config, run_restore(settings, arguments.directory.clone())))
+    let directory = arguments.directory.clone();
+    match arguments.placement.clone() {
+        Some(name) => finish(run_with_observability(
+            &config,
+            super::backup_placements::restore_placement(settings, directory, name),
+        )),
+        None => finish(run_with_observability(&config, run_restore(settings, directory))),
+    }
 }
 
 fn finish(outcome: Result<String, String>) -> ExitCode {
@@ -71,20 +89,25 @@ fn finish(outcome: Result<String, String>) -> ExitCode {
 
 /// Tạo bản backup trong `directory`; trả nội dung in ra. Lõi nằm ở `autoxide_kernel::backup`, dùng
 /// chung với job backup theo lịch.
-pub(crate) async fn run_backup(settings: Settings, directory: PathBuf) -> Result<String, String> {
+pub(crate) async fn run_backup(
+    settings: Settings,
+    directory: PathBuf,
+    all: bool,
+) -> Result<String, String> {
     // Đường dẫn tuyệt đối: người chạy trong container phải thấy bản backup nằm ở ĐÂU.
     let directory = absolute(&directory);
     prepare_directory(&directory)?;
     if let Some(warning) = container_warning(&directory) {
         eprintln!("autoxide: warning: {warning}");
     }
-    let runtime = runtime::start(settings, Migrations::RequireApplied).await?;
+    // Không đòi database đủ migration: backup trước khi nâng cấp là lúc database còn ở bản cũ. Bản backup giữ đúng
+    // schema của nguồn (D-20261126-upgrade-rollback), nên chương trình của bản đó restore được.
+    let runtime = runtime::start(settings, Migrations::Ignore).await?;
     let result = async {
-        // Backup chỉ chứa bảng của module đang bật: còn dữ liệu của module đang tắt thì dừng.
-        crate::modules::refuse_dormant_data(&runtime.modules, &runtime.database, "backup create")
-            .await?;
         let migrator = runtime.modules.migrator().map_err(|error| error.to_string())?;
-        let names = runtime.modules.names();
+        // Mọi module có migration, cả module đang tắt: dữ liệu của nó vẫn ở đó và phải theo bản backup.
+        let names = super::backup_placements::migration_modules(&migrator);
+        let names: Vec<&str> = names.iter().map(String::as_str).collect();
         let scratch =
             std::env::temp_dir().join(format!("autoxide-backup-{}", uuid::Uuid::now_v7()));
         let manifest = backup::write_backup(
@@ -104,7 +127,13 @@ pub(crate) async fn run_backup(settings: Settings, directory: PathBuf) -> Result
             manifest.files,
             directory.display()
         );
-        text.push_str(&skipped_placements(runtime.modules.tenancy().as_ref()).await?);
+        if all {
+            text.push_str(
+                &super::backup_placements::write_all(&runtime, &names, &directory).await?,
+            );
+        } else {
+            text.push_str(&skipped_placements(runtime.modules.tenancy().as_ref()).await?);
+        }
         Ok(text)
     }
     .await;
@@ -137,8 +166,7 @@ async fn skipped_placements(
     tracing::warn!(placements = others.join(","), "backup does not copy dedicated placements");
     Ok(format!(
         "WARNING: only the main database was copied. The databases of these placements were NOT: \
-         {}. Back each of them up with your database's own tools until `autoxide backup` covers \
-         them; the same goes for a placement's own file storage (`autoxide placement storage`).\n",
+         {}. Run `autoxide backup --all` to back them up too, with their own file storage.\n",
         others.join(", ")
     ))
 }
@@ -218,7 +246,7 @@ pub(crate) async fn run_restore(settings: Settings, directory: PathBuf) -> Resul
     result
 }
 
-fn summary(verb: &str, tables: &[CopiedTable], files: u64, directory: &Path) -> String {
+pub(crate) fn summary(verb: &str, tables: &[CopiedTable], files: u64, directory: &Path) -> String {
     let directory = absolute(directory);
     let directory = directory.as_path();
     let rows: u64 = tables.iter().map(|table| table.rows).sum();
@@ -235,7 +263,7 @@ fn absolute(path: &Path) -> PathBuf {
 }
 
 /// Thư mục đích phải chưa có hoặc trống.
-fn prepare_directory(directory: &Path) -> Result<(), String> {
+pub(crate) fn prepare_directory(directory: &Path) -> Result<(), String> {
     if directory.exists() {
         let mut entries =
             std::fs::read_dir(directory).map_err(|error| describe_io(directory, &error))?;
@@ -296,7 +324,7 @@ fn same_device(_: &Path, _: &Path) -> Option<bool> {
     None
 }
 
-async fn read_manifest(directory: &Path) -> Result<Value, String> {
+pub(crate) async fn read_manifest(directory: &Path) -> Result<Value, String> {
     let path = directory.join(MANIFEST);
     let text = tokio::fs::read_to_string(&path).await.map_err(|error| {
         format!("{} is not a backup made by `autoxide backup`: {error}", directory.display())
@@ -314,7 +342,7 @@ async fn read_manifest(directory: &Path) -> Result<Value, String> {
 }
 
 /// Đưa mọi file trong `directory` (khoá = đường dẫn tương đối) vào nơi lưu.
-async fn load_files(storage: Arc<dyn Storage>, directory: &Path) -> Result<u64, String> {
+pub(crate) async fn load_files(storage: Arc<dyn Storage>, directory: &Path) -> Result<u64, String> {
     let mut files = 0;
     let mut pending = vec![directory.to_path_buf()];
     while let Some(folder) = pending.pop() {
@@ -353,7 +381,7 @@ async fn load_files(storage: Arc<dyn Storage>, directory: &Path) -> Result<u64, 
 }
 
 /// Lỗi kèm nguyên nhân gốc (lỗi nội bộ chỉ có câu chung chung).
-fn describe(error: Error) -> String {
+pub(crate) fn describe(error: Error) -> String {
     match std::error::Error::source(&error) {
         Some(source) => format!("{}: {source}", error.code()),
         None => error.message(),
@@ -462,20 +490,32 @@ mod tests {
         std::fs::remove_dir_all(&path).unwrap();
     }
 
-    /// Chế độ `multi` có placement riêng: backup nói rõ database của placement đó không được chép.
+    /// Chế độ `multi` có placement riêng: không `--all` thì backup nói rõ database của placement không được chép;
+    /// `--all` chép nó vào `placements/<tên>/`, và `restore --placement` đưa nó vào một placement trống khác.
     #[tokio::test]
-    async fn multi_canh_bao_placement_khong_chep() {
+    async fn multi_backup_all_roi_restore_placement() {
         use autoxide_kernel::tenancy::{
             DatabaseRegistry, NewPlacement, PlacementKind, TenancyConfig, TenancyMode,
         };
         TestDatabase::run(async |test| {
-            let source = ConfigSource::from_pairs([("DATABASE_URL", test.url())]);
-            let settings = crate::settings::read(&source).unwrap();
+            let scratch = Scratch::new();
+            let files = scratch.0.join("files");
+            let multi = |url: &str| {
+                let files = files.display().to_string();
+                let source = ConfigSource::from_pairs([
+                    ("DATABASE_URL", url),
+                    ("AUTOXIDE_FILES_DIR", files.as_str()),
+                    ("AUTOXIDE_TENANCY_MODE", "multi"),
+                    ("AUTOXIDE_SECRET_KEY", "a-configured-secret-that-is-long-enough-0123"),
+                ]);
+                crate::settings::read(&source).unwrap()
+            };
+            let settings = multi(test.url());
             let database = Database::connect(&settings.config.database).await.unwrap();
             let single = DatabaseRegistry::new(
                 database.clone(),
                 settings.config.database.clone(),
-                settings.config.tenancy.clone(),
+                autoxide_kernel::tenancy::TenancyConfig::default(),
             );
             assert_eq!(skipped_placements(Some(&single)).await.unwrap(), "");
             let registry = DatabaseRegistry::new(
@@ -484,17 +524,91 @@ mod tests {
                 TenancyConfig::with_mode(TenancyMode::Multi),
             );
             let placements = settings.modules.placements(&registry).unwrap();
-            let up_all = crate::commands::migrate::Action::Up { all: true };
-            crate::commands::migrate::execute_all(&up_all, &placements).await.unwrap();
-            assert_eq!(skipped_placements(Some(&registry)).await.unwrap(), "");
-            let url = test.extra_database().await.unwrap();
-            let new = NewPlacement::new("eu-1", PlacementKind::Dedicated, url.parse().unwrap());
-            placements.add(new).await.unwrap();
-            crate::commands::migrate::execute_all(&up_all, &placements).await.unwrap();
+            placements.up_all().await.unwrap();
+            for name in ["eu-1", "eu-2"] {
+                let url = test.extra_database().await.unwrap();
+                let new = NewPlacement::new(name, PlacementKind::Dedicated, url.parse().unwrap());
+                placements.add(new).await.unwrap();
+            }
+            // Chỉ eu-1 được migrate (có dữ liệu do migration nạp sẵn); eu-2 trống, chờ restore.
+            placements.up_placements(Some("eu-1")).await.unwrap();
             let warning = skipped_placements(Some(&registry)).await.unwrap();
-            assert!(warning.starts_with("WARNING: only the main database was copied"), "{warning}");
-            assert!(warning.contains(": eu-1."), "{warning}");
+            assert!(warning.contains("`autoxide backup --all`"), "{warning}");
+
+            let backup = scratch.0.join("backup");
+            let report = run_backup(multi(test.url()), backup.clone(), true).await.unwrap();
+            assert!(report.contains("Backed up placement eu-1: "), "{report}");
+            let eu1 = backup.join("placements/eu-1");
+            let manifest: Value =
+                serde_json::from_str(&std::fs::read_to_string(eu1.join(MANIFEST)).unwrap())
+                    .unwrap();
+            assert!(!manifest["migrations"].as_array().unwrap().is_empty(), "{manifest}");
+
+            let restored = crate::commands::backup_placements::restore_placement(
+                multi(test.url()),
+                eu1.clone(),
+                "eu-2".to_owned(),
+            )
+            .await
+            .unwrap();
+            assert!(restored.starts_with("Restored placement eu-2:"), "{restored}");
+            let ready: Vec<(String, String)> = placements
+                .list()
+                .await
+                .unwrap()
+                .into_iter()
+                .map(|found| (found.name, found.schema_state))
+                .collect();
+            assert!(ready.contains(&("eu-2".to_owned(), "ready".to_owned())), "{ready:?}");
+            // Placement đã có bảng: từ chối.
+            let again = crate::commands::backup_placements::restore_placement(
+                multi(test.url()),
+                eu1,
+                "eu-2".to_owned(),
+            )
+            .await
+            .unwrap_err();
+            assert!(again.contains("already has Autoxide tables"), "{again}");
             database.close().await.unwrap();
+        })
+        .await
+        .unwrap();
+    }
+
+    /// Database đang ở bản cũ (thiếu migration mới nhất của `auth`): backup không đòi migrate trước, giữ đúng
+    /// schema nguồn (`backup.json` ghi đúng danh sách đã áp), và restore bằng chương trình này vẫn được.
+    #[tokio::test]
+    async fn backup_database_chua_migrate_giu_schema_nguon() {
+        TestDatabase::run(async |test| {
+            let scratch = Scratch::new();
+            let files_a = scratch.0.join("files-a");
+            seed(test.url(), &files_a).await;
+            let migrator = settings(test.url(), &files_a).modules.migrator().unwrap();
+            let database =
+                Database::connect(&settings(test.url(), &files_a).config.database).await.unwrap();
+            let reverted = migrator.down(&database, "auth", 1).await.unwrap();
+            let missing = format!("auth/{}", reverted[0].name);
+            database.close().await.unwrap();
+
+            let backup = scratch.0.join("backup");
+            run_backup(settings(test.url(), &files_a), backup.clone(), false).await.unwrap();
+            let manifest: Value =
+                serde_json::from_str(&std::fs::read_to_string(backup.join(MANIFEST)).unwrap())
+                    .unwrap();
+            let listed: Vec<&str> = manifest["migrations"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter_map(Value::as_str)
+                .collect();
+            assert!(!listed.contains(&missing.as_str()), "{missing} must not be in the backup");
+            assert_eq!(listed.len(), migrator.names().len() - 1);
+
+            let restored =
+                format!("sqlite://{}?mode=rwc", scratch.0.join("restored.sqlite").display());
+            let files_b = scratch.0.join("files-b");
+            run_restore(settings(&restored, &files_b), backup).await.unwrap();
+            check(&restored, &files_b).await;
         })
         .await
         .unwrap();
@@ -529,7 +643,7 @@ mod tests {
             let backup = scratch.0.join("backup");
 
             let report =
-                run_backup(settings(test.url(), &scratch.0.join("files-a")), backup.clone())
+                run_backup(settings(test.url(), &scratch.0.join("files-a")), backup.clone(), false)
                     .await
                     .unwrap();
             assert!(report.starts_with("Backed up "), "{report}");
@@ -545,7 +659,7 @@ mod tests {
             // Database đích đã có dữ liệu, hay thư mục backup đã có gì: từ chối.
             let again = run_restore(settings(&restored, &files), backup.clone()).await.unwrap_err();
             assert!(again.contains("restore into a new, empty database"), "{again}");
-            let full = run_backup(settings(test.url(), &scratch.0.join("files-a")), backup)
+            let full = run_backup(settings(test.url(), &scratch.0.join("files-a")), backup, false)
                 .await
                 .unwrap_err();
             assert!(full.contains("is not empty"), "{full}");
@@ -563,7 +677,7 @@ mod tests {
             let source = format!("sqlite://{}?mode=rwc", scratch.0.join("source.sqlite").display());
             seed(&source, &scratch.0.join("files-a")).await;
             let backup = scratch.0.join("backup");
-            run_backup(settings(&source, &scratch.0.join("files-a")), backup.clone())
+            run_backup(settings(&source, &scratch.0.join("files-a")), backup.clone(), false)
                 .await
                 .unwrap();
 
@@ -623,7 +737,7 @@ mod tests {
             runtime.database.close().await.unwrap();
 
             let backup = scratch.0.join("backup");
-            run_backup(settings(test.url(), &files_a), backup.clone()).await.unwrap();
+            run_backup(settings(test.url(), &files_a), backup.clone(), false).await.unwrap();
             let restored =
                 format!("sqlite://{}?mode=rwc", scratch.0.join("restored.sqlite").display());
             let files_b = scratch.0.join("files-b");

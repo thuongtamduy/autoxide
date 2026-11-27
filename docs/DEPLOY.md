@@ -316,9 +316,16 @@ To restore on a new machine, prepare the directory (steps 1–2), then run
 `autoxide restore <backup directory>` there before starting the service.
 
 With `AUTOXIDE_TENANCY_MODE=multi`, the backup holds the main database (the tenant register and
-every tenant on it) and all files of the shared file storage, but not the databases of other
-placements nor a placement's own file storage; the command prints a warning naming them. Back
-those up with the database's (and the storage's) own tools. Keep
+every tenant on it) and all files of the shared file storage. Add `--all` to back up every other
+placement too, with its own file storage, into `placements/<name>/` of the directory; without it
+the command prints a warning naming them. Restore one with
+`autoxide restore <directory>/placements/<name> --placement <name>` into a placement whose database
+is new and empty (`autoxide placement add`).
+
+A backup keeps the schema of its source exactly as it is: the command does not need the database
+migrated first, so you can back up right before an upgrade, and the release you upgrade from can
+restore that backup (`backup.json` lists the migrations it holds). It also holds the data of modules
+that are turned off. Keep
 `AUTOXIDE_SECRET_KEY` in a safe place apart from the backups: without it, the encrypted secrets in
 a backup cannot be read.
 

@@ -497,6 +497,32 @@ async fn nang_cap_tu_ban_phat_hanh_truoc_giu_nguyen_du_lieu() {
         assert_eq!(String::from_utf8_lossy(&stopped.stdout).trim(), "0", "{}", logs());
         drop(container);
 
+        // --- backup trước khi nâng (D-20261126-upgrade-rollback) ---
+        // Binary mới backup database còn ở bản cũ: không đòi migrate trước, giữ đúng schema nguồn. Bản cũ phải
+        // restore được bản backup đó vào một database trống — đường quay về khi nâng cấp hỏng.
+        let backup = current(directory.path(), &environment, &["backup", "data/before-upgrade"]);
+        assert!(backup.status.success(), "new `backup` before migrating: {}", text(&backup));
+        let restored_url = match test.backend() {
+            DbBackend::Sqlite => "sqlite://data/restored.sqlite?mode=rwc".to_owned(),
+            _ => test.extra_database().await.unwrap(),
+        };
+        let mut restore_environment: Vec<(String, String)> = old_environment
+            .iter()
+            .filter(|(key, _)| key != "DATABASE_URL" && key != "AUTOXIDE_FILES_DIR")
+            .cloned()
+            .collect();
+        restore_environment.push(("DATABASE_URL".to_owned(), restored_url));
+        restore_environment.push(("AUTOXIDE_FILES_DIR".to_owned(), "data/restored-files".to_owned()));
+        let restored = docker(
+            &image,
+            directory.path(),
+            &restore_environment,
+            &["restore", "/var/lib/autoxide/data/before-upgrade"],
+            None,
+            None,
+        );
+        assert!(restored.status.success(), "old `restore` of the new binary's backup: {}", text(&restored));
+
         // --- bản hiện tại, cùng database ---
         // Không đặt `AUTOXIDE_MODULES` thì module hạng thử nghiệm không chạy nữa
         // (D-20261121-module-selection). Bản cũ đã ghi dữ liệu vào một module như vậy (`newsletter`):

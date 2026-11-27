@@ -2,6 +2,7 @@
 
 pub mod ai;
 pub mod backup;
+mod backup_placements;
 pub mod config;
 pub mod copy;
 pub mod demo;
