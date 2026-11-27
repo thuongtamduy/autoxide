@@ -57,15 +57,18 @@ async fn tac_gia_chuyen_muc_chuyen_huong_lich_dang_va_duyet_bai() {
         get(&app, &path).await;
         write(&app, "PATCH", &path, Some(json!({"description": "Tin mới", "locale": "vi"})), 200)
             .await;
-        expect(
-            &app,
-            "GET",
-            "/api/v1/content/public/terms/category/tin-tuc?locale=vi",
-            ANONYMOUS,
-            None,
-            200,
-        )
-        .await;
+        // PT-11: chuyên mục chưa có bài nào đang hiện trên website thì không công khai (404); có bài đã đăng mang nó
+        // thì công khai.
+        let public = "/api/v1/content/public/terms/category/tin-tuc?locale=vi";
+        let hidden = expect(&app, "GET", public, ANONYMOUS, None, 404).await;
+        assert_eq!(hidden["code"], "content.term_not_found");
+        let news = entry(&app, "post", "Tin đầu tiên").await;
+        let news = news["id"].as_str().unwrap().to_owned();
+        let terms = json!({"term_ids": [term]});
+        write(&app, "PUT", &format!("/api/v1/content/entries/{news}/terms"), Some(terms), 200)
+            .await;
+        write(&app, "POST", &format!("/api/v1/content/entries/{news}/publish"), None, 200).await;
+        expect(&app, "GET", public, ANONYMOUS, None, 200).await;
         write(&app, "DELETE", &path, None, 204).await;
 
         let redirect = json!({"from_path": "/cu", "to_url": "/moi", "status_code": 301});

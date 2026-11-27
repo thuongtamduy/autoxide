@@ -39,6 +39,9 @@ pub enum Action {
         #[arg(long)]
         all: bool,
     },
+    /// Print every migration of this program, `<module>/<name>` one per line, in the order `up`
+    /// applies them. Needs no database (`cargo xtask migration-releases record` reads it).
+    Manifest,
     /// Revert the most recent migrations of one module.
     Down {
         /// Name of the module whose migrations to revert.
@@ -55,6 +58,16 @@ pub fn run(arguments: &Arguments) -> ExitCode {
         Err(errors) => return report_invalid_configuration(&errors),
     };
     let action = arguments.action.clone();
+    // `manifest` không cần database: in ngay.
+    if let Action::Manifest = action {
+        return match settings.modules.migrator() {
+            Ok(migrator) => {
+                print!("{}", migrator.names().join("\n") + "\n");
+                ExitCode::SUCCESS
+            }
+            Err(error) => report_failure(&error.to_string()),
+        };
+    }
     let config = settings.config.clone();
     let outcome = run_with_observability(&config, async move {
         let migrator = settings.modules.migrator().map_err(|error| error.to_string())?;
@@ -239,6 +252,7 @@ async fn execute(
                 &format!("Nothing to revert: module `{module}` has no applied migrations."),
             ))
         }
+        Action::Manifest => Ok(migrator.names().join("\n") + "\n"),
     }
 }
 

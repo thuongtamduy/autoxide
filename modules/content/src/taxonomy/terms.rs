@@ -9,7 +9,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
-use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
+use autoxide_kernel::tenancy::{ScopeExt, Site, TenantContext};
 use sea_orm::sea_query::Query;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseTransaction, EntityTrait,
@@ -649,6 +649,7 @@ impl ContentService {
     pub(crate) async fn public_terms(
         &self,
         tenant: &TenantContext,
+        site: &Site,
         locale: &str,
         taxonomy: Option<Taxonomy>,
         page: &PageRequest,
@@ -659,6 +660,9 @@ impl ContentService {
         if !problems.is_empty() {
             return Err(Error::validation(problems));
         }
+        // Chỉ bài người đọc thấy được (PT-11): không bị ẩn (D-363), hiện trên website này (D-307) — thuật ngữ chỉ gắn
+        // với bài bị ẩn hay bài của website khác không lộ ra.
+        let lineage = site.lineage_ids();
         let posts = || {
             Query::select()
                 .column(published::Column::EntryId)
@@ -666,6 +670,8 @@ impl ContentService {
                 .and_where(published::Column::TenantId.eq(tenant.id().as_uuid()))
                 .and_where(published::Column::Kind.eq("post"))
                 .and_where(published::Column::Locale.eq(locale.as_str()))
+                .and_where(published::Column::RestrictedAt.is_null())
+                .cond_where(crate::publishing::reading::on_site(&lineage))
                 .to_owned()
         };
         let used = Query::select()
@@ -717,6 +723,7 @@ impl ContentService {
     pub(crate) async fn term_by_slug(
         &self,
         tenant: &TenantContext,
+        site: &Site,
         taxonomy: Taxonomy,
         locale: &str,
         slug: &str,
@@ -727,6 +734,7 @@ impl ContentService {
         if !problems.is_empty() {
             return Err(Error::validation(problems));
         }
+        let read = tenant.database().read();
         let mut found = None;
         for language in [locale.as_str(), languages.default.as_str()] {
             found = term_translation::Entity::find()
@@ -734,16 +742,29 @@ impl ContentService {
                 .filter(term_translation::Column::Taxonomy.eq(taxonomy.as_str()))
                 .filter(term_translation::Column::Locale.eq(language))
                 .filter(term_translation::Column::Slug.eq(slug))
-                .one(tenant.database().read())
+                .one(read)
                 .await?;
             if found.is_some() {
                 break;
             }
         }
-        let text = found.ok_or_else(|| {
+        let not_found = || {
             Error::not_found("content.term_not_found", "No category or tag has the slug `{slug}`.")
                 .with_param("slug", slug)
-        })?;
+        };
+        let text = found.ok_or_else(not_found)?;
+        // Như danh sách (PT-11): thuật ngữ chưa gắn với bài nào người đọc thấy được trên website này thì như không có —
+        // không lộ tên, mô tả của thuật ngữ đang soạn.
+        let shown_post = published::Entity::find()
+            .scoped(tenant)
+            .filter(published::Column::RestrictedAt.is_null())
+            .filter(crate::publishing::reading::on_site(&site.lineage_ids()))
+            .filter(published_has_term(tenant, text.term_id))
+            .one(read)
+            .await?;
+        if shown_post.is_none() {
+            return Err(not_found());
+        }
         let full = self.term_with_texts(tenant, text.term_id).await?;
         let shown = pick(&full.texts, text.term_id, &locale, &languages.default)
             .ok_or_else(|| Error::internal("a term without names"))?;

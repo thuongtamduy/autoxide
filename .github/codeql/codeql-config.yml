@@ -1,0 +1,12 @@
+# Cấu hình CodeQL (D-20261127-codeql-skip-tests, chủ dự án quyết): bỏ qua code CHỈ dùng cho test, vẫn quét đầy đủ code
+# chạy thật. Bộ truy vấn báo nhầm liên tục ở đây (mật khẩu mẫu, in ID trong thông báo assert) và mỗi lần phải dismiss tay.
+# Danh sách khớp `is_test_file` của xtask (`/tests/`, `tests.rs`, `*_tests.rs`) cộng phần e2e của `autoxide`
+# (`#[cfg(test)] mod e2e`) và crate testkit (chỉ khai ở `[dev-dependencies]`). Không thêm đường dẫn của code chạy thật.
+name: autoxide
+
+paths-ignore:
+  - crates/app/src/e2e
+  - crates/testkit
+  - "**/tests"
+  - "**/tests.rs"
+  - "**/*_tests.rs"
