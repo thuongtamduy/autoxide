@@ -8,3 +8,9 @@
   item in the reconciliation queue, as money arriving after the deadline already did.
 - Module `ledger`: a `late_payment` item closes on its own (`resolved`, resolution `refunded`) once the
   payment is refunded in full through the partner, so the queue shows only payments to refund by hand.
+- Module `ledger`: money collected after a payment's deadline opens a `late_payment` item even before the
+  expiry job has marked it `expired`; a refund the partner refuses becomes `failed` and frees the amount
+  it held.
+- Module `orders`: an automatic refund of a late payment that the partner refuses no longer retries
+  forever; the `late_payment` item tells the operator to refund by hand. A balance link replaced by a new
+  one is `superseded`: if the partner still collects it, the money is refunded instead of counted.
