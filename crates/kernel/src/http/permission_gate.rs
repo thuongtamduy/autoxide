@@ -71,6 +71,9 @@ pub(super) fn rules(module: &str, openapi: &OpenApi) -> Rules {
             (Method::PATCH, item.patch.as_ref()),
             (Method::DELETE, item.delete.as_ref()),
             (Method::HEAD, item.head.as_ref()),
+            // `#[endpoint]` nhận cả `options` và `trace`: gate phủ mọi method mà tài liệu khai.
+            (Method::OPTIONS, item.options.as_ref()),
+            (Method::TRACE, item.trace.as_ref()),
         ];
         for (method, operation) in methods {
             let Some(operation) = operation else { continue };

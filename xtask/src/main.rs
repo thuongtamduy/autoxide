@@ -368,6 +368,7 @@ fn check() -> ExitCode {
         }
         violations.extend(layer.violations);
         violations.extend(library_layer::check_private_paths(&workspace)?);
+        violations.extend(library_layer::check_single_copies(&workspace.root)?);
         violations.extend(library_layer::check_strict(&workspace)?);
         violations.extend(decisions::check(&workspace.root)?);
         violations.extend(changelog::check(&workspace.root)?);

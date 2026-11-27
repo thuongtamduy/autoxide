@@ -414,7 +414,9 @@ impl Modules {
             if let Some(paths) = document.as_object() {
                 for (path, item) in paths {
                     for method in METHODS.iter().filter(|method| item.get(**method).is_some()) {
-                        found.insert((path.clone(), method.to_uppercase()));
+                        // Path rỗng là `/` với axum: chuẩn hoá trước khi so, để báo lỗi rõ thay vì để axum dừng tiến trình.
+                        let path = if path.is_empty() { "/".to_owned() } else { path.clone() };
+                        found.insert((path, method.to_uppercase()));
                     }
                 }
             }

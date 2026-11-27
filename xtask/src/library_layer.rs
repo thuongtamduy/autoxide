@@ -465,6 +465,35 @@ fn private_uses(text: &str) -> Vec<(usize, String)> {
     found
 }
 
+/// Thư viện mà kernel dùng ĐÚNG bản thư viện khác dùng, nên `Cargo.lock` chỉ được có một bản: `matchit` (bộ khớp route
+/// của axum, kernel hỏi nó để báo route xung đột như axum sẽ thấy — D-20261127-http-layer-choices).
+const SINGLE_COPY: &[&str] = &["matchit"];
+
+/// `single-copy`: mỗi thư viện trong [`SINGLE_COPY`] có đúng một bản trong `Cargo.lock`.
+pub fn check_single_copies(root: &Path) -> Result<Vec<Violation>, String> {
+    let lock = fs::read_to_string(root.join("Cargo.lock"))
+        .map_err(|error| format!("Cargo.lock: {error}"))?;
+    Ok(single_copy_problems(&lock))
+}
+
+fn single_copy_problems(lock: &str) -> Vec<Violation> {
+    SINGLE_COPY
+        .iter()
+        .filter_map(|name| {
+            let wanted = format!("name = \"{name}\"");
+            let copies = lock.lines().filter(|line| line.trim() == wanted).count();
+            (copies > 1).then(|| Violation {
+                rule: "single-copy",
+                location: "Cargo.lock".to_owned(),
+                message: format!(
+                    "`{name}` appears {copies} times: the kernel must use the same version as axum; align the \
+                     version in [workspace.dependencies] (D-20261127-http-layer-choices)"
+                ),
+            })
+        })
+        .collect()
+}
+
 /// File test của module: `tests.rs`, `*_tests.rs`, hay nằm trong thư mục `tests/`.
 fn is_test_file(file: &str) -> bool {
     let name = file.rsplit('/').next().unwrap_or(file);
@@ -474,6 +503,16 @@ fn is_test_file(file: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn matchit_chi_mot_ban() {
+        let one = "[[package]]\nname = \"matchit\"\nversion = \"0.8.4\"\n";
+        assert!(single_copy_problems(one).is_empty());
+        let two = format!("{one}\n[[package]]\nname = \"matchit\"\nversion = \"0.9.0\"\n");
+        let found = single_copy_problems(&two);
+        assert_eq!(found.len(), 1);
+        assert!(found[0].message.contains("2 times"));
+    }
 
     // Đường riêng của kernel: `__private`, hàm dựng ẩn của lớp HTTP, `impl Endpoint for` viết tay; chú thích thì bỏ qua.
     #[test]

@@ -127,6 +127,24 @@ fn filter(method: &HttpMethod) -> MethodFilter {
 /// ```compile_fail
 /// use autoxide_kernel::http::endpoint;
 ///
+/// /// Read; a key without `x-` is the same key once prefixed.
+/// #[endpoint(get, path = "/x", permission = "notes.read", extensions(("permissions" = json!([]))),
+///     responses((status = 200, description = "Read.")))]
+/// async fn read() {}
+/// ```
+///
+/// ```compile_fail
+/// use autoxide_kernel::http::endpoint;
+///
+/// /// Read; an extension key must be a string literal.
+/// #[endpoint(get, path = "/x", public, extensions((concat!("x-", "public") = json!(true))),
+///     responses((status = 200, description = "Read.")))]
+/// async fn read() {}
+/// ```
+///
+/// ```compile_fail
+/// use autoxide_kernel::http::endpoint;
+///
 /// /// Delete; the only approval kind is `agent`.
 /// #[endpoint(delete, path = "/x", permission = "notes.write", approval = "human",
 ///     responses((status = 204, description = "Deleted.")))]

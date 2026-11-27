@@ -43,6 +43,12 @@ async fn remove() -> NoContent {
     NoContent
 }
 
+/// Trace the probe; any signed-in caller. The handler does not take a `Principal`.
+#[endpoint(trace, path = "/opts", signed_in, responses((status = 200, description = "Options.", body = String)))]
+async fn opts() -> &'static str {
+    "opts"
+}
+
 /// Nested route.
 #[endpoint(get, path = "/", public, responses((status = 200, description = "Nested.", body = String)))]
 async fn nested() -> &'static str {
@@ -62,7 +68,7 @@ impl Module for Probe {
 
     fn endpoints(&self) -> Routes {
         let first: Routes = routes![ping, me];
-        first.merge(routes![read, remove]).nest("/inner", routes![nested])
+        first.merge(routes![read, remove, opts]).nest("/inner", routes![nested])
     }
 }
 
@@ -103,6 +109,17 @@ async fn signed_in_bi_ep_dang_nhap_du_handler_khong_nhan_principal() {
         assert_eq!(signed_in.status(), StatusCode::OK);
         let public = app.get("/api/v1/probe/ping").send().await.unwrap();
         assert_eq!(public.status(), StatusCode::OK);
+        // Gate phủ mọi method mà tài liệu khai, kể cả `TRACE`: không token thì 401.
+        let trace =
+            app.request(axum::http::Method::TRACE, "/api/v1/probe/opts").send().await.unwrap();
+        assert_eq!(trace.status(), StatusCode::UNAUTHORIZED);
+        let trace = app
+            .request(axum::http::Method::TRACE, "/api/v1/probe/opts")
+            .token("ada")
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(trace.status(), StatusCode::OK);
         // Đăng nhập mà thiếu permission: 403 trước khi tới handler.
         let denied = app.get("/api/v1/probe/read").token("ada").send().await.unwrap();
         assert_eq!(denied.status(), StatusCode::FORBIDDEN);
@@ -174,8 +191,8 @@ async fn nest_len_path_da_co_giu_ca_hai_operation() {
 }
 
 /// Chống lệch: kernel hỏi `matchit` (khai thẳng, cùng bản lớn với axum) để báo route xung đột lúc khởi động. Cặp route
-/// mà `matchit` coi là xung đột thì axum cũng dừng tiến trình khi dựng router, và ngược lại. Axum đổi bản lớn của
-/// `matchit` (luật khớp đổi) thì test này đỏ thay vì phép kiểm lúc khởi động lặng lẽ sai.
+/// mà `matchit` coi là xung đột thì axum cũng dừng tiến trình khi dựng router, và ngược lại. Luật khớp đổi ở một trong
+/// các cặp mẫu thì test này đỏ; hai bản `matchit` cùng có trong cây phụ thuộc thì luật `single-copy` của `xtask check` đỏ.
 #[test]
 fn matchit_khop_voi_axum() {
     let cases = [
