@@ -23,6 +23,12 @@ Sau kiểm độc lập: quy tắc tra theo **ngày thuế lúc huỷ** (`TaxEng
 `plans:<kỳ>:void`, chạy lại không lập hai lần) rồi phát hành. Hoá đơn điều chỉnh, thay thế (cả khi sửa nháp) tính thuế
 theo ngày của hoá đơn gốc.
 
+Kiểm độc lập #575 (vòng 3): quy tắc cấm huỷ áp cho **mọi** trường hợp. NĐ 70/2025 có thể vẫn cho huỷ khi hoá đơn lập lúc
+thu tiền trước rồi dịch vụ bị huỷ — đúng ca huỷ kỳ thuê bao của `plans`: **cần đối chiếu văn bản gốc / người có chuyên
+môn pháp lý**. Không đổi hành vi: điều chỉnh giảm toàn bộ là cách an toàn đang dùng (đúng luật trong mọi cách đọc).
+Nhà cung cấp không có lệnh huỷ (SePay eInvoice — gặp khi người bán chưa có hồ sơ thuế nên quy tắc chưa áp) trả
+`409 invoices.einvoice_cancel_unsupported`, cùng hướng điều chỉnh / thay thế; `plans` xử lý như `einvoice_not_cancellable`.
+
 Lý do: trước đây `invoices` gọi `cancel` của nhà cung cấp, SePay luôn trả `not_supported`, người dùng nhận lỗi khó hiểu
 và không biết phải làm gì. Từ chối sớm với căn cứ và hướng đi đúng luật thì rõ hơn, và đóng luôn khe hở huỷ khi job gửi
 hoá đơn chưa chạy (trạng thái `issued`).

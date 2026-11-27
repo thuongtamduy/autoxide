@@ -321,12 +321,24 @@ impl PlansService {
             // Lượt trước đã điều chỉnh xong (gốc thành `adjusted`): đi lại đường điều chỉnh — cùng `reference`
             // nên trả lại đúng điều chỉnh đó, phát hành lại trả cùng số.
             Err(error)
-                if error.code() == "invoices.einvoice_not_cancellable"
-                    || error.code() == "invoices.not_cancellable" =>
+                if matches!(
+                    error.code(),
+                    "invoices.einvoice_not_cancellable"
+                        | "invoices.einvoice_cancel_unsupported"
+                        | "invoices.not_cancellable"
+                ) =>
             {
                 let Some(original) = invoices.document(&operator, document).await? else {
                     return Ok(());
                 };
+                // `not_cancellable` khi gốc còn ở trạng thái huỷ được: trạng thái vừa đổi giữa lúc đọc và lúc khoá
+                // (vd `issued` → `submitting`) — lỗi tạm, để job thử lại (kiểm độc lập #575, N1).
+                if error.code() == "invoices.not_cancellable"
+                    && ["issued", "submitting", "accepted", "rejected"]
+                        .contains(&original.status.as_str())
+                {
+                    return Err(error);
+                }
                 // Gốc đã thay thế (hay ở trạng thái khác không huỷ, không điều chỉnh được): chạy lại không đổi được
                 // gì — lỗi vĩnh viễn, báo người vận hành qua log thay vì thử lại tới dead-letter queue.
                 if error.code() == "invoices.not_cancellable" && original.status != "adjusted" {

@@ -229,9 +229,12 @@ impl InvoicesService {
         // `TaxEngine` đọc database điều khiển.
         let mut current = current;
         let recomputed = if current.status == "draft" {
-            // Điều chỉnh / thay thế: thuế theo ngày của chứng từ gốc, không theo ngày lập.
+            // Điều chỉnh / thay thế: thuế theo ngày của chứng từ gốc, không theo ngày lập. Đường ghi như `current`:
+            // replica trễ chưa có gốc vừa lập thì điều chỉnh sẽ tính theo thuế suất hôm nay.
             let original = match current.related_document_id {
-                Some(original) => self.original_tax_date(database.read(), tenant, original).await?,
+                Some(original) => {
+                    self.original_tax_date(database.write(), tenant, original).await?
+                }
                 None => None,
             };
             let on = original.or(current.issue_date).unwrap_or(today);
@@ -827,7 +830,11 @@ impl InvoicesService {
             if let Some(provider_ref) = &row.provider_ref {
                 self.provider(&name)?
                     .cancel(tenant.id(), &EInvoiceCancel::new(provider_ref.clone(), reason.clone()))
-                    .await?;
+                    .await
+                    // Nhà cung cấp không có lệnh huỷ (SePay eInvoice): thường gặp khi người bán chưa có hồ sơ thuế
+                    // nên quy tắc cấm huỷ của vùng thuế chưa áp — báo rõ đường điều chỉnh / thay thế (kiểm độc
+                    // lập #575, N2) thay vì `einvoice.not_supported` khó hiểu.
+                    .map_err(|error| provider_cancel_error(error, &name))?;
             }
         }
         let (outbox, seen) = (&self.outbox, &row.status);
@@ -1032,6 +1039,27 @@ fn einvoice_not_cancellable(legal_basis: String) -> Error {
          `direction` `decrease` to cancel the whole amount) or a replacement (`POST .../documents/<id>/replace`).",
     )
     .with_param("legal_basis", legal_basis)
+}
+
+/// Lỗi của `cancel` ở nhà cung cấp `provider`: không hỗ trợ huỷ → [`einvoice_cancel_unsupported`], còn lại giữ nguyên.
+pub(crate) fn provider_cancel_error(error: Error, provider: &str) -> Error {
+    if error.code() == "einvoice.not_supported" {
+        einvoice_cancel_unsupported(provider)
+    } else {
+        error
+    }
+}
+
+/// Nhà cung cấp hoá đơn điện tử không huỷ được hoá đơn đã gửi.
+fn einvoice_cancel_unsupported(provider: &str) -> Error {
+    Error::conflict(
+        "invoices.einvoice_cancel_unsupported",
+        "The e-invoice provider `{provider}` cannot cancel an invoice it has sent. Issue an adjustment instead \
+         (`POST .../documents/<id>/adjust`, `direction` `decrease` to cancel the whole amount) or a replacement \
+         (`POST .../documents/<id>/replace`), and give the seller a tax profile (`PUT /api/v1/tax/profiles/<org>`) \
+         so the rules of its tax jurisdiction apply.",
+    )
+    .with_param("provider", provider)
 }
 
 /// Nháp bị sửa trong lúc phát hành.

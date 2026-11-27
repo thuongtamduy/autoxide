@@ -598,7 +598,7 @@ impl InvoicesService {
         let database = tenant.database();
         // Nháp điều chỉnh / thay thế: thuế theo ngày của chứng từ gốc, như lúc tạo.
         let original_date = match found.related_document_id {
-            Some(original) => self.original_tax_date(database.read(), tenant, original).await?,
+            Some(original) => self.original_tax_date(database.write(), tenant, original).await?,
             None => None,
         };
         let on = match (original_date, issue_date) {
@@ -658,18 +658,20 @@ impl InvoicesService {
         Ok(described)
     }
 
-    /// Dòng đã lưu, dạng đầu vào (để tính lại khi đổi người mua / ngày).
+    /// Dòng đã lưu, dạng đầu vào (để tính lại khi đổi người mua / ngày). Đọc qua đường ghi, không qua read
+    /// replica: hai nơi gọi (sửa nháp, lập) ghi lại các dòng này — replica trễ sẽ ghi đè dòng vừa sửa bằng dòng cũ
+    /// (kiểm độc lập #575, V1).
     pub(crate) async fn stored_lines(
         &self,
         tenant: &TenantContext,
         id: Uuid,
     ) -> Result<Vec<NewDocumentLine>, Error> {
         let found = describe(
-            tenant.database().read(),
+            tenant.database().write(),
             tenant,
             document::Entity::find_by_id(id)
                 .scoped(tenant)
-                .one(tenant.database().read())
+                .one(tenant.database().write())
                 .await?
                 .ok_or_else(document_not_found)?,
         )

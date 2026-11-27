@@ -73,21 +73,22 @@ pub(crate) struct DocumentResponse {
     total: Option<Money>,
     /// Code to look the invoice up at the tax authority's portal.
     lookup_code: Option<String>,
-    /// `true`: this invoice's tax or total differs from what was settled on the order — the invoice
-    /// computes tax at its own date (the tax point), so a tax rate change between ordering and
+    /// `true`: this invoice applies a different tax rate than the one settled on the order for at
+    /// least one line (lines matched by SKU; the shipping fee by its line without an item code) — the
+    /// invoice computes tax at its own date (the tax point), so a rate change between ordering and
     /// invoicing (e.g. the end of the 8% VAT on 2026-12-31) shows here. Check the invoice and settle
-    /// the difference with the buyer. Always `false` for an adjustment, or when part of the order was
-    /// cancelled.
+    /// the difference with the buyer. A difference of one minor unit from rounding does not count.
+    /// Always `false` for an adjustment.
     differs_from_order: bool,
 }
 
 fn document_response(
-    settled: Option<(i64, i64)>,
+    settled: Vec<crate::invoicing::SettledLine>,
     link: invoice_link::Model,
     document: Option<autoxide_invoices::api::Document>,
 ) -> DocumentResponse {
     let differs_from_order =
-        crate::invoicing::differs_from_order(settled, &link.kind, document.as_ref());
+        crate::invoicing::differs_from_order(&settled, &link.kind, document.as_ref());
     DocumentResponse {
         differs_from_order,
         document_id: link.document_id,
@@ -196,7 +197,7 @@ async fn documents(
     page: &PageRequest,
 ) -> Result<Page<DocumentResponse>, Error> {
     let (found, settled) = service.order_documents(tenant, id, page).await?;
-    Ok(found.map(|(link, document)| document_response(settled, link, document)))
+    Ok(found.map(|(link, document)| document_response(settled.clone(), link, document)))
 }
 
 /// Documents of one of your orders.

@@ -43,7 +43,7 @@ impl ModerationPolicy for Policy {
         _: autoxide_kernel::tenancy::TenantId,
         _: &str,
     ) -> Result<Vec<String>, autoxide_kernel::error::Error> {
-        Ok(vec!["personal_data".to_owned()])
+        Ok(vec!["personal_data".to_owned(), "spam".to_owned()])
     }
     async fn check_hide_reason(
         &self,
@@ -52,16 +52,17 @@ impl ModerationPolicy for Policy {
         reason: &str,
     ) -> Result<(), autoxide_kernel::error::Error> {
         self.0.lock().unwrap().push(format!("{surface}:{reason}"));
-        if reason == "personal_data" {
+        if reason == "personal_data" || reason == "spam" {
             return Ok(());
         }
-        Err(autoxide_kernel::error::Error::validation(vec![
-            autoxide_kernel::error::FieldError::new(
-                "reason",
-                "not_allowed",
-                "is empty, too long or repeated",
-            ),
-        ]))
+        // Như `compliance`: lỗi nêu mã của quy tắc luật.
+        Err(autoxide_kernel::error::Error::new(
+            autoxide_kernel::error::ErrorKind::Validation,
+            "compliance.hide_reason_not_allowed",
+            "Content of consumers may not be hidden for `{reason}`; allowed reasons: {allowed}.",
+        )
+        .with_param("reason", reason)
+        .with_param("allowed", "personal_data, spam"))
     }
 }
 
@@ -185,6 +186,11 @@ async fn chi_nguoi_da_nhan_hang_danh_gia_va_an_can_ly_do_trong_danh_sach() {
             )
             .await;
         assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{refused}");
+        // Lỗi nêu mã người gọi gửi và các mã của `orders` được phép, không phải mã của luật (kiểm độc lập #575, N3).
+        assert_eq!(refused["code"], "compliance.hide_reason_not_allowed");
+        let detail = refused["detail"].as_str().unwrap();
+        assert!(detail.contains("`abusive_language`"), "{refused}");
+        assert!(detail.contains("personal_data, spam_or_advertising"), "{refused}");
         let (status, hidden) = boss
             .send("POST", &moderation, Some(json!({"action": "hide", "reason": "personal_data"})))
             .await;

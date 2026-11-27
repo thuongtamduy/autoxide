@@ -225,6 +225,8 @@ struct NoCancelInvoices {
     /// (`reference`, dòng) của mỗi điều chỉnh đã lập.
     adjustments: Mutex<Vec<(String, Vec<NewDocumentLine>)>>,
     fail_after_issue: Mutex<usize>,
+    /// Số lần `cancel` tới trả `not_cancellable` dù gốc còn `issued` (trạng thái đổi giữa lúc đọc và lúc khoá).
+    transient_cancel: Mutex<usize>,
 }
 
 /// Lỗi của module `invoices` (không phải mã của `plans`): dựng như `invoices` trả về.
@@ -327,6 +329,11 @@ impl Invoices for NoCancelInvoices {
     ) -> Result<Document, Error> {
         let documents = self.documents.lock().unwrap();
         let status = documents.iter().find(|found| found.id == id).unwrap().status.clone();
+        let mut transient = self.transient_cancel.lock().unwrap();
+        if *transient > 0 {
+            *transient -= 1;
+            return Err(invoices_error("invoices.not_cancellable", "submitting"));
+        }
         let code = if status == "issued" {
             "invoices.einvoice_not_cancellable"
         } else {
@@ -402,6 +409,9 @@ async fn huy_ky_dieu_chinh_giam_mot_lan_du_chay_lai() {
             .unwrap_or_else(|| panic!("a period with an invoice: {periods}"));
         let id = period["id"].as_str().unwrap();
         *invoices.fail_after_issue.lock().unwrap() = 1;
+        // Lần huỷ đầu gặp trạng thái đổi giữa chừng (`not_cancellable` khi gốc còn huỷ được): job thử lại, không
+        // bỏ qua (kiểm độc lập #575, N1).
+        *invoices.transient_cancel.lock().unwrap() = 1;
         ok(&app, Method::POST, &format!("/plans/billing-periods/{id}/void"), "ops", None).await;
         run_jobs(&app).await;
 
@@ -413,6 +423,7 @@ async fn huy_ky_dieu_chinh_giam_mot_lan_du_chay_lai() {
         assert_eq!(lines[0].unit.as_deref(), Some("period"));
         assert_eq!(lines[0].kind, "service");
         assert_eq!(*invoices.fail_after_issue.lock().unwrap(), 0, "lần hỏng đã xảy ra");
+        assert_eq!(*invoices.transient_cancel.lock().unwrap(), 0, "lần huỷ gặp lỗi tạm đã xảy ra");
         let open = invoices
             .documents
             .lock()
