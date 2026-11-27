@@ -2,9 +2,9 @@
 //!
 //! NIST yêu cầu so mật khẩu mới với danh sách giá trị "hay dùng, dễ đoán hay đã lộ" và từ chối nếu trùng.
 //! Danh sách đi kèm binary (`data/common-passwords.txt`), kiểm hoàn toàn offline: không gửi mật khẩu hay
-//! một phần hash của nó ra ngoài. Nguồn: `xato-net-10-million-passwords-1000000.txt` của SecLists (giấy phép
-//! MIT), chỉ giữ mục dài 12 đến 128 ký tự (ngắn hơn đã bị luật độ dài chặn), đổi sang chữ thường, bỏ trùng,
-//! sắp theo byte — cách dựng lại ghi ở quyết định.
+//! một phần hash của nó ra ngoài. Nguồn: `xato-net-10-million-passwords.txt` của SecLists (giấy phép MIT), chỉ
+//! giữ mục dài 15 đến 128 ký tự (ngắn hơn đã bị luật độ dài chặn, giữ thì chỉ tốn chỗ), lấy theo thứ tự hay gặp
+//! nhất cho tới khi file đủ 1 MB, đổi sang chữ thường, bỏ trùng, sắp theo byte — cách dựng lại ghi ở quyết định.
 //!
 //! So không phân biệt hoa thường: `Password123456` cũng bị chặn như `password123456` (NIST: đổi hoa thường
 //! không làm mật khẩu khó đoán hơn với kẻ thử theo danh sách).
@@ -28,8 +28,13 @@ pub(crate) fn is_common(password: &str) -> bool {
     {
         return true;
     }
+    // Tra cả bản bỏ khoảng trắng hai đầu: `"password123456789 "` cũng là mật khẩu trong danh sách. Chỉ để tra;
+    // chuỗi được hash vẫn là chuỗi người dùng gửi.
     let lowered = password.to_lowercase();
-    ENTRIES.binary_search_by(|entry| entry.as_bytes().cmp(lowered.as_bytes())).is_ok()
+    let listed = |candidate: &str| {
+        ENTRIES.binary_search_by(|entry| entry.as_bytes().cmp(candidate.as_bytes())).is_ok()
+    };
+    listed(&lowered) || listed(lowered.trim())
 }
 
 #[cfg(test)]
@@ -40,17 +45,21 @@ mod tests {
     fn danh_sach_da_sap_va_khong_trung() {
         // Tìm nhị phân chỉ đúng khi danh sách sắp đúng thứ tự byte: kiểm ở đây để ai cập nhật file
         // mà quên sắp thì test đỏ ngay.
-        assert!(ENTRIES.len() > 40_000, "{}", ENTRIES.len());
+        assert!(ENTRIES.len() > 50_000, "{}", ENTRIES.len());
         assert!(ENTRIES.windows(2).all(|pair| pair[0].as_bytes() < pair[1].as_bytes()));
         assert!(ENTRIES.iter().all(|entry| *entry == entry.to_lowercase()));
-        assert!(ENTRIES.iter().all(|entry| (12..=128).contains(&entry.chars().count())));
+        assert!(ENTRIES.iter().all(|entry| *entry == entry.trim()));
+        // Mục ngắn hơn mức tối thiểu không bao giờ được tra (luật độ dài chặn trước): không giữ.
+        let lengths = crate::password::MIN_LENGTH..=crate::password::MAX_LENGTH;
+        assert!(ENTRIES.iter().all(|entry| lengths.contains(&entry.chars().count())));
     }
 
     #[test]
     fn chan_mat_khau_trong_danh_sach_khong_phan_biet_hoa_thuong() {
-        assert!(is_common("123456789012"));
+        assert!(is_common("123456789012345"));
         assert!(is_common("qwertyuiopasdfghjkl"));
-        assert!(is_common("PassWord1234"));
+        assert!(is_common("PassWord123456789"));
+        assert!(is_common(" password123456789 "));
         assert!(is_common("aaaaaaaaaaaaaa"));
         assert!(is_common("ééééééééééééé"));
     }

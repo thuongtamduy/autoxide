@@ -709,8 +709,9 @@ và `PATCH /api/v1/auth/customers/{id}` (permission `auth.customers.read`, `auth
 
 **Luật mật khẩu** (NIST SP 800-63B-4). Mật khẩu mới — lúc tự đăng ký, khi quản trị viên hay
 `autoxide user create` đặt, khi đổi, đặt lại và khi nhận lời mời — phải dài 15 đến 128 ký tự và không nằm
-trong danh sách mật khẩu phổ biến hoặc đã lộ đi kèm binary (khoảng 46.000 mục; kiểm offline, không phân
-biệt hoa thường, không gửi gì ra ngoài máy chủ). Mật khẩu bị từ chối nhận `422` với mã trường
+trong danh sách mật khẩu phổ biến hoặc đã lộ đi kèm binary (khoảng 56.000 mục dài từ 15 ký tự; kiểm
+offline, không phân biệt hoa thường, không gửi gì ra ngoài máy chủ). Kể cả
+`AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD`: mật khẩu sai luật làm `autoxide serve` dừng lúc khởi động. Mật khẩu bị từ chối nhận `422` với mã trường
 `common_password`. Không có luật bắt buộc chữ số hay ký tự đặc biệt, và mật khẩu không hết hạn. Mật khẩu
 đang dùng vẫn đăng nhập được: luật chỉ áp khi đặt mật khẩu.
 

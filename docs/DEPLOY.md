@@ -731,8 +731,9 @@ limits:
 **Password rules** (NIST SP 800-63B-4). A new password — at sign-up, when an administrator or
 `autoxide user create` sets one, on change, reset and when accepting an invitation — must be 15 to 128
 characters and must not be on the list of common or breached passwords that ships inside the binary
-(about 46,000 entries; checked offline, case-insensitively, nothing leaves the server). A refused
-password gets `422` with field code `common_password`. There are no rules about digits or symbols,
+(about 56,000 entries of 15 characters or more; checked offline, case-insensitively, nothing leaves
+the server). This includes `AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD`: a password that breaks the rules stops
+`autoxide serve` at startup. A refused password gets `422` with field code `common_password`. There are no rules about digits or symbols,
 and passwords never expire. Existing passwords keep working: the rules apply when a password is set.
 
 **Inviting staff.** Instead of creating accounts with passwords, invite people:

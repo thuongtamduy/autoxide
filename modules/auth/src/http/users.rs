@@ -282,7 +282,7 @@ async fn list_users(
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `auth.users.manage`; code `permission_denied`.", body = Problem),
         (status = 409, description = "An account has this email; code `auth.email_taken`.", body = Problem),
-        (status = 422, description = "A value is invalid, e.g. a password that is not 15 to 128 characters (more when the tenant raises `auth.password_min_length`) and not on the list of common or breached passwords (field code `common_password`); see `errors`.", body = Problem),
+        (status = 422, description = "A value is invalid, e.g. a password that is not 15 to 128 characters (more when the tenant raises `auth.password_min_length`), or is on the list of common or breached passwords (field code `common_password`); see `errors`.", body = Problem),
     )
 )]
 async fn create_user(
@@ -421,7 +421,7 @@ async fn delete_user(
         (status = 201, description = "The account was created.", body = Data<UserResponse>),
         (status = 403, description = "Self-registration of staff is turned off for this tenant (setting `auth.staff_registration`, otherwise the server's AUTOXIDE_AUTH_SELF_REGISTRATION; code `auth.registration_disabled`), or the shop does not let customers create accounts (code `auth.customer_registration_closed`).", body = Problem),
         (status = 409, description = "An account has this email; code `auth.email_taken`.", body = Problem),
-        (status = 422, description = "A value is invalid, e.g. a password that is not 15 to 128 characters (more when the tenant raises `auth.password_min_length`) and not on the list of common or breached passwords (field code `common_password`); see `errors`.", body = Problem),
+        (status = 422, description = "A value is invalid, e.g. a password that is not 15 to 128 characters (more when the tenant raises `auth.password_min_length`), or is on the list of common or breached passwords (field code `common_password`); see `errors`.", body = Problem),
     )
 )]
 async fn register(
@@ -460,7 +460,7 @@ async fn register(
     responses(
         (status = 202, description = "Accepted; a mail went to the email (confirm the new account, or a notice when it already had one).", body = Data<RegistrationResponse>),
         (status = 403, description = "Self-registration of staff is turned off for this tenant (setting `auth.staff_registration`, otherwise the server's AUTOXIDE_AUTH_SELF_REGISTRATION; code `auth.registration_disabled`), or the shop does not let customers create accounts (code `auth.customer_registration_closed`).", body = Problem),
-        (status = 422, description = "A value is invalid, e.g. a password that is not 15 to 128 characters (more when the tenant raises `auth.password_min_length`) and not on the list of common or breached passwords (field code `common_password`); see `errors`.", body = Problem),
+        (status = 422, description = "A value is invalid, e.g. a password that is not 15 to 128 characters (more when the tenant raises `auth.password_min_length`), or is on the list of common or breached passwords (field code `common_password`); see `errors`.", body = Problem),
     )
 )]
 async fn request_registration(

@@ -117981,7 +117981,7 @@
                 }
               }
             },
-            "description": "A value is invalid, e.g. a password that is not 15 to 128 characters (more when the tenant raises `auth.password_min_length`) and not on the list of common or breached passwords (field code `common_password`); see `errors`."
+            "description": "A value is invalid, e.g. a password that is not 15 to 128 characters (more when the tenant raises `auth.password_min_length`), or is on the list of common or breached passwords (field code `common_password`); see `errors`."
           },
           "default": {
             "content": {
@@ -118059,7 +118059,7 @@
                 }
               }
             },
-            "description": "A value is invalid, e.g. a password that is not 15 to 128 characters (more when the tenant raises `auth.password_min_length`) and not on the list of common or breached passwords (field code `common_password`); see `errors`."
+            "description": "A value is invalid, e.g. a password that is not 15 to 128 characters (more when the tenant raises `auth.password_min_length`), or is on the list of common or breached passwords (field code `common_password`); see `errors`."
           },
           "default": {
             "content": {
@@ -122359,7 +122359,7 @@
                 }
               }
             },
-            "description": "A value is invalid, e.g. a password that is not 15 to 128 characters (more when the tenant raises `auth.password_min_length`) and not on the list of common or breached passwords (field code `common_password`); see `errors`."
+            "description": "A value is invalid, e.g. a password that is not 15 to 128 characters (more when the tenant raises `auth.password_min_length`), or is on the list of common or breached passwords (field code `common_password`); see `errors`."
           },
           "default": {
             "content": {
