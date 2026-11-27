@@ -31,6 +31,8 @@ curl -sS "$API/api/v1/auth/me" -H "Authorization: Bearer $AGENT_KEY"
 
 ## 2. Connect the client
 
+When the server has OAuth sign-in on, clients that support it (Claude, ChatGPT, Claude Code, IDEs) connect with the address alone and the person approves them in your interface: see [Connecting MCP clients with OAuth sign-in](mcp-oauth.md). The rest of this section connects with an API key, which works with every client.
+
 Claude Code:
 
 ```bash
