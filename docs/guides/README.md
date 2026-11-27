@@ -20,6 +20,7 @@ older curl, replace `--json '…'` with `-H 'Content-Type: application/json' -H 
 - [Upgrading clients: every list is a page](list-pages-upgrade.md): `data` + `pagination`, `count`, default orders, MCP tools
 - [Reading errors](errors.md): `code`, `errors`, `Retry-After`
 - [Connecting an AI agent over MCP](mcp.md): a key for the agent, client setup, the tools
+- [Connecting MCP clients with OAuth sign-in](mcp-oauth.md): Claude, ChatGPT and other clients without a key, the consent page, revoking
 - [Receiving events in real time](realtime-events.md): Server-Sent Events, `Last-Event-ID`, limits
 - [Uploading large files straight to storage](direct-uploads.md): signed links to S3, completing, checks
 - [Trying changes in a sandbox](sandbox.md): a test copy of your tenant, simulated partners, bringing drafts back

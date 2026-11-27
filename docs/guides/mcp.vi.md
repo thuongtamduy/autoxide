@@ -31,6 +31,8 @@ curl -sS "$API/api/v1/auth/me" -H "Authorization: Bearer $AGENT_KEY"
 
 ## 2. Nối client
 
+Khi máy chủ bật đăng nhập OAuth, client hỗ trợ nó (Claude, ChatGPT, Claude Code, IDE) kết nối chỉ bằng địa chỉ và người dùng duyệt nó trong giao diện của bạn: xem [Kết nối client MCP bằng đăng nhập OAuth](mcp-oauth.vi.md). Phần còn lại của mục này kết nối bằng API key, cách dùng được với mọi client.
+
 Claude Code:
 
 ```bash
