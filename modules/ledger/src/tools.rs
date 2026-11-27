@@ -119,7 +119,8 @@ pub(crate) struct PaymentInput {
 #[derive(Debug, Deserialize, Validate, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct SimulateInput {
-    /// Id of the payment (an order's `ledger_payment_id`).
+    /// Id of the payment: for an order, find it with
+    /// `GET /api/v1/ledger/payments?source_module=orders&source_id=<order id>`.
     payment_id: Uuid,
     /// `succeeded` (the partner collected the money) or `failed` (the buyer did not pay).
     outcome: String,
@@ -198,10 +199,9 @@ pub(crate) fn all(service: &Arc<LedgerService>) -> Vec<Tool> {
             move |tenant: TenantContext, principal: Principal, input: SimulateInput| {
                 let service = simulate.clone();
                 async move {
-                    let outcome = crate::simulate::Outcome::parse(&input.outcome)?;
                     let amount = input.amount_minor.map(crate::simulate::Reported::Minor);
                     service
-                        .simulate_payment(&tenant, &principal, input.payment_id, outcome, amount)
+                        .simulate_payment(&tenant, &principal, input.payment_id, &input.outcome, amount)
                         .await
                 }
             },

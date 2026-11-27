@@ -275,8 +275,8 @@ pub(crate) struct SimulatePaymentRequest {
 /// real partner, so none notifies back; this plays the partner for a `pending` payment created in the
 /// sandbox and goes through the same path as a partner notification: the payment becomes `succeeded`
 /// (or `failed`, or `needs_review` for another amount), the entry is posted and the module that asked
-/// for the payment is told (an order becomes `confirmed` a moment later). No money moves. Send an
-/// `Idempotency-Key` to retry safely.
+/// for the payment is told (an order becomes `confirmed` a moment later). No money moves. Bank transfer
+/// (VietQR) payments are not supported yet. Send an `Idempotency-Key` to retry safely.
 #[utoipa::path(
     post,
     path = "/payments/{id}/simulate",
@@ -284,7 +284,7 @@ pub(crate) struct SimulatePaymentRequest {
     operation_id = "simulate_ledger_payment",
     security(("bearer" = [])),
     params(
-        ("id" = Uuid, Path, description = "Id of the payment (an order's `ledger_payment_id`)."),
+        ("id" = Uuid, Path, description = "Id of the payment: for an order, find it with `GET /api/v1/ledger/payments?source_module=orders&source_id=<order id>`."),
         ("Idempotency-Key" = Option<String>, Header, description = "Key of this attempt; resend the same key when retrying."),
     ),
     request_body = SimulatePaymentRequest,
@@ -304,13 +304,12 @@ async fn simulate_payment(
     Path(id): Path<Uuid>,
     ValidJson(input): ValidJson<SimulatePaymentRequest>,
 ) -> Result<Data<Payment>, Error> {
-    let outcome = crate::simulate::Outcome::parse(&input.outcome)?;
     let payment = service
         .simulate_payment(
             &tenant,
             &principal,
             id,
-            outcome,
+            &input.outcome,
             input.amount.map(crate::simulate::Reported::Money),
         )
         .await?;

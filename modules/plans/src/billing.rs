@@ -309,7 +309,9 @@ pub(crate) struct PaymentListener(pub Arc<PlansService>);
 #[async_trait::async_trait]
 impl EventHandler for PaymentListener {
     async fn handle(&self, event: &Delivered) -> Result<(), Error> {
-        if event.payload["source_module"] != "plans" {
+        // Kỳ thuê bao chỉ được thu ở khách vận hành (`operator`): event của khách khác — kể cả sandbox,
+        // nơi `ledger` giả lập được thông báo của đối tác (UT-4) — không bao giờ đánh dấu kỳ đã trả.
+        if event.payload["source_module"] != "plans" || event.tenant.id() != self.0.operator().id() {
             return Ok(());
         }
         let Some(period) =

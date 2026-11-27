@@ -39,15 +39,19 @@ pub(crate) enum Outcome {
 }
 
 impl Outcome {
-    pub(crate) fn parse(raw: &str) -> Result<Outcome, Error> {
+    /// `succeeded` / `failed`; giá trị khác → lỗi của ô `outcome` vào `problems`.
+    fn parse(raw: &str, problems: &mut Vec<FieldError>) -> Option<Outcome> {
         match raw {
-            "succeeded" => Ok(Outcome::Succeeded),
-            "failed" => Ok(Outcome::Failed),
-            _ => Err(Error::validation(vec![FieldError::new(
-                "outcome",
-                "invalid",
-                "must be `succeeded` or `failed`",
-            )])),
+            "succeeded" => Some(Outcome::Succeeded),
+            "failed" => Some(Outcome::Failed),
+            _ => {
+                problems.push(FieldError::new(
+                    "outcome",
+                    "invalid",
+                    "must be `succeeded` or `failed`",
+                ));
+                None
+            }
         }
     }
 }
@@ -72,8 +76,8 @@ fn simulation_disabled() -> Error {
 fn not_simulated() -> Error {
     Error::conflict(
         "ledger.payment_not_simulated",
-        "This payment was not created by the sandbox's simulated partner, so its result cannot be \
-         simulated.",
+        "This payment was not created by the sandbox's simulated partner (bank transfer payments are not \
+         supported yet), so its result cannot be simulated.",
     )
 }
 
@@ -86,13 +90,14 @@ impl LedgerService {
         tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
-        outcome: Outcome,
+        outcome: &str,
         amount: Option<Reported>,
     ) -> Result<Payment, Error> {
+        // Quyền trước mọi kiểm khác: người không có quyền không biết tính năng bật hay tắt.
+        principal.require(&RECONCILE)?;
         if !self.config.sandbox_simulation {
             return Err(simulation_disabled());
         }
-        principal.require(&RECONCILE)?;
         if !tenant.is_sandbox() {
             return Err(sandbox_only());
         }
@@ -107,6 +112,9 @@ impl LedgerService {
         if row.status != "pending" {
             return Err(payment_state(&row.status));
         }
+        // Gom mọi lỗi của đầu vào, báo một lần (D-083).
+        let mut problems = Vec::new();
+        let outcome = Outcome::parse(outcome, &mut problems);
         let due = money(row.amount_minor, &row.amount_currency)?;
         let received = match amount {
             None => due,
@@ -114,12 +122,15 @@ impl LedgerService {
             Some(Reported::Minor(minor)) => Money::new(minor, due.currency()),
         };
         if received.currency() != due.currency() || received.minor() <= 0 {
-            return Err(Error::validation(vec![FieldError::new(
+            problems.push(FieldError::new(
                 "amount",
                 "invalid",
                 "must be a positive amount in the currency of the payment",
-            )]));
+            ));
         }
+        let Some(outcome) = outcome.filter(|_| problems.is_empty()) else {
+            return Err(Error::validation(problems));
+        };
         let kind = match outcome {
             Outcome::Succeeded => NotificationKind::PaymentSucceeded,
             Outcome::Failed => NotificationKind::PaymentFailed { reason: "simulated".to_owned() },

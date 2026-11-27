@@ -70,6 +70,8 @@ pub struct McpClient {
     router: Router,
     path: String,
     token: Option<String>,
+    /// Extra headers sent with every request (e.g. `Autoxide-Tenant`).
+    headers: Vec<(String, String)>,
     /// `None`: new version. `Some(v)`: old version, handshake done at version `v`.
     legacy: Option<String>,
     next_id: std::sync::Arc<AtomicU64>,
@@ -88,6 +90,7 @@ impl McpClient {
             router,
             path: path.to_owned(),
             token: token.map(str::to_owned),
+            headers: Vec::new(),
             legacy: None,
             next_id: std::sync::Arc::new(AtomicU64::new(1)),
         }
@@ -118,6 +121,14 @@ impl McpClient {
         client.legacy = Some(chosen);
         client.notify("notifications/initialized").await?;
         Ok(client)
+    }
+
+    /// Sends `name: value` with every later request — e.g. `Autoxide-Tenant: <sandbox id>` to act inside a
+    /// sandbox the token may enter.
+    #[must_use]
+    pub fn with_header(mut self, name: &str, value: &str) -> Self {
+        self.headers.push((name.to_owned(), value.to_owned()));
+        self
     }
 
     /// The protocol version being spoken.
@@ -205,6 +216,9 @@ impl McpClient {
             .header(header::ACCEPT, "application/json, text/event-stream");
         if let Some(token) = &self.token {
             builder = builder.header(header::AUTHORIZATION, format!("Bearer {token}"));
+        }
+        for (name, value) in &self.headers {
+            builder = builder.header(name.as_str(), value.as_str());
         }
         builder
     }

@@ -74,11 +74,17 @@ async fn call(
 
 /// Chủ khách `shop` (admin, email đã xác minh), đã đăng nhập; trả access token.
 async fn owner(app: &TestApp, shop: &TenantContext) -> String {
+    account(app, shop, EMAIL, true).await
+}
+
+/// Tài khoản `email` của khách `shop` (`admin`: role quản trị; không thì không có permission nào), email đã
+/// xác minh, đã đăng nhập; trả access token.
+async fn account(app: &TestApp, shop: &TenantContext, email: &str, admin: bool) -> String {
     let account = NewAccount {
-        email: EMAIL.to_owned(),
-        name: "Owner".to_owned(),
+        email: email.to_owned(),
+        name: "Staff".to_owned(),
         password: Some(PASSWORD.to_owned()),
-        admin: true,
+        admin,
     };
     app.api::<dyn Accounts>().unwrap().create(shop, account).await.unwrap();
     let verified = sea_orm::sea_query::Query::update()
@@ -87,10 +93,10 @@ async fn owner(app: &TestApp, shop: &TenantContext) -> String {
             sea_orm::sea_query::Alias::new("email_verified_at"),
             sea_orm::Value::from(Timestamp::now()),
         )
-        .and_where(sea_orm::sea_query::Expr::col(sea_orm::sea_query::Alias::new("email")).eq(EMAIL))
+        .and_where(sea_orm::sea_query::Expr::col(sea_orm::sea_query::Alias::new("email")).eq(email))
         .to_owned();
     shop.database().write().execute(&verified).await.unwrap();
-    let body = json!({"email": EMAIL, "password": PASSWORD});
+    let body = json!({"email": email, "password": PASSWORD});
     let (status, _, answer) =
         call(app, Method::POST, "/auth/login", "", "shop", None, Some(body)).await;
     assert_eq!(status, StatusCode::OK, "{answer}");
@@ -129,6 +135,38 @@ async fn pay(app: &TestApp, tenant: &TenantContext, reference: &str) -> Payment 
         NewPayment::new(root_of(tenant.id()), "card", amount, "Order 1001", "demo", reference);
     let ledger = app.api::<dyn Ledger>().unwrap();
     ledger.create_payment(tenant, Actor::system(), payment).await.unwrap().into_inner()
+}
+
+/// Số dòng của bảng `table` trong database của `tenant` có `column = value`.
+async fn count(tenant: &TenantContext, table: &str, column: &str, value: &str) -> i64 {
+    let database = tenant.database();
+    let backend = database.read().get_database_backend();
+    let sql = format!("SELECT COUNT(*) AS n FROM {table} WHERE {column} = '{value}'");
+    let row = database
+        .read()
+        .query_one_raw(autoxide_kernel::database::statement(backend, sql, []))
+        .await
+        .unwrap()
+        .unwrap();
+    row.try_get::<i64>("", "n").unwrap()
+}
+
+/// Số event `ledger.payment_succeeded` của lượt thu `payment` trong database của `tenant`.
+async fn succeeded_events(tenant: &TenantContext, payment: uuid::Uuid) -> usize {
+    let database = tenant.database();
+    let backend = database.read().get_database_backend();
+    let sql = "SELECT payload FROM ledger_events WHERE name = 'ledger.payment_succeeded'";
+    let rows = database
+        .read()
+        .query_all_raw(autoxide_kernel::database::statement(backend, sql, []))
+        .await
+        .unwrap();
+    rows.iter()
+        .map(|row| row.try_get::<String>("", "payload").unwrap())
+        .filter(|payload| {
+            serde_json::from_str::<Value>(payload).unwrap()["payment_id"] == json!(payment)
+        })
+        .count()
 }
 
 fn simulate_path(payment: &Payment) -> String {
@@ -183,6 +221,33 @@ async fn gia_lap_chi_trong_sandbox_va_di_duong_cua_webhook() {
             "{refused}"
         );
 
+        // Thiếu `ledger.reconcile`: 403 trước mọi kiểm khác (không lộ tính năng bật hay tắt).
+        let clerk = account(&app, &shop, "clerk@shop.example", false).await;
+        let (status, _, refused) = call(
+            &app,
+            Method::POST,
+            &simulate_path(&real),
+            &clerk,
+            "shop",
+            None,
+            succeeded.clone(),
+        )
+        .await;
+        assert_eq!(
+            (status, refused["code"].as_str()),
+            (StatusCode::FORBIDDEN, Some("permission_denied")),
+            "{refused}"
+        );
+        // ID lượt thu của khách thật gọi trong sandbox: không có ở đó.
+        let (status, _, missing) =
+            call(&app, Method::POST, &simulate_path(&real), &token, &id, None, succeeded.clone())
+                .await;
+        assert_eq!(
+            (status, missing["code"].as_str()),
+            (StatusCode::NOT_FOUND, Some("ledger.payment_not_found")),
+            "{missing}"
+        );
+
         // Sandbox, đúng số: đã thu; gọi lại cùng khoá trả bản lưu, không ghi gì thêm.
         let payment = pay(&app, &sandbox, "S-1").await;
         assert!(payment.provider_ref.as_deref().unwrap().starts_with("SANDBOX-"));
@@ -208,6 +273,24 @@ async fn gia_lap_chi_trong_sandbox_va_di_duong_cua_webhook() {
         settle(&app).await;
         let ledger = app.api::<dyn Ledger>().unwrap();
         let stored = ledger.payment(&sandbox, payment.id).await.unwrap().unwrap();
+        assert_eq!(stored.status, "succeeded");
+        // Cùng đường của webhook: bút toán ghi thu và `ledger.payment_succeeded` cho module nguồn, đúng một.
+        let reference = format!("payment:{}:captured", payment.id);
+        assert_eq!(count(&sandbox, "ledger_entries", "reference", &reference).await, 1);
+        assert_eq!(succeeded_events(&sandbox, payment.id).await, 1);
+
+        // Qua tool MCP (agent): cùng service, cùng kết quả.
+        let by_agent = pay(&app, &sandbox, "S-mcp").await;
+        let mcp = app.mcp(&token).await.unwrap().with_header("autoxide-tenant", &id);
+        let answer = mcp
+            .call_tool(autoxide_testkit::tool(
+                "ledger.simulate_payment",
+                json!({"payment_id": by_agent.id, "outcome": "succeeded"}),
+            ))
+            .await
+            .unwrap();
+        assert_ne!(answer.is_error, Some(true), "{answer:?}");
+        let stored = ledger.payment(&sandbox, by_agent.id).await.unwrap().unwrap();
         assert_eq!(stored.status, "succeeded");
 
         // Người mua không trả: `failed`.
@@ -258,6 +341,125 @@ async fn gia_lap_chi_trong_sandbox_va_di_duong_cua_webhook() {
                 "{refused}"
             );
         }
+    })
+    .await
+    .unwrap();
+}
+
+/// Như hướng dẫn hứa: trong sandbox, đặt một đơn trả bằng thẻ (cổng giả), tìm lượt thu của đơn theo
+/// `source_id`, giả lập "đã thu" → đơn `confirmed` / `paid`. Đủ mọi module như chương trình thật.
+#[tokio::test]
+async fn don_trong_sandbox_tra_bang_gia_lap_thi_xac_nhan() {
+    TestDatabase::run(async |test| {
+        let dir = std::env::temp_dir().join(format!("autoxide-sandbox-order-{}", uuid::Uuid::now_v7()));
+        let mut builder = TestApp::builder(test)
+            .setting("AUTOXIDE_MAIL_FILE_DIR", &dir.join("mail").display().to_string())
+            .setting("AUTOXIDE_LEDGER_SANDBOX_SIMULATION", "true")
+            .tenant("shop")
+            .contribute::<dyn PaymentGateway>(Arc::new(FakePaymentGateway::new()));
+        for module in crate::modules::all() {
+            builder = builder.boxed_module(module);
+        }
+        let app = builder.build().await.unwrap();
+        let shop = app.tenant("shop").await.unwrap();
+        let token = owner(&app, &shop).await;
+        let (id, _) = sandbox(&app, &token, &shop).await;
+        let staff = |method: Method, path: &str, body: Option<Value>| {
+            let (app, token, id) = (&app, token.clone(), id.clone());
+            let path = path.to_owned();
+            async move { call(app, method, &path, &token, &id, None, body).await }
+        };
+
+        // Cửa hàng trong sandbox: cổng mặc định, một sản phẩm số đang bán giá 150.000.
+        let (status, _, set) = staff(
+            Method::PUT,
+            "/kernel/settings/ledger.payments.default_provider",
+            Some(json!({"value": "fake"})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{set}");
+        let product = json!({"kind": "digital", "tax_category": "vat.standard", "locale": "vi",
+            "text": {"name": "Khoá học"}, "variant": {"sku": "COURSE-1"}});
+        let (status, _, created) = staff(Method::POST, "/catalog/products", Some(product)).await;
+        assert_eq!(status, StatusCode::CREATED, "{created}");
+        let product_id = created["data"]["id"].as_str().unwrap().to_owned();
+        let variant = created["data"]["variants"][0]["id"].as_str().unwrap().to_owned();
+        let list = json!({"name": "Bán lẻ", "currency": "VND", "tax_inclusive": true});
+        let (status, _, list) = staff(Method::POST, "/catalog/price-lists", Some(list)).await;
+        assert_eq!(status, StatusCode::CREATED, "{list}");
+        let prices = json!({"reference": "opening", "prices": [{"variant_id": variant,
+            "amount": {"amount": "150000", "currency": "VND"}}]});
+        let uri = format!("/catalog/price-lists/{}/prices", list["data"]["id"].as_str().unwrap());
+        let (status, _, added) = staff(Method::POST, &uri, Some(prices)).await;
+        assert_eq!(status, StatusCode::OK, "{added}");
+        let uploaded = app
+            .post("/api/v1/files?name=course.pdf")
+            .token(&token)
+            .header("autoxide-tenant", &id)
+            .header("content-type", "application/pdf")
+            .bytes(b"%PDF-1.4 course".to_vec())
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(uploaded.status(), StatusCode::CREATED, "{}", uploaded.text());
+        let file = json!({"file_id": uploaded.json()["data"]["id"]});
+        let uri = format!("/catalog/variants/{variant}/digital-assets");
+        let (status, _, attached) = staff(Method::POST, &uri, Some(file)).await;
+        assert_eq!(status, StatusCode::CREATED, "{attached}");
+        let active = app
+            .post(&format!("/api/v1/catalog/products/{product_id}/status"))
+            .token(&token)
+            .header("autoxide-tenant", &id)
+            .header("if-match", "*")
+            .json(json!({"status": "active"}))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(active.status(), StatusCode::OK, "{}", active.text());
+
+        // Người mua vãng lai trong sandbox: giỏ, đặt hàng trả bằng thẻ.
+        let guest = |method: Method, path: &str, cart: Option<&str>, body: Value| {
+            let mut request =
+                app.request(method, &format!("/api/v1{path}")).header("autoxide-tenant", &id);
+            if let Some(cart) = cart {
+                request = request.header("cart-token", cart);
+            }
+            request.json(body)
+        };
+        let cart = guest(Method::POST, "/orders/carts", None, json!({})).send().await.unwrap();
+        assert_eq!(cart.status(), StatusCode::CREATED, "{}", cart.text());
+        let cart = cart.json();
+        let cart_id = cart["data"]["id"].as_str().unwrap().to_owned();
+        let cart_token = cart["data"]["cart_token"].as_str().unwrap().to_owned();
+        let uri = format!("/orders/carts/{cart_id}/lines/{variant}");
+        let line = guest(Method::PUT, &uri, Some(&cart_token), json!({"quantity": 1}));
+        let line = line.send().await.unwrap();
+        assert_eq!(line.status(), StatusCode::OK, "{}", line.text());
+        let quote = line.json()["data"]["quote_token"].as_str().unwrap().to_owned();
+        let body = json!({"cart_id": cart_id, "quote_token": quote, "payment_method": "card",
+            "contact": {"name": "An", "phone": "0901234567"}});
+        let placed = guest(Method::POST, "/orders/checkout", Some(&cart_token), body)
+            .header("idempotency-key", "sandbox-order-1")
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(placed.status(), StatusCode::CREATED, "{}", placed.text());
+        let order = placed.json()["data"]["orders"][0]["id"].as_str().unwrap().to_owned();
+
+        // Lượt thu của đơn theo `source_id`, rồi đóng vai đối tác.
+        let uri = format!("/ledger/payments?source_module=orders&source_id={order}");
+        let (status, _, found) = staff(Method::GET, &uri, None).await;
+        assert_eq!(status, StatusCode::OK, "{found}");
+        let payment = found["data"][0]["id"].as_str().unwrap().to_owned();
+        let uri = format!("/ledger/payments/{payment}/simulate");
+        let (status, _, paid) =
+            staff(Method::POST, &uri, Some(json!({"outcome": "succeeded"}))).await;
+        assert_eq!(status, StatusCode::OK, "{paid}");
+        settle(&app).await;
+        let (status, _, got) = staff(Method::GET, &format!("/orders/{order}"), None).await;
+        assert_eq!(status, StatusCode::OK, "{got}");
+        assert_eq!(got["data"]["status"], "confirmed", "{got}");
+        assert_eq!(got["data"]["payment_status"], "paid");
     })
     .await
     .unwrap();

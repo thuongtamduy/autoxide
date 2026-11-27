@@ -283,6 +283,7 @@ The tools of this version, by module (`docs/mcp-tools.json` has their full input
 | `ledger.record_exchange_rate` | `ledger.settings_manage` | writes |
 | `ledger.release_hold` | `ledger.holds_release` | writes |
 | `ledger.resolve_exception` | `ledger.reconcile` | writes |
+| `ledger.simulate_payment` | `ledger.reconcile` | writes |
 | `ledger.trial_balance` | `ledger.read` | read-only |
 | `media.confirm_upload` | `media.write` | writes |
 | `media.create_upload` | `media.write` | writes |

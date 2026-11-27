@@ -61,10 +61,15 @@ curl -sS "$API/api/v1/kernel/sandbox/messages?channel=mail" \
 No partner notifies a sandbox, so a payment made there (an order paid by `card` or `wallet`, for
 example) stays `pending` until you play the partner. The server operator first allows it with
 `AUTOXIDE_LEDGER_SANDBOX_SIMULATION=true` (off by default; it never works outside a sandbox). Then,
-with `ledger.reconcile`:
+with `ledger.reconcile`, find the order's payment in the `ledger` (an order's payments carry
+`source_id` = the order's id; an order's payment action also gives it as `ledger_payment_id`) and
+answer for the partner:
 
 ```bash
-# The order's payment action gives the id as `ledger_payment_id`.
+# The order's payment at the partner (the order's id is $ORDER).
+LEDGER_PAYMENT_ID=$(curl -sS "$API/api/v1/ledger/payments?source_module=orders&source_id=$ORDER" \
+  -H "Authorization: Bearer $TOKEN" -H "Autoxide-Tenant: $SANDBOX" | jq -r '.data[0].id')
+
 curl -sS "$API/api/v1/ledger/payments/$LEDGER_PAYMENT_ID/simulate" \
   -H "Authorization: Bearer $TOKEN" -H "Autoxide-Tenant: $SANDBOX" \
   -H "Idempotency-Key: $(openssl rand -hex 16)" -H 'Content-Type: application/json' \
@@ -75,7 +80,8 @@ It goes through the same path as a partner notification: the payment becomes `su
 order `confirmed` a moment later. `{"outcome": "failed"}` makes the payment fail; an `amount` other
 than the amount due (`{"outcome": "succeeded", "amount": {"amount": "100000", "currency": "VND"}}`)
 puts it in `needs_review`, to practise resolving a difference. Only `pending` payments created inside
-the sandbox can be simulated. AI agents use the MCP tool `ledger.simulate_payment`.
+the sandbox can be simulated; bank transfer (VietQR) payments are not supported yet. AI agents use
+the MCP tool `ledger.simulate_payment`.
 
 ## Bring changes back
 

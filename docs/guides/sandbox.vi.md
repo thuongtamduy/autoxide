@@ -59,10 +59,14 @@ curl -sS "$API/api/v1/kernel/sandbox/messages?channel=mail" \
 Không đối tác nào gửi thông báo cho sandbox, nên khoản thanh toán tạo trong đó (vd một đơn trả bằng
 `card` hay `wallet`) đứng `pending` cho tới khi bạn đóng vai đối tác. Người vận hành máy chủ cho phép
 trước bằng `AUTOXIDE_LEDGER_SANDBOX_SIMULATION=true` (mặc định tắt; ngoài sandbox không bao giờ dùng
-được). Rồi, với `ledger.reconcile`:
+được). Rồi, với `ledger.reconcile`, tìm lượt thu của đơn ở `ledger` (lượt thu của một đơn có `source_id`
+là id của đơn; việc thanh toán của đơn cũng cho id này ở `ledger_payment_id`) và trả lời thay đối tác:
 
 ```bash
-# Việc thanh toán của đơn cho id này ở `ledger_payment_id`.
+# The order's payment at the partner (the order's id is $ORDER).
+LEDGER_PAYMENT_ID=$(curl -sS "$API/api/v1/ledger/payments?source_module=orders&source_id=$ORDER" \
+  -H "Authorization: Bearer $TOKEN" -H "Autoxide-Tenant: $SANDBOX" | jq -r '.data[0].id')
+
 curl -sS "$API/api/v1/ledger/payments/$LEDGER_PAYMENT_ID/simulate" \
   -H "Authorization: Bearer $TOKEN" -H "Autoxide-Tenant: $SANDBOX" \
   -H "Idempotency-Key: $(openssl rand -hex 16)" -H 'Content-Type: application/json' \
@@ -72,8 +76,8 @@ curl -sS "$API/api/v1/ledger/payments/$LEDGER_PAYMENT_ID/simulate" \
 Lệnh đi đúng đường của thông báo từ đối tác: khoản thành `succeeded` và đơn thành `confirmed` ngay sau
 đó. `{"outcome": "failed"}` làm khoản hỏng; `amount` khác số phải thu
 (`{"outcome": "succeeded", "amount": {"amount": "100000", "currency": "VND"}}`) đưa khoản vào
-`needs_review`, để tập gỡ chênh lệch. Chỉ giả lập được khoản `pending` tạo trong sandbox. AI agent dùng
-tool MCP `ledger.simulate_payment`.
+`needs_review`, để tập gỡ chênh lệch. Chỉ giả lập được khoản `pending` tạo trong sandbox; chưa hỗ trợ
+thanh toán chuyển khoản (VietQR). AI agent dùng tool MCP `ledger.simulate_payment`.
 
 ## Đem thay đổi về
 

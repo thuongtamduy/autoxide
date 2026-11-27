@@ -65,6 +65,13 @@ async fn thu_thieu_khong_danh_dau_ky_da_tra() {
         let id: Uuid = period["id"].as_str().unwrap().parse().unwrap();
         let operator = app.default_tenant();
 
+        // Event của khách khác (vd một sandbox giả lập thông báo của đối tác) mang đúng `source_id`
+        // của kỳ: không bao giờ đánh dấu đã trả — chỉ tiền ở khách vận hành mới tính.
+        let acme = app.tenant("acme").await.unwrap();
+        succeed(&ledger, &acme, id, Money::parse("199000", "VND").unwrap()).await;
+        deliver(&app).await;
+        assert_eq!(renewal(&app).await["status"], "open");
+
         // Thu thiếu (đối soát chấp nhận số thực nhận): kỳ vẫn mở.
         succeed(&ledger, &operator, id, Money::parse("150000", "VND").unwrap()).await;
         deliver(&app).await;
