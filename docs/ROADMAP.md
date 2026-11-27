@@ -7,7 +7,7 @@ thư viện: [`STACK.md`](../STACK.md). Cách làm từng bước: [`docs/steps/
 Trạng thái: **bước 0–38 và 40 xong** — đã chuyển sang [`docs/roadmap/done.md`](roadmap/done.md) (D-228);
 **kế tiếp bước 71** (đường tới 1.0, D-20261126-road-to-1-0) cùng phần còn mở của bước 70; đóng băng tính năng mới tới
 1.0; bước 50 chờ chủ dự án công khai repo (D-199); bản
-phát hành mới nhất `v0.19.0`. CI trên GitHub (`.github/workflows/ci.yml`) chạy gate đầy đủ trên mỗi pull request và mỗi lần push lên `main` (D-175, D-197); `./gate.sh` trên máy vẫn là định nghĩa "xong".
+phát hành mới nhất `v0.20.0`. CI trên GitHub (`.github/workflows/ci.yml`) chạy gate đầy đủ trên mỗi pull request và mỗi lần push lên `main` (D-175, D-197); `./gate.sh` trên máy vẫn là định nghĩa "xong".
 
 **Số bước là mã cố định, không phải thứ tự** (D-228): bước mang số lớn vẫn có thể làm trước. Các bước dưới đây
 xếp theo **thứ tự làm**; bước kế tiếp là bước đầu tiên (từ trên xuống) còn mục `[ ]` mà các bước nó phụ
@@ -158,6 +158,11 @@ Postgres; vòng kiểm thử bảo mật kiểu bên ngoài cuối cùng không 
       tự sao lưu mọi nơi đặt dữ liệu và kho file (hay từ chối nếu không có `--no-backup`), migrate database chính rồi mọi
       khách song song kèm báo cáo JSON tiếp tục được, chạy `doctor` kiểm lại, ghi kế hoạch quay về; `doctor` báo có bản mới;
       compose và Kubernetes dùng lệnh này làm một bước duy nhất
+  - [x] (b) `autoxide backup` giữ nguyên schema nguồn (không cần migrate trước) và sao lưu cả mọi nơi đặt dữ liệu kèm kho
+        file của chúng — xong qua #596
+  - [ ] (c) sao lưu nằm BÊN TRONG `autoxide upgrade` (tự gọi backup trước migrate, từ chối khi không có `--no-backup`)
+  - [ ] Kiểu lỗi riêng cho "database mới hơn binary" (hiện chung với lỗi migration), để `upgrade` và `doctor` báo đúng
+        cách sửa (chạy binary mới hơn hay `rollback`)
 - [ ] `autoxide rollback --to X.Y.Z`: ghi phiên bản binary cạnh mỗi migration đã chạy; lùi theo bản phát hành qua mọi
       module và mọi khách đúng thứ tự phụ thuộc; CI kiểm binary cũ chạy lại được sau khi lùi
 - [ ] Ma trận test nâng cấp trong CI: từ bản trước và từ bản cũ nhất còn hỗ trợ, nhiều khách có database riêng, bản cũ và
@@ -170,9 +175,10 @@ Postgres; vòng kiểm thử bảo mật kiểu bên ngoài cuối cùng không 
 
 ### G4 — Chuẩn AI agent
 
-- [ ] Đăng nhập chuẩn cho MCP theo đặc tả mới nhất: máy chủ uỷ quyền OAuth 2.1 tích hợp (PKCE, Client ID Metadata
+- [x] Đăng nhập chuẩn cho MCP theo đặc tả mới nhất: máy chủ uỷ quyền OAuth 2.1 tích hợp (PKCE, Client ID Metadata
       Documents / đăng ký động), Protected Resource Metadata (RFC 9728) và `WWW-Authenticate` có `resource_metadata`,
-      `/.well-known/*`; Claude, ChatGPT và các client MCP khác kết nối được không cần dán khoá
+      `/.well-known/*`; Claude, ChatGPT và các client MCP khác kết nối được không cần dán khoá — xong qua #557, #569, #599
+  - [ ] **Sau 1.0**: xác thực client bằng `private_key_jwt` (#599)
 - [ ] Uỷ quyền cho agent: thông tin đăng nhập gắn với một người, phạm vi hẹp, có hạn, thu hồi được (token exchange RFC 8693
       hay tương đương); hạn mức và ngân sách theo từng agent; nhật ký hành động của agent ghi rõ agent nào làm thay ai
 - [ ] Người duyệt: rà mọi lệnh xoá, lệnh chạm tiền và lệnh không hoàn tác được để gắn `x-approval` khi agent gọi
@@ -218,7 +224,9 @@ Postgres; vòng kiểm thử bảo mật kiểu bên ngoài cuối cùng không 
       cách xác thực API key riêng
 - [ ] OpenTelemetry: tên thuộc tính theo semantic conventions, truyền `traceparent` khi gọi ra ngoài và qua job / event,
       xuất metrics và log qua OTLP
-- [ ] Mật khẩu: chặn mật khẩu đã lộ theo NIST SP 800-63B-4; HSTS bật mặc định ở môi trường production
+- [x] Mật khẩu NIST + HSTS: chặn mật khẩu đã lộ theo NIST SP 800-63B-4; HSTS bật mặc định ở môi trường production — xong qua #600
+  - [ ] **Sau 1.0** (#600): tra HIBP (k-anonymity) ngoài danh sách có sẵn; chặn từ theo ngữ cảnh (tên, email, tên cửa hàng);
+        chuẩn hoá NFC trước khi hash
 - [ ] Image: nền distroless hay tĩnh, kiểm sức khoẻ bằng chính binary (`HEALTHCHECK`, healthcheck trong compose)
 
 ### G8 — Chuẩn cộng đồng mã nguồn mở
@@ -308,6 +316,18 @@ Việc từ rà pháp lý vòng 1 do AI đóng vai (`docs/legal/review-2026-11-r
       định kỳ), xác nhận cơ quan tiếp nhận / online.gov.vn và hạn chuyển tiếp (D-20261126-legal-rules-r1-update)
 - [ ] LG-4b: tính hạn thực hiện yêu cầu của chủ thể dữ liệu theo `fulfil_within_days` (đơn vị: ngày theo bản phân tích,
       chưa xác nhận ngày làm việc hay ngày thường; bên xử lý thứ ba)
+- [ ] LG-3b: `compliance` phát event khi hồ sơ KYC hết hạn / bị thu hồi → `catalog` dừng hàng của nút đó; quét lại hàng
+      đang bán khi đổi `kernel.business_model` hay khi quy tắc bắt đầu áp dụng, gộp khách vào sàn; chuyển cửa hàng con
+      đang có hàng active sang dưới người bán chưa định danh thì hàng vẫn bán (cần chặn hay quét lại)
+- [ ] LG-3c: hồ sơ KYC thiếu mục NĐ 248 Điều 18 (ngày sinh, địa chỉ, người đại diện, nước cấp + hạn hộ chiếu ≥ 6 tháng);
+      livestream / affiliate chưa hỏi `KycGate`
+- [ ] Nhỏ LG-3: `catalog` `products.rs` có `Err(_) => vec![org]` nuốt lỗi đọc chuỗi nút (phải trả lỗi); doc
+      `listing_denied` trong `errors.rs` lệch chỗ
+- [ ] `compliance` `kyc.rs`: thân quy tắc không parse được JSON đang coi là "không bắt buộc" (fail-open) — phải báo lỗi; hồ
+      sơ quá `expires_at` vẫn tính là đã định danh tới khi job hằng ngày chạy — phải kiểm hạn ngay lúc hỏi
+- [ ] Bảo mật kernel: `set_setting` cho cài đặt cấp khách (vd `kernel.business_model`) ở mọi nhánh chỉ đòi
+      `kernel.settings.manage`; cần quyền phạm vi gốc + ghi audit; chạm bảo mật nên qua kiểm độc lập
+- [ ] Số đơn / POS / trả hàng / bảo hành lấy năm theo UTC (#575 N4): lấy theo múi giờ người bán như LG-2
 
 ### G13 — Phát hành 1.0 (chủ dự án duyệt ngày 26/11/2026, D-20261126-release-1-0-readiness)
 
@@ -321,6 +341,9 @@ Việc từ rà pháp lý vòng 1 do AI đóng vai (`docs/legal/review-2026-11-r
       các mục dưới đây đều có mã UT-x trong báo cáo; xong hết thì chạy vòng 2 trên `1.0.0-rc.1`
   - [ ] UT-1 (chặn): giao hàng không ghi dòng `sale` vào kho — `on_hand` không giảm, reservation vẫn `confirmed`, đơn vẫn
         `unfulfilled` sau `delivered`; có test chạy trên cả hai database; chạm tiền / kho nên qua kiểm độc lập
+    - [ ] UT-1 tiếp: xuất kho lỗi 4xx hiện chỉ `warn` — thêm cảnh báo / đối soát cho người vận hành; đối soát các đơn giao
+          trước bản sửa; `inventory`: chỗ giữ do nhân viên trả tay (`release_reason=manual`) rồi hàng vẫn giao hiện chỉ log
+          `debug` — đổi thành `warn` + metric
   - [ ] UT-2 (chặn): phân quyền khi quản lý API key qua MCP chưa đúng phạm vi (đã báo kín, công bố sau khi sửa); có test;
         chạm bảo mật nên qua kiểm độc lập
   - [ ] UT-3: đường chạy bằng binary không Docker cho người mới: README trỏ tới DEPLOY.md mục B, hai secret ở bước
@@ -380,6 +403,21 @@ Việc từ rà pháp lý vòng 1 do AI đóng vai (`docs/legal/review-2026-11-r
       file); test giữ hợp đồng như api-diff
 - [ ] Đường chuyển từ 0.x lên 1.0 cho người viết module: hướng dẫn từng bước (EN + VI) và công cụ tự sửa code cũ sang hợp
       đồng mới (dùng chính nó để chuyển module trong repo); chạy thử trên `examples/external-module`
+
+### G15 — Việc theo sau v0.20.0 (đánh giá ngày 27/11/2026)
+
+- [ ] Hoá đơn: chế độ giá (gồm / chưa thuế) theo từng dòng, dòng phí giao thuế cố định; `update_draft` khi khoá chỉ so
+      `status`, không so `updated_at` → hai PATCH đồng thời ghi đè dòng của nhau (cần so `updated_at` hay `version`)
+- [ ] `ledger`: `bookings` và `plans` chưa gọi `Ledger::keep_late_payment`
+- [ ] `ledger` sandbox (theo sau #594): lệnh giả lập thua khi gọi đồng thời vẫn trả 200 → đổi thành 409 và siết test; đọc
+      kết quả cuối qua `write()`; `outcome: failed` kèm `amount` bị bỏ qua lặng lẽ (phải báo lỗi); webhook gửi từ sandbox
+      thêm header `Autoxide-Sandbox: true`; gom ba bản `parse_bool` về `autoxide_kernel::config`
+- [ ] `content` tìm kiếm (theo sau #573): `.max(2)` ở `public_limits.rs` — pool đọc cỡ 1–3 vẫn bị chiếm gần hết, trái
+      DEPLOY "pool trừ 2"; câu lấy trang của danh sách có `q` và gợi ý chưa nằm trong hạn 2 s; `Database::read_pool_size`
+      có thể panic với `Database::detached()`; changelog thiếu `TenantContext::read_pool_size()`; log khi trần tự hạ;
+      test hai nhánh mới của `words.rs`
+- [ ] CI nhanh hơn (chủ dự án đồng ý, làm ngay sau 0.20.0): đo thời gian từng bước; PR chỉ test crate bị sửa (bộ đủ ở
+      `main` và lúc phát hành); bỏ lần chạy thừa; cân lại shard; chỉ dùng runner miễn phí
 
 ## Giai đoạn A — Hợp đồng và nền lõi
 

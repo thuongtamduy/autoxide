@@ -28,7 +28,7 @@ services:
   autoxide:
     # The release this file was written for (each release updates it). Another release:
     # AUTOXIDE_IMAGE=ghcr.io/thuongtamduy/autoxide:<version> in `.env` (0.17.0 or later).
-    image: ${AUTOXIDE_IMAGE:-ghcr.io/thuongtamduy/autoxide:0.19.0}
+    image: ${AUTOXIDE_IMAGE:-ghcr.io/thuongtamduy/autoxide:0.20.0}
     command: ["serve"]
     environment:
       AUTOXIDE_AUTH_TOKEN_SECRET: ${AUTOXIDE_AUTH_TOKEN_SECRET:?create .env next to compose.quickstart.yml with AUTOXIDE_AUTH_TOKEN_SECRET (openssl rand -base64 48), see the top of compose.quickstart.yml}

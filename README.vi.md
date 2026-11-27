@@ -209,7 +209,7 @@ printf 'AUTOXIDE_AUTH_TOKEN_SECRET=%s\nAUTOXIDE_SECRET_KEY=%s\n' \
   "$(openssl rand -base64 48 | tr -d '\n')" "$(openssl rand -base64 48 | tr -d '\n')" > autoxide.env
 chmod 600 autoxide.env
 
-IMAGE=ghcr.io/thuongtamduy/autoxide:0.19.0   # một bản phát hành ở trang GitHub Releases
+IMAGE=ghcr.io/thuongtamduy/autoxide:0.20.0   # một bản phát hành ở trang GitHub Releases
 RUN="docker run --rm --env-file autoxide.env -v autoxide-data:/var/lib/autoxide/data"
 
 # 1. Tạo bảng (máy chủ không khởi động được nếu chưa làm bước này; làm lại sau mỗi lần cập nhật)

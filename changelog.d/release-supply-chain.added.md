@@ -1,1 +1,0 @@
-- Releases carry a CycloneDX SBOM of the Rust crates (`autoxide.cdx.json`), the texts of the third-party licenses (`THIRD-PARTY-LICENSES.html`, also inside the image and every binary archive), and the binary embeds its dependency list (`cargo auditable`). Docs are published per release at a versioned documentation site (GitHub Pages).
