@@ -476,7 +476,7 @@ into a new database.
 | `AUTOXIDE_HTTP_MAX_CONNECTIONS` | Most open connections at once, WebSockets included (default `4096`, `0`: no limit); over it new connections wait. Keep it below the open file limit (`ulimit -n`, often 1024; systemd `LimitNOFILE`, `docker run --ulimit nofile=…`) with some room for database connections and files — the server warns at startup when it is not. Your reverse proxy should still limit connections per client |
 | `AUTOXIDE_HTTP_PUBLIC_URL` | The address the internet reaches the API at, e.g. `https://api.example.com`; needed for links back to the API in mail (newsletter unsubscribe) |
 | `AUTOXIDE_HTTP_CORS_ORIGINS` | Web pages on other origins allowed to call the API; tenants' verified domains are allowed for their own tenant without being listed, see [Custom domains of tenants](#custom-domains-of-tenants) |
-| `AUTOXIDE_HTTP_HSTS_SECONDS` | Once every client reaches the API over HTTPS: send `Strict-Transport-Security` (e.g. `31536000`, one year); `autoxide doctor` reminds you when the public URL is `https://` and this is `0`. Every response already carries `nosniff`, `Referrer-Policy`, `X-Frame-Options` and a strict `Content-Security-Policy` (`AUTOXIDE_HTTP_SECURITY_HEADERS`, `AUTOXIDE_HTTP_REFERRER_POLICY`) |
+| `AUTOXIDE_HTTP_HSTS_SECONDS` | `Strict-Transport-Security` is **on by default in production**: when `AUTOXIDE_HTTP_PUBLIC_URL` starts with `https://`, every response carries `max-age=31536000` (one year) unless you set this. Set a number of seconds to change it, or `0` to turn HSTS off (for example while some clients still use plain HTTP to this host); `autoxide doctor` warns when the public URL is `https://` and HSTS is off. Without a public URL, or with an `http://` one (development), no HSTS is sent. Browsers ignore the header on plain HTTP, so terminate TLS in front of the API before you set an `https://` public URL. Every response already carries `nosniff`, `Referrer-Policy`, `X-Frame-Options` and a strict `Content-Security-Policy` (`AUTOXIDE_HTTP_SECURITY_HEADERS`, `AUTOXIDE_HTTP_REFERRER_POLICY`) |
 | `AUTOXIDE_MAIL_SMTP_URL`, `AUTOXIDE_MAIL_FROM` | Send mail (password reset, email verification) |
 | `AUTOXIDE_FILES_S3_BUCKET` and `AWS_…` | Store files in S3 or an S3-compatible service; also add a bucket lifecycle rule that aborts incomplete multipart uploads after a day |
 | `AUTOXIDE_AUTH_PASSWORD_RESET_URL`, `AUTOXIDE_AUTH_EMAIL_VERIFICATION_URL` | Link mails to your own pages |
@@ -746,9 +746,17 @@ limits:
 | Setting | Effect |
 | ------- | ------ |
 | `auth.staff_registration` | `true` / `false`: anyone may create their own staff account (`POST /api/v1/auth/register`, or a first sign-in with a provider that allows sign-up). Unset: `AUTOXIDE_AUTH_SELF_REGISTRATION` |
-| `auth.password_min_length` | 12 to 128: shortest new password. Only raises the server's minimum of 12 |
+| `auth.password_min_length` | 15 to 128: shortest new password. Only raises the server's minimum of 15 |
 | `auth.session_days` | 1 to 365: lifetime of each refresh token. Only shortens `AUTOXIDE_AUTH_REFRESH_TOKEN_DAYS`; a longer value is ignored |
 | `auth.totp_issuer` | Name shown in authenticator apps (no `:`), instead of `AUTOXIDE_AUTH_TOTP_ISSUER` |
+
+**Password rules** (NIST SP 800-63B-4). A new password — at sign-up, when an administrator or
+`autoxide user create` sets one, on change, reset and when accepting an invitation — must be 15 to 128
+characters and must not be on the list of common or breached passwords that ships inside the binary
+(about 56,000 entries of 15 characters or more; checked offline, case-insensitively, nothing leaves
+the server). This includes `AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD`: a password that breaks the rules stops
+`autoxide serve` at startup. A refused password gets `422` with field code `common_password`. There are no rules about digits or symbols,
+and passwords never expire. Existing passwords keep working: the rules apply when a password is set.
 
 **Inviting staff.** Instead of creating accounts with passwords, invite people:
 `POST /api/v1/auth/invitations` with an `email`, the `role_ids` and the unit (`org_id`) they get

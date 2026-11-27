@@ -7,8 +7,8 @@ export type AcceptInvitationRequest = {
   /** For a new account: display name (default: the one in the invitation). */
   name?: string | null;
   /**
-   * For a new account: a password (12 to 128 characters). Omit to sign in later with a link
-   * or add a passkey with the tokens returned here.
+   * For a new account: a password (15 to 128 characters, not a common or breached one).
+   * Omit to sign in later with a link or add a passkey with the tokens returned here.
    */
   password?: string | null;
   /** The token from the invitation mail. */
@@ -2773,7 +2773,7 @@ export type ChangeEmailRequest = {
 /** The current password and the new one. */
 export type ChangePasswordRequest = {
   current_password: string;
-  /** 12 to 128 characters. */
+  /** 15 to 128 characters, not a common or breached password. */
   new_password: string;
   /**
    * `true`: also remove every API key, passkey and external sign-in link of the account, as a
@@ -5503,7 +5503,7 @@ export type CreateUserRequest = {
   /** Display name, 1 to 200 characters. */
   name: string;
   /**
-   * 12 to 128 characters. When omitted, the account cannot sign in with a password
+   * 15 to 128 characters, not a common or breached password. When omitted, the account cannot sign in with a password
    * until one is set.
    */
   password?: string | null;
@@ -29904,7 +29904,7 @@ export type RegisterRequest = {
   email: string;
   /** Display name, 1 to 200 characters. */
   name: string;
-  /** 12 to 128 characters. */
+  /** 15 to 128 characters, not a common or breached password. */
   password: string;
   /**
    * `staff` (default; needs self-registration on the server) or `customer`: a customer
@@ -30180,7 +30180,7 @@ export type RescheduleBookingRequest = {
 
 /** A new password, with the token from the reset mail. */
 export type ResetConfirmation = {
-  /** 12 to 128 characters. */
+  /** 15 to 128 characters, not a common or breached password. */
   password: string;
   /** The token from the reset mail. */
   token: string;
@@ -30971,7 +30971,7 @@ export type SetOrdersCartVouchersRequest = {
 
 /** The first password of an account. */
 export type SetPasswordRequest = {
-  /** 12 to 128 characters. */
+  /** 15 to 128 characters, not a common or breached password. */
   password: string;
 };
 

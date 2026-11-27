@@ -44,7 +44,7 @@ pub(crate) struct ResetRequest {
 pub(crate) struct ResetConfirmation {
     /// The token from the reset mail.
     token: String,
-    /// 12 to 128 characters.
+    /// 15 to 128 characters, not a common or breached password.
     password: String,
 }
 
@@ -90,7 +90,7 @@ async fn request_reset(
     responses(
         (status = 204, description = "The password was changed."),
         (status = 400, description = "The token is unknown, expired or used; code `auth.invalid_reset_token`, with `reason` (`expired`, `used` or `unknown`). Ask for a new mail with `POST /api/v1/auth/password-reset`.", body = Problem),
-        (status = 422, description = "The password does not follow the rules (12 to 128 characters); see `errors`.", body = Problem),
+        (status = 422, description = "The password breaks the rules: it must be 15 to 128 characters (more when the tenant raises `auth.password_min_length`) and not on the list of common or breached passwords (field code `common_password`); see `errors`.", body = Problem),
     )
 )]
 async fn confirm_reset(

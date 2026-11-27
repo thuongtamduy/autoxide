@@ -469,7 +469,7 @@ database mới.
 | `AUTOXIDE_HTTP_MAX_CONNECTIONS` | Số kết nối mở cùng lúc tối đa, tính cả WebSocket (mặc định `4096`, `0`: không giới hạn); quá số này thì kết nối mới phải chờ. Đặt thấp hơn giới hạn file mở (`ulimit -n`, thường 1024; systemd `LimitNOFILE`, `docker run --ulimit nofile=…`) và chừa chỗ cho kết nối database và file — máy chủ cảnh báo lúc khởi động khi không như vậy. Reverse proxy vẫn nên giới hạn số kết nối theo từng client |
 | `AUTOXIDE_HTTP_PUBLIC_URL` | Địa chỉ internet dùng để gọi API, vd `https://api.example.com`; cần cho link trỏ về API trong mail (huỷ đăng ký bản tin) |
 | `AUTOXIDE_HTTP_CORS_ORIGINS` | Trang web ở origin khác được gọi API; tên miền đã xác minh của khách được gọi cho chính khách đó mà không cần liệt kê, xem [Tên miền riêng của khách hàng](#tên-miền-riêng-của-khách-hàng) |
-| `AUTOXIDE_HTTP_HSTS_SECONDS` | Khi mọi client đã gọi API qua HTTPS: gửi `Strict-Transport-Security` (vd `31536000`, một năm); `autoxide doctor` nhắc khi URL công khai là `https://` mà biến này là `0`. Mọi response đã có sẵn `nosniff`, `Referrer-Policy`, `X-Frame-Options` và `Content-Security-Policy` chặt (`AUTOXIDE_HTTP_SECURITY_HEADERS`, `AUTOXIDE_HTTP_REFERRER_POLICY`) |
+| `AUTOXIDE_HTTP_HSTS_SECONDS` | `Strict-Transport-Security` **bật sẵn ở production**: khi `AUTOXIDE_HTTP_PUBLIC_URL` bắt đầu bằng `https://`, mọi response có `max-age=31536000` (một năm) nếu bạn không đặt biến này. Đặt số giây để đổi, hoặc `0` để tắt HSTS (vd khi còn client gọi host này bằng HTTP thường); `autoxide doctor` cảnh báo khi URL công khai là `https://` mà HSTS tắt. Không đặt URL công khai, hay URL `http://` (máy phát triển), thì không gửi HSTS. Trình duyệt bỏ qua header này trên HTTP thường, nên hãy dựng TLS phía trước API trước khi đặt URL công khai `https://`. Mọi response đã có sẵn `nosniff`, `Referrer-Policy`, `X-Frame-Options` và `Content-Security-Policy` chặt (`AUTOXIDE_HTTP_SECURITY_HEADERS`, `AUTOXIDE_HTTP_REFERRER_POLICY`) |
 | `AUTOXIDE_MAIL_SMTP_URL`, `AUTOXIDE_MAIL_FROM` | Gửi mail (đặt lại mật khẩu, xác minh email) |
 | `AUTOXIDE_FILES_S3_BUCKET` và `AWS_…` | Lưu file trên S3 hay dịch vụ tương thích S3; nên đặt thêm lifecycle rule cho bucket để huỷ multipart upload dở sau một ngày |
 | `AUTOXIDE_AUTH_PASSWORD_RESET_URL`, `AUTOXIDE_AUTH_EMAIL_VERIFICATION_URL` | Mail dẫn tới trang của bạn |
@@ -723,9 +723,17 @@ và `PATCH /api/v1/auth/customers/{id}` (permission `auth.customers.read`, `auth
 | Cài đặt | Tác dụng |
 | ------- | -------- |
 | `auth.staff_registration` | `true` / `false`: ai cũng tự tạo được tài khoản nhân sự (`POST /api/v1/auth/register`, hay đăng nhập lần đầu qua nhà cung cấp cho đăng ký). Chưa đặt: `AUTOXIDE_AUTH_SELF_REGISTRATION` |
-| `auth.password_min_length` | 12 tới 128: độ dài tối thiểu của mật khẩu mới. Chỉ nâng mức 12 của máy chủ |
+| `auth.password_min_length` | 15 tới 128: độ dài tối thiểu của mật khẩu mới. Chỉ nâng mức 15 của máy chủ |
 | `auth.session_days` | 1 tới 365: thời hạn mỗi refresh token. Chỉ rút ngắn `AUTOXIDE_AUTH_REFRESH_TOKEN_DAYS`; giá trị dài hơn bị bỏ qua |
 | `auth.totp_issuer` | Tên hiện trong app xác thực (không có `:`), thay `AUTOXIDE_AUTH_TOTP_ISSUER` |
+
+**Luật mật khẩu** (NIST SP 800-63B-4). Mật khẩu mới — lúc tự đăng ký, khi quản trị viên hay
+`autoxide user create` đặt, khi đổi, đặt lại và khi nhận lời mời — phải dài 15 đến 128 ký tự và không nằm
+trong danh sách mật khẩu phổ biến hoặc đã lộ đi kèm binary (khoảng 56.000 mục dài từ 15 ký tự; kiểm
+offline, không phân biệt hoa thường, không gửi gì ra ngoài máy chủ). Kể cả
+`AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD`: mật khẩu sai luật làm `autoxide serve` dừng lúc khởi động. Mật khẩu bị từ chối nhận `422` với mã trường
+`common_password`. Không có luật bắt buộc chữ số hay ký tự đặc biệt, và mật khẩu không hết hạn. Mật khẩu
+đang dùng vẫn đăng nhập được: luật chỉ áp khi đặt mật khẩu.
 
 **Mời nhân sự.** Thay vì tạo tài khoản kèm mật khẩu, hãy mời: `POST /api/v1/auth/invitations` với
 `email`, các `role_ids` và nút (`org_id`) họ nhận (permission `auth.invitations.manage`; không mời kèm

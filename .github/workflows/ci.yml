@@ -551,6 +551,10 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - run: cargo install cargo-about --locked --version 0.9.3 --features cli
       - run: cargo about generate --manifest-path crates/app/Cargo.toml --locked about.hbs -o "$RUNNER_TEMP/THIRD-PARTY-LICENSES.html"
+      # Dữ liệu nhúng trong binary (danh sách mật khẩu đã lộ, MIT) phải được ghi công trong mọi bản phân phối
+      # (D-20261127-breached-passwords): văn bản sinh ra phải còn mục "Bundled data".
+      - name: The license file credits bundled data
+        run: grep -q 'Copyright (c) 2018 Daniel Miessler' "$RUNNER_TEMP/THIRD-PARTY-LICENSES.html"
       - name: The SDK has no runtime dependencies
         run: jq -e '(.dependencies // {}) == {}' sdk/typescript/package.json
 

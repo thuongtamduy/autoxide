@@ -389,7 +389,7 @@ mod tests {
         let state = State {
             token_secret: "t".repeat(64),
             secret_key: "k".repeat(64),
-            admin_password: "pw-pw-pw-pw-1".into(),
+            admin_password: "pw-pw-pw-pw-pw-1".into(),
         };
         let url = format!("sqlite://{}/autoxide.sqlite", dir.display());
         let source = demo_source(

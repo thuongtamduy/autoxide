@@ -228,6 +228,13 @@ impl<'a> ConfigReader<'a> {
         }
     }
 
+    /// The value of variable `name` as configured (no default), without recording it as read: for a
+    /// default that depends on a variable another part of the configuration reads and records (such as
+    /// HSTS turned on when `AUTOXIDE_HTTP_PUBLIC_URL` is `https`).
+    pub(crate) fn configured(&self, name: &str) -> Option<&'a str> {
+        self.source.get(name)
+    }
+
     /// The list of variables read so far, including when there are errors.
     pub fn values(&self) -> &[SettingValue] {
         &self.values
