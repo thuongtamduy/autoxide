@@ -74,8 +74,8 @@ async fn tim_cong_khai_theo_tu_qua_chi_muc() {
     .unwrap();
 }
 
-/// Cùng chữ ở hai khách trên cùng database: mỗi khách chỉ thấy bài của mình, kể cả khi người tìm gõ đúng từ riêng
-/// của khách kia (từ đó chỉ là một từ trong chỉ mục, cột `tenant_id` vẫn lọc).
+/// Cùng chữ ở hai khách trên cùng database: mỗi khách chỉ thấy bài của mình (chỉ mục đảo có `tenant_id`, handle của
+/// kernel lọc cả câu ngoài lẫn subquery của từng từ).
 #[tokio::test]
 async fn moi_khach_chi_thay_bai_cua_minh() {
     TestDatabase::run(async |test| {
@@ -100,8 +100,13 @@ async fn moi_khach_chi_thay_bai_cua_minh() {
         let query = WordQuery::parse("pho ha noi");
         assert_eq!(words::matching_ids(&a, anywhere("en"), &query).await.unwrap(), [ids[0]]);
         assert_eq!(words::matching_ids(&b, anywhere("en"), &query).await.unwrap(), [ids[1]]);
-        let other = WordQuery::parse(&words::tenant_token(b.id().as_uuid()));
-        assert!(words::matching_ids(&a, anywhere("en"), &other).await.unwrap().is_empty());
+        // Từ chỉ khách B có: khách A không thấy gì.
+        let who = ada.clone().in_tenant(b.id());
+        let only_b = content.create(&b, &who, post("Bánh xèo miền Tây")).await.unwrap();
+        content.publish(&b, &who, only_b.id, None, None, false).await.unwrap();
+        let query = WordQuery::parse("banh xeo");
+        assert!(words::matching_ids(&a, anywhere("en"), &query).await.unwrap().is_empty());
+        assert_eq!(words::matching_ids(&b, anywhere("en"), &query).await.unwrap(), [only_b.id]);
     })
     .await
     .unwrap();
@@ -185,6 +190,10 @@ async fn website_khac_nhieu_bai_khop_khong_lap_ket_qua() {
         for chunk in rows.chunks(200) {
             published::Entity::insert_many(chunk.to_vec()).exec(database.write()).await.unwrap();
         }
+        for row in &rows {
+            let entry = row.entry_id.clone().unwrap();
+            words::write(database.write(), &tenant, entry, "en", "pho ga").await.unwrap();
+        }
 
         let query = WordQuery::parse("pho ga");
         let site_a = [shop_a, root[0]];
@@ -195,6 +204,32 @@ async fn website_khac_nhieu_bai_khop_khong_lap_ket_qua() {
         let found = words::matching_ids(&tenant, on_b, &query).await.unwrap();
         assert_eq!(found.len(), MATCH_CAP as usize);
         assert!(!found.contains(&mine.id));
+    })
+    .await
+    .unwrap();
+}
+
+/// Tiền tố trên từ ngoài ASCII: khoảng `[w, w_next)` đúng với thứ tự byte trên cả hai database; tiền tố không khớp
+/// từ khác chỉ chung vài ký tự đầu.
+#[tokio::test]
+async fn tien_to_voi_chu_ngoai_ascii() {
+    TestDatabase::run(async |test| {
+        let (content, _, database) = service(test, config(&[])).await;
+        let tenant = TenantContext::default_on(database.clone());
+        let ada = editor();
+        let tokyo = content.create(&tenant, &ada, post("東京タワー の 夜景")).await.unwrap();
+        let other = content.create(&tenant, &ada, post("東西 の 道")).await.unwrap();
+        let late = content.create(&tenant, &ada, post("latte lau")).await.unwrap();
+        for id in [tokyo.id, other.id, late.id] {
+            content.publish(&tenant, &ada, id, None, None, false).await.unwrap();
+        }
+        let find = async |q: &str| {
+            words::matching_ids(&tenant, anywhere("en"), &WordQuery::parse(q)).await.unwrap()
+        };
+        assert_eq!(find("東京タ").await, [tokyo.id]);
+        assert_eq!(find("lat").await, [late.id], "`lau` is not under the prefix `lat`");
+        assert_eq!(find("lau").await, [late.id]);
+        assert!(find("東京タワー夜").await.is_empty());
     })
     .await
     .unwrap();

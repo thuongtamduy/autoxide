@@ -542,7 +542,6 @@ impl ContentService {
             body_schema_version: version.body_schema_version,
             plain_text: version.plain_text.clone(),
             search_key: version.search_key.clone(),
-            search_words: words::words(tenant.id().as_uuid(), &version.search_key),
             word_count: version.word_count,
             reading_time_minutes: version.reading_time_minutes,
             featured_media_id: version.featured_media_id,
@@ -598,6 +597,8 @@ impl ContentService {
                     .map_err(|error| unique_path(error, &path))?;
             }
         }
+        // Chỉ mục từ của bản công khai (PT-15): cùng transaction với bản đăng.
+        words::write(transaction, tenant, version.id, &version.locale, &version.search_key).await?;
         paths::clear_automatic(transaction, tenant, &version.locale, &path).await?;
         paths::redirect_moved(transaction, tenant, &version.locale, &moved, by, now).await?;
         if let Some(type_id) = version.type_id {
@@ -649,6 +650,7 @@ impl ContentService {
             .filter(published::Column::EntryId.eq(entry.id))
             .exec(transaction)
             .await?;
+        words::remove(transaction, tenant, entry.id).await?;
         if old.type_id.is_some() {
             crate::types::public::remove_published_index(transaction, tenant, entry.id).await?;
         }

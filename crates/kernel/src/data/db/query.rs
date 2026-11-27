@@ -31,7 +31,14 @@ pub trait Queries: Handle + Sized {
             statement.and_where(tenant_filter::<R>(tenant));
         }
         let error = global_check::<R>().map(global_refused);
-        Find { handle: self, statement, joined: Vec::new(), error, _marker: PhantomData }
+        Find {
+            handle: self,
+            statement,
+            joined: Vec::new(),
+            error,
+            within: None,
+            _marker: PhantomData,
+        }
     }
 
     /// A subquery selecting `column` of `S` (for `Col::in_sub`), filtered by tenant like `find`. It remembers
@@ -86,6 +93,7 @@ pub struct Find<'h, H, R> {
     statement: SelectStatement,
     joined: Vec<&'static str>,
     error: Option<Error>,
+    within: Option<std::time::Duration>,
     _marker: PhantomData<fn() -> R>,
 }
 
@@ -155,12 +163,22 @@ impl<'h, H: Handle, R: Record> Find<'h, H, R> {
         self
     }
 
+    /// Stops the query when it runs longer than `limit`, or when the caller stops waiting: the database ends it
+    /// and [`all`](Self::all) returns [`QUERY_TIMEOUT`](super::QUERY_TIMEOUT). For reads on a read handle only
+    /// (on a write transaction the read fails). Use it for queries whose cost depends on what a caller sends
+    /// (public search).
+    #[must_use]
+    pub fn within(mut self, limit: std::time::Duration) -> Self {
+        self.within = Some(limit);
+        self
+    }
+
     /// Every matching row.
     pub async fn all(self) -> Result<Vec<R>, Error> {
         if let Some(error) = self.error {
             return Err(error);
         }
-        read_all(self.handle, &self.statement, R::read).await
+        read_rows(self.handle, &self.statement, self.within, R::read).await
     }
 
     /// The first matching row.
@@ -359,7 +377,7 @@ impl<H: Handle, R: Record, Out: FromRow> Grouped<'_, H, R, Out> {
         if let Some(error) = self.find.error {
             return Err(error);
         }
-        read_all(self.find.handle, &self.find.statement, Out::from_row).await
+        read_rows(self.find.handle, &self.find.statement, self.find.within, Out::from_row).await
     }
 }
 
@@ -368,7 +386,21 @@ pub(crate) async fn read_all<H: Handle, T>(
     statement: &SelectStatement,
     read: impl Fn(&Row<'_>) -> Result<T, Error>,
 ) -> Result<Vec<T>, Error> {
+    read_rows(handle, statement, None, read).await
+}
+
+// Như `read_all`, có trần thời gian khi `within` có giá trị (`super::bounded`).
+async fn read_rows<H: Handle, T>(
+    handle: &H,
+    statement: &SelectStatement,
+    within: Option<std::time::Duration>,
+    read: impl Fn(&Row<'_>) -> Result<T, Error>,
+) -> Result<Vec<T>, Error> {
     let connection = handle.connection();
-    let rows = connection.all(connection.build(statement)).await?;
+    let statement = connection.build(statement);
+    let rows = match within {
+        Some(limit) => connection.all_within(statement, limit).await?,
+        None => connection.all(statement).await?,
+    };
     rows.iter().map(|row| read(&Row(row))).collect()
 }

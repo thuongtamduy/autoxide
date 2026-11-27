@@ -145,6 +145,14 @@ impl Module for ContentModule {
         vec!["ai", "media"]
     }
 
+    fn records(&self) -> Vec<autoxide_kernel::db::RecordInfo> {
+        // Hai bảng đọc qua lớp `db` cho tìm chữ công khai (PT-15).
+        vec![
+            autoxide_kernel::db::RecordInfo::of::<publishing::words::PublishedHit>(),
+            autoxide_kernel::db::RecordInfo::of::<publishing::words::IndexedWord>(),
+        ]
+    }
+
     fn migrations(&self) -> Vec<Box<dyn MigrationTrait>> {
         migration::all()
     }

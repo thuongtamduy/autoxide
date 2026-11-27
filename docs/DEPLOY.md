@@ -185,11 +185,9 @@ holds data of a module that is off, with the line to add — see
 [MODULES.md](MODULES.md#upgrading-from-017-or-earlier). This applies to setups B and C too.
 
 **Updating to the release with the content word index** (migration `content.m0036_word_index`): the
-migration computes the words of every published entry in batches of 500, then builds the index — on
-PostgreSQL a GIN index, which blocks writes to `content_published` while it is built (publishing
-waits; reading does not). The time grows with the number of published entries: on a large site,
-update in a quiet hour. On SQLite the full-text table is filled in the same migration. This applies
-to setups B and C too.
+migration fills the new table `content_published_words` with the words of every published entry, in
+batches, then builds its index. On a large site it takes longer and holds the migration lock meanwhile:
+update in a quiet hour. This applies to setups B and C too.
 
 ### 6. Back up and restore
 

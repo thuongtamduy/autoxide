@@ -254,11 +254,6 @@ impl<'a> TenantDb<'a> {
     pub async fn begin_write(&self) -> Result<TenantTx, Error> {
         Ok(Tx { transaction: self.database.begin_write().await?, access: InTenant(self.tenant) })
     }
-    /// Which database this tenant is on, for the few queries written per database behind a module's own trait
-    /// (hand-written SQL, Rule one).
-    pub fn backend(&self) -> crate::config::DatabaseBackend {
-        self.database.backend()
-    }
 }
 
 /// The control-plane handles of one module, from `StartContext::control_plane` (modules that own global

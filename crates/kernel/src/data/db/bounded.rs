@@ -193,7 +193,27 @@ fn sqlite_arguments(values: Vec<sea_orm::Value>) -> Result<sqlx::sqlite::SqliteA
             Value::SmallInt(value) => arguments.add(value),
             Value::Int(value) => arguments.add(value),
             Value::BigInt(value) => arguments.add(value),
+            Value::SmallUnsigned(value) => arguments.add(value.map(i64::from)),
+            Value::Unsigned(value) => arguments.add(value.map(i64::from)),
+            // `LIMIT` / `OFFSET` của bộ dựng câu: `u64`; SQLite lưu số nguyên có dấu 64 bit.
+            Value::BigUnsigned(value) => {
+                let value = value
+                    .map(i64::try_from)
+                    .transpose()
+                    .map_err(|_| Error::internal("an unsigned value over i64 cannot be bound"))?;
+                arguments.add(value)
+            }
             Value::String(value) => arguments.add(value),
+            // Ngày, giờ của kernel (`database::statement` gắn kiểu cho Postgres): SQLite nhận chuỗi, như sea-query-sqlx.
+            Value::Enum(value) => arguments.add(match value {
+                sea_orm::sea_query::OptionEnum::Some(value) => Some(value.value.into_owned()),
+                sea_orm::sea_query::OptionEnum::None(_) => None,
+            }),
+            Value::Char(value) => arguments.add(value.map(|value| value.to_string())),
+            Value::TinyInt(value) => arguments.add(value),
+            Value::TinyUnsigned(value) => arguments.add(value),
+            Value::Float(value) => arguments.add(value),
+            Value::Double(value) => arguments.add(value),
             Value::Bytes(value) => arguments.add(value),
             Value::Uuid(value) => arguments.add(value),
             other => {

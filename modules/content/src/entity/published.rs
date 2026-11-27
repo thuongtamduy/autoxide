@@ -31,9 +31,6 @@ pub struct Model {
     pub body_schema_version: i32,
     pub plain_text: String,
     pub search_key: String,
-    /// Các từ của `search_key` cho chỉ mục từ (`publishing::words`, D-20261126-content-word-index). Cột
-    /// `search_rowid` (khoá của bảng FTS5 ở SQLite) không có ở đây: chỉ trigger của SQLite đọc ghi nó.
-    pub search_words: String,
     pub word_count: i32,
     pub reading_time_minutes: i32,
     pub featured_media_id: Option<Uuid>,

@@ -1,10 +1,10 @@
-## D-20261127-db-read-within · Đọc có trần thời gian trong lớp `db` của kernel: `Sql::within`, database dừng câu — 2026-11-27 — agent quyết
+## D-20261127-db-read-within · Đọc có trần thời gian trong lớp `db` của kernel: `within`, database dừng câu — 2026-11-27 — agent quyết
 
 Chủ đề: Database, dữ liệu, job, event
 
-Quyết định: lớp `db` của kernel có `Sql::within(limit)` cho câu viết tay trên handle đọc
-(`tenant.db().read().sql(…).within(…).all()`). Database tự dừng câu khi nó chạy quá `limit` và khi người gọi
-thôi chờ (future bị drop). Câu bị dừng trả lỗi `503 db.query_timeout` (`db::QUERY_TIMEOUT`,
+Quyết định: lớp `db` của kernel có `within(limit)` cho câu đọc trên handle đọc — của bộ dựng câu (`Find::within`,
+dùng cả khi `select(…)`: `tenant.db().read().find::<R>()….within(…).all()`) và của câu viết tay (`Sql::within`).
+Database tự dừng câu khi nó chạy quá `limit` và khi người gọi thôi chờ (future bị drop). Câu bị dừng trả lỗi `503 db.query_timeout` (`db::QUERY_TIMEOUT`,
 `db::is_query_timeout`), nhận ra bằng mã lỗi của database, không bằng đồng hồ.
 
 - Postgres: transaction chỉ đọc với `SET LOCAL statement_timeout` (chỉ trong transaction đó, kết nối về pool không
@@ -14,19 +14,19 @@ thôi chờ (future bị drop). Câu bị dừng trả lỗi `503 db.query_timeo
   (`LockedSqliteHandle::set_progress_handler`). Handler trả `false` khi quá hạn hay khi cờ dừng bật, SQLite dừng
   câu với `SQLITE_INTERRUPT` (mã `9`). Gỡ handler trước khi trả kết nối về pool. Future bị drop: bật cờ dừng và đóng
   kết nối thay vì trả về pool (handler còn gắn trên nó).
-- Giá trị bind trên SQLite đi thẳng qua sqlx: bool, số nguyên, chuỗi, byte, UUID. Kiểu khác là lỗi nội bộ, không
-  đoán.
+- Giá trị bind trên SQLite đi thẳng qua sqlx, như sea-query-sqlx: bool, số nguyên (cả không dấu của `LIMIT`), số
+  thực, chuỗi, byte, UUID, ngày giờ của kernel (biến thể `Enum` mang kiểu, bind là chuỗi). Kiểu khác là lỗi nội bộ,
+  không đoán.
 - `within` trên transaction ghi là lỗi: câu ghi không bị cắt giữa chừng.
-- Thêm `TenantDb::backend()` để module chọn phần câu riêng của từng database (sau trait của module) mà không cần
-  `tenant.database()`.
 
-Test: `crates/kernel/tests/integration/db_within.rs`, cả hai database. Câu quá trần bị dừng và mọi kết nối của pool
+Test: `crates/kernel/tests/integration/db_within.rs` và `db_layer.rs` (`doc_co_tran_tren_bo_dung_cau`), cả hai
+database. Câu quá trần bị dừng và mọi kết nối của pool
 dùng lại được. Future bị drop thì câu dừng thật: Postgres không còn tiến trình chạy câu; SQLite đóng xong kết nối
 dưới 3 giây, trong khi sqlx bỏ chờ sau 5 giây nếu câu còn chạy. Đã thử bỏ phần huỷ: cả hai nhánh đều đỏ.
 
-Lý do: tìm chữ công khai của `content` (PT-15, D-20261126-content-word-index) cần trần thời gian thật trên cả hai
-database. Trần ở tầng task (`tokio::time::timeout`) chỉ thôi chờ, câu vẫn chạy nốt và giữ kết nối. Đặt trong kernel
-thì module không cần sqlx (D-20261126-library-isolation), và mọi câu tìm có chi phí do người gọi quyết sau này dùng
+Lý do: tìm chữ công khai của `content` (PT-15, D-20261126-content-word-index, câu dựng bằng bộ dựng câu) cần trần thời
+gian thật trên cả hai database. Trần ở tầng task (`tokio::time::timeout`) chỉ thôi chờ, câu vẫn chạy nốt và giữ kết
+nối. Đặt trong kernel thì module không cần sqlx (D-20261126-library-isolation), và mọi câu tìm có chi phí do người gọi quyết sau này dùng
 chung một cách.
 
 Đã cân nhắc:
