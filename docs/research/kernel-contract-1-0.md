@@ -433,7 +433,7 @@ Lối thoát: nếu bản lớn sau của utoipa bỏ được cách này, `auto
 `nested` — đúng năm luật module đang dùng; thêm luật là thêm vào macro. Lỗi trả đúng `FieldError` và mã i18n hiện có
 (`validation.length`…) nên OpenAPI và client không đổi. `ValidJson<T>` đổi bound từ `validator::Validate` sang
 `autoxide_kernel::http::Validate`, trait có impl chung cho mọi kiểu của `validator` — một extractor cho cả module cũ lẫn
-mới, không ép module đổi một lần (D-20261127-http-layer-choices, thay cách hai extractor của bản đầu). Cuối cùng `validator` chỉ còn (nếu còn) bên trong kernel.
+mới, không ép module đổi một lần (quyết định của PR 4, thay cách hai extractor của bản đầu). Cuối cùng `validator` chỉ còn (nếu còn) bên trong kernel.
 
 ### 4.4 Thời gian
 
