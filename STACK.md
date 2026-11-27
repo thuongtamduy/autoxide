@@ -44,6 +44,7 @@ mới nhất ngày 11/11/2026; **`Cargo.lock` là nguồn sự thật** sau khi 
 | ------------------ | ------------------------------- | --------- | --------------------------------------------------- |
 | Async runtime      | `tokio`                         | 1.54      | Chuẩn thực tế của Rust async                        |
 | HTTP / REST        | `axum`                          | 0.8       | Do nhóm tokio làm                                   |
+| Khớp route        | `matchit`                       | =0.8.4    | Bộ khớp route của axum, ghim đúng bản axum ghim: kernel hỏi nó trước khi ghép router để báo route xung đột bằng lỗi rõ thay vì để axum dừng tiến trình (D-20261127-http-layer-choices) |
 | WebSocket          | `axum` feature `ws` (`tokio-tungstenite` 0.29) | 0.8 | `GET /api/v1/kernel/events/ws` (bước 69); test dùng client `tokio-tungstenite` cùng bản |
 | Middleware HTTP    | `tower-http`                    | 0.7       | Trace, CORS, timeout, giới hạn body, request id, nén response (gzip, brotli — D-20261119-step39-compression) |
 | ORM                | `sea-orm`                       | 2.0       | Một bộ code cho SQLite và Postgres. Module mới truy vấn qua lớp `autoxide_kernel::db` của kernel (dựng trên sea-query + kết nối của SeaORM), không khai SeaORM (D-20261126-kernel-data-layer, luật `wrapped-libraries`) |
