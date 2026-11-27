@@ -45,7 +45,7 @@ async fn list_price_lists(call: ToolCall, input: ListPriceLists) -> Result<Page<
   `cancelled()` luôn `false`, tool `.long_running()` chạy tại chỗ như mọi tool (service vẫn enqueue job của nó), trường
   `.ask_for` thiếu thì trả `kernel.choice_required` (§4) — không bao giờ treo.
 - `Tool::new` không gắn `#[deprecated]`: gỡ thẳng trước 1.0 khi chuyển hết, theo dõi bằng baseline của gate
-  `mcp-output-schema` (D-20261127-transition-paths, #580).
+  `mcp-output-schema` (chính sách "đường cũ trong lúc chuyển", §2.3 hợp đồng kernel, PR #580).
 - **Annotations** sinh từ khai báo và **luôn phát đủ bốn hint tường minh**: `readOnlyHint`, `destructiveHint`,
   `idempotentHint` (`true` khi `read_only`; lệnh ghi `false` trừ khi gọi `.idempotent()`), `openWorldHint` (`false` trừ khi
   `.open_world()`). Kiểm lúc khởi động (`Tool::problems`): `read_only` + `destructive` là lỗi; `title` rỗng hay thiếu (tool
