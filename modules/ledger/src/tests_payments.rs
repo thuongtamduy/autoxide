@@ -466,8 +466,9 @@ async fn expires_by_rut_han_va_tien_ve_sau_han_vao_hang_cho() {
         let (app, gateway) = app(test).await;
         let tenant = app.default_tenant();
         let soon = Timestamp::now() + SignedDuration::from_mins(5);
-        let capped = NewPayment::new(root_of(DEFAULT_TENANT), "card", vnd(100_000), "Order", "demo", "C")
-            .expires_by(soon);
+        let capped =
+            NewPayment::new(root_of(DEFAULT_TENANT), "card", vnd(100_000), "Order", "demo", "C")
+                .expires_by(soon);
         let made = ledger(&app).create_payment(&tenant, Actor::system(), capped).await.unwrap();
         let made = made.into_inner();
         assert!(made.expires_at <= soon, "{} > {soon}", made.expires_at);
@@ -478,7 +479,8 @@ async fn expires_by_rut_han_va_tien_ve_sau_han_vao_hang_cho() {
         assert!(long.into_inner().expires_at < later, "không kéo dài quá hạn thường");
         let past = NewPayment::new(root_of(DEFAULT_TENANT), "card", vnd(1), "Order", "demo", "P")
             .expires_by(Timestamp::now() - SignedDuration::from_mins(1));
-        let refused = ledger(&app).create_payment(&tenant, Actor::system(), past).await.unwrap_err();
+        let refused =
+            ledger(&app).create_payment(&tenant, Actor::system(), past).await.unwrap_err();
         assert_eq!(refused.code(), "validation_failed");
 
         // Hạn đã qua mà job hết hạn chưa chạy (còn `pending`): tiền về vẫn là muộn.
@@ -493,7 +495,10 @@ async fn expires_by_rut_han_va_tien_ve_sau_han_vao_hang_cho() {
             .await
             .unwrap();
         assert_eq!(status(&app, made.id).await, "pending");
-        assert_eq!(webhook(&app, gateway.paid(made.id, vnd(100_000), "evt-c")).await, StatusCode::OK);
+        assert_eq!(
+            webhook(&app, gateway.paid(made.id, vnd(100_000), "evt-c")).await,
+            StatusCode::OK
+        );
         drain(&app).await;
         assert_eq!(status(&app, made.id).await, "succeeded");
         let open = exceptions(&app).await;

@@ -9766,6 +9766,11 @@ export type Data_LedgerExceptionResponse = {
      */
     kind: string;
     note?: string | null;
+    /**
+     * How it was closed: `match`, `accept_received`, `ignore`, `refunded_outside` (by a person), or
+     * `refunded` (closed by the ledger once the payment was refunded in full through the partner;
+     * `resolved_by` is empty). Empty while `open`.
+     */
     resolution?: string | null;
     resolved_by?: string | null;
     /** `open`, `resolved` or `ignored`. */
@@ -17120,6 +17125,11 @@ export type LedgerExceptionResponse = {
    */
   kind: string;
   note?: string | null;
+  /**
+   * How it was closed: `match`, `accept_received`, `ignore`, `refunded_outside` (by a person), or
+   * `refunded` (closed by the ledger once the payment was refunded in full through the partner;
+   * `resolved_by` is empty). Empty while `open`.
+   */
   resolution?: string | null;
   resolved_by?: string | null;
   /** `open`, `resolved` or `ignored`. */
@@ -23348,6 +23358,11 @@ export type Page_LedgerExceptionResponse = {
      */
     kind: string;
     note?: string | null;
+    /**
+     * How it was closed: `match`, `accept_received`, `ignore`, `refunded_outside` (by a person), or
+     * `refunded` (closed by the ledger once the payment was refunded in full through the partner;
+     * `resolved_by` is empty). Empty while `open`.
+     */
     resolution?: string | null;
     resolved_by?: string | null;
     /** `open`, `resolved` or `ignored`. */

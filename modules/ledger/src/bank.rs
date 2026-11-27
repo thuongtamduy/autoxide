@@ -385,7 +385,8 @@ impl LedgerService {
             ));
         }
         let expiry = SignedDuration::from_mins(self.config.payment_expiry_minutes);
-        let deadline = crate::service::payment_deadline(now() + expiry, input.expires_by, &mut problems);
+        let deadline =
+            crate::service::payment_deadline(now() + expiry, input.expires_by, &mut problems);
         if !problems.is_empty() {
             return Err(Error::validation(problems));
         }
