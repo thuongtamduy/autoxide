@@ -290,7 +290,7 @@ async fn open(
     }
 }
 
-/// Nếu không mở được kết nối TCP tới máy chủ trong URL PostgreSQL thì trả lý do (đã nói máy và cổng); ngược lại `None`.
+// Nếu không mở được kết nối TCP tới máy chủ trong URL PostgreSQL thì trả lý do (đã nói máy và cổng); ngược lại `None`.
 async fn tcp_cause(url: &DatabaseUrl) -> Option<String> {
     if url.backend() != DatabaseBackend::Postgres {
         return None;
@@ -407,7 +407,7 @@ fn read_options(config: &DatabaseConfig, url: &DatabaseUrl) -> ConnectOptions {
 mod tests {
     use super::*;
 
-    /// Cổng 1 không có ai nghe: nguyên nhân gốc là "không tới được", không phải "pool timed out" chung chung.
+    // Cổng 1 không có ai nghe: nguyên nhân gốc là "không tới được", không phải "pool timed out" chung chung.
     #[tokio::test]
     async fn postgres_sai_cong_noi_nguyen_nhan_goc() {
         let url: DatabaseUrl = "postgres://u:p@127.0.0.1:1/db".parse().unwrap();
