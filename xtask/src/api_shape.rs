@@ -1,6 +1,6 @@
 //! Hình dạng thống nhất của `/api/v1`, kiểm trên `docs/openapi.json` (D-20261121-api-shape).
 //!
-//! Học một endpoint là biết các endpoint còn lại (CLAUDE.md, "Thân thiện với AI"). Sáu luật:
+//! Học một endpoint là biết các endpoint còn lại (CLAUDE.md, "Thân thiện với AI"). Bảy luật:
 //!
 //! - `api-closed-body`: thân request JSON là object thì đóng (`additionalProperties: false`, tức
 //!   kiểu Rust có `#[serde(deny_unknown_fields)]`): trường lạ hay gõ sai tên bị trả 422
@@ -15,6 +15,13 @@
 //! - `api-param-description`: mọi tham số (đường dẫn, query, header) có `description` ở chính tham số — chỗ
 //!   Swagger UI / Scalar hiển thị và agent đọc để gọi đúng (D-20261125-list-pages-kernel). Dòng cho phép của luật
 //!   này ghi `<đường dẫn>?<tên tham số>`.
+//!
+//! - `api-inline-field-doc`: không `allOf` nào có phần chỉ gồm `{description?, type: "object"}` không `properties` —
+//!   dấu của doc `///` trên trường `#[schema(inline)]` có kiểu là thẳng một struct / enum: utoipa gộp schema của
+//!   kiểu với mô tả của trường thành `allOf` mà phần sau là object rỗng (chuỗi giao object không có giá trị hợp lệ,
+//!   SDK sinh `& Record<string, unknown>`; D-20261127-inline-field-docs). Kiểm trên cả `docs/openapi.json` và
+//!   `docs/mcp-tools.json`. Hình của `#[serde(flatten)]` một map (phần object rỗng ĐỨNG ĐẦU, mọi phần sau là thân
+//!   struct có `properties`, như `PersonalDataResponse`) được nhận ra theo cấu trúc; luật này không có dòng cho phép.
 //!
 //! SCIM 2.0 (`/api/v1/auth/scim/v2/…`) theo RFC 7643 / 7644 — thân lỗi riêng
 //! (`application/scim+json`) và client gửi kèm thuộc tính chỉ đọc (`id`, `meta`, `schemas`) mà máy
@@ -57,6 +64,8 @@ pub fn check(root: &Path) -> Result<Report, String> {
     let tools: Value =
         serde_json::from_str(&tools_text).map_err(|error| format!("{MCP_FILE}: {error}"))?;
     found.extend(find_tools(&tools));
+    found.extend(inline_field_docs(&document, "OPENAPI"));
+    found.extend(inline_field_docs(&tools, "MCP"));
     let mut used = BTreeSet::new();
     let mut violations = Vec::new();
     for (key, message) in found {
@@ -68,8 +77,10 @@ pub fn check(root: &Path) -> Result<Report, String> {
         violations.push(Violation {
             rule,
             // Luật của tool ghi vị trí ở file tool, luật của endpoint ở file OpenAPI.
-            location: if method == "TOOL" {
+            location: if method == "TOOL" || method == "MCP" {
                 format!("{MCP_FILE} {path}")
+            } else if method == "OPENAPI" {
+                format!("{OPENAPI_FILE} {path}")
             } else {
                 format!("{OPENAPI_FILE} {method} {path}")
             },
@@ -209,6 +220,65 @@ fn find_tools(document: &Value) -> Vec<(Key, String)> {
             })
         })
         .collect()
+}
+
+/// `allOf` có phần object rỗng do doc `///` trên trường `#[schema(inline)]` (luật `api-inline-field-doc`), theo JSON
+/// pointer trong `document`; `file` là `OPENAPI` hay `MCP` (chỗ ghi vị trí). Luật không nằm trong [`RULES`] nên
+/// không có dòng cho phép.
+fn inline_field_docs(document: &Value, file: &str) -> Vec<(Key, String)> {
+    let mut found = Vec::new();
+    let mut stack = vec![(String::new(), document)];
+    while let Some((pointer, value)) = stack.pop() {
+        match value {
+            Value::Object(map) => {
+                if let Some(members) = map.get("allOf").and_then(Value::as_array)
+                    && has_field_doc_member(members)
+                {
+                    found.push((
+                        ("api-inline-field-doc", file.to_owned(), format!("{pointer}/allOf")),
+                        "`allOf` has a member that is only `{description, type: object}`: a `///` doc on a \
+                         `#[schema(inline)]` field whose type is directly a struct or enum. Move the text to the \
+                         doc of the containing type (or of the field's type) and write `//` on the field \
+                         (D-20261127-inline-field-docs)"
+                            .to_owned(),
+                    ));
+                }
+                for (key, child) in map {
+                    let key = key.replace('~', "~0").replace('/', "~1");
+                    stack.push((format!("{pointer}/{key}"), child));
+                }
+            }
+            Value::Array(items) => {
+                for (index, child) in items.iter().enumerate() {
+                    stack.push((format!("{pointer}/{index}"), child));
+                }
+            }
+            _ => {}
+        }
+    }
+    found.sort();
+    found
+}
+
+/// Có phần object rỗng (`{description?, type: "object"}`, không gì khác) mà không phải hình của `#[serde(flatten)]`
+/// một map: phần rỗng đứng đầu, mọi phần sau là thân struct (`type: object` có `properties`, không `$ref`).
+fn has_field_doc_member(members: &[Value]) -> bool {
+    let bare = |member: &Value| {
+        member.as_object().is_some_and(|map| {
+            map.get("type").and_then(Value::as_str) == Some("object")
+                && map.keys().all(|key| key == "type" || key == "description")
+        })
+    };
+    let body = |member: &Value| {
+        member.get("type").and_then(Value::as_str) == Some("object")
+            && member.get("properties").is_some_and(Value::is_object)
+            && member.get("$ref").is_none()
+    };
+    let Some(position) = members.iter().position(bare) else {
+        return false;
+    };
+    let flattened_map = position == 0 && members.len() > 1 && members[1..].iter().all(body);
+    !flattened_map
 }
 
 /// Câu báo lỗi khi thân request JSON là object mà không đóng.
@@ -453,6 +523,35 @@ mod tests {
         let operation = doc["paths"]["/api/v1/x"].clone();
         doc["paths"] = json!({ "/api/v1/auth/scim/v2/Users": operation });
         assert!(rules(&doc).is_empty());
+    }
+
+    #[test]
+    fn doc_tren_truong_inline_bi_bao_flatten_map_thi_khong() {
+        let money = json!({"type": "object", "properties": {"amount": {"type": "string"}}});
+        let realm = json!({"type": "string", "enum": ["staff", "customer"]});
+        let bare = json!({"description": "Field doc.", "type": "object"});
+        let doc = json!({"components": {"schemas": {
+            "Realm": {"properties": {"realm": {"allOf": [realm, bare]}}},
+            "Price": {"properties": {"amount": {"allOf": [money, {"type": "object"}]}}},
+            // `#[serde(flatten)]` một map rồi tới các trường của struct (`PersonalDataResponse`).
+            "Flatten": {"allOf": [bare, {"type": "object", "required": ["auth"], "properties": {"auth": {}}}]},
+            // `Option<T>` / `$ref` kèm mô tả: không phải phần rỗng.
+            "Described": {"allOf": [{"$ref": "#/components/schemas/X", "description": "d"}, {"type": "object", "properties": {"a": {}}}]},
+            "Nullable": {"properties": {"compare_at": {"description": "d", "oneOf": [money, {"type": "null"}]}}}
+        }}});
+        let found: Vec<String> =
+            inline_field_docs(&doc, "OPENAPI").into_iter().map(|((_, _, path), _)| path).collect();
+        assert_eq!(
+            found,
+            vec![
+                "/components/schemas/Price/properties/amount/allOf".to_owned(),
+                "/components/schemas/Realm/properties/realm/allOf".to_owned(),
+            ]
+        );
+        // Phần rỗng đứng sau một thân struct thì vẫn là doc trên trường inline.
+        assert!(has_field_doc_member(&[money.clone(), bare.clone()]));
+        assert!(has_field_doc_member(std::slice::from_ref(&bare)));
+        assert!(!has_field_doc_member(&[bare, money]));
     }
 
     #[test]

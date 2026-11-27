@@ -5600,34 +5600,26 @@
       },
       "CatalogPriceInput": {
         "additionalProperties": false,
-        "description": "A price to add.",
+        "description": "A price to add. `amount` is in the currency of the list and not negative.",
         "properties": {
           "amount": {
-            "allOf": [
-              {
-                "description": "A sum of money: an integer number of the currency's minor units (cents for `USD`, dong for\n`VND`) plus the currency.",
-                "properties": {
-                  "amount": {
-                    "description": "Amount in minor units of `currency`, as a base-10 integer string (JSON numbers above\n2^53 lose precision in JavaScript). `\"1999\"` with `USD` is 19.99 US dollars; negative\namounts start with `-`.",
-                    "example": "1999",
-                    "pattern": "^-?[0-9]{1,19}$",
-                    "type": "string"
-                  },
-                  "currency": {
-                    "$ref": "#/components/schemas/Currency"
-                  }
-                },
-                "required": [
-                  "amount",
-                  "currency"
-                ],
-                "type": "object"
+            "description": "A sum of money: an integer number of the currency's minor units (cents for `USD`, dong for\n`VND`) plus the currency.",
+            "properties": {
+              "amount": {
+                "description": "Amount in minor units of `currency`, as a base-10 integer string (JSON numbers above\n2^53 lose precision in JavaScript). `\"1999\"` with `USD` is 19.99 US dollars; negative\namounts start with `-`.",
+                "example": "1999",
+                "pattern": "^-?[0-9]{1,19}$",
+                "type": "string"
               },
-              {
-                "description": "In the currency of the list, not negative.",
-                "type": "object"
+              "currency": {
+                "$ref": "#/components/schemas/Currency"
               }
-            ]
+            },
+            "required": [
+              "amount",
+              "currency"
+            ],
+            "type": "object"
           },
           "compare_at": {
             "description": "Struck-through price, higher than `amount`; display only.",
@@ -88491,7 +88483,7 @@
       },
       "ProviderRequest": {
         "additionalProperties": false,
-        "description": "A new sign-in provider.",
+        "description": "A new sign-in provider. `realm` is `staff` (default) or `customer`.",
         "properties": {
           "allow_signup": {
             "description": "Let someone without an account get one by signing in (still needs registration open, or\n`default_role_id`). Default `false`.",
@@ -88556,20 +88548,12 @@
             "type": "string"
           },
           "realm": {
-            "allOf": [
-              {
-                "description": "The kind of account: `staff` (has the permissions of their roles) or `customer` (an account of\none tenant's shop, without permissions).",
-                "enum": [
-                  "staff",
-                  "customer"
-                ],
-                "type": "string"
-              },
-              {
-                "description": "`staff` (default) or `customer`.",
-                "type": "object"
-              }
-            ]
+            "description": "The kind of account: `staff` (has the permissions of their roles) or `customer` (an account of\none tenant's shop, without permissions).",
+            "enum": [
+              "staff",
+              "customer"
+            ],
+            "type": "string"
           },
           "redirect_uris": {
             "description": "Pages of the interface the provider may send the browser back to (1 to 20, exact match).",
@@ -173197,6 +173181,16 @@
               }
             },
             "description": "No such call in your scope; code `conversations.call_not_found`."
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The recording cannot be deleted yet: file storage is missing (`conversations.storage_unavailable`) or the recording is still kept by a voice provider whose connector is off (`conversations.voice_provider_unavailable`); nothing was deleted, try again once it is on."
           },
           "default": {
             "content": {

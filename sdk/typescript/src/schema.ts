@@ -1964,8 +1964,12 @@ export type CatalogPriceGuard = {
   org_id: string;
 };
 
-/** A price to add. */
+/** A price to add. `amount` is in the currency of the list and not negative. */
 export type CatalogPriceInput = {
+  /**
+   * A sum of money: an integer number of the currency's minor units (cents for `USD`, dong for
+   * `VND`) plus the currency.
+   */
   amount: {
     /**
      * Amount in minor units of `currency`, as a base-10 integer string (JSON numbers above
@@ -1974,7 +1978,7 @@ export type CatalogPriceInput = {
      */
     amount: string;
     currency: Currency;
-  } & Record<string, unknown>;
+  };
   /** Struck-through price, higher than `amount`; display only. */
   compare_at?: {
     /**
@@ -28582,7 +28586,7 @@ export type ProviderPatch = {
   scopes?: string | null;
 };
 
-/** A new sign-in provider. */
+/** A new sign-in provider. `realm` is `staff` (default) or `customer`. */
 export type ProviderRequest = {
   /**
    * Let someone without an account get one by signing in (still needs registration open, or
@@ -28615,7 +28619,11 @@ export type ProviderRequest = {
   kind: string;
   /** Label for the "Sign in with …" button, 1 to 100 characters. */
   name: string;
-  realm?: ("staff" | "customer") & Record<string, unknown>;
+  /**
+   * The kind of account: `staff` (has the permissions of their roles) or `customer` (an account of
+   * one tenant's shop, without permissions).
+   */
+  realm?: "staff" | "customer";
   /** Pages of the interface the provider may send the browser back to (1 to 20, exact match). */
   redirect_uris: string[];
   /** Space-separated scopes; default `openid email profile` (`read:user user:email` for GitHub). */
@@ -41280,6 +41288,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        503: Problem;
         default: Problem;
       };
     };
