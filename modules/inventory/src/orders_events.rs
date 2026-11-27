@@ -7,8 +7,8 @@
 //! | `orders.order_confirmed` | `confirm(order_id)` | `order_id` |
 //! | `orders.order_cancelled` | `release(order_id, Cancelled)` | `order_id` |
 //! | `orders.preorder_cancelled` | `release_lines(order_id, reference = event id)` — trả riêng các dòng | `order_id`, `lines[{line_key, quantity}]` (phần huỷ lần đó) |
-//! | `orders.fulfillment_delivered` | xuất (`delivery`), `fulfilment_key = fulfillment:<fulfillment_id>` — một lần giao tới tay người mua | `order_id`, `fulfillment_id`, `lines[{line_key, quantity, serials[]}]` |
-//! | `orders.order_delivered` | xuất (`delivery`) `delivered_lines` (event cũ không có: phần còn giữ của mọi dòng), `fulfilment_key = order:<order_id>:delivered` (UT-1) | `order_id`, `delivered_lines[{line_key, quantity, serials[]}]` |
+//! | `orders.fulfillment_delivered` | xuất (`delivery`) mỗi dòng tới `delivered_quantity` (tổng đã giao; event cũ: thêm `quantity`), `fulfilment_key = fulfillment:<fulfillment_id>` — một lần giao tới tay người mua | `order_id`, `fulfillment_id`, `lines[{line_key, variant_id, quantity, delivered_quantity, serials[]}]` |
+//! | `orders.order_delivered` | xuất (`delivery`) mỗi dòng của `delivered_lines` tới `delivered_quantity` (event cũ không có: phần còn giữ của mọi dòng), `fulfilment_key = order:<order_id>:delivered` (UT-1); không xuất được thì log + `inventory_delivery_unissued_total` | `order_id`, `delivered_lines[{line_key, variant_id, quantity, delivered_quantity, serials[]}]` |
 //! | `orders.line_serials_recorded` | xuất (`delivery`) phần đã giao của dòng mà trước đó thiếu serial, `fulfilment_key = serials:<event id>` | `order_id`, `line_id`, `line_key`, `delivered_quantity`, `serials[]` |
 //! | `orders.return_received` | `restock`, `reference = return:<return_id>` | `return_id`, `order_id`, `warehouse_org_id`, `lines[{variant_id, quantity, sellable, lot_code?, serials[]}]` |
 

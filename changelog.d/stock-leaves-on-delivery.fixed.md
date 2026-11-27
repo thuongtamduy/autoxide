@@ -8,7 +8,8 @@
   nothing more. Serial-tracked units issue with the serials recorded on the order line, each from the warehouse
   holding it; units still without serials stay reserved until they are recorded (new event
   `orders.line_serials_recorded`). Because the goods are gone, this path may take units of an expired lot and
-  issues units whose reservation had expired or been released (both logged); a delivery that cannot be issued
-  is logged with its error code and counted in `inventory_delivery_unissued_total`.
-  **Upgrading:** orders delivered before this version keep their reservation `confirmed`; see "Reservations (for orders)" in
-  `docs/INVENTORY.md` to release them and record the sale by hand.
+  issues units whose reservation the system had released (hold expired, payment failed) — both logged; a
+  reservation released by staff is never issued again. A delivery that cannot be issued is logged with its error
+  code and counted in `inventory_delivery_unissued_total`; reconcile it by releasing the hold and recording an
+  adjustment. **Upgrading:** orders delivered before this version keep their reservation `confirmed`; reconcile
+  them the same way (see "Reservations (for orders)" in `docs/INVENTORY.md`).

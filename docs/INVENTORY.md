@@ -76,22 +76,26 @@ Module `orders` holds stock through `autoxide_inventory::api::Inventory`:
    events arriving twice, late or in any order, or after units were already issued by hand with `fulfil` when the
    parcel left, never issue more. Because the goods are already gone, this path also:
    - takes units from an expired lot when the lots still in date are not enough (logged as a warning);
-   - issues units whose reservation had already expired or been released (for example a bank transfer that
-     arrived after the hold ran out): the `sale` line takes them straight from `on_hand` and `available`;
+   - issues units whose reservation the system had released (the hold expired, or the payment failed, for example
+     a bank transfer that arrived after the hold ran out): the `sale` line takes them straight from `on_hand` and
+     `available`. A reservation released by staff (`POST /reservations/{id}/release`) or by a cancelled order is
+     never issued again;
    - issues serial-tracked goods with the serial numbers recorded on the order line
      (`POST /api/v1/orders/{id}/lines/{line_id}/serials`), each serial from the warehouse that holds it. Units
      without a usable serial (not recorded yet, or not in stock in a warehouse holding the line) stay reserved
      (logged as a warning) while the other lines are issued; recording the serials later
      (`orders.line_serials_recorded`) issues them.
-   A manual `fulfil` does none of these three. When a delivered order cannot be issued at all (no reservation for
-   goods that track stock, or stock already gone), `inventory` logs a warning with the error `code` and counts
-   `inventory_delivery_unissued_total{reason="no_reservation"|"rejected"}`: reconcile that stock level by hand
-   with an adjustment.
+   A manual `fulfil` does none of these three. One event is issued in one transaction: if one of its lines is
+   rejected (for example stock already gone), none of its lines is issued. When a delivered order cannot be issued
+   (no reservation for goods that track stock, or rejected), `inventory` logs a warning with the error `code` and
+   counts `inventory_delivery_unissued_total{reason="no_reservation"|"rejected"}`. Reconcile by hand: release
+   the hold (`POST /api/v1/inventory/reservations/{id}/release`; a reservation released by staff is never issued
+   again, so later events for the order, such as serials recorded afterwards, do not take the stock a second
+   time), then record the units sold with an adjustment (`POST /api/v1/inventory/adjustments`, negative
+   quantity, reason `data_entry_fix`).
    Upgrading from an earlier version: orders delivered before this version keep their reservation `confirmed`
-   (their units stay `reserved`). List them with `GET /api/v1/inventory/reservations?status=confirmed`, and for
-   each order already delivered release the hold (`POST /api/v1/inventory/reservations/{id}/release`) and record
-   the units sold with an adjustment (`POST /api/v1/inventory/adjustments`, negative quantity, reason
-   `data_entry_fix`).
+   (their units stay `reserved`). List them with `GET /api/v1/inventory/reservations?status=confirmed` and
+   reconcile each order already delivered the same way (release, then adjustment).
 4. `release` — give back what was not shipped (cancelled, payment failed…). Releasing twice adds back once.
 5. `restock` — returned goods come back in (`reference` such as `return:<id>`); unsellable lines are only recorded.
 

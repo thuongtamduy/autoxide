@@ -813,11 +813,25 @@ impl InventoryService {
                     tracing::debug!(order_id = %order, "reservation already fulfilled; nothing to issue");
                     return load(&transaction, tenant, row).await;
                 }
-                // Chỗ giữ đã hết hạn / đã trả mà hàng vẫn tới tay người mua (vd chờ chuyển khoản quá hạn giữ):
-                // hàng vật lý đã đi, nên event giao hàng vẫn xuất phần đã trả lại, trừ thẳng tồn (`available`
-                // cùng giảm). `fulfil` gọi tay thì không.
-                let lapsed = delivery.is_some()
-                    && matches!(status, ReservationStatus::Expired | ReservationStatus::Released);
+                // Nhân viên đã trả tay chỗ giữ (đối soát tay hàng đã giao, xem docs/INVENTORY.md): xong, không xuất.
+                if delivery.is_some()
+                    && status == ReservationStatus::Released
+                    && row.release_reason.as_deref() == Some("manual")
+                {
+                    tracing::debug!(order_id = %order, "reservation released by staff; nothing to issue");
+                    return load(&transaction, tenant, row).await;
+                }
+                // Chỗ giữ HỆ THỐNG tự trả (hết hạn giữ, thanh toán lỗi) mà hàng vẫn tới tay người mua (vd chuyển
+                // khoản tới muộn): hàng vật lý đã đi, nên event giao hàng vẫn xuất phần đã trả lại, trừ thẳng tồn
+                // (`available` cùng giảm). Không áp khi: nhân viên trả tay (`manual` — đã tự đối soát, xuất nữa là
+                // trừ hai lần), đơn huỷ; event cũ không nêu tổng đã giao (không biết phần nào đã huỷ); `fulfil` tay.
+                let lapsed = delivery.is_some_and(crate::delivery::knows_totals)
+                    && (status == ReservationStatus::Expired
+                        || (status == ReservationStatus::Released
+                            && matches!(
+                                row.release_reason.as_deref(),
+                                Some("payment_failed" | "expired")
+                            )));
                 if !lapsed && !matches!(status, ReservationStatus::Held | ReservationStatus::Confirmed) {
                     return Err(expired(order));
                 }

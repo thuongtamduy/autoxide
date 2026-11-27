@@ -476,39 +476,71 @@ async fn giao_hang_combo_hai_thanh_phan_serial() {
     .unwrap();
 }
 
-/// Chỗ giữ đã trả (vd quá hạn chờ chuyển khoản) mà hàng vẫn tới tay người mua: kho vẫn ghi `sale`, trừ thẳng
-/// tồn (`available` cùng giảm); event tới lại không trừ thêm.
+/// Chỗ giữ hệ thống tự trả (thanh toán lỗi, hết hạn giữ) mà hàng vẫn tới tay người mua: kho vẫn ghi `sale`,
+/// trừ thẳng tồn (`available` cùng giảm); event tới lại không trừ thêm. Event cũ (không nêu tổng đã giao) không
+/// xuất trên chỗ giữ đã trả. Nhân viên trả tay (đối soát tay) thì event sau không xuất nữa.
 #[tokio::test]
 async fn giao_hang_khi_cho_giu_da_tra_van_tru_ton() {
     TestDatabase::run(async |test| {
         let (orders, outbox) = Emitter::new("orders", &EVENTS);
         let shop = shop_with(test, |builder, _| builder.module(orders)).await;
+        // Lịch chạy mỗi ngày của module chạy trước khi đẩy hạn giữ.
+        drain(&shop).await;
         let item = shop.catalog.item();
-        stock_in(&shop, shop.tree.a, item, 10, None).await;
+        stock_in(&shop, shop.tree.a, item, 20, None).await;
         let api = shop.api::<dyn Inventory>().unwrap();
         let tenant = shop.default_tenant();
-        let order = Uuid::now_v7();
-        let request = ReserveRequest::new(
-            order,
-            shop.tree.a,
-            Timestamp::now() + SignedDuration::from_mins(30),
-            vec![ReserveLine::new("1", item, 3)],
-        );
-        api.reserve(&tenant, &request).await.unwrap();
-        api.release(&tenant, order, crate::api::ReleaseReason::PaymentFailed).await.unwrap();
-        assert_eq!(stock(&shop, item).await, (10, 0));
-        let delivered = OrderDelivered(json!({"after": {
-            "order_id": order, "lines": [{"line_key": "1"}],
-            "delivered_lines": [{"line_key": "1", "variant_id": item, "quantity": 3, "delivered_quantity": 3, "serials": []}],
-        }}));
-        twice(&shop, &outbox, &delivered).await;
+        let hold = |order: Uuid| {
+            ReserveRequest::new(
+                order,
+                shop.tree.a,
+                Timestamp::now() + SignedDuration::from_mins(30),
+                vec![ReserveLine::new("1", item, 3)],
+            )
+        };
+        let delivered = |order: Uuid, total: Option<i64>| {
+            let mut line =
+                json!({"line_key": "1", "variant_id": item, "quantity": 3, "serials": []});
+            if let Some(total) = total {
+                line["delivered_quantity"] = json!(total);
+            }
+            OrderDelivered(json!({"after": {
+                "order_id": order, "lines": [{"line_key": "1"}], "delivered_lines": [line],
+            }}))
+        };
+
+        // Thanh toán lỗi, chỗ giữ trả; event cũ không xuất; event mới xuất 3 (hai lần vẫn 3).
+        let failed = Uuid::now_v7();
+        api.reserve(&tenant, &hold(failed)).await.unwrap();
+        api.release(&tenant, failed, crate::api::ReleaseReason::PaymentFailed).await.unwrap();
+        assert_eq!(stock(&shop, item).await, (20, 0));
+        twice(&shop, &outbox, &delivered(failed, None)).await;
+        assert_eq!(stock(&shop, item).await, (20, 0));
+        twice(&shop, &outbox, &delivered(failed, Some(3))).await;
         let found = level(&shop, shop.tree.a, item).await;
         assert_eq!(
             (found["on_hand"].as_i64(), found["reserved"].as_i64(), found["available"].as_i64()),
-            (Some(7), Some(0), Some(7)),
+            (Some(17), Some(0), Some(17)),
             "{found}"
         );
-        assert_eq!(status(&shop, order).await, "released");
+        assert_eq!(status(&shop, failed).await, "released");
+
+        // Hết hạn giữ: cùng nhánh.
+        let late = Uuid::now_v7();
+        api.reserve(&tenant, &hold(late)).await.unwrap();
+        super::reservations::age_holds(&shop).await;
+        super::reservations::expire_now(&shop).await;
+        assert_eq!(status(&shop, late).await, "expired");
+        twice(&shop, &outbox, &delivered(late, Some(3))).await;
+        assert_eq!(stock(&shop, item).await, (14, 0));
+
+        // Nhân viên đã đối soát tay (trả chỗ giữ + điều chỉnh): event sau không trừ lần hai.
+        let manual = Uuid::now_v7();
+        api.reserve(&tenant, &hold(manual)).await.unwrap();
+        api.confirm(&tenant, manual).await.unwrap();
+        api.release(&tenant, manual, crate::api::ReleaseReason::Manual).await.unwrap();
+        twice(&shop, &outbox, &delivered(manual, Some(3))).await;
+        assert_eq!(stock(&shop, item).await, (14, 0));
         assert_consistent(&shop).await;
     })
     .await

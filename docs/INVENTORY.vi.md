@@ -74,19 +74,23 @@ Module `orders` giữ hàng qua `autoxide_inventory::api::Inventory`:
    dòng **tới đúng** tổng đó, không quá phần còn giữ: event tới hai lần, tới muộn, sai thứ tự, hay sau khi đã xuất
    tay bằng `fulfil` lúc gửi kiện cũng không xuất thừa. Vì hàng đã đi rồi, đường này còn:
    - lấy lô đã quá hạn khi lô còn hạn không đủ (ghi cảnh báo trong log);
-   - xuất cả đơn vị mà chỗ giữ đã hết hạn hay đã trả (vd chuyển khoản tới sau khi hết hạn giữ): dòng `sale` trừ
-     thẳng `on_hand` và `available`;
+   - xuất cả đơn vị mà hệ thống đã tự trả chỗ giữ (hết hạn giữ, hay thanh toán lỗi — vd chuyển khoản tới sau khi
+     hết hạn giữ): dòng `sale` trừ thẳng `on_hand` và `available`. Chỗ giữ do nhân viên trả
+     (`POST /reservations/{id}/release`) hay do huỷ đơn thì không bao giờ xuất lại;
    - xuất hàng theo serial bằng các số serial đã ghi ở dòng đơn
      (`POST /api/v1/orders/{id}/lines/{line_id}/serials`), mỗi số ở đúng kho đang giữ số đó. Đơn vị chưa có số dùng
      được (chưa ghi, hay số không còn ở kho nào đang giữ dòng) vẫn giữ (ghi cảnh báo trong log) trong khi các dòng
      khác được xuất; ghi serial sau đó (`orders.line_serials_recorded`) sẽ xuất nốt.
-   `fulfil` gọi tay không làm ba điều trên. Đơn đã giao mà không xuất được gì (không có chỗ giữ cho hàng theo dõi
-   tồn, hay tồn đã hết) thì `inventory` ghi cảnh báo kèm `code` của lỗi và đếm
-   `inventory_delivery_unissued_total{reason="no_reservation"|"rejected"}`: chỉnh tay dòng tồn đó bằng lệnh điều chỉnh.
-   Nâng cấp từ bản trước: đơn đã giao trước bản này giữ chỗ `confirmed` mãi (đơn vị vẫn `reserved`). Liệt kê bằng
-   `GET /api/v1/inventory/reservations?status=confirmed`; với mỗi đơn đã giao, trả chỗ giữ
-   (`POST /api/v1/inventory/reservations/{id}/release`) rồi ghi số đã bán bằng lệnh điều chỉnh
+   `fulfil` gọi tay không làm ba điều trên. Một event xuất trong một transaction: một dòng của nó bị từ chối (vd
+   tồn đã hết) thì không dòng nào của event được xuất. Đơn đã giao mà không xuất được (không có chỗ giữ cho hàng
+   theo dõi tồn, hay bị từ chối) thì `inventory` ghi cảnh báo kèm `code` của lỗi và đếm
+   `inventory_delivery_unissued_total{reason="no_reservation"|"rejected"}`. Đối soát tay: trả chỗ giữ
+   (`POST /api/v1/inventory/reservations/{id}/release`; chỗ giữ do nhân viên trả không bao giờ xuất lại, nên event
+   sau của đơn — như ghi serial sau — không trừ kho lần hai), rồi ghi số đã bán bằng lệnh điều chỉnh
    (`POST /api/v1/inventory/adjustments`, số âm, lý do `data_entry_fix`).
+   Nâng cấp từ bản trước: đơn đã giao trước bản này giữ chỗ `confirmed` mãi (đơn vị vẫn `reserved`). Liệt kê bằng
+   `GET /api/v1/inventory/reservations?status=confirmed` và đối soát từng đơn đã giao như trên (trả chỗ giữ, rồi
+   điều chỉnh).
 4. `release` — trả phần chưa xuất (huỷ đơn, thanh toán lỗi…). Trả hai lần chỉ cộng lại một lần.
 5. `restock` — nhập lại hàng trả về (`reference` như `return:<id>`); dòng không bán lại được chỉ được ghi nhận.
 

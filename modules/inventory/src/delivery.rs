@@ -6,7 +6,7 @@
 //! - kho tự chia số lượng và số serial theo từng dòng giữ (kho): serial nào xuất ở kho đang giữ serial đó;
 //!   phần thiếu số serial (chưa ghi, hay số không ở kho nào đang giữ dòng) giữ nguyên chỗ giữ (cảnh báo trong
 //!   log) tới khi nhân viên ghi serial (`orders.line_serials_recorded`) — các dòng khác vẫn xuất;
-//! - chỗ giữ đã hết hạn / đã trả (`lapsed`): phần đã trả lại `available` vẫn xuất, trừ thẳng tồn;
+//! - chỗ giữ hệ thống tự trả (hết hạn, thanh toán lỗi — `lapsed`): phần đã trả lại vẫn xuất, trừ thẳng tồn;
 //! - lô đã quá hạn được lấy khi lô còn hạn không đủ (cảnh báo trong log, xem `lots::lots_out`).
 
 use std::collections::{HashMap, VecDeque};
@@ -51,6 +51,11 @@ impl DeliveredLine {
     pub(crate) fn all() -> Self {
         DeliveredLine { line_key: String::new(), want: Want::Remainder, serials: Vec::new() }
     }
+}
+
+/// Mọi dòng nêu tổng đã giao (`Want::UpTo`, event từ vòng sửa 3 của UT-1).
+pub(crate) fn knows_totals(wanted: &[DeliveredLine]) -> bool {
+    !wanted.is_empty() && wanted.iter().all(|line| matches!(line.want, Want::UpTo(_)))
 }
 
 /// Số đơn vị của dòng đơn theo `count` của từng dòng giữ: nhỏ nhất qua các biến thể (combo).
