@@ -50,6 +50,9 @@ services:
   migrate:
     <<: *autoxide
     command: ["migrate", "up", "--all"]
+    # Chạy một lần rồi thoát: không có máy chủ để hỏi (HEALTHCHECK của image chỉ dành cho `serve`).
+    healthcheck:
+      disable: true
     depends_on:
       postgres:
         condition: service_healthy
@@ -58,6 +61,14 @@ services:
   app:
     <<: *autoxide
     command: ["serve"]
+    # Hỏi chính binary (image không có shell hay curl): 200 ở /health/ready khi database trả lời. Cùng lệnh với HEALTHCHECK của
+    # image; khai ở đây để người đọc thấy và chỉnh được.
+    healthcheck:
+      test: ["CMD", "autoxide", "healthcheck"]
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
     ports:
       # Chỉ mở trên máy này; đặt reverse proxy (TLS) phía trước khi ra internet.
       - "127.0.0.1:8080:8080"

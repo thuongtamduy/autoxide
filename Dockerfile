@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 #
 # Image của Autoxide: build bằng toolchain Rust đã ghim (thư viện ngoài ở lớp riêng nhờ cargo-chef),
-# chạy trên Debian slim với một người dùng không phải root. Xem docs/DEPLOY.md.
+# chạy trên image distroless (không shell) với một người dùng không phải root. Xem docs/DEPLOY.md.
 #
 #   docker build -t autoxide .
 #   docker run --rm -p 8080:8080 -v autoxide-data:/var/lib/autoxide/data autoxide
@@ -49,14 +49,19 @@ COPY . .
 ARG SOURCE_DATE_EPOCH=0
 ENV SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH}
 RUN cargo auditable build --release --locked -p autoxide \
-    && cp target/release/autoxide /usr/local/bin/autoxide
+    && cp target/release/autoxide /usr/local/bin/autoxide \
+    && mkdir -p /rootfs/var/lib/autoxide/data
 # Văn bản giấy phép của mọi crate trong binary (D-20261126-third-party-licenses): nghĩa vụ giữ thông báo bản quyền khi
 # phân phối binary. Đi cùng image, và workflow phát hành lấy từ đây đưa vào tarball và trang Release.
 RUN cargo about generate --manifest-path crates/app/Cargo.toml --locked about.hbs \
     -o /usr/local/share/THIRD-PARTY-LICENSES.html
 
 # --- chạy ----------------------------------------------------------------------
-FROM debian:trixie-slim@sha256:a72b4433de1cf7d6bae0c4cee74d0547f58601a643b3375f070c51600d63b6b2
+# Image distroless (G7): chỉ glibc, libgcc, chứng chỉ gốc và múi giờ — không shell, không trình quản lý gói, không curl — nên bề mặt
+# tấn công và số thành phần cần vá nhỏ hơn nhiều so với một bản Debian đầy đủ. Binary build trên Debian 13 và dùng glibc nên chọn
+# biến thể `cc` của Debian 13 (cùng phiên bản glibc), không phải `static` (dành cho binary tĩnh). Kiểm sức khoẻ bằng chính binary
+# (`autoxide healthcheck`) vì không có shell hay curl. Ghim theo digest như mọi image nền; Dependabot đề xuất digest mới mỗi tuần.
+FROM gcr.io/distroless/cc-debian13:nonroot@sha256:29ee70762214fe8190cea04ef1c0a84a8365879e047ce8f911ae5a5ab2355fa2
 # Nhãn OCI: trang package trên GitHub (ghcr.io) và `docker inspect` đọc mô tả, mã nguồn, tài liệu từ đây.
 # Workflow phát hành (docker/metadata-action) có thể ghi đè title / description / source bằng thông tin
 # của repo; `documentation` thì chỉ có ở đây.
@@ -65,22 +70,21 @@ LABEL org.opencontainers.image.title="Autoxide" \
       org.opencontainers.image.source="https://github.com/thuongtamduy/autoxide" \
       org.opencontainers.image.documentation="https://github.com/thuongtamduy/autoxide#readme" \
       org.opencontainers.image.licenses="MIT OR Apache-2.0"
-# Chứng chỉ gốc cho TLS ra ngoài (SMTP, S3, OTLP, PostgreSQL có TLS).
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates \
-    && rm -rf /var/lib/apt/lists/* \
-    && useradd --system --uid 10001 --user-group --home-dir /var/lib/autoxide autoxide \
-    && mkdir -p /var/lib/autoxide/data \
-    && chown -R autoxide:autoxide /var/lib/autoxide
 COPY --from=build /usr/local/bin/autoxide /usr/local/bin/autoxide
 COPY --from=build /usr/local/share/THIRD-PARTY-LICENSES.html /usr/share/doc/autoxide/THIRD-PARTY-LICENSES.html
 COPY LICENSE-MIT LICENSE-APACHE /usr/share/doc/autoxide/
-USER autoxide
+# Thư mục dữ liệu thuộc user 10001 (cùng uid với các bản trước, để volume cũ vẫn ghi được): distroless không có `useradd`, nên
+# dựng sẵn ở stage build rồi chép sang với chủ sở hữu đúng. UID số là đủ, không cần dòng trong /etc/passwd.
+COPY --from=build --chown=10001:10001 /rootfs/var/lib/autoxide /var/lib/autoxide
+USER 10001:10001
 WORKDIR /var/lib/autoxide
 # Mọi dữ liệu ghi xuống đĩa (SQLite, file tải lên, mail ghi ra file) nằm trong `data/`.
 VOLUME ["/var/lib/autoxide/data"]
 ENV AUTOXIDE_HTTP_ADDRESS=0.0.0.0:8080 \
     AUTOXIDE_LOG_FORMAT=json
 EXPOSE 8080
+# `/health/ready`: máy chủ nhận được request (database trả lời). Khoảng bắt đầu rộng cho lần migrate đầu; container chỉ chạy lệnh
+# một lần (`migrate up`, `doctor`) không bị ảnh hưởng — compose tắt kiểm cho chúng.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 CMD ["/usr/local/bin/autoxide", "healthcheck"]
 ENTRYPOINT ["autoxide"]
 CMD ["serve"]

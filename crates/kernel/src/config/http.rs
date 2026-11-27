@@ -469,11 +469,18 @@ pub struct RateLimit {
 }
 
 impl HttpConfig {
-    pub fn read(reader: &mut ConfigReader) -> Result<Self, Invalid> {
-        let address = reader.get_with(&ADDRESS, |raw| {
+    /// Reads only `AUTOXIDE_HTTP_ADDRESS`: the address the server listens on. For a command that must know where the
+    /// server is but needs no other setting (such as `autoxide healthcheck`), so that it works when the rest of the
+    /// configuration is missing and never builds a structure holding secrets.
+    pub fn read_address(reader: &mut ConfigReader) -> Result<SocketAddr, Invalid> {
+        reader.get_with(&ADDRESS, |raw| {
             raw.parse::<SocketAddr>()
                 .map_err(|_| "must be an IP address and a port, like `127.0.0.1:8080`".to_owned())
-        });
+        })
+    }
+
+    pub fn read(reader: &mut ConfigReader) -> Result<Self, Invalid> {
+        let address = Self::read_address(reader);
         let request_timeout =
             reader.get_with(&REQUEST_TIMEOUT_SECONDS, |raw| parse_in_range(raw, 1u64, 3600));
         let body_limit = reader

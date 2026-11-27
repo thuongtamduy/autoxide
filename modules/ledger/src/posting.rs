@@ -277,6 +277,10 @@ fn key_order(key: &AccountKey) -> (String, String, String, &'static str) {
 }
 
 fn actor_kind(actor: &Actor) -> &'static str {
+    // Client OAuth làm thay người dùng (D-20261126-mcp-oauth).
+    if matches!(actor.access, autoxide_kernel::access::AccessPath::OAuthGrant(_)) {
+        return "oauth";
+    }
     match (actor.user_id, actor.api_key_id) {
         (_, Some(_)) => "api_key",
         (Some(_), None) => "user",

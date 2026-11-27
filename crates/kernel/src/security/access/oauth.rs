@@ -187,8 +187,9 @@ impl Principal {
                 .collect(),
             Grants::Only(map) => (**map).clone(),
         };
+        // Tên ngoài danh mục (permission đã bỏ) không bao giờ giữ lại, dù scope có liệt kê.
         let (kept, withheld): (BTreeMap<_, _>, BTreeMap<_, _>) =
-            held.into_iter().partition(|(name, _)| allows(name));
+            held.into_iter().partition(|(name, _)| allows(name) && catalog.contains(name));
         // Không giữ lại gì (vd scope `*`): giữ nguyên, kể cả "mọi permission" và lối tắt của nó.
         if withheld.is_empty() {
             return self;

@@ -12,6 +12,7 @@ pub(crate) mod invitations;
 mod login_link;
 pub(crate) mod memberships;
 mod mfa;
+pub(crate) mod oauth;
 pub(crate) mod oidc;
 mod passkeys;
 mod phone;
@@ -41,6 +42,8 @@ use crate::verify::EmailVerifications;
 /// Các service mà handler dùng.
 #[derive(Clone)]
 pub(crate) struct HttpState {
+    /// Máy chủ uỷ quyền OAuth cho client MCP (bước 71 G4); `None`: tắt.
+    pub oauth: Option<Arc<crate::oauth::OAuthService>>,
     /// Đăng nhập qua nhà cung cấp danh tính (bước 40 P3).
     pub oidc: Arc<crate::oidc::OidcService>,
     /// Đồng bộ nhân viên qua SCIM 2.0 (bước 66).
@@ -105,6 +108,7 @@ pub(crate) fn routes(state: HttpState) -> OpenApiRouter {
         .merge(scim::routes())
         .merge(scim_admin::routes())
         .merge(scim_groups::routes())
+        .merge(oauth::routes())
         .with_state(Arc::new(state))
         // Response của `auth` hay chứa secret chỉ trả một lần (token, API key mới, secret TOTP,
         // mã khôi phục): không ai được lưu lại — proxy, trình duyệt, lớp idempotency (RFC 6749

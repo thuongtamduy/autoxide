@@ -61,6 +61,18 @@ impl JobHandler for Cleanup {
         // Nghi thức passkey bỏ dở.
         let expired = Condition::all().add(Expr::col(Alias::new("expires_at")).lt(now));
         removed += delete(connection, "auth_passkey_ceremony", expired).await?;
+        // Token OAuth (mã, access, refresh) hết hạn; client đăng ký động chưa từng dùng sau 30 ngày hay bỏ rơi 90 ngày
+        // (client dùng lại thì tự đăng ký lại; grant đã cấp không phụ thuộc dòng client) — D-20261126-mcp-oauth.
+        let expired = Condition::all().add(Expr::col(Alias::new("expires_at")).lt(now));
+        removed += delete(connection, "auth_oauth_tokens", expired).await?;
+        let unused = Condition::all()
+            .add(Expr::col(Alias::new("last_used_at")).is_null())
+            .add(Expr::col(Alias::new("created_at")).lt(now - SignedDuration::from_hours(24 * 30)));
+        removed += delete(connection, "auth_oauth_clients", unused).await?;
+        let abandoned = Condition::all().add(
+            Expr::col(Alias::new("last_used_at")).lt(now - SignedDuration::from_hours(24 * 90)),
+        );
+        removed += delete(connection, "auth_oauth_clients", abandoned).await?;
         tracing::info!(removed, "expired sign-in data removed");
         Ok(())
     }
