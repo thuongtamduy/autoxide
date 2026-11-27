@@ -629,7 +629,8 @@ pub(crate) struct MigrationRunRef {
 #[serde(untagged)]
 enum ToolAnswer {
     DryRun(MigrationDryRun),
-    Run(MigrationRun),
+    // `Box`: lượt lớn hơn nhiều so với kết quả chạy thử; serde in như không có `Box`.
+    Run(Box<MigrationRun>),
 }
 
 pub(crate) fn tools(runs: Arc<MigrationRuns>) -> Vec<crate::mcp::Tool> {
@@ -658,7 +659,9 @@ pub(crate) fn tools(runs: Arc<MigrationRuns>) -> Vec<crate::mcp::Tool> {
                             pending,
                         }));
                     }
-                    Ok(ToolAnswer::Run(runs.start(Actor::from(&principal), placement).await?))
+                    Ok(ToolAnswer::Run(Box::new(
+                        runs.start(Actor::from(&principal), placement).await?,
+                    )))
                 }
             },
         )
