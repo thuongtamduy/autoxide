@@ -418,7 +418,7 @@ impl ContentService {
     ) -> Result<super::public_limits::Slot, Error> {
         let (search, _) = super::public_limits::capacities(
             self.config.public_search_concurrency,
-            tenant.database().read_pool_size(),
+            tenant.read_pool_size(),
         );
         self.search_cache.public_limits.admit(
             tenant.placement(),
@@ -436,7 +436,7 @@ impl ContentService {
     ) -> Result<super::public_limits::Slot, Error> {
         let (_, suggest) = super::public_limits::capacities(
             self.config.public_search_concurrency,
-            tenant.database().read_pool_size(),
+            tenant.read_pool_size(),
         );
         self.search_cache.suggest_limits.admit(
             tenant.placement(),

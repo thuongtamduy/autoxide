@@ -266,7 +266,7 @@ async fn danh_sach_co_q_va_goi_y_qua_cung_chot() {
         let reader: Option<std::net::IpAddr> = "203.0.113.7".parse().ok();
         let suggest = crate::suggest::Entries(content.clone());
         // Tìm và gợi ý cộng lại luôn để dành kết nối đọc cho phần còn lại của ứng dụng.
-        let pool = database.read_pool_size();
+        let pool = tenant.read_pool_size();
         let (searching_slots, suggesting_slots) =
             crate::ai::public_limits::capacities(content.config.public_search_concurrency, pool);
         assert!(searching_slots + suggesting_slots < pool, "{pool}");
