@@ -104,6 +104,10 @@ const FIXES: &[(&str, &str)] = &[
     ),
     ("metric-labels", "Use labels from a small fixed set (an enum), never ids or raw paths."),
     (
+        "permission-first",
+        "Call `principal.require(&PERMISSION)?` (or the same check the service runs first) before parsing the page request, so a caller without the permission gets 403, not 422; if the order is intended, add `// permission-first: <reason>` above the `fn`.",
+    ),
+    (
         "private-paths",
         "Use the public path (`autoxide_kernel::db::…`, `autoxide_kernel::http::…`); `__private` is only for code the kernel's macros generate.",
     ),

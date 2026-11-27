@@ -83,6 +83,13 @@ async fn list_all_api_keys(
     Query(filter): Query<AllApiKeysQuery>,
     Query(query): Query<PageQuery>,
 ) -> Result<Page<ManagedApiKeyResponse>, Error> {
+    // Quyền trước tham số trang: thiếu quyền là 403, không phải 422 (luật `permission-first` của xtask).
+    // Như service: người duyệt (không quản lý key) cũng xem được; không ai trong hai thì lỗi nêu quyền quản lý.
+    if !principal.has(&crate::permissions::API_KEYS_MANAGE)
+        && !principal.has(&crate::permissions::API_KEYS_APPROVE)
+    {
+        principal.require(&crate::permissions::API_KEYS_MANAGE)?;
+    }
     let page = PageRequest::try_from(query)?;
     let status = filter.status.as_deref();
     if status.is_some_and(|status| !["active", "pending"].contains(&status)) {

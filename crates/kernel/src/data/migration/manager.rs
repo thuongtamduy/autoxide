@@ -34,6 +34,14 @@ pub trait MigrationTrait: MigrationName + Send + Sync {
         let _ = manager;
         Err(DbErr::Migration(format!("migration `{}` cannot be reverted", self.name())))
     }
+
+    /// `true` for a migration whose `down` cannot give an earlier release back its data — typically the
+    /// contract step of an expand–contract change, which drops what the earlier release still reads.
+    /// `autoxide rollback` refuses to cross it and says to restore the backup taken before the upgrade
+    /// instead. Every migration that returns `true` is listed in the changelog under the upgrade notes.
+    fn irreversible(&self) -> bool {
+        false
+    }
 }
 
 /// Runs schema-building statements on a connection or a transaction.

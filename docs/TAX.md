@@ -23,7 +23,11 @@ invoices, the ledger) compute taxes through `autoxide_tax::api::TaxEngine`.
 
 Withholding by marketplaces with payment (Decree 117/2025/ND-CP) for household businesses: goods 1% VAT
 + 0.5% PIT, services 5% + 2%, production and transport 3% + 1.5%. Businesses declare themselves:
-nothing is withheld.
+nothing is withheld. What core does today: computes the amount (`POST /api/v1/tax/withholding`) and books it
+when a settlement asks for it (`ledger`, entry `TaxWithheld`). What it does **not** do yet (with the
+marketplace module, after 1.0): withhold by itself on every payout to a household seller, issue the
+withholding certificate (`withholding_certificate` exists as a document kind, nothing creates it), and
+prepare the data of the declaration on the seller's behalf — a marketplace does these itself until then.
 
 The pack is imported by itself within an hour after the server starts (and whenever an update ships a
 newer one). To import it at once, or another pack:

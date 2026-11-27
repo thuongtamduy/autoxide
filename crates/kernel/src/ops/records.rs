@@ -568,7 +568,9 @@ async fn list_record_events(
 /// using an image, menu items linking to a page… — limited to modules whose `<module>.read` you
 /// hold. Use it before deleting or making a record private. Ordered by when each pointing row was
 /// created (its ID): newest first unless `order=asc`; paged with `limit` / `cursor` (`count=true`
-/// adds the total on the first page).
+/// adds the total on the first page). Exception: a module that has no paged usage lookup of its own
+/// orders its records by a stable key derived from their fields instead of creation time, and such
+/// records are interleaved with the others by that key.
 #[utoipa::path(
     get,
     path = "/records/{kind}/{id}/usages",
@@ -581,7 +583,7 @@ async fn list_record_events(
         PageQuery,
     ),
     responses(
-        (status = 200, description = "One page of the records using it, newest first.", body = Page<crate::ops::usages::Referrer>),
+        (status = 200, description = "One page of the records using it, newest first (records of a module without a paged usage lookup are ordered by a stable key instead).", body = Page<crate::ops::usages::Referrer>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 404, description = "No such record you may read; code `kernel.record_not_found`.", body = Problem),
         (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
