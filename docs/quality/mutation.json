@@ -1,5 +1,5 @@
 {
-  "note": "Phạm vi và ngưỡng của mutation testing hằng tuần (.github/workflows/mutants.yml, scripts/mutants-report.py). `units`: mỗi mục là một nhóm file của một crate, chia `shards` phần cho các job chạy song song. `baseline`: số mutant sống (missed) TỐI ĐA cho phép của từng nhóm; null = chưa đo, lần chạy đầu in ra số để điền. Chỉ được hạ số này xuống, không nâng lên (tệ đi thì job đỏ).",
+  "note": "Phạm vi và ngưỡng của mutation testing hằng tuần (.github/workflows/mutants.yml, scripts/mutants-report.py). `units`: mỗi mục là một nhóm file của một crate, chia `shards` phần cho các job chạy song song. `baseline`: số mutant sống (missed) TỐI ĐA cho phép của từng nhóm; null = chưa đo, lần chạy đầu in ra số để điền. Chỉ được hạ số này xuống, không nâng lên (tệ đi thì job đỏ). Số đầu đo ở lần chạy tay đầu tiên (run 45883433205, commit e4f5e6d, 26/11/2026): các nhóm đủ shard dùng số mutant sống đo được. `tax` vẫn null: shard 1/2 mất (runner dừng giữa chừng, không có artifact), mới có kết quả của shard 0; đặt số khi một lần chạy có đủ hai shard.",
   "units": [
     {
       "name": "kernel-values",
@@ -59,11 +59,11 @@
     }
   ],
   "baseline": {
-    "kernel-values": null,
-    "kernel-access": null,
+    "kernel-values": 78,
+    "kernel-access": 114,
     "tax": null,
-    "ledger-posting": null,
-    "promotions-engine": null,
-    "orders-lifecycle": null
+    "ledger-posting": 60,
+    "promotions-engine": 97,
+    "orders-lifecycle": 20
   }
 }

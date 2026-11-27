@@ -287,6 +287,12 @@ async fn list_bookings(
     Query(filter): Query<BookingsQuery>,
     Query(query): Query<PageQuery>,
 ) -> Result<Page<BookingRecord>, Error> {
+    // Quyền trước tham số trang: thiếu quyền là 403, không phải 422 (luật `permission-first` của xtask).
+    principal.require_any(&[
+        &crate::permissions::BOOKINGS_MANAGE,
+        &crate::permissions::BOOKINGS_READ,
+        &crate::permissions::BOOKINGS_STAFF,
+    ])?;
     let page = PageRequest::try_from(query)?;
     BookingRecord::page(service.list_bookings(&tenant, &principal, &filter.into(), &page).await?)
 }

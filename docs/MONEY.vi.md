@@ -61,7 +61,8 @@ Mỗi nút có một **chế độ dòng tiền** (`PUT /ledger/flow-settings/{o
 Tạm giữ được nhả bởi job (5 phút một lần) hay bằng tay (`POST /ledger/holds/{id}/release`). Chi trả
 (`POST /ledger/payouts`) đi qua đối tác `PayoutGateway` và không bao giờ vượt số dư khả dụng, kể cả
 khi gửi đồng thời. Phí sàn tách GTGT riêng; khấu trừ thay cho hộ kinh doanh (NĐ 117/2025/NĐ-CP — cần
-đối chiếu) chỉ có ở chế độ thu hộ.
+đối chiếu) chỉ có ở chế độ thu hộ; core tính và ghi sổ, nhưng chưa tự khấu trừ ở mỗi lần chi trả, chưa lập chứng từ
+khấu trừ, chưa chuẩn bị tờ khai (cùng module sàn, sau 1.0 — xem `TAX.vi.md`).
 
 ## Chuyển khoản VietQR
 
