@@ -343,11 +343,17 @@ nó, vào `placements/<tên>/` của thư mục; không có thì lệnh in cản
 mục không phải bản backup trọn (xoá nó rồi chạy lại). Để lấy lại một placement đã mất: restore database
 chính trước nếu nó cũng mất, tạo một database mới, trống ở đúng địa chỉ của placement, rồi chạy
 `autoxide restore <thư mục backup> --placement <tên>`: lệnh restore vào chính placement đó (cùng tên,
-cùng id), không phải vào một placement mới.
+cùng id), không phải vào một placement mới. Dừng service trước, như với database chính; trong lúc lệnh
+chạy, placement ở trạng thái `migrating` và khách của nó nhận 503.
+
+`restore` kiểm toàn bộ bản backup (phiên bản, module đang tắt hay không có, file) trước khi chạm đích,
+nên restore bị từ chối thì đích vẫn trống: sửa cấu hình được nêu rồi chạy lại. Nếu lệnh dừng giữa chừng
+sau đó (đầy đĩa, mất kết nối), đích có một phần dữ liệu: xoá và tạo lại database đó rồi chạy lại.
 
 Bản backup giữ nguyên schema của nguồn: lệnh không đòi database đã migrate, nên backup được ngay trước
 khi nâng cấp, và bản đang chạy trước khi nâng restore được bản backup đó (`backup.json` liệt kê các
-migration nó có). Bản mới hơn cũng restore được; bản cũ hơn nguồn thì từ chối. Bản backup chứa các
+migration nó có). Bản mới hơn cũng restore được. Từ bản này trở đi, bản cũ hơn nguồn từ chối với
+thông báo rõ (các bản trước đó báo lỗi migration). Bản backup chứa các
 module đang bật: module đang tắt mà còn dữ liệu thì lệnh dừng và nói cấu hình nào bật nó.
 Cất
 `AUTOXIDE_SECRET_KEY` ở nơi an toàn, tách khỏi bản

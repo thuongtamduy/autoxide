@@ -237,6 +237,27 @@ pub async fn refuse_dormant_data(
     command: &str,
 ) -> Result<(), String> {
     let dormant = dormant_with_data(modules, database).await?;
+    refuse_dormant(modules, &dormant, command)
+}
+
+/// Như [`refuse_dormant_data`] nhưng chỉ xem đúng `database`, kể cả khi module đã khởi động (khi ấy
+/// `dormant_with_data` xem database điều khiển và các placement): restore kiểm CHÍNH bản sao của bản backup.
+pub async fn refuse_dormant_in(
+    modules: &Modules,
+    database: &Database,
+    command: &str,
+) -> Result<(), String> {
+    let dormant = modules.dormant(database).await.map_err(|error| format!("database: {error}"))?;
+    let dormant: Vec<DormantModule> =
+        dormant.into_iter().filter(|module| !module.tables_with_data.is_empty()).collect();
+    refuse_dormant(modules, &dormant, command)
+}
+
+fn refuse_dormant(
+    modules: &Modules,
+    dormant: &[DormantModule],
+    command: &str,
+) -> Result<(), String> {
     if dormant.is_empty() {
         return Ok(());
     }

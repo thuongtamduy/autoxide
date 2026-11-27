@@ -107,6 +107,16 @@ impl fmt::Display for MigrationError {
 
 impl std::error::Error for MigrationError {}
 
+/// Words of the error for a migration recorded in the database but unknown to this program.
+const UNKNOWN_APPLIED: &str = "its file is missing";
+
+impl MigrationError {
+    /// The database holds migrations this program does not know: a newer version of the program migrated it.
+    pub fn is_from_newer_program(&self) -> bool {
+        self.0.contains(UNKNOWN_APPLIED)
+    }
+}
+
 /// The migrations of one module, in the order they are applied.
 #[derive(Clone)]
 pub struct ModuleMigrations {
@@ -448,7 +458,7 @@ async fn applied_names<C: sea_orm::ConnectionTrait>(
         .map(|name| {
             format!(
                 "Migration file of version '{name}' is missing, this migration has been applied but \
-                 its file is missing"
+                 {UNKNOWN_APPLIED}"
             )
         })
         .collect();

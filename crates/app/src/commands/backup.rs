@@ -25,9 +25,9 @@ use super::{report_failure, report_invalid_configuration, run_with_observability
 use crate::runtime::{self, Migrations};
 use crate::settings::{self, Settings};
 
-use autoxide_kernel::backup::{
-    self, DATABASE_FILE, FILES_DIR, FORMAT, MANIFEST, open_sqlite, private_dir, read_file,
-};
+use autoxide_kernel::backup::{self, FILES_DIR, FORMAT, MANIFEST, private_dir, read_file};
+
+use super::backup_checks::{open_checked, placements_to_restore};
 
 #[derive(Debug, Clone, clap::Args)]
 pub struct BackupArguments {
@@ -167,8 +167,15 @@ pub(crate) async fn migrations_behind(
     database: &Database,
 ) -> Result<usize, String> {
     match migrator.status(database).await {
+        // Không có bảng nào của Autoxide: thường là `DATABASE_URL` sai (SQLite tạo một file mới, trống). Bản backup
+        // "0 dòng" với mã thoát 0 dễ bị tưởng là đã có bản backup.
+        Ok(states) if !states.is_empty() && states.iter().all(|state| !state.applied) => Err(
+            "the database has no Autoxide tables, so there is nothing to back up; check `DATABASE_URL` (or the \
+             placement's address)"
+                .to_owned(),
+        ),
         Ok(states) => Ok(states.iter().filter(|state| !state.applied).count()),
-        Err(error) if error.to_string().contains("its file is missing") => Err(format!(
+        Err(error) if error.is_from_newer_program() => Err(format!(
             "the database was migrated by a newer Autoxide than this one ({}); back it up with that version",
             env!("CARGO_PKG_VERSION")
         )),
@@ -207,7 +214,8 @@ async fn skipped_placements(
 }
 
 /// Đưa bản backup trong `directory` vào database (mới, trống) và nơi lưu file đang cấu
-/// hình; trả nội dung in ra.
+/// hình; trả nội dung in ra. Mọi kiểm làm trên bản sao TRƯỚC khi chạm đích: lỗi biết trước thì đích
+/// còn nguyên, sửa cấu hình rồi chạy lại được.
 pub(crate) async fn run_restore(settings: Settings, directory: PathBuf) -> Result<String, String> {
     let manifest = read_manifest(&directory).await?;
     if let Some(name) = manifest["placement"]["name"].as_str() {
@@ -217,68 +225,19 @@ pub(crate) async fn run_restore(settings: Settings, directory: PathBuf) -> Resul
         ));
     }
     let migrator = settings.modules.migrator().map_err(|error| error.to_string())?;
-    refuse_newer_backup(&manifest, &migrator)?;
     let target = Database::connect(&settings.config.database).await.map_err(|e| e.to_string())?;
-    let prepared = async {
-        let states = migrator.status(&target).await.map_err(|error| error.to_string())?;
-        if states.iter().any(|state| state.applied) {
-            return Err("the database already has Autoxide tables; restore into a new, empty \
-                        database"
-                .to_owned());
-        }
-        migrator.up(&target).await.map_err(|error| error.to_string())
-    }
-    .await;
+    let empty = refuse_non_empty(&migrator, &target, "the database").await;
     let _ = target.close().await;
-    prepared?;
+    empty?;
 
-    // Làm trên một bản sao của file backup: migration mới hơn (nếu có) được áp dụng lên
-    // bản sao, bản backup giữ nguyên. Chỉ chép đúng `database.sqlite`, KHÔNG chép file
-    // `-wal` / `-shm` nằm cạnh (backup đóng database trước khi xong nên không có): lỗ hổng
-    // RUSTSEC-2026-0459 của SQLite đóng gói chỉ khai thác được qua một file `-wal` do kẻ
-    // tấn công chuẩn bị (D-032, D-075).
     let scratch = std::env::temp_dir().join(format!("autoxide-restore-{}", uuid::Uuid::now_v7()));
     private_dir(&scratch).map_err(|error| error.to_string())?;
     let result = async {
-        let copy = scratch.join(DATABASE_FILE);
-        std::fs::copy(directory.join(DATABASE_FILE), &copy)
-            .map_err(|error| format!("cannot read {DATABASE_FILE} of the backup: {error}"))?;
-        let source = open_sqlite(&copy, &migrator).await.map_err(describe)?;
-        let runtime = match runtime::start(settings, Migrations::RequireApplied).await {
-            Ok(runtime) => runtime,
-            Err(error) => {
-                let _ = source.close().await;
-                return Err(error);
-            }
-        };
-        let names = runtime.modules.names();
-        // Bản backup có dữ liệu của module mà bản cài này đang tắt: dừng, không bỏ sót nó.
-        let tables =
-            match crate::modules::refuse_dormant_data(&runtime.modules, &source, "restore").await {
-                Ok(()) => copy_modules(&source, &runtime.database, &names)
-                    .await
-                    .map_err(|error| error.to_string()),
-                Err(error) => Err(error),
-            };
+        let source =
+            open_checked(&settings.modules, &migrator, &manifest, &directory, &scratch).await?;
+        let restored = restore_checked(settings, &migrator, &source, &directory).await;
         let _ = source.close().await;
-        let restored = async {
-            let tables = tables.map_err(|error| error.to_string())?;
-            let files = match runtime.modules.api::<dyn Storage>() {
-                Some(storage) => load_files(storage, &directory.join(FILES_DIR)).await?,
-                None => 0,
-            };
-            Ok::<_, String>((tables, files))
-        }
-        .await;
-        let _ = runtime.database.close().await;
         let (tables, files) = restored?;
-        let expected = manifest["files"].as_u64().unwrap_or_default();
-        if files != expected {
-            return Err(format!(
-                "the backup lists {expected} files but {files} were found in its `{FILES_DIR}` \
-                 directory"
-            ));
-        }
         let mut text = summary("Restored", &tables, files, &directory);
         text.push_str(&placements_to_restore(&manifest));
         Ok(text)
@@ -288,54 +247,47 @@ pub(crate) async fn run_restore(settings: Settings, directory: PathBuf) -> Resul
     result
 }
 
-/// Bản backup do một bản Autoxide MỚI hơn làm (module đang chạy ở đây mà có migration chương trình này không biết):
-/// từ chối rõ, TRƯỚC khi chạm database đích. Migration của module đang tắt ở đây thì bỏ qua: `refuse_dormant_data`
-/// trên bản sao quyết (chỉ dừng khi module đó có dữ liệu). Bản backup cũ (định dạng 1 trước khi có danh sách
-/// migration) không có gì để kiểm.
-pub(crate) fn refuse_newer_backup(
-    manifest: &Value,
+/// Bản sao đã qua kiểm: migrate database đích, chép dữ liệu, đưa file vào nơi lưu.
+async fn restore_checked(
+    settings: Settings,
     migrator: &autoxide_kernel::migration::Migrator,
+    source: &Database,
+    directory: &Path,
+) -> Result<(Vec<CopiedTable>, u64), String> {
+    let target = Database::connect(&settings.config.database).await.map_err(|e| e.to_string())?;
+    let migrated = migrator.up(&target).await.map_err(|error| error.to_string());
+    let _ = target.close().await;
+    migrated?;
+    let runtime = runtime::start(settings, Migrations::RequireApplied).await?;
+    let restored = async {
+        let names = runtime.modules.names();
+        let tables = copy_modules(source, &runtime.database, &names)
+            .await
+            .map_err(|error| error.to_string())?;
+        let files = match runtime.modules.api::<dyn Storage>() {
+            Some(storage) => load_files(storage, &directory.join(FILES_DIR)).await?,
+            None => 0,
+        };
+        Ok::<_, String>((tables, files))
+    }
+    .await;
+    let _ = runtime.database.close().await;
+    restored
+}
+
+/// Restore chỉ nhận database chưa có bảng nào của Autoxide.
+pub(crate) async fn refuse_non_empty(
+    migrator: &autoxide_kernel::migration::Migrator,
+    target: &Database,
+    what: &str,
 ) -> Result<(), String> {
-    let known: std::collections::BTreeSet<String> = migrator.names().into_iter().collect();
-    let running: std::collections::BTreeSet<&str> =
-        known.iter().filter_map(|name| name.split('/').next()).collect();
-    let listed = manifest["migrations"].as_array().map(Vec::as_slice).unwrap_or_default();
-    let newer: Vec<&str> = listed
-        .iter()
-        .filter_map(Value::as_str)
-        .filter(|name| !known.contains(*name))
-        .filter(|name| running.contains(name.split('/').next().unwrap_or(name)))
-        .collect();
-    if !newer.is_empty() {
-        let shown = newer.iter().take(3).copied().collect::<Vec<_>>().join(", ");
+    let states = migrator.status(target).await.map_err(|error| error.to_string())?;
+    if states.iter().any(|state| state.applied) {
         return Err(format!(
-            "this backup holds {} migration(s) this Autoxide ({}) does not know ({shown}): it was made from a \
-             database migrated by a newer release (`backup.json` names the version that wrote it); restore it \
-             with that release",
-            newer.len(),
-            env!("CARGO_PKG_VERSION"),
+            "{what} already has Autoxide tables; restore into a new, empty database"
         ));
     }
     Ok(())
-}
-
-/// Bản backup làm bằng `--all`: nhắc restore từng placement nó chứa.
-fn placements_to_restore(manifest: &Value) -> String {
-    let names: Vec<&str> = manifest["placements"]
-        .as_array()
-        .map(Vec::as_slice)
-        .unwrap_or_default()
-        .iter()
-        .filter_map(Value::as_str)
-        .collect();
-    if names.is_empty() {
-        return String::new();
-    }
-    format!(
-        "The backup also holds these placements: {}. Restore each one into its own empty database with \
-         `autoxide restore <directory> --placement <name>`.\n",
-        names.join(", ")
-    )
 }
 
 pub(crate) fn summary(verb: &str, tables: &[CopiedTable], files: u64, directory: &Path) -> String {
@@ -516,6 +468,17 @@ mod tests {
         crate::settings::read(&source).unwrap()
     }
 
+    /// Chạy từng câu SQL trên database `url` (sửa một bản backup cho bài test).
+    async fn sql(url: &str, statements: &[&str]) {
+        let connection = sea_orm::Database::connect(url).await.unwrap();
+        let backend = sea_orm::ConnectionTrait::get_database_backend(&connection);
+        for text in statements {
+            let statement = autoxide_kernel::database::statement(backend, *text, []);
+            sea_orm::ConnectionTrait::execute_raw(&connection, statement).await.unwrap();
+        }
+        connection.close().await.unwrap();
+    }
+
     fn admin(email: &str) -> NewAccount {
         NewAccount {
             email: email.to_owned(),
@@ -593,16 +556,20 @@ mod tests {
         TestDatabase::run(async |test| {
             let scratch = Scratch::new();
             let files = scratch.0.join("files");
-            let multi = |url: &str| {
+            // `modules`: giá trị `AUTOXIDE_MODULES` (`all`: mọi module, như mặc định của test crate này; `official`:
+            // `newsletter` tắt).
+            let with_modules = |url: &str, modules: &str| {
                 let files = files.display().to_string();
                 let source = ConfigSource::from_pairs([
                     ("DATABASE_URL", url),
                     ("AUTOXIDE_FILES_DIR", files.as_str()),
                     ("AUTOXIDE_TENANCY_MODE", "multi"),
                     ("AUTOXIDE_SECRET_KEY", "a-configured-secret-that-is-long-enough-0123"),
+                    ("AUTOXIDE_MODULES", modules),
                 ]);
                 crate::settings::read(&source).unwrap()
             };
+            let multi = |url: &str| with_modules(url, "all");
             let settings = multi(test.url());
             let database = Database::connect(&settings.config.database).await.unwrap();
             let single = DatabaseRegistry::new(
@@ -672,6 +639,29 @@ mod tests {
                 "{wrong}"
             );
 
+            // Bản backup có dữ liệu của module đang tắt (`newsletter`): từ chối khi đích còn nguyên — kiểm chính bản
+            // sao, không phải database đang chạy (module đã khởi động với sổ placement).
+            let copy_url = format!("sqlite://{}?mode=rw", eu1.join("database.sqlite").display());
+            let probe = [
+                "CREATE TABLE newsletter_probe (id TEXT)",
+                "INSERT INTO newsletter_probe VALUES ('x')",
+            ];
+            sql(&copy_url, &probe).await;
+            let dormant = crate::commands::backup_placements::restore_placement(
+                with_modules(test.url(), "official"),
+                eu1.clone(),
+                "eu-1".to_owned(),
+            )
+            .await
+            .unwrap_err();
+            assert!(
+                dormant.contains("newsletter") && dormant.contains("AUTOXIDE_MODULES"),
+                "{dormant}"
+            );
+            let states = migrator.status(&eu1_database).await.unwrap();
+            assert!(states.iter().all(|state| !state.applied), "eu-1 must stay untouched");
+            sql(&copy_url, &["DROP TABLE newsletter_probe"]).await;
+
             // Thư mục của bản backup chính (`--all`) cũng được: lấy `placements/eu-1/` của nó.
             let restored = restore(backup.clone(), "eu-1").await.unwrap();
             assert!(restored.starts_with("Restored placement eu-1:"), "{restored}");
@@ -681,6 +671,38 @@ mod tests {
             // Placement đã có bảng: từ chối.
             let again = restore(eu1, "eu-1").await.unwrap_err();
             assert!(again.contains("already has Autoxide tables"), "{again}");
+
+            // `--all` khi một placement có dữ liệu của module đang tắt: từ chối, nêu module.
+            let eu2_id =
+                placements.list().await.unwrap().into_iter().find(|p| p.name == "eu-2").unwrap().id;
+            let eu2 = registry.placement_database(PlacementId::from_uuid(eu2_id)).await.unwrap();
+            let backend = sea_orm::ConnectionTrait::get_database_backend(eu2.write());
+            let run = async |text: &str| {
+                let statement = autoxide_kernel::database::statement(backend, text, []);
+                sea_orm::ConnectionTrait::execute_raw(eu2.write(), statement).await.unwrap();
+            };
+            run("CREATE TABLE newsletter_probe (id TEXT)").await;
+            run("INSERT INTO newsletter_probe VALUES ('x')").await;
+            let refused =
+                run_backup(with_modules(test.url(), "official"), scratch.0.join("dormant"), true)
+                    .await
+                    .unwrap_err();
+            assert!(refused.contains("newsletter"), "{refused}");
+            run("DROP TABLE newsletter_probe").await;
+
+            // Một placement lỗi giữa chừng (database của nó do bản mới hơn migrate): lỗi, nêu placement, và thư mục
+            // không có `backup.json` chính — restore không nhận nó là bản backup.
+            run("INSERT INTO auth_migrations (version, applied_at) VALUES ('m9999_future', 0)")
+                .await;
+            let partial = scratch.0.join("partial");
+            let failed = run_backup(multi(test.url()), partial.clone(), true).await.unwrap_err();
+            assert!(
+                failed.contains("placement `eu-2`") && failed.contains("incomplete"),
+                "{failed}"
+            );
+            assert!(!partial.join(MANIFEST).exists());
+            let refused = run_restore(multi(test.url()), partial).await.unwrap_err();
+            assert!(refused.contains("is not a backup made by `autoxide backup`"), "{refused}");
             database.close().await.unwrap();
         })
         .await
@@ -748,19 +770,45 @@ mod tests {
                 .as_array_mut()
                 .unwrap()
                 .push(Value::from("auth/m9999_from_the_future"));
-            // Migration của module không chạy ở đây không làm bản backup thành "mới hơn".
-            manifest["migrations"].as_array_mut().unwrap().push(Value::from("unknown/m0001_x"));
             std::fs::write(backup.join(MANIFEST), manifest.to_string()).unwrap();
             let empty = format!("sqlite://{}?mode=rwc", scratch.0.join("empty.sqlite").display());
             let refused =
                 run_restore(settings(&empty, &files_b), backup.clone()).await.unwrap_err();
             assert!(refused.contains("1 migration(s) this Autoxide"), "{refused}");
             assert!(refused.contains("auth/m9999_from_the_future"), "{refused}");
+
+            // Module không có trong bản này: không có dòng nào thì bỏ qua được, có dữ liệu thì từ chối, nêu tên.
+            manifest["migrations"].as_array_mut().unwrap().pop();
+            manifest["migrations"].as_array_mut().unwrap().push(Value::from("unknown/m0001_x"));
+            let tables = manifest["tables"].as_array_mut().unwrap();
+            tables.push(serde_json::json!({"table": "unknown_things", "rows": 0}));
+            let checked = super::super::backup_checks::open_checked(
+                &settings(&empty, &files_b).modules,
+                &migrator,
+                &manifest,
+                &backup,
+                &scratch.0,
+            )
+            .await
+            .unwrap();
+            checked.close().await.unwrap();
+            let last = manifest["tables"].as_array().unwrap().len() - 1;
+            manifest["tables"][last]["rows"] = Value::from(3);
+            std::fs::write(backup.join(MANIFEST), manifest.to_string()).unwrap();
+            let refused =
+                run_restore(settings(&empty, &files_b), backup.clone()).await.unwrap_err();
+            assert!(refused.contains("modules this Autoxide does not have (unknown)"), "{refused}");
             let target =
                 Database::connect(&settings(&empty, &files_b).config.database).await.unwrap();
             let states = migrator.status(&target).await.unwrap();
             assert!(states.iter().all(|state| !state.applied), "the target must stay untouched");
             target.close().await.unwrap();
+
+            // Nguồn không có bảng nào của Autoxide (vd `DATABASE_URL` sai): không có bản backup "0 dòng".
+            let nothing = run_backup(settings(&empty, &files_b), scratch.0.join("nothing"), false)
+                .await
+                .unwrap_err();
+            assert!(nothing.contains("no Autoxide tables"), "{nothing}");
         })
         .await
         .unwrap();

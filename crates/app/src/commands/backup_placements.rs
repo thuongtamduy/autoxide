@@ -5,23 +5,24 @@
 //! <thư mục>/placements/<tên>/backup.json, database.sqlite, files/…
 //! ```
 //!
-//! Mỗi placement một bản backup cùng định dạng, giữ đúng schema của placement đó lúc backup. Restore vào một
-//! placement có database trống (thêm bằng `autoxide placement add`), file vào nơi lưu riêng của nó hay nơi lưu chung.
+//! Mỗi placement một bản backup cùng định dạng, giữ đúng schema của placement đó lúc backup. Restore vào CHÍNH
+//! placement đó (cùng tên, cùng id) khi database của nó trống lại, file vào nơi lưu riêng của nó hay nơi lưu chung.
 
 use std::path::{Path, PathBuf};
 
-use autoxide_kernel::backup::{
-    self, BackupOf, BackupPlacement, DATABASE_FILE, FILES_DIR, open_sqlite, private_dir,
-};
+use autoxide_kernel::backup::{self, BackupOf, BackupPlacement, FILES_DIR, private_dir};
+use autoxide_kernel::migration::MigrationLock;
 use autoxide_kernel::storage::Storage;
 use autoxide_kernel::tenancy::{MAIN_PLACEMENT, PlacementId, TenancyMode};
 use autoxide_kernel::transfer::copy_modules;
 
 use super::backup::{
-    describe, load_files, migrations_behind, read_manifest, refuse_newer_backup, summary,
+    describe, load_files, migrations_behind, read_manifest, refuse_non_empty, summary,
 };
+use super::backup_checks::open_checked;
 use crate::runtime::{self, Migrations, Runtime};
 use crate::settings::Settings;
+use crate::startup::LOCK_WAIT;
 
 /// Thư mục con chứa bản backup của các placement.
 pub(crate) const PLACEMENTS_DIR: &str = "placements";
@@ -190,35 +191,30 @@ async fn restore_into(
     let target = registry.placement_database(id).await.map_err(describe)?;
     let migrator =
         runtime.modules.migrator().map_err(|error| error.to_string())?.keyed_on(&runtime.database);
-    refuse_newer_backup(manifest, &migrator)?;
-    let states = migrator.status(&target).await.map_err(|error| error.to_string())?;
-    if states.iter().any(|state| state.applied) {
-        return Err(format!(
-            "the database of placement `{name}` already has Autoxide tables; restore into a placement with a new, \
-             empty database"
-        ));
-    }
-    migrator.up(&target).await.map_err(|error| error.to_string())?;
+    refuse_non_empty(&migrator, &target, &format!("the database of placement `{name}`")).await?;
 
-    // Như restore của database chính: làm trên bản sao của file backup, chỉ chép đúng `database.sqlite`.
+    // Mọi kiểm trên bản sao trước, đích chưa bị chạm (như restore của database chính).
     let scratch = std::env::temp_dir().join(format!("autoxide-restore-{}", uuid::Uuid::now_v7()));
     private_dir(&scratch).map_err(|error| error.to_string())?;
     let copied = async {
-        let copy = scratch.join(DATABASE_FILE);
-        std::fs::copy(directory.join(DATABASE_FILE), &copy)
-            .map_err(|error| format!("cannot read {DATABASE_FILE} of the backup: {error}"))?;
-        let source = open_sqlite(&copy, &migrator).await.map_err(describe)?;
-        let modules = runtime.modules.names();
-        // Bản backup có dữ liệu của module mà bản cài này đang tắt: dừng, không bỏ sót nó.
-        let tables =
-            match crate::modules::refuse_dormant_data(&runtime.modules, &source, "restore").await {
-                Ok(()) => copy_modules(&source, &target, &modules)
-                    .await
-                    .map_err(|error| error.to_string()),
-                Err(error) => Err(error),
-            };
+        let source =
+            open_checked(&runtime.modules, &migrator, manifest, directory, &scratch).await?;
+        // Giữ lock migration và đặt placement `migrating` trong lúc chép: khách của nó nhận 503 thay vì đọc/ghi
+        // một database đang dở (máy chủ có thể vẫn chạy), và không ai migrate nó cùng lúc. Dừng giữa chừng thì lần
+        // chạy migrate sau đặt nó `behind`.
+        let copied = match placements.lock(LOCK_WAIT).await.map_err(describe) {
+            Ok(held) => {
+                let copied =
+                    copy_into(runtime, &placements, &held, name, &migrator, &source, &target).await;
+                if let Err(error) = held.release().await {
+                    tracing::warn!(error = %error, "cannot release the migration lock");
+                }
+                copied
+            }
+            Err(error) => Err(error),
+        };
         let _ = source.close().await;
-        tables
+        copied
     }
     .await;
     let _ = std::fs::remove_dir_all(&scratch);
@@ -231,13 +227,30 @@ async fn restore_into(
         Some(storage) => load_files(storage, &directory.join(FILES_DIR)).await?,
         None => 0,
     };
-    let expected = manifest["files"].as_u64().unwrap_or_default();
-    if files != expected {
-        return Err(format!(
-            "the backup lists {expected} files but {files} were found in its `{FILES_DIR}` directory"
-        ));
-    }
     // Placement đủ migration: khách trên đó phục vụ lại được.
     placements.check().await.map_err(describe)?;
     Ok(summary(&format!("Restored placement {name}:"), &tables, files, directory))
+}
+
+/// Giữ lock: đặt placement `migrating`, migrate database trống của nó, chép dữ liệu, rồi đặt `behind` (lần `check`
+/// sau đặt `ready` khi đủ migration). Lỗi thì vẫn đặt `behind`: database dở, khách nhận 503 tới khi sửa.
+async fn copy_into(
+    runtime: &Runtime,
+    placements: &autoxide_kernel::tenancy::Placements,
+    held: &MigrationLock,
+    name: &str,
+    migrator: &autoxide_kernel::migration::Migrator,
+    source: &autoxide_kernel::database::Database,
+    target: &autoxide_kernel::database::Database,
+) -> Result<Vec<autoxide_kernel::transfer::CopiedTable>, String> {
+    placements.mark_rollback(held, name, false).await.map_err(describe)?;
+    let copied = async {
+        migrator.up(target).await.map_err(|error| error.to_string())?;
+        copy_modules(source, target, &runtime.modules.names())
+            .await
+            .map_err(|error| error.to_string())
+    }
+    .await;
+    placements.mark_rollback(held, name, true).await.map_err(describe)?;
+    copied
 }
