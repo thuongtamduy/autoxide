@@ -199,15 +199,18 @@ fn extension_entries(item: TokenStream) -> syn::Result<Vec<TokenStream>> {
     };
     let entries = split_commas(group.stream());
     for entry in &entries {
+        // Khoá đọc bằng `LitStr` (giá trị thật của chuỗi): `r"x-permissions"` hay chuỗi có ký tự thoát cũng bị nhận ra.
         let key = entry.clone().into_iter().find_map(|token| match token {
-            TokenTree::Group(inner) => {
-                inner.stream().into_iter().next().map(|first| first.to_string())
-            }
+            TokenTree::Group(inner) => inner
+                .stream()
+                .into_iter()
+                .next()
+                .and_then(|first| syn::parse2::<syn::LitStr>(first.into()).ok())
+                .map(|literal| literal.value()),
             _ => None,
         });
         if let Some(key) = key
-            && let Some((name, instead)) =
-                RESERVED_EXTENSIONS.iter().find(|(name, _)| key.trim_matches('"') == *name)
+            && let Some((name, instead)) = RESERVED_EXTENSIONS.iter().find(|(name, _)| key == *name)
         {
             return Err(syn::Error::new_spanned(
                 entry,
@@ -331,6 +334,9 @@ pub(crate) fn expand(args: TokenStream, function: ItemFn) -> syn::Result<TokenSt
         .collect();
     let cfgs: Vec<_> =
         carried.iter().filter(|attribute| attribute.path().is_ident("cfg")).collect();
+    // `#[deprecated]` cũng sang bản sao chữ ký mà `#[utoipa::path]` đọc: tài liệu có `deprecated: true`.
+    let deprecated: Vec<_> =
+        carried.iter().filter(|attribute| attribute.path().is_ident("deprecated")).collect();
     let visibility = &function.vis;
     let inputs = &function.sig.inputs;
     let output = &function.sig.output;
@@ -352,6 +358,7 @@ pub(crate) fn expand(args: TokenStream, function: ItemFn) -> syn::Result<TokenSt
                 // Bản sao chữ ký cho utoipa đọc; không bao giờ chạy.
                 #[utoipa::path(#(#all),*)]
                 #(#docs)*
+                #(#deprecated)*
                 #[allow(dead_code, unused_variables, clippy::all)]
                 async fn #name(#inputs) #output {
                     loop {}

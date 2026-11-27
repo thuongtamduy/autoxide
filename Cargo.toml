@@ -91,6 +91,9 @@ autoxide-customers = { path = "modules/customers", version = "=0.19.0" }
 # --- Thư viện nền (STACK.md, bảng "Nền") ---
 tokio = { version = "1.54", features = ["macros", "rt-multi-thread", "net", "signal", "sync", "time"] }
 axum = { version = "0.8", features = ["ws"] }
+# Bộ khớp route của axum, ghim ĐÚNG bản axum ghim: kernel hỏi nó trước khi ghép router để báo route xung đột bằng lỗi
+# rõ thay vì để axum dừng tiến trình (D-20261127-http-layer-choices).
+matchit = "=0.8.4"
 tower-http = { version = "0.7", features = [
   "catch-panic",
   "compression-br",

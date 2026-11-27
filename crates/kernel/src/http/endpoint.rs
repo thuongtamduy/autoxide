@@ -59,6 +59,18 @@ impl EndpointDoc {
     }
 }
 
+// Đường đầy đủ của route `path` lồng dưới `prefix`, đúng cách axum ghép (`path_for_nested_route` của axum).
+fn nested_path(prefix: &str, path: &str) -> String {
+    let path = if path.is_empty() { "/" } else { path };
+    if prefix.ends_with('/') {
+        format!("{prefix}{}", path.trim_start_matches('/'))
+    } else if path == "/" {
+        prefix.to_owned()
+    } else {
+        format!("{prefix}{path}")
+    }
+}
+
 fn filter(method: &HttpMethod) -> MethodFilter {
     match method {
         HttpMethod::Get => MethodFilter::GET,
@@ -101,6 +113,15 @@ fn filter(method: &HttpMethod) -> MethodFilter {
 /// #[endpoint(get, path = "/ping", signed_in, extensions(("x-public" = json!(true))),
 ///     responses((status = 200, description = "Alive.")))]
 /// async fn ping() {}
+/// ```
+///
+/// ```compile_fail
+/// use autoxide_kernel::http::endpoint;
+///
+/// /// Read; a raw string is still the reserved key.
+/// #[endpoint(get, path = "/x", public, extensions((r"x-permissions" = json!([]))),
+///     responses((status = 200, description = "Read.")))]
+/// async fn read() {}
 /// ```
 ///
 /// ```compile_fail
@@ -165,9 +186,24 @@ impl<S: Clone + Send + Sync + 'static> Routes<S> {
         Routes(self.0.merge(other.0))
     }
 
-    /// Adds the routes of `other` under `path` (for example `/{id}/comments`).
+    /// Adds the routes of `other` under `path` (for example `/{id}/comments`). An operation of `other` on a path `self`
+    /// already has joins that path's other operations (same path and method: axum refuses it while building).
     pub fn nest(self, path: &str, other: Routes<S>) -> Self {
-        Routes(self.0.nest(path, other.0))
+        // `OpenApiRouter::nest` của utoipa-axum THAY cả mục path đã có trong tài liệu, trong khi axum GỘP method của
+        // cùng path: tài liệu (mà permission gate, lint và phép kiểm trùng route dựa vào) sẽ thiếu operation đang chạy.
+        // Nên: phần axum để axum lồng, phần tài liệu tự ghép tiền tố rồi gộp từng operation.
+        let (router, mut nested) = other.0.split_for_parts();
+        let mut routes = self.0.nest(path, OpenApiRouter::from(router));
+        let paths = std::mem::take(&mut nested.paths.paths);
+        let mut prefixed = Paths::new();
+        for (child, item) in paths {
+            prefixed.paths.insert(nested_path(path, &child), item);
+        }
+        let document = routes.get_openapi_mut();
+        document.paths.merge(prefixed);
+        // Schema (components) của nhánh con: `OpenApi::merge` thêm cái chưa có, không đụng path (đã gộp ở trên).
+        document.merge(nested);
+        Routes(routes)
     }
 
     /// Gives the handlers their state (`State<T>`, where `T` is `state`'s type).

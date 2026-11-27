@@ -420,24 +420,8 @@ impl Modules {
             }
             found
         };
-        // `/{id}` và `/{key}` là cùng một route với axum (tên tham số khác nhau thì axum dừng tiến trình lúc ghép, kể cả
-        // khi method khác nhau): so theo dạng chuẩn hoá, mọi `{…}` thành `{}`.
-        let shape = |path: &str| {
-            let mut out = String::with_capacity(path.len());
-            let mut inside = false;
-            for c in path.chars() {
-                match c {
-                    '{' => {
-                        inside = true;
-                        out.push_str("{}");
-                    }
-                    '}' => inside = false,
-                    _ if inside => {}
-                    _ => out.push(c),
-                }
-            }
-            out
-        };
+        // Hỏi chính bộ khớp route của axum (matchit, cùng bản axum ghim): `/{id}` với `/{key}`, hay `/{id}` với
+        // `/{*rest}`, là xung đột với nó, dù method khác nhau. Cùng path và khác method thì axum gộp, không xung đột.
         let mut overlaps = Vec::new();
         for module in &self.modules {
             let endpoints = module.endpoints().into_router();
@@ -445,16 +429,34 @@ impl Modules {
             if endpoints.is_empty() {
                 continue;
             }
-            for (path, method) in &pairs(&module.routes()) {
-                for (other, other_method) in &endpoints {
-                    let same_route = shape(path) == shape(other);
-                    if same_route && (method == other_method || path != other) {
+            let mut known: std::collections::BTreeMap<String, std::collections::BTreeSet<String>> =
+                std::collections::BTreeMap::new();
+            for (path, method) in pairs(&module.routes()) {
+                known.entry(path).or_default().insert(method);
+            }
+            let mut matcher = matchit::Router::new();
+            for path in known.keys() {
+                // Xung đột giữa các route cũ với nhau không thuộc phép kiểm này (axum đã chạy chúng như thế).
+                let _ = matcher.insert(path.as_str(), ());
+            }
+            for (path, method) in &endpoints {
+                if let Some(methods) = known.get(path) {
+                    if methods.contains(method) {
                         overlaps.push(format!(
-                            "{}: {method} {path} (routes) and {other_method} {other} (endpoints)",
+                            "{}: {method} {path} is in both routes and endpoints",
                             module.name()
                         ));
                     }
+                    continue;
                 }
+                if let Err(error) = matcher.insert(path.as_str(), ()) {
+                    overlaps.push(format!(
+                        "{}: {method} {path} (endpoints) conflicts: {error}",
+                        module.name()
+                    ));
+                    continue;
+                }
+                known.entry(path.clone()).or_default().insert(method.clone());
             }
         }
         overlaps

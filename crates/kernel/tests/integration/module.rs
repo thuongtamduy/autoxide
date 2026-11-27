@@ -675,10 +675,63 @@ async fn route_cung_dang_khac_ten_tham_so_thi_khong_khoi_dong() {
         let db = connect(database).await;
         let mut modules = Modules::new(vec![Box::new(Renamed)]).unwrap();
         let error = modules.start(&db).unwrap_err().to_string();
-        assert!(
-            error.contains("renamed: GET /{id} (routes) and DELETE /{key} (endpoints)"),
-            "{error}"
-        );
+        assert!(error.contains("renamed: DELETE /{key} (endpoints) conflicts"), "{error}");
+    })
+    .await
+    .unwrap();
+}
+
+/// Every file under a path (cách cũ, tham số đuôi).
+#[utoipa::path(get, path = "/{*rest}", params(("rest" = String, Path, description = "Path.")), responses((status = 200, description = "File.")))]
+async fn any_file() -> &'static str {
+    "file"
+}
+
+/// Old way to delete; kept for clients that still call it.
+#[deprecated(note = "use `DELETE /v2/{id}` instead")]
+#[autoxide_kernel::http::endpoint(delete, path = "/{id}", public, params(("id" = String, Path, description = "Id.")), responses((status = 204, description = "Deleted.")))]
+async fn old_delete() -> autoxide_kernel::http::NoContent {
+    autoxide_kernel::http::NoContent
+}
+
+struct Wildcard {
+    nested: bool,
+}
+
+impl Module for Wildcard {
+    fn name(&self) -> &'static str {
+        "wildcard"
+    }
+
+    fn routes(&self) -> OpenApiRouter {
+        let files = OpenApiRouter::new().routes(routes!(any_file));
+        if self.nested { OpenApiRouter::new().nest("/files", files) } else { files }
+    }
+
+    // Test cố ý dùng endpoint `#[deprecated]` để kiểm tài liệu có `deprecated: true`.
+    #[allow(deprecated)]
+    fn endpoints(&self) -> autoxide_kernel::http::Routes {
+        autoxide_kernel::routes![old_delete]
+    }
+}
+
+/// `/{*rest}` (tham số đuôi) và `/{id}` xung đột với bộ khớp route của axum: báo lỗi rõ lúc khởi động thay vì để axum
+/// dừng tiến trình. Đặt `/{*rest}` dưới `/files` thì hết xung đột; endpoint `#[deprecated]` mang `deprecated: true`.
+#[tokio::test]
+async fn tham_so_duoi_xung_dot_va_endpoint_cu_co_dau_deprecated() {
+    TestDatabase::run(async |database| {
+        let db = connect(database).await;
+        let mut modules = Modules::new(vec![Box::new(Wildcard { nested: false })]).unwrap();
+        let error = modules.start(&db).unwrap_err().to_string();
+        assert!(error.contains("wildcard: DELETE /{id} (endpoints) conflicts"), "{error}");
+
+        let mut modules = Modules::new(vec![Box::new(Wildcard { nested: true })]).unwrap();
+        modules.start(&db).unwrap();
+        let routes = modules.routes();
+        let (_, router) = routes.iter().find(|(name, _)| *name == "wildcard").unwrap();
+        let document = serde_json::to_value(router.get_openapi()).unwrap();
+        assert_eq!(document["paths"]["/{id}"]["delete"]["deprecated"], serde_json::json!(true));
+        assert!(document["paths"]["/files/{*rest}"]["get"].is_object());
     })
     .await
     .unwrap();

@@ -814,6 +814,7 @@ dependencies = [
  "hyper",
  "hyper-util",
  "jiff",
+ "matchit",
  "metrics",
  "metrics-exporter-prometheus",
  "minijinja",

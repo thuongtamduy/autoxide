@@ -110,3 +110,65 @@ async fn signed_in_bi_ep_dang_nhap_du_handler_khong_nhan_principal() {
     .await
     .unwrap();
 }
+
+/// List things; needs `probe.read`. The handler does not take a `Principal`: only the gate protects it.
+#[endpoint(get, path = "/things", permission = "probe.read", responses((status = 200, description = "Things.", body = String)))]
+async fn list_things() -> &'static str {
+    "things"
+}
+
+/// Create a thing; needs `probe.write`.
+#[endpoint(post, path = "/", permission = "probe.write", responses((status = 201, description = "Created.", body = String)))]
+async fn create_thing() -> &'static str {
+    "created"
+}
+
+/// `nest` lên một path đã có operation khác method.
+struct Nester;
+
+impl Module for Nester {
+    fn name(&self) -> &'static str {
+        "probe"
+    }
+
+    fn permissions(&self) -> Vec<Permission> {
+        vec![PROBE_READ, PROBE_WRITE]
+    }
+
+    fn endpoints(&self) -> Routes {
+        let list: Routes = routes![list_things];
+        list.nest("/things", routes![create_thing])
+    }
+}
+
+/// `Routes::nest` lên path đã có: tài liệu giữ CẢ hai operation (không thay mục path), nên gate có luật cho cả hai.
+#[tokio::test]
+async fn nest_len_path_da_co_giu_ca_hai_operation() {
+    TestDatabase::run(async |test| {
+        let app = TestApp::builder(test).user("ada", 1, &[]).module(Nester).build().await.unwrap();
+        let document = serde_json::to_value(app.openapi()).unwrap();
+        let item = &document["paths"]["/api/v1/probe/things"];
+        assert!(item.get("get").is_some() && item.get("post").is_some(), "{item}");
+        for method in ["GET", "POST"] {
+            let request = |token: Option<&str>| {
+                let mut request = app.request(method.parse().unwrap(), "/api/v1/probe/things");
+                if let Some(token) = token {
+                    request = request.token(token);
+                }
+                request
+            };
+            assert_eq!(
+                request(None).send().await.unwrap().status(),
+                StatusCode::UNAUTHORIZED,
+                "{method}"
+            );
+            assert_eq!(
+                request(Some("ada")).send().await.unwrap().status(),
+                StatusCode::FORBIDDEN,
+                "{method}"
+            );
+        }
+    })
+    .await
+    .unwrap();
+}

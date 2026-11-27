@@ -625,7 +625,7 @@ impl Modules {
         let overlaps = self.overlapping_routes();
         if !overlaps.is_empty() {
             return Err(ModuleError(format!(
-                "a route is declared both in `Module::routes` and in `Module::endpoints`: {}; keep one",
+                "routes of `Module::routes` and `Module::endpoints` collide: {}; keep one route per path and method",
                 overlaps.join(", ")
             )));
         }

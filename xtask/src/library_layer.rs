@@ -389,8 +389,9 @@ fn code_lines(text: &str) -> impl Iterator<Item = (usize, &str)> {
     text.lines().enumerate().filter(|(_, line)| !line.trim_start().starts_with("//"))
 }
 
-/// `private-paths`: `__private` trong mã viết tay của mọi crate trừ kernel (nơi khai đường đó) và crate macro
-/// (nơi sinh mã gọi nó). Không có danh sách chỗ cũ.
+/// `private-paths`: `__private`, các hàm dựng ẩn của lớp HTTP (`__add`, `__new`, `__describe`, `__filters`) và `impl
+/// Endpoint for` viết tay, trong mã của mọi crate trừ kernel (nơi khai chúng) và crate macro (nơi sinh mã gọi chúng);
+/// `check-module` áp cho module ngoài repo. Không có danh sách chỗ cũ.
 pub fn check_private_paths(workspace: &Workspace) -> Result<Vec<Violation>, String> {
     let mut violations = Vec::new();
     for package in &workspace.packages {
@@ -408,21 +409,60 @@ pub fn check_private_paths(workspace: &Workspace) -> Result<Vec<Violation>, Stri
                 let path = base.join(file.trim_start_matches("src/"));
                 let text = fs::read_to_string(&path)
                     .map_err(|error| format!("{}: {error}", path.display()))?;
-                for (index, line) in text.lines().enumerate() {
-                    if line.contains("__private") {
-                        violations.push(Violation {
-                            rule: "private-paths",
-                            location: format!("{}/{sub}/{}:{}", package.dir, file.trim_start_matches("src/"), index + 1),
-                            message: "`autoxide_kernel::__private` is for code the kernel's macros generate, not part \
-                                      of the contract: use the public path"
-                                .to_owned(),
-                        });
-                    }
+                for (index, message) in private_uses(&text) {
+                    violations.push(Violation {
+                        rule: "private-paths",
+                        location: format!(
+                            "{}/{sub}/{}:{}",
+                            package.dir,
+                            file.trim_start_matches("src/"),
+                            index + 1
+                        ),
+                        message,
+                    });
                 }
             }
         }
     }
     Ok(violations)
+}
+
+/// Hàm ẩn mà chỉ mã do macro của kernel sinh được gọi: viết tay thì dựng được route bỏ qua `#[endpoint]` (không khai ai
+/// được gọi, không có trong tài liệu mà permission gate dựa vào).
+const GENERATED_ONLY: &[&str] = &["__add", "__new", "__describe", "__filters"];
+
+/// (số dòng, lời báo) của mỗi chỗ dùng đường riêng của kernel trong `text`, bỏ dòng chú thích.
+fn private_uses(text: &str) -> Vec<(usize, String)> {
+    let mut found = Vec::new();
+    for (index, line) in code_lines(text) {
+        let words: Vec<&str> = line.split(|c: char| !c.is_alphanumeric() && c != '_').collect();
+        if line.contains("__private") {
+            found.push((
+                index,
+                "`autoxide_kernel::__private` is for code the kernel's macros generate, not part of the contract: \
+                 use the public path"
+                    .to_owned(),
+            ));
+        }
+        if let Some(name) = GENERATED_ONLY.iter().find(|name| words.contains(name)) {
+            found.push((
+                index,
+                format!(
+                    "`{name}` is called only by code `#[endpoint]` / `routes!` generate: declare the endpoint with \
+                     `#[endpoint(…)]` and list it in `routes![…]`"
+                ),
+            ));
+        }
+        // `impl Endpoint for X` (hay `impl …::http::Endpoint for X`) viết tay: chỉ `#[endpoint]` cài trait này.
+        let compact: String = line.chars().filter(|c| !c.is_whitespace()).collect();
+        if compact.starts_with("impl") && compact.contains("Endpointfor") {
+            found.push((
+                index,
+                "`Endpoint` is implemented only by `#[endpoint]`: declare the handler with `#[endpoint(…)]`".to_owned(),
+            ));
+        }
+    }
+    found
 }
 
 /// File test của module: `tests.rs`, `*_tests.rs`, hay nằm trong thư mục `tests/`.
@@ -434,6 +474,16 @@ fn is_test_file(file: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Đường riêng của kernel: `__private`, hàm dựng ẩn của lớp HTTP, `impl Endpoint for` viết tay; chú thích thì bỏ qua.
+    #[test]
+    fn duong_rieng_cua_kernel_bi_chan() {
+        let text = "use autoxide_kernel::__private::utoipa;\nlet r = routes.__add(doc, router);\n\
+                    let d = EndpointDoc::__new(p, m, o, s);\nimpl autoxide_kernel::http::Endpoint for Fake {}\n\
+                    impl Endpoint for Fake {}\n// __add trong chú thích\nlet added = add(1);\n";
+        let lines: Vec<usize> = private_uses(text).iter().map(|(line, _)| *line).collect();
+        assert_eq!(lines, [0, 1, 2, 3, 4]);
+    }
     use crate::workspace::{Dep, Package};
 
     // Phụ thuộc thường và phụ thuộc của test tính hai luật riêng; module chỉ còn thư viện bọc ở dev vẫn là "đã chuyển".
