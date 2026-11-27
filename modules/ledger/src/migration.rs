@@ -24,6 +24,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(AddListIndexes),
         Box::new(AddBankPaymentIndex),
         Box::new(AddCapturedAmount),
+        Box::new(AddSandboxFlag),
     ]
 }
 
@@ -1086,6 +1087,36 @@ impl MigrationTrait for AddCapturedAmount {
             .alter_table(
                 Table::alter().table("ledger_payments").drop_column("captured_minor").to_owned(),
             )
+            .await
+    }
+}
+
+/// Lượt thu tạo khi khách là sandbox (UT-4, D-20261127-sandbox-payment-simulation): chỉ lượt đó mới giả lập
+/// được phản hồi của đối tác. Lượt có sẵn: `false`.
+struct AddSandboxFlag;
+
+impl MigrationName for AddSandboxFlag {
+    fn name(&self) -> &str {
+        "m0013_add_sandbox_flag"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for AddSandboxFlag {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .alter_table(
+                Table::alter()
+                    .table("ledger_payments")
+                    .add_column(schema::boolean("sandbox").default(false))
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .alter_table(Table::alter().table("ledger_payments").drop_column("sandbox").to_owned())
             .await
     }
 }

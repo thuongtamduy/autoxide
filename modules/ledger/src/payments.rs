@@ -372,6 +372,7 @@ impl LedgerService {
                 transfer_code: Set(None),
                 bank_account_id: Set(None),
                 captured_minor: Set(None),
+                sandbox: Set(tenant.is_sandbox()),
             };
             let saved = payment::Entity::insert(row).exec_with_returning(&transaction).await?;
             let event = events::PaymentCreated(payment_payload(&saved)?);
@@ -518,11 +519,24 @@ impl LedgerService {
                 return Err(error);
             }
         };
-        let stored = serde_json::to_string(&StoredNotification::of(&notification))
-            .map_err(Error::internal)?;
         let text = String::from_utf8_lossy(body).into_owned();
-        let (database, jobs, notification, provider) =
-            (tenant.database(), &self.jobs, &notification, gateway.provider());
+        self.record_notification(tenant, gateway.provider(), &notification, text).await?;
+        Ok(())
+    }
+
+    /// Lưu thông báo đã kiểm của đối tác `provider` (`body`: nguyên văn) và xếp job xử lý, trong một
+    /// transaction. Chung cho webhook thật và thông báo giả lập trong sandbox (`simulate.rs`): từ đây trở
+    /// đi hai đường chạy cùng một code. Trả ID dòng đã lưu; cùng mã thông báo đã có → `None`.
+    pub(crate) async fn record_notification(
+        &self,
+        tenant: &TenantContext,
+        provider: &str,
+        notification: &GatewayNotification,
+        text: String,
+    ) -> Result<Option<Uuid>, Error> {
+        let stored = serde_json::to_string(&StoredNotification::of(notification))
+            .map_err(Error::internal)?;
+        let (database, jobs) = (tenant.database(), &self.jobs);
         database
             .write_with_retry(move || {
                 let (stored, text) = (stored.clone(), text.clone());
@@ -563,7 +577,7 @@ impl LedgerService {
                         .await?;
                     }
                     transaction.commit().await?;
-                    Ok(())
+                    Ok((inserted == 1).then_some(id))
                 }
             })
             .await

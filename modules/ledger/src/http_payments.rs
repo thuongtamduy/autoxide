@@ -34,6 +34,7 @@ pub(crate) fn routes(service: Arc<LedgerService>) -> OpenApiRouter {
         .routes(routes!(list_payments, create_payment))
         .routes(routes!(get_payment))
         .routes(routes!(create_refund))
+        .routes(routes!(simulate_payment))
         .routes(routes!(receive_webhook))
         .routes(routes!(receive_tenant_webhook))
         .routes(routes!(list_exceptions))
@@ -250,6 +251,62 @@ async fn get_payment(
             refunds: refunds.iter().map(describe_refund).collect::<Result<Vec<_>, _>>()?,
         },
     })
+}
+
+/// The partner's answer to simulate.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+#[schema(as = LedgerSimulatePaymentRequest)]
+pub(crate) struct SimulatePaymentRequest {
+    /// `succeeded` (the partner collected the money) or `failed` (the buyer did not pay).
+    #[schema(example = "succeeded")]
+    outcome: String,
+    /// The amount the partner reports collected; omit for exactly the amount due. Another amount
+    /// puts the payment in `needs_review`, as a real notification would.
+    amount: Option<Money>,
+}
+
+/// Simulate the partner's answer for a sandbox payment.
+///
+/// Requires `ledger.reconcile`, a sandbox (`Autoxide-Tenant: <sandbox id>`) and the server setting
+/// `AUTOXIDE_LEDGER_SANDBOX_SIMULATION=true` (off by default). Inside a sandbox no payment reaches a
+/// real partner, so none notifies back; this plays the partner for a `pending` payment created in the
+/// sandbox and goes through the same path as a partner notification: the payment becomes `succeeded`
+/// (or `failed`, or `needs_review` for another amount), the entry is posted and the module that asked
+/// for the payment is told (an order becomes `confirmed` a moment later). No money moves. Send an
+/// `Idempotency-Key` to retry safely.
+#[utoipa::path(
+    post,
+    path = "/payments/{id}/simulate",
+    extensions(("x-permissions" = json!(["ledger.reconcile"]))),
+    operation_id = "simulate_ledger_payment",
+    security(("bearer" = [])),
+    params(
+        ("id" = Uuid, Path, description = "Id of the payment (an order's `ledger_payment_id`)."),
+        ("Idempotency-Key" = Option<String>, Header, description = "Key of this attempt; resend the same key when retrying."),
+    ),
+    request_body = SimulatePaymentRequest,
+    responses(
+        (status = 200, description = "The payment after the simulated notification.", body = Data<Payment>),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Missing `ledger.reconcile`; code `permission_denied`.", body = Problem),
+        (status = 404, description = "Simulation is turned off on this server (`ledger.simulation_disabled`) or no such payment in your scope (`ledger.payment_not_found`).", body = Problem),
+        (status = 409, description = "Not inside a sandbox (`tenancy.sandbox_only`), the payment was not created by the sandbox's simulated partner (`ledger.payment_not_simulated`) or it is no longer `pending` (`ledger.payment_state`).", body = Problem),
+        (status = 422, description = "A value is invalid; every problem in `errors`.", body = Problem),
+    )
+)]
+async fn simulate_payment(
+    State(service): State<Arc<LedgerService>>,
+    tenant: TenantContext,
+    principal: Principal,
+    Path(id): Path<Uuid>,
+    ValidJson(input): ValidJson<SimulatePaymentRequest>,
+) -> Result<Data<Payment>, Error> {
+    let outcome = crate::simulate::Outcome::parse(&input.outcome)?;
+    let payment = service
+        .simulate_payment(&tenant, &principal, id, outcome, input.amount.map(crate::simulate::Reported::Money))
+        .await?;
+    Ok(Data { data: payment })
 }
 
 /// A refund to make.

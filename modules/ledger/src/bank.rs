@@ -472,6 +472,7 @@ impl LedgerService {
                 transfer_code: Set(Some(code)),
                 bank_account_id: Set(Some(account.id)),
                 captured_minor: Set(None),
+                sandbox: Set(tenant.is_sandbox()),
             })
             .exec_with_returning(&transaction)
             .await?;

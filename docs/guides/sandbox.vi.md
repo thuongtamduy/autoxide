@@ -54,6 +54,27 @@ curl -sS "$API/api/v1/kernel/sandbox/messages?channel=mail" \
   -H "Authorization: Bearer $TOKEN" -H "Autoxide-Tenant: $SANDBOX"
 ```
 
+### Hoàn tất một thanh toán giả
+
+Không đối tác nào gửi thông báo cho sandbox, nên khoản thanh toán tạo trong đó (vd một đơn trả bằng
+`card` hay `wallet`) đứng `pending` cho tới khi bạn đóng vai đối tác. Người vận hành máy chủ cho phép
+trước bằng `AUTOXIDE_LEDGER_SANDBOX_SIMULATION=true` (mặc định tắt; ngoài sandbox không bao giờ dùng
+được). Rồi, với `ledger.reconcile`:
+
+```bash
+# Việc thanh toán của đơn cho id này ở `ledger_payment_id`.
+curl -sS "$API/api/v1/ledger/payments/$LEDGER_PAYMENT_ID/simulate" \
+  -H "Authorization: Bearer $TOKEN" -H "Autoxide-Tenant: $SANDBOX" \
+  -H "Idempotency-Key: $(openssl rand -hex 16)" -H 'Content-Type: application/json' \
+  -d '{"outcome": "succeeded"}'
+```
+
+Lệnh đi đúng đường của thông báo từ đối tác: khoản thành `succeeded` và đơn thành `confirmed` ngay sau
+đó. `{"outcome": "failed"}` làm khoản hỏng; `amount` khác số phải thu
+(`{"outcome": "succeeded", "amount": {"amount": "100000", "currency": "VND"}}`) đưa khoản vào
+`needs_review`, để tập gỡ chênh lệch. Chỉ giả lập được khoản `pending` tạo trong sandbox. AI agent dùng
+tool MCP `ledger.simulate_payment`.
+
 ## Đem thay đổi về
 
 Từ khách thật (không gửi `Autoxide-Tenant`), đẩy bản ghi của sandbox về. Danh sách loại đẩy được:

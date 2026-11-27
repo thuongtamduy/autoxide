@@ -56,6 +56,27 @@ curl -sS "$API/api/v1/kernel/sandbox/messages?channel=mail" \
   -H "Authorization: Bearer $TOKEN" -H "Autoxide-Tenant: $SANDBOX"
 ```
 
+### Complete a simulated payment
+
+No partner notifies a sandbox, so a payment made there (an order paid by `card` or `wallet`, for
+example) stays `pending` until you play the partner. The server operator first allows it with
+`AUTOXIDE_LEDGER_SANDBOX_SIMULATION=true` (off by default; it never works outside a sandbox). Then,
+with `ledger.reconcile`:
+
+```bash
+# The order's payment action gives the id as `ledger_payment_id`.
+curl -sS "$API/api/v1/ledger/payments/$LEDGER_PAYMENT_ID/simulate" \
+  -H "Authorization: Bearer $TOKEN" -H "Autoxide-Tenant: $SANDBOX" \
+  -H "Idempotency-Key: $(openssl rand -hex 16)" -H 'Content-Type: application/json' \
+  -d '{"outcome": "succeeded"}'
+```
+
+It goes through the same path as a partner notification: the payment becomes `succeeded` and the
+order `confirmed` a moment later. `{"outcome": "failed"}` makes the payment fail; an `amount` other
+than the amount due (`{"outcome": "succeeded", "amount": {"amount": "100000", "currency": "VND"}}`)
+puts it in `needs_review`, to practise resolving a difference. Only `pending` payments created inside
+the sandbox can be simulated. AI agents use the MCP tool `ledger.simulate_payment`.
+
 ## Bring changes back
 
 From your real tenant (without `Autoxide-Tenant`), promote records of the sandbox. List the kinds
