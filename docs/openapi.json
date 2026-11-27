@@ -195312,7 +195312,7 @@
                 }
               }
             },
-            "description": "The series is retired (`invoices.series_inactive`), the booking day is in a closed period (`ledger.period_closed`), or the draft was edited while being issued (`invoices.draft_changed`; issue again)."
+            "description": "No active series for the unit, kind and year of issue (`invoices.no_active_series`; create one), the series is retired (`invoices.series_inactive`), the booking day is in a closed period (`ledger.period_closed`), or the draft was edited while being issued (`invoices.draft_changed`; issue again)."
           },
           "422": {
             "content": {
@@ -245790,7 +245790,7 @@
     },
     "/api/v1/plans/billing-periods/{id}/void": {
       "post": {
-        "description": "Platform staff with `plans.subscriptions.manage`.",
+        "description": "Platform staff with `plans.subscriptions.manage`. When the period already has an invoice, it is cancelled\nafterwards by a background job, not within this request: an e-invoice the tax rules no longer let cancel\n(Vietnam since 2025-06-01) gets a full decrease adjustment instead. Read the invoice later to see the result.",
         "operationId": "plans_void_billing_period",
         "parameters": [
           {
@@ -245838,7 +245838,7 @@
                 }
               }
             },
-            "description": "The billing period, now `void`."
+            "description": "The billing period, now `void`; its invoice is cancelled or adjusted asynchronously."
           },
           "401": {
             "content": {

@@ -124,10 +124,13 @@ pub(crate) fn profile_not_found() -> Error {
     )
 }
 
-/// Múi giờ trong giá trị JSON (dạng chuỗi) của quy tắc [`TIME_ZONE_RULE`]: `{"time_zone": "…"}`.
-pub(crate) fn rule_time_zone(raw: &str) -> Option<jiff::tz::TimeZone> {
+/// Ngày của lúc `at` theo múi giờ trong giá trị JSON (dạng chuỗi) của quy tắc [`TIME_ZONE_RULE`]
+/// (`{"time_zone": "…"}`); `None` khi giá trị không có múi giờ hợp lệ. Kiểu múi giờ của kernel không lộ ra đây:
+/// module không phụ thuộc thẳng thư viện thời gian (D-20261126-kernel-data-layer).
+pub(crate) fn rule_date(raw: &str, at: Timestamp) -> Option<Date> {
     let value: serde_json::Value = serde_json::from_str(raw).ok()?;
-    value["time_zone"].as_str().and_then(autoxide_kernel::time::zone)
+    let zone = value["time_zone"].as_str().and_then(autoxide_kernel::time::zone)?;
+    Some(at.date_in(&zone))
 }
 
 /// `from <= on < to` (nửa mở), ngày dạng `YYYY-MM-DD` so sánh như chữ.
@@ -529,8 +532,7 @@ impl TaxService {
                     && rule.code == TIME_ZONE_RULE
                     && in_force(&rule.effective_from, rule.effective_to.as_deref(), &day)
             })
-            .find_map(|rule| rule_time_zone(&rule.value))
-            .map(|zone| at.date_in(&zone)))
+            .find_map(|rule| rule_date(&rule.value, at)))
     }
 
     /// Vùng thuế đã nhập không có quy tắc [`TIME_ZONE_RULE`] đang hiệu lực vào lúc `at`.
