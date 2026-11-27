@@ -7,7 +7,9 @@ ngoài database và ngoài file backup của database) → DEK (mỗi khách và
 `kernel_data_keys`). Khi xoá dữ liệu của một khách, kernel **huỷ tenant key** của khách đó (crypto-shredding): bản backup
 database cũ còn DEK đã bọc nhưng không còn khoá để mở. Trước khi huỷ, DEK của purpose thuộc bảng mà module khai phải lưu
 giữ (`Module::retained_tables`: sổ của `ledger`, hồ sơ của `compliance`) được bọc lại bằng **retention key** riêng của
-khách, giữ tới hết hạn lưu của bảng rồi huỷ cùng dữ liệu. Huỷ khoá như vậy là có chủ ý, không phải mất mát. Xoá bản ghi
+khách, giữ tới hết hạn lưu của bảng rồi huỷ cùng dữ liệu. Huỷ khoá như vậy là có chủ ý, không phải mất mát. Huỷ chỉ có hiệu lực khi mọi bản backup của kho khoá còn chứa tenant
+key đó đã hết hạn lưu `R`; RUNBOOK đặt `R` không dài hơn hạn phải xoá dữ liệu, và luật khôi phục đòi bản backup kho khoá
+mới bằng hoặc mới hơn bản backup database. Xoá bản ghi
 theo yêu cầu của chủ thể dữ liệu không đổi: xoá giá trị và blind index của người đó, giữ khoá chung của khách.
 
 Lý do: Bản sao lưu cũ vẫn chứa dữ liệu của khách đã xoá, và không xoá từng dòng trong bản sao lưu được. Xoá khoá là cách
