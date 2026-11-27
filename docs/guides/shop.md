@@ -23,6 +23,9 @@ Vietnamese: [`shop.vi.md`](shop.vi.md).
   Key, Secret Key), a GHN shop (API token and ShopId), an eSMS account with a registered brandname
   (ApiKey, SecretKey) and a SePay eInvoice account (client id, client secret, provider account id).
   Each guide below says where to find these values.
+- `curl` and `jq` (the examples read answers with `jq`).
+- No provider account yet? Go through [Try it without real accounts](#try-it-without-real-accounts) first: the
+  same steps inside a sandbox, where every partner is simulated.
 - Before selling to the public in Vietnam: notify your sales website to the Ministry of Industry and
   Trade (Decree 52/2013/ND-CP as amended) and publish your terms; see the `compliance` module. This
   guide does not replace legal advice.
@@ -118,6 +121,42 @@ curl -sS "$API/api/v1/shipping/methods" -H "Authorization: Bearer $TOKEN" -H 'Co
   -d "{\"org_id\": \"$ORG\", \"code\": \"ghn\", \"kind\": \"carrier\", \"names\": {\"vi\": \"Giao Hàng Nhanh\", \"en\": \"GHN\"}, \"currency\": \"VND\", \"carrier_account_id\": \"$(echo "$GHN" | jq -r .data.id)\", \"auto_book\": true}"
 ```
 
+No e-invoice account yet? A series without `einvoice_provider` still numbers your invoices inside Autoxide
+(internal documents, not sent to the tax authority). Without any series no invoice is issued at delivery; with
+two series of the same kind, year and unit, pick one when issuing (`series_id`). Ask for an order's invoice
+again with `POST /api/v1/orders/{id}/invoice`.
+
+```bash
+curl -sS "$API/api/v1/invoices/series" -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"kind": "vat_invoice", "symbol": "1C26TAA", "year": 2026}'
+```
+
+**Tax profile** — who sells and under which tax rules. Tax on the cart and the seller on every invoice (name,
+tax code, address) come from it; without it tax is computed as `vat_credit` and invoices carry no seller
+details. `regime` is `vat_credit`, `vat_direct`, `household` or `exempt`; `business_lines` are `goods`,
+`services`, `production_transport` or `other`:
+
+```bash
+curl -sS -X PUT "$API/api/v1/tax/profiles/$ORG" -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"jurisdiction": "VN", "regime": "vat_credit", "tax_code": "0101234567", "legal_name": "Công ty TNHH Trà Việt",
+       "business_lines": ["goods"]}'
+```
+
+**Your own delivery fees** (no carrier account): a zone, a method with fixed rates by weight. A zone
+listing a province (`{"country": "VN", "province_code": "01"}`) wins over the whole country. Items without a
+weight use `default_item_weight_grams`:
+
+```bash
+ZONE=$(curl -sS "$API/api/v1/shipping/zones" -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d "{\"org_id\": \"$ORG\", \"name\": \"Viet Nam\", \"regions\": [{\"country\": \"VN\"}]}" | jq -r .data.id)
+METHOD=$(curl -sS "$API/api/v1/shipping/methods" -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d "{\"org_id\": \"$ORG\", \"code\": \"standard\", \"kind\": \"table_rate\", \"names\": {\"vi\": \"Giao tiêu chuẩn\", \"en\": \"Standard\"},
+       \"currency\": \"VND\", \"default_item_weight_grams\": 500}" | jq -r .data.id)
+curl -sS -X PUT "$API/api/v1/shipping/methods/$METHOD/rates" -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d "{\"rates\": [{\"zone_id\": \"$ZONE\", \"min_weight_grams\": 0, \"amount\": {\"amount\": \"30000\", \"currency\": \"VND\"}}]}"
+```
+
 In the GHN dashboard, register `AUTOXIDE_HTTP_PUBLIC_URL` + `webhook_path` as the status webhook (see
 the [GHN guide](providers/ghn.md#status-webhook)). MoMo needs nothing: Autoxide sends your
 notification address with every payment.
@@ -189,6 +228,17 @@ addresses, see step 2); MoMo requires one (or set `momo.connection.account.retur
 (`pending_payment`) and `payment_actions[0]`: a `redirect` to MoMo's payment page. When the buyer has paid, MoMo notifies your server, and the order becomes `confirmed` / `paid` on
 its own. The buyer receives an SMS for the order placed and for the payment confirmed.
 
+`payment_method` is `cod` (cash on delivery, when the cart has a delivery), `bank_transfer`, or a method of
+the payment partner (`wallet`, `card`…); the cart's `payment_methods` lists `cod`, `bank_transfer` and
+`gateway`, where `gateway` stands for any method of the partner. Checkout gives a guest no token to read the
+order later: the buyer asks for one with the order number and phone, and confirms the code sent by SMS. The
+`access_token` then goes in the `Order-Token` header of `/api/v1/orders/public/orders/…` calls:
+
+```bash
+LOOKUP=$(curl -sS "$API/api/v1/orders/public/orders/lookup" -H 'Content-Type: application/json'   -d '{"number": "<order number>", "phone": "0912345678"}' | jq -r .data.lookup_id)
+ORDER_TOKEN=$(curl -sS "$API/api/v1/orders/public/orders/lookup/$LOOKUP/confirm" -H 'Content-Type: application/json'   -d '{"code": "<code from the SMS>"}' | jq -r .data.access_token)
+```
+
 ## 5. Ship it
 
 Note the order id from the checkout answer. Requesting the shipment accepts the order (`preparing`);
@@ -210,6 +260,55 @@ curl -sS "$API/api/v1/orders/$ORDER" -H "Authorization: Bearer $TOKEN" | jq '.da
 curl -sS "$API/api/v1/invoices/documents?source_module=orders&source_id=$ORDER" -H "Authorization: Bearer $TOKEN" \
   | jq '.data[0] | {status, number, authority_code}'
 ```
+
+## Try it without real accounts
+
+Before you have provider accounts, run the whole flow in a [sandbox](sandbox.md): a test copy of a shop
+where every partner is simulated (payments, delivery, SMS, e-invoices) and nothing reaches a real one. A
+sandbox needs a server with several tenants, and its payments are completed by hand, so allow that too
+(both settings are off by default):
+
+```bash
+# Next to compose.quickstart.yml: several tenants, and simulated payments allowed inside sandboxes.
+cat > compose.try.yml <<'EOF'
+services:
+  autoxide:
+    environment:
+      AUTOXIDE_TENANCY_MODE: multi
+      AUTOXIDE_LEDGER_SANDBOX_SIMULATION: "true"
+EOF
+docker compose -f compose.quickstart.yml -f compose.try.yml up -d
+
+# A shop tenant and its first administrator (the command prints the password).
+X="docker compose -f compose.quickstart.yml -f compose.try.yml exec autoxide autoxide"
+$X tenant create --slug demo --name "Demo shop"
+$X user create --tenant demo --email owner@demo.example --name "Owner" --admin
+
+# Sign in to the shop, then create a sandbox of it.
+API=http://127.0.0.1:8080
+TOKEN=$(curl -sS "$API/api/v1/auth/login" -H 'Autoxide-Tenant: demo' -H 'Content-Type: application/json' \
+  -d '{"email":"owner@demo.example","password":"<printed password>"}' | jq -r .data.access_token)
+TENANT=$(curl -sS "$API/api/v1/kernel/tenant" -H "Authorization: Bearer $TOKEN" -H 'Autoxide-Tenant: demo' | jq -r .data.id)
+SANDBOX=$(curl -sS "$API/api/v1/kernel/tenants/$TENANT/sandboxes" -H "Authorization: Bearer $TOKEN" \
+  -H 'Autoxide-Tenant: demo' -H "Idempotency-Key: $(openssl rand -hex 16)" -H 'Content-Type: application/json' \
+  -d '{"name": "First sale"}' | jq -r .data.id)
+curl -sS "$API/api/v1/kernel/tenant" -H "Authorization: Bearer $TOKEN" -H "Autoxide-Tenant: $SANDBOX" | jq .data.status
+```
+
+The status is `active` once the copy is done (a few seconds). Then do steps 1 to 5 with **two changes**:
+
+- Send `-H "Autoxide-Tenant: $SANDBOX"` with **every** call, the public ones too (cart, checkout, address
+  codes): without a sign-in, that header is what picks the shop. Skip step 2's provider accounts; in step 1
+  `AUTOXIDE_MODULES` still names the connectors, so their simulated twins exist.
+- A new sandbox is empty: it copies settings, roles and pages, not products, prices, stock, delivery
+  methods, the tax profile or invoice series. Create them inside it (step 2's series without
+  `einvoice_provider`, the tax profile, your own delivery fees; step 3). If there are several payment
+  partners, set the default one inside the sandbox too.
+
+After checkout the payment stays `pending`, because no partner notifies a sandbox. Complete it as the
+partner would: see [Complete a simulated payment](sandbox.md#complete-a-simulated-payment). The order then
+becomes `confirmed` / `paid`, and you continue with step 5. Delete the sandbox when you are done
+(`DELETE /api/v1/kernel/sandboxes/{id}` from the shop, without `Autoxide-Tenant: $SANDBOX`).
 
 ## When something does not happen
 

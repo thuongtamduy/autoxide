@@ -53,6 +53,46 @@ trước khi chạy thật.
 bắt đầu, hạn nộp, căn cứ pháp lý và những gì đã ghi nhận. Con người nộp thông báo cho cơ quan; Autoxide chỉ chuẩn
 bị dữ liệu và ghi nhận.
 
+### Một mã giảm giá, từng bước
+
+Dùng `API`, `TOKEN` và `ORG` (nút tổ chức của bạn) như trong [hướng dẫn mở cửa hàng](guides/shop.vi.md#1-bật-các-bộ-nối).
+Đường dẫn trong trang này nằm dưới `/api/v1/promotions`, nên một chương trình ở `/api/v1/promotions/promotions/{id}`.
+
+```bash
+P="$API/api/v1/promotions/promotions"
+# 1. The province that receives your notices: a setting of your unit (units below it inherit it).
+curl -sS -X PUT "$API/api/v1/organizations/units/$ORG/settings/promotions.notice_province" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"value": "01"}'
+
+# 2. A draft: 10% off with a code, from now for 30 days.
+PROMO=$(curl -sS "$P" -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d "{\"org_id\": \"$ORG\", \"trigger\": \"code\", \"kind\": \"percent_off\", \"value_bp\": 1000,
+       \"currency\": \"VND\", \"locale\": \"vi\", \"title\": \"Giảm 10%\", \"terms\": \"Nhập mã GIAM10\",
+       \"starts_at\": \"$(jq -rn 'now | todate')\", \"ends_at\": \"$(jq -rn 'now + 30 * 86400 | todate')\"}" \
+  | jq -r .data.id)
+
+# 3. The code buyers type (`"count": 100` instead of `code` generates codes).
+curl -sS "$P/$PROMO/codes" -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"purpose": "redeem", "code": "GIAM10"}'
+
+# 4. What is still missing: a `promotions.notice_required` check names its authority, e.g. `province:01`.
+curl -sS -X POST "$P/$PROMO/activation-check" -H "Authorization: Bearer $TOKEN" | jq '.data.checks'
+
+# 5. Record the notice you submitted to that authority, then turn the promotion on.
+curl -sS -X PATCH "$P/$PROMO/notices/province:01" -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' -d '{"status": "submitted", "reference": "123/TB-SCT"}'
+curl -sS -X POST "$P/$PROMO/activate" -H "Authorization: Bearer $TOKEN"
+```
+
+- `purpose` là `redeem` cho mã giảm giá của chương trình `code`, `claim` cho mã nhận voucher của chương trình
+  `voucher`. Mã đã thuộc chương trình khác bị từ chối (`promotions.code_taken`).
+- Cài đặt giữ mã tỉnh (`GET /api/v1/address/provinces`); chưa đặt thì nơi nhận là `province:unknown`.
+  `{"status": "not_required"}` ghi nhận là không cần thông báo.
+- **Giá phải có trước khi chương trình bắt đầu.** Trần giảm tính từ giá ngay trước `starts_at`, và một giá chỉ được
+  tính từ `valid_from` của nó (là lúc thêm, khi bỏ trống). Chương trình bắt đầu trước giá đầu tiên của sản phẩm thì
+  sản phẩm đó không được giảm (`withheld`, lý do `promotions.reason.no_reference_price`). Cho chương trình bắt đầu
+  sau lúc đặt giá, hoặc khi thêm giá thì ghi `valid_from` sớm hơn (`POST /api/v1/catalog/price-lists/{id}/prices`).
+
 ## Tính giỏ
 
 `POST /evaluate` (và `Promotions::evaluate`) tính giỏ, không giữ gì:

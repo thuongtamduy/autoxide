@@ -13,8 +13,9 @@ You need `kernel.sandboxes.manage` in your tenant. Your plan sets how many sandb
 the same time (`kernel.sandboxes`, 1 when the plan does not say).
 
 ```bash
+TENANT=$(curl -sS "$API/api/v1/kernel/tenant" -H "Authorization: Bearer $TOKEN" | jq -r .data.id)
 curl -sS "$API/api/v1/kernel/tenants/$TENANT/sandboxes" \
-  -H "Authorization: Bearer $TOKEN" -H "Idempotency-Key: $(uuidgen)" \
+  -H "Authorization: Bearer $TOKEN" -H "Idempotency-Key: $(openssl rand -hex 16)" \
   --json '{"name": "Try the new theme", "role_id": null}'
 ```
 
@@ -23,7 +24,9 @@ The answer is `201` with the sandbox (`status: "provisioning"`) and `job_id`. Fo
 
 **What is copied:** settings that are not secret, roles, pages (published pages stay published), the
 notification templates in use. **What is never copied:** users, buyers, orders, ledger, documents,
-notifications, private files, secrets and partner connection details, domains, API keys.
+notifications, private files, secrets and partner connection details, domains, API keys. **Not copied
+either:** products, prices, stock, delivery methods and rates, the tax profile, invoice series. To try a sale, build the shop
+inside the sandbox; the [shop guide](shop.md#try-it-without-real-accounts) lists the steps.
 
 ## Work inside it
 
@@ -35,13 +38,18 @@ curl -sS "$API/api/v1/kernel/tenant" \
   -H "Authorization: Bearer $TOKEN" -H "Autoxide-Tenant: $SANDBOX"
 ```
 
+Send the header with **every** call, the public ones too (a guest's cart and checkout, address codes):
+without a sign-in it is the header that picks the shop. The sandbox's slug works there as well as its id.
+
 Every answer from a sandbox carries `Autoxide-Sandbox: true` and `X-Robots-Tag: noindex, nofollow`.
 Its public website has an empty sitemap and shows a "test copy" label instead of the ministry badge.
 
 Inside a sandbox:
 
-- **Partners are always simulated.** Payments succeed, payouts succeed, e-invoices get numbers
-  starting with `SANDBOX-`, identity checks pass. Nothing reaches a bank, a carrier, a tax provider
+- **Partners are always simulated.** Payments are created at a simulated partner and stay `pending`
+  until you complete them ([below](#complete-a-simulated-payment)); refunds and payouts succeed;
+  e-invoices are accepted with references starting with `SANDBOX-` (`provider_ref`, `lookup_code`,
+  `authority_code`; the invoice `number` is the usual one); identity checks pass. Nothing reaches a bank, a carrier, a tax provider
   or an SMS gateway, whatever your tenant has set up. These results are never legal evidence.
 - **Mail** reaches only the verified e-mail of staff who may enter the sandbox. Mail to anyone else is
   kept, not sent.
@@ -63,7 +71,8 @@ example) stays `pending` until you play the partner. The server operator first a
 `AUTOXIDE_LEDGER_SANDBOX_SIMULATION=true` (off by default; it never works outside a sandbox). Then,
 with `ledger.reconcile`, find the order's payment in the `ledger` (an order's payments carry
 `source_id` = the order's id; an order's payment action also gives it as `ledger_payment_id`) and
-answer for the partner:
+answer for the partner. The newest payment comes first: after a failed one, starting the payment again
+(`payment-link`) creates a new one.
 
 ```bash
 # The order's payment at the partner (the order's id is $ORDER).
@@ -90,7 +99,7 @@ with `GET /api/v1/kernel/sandboxes/promotable`.
 
 ```bash
 curl -sS "$API/api/v1/kernel/sandboxes/$SANDBOX/promote" \
-  -H "Authorization: Bearer $TOKEN" -H "Idempotency-Key: $(uuidgen)" \
+  -H "Authorization: Bearer $TOKEN" -H "Idempotency-Key: $(openssl rand -hex 16)" \
   --json '{"items": [{"kind": "content.page", "id": "'"$PAGE"'"}]}'
 ```
 
