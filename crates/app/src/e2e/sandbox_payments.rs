@@ -351,7 +351,8 @@ async fn gia_lap_chi_trong_sandbox_va_di_duong_cua_webhook() {
 #[tokio::test]
 async fn don_trong_sandbox_tra_bang_gia_lap_thi_xac_nhan() {
     TestDatabase::run(async |test| {
-        let dir = std::env::temp_dir().join(format!("autoxide-sandbox-order-{}", uuid::Uuid::now_v7()));
+        let dir =
+            std::env::temp_dir().join(format!("autoxide-sandbox-order-{}", uuid::Uuid::now_v7()));
         let mut builder = TestApp::builder(test)
             .setting("AUTOXIDE_MAIL_FILE_DIR", &dir.join("mail").display().to_string())
             .setting("AUTOXIDE_LEDGER_SANDBOX_SIMULATION", "true")

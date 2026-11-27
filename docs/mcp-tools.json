@@ -11832,7 +11832,7 @@
             "type": "string"
           },
           "payment_id": {
-            "description": "Id of the payment (an order's `ledger_payment_id`).",
+            "description": "Id of the payment: for an order, find it with\n`GET /api/v1/ledger/payments?source_module=orders&source_id=<order id>`.",
             "format": "uuid",
             "type": "string"
           }

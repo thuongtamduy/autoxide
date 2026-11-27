@@ -214977,11 +214977,11 @@
     },
     "/api/v1/ledger/payments/{id}/simulate": {
       "post": {
-        "description": "Requires `ledger.reconcile`, a sandbox (`Autoxide-Tenant: <sandbox id>`) and the server setting\n`AUTOXIDE_LEDGER_SANDBOX_SIMULATION=true` (off by default). Inside a sandbox no payment reaches a\nreal partner, so none notifies back; this plays the partner for a `pending` payment created in the\nsandbox and goes through the same path as a partner notification: the payment becomes `succeeded`\n(or `failed`, or `needs_review` for another amount), the entry is posted and the module that asked\nfor the payment is told (an order becomes `confirmed` a moment later). No money moves. Send an\n`Idempotency-Key` to retry safely.",
+        "description": "Requires `ledger.reconcile`, a sandbox (`Autoxide-Tenant: <sandbox id>`) and the server setting\n`AUTOXIDE_LEDGER_SANDBOX_SIMULATION=true` (off by default). Inside a sandbox no payment reaches a\nreal partner, so none notifies back; this plays the partner for a `pending` payment created in the\nsandbox and goes through the same path as a partner notification: the payment becomes `succeeded`\n(or `failed`, or `needs_review` for another amount), the entry is posted and the module that asked\nfor the payment is told (an order becomes `confirmed` a moment later). No money moves. Bank transfer\n(VietQR) payments are not supported yet. Send an `Idempotency-Key` to retry safely.",
         "operationId": "ledger_simulate_ledger_payment",
         "parameters": [
           {
-            "description": "Id of the payment (an order's `ledger_payment_id`).",
+            "description": "Id of the payment: for an order, find it with `GET /api/v1/ledger/payments?source_module=orders&source_id=<order id>`.",
             "in": "path",
             "name": "id",
             "required": true,
