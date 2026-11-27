@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/thuongtamduy/autoxide/docs/quality/agent-eval.schema.json",
+  "title": "Autoxide agent eval result",
+  "description": "Result of one run of the sample-task eval for real AI agents (roadmap 71-G4, consumed by scripts/release-metrics.py via --agent-eval; the release workflow reads docs/quality/agent-eval.json when it exists at the release commit). One file = one run: a fresh agent with only the public docs and the API/MCP endpoint is given each sample task and a task counts as done only when a machine check of the resulting server state passes. Threshold for 1.0: passed / tasks above 0.90.",
+  "type": "object",
+  "required": ["model", "date", "tasks", "passed", "failed"],
+  "additionalProperties": false,
+  "properties": {
+    "model": { "type": "string", "description": "Model identifier of the agent that did the tasks." },
+    "date": { "type": "string", "format": "date", "description": "Day of the run (UTC)." },
+    "version": { "type": "string", "description": "Autoxide version the server under test was built from." },
+    "tasks": { "type": "integer", "minimum": 1, "description": "Number of sample tasks given." },
+    "passed": { "type": "integer", "minimum": 0, "description": "Number of tasks whose machine check passed." },
+    "cost_usd": { "type": "number", "minimum": 0, "description": "Total cost of the run in US dollars, when known." },
+    "failed": {
+      "type": "array",
+      "description": "The tasks that failed; its length is tasks - passed.",
+      "items": {
+        "type": "object",
+        "required": ["task", "reason"],
+        "additionalProperties": false,
+        "properties": {
+          "task": { "type": "string", "description": "Stable ID of the sample task." },
+          "reason": { "type": "string", "description": "Why it failed (for example the API error code the agent could not get past, or the check that did not hold)." }
+        }
+      }
+    }
+  }
+}
