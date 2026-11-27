@@ -103,6 +103,21 @@ fn id(flag: &str) -> String {
     String::from_utf8(output.stdout).unwrap().trim().to_owned()
 }
 
+/// Số dòng của `table` trong database `url`; `None` khi bảng không có (module chưa có ở bản cũ).
+async fn rows(url: &str, table: &str) -> Option<i64> {
+    use sea_orm::ConnectionTrait as _;
+    let connection = sea_orm::Database::connect(url).await.unwrap();
+    let backend = connection.get_database_backend();
+    let sql = format!("SELECT COUNT(*) FROM {table}");
+    let count = match connection.query_one_raw(sea_orm::Statement::from_string(backend, sql)).await
+    {
+        Ok(Some(row)) => Some(row.try_get_by_index::<i64>(0).unwrap()),
+        _ => None,
+    };
+    connection.close().await.unwrap();
+    count
+}
+
 /// `docker run` image cũ với cấu hình chung. `detach` thì chạy nền với tên `name`.
 fn docker(
     image: &str,
@@ -500,7 +515,8 @@ async fn nang_cap_tu_ban_phat_hanh_truoc_giu_nguyen_du_lieu() {
         // --- backup trước khi nâng (D-20261126-upgrade-rollback) ---
         // Binary mới backup database còn ở bản cũ: không đòi migrate trước, giữ đúng schema nguồn. Bản cũ phải
         // restore được bản backup đó vào một database trống — đường quay về khi nâng cấp hỏng.
-        let backup = current(directory.path(), &environment, &["backup", "data/before-upgrade"]);
+        // Cùng bộ module như bản cũ (bản mới tắt `newsletter` mặc định và từ chối backup khi module tắt còn dữ liệu).
+        let backup = current(directory.path(), &old_environment, &["backup", "data/before-upgrade"]);
         assert!(backup.status.success(), "new `backup` before migrating: {}", text(&backup));
         let restored_url = match test.backend() {
             DbBackend::Sqlite => "sqlite://data/restored.sqlite?mode=rwc".to_owned(),
@@ -511,7 +527,7 @@ async fn nang_cap_tu_ban_phat_hanh_truoc_giu_nguyen_du_lieu() {
             .filter(|(key, _)| key != "DATABASE_URL" && key != "AUTOXIDE_FILES_DIR")
             .cloned()
             .collect();
-        restore_environment.push(("DATABASE_URL".to_owned(), restored_url));
+        restore_environment.push(("DATABASE_URL".to_owned(), restored_url.clone()));
         restore_environment.push(("AUTOXIDE_FILES_DIR".to_owned(), "data/restored-files".to_owned()));
         let restored = docker(
             &image,
@@ -522,6 +538,19 @@ async fn nang_cap_tu_ban_phat_hanh_truoc_giu_nguyen_du_lieu() {
             None,
         );
         assert!(restored.status.success(), "old `restore` of the new binary's backup: {}", text(&restored));
+        // Dữ liệu thật có mặt sau restore, không chỉ mã thoát: cùng số dòng ở vài bảng của module đang bật.
+        let on_host = |url: &str| match url.strip_prefix("sqlite://") {
+            Some(path) => format!("sqlite://{}?mode=rw", directory.path().join(path.split('?').next().unwrap()).display()),
+            None => url.to_owned(),
+        };
+        for (table, written) in [("auth_user", true), ("content_entries", true), ("newsletter_lists", false)] {
+            let source = rows(&on_host(&database_url), table).await;
+            let copy = rows(&on_host(&restored_url), table).await;
+            assert_eq!(copy, source, "`{table}` after the old release restored the backup");
+            if written {
+                assert!(source.is_some_and(|count| count > 0), "`{table}` has no rows to compare");
+            }
+        }
 
         // --- bản hiện tại, cùng database ---
         // Không đặt `AUTOXIDE_MODULES` thì module hạng thử nghiệm không chạy nữa

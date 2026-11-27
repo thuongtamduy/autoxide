@@ -10,8 +10,9 @@
 
 use std::path::{Path, PathBuf};
 
-use autoxide_kernel::backup::{self, DATABASE_FILE, FILES_DIR, open_sqlite, private_dir};
-use autoxide_kernel::migration::Migrator;
+use autoxide_kernel::backup::{
+    self, BackupOf, BackupPlacement, DATABASE_FILE, FILES_DIR, open_sqlite, private_dir,
+};
 use autoxide_kernel::storage::Storage;
 use autoxide_kernel::tenancy::{MAIN_PLACEMENT, PlacementId, TenancyMode};
 use autoxide_kernel::transfer::copy_modules;
@@ -23,35 +24,35 @@ use crate::settings::Settings;
 /// Thư mục con chứa bản backup của các placement.
 pub(crate) const PLACEMENTS_DIR: &str = "placements";
 
-/// Tên mọi module có migration (cả module đang tắt), theo thứ tự đăng ký.
-pub(crate) fn migration_modules(migrator: &Migrator) -> Vec<String> {
-    let mut modules: Vec<String> = Vec::new();
-    for name in migrator.names() {
-        if let Some((module, _)) = name.split_once('/')
-            && !modules.iter().any(|known| known == module)
-        {
-            modules.push(module.to_owned());
-        }
-    }
-    modules
-}
-
-/// Backup mọi placement (trừ database chính) vào `<directory>/placements/<tên>/`; trả nội dung in ra.
+/// Backup mọi placement (trừ database chính) vào `<directory>/placements/<tên>/`; trả nội dung in ra và tên các placement
+/// đã backup (ghi vào manifest của database chính, viết sau cùng).
+///
+/// Đọc sổ placement của database chính: database chính đi sau chương trình này quá xa (sổ có cột chương trình chưa
+/// biết hay thiếu cột) thì báo rõ. Đừng chuyển / tách / gộp khách trong lúc chạy: một khách chuyển giữa hai placement
+/// có thể có mặt ở cả hai bản hay ở không bản nào.
 pub(crate) async fn write_all(
     runtime: &Runtime,
     modules: &[&str],
     directory: &Path,
-) -> Result<String, String> {
-    let Some(registry) = runtime.modules.tenancy() else { return Ok(String::new()) };
+) -> Result<(String, Vec<String>), String> {
+    let Some(registry) = runtime.modules.tenancy() else { return Ok((String::new(), Vec::new())) };
     if registry.mode() != TenancyMode::Multi {
-        return Ok(String::new());
+        return Ok((String::new(), Vec::new()));
     }
     let placements = runtime.modules.placements(&registry).map_err(|error| error.to_string())?;
+    let listed = placements.list().await.map_err(|error| {
+        format!(
+            "cannot read the placement register of the main database ({}); back up with the release the \
+             main database runs, or migrate the main database first",
+            describe(error)
+        )
+    })?;
     // Data upgrade trên bản nháp của placement dùng khoá của database chính, như khi migrate placement.
     let keyed =
         runtime.modules.migrator().map_err(|error| error.to_string())?.keyed_on(&runtime.database);
     let mut text = String::new();
-    for found in placements.list().await.map_err(describe)? {
+    let mut names = Vec::new();
+    for found in listed {
         if found.id == MAIN_PLACEMENT.as_uuid() {
             continue;
         }
@@ -63,13 +64,14 @@ pub(crate) async fn write_all(
         let files = registry.placement_storage(id).await.map_err(describe)?;
         let scratch =
             std::env::temp_dir().join(format!("autoxide-backup-{}", uuid::Uuid::now_v7()));
-        let manifest = backup::write_backup(
+        let manifest = backup::write_backup_of(
             &database,
             &keyed,
             modules,
             files,
             &backup::DirectorySink::new(&target),
             &scratch,
+            BackupOf::placement(BackupPlacement::new(found.id, found.name.clone())),
         )
         .await
         .map_err(|error| format!("placement `{}`: {}", found.name, describe(error)))?;
@@ -80,8 +82,9 @@ pub(crate) async fn write_all(
             manifest.tables.len(),
             manifest.files
         ));
+        names.push(found.name);
     }
-    Ok(text)
+    Ok((text, names))
 }
 
 /// `<directory>/placements/<name>`; tên placement chỉ gồm chữ thường, số, `-` và `_` (không đi ra ngoài thư mục).
@@ -94,7 +97,9 @@ fn placement_directory(directory: &Path, name: &str) -> Result<PathBuf, String> 
     Ok(directory.join(PLACEMENTS_DIR).join(name))
 }
 
-/// Đưa bản backup của một placement (`<thư mục>/placements/<tên>/`) vào placement `name`, database phải trống.
+/// Đưa bản backup của một placement (`<thư mục>/placements/<tên>/`) vào CHÍNH placement đó (cùng tên, cùng id), database
+/// phải trống. Phục hồi sau sự cố: tạo lại database trống ở đúng URL của placement, rồi restore vào đúng tên — không
+/// `placement add` một placement mới (khách vẫn trỏ tới id cũ).
 pub(crate) async fn restore_placement(
     settings: Settings,
     directory: PathBuf,
@@ -125,6 +130,20 @@ async fn restore_into(
         .ok_or_else(|| {
             format!("there is no placement `{name}`; add it first (`autoxide placement add`)")
         })?;
+    let meant = &manifest["placement"];
+    if meant["name"].as_str() != Some(name)
+        || meant["id"].as_str() != Some(found.id.to_string().as_str())
+    {
+        let what = match meant["name"].as_str() {
+            Some(other) => format!("the backup of placement `{other}`"),
+            None => "the backup of the main database".to_owned(),
+        };
+        return Err(format!(
+            "this is {what}, not of placement `{name}` (id {}); restore a placement's backup into that same \
+             placement",
+            found.id
+        ));
+    }
     let id = PlacementId::from_uuid(found.id);
     let target = registry.placement_database(id).await.map_err(describe)?;
     let migrator =
@@ -146,10 +165,17 @@ async fn restore_into(
         std::fs::copy(directory.join(DATABASE_FILE), &copy)
             .map_err(|error| format!("cannot read {DATABASE_FILE} of the backup: {error}"))?;
         let source = open_sqlite(&copy, &migrator).await.map_err(describe)?;
-        let modules = migration_modules(&migrator);
-        let modules: Vec<&str> = modules.iter().map(String::as_str).collect();
+        let modules = runtime.modules.names();
+        // Bản backup có dữ liệu của module mà bản cài này đang tắt: dừng, không bỏ sót nó.
         let tables =
-            copy_modules(&source, &target, &modules).await.map_err(|error| error.to_string());
+            match crate::modules::refuse_dormant_data(&runtime.modules, &source, "backup restore")
+                .await
+            {
+                Ok(()) => copy_modules(&source, &target, &modules)
+                    .await
+                    .map_err(|error| error.to_string()),
+                Err(error) => Err(error),
+            };
         let _ = source.close().await;
         tables
     }

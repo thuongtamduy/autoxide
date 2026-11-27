@@ -61,6 +61,50 @@ pub struct BackupManifest {
     /// written before 0.20.
     #[serde(default)]
     pub migrations: Vec<String>,
+    /// The placement (tenant database) this is the backup of; `None`: the main database. A restore refuses a
+    /// backup meant for another database.
+    #[serde(default)]
+    pub placement: Option<BackupPlacement>,
+    /// Backup of the main database written with `--all`: the placements backed up beside it (in
+    /// `placements/<name>/`), written BEFORE this manifest, so a manifest that lists them means they are there.
+    #[serde(default)]
+    pub placements: Vec<String>,
+}
+
+/// The placement a backup belongs to.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct BackupPlacement {
+    pub id: uuid::Uuid,
+    pub name: String,
+}
+
+impl BackupPlacement {
+    pub fn new(id: uuid::Uuid, name: impl Into<String>) -> Self {
+        BackupPlacement { id, name: name.into() }
+    }
+}
+
+/// What a backup is of, written into its manifest.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct BackupOf {
+    /// A placement; `None`: the main database.
+    pub placement: Option<BackupPlacement>,
+    /// Main database with `--all`: the placements already backed up beside it.
+    pub placements: Vec<String>,
+}
+
+impl BackupOf {
+    /// The main database.
+    pub fn main(placements: Vec<String>) -> Self {
+        BackupOf { placement: None, placements }
+    }
+
+    /// A placement.
+    pub fn placement(placement: BackupPlacement) -> Self {
+        BackupOf { placement: Some(placement), placements: Vec::new() }
+    }
 }
 
 impl BackupManifest {
@@ -157,6 +201,19 @@ pub async fn write_backup(
     sink: &dyn BackupSink,
     scratch: &Path,
 ) -> Result<BackupManifest, Error> {
+    write_backup_of(database, migrator, modules, files, sink, scratch, BackupOf::default()).await
+}
+
+/// Like [`write_backup`], recording in the manifest which database it is the backup of.
+pub async fn write_backup_of(
+    database: &Database,
+    migrator: &Migrator,
+    modules: &[&str],
+    files: Option<Arc<dyn Storage>>,
+    sink: &dyn BackupSink,
+    scratch: &Path,
+    of: BackupOf,
+) -> Result<BackupManifest, Error> {
     private_dir(scratch).map_err(io(scratch))?;
     let result = async {
         let path = scratch.join(DATABASE_FILE);
@@ -174,10 +231,19 @@ pub async fn write_backup(
             applied.contains(format!("{module}/{name}").as_str())
         })
         .await?;
+        // `backup.json` ghi đúng những gì bản sao có (không phải mọi thứ của nguồn): migration của module mà bản
+        // sao bỏ qua (module đang tắt) không được liệt kê như thể có.
+        let held = migrator.status(&copy).await;
         let tables = copy_modules(database, &copy, modules).await;
         // Đóng trước khi đọc file: mọi trang đã nằm trong file chính, không còn file `-wal`.
         copy.close().await?;
         let tables = tables.map_err(|error| Error::internal(error.to_string()))?;
+        let migrations: Vec<String> = held
+            .map_err(|error| Error::internal(error.to_string()))?
+            .into_iter()
+            .filter(|state| state.applied)
+            .map(|state| format!("{}/{}", state.module, state.name))
+            .collect();
         sink.put(DATABASE_FILE, read_file(path).await?).await?;
         let (count, bytes) = match files {
             Some(storage) => copy_files(storage.as_ref(), sink).await?,
@@ -195,6 +261,8 @@ pub async fn write_backup(
             files: count,
             file_bytes: bytes,
             migrations,
+            placement: of.placement,
+            placements: of.placements,
         };
         let text = serde_json::to_vec_pretty(&manifest).map_err(Error::internal)?;
         let stream = futures_util::stream::once(async move { Ok(bytes::Bytes::from(text)) });
