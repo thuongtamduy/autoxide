@@ -28,6 +28,7 @@ fn nha_cung_cap_khong_huy_duoc_thi_bao_dieu_chinh() {
     let mapped = provider_cancel_error(autoxide_kernel::einvoice::not_supported("sepay"), "sepay");
     assert_eq!(mapped.code(), "invoices.einvoice_cancel_unsupported");
     assert!(mapped.message().contains("adjust"), "{}", mapped.message());
-    let other = autoxide_kernel::error::Error::conflict("einvoice.provider_unavailable", "Down.");
-    assert_eq!(provider_cancel_error(other, "sepay").code(), "einvoice.provider_unavailable");
+    let other = autoxide_kernel::einvoice::provider_unavailable();
+    let code = other.code().to_owned();
+    assert_eq!(provider_cancel_error(other, "sepay").code(), code);
 }

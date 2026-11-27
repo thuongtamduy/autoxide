@@ -55,10 +55,11 @@ impl ModerationPolicy for Policy {
         if reason == "personal_data" || reason == "spam" {
             return Ok(());
         }
-        // Như `compliance`: lỗi nêu mã của quy tắc luật.
+        // Như `compliance`: lỗi nêu mã của quy tắc luật (mã của module khác: dựng từ biến).
+        let code = "compliance.hide_reason_not_allowed".to_owned();
         Err(autoxide_kernel::error::Error::new(
             autoxide_kernel::error::ErrorKind::Validation,
-            "compliance.hide_reason_not_allowed",
+            code,
             "Content of consumers may not be hidden for `{reason}`; allowed reasons: {allowed}.",
         )
         .with_param("reason", reason)

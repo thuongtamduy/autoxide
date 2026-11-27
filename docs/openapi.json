@@ -59279,7 +59279,7 @@
         "description": "A document of an order (invoice or adjustment).",
         "properties": {
           "differs_from_order": {
-            "description": "`true`: this invoice's tax or total differs from what was settled on the order — the invoice\ncomputes tax at its own date (the tax point), so a tax rate change between ordering and\ninvoicing (e.g. the end of the 8% VAT on 2026-12-31) shows here. Check the invoice and settle\nthe difference with the buyer. Always `false` for an adjustment, or when part of the order was\ncancelled.",
+            "description": "`true`: this invoice applies a different tax rate than the one settled on the order for at\nleast one line (lines matched by SKU; the shipping fee by its line without an item code) — the\ninvoice computes tax at its own date (the tax point), so a rate change between ordering and\ninvoicing (e.g. the end of the 8% VAT on 2026-12-31) shows here. Check the invoice and settle\nthe difference with the buyer. A difference of one minor unit from rounding does not count.\nAlways `false` for an adjustment.",
             "type": "boolean"
           },
           "document_id": {
@@ -74776,7 +74776,7 @@
               "description": "A document of an order (invoice or adjustment).",
               "properties": {
                 "differs_from_order": {
-                  "description": "`true`: this invoice's tax or total differs from what was settled on the order — the invoice\ncomputes tax at its own date (the tax point), so a tax rate change between ordering and\ninvoicing (e.g. the end of the 8% VAT on 2026-12-31) shows here. Check the invoice and settle\nthe difference with the buyer. Always `false` for an adjustment, or when part of the order was\ncancelled.",
+                  "description": "`true`: this invoice applies a different tax rate than the one settled on the order for at\nleast one line (lines matched by SKU; the shipping fee by its line without an item code) — the\ninvoice computes tax at its own date (the tax point), so a rate change between ordering and\ninvoicing (e.g. the end of the 8% VAT on 2026-12-31) shows here. Check the invoice and settle\nthe difference with the buyer. A difference of one minor unit from rounding does not count.\nAlways `false` for an adjustment.",
                   "type": "boolean"
                 },
                 "document_id": {
@@ -196986,7 +196986,7 @@
                 }
               }
             },
-            "description": "A draft or a corrected document cannot be cancelled (`invoices.not_cancellable`); an e-invoice sent to the tax authority whose law forbids cancelling (`invoices.einvoice_not_cancellable`, with `legal_basis`)."
+            "description": "A draft or a corrected document cannot be cancelled (`invoices.not_cancellable`); an e-invoice sent to the tax authority whose law forbids cancelling (`invoices.einvoice_not_cancellable`, with `legal_basis`), or whose provider cannot cancel it (`invoices.einvoice_cancel_unsupported`); adjust or replace it instead."
           },
           "503": {
             "content": {
