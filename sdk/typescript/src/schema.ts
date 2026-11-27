@@ -9775,8 +9775,9 @@ export type Data_LedgerExceptionResponse = {
     note?: string | null;
     /**
      * How it was closed: `match`, `accept_received`, `ignore`, `refunded_outside` (by a person), or
-     * `refunded` (closed by the ledger once the payment was refunded in full through the partner;
-     * `resolved_by` is empty). Empty while `open`.
+     * by the ledger (`resolved_by` is empty): `refunded` (the payment was refunded in full through the
+     * partner) or `kept` (a `late_payment` the source module counted, e.g. the order went on). Empty
+     * while `open`.
      */
     resolution?: string | null;
     resolved_by?: string | null;
@@ -17223,8 +17224,9 @@ export type LedgerExceptionResponse = {
   note?: string | null;
   /**
    * How it was closed: `match`, `accept_received`, `ignore`, `refunded_outside` (by a person), or
-   * `refunded` (closed by the ledger once the payment was refunded in full through the partner;
-   * `resolved_by` is empty). Empty while `open`.
+   * by the ledger (`resolved_by` is empty): `refunded` (the payment was refunded in full through the
+   * partner) or `kept` (a `late_payment` the source module counted, e.g. the order went on). Empty
+   * while `open`.
    */
   resolution?: string | null;
   resolved_by?: string | null;
@@ -23636,8 +23638,9 @@ export type Page_LedgerExceptionResponse = {
     note?: string | null;
     /**
      * How it was closed: `match`, `accept_received`, `ignore`, `refunded_outside` (by a person), or
-     * `refunded` (closed by the ledger once the payment was refunded in full through the partner;
-     * `resolved_by` is empty). Empty while `open`.
+     * by the ledger (`resolved_by` is empty): `refunded` (the payment was refunded in full through the
+     * partner) or `kept` (a `late_payment` the source module counted, e.g. the order went on). Empty
+     * while `open`.
      */
     resolution?: string | null;
     resolved_by?: string | null;
@@ -48800,6 +48803,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49134,6 +49138,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
