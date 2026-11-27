@@ -733,6 +733,7 @@ impl InventoryService {
                         .then_some(line.serials.as_slice()),
                     serial_status: "returned",
                     order: None,
+                    allow_expired: false,
                 };
                 let new = NewMovement {
                     org: input.org_id,

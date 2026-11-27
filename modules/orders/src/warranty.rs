@@ -30,7 +30,7 @@ use uuid::Uuid;
 use crate::api::{OrderStatus, events as names};
 use crate::entity::{line, line_serial, warranty, warranty_claim};
 use crate::errors;
-use crate::events::{Change, WarrantyClaimChanged};
+use crate::events::{Change, LineSerialsRecorded, WarrantyClaimChanged};
 use crate::guests::DEFAULT_COUNTRY;
 use crate::permissions::{MANAGE, WARRANTY_MANAGE};
 use crate::policy::WARRANTY_CLAIM_DAYS;
@@ -212,8 +212,34 @@ impl OrdersService {
             .exec_without_returning(&transaction)
             .await?;
         }
-        transaction.commit().await?;
         let status = OrderStatus::parse(&row.status).unwrap_or(OrderStatus::Cancelled);
+        // Hàng của dòng đã tới tay người mua mà kho còn giữ vì thiếu serial: báo kho xuất bằng số vừa ghi.
+        let delivered = if matches!(status, OrderStatus::Delivered | OrderStatus::Completed) {
+            item.quantity - item.cancelled_quantity
+        } else {
+            let rows = crate::fulfillments::fulfillments_of(&transaction, tenant, id).await?;
+            crate::fulfillments::delivered_units(&rows).get(&line_id).copied().unwrap_or(0)
+        };
+        if delivered > 0 && !cleaned.is_empty() {
+            let serials = crate::fulfillments::serials_by_line(&transaction, tenant, id)
+                .await?
+                .remove(&line_id)
+                .unwrap_or_default();
+            let event = LineSerialsRecorded(Change::after(json!({
+                "order_id": id, "line_id": line_id, "line_key": item.line_key,
+                "delivered_quantity": delivered, "serials": serials,
+            })));
+            self.outbox
+                .record(
+                    &transaction,
+                    tenant,
+                    Actor::system(),
+                    Some(format!("orders.order:{id}")),
+                    &event,
+                )
+                .await?;
+        }
+        transaction.commit().await?;
         if matches!(status, OrderStatus::Delivered | OrderStatus::Completed) {
             // Đã có bảo hành theo dòng (chưa có serial): thay bằng bảo hành theo serial.
             warranty::Entity::delete_many()

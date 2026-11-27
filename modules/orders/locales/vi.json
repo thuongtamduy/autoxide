@@ -175,6 +175,8 @@
   "text:A refund of an order was completed.": "Đã hoàn tiền xong cho một đơn.",
   "text:A return changed status (approved, rejected, received, refunded or closed).": "Một yêu cầu trả hàng đổi trạng thái (duyệt, từ chối, đã nhận, đã hoàn tiền, đóng).",
   "text:A shipment was requested for an order; `after.shipment` is the shipment request.": "Đã yêu cầu vận đơn cho một đơn; `after.shipment` là yêu cầu vận đơn.",
+  "text:One shipment of an order reached the buyer; `after.lines` are the units it carried.": "Một lần giao của đơn đã tới tay người mua; `after.lines` là các đơn vị lần đó mang theo.",
+  "text:Serial numbers were recorded for an order line whose goods already reached the buyer.": "Đã ghi số serial cho một dòng đơn mà hàng đã tới tay người mua.",
   "text:A warranty claim changed status.": "Phiếu bảo hành đổi trạng thái.",
   "text:An electronic invoice was linked to an order.": "Một hoá đơn điện tử đã gắn vào đơn.",
   "text:An order imported from a channel lacks stock.": "Đơn nhập từ kênh bán thiếu hàng.",

@@ -154,7 +154,7 @@ impl Job for ExpireNow {
     const KIND: &'static str = crate::contract::EXPIRE_RESERVATIONS;
 }
 
-async fn expire_now(app: &TestApp) {
+pub(super) async fn expire_now(app: &TestApp) {
     JobQueue::new("inventory")
         .enqueue_database(app.database().write(), &ExpireNow {}, EnqueueOptions::default())
         .await
@@ -163,7 +163,7 @@ async fn expire_now(app: &TestApp) {
 }
 
 /// Đẩy hạn của mọi chỗ giữ về quá khứ.
-async fn age_holds(app: &TestApp) {
+pub(super) async fn age_holds(app: &TestApp) {
     let write = app.database().write();
     let backend = write.get_database_backend();
     let past = (Timestamp::now() - SignedDuration::from_mins(1)).to_rfc3339();

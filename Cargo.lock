@@ -757,6 +757,7 @@ dependencies = [
  "axum",
  "futures-util",
  "jiff",
+ "metrics",
  "sea-orm",
  "serde",
  "serde_json",

@@ -10,7 +10,8 @@
 //! - **Bán** (`POST /pos/sales`): cùng hàm báo giá với giỏ online (giá của cửa hàng, khuyến mại; mã
 //!   không áp được thì bỏ qua và trả lý do), giữ tồn CHỈ ở kho của cửa hàng (`fixed_org_id`), tổng
 //!   các khoản thu phải bằng tổng đơn; đơn tạo ở `confirmed` rồi `delivered` trong cùng transaction
-//!   (khách nhận hàng tại chỗ) — `inventory` trừ kho khi nghe `orders.order_confirmed`, doanh thu và
+//!   (khách nhận hàng tại chỗ) — `inventory` xác nhận chỗ giữ khi nghe `orders.order_confirmed` và trừ kho
+//!   (dòng `sale`) khi nghe `orders.order_delivered` (UT-1), doanh thu và
 //!   hoá đơn từ máy tính tiền theo `orders.order_delivered`, hoàn tất bằng job như mọi đơn.
 //! - **Chống trùng**: `reference` do máy quầy sinh (kể cả lúc ngoại tuyến) — unique theo ca; gửi lại
 //!   cùng nội dung → 200 kết quả cũ, khác nội dung → 422.
