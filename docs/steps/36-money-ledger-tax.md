@@ -570,6 +570,7 @@ bảng, không phải biến môi trường. Sinh lại `.env.example`.
 | `invoices.not_draft` | 409 | Chỉ sửa hay xoá được chứng từ nháp. Chứng từ đã phát hành thì lập chứng từ điều chỉnh hoặc thay thế. |
 | `invoices.retention_hold` | 409 | Chứng từ kế toán phải lưu tới {until}, không xoá được. |
 | `invoices.series_not_found` | 404 | Không tìm thấy ký hiệu chứng từ này. |
+| `invoices.no_active_series` | 409 | Không có dãy số đang hoạt động cho đơn vị, loại chứng từ và năm `{year}` (D-20261127-no-active-series-code). |
 | `invoices.series_inactive` | 409 | Ký hiệu `{symbol}` đã ngừng dùng. |
 | `invoices.mandate_missing` | 403 | Chưa có uỷ nhiệm còn hiệu lực để lập hoá đơn thay người bán này. |
 | `invoices.provider_not_configured` | 422 | Khách chưa cấu hình nhà cung cấp hoá đơn điện tử `{provider}`. |

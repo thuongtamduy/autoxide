@@ -123,6 +123,7 @@ impl Module for TaxModule {
             outbox: context.outbox()?,
             tables: TablesCache::new(),
             units: context.require::<dyn autoxide_address::api::AdministrativeUnits>().ok(),
+            orgs: context.require::<dyn autoxide_organizations::api::OrgDirectory>().ok(),
             warning_days: self.warning_days.unwrap_or(60),
         });
         self.service = Some(service.clone());
@@ -156,11 +157,18 @@ impl Module for TaxModule {
 
     fn checks(&self) -> Vec<autoxide_kernel::doctor::Check> {
         self.service.clone().map_or_else(Vec::new, |service| {
-            vec![autoxide_kernel::doctor::Check::new(
-                "tax_rates",
-                "Tax rates are imported, and none ends soon without a rate after it.",
-                Arc::new(ExpiringRates(service)),
-            )]
+            vec![
+                autoxide_kernel::doctor::Check::new(
+                    "tax_rates",
+                    "Tax rates are imported, and none ends soon without a rate after it.",
+                    Arc::new(ExpiringRates(service.clone())),
+                ),
+                autoxide_kernel::doctor::Check::new(
+                    "tax_time_zones",
+                    "Every imported tax jurisdiction declares the time zone of its tax dates.",
+                    Arc::new(MissingTimeZones(service)),
+                ),
+            ]
         })
     }
 }
@@ -182,6 +190,29 @@ impl autoxide_kernel::doctor::Probe for ExpiringRates {
             ))
             .with_hint("Import a newer tax data pack (`autoxide task tax.import_pack path=…`)."),
             Err(error) => Finding::failed(format!("cannot read the tax rates: {error}")),
+        }
+    }
+}
+
+/// `autoxide doctor`: vùng thuế đã nhập mà không khai múi giờ đang hiệu lực (quy tắc `tax_date.time_zone`):
+/// ngày thuế của người bán ở đó lặng lẽ theo múi giờ của nút, mặc định UTC (LG-2).
+struct MissingTimeZones(Arc<TaxService>);
+
+#[async_trait::async_trait]
+impl autoxide_kernel::doctor::Probe for MissingTimeZones {
+    async fn probe(&self) -> autoxide_kernel::doctor::Finding {
+        use autoxide_kernel::doctor::Finding;
+        match self.0.jurisdictions_without_time_zone(Timestamp::now()).await {
+            Ok(missing) if missing.is_empty() => {
+                Finding::ok("Every imported tax jurisdiction declares its time zone.")
+            }
+            Ok(missing) => Finding::warning(format!(
+                "Tax jurisdictions without a time zone rule in force: {}. Tax points and invoice dates of \
+                 sellers there follow the unit time zone (`organizations.timezone`, UTC by default).",
+                missing.join(", ")
+            ))
+            .with_hint("Add a `tax_date.time_zone` rule to the tax data pack and import it."),
+            Err(error) => Finding::failed(format!("cannot read the tax rules: {error}")),
         }
     }
 }

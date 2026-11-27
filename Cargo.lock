@@ -1249,6 +1249,7 @@ dependencies = [
  "async-trait",
  "autoxide-address",
  "autoxide-kernel",
+ "autoxide-organizations",
  "autoxide-testkit",
  "axum",
  "proptest",

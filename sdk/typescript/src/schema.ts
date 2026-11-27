@@ -9766,10 +9766,19 @@ export type Data_LedgerExceptionResponse = {
     id: string;
     /**
      * `amount_mismatch`, `unmatched_credit`, `duplicate_payment`, `missing_in_statement`,
-     * `unknown_in_statement` or `late_payment`.
+     * `unknown_in_statement`, `late_payment` (money arrived after the payment's deadline or after the
+     * partner reported it failed) or `refund_failed` (the partner refused a refund: the money is still
+     * to be returned by hand, then resolve with `refunded_outside`; it closes on its own once the
+     * payment is refunded in full through the partner).
      */
     kind: string;
     note?: string | null;
+    /**
+     * How it was closed: `match`, `accept_received`, `ignore`, `refunded_outside` (by a person), or
+     * by the ledger (`resolved_by` is empty): `refunded` (the payment was refunded in full through the
+     * partner) or `kept` (a `late_payment` the source module counted, e.g. the order went on). Empty
+     * while `open`.
+     */
     resolution?: string | null;
     resolved_by?: string | null;
     /** `open`, `resolved` or `ignored`. */
@@ -11093,12 +11102,26 @@ export type Data_OrdersPaymentAction = {
      * `none` (the payment could not be started yet; retry from the order).
      */
     kind: string;
+    /**
+     * Id of the collection at the payment partner, in the `ledger` module
+     * (`GET /api/v1/ledger/payments/{id}`, its refunds, its exceptions). `null` while the payment
+     * is not started yet (`kind = none`) and for cash on delivery or tenders.
+     */
+    ledger_payment_id?: string | null;
     order_id: string;
+    /**
+     * Id of this payment of the order (it stays the same while the buyer pays it; a new attempt
+     * after a failed payment gets a new id). Not an id of the `ledger` module: use
+     * `ledger_payment_id` with `GET /api/v1/ledger/payments/{id}`.
+     */
     payment_id: string;
     /** VietQR payload; the money goes to the seller's or the licensed partner's account. */
     qr_payload?: string | null;
     redirect_url?: string | null;
-    /** `pending`, `succeeded`, `failed`, `expired`… */
+    /**
+     * `pending`, `succeeded`, `expired`, `superseded` (replaced by a new attempt after the
+     * partner reported its collection failed; start the payment again from the order)…
+     */
     status: string;
     /** For `GET /public/payments/{token}`. */
     status_token: string;
@@ -14536,12 +14559,26 @@ export type Data_Vec_OrdersPaymentAction = {
      * `none` (the payment could not be started yet; retry from the order).
      */
     kind: string;
+    /**
+     * Id of the collection at the payment partner, in the `ledger` module
+     * (`GET /api/v1/ledger/payments/{id}`, its refunds, its exceptions). `null` while the payment
+     * is not started yet (`kind = none`) and for cash on delivery or tenders.
+     */
+    ledger_payment_id?: string | null;
     order_id: string;
+    /**
+     * Id of this payment of the order (it stays the same while the buyer pays it; a new attempt
+     * after a failed payment gets a new id). Not an id of the `ledger` module: use
+     * `ledger_payment_id` with `GET /api/v1/ledger/payments/{id}`.
+     */
     payment_id: string;
     /** VietQR payload; the money goes to the seller's or the licensed partner's account. */
     qr_payload?: string | null;
     redirect_url?: string | null;
-    /** `pending`, `succeeded`, `failed`, `expired`… */
+    /**
+     * `pending`, `succeeded`, `expired`, `superseded` (replaced by a new attempt after the
+     * partner reported its collection failed; start the payment again from the order)…
+     */
     status: string;
     /** For `GET /public/payments/{token}`. */
     status_token: string;
@@ -17178,10 +17215,19 @@ export type LedgerExceptionResponse = {
   id: string;
   /**
    * `amount_mismatch`, `unmatched_credit`, `duplicate_payment`, `missing_in_statement`,
-   * `unknown_in_statement` or `late_payment`.
+   * `unknown_in_statement`, `late_payment` (money arrived after the payment's deadline or after the
+   * partner reported it failed) or `refund_failed` (the partner refused a refund: the money is still
+   * to be returned by hand, then resolve with `refunded_outside`; it closes on its own once the
+   * payment is refunded in full through the partner).
    */
   kind: string;
   note?: string | null;
+  /**
+   * How it was closed: `match`, `accept_received`, `ignore`, `refunded_outside` (by a person), or
+   * by the ledger (`resolved_by` is empty): `refunded` (the payment was refunded in full through the
+   * partner) or `kept` (a `late_payment` the source module counted, e.g. the order went on). Empty
+   * while `open`.
+   */
   resolution?: string | null;
   resolved_by?: string | null;
   /** `open`, `resolved` or `ignored`. */
@@ -19727,6 +19773,19 @@ export type OrdersContactRequest = {
 
 /** A document of an order (invoice or adjustment). */
 export type OrdersDocument = {
+  /**
+   * `true`: this invoice differs from what was settled on the order — the tax of a line (lines
+   * matched by SKU; the shipping fee by its line without an item code) or the total differs by more
+   * than one minor unit per line (two for a line partly cancelled), or the order mixes
+   * tax-inclusive and tax-exclusive prices (one invoice has a single price mode). The invoice
+   * computes tax at its own date (the tax point), so a rate change between ordering and invoicing
+   * (e.g. the end of the 8% VAT on 2026-12-31) shows here. Check the invoice and settle the
+   * difference with the buyer: correct the invoice with an adjustment
+   * (`POST /api/v1/invoices/documents/{id}/adjust`) or a replacement
+   * (`POST /api/v1/invoices/documents/{id}/replace`) — always needed for an order mixing price
+   * modes, whose invoice cannot match it. Always `false` for an adjustment.
+   */
+  differs_from_order: boolean;
   document_id: string;
   issue_date?: string | null;
   /** `sales`, `cash_register` or `adjustment` (after a return). */
@@ -19947,12 +20006,26 @@ export type OrdersPaymentAction = {
    * `none` (the payment could not be started yet; retry from the order).
    */
   kind: string;
+  /**
+   * Id of the collection at the payment partner, in the `ledger` module
+   * (`GET /api/v1/ledger/payments/{id}`, its refunds, its exceptions). `null` while the payment
+   * is not started yet (`kind = none`) and for cash on delivery or tenders.
+   */
+  ledger_payment_id?: string | null;
   order_id: string;
+  /**
+   * Id of this payment of the order (it stays the same while the buyer pays it; a new attempt
+   * after a failed payment gets a new id). Not an id of the `ledger` module: use
+   * `ledger_payment_id` with `GET /api/v1/ledger/payments/{id}`.
+   */
   payment_id: string;
   /** VietQR payload; the money goes to the seller's or the licensed partner's account. */
   qr_payload?: string | null;
   redirect_url?: string | null;
-  /** `pending`, `succeeded`, `failed`, `expired`… */
+  /**
+   * `pending`, `succeeded`, `expired`, `superseded` (replaced by a new attempt after the
+   * partner reported its collection failed; start the payment again from the order)…
+   */
   status: string;
   /** For `GET /public/payments/{token}`. */
   status_token: string;
@@ -23569,10 +23642,19 @@ export type Page_LedgerExceptionResponse = {
     id: string;
     /**
      * `amount_mismatch`, `unmatched_credit`, `duplicate_payment`, `missing_in_statement`,
-     * `unknown_in_statement` or `late_payment`.
+     * `unknown_in_statement`, `late_payment` (money arrived after the payment's deadline or after the
+     * partner reported it failed) or `refund_failed` (the partner refused a refund: the money is still
+     * to be returned by hand, then resolve with `refunded_outside`; it closes on its own once the
+     * payment is refunded in full through the partner).
      */
     kind: string;
     note?: string | null;
+    /**
+     * How it was closed: `match`, `accept_received`, `ignore`, `refunded_outside` (by a person), or
+     * by the ledger (`resolved_by` is empty): `refunded` (the payment was refunded in full through the
+     * partner) or `kept` (a `late_payment` the source module counted, e.g. the order went on). Empty
+     * while `open`.
+     */
     resolution?: string | null;
     resolved_by?: string | null;
     /** `open`, `resolved` or `ignored`. */
@@ -24363,6 +24445,19 @@ export type Page_OrdersCodRule = {
 export type Page_OrdersDocument = {
   /** The items of this page, in the requested order. */
   data: {
+    /**
+     * `true`: this invoice differs from what was settled on the order — the tax of a line (lines
+     * matched by SKU; the shipping fee by its line without an item code) or the total differs by more
+     * than one minor unit per line (two for a line partly cancelled), or the order mixes
+     * tax-inclusive and tax-exclusive prices (one invoice has a single price mode). The invoice
+     * computes tax at its own date (the tax point), so a rate change between ordering and invoicing
+     * (e.g. the end of the 8% VAT on 2026-12-31) shows here. Check the invoice and settle the
+     * difference with the buyer: correct the invoice with an adjustment
+     * (`POST /api/v1/invoices/documents/{id}/adjust`) or a replacement
+     * (`POST /api/v1/invoices/documents/{id}/replace`) — always needed for an order mixing price
+     * modes, whose invoice cannot match it. Always `false` for an adjustment.
+     */
+    differs_from_order: boolean;
     document_id: string;
     issue_date?: string | null;
     /** `sales`, `cash_register` or `adjustment` (after a return). */
@@ -48736,6 +48831,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49070,6 +49166,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };

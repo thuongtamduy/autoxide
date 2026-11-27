@@ -15,6 +15,7 @@ publish.workspace = true
 async-trait.workspace = true
 autoxide-address.workspace = true
 autoxide-kernel.workspace = true
+autoxide-organizations.workspace = true
 axum.workspace = true
 rust_decimal.workspace = true
 sea-orm.workspace = true

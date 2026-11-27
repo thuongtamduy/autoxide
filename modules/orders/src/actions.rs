@@ -279,6 +279,8 @@ impl OrdersService {
             return Err(errors::payment_expired());
         }
         if Method::parse(&row.payment_method) != Method::Cod {
+            // Lượt thu trước đã hỏng / hết hạn ở `ledger`: lần thử mới thay vì trả lại link cũ (UT-6 L4).
+            self.replace_ended_attempt(tenant, id).await?;
             self.start_payment(tenant, id, return_url).await?;
         }
         self.pending_payments(tenant, id).await
@@ -290,11 +292,12 @@ impl OrdersService {
         tenant: &TenantContext,
         id: Uuid,
     ) -> Result<Vec<payment::Model>, Error> {
+        // Kết nối ghi: đọc ngay sau khi lượt thu vừa được tạo / thay (không trễ theo bản sao đọc).
         Ok(payment::Entity::find()
             .filter(payment::Column::OrderId.eq(id))
             .filter(payment::Column::Status.eq(payments::PENDING))
             .scoped(tenant)
-            .all(tenant.database().read())
+            .all(tenant.database().write())
             .await?)
     }
 }

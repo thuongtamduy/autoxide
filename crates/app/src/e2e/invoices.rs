@@ -4,7 +4,7 @@
 //! bị từ chối gửi lại cùng số, lập thay cần uỷ nhiệm, hoá đơn máy tính tiền, ghi sổ và huỷ đảo sổ,
 //! điều chỉnh / thay thế.
 
-use autoxide_kernel::time::Timestamp;
+use autoxide_kernel::time::{Date, Timestamp};
 use std::sync::Arc;
 
 use autoxide_kernel::einvoice::EInvoiceProvider;
@@ -19,7 +19,7 @@ use uuid::Uuid;
 
 use autoxide_invoices::api::{Buyer, Document, Invoices, NewDocument, NewDocumentLine};
 
-const PERMISSIONS: [&str; 9] = [
+const PERMISSIONS: [&str; 10] = [
     "invoices.read",
     "invoices.write",
     "invoices.issue",
@@ -28,6 +28,7 @@ const PERMISSIONS: [&str; 9] = [
     "invoices.mandates_manage",
     "tax.read",
     "tax.packs_manage",
+    "tax.profiles_manage",
     "ledger.read",
 ];
 
@@ -624,6 +625,498 @@ async fn hai_nhap_thay_the_cung_mot_hoa_don_chi_phat_hanh_mot() {
         assert_eq!(balance(&app, &tenant, "receivable.customer").await, issued.total.minor());
         let current = service.document(&tenant, first.id).await.unwrap().unwrap();
         assert_eq!(current.status, "replaced");
+    })
+    .await
+    .unwrap();
+}
+
+/// Ngày lập theo giờ Việt Nam khi người bán thuộc vùng thuế `VN`, không theo UTC (LG-2): hoá đơn lập lúc
+/// 00:30 giờ Việt Nam mang ngày hôm đó, không mang ngày hôm trước.
+#[tokio::test]
+async fn ngay_lap_theo_gio_viet_nam() {
+    TestDatabase::run(async |test| {
+        let Setup { app, .. } = setup(test).await;
+        let root = root_of(DEFAULT_TENANT).as_uuid();
+        let profile = json!({"jurisdiction": "VN", "regime": "vat_credit"});
+        let answer = app
+            .request(Method::PUT, &format!("/api/v1/tax/profiles/{root}"))
+            .token("clerk")
+            .json(profile)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(answer.status(), StatusCode::OK, "{}", answer.text());
+        let vietnam = autoxide_kernel::time::zone("Asia/Ho_Chi_Minh").unwrap();
+        let before = Timestamp::now().date_in(&vietnam);
+        let body = json!({"kind": "vat_invoice", "symbol": "1C26TAA", "year": before.year()});
+        let (status, created) = call(&app, "POST", "/series", Some(body)).await;
+        assert_eq!(status, StatusCode::CREATED, "{created}");
+        let found = draft(&app, "VN-1", 100_000).await;
+        let tenant = app.default_tenant();
+        let issued = invoices(&app).issue(&tenant, Actor::system(), found.id).await.unwrap();
+        // Hai lần đọc giờ có thể vắt qua nửa đêm giờ Việt Nam: nhận một trong hai ngày.
+        let after = Timestamp::now().date_in(&vietnam);
+        let day = issued.issue_date.unwrap();
+        assert!(day == before || day == after, "{day} not in [{before}, {after}]");
+    })
+    .await
+    .unwrap();
+}
+
+/// Nháp tính thuế theo ngày khác ngày lập (vd tạo 31/12/2026, lập 02/01/2027): lúc lập tính lại theo ngày
+/// lập, không giữ thuế suất của ngày tạo nháp (kiểm độc lập #560, điểm 1).
+#[tokio::test]
+async fn nhap_tinh_lai_thue_theo_ngay_lap() {
+    use sea_orm::ConnectionTrait as _;
+    TestDatabase::run(async |test| {
+        let Setup { app, .. } = setup(test).await;
+        let root = root_of(DEFAULT_TENANT).as_uuid();
+        let profile = json!({"jurisdiction": "VN", "regime": "vat_credit"});
+        let answer = app
+            .request(Method::PUT, &format!("/api/v1/tax/profiles/{root}"))
+            .token("clerk")
+            .json(profile)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(answer.status(), StatusCode::OK, "{}", answer.text());
+        let vietnam = autoxide_kernel::time::zone("Asia/Ho_Chi_Minh").unwrap();
+        let year = Timestamp::now().date_in(&vietnam).year();
+        let body = json!({"kind": "vat_invoice", "symbol": "1C26TAA", "year": year});
+        let (status, created) = call(&app, "POST", "/series", Some(body)).await;
+        assert_eq!(status, StatusCode::CREATED, "{created}");
+        let line = NewDocumentLine::new("Service fee", rust_decimal::Decimal::ONE, vnd(100_000))
+            .service()
+            .tax_category("vat.standard");
+        let draft = NewDocument::new(
+            root_of(DEFAULT_TENANT),
+            "vat_invoice",
+            Currency::VND,
+            Buyer::business("Buyer Co", "0101234567"),
+            vec![line],
+            "demo",
+            "T-1",
+        );
+        let tenant = app.default_tenant();
+        let found = invoices(&app)
+            .create_document(&tenant, Actor::system(), draft)
+            .await
+            .unwrap()
+            .into_inner();
+        assert_eq!(found.tax.minor(), 10_000);
+        // Giả như nháp được tính vào một ngày khác, với thuế khác (8%).
+        let write = app.database().write();
+        let backend = write.get_database_backend();
+        write
+            .execute_raw(autoxide_kernel::database::statement(
+                backend,
+                "UPDATE invoices_documents SET tax_minor = $1, total_minor = $2, tax_snapshot = $3 WHERE id = $4",
+                [8000_i64.into(), 108_000_i64.into(), r#"{"tax_point": "2026-01-01"}"#.into(), found.id.into()],
+            ))
+            .await
+            .unwrap();
+        let issued = invoices(&app).issue(&tenant, Actor::system(), found.id).await.unwrap();
+        assert_eq!((issued.tax.minor(), issued.total.minor()), (10_000, 110_000));
+        assert_eq!(issued.lines.iter().map(|line| line.tax.minor()).sum::<i64>(), 10_000);
+
+        // Sửa dòng cùng lúc với lập (kiểm độc lập #560, điểm A): PATCH ghi lại ĐÚNG ảnh chụp thuế cũ (cùng ngày
+        // thuế D) nên so ảnh chụp không thấy; so `updated_at` thì thấy. Kết quả hợp lệ: lập báo `draft_changed`,
+        // PATCH bị từ chối `invoices.not_draft` (lập xong trước), hoặc hoá đơn mang dòng mới — không bao giờ
+        // hoá đơn mang dòng cũ sau khi PATCH đã thành công.
+        let day = Date::new(year, 1, 1).unwrap();
+        let day = if day == Timestamp::now().date_in(&vietnam) { Date::new(year, 1, 2).unwrap() } else { day };
+        let line_of = |price: i64| {
+            json!({"description": "Service fee", "kind": "service", "quantity": "1",
+                   "unit_price": {"amount": price.to_string(), "currency": "VND"}, "tax_category": "vat.standard"})
+        };
+        let (mut changed, mut refused, mut new_lines) = (0, 0, 0);
+        for round in 0..8 {
+            let body = json!({"kind": "vat_invoice", "currency": "VND", "reference": format!("R-{round}"),
+                "buyer": {"kind": "business", "name": "Buyer Co", "tax_code": "0101234567"}, "lines": [line_of(100_000)]});
+            let (status, created) = call(&app, "POST", "/documents", Some(body)).await;
+            assert_eq!(status, StatusCode::CREATED, "{created}");
+            let id: Uuid = created["data"]["id"].as_str().unwrap().parse().unwrap();
+            let path = format!("/documents/{id}");
+            // a. Ảnh chụp thật S, ngày thuế D.
+            let (status, patched) =
+                call(&app, "PATCH", &path, Some(json!({"issue_date": day, "lines": [line_of(100_000)]}))).await;
+            assert_eq!(status, StatusCode::OK, "{patched}");
+            // b. Bỏ ngày lập, giữ S: lúc lập sẽ tính lại theo hôm nay.
+            write
+                .execute_raw(autoxide_kernel::database::statement(
+                    backend,
+                    "UPDATE invoices_documents SET issue_date = NULL WHERE id = $1",
+                    [id.into()],
+                ))
+                .await
+                .unwrap();
+            // c. Chạy đua: PATCH ghi lại đúng S (cùng D) với dòng 200.000.
+            let change = json!({"issue_date": day, "lines": [line_of(200_000)]});
+            let service = invoices(&app);
+            let (patched, issued) =
+                tokio::join!(call(&app, "PATCH", &path, Some(change)), service.issue(&tenant, Actor::system(), id));
+            match issued {
+                Ok(issued) if patched.0 == StatusCode::OK => {
+                    assert_eq!(issued.lines[0].unit_price.minor(), 200_000, "round {round}: {issued:?}");
+                    new_lines += 1;
+                }
+                Ok(issued) => {
+                    assert_eq!(patched.0, StatusCode::CONFLICT, "round {round}: {:?}", patched.1);
+                    assert_eq!(patched.1["code"], "invoices.not_draft", "round {round}");
+                    assert_eq!(issued.lines[0].unit_price.minor(), 100_000, "round {round}");
+                    refused += 1;
+                }
+                Err(error) => {
+                    assert_eq!(error.code(), "invoices.draft_changed", "round {round}");
+                    assert_eq!(patched.0, StatusCode::OK, "round {round}");
+                    changed += 1;
+                }
+            }
+        }
+        assert!(changed + new_lines > 0, "draft_changed {changed}, new lines {new_lines}, refused {refused}");
+    })
+    .await
+    .unwrap();
+}
+
+/// Nháp điều chỉnh bị sửa cùng lúc với lập (kiểm độc lập #560, F3): thuế luôn theo ngày của hoá đơn gốc — lập
+/// báo `invoices.draft_changed`, hoặc hoá đơn mang thuế suất của gốc; không bao giờ thuế suất của hôm nay.
+#[tokio::test]
+async fn nhap_dieu_chinh_sua_cung_luc_voi_lap_giu_thue_suat_goc() {
+    use sea_orm::ConnectionTrait as _;
+    TestDatabase::run(async |test| {
+        let Setup { app, .. } = setup(test).await;
+        let root = root_of(DEFAULT_TENANT).as_uuid();
+        let profile = json!({"jurisdiction": "VN", "regime": "vat_credit"});
+        let answer =
+            app.request(Method::PUT, &format!("/api/v1/tax/profiles/{root}")).token("clerk").json(profile).send().await.unwrap();
+        assert_eq!(answer.status(), StatusCode::OK, "{}", answer.text());
+        let vietnam = autoxide_kernel::time::zone("Asia/Ho_Chi_Minh").unwrap();
+        let today = Timestamp::now().date_in(&vietnam);
+        // Ngày của gốc ở phía kia mốc hết giảm GTGT so với hôm nay.
+        let (original_day, original_rate) = if today < Date::new(2027, 1, 1).unwrap() {
+            (Date::new(2027, 1, 5).unwrap(), "10")
+        } else {
+            (Date::new(2025, 8, 1).unwrap(), "8")
+        };
+        let body = json!({"kind": "vat_invoice", "symbol": "1C26TAA", "year": today.year()});
+        let (status, created) = call(&app, "POST", "/series", Some(body)).await;
+        assert_eq!(status, StatusCode::CREATED, "{created}");
+        let line = |price: i64| {
+            json!({"description": "Goods", "kind": "goods", "quantity": "1",
+                   "unit_price": {"amount": price.to_string(), "currency": "VND"}, "tax_category": "vat.standard_reducible"})
+        };
+        let tenant = app.default_tenant();
+        let write = app.database().write();
+        let backend = write.get_database_backend();
+        for round in 0..6 {
+            let body = json!({"kind": "vat_invoice", "currency": "VND", "reference": format!("O-{round}"),
+                "buyer": {"kind": "business", "name": "Buyer Co", "tax_code": "0101234567"}, "lines": [line(100_000)]});
+            let (status, created) = call(&app, "POST", "/documents", Some(body)).await;
+            assert_eq!(status, StatusCode::CREATED, "{created}");
+            let id = created["data"]["id"].as_str().unwrap().to_owned();
+            let (status, issued) = call(&app, "POST", &format!("/documents/{id}/issue"), None).await;
+            assert_eq!(status, StatusCode::OK, "{issued}");
+            write
+                .execute_raw(autoxide_kernel::database::statement(
+                    backend,
+                    "UPDATE invoices_documents SET issue_date = $1 WHERE id = $2",
+                    [original_day.into(), id.parse::<Uuid>().unwrap().into()],
+                ))
+                .await
+                .unwrap();
+            let adjust = json!({"direction": "decrease", "reference": format!("A-{round}"), "lines": [line(50_000)]});
+            let (status, adjusted) = call(&app, "POST", &format!("/documents/{id}/adjust"), Some(adjust)).await;
+            assert_eq!(status, StatusCode::CREATED, "{adjusted}");
+            let draft: Uuid = adjusted["data"]["id"].as_str().unwrap().parse().unwrap();
+            let path = format!("/documents/{draft}");
+            let service = invoices(&app);
+            let (patched, issued) = tokio::join!(
+                call(&app, "PATCH", &path, Some(json!({"lines": [line(60_000)]}))),
+                service.issue(&tenant, Actor::system(), draft)
+            );
+            // PATCH thắng (200) hay thua vì nháp đã lập (409 `invoices.not_draft`) — không kết quả nào khác.
+            assert!(
+                patched.0 == StatusCode::OK
+                    || (patched.0 == StatusCode::CONFLICT && patched.1["code"] == "invoices.not_draft"),
+                "round {round}: {:?} {}",
+                patched.0,
+                patched.1
+            );
+            match issued {
+                Ok(issued) => {
+                    assert_eq!(issued.lines[0].rate_percent.as_deref(), Some(original_rate), "round {round}: {issued:?}");
+                    if patched.0 == StatusCode::OK {
+                        assert_eq!(issued.lines[0].unit_price.minor(), 60_000, "round {round}");
+                    }
+                }
+                Err(error) => assert_eq!(error.code(), "invoices.draft_changed", "round {round}"),
+            }
+        }
+    })
+    .await
+    .unwrap();
+}
+
+/// Người bán vùng thuế `VN`: hoá đơn điện tử đã gửi cơ quan thuế không huỷ được (NĐ 70/2025, LG-9) — lỗi
+/// nêu căn cứ, hướng sang điều chỉnh / thay thế, không gọi nhà cung cấp; hoá đơn bị cơ quan thuế từ chối
+/// thì huỷ được mà không báo nhà cung cấp.
+#[tokio::test]
+async fn hoa_don_dien_tu_da_gui_khong_huy_duoc_o_viet_nam() {
+    TestDatabase::run(async |test| {
+        let Setup { app, provider, .. } = setup(test).await;
+        let root = root_of(DEFAULT_TENANT).as_uuid();
+        let profile = json!({"jurisdiction": "VN", "regime": "vat_credit"});
+        let answer = app
+            .request(Method::PUT, &format!("/api/v1/tax/profiles/{root}"))
+            .token("clerk")
+            .json(profile)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(answer.status(), StatusCode::OK, "{}", answer.text());
+        let vietnam = autoxide_kernel::time::zone("Asia/Ho_Chi_Minh").unwrap();
+        let year = Timestamp::now().date_in(&vietnam).year();
+        let body = json!({"kind": "vat_invoice", "symbol": "1C26TAA", "year": year, "einvoice_provider": "fake"});
+        let (status, created) = call(&app, "POST", "/series", Some(body)).await;
+        assert_eq!(status, StatusCode::CREATED, "{created}");
+        let reason = json!({"reason": "Wrong amount"});
+
+        let sent = draft(&app, "C-1", 100_000).await;
+        let (status, _) = call(&app, "POST", &format!("/documents/{}/issue", sent.id), None).await;
+        assert_eq!(status, StatusCode::OK);
+        drain(&app).await;
+        let (status, refused) =
+            call(&app, "POST", &format!("/documents/{}/cancel", sent.id), Some(reason.clone())).await;
+        assert_eq!(status, StatusCode::CONFLICT, "{refused}");
+        assert_eq!(refused["code"], "invoices.einvoice_not_cancellable");
+        assert!(refused["detail"].as_str().unwrap().contains("70/2025"), "{refused}");
+        assert!(provider.cancelled.lock().unwrap().is_empty());
+        // Điều chỉnh giảm vẫn làm được.
+        let decrease = json!({"direction": "decrease", "reference": "ADJ-1", "lines": [{"description": "Service fee", "kind": "service",
+            "quantity": "1", "unit_price": {"amount": "100000", "currency": "VND"}, "tax_category": "vat.standard"}]});
+        let (status, adjusted) =
+            call(&app, "POST", &format!("/documents/{}/adjust", sent.id), Some(decrease)).await;
+        assert_eq!(status, StatusCode::CREATED, "{adjusted}");
+
+        let bounced = draft(&app, "C-2", 100_000).await;
+        provider.reject_next("buyer tax code does not exist");
+        let (status, _) = call(&app, "POST", &format!("/documents/{}/issue", bounced.id), None).await;
+        assert_eq!(status, StatusCode::OK);
+        drain(&app).await;
+        let (status, cancelled) =
+            call(&app, "POST", &format!("/documents/{}/cancel", bounced.id), Some(reason)).await;
+        assert_eq!(status, StatusCode::OK, "{cancelled}");
+        assert_eq!(cancelled["data"]["status"], "cancelled");
+        assert!(provider.cancelled.lock().unwrap().is_empty());
+    })
+    .await
+    .unwrap();
+}
+
+/// Điều chỉnh tính thuế theo ngày của hoá đơn gốc, kể cả khi sửa nháp điều chỉnh (kiểm độc lập #575, B và C):
+/// hoá đơn gốc đặt ở phía kia mốc hết giảm GTGT (01/01/2027) so với hôm nay — điều chỉnh theo thuế suất của gốc.
+#[tokio::test]
+async fn dieu_chinh_theo_thue_suat_cua_hoa_don_goc() {
+    use sea_orm::ConnectionTrait as _;
+    TestDatabase::run(async |test| {
+        let Setup { app, .. } = setup(test).await;
+        let root = root_of(DEFAULT_TENANT).as_uuid();
+        let profile = json!({"jurisdiction": "VN", "regime": "vat_credit"});
+        let answer = app
+            .request(Method::PUT, &format!("/api/v1/tax/profiles/{root}"))
+            .token("clerk")
+            .json(profile)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(answer.status(), StatusCode::OK, "{}", answer.text());
+        let vietnam = autoxide_kernel::time::zone("Asia/Ho_Chi_Minh").unwrap();
+        let today = Timestamp::now().date_in(&vietnam);
+        // Ngày của hoá đơn gốc ở phía kia mốc hết giảm thuế so với hôm nay: thuế suất của nó khác hôm nay.
+        let (original_day, today_rate, original_rate) = if today < Date::new(2027, 1, 1).unwrap() {
+            (Date::new(2027, 1, 5).unwrap(), "8", "10")
+        } else {
+            (Date::new(2025, 8, 1).unwrap(), "10", "8")
+        };
+        let symbol = format!("1C{:02}TAA", today.year() % 100);
+        let body = json!({"kind": "vat_invoice", "symbol": symbol, "year": today.year()});
+        let (status, created) = call(&app, "POST", "/series", Some(body)).await;
+        assert_eq!(status, StatusCode::CREATED, "{created}");
+        let line = |price: i64| {
+            json!({"description": "Goods", "kind": "goods", "quantity": "1",
+                   "unit_price": {"amount": price.to_string(), "currency": "VND"}, "tax_category": "vat.standard_reducible"})
+        };
+        let body = json!({"kind": "vat_invoice", "currency": "VND", "reference": "G-1",
+            "buyer": {"kind": "business", "name": "Buyer Co", "tax_code": "0101234567"}, "lines": [line(100_000)]});
+        let (status, created) = call(&app, "POST", "/documents", Some(body)).await;
+        assert_eq!(status, StatusCode::CREATED, "{created}");
+        let id = created["data"]["id"].as_str().unwrap().to_owned();
+        let (status, issued) = call(&app, "POST", &format!("/documents/{id}/issue"), None).await;
+        assert_eq!(status, StatusCode::OK, "{issued}");
+        assert_eq!(issued["data"]["lines"][0]["rate_percent"], today_rate);
+        let write = app.database().write();
+        write
+            .execute_raw(autoxide_kernel::database::statement(
+                write.get_database_backend(),
+                "UPDATE invoices_documents SET issue_date = $1 WHERE id = $2",
+                [original_day.into(), id.parse::<Uuid>().unwrap().into()],
+            ))
+            .await
+            .unwrap();
+        let adjust = json!({"direction": "decrease", "reference": "ADJ-G-1", "lines": [line(50_000)]});
+        let (status, adjusted) = call(&app, "POST", &format!("/documents/{id}/adjust"), Some(adjust)).await;
+        assert_eq!(status, StatusCode::CREATED, "{adjusted}");
+        assert_eq!(adjusted["data"]["lines"][0]["rate_percent"], original_rate, "{adjusted}");
+        // Sửa nháp điều chỉnh: vẫn theo ngày của hoá đơn gốc.
+        let path = format!("/documents/{}", adjusted["data"]["id"].as_str().unwrap());
+        let (status, edited) = call(&app, "PATCH", &path, Some(json!({"lines": [line(60_000)]}))).await;
+        assert_eq!(status, StatusCode::OK, "{edited}");
+        assert_eq!(edited["data"]["lines"][0]["rate_percent"], original_rate, "{edited}");
+        let tax = if original_rate == "10" { "6000" } else { "4800" };
+        assert_eq!(edited["data"]["tax"]["amount"], tax);
+        // Gốc khác năm (dãy số của gốc mang năm của gốc): phát hành tự chọn dãy của năm lập.
+        let (status, issued) = call(&app, "POST", &format!("{path}/issue"), None).await;
+        assert_eq!(status, StatusCode::OK, "{issued}");
+        assert_eq!(issued["data"]["symbol"], symbol.as_str());
+        // Gọi lại cùng điều chỉnh sau khi gốc đã `adjusted`: trả lại đúng điều chỉnh đó, không lỗi.
+        let again = json!({"direction": "decrease", "reference": "ADJ-G-1", "lines": [line(50_000)]});
+        let (status, replayed) = call(&app, "POST", &format!("/documents/{id}/adjust"), Some(again)).await;
+        assert!(status.is_success(), "{status} {replayed}");
+        assert_eq!(replayed["data"]["id"], adjusted["data"]["id"]);
+    })
+    .await
+    .unwrap();
+}
+
+/// Hoá đơn gốc năm trước (dãy số năm trước), điều chỉnh lập năm nay: phát hành tự chọn dãy của năm nay, không lỗi
+/// lệch năm (kiểm độc lập #575 — vd huỷ sau 01/01 một kỳ đã xuất hoá đơn tháng 12).
+#[tokio::test]
+async fn dieu_chinh_nam_sau_tu_chon_day_so_dung_nam() {
+    TestDatabase::run(async |test| {
+        let Setup { app, .. } = setup(test).await;
+        let vietnam = autoxide_kernel::time::zone("Asia/Ho_Chi_Minh").unwrap();
+        let today = Timestamp::now().date_in(&vietnam);
+        let last = today.year() - 1;
+        let old = json!({"kind": "vat_invoice", "symbol": format!("1C{:02}TAA", last % 100), "year": last});
+        let (status, old_series) = call(&app, "POST", "/series", Some(old)).await;
+        assert_eq!(status, StatusCode::CREATED, "{old_series}");
+        let new_symbol = format!("1C{:02}TAA", today.year() % 100);
+        let line = json!({"description": "Service", "kind": "service", "quantity": "1",
+            "unit_price": {"amount": "100000", "currency": "VND"}, "tax_category": "vat.standard"});
+        let body = json!({"kind": "vat_invoice", "currency": "VND", "reference": "Y-1", "issue_date": format!("{last}-12-20"),
+            "series_id": old_series["data"]["id"], "buyer": {"kind": "business", "name": "Buyer Co", "tax_code": "0101234567"},
+            "lines": [line.clone()]});
+        let (status, created) = call(&app, "POST", "/documents", Some(body)).await;
+        assert_eq!(status, StatusCode::CREATED, "{created}");
+        let id = created["data"]["id"].as_str().unwrap().to_owned();
+        let (status, issued) = call(&app, "POST", &format!("/documents/{id}/issue"), None).await;
+        assert_eq!(status, StatusCode::OK, "{issued}");
+        let adjust = json!({"direction": "decrease", "reference": "Y-1-ADJ", "lines": [line]});
+        let (status, adjusted) = call(&app, "POST", &format!("/documents/{id}/adjust"), Some(adjust)).await;
+        assert_eq!(status, StatusCode::CREATED, "{adjusted}");
+        let draft = adjusted["data"]["id"].as_str().unwrap();
+        // Chưa có dãy của năm lập: lỗi nêu năm thiếu dãy (D-20261127-no-active-series-code).
+        let (status, refused) = call(&app, "POST", &format!("/documents/{draft}/issue"), None).await;
+        assert_eq!(status, StatusCode::CONFLICT, "{refused}");
+        assert_eq!(refused["code"], "invoices.no_active_series");
+        assert!(refused["detail"].as_str().unwrap().contains(&today.year().to_string()), "{refused}");
+        let new = json!({"kind": "vat_invoice", "symbol": new_symbol, "year": today.year()});
+        let (status, _) = call(&app, "POST", "/series", Some(new)).await;
+        assert_eq!(status, StatusCode::CREATED);
+        let (status, issued) = call(&app, "POST", &format!("/documents/{draft}/issue"), None).await;
+        assert_eq!(status, StatusCode::OK, "{issued}");
+        assert_eq!(issued["data"]["symbol"], new_symbol.as_str(), "{issued}");
+    })
+    .await
+    .unwrap();
+}
+
+/// Huỷ ghi `cancelled` rồi đảo bút toán SAU commit; đảo hỏng (lỗi tạm của sổ cái) thì gọi huỷ lại phải đảo
+/// (kiểm độc lập #575, M1) — đúng một bút toán đảo dù gọi bao nhiêu lần.
+#[tokio::test]
+async fn huy_lai_sau_khi_dao_but_toan_hong_van_dao_dung_mot_lan() {
+    TestDatabase::run(async |test| {
+        let ledger = Arc::new(autoxide_ledger::api::testing::FakeLedger::new());
+        let mut builder =
+            TestApp::builder(test).user("clerk", 1, &PERMISSIONS).module(ledger.module());
+        for module in crate::modules::all() {
+            if module.name() != "ledger" {
+                builder = builder.boxed_module(module);
+            }
+        }
+        let app = builder.build().await.unwrap();
+        let pack: Value =
+            serde_json::from_str(include_str!("../../../../modules/tax/packs/vn.json")).unwrap();
+        let answer = app
+            .post("/api/v1/tax/packs")
+            .token("clerk")
+            .json(json!({"pack": pack}))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(answer.status(), StatusCode::OK, "{}", answer.text());
+        series(&app, "vat_invoice", "1C26TAA", None).await;
+        let tenant = app.default_tenant();
+        let first = draft(&app, "C-1", 100_000).await;
+        invoices(&app).issue(&tenant, Actor::system(), first.id).await.unwrap();
+        let reference = format!("invoices:{}:cancelled", first.id);
+        ledger.fail_next_posts(1);
+        let failed = invoices(&app)
+            .cancel(&tenant, Actor::system(), first.id, "Wrong buyer".to_owned())
+            .await;
+        assert!(failed.is_err(), "{failed:?}");
+        let found = invoices(&app).document(&tenant, first.id).await.unwrap().unwrap();
+        assert_eq!(found.status, "cancelled");
+        assert!(ledger.entry_by_reference(&reference).is_none(), "chưa đảo");
+        for _ in 0..2 {
+            let again = invoices(&app)
+                .cancel(&tenant, Actor::system(), first.id, "Wrong buyer".to_owned())
+                .await
+                .unwrap();
+            assert_eq!(again.status, "cancelled");
+        }
+        let reversals = ledger.references().iter().filter(|found| **found == reference).count();
+        assert_eq!(reversals, 1, "{:?}", ledger.references());
+    })
+    .await
+    .unwrap();
+}
+
+/// Huỷ gọi đồng thời rồi gọi lại với sổ cái thật (kiểm độc lập #575, M1): mọi lần gọi trả `cancelled`, bút toán
+/// phát hành bị đảo đúng một lần — đảo hai lần thì công nợ âm, bỏ sót thì công nợ còn nguyên.
+#[tokio::test]
+async fn huy_dong_thoi_va_goi_lai_dao_but_toan_dung_mot_lan() {
+    TestDatabase::run(async |test| {
+        let Setup { app, .. } = setup(test).await;
+        series(&app, "vat_invoice", "1C26TAA", None).await;
+        let tenant = app.default_tenant();
+        let first = draft(&app, "CC-1", 100_000).await;
+        let issued = invoices(&app).issue(&tenant, Actor::system(), first.id).await.unwrap();
+        assert_eq!(balance(&app, &tenant, "receivable.customer").await, issued.total.minor());
+        let tasks: Vec<_> = (0..6)
+            .map(|_| {
+                let (service, tenant) = (invoices(&app), tenant.clone());
+                tokio::spawn(async move {
+                    service
+                        .cancel(&tenant, Actor::system(), first.id, "Wrong buyer".to_owned())
+                        .await
+                })
+            })
+            .collect();
+        for task in tasks {
+            let cancelled = task.await.unwrap().unwrap();
+            assert_eq!(cancelled.status, "cancelled");
+        }
+        assert_eq!(balance(&app, &tenant, "receivable.customer").await, 0);
+        assert_eq!(balance(&app, &tenant, "revenue.sales").await, 0);
+        // Gọi lại sau khi đã xong: không đảo thêm.
+        let again = invoices(&app)
+            .cancel(&tenant, Actor::system(), first.id, "Wrong buyer".to_owned())
+            .await
+            .unwrap();
+        assert_eq!(again.status, "cancelled");
+        assert_eq!(balance(&app, &tenant, "receivable.customer").await, 0);
     })
     .await
     .unwrap();

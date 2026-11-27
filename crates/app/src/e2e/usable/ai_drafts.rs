@@ -189,8 +189,20 @@ async fn mo_ta_san_pham_va_tom_tat_danh_gia_bi_tu_choi() {
         let confirm = format!("/api/v1/compliance/me/phone-verifications/{}/confirm", id(&sent));
         expect(&app, "POST", &confirm, BUYER, Some(json!({"code": code})), 200).await;
         let review = json!({"rating": 5, "body": "Ấm đẹp, giao nhanh."});
-        expect(&app, "POST", &format!("/api/v1/orders/me/orders/{order}/lines/{line}/review"), BUYER, Some(review), 201).await;
+        let review = expect(&app, "POST", &format!("/api/v1/orders/me/orders/{order}/lines/{line}/review"), BUYER, Some(review), 201).await;
         drain(&app).await;
+
+        // Ẩn đánh giá qua quy tắc luật của `compliance` thật (LG-12): mọi lý do sẵn có của `orders` ẩn được; mã
+        // khách tự thêm vào danh sách thì luật không cho.
+        let moderation = format!("/api/v1/orders/reviews/{}/moderation", id(&review));
+        for reason in ["unlawful_content", "personal_data", "abusive_language", "spam_or_advertising", "not_about_product"] {
+            expect(&app, "POST", &moderation, ADMIN, Some(json!({"action": "hide", "reason": reason})), 200).await;
+            expect(&app, "POST", &moderation, ADMIN, Some(json!({"action": "reopen"})), 200).await;
+        }
+        let own = json!({"labels": {"vi": "Đánh giá tiêu cực", "en": "Negative review"}});
+        expect(&app, "PUT", "/api/v1/kernel/reasons/orders.review_hidden/negative_review", ADMIN, Some(own), 200).await;
+        let refused = expect(&app, "POST", &moderation, ADMIN, Some(json!({"action": "hide", "reason": "negative_review"})), 422).await;
+        assert_eq!(refused["code"], "compliance.hide_reason_not_allowed", "{refused}");
 
         ai_answers(&server, json!({"summary": "Người mua khen ấm đẹp và giao nhanh.", "themes": ["đẹp", "giao nhanh"]}));
         let summary = json!({"locale": "vi"});

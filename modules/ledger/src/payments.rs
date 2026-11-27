@@ -20,11 +20,10 @@ use autoxide_kernel::job::{EnqueueOptions, Job, JobContext, JobHandler};
 use autoxide_kernel::money::{Currency, Money};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::payment::{
-    GatewayNotification, NotificationKind, PaymentGateway, PaymentIntent, RefundIntent,
-    RefundStatus,
+    GatewayNotification, NotificationKind, PaymentGateway, PaymentIntent,
 };
 use autoxide_kernel::reference::{self, Reference, Submitted};
-use autoxide_kernel::rows::{self, Bounds};
+use autoxide_kernel::rows;
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext};
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{
@@ -35,12 +34,11 @@ use serde_json::{Value, json};
 use uuid::Uuid;
 
 use crate::api::{
-    AccountKey, Counterparty, LineAccount, NewEntry, NewLine, NewPayment, NewRefund, Payment,
-    Refund,
+    AccountKey, Counterparty, LineAccount, NewEntry, NewLine, NewPayment, Payment, Refund,
 };
 use crate::entity::{gateway_event, payment, refund};
 use crate::events;
-use crate::permissions::{PAYMENTS_CREATE, READ, REFUNDS_CREATE};
+use crate::permissions::{PAYMENTS_CREATE, READ};
 use crate::service::{LedgerService, exchange_rate_missing, money, now, valid_id, valid_name};
 
 pub(crate) const PROCESS_GATEWAY_EVENT: &str = "ledger.process_gateway_event";
@@ -69,7 +67,7 @@ pub(crate) fn payment_state(status: &str) -> Error {
         .with_param("status", status)
 }
 
-fn refund_exceeds(remaining: Money) -> Error {
+pub(crate) fn refund_exceeds(remaining: Money) -> Error {
     Error::new(
         ErrorKind::Validation,
         "ledger.refund_exceeds_payment",
@@ -120,7 +118,7 @@ pub(crate) fn describe_refund(row: &refund::Model) -> Result<Refund, Error> {
     })
 }
 
-fn payment_subject(id: Uuid) -> Option<String> {
+pub(crate) fn payment_subject(id: Uuid) -> Option<String> {
     Some(format!("ledger.payment:{id}"))
 }
 
@@ -308,6 +306,9 @@ impl LedgerService {
                     .with_param("values", gateway.capabilities().methods.join(", ")),
             );
         }
+        let expiry = SignedDuration::from_mins(self.config.payment_expiry_minutes);
+        let deadline =
+            crate::service::payment_deadline(now() + expiry, input.expires_by, &mut problems);
         if !problems.is_empty() {
             return Err(Error::validation(problems));
         }
@@ -325,7 +326,6 @@ impl LedgerService {
             "amount": input.amount.minor(), "currency": input.amount.currency().code(),
             "description": description, "source_id": input.source_id, "return_url": input.return_url,
         }))?;
-        let expiry = SignedDuration::from_mins(self.config.payment_expiry_minutes);
         let (database, outbox) = (tenant.database(), &self.outbox);
         let (reference, fingerprint, input, book, description, provider) =
             (&reference, &fingerprint, &input, &book, &description, gateway.provider());
@@ -361,7 +361,7 @@ impl LedgerService {
                 checkout_url: Set(None),
                 qr_payload: Set(None),
                 return_url: Set(input.return_url.clone()),
-                expires_at: Set(at + expiry),
+                expires_at: Set(deadline),
                 captured_at: Set(None),
                 source_module: Set(input.source_module.clone()),
                 source_id: Set(input.source_id.clone()),
@@ -686,25 +686,25 @@ impl LedgerService {
     /// `manual`, [`VIA_ACCEPTED`]). Đúng số tiền → ghi bút toán (theo `reference` ổn định, gọi lại
     /// không ghi trùng), chuyển `succeeded`, phát `ledger.payment_succeeded` mang số thực thu. Sai
     /// số → `needs_review` + hàng chờ; chỉ người đối soát xác nhận riêng ([`VIA_ACCEPTED`]) mới ghi
-    /// được số lệch.
+    /// được số lệch. Trả `true` khi tiền được ghi là về muộn (mục `late_payment` đã mở).
     pub(crate) async fn capture(
         &self,
         tenant: &TenantContext,
         id: Uuid,
         received: Money,
         via: &str,
-    ) -> Result<(), Error> {
+    ) -> Result<bool, Error> {
         let database = tenant.database();
         let current = Self::find_payment(database.write(), tenant, id)
             .await?
             .ok_or_else(payment_not_found)?;
         if current.status == "succeeded" {
-            return Ok(());
+            return Ok(false);
         }
         let expected = money(current.amount_minor, &current.amount_currency)?;
         if received != expected && via != VIA_ACCEPTED {
             self.mark_needs_review(tenant, &current, received).await?;
-            return Ok(());
+            return Ok(false);
         }
         // Bút toán trước (gọi lại an toàn), trạng thái sau: lỗi giữa chừng thì job chạy lại.
         let book = OrgId::from_uuid(current.org_id);
@@ -730,7 +730,23 @@ impl LedgerService {
         )
         .source_id(id.to_string());
         self.post(tenant, Actor::system(), entry).await?;
-        let late = current.status == "expired";
+        // Một mốc thời gian cho cả lần đọc và lần kiểm sau khoá: hạn trôi qua giữa hai lần không làm job hỏng
+        // (rà #591 N3) — chỉ trạng thái đổi (vừa báo hỏng / hết hạn) mới bắt chạy lại.
+        let read_at = now();
+        let late = arrived_late(&current, read_at);
+        if late {
+            // Tiền về sau khi đã hết hạn / đã hỏng: vẫn ghi (tiền đã ở đối tác), mở hàng chờ để người
+            // quyết giữ hay hoàn. Mở TRƯỚC khi chuyển `succeeded` (event tới module nguồn): lượt hoàn tự
+            // động của module nguồn xong sau đó thì tự đóng mục (`close_late_payment_if_refunded`).
+            self.open_exception(
+                tenant,
+                crate::reconcile::LATE_PAYMENT,
+                &format!("ledger.payment:{id}"),
+                json!({"payment_id": id, "amount": received}),
+                &crate::reconcile::late_payment_key(id),
+            )
+            .await?;
+        }
         let outbox = &self.outbox;
         database
             .write_with_retry(move || async move {
@@ -743,6 +759,11 @@ impl LedgerService {
                 };
                 if row.status == "succeeded" {
                     return Ok(());
+                }
+                // Trạng thái đổi giữa lần đọc trên và lúc khoá (vd vừa báo hỏng): chưa mở mục mà giờ phải
+                // mở thì dừng — job chạy lại, đọc lại, mở mục rồi mới ghi thu.
+                if !late && arrived_late(&row, read_at) {
+                    return Err(payment_state(&row.status));
                 }
                 let at = now();
                 let mut active: payment::ActiveModel = row.into();
@@ -763,19 +784,7 @@ impl LedgerService {
                 Ok(())
             })
             .await?;
-        if late {
-            // Tiền về sau khi đã hết hạn: vẫn ghi (tiền đã ở đối tác), mở hàng chờ để người quyết
-            // giữ hay hoàn.
-            self.open_exception(
-                tenant,
-                "late_payment",
-                &format!("ledger.payment:{id}"),
-                json!({"payment_id": id, "amount": received}),
-                &format!("late_payment:{id}"),
-            )
-            .await?;
-        }
-        Ok(())
+        Ok(late)
     }
 
     async fn mark_needs_review(
@@ -870,253 +879,6 @@ impl LedgerService {
         }
         Ok(expired)
     }
-
-    // ---- Hoàn tiền -----------------------------------------------------------------------------
-
-    /// Hoàn (một phần) thanh toán (`dyn Ledger`).
-    pub(crate) async fn refund(
-        &self,
-        tenant: &TenantContext,
-        _actor: Actor,
-        input: NewRefund,
-    ) -> Result<Submitted<Refund>, Error> {
-        let mut problems = Vec::new();
-        let reference = Reference::checked(&input.reference, "reference", &mut problems);
-        if !input.amount.is_positive() {
-            problems.push(FieldError::new("amount", "range", "must be greater than zero"));
-        }
-        let reason = input.reason.trim().to_owned();
-        if !(1..=200).contains(&reason.chars().count()) {
-            problems.push(FieldError::new(
-                "reason",
-                "length",
-                "must be 1 to 200 characters long (no personal data)",
-            ));
-        }
-        if !problems.is_empty() {
-            return Err(Error::validation(problems));
-        }
-        let Some(reference) = reference else {
-            return Err(Error::internal("a checked reference went missing"));
-        };
-        let found = Self::find_payment(tenant.database().read(), tenant, input.payment)
-            .await?
-            .ok_or_else(payment_not_found)?;
-        let gateway = self.gateway(Some(&found.provider))?;
-        let capabilities = gateway.capabilities();
-        if !capabilities.refunds
-            || (!capabilities.partial_refunds && input.amount.minor() != found.amount_minor)
-        {
-            return Err(autoxide_kernel::payment::not_supported(gateway.provider()));
-        }
-        if input.amount.currency().code() != found.amount_currency {
-            return Err(crate::service::currency_mixed());
-        }
-        let fingerprint = reference::fingerprint(&json!({
-            "payment": input.payment, "amount": input.amount.minor(), "reason": reason,
-        }))?;
-        let database = tenant.database();
-        let (reference, fingerprint, input, reason) = (&reference, &fingerprint, &input, &reason);
-        let submitted = reference::submit_once(database, move || async move {
-            let transaction = database.begin_write().await?;
-            let stored = refund::Entity::find()
-                .scoped(tenant)
-                .filter(refund::Column::PaymentId.eq(input.payment))
-                .filter(refund::Column::Reference.eq(reference.as_str()))
-                .one(&transaction)
-                .await?
-                .map(|row| {
-                    let fingerprint = row.reference_fingerprint.clone();
-                    (row, fingerprint)
-                });
-            if let Some(existing) = reference::replayed(stored, reference, fingerprint)? {
-                return Ok(Submitted::Replayed(existing));
-            }
-            let row = rows::lock_one(
-                &transaction,
-                payment::Entity::find_by_id(input.payment).scoped(tenant),
-            )
-            .await?
-            .ok_or_else(payment_not_found)?;
-            if row.status != "succeeded" {
-                return Err(payment_state(&row.status));
-            }
-            // Giữ chỗ số hoàn trong một câu: hai lượt hoàn cùng lúc không vượt số đã thu.
-            let changed = rows::adjust::<payment::Entity, _>(
-                &transaction,
-                payment::Column::RefundedMinor,
-                payment::Column::Id.eq(row.id),
-                input.amount.minor(),
-                Bounds { floor: 0, ceiling: collected(&row) },
-            )
-            .await?;
-            if changed == 0 {
-                let remaining = collected(&row).saturating_sub(row.refunded_minor);
-                return Err(refund_exceeds(money(remaining, &row.amount_currency)?));
-            }
-            let at = now();
-            let saved = refund::Entity::insert(refund::ActiveModel {
-                id: Set(Uuid::now_v7()),
-                tenant_id: Set(tenant.id().as_uuid()),
-                payment_id: Set(row.id),
-                amount_minor: Set(input.amount.minor()),
-                amount_currency: Set(row.amount_currency.clone()),
-                status: Set("pending".to_owned()),
-                provider_ref: Set(None),
-                reason: Set(reason.clone()),
-                reference: Set(reference.as_str().to_owned()),
-                reference_fingerprint: Set(fingerprint.clone()),
-                created_at: Set(at),
-                updated_at: Set(at),
-            })
-            .exec_with_returning(&transaction)
-            .await?;
-            transaction.commit().await?;
-            Ok(Submitted::Created(saved))
-        })
-        .await?;
-        let created = matches!(submitted, Submitted::Created(_));
-        let mut row = submitted.into_inner();
-        if row.status == "pending" && row.provider_ref.is_none() {
-            let provider_ref = found.provider_ref.clone().unwrap_or_default();
-            let amount = money(row.amount_minor, &row.amount_currency)?;
-            let intent = RefundIntent::new(row.id, provider_ref, amount, &row.reason);
-            let answer = gateway.refund(tenant.id(), &intent).await?;
-            refund::Entity::update_many()
-                .scoped(tenant)
-                .col_expr(refund::Column::ProviderRef, Some(answer.provider_ref.clone()).into())
-                .col_expr(refund::Column::UpdatedAt, now().into())
-                .filter(refund::Column::Id.eq(row.id))
-                .filter(refund::Column::ProviderRef.is_null())
-                .exec(database.write())
-                .await?;
-            match answer.status {
-                RefundStatus::Succeeded => self.complete_refund(tenant, row.id).await?,
-                RefundStatus::Failed => self.fail_refund(tenant, row.id).await?,
-                RefundStatus::Pending => {}
-            }
-            row = refund::Entity::find_by_id(row.id)
-                .scoped(tenant)
-                .one(database.write())
-                .await?
-                .ok_or_else(|| Error::internal("a refund vanished"))?;
-        }
-        let described = describe_refund(&row)?;
-        Ok(if created { Submitted::Created(described) } else { Submitted::Replayed(described) })
-    }
-
-    /// Hoàn qua REST / MCP: cần `ledger.refunds_create` ở nút nhận tiền.
-    pub(crate) async fn refund_manual(
-        &self,
-        tenant: &TenantContext,
-        principal: &Principal,
-        input: NewRefund,
-    ) -> Result<Submitted<Refund>, Error> {
-        self.payment_for(tenant, principal, &REFUNDS_CREATE, input.payment).await?;
-        self.refund(tenant, Actor::from(principal), input).await
-    }
-
-    /// Đối tác đã hoàn: ghi bút toán, `succeeded`, event. Gọi lại vô hại.
-    async fn complete_refund(&self, tenant: &TenantContext, id: Uuid) -> Result<(), Error> {
-        let database = tenant.database();
-        let Some(current) =
-            refund::Entity::find_by_id(id).scoped(tenant).one(database.write()).await?
-        else {
-            return Ok(());
-        };
-        if current.status != "pending" {
-            return Ok(());
-        }
-        let paid = Self::find_payment(database.write(), tenant, current.payment_id)
-            .await?
-            .ok_or_else(payment_not_found)?;
-        let amount = money(current.amount_minor, &current.amount_currency)?;
-        let book = OrgId::from_uuid(paid.org_id);
-        let clearing = AccountKey::new(book, "clearing.gateway", amount.currency())
-            .with_counterparty(Counterparty::new("partner", paid.provider.clone()));
-        let receivable = AccountKey::new(book, "receivable.customer", amount.currency());
-        let entry = NewEntry::new(
-            book,
-            "ledger",
-            "refund",
-            format!("refund:{id}"),
-            "Payment refunded by the partner",
-            vec![
-                NewLine::debit(LineAccount::Key(receivable), amount),
-                NewLine::credit(LineAccount::Key(clearing), amount),
-            ],
-        )
-        .source_id(paid.id.to_string());
-        self.post(tenant, Actor::system(), entry).await?;
-        let (outbox, paid) = (&self.outbox, &paid);
-        database
-            .write_with_retry(move || async move {
-                let transaction = database.begin_write().await?;
-                let Some(row) =
-                    rows::lock_one(&transaction, refund::Entity::find_by_id(id).scoped(tenant))
-                        .await?
-                else {
-                    return Ok(());
-                };
-                if row.status != "pending" {
-                    return Ok(());
-                }
-                let mut active: refund::ActiveModel = row.clone().into();
-                active.status = Set("succeeded".to_owned());
-                active.updated_at = Set(now());
-                refund::Entity::update(active).exec(&transaction).await?;
-                let event = events::PaymentRefunded(json!({
-                    "payment_id": row.payment_id, "refund_id": row.id,
-                    "amount": money(row.amount_minor, &row.amount_currency)?,
-                    "source_module": paid.source_module, "source_id": paid.source_id,
-                }));
-                outbox
-                    .record(
-                        &transaction,
-                        tenant,
-                        Actor::system(),
-                        payment_subject(row.payment_id),
-                        &event,
-                    )
-                    .await?;
-                transaction.commit().await?;
-                Ok(())
-            })
-            .await
-    }
-
-    /// Đối tác từ chối hoàn: `failed`, trả lại số đã giữ chỗ.
-    async fn fail_refund(&self, tenant: &TenantContext, id: Uuid) -> Result<(), Error> {
-        let database = tenant.database();
-        database
-            .write_with_retry(move || async move {
-                let transaction = database.begin_write().await?;
-                let Some(row) =
-                    rows::lock_one(&transaction, refund::Entity::find_by_id(id).scoped(tenant))
-                        .await?
-                else {
-                    return Ok(());
-                };
-                if row.status != "pending" {
-                    return Ok(());
-                }
-                rows::adjust::<payment::Entity, _>(
-                    &transaction,
-                    payment::Column::RefundedMinor,
-                    payment::Column::Id.eq(row.payment_id),
-                    -row.amount_minor,
-                    Bounds::NON_NEGATIVE,
-                )
-                .await?;
-                let mut active: refund::ActiveModel = row.into();
-                active.status = Set("failed".to_owned());
-                active.updated_at = Set(now());
-                refund::Entity::update(active).exec(&transaction).await?;
-                transaction.commit().await?;
-                Ok(())
-            })
-            .await
-    }
 }
 
 /// Job `ledger.process_gateway_event`.
@@ -1148,6 +910,12 @@ impl JobHandler for ExpirePaymentsJob {
 /// Số đã thu của thanh toán: số thực thu lúc ghi thu, thanh toán ghi thu trước m0012 thì số phải thu.
 /// Trần của tổng số hoàn — nhận thiếu rồi hoàn theo số phải thu là trả ra nhiều hơn đã vào (rà soát
 /// bảo mật 2026-11).
-fn collected(row: &payment::Model) -> i64 {
+/// Tiền về muộn (UT-6): sau hạn của lượt thu, hay sau khi đối tác đã báo hỏng (thông báo sai thứ tự) —
+/// module nguồn có thể đã huỷ chứng từ hay mở lượt thu khác, người vận hành phải thấy (`late_payment`).
+fn arrived_late(row: &payment::Model, at: Timestamp) -> bool {
+    matches!(row.status.as_str(), "expired" | "failed") || row.expires_at <= at
+}
+
+pub(crate) fn collected(row: &payment::Model) -> i64 {
     row.captured_minor.unwrap_or(row.amount_minor)
 }

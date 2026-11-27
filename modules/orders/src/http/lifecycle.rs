@@ -11,6 +11,7 @@ use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, Tagged};
 use axum::extract::{Path, State};
 use axum::http::HeaderMap;
+use axum::response::Response;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -251,7 +252,7 @@ async fn payment_actions(
     ),
     request_body = PaymentLinkRequest,
     responses(
-        (status = 200, description = "The payment actions of the order.", body = Data<Vec<PaymentActionResponse>>),
+        (status = 200, description = "The payment actions of the order.", body = Data<Vec<PaymentActionResponse>>, headers(("Idempotent-Replayed" = String, description = "`true` when the same `Idempotency-Key` was sent before: the current state; nothing was done again."))),
         (status = 401, description = "Missing, wrong or expired token; code `orders.lookup_token_invalid`.", body = Problem),
         (status = 404, description = "The token opens another order; code `orders.order_not_found`.", body = Problem),
         (status = 409, description = "The order is not waiting for payment (`orders.invalid_transition`), its deadline passed (`orders.payment_expired`) or the time to pay the balance passed (`orders.balance_overdue`).", body = Problem),
@@ -266,12 +267,15 @@ pub(crate) async fn guest_payment_link(
     headers: HeaderMap,
     Path(id): Path<Uuid>,
     ValidJson(input): ValidJson<PaymentLinkRequest>,
-) -> Result<Data<Vec<PaymentActionResponse>>, Error> {
+) -> Result<Response, Error> {
     let access = super::guests::access(&service, &tenant, &headers).await?;
     let key =
         super::guests::idempotency_key(&headers).unwrap_or_else(|| Uuid::now_v7().to_string());
-    let payments = service.guest_payment_link(&tenant, &access, id, input.return_url, &key).await?;
-    payment_actions(&service, &tenant, language, payments).await
+    let submitted =
+        service.guest_payment_link(&tenant, &access, id, input.return_url, &key).await?;
+    let (replayed, payments) = super::replay::split(submitted);
+    let body = payment_actions(&service, &tenant, language, payments).await?;
+    Ok(super::replay::marked(body, replayed))
 }
 
 /// Start the payment of your order again.
@@ -291,7 +295,7 @@ pub(crate) async fn guest_payment_link(
     ),
     request_body = PaymentLinkRequest,
     responses(
-        (status = 200, description = "The payment actions of the order.", body = Data<Vec<PaymentActionResponse>>),
+        (status = 200, description = "The payment actions of the order.", body = Data<Vec<PaymentActionResponse>>, headers(("Idempotent-Replayed" = String, description = "`true` when the same `Idempotency-Key` was sent before: the current state; nothing was done again."))),
         (status = 401, description = "Not signed in; code `unauthenticated`.", body = Problem),
         (status = 404, description = "No such order of yours; code `orders.order_not_found`.", body = Problem),
         (status = 409, description = "The order is not waiting for payment (`orders.invalid_transition`), its deadline passed (`orders.payment_expired`) or the time to pay the balance passed (`orders.balance_overdue`).", body = Problem),
@@ -307,12 +311,14 @@ pub(crate) async fn my_payment_link(
     headers: HeaderMap,
     Path(id): Path<Uuid>,
     ValidJson(input): ValidJson<PaymentLinkRequest>,
-) -> Result<Data<Vec<PaymentActionResponse>>, Error> {
+) -> Result<Response, Error> {
     let key =
         super::guests::idempotency_key(&headers).unwrap_or_else(|| Uuid::now_v7().to_string());
-    let payments =
+    let submitted =
         service.my_payment_link(&tenant, principal.user_id(), id, input.return_url, &key).await?;
-    payment_actions(&service, &tenant, language, payments).await
+    let (replayed, payments) = super::replay::split(submitted);
+    let body = payment_actions(&service, &tenant, language, payments).await?;
+    Ok(super::replay::marked(body, replayed))
 }
 
 /// Pay the balance of your order.

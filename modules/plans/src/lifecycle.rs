@@ -679,9 +679,13 @@ impl PlansService {
             json!({ "tenant_id": tenant, "reference": voided.reference }),
         );
         self.record_event(&transaction, actor, tenant, &event).await?;
+        if voided.invoice_id.is_some() {
+            // Cùng transaction: hoá đơn của kỳ chắc chắn được xử lý (job thử lại khi lỗi).
+            self.enqueue_void_invoice(&transaction, id).await?;
+        }
         transaction.commit().await?;
-        // Sau commit: huỷ hoá đơn của kỳ (gọi `dyn Invoices`, có thể gọi nhà cung cấp).
-        self.cancel_invoice(&voided).await?;
+        // Hoá đơn của kỳ do job xử lý (huỷ hay điều chỉnh giảm, có thể gọi nhà cung cấp; lỗi thì thử lại): API
+        // trả kỳ đã huỷ, không chờ.
         Ok(voided)
     }
 

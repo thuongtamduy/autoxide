@@ -100,6 +100,10 @@ impl Ledger for Provider {
         self.0.refund(tenant, actor, refund).await
     }
 
+    async fn keep_late_payment(&self, tenant: &TenantContext, payment: Uuid) -> Result<(), Error> {
+        self.0.keep_late_payment(tenant, payment).await
+    }
+
     async fn payment(&self, tenant: &TenantContext, id: Uuid) -> Result<Option<Payment>, Error> {
         match LedgerService::find_payment(tenant.database().read(), tenant, id).await? {
             Some(row) => Ok(Some(crate::payments::describe_payment(&row)?)),

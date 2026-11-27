@@ -279,7 +279,7 @@ Việc từ rà pháp lý vòng 1 do AI đóng vai (`docs/legal/review-2026-11-r
 
 - [x] LG-1 (chặn 1.0): quy tắc `moit.checklist.*`, `cases.deadlines` phiên bản mới theo NĐ 248/2026 (thay NĐ 52/2013, 85/2021
       từ 01/7/2026), chuyển tiếp tới 30/6/2027; sửa `COMPLIANCE.md` / `.vi.md` và mẫu trang
-- [ ] LG-2 (chặn 1.0): ngày lập hoá đơn và `tax_point` của đơn theo múi giờ người bán, không theo UTC; test mốc
+- [x] LG-2 (chặn 1.0): ngày lập hoá đơn và `tax_point` của đơn theo múi giờ người bán, không theo UTC; test mốc
       31/12/2026 – 01/01/2027 giờ Việt Nam; xong trước 31/12/2026; qua kiểm độc lập
 - [ ] LG-3: tài liệu nói rõ cổng KYC người bán chưa chặn đăng bán; cài `ListingGate` gọi `KycGate` là điều kiện của module
       sàn; đối chiếu trường KYC với NĐ 248 Điều 18 (từ 01/01/2027)
@@ -291,10 +291,10 @@ Việc từ rà pháp lý vòng 1 do AI đóng vai (`docs/legal/review-2026-11-r
       `TaxEngine::invoice_requirements` thay vì quyết theo kênh `pos`
 - [x] LG-8 (phần tài liệu xong; code là dòng nợ **sau 1.0** bên dưới): tài liệu tách phần khấu trừ thay đã có và chưa có; phát `TaxWithheld`, chứng từ khấu trừ, dữ liệu tờ khai là điều
       kiện của module sàn
-- [ ] LG-9: huỷ hoá đơn đã gửi SePay — lỗi rõ hướng sang điều chỉnh / thay thế; xác định nghĩa vụ 04/SS sau NĐ 70/2025
-- [ ] LG-10: phát hiện và báo chênh lệch thuế giữa đơn và hoá đơn khi qua mốc đổi thuế suất
+- [x] LG-9: huỷ hoá đơn đã gửi SePay — lỗi rõ hướng sang điều chỉnh / thay thế; xác định nghĩa vụ 04/SS sau NĐ 70/2025
+- [x] LG-10: phát hiện và báo chênh lệch thuế giữa đơn và hoá đơn khi qua mốc đổi thuế suất
 - [x] LG-11: hạn mức và thủ tục khuyến mại theo NĐ 239/2026 và thông tư của Bộ Công Thương (thay căn cứ NĐ 81/2018 Điều 6, 7)
-- [ ] LG-12: `orders` ẩn đánh giá qua `ModerationPolicy` (ánh xạ mã lý do) hoặc sửa `COMPLIANCE.md` cho khớp code
+- [x] LG-12: `orders` ẩn đánh giá qua `ModerationPolicy` (ánh xạ mã lý do) hoặc sửa `COMPLIANCE.md` cho khớp code
 - [x] LG-13: căn cứ Luật An ninh mạng 116/2025 và nghị định hướng dẫn thay NĐ 53/2022 trong tài liệu lưu dữ liệu trong nước
 - [x] LG-3/5/6/8 tài liệu: `COMPLIANCE.md` mục "Chưa làm (trước 1.0)", `AI.md` dữ liệu gửi ra nước ngoài, `TAX.md` /
       `MONEY.md` phần khấu trừ thay đã có và chưa có (EN + VI)
@@ -334,8 +334,12 @@ Việc từ rà pháp lý vòng 1 do AI đóng vai (`docs/legal/review-2026-11-r
         kiểm `tax_category`, giá trị lọc sai (`readiness`, `module`, `subject`) báo lỗi, `version` nhận cả hai dạng, thông
         báo `precondition_failed` riêng cho MCP, ẩn tool luôn lỗi với API key, cách idempotency của MCP ghi trong `mcp.md`,
         lỗi `Idempotency-Key` trùng thành lỗi tool, gom lỗi của `invoices.create_draft`, tên key trong audit
-  - [ ] UT-6: `payment_id` của checkout / `payment-link` dùng được ở API ledger; header `Idempotent-Replayed` cho checkout
-        và huỷ đơn khách; `payment-link` gọi lại sau lần lỗi; cách gỡ khoản `needs_review`
+  - [x] UT-6: `payment_id` của checkout / `payment-link` dùng được ở API ledger; header `Idempotent-Replayed` cho checkout
+        và huỷ đơn khách; `payment-link` gọi lại sau lần lỗi; cách gỡ khoản `needs_review` — thêm `ledger_payment_id`,
+        header ở mọi thao tác vãng lai gửi lại, lần thử mới (`superseded`) và hoàn lượt cũ thu muộn qua đối tác, tài liệu
+        gỡ `needs_review`
+    - [ ] Nợ nhỏ (từ rà UT-6): hợp đồng `PaymentGateway` không có lệnh huỷ lượt thu ở đối tác, nên bộ nối chỉ được báo
+          `Failed` khi đối tác đã chốt kết quả cuối; khi thêm lệnh huỷ thì gọi nó lúc mở lần thử mới
   - [ ] UT-7: thời gian build lần đầu của module ngoài repo (đo ~30 phút debug trên 4 lõi): hướng dẫn nêu con số, đường dùng
         bản dựng sẵn hay cache, một cách gọi `check-module`; đo lại cho G9 trên máy rảnh
   - [ ] UT-8: thông báo và log cho người vận hành: `--steps 0`, log backup / restore chỉ tóm tắt, `migrate up` tóm tắt,
