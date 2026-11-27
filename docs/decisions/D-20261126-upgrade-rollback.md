@@ -24,8 +24,9 @@ compose / Kubernetes / DEPLOY.
    `kernel_migration_runs` (migration mới `m0043_migration_run_kind`: `kind`, `from_version`, `to_version`), đóng lượt
    TRƯỚC khi lùi database chính vì lùi xa có thể bỏ chính các cột đó. `--dry-run` in từng database: migration sẽ gỡ,
    bảng / cột sẽ mất kèm số dòng (chạy các `down` schema trong một transaction, so bảng / cột trước và sau, huỷ
-   transaction; data upgrade chỉ liệt kê) — sau kiểm độc lập #586: SQLite chạy trên bản sao `VACUUM INTO` (không khoá
-   database thật), Postgres trong transaction có `lock_timeout` (`--lock-timeout-seconds`, mặc định 2) và
+   transaction; data upgrade chỉ liệt kê) — sau kiểm độc lập #586: SQLite chạy trên bản sao `VACUUM INTO` trong thư mục riêng 0700 cạnh file database
+   (file 0600, guard `Drop` xoá cả thư mục; lần chạy thật khi máy chủ đã dừng đo thẳng, không chép), Postgres trong
+   transaction REPEATABLE READ (chỉ đếm lại bảng có `n_tup_del > 0` hay đổi oid) có `lock_timeout` (`--lock-timeout-seconds`, mặc định 2) và
    `statement_timeout`; một lần chụp shape trước / sau; đếm cả dòng bị xoá ở bảng còn giữ; cột chỉ toàn giá trị mặc
    định không tính là mất; bảng lịch sử `<module>_migrations` không tính. Placement đang lùi ở `migrating`, xong thì
    `behind`. Module không có tên nào trong bảng (ghép từ ngoài) giữ nguyên, trừ khi `--revert-untracked`. Bản đích

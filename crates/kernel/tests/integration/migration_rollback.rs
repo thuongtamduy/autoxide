@@ -131,6 +131,20 @@ async fn run(database: &Database, sql: &str) {
     database.write().execute_raw(sea_orm::Statement::from_string(backend, sql)).await.unwrap();
 }
 
+/// Số thư mục bản sao của chạy thử còn sót cạnh file SQLite (Postgres: 0).
+fn copies_left(test: &TestDatabase) -> usize {
+    let Some(rest) = test.url().strip_prefix("sqlite://") else {
+        return 0;
+    };
+    let file = std::path::Path::new(rest.split('?').next().unwrap());
+    std::fs::read_dir(file.parent().unwrap())
+        .unwrap()
+        .filter(|entry| {
+            entry.as_ref().unwrap().file_name().to_string_lossy().starts_with(".autoxide-rollback-")
+        })
+        .count()
+}
+
 /// Bản đích chỉ có `shop/m0001` và `tags/m0001`.
 fn target(module: &str, name: &str) -> bool {
     matches!((module, name), ("shop", "m0001_create_item") | ("tags", "m0001_create_tag"))
@@ -162,6 +176,8 @@ async fn ke_hoach_neu_buoc_va_du_lieu_mat_roi_lui_that() {
             [("shop_item", Some("title"), 1, false), ("shop_item", None, 2, false), ("shop_order", None, 1, true)]
         );
         assert_eq!(plan.lost_rows(), 4);
+        // SQLite: bản sao của chạy thử nằm trong thư mục riêng cạnh file database và đã bị xoá.
+        assert_eq!(copies_left(test), 0);
         // Chạy thử không đổi gì.
         assert!(migrator.pending(&db).await.unwrap().is_empty());
         assert!(SchemaManager::new(db.read()).has_table("shop_order").await.unwrap());

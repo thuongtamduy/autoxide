@@ -1314,7 +1314,10 @@ with the binary of the release you are leaving: only it knows how to revert its 
 1. `autoxide rollback --to X.Y.Z --dry-run` lists, per database, the migrations it would revert, the
    tables and columns it would drop with how many rows or values they hold (a column that only holds
    its default value loses nothing), and the rows a revert deletes. It changes nothing. On SQLite it
-   works on a copy of the database; on PostgreSQL it runs the reverts inside a transaction that is
+   works on a copy of the database, in a private directory (`.autoxide-rollback-…`, readable by the
+   server's user only) next to the database file, deleted when it is done: keep free space the size
+   of the database there. The real run, once the servers are stopped, measures without a copy. On
+   PostgreSQL it runs the reverts inside a transaction that is
    rolled back, so for that time it holds locks on the tables it changes: it waits at most
    `--lock-timeout-seconds` (default 2) for a busy table, then stops and says so — run it when the
    load is low, or once the servers are stopped.

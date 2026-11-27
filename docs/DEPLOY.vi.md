@@ -1263,7 +1263,9 @@ bản `X.Y.Z` (từ 0.14.0 trở đi), để máy chủ của bản đó chạy 
 
 1. `autoxide rollback --to X.Y.Z --dry-run` liệt kê từng database: migration sẽ gỡ, bảng và cột sẽ bị
    bỏ kèm số dòng hay giá trị đang có (cột chỉ chứa giá trị mặc định thì không mất gì), và số dòng một
-   bước gỡ sẽ xoá. Không đổi gì. Trên SQLite nó làm trên bản sao của database; trên PostgreSQL nó chạy
+   bước gỡ sẽ xoá. Không đổi gì. Trên SQLite nó làm trên bản sao của database, trong một thư mục riêng
+   (`.autoxide-rollback-…`, chỉ user của máy chủ đọc được) cạnh file database, xoá khi xong: cần chỗ trống
+   bằng kích thước database ở đó. Lần chạy thật, khi máy chủ đã dừng, đo mà không chép. Trên PostgreSQL nó chạy
    các bước gỡ trong một transaction rồi huỷ, nên trong lúc đó giữ lock trên các bảng nó đổi: chờ một
    bảng đang bận tối đa `--lock-timeout-seconds` (mặc định 2) rồi dừng và báo — chạy lúc ít tải, hoặc
    sau khi đã dừng máy chủ.

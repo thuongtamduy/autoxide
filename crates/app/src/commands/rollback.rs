@@ -45,11 +45,12 @@ pub struct Arguments {
     /// `.module(…)`): without it they are left as they are.
     #[arg(long)]
     revert_untracked: bool,
-    /// PostgreSQL: how long the dry run waits for a table another session uses before it gives up.
-    #[arg(long, default_value_t = 2)]
+    /// PostgreSQL: how long the dry run waits for a table another session uses before it gives up (at least 1:
+    /// on PostgreSQL 0 would mean waiting forever).
+    #[arg(long, default_value_t = 2, value_parser = clap::value_parser!(u64).range(1..))]
     lock_timeout_seconds: u64,
-    /// PostgreSQL: longest run of one statement of the dry run.
-    #[arg(long, default_value_t = 60)]
+    /// PostgreSQL: longest run of one statement of the dry run (at least 1).
+    #[arg(long, default_value_t = 60, value_parser = clap::value_parser!(u64).range(1..))]
     statement_timeout_seconds: u64,
 }
 
@@ -186,10 +187,14 @@ async fn rollback_locked(
         ));
     }
     let main = context.registry.control().clone();
-    let limits = DryRunLimits {
-        lock_timeout: Duration::from_secs(arguments.lock_timeout_seconds),
-        statement_timeout: Duration::from_secs(arguments.statement_timeout_seconds),
-    };
+    let mut limits = DryRunLimits::new(
+        Duration::from_secs(arguments.lock_timeout_seconds),
+        Duration::from_secs(arguments.statement_timeout_seconds),
+    );
+    if arguments.yes && !arguments.dry_run {
+        // Máy chủ đã dừng (`--yes`): SQLite đo thẳng, không chép lại database.
+        limits = limits.with_servers_stopped();
+    }
 
     let mut plans: Vec<(String, RollbackPlan)> = Vec::new();
     for (name, database) in
@@ -469,6 +474,27 @@ mod tests {
         .unwrap();
     }
 
+    /// `--lock-timeout-seconds 0` bị từ chối ngay khi đọc tham số (trên Postgres 0 là chờ mãi).
+    #[test]
+    fn lock_timeout_bang_khong_bi_tu_choi() {
+        #[derive(clap::Parser)]
+        struct Cli {
+            #[command(flatten)]
+            arguments: Arguments,
+        }
+        let parse = |value: &str| {
+            <Cli as clap::Parser>::try_parse_from([
+                "rollback",
+                "--to",
+                "0.19.0",
+                "--lock-timeout-seconds",
+                value,
+            ])
+        };
+        assert!(parse("0").is_err());
+        assert_eq!(parse("5").unwrap().arguments.lock_timeout_seconds, 5);
+    }
+
     /// Lần đầu `down` của data upgrade hỏng (giả lập lỗi giữa chừng), lần sau được.
     static FAIL_DOWN: AtomicBool = AtomicBool::new(true);
 
@@ -657,6 +683,22 @@ mod tests {
                 .err()
                 .unwrap();
             assert!(error.starts_with("main: ") && error.contains("cannot measure"), "{error}");
+            // SQLite: bản sao của chạy thử đã bị xoá dù `down` hỏng giữa chừng.
+            if let Some(rest) = test.url().strip_prefix("sqlite://") {
+                let file = std::path::Path::new(rest.split('?').next().unwrap());
+                let left = std::fs::read_dir(file.parent().unwrap())
+                    .unwrap()
+                    .filter(|entry| {
+                        entry
+                            .as_ref()
+                            .unwrap()
+                            .file_name()
+                            .to_string_lossy()
+                            .starts_with(".autoxide-rollback-")
+                    })
+                    .count();
+                assert_eq!(left, 0);
+            }
             assert!(pending(&migrator, &setup.database).await.is_empty(), "không đổi gì");
             main_lock.release().await.unwrap();
             setup.database.close().await.unwrap();
