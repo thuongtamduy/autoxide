@@ -188,7 +188,7 @@ module đang tắt, kèm dòng cần thêm — xem
 [MODULES.vi.md](MODULES.vi.md#nâng-cấp-từ-017-trở-về-trước). Điều này áp dụng cả cho cách B và C.
 
 **Cập nhật lên bản có chỉ mục từ của content** (migration `content.m0036_word_index`): migration điền từ
-của mọi bài đã đăng vào bảng mới `content_published_words` theo từng lô, rồi dựng index của bảng. Website lớn
+của mọi bài đã đăng vào bảng mới `content_published_words` theo từng lô, rồi dựng index của bảng và thêm một index trên `content_published`. Website lớn
 thì lâu hơn và giữ lock của migration trong lúc đó: hãy cập nhật vào giờ vắng. Điều này áp dụng cả cho cách B
 và C.
 

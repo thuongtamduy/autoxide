@@ -40,8 +40,7 @@ impl SuggestSource for Entries {
         let read = tenant.database().read();
         // Chỉ mục từ (PT-15, D-20261126-content-word-index) thay `LIKE '%q%'` trên mọi bài.
         let lineage = site.lineage_ids();
-        let matching =
-            words::Matching {
+        let matching = words::Matching {
             locale,
             kind: None,
             site: Some(&lineage),

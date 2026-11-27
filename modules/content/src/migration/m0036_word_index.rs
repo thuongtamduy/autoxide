@@ -15,6 +15,7 @@ impl MigrationName for Migration {
 
 const TABLE: &str = "content_published_words";
 const PUBLISHED: &str = "content_published";
+const PUBLISHED_NEWEST: &str = "content_published_newest_idx";
 /// Số bài mỗi lượt tính từ.
 const BATCH: u64 = 200;
 
@@ -121,10 +122,30 @@ impl MigrationTrait for Migration {
                     .col("entry_id")
                     .to_owned(),
             )
+            .await?;
+        // Duyệt bài mới nhất của một ngôn ngữ, mọi loại (bước 3 của `publishing::words::matching_ids`, gợi ý tìm): index
+        // sẵn có bắt đầu bằng `kind`, không có `kind` thì mỗi trang phải sắp mọi bài.
+        manager
+            .create_index(
+                Index::create()
+                    .name(PUBLISHED_NEWEST)
+                    .table(PUBLISHED)
+                    .col("tenant_id")
+                    .col("locale")
+                    .col("published_at")
+                    .col("entry_id")
+                    .if_not_exists()
+                    .to_owned(),
+            )
             .await
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_index(
+                Index::drop().name(PUBLISHED_NEWEST).table(PUBLISHED).if_exists().to_owned(),
+            )
+            .await?;
         manager.drop_table(Table::drop().table(TABLE).to_owned()).await
     }
 }

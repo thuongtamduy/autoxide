@@ -197,11 +197,13 @@ pub(crate) struct EntryAuthorLink {
 /// lỗi, không trả thiếu. Mỗi câu đọc có trần số dòng, để từ rất phổ biến không làm một câu đọc hết chỉ mục của khách:
 ///
 /// 1. Mỗi từ của câu: ID bài có từ đó, tối đa [`TERM_ROWS_MAX`] dòng chỉ mục (index `(tenant_id, locale, word,
-///    entry_id)`). Từ nào không có dòng nào: không có kết quả. Từ nào vượt trần là "phổ biến".
-/// 2. Có ít nhất một từ không phổ biến: giao các tập đã đủ, rồi kiểm từ phổ biến bằng khoá chính `(tenant_id,
-///    entry_id, word)` trên chính các bài còn lại; cuối cùng lọc bài theo `filter`, mới đăng trước.
-/// 3. Mọi từ đều phổ biến: duyệt bài theo `filter`, mới đăng trước, từng trang [`SCAN_PAGE`] bài, kiểm mọi từ bằng khoá
-///    chính, tới khi đủ [`MATCH_CAP`] bài hay hết bài.
+///    entry_id)`), giao dần trong bộ nhớ. Từ nào không có dòng nào, hay giao rỗng: không có kết quả. Từ nào vượt trần
+///    là "phổ biến".
+/// 2. Còn ít ứng viên (tối đa `DIRECT_MAX`): kiểm từ phổ biến bằng khoá chính `(tenant_id, entry_id, word)` trên chính
+///    các bài đó, rồi lấy bài theo `filter`, mới đăng trước.
+/// 3. Nhiều ứng viên, hay mọi từ đều phổ biến: duyệt bài theo `filter`, mới đăng trước, từng trang [`SCAN_PAGE`] bài
+///    (index `(tenant_id, locale, published_at, entry_id)`), giữ bài thuộc tập ứng viên (trong bộ nhớ) và có các từ
+///    phổ biến (khoá chính), tới khi đủ [`MATCH_CAP`] bài hay hết bài.
 pub(crate) async fn matching_ids(
     tenant: &TenantContext,
     filter: Matching<'_>,
@@ -220,8 +222,18 @@ pub(crate) async fn matching_ids(
     }
 }
 
-/// Số dòng chỉ mục tối đa đọc cho một từ của câu tìm; từ có nhiều dòng hơn là từ phổ biến.
-pub(crate) const TERM_ROWS_MAX: u64 = 20_000;
+/// Số dòng chỉ mục tối đa đọc cho một từ của câu tìm (tập ID trong bộ nhớ: tối đa chừng 800 KB một từ); từ có nhiều
+/// dòng hơn là từ "phổ biến", kiểm bằng khoá chính. Test dùng trần nhỏ để mọi đường đi chạy với ít dữ liệu.
+#[cfg(not(test))]
+pub(crate) const TERM_ROWS_MAX: u64 = 50_000;
+#[cfg(test)]
+pub(crate) const TERM_ROWS_MAX: u64 = 2_000;
+/// Tập bài ứng viên tối đa chừng này thì lấy bài mới nhất bằng danh sách `IN (…)`; nhiều hơn thì duyệt bài mới nhất và
+/// kiểm thành viên trong bộ nhớ.
+#[cfg(not(test))]
+const DIRECT_MAX: usize = 2_000;
+#[cfg(test)]
+pub(crate) const DIRECT_MAX: usize = 200;
 /// Số bài mỗi trang khi duyệt bài mới nhất (mọi từ đều phổ biến).
 const SCAN_PAGE: u64 = 1_000;
 /// Số ID tối đa của một danh sách `IN (…)`: dưới trần tham số bind của cả hai database.
@@ -236,8 +248,8 @@ struct Search<'a> {
 
 impl Search<'_> {
     async fn run(&self, query: &WordQuery) -> Result<Vec<Uuid>, Error> {
-        // Bước 1: tập ID của từng từ (None: từ phổ biến, tập chưa đủ).
-        let mut complete: Vec<HashSet<Uuid>> = Vec::new();
+        // Bước 1: tập ID của từng từ, giao dần trong bộ nhớ; từ vượt trần ("phổ biến") để kiểm sau bằng khoá chính.
+        let mut candidates: Option<HashSet<Uuid>> = None;
         let mut common: Vec<&Term> = Vec::new();
         for term in &query.terms {
             let ids = self.term_ids(term).await?;
@@ -246,25 +258,33 @@ impl Search<'_> {
             }
             if ids.len() as u64 > TERM_ROWS_MAX {
                 common.push(term);
-            } else {
-                complete.push(ids.into_iter().collect());
+                continue;
             }
-        }
-        // Bước 2: giao các tập đủ (bắt đầu từ tập nhỏ nhất), kiểm từ phổ biến trên bài còn lại.
-        complete.sort_by_key(HashSet::len);
-        let mut sets = complete.into_iter();
-        if let Some(first) = sets.next() {
-            let mut candidates: Vec<Uuid> = sets
-                .fold(first, |kept, set| kept.intersection(&set).copied().collect())
-                .into_iter()
-                .collect();
-            for term in &common {
-                candidates = self.having(term, &candidates).await?;
+            let set: HashSet<Uuid> = ids.into_iter().collect();
+            let kept = match candidates {
+                None => set,
+                Some(mut kept) => {
+                    kept.retain(|id| set.contains(id));
+                    kept
+                }
+            };
+            if kept.is_empty() {
+                return Ok(Vec::new());
             }
-            return self.newest(&candidates).await;
+            candidates = Some(kept);
         }
-        // Bước 3: mọi từ đều phổ biến.
-        self.scan(&common).await
+        match candidates {
+            // Bước 2: ít ứng viên — kiểm từ phổ biến bằng khoá chính, rồi lấy bài mới nhất trong danh sách.
+            Some(kept) if kept.len() <= DIRECT_MAX => {
+                let mut ids: Vec<Uuid> = kept.into_iter().collect();
+                for term in &common {
+                    ids = self.having(term, &ids).await?;
+                }
+                self.newest(&ids).await
+            }
+            // Bước 3: nhiều ứng viên, hay mọi từ đều phổ biến — duyệt bài mới nhất.
+            kept => self.scan(kept.as_ref(), &common).await,
+        }
     }
 
     /// Thời gian còn lại của lần tìm; hết thì là lỗi quá hạn như khi database dừng câu.
@@ -279,9 +299,9 @@ impl Search<'_> {
         Ok(left)
     }
 
-    fn word(&self, term: &Term) -> Cond<IndexedWord> {
-        let locale = IndexedWord::LOCALE.eq(self.filter.locale.to_owned());
-        let word = if term.prefix {
+    /// Điều kiện của từ `term` trên cột `word` (khớp nguyên từ, hay khoảng tiền tố).
+    fn word(term: &Term) -> Cond<IndexedWord> {
+        if term.prefix {
             let from = IndexedWord::WORD.gte(term.word.clone());
             match next_prefix(&term.word) {
                 Some(next) => Cond::all().with(from).with(IndexedWord::WORD.lt(next)),
@@ -289,8 +309,7 @@ impl Search<'_> {
             }
         } else {
             IndexedWord::WORD.eq(term.word.clone())
-        };
-        Cond::all().with(locale).with(word)
+        }
     }
 
     /// ID bài có từ `term`, tối đa `TERM_ROWS_MAX + 1` dòng chỉ mục (một bài có thể có nhiều từ cùng tiền tố).
@@ -299,7 +318,8 @@ impl Search<'_> {
         let rows: Vec<(Uuid,)> = db
             .read()
             .find::<IndexedWord>()
-            .filter(self.word(term))
+            .filter(IndexedWord::LOCALE.eq(self.filter.locale.to_owned()))
+            .filter(Self::word(term))
             .limit(TERM_ROWS_MAX + 1)
             .within(self.remaining()?)
             .select((IndexedWord::ENTRY_ID,))
@@ -321,8 +341,12 @@ impl Search<'_> {
             let rows: Vec<(Uuid,)> = db
                 .read()
                 .find::<IndexedWord>()
+                // Không lọc ngôn ngữ ở đây (mỗi bài chỉ một ngôn ngữ, các bài trong `ids` đã đúng ngôn ngữ): không có
+                // `locale` thì index `(tenant_id, locale, word, entry_id)` không dùng được cho câu này, chỉ còn khoá
+                // chính `(tenant_id, entry_id, word)` — mỗi ID một lần dò. Có `locale`, Postgres có lúc chọn index kia
+                // và quét cả khoảng từ (đo được: tới 640 ms một câu với 50 000 bài).
                 .filter(IndexedWord::ENTRY_ID.is_in(chunk.iter().copied()))
-                .filter(self.word(term))
+                .filter(Self::word(term))
                 .within(self.remaining()?)
                 .select((IndexedWord::ENTRY_ID,))
                 .all()
@@ -385,9 +409,13 @@ impl Search<'_> {
         Ok(found.into_iter().map(|(_, id)| id).collect())
     }
 
-    /// Mọi từ đều phổ biến: duyệt bài theo `filter`, mới đăng trước, giữ bài có mọi từ, tới khi đủ `MATCH_CAP` hay hết
-    /// bài.
-    async fn scan(&self, terms: &[&Term]) -> Result<Vec<Uuid>, Error> {
+    /// Duyệt bài theo `filter`, mới đăng trước, giữ bài thuộc `candidates` (nếu có) và có mọi từ `terms`, tới khi đủ
+    /// `MATCH_CAP` hay hết bài.
+    async fn scan(
+        &self,
+        candidates: Option<&HashSet<Uuid>>,
+        terms: &[&Term],
+    ) -> Result<Vec<Uuid>, Error> {
         let cap = usize::try_from(MATCH_CAP).unwrap_or(usize::MAX);
         let mut found = Vec::new();
         let mut after: Option<(Timestamp, Uuid)> = None;
@@ -417,8 +445,16 @@ impl Search<'_> {
                 .all()
                 .await?;
             let Some(&(last_id, last_at)) = rows.last() else { break };
-            let mut kept: Vec<Uuid> = rows.iter().map(|(id, _)| *id).collect();
+            // Thành viên trong bộ nhớ trước (không tốn câu), rồi từ phổ biến bằng khoá chính trên số còn lại.
+            let mut kept: Vec<Uuid> = rows
+                .iter()
+                .map(|(id, _)| *id)
+                .filter(|id| candidates.is_none_or(|candidates| candidates.contains(id)))
+                .collect();
             for term in terms {
+                if kept.is_empty() {
+                    break;
+                }
                 kept = self.having(term, &kept).await?;
             }
             found.extend(kept);

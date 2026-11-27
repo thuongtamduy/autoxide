@@ -357,10 +357,11 @@ async fn migration_nap_nhieu_bai_nhieu_tu() {
     .unwrap();
 }
 
-/// Từ phổ biến (hơn [`TERM_ROWS_MAX`](words::TERM_ROWS_MAX) bài) không làm một câu đọc hết chỉ mục, và kết quả vẫn
-/// là các bài mới nhất khớp mọi từ: có từ hiếm thì đi từ từ hiếm; mọi từ đều phổ biến nhưng chỉ cùng có ở bài cũ thì
-/// vẫn tìm ra (duyệt tới khi đủ, không cắt theo số bài đã duyệt). Lọc chuyên mục / tác giả trước khi cắt trần: bài cũ
-/// của tác giả vẫn ra dù hàng nghìn bài khớp mới hơn.
+/// Từ phổ biến (hơn [`TERM_ROWS_MAX`](words::TERM_ROWS_MAX) bài; test dùng trần nhỏ) không làm một câu đọc hết chỉ
+/// mục, và kết quả vẫn là các bài mới nhất khớp mọi từ, qua cả ba đường đi: ít ứng viên (từ hiếm), nhiều ứng viên
+/// (hơn `DIRECT_MAX`, duyệt bài mới nhất và kiểm trong bộ nhớ), mọi từ đều phổ biến nhưng chỉ cùng có ở bài cũ (duyệt
+/// tới khi đủ, không cắt theo số bài đã duyệt). Lọc chuyên mục / tác giả trước khi cắt trần: bài cũ của tác giả vẫn
+/// ra dù nhiều bài khớp mới hơn.
 #[tokio::test]
 async fn tu_pho_bien_khong_quet_het_chi_muc() {
     TestDatabase::run(async |test| {
@@ -398,13 +399,17 @@ async fn tu_pho_bien_khong_quet_het_chi_muc() {
         for chunk in rows.chunks(200) {
             published::Entity::insert_many(chunk.to_vec()).exec(database.write()).await.unwrap();
         }
-        // `ga` ở mọi bài, `pho` ở các bài cũ, `hiem` ở ba bài.
-        let rare = [ids[3], ids[2_000], ids[4_000]];
+        // `ga` ở mọi bài, `pho` ở các bài cũ, `bun` ở các bài cũ nhất (nhiều hơn `DIRECT_MAX`), `hiem` ở ba bài.
+        let rare = [ids[3], ids[1_000], ids[1_500]];
+        let bun = words::DIRECT_MAX + 50;
         let mut index: Vec<crate::entity::published_word::ActiveModel> = Vec::new();
         for (n, id) in ids.iter().enumerate() {
             let mut row_words = vec!["ga"];
             if n < old {
                 row_words.push("pho");
+            }
+            if n < bun {
+                row_words.push("bun");
             }
             if rare.contains(id) {
                 row_words.push("hiem");
@@ -438,6 +443,10 @@ async fn tu_pho_bien_khong_quet_het_chi_muc() {
         // Hai từ phổ biến chỉ cùng có ở bài cũ: vẫn là `MATCH_CAP` bài mới nhất khớp cả hai.
         let both: Vec<Uuid> = ids[..old].iter().rev().take(cap).copied().collect();
         assert_eq!(find("ga pho").await, both);
+        // Nhiều ứng viên (`bun`, hơn `DIRECT_MAX`) cùng từ phổ biến: mọi bài có `bun`, mới nhất trước.
+        let with_bun: Vec<Uuid> = ids[..bun].iter().rev().copied().collect();
+        assert_eq!(find("ga bun").await, with_bun);
+        assert_eq!(find("bun").await, with_bun);
         // Từ phổ biến cùng một từ không có ở bài nào: không có kết quả.
         assert!(find("pho khongco").await.is_empty());
 

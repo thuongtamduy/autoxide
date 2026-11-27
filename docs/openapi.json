@@ -167409,7 +167409,7 @@
             }
           },
           {
-            "description": "Only posts whose title, summary or body contain every word of this text, ignoring case and\naccents; a word of 3 letters or more also matches longer words that start with it (`lat` finds\n\"Da Lat\"). Covers the 1,000 newest matching posts. At most 200 characters. Changed: earlier\nversions matched any substring.",
+            "description": "Only posts whose title, summary or body contain every word of this text, ignoring case and\naccents; a word of 3 letters or more also matches longer words that start with it (`lat` finds\n\"Da Lat\"). Returns the newest matching posts, at most 1,000 across all pages, after the other\nfilters (`term_id`, `author_id`). At most 200 characters. A search that takes longer than 2\nseconds answers 503 rather than a partial list. Changed: earlier versions matched any\nsubstring.",
             "in": "query",
             "name": "q",
             "required": false,
@@ -167578,7 +167578,7 @@
             "operator": "eq"
           },
           {
-            "description": "Only posts whose title, summary or body contain every word of this text, ignoring case and\naccents; a word of 3 letters or more also matches longer words that start with it (`lat` finds\n\"Da Lat\"). Covers the 1,000 newest matching posts. At most 200 characters. Changed: earlier\nversions matched any substring.",
+            "description": "Only posts whose title, summary or body contain every word of this text, ignoring case and\naccents; a word of 3 letters or more also matches longer words that start with it (`lat` finds\n\"Da Lat\"). Returns the newest matching posts, at most 1,000 across all pages, after the other\nfilters (`term_id`, `author_id`). At most 200 characters. A search that takes longer than 2\nseconds answers 503 rather than a partial list. Changed: earlier versions matched any\nsubstring.",
             "kind": "string",
             "name": "q",
             "operator": "contains"
@@ -167825,7 +167825,7 @@
     },
     "/api/v1/content/public/search": {
       "get": {
-        "description": "No sign-in needed; off unless the server sets `AUTOXIDE_CONTENT_PUBLIC_SEMANTIC_SEARCH=true`\n(then `404` with code `content.semantic_search_disabled`). Like `GET /search`, but only\npublished entries, each with its `path`. Searches by meaning have a budget per minute\n(`AUTOXIDE_CONTENT_PUBLIC_SEARCH_PER_MINUTE`); past it, results match words only. Searches\nare also limited per client address and per server, and stopped after 3 seconds.",
+        "description": "No sign-in needed; off unless the server sets `AUTOXIDE_CONTENT_PUBLIC_SEMANTIC_SEARCH=true`\n(then `404` with code `content.semantic_search_disabled`). Like `GET /search`, but only\npublished entries, each with its `path`. Searches by meaning have a budget per minute\n(`AUTOXIDE_CONTENT_PUBLIC_SEARCH_PER_MINUTE`); past it, results match words only. Searches\nare also limited per client address and per server, and stopped after 3 seconds. The word part\nmatches whole words and word prefixes from 3 letters, ignoring case and accents (not any\nsubstring), among the newest matching entries.",
         "operationId": "content_search_public_content",
         "parameters": [
           {

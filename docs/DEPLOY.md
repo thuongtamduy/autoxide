@@ -192,7 +192,7 @@ holds data of a module that is off, with the line to add — see
 
 **Updating to the release with the content word index** (migration `content.m0036_word_index`): the
 migration fills the new table `content_published_words` with the words of every published entry, in
-batches, then builds its index. On a large site it takes longer and holds the migration lock meanwhile:
+batches, then builds its index and one more index on `content_published`. On a large site it takes longer and holds the migration lock meanwhile:
 update in a quiet hour. This applies to setups B and C too.
 
 ### 6. Back up and restore

@@ -276,7 +276,8 @@ async fn danh_sach_co_q_va_goi_y_qua_cung_chot() {
         drop(held);
         // …và gợi ý hết chỗ không chặn tìm kiếm.
         let suggesting = &content.search_cache.suggest_limits;
-        let held = (suggesting.admit(None, 100, 2).unwrap(), suggesting.admit(None, 100, 2).unwrap());
+        let held =
+            (suggesting.admit(None, 100, 2).unwrap(), suggesting.admit(None, 100, 2).unwrap());
         let busy = suggest.suggest(&tenant, &site, "en", "da lat", 5).await;
         assert_eq!(busy.unwrap_err().code(), "content.public_search_busy");
         let page = content.public_posts_for(&tenant, &searching, &first, None).await.unwrap();
