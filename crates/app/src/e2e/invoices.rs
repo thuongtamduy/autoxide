@@ -1002,9 +1002,6 @@ async fn dieu_chinh_nam_sau_tu_chon_day_so_dung_nam() {
         let (status, old_series) = call(&app, "POST", "/series", Some(old)).await;
         assert_eq!(status, StatusCode::CREATED, "{old_series}");
         let new_symbol = format!("1C{:02}TAA", today.year() % 100);
-        let new = json!({"kind": "vat_invoice", "symbol": new_symbol, "year": today.year()});
-        let (status, _) = call(&app, "POST", "/series", Some(new)).await;
-        assert_eq!(status, StatusCode::CREATED);
         let line = json!({"description": "Service", "kind": "service", "quantity": "1",
             "unit_price": {"amount": "100000", "currency": "VND"}, "tax_category": "vat.standard"});
         let body = json!({"kind": "vat_invoice", "currency": "VND", "reference": "Y-1", "issue_date": format!("{last}-12-20"),
@@ -1019,6 +1016,14 @@ async fn dieu_chinh_nam_sau_tu_chon_day_so_dung_nam() {
         let (status, adjusted) = call(&app, "POST", &format!("/documents/{id}/adjust"), Some(adjust)).await;
         assert_eq!(status, StatusCode::CREATED, "{adjusted}");
         let draft = adjusted["data"]["id"].as_str().unwrap();
+        // Chưa có dãy của năm lập: lỗi nêu năm thiếu dãy (D-20261127-no-active-series-code).
+        let (status, refused) = call(&app, "POST", &format!("/documents/{draft}/issue"), None).await;
+        assert_eq!(status, StatusCode::CONFLICT, "{refused}");
+        assert_eq!(refused["code"], "invoices.no_active_series");
+        assert!(refused["detail"].as_str().unwrap().contains(&today.year().to_string()), "{refused}");
+        let new = json!({"kind": "vat_invoice", "symbol": new_symbol, "year": today.year()});
+        let (status, _) = call(&app, "POST", "/series", Some(new)).await;
+        assert_eq!(status, StatusCode::CREATED);
         let (status, issued) = call(&app, "POST", &format!("/documents/{draft}/issue"), None).await;
         assert_eq!(status, StatusCode::OK, "{issued}");
         assert_eq!(issued["data"]["symbol"], new_symbol.as_str(), "{issued}");
@@ -1073,6 +1078,45 @@ async fn huy_lai_sau_khi_dao_but_toan_hong_van_dao_dung_mot_lan() {
         }
         let reversals = ledger.references().iter().filter(|found| **found == reference).count();
         assert_eq!(reversals, 1, "{:?}", ledger.references());
+    })
+    .await
+    .unwrap();
+}
+
+/// Huỷ gọi đồng thời rồi gọi lại với sổ cái thật (kiểm độc lập #575, M1): mọi lần gọi trả `cancelled`, bút toán
+/// phát hành bị đảo đúng một lần — đảo hai lần thì công nợ âm, bỏ sót thì công nợ còn nguyên.
+#[tokio::test]
+async fn huy_dong_thoi_va_goi_lai_dao_but_toan_dung_mot_lan() {
+    TestDatabase::run(async |test| {
+        let Setup { app, .. } = setup(test).await;
+        series(&app, "vat_invoice", "1C26TAA", None).await;
+        let tenant = app.default_tenant();
+        let first = draft(&app, "CC-1", 100_000).await;
+        let issued = invoices(&app).issue(&tenant, Actor::system(), first.id).await.unwrap();
+        assert_eq!(balance(&app, &tenant, "receivable.customer").await, issued.total.minor());
+        let tasks: Vec<_> = (0..6)
+            .map(|_| {
+                let (service, tenant) = (invoices(&app), tenant.clone());
+                tokio::spawn(async move {
+                    service
+                        .cancel(&tenant, Actor::system(), first.id, "Wrong buyer".to_owned())
+                        .await
+                })
+            })
+            .collect();
+        for task in tasks {
+            let cancelled = task.await.unwrap().unwrap();
+            assert_eq!(cancelled.status, "cancelled");
+        }
+        assert_eq!(balance(&app, &tenant, "receivable.customer").await, 0);
+        assert_eq!(balance(&app, &tenant, "revenue.sales").await, 0);
+        // Gọi lại sau khi đã xong: không đảo thêm.
+        let again = invoices(&app)
+            .cancel(&tenant, Actor::system(), first.id, "Wrong buyer".to_owned())
+            .await
+            .unwrap();
+        assert_eq!(again.status, "cancelled");
+        assert_eq!(balance(&app, &tenant, "receivable.customer").await, 0);
     })
     .await
     .unwrap();

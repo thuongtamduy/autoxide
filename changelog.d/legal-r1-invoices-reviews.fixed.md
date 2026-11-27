@@ -12,3 +12,6 @@
   (once, reference `plans:<period>:void`). Adjustments and replacements, also when their draft is edited, are taxed
   at the date of the invoice they correct. A tenant whose jurisdiction has no `moderation.hide_reasons` rule is not
   limited when hiding reviews.
+- Cancelling an already cancelled document again now finishes the ledger reversal if it failed the first time
+  (exactly one reversal, also under concurrent calls). Voiding a billing period whose invoice was already
+  replaced or corrected by another document logs a warning instead of retrying.

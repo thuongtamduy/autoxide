@@ -177,7 +177,7 @@ async fn chung_tu_ngoai_te_chup_ti_gia_khi_phat_hanh() {
         // PATCH đã xong trước thì hoá đơn mang tổng mới.
         let draft_line = |price: i64| {
             json!({"lines": [{"description": "Tư vấn", "kind": "service", "quantity": "1",
-                "unit_price": {"amount": format!("{}.{:02}", price / 100, price % 100), "currency": "USD"},
+                "unit_price": {"amount": price.to_string(), "currency": "USD"},
                 "tax_category": "vat.standard"}]})
         };
         let business = Buyer::business("Foreign Buyer Ltd", "0101234567");
