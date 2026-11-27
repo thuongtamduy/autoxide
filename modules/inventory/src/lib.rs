@@ -8,6 +8,7 @@ pub mod api;
 mod config;
 mod contract;
 mod counts;
+mod delivery;
 mod entity;
 mod errors;
 mod events;

@@ -3,6 +3,7 @@
 //! chỉ dùng qua `api`).
 
 mod alerts;
+mod delivery;
 mod documents;
 mod levels;
 mod lots;

@@ -750,6 +750,18 @@ impl InventoryService {
         tenant: &TenantContext,
         request: &FulfilRequest,
     ) -> Result<Reservation, Error> {
+        self.fulfil_with(tenant, request, None).await
+    }
+
+    /// [`Self::fulfil`]; `delivery`: xuất theo event giao hàng — dòng tính trong transaction (`delivery::plan`),
+    /// được lấy lô quá hạn, chỗ giữ đã xuất hết là xong.
+    pub(crate) async fn fulfil_with(
+        &self,
+        tenant: &TenantContext,
+        request: &FulfilRequest,
+        delivery: Option<&[crate::delivery::DeliveredLine]>,
+    ) -> Result<Reservation, Error> {
+        let allow_expired = delivery.is_some();
         let mut problems = Vec::new();
         let key = Reference::checked(&request.fulfilment_key, "fulfilment_key", &mut problems);
         for (index, line) in request.lines.iter().enumerate() {
@@ -762,7 +774,10 @@ impl InventoryService {
         }
         fail_if_any(problems)?;
         let Some(key) = key else { return Err(Error::internal("key checked without a problem")) };
-        let fingerprint = reference::fingerprint(&request.lines)?;
+        let fingerprint = match delivery {
+            Some(wanted) => reference::fingerprint(&wanted)?,
+            None => reference::fingerprint(&request.lines)?,
+        };
         // Cờ lô / serial của các biến thể trong chỗ giữ: hỏi `Catalog` TRƯỚC transaction.
         let variant_ids: Vec<Uuid> =
             match find_by_order(tenant.database().read(), tenant, request.order_id, false).await? {
@@ -801,9 +816,9 @@ impl InventoryService {
                     return load(&transaction, tenant, row).await;
                 }
                 let status = status_of(&row)?;
-                // "Xuất phần còn lại" khi đã xuất hết: không còn gì để xuất (vd lần giao lẻ tới trước phần còn
-                // lại của đơn, UT-1).
-                if request.lines.is_empty() && status == ReservationStatus::Fulfilled {
+                // Event giao hàng tới khi chỗ giữ đã xuất hết (tới lại, hay sau lần giao khác): không còn gì để xuất.
+                if delivery.is_some() && status == ReservationStatus::Fulfilled {
+                    tracing::debug!(order_id = %order, "reservation already fulfilled; nothing to issue");
                     return load(&transaction, tenant, row).await;
                 }
                 if !matches!(status, ReservationStatus::Held | ReservationStatus::Confirmed) {
@@ -815,6 +830,20 @@ impl InventoryService {
                     .order_by_asc(reservation_line::Column::Id)
                     .all(&transaction)
                     .await?;
+                let planned;
+                let request = match delivery {
+                    Some(wanted) => {
+                        let lines =
+                            crate::delivery::plan(&transaction, tenant, order, &lines, variants, wanted)
+                                .await?;
+                        if lines.is_empty() {
+                            return load(&transaction, tenant, row).await;
+                        }
+                        planned = FulfilRequest::new(order, key.as_str(), lines);
+                        &planned
+                    }
+                    None => request,
+                };
                 let takes = takes(&lines, request)?;
                 let mut ordered: Vec<(&reservation_line::Model, i64)> =
                     takes.iter().map(|(index, quantity)| (&lines[*index], *quantity)).collect();
@@ -843,6 +872,7 @@ impl InventoryService {
                         serials,
                         serial_status: "sold",
                         order: Some(order),
+                        allow_expired,
                     };
                     let new = NewMovement {
                         org: line.org_id,

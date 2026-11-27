@@ -69,10 +69,18 @@ Module `orders` holds stock through `autoxide_inventory::api::Inventory`:
 2. `confirm` — the order was placed: the reservation no longer expires.
 3. `fulfil` — ship some or all reserved units (`fulfilment_key` makes it safe to retry); writes `sale` lines.
    With module `orders`, stock leaves when the goods reach the buyer: `inventory` listens to
-   `orders.fulfillment_delivered` (one shipment of a split order; key `fulfillment:<id>`) and
-   `orders.order_delivered` (the rest; key `order:<id>:delivered`), so `on_hand` and `reserved` drop and the
-   order becomes `fulfilled`. Units on the way stay reserved (already out of `available`). Serial-tracked
-   goods need their serial numbers: issue them through `fulfil` yourself (the event logs a warning).
+   `orders.fulfillment_delivered` (one shipment; key `fulfillment:<id>`) and `orders.order_delivered` (the units no
+   shipment carried, `after.delivered_lines`; key `order:<id>:delivered`), so `on_hand` and `reserved` drop and the
+   order becomes `fulfilled`. Units on the way stay reserved (already out of `available`). Each line issues at most
+   what is still held, so events arriving twice, late or in any order never issue more; an event for a reservation
+   already `fulfilled` is done. Because the goods are already gone, this path may take units from an expired lot
+   when the lots still in date are not enough (logged as a warning); a manual `fulfil` never does.
+   Serial-tracked goods issue with the serial numbers recorded on the order line
+   (`POST /api/v1/orders/{id}/lines/{line_id}/serials`) that are still in stock; units without a recorded serial
+   stay reserved (logged as a warning) while the other lines are issued, and recording the serials later
+   (`orders.line_serials_recorded`) issues them. Limitation: when one line is reserved in several warehouses,
+   serials are matched warehouse by warehouse in order; a serial held in another warehouse makes that issue fail
+   (logged) and the line stays reserved — issue it yourself through `fulfil`.
 4. `release` — give back what was not shipped (cancelled, payment failed…). Releasing twice adds back once.
 5. `restock` — returned goods come back in (`reference` such as `return:<id>`); unsellable lines are only recorded.
 

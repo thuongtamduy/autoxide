@@ -422,6 +422,7 @@ impl InventoryService {
                         serials: serial_tracked.then_some(line.serials.as_slice()),
                         serial_status: "written_off",
                         order: None,
+                        allow_expired: false,
                     };
                     let (rows, _) =
                         crate::lots::record_out(&transaction, tenant, &mut touched, new, &tracking)

@@ -21,7 +21,7 @@ use uuid::Uuid;
 
 use crate::api::OrderStatus;
 use crate::carts::ShipTo;
-use crate::entity::{fulfillment, line, order};
+use crate::entity::{fulfillment, line, line_serial, order};
 use crate::errors;
 use crate::events::{Change, FulfillmentDelivered, FulfillmentRequested};
 use crate::lifecycle::{self, Cause, Transition};
@@ -91,6 +91,57 @@ pub(crate) fn cancelled_value(lines: &[line::Model]) -> Result<i64, Error> {
 pub(crate) fn all_delivered(lines: &[line::Model], rows: &[fulfillment::Model]) -> bool {
     let delivered = shipped(rows, &[DELIVERED]);
     lines.iter().filter(|line| line.requires_shipping).all(|line| remaining(line, &delivered) <= 0)
+}
+
+/// Số serial đã ghi của mỗi dòng đơn (theo thứ tự ghi) — kho xuất hàng theo serial bằng các số này.
+pub(crate) async fn serials_by_line(
+    connection: &impl ConnectionTrait,
+    tenant: &TenantContext,
+    order_id: Uuid,
+) -> Result<HashMap<Uuid, Vec<String>>, Error> {
+    let rows = line_serial::Entity::find()
+        .filter(line_serial::Column::OrderId.eq(order_id))
+        .scoped(tenant)
+        .order_by_asc(line_serial::Column::CreatedAt)
+        .order_by_asc(line_serial::Column::Serial)
+        .all(connection)
+        .await?;
+    let mut by_line: HashMap<Uuid, Vec<String>> = HashMap::new();
+    for row in rows {
+        by_line.entry(row.line_id).or_default().push(row.serial);
+    }
+    Ok(by_line)
+}
+
+/// Đơn vị đã tới tay người mua của mỗi dòng (theo các lần giao `delivered`).
+pub(crate) fn delivered_units(rows: &[fulfillment::Model]) -> HashMap<Uuid, i64> {
+    shipped(rows, &[DELIVERED])
+}
+
+/// `delivered_lines` của `orders.order_delivered`: phần mỗi dòng (trừ đã huỷ) chưa đi theo lần giao nào đã
+/// tới tay người mua — các lần đó đã có `orders.fulfillment_delivered` riêng. Kho xuất đúng phần này.
+pub(crate) async fn undelivered_lines(
+    connection: &impl ConnectionTrait,
+    tenant: &TenantContext,
+    order_id: Uuid,
+) -> Result<Vec<Value>, Error> {
+    let lines = line::Entity::find()
+        .filter(line::Column::OrderId.eq(order_id))
+        .scoped(tenant)
+        .order_by_asc(line::Column::Id)
+        .all(connection)
+        .await?;
+    let delivered = delivered_units(&fulfillments_of(connection, tenant, order_id).await?);
+    let serials = serials_by_line(connection, tenant, order_id).await?;
+    Ok(lines
+        .iter()
+        .map(|line| (line, remaining(line, &delivered)))
+        .filter(|(_, quantity)| *quantity > 0)
+        .map(|(line, quantity)| {
+            json!({"line_key": line.line_key, "quantity": quantity,
+                "serials": serials.get(&line.id).cloned().unwrap_or_default()})
+        })
+        .collect())
 }
 
 pub(crate) async fn fulfillments_of(
@@ -293,29 +344,36 @@ impl OrdersService {
         let rows = fulfillments_of(transaction, tenant, order_id).await?;
         // Đơn cũ chưa có lần giao nào (yêu cầu trước khi có bảng này): theo vận đơn như trước.
         let complete = rows.is_empty() || all_delivered(&lines, &rows);
-        // Đơn giao xong hết thì `orders.order_delivered` mang phần còn lại; chỉ lần giao lẻ cần event riêng.
+        // Mỗi lần giao tới tay người mua có event riêng (kể cả lần cuối): kho xuất đúng phần của nó;
+        // `orders.order_delivered` chỉ mang phần chưa đi theo lần giao nào.
+        let serials = if arrived.is_empty() {
+            HashMap::new()
+        } else {
+            serials_by_line(transaction, tenant, order_id).await?
+        };
+        for row in arrived {
+            let delivered: Vec<Value> = lines_of(&row)
+                .iter()
+                .filter_map(|shipped| {
+                    let line = lines.iter().find(|line| line.id == shipped.line_id)?;
+                    Some(json!({"line_key": line.line_key, "quantity": shipped.quantity,
+                        "serials": serials.get(&line.id).cloned().unwrap_or_default()}))
+                })
+                .collect();
+            let event = FulfillmentDelivered(Change::after(json!({
+                "order_id": order_id, "fulfillment_id": row.id, "lines": delivered,
+            })));
+            self.outbox
+                .record(
+                    transaction,
+                    tenant,
+                    Actor::system(),
+                    Some(format!("orders.order:{order_id}")),
+                    &event,
+                )
+                .await?;
+        }
         if !complete {
-            for row in arrived {
-                let delivered: Vec<Value> = lines_of(&row)
-                    .iter()
-                    .filter_map(|shipped| {
-                        let line = lines.iter().find(|line| line.id == shipped.line_id)?;
-                        Some(json!({"line_key": line.line_key, "quantity": shipped.quantity}))
-                    })
-                    .collect();
-                let event = FulfillmentDelivered(Change::after(json!({
-                    "order_id": order_id, "fulfillment_id": row.id, "lines": delivered,
-                })));
-                self.outbox
-                    .record(
-                        transaction,
-                        tenant,
-                        Actor::system(),
-                        Some(format!("orders.order:{order_id}")),
-                        &event,
-                    )
-                    .await?;
-            }
             order::Entity::update_many()
                 .col_expr(order::Column::FulfillmentStatus, "partial".into())
                 .filter(order::Column::Id.eq(order_id))

@@ -46,6 +46,7 @@ event!(OrderCompleted, names::ORDER_COMPLETED);
 event!(PaymentRecorded, names::PAYMENT_RECORDED);
 event!(FulfillmentRequested, names::FULFILLMENT_REQUESTED);
 event!(FulfillmentDelivered, names::FULFILLMENT_DELIVERED);
+event!(LineSerialsRecorded, names::LINE_SERIALS_RECORDED);
 event!(RefundCompleted, names::REFUND_COMPLETED);
 event!(PickupReady, names::PICKUP_READY);
 event!(PreorderDelayed, names::PREORDER_DELAYED);
@@ -91,7 +92,11 @@ pub(crate) fn all() -> Vec<EventInfo> {
         ),
         EventInfo::new(
             names::FULFILLMENT_DELIVERED,
-            "One shipment of a split order reached the buyer; `after.lines` are the units it carried.",
+            "One shipment of an order reached the buyer; `after.lines` are the units it carried.",
+        ),
+        EventInfo::new(
+            names::LINE_SERIALS_RECORDED,
+            "Serial numbers were recorded for an order line whose goods already reached the buyer.",
         ),
         EventInfo::new(
             names::RETURN_PICKUP_REQUESTED,

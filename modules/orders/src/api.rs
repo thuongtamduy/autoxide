@@ -45,12 +45,16 @@ pub mod events {
     pub const ORDER_STATUS_CHANGED: &str = "orders.order_status_changed";
     /// An order cancelled: holders release their holds. `after`: `order_id`, `hold_reference`, `cause`.
     pub const ORDER_CANCELLED: &str = "orders.order_cancelled";
-    /// An order fully delivered. `inventory` issues the stock still held for it (`sale` lines).
+    /// An order fully delivered. `after.delivered_lines` (`line_key`, `quantity`, `serials`) are the units no
+    /// shipment carried (`orders.fulfillment_delivered` covers those); `inventory` issues them (`sale` lines).
     pub const ORDER_DELIVERED: &str = "orders.order_delivered";
-    /// One shipment of an order split in several reached the buyer while other units are still on the way:
-    /// `after.order_id`, `after.fulfillment_id`, `after.lines` (`line_key`, `quantity`). `inventory` issues
-    /// these units (`sale` lines); the rest goes with `orders.order_delivered`.
+    /// One shipment of an order reached the buyer: `after.order_id`, `after.fulfillment_id`, `after.lines`
+    /// (`line_key`, `quantity`, `serials` recorded for the line). `inventory` issues these units (`sale` lines).
     pub const FULFILLMENT_DELIVERED: &str = "orders.fulfillment_delivered";
+    /// Serial numbers were recorded for a line whose goods already reached the buyer: `after.order_id`,
+    /// `after.line_id`, `after.line_key`, `after.delivered_quantity`, `after.serials` (every serial of the
+    /// line). `inventory` issues the serial-tracked units it still held for want of serial numbers.
+    pub const LINE_SERIALS_RECORDED: &str = "orders.line_serials_recorded";
     /// An order completed (return window over, no longer deferred): the trigger for commission, points, seller payout.
     pub const ORDER_COMPLETED: &str = "orders.order_completed";
     /// A request to ship a parcel: `after.shipment` is the `ShipmentRequest` of `shipping`.

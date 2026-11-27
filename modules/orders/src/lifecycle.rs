@@ -303,6 +303,13 @@ pub(crate) async fn emit(
             outbox.record(transaction, tenant, actor, subject, &OrderCancelled(change)).await
         }
         Delivered => {
+            // Phần mỗi dòng chưa đi theo lần giao lẻ nào (kho xuất đúng phần này, kèm serial đã ghi).
+            let mut change = change;
+            if let Some(after) = change.after.as_mut() {
+                after["delivered_lines"] = json!(
+                    crate::fulfillments::undelivered_lines(transaction, tenant, order.id).await?
+                );
+            }
             outbox.record(transaction, tenant, actor, subject, &OrderDelivered(change)).await
         }
         Completed => {

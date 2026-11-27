@@ -135,7 +135,7 @@ async fn don_tron_hang_san_va_dat_truoc_tach_hai_lan_giao() {
         assert_eq!(count_events(&shop, "orders.fulfillment_delivered").await, 1);
         let shirt_line = line_of(&shop, id, shirt).await;
         let arrived = fulfillment_delivered(&shop).await;
-        assert_eq!(arrived["lines"], json!([{"line_key": shirt_line.line_key, "quantity": 1}]), "{arrived}");
+        assert_eq!(arrived["lines"], json!([{"line_key": shirt_line.line_key, "quantity": 1, "serials": []}]), "{arrived}");
         assert_eq!(found["data"]["fulfillment_status"], "partial");
         // Hàng chưa về: không có gì để giao.
         let (status, error) = ship(&shop, id).await;
@@ -157,8 +157,8 @@ async fn don_tron_hang_san_va_dat_truoc_tach_hai_lan_giao() {
         assert_eq!(status_of(&shop, id).await, "delivered");
         let (_, found) = Call::as_user(&shop, "boss").send("GET", &format!("/{id}"), None).await;
         assert_eq!(found["data"]["payment_status"], "paid");
-        // Lần cuối: phần còn lại đi theo `orders.order_delivered`, không thêm event lần giao lẻ.
-        assert_eq!(count_events(&shop, "orders.fulfillment_delivered").await, 1);
+        // Lần cuối cũng có event riêng; `orders.order_delivered` không còn phần nào chưa đi theo lần giao.
+        assert_eq!(count_events(&shop, "orders.fulfillment_delivered").await, 2);
         assert_eq!(count_events(&shop, "orders.order_delivered").await, 1);
         assert_eq!(found["data"]["fulfillment_status"], "fulfilled");
         assert_eq!(minor(&found["data"]["totals"]["paid"]), 330_000);

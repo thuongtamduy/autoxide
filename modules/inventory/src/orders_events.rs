@@ -7,8 +7,9 @@
 //! | `orders.order_confirmed` | `confirm(order_id)` | `order_id` |
 //! | `orders.order_cancelled` | `release(order_id, Cancelled)` | `order_id` |
 //! | `orders.preorder_cancelled` | `release_lines(order_id, reference = event id)` — trả riêng các dòng | `order_id`, `lines[{line_key, quantity}]` (phần huỷ lần đó) |
-//! | `orders.fulfillment_delivered` | `fulfil`, `fulfilment_key = fulfillment:<fulfillment_id>` — một lần giao lẻ tới tay người mua | `order_id`, `fulfillment_id`, `lines[{line_key, quantity}]` |
-//! | `orders.order_delivered` | `fulfil` phần còn giữ, `fulfilment_key = order:<order_id>:delivered` (UT-1) | `order_id` |
+//! | `orders.fulfillment_delivered` | xuất (`delivery`), `fulfilment_key = fulfillment:<fulfillment_id>` — một lần giao tới tay người mua | `order_id`, `fulfillment_id`, `lines[{line_key, quantity, serials[]}]` |
+//! | `orders.order_delivered` | xuất (`delivery`) `delivered_lines` (event cũ không có: phần còn giữ của mọi dòng), `fulfilment_key = order:<order_id>:delivered` (UT-1) | `order_id`, `delivered_lines[{line_key, quantity, serials[]}]` |
+//! | `orders.line_serials_recorded` | xuất (`delivery`) phần đã giao của dòng mà trước đó thiếu serial, `fulfilment_key = serials:<line_id>:<số serial>` | `order_id`, `line_id`, `line_key`, `delivered_quantity`, `serials[]` |
 //! | `orders.return_received` | `restock`, `reference = return:<return_id>` | `return_id`, `order_id`, `warehouse_org_id`, `lines[{variant_id, quantity, sellable, lot_code?, serials[]}]` |
 
 use std::sync::Arc;
@@ -20,7 +21,8 @@ use serde::Deserialize;
 use serde_json::Value;
 use uuid::Uuid;
 
-use crate::api::{FulfilLine, FulfilRequest, ReleaseReason, RestockLine, RestockRequest};
+use crate::api::{FulfilRequest, ReleaseReason, RestockLine, RestockRequest};
+use crate::delivery::{DeliveredLine, Want};
 use crate::partial::CancelledLine;
 use crate::service::InventoryService;
 
@@ -30,6 +32,7 @@ pub(crate) const RETURN_RECEIVED: &str = "orders.return_received";
 pub(crate) const PREORDER_CANCELLED: &str = "orders.preorder_cancelled";
 pub(crate) const ORDER_DELIVERED: &str = "orders.order_delivered";
 pub(crate) const FULFILLMENT_DELIVERED: &str = "orders.fulfillment_delivered";
+pub(crate) const LINE_SERIALS_RECORDED: &str = "orders.line_serials_recorded";
 
 pub(crate) fn subscriptions(service: &Arc<InventoryService>) -> Vec<Subscription> {
     let listener = Arc::new(OrderEvents(service.clone()));
@@ -40,7 +43,8 @@ pub(crate) fn subscriptions(service: &Arc<InventoryService>) -> Vec<Subscription
         Subscription::optional(PREORDER_CANCELLED, listener.clone()),
         // Hàng tới tay người mua thì rời kho: ghi dòng `sale` (UT-1).
         Subscription::optional(FULFILLMENT_DELIVERED, listener.clone()),
-        Subscription::optional(ORDER_DELIVERED, listener),
+        Subscription::optional(ORDER_DELIVERED, listener.clone()),
+        Subscription::optional(LINE_SERIALS_RECORDED, listener),
     ]
 }
 
@@ -79,12 +83,53 @@ struct CancelledLineIn {
     quantity: i64,
 }
 
+/// Một dòng đã giao trong `orders.fulfillment_delivered` / `orders.order_delivered`.
+#[derive(Debug, Deserialize)]
+struct ArrivedLine {
+    line_key: String,
+    quantity: i64,
+    #[serde(default)]
+    serials: Vec<String>,
+}
+
+impl ArrivedLine {
+    fn wanted(self) -> DeliveredLine {
+        DeliveredLine::new(self.line_key, Want::More(self.quantity), self.serials)
+    }
+}
+
 /// `after` của `orders.fulfillment_delivered`.
 #[derive(Debug, Deserialize)]
 struct Arrived {
     order_id: Uuid,
     fulfillment_id: Uuid,
-    lines: Vec<CancelledLineIn>,
+    lines: Vec<ArrivedLine>,
+}
+
+/// Một dòng đơn trong `after.lines` của event đơn.
+#[derive(Debug, Deserialize)]
+struct OrderLine {
+    line_key: String,
+}
+
+/// `after` của `orders.order_delivered`.
+#[derive(Debug, Deserialize)]
+struct OrderArrived {
+    order_id: Uuid,
+    /// Có từ bản sửa UT-1: phần mỗi dòng chưa đi theo lần giao lẻ nào.
+    delivered_lines: Option<Vec<ArrivedLine>>,
+    #[serde(default)]
+    lines: Vec<OrderLine>,
+}
+
+/// `after` của `orders.line_serials_recorded`.
+#[derive(Debug, Deserialize)]
+struct SerialsRecorded {
+    order_id: Uuid,
+    line_id: Uuid,
+    line_key: String,
+    delivered_quantity: i64,
+    serials: Vec<String>,
 }
 
 /// `after` của `orders.preorder_cancelled`.
@@ -156,27 +201,46 @@ impl EventHandler for OrderEvents {
                 settle(event, outcome)
             }
             ORDER_DELIVERED => {
-                let Some(order) = order_id(after) else { return Ok(()) };
-                let request =
-                    FulfilRequest::new(order, format!("order:{order}:delivered"), Vec::new());
-                let outcome = self.0.fulfil(tenant, &request).await.map(|_| ());
-                Self::issued(event, outcome)
+                let Ok(arrived) = serde_json::from_value::<OrderArrived>(after.clone()) else {
+                    tracing::warn!(event_id = %event.id, "orders.order_delivered without the fields inventory reads; ignored");
+                    return Ok(());
+                };
+                let wanted: Vec<DeliveredLine> = match arrived.delivered_lines {
+                    Some(lines) => lines.into_iter().map(ArrivedLine::wanted).collect(),
+                    // Event cũ: phần còn giữ của mọi dòng.
+                    None if arrived.lines.is_empty() => vec![DeliveredLine::all()],
+                    None => arrived
+                        .lines
+                        .into_iter()
+                        .map(|line| DeliveredLine::new(line.line_key, Want::Remainder, Vec::new()))
+                        .collect(),
+                };
+                let key = format!("order:{}:delivered", arrived.order_id);
+                self.issue(event, arrived.order_id, key, &wanted).await
             }
             FULFILLMENT_DELIVERED => {
                 let Ok(arrived) = serde_json::from_value::<Arrived>(after.clone()) else {
                     tracing::warn!(event_id = %event.id, "orders.fulfillment_delivered without the fields inventory reads; ignored");
                     return Ok(());
                 };
-                let lines = arrived
-                    .lines
-                    .into_iter()
-                    .filter(|line| line.quantity > 0)
-                    .map(|line| FulfilLine::new(line.line_key, line.quantity))
-                    .collect();
+                let wanted: Vec<DeliveredLine> =
+                    arrived.lines.into_iter().map(ArrivedLine::wanted).collect();
                 let key = format!("fulfillment:{}", arrived.fulfillment_id);
-                let request = FulfilRequest::new(arrived.order_id, key, lines);
-                let outcome = self.0.fulfil(tenant, &request).await.map(|_| ());
-                Self::issued(event, outcome)
+                self.issue(event, arrived.order_id, key, &wanted).await
+            }
+            LINE_SERIALS_RECORDED => {
+                let Ok(recorded) = serde_json::from_value::<SerialsRecorded>(after.clone()) else {
+                    tracing::warn!(event_id = %event.id, "orders.line_serials_recorded without the fields inventory reads; ignored");
+                    return Ok(());
+                };
+                // Serial chỉ thêm, không xoá: số serial sau lần ghi định danh lần xuất này.
+                let key = format!("serials:{}:{}", recorded.line_id, recorded.serials.len());
+                let wanted = [DeliveredLine::new(
+                    recorded.line_key,
+                    Want::UpTo(recorded.delivered_quantity),
+                    recorded.serials,
+                )];
+                self.issue(event, recorded.order_id, key, &wanted).await
             }
             PREORDER_CANCELLED => {
                 let Ok(cancelled) = serde_json::from_value::<Cancelled>(after.clone()) else {
@@ -202,9 +266,20 @@ impl EventHandler for OrderEvents {
 }
 
 impl OrderEvents {
-    /// Kết quả xuất kho theo event giao hàng: đơn không có chỗ giữ (hàng số, dịch vụ) là xong, không cảnh báo;
-    /// lỗi nghiệp vụ khác như [`settle`] (vd hàng theo serial cần nhân viên nhập số serial — xuất tay qua REST).
-    fn issued(event: &Delivered, outcome: Result<(), Error>) -> Result<(), Error> {
+    /// Xuất kho theo event giao hàng (`delivery`): đơn không có chỗ giữ (hàng số, dịch vụ) là xong, không cảnh
+    /// báo; lỗi nghiệp vụ khác như [`settle`].
+    async fn issue(
+        &self,
+        event: &Delivered,
+        order: Uuid,
+        key: String,
+        wanted: &[DeliveredLine],
+    ) -> Result<(), Error> {
+        if wanted.is_empty() {
+            return Ok(());
+        }
+        let request = FulfilRequest::new(order, key, Vec::new());
+        let outcome = self.0.fulfil_with(&event.tenant, &request, Some(wanted)).await.map(|_| ());
         if let Err(error) = &outcome
             && error.code() == "inventory.reservation_not_found"
         {
