@@ -3,10 +3,12 @@
   `einvoice.cancel_after_submission`, pack `vn` version 3), pointing to an adjustment or a replacement. Before, every
   cancellation through SePay failed with `not_supported`. An e-invoice the tax authority rejected is cancelled locally.
 - Order documents (`GET …/orders/me/orders/{id}/documents` and the staff and guest variants) have
-  `differs_from_order`: `true` when the invoice applies a different tax rate than the order settled for at least one
-  line, e.g. when the VAT rate changed between ordering and invoicing (rounding differences do not count).
+  `differs_from_order`: `true` when the tax of an invoice line, or the invoice total, differs from what the order
+  settled by more than one minor unit per line (e.g. when the VAT rate changed between ordering and invoicing), and
+  always for an order mixing tax-inclusive and tax-exclusive prices, which one invoice cannot carry exactly.
 - The invoice of an order priced without tax now carries the shipping fee at its pre-tax amount: the order treats the
-  shipping fee as tax-inclusive, and before the invoice added the tax a second time.
+  shipping fee as tax-inclusive, and before the invoice added the tax a second time. The invoice total can still
+  differ from the order total by one minor unit from rounding the shipping tax again.
 - Hiding a product review in `orders` now asks the legal rule `moderation.hide_reasons` (module `compliance`) through
   `ModerationPolicy`, which moved to `autoxide_kernel::moderation` (still re-exported by `autoxide_compliance::api`);
   a reason a tenant added to its own list can no longer hide a review.
@@ -17,7 +19,5 @@
 - Cancelling an already cancelled document again now finishes the ledger reversal if it failed the first time
   (exactly one reversal, also under concurrent calls). Voiding a billing period whose invoice was already
   replaced or corrected by another document logs a warning instead of retrying.
-- An e-invoice provider that cannot cancel a sent invoice (SePay eInvoice, e.g. when the seller has no tax profile)
-  now gives `409 invoices.einvoice_cancel_unsupported`, pointing to an adjustment or a replacement, instead of
-  `einvoice.not_supported`. Refusing to hide a review for a reason the legal rule does not allow names the `orders`
-  reason sent and the allowed `orders` reasons.
+- Refusing to hide a review for a reason the legal rule does not allow names the `orders` reason sent and the allowed
+  `orders` reasons.

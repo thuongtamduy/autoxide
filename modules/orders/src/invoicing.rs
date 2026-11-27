@@ -157,14 +157,33 @@ fn tax_category(row: &line::Model) -> String {
         .unwrap_or_else(|| "vat.standard".to_owned())
 }
 
-/// Số đã chốt của một dòng đơn (hay phí giao) để so thuế suất với hoá đơn (LG-10,
-/// D-20261126-invoice-tax-difference): `item_ref` là SKU (`None`: phí giao), `base` là tiền trước thuế, `tax` là
-/// thuế đơn đã tính.
+/// Số đã chốt của một dòng đơn (hay phí giao) để so với hoá đơn (LG-10, D-20261126-invoice-tax-difference):
+/// `item_ref` là SKU (`None`: phí giao); `tax`, `total` là thuế và tổng đơn đã tính cho phần còn lại (sau huỷ
+/// một phần, chia theo số lượng — như dòng hoá đơn).
 #[derive(Debug, Clone)]
-pub(crate) struct SettledLine {
+struct SettledLine {
     item_ref: Option<String>,
-    base: i64,
     tax: i64,
+    total: i64,
+}
+
+/// Số đã chốt của đơn để so với hoá đơn bán của nó.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct Settled {
+    lines: Vec<SettledLine>,
+    /// Đơn trộn dòng giá gồm thuế và chưa thuế: hoá đơn chỉ có một chế độ giá nên không lập đúng được — luôn báo
+    /// khác (kiểm độc lập #575, V5; sửa tận gốc ở lộ trình).
+    mixed_modes: bool,
+}
+
+/// Dòng đơn còn trên hoá đơn (chưa huỷ hết), như lúc lập hoá đơn.
+fn invoiced(line: &line::Model) -> bool {
+    line.quantity > line.cancelled_quantity
+}
+
+/// Chế độ giá của hoá đơn: theo dòng đầu còn trên hoá đơn (dòng huỷ hết không tính).
+fn prices_include_tax(lines: &[line::Model]) -> bool {
+    lines.iter().find(|line| invoiced(line)).is_none_or(|line| line.tax_inclusive)
 }
 
 /// Thuế phí giao đã chốt: thuế của đơn trừ thuế các dòng (đơn tính thuế phí giao riêng, `pricing::apply_tax`).
@@ -172,22 +191,32 @@ fn shipping_tax(row: &order::Model, lines: &[line::Model]) -> i64 {
     (row.tax_minor - lines.iter().map(|line| line.tax_minor).sum::<i64>()).max(0)
 }
 
-/// Số đã chốt từng dòng của đơn `row` (dòng cấp trên `lines`, kể cả dòng huỷ một phần: thuế suất không đổi).
-fn settled_lines(row: &order::Model, lines: &[line::Model]) -> Vec<SettledLine> {
+/// Số đã chốt của đơn `row` (dòng cấp trên `lines`).
+fn settled_lines(row: &order::Model, lines: &[line::Model]) -> Settled {
+    let part = |amount: i64, line: &line::Model| {
+        if line.cancelled_quantity == 0 || line.quantity == 0 {
+            amount
+        } else {
+            amount * (line.quantity - line.cancelled_quantity) / line.quantity
+        }
+    };
     let mut settled: Vec<SettledLine> = lines
         .iter()
+        .filter(|line| invoiced(line))
         .map(|line| SettledLine {
             item_ref: Some(line.sku.clone()),
-            base: line.total_minor - line.tax_minor,
-            tax: line.tax_minor,
+            tax: part(line.tax_minor, line),
+            total: part(line.total_minor, line),
         })
         .collect();
     let shipping_gross = row.shipping_fee_minor - row.shipping_discount_minor;
     if shipping_gross > 0 {
         let tax = shipping_tax(row, lines);
-        settled.push(SettledLine { item_ref: None, base: shipping_gross - tax, tax });
+        settled.push(SettledLine { item_ref: None, tax, total: shipping_gross });
     }
-    settled
+    let mut modes = lines.iter().filter(|line| invoiced(line)).map(|line| line.tax_inclusive);
+    let mixed_modes = modes.next().is_some_and(|first| modes.any(|mode| mode != first));
+    Settled { lines: settled, mixed_modes }
 }
 
 /// [`settled_lines`] của đơn `id`, đọc từ database.
@@ -195,9 +224,9 @@ async fn settled_amounts(
     read: &impl ConnectionTrait,
     tenant: &TenantContext,
     id: Uuid,
-) -> Result<Vec<SettledLine>, Error> {
+) -> Result<Settled, Error> {
     let Some(row) = order::Entity::find_by_id(id).scoped(tenant).one(read).await? else {
-        return Ok(Vec::new());
+        return Ok(Settled::default());
     };
     // Cùng phép lọc với lúc lập hoá đơn: chỉ dòng cấp trên.
     let lines = line::Entity::find()
@@ -214,36 +243,34 @@ fn link_kind_of(kind: &str) -> String {
     if kind == "cash_register_invoice" { "cash_register" } else { "sales" }.to_owned()
 }
 
-/// Hoá đơn bán (không phải điều chỉnh) áp thuế suất khác thuế suất đơn đã chốt cho ít nhất một dòng (LG-10).
-/// So theo thuế suất, không theo tổng tiền: hoá đơn làm tròn thuế theo cách của nó và chỉ có một chế độ giá cho
-/// mọi dòng, nên tổng có thể lệch vài đồng dù thuế suất như nhau (kiểm độc lập #575, V2). Dòng hoá đơn khớp
-/// dòng đơn theo SKU (phí giao: dòng không có mã); thuế đơn đã tính lệch quá 1 đơn vị tiền nhỏ nhất so với
-/// `trước thuế × thuế suất của hoá đơn` thì khác. Dòng không tìm được trong đơn thì bỏ qua.
+/// Hoá đơn bán (không phải điều chỉnh) khác số đơn đã chốt (LG-10): đơn trộn hai chế độ giá; thuế của một dòng
+/// hoá đơn lệch quá [`TOLERANCE`] so với thuế đơn đã tính cho dòng đó (khớp theo SKU, phí giao: dòng không có mã —
+/// so tiền thuế, không so thuế suất: hàng chịu nhiều tầng thuế như TTĐB rồi GTGT có thuế dòng khác `trước thuế ×
+/// suất GTGT`, kiểm độc lập #575, V4); hay tổng hoá đơn lệch tổng đơn quá [`TOLERANCE`] mỗi dòng. Ngưỡng cho phép
+/// hoá đơn làm tròn thuế theo cách của nó (vd phí giao gồm thuế ghi trên hoá đơn giá chưa thuế lệch tối đa 1 đồng).
 pub(crate) fn differs_from_order(
-    settled: &[SettledLine],
+    settled: &Settled,
     link_kind: &str,
     document: Option<&Document>,
 ) -> bool {
     let Some(document) = document.filter(|_| link_kind != "adjustment") else { return false };
-    document.lines.iter().any(|invoice_line| {
-        let rate = invoice_line
-            .rate_percent
-            .as_deref()
-            .and_then(|raw| raw.parse::<rust_decimal::Decimal>().ok())
-            .unwrap_or_default();
-        let candidates: Vec<&SettledLine> = settled
-            .iter()
-            .filter(|line| line.item_ref == invoice_line.item_ref && line.base > 0)
-            .collect();
-        !candidates.is_empty()
-            && candidates.iter().all(|line| {
-                let expected = rust_decimal::Decimal::from(line.base) * rate
-                    / rust_decimal::Decimal::ONE_HUNDRED;
-                (expected - rust_decimal::Decimal::from(line.tax)).abs()
-                    > rust_decimal::Decimal::ONE
-            })
-    })
+    if settled.mixed_modes {
+        return true;
+    }
+    let line_differs = document.lines.iter().any(|invoice_line| {
+        let mut candidates =
+            settled.lines.iter().filter(|line| line.item_ref == invoice_line.item_ref).peekable();
+        candidates.peek().is_some()
+            && candidates.all(|line| (invoice_line.tax.minor() - line.tax).abs() > TOLERANCE)
+    });
+    let expected: i64 = settled.lines.iter().map(|line| line.total).sum();
+    let allowed = TOLERANCE * i64::try_from(settled.lines.len()).unwrap_or(i64::MAX);
+    line_differs
+        || (!settled.lines.is_empty() && (document.total.minor() - expected).abs() > allowed)
 }
+
+/// Lệch do làm tròn được bỏ qua khi so hoá đơn với đơn: 1 đơn vị tiền nhỏ nhất mỗi dòng.
+const TOLERANCE: i64 = 1;
 
 /// Dòng hoá đơn cho `quantity` đơn vị của dòng đơn `row` (khoản giảm chia theo số lượng).
 fn document_line(row: &line::Model, quantity: i64, currency: Currency) -> NewDocumentLine {
@@ -318,7 +345,7 @@ impl OrdersService {
             .map(|row| document_line(row, row.quantity - row.cancelled_quantity, currency))
             .collect();
         // Hoá đơn có một chế độ giá cho mọi dòng (theo dòng đầu); đơn luôn coi phí giao là giá đã gồm thuế.
-        let inclusive = lines.first().is_none_or(|line| line.tax_inclusive);
+        let inclusive = prices_include_tax(&lines);
         if row.shipping_fee_minor > 0 {
             let option: Value = row
                 .shipping_option
@@ -389,7 +416,7 @@ impl OrdersService {
                 document_id = %issued.id,
                 order_tax = row.tax_minor,
                 invoice_tax = issued.tax.minor(),
-                "the invoice applies a tax rate other than the one settled on the order"
+                "the invoice differs from the tax or total settled on the order"
             );
         }
         self.link_issued(tenant, &row, &reference, &issued).await
@@ -623,7 +650,7 @@ impl OrdersService {
         tenant: &TenantContext,
         id: Uuid,
         page: &PageRequest,
-    ) -> Result<(Page<(invoice_link::Model, Option<Document>)>, Vec<SettledLine>), Error> {
+    ) -> Result<(Page<(invoice_link::Model, Option<Document>)>, Settled), Error> {
         let read = tenant.database().read();
         // Theo thứ tự tạo (id UUIDv7 sinh cùng lúc `created_at`), keyset trong database (index
         // `orders_invoice_links_order_page_idx`).
@@ -646,7 +673,7 @@ impl OrdersService {
         tenant: &TenantContext,
         id: Uuid,
         link_id: Uuid,
-    ) -> Result<Option<(invoice_link::Model, Option<Document>, Vec<SettledLine>)>, Error> {
+    ) -> Result<Option<(invoice_link::Model, Option<Document>, Settled)>, Error> {
         let read = tenant.database().read();
         let found = invoice_link::Entity::find_by_id(link_id)
             .filter(invoice_link::Column::OrderId.eq(id))

@@ -238,9 +238,9 @@ async fn hoa_don_lap_khi_giao_xong_va_dieu_chinh_khi_tra_hang() {
         assert_eq!(docs["data"][0]["number"], 1);
         // Hoá đơn khớp số đã chốt của đơn.
         assert_eq!(docs["data"][0]["differs_from_order"], false, "{docs}");
-        // Hoá đơn áp thuế suất khác đơn (vd qua mốc hết giảm GTGT): báo, không lặng lẽ (LG-10). Đơn ở đây không
-        // tính thuế (0%); dòng áo trên hoá đơn mang 10% → khác. Cùng thuế suất (0%) thì không.
-        let invoice_line = |rate: &str| {
+        // Hoá đơn tính thuế khác đơn (vd qua mốc hết giảm GTGT): báo, không lặng lẽ (LG-10). Đơn ở đây không tính
+        // thuế; dòng áo trên hoá đơn mang thuế 0 thì khớp, mang 2.000 đ thì khác; lệch 1 đ (làm tròn) thì không.
+        let invoice_line = |tax: i64| {
             let documents = world.invoices.documents.lock().unwrap();
             let (_, draft) = &documents[0];
             let shirt_line = &draft.lines[0];
@@ -256,17 +256,23 @@ async fn hoa_don_lap_khi_giao_xong_va_dieu_chinh_khi_tra_hang() {
                 discount: money(0),
                 net: price,
                 tax_category: Some("vat.standard".to_owned()),
-                rate_percent: Some(rate.to_owned()),
-                tax: money(0),
-                total: price,
+                rate_percent: Some("10".to_owned()),
+                tax: money(tax),
+                total: money(price.minor() + tax),
             }
         };
-        for (rate, expected) in [("0", false), ("10", true)] {
-            let line = invoice_line(rate);
+        for (tax, expected) in [(0, false), (1, false), (2_000, true)] {
+            let line = invoice_line(tax);
             world.invoices.documents.lock().unwrap()[0].0.lines = vec![line];
             let (_, differs) = buyer.send("GET", &format!("/me/orders/{id}/documents"), None).await;
-            assert_eq!(differs["data"][0]["differs_from_order"], expected, "{rate}: {differs}");
+            assert_eq!(differs["data"][0]["differs_from_order"], expected, "{tax}: {differs}");
         }
+        // Tổng hoá đơn lệch tổng đơn quá ngưỡng (vd đơn trộn hai chế độ giá lập sai): khác.
+        let saved = world.invoices.documents.lock().unwrap()[0].0.total;
+        world.invoices.documents.lock().unwrap()[0].0.total = money(saved.minor() + 15_000);
+        let (_, differs) = buyer.send("GET", &format!("/me/orders/{id}/documents"), None).await;
+        assert_eq!(differs["data"][0]["differs_from_order"], true, "{differs}");
+        world.invoices.documents.lock().unwrap()[0].0.total = saved;
         world.invoices.documents.lock().unwrap()[0].0.lines = Vec::new();
         let document = docs["data"][0]["document_id"].as_str().unwrap().to_owned();
         let answer = shop

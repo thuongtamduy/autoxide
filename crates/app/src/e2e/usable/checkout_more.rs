@@ -17,13 +17,13 @@ use super::kit::{
     promotion_window,
 };
 
-const BUYER: &str = "buyer";
+pub(super) const BUYER: &str = "buyer";
 
 fn vnd(amount: i64) -> Value {
     json!({"amount": amount.to_string(), "currency": "VND"})
 }
 
-async fn activate_product(app: &TestApp, product: &str) {
+pub(super) async fn activate_product(app: &TestApp, product: &str) {
     let answer = app
         .post(&format!("/api/v1/catalog/products/{product}/status"))
         .token(ADMIN)
@@ -36,7 +36,7 @@ async fn activate_product(app: &TestApp, product: &str) {
 }
 
 /// Cửa hàng thu qua cổng giả, giao tiêu chuẩn 30.000đ; trả (app, cổng, biến thể ấm trà, ID bảng giá).
-async fn shop(
+pub(super) async fn shop(
     test: &TestDatabase,
     settings: &[(&str, &str)],
 ) -> (TestApp, Arc<FakePaymentGateway>, String, String) {
@@ -496,69 +496,6 @@ async fn return_url_la_bi_tu_choi_qua_checkout_va_link_thanh_toan() {
         let answer = link("https://shop.example/thanks", "b2").await.unwrap();
         assert_eq!(answer.status(), 200, "{}", answer.text());
         assert_eq!(answer.json()["data"][0]["kind"], "redirect");
-    })
-    .await
-    .unwrap();
-}
-
-/// Bảng giá chưa gồm thuế và có phí giao (kiểm độc lập #575, V2): đơn coi phí giao là giá đã gồm thuế, hoá đơn chỉ có
-/// một chế độ giá — hoá đơn ghi phí giao bằng phần trước thuế nên tổng hoá đơn bằng tổng khách trả, và
-/// `differs_from_order` là `false` khi thuế suất không đổi.
-#[tokio::test]
-async fn gia_chua_thue_co_phi_giao_hoa_don_khop_don() {
-    TestDatabase::run(async |test| {
-        let (app, _gateway, variant, _) = shop(test, &[]).await;
-        let vietnam = autoxide_kernel::time::zone("Asia/Ho_Chi_Minh").unwrap();
-        let year = i32::from(autoxide_kernel::time::Timestamp::now().date_in(&vietnam).year());
-        let series = json!({"kind": "vat_invoice", "symbol": "1C26TAA", "year": year});
-        expect(&app, "POST", "/api/v1/invoices/series", ADMIN, Some(series), 201).await;
-        // Bảng giá chưa thuế, ưu tiên hơn bảng giá gồm thuế của `shop` — lập trước hồ sơ thuế Việt Nam (luật giá cho
-        // người tiêu dùng gồm thuế của `catalog` chỉ áp khi đã có hồ sơ; bảng cũ vẫn dùng được).
-        let list = json!({"name": "Bán buôn", "currency": "VND", "tax_inclusive": false, "priority": 10});
-        let list = id(&expect(&app, "POST", "/api/v1/catalog/price-lists", ADMIN, Some(list), 201).await);
-        let prices = json!({"reference": "net", "prices": [{"variant_id": variant, "amount": vnd(150_000)}]});
-        expect(&app, "POST", &format!("/api/v1/catalog/price-lists/{list}/prices"), ADMIN, Some(prices), 200).await;
-        let root = root_of(DEFAULT_TENANT).as_uuid();
-        let profile = json!({"jurisdiction": "VN", "regime": "vat_credit"});
-        expect(&app, "PUT", &format!("/api/v1/tax/profiles/{root}"), ADMIN, Some(profile), 200).await;
-
-        let cart = id(&expect(&app, "POST", "/api/v1/orders/carts", BUYER, Some(json!({})), 201).await);
-        let path = format!("/api/v1/orders/carts/{cart}");
-        expect(&app, "PUT", &format!("{path}/lines/{variant}"), BUYER, Some(json!({"quantity": 1})), 200).await;
-        let mut delivery = json!({"recipient_name": "An", "phone": "0901234567",
-            "address": {"country": "VN", "province_code": "01", "commune_code": "00004", "line": "12 Tràng Tiền"}});
-        let priced = expect(&app, "PUT", &format!("{path}/delivery"), BUYER, Some(delivery.clone()), 200).await;
-        delivery["shipping_option"] = priced["data"]["shipping"]["options"][0]["option_key"].clone();
-        let priced = expect(&app, "PUT", &format!("{path}/delivery"), BUYER, Some(delivery), 200).await;
-        let body = json!({"cart_id": cart, "quote_token": priced["data"]["quote_token"], "payment_method": "cod",
-                          "contact": {"name": "An", "phone": "0901234567"}});
-        let answer =
-            app.post("/api/v1/orders/checkout").token(BUYER).header("idempotency-key", "net-1").json(body).send().await.unwrap();
-        let placed = answer.json();
-        assert_eq!(answer.status(), 201, "{placed}");
-        let order = placed["data"]["orders"][0]["id"].as_str().unwrap().to_owned();
-        let order_total = placed["data"]["orders"][0]["totals"]["total"]["amount"].clone();
-        // 150.000 + 10% + phí giao 30.000 đã gồm thuế.
-        assert_eq!(order_total, "195000", "{placed}");
-        for to in ["preparing", "shipping", "delivered"] {
-            call_tool(&app, ADMIN, "orders.transition_order", json!({"id": order, "to": to})).await;
-        }
-        drain(&app).await;
-
-        let documents = expect(&app, "GET", &format!("/api/v1/orders/me/orders/{order}/documents"), BUYER, None, 200).await;
-        assert_eq!(documents["data"][0]["differs_from_order"], false, "{documents}");
-        assert_eq!(documents["data"][0]["total"]["amount"], order_total, "{documents}");
-        let document = documents["data"][0]["document_id"].as_str().unwrap().to_owned();
-        let invoice = get(&app, &format!("/api/v1/invoices/documents/{document}")).await;
-        assert_eq!(invoice["data"]["prices_include_tax"], false, "{invoice}");
-        let shipping = invoice["data"]["lines"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .find(|line| line["item_ref"].is_null())
-            .cloned()
-            .unwrap_or_else(|| panic!("{invoice}"));
-        assert_eq!(shipping["total"]["amount"], "30000", "{invoice}");
     })
     .await
     .unwrap();

@@ -73,17 +73,17 @@ pub(crate) struct DocumentResponse {
     total: Option<Money>,
     /// Code to look the invoice up at the tax authority's portal.
     lookup_code: Option<String>,
-    /// `true`: this invoice applies a different tax rate than the one settled on the order for at
-    /// least one line (lines matched by SKU; the shipping fee by its line without an item code) — the
-    /// invoice computes tax at its own date (the tax point), so a rate change between ordering and
-    /// invoicing (e.g. the end of the 8% VAT on 2026-12-31) shows here. Check the invoice and settle
-    /// the difference with the buyer. A difference of one minor unit from rounding does not count.
-    /// Always `false` for an adjustment.
+    /// `true`: this invoice differs from what was settled on the order — the tax of a line (lines
+    /// matched by SKU; the shipping fee by its line without an item code) or the total differs by more
+    /// than one minor unit per line, or the order mixes tax-inclusive and tax-exclusive prices (one
+    /// invoice has a single price mode). The invoice computes tax at its own date (the tax point), so a
+    /// rate change between ordering and invoicing (e.g. the end of the 8% VAT on 2026-12-31) shows here.
+    /// Check the invoice and settle the difference with the buyer. Always `false` for an adjustment.
     differs_from_order: bool,
 }
 
 fn document_response(
-    settled: Vec<crate::invoicing::SettledLine>,
+    settled: crate::invoicing::Settled,
     link: invoice_link::Model,
     document: Option<autoxide_invoices::api::Document>,
 ) -> DocumentResponse {
