@@ -1,0 +1,14 @@
+{
+  "name": "autoxide-mcp-oauth-check",
+  "version": "0.0.0",
+  "private": true,
+  "description": "End-to-end check: the official MCP TypeScript SDK client signs in to a real Autoxide server with OAuth and calls a tool.",
+  "license": "MIT OR Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "check": "node client.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2"
+  }
+}

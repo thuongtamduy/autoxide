@@ -20,6 +20,7 @@ Ví dụ `curl` gửi JSON bằng `--json '…'`, cần curl 7.82 trở lên (`c
 - [Nâng cấp client: mọi danh sách là một trang](list-pages-upgrade.vi.md): `data` + `pagination`, `count`, thứ tự mặc định, tool MCP
 - [Đọc lỗi](errors.vi.md): `code`, `errors`, `Retry-After`
 - [Nối AI agent qua MCP](mcp.vi.md): key cho agent, cấu hình client, các tool
+- [Kết nối client MCP bằng đăng nhập OAuth](mcp-oauth.vi.md): Claude, ChatGPT và client khác không cần key, trang consent, thu hồi
 - [Nhận event theo thời gian thực](realtime-events.vi.md): Server-Sent Events, `Last-Event-ID`, giới hạn
 - [Tải file lớn thẳng lên nơi lưu](direct-uploads.vi.md): link đã ký tới S3, xác nhận, kiểm file
 - [Thử thay đổi trong sandbox](sandbox.vi.md): bản thử của khách, đối tác giả lập, đem bản nháp về
