@@ -831,12 +831,13 @@ impl CatalogService {
         let Some(kyc) = &self.kyc else {
             return Err(errors::seller_verification_unavailable());
         };
-        let read = tenant.database().read();
-        let mut chain =
-            autoxide_kernel::tenancy::OrgTree::ancestors(read, tenant.id(), org).await?;
-        if chain.is_empty() {
-            chain.push(org);
-        }
+        // Chuỗi nút của kernel (nút, rồi các nút trên nó, gốc cuối) đọc qua `Site` — lớp có lọc theo khách.
+        // Nút không có trong cây (không xảy ra: sản phẩm chỉ gắn nút có thật) → chỉ hỏi chính nút đó, hướng
+        // chặt hơn.
+        let chain = match autoxide_kernel::tenancy::Site::of(tenant, org).await {
+            Ok(site) => site.lineage().to_vec(),
+            Err(_) => vec![org],
+        };
         let mut refused = None;
         for node in chain.into_iter().filter(|node| *node != root) {
             let seller = autoxide_compliance::api::Subject::Org(node);
