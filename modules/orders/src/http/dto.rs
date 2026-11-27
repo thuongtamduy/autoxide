@@ -651,7 +651,7 @@ impl OrderResponse {
 pub(crate) struct PaymentActionResponse {
     order_id: Uuid,
     /// Id of this payment of the order (it stays the same while the buyer pays it; a new attempt
-    /// after a failed or expired payment gets a new id). Not an id of the `ledger` module: use
+    /// after a failed payment gets a new id). Not an id of the `ledger` module: use
     /// `ledger_payment_id` with `GET /api/v1/ledger/payments/{id}`.
     payment_id: Uuid,
     /// Id of the collection at the payment partner, in the `ledger` module
@@ -662,8 +662,8 @@ pub(crate) struct PaymentActionResponse {
     /// `none` (the payment could not be started yet; retry from the order).
     kind: String,
     amount: Money,
-    /// `pending`, `succeeded`, `expired`, `superseded` (replaced by a new attempt after its
-    /// collection failed or expired; start the payment again from the order)…
+    /// `pending`, `succeeded`, `expired`, `superseded` (replaced by a new attempt after the
+    /// partner reported its collection failed; start the payment again from the order)…
     status: String,
     redirect_url: Option<String>,
     /// VietQR payload; the money goes to the seller's or the licensed partner's account.

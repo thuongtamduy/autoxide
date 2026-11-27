@@ -252,7 +252,7 @@ async fn payment_actions(
     ),
     request_body = PaymentLinkRequest,
     responses(
-        (status = 200, description = "The payment actions of the order.", body = Data<Vec<PaymentActionResponse>>, headers(("Idempotent-Replayed" = String, description = "`true` when the same `Idempotency-Key` was sent before: the result of that attempt; nothing was done again."))),
+        (status = 200, description = "The payment actions of the order.", body = Data<Vec<PaymentActionResponse>>, headers(("Idempotent-Replayed" = String, description = "`true` when the same `Idempotency-Key` was sent before: the current state; nothing was done again."))),
         (status = 401, description = "Missing, wrong or expired token; code `orders.lookup_token_invalid`.", body = Problem),
         (status = 404, description = "The token opens another order; code `orders.order_not_found`.", body = Problem),
         (status = 409, description = "The order is not waiting for payment (`orders.invalid_transition`), its deadline passed (`orders.payment_expired`) or the time to pay the balance passed (`orders.balance_overdue`).", body = Problem),
@@ -295,7 +295,7 @@ pub(crate) async fn guest_payment_link(
     ),
     request_body = PaymentLinkRequest,
     responses(
-        (status = 200, description = "The payment actions of the order.", body = Data<Vec<PaymentActionResponse>>, headers(("Idempotent-Replayed" = String, description = "`true` when the same `Idempotency-Key` was sent before: the result of that attempt; nothing was done again."))),
+        (status = 200, description = "The payment actions of the order.", body = Data<Vec<PaymentActionResponse>>, headers(("Idempotent-Replayed" = String, description = "`true` when the same `Idempotency-Key` was sent before: the current state; nothing was done again."))),
         (status = 401, description = "Not signed in; code `unauthenticated`.", body = Problem),
         (status = 404, description = "No such order of yours; code `orders.order_not_found`.", body = Problem),
         (status = 409, description = "The order is not waiting for payment (`orders.invalid_transition`), its deadline passed (`orders.payment_expired`) or the time to pay the balance passed (`orders.balance_overdue`).", body = Problem),

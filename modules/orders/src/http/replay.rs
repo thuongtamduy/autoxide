@@ -1,6 +1,7 @@
 //! Đánh dấu kết quả gửi lại cùng `Idempotency-Key` (UT-6 L3). Đường công khai không có principal nên
 //! lớp idempotency của kernel bỏ qua; orders tự chống trùng, nên handler phải tự gắn
-//! `Idempotent-Replayed: true` như kernel làm (`docs/guides/retries.md`).
+//! `Idempotent-Replayed: true` như kernel làm (`docs/guides/retries.md`). Khác kernel: thân là trạng thái hiện
+//! tại (đọc lại), không phải bản lưu của lần đầu — OpenAPI nói đúng như vậy.
 
 use autoxide_kernel::reference::Submitted;
 use axum::http::{HeaderName, HeaderValue};

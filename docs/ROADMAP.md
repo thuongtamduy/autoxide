@@ -313,6 +313,8 @@ Việc từ rà pháp lý vòng 1 do AI đóng vai (`docs/legal/review-2026-11-r
         và huỷ đơn khách; `payment-link` gọi lại sau lần lỗi; cách gỡ khoản `needs_review` — thêm `ledger_payment_id`,
         header ở mọi thao tác vãng lai gửi lại, lần thử mới (`superseded`) và hoàn lượt cũ thu muộn qua đối tác, tài liệu
         gỡ `needs_review`
+    - [ ] Nợ nhỏ (từ rà UT-6): hợp đồng `PaymentGateway` không có lệnh huỷ lượt thu ở đối tác, nên bộ nối chỉ được báo
+          `Failed` khi đối tác đã chốt kết quả cuối; khi thêm lệnh huỷ thì gọi nó lúc mở lần thử mới
   - [ ] UT-7: thời gian build lần đầu của module ngoài repo (đo ~30 phút debug trên 4 lõi): hướng dẫn nêu con số, đường dùng
         bản dựng sẵn hay cache, một cách gọi `check-module`; đo lại cho G9 trên máy rảnh
   - [ ] UT-8: thông báo và log cho người vận hành: `--steps 0`, log backup / restore chỉ tóm tắt, `migrate up` tóm tắt,

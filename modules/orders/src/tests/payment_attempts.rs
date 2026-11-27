@@ -69,9 +69,20 @@ async fn card_order(shop: &Shop) -> (String, String, Value) {
 
 /// `ledger` báo đã thu đủ lượt `payment` (như `ledger.payment_succeeded` thật).
 async fn paid(shop: &Shop, payment: &autoxide_ledger::api::Payment) {
+    // Như `ledger` thật: ghi thu trước, phát event sau.
+    shop.ledger.collect(payment.id);
     let event = json!({"payment_id": payment.id, "source_module": "orders",
         "amount": payment.amount, "reference": payment.reference});
     emit(shop, &PaymentSucceeded(event)).await;
+}
+
+/// Số event `ledger.*` chưa giao xong (bên nhận trả lỗi thì event nằm chờ thử lại).
+async fn undelivered(shop: &Shop) -> i64 {
+    let database = shop.database();
+    let backend = database.read().get_database_backend();
+    let sql = "SELECT COUNT(*) AS n FROM ledger_events WHERE delivered_at IS NULL";
+    let row = database.read().query_one_raw(statement(backend, sql, [])).await.unwrap().unwrap();
+    row.try_get::<i64>("", "n").unwrap()
 }
 
 /// Số event `orders.payment_recorded` mang `superseded: true` của khách mặc định.
@@ -181,6 +192,106 @@ async fn luot_thu_hong_thi_mo_lai_ra_lan_thu_moi_va_luot_cu_thu_muon_duoc_hoan()
         );
         let (_, view) = boss.send("GET", &format!("/{order}"), None).await;
         assert_eq!(super::minor(&view["data"]["totals"]["paid"]), new.amount.minor());
+        assert_eq!(superseded_events(shop).await, 1);
+    })
+    .await
+    .unwrap();
+}
+
+/// Hạn thanh toán của đơn `order` (đọc qua API của nhân viên).
+async fn due_of(shop: &Shop, order: &str) -> Value {
+    let (_, view) = Call::as_user(shop, "boss").send("GET", &format!("/{order}"), None).await;
+    view["data"]["payment_due_at"].clone()
+}
+
+#[tokio::test]
+async fn mo_lai_nhieu_lan_khong_keo_dai_han_cua_don() {
+    TestDatabase::run(async |test| {
+        let guests = guests(test, false).await;
+        let shop = &guests.shop;
+        let (order, number, _) = card_order(shop).await;
+        let token = access_token(&guests, &number).await;
+        let uri = format!("/public/orders/{order}/payment-link");
+        let due = due_of(shop, &order).await;
+        assert!(due.is_string(), "{due}");
+        for attempt in 0..3 {
+            let last = shop.ledger.last_payment().unwrap();
+            shop.ledger.fail(last.id);
+            // Lượt thu mới của bộ giả hết hạn muộn hơn lượt trước.
+            tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+            let key = format!("again-{attempt}");
+            let (status, _, opened) =
+                send(shop, &uri, &[("Order-Token", &token), ("Idempotency-Key", &key)], json!({}))
+                    .await;
+            assert_eq!(status, StatusCode::OK, "{opened}");
+            assert_ne!(shop.ledger.last_payment().unwrap().id, last.id);
+            assert_eq!(due_of(shop, &order).await, due, "lần thử {attempt} kéo dài hạn");
+            assert_eq!(opened["data"][0]["expires_at"], due);
+        }
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn quyet_dinh_da_bi_thay_doc_sau_khoa_don() {
+    TestDatabase::run(async |test| {
+        use crate::entity::payment;
+        use autoxide_kernel::tenancy::ScopeExt as _;
+        use sea_orm::sea_query::Expr;
+        use sea_orm::{ColumnTrait as _, EntityTrait as _, QueryFilter as _};
+
+        let guests = guests(test, false).await;
+        let shop = &guests.shop;
+        let (order, _, _) = card_order(shop).await;
+        let lot = shop.ledger.payments()[0].clone();
+        // Khoản chuyển `superseded` ngay trước khi thông báo đã thu được xử lý (như một lần thay lượt
+        // commit giữa lúc đọc và lúc khoá): chỉ dòng đọc sau khoá đơn quyết định.
+        payment::Entity::update_many()
+            .col_expr(payment::Column::Status, Expr::value(crate::payment_attempts::SUPERSEDED))
+            .filter(payment::Column::LedgerPaymentId.eq(lot.id))
+            .scoped(&shop.default_tenant())
+            .exec(shop.database().write())
+            .await
+            .unwrap();
+        paid(shop, &lot).await;
+        drain(shop).await;
+        paid(shop, &lot).await;
+        drain(shop).await;
+        let boss = Call::as_user(shop, "boss");
+        let (_, view) = boss.send("GET", &format!("/{order}"), None).await;
+        assert_eq!(view["data"]["status"], "pending_payment", "{view}");
+        assert_eq!(super::minor(&view["data"]["totals"]["paid"]), 0);
+        assert_eq!(
+            super::refund_rows(&shop.ledger),
+            vec![(lot.id, lot.amount.minor(), "superseded_payment".to_owned())]
+        );
+        assert_eq!(superseded_events(shop).await, 1);
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn doi_tac_tu_choi_hoan_luot_cu_thi_khong_thu_lai_mai() {
+    TestDatabase::run(async |test| {
+        let guests = guests(test, false).await;
+        let shop = &guests.shop;
+        let (order, number, _) = card_order(shop).await;
+        let old = shop.ledger.payments()[0].clone();
+        shop.ledger.fail(old.id);
+        let token = access_token(&guests, &number).await;
+        let uri = format!("/public/orders/{order}/payment-link");
+        let (status, _, opened) =
+            send(shop, &uri, &[("Order-Token", &token), ("Idempotency-Key", "x1")], json!({})).await;
+        assert_eq!(status, StatusCode::OK, "{opened}");
+        // Lượt cũ báo đã thu, đối tác từ chối hoàn (4xx): event giao xong, không nằm chờ thử lại; người
+        // vận hành thấy mục `late_payment` ở `ledger` (test ở module `ledger`).
+        shop.ledger.refuse_next_refunds(1);
+        paid(shop, &old).await;
+        drain(shop).await;
+        assert_eq!(undelivered(shop).await, 0);
+        assert!(shop.ledger.refunds().is_empty());
         assert_eq!(superseded_events(shop).await, 1);
     })
     .await

@@ -292,11 +292,12 @@ impl OrdersService {
         tenant: &TenantContext,
         id: Uuid,
     ) -> Result<Vec<payment::Model>, Error> {
+        // Kết nối ghi: đọc ngay sau khi lượt thu vừa được tạo / thay (không trễ theo bản sao đọc).
         Ok(payment::Entity::find()
             .filter(payment::Column::OrderId.eq(id))
             .filter(payment::Column::Status.eq(payments::PENDING))
             .scoped(tenant)
-            .all(tenant.database().read())
+            .all(tenant.database().write())
             .await?)
     }
 }

@@ -68,6 +68,19 @@ pub(crate) fn funds_flow(mode: FlowMode) -> FundsFlow {
     }
 }
 
+/// Kết quả ghi một lượt thu `ledger` báo đã thu vào khoản của đơn.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Recorded {
+    /// Đã ghi từ trước (event giao lại).
+    Already,
+    /// Tính vào đơn.
+    Counted,
+    /// Đơn đã huỷ: ghi đã thu, hoàn tự động (`late_payment`).
+    Late,
+    /// Khoản đã bị thay bằng lần thử mới: không tính vào đơn, hoàn qua đối tác (UT-6 L4).
+    Superseded,
+}
+
 /// Mã tham chiếu của khoản thu gửi `ledger`: `orders:<order>:<purpose>:<lần>`.
 pub(crate) fn reference(order: Uuid, purpose: &str, attempt: u32) -> String {
     format!("orders:{order}:{purpose}:{attempt}")
@@ -140,7 +153,8 @@ impl OrdersService {
             .filter(payment::Column::Status.eq(PENDING))
             .scoped(tenant)
             .order_by_desc(payment::Column::Id)
-            .one(tenant.database().read())
+            // Kết nối ghi: ngay sau khi một lần thử mới vừa commit (`replace_ended_attempt`) vẫn thấy nó.
+            .one(tenant.database().write())
             .await?
             .ok_or_else(errors::order_not_found)?;
         if row.ledger_payment_id.is_some() {
@@ -220,11 +234,17 @@ impl OrdersService {
             transfer_code: created.transfer_code.clone(),
             error: None,
         };
+        // Lần thử lại (UT-6 L4) không kéo dài hạn của đơn: hạn là hạn cũ hay hạn của lượt thu mới, cái
+        // nào sớm hơn — từ chối rồi mở lại nhiều lần không giữ hàng mãi.
+        let due = match order.payment_due_at {
+            Some(old) if crate::payment_attempts::is_retry(&row) => old.min(created.expires_at),
+            _ => created.expires_at,
+        };
         let mut updated: payment::ActiveModel = row.into();
         updated.ledger_payment_id = Set(Some(created.id));
         updated.gateway = Set(Some(created.provider.clone()));
         updated.action = Set(Some(serde_json::to_string(&action).map_err(Error::internal)?));
-        updated.expires_at = Set(Some(created.expires_at));
+        updated.expires_at = Set(Some(due));
         updated.updated_at = Set(crate::service::now());
         let database = tenant.database();
         let transaction = database.begin_write().await?;
@@ -232,7 +252,7 @@ impl OrdersService {
         order::Entity::update_many()
             .col_expr(
                 order::Column::PaymentDueAt,
-                sea_orm::sea_query::Expr::value(created.expires_at),
+                sea_orm::sea_query::Expr::value(due),
             )
             .filter(order::Column::Id.eq(order_id))
             .scoped(tenant)
@@ -300,13 +320,9 @@ impl OrdersService {
         else {
             return Ok(());
         };
-        if row.status == crate::payment_attempts::SUPERSEDED {
-            // Lượt thu của một lần thử đã bị thay: không tính vào đơn, hoàn qua đối tác (UT-6 L4).
-            return self.refund_superseded(tenant, &row, ledger_payment, amount).await;
-        }
         let (database, outbox) = (tenant.database(), &self.outbox);
         let payment_id = row.id;
-        let late = database
+        let recorded = database
             .write_with_retry(move || async move {
                 let transaction = database.begin_write().await?;
                 let current = lifecycle::lock(&transaction, tenant, row.order_id).await?;
@@ -316,7 +332,12 @@ impl OrdersService {
                     .await?
                     .ok_or_else(errors::order_not_found)?;
                 if stored.status == SUCCEEDED {
-                    return Ok(false);
+                    return Ok(Recorded::Already);
+                }
+                // Quyết định "đã bị thay" đọc trên dòng sau khoá đơn (UT-6 L4): lần thay lượt cũng khoá
+                // dòng đơn, nên không có khe giữa lúc đọc và lúc ghi. Không tính vào đơn; hoàn sau commit.
+                if stored.status == crate::payment_attempts::SUPERSEDED {
+                    return Ok(Recorded::Superseded);
                 }
                 let now = crate::service::now();
                 let purpose = stored.purpose.clone();
@@ -415,10 +436,13 @@ impl OrdersService {
                     )
                     .await?;
                 transaction.commit().await?;
-                Ok(late)
+                Ok(if late { Recorded::Late } else { Recorded::Counted })
             })
             .await?;
-        if late && let Some(ledger) = &self.ledger {
+        if recorded == Recorded::Superseded {
+            return self.refund_superseded(tenant, &row, ledger_payment, amount).await;
+        }
+        if recorded == Recorded::Late && let Some(ledger) = &self.ledger {
             let refund = NewRefund::new(
                 ledger_payment,
                 amount,

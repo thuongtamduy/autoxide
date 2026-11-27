@@ -280,7 +280,7 @@ pub(crate) struct GuestCancelRequest {
     ),
     request_body = GuestCancelRequest,
     responses(
-        (status = 200, description = "The cancelled order.", body = Data<GuestOrderResponse>, headers(("Idempotent-Replayed" = String, description = "`true` when the same `Idempotency-Key` was sent before: the result of that attempt; nothing was done again."))),
+        (status = 200, description = "The cancelled order.", body = Data<GuestOrderResponse>, headers(("Idempotent-Replayed" = String, description = "`true` when the same `Idempotency-Key` was sent before: the current state; nothing was done again."))),
         (status = 401, description = "Missing, wrong or expired token; code `orders.lookup_token_invalid`.", body = Problem),
         (status = 404, description = "The token opens another order; code `orders.order_not_found`.", body = Problem),
         (status = 409, description = "Too late to cancel by yourself; code `orders.cancel_not_allowed`.", body = Problem),
@@ -370,7 +370,7 @@ pub(crate) struct AddressRequest {
     ),
     request_body = AddressRequest,
     responses(
-        (status = 200, description = "The order with the new address.", body = Data<GuestOrderResponse>, headers(("Idempotent-Replayed" = String, description = "`true` when the same `Idempotency-Key` was sent before: the result of that attempt; nothing was done again."))),
+        (status = 200, description = "The order with the new address.", body = Data<GuestOrderResponse>, headers(("Idempotent-Replayed" = String, description = "`true` when the same `Idempotency-Key` was sent before: the current state; nothing was done again."))),
         (status = 401, description = "Missing, wrong or expired token; code `orders.lookup_token_invalid`.", body = Problem),
         (status = 404, description = "The token opens another order; code `orders.order_not_found`.", body = Problem),
         (status = 409, description = "The goods left the warehouse (`orders.address_locked`) or the fee changes (`orders.address_change_needs_payment`).", body = Problem),

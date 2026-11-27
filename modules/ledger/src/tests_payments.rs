@@ -405,3 +405,34 @@ async fn nhan_thieu_roi_chap_nhan_thi_hoan_toi_da_so_da_thu() {
     .await
     .unwrap();
 }
+
+/// UT-6: đối tác báo hỏng rồi lại báo đã thu (sai thứ tự): vẫn ghi thu, và mở `late_payment` ở hàng chờ
+/// như tiền về sau hạn — module nguồn có thể đã mở lượt thu khác, người vận hành phải thấy.
+#[tokio::test]
+async fn hong_roi_lai_bao_da_thu_thi_vao_hang_cho() {
+    TestDatabase::run(async |test| {
+        let (app, gateway) = app(test).await;
+        let payment = pay(&app, 100_000, "F").await;
+        let provider_ref = gateway.provider_ref(payment.id).unwrap();
+        let failed = gateway.webhook(&json!({
+            "event_id": "evt-f", "kind": "payment_failed", "provider_ref": provider_ref,
+            "payment_id": payment.id, "amount": 100_000, "currency": "VND", "reason": "declined",
+        }));
+        assert_eq!(webhook(&app, failed).await, StatusCode::OK);
+        drain(&app).await;
+        assert_eq!(status(&app, payment.id).await, "failed");
+        assert_eq!(
+            webhook(&app, gateway.paid(payment.id, vnd(100_000), "evt-p")).await,
+            StatusCode::OK
+        );
+        drain(&app).await;
+        assert_eq!(status(&app, payment.id).await, "succeeded");
+        assert_eq!(clearing(&app).await, 100_000);
+        let open = exceptions(&app).await;
+        assert_eq!(open.len(), 1, "{open:?}");
+        assert_eq!(open[0]["kind"], "late_payment");
+        assert_eq!(open[0]["subject"], format!("ledger.payment:{}", payment.id));
+    })
+    .await
+    .unwrap();
+}

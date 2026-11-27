@@ -1,11 +1,14 @@
 //! Lần thử thanh toán mới sau một lượt thu hỏng (UT-6 L4). Khoản `pending` của đơn trỏ tới lượt thu ở
-//! `ledger` đã `failed` / `expired` (đối tác từ chối, link hết hạn) thì mở lại (`payment-link`) không
+//! `ledger` đã `failed` (đối tác báo người mua từ chối / bỏ dở) thì mở lại (`payment-link`) không
 //! được trả lại lượt cũ: khoản cũ thành `superseded`, khoản mới mang lần thử n+1 (mã tham chiếu mới
 //! `orders:<đơn>:<mục đích>:<n+1>` — `ledger` tạo lượt thu mới, không trả lại lượt cũ), nên người mua
 //! nhận `payment_id`, `status_token` và `ledger_payment_id` mới.
 //!
-//! Lượt cũ đã kết thúc ở `ledger` (và ở đối tác: hợp đồng `PaymentGateway` không có lệnh huỷ lượt thu,
-//! đối tác tự đóng lượt hỏng / hết hạn). Nếu đối tác vẫn báo đã thu lượt cũ (hiếm, sai thứ tự thông báo)
+//! Lượt `expired` ở `ledger` cũng được thay, nhưng thực tế hiếm: hạn của đơn là hạn của lượt thu, nên khi
+//! lượt thu hết hạn thì đơn thường đã quá hạn và mở lại trả `orders.payment_expired`.
+//!
+//! Lượt cũ đã kết thúc ở `ledger` (và ở đối tác: hợp đồng `PaymentGateway` không có lệnh huỷ lượt thu, nên
+//! bộ nối chỉ được báo `Failed` khi đối tác đã chốt kết quả cuối). Nếu đối tác vẫn báo đã thu lượt cũ (hiếm, sai thứ tự thông báo)
 //! thì tiền đó được hoàn qua lệnh hoàn của đối tác (`Ledger::refund`, D-187: core không giữ tiền), theo
 //! mã tham chiếu ổn định — event giao lại không hoàn hai lần — và ghi `orders.payment_recorded`
 //! (`superseded: true`) một lần để audit.
@@ -172,12 +175,39 @@ impl OrdersService {
         };
         let refund =
             NewRefund::new(ledger_payment, amount, REFUND_REASON, superseded_reference(row.id));
-        if let Err(error) = ledger.refund(tenant, Actor::system(), refund).await {
-            tracing::warn!(order_id = %row.order_id, code = error.code(), "superseded payment not refunded yet");
-            return Err(error);
+        match ledger.refund(tenant, Actor::system(), refund).await {
+            // `Replayed`: lần trước đã gửi lệnh hoàn này — xong.
+            Ok(_) => Ok(()),
+            // Đối tác / sổ từ chối hẳn (không hỗ trợ hoàn, đã hoàn tay, chưa cấu hình): gửi lại không
+            // bao giờ được, nên không để event thử lại tới dead-letter. `ledger` đã mở mục `late_payment`
+            // cho lượt thu này ở hàng chờ đối soát: người vận hành thấy và hoàn tay.
+            Err(error) if error.kind().status() < 500 => {
+                tracing::warn!(
+                    order_id = %row.order_id,
+                    code = error.code(),
+                    "superseded payment refused by the partner; left to the reconciliation queue"
+                );
+                Ok(())
+            }
+            // Lỗi tạm (5xx): event thử lại, cùng mã tham chiếu — `ledger` không hoàn hai lần.
+            Err(error) => {
+                tracing::warn!(order_id = %row.order_id, code = error.code(), "superseded payment not refunded yet");
+                Err(error)
+            }
         }
-        Ok(())
     }
+}
+
+/// Khoản `row` là lần thử lại do [`OrdersService::replace_ended_attempt`] mở (lần thử thứ hai trở đi của
+/// tiền đơn; phần còn lại của đơn trả trước có hạn riêng): hạn của nó không được vượt hạn cũ của đơn.
+pub(crate) fn is_retry(row: &payment::Model) -> bool {
+    row.purpose != crate::advance::PURPOSE_BALANCE
+        && row
+            .reference
+            .rsplit(':')
+            .next()
+            .and_then(|attempt| attempt.parse::<u32>().ok())
+            .is_some_and(|attempt| attempt > 1)
 }
 
 /// Phần đầu chung của mã tham chiếu mọi lần thử của một mục đích (`orders:<đơn>:<mục đích>:`).

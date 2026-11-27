@@ -730,7 +730,9 @@ impl LedgerService {
         )
         .source_id(id.to_string());
         self.post(tenant, Actor::system(), entry).await?;
-        let late = current.status == "expired";
+        // Hết hạn, hay đối tác đã báo hỏng rồi lại báo đã thu (thông báo sai thứ tự): tiền về khi nguồn
+        // có thể đã mở lượt thu khác — người vận hành phải thấy.
+        let late = matches!(current.status.as_str(), "expired" | "failed");
         let outbox = &self.outbox;
         database
             .write_with_retry(move || async move {
@@ -764,8 +766,8 @@ impl LedgerService {
             })
             .await?;
         if late {
-            // Tiền về sau khi đã hết hạn: vẫn ghi (tiền đã ở đối tác), mở hàng chờ để người quyết
-            // giữ hay hoàn.
+            // Tiền về sau khi đã hết hạn / đã hỏng: vẫn ghi (tiền đã ở đối tác), mở hàng chờ để người
+            // quyết giữ hay hoàn (module nguồn có thể đã tự hoàn; khi đó xử lý mục bằng `refunded_outside`).
             self.open_exception(
                 tenant,
                 "late_payment",

@@ -95,6 +95,7 @@ struct State {
     fail_posts: usize,
     /// Number of upcoming `create_payment` calls that return `ledger.gateway_not_configured`.
     fail_payments: usize,
+    refuse_refunds: usize,
     /// The `return_url` the caller sent for each payment through the gateway, in order.
     return_urls: Vec<Option<String>>,
 }
@@ -224,6 +225,23 @@ impl FakeLedger {
             .filter(|refund| refund.payment_id == payment)
             .map(|refund| refund.amount.minor())
             .sum()
+    }
+
+    /// The next `count` `refund` calls are refused with `payment.not_supported` (422: the partner cannot
+    /// refund; sending again never helps).
+    pub fn refuse_next_refunds(&self, count: usize) {
+        lock(&self.state).refuse_refunds = count;
+    }
+
+    /// The partner collected `payment`: marks it `succeeded` as the real `ledger` does before it emits
+    /// `ledger.payment_succeeded` (for tests that emit the event themselves).
+    pub fn collect(&self, payment: Uuid) {
+        let mut state = lock(&self.state);
+        if let Some(found) = state.payments.iter_mut().find(|found| found.id == payment) {
+            found.status = "succeeded".to_owned();
+            found.captured_at = Some(Timestamp::now());
+            found.updated_at = Timestamp::now();
+        }
     }
 
     /// The partner reports `payment` failed (declined, abandoned): marks it `failed`, as the real `ledger`
@@ -549,6 +567,10 @@ impl Ledger for FakeLedger {
             .find(|found| found.payment_id == refund.payment && found.reference == refund.reference)
         {
             return Ok(Submitted::Replayed(found.clone()));
+        }
+        if state.refuse_refunds > 0 {
+            state.refuse_refunds -= 1;
+            return Err(autoxide_kernel::payment::not_supported(FAKE_LEDGER_PROVIDER));
         }
         let now = Timestamp::now();
         if let Some(payment) = state.payments.iter_mut().find(|found| found.id == refund.payment) {
