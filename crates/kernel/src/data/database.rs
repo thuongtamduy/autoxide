@@ -295,9 +295,7 @@ async fn tcp_cause(url: &DatabaseUrl) -> Option<String> {
     if url.backend() != DatabaseBackend::Postgres {
         return None;
     }
-    let parsed = url::Url::parse(url.expose()).ok()?;
-    let host = parsed.host_str()?.to_owned();
-    let port = parsed.port().unwrap_or(5432);
+    let (host, port) = probe_target(url.expose())?;
     let attempt = tokio::time::timeout(
         Duration::from_secs(3),
         tokio::net::TcpStream::connect((host.as_str(), port)),
@@ -308,6 +306,29 @@ async fn tcp_cause(url: &DatabaseUrl) -> Option<String> {
         Ok(Err(error)) => Some(format!("cannot reach {host}:{port}: {error}")),
         Err(_) => Some(format!("no answer from {host}:{port} within 3 seconds")),
     }
+}
+
+// Máy và cổng để thăm dò TCP, hoặc `None` khi URL không nói rõ một đích TCP: host là unix socket (`/var/run/...`,
+// hay `%2F...` mã hoá), hay query `host`/`hostaddr`/`port` đổi đích thật của driver. Thăm dò sai đích thì "nguyên nhân
+// gốc" bịa ra còn tệ hơn không có.
+fn probe_target(url: &str) -> Option<(String, u16)> {
+    let parsed = url::Url::parse(url).ok()?;
+    if parsed.query_pairs().any(|(key, _)| matches!(key.as_ref(), "host" | "hostaddr" | "port")) {
+        return None;
+    }
+    let host = match parsed.host()? {
+        // `Ipv6` đã có dạng không ngoặc vuông khi in; `host_str()` thì giữ `[::1]`, mà tra DNS thì hỏng.
+        url::Host::Ipv4(address) => address.to_string(),
+        url::Host::Ipv6(address) => address.to_string(),
+        url::Host::Domain(name) => {
+            let lower = name.to_ascii_lowercase();
+            if name.starts_with('/') || lower.starts_with("%2f") || name.is_empty() {
+                return None;
+            }
+            name.to_owned()
+        }
+    };
+    Some((host, parsed.port().unwrap_or(5432)))
 }
 
 /// A dedicated connection to the main database, outside the two pools: the migration lock on Postgres
@@ -415,6 +436,18 @@ mod tests {
         assert!(cause.contains("127.0.0.1:1"), "{cause}");
         let sqlite: DatabaseUrl = "sqlite://data/x.sqlite".parse().unwrap();
         assert_eq!(tcp_cause(&sqlite).await, None);
+    }
+
+    #[test]
+    fn dich_tham_do_chi_khi_url_noi_ro_mot_dich_tcp() {
+        let target = |url: &str| probe_target(url);
+        assert_eq!(target("postgres://u:p@db.example:6543/x"), Some(("db.example".into(), 6543)));
+        assert_eq!(target("postgres://u:p@db.example/x"), Some(("db.example".into(), 5432)));
+        assert_eq!(target("postgres://u:p@[::1]:5433/x"), Some(("::1".into(), 5433)));
+        assert_eq!(target("postgres://u:p@%2Fvar%2Frun%2Fpostgresql/x"), None);
+        assert_eq!(target("postgres://u@/x?host=/var/run/postgresql"), None);
+        assert_eq!(target("postgres://u@db.example/x?hostaddr=10.0.0.1"), None);
+        assert_eq!(target("postgres://u@db.example/x?port=6000"), None);
     }
 
     #[test]

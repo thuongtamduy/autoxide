@@ -10,8 +10,11 @@ use super::{ConfigError, ConfigErrors};
 fn dotenv_error_text(error: &dotenvy::Error) -> String {
     match error {
         dotenvy::Error::LineParse(line, index) => {
-            let name = line.split('=').next().map(str::trim).filter(|name| {
-                !name.is_empty() && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+            // Chỉ khi dòng CÓ dấu `=` thì phần trước nó mới là tên biến; dòng trần không có `=` (một mật khẩu
+            // lỡ xuống dòng, kết quả của `openssl rand …`) có thể chính là bí mật nên không bao giờ được in.
+            let name = line.split_once('=').map(|(name, _)| name.trim()).filter(|name| {
+                name.chars().next().is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
+                    && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
             });
             match name {
                 Some(name) => format!(
@@ -105,7 +108,7 @@ impl ConfigSource {
         self
     }
 
-    /// Names of every variable that has a value (even an empty one), in order. For checks such as "is this
+    /// Names of every variable that has a value (even an empty one), sorted by name. For checks such as "is this
     /// `AUTOXIDE_…` name one the program reads?".
     pub fn names(&self) -> impl Iterator<Item = &str> {
         self.values.keys().map(String::as_str)
@@ -129,6 +132,21 @@ mod tests {
         assert_eq!(source.get("B"), None);
         assert_eq!(source.get("C"), Some("x"));
         assert_eq!(source.get("MISSING"), None);
+    }
+
+    #[test]
+    fn dong_tran_khong_co_dau_bang_khong_bi_in_ra() {
+        for line in [
+            "0123abcdef",
+            "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+            "openssl",
+        ] {
+            let text = dotenv_error_text(&dotenvy::Error::LineParse(line.to_owned(), 10));
+            assert!(!text.contains(line), "{text}");
+        }
+        // Có `=` nhưng tên không hợp lệ: cũng không in.
+        let text = dotenv_error_text(&dotenvy::Error::LineParse("1ST=value".to_owned(), 3));
+        assert!(!text.contains("1ST"), "{text}");
     }
 
     #[test]

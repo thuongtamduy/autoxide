@@ -262,7 +262,7 @@ fn render_status(states: &[MigrationState]) -> String {
     output
 }
 
-/// Từ chừng này migration trở lên thì tóm tắt theo module.
+/// Nhiều hơn chừng này migration thì tóm tắt theo module.
 const SUMMARY_ABOVE: usize = 20;
 
 fn render_changes(changed: &[MigrationState], verb: &str, nothing: &str) -> String {
@@ -301,6 +301,10 @@ mod tests {
     use super::*;
     use autoxide_kernel::config::ConfigSource;
 
+    use autoxide_kernel::migration::ModuleMigrations;
+    use autoxide_kernel::migration::prelude::*;
+    use autoxide_testkit::TestDatabase;
+
     #[test]
     fn nhieu_migration_thi_tom_tat_theo_module() {
         let names: Vec<String> = (0..30).map(|n| format!("m{n:04}")).collect();
@@ -328,9 +332,6 @@ mod tests {
         assert!(Cli::try_parse_from(["x", "down", "notes", "--steps", "0"]).is_err());
         assert!(Cli::try_parse_from(["x", "down", "notes", "--steps", "2"]).is_ok());
     }
-    use autoxide_kernel::migration::ModuleMigrations;
-    use autoxide_kernel::migration::prelude::*;
-    use autoxide_testkit::TestDatabase;
 
     struct CreateTable {
         name: &'static str,

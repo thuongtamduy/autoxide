@@ -29,7 +29,7 @@ pub fn run() -> ExitCode {
         for (name, nearest) in settings::unknown_variables() {
             tracing::warn!(
                 variable = %name,
-                did_you_mean = nearest.as_deref().unwrap_or(""),
+                did_you_mean = ?nearest,
                 "this AUTOXIDE_ variable is not a setting and is ignored (run `autoxide config` for the list)"
             );
         }
