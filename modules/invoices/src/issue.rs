@@ -229,7 +229,7 @@ impl InvoicesService {
         let recomputed = if current.status == "draft" {
             // Điều chỉnh / thay thế: thuế theo ngày của chứng từ gốc, không theo ngày lập.
             let original = match current.related_document_id {
-                Some(original) => self.original_tax_date(tenant, original).await?,
+                Some(original) => self.original_tax_date(database.read(), tenant, original).await?,
                 None => None,
             };
             let on = original.or(current.issue_date).unwrap_or(today);
