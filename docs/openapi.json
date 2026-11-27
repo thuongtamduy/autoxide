@@ -59279,7 +59279,7 @@
         "description": "A document of an order (invoice or adjustment).",
         "properties": {
           "differs_from_order": {
-            "description": "`true`: this invoice differs from what was settled on the order — the tax of a line (lines\nmatched by SKU; the shipping fee by its line without an item code) or the total differs by more\nthan one minor unit per line, or the order mixes tax-inclusive and tax-exclusive prices (one\ninvoice has a single price mode). The invoice computes tax at its own date (the tax point), so a\nrate change between ordering and invoicing (e.g. the end of the 8% VAT on 2026-12-31) shows here.\nCheck the invoice and settle the difference with the buyer. Always `false` for an adjustment.",
+            "description": "`true`: this invoice differs from what was settled on the order — the tax of a line (lines\nmatched by SKU; the shipping fee by its line without an item code) or the total differs by more\nthan one minor unit per line (two for a line partly cancelled), or the order mixes\ntax-inclusive and tax-exclusive prices (one invoice has a single price mode). The invoice\ncomputes tax at its own date (the tax point), so a rate change between ordering and invoicing\n(e.g. the end of the 8% VAT on 2026-12-31) shows here. Check the invoice and settle the\ndifference with the buyer: correct the invoice with an adjustment\n(`POST /api/v1/invoices/documents/{id}/adjust`) or a replacement\n(`POST /api/v1/invoices/documents/{id}/replace`) — always needed for an order mixing price\nmodes, whose invoice cannot match it. Always `false` for an adjustment.",
             "type": "boolean"
           },
           "document_id": {
@@ -74776,7 +74776,7 @@
               "description": "A document of an order (invoice or adjustment).",
               "properties": {
                 "differs_from_order": {
-                  "description": "`true`: this invoice differs from what was settled on the order — the tax of a line (lines\nmatched by SKU; the shipping fee by its line without an item code) or the total differs by more\nthan one minor unit per line, or the order mixes tax-inclusive and tax-exclusive prices (one\ninvoice has a single price mode). The invoice computes tax at its own date (the tax point), so a\nrate change between ordering and invoicing (e.g. the end of the 8% VAT on 2026-12-31) shows here.\nCheck the invoice and settle the difference with the buyer. Always `false` for an adjustment.",
+                  "description": "`true`: this invoice differs from what was settled on the order — the tax of a line (lines\nmatched by SKU; the shipping fee by its line without an item code) or the total differs by more\nthan one minor unit per line (two for a line partly cancelled), or the order mixes\ntax-inclusive and tax-exclusive prices (one invoice has a single price mode). The invoice\ncomputes tax at its own date (the tax point), so a rate change between ordering and invoicing\n(e.g. the end of the 8% VAT on 2026-12-31) shows here. Check the invoice and settle the\ndifference with the buyer: correct the invoice with an adjustment\n(`POST /api/v1/invoices/documents/{id}/adjust`) or a replacement\n(`POST /api/v1/invoices/documents/{id}/replace`) — always needed for an order mixing price\nmodes, whose invoice cannot match it. Always `false` for an adjustment.",
                   "type": "boolean"
                 },
                 "document_id": {
