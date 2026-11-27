@@ -45,6 +45,8 @@ event!(OrderDelivered, names::ORDER_DELIVERED);
 event!(OrderCompleted, names::ORDER_COMPLETED);
 event!(PaymentRecorded, names::PAYMENT_RECORDED);
 event!(FulfillmentRequested, names::FULFILLMENT_REQUESTED);
+event!(FulfillmentDelivered, names::FULFILLMENT_DELIVERED);
+event!(LineSerialsRecorded, names::LINE_SERIALS_RECORDED);
 event!(RefundCompleted, names::REFUND_COMPLETED);
 event!(PickupReady, names::PICKUP_READY);
 event!(PreorderDelayed, names::PREORDER_DELAYED);
@@ -89,11 +91,24 @@ pub(crate) fn all() -> Vec<EventInfo> {
             "A shipment was requested for an order; `after.shipment` is the shipment request.",
         ),
         EventInfo::new(
+            names::FULFILLMENT_DELIVERED,
+            "One shipment of an order reached the buyer; `after.lines` are the units it carried.",
+        ),
+        EventInfo::new(
+            names::LINE_SERIALS_RECORDED,
+            "Serial numbers were recorded for an order line whose goods already reached the buyer.",
+        ),
+        EventInfo::new(
             names::RETURN_PICKUP_REQUESTED,
             "A carrier pickup was requested for a return; `after.shipment` is the shipment request.",
         ),
         EventInfo::new(names::STOCK_SHORTAGE, "An order imported from a channel lacks stock."),
-        EventInfo::new(names::PAYMENT_RECORDED, "A payment of an order was recorded."),
+        EventInfo::new(
+            names::PAYMENT_RECORDED,
+            "A payment of an order was recorded. `late: true`: it arrived after the order was cancelled \
+             and is refunded. `superseded: true`: it is an attempt replaced by a newer one; it does not \
+             count towards the order and is refunded through the payment partner.",
+        ),
         EventInfo::new(names::REFUND_COMPLETED, "A refund of an order was completed."),
         EventInfo::new(names::RETURN_REQUESTED, "A buyer asked to return items of an order."),
         EventInfo::new(

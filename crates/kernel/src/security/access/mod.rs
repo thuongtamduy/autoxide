@@ -204,6 +204,7 @@ impl ActorKind {
 /// audit can see it.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "id", rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum AccessPath {
     #[default]
     Direct,

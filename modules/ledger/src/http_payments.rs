@@ -177,6 +177,8 @@ async fn list_payments(
     Query(query): Query<PaymentsQuery>,
     Query(page): Query<PageQuery>,
 ) -> Result<Page<Payment>, Error> {
+    // Quyền trước tham số trang: thiếu quyền là 403, không phải 422 (luật `permission-first` của xtask).
+    principal.require(&crate::permissions::READ)?;
     let mut problems = Vec::new();
     let amount_minor = query.amount.as_deref().map(str::trim).and_then(|raw| {
         raw.parse::<i64>().ok().or_else(|| {
@@ -221,7 +223,15 @@ async fn list_payments(
 
 /// Get a payment with its refunds.
 ///
-/// Requires `ledger.read` on the unit that receives it.
+/// Requires `ledger.read` on the unit that receives it. An order's payment action gives this id as
+/// `ledger_payment_id` (its `payment_id` is the order's own payment, not this id). A payment in
+/// `needs_review` was reported with another amount than the amount due; a later notification for the
+/// same partner transaction does not change it. Find its `amount_mismatch` item in
+/// `GET /api/v1/ledger/exceptions?status=open` (subject `ledger.payment:<id>`) and resolve it with
+/// `POST /api/v1/ledger/exceptions/{id}/resolve` (`ledger.reconcile`): `accept_received` records the
+/// amount collected: the order goes on if it is still waiting for payment; after the order's payment
+/// deadline the order is already cancelled and the amount is refunded through the partner on its own.
+/// `refunded_outside` or `ignore` close the item and leave the payment unpaid.
 #[utoipa::path(
     get,
     path = "/payments/{id}",
@@ -388,7 +398,10 @@ async fn receive_tenant_webhook(
 pub(crate) struct ExceptionResponse {
     id: Uuid,
     /// `amount_mismatch`, `unmatched_credit`, `duplicate_payment`, `missing_in_statement`,
-    /// `unknown_in_statement` or `late_payment`.
+    /// `unknown_in_statement`, `late_payment` (money arrived after the payment's deadline or after the
+    /// partner reported it failed) or `refund_failed` (the partner refused a refund: the money is still
+    /// to be returned by hand, then resolve with `refunded_outside`; it closes on its own once the
+    /// payment is refunded in full through the partner).
     kind: String,
     /// The record concerned, e.g. `ledger.payment:<id>`.
     subject: String,
@@ -396,6 +409,10 @@ pub(crate) struct ExceptionResponse {
     details: serde_json::Value,
     /// `open`, `resolved` or `ignored`.
     status: String,
+    /// How it was closed: `match`, `accept_received`, `ignore`, `refunded_outside` (by a person), or
+    /// by the ledger (`resolved_by` is empty): `refunded` (the payment was refunded in full through the
+    /// partner) or `kept` (a `late_payment` the source module counted, e.g. the order went on). Empty
+    /// while `open`.
     resolution: Option<String>,
     note: Option<String>,
     resolved_by: Option<Uuid>,
@@ -452,6 +469,8 @@ async fn list_exceptions(
     Query(query): Query<ExceptionsQuery>,
     Query(page): Query<PageQuery>,
 ) -> Result<Page<ExceptionResponse>, Error> {
+    // Quyền trước tham số trang: thiếu quyền là 403, không phải 422 (luật `permission-first` của xtask).
+    principal.require(&crate::permissions::READ)?;
     let page = service
         .list_exceptions(&tenant, &principal, query.status, &PageRequest::try_from(page)?)
         .await?;
@@ -599,6 +618,8 @@ async fn list_reconciliations(
     principal: Principal,
     Query(page): Query<PageQuery>,
 ) -> Result<Page<ReconciliationResponse>, Error> {
+    // Quyền trước tham số trang: thiếu quyền là 403, không phải 422 (luật `permission-first` của xtask).
+    principal.require(&crate::permissions::RECONCILE)?;
     let page =
         service.list_reconciliations(&tenant, &principal, &PageRequest::try_from(page)?).await?;
     Ok(page.map(ReconciliationResponse::from))

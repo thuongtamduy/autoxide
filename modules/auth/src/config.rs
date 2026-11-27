@@ -80,6 +80,39 @@ pub(crate) const OIDC_ALLOW_PRIVATE_NETWORKS: Setting = Setting::new(
 )
 .with_default("false");
 
+pub(crate) const OAUTH_CONSENT_URL: Setting = Setting::new(
+    "AUTOXIDE_AUTH_OAUTH_CONSENT_URL",
+    "Page of your interface where a signed-in person approves an MCP client (Claude, ChatGPT…) \
+     that asks to act for them, with `{token}` where the request token goes, e.g. \
+     `https://app.example.com/connect?request={token}`. The page reads the request with `GET \
+     /api/v1/auth/oauth/requests/{token}` and answers with `…/approve` or `…/deny`. Unset (or \
+     `AUTOXIDE_HTTP_PUBLIC_URL` unset): OAuth sign-in is off and MCP clients connect with an API key.",
+)
+.with_example("https://app.example.com/connect?request={token}");
+
+pub(crate) const OAUTH_DYNAMIC_REGISTRATION: Setting = Setting::new(
+    "AUTOXIDE_AUTH_OAUTH_DYNAMIC_REGISTRATION",
+    "Let MCP clients register themselves with `POST /api/v1/auth/oauth/register` (RFC 7591; \
+     deprecated by MCP 2026-07-28 in favour of client metadata documents, kept for clients that \
+     still use it) (`true` or `false`).",
+)
+.with_default("true");
+
+pub(crate) const OAUTH_ALLOW_PRIVATE_NETWORKS: Setting = Setting::new(
+    "AUTOXIDE_AUTH_OAUTH_ALLOW_PRIVATE_NETWORKS",
+    "Fetch OAuth client metadata documents from private or local network addresses and over plain \
+     `http://` (`true` or `false`). Anyone can name a client, so leave it `false` in production; \
+     for tests only.",
+)
+.with_default("false");
+
+pub(crate) const OAUTH_GRANT_DAYS: Setting = Setting::new(
+    "AUTOXIDE_AUTH_OAUTH_GRANT_DAYS",
+    "How long an approval of an MCP client lasts at most (1 to 365 days); the person approving \
+     can choose less. Its refresh tokens stop working then and the person approves again.",
+)
+.with_default("90");
+
 pub(crate) const LOGIN_LINK_URL: Setting = Setting::new(
     "AUTOXIDE_AUTH_LOGIN_LINK_URL",
     "Address of the interface's page that signs in with a link, with `{token}` where the token \
@@ -251,6 +284,12 @@ pub(crate) struct AuthConfig {
     pub api_key_max_days: i64,
     /// Cửa sổ xác nhận lại cho việc nhạy cảm, theo phút (bước 54 P5).
     pub step_up_minutes: i64,
+    /// Máy chủ uỷ quyền OAuth cho MCP (bước 71 G4): trang consent của giao diện (`None`: tắt), đăng ký động,
+    /// tải metadata của client từ mạng riêng (chỉ để thử), hạn tối đa của một lần duyệt (ngày).
+    pub oauth_consent_url: Option<String>,
+    pub oauth_dynamic_registration: bool,
+    pub oauth_allow_private_networks: bool,
+    pub oauth_grant_days: i64,
 }
 
 /// Cấu hình passkey (WebAuthn).
@@ -320,6 +359,11 @@ impl AuthConfig {
         let oidc = reader.get_with(&OIDC, boolean);
         let oidc_allow_private_networks = reader.get_with(&OIDC_ALLOW_PRIVATE_NETWORKS, boolean);
         let invitation_url = reader.optional_with(&INVITATION_URL, token_url);
+        let oauth_consent_url = reader.optional_with(&OAUTH_CONSENT_URL, token_url);
+        let oauth_dynamic_registration = reader.get_with(&OAUTH_DYNAMIC_REGISTRATION, boolean);
+        let oauth_allow_private_networks = reader.get_with(&OAUTH_ALLOW_PRIVATE_NETWORKS, boolean);
+        let oauth_grant_days =
+            reader.get_with(&OAUTH_GRANT_DAYS, |raw| parse_in_range(raw, 1i64, 365));
         let support_max_hours =
             reader.get_with(&SUPPORT_ACCESS_MAX_HOURS, |raw| parse_in_range(raw, 1u32, 72));
         let step_up_minutes =
@@ -410,6 +454,10 @@ impl AuthConfig {
             support_max_hours: support_max_hours?,
             api_key_max_days: api_key_max_days?,
             step_up_minutes: step_up_minutes?,
+            oauth_consent_url: oauth_consent_url?,
+            oauth_dynamic_registration: oauth_dynamic_registration?,
+            oauth_allow_private_networks: oauth_allow_private_networks?,
+            oauth_grant_days: oauth_grant_days?,
         })
     }
 }

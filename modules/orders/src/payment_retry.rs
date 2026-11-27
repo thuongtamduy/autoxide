@@ -8,7 +8,7 @@
 //! thanh toán). Gọi lại cùng `Idempotency-Key` không tính thêm lượt.
 
 use autoxide_kernel::error::Error;
-use autoxide_kernel::reference::fingerprint;
+use autoxide_kernel::reference::{Submitted, fingerprint};
 use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::throttle::{Outcome, Throttle};
 use serde_json::json;
@@ -34,7 +34,7 @@ impl OrdersService {
         id: Uuid,
         return_url: Option<String>,
         reference: &str,
-    ) -> Result<Vec<payment::Model>, Error> {
+    ) -> Result<Submitted<Vec<payment::Model>>, Error> {
         let row = self.guest_order(tenant, access, id).await?;
         self.buyer_reopen(tenant, &row, return_url, reference).await
     }
@@ -47,7 +47,7 @@ impl OrdersService {
         id: Uuid,
         return_url: Option<String>,
         reference: &str,
-    ) -> Result<Vec<payment::Model>, Error> {
+    ) -> Result<Submitted<Vec<payment::Model>>, Error> {
         let row = self.order(tenant, id).await?;
         if row.buyer_user_id != Some(buyer) {
             return Err(errors::order_not_found());
@@ -61,10 +61,10 @@ impl OrdersService {
         row: &order::Model,
         return_url: Option<String>,
         reference: &str,
-    ) -> Result<Vec<payment::Model>, Error> {
+    ) -> Result<Submitted<Vec<payment::Model>>, Error> {
         let print = fingerprint(&json!({ "return_url": return_url }))?;
         if self.guest_replayed(tenant, row.id, ACTION, reference, &print).await? {
-            return self.pending_payments(tenant, row.id).await;
+            return self.pending_payments(tenant, row.id).await.map(Submitted::Replayed);
         }
         let hour = std::time::Duration::from_secs(3600);
         let limit = Throttle::new("orders", RETRY_PER_HOUR, hour)?;
@@ -83,6 +83,6 @@ impl OrdersService {
             &print,
         )
         .await?;
-        Ok(payments)
+        Ok(Submitted::Created(payments))
     }
 }

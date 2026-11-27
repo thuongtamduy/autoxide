@@ -172,6 +172,49 @@ async fn chung_tu_ngoai_te_chup_ti_gia_khi_phat_hanh() {
         assert_eq!(base.currency(), Currency::VND);
         // total USD (đơn vị cent) × 25000 / 100.
         assert_eq!(base.minor(), document.total.minor() * 250);
+        // Sửa nháp xen giữa lúc lập (kiểm độc lập #560): lập báo `invoices.draft_changed` khi PATCH chen giữa lúc đọc
+        // tỉ giá và khoá dòng; lập được thì tổng quy đổi luôn từ đúng tổng được lưu (`base = total × tỉ giá`), và
+        // PATCH đã xong trước thì hoá đơn mang tổng mới.
+        let draft_line = |price: i64| {
+            json!({"lines": [{"description": "Tư vấn", "kind": "service", "quantity": "1",
+                "unit_price": {"amount": price.to_string(), "currency": "USD"},
+                "tax_category": "vat.standard"}]})
+        };
+        let business = Buyer::business("Foreign Buyer Ltd", "0101234567");
+        for round in 0..8 {
+            let reference = format!("U-race-{round}");
+            let draft = invoices
+                .create_document(&tenant, Actor::system(), sale(&tenant, Currency::USD, 10_000, business.clone(), &reference))
+                .await
+                .unwrap()
+                .into_inner();
+            let path = format!("/api/v1/invoices/documents/{}", draft.id);
+            let (patched, issued) = tokio::join!(
+                call(&app, "clerk", "PATCH", &path, Some(draft_line(20_000))),
+                invoices.issue(&tenant, Actor::system(), draft.id)
+            );
+            // PATCH thắng (200) hay thua vì nháp đã lập (409 `invoices.not_draft`) — không kết quả nào khác.
+            assert!(
+                patched.0 == StatusCode::OK
+                    || (patched.0 == StatusCode::CONFLICT && patched.1["code"] == "invoices.not_draft"),
+                "round {round}: {:?} {}",
+                patched.0,
+                patched.1
+            );
+            let issued = match issued {
+                Ok(issued) => issued,
+                Err(error) => {
+                    assert_eq!(error.code(), "invoices.draft_changed", "round {round}");
+                    assert_eq!(patched.0, StatusCode::OK, "round {round}");
+                    continue;
+                }
+            };
+            let base = issued.base_total.unwrap();
+            assert_eq!(base.minor(), issued.total.minor() * 250, "round {round}: {:?}", patched.0);
+            if patched.0 == StatusCode::OK {
+                assert_eq!(issued.lines[0].unit_price.minor(), 20_000, "round {round}");
+            }
+        }
         // Tỉ giá mới không đổi chứng từ đã phát hành; bút toán ghi cùng tỉ giá.
         let newer = json!({"base": "USD", "quote": "VND", "rate": "26000", "effective_date": today});
         call(&app, "clerk", "POST", "/api/v1/ledger/exchange-rates", Some(newer)).await;

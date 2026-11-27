@@ -17,8 +17,8 @@ use super::checkout::{body, checkout};
 use super::lifecycle::{count_events, status_of};
 use super::{
     Call, CodCollected, PaymentSucceeded, PreorderAllocated, PreorderDateChanged,
-    ShipmentDelivered, Shop, VariantUpdated, drain, emit, emit_from, keyed_shipment_event, minor,
-    shop,
+    ShipmentDelivered, ShipmentStatusChanged, Shop, VariantUpdated, drain, emit, emit_from,
+    keyed_shipment_event, minor, shop,
 };
 use crate::entity::line;
 
@@ -126,11 +126,24 @@ async fn don_tron_hang_san_va_dat_truoc_tach_hai_lan_giao() {
         // Gửi lại: cùng yêu cầu.
         let (_, again) = ship(&shop, id).await;
         assert_eq!(again["data"]["request_key"], key.as_str());
+        // Kiện đang đi đường: chưa đơn vị nào tới tay người mua, đơn chưa giao một phần.
+        let moving = keyed_shipment_event(id, &key, "in_transit", None);
+        emit_from(&shop, &shop.shipping_outbox, &ShipmentStatusChanged(moving)).await;
+        drain(&shop).await;
+        assert_eq!(status_of(&shop, id).await, "shipping");
+        let (_, found) = Call::as_user(&shop, "boss").send("GET", &format!("/{id}"), None).await;
+        assert_eq!(found["data"]["fulfillment_status"], "unfulfilled", "{found}");
         deliver(&shop, id, &key, Some(100_000)).await;
         // Còn hàng đặt trước chưa giao: đơn chưa `delivered`.
         assert_eq!(status_of(&shop, id).await, "shipping");
         let (_, found) = Call::as_user(&shop, "boss").send("GET", &format!("/{id}"), None).await;
         assert_eq!(found["data"]["payment_status"], "partially_paid");
+        // Lần giao lẻ tới tay người mua: báo kho xuất đúng phần đó (UT-1), đơn giao một phần.
+        assert_eq!(count_events(&shop, "orders.fulfillment_delivered").await, 1);
+        let shirt_line = line_of(&shop, id, shirt).await;
+        let arrived = fulfillment_delivered(&shop).await;
+        assert_eq!(arrived["lines"], json!([{"line_key": shirt_line.line_key, "variant_id": shirt, "quantity": 1, "delivered_quantity": 1, "serials": []}]), "{arrived}");
+        assert_eq!(found["data"]["fulfillment_status"], "partial");
         // Hàng chưa về: không có gì để giao.
         let (status, error) = ship(&shop, id).await;
         assert_eq!(status, StatusCode::CONFLICT, "{error}");
@@ -151,6 +164,10 @@ async fn don_tron_hang_san_va_dat_truoc_tach_hai_lan_giao() {
         assert_eq!(status_of(&shop, id).await, "delivered");
         let (_, found) = Call::as_user(&shop, "boss").send("GET", &format!("/{id}"), None).await;
         assert_eq!(found["data"]["payment_status"], "paid");
+        // Lần cuối cũng có event riêng; `orders.order_delivered` không còn phần nào chưa đi theo lần giao.
+        assert_eq!(count_events(&shop, "orders.fulfillment_delivered").await, 2);
+        assert_eq!(count_events(&shop, "orders.order_delivered").await, 1);
+        assert_eq!(found["data"]["fulfillment_status"], "fulfilled");
         assert_eq!(minor(&found["data"]["totals"]["paid"]), 330_000);
     })
     .await
@@ -219,4 +236,20 @@ async fn ngung_dat_truoc_huy_va_hoan_tien_tu_dong() {
     })
     .await
     .unwrap();
+}
+
+/// `after` của event `orders.fulfillment_delivered` (một event).
+async fn fulfillment_delivered(shop: &Shop) -> serde_json::Value {
+    use sea_orm::ConnectionTrait as _;
+    let read = shop.database().read();
+    let sql = "SELECT payload FROM orders_events WHERE name = $1";
+    let statement = autoxide_kernel::database::statement(
+        read.get_database_backend(),
+        sql,
+        ["orders.fulfillment_delivered".into()],
+    );
+    let row = read.query_one_raw(statement).await.unwrap().unwrap();
+    let payload: serde_json::Value =
+        serde_json::from_str(&row.try_get_by_index::<String>(0).unwrap()).unwrap();
+    payload["after"].clone()
 }

@@ -82,6 +82,27 @@ impl PlansService {
         self.databases.default_tenant()
     }
 
+    /// Xếp job xử lý hoá đơn của kỳ vừa huỷ (trong transaction huỷ kỳ): job `plans.invoice_period` thấy kỳ
+    /// `void` có hoá đơn thì huỷ / điều chỉnh giảm nó; lỗi giữa chừng thì job thử lại. Khoá `void-invoice:<kỳ>`: một
+    /// job.
+    pub(crate) async fn enqueue_void_invoice<C: ConnectionTrait>(
+        &self,
+        connection: &C,
+        period_id: Uuid,
+    ) -> Result<(), Error> {
+        if self.invoices.is_none() {
+            return Ok(());
+        }
+        self.jobs
+            .enqueue_database(
+                connection,
+                &InvoicePeriod { period_id },
+                EnqueueOptions::default().unique_key(format!("void-invoice:{period_id}")),
+            )
+            .await
+            .map(|_| ())
+    }
+
     /// Xếp job lập hoá đơn cho kỳ `period_id` (trong transaction mở kỳ).
     pub(crate) async fn enqueue_invoice<C: ConnectionTrait>(
         &self,
@@ -173,7 +194,12 @@ impl PlansService {
             invoices.create_document(&operator, Actor::system(), draft).await?.into_inner();
         let issued = match invoices.issue(&operator, Actor::system(), document.id).await {
             Ok(issued) => issued,
-            Err(error) if error.code() == "invoices.series_not_found" => {
+            Err(error)
+                if matches!(
+                    error.code(),
+                    "invoices.series_not_found" | "invoices.no_active_series"
+                ) =>
+            {
                 tracing::warn!(
                     period_id = %period_id,
                     "no invoice series for subscription invoices; create one with POST /api/v1/invoices/series"
@@ -284,10 +310,101 @@ impl PlansService {
         let (Some(invoices), Some(document)) = (&self.invoices, period.invoice_id) else {
             return Ok(());
         };
-        invoices
-            .cancel(&self.operator(), Actor::system(), document, "Billing period voided".to_owned())
+        let operator = self.operator();
+        match invoices
+            .cancel(&operator, Actor::system(), document, "Billing period voided".to_owned())
             .await
-            .map(|_| ())
+        {
+            Ok(_) => Ok(()),
+            // Hoá đơn điện tử đã gửi cơ quan thuế mà luật không cho huỷ (Việt Nam từ 01/6/2025): lập điều
+            // chỉnh giảm toàn bộ. `reference` cố định nên job chạy lại không lập hai lần.
+            // Lượt trước đã điều chỉnh xong (gốc thành `adjusted`): đi lại đường điều chỉnh — cùng `reference`
+            // nên trả lại đúng điều chỉnh đó, phát hành lại trả cùng số.
+            Err(error)
+                if matches!(
+                    error.code(),
+                    "invoices.einvoice_not_cancellable"
+                        | "invoices.einvoice_cancel_unsupported"
+                        | "invoices.not_cancellable"
+                ) =>
+            {
+                let Some(original) = invoices.document(&operator, document).await? else {
+                    return Ok(());
+                };
+                // `not_cancellable` khi gốc còn ở trạng thái huỷ được: trạng thái vừa đổi giữa lúc đọc và lúc khoá
+                // (vd `issued` → `submitting`) — lỗi tạm, để job thử lại (kiểm độc lập #575, N1).
+                if error.code() == "invoices.not_cancellable"
+                    && ["issued", "submitting", "accepted", "rejected"]
+                        .contains(&original.status.as_str())
+                {
+                    return Err(error);
+                }
+                // Gốc đã thay thế (hay ở trạng thái khác không huỷ, không điều chỉnh được): chạy lại không đổi được
+                // gì — lỗi vĩnh viễn, báo người vận hành qua log thay vì thử lại tới dead-letter queue.
+                if error.code() == "invoices.not_cancellable" && original.status != "adjusted" {
+                    tracing::warn!(
+                        period_id = %period.id,
+                        document_id = %document,
+                        status = original.status.as_str(),
+                        "voided period: its invoice can be neither cancelled nor adjusted; correct it by hand"
+                    );
+                    return Ok(());
+                }
+                // Dòng ghi chú (`note`) không có tiền: không điều chỉnh.
+                let lines = original
+                    .lines
+                    .iter()
+                    .filter(|line| line.kind != "note")
+                    .map(|line| {
+                        let quantity = line
+                            .quantity
+                            .parse::<rust_decimal::Decimal>()
+                            .map_err(|_| Error::internal("an invoice line has a bad quantity"))?;
+                        let mut back = NewDocumentLine::new(
+                            line.description.clone(),
+                            quantity,
+                            line.unit_price,
+                        );
+                        if line.kind == "service" {
+                            back = back.service();
+                        }
+                        if let Some(category) = &line.tax_category {
+                            back = back.tax_category(category.clone());
+                        }
+                        if let Some(unit) = &line.unit {
+                            back = back.unit(unit.clone());
+                        }
+                        if let Some(item) = &line.item_ref {
+                            back = back.item_ref(item.clone());
+                        }
+                        if line.discount.is_positive() {
+                            back.discount = Some(line.discount);
+                        }
+                        Ok(back)
+                    })
+                    .collect::<Result<Vec<_>, Error>>()?;
+                let reference = format!("plans:{}:void", period.id);
+                let adjustment = match invoices
+                    .adjust(&operator, Actor::system(), document, "decrease", lines, reference)
+                    .await
+                {
+                    Ok(adjustment) => adjustment.into_inner(),
+                    // Gốc đã được điều chỉnh bằng một chứng từ khác (không phải của lần chạy trước — lần đó cùng
+                    // `reference` nên được trả lại ở trên): không tự điều chỉnh thêm, báo người vận hành.
+                    Err(error) if error.code() == "invoices.not_correctable" => {
+                        tracing::warn!(
+                            period_id = %period.id,
+                            document_id = %document,
+                            "voided period: its invoice was already corrected by another document; check it by hand"
+                        );
+                        return Ok(());
+                    }
+                    Err(error) => return Err(error),
+                };
+                invoices.issue(&operator, Actor::system(), adjustment.id).await.map(|_| ())
+            }
+            Err(error) => Err(error),
+        }
     }
 }
 

@@ -469,6 +469,7 @@ name = "autoxide-catalog"
 version = "0.19.0"
 dependencies = [
  "async-trait",
+ "autoxide-compliance",
  "autoxide-files",
  "autoxide-kernel",
  "autoxide-media",
@@ -526,6 +527,7 @@ dependencies = [
  "autoxide-kernel",
  "autoxide-testkit",
  "axum",
+ "futures-util",
  "getrandom 0.4.3",
  "jiff",
  "sea-orm",
@@ -755,6 +757,7 @@ dependencies = [
  "axum",
  "futures-util",
  "jiff",
+ "metrics",
  "sea-orm",
  "serde",
  "serde_json",
@@ -814,6 +817,7 @@ dependencies = [
  "hyper",
  "hyper-util",
  "jiff",
+ "matchit",
  "metrics",
  "metrics-exporter-prometheus",
  "minijinja",
@@ -880,7 +884,7 @@ version = "0.19.0"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.119",
+ "syn 3.0.10",
 ]
 
 [[package]]
@@ -999,20 +1003,15 @@ dependencies = [
 name = "autoxide-notes"
 version = "0.19.0"
 dependencies = [
- "async-trait",
  "autoxide-kernel",
  "autoxide-testkit",
  "axum",
- "jiff",
  "serde",
  "serde_json",
  "tokio",
  "tower",
  "tracing",
- "utoipa",
- "utoipa-axum",
  "uuid",
- "validator",
 ]
 
 [[package]]
@@ -1250,6 +1249,7 @@ dependencies = [
  "async-trait",
  "autoxide-address",
  "autoxide-kernel",
+ "autoxide-organizations",
  "autoxide-testkit",
  "axum",
  "proptest",
@@ -6687,7 +6687,7 @@ dependencies = [
  "quote",
  "serde",
  "serde_json",
- "syn 2.0.119",
+ "syn 3.0.10",
 ]
 
 [[package]]

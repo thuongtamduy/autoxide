@@ -94,6 +94,12 @@ curl http://127.0.0.1:8080/health/ready
 
 `{"data":{"status":"ok"}}` nghĩa là máy chủ và database đã sẵn sàng.
 
+Image là distroless: không có shell, `curl` hay trình quản lý gói (bề mặt tấn công và số thứ cần vá nhỏ hơn), và chạy bằng user
+`10001`. Nó tự kiểm bằng chính binary: `autoxide healthcheck` hỏi máy chủ trên máy này ở `/health/ready` (`--live` cho
+`/health/live`) và thoát `0` khi nhận 200. `HEALTHCHECK` của image và service `app` trong `compose.yml` dùng lệnh này, nên
+`docker compose ps` hiện `healthy`. Muốn xem bên trong container đang chạy, dùng `docker debug` hay `kubectl debug`
+(container tạm có công cụ), không dùng `docker exec … sh`: không có `sh`.
+
 ### 3. Tạo quản trị viên đầu tiên
 
 ```bash
@@ -256,6 +262,31 @@ Ba lệnh này làm việc với khách mặc định. Khi có nhiều khách (`
 sudo -u autoxide autoxide user create --tenant acme --email owner@acme.example --name "Owner" --admin
 ```
 
+### 3b. Chạy thử bằng tay
+
+Trước khi dựng service, chạy ở foreground và đọc lại một thứ gì đó. Thứ tự quan trọng: `migrate up` (bước 3) tạo bảng,
+và `serve` từ chối khởi động khi còn migration chưa áp dụng (lần đầu có khoảng bốn trăm migration, chừng hai mươi giây).
+
+```bash
+cd /var/lib/autoxide
+sudo -u autoxide autoxide task address.import        # dữ liệu tham chiếu: đơn vị hành chính Việt Nam
+sudo -u autoxide autoxide serve                      # nghe ở 127.0.0.1:8080
+```
+
+Ở terminal khác:
+
+```bash
+curl http://127.0.0.1:8080/health/ready
+curl "http://127.0.0.1:8080/api/v1/address/provinces?limit=2"    # dữ liệu thật, không cần đăng nhập
+```
+
+Đổi cổng hay địa chỉ: `AUTOXIDE_HTTP_ADDRESS=0.0.0.0:9000` trong `.env` (tên đúng là vậy: không có
+`AUTOXIDE_PORT`). Biến `AUTOXIDE_…` gõ sai tên bị bỏ qua, nhưng `autoxide config` và log khởi động giờ nêu tên
+nó và gợi ý tên đúng.
+
+Giá trị có dấu cách hay ký tự đặc biệt trong `.env` phải nằm trong dấu nháy kép (`NAME="giá trị"`); khi một dòng
+không đọc được, thông báo lỗi nêu tên biến.
+
 ### 4. Chạy như một service
 
 `/etc/systemd/system/autoxide.service`:
@@ -312,10 +343,45 @@ sudo -u autoxide autoxide backup "backups/$(date +%F)"
 `autoxide restore <thư mục backup>` ở đó trước khi khởi động service.
 
 Với `AUTOXIDE_TENANCY_MODE=multi`, bản backup có database chính (sổ khách và mọi khách trên đó) và
-mọi file ở nơi lưu file chung, nhưng không có database của các placement khác, cũng không có nơi lưu
-file riêng của placement; lệnh in cảnh báo nêu tên chúng. Backup những thứ đó bằng công cụ của chính
-database (và của nơi lưu). Cất `AUTOXIDE_SECRET_KEY` ở nơi an toàn, tách khỏi bản
+mọi file ở nơi lưu file chung. Thêm `--all` để backup cả mọi placement khác, kèm nơi lưu file riêng của
+nó, vào `placements/<tên>/` của thư mục; không có thì lệnh in cảnh báo nêu tên chúng. Với `--all`,
+`backup.json` của database chính được ghi sau cùng: một placement lỗi thì lệnh dừng và báo lỗi, thư
+mục không phải bản backup trọn (xoá nó rồi chạy lại). Để lấy lại một placement đã mất: restore database
+chính trước nếu nó cũng mất, tạo một database mới, trống ở đúng địa chỉ của placement, rồi chạy
+`autoxide restore <thư mục backup> --placement <tên>`: lệnh restore vào chính placement đó (cùng tên,
+cùng id), không phải vào một placement mới. Dừng service trước, như với database chính; trong lúc lệnh
+chạy, placement ở trạng thái `migrating` và khách của nó nhận 503.
+
+`restore` kiểm toàn bộ bản backup (phiên bản, module đang tắt hay không có, file) trước khi chạm đích,
+nên restore bị từ chối thì đích vẫn trống: sửa cấu hình được nêu rồi chạy lại. Nếu lệnh dừng giữa chừng
+sau đó (đầy đĩa, mất kết nối), đích có một phần dữ liệu: xoá và tạo lại database đó rồi chạy lại.
+
+Bản backup giữ nguyên schema của nguồn: lệnh không đòi database đã migrate, nên backup được ngay trước
+khi nâng cấp, và bản đang chạy trước khi nâng restore được bản backup đó (`backup.json` liệt kê các
+migration nó có). Bản mới hơn cũng restore được. Từ bản này trở đi, bản cũ hơn nguồn từ chối với
+thông báo rõ (các bản trước đó báo lỗi migration). Bản backup làm trước 0.20 không có danh sách
+migration, nên `restore` không biết nó có dữ liệu của module mà bản build này thiếu hay không: restore
+chúng bằng bản build có đủ mọi module của nguồn. Đừng thêm file vào thư mục backup (`restore` đếm file
+trong `files/`, một file `.DS_Store` cũng làm nó từ chối). Bản backup chứa các
+module đang bật: module đang tắt mà còn dữ liệu thì lệnh dừng và nói cấu hình nào bật nó.
+Cất
+`AUTOXIDE_SECRET_KEY` ở nơi an toàn, tách khỏi bản
 backup: thiếu nó thì secret đã mã hoá trong bản backup không đọc được.
+
+## B+. Một binary với PostgreSQL, từ đầu
+
+Như B, với một máy chủ PostgreSQL bạn đã có (gói cài, database trên cloud; không cần Docker). Tạo database và
+người dùng, rồi đặt URL vào `.env` thay cho file SQLite:
+
+```bash
+sudo -u postgres psql -c "CREATE USER autoxide WITH PASSWORD 'chon-mat-khau-dai'" \
+  -c "CREATE DATABASE autoxide OWNER autoxide"
+printf 'DATABASE_URL=postgres://autoxide:chon-mat-khau-dai@127.0.0.1:5432/autoxide\n' >> /var/lib/autoxide/.env
+```
+
+Rồi làm các bước 3, 3b và 4 của B như đã viết (`migrate up`, tạo quản trị viên, `serve`). Nếu máy chủ không kết nối
+được, lỗi giờ nói lý do (ví dụ "connection refused" khi sai cổng) cạnh thông báo của pool; `autoxide doctor` kiểm
+kết nối và nói cần sửa gì.
 
 ## C. Một container với SQLite
 
@@ -393,7 +459,7 @@ database mới.
 | --- | --- |
 | `DATABASE_URL` | `sqlite://data/autoxide.sqlite` (mặc định) hoặc `postgres://user:password@host:5432/db` |
 | `AUTOXIDE_MODULES` | Module nào chạy: `official` (mặc định), `core`, `all`, tên để thêm, `-tên` để bỏ. Module thử nghiệm phải nêu tên. Xem [MODULES.vi.md](MODULES.vi.md) |
-| `AUTOXIDE_AUTH_TOKEN_SECRET` | Ký access token; bắt buộc ở production, giống nhau trên mọi máy chủ |
+| `AUTOXIDE_AUTH_TOKEN_SECRET` | Ký access token; nên đặt ở production (không đặt thì mỗi lần khởi động tạo khoá ngẫu nhiên và token hết hiệu lực khi khởi động lại), giống nhau trên mọi máy chủ |
 | `AUTOXIDE_SECRET_KEY` | Ký các token sống ngắn của mọi module và làm khoá băm địa chỉ IP của người lạ; không bắt buộc: không đặt thì máy chủ sinh một lần và lưu trong database. Khi chạy thật nên đặt (ngoài database, giống nhau trên mọi máy chủ): khoá nằm trong database thì ai có bản backup database cũng mở được các secret đã mã hoá và tính ngược được khối IP từ các bản băm đã lưu |
 | `AUTOXIDE_SECRET_KEY_PREVIOUS` | Các giá trị cũ của `AUTOXIDE_SECRET_KEY`, cách nhau dấu phẩy, trong lúc xoay khoá; bỏ đi sau khi chạy `autoxide secrets reseal` |
 | `AUTOXIDE_AUTH_TOKEN_SECRET_PREVIOUS` | Các giá trị cũ của `AUTOXIDE_AUTH_TOKEN_SECRET`, cách nhau dấu phẩy, trong lúc xoay khoá; chỉ dùng để kiểm token, bỏ đi sau thời gian sống của access token |
@@ -403,7 +469,7 @@ database mới.
 | `AUTOXIDE_HTTP_MAX_CONNECTIONS` | Số kết nối mở cùng lúc tối đa, tính cả WebSocket (mặc định `4096`, `0`: không giới hạn); quá số này thì kết nối mới phải chờ. Đặt thấp hơn giới hạn file mở (`ulimit -n`, thường 1024; systemd `LimitNOFILE`, `docker run --ulimit nofile=…`) và chừa chỗ cho kết nối database và file — máy chủ cảnh báo lúc khởi động khi không như vậy. Reverse proxy vẫn nên giới hạn số kết nối theo từng client |
 | `AUTOXIDE_HTTP_PUBLIC_URL` | Địa chỉ internet dùng để gọi API, vd `https://api.example.com`; cần cho link trỏ về API trong mail (huỷ đăng ký bản tin) |
 | `AUTOXIDE_HTTP_CORS_ORIGINS` | Trang web ở origin khác được gọi API; tên miền đã xác minh của khách được gọi cho chính khách đó mà không cần liệt kê, xem [Tên miền riêng của khách hàng](#tên-miền-riêng-của-khách-hàng) |
-| `AUTOXIDE_HTTP_HSTS_SECONDS` | Khi mọi client đã gọi API qua HTTPS: gửi `Strict-Transport-Security` (vd `31536000`, một năm); `autoxide doctor` nhắc khi URL công khai là `https://` mà biến này là `0`. Mọi response đã có sẵn `nosniff`, `Referrer-Policy`, `X-Frame-Options` và `Content-Security-Policy` chặt (`AUTOXIDE_HTTP_SECURITY_HEADERS`, `AUTOXIDE_HTTP_REFERRER_POLICY`) |
+| `AUTOXIDE_HTTP_HSTS_SECONDS` | `Strict-Transport-Security` **bật sẵn ở production**: khi `AUTOXIDE_HTTP_PUBLIC_URL` bắt đầu bằng `https://`, mọi response có `max-age=31536000` (một năm) nếu bạn không đặt biến này. Đặt số giây để đổi, hoặc `0` để tắt HSTS (vd khi còn client gọi host này bằng HTTP thường); `autoxide doctor` cảnh báo khi URL công khai là `https://` mà HSTS tắt. Không đặt URL công khai, hay URL `http://` (máy phát triển), thì không gửi HSTS. Trình duyệt bỏ qua header này trên HTTP thường, nên hãy dựng TLS phía trước API trước khi đặt URL công khai `https://`. Mọi response đã có sẵn `nosniff`, `Referrer-Policy`, `X-Frame-Options` và `Content-Security-Policy` chặt (`AUTOXIDE_HTTP_SECURITY_HEADERS`, `AUTOXIDE_HTTP_REFERRER_POLICY`) |
 | `AUTOXIDE_MAIL_SMTP_URL`, `AUTOXIDE_MAIL_FROM` | Gửi mail (đặt lại mật khẩu, xác minh email) |
 | `AUTOXIDE_FILES_S3_BUCKET` và `AWS_…` | Lưu file trên S3 hay dịch vụ tương thích S3; nên đặt thêm lifecycle rule cho bucket để huỷ multipart upload dở sau một ngày |
 | `AUTOXIDE_AUTH_PASSWORD_RESET_URL`, `AUTOXIDE_AUTH_EMAIL_VERIFICATION_URL` | Mail dẫn tới trang của bạn |
@@ -657,9 +723,17 @@ và `PATCH /api/v1/auth/customers/{id}` (permission `auth.customers.read`, `auth
 | Cài đặt | Tác dụng |
 | ------- | -------- |
 | `auth.staff_registration` | `true` / `false`: ai cũng tự tạo được tài khoản nhân sự (`POST /api/v1/auth/register`, hay đăng nhập lần đầu qua nhà cung cấp cho đăng ký). Chưa đặt: `AUTOXIDE_AUTH_SELF_REGISTRATION` |
-| `auth.password_min_length` | 12 tới 128: độ dài tối thiểu của mật khẩu mới. Chỉ nâng mức 12 của máy chủ |
+| `auth.password_min_length` | 15 tới 128: độ dài tối thiểu của mật khẩu mới. Chỉ nâng mức 15 của máy chủ |
 | `auth.session_days` | 1 tới 365: thời hạn mỗi refresh token. Chỉ rút ngắn `AUTOXIDE_AUTH_REFRESH_TOKEN_DAYS`; giá trị dài hơn bị bỏ qua |
 | `auth.totp_issuer` | Tên hiện trong app xác thực (không có `:`), thay `AUTOXIDE_AUTH_TOTP_ISSUER` |
+
+**Luật mật khẩu** (NIST SP 800-63B-4). Mật khẩu mới — lúc tự đăng ký, khi quản trị viên hay
+`autoxide user create` đặt, khi đổi, đặt lại và khi nhận lời mời — phải dài 15 đến 128 ký tự và không nằm
+trong danh sách mật khẩu phổ biến hoặc đã lộ đi kèm binary (khoảng 56.000 mục dài từ 15 ký tự; kiểm
+offline, không phân biệt hoa thường, không gửi gì ra ngoài máy chủ). Kể cả
+`AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD`: mật khẩu sai luật làm `autoxide serve` dừng lúc khởi động. Mật khẩu bị từ chối nhận `422` với mã trường
+`common_password`. Không có luật bắt buộc chữ số hay ký tự đặc biệt, và mật khẩu không hết hạn. Mật khẩu
+đang dùng vẫn đăng nhập được: luật chỉ áp khi đặt mật khẩu.
 
 **Mời nhân sự.** Thay vì tạo tài khoản kèm mật khẩu, hãy mời: `POST /api/v1/auth/invitations` với
 `email`, các `role_ids` và nút (`org_id`) họ nhận (permission `auth.invitations.manage`; không mời kèm
@@ -1254,6 +1328,36 @@ database theo hai bước ("mở rộng trước, thu hẹp sau"):
 (database chính rồi mọi database riêng của khách; ở chế độ một khách giống `migrate up`) trước khi
 bật máy chủ mới, rồi thay máy chủ cũ như mục "Cập nhật không làm rơi
 request".
+
+### Lùi về một bản trước
+
+`autoxide rollback --to X.Y.Z` đưa database chính và mọi database của khách về đúng các migration của
+bản `X.Y.Z` (từ 0.14.0 trở đi), để máy chủ của bản đó chạy lại được. Chạy bằng binary của bản đang rời
+đi: chỉ nó biết cách gỡ migration của chính nó.
+
+1. `autoxide rollback --to X.Y.Z --dry-run` liệt kê từng database: migration sẽ gỡ, bảng và cột sẽ bị
+   bỏ kèm số dòng hay giá trị đang có (cột chỉ chứa giá trị mặc định thì không mất gì), và số dòng một
+   bước gỡ sẽ xoá. Không đổi gì. Trên SQLite nó làm trên bản sao của database, trong một thư mục riêng
+   (`.autoxide-rollback-…`, chỉ user của máy chủ đọc được) cạnh file database, xoá khi xong: cần chỗ trống
+   bằng kích thước database ở đó. Lần chạy thật, khi máy chủ đã dừng, đo mà không chép. Trên PostgreSQL nó chạy
+   các bước gỡ trong một transaction rồi huỷ, nên trong lúc đó giữ lock trên các bảng nó đổi: chờ một
+   bảng đang bận tối đa `--lock-timeout-seconds` (mặc định 2) rồi dừng và báo — chạy lúc ít tải, hoặc
+   sau khi đã dừng máy chủ.
+2. Dừng mọi máy chủ và worker của bản hiện tại. Lần chạy thử cho thấy có dữ liệu sẽ mất thì backup
+   trước (`autoxide backup`).
+3. `autoxide rollback --to X.Y.Z --yes`, thêm `--accept-data-loss` khi có dữ liệu mất. Database của
+   khách trước, database chính sau cùng; database của khách nào hỏng thì database chính giữ nguyên:
+   sửa nguyên nhân rồi chạy lại đúng lệnh đó.
+4. Khởi động máy chủ của `X.Y.Z`.
+
+Module do binary của bạn tự ghép thêm (`.module(…)`) không có trong bảng phiên bản: lệnh lùi để nguyên
+migration của chúng và nói rõ; `--revert-untracked` gỡ cả chúng. Lần lùi được ghi thành một lượt migrate
+loại `rollback`; khi bản đích cũ hơn sổ ghi đó (0.19.0 trở về trước), lượt được đóng trước khi lùi
+database chính, và lỗi ở đó chỉ được in ra.
+
+Migration không trả lại được dữ liệu cho bản trước (bước thu hẹp của mở rộng–thu hẹp) làm lệnh từ
+chối; changelog liệt kê các migration như vậy ở mục ghi chú nâng cấp, và đường lùi qua chúng là bản
+backup lấy trước khi nâng.
 
 ## Kiểm trước khi chạy thật
 

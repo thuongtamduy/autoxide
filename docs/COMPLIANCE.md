@@ -15,7 +15,7 @@ What the module covers:
 
 | Part | Endpoints (under `/api/v1/compliance`) |
 | --- | --- |
-| Identity verification (KYC) of sellers, livestreamers, affiliates | `/kyc/…`, `/me/kyc…` |
+| Identity verification (KYC) of sellers, livestreamers, affiliates — profiles, checks and the gate `KycGate`; on a marketplace, `catalog` blocks listing goods of unverified sellers (see below) | `/kyc/…`, `/me/kyc…` |
 | Account verification for posting (phone / identity) | `/me/verification`, `/me/phone-verifications…` |
 | Versioned legal documents and proof of acceptance | `/documents…`, `/me/acceptances`, `/public/documents/{kind}` |
 | Consent ledger | `/me/consents` |
@@ -32,8 +32,12 @@ complaints, and tracking tags with cookie consent.
 
 ## The Ministry of Industry and Trade procedure
 
-Vietnamese law (Decree 52/2013/ND-CP as amended by Decree 85/2021/ND-CP; from 1 July 2026 also the
-E-commerce Law 122/2025/QH15 and its decrees — check the originals) requires:
+Vietnamese law (from 1 July 2026 the E-commerce Law 122/2025/QH15 and Decree 248/2026/ND-CP, which
+replaces Decrees 52/2013/ND-CP and 85/2021/ND-CP; before that, those two decrees — check the originals)
+requires the items below. The rules `moit.checklist.*` version 2 apply from 1 July 2026. A website notified or
+registered before then files again under the new decree within the transition period (one summary says 30 June
+2027 — not confirmed); electronic identity checks of sellers and livestreamers apply from 1 January 2027. Which
+authority receives the files, whether online.gov.vn and the logos stay, is not confirmed yet — check.
 
 - a **sales website** (you sell your own goods) to be **notified** to the ministry — it then shows a
   blue "Đã thông báo Bộ Công Thương" logo;
@@ -216,10 +220,49 @@ forever). The limits shipped are cautious defaults, not numbers from the law. `a
 data is kept — the input of a data protection impact assessment, whose official form needs a legal
 professional.
 
+### Not covered yet (before 1.0)
+
+Findings of the first legal review (AI-performed, not legal advice; `docs/legal/review-2026-11-r1/`) that core does
+not handle yet. Until they are done, the deployer covers them:
+
+- **Seller identity before selling.** The legal rule `kyc.required_activities` asks for verified sellers,
+  livestreamers and affiliates (E-commerce Law 122/2025/QH15; Decree 248/2026/ND-CP Article 18, electronic identity
+  of sellers from 1 January 2027 — check the originals). When the tenant is a marketplace
+  (`kernel.business_model = marketplace`), `catalog` asks `KycGate` before a product of a seller (any branch other
+  than the tenant's root) goes `active`. The seller is the owning branch or a branch above it, below the root
+  (marketplace → seller → store): one verified branch in that chain is enough. An unverified seller gets
+  `compliance.kyc_required` (403); goods of the root and tenants that sell their own goods are not asked. If module
+  `compliance` is turned off (for example `AUTOXIDE_MODULES=official,-compliance`), identity cannot be checked, so
+  goods of a seller cannot go on sale on a marketplace (`catalog.seller_verification_unavailable`, 403). Only the
+  change to `active` is checked: goods already on sale stay on sale when the tenant becomes a marketplace, the rule
+  starts to apply or a seller's verification expires or is revoked — stop them yourself
+  (`POST /api/v1/catalog/products/{id}/status`). A marketplace that gives each seller its own child tenant instead
+  of a branch is not checked this way: each child tenant sells its own goods. Still open: livestream and affiliate flows (no module
+  yet), and the profile does not record every item Article 18 lists — individuals: full name, date of birth,
+  personal identification number (one source adds residential address); organisations and household businesses:
+  name, head office, identification number, legal representative; foreign individuals: passport (or equivalent)
+  number and issuing country, valid at least 6 more months at review. The profile keeps the verified name and a
+  hash and last 4 digits of the document; the other items stay with the eKYC provider. Check the originals before
+  relying on this.
+- **Personal data of children.** Law 91/2025/QH15 sets special rules for children and persons under guardianship
+  (consent of a parent or guardian; from age 7 also the child's — the article and ages need checking). Core has no
+  birth date, age check or guardian consent: a service aimed at children must collect and keep the guardian's
+  consent itself. Planned after 1.0: a per-tenant setting, self-declared age at sign-up and consent given on
+  someone's behalf in the consent ledger.
+- **Data sent abroad by providers.** The AI providers of module `ai`, mail, SMS and file storage may process
+  personal data outside Vietnam; they are not added to the processing register by themselves. Add each provider
+  as a recipient (name, country) of the purposes that use it (`POST /purposes`, `PATCH /purposes/{key}`), and
+  prepare the impact assessment for transfers abroad (Decree 356/2025/ND-CP — form and exemptions for small
+  businesses need checking). Planned after 1.0: modules declare their processors (`Module::processors`) and
+  `autoxide doctor` warns about recipients abroad.
+
 ### Data residency
 
-A tenant can be required to keep its data in one country (Cybersecurity Law 116/2025/QH15, Decree
-53/2022/ND-CP — who must keep data in Vietnam needs a legal check):
+A tenant can be required to keep its data in one country (Cybersecurity Law 116/2025/QH15, in force 1 July
+2026, replacing the Cybersecurity Law 2018 and the Network Information Security Law 2015 — secondary sources,
+to check; its implementing
+decree, reported as Decree 333/2026/ND-CP, replaces Decree 53/2022/ND-CP — not confirmed. Who must keep data in
+Vietnam needs a legal check):
 
 ```bash
 autoxide placement country main VN          # record where a placement's servers are
@@ -267,7 +310,10 @@ phone or from an authority is recorded so it is not lost:
 - `POST /subject-requests` with `kind` (`access`, `erasure`, `rectification`, `objection`, `restriction`,
   `withdrawal`), `channel` (`email`, `post`, `phone`, `authority`, `other`), `subject` (a user id, an email
   address or a phone number) and `received_at`. `due_at` comes from the legal rule `privacy.subject_requests`
-  in force when it was received (72 hours by default — check the original texts).
+  in force when it was received: 72 hours, stricter than the 2 working days to answer of Decree 356/2025/ND-CP
+  Article 5 (which replaced Decree 13/2023/ND-CP). Version 2 of the rule also lists the days to carry the
+  request out by kind (`fulfil_within_days`, from secondary sources) for reference; Autoxide does not track
+  that second deadline yet — check the original texts.
 - `POST /subject-requests/{id}/fulfil`: `access` of a user returns the personal data of every module (send
   it to the person; it is not stored); `erasure` / `withdrawal` of an email or phone number empties it from
   the consent ledger (the hashed key and the records stay as proof, so nothing is sent again). Erasing a
@@ -285,7 +331,8 @@ the identity verification result stay for the time the law requires. The persona
 Intellectual property infringements, counterfeits and prohibited goods are reported as **cases**;
 so are consumer complaints. A case goes: intake → (hide the target) → answer of the reported party →
 decision, with deadlines and a log that only grows. Basis — check the original texts: E-commerce Law
-2025, Intellectual Property Law, Decree 85/2021/ND-CP (take-down on request of an authority), Consumer
+122/2025/QH15 and Decree 248/2026/ND-CP (from 1 July 2026; take-down on request of an authority, Decree
+85/2021/ND-CP before), Intellectual Property Law, Consumer
 Protection Law 19/2023/QH15 and Decree 55/2024/ND-CP (complaints).
 
 | Who | Endpoints (under `/api/v1/compliance`) |
@@ -338,7 +385,10 @@ MCP tools: `compliance.list_cases`, `compliance.get_case` (read), `compliance.ad
 
 - **Hiding reviews.** Content of consumers may be hidden only for the reasons of the legal rule
   `moderation.hide_reasons` (`spam`, `illegal_content`, `personal_data`, `unrelated`, `offensive` — to
-  check). Modules that moderate reviews ask the trait `ModerationPolicy` before hiding
+  check). Modules that moderate reviews ask the trait `ModerationPolicy` (`autoxide_kernel::moderation`)
+  before hiding — `orders` maps its own reasons (`unlawful_content` → `illegal_content`, `abusive_language` →
+  `offensive`, `spam_or_advertising` → `spam`, `not_about_product` → `unrelated`), so a reason a tenant adds
+  to its list cannot hide a review while `compliance` is installed
   (`compliance.hide_reason_not_allowed`, 422) and record the reason in their own event; the list is
   public at `GET /public/moderation-reasons`. A negative but lawful review stays visible.
 - **General conditions of trade** are a versioned legal document of kind `general_conditions`, public at

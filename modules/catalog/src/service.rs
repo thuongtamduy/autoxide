@@ -64,6 +64,9 @@ pub(crate) struct CatalogService {
     pub(crate) sale_prices: std::sync::OnceLock<Arc<dyn crate::api::SalePriceSource>>,
     /// Điều kiện mở bán do `marketplace` cắm vào (bước 46).
     pub(crate) listing_gate: std::sync::OnceLock<Arc<dyn crate::api::ListingGate>>,
+    /// `dyn KycGate` của `compliance` khi đã cài (đăng ký trước `catalog`): người bán trên sàn phải định danh
+    /// trước khi mở bán (LG-3).
+    pub(crate) kyc: Option<Arc<dyn autoxide_compliance::api::KycGate>>,
     /// Sổ nguồn gợi ý tìm của mọi module (kernel), cho `GET /public/search/suggest`.
     pub(crate) suggestions: autoxide_kernel::suggest::SuggestSources,
     /// `dyn Embedder` của module `ai` khi đã cài: sản phẩm tương tự theo ý nghĩa.

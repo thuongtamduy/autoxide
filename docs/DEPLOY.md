@@ -96,6 +96,12 @@ curl http://127.0.0.1:8080/health/ready
 
 `{"data":{"status":"ok"}}` means the server and its database are ready.
 
+The image is distroless: it has no shell, `curl` or package manager (a smaller surface to attack and to patch), and runs as user
+`10001`. It checks itself with its own binary: `autoxide healthcheck` asks the server on this machine for `/health/ready`
+(`--live` for `/health/live`) and exits `0` when it answers 200. The image's `HEALTHCHECK` and the `app` service of
+`compose.yml` use it, so `docker compose ps` shows `healthy`. To look inside a running container use
+`docker debug` or `kubectl debug` (an ephemeral container with tools), not `docker exec … sh`: there is no `sh`.
+
 ### 3. Create the first administrator
 
 ```bash
@@ -260,6 +266,32 @@ for example its first administrator:
 sudo -u autoxide autoxide user create --tenant acme --email owner@acme.example --name "Owner" --admin
 ```
 
+### 3b. Try it by hand
+
+Before setting up a service, run it in the foreground and read something back. Order matters: `migrate up`
+(step 3) creates the tables, and `serve` refuses to start while migrations are pending (a first start applies
+about four hundred of them, around twenty seconds).
+
+```bash
+cd /var/lib/autoxide
+sudo -u autoxide autoxide task address.import        # reference data: the administrative units of Vietnam
+sudo -u autoxide autoxide serve                      # listens on 127.0.0.1:8080
+```
+
+In another terminal:
+
+```bash
+curl http://127.0.0.1:8080/health/ready
+curl "http://127.0.0.1:8080/api/v1/address/provinces?limit=2"    # real data, no sign-in needed
+```
+
+Another port or address: `AUTOXIDE_HTTP_ADDRESS=0.0.0.0:9000` in `.env` (the name is exactly that: there is no
+`AUTOXIDE_PORT`). A misspelled `AUTOXIDE_…` variable is ignored, but `autoxide config` and the start-up log now
+name it and suggest the right one.
+
+A value with spaces or special characters in `.env` goes in double quotes (`NAME="my value"`); the error names
+the variable when a line cannot be read.
+
 ### 4. Run as a service
 
 `/etc/systemd/system/autoxide.service`:
@@ -316,11 +348,48 @@ To restore on a new machine, prepare the directory (steps 1–2), then run
 `autoxide restore <backup directory>` there before starting the service.
 
 With `AUTOXIDE_TENANCY_MODE=multi`, the backup holds the main database (the tenant register and
-every tenant on it) and all files of the shared file storage, but not the databases of other
-placements nor a placement's own file storage; the command prints a warning naming them. Back
-those up with the database's (and the storage's) own tools. Keep
+every tenant on it) and all files of the shared file storage. Add `--all` to back up every other
+placement too, with its own file storage, into `placements/<name>/` of the directory; without it
+the command prints a warning naming them. With `--all`, `backup.json` of the main database is
+written last: if a placement fails, the command stops with an error and the directory is not a
+complete backup (remove it and run again). To bring back a lost placement, restore the main
+database first if it was lost too, create a new, empty database at the placement's address, then
+run `autoxide restore <backup directory> --placement <name>`: it restores into that same
+placement (same name and id), not into a new one. Stop the service first, as for the main
+database; while the command runs, the placement is marked `migrating` and its tenants get 503.
+
+`restore` checks the whole backup (release, modules turned off or missing, files) before it
+touches the target, so a refused restore leaves the target empty: fix the setting it names and run
+it again. If it stops later (disk full, connection lost), the target holds part of the data: drop
+and recreate that database, then run it again.
+
+A backup keeps the schema of its source exactly as it is: the command does not need the database
+migrated first, so you can back up right before an upgrade, and the release you upgrade from can
+restore that backup (`backup.json` lists the migrations it holds). A newer release restores it
+too. From this release on, an older release than the source refuses it with a clear message
+(earlier releases fail with a migration error). A backup written before 0.20 has no list of
+migrations, so `restore` cannot tell whether it holds data of a module this build lacks: restore
+those with a build that has every module the source had. Do not add files to a backup directory
+(`restore` counts the files under `files/`, so even a `.DS_Store` makes it refuse). The backup holds the modules that are turned on: if
+a module that is turned off still has data, the command stops and says which setting turns it on.
+Keep
 `AUTOXIDE_SECRET_KEY` in a safe place apart from the backups: without it, the encrypted secrets in
 a backup cannot be read.
+
+## B+. One binary with PostgreSQL, from scratch
+
+Same as B, with a PostgreSQL server you already run (a package, a cloud database; Docker is not needed). Create
+a database and a user, then put the URL in `.env` instead of the SQLite file:
+
+```bash
+sudo -u postgres psql -c "CREATE USER autoxide WITH PASSWORD 'choose-a-long-password'" \
+  -c "CREATE DATABASE autoxide OWNER autoxide"
+printf 'DATABASE_URL=postgres://autoxide:choose-a-long-password@127.0.0.1:5432/autoxide\n' >> /var/lib/autoxide/.env
+```
+
+Then B steps 3, 3b and 4 as written (`migrate up`, create the administrator, `serve`). If the server cannot connect,
+the error now says why (for example "connection refused" for a wrong port) next to the pool message; `autoxide
+doctor` checks the connection and says what to fix.
 
 ## C. One container with SQLite
 
@@ -397,7 +466,7 @@ into a new database.
 | --- | --- |
 | `DATABASE_URL` | `sqlite://data/autoxide.sqlite` (default) or `postgres://user:password@host:5432/db` |
 | `AUTOXIDE_MODULES` | Which modules run: `official` (default), `core`, `all`, names to add, `-name` to leave out. Experimental modules must be named. See [MODULES.md](MODULES.md) |
-| `AUTOXIDE_AUTH_TOKEN_SECRET` | Signs access tokens; required in production, the same on every server |
+| `AUTOXIDE_AUTH_TOKEN_SECRET` | Signs access tokens; recommended in production (without it a random key is made at start and tokens stop working after a restart), the same on every server |
 | `AUTOXIDE_SECRET_KEY` | Signs short-lived tokens of every module and keys the hashes of visitors' IP addresses; optional: when unset, one is generated once and kept in the database. Set it (outside the database, the same on every server) in production: with the key in the database, anyone holding a database backup can open the secrets stored encrypted and work the IP blocks back out of the stored hashes |
 | `AUTOXIDE_SECRET_KEY_PREVIOUS` | Old values of `AUTOXIDE_SECRET_KEY`, separated by commas, while rotating the key; remove them after `autoxide secrets reseal` |
 | `AUTOXIDE_AUTH_TOKEN_SECRET_PREVIOUS` | Old values of `AUTOXIDE_AUTH_TOKEN_SECRET`, separated by commas, while rotating it; only used to check tokens, remove after the access token lifetime |
@@ -407,7 +476,7 @@ into a new database.
 | `AUTOXIDE_HTTP_MAX_CONNECTIONS` | Most open connections at once, WebSockets included (default `4096`, `0`: no limit); over it new connections wait. Keep it below the open file limit (`ulimit -n`, often 1024; systemd `LimitNOFILE`, `docker run --ulimit nofile=…`) with some room for database connections and files — the server warns at startup when it is not. Your reverse proxy should still limit connections per client |
 | `AUTOXIDE_HTTP_PUBLIC_URL` | The address the internet reaches the API at, e.g. `https://api.example.com`; needed for links back to the API in mail (newsletter unsubscribe) |
 | `AUTOXIDE_HTTP_CORS_ORIGINS` | Web pages on other origins allowed to call the API; tenants' verified domains are allowed for their own tenant without being listed, see [Custom domains of tenants](#custom-domains-of-tenants) |
-| `AUTOXIDE_HTTP_HSTS_SECONDS` | Once every client reaches the API over HTTPS: send `Strict-Transport-Security` (e.g. `31536000`, one year); `autoxide doctor` reminds you when the public URL is `https://` and this is `0`. Every response already carries `nosniff`, `Referrer-Policy`, `X-Frame-Options` and a strict `Content-Security-Policy` (`AUTOXIDE_HTTP_SECURITY_HEADERS`, `AUTOXIDE_HTTP_REFERRER_POLICY`) |
+| `AUTOXIDE_HTTP_HSTS_SECONDS` | `Strict-Transport-Security` is **on by default in production**: when `AUTOXIDE_HTTP_PUBLIC_URL` starts with `https://`, every response carries `max-age=31536000` (one year) unless you set this. Set a number of seconds to change it, or `0` to turn HSTS off (for example while some clients still use plain HTTP to this host); `autoxide doctor` warns when the public URL is `https://` and HSTS is off. Without a public URL, or with an `http://` one (development), no HSTS is sent. Browsers ignore the header on plain HTTP, so terminate TLS in front of the API before you set an `https://` public URL. Every response already carries `nosniff`, `Referrer-Policy`, `X-Frame-Options` and a strict `Content-Security-Policy` (`AUTOXIDE_HTTP_SECURITY_HEADERS`, `AUTOXIDE_HTTP_REFERRER_POLICY`) |
 | `AUTOXIDE_MAIL_SMTP_URL`, `AUTOXIDE_MAIL_FROM` | Send mail (password reset, email verification) |
 | `AUTOXIDE_FILES_S3_BUCKET` and `AWS_…` | Store files in S3 or an S3-compatible service; also add a bucket lifecycle rule that aborts incomplete multipart uploads after a day |
 | `AUTOXIDE_AUTH_PASSWORD_RESET_URL`, `AUTOXIDE_AUTH_EMAIL_VERIFICATION_URL` | Link mails to your own pages |
@@ -677,9 +746,17 @@ limits:
 | Setting | Effect |
 | ------- | ------ |
 | `auth.staff_registration` | `true` / `false`: anyone may create their own staff account (`POST /api/v1/auth/register`, or a first sign-in with a provider that allows sign-up). Unset: `AUTOXIDE_AUTH_SELF_REGISTRATION` |
-| `auth.password_min_length` | 12 to 128: shortest new password. Only raises the server's minimum of 12 |
+| `auth.password_min_length` | 15 to 128: shortest new password. Only raises the server's minimum of 15 |
 | `auth.session_days` | 1 to 365: lifetime of each refresh token. Only shortens `AUTOXIDE_AUTH_REFRESH_TOKEN_DAYS`; a longer value is ignored |
 | `auth.totp_issuer` | Name shown in authenticator apps (no `:`), instead of `AUTOXIDE_AUTH_TOTP_ISSUER` |
+
+**Password rules** (NIST SP 800-63B-4). A new password — at sign-up, when an administrator or
+`autoxide user create` sets one, on change, reset and when accepting an invitation — must be 15 to 128
+characters and must not be on the list of common or breached passwords that ships inside the binary
+(about 56,000 entries of 15 characters or more; checked offline, case-insensitively, nothing leaves
+the server). This includes `AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD`: a password that breaks the rules stops
+`autoxide serve` at startup. A refused password gets `422` with field code `common_password`. There are no rules about digits or symbols,
+and passwords never expire. Existing passwords keep working: the rules apply when a password is set.
 
 **Inviting staff.** Instead of creating accounts with passwords, invite people:
 `POST /api/v1/auth/invitations` with an `email`, the `role_ids` and the unit (`org_id`) they get
@@ -1304,6 +1381,39 @@ changes the database in two steps ("expand, then contract"):
 (the main database, then every tenant database; the same as `migrate up` in single-tenant mode)
 before starting the new servers, then replace the old ones as in
 "Updating without dropping requests".
+
+### Rolling back to an earlier release
+
+`autoxide rollback --to X.Y.Z` brings the main database and every tenant database back to the
+migrations of release `X.Y.Z` (0.14.0 or later), so the servers of that release start again. Run it
+with the binary of the release you are leaving: only it knows how to revert its own migrations.
+
+1. `autoxide rollback --to X.Y.Z --dry-run` lists, per database, the migrations it would revert, the
+   tables and columns it would drop with how many rows or values they hold (a column that only holds
+   its default value loses nothing), and the rows a revert deletes. It changes nothing. On SQLite it
+   works on a copy of the database, in a private directory (`.autoxide-rollback-…`, readable by the
+   server's user only) next to the database file, deleted when it is done: keep free space the size
+   of the database there. The real run, once the servers are stopped, measures without a copy. On
+   PostgreSQL it runs the reverts inside a transaction that is
+   rolled back, so for that time it holds locks on the tables it changes: it waits at most
+   `--lock-timeout-seconds` (default 2) for a busy table, then stops and says so — run it when the
+   load is low, or once the servers are stopped.
+2. Stop every server and worker of the current release. If the dry run shows data that would be
+   dropped, take a backup first (`autoxide backup`).
+3. `autoxide rollback --to X.Y.Z --yes`, adding `--accept-data-loss` when data is dropped. Tenant
+   databases go first, the main database last; if a tenant database fails, the main database is
+   left as it is: fix the cause and run the same command again.
+4. Start the servers of `X.Y.Z`.
+
+Modules your own binary adds (`.module(…)`) are not in the release table: the rollback leaves their
+migrations as they are and says so; `--revert-untracked` reverts them too. The rollback is recorded as
+a migration run of kind `rollback`; when the target release predates that record (0.19.0 and
+earlier), the run is closed before the main database is rolled back, and an error there is only
+printed.
+
+A migration that cannot give an earlier release its data back (the contract step of an expand–contract
+change) refuses the rollback; the changelog lists such migrations under the upgrade notes, and the way
+back across them is the backup taken before the upgrade.
 
 ## Checklist before going live
 

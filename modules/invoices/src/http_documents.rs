@@ -147,6 +147,8 @@ async fn list_documents(
     Query(query): Query<DocumentsQuery>,
     Query(page): Query<PageQuery>,
 ) -> Result<Page<Document>, Error> {
+    // Quyền trước tham số trang: thiếu quyền là 403, không phải 422 (luật `permission-first` của xtask).
+    principal.require(&crate::permissions::READ)?;
     let filter = DocumentFilter {
         org: query.org_id.map(OrgId::from_uuid),
         kind: query.kind,
@@ -311,7 +313,7 @@ async fn delete_document(
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing `invoices.issue` (`permission_denied`), the unit is frozen (`org_frozen`), or no mandate for the seller (`invoices.mandate_missing`).", body = Problem),
         (status = 404, description = "No such document (`invoices.document_not_found`) or no series for it (`invoices.series_not_found`).", body = Problem),
-        (status = 409, description = "The series is retired (`invoices.series_inactive`) or the booking day is in a closed period (`ledger.period_closed`).", body = Problem),
+        (status = 409, description = "No active series for the unit, kind and year of issue (`invoices.no_active_series`; create one), the series is retired (`invoices.series_inactive`), the booking day is in a closed period (`ledger.period_closed`), or the draft was edited while being issued (`invoices.draft_changed`; issue again).", body = Problem),
         (status = 422, description = "The series does not fit the document; every problem in `errors`.", body = Problem),
     )
 )]
@@ -367,7 +369,9 @@ pub(crate) struct CancelRequest {
 /// Cancel an issued document.
 ///
 /// Requires `invoices.correct` on the unit. Tells the e-invoice provider, and reverses the booking.
-/// Cancelling a cancelled document returns it.
+/// Cancelling a cancelled document returns it. An e-invoice sent to the tax authority cannot be cancelled
+/// where the seller's tax jurisdiction forbids it (Vietnam since 2025-06-01): use `adjust` (decrease) or
+/// `replace` instead. An e-invoice the tax authority rejected is cancelled here only.
 #[utoipa::path(
     post,
     path = "/documents/{id}/cancel",
@@ -381,7 +385,7 @@ pub(crate) struct CancelRequest {
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing `invoices.correct`; code `permission_denied`.", body = Problem),
         (status = 404, description = "No such document in your scope; code `invoices.document_not_found`.", body = Problem),
-        (status = 409, description = "A draft or a corrected document cannot be cancelled; code `invoices.not_cancellable`.", body = Problem),
+        (status = 409, description = "A draft or a corrected document cannot be cancelled (`invoices.not_cancellable`); an e-invoice sent to the tax authority whose law forbids cancelling (`invoices.einvoice_not_cancellable`, with `legal_basis`), or whose provider cannot cancel it (`invoices.einvoice_cancel_unsupported`); adjust or replace it instead.", body = Problem),
         (status = 503, description = "The e-invoice provider did not answer (`einvoice.provider_unavailable`).", body = Problem),
     )
 )]

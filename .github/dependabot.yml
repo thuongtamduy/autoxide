@@ -19,6 +19,11 @@ updates:
       # Bỏ dòng này khi nâng `webauthn_rp` lên bản dùng `p256` 0.14 (D-092).
       - dependency-name: p256
         versions: [">= 0.14"]
+      # `matchit` phải chỉ có một bản trong Cargo.lock, cùng bản với `axum` dùng (luật `single-copy` của
+      # `cargo xtask check`, D-20261127-http-layer-choices). `axum` hiện dùng matchit 0.8; 0.x nên bản minor cũng là
+      # phá vỡ. Điều kiện gỡ: khi `axum` lên bản dùng matchit mới thì nâng cả hai cùng lúc và xoá mục này.
+      - dependency-name: matchit
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
   # Workspace riêng của fuzz/ (libFuzzer, Cargo.lock riêng): không nằm trong Cargo.lock gốc nên cần mục riêng để được nâng cấp
   # và cảnh báo lỗ hổng (G8).
   - package-ecosystem: cargo
@@ -31,6 +36,11 @@ updates:
     groups:
       fuzz:
         update-types: [minor, patch]
+    ignore:
+      # Cùng lý do với mục gốc: fuzz/Cargo.lock cũng ghim matchit 0.8.4, nâng riêng ở đây sẽ lệch khỏi bản của workspace gốc.
+      # Gỡ cùng lúc với mục gốc.
+      - dependency-name: matchit
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
   # SDK TypeScript: chỉ có phụ thuộc lúc phát triển (TypeScript để kiểm kiểu). Một PR mỗi tuần cho mọi bản.
   - package-ecosystem: npm
     directory: /sdk/typescript
@@ -40,6 +50,16 @@ updates:
       default-days: 7
     groups:
       npm:
+        patterns: ["*"]
+  # Client MCP chính thức cho bài kiểm OAuth đầu-cuối của CI (job `mcp-oauth`, D-20261127-mcp-sdk-ci-check).
+  - package-ecosystem: npm
+    directory: /scripts/mcp-oauth
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      mcp-oauth:
         patterns: ["*"]
   # Image nền của Dockerfile và image gitleaks của secret scan (.github/gitleaks/Dockerfile), đều ghim theo digest.
   - package-ecosystem: docker

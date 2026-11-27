@@ -158,7 +158,9 @@ impl Module for MailModule {
             .clone()
             .ok_or_else(|| Error::internal("module `mail` started before it was configured"))?;
         if config.smtp_url.is_none() {
-            tracing::warn!(
+            // Mức info lúc khởi động: `migrate`, `backup`, `user create`… cũng khởi động module mà không gửi thư nào.
+            // Cảnh báo (warn) đến đúng lúc có thư thật sự bị ghi ra file (`transport.rs`), và `autoxide doctor` nêu nó.
+            tracing::info!(
                 directory = %config.file_dir.display(),
                 "AUTOXIDE_MAIL_SMTP_URL is not set: mail is written to files instead of being \
                  sent; set it for production"

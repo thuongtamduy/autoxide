@@ -2,16 +2,21 @@
 
 pub mod ai;
 pub mod backup;
+mod backup_checks;
+mod backup_placements;
 pub mod config;
 pub mod copy;
 pub mod demo;
 pub mod doctor;
+pub mod healthcheck;
+pub mod initial_password;
 pub mod jobs;
 pub mod mcp_manifest;
 pub mod migrate;
 pub mod modules;
 pub mod openapi;
 pub mod placement;
+pub mod rollback;
 pub mod secrets;
 pub mod serve;
 pub mod task;

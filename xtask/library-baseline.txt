@@ -2,43 +2,53 @@
 # `<luật> <số chỗ tối đa> <đường dẫn>` như `security-baseline.txt`. Chỉ được giảm: chuyển xong một module thì
 # xoá dòng của nó (gate chỉ cảnh báo khi số thật nhỏ hơn). Không thêm dòng cho code mới.
 #
-# - `wrapped-libraries`: module còn khai thư viện trong `wrapped-libraries.txt` (đếm theo số thư viện).
+# - `wrapped-libraries`: module còn khai thư viện trong `wrapped-libraries.txt` ở `[dependencies]` (đếm theo số thư viện).
+# - `wrapped-libraries-dev`: như trên, ở `[dev-dependencies]` (test, bench); chờ testkit bọc kiểu `http`.
 # - `raw-sql`: số chỗ gọi `.sql(` trong mã không phải test của file.
 # - `raw-database`: số chỗ gọi `.database()` (database thô, không lọc khách) trong mã không phải test của file.
 
-wrapped-libraries 1 modules/address/Cargo.toml
-wrapped-libraries 1 modules/ai/Cargo.toml
-wrapped-libraries 1 modules/analytics/Cargo.toml
-wrapped-libraries 1 modules/audit/Cargo.toml
-wrapped-libraries 1 modules/auth/Cargo.toml
-wrapped-libraries 1 modules/automations/Cargo.toml
-wrapped-libraries 1 modules/bookings/Cargo.toml
-wrapped-libraries 1 modules/catalog/Cargo.toml
-wrapped-libraries 1 modules/comments/Cargo.toml
-wrapped-libraries 1 modules/compliance/Cargo.toml
-wrapped-libraries 1 modules/content/Cargo.toml
-wrapped-libraries 1 modules/conversations/Cargo.toml
-wrapped-libraries 1 modules/customers/Cargo.toml
-wrapped-libraries 1 modules/files/Cargo.toml
-wrapped-libraries 1 modules/forms/Cargo.toml
-wrapped-libraries 1 modules/idempotency/Cargo.toml
-wrapped-libraries 1 modules/inventory/Cargo.toml
-wrapped-libraries 1 modules/invoices/Cargo.toml
-wrapped-libraries 1 modules/ledger/Cargo.toml
-wrapped-libraries 1 modules/mail/Cargo.toml
-wrapped-libraries 1 modules/media/Cargo.toml
-wrapped-libraries 1 modules/menus/Cargo.toml
-wrapped-libraries 1 modules/newsletter/Cargo.toml
-wrapped-libraries 1 modules/notifications/Cargo.toml
-wrapped-libraries 1 modules/orders/Cargo.toml
-wrapped-libraries 1 modules/organizations/Cargo.toml
-wrapped-libraries 1 modules/plans/Cargo.toml
-wrapped-libraries 1 modules/promotions/Cargo.toml
-wrapped-libraries 1 modules/reporting/Cargo.toml
-wrapped-libraries 1 modules/shipping/Cargo.toml
-wrapped-libraries 1 modules/support/Cargo.toml
-wrapped-libraries 1 modules/tax/Cargo.toml
-wrapped-libraries 1 modules/webhooks/Cargo.toml
+wrapped-libraries 6 modules/address/Cargo.toml
+wrapped-libraries 6 modules/ai/Cargo.toml
+wrapped-libraries 7 modules/analytics/Cargo.toml
+wrapped-libraries 7 modules/audit/Cargo.toml
+wrapped-libraries 7 modules/auth/Cargo.toml
+wrapped-libraries 7 modules/automations/Cargo.toml
+wrapped-libraries 7 modules/bookings/Cargo.toml
+wrapped-libraries 7 modules/catalog/Cargo.toml
+wrapped-libraries 7 modules/comments/Cargo.toml
+wrapped-libraries 7 modules/compliance/Cargo.toml
+wrapped-libraries 7 modules/content/Cargo.toml
+wrapped-libraries 7 modules/conversations/Cargo.toml
+wrapped-libraries 7 modules/customers/Cargo.toml
+wrapped-libraries 1 modules/einvoice_sepay/Cargo.toml
+wrapped-libraries 1 modules/esms/Cargo.toml
+wrapped-libraries 7 modules/files/Cargo.toml
+wrapped-libraries 7 modules/forms/Cargo.toml
+wrapped-libraries 2 modules/ghn/Cargo.toml
+wrapped-libraries 3 modules/idempotency/Cargo.toml
+wrapped-libraries 7 modules/inventory/Cargo.toml
+wrapped-libraries 6 modules/invoices/Cargo.toml
+wrapped-libraries 7 modules/ledger/Cargo.toml
+wrapped-libraries 6 modules/mail/Cargo.toml
+wrapped-libraries 7 modules/media/Cargo.toml
+wrapped-libraries 7 modules/menus/Cargo.toml
+wrapped-libraries 2 modules/momo/Cargo.toml
+wrapped-libraries 7 modules/newsletter/Cargo.toml
+wrapped-libraries 7 modules/notifications/Cargo.toml
+wrapped-libraries 7 modules/orders/Cargo.toml
+wrapped-libraries 7 modules/organizations/Cargo.toml
+wrapped-libraries 7 modules/plans/Cargo.toml
+wrapped-libraries 7 modules/promotions/Cargo.toml
+wrapped-libraries 7 modules/reporting/Cargo.toml
+wrapped-libraries 3 modules/sepay/Cargo.toml
+wrapped-libraries 7 modules/shipping/Cargo.toml
+wrapped-libraries 7 modules/support/Cargo.toml
+wrapped-libraries 6 modules/tax/Cargo.toml
+wrapped-libraries 7 modules/webhooks/Cargo.toml
+wrapped-libraries-dev 1 modules/einvoice_sepay/Cargo.toml
+wrapped-libraries-dev 1 modules/esms/Cargo.toml
+wrapped-libraries-dev 3 modules/idempotency/Cargo.toml
+wrapped-libraries-dev 1 modules/notes/Cargo.toml
 raw-database 3 modules/ai/src/usage.rs
 raw-database 6 modules/analytics/src/ingest.rs
 raw-database 3 modules/analytics/src/privacy.rs
@@ -172,12 +182,11 @@ raw-database 10 modules/compliance/src/legal.rs
 raw-database 1 modules/compliance/src/overview.rs
 raw-database 10 modules/compliance/src/privacy.rs
 raw-database 3 modules/compliance/src/service.rs
-raw-database 6 modules/compliance/src/sign_in_codes.rs
+raw-database 4 modules/compliance/src/sign_in_codes.rs
 raw-database 5 modules/compliance/src/subject_requests.rs
 raw-database 11 modules/compliance/src/tests_cases.rs
 raw-database 1 modules/compliance/src/tests_moit.rs
 raw-database 10 modules/compliance/src/tests_privacy.rs
-raw-database 1 modules/compliance/src/tests_sign_in_codes.rs
 raw-database 1 modules/compliance/src/tests_tracking.rs
 raw-database 3 modules/compliance/src/tests_verification.rs
 raw-database 12 modules/compliance/src/tracking.rs
@@ -304,7 +313,8 @@ raw-database 13 modules/ledger/src/bank.rs
 raw-database 9 modules/ledger/src/flows.rs
 raw-database 4 modules/ledger/src/fx.rs
 raw-database 1 modules/ledger/src/journal.rs
-raw-database 15 modules/ledger/src/payments.rs
+raw-database 4 modules/ledger/src/payment_refunds.rs
+raw-database 11 modules/ledger/src/payments.rs
 raw-database 7 modules/ledger/src/payouts.rs
 raw-database 7 modules/ledger/src/periods.rs
 raw-database 5 modules/ledger/src/posting.rs

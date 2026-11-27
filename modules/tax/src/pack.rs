@@ -233,6 +233,14 @@ pub(crate) fn parse_pack(text: &str) -> Result<Pack, Error> {
         if !jurisdictions.contains(found.jurisdiction.as_str()) {
             problems.push(format!("{what}: unknown jurisdiction"));
         }
+        if found.code == crate::service::TIME_ZONE_RULE
+            && found.value["time_zone"].as_str().and_then(autoxide_kernel::time::zone).is_none()
+        {
+            problems.push(format!("{what}: `value.time_zone` must be an IANA time zone"));
+        }
+        if found.code == crate::service::CANCEL_RULE && !found.value["allowed"].is_boolean() {
+            problems.push(format!("{what}: `value.allowed` must be true or false"));
+        }
         window(&found.effective_from, found.effective_to.as_deref(), &what, &mut problems);
     }
     if problems.is_empty() {
@@ -510,6 +518,27 @@ mod tests {
         let error = parse_pack(text).unwrap_err();
         assert_eq!(error.code(), "validation_failed");
         assert!(error.fields().len() >= 4, "{:?}", error.fields());
+    }
+
+    #[test]
+    fn goi_tu_choi_quy_tac_mui_gio_va_huy_hoa_don_sai_dang() {
+        let text = r#"{"code": "x", "version": 1, "checked_on": "2026-01-01", "source_note": "",
+            "jurisdictions": [{"code": "XX", "name": "X", "default_currency": "VND"}],
+            "categories": [], "rates": [],
+            "rules": [
+              {"jurisdiction": "XX", "code": "einvoice.cancel_after_submission", "value": {"allowed": "no"}, "effective_from": "2026-01-01", "effective_to": null, "legal_basis": ""},
+              {"jurisdiction": "XX", "code": "tax_date.time_zone", "value": {"time_zone": "Mars/Base"}, "effective_from": "2026-01-01", "effective_to": null, "legal_basis": ""}
+            ]}"#;
+        let error = parse_pack(text).unwrap_err();
+        let messages: Vec<&str> =
+            error.fields().iter().map(|field| field.message.as_str()).collect();
+        assert!(
+            messages
+                .iter()
+                .any(|message| message.contains("`value.allowed` must be true or false")),
+            "{messages:?}"
+        );
+        assert!(messages.iter().any(|message| message.contains("IANA time zone")), "{messages:?}");
     }
 
     #[test]

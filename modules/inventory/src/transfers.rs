@@ -404,6 +404,7 @@ impl InventoryService {
                             .then_some(serial_list.as_slice()),
                         serial_status: "in_transit",
                         order: None,
+                        allow_expired: false,
                     };
                     let (_, picks) = crate::lots::record_out(
                         &transaction,

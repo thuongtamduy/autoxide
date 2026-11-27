@@ -4,7 +4,8 @@
 //! without access does not learn which endpoints need an `ETag`, which fields are wrong or which records exist.
 //!
 //! The only source is the module's OpenAPI document (like `approvals::rules`): `x-permissions: []` (any signed-in
-//! user) and public operations pass. The layer only checks "has the permission at some unit"; scope, records and
+//! user) needs only a signed-in caller — enforced here even when the handler does not take a `Principal` — and public
+//! operations (no `x-permissions`) pass. The layer only checks "has the permission at some unit"; scope, records and
 //! step-up are still checked by the service. Every guarded operation needs a signed-in caller, so a caller that
 //! cannot be authenticated gets the authentication error here (401), before any extractor of the handler.
 //! A route that does not declare its own `HEAD` answers `HEAD` with its `GET` handler (axum), so `HEAD` is guarded
@@ -70,14 +71,19 @@ pub(super) fn rules(module: &str, openapi: &OpenApi) -> Rules {
             (Method::PATCH, item.patch.as_ref()),
             (Method::DELETE, item.delete.as_ref()),
             (Method::HEAD, item.head.as_ref()),
+            // `#[endpoint]` nhận cả `options` và `trace`: gate phủ mọi method mà tài liệu khai.
+            (Method::OPTIONS, item.options.as_ref()),
+            (Method::TRACE, item.trace.as_ref()),
         ];
         for (method, operation) in methods {
             let Some(operation) = operation else { continue };
-            let permissions: Vec<String> = operation
+            // `None`: operation không khai `x-permissions` (công khai). `Some([])`: chỉ cần đăng nhập (`signed_in`).
+            let declared = operation
                 .extensions
                 .as_ref()
                 .and_then(|extensions| extensions.get("x-permissions"))
-                .and_then(|value| value.as_array())
+                .and_then(|value| value.as_array());
+            let permissions: Vec<String> = declared
                 .into_iter()
                 .flatten()
                 .filter_map(|value| value.as_str().map(str::to_owned))
@@ -85,7 +91,7 @@ pub(super) fn rules(module: &str, openapi: &OpenApi) -> Rules {
             // Đường gốc của module là `/` trong tài liệu của nó, `/api/v1/<module>` sau khi ghép (không có `/` cuối).
             let tail = if path == "/" { "" } else { path.as_str() };
             let full = format!("{}/{module}{tail}", super::API_PREFIX);
-            if permissions.is_empty() {
+            if declared.is_none() {
                 // `HEAD` khai riêng mà không nêu permission: ghi lại để nó không mượn quy tắc của `GET`.
                 if method == Method::HEAD {
                     operations.entry(full).or_default().push((method, None));
@@ -121,7 +127,9 @@ pub(super) async fn gate(rules: Arc<Rules>, request: Request, next: Next) -> Res
         Ok(principal) => principal,
         Err(error) => return error.into_response(),
     };
-    if !(guard.buyers && principal.realm() == Realm::Customer)
+    // `x-permissions: []` (`signed_in`): đăng nhập là đủ — kernel bảo đảm, kể cả khi handler không nhận `Principal`.
+    if !guard.permissions.is_empty()
+        && !(guard.buyers && principal.realm() == Realm::Customer)
         && let Err(error) = principal.require_any_named(&guard.permissions)
     {
         return error.into_response();

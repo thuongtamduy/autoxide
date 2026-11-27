@@ -10,6 +10,7 @@ mod lifecycle;
 mod orders;
 mod pickups;
 mod pos;
+mod replay;
 pub(crate) mod returns;
 pub(crate) mod reviews;
 mod risk;

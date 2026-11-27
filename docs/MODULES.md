@@ -163,7 +163,7 @@ While it is off, the module still takes part in personal data and in the tenant 
   done while content remains).
 
 This is an obligation of personal data protection law (Vietnam: Law 91/2025/QH15, Decree
-13/2023/ND-CP), so it does not depend on whether you use the module any more. What it still does not
+356/2025/ND-CP), so it does not depend on whether you use the module any more. What it still does not
 do while off:
 
 - retention clean-up of its data does not run (the module's jobs do not run);
@@ -176,7 +176,7 @@ So that data is not lost by accident:
   `modules_turned_off`, when the database holds rows of a module that is off — with the exact
   `AUTOXIDE_MODULES=…` line that turns it back on. (When you set `AUTOXIDE_MODULES` yourself the
   message is informational: you chose.)
-- `autoxide copy`, `autoxide backup create` and `autoxide backup restore` refuse to run while
+- `autoxide copy`, `autoxide backup` and `autoxide restore` refuse to run while
   such data exists, because they only handle the modules that are on. Run them with the module
   turned on, or with `AUTOXIDE_MODULES=all`.
 

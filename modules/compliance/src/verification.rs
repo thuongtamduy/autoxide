@@ -38,7 +38,7 @@ pub(crate) const SMS_TIMEOUT: Duration = Duration::from_secs(10);
 /// Mã đã hết hạn / đã dùng giữ lại chừng này rồi job hằng ngày xoá.
 pub(crate) const CHALLENGE_KEEP_HOURS: i64 = 24;
 pub(crate) const HOUR: Duration = Duration::from_secs(3_600);
-const DAY: Duration = Duration::from_secs(86_400);
+pub(crate) const DAY: Duration = Duration::from_secs(86_400);
 
 /// Trạng thái xác thực của một tài khoản.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -293,11 +293,25 @@ impl ComplianceService {
         let phone_key = sha256(phone.as_str());
         // Kiểm sớm để không gửi tin vô ích; xác nhận kiểm lại dưới khoá.
         let max = self.max_accounts_per_phone(tenant).await?;
-        if Self::others_with_phone(tenant.database().read(), tenant, &phone_key, user_id).await?
-            >= max
-        {
+        // Một kết nối đọc cho cả hàm (luật `raw-database`: bảng SeaORM chưa chuyển sang lớp `db`).
+        let read = tenant.database().read();
+        if Self::others_with_phone(read, tenant, &phone_key, user_id).await? >= max {
             return Err(phone_in_use());
         }
+        // Hạn mức mã sai mỗi ngày trên mã xác minh của chính người này với số (như khi xác nhận): đã chạm thì không gửi
+        // thêm mã (mã gửi đi cũng không kiểm được).
+        let lock_key = self.secret.phone_key(tenant.id(), &phone).await?;
+        let mine = phone_challenge::Entity::find()
+            .filter(phone_challenge::Column::Phone.eq(phone.as_str()))
+            .filter(phone_challenge::Column::UserId.eq(user_id))
+            .filter(
+                phone_challenge::Column::CreatedAt.gt(now() - crate::sign_in_codes::WRONG_WINDOW),
+            )
+            .scoped(tenant)
+            .all(read)
+            .await?;
+        let unlocked = crate::phone_lock::unlocked_at(read, tenant, &lock_key).await?;
+        self.check_wrong_today(&mine, None, true, unlocked, now())?;
         let otp = self.otp;
         let mut limits = vec![
             (
@@ -307,6 +321,12 @@ impl ComplianceService {
             (
                 Throttle::new("compliance", otp.per_user_per_day, DAY)?,
                 format!("otp-user:{user_id}"),
+            ),
+            // Trần SMS mỗi ngày của một số cho mã xác minh (D-20261126-otp-nist): chặn dội SMS tới một số. Hạn mức RIÊNG,
+            // không chung với mã đăng nhập: xin mã đăng nhập từ nơi lạ không làm chủ số hết đường xác minh lại số.
+            (
+                Throttle::new("compliance", otp.per_phone_per_day, DAY)?,
+                format!("otp-phone-day-verify:{}", phone.as_str()),
             ),
         ];
         if let Some(ip) = ip {
@@ -397,6 +417,11 @@ impl ComplianceService {
         let pepper = self.secret.derive_for(tenant.id(), OTP_PURPOSE).await?;
         let max = self.max_accounts_per_phone(tenant).await?;
         let phone_key = sha256(&found.phone);
+        // Khoá của số cho trạng thái chống đoán mã (HMAC theo khách): tính trước transaction ghi (có thể đọc bảng
+        // secret).
+        let number = PhoneNumber::parse(&found.phone, DEFAULT_COUNTRY)
+            .ok_or_else(|| Error::internal("stored phone is not E.164"))?;
+        let lock_key = self.secret.phone_key(tenant.id(), &number).await?;
 
         let transaction = tenant.database().begin_write().await?;
         // Khoá MỌI mã của cùng số (theo ID): hai lần xác nhận cùng mã, hay hai người cùng nhận một
@@ -410,7 +435,7 @@ impl ComplianceService {
             phone_challenge::Column::Id,
         )
         .await?;
-        let Some(row) = locked.into_iter().find(|row| row.id == id) else {
+        let Some(row) = locked.iter().find(|row| row.id == id).cloned() else {
             return Err(challenge_not_found());
         };
         let at = now();
@@ -420,6 +445,13 @@ impl ComplianceService {
         if row.attempts >= self.otp.max_attempts {
             return Err(otp_attempts_exceeded());
         }
+        // Hạn mức mã sai mỗi ngày (D-20261126-otp-nist): xin mã xác minh mới liên tục không mở thêm lượt đoán. Chỉ đếm mã
+        // xác minh của chính người này với số — lần sai mã đăng nhập của người khác không chặn được đường xác minh lại số
+        // (cách chủ số tự mở khoá).
+        let unlocked = crate::phone_lock::unlocked_at(&transaction, tenant, &lock_key).await?;
+        let mine: Vec<phone_challenge::Model> =
+            locked.iter().filter(|other| other.user_id == user_id).cloned().collect();
+        self.check_wrong_today(&mine, None, true, unlocked, at)?;
         let digits: String = code.chars().filter(|c| !c.is_whitespace()).collect();
         if !same(&code_hash(&pepper, id, &digits), &row.code_hash) {
             phone_challenge::Entity::update_many()
@@ -452,6 +484,9 @@ impl ComplianceService {
         if consumed.rows_affected != 1 {
             return Err(otp_invalid());
         }
+        // Chủ số chứng minh lại được số từ tài khoản đã đăng nhập (NIST SP 800-63B-4 §4.1, gắn lại bộ xác thực): mở khoá
+        // mã đăng nhập SMS của số (D-20261126-otp-nist).
+        crate::phone_lock::succeeded(&transaction, tenant, &row.phone, &lock_key, id, at).await?;
         account_verification::Entity::insert(account_verification::ActiveModel {
             tenant_id: Set(tenant.id().as_uuid()),
             user_id: Set(user_id),
@@ -534,11 +569,29 @@ impl ComplianceService {
     ) -> Result<u64, Error> {
         let before = Timestamp::now() - SignedDuration::from_hours(CHALLENGE_KEEP_HOURS);
         // tenant-scope: việc nền / kiểm tra quét mọi khách của database, chủ ý không lọc khách (rà soát bảo mật 2026-11)
-        Ok(phone_challenge::Entity::delete_many()
+        let challenges = phone_challenge::Entity::delete_many()
             .filter(phone_challenge::Column::CreatedAt.lt(before))
             .exec(database.write())
             .await?
-            .rows_affected)
+            .rows_affected;
+        // Client quen của số (D-20261126-otp-nist): giữ `KNOWN_CLIENT_DAYS` ngày kể từ lần đăng nhập đúng cuối.
+        let forgotten = Timestamp::now()
+            - SignedDuration::from_hours(crate::sign_in_codes::KNOWN_CLIENT_DAYS * 24);
+        // tenant-scope: việc nền quét mọi khách của database, chủ ý không lọc khách
+        let clients = crate::entity::phone_known_client::Entity::delete_many()
+            .filter(crate::entity::phone_known_client::Column::LastSuccessAt.lt(forgotten))
+            .exec(database.write())
+            .await?
+            .rows_affected;
+        // Bộ đếm lần sai liên tiếp không đổi quá một năm: số đã thôi dùng, không giữ khoá của số mãi.
+        let stale = Timestamp::now() - SignedDuration::from_hours(365 * 24);
+        // tenant-scope: việc nền quét mọi khách của database, chủ ý không lọc khách
+        let failures = crate::entity::phone_failure::Entity::delete_many()
+            .filter(crate::entity::phone_failure::Column::UpdatedAt.lt(stale))
+            .exec(database.write())
+            .await?
+            .rows_affected;
+        Ok(challenges + clients + failures)
     }
 }
 

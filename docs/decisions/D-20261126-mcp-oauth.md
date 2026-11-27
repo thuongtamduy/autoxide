@@ -29,17 +29,19 @@ kiểm độc lập (bảo mật và đối chiếu đặc tả) trước khi vi
    `X-Forwarded-Host` chỉ tin từ proxy tin cậy (sẵn có).
 4. **Đăng ký client:** Client ID Metadata Documents là đường chính (tải bằng HTTP client chống SSRF của kernel —
    `net::PublicOnly`, không proxy, không theo redirect, tối đa 5 KB; hạn mức theo IP và host, giới hạn tải đồng thời,
-   cache lỗi ngắn; chỉ nhận `token_endpoint_auth_method` `none` hay không khai; không tải `logo_uri`; `client_name` là
+   cache lỗi ngắn, hạn mức theo host, chỉ cổng 443, scheme và host viết thường; chỉ nhận `token_endpoint_auth_method` `none` hay không khai; không tải `logo_uri`; `client_name` là
    dữ liệu chưa tin). Client đăng ký trước do quản trị khách tạo (chỉ public client ở bản đầu). Dynamic Client
    Registration (RFC 7591) giữ cho client hiện tại nhưng khai deprecated như MCP 2026-07-28, tắt được, chỉ client
    public; dọn client DCR chưa từng có grant sau 30 ngày.
-5. **Luồng:** chỉ `authorization_code` với PKCE `S256` bắt buộc. `/authorize` lỗi trước khi xác nhận client và
-   `redirect_uri` → 400, không chuyển hướng; sau đó → chuyển hướng kèm `error`, `state`, `iss`. Mọi phản hồi uỷ quyền
-   (cả lỗi) mang `iss` (RFC 9207) mới khai `authorization_response_iss_parameter_supported`; issuer giống hệt nhau ở PRM,
-   metadata và `iss`. Code dùng lại → thu hồi token sinh từ code. Refresh token xoay vòng, luôn cấp cho public client;
-   dùng lại token cũ → thu hồi cả grant, trừ ân hạn ngắn cho đúng token liền trước khi client gửi lại (trả
-   `invalid_grant`). Revoke RFC 7009. Không implicit, không password grant; PAR, DPoP, device flow, client
-   confidential, issuer theo tên miền khách xem lại sau.
+5. **Luồng:** chỉ `authorization_code` với PKCE `S256` bắt buộc. Client của bản đầu đều tự đăng ký (tài liệu metadata
+   hay đăng ký động) và tự chọn `redirect_uri`, nên MỌI lỗi của `/authorize` trả 400 tại chỗ, không chuyển hướng lỗi về
+   client (tránh bộ chuyển hướng mở, RFC 9700 §4.11.2); chỉ quyết định của người dùng (mã hay `access_denied`) mới chuyển
+   hướng, kèm `state`, `iss` (RFC 9207). `client_id` và `redirect_uri` tối đa 2048 ký tự. Linh hoạt cổng chỉ cho địa
+   chỉ IP loopback (`127.0.0.1`, `[::1]`), không cho tên `localhost` (RFC 8252 §8.3). Code dùng lại → thu hồi grant.
+   Refresh token xoay vòng, luôn cấp cho public client; gửi lại refresh token đã dùng → thu hồi cả grant, KHÔNG ân hạn
+   (RFC 9700 §4.14.2: không phân biệt được kẻ trộm dùng trước với client gửi trùng; client phải làm mới tuần tự — hai
+   lượt đồng thời thì một thắng và grant bị thu hồi). Đường xoay vòng đọc trên kết nối ghi. Revoke RFC 7009. Không
+   implicit, không password grant; PAR, DPoP, device flow, client confidential, issuer theo tên miền khách xem lại sau.
 6. **Consent theo luật kiến trúc 9 (core chỉ có API):** `/authorize` kiểm tham số rồi chuyển trình duyệt tới trang của
    giao diện `AUTOXIDE_AUTH_OAUTH_CONSENT_URL`; trang đó gọi API của `auth` để xem yêu cầu (host của `client_id` và của
    `redirect_uri`, cảnh báo redirect chỉ localhost) và duyệt / từ chối. Chỉ phiên đăng nhập (`is_session`) được duyệt và
@@ -56,6 +58,9 @@ kiểm độc lập (bảo mật và đối chiếu đặc tả) trước khi vi
    resource_metadata="…"` (lý do `outside_grant_scope`) cho REST và `tools/call`; với MCP challenge còn nằm trong
    `_meta["mcp/www_authenticate"]` của kết quả. `tools/list` chỉ liệt kê tool grant dùng được.
 9. **Vòng đời:** thu hồi grant khi người dùng bị khoá, rời khách, khách bị xoá, đổi mật khẩu hay "đăng xuất khắp nơi".
+   Luật tự động tạo qua client tạm dừng khi grant bị THU HỒI; grant chỉ HẾT HẠN thì luật vẫn chạy với bản chụp quyền
+   lúc lưu (như luật của API key hết hạn) — người quản lý luật thấy credential trên luật và tắt khi cần. Người duyệt
+   phải làm trực tiếp trong khách của mình (không qua uỷ quyền, hỗ trợ hay nhân sự nền tảng vào khách khác).
 10. **Ngoại lệ luật repo:** endpoint giao thức OAuth (`/token`, `/revoke`, `/register`) và `/.well-known/*` dùng đúng
     wire format của RFC (form-urlencoded, JSON trần, lỗi `{error, error_description}` RFC 6749) thay vì `ValidJson`,
     envelope `Data` và `Problem`; vẫn khai đủ trong OpenAPI. `/token` không nhận `Idempotency-Key` (mã và refresh token

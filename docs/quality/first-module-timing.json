@@ -1,0 +1,4 @@
+{
+  "note": "Số đo 'người mới xong module đầu tiên' (ngưỡng 1.0: dưới 30 phút). Hai loại số KHÁC NHAU, không gộp, không thay nhau: `human` = người thật làm theo checklist trong docs/RELEASING.md có bấm giờ; `agent` = agent context sạch làm theo cùng hướng dẫn, đo bằng đồng hồ. Thêm một dòng mỗi lần đo (không sửa dòng cũ). Chưa có dòng nào thì báo cáo ghi 'chưa đo', không bịa.",
+  "runs": []
+}

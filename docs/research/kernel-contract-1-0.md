@@ -146,6 +146,14 @@ Hai hệ quả phải làm cùng PR chuyển hạng (PR 6):
   `note` có chữ "use".
 - Gỡ `TenantContext::legacy_default` (0 người gọi) trong PR đầu tiên của nhóm này.
 
+
+### 2.3 Đường cũ trong lúc chuyển (D-20261127-transition-paths)
+
+Đường cũ của kernel mà module còn gọi trong lúc chuyển (database thô, entity SeaORM, `fetch_page*`, `MigrationTrait`,
+`Outbox::record` nhận connection, hàm đăng ký cũ của `StartContext`, `Module::routes`…) **không** gắn `#[deprecated]` trong
+lúc chuyển: clippy chạy `-D warnings` và luật không cho `allow(deprecated)`. Chỗ gọi còn lại trong repo đếm bằng baseline
+của `xtask check`, chỉ giảm. Khi chỗ gọi cuối trong repo đã chuyển, đường cũ gắn `#[deprecated]` ở bản phát hành đó (báo trước
+một bản minor cho module ngoài repo), gỡ ở bản sau. Mọi chỗ trong tài liệu này nói "đường cũ" theo nghĩa đó.
 ## 3. (b) Lớp dữ liệu `autoxide_kernel::db`
 
 ### 3.1 Record thay entity SeaORM
@@ -205,8 +213,8 @@ tx.commit().await?;
 ```
 
 - `Database::read()/write()/begin_write()` hiện trả `&DatabaseConnection` / `DatabaseTransaction` của SeaORM. Đổi kiểu
-  trả về là phá vỡ cả 29 module cùng lúc, nên lớp mới dùng **tên mới** (`tenant.db()`, `database.db()`), đường cũ được
-  `#[deprecated]` và gỡ trước 1.0.
+  trả về là phá vỡ cả 29 module cùng lúc, nên lớp mới dùng **tên mới** (`tenant.db()`, `database.db()`); đường cũ theo §2.3 và
+  gỡ trước 1.0.
 - Tập thao tác (đủ cho mọi mẫu trong bảng §0): `find` / `filter` / `order_by` / `limit` / `one` / `all` / `exists` /
   `count`; `page` / `page_by` / `page_sorted` (thay `fetch_page*`, cùng luật keyset); `select((cột, cột))` +
   `group_by` + `count()`/`sum()`/`min()`/`max()`/`count_distinct()` → `all_as::<(A, B)>()`; `join::<B>(điều kiện)` /
@@ -221,7 +229,7 @@ tx.commit().await?;
   catalog), `sum`/`count`/`max` luôn ép `BIGINT` qua `COALESCE` (Postgres trả `numeric` cho `SUM(bigint)`).
 - Ghi chung transaction với kernel: `Outbox::record(&TenantTx, …)`, `SyncLog::changed(&TenantTx, …)`,
   `principal.require_write_at(&TenantTx, …)` — ~125 chữ ký kernel đang generic theo `ConnectionTrait` đổi sang nhận
-  `&impl Handle` (trait niêm phong của `db`), giữ bản cũ `#[deprecated]` trong lúc chuyển.
+  `&impl Handle` (trait niêm phong của `db`); bản cũ giữ theo §2.3 (vd `Outbox::record`, §14.2 i).
 - Đọc và ghi tách kết nối như luật dữ liệu: `read()` đi pool đọc (read replica nếu có), `begin_write()` đi pool ghi; handle
   đọc không có hàm ghi nào (lỗi biên dịch, không phải lỗi lúc chạy).
 - `for_update()`: Postgres `FOR UPDATE`; SQLite bỏ qua vì transaction ghi của SQLite đã giữ khoá cả database (một bên ghi).
@@ -255,8 +263,8 @@ tx.commit().await?;
 
 - `Db`, `AllTenants` và `Db::sql` **không** lấy được từ `TenantContext` hay `Database` công khai: chỉ có qua
   `context.kernel::<ControlPlane>()` trong `start` (module control-plane như `auth`, `plans`) — handle đó giữ tên module để
-  ghi metric. `TenantContext::database()` (trả `&Database` thô) thành `#[deprecated]` rồi gỡ; gate `raw-database` chặn module
-  gọi nó trong lúc chuyển.
+  ghi metric. `TenantContext::database()` (trả `&Database` thô) là đường cũ theo §2.3 rồi gỡ; gate `raw-database` đếm chỗ
+  module gọi nó trong lúc chuyển.
 - `on_conflict().do_update(…)` trên `TenantDb`: kernel thêm `WHERE <bảng>.tenant_id = <khách>` vào nhánh `DO UPDATE` (Postgres
   và SQLite đều hỗ trợ `ON CONFLICT … DO UPDATE … WHERE`); đụng dòng của khách khác thì 0 dòng đổi và kernel trả lỗi
   `db.unique_conflict` — không ghi đè. Đã chạy trong spike (a) với khoá unique không có `tenant_id`.
@@ -270,7 +278,7 @@ Câu chạy trên `TenantDb` **phải** có tham số `:tenant` (kernel gắn gi
 **rào phụ**, không phải cam kết cách ly của lớp 1: kiểm dò chuỗi không thấy `OR 1=1` hay `:tenant` nằm trong comment. Vì vậy
 số chỗ gọi `db.sql` của mỗi module đếm theo baseline chỉ được giảm (`xtask/raw-sql-baseline.txt`), mỗi chỗ có lý do đo được
 và test cách ly khách riêng. Câu viết tay vẫn phải chạy trên cả hai database (luật dữ liệu). Thay `autoxide_kernel::database::statement`
-(D-20261121-raw-statement) — giữ đường cũ `#[deprecated]`.
+(D-20261121-raw-statement) — đường cũ theo §2.3.
 
 ### 3.5 Bên trong
 
@@ -316,8 +324,8 @@ impl Migration for CreateNote {
   không dùng `Record` vì record đổi theo thời gian còn migration thì đóng băng).
 - Vì kế hoạch là dữ liệu, G3 được lợi ngay: "luật an toàn migration" đọc `Plan` (xoá cột, đổi tên, NOT NULL không mặc định)
   thay vì đọc text; `autoxide rollback` biết trước bước `down` làm gì.
-- `MigrationTrait` + `SchemaManager` + `migration::prelude` (xuất lại sea-query, SeaORM, async-trait) giữ `#[deprecated]` tới
-  khi mọi module đã chuyển; kernel chạy được cả hai loại trong cùng một bảng lịch sử (tên migration không đổi).
+- `MigrationTrait` + `SchemaManager` + `migration::prelude` (xuất lại sea-query, SeaORM, async-trait) là đường cũ theo §2.3
+  tới khi mọi module đã chuyển; kernel chạy được cả hai loại trong cùng một bảng lịch sử (tên migration không đổi).
 - **Viết lại migration đã commit** (để module bỏ được `sea-query`) — D-20261126-migration-rewrite-proof, sửa theo kiểm lần 1
   (điểm 2). Rà 26/11: ~64/236 file migration có bước dữ liệu hay code riêng từng database (vd `auth` `m0019_move_tokens` đọc
   từng dòng và ghi `Timestamp::now()`), helper dùng chung (`event::outbox_migration`, `tokens_migration`…) và `down` gọi `up`
@@ -424,8 +432,8 @@ Lối thoát: nếu bản lớn sau của utoipa bỏ được cách này, `auto
 `#[derive(Validate)]` của kernel, ngữ pháp `#[validate(length(min = 1, max = 200))]`, `range(min, max)`, `email`, `url`,
 `nested` — đúng năm luật module đang dùng; thêm luật là thêm vào macro. Lỗi trả đúng `FieldError` và mã i18n hiện có
 (`validation.length`…) nên OpenAPI và client không đổi. `ValidJson<T>` đổi bound từ `validator::Validate` sang
-`autoxide_kernel::http::Validate`; trong thời gian chuyển kernel có cả hai bound qua hai extractor (`ValidJson` cũ
-`#[deprecated]`, `Input<T>` mới) — không ép module đổi một lần. Cuối cùng `validator` chỉ còn (nếu còn) bên trong kernel.
+`autoxide_kernel::http::Validate`, trait có impl chung cho mọi kiểu của `validator` — một extractor cho cả module cũ lẫn
+mới, không ép module đổi một lần (quyết định của PR 4, thay cách hai extractor của bản đầu). Cuối cùng `validator` chỉ còn (nếu còn) bên trong kernel.
 
 ### 4.4 Thời gian
 
@@ -499,13 +507,14 @@ service hay cấu hình đã đọc → `start` (kiểm lần 1, điểm 6).
 
 ### 5.2 Đường chuyển
 
-1. Thêm `manifest()` có **cài đặt mặc định** dựng `Manifest` từ các hàm cũ (gọi với `#[allow(deprecated)]`); `name()` đổi từ
-   bắt buộc thành **có mặc định** trả `""` (`#[deprecated]`). Kernel chỉ đọc `manifest()`; tên rỗng → lỗi đăng ký "implement
-   `Module::manifest`". Nhờ vậy module kiểu mới chỉ cài `manifest()` + `start()` — **không** phải cài hàm deprecated nào, và
+1. Thêm `manifest()` có **cài đặt mặc định** dựng `Manifest` từ các hàm cũ; `name()` đổi từ bắt buộc thành **có mặc định**
+   trả `""` (đường cũ theo §2.3). Kernel chỉ đọc `manifest()`; tên rỗng → lỗi đăng ký "implement `Module::manifest`". Nhờ vậy
+   module kiểu mới chỉ cài `manifest()` + `start()` — **không** phải cài hàm cũ nào, và
    không có vòng gọi vô hạn giữa hai mặc định.
-2. Các hàm cũ và các hàm đăng ký riêng của `StartContext`: `#[deprecated(note = "use `Module::manifest` …")]`. Rust không cảnh
-   báo khi *cài* một hàm trait bị deprecated, nên `xtask check` đếm module còn cài hàm cũ theo
-   `xtask/module-contract-legacy.txt` (chỉ được giảm).
+2. Các hàm cũ và các hàm đăng ký riêng của `StartContext`: đường cũ theo §2.3 (không `#[deprecated]` trong lúc chuyển).
+   `xtask check` đếm module còn cài hàm cũ (gồm `Module::routes` và `Module::endpoints`) và chỗ gọi hàm đăng ký cũ theo
+   `xtask/module-contract-legacy.txt` (chỉ được giảm); chỗ cuối chuyển xong thì gắn `#[deprecated(note = "use
+   `Module::manifest` …")]`.
 3. Chuyển module theo cụm. Khi danh sách rỗng: gỡ hàm cũ; `manifest()` và `start()` thành bắt buộc (không mặc định) — trước
    1.0, thay đổi phá vỡ có ghi (D-20261125-api-break-before-1-0).
 4. `examples/external-module` biên dịch và chạy test ở **mọi** PR của G1–G2 (CI chạy `./gate.sh --only example` khi PR chạm
@@ -631,7 +640,7 @@ mới; baseline của `wrapped-libraries` giảm đúng số module của cụm.
    `async_trait` xuất lại; `notes` chuyển hết → `notes` không còn khai thư viện bọc nào. Đo thời gian biên dịch (§4.2) ít nhất 3
    lần, lấy trung vị. Có test khẳng định rõ `openapi.json` sinh ra bằng đúng bản đã commit sau khi đổi derive (không chỉ dựa
    vào việc file sinh lại không đổi). **Trước PR 4** (kiểm lần 2, F9): spike `#[endpoint]` + `Params` trên một module trọn vẹn
-   không còn khai `utoipa`/`utoipa-axum`, `openapi.json` giống từng byte.
+   không còn khai `utoipa`/`utoipa-axum`, `openapi.json` bằng nhau sau khi chuẩn hoá `serde_json` — **đã làm, đạt** (§15.4).
 5. `Manifest` + `StartContext` gọn; `notes` chuyển; luật `module-contract-legacy`.
 5b. Đánh phiên bản event / webhook / `x-*` (§13): `EventInfo::payload`, `docs/events.json`, danh mục phần mở rộng,
    `xtask contract-diff`.
@@ -768,6 +777,239 @@ người đọc; và lọc/sắp theo trường nhạy cảm vẫn lộ giá tr�
   nhân) không che phần của chính người đó.
 - Trường tuỳ biến (`custom_fields`) khai lớp khi tạo trường; giá trị đi qua cùng bước egress.
 
+### 14.2 Mã hoá mức trường (G13) cắm vào `db`
+
+Đây là **nguồn duy nhất** mô tả cách mã hoá mức trường ghép vào lớp `db`, kể cả vòng đời khoá. Thiết kế G13
+(`docs/research/g13-field-encryption-audit.md`, PR #577) giữ phần mật mã (envelope, `enc:v1`, nhật ký kiểm toán) và dẫn
+sang mục này cho phần chạm hợp đồng kernel. Code của G13 đi sau G1 PR 2–5. Đã qua ba vòng rà độc lập (#580).
+
+Giới hạn phải nói thật: kiểm quyền `reveal` bảo vệ **người gọi API** (REST, MCP, job do người dùng khởi tạo), không bảo
+vệ trước **mã của module** — module chạy trong cùng tiến trình với kernel. Chống mã module xấu là việc của rà soát mã và
+hạng module (§2.1), không phải của lớp này.
+
+#### a. Kiểu, thuộc tính, purpose
+
+- Bộ kiểu trường (§3.1) nhận thêm `db::Sensitive<T, C = class::Sensitive>` (`T`: `String`, `serde_json::Value`; cột cho NULL
+  là `Option<Sensitive<T, C>>`) và `db::BlindIndex<T>`. `C` là lớp dữ liệu (`privacy::class::{Personal, Sensitive,
+  Financial}`): số tài khoản chi trả là `Sensitive<String, class::Financial>`. Thêm ở PR 1 của G13: kiểu trường mới là thay
+  đổi cộng thêm, và derive đang từ chối mọi tuỳ chọn lạ trong `#[record(…)]`.
+- **Kiểu quyết định việc mã hoá**, không có `#[record(encrypted)]`. Ngoại lệ duy nhất: `#[record(plaintext = "<lý do>")]`
+  (lưu rõ trong lúc chuyển; vẫn che ở egress); gate `sensitive-plaintext` đếm, baseline chỉ giảm.
+- **Loại cột ở kiểu, không ở tên kiểu.** `Col<R, T, K = Plain>` thêm tham số loại `K` ∈ `Plain`, `Key` (khoá chính),
+  `Sealed` (trường `Sensitive`), `Index` (trường `BlindIndex`). Derive lấy `K` từ associated type `DbField::Kind` của kiểu
+  trường (không so tên kiểu: bí danh hay đường dẫn khác vẫn đúng); riêng `Key` lấy từ `#[record(primary_key)]`. Chỉ `Plain`
+  cài `Settable`. API của PR 2 đổi theo:
+  `Update::set` / `set_expr` / `adjust` đòi `K = Plain`; `on_conflict_update` (danh sách cập nhật) đòi `Plain`;
+  `eq`/`ne`/`is_in`/`order_*`/`group_by`/`select`/hàm gộp nhận `Plain | Key`; `Find::page` / `id_cursor` nhận
+  `Col<R, Uuid, Key>`. Hằng cột sinh ra đổi kiểu: `R::ID` thành `Col<R, Uuid, Key>`. Mã module chỉ dùng hằng cột (`R::TITLE.eq(…)`,
+  `page(R::ID, …)`) không phải sửa; chỗ ghi tường minh kiểu `Col<R, Uuid>` cho cột khoá chính (tham số hàm, biến có kiểu) phải
+  thêm `Key`; `set(R::ID, …)` thôi biên dịch.
+- Derive từ chối: `Sensitive` trên record `scope = global` (không có khách thì không có khoá); `Sensitive` trên record không
+  có `#[record(primary_key)]`.
+- **Purpose** của trường mặc định là `<module>.<đuôi tên bảng>.<trường>` (bảng `ledger_payout`, trường `account` →
+  `ledger.payout.account`); đổi được bằng `#[record(purpose = "…")]`, bắt buộc có tiền tố `<module>.`. Purpose được lưu vào AAD
+  và `kernel_data_keys`, nên **đổi tên trường Rust phải giữ purpose cũ** bằng thuộc tính này.
+- `RecordInfo` mang loại (`plain` / `sensitive` / `blind_index`) và purpose của từng cột. `check_records` từ chối lúc khởi
+  động khi: các record của cùng một bảng khai một cột khác loại hay khác purpose; một purpose dùng cho hai cột; một purpose
+  dùng chung cho bảng thuộc `retained_tables` và bảng không thuộc; cột `Sensitive` / `BlindIndex` không phải `TEXT`.
+  `doctor` cảnh báo purpose có dữ liệu mà không record nào khai.
+- Đường dẫn: `Sensitive`, `BlindIndex`, `Classified` là **ổn định** khi ≥ 2 module dùng trước 1.0 (`compliance`, `ledger`);
+  chưa đủ thì ở `unstable::`, lên hạng thì giữ `pub use` cũ kèm `#[deprecated]` một bản.
+
+#### b. Khoá: ba tầng, theo khách
+
+`KeyProvider` giữ **KEK** của bản cài → **tenant key** (một khoá mỗi khách) → **DEK** (một khoá mỗi khách và purpose, bọc bằng
+tenant key, lưu trong `kernel_data_keys`).
+
+- `KeyProvider` dùng KMS / Vault: tenant key là một khoá của KMS cho mỗi khách (tạo khi tạo khách), không rời KMS.
+- `LocalKeyProvider` (mặc định): tenant key nằm trong một **kho khoá riêng**, ngoài database và ngoài file backup của
+  database (thư mục cấu hình bằng `AUTOXIDE_KEY_STORE`, mỗi khách một file, bọc bằng KEK suy ra từ khoá gốc). RUNBOOK (G14)
+  ghi luật backup riêng cho kho này: backup tách nơi, tách quyền với backup database; mất kho là mất dữ liệu nhạy cảm.
+- **Huỷ khoá một khách** (D-20261126-tenant-delete-key-shred) là huỷ tenant key của khách đó (KMS: lên lịch xoá khoá;
+  local: xoá file và mọi bản sao của nó theo luật backup của kho). Bản backup database cũ còn DEK đã bọc nhưng không còn
+  tenant key để mở. Trước khi huỷ, DEK của purpose phải lưu giữ được **bọc lại bằng retention key** riêng của khách (cũng
+  trong `KeyProvider`), giữ tới hết hạn lưu rồi huỷ.
+- **Thứ tự tạo khoá, không bao giờ tạo đè.**
+  - `LocalKeyProvider` ghi file tenant key **không bao giờ đè**: ghi ra file tạm (tạo bằng `O_EXCL`), `fsync`, rồi
+    `link(tạm, đích)` (hay `renameat2(RENAME_NOREPLACE)`); gặp `EEXIST` thì nạp file đã có và so dấu vân tay. Xong thì `unlink`
+    file tạm và `fsync` thư mục. File khoá phải bền trên đĩa **trước** khi dòng dấu vân tay được commit. Chỉ bước bọc lại khi
+    xoay khoá gốc mới được `rename` đè, và phải kiểm dấu vân tay của file cũ trước. Quyền file 0600, thư mục 0700; kiểm lại
+    quyền lúc khởi động.
+  - Dấu vân tay (key-check value, KCV) = `HMAC-SHA256(tenant key, "autoxide.kcv.v1")` cắt 8 byte, so sánh theo thời gian hằng;
+    ghi vào database trong cùng bước dùng khoá lần đầu. KMS: tạo khoá KMS trước
+    DEK đầu tiên, ghi key id.
+  - Database đã ghi nhận khoá cho khách mà không thấy file, hay file không khớp dấu vân tay: lỗi cứng `db.tenant_key_missing`,
+    `doctor` hiện. Không bao giờ sinh khoá mới đè.
+  - Khách có từ trước G13: backfill bằng lệnh tường minh `autoxide keys init` (hay một bước migration), không tạo lười trên
+    đường xử lý request.
+- **Nhiều instance** dùng chung kho khoá: phải dùng KMS / Vault hay volume dùng chung cho `AUTOXIDE_KEY_STORE`; `doctor` so dấu
+  vân tay giữa các instance. Biến thể cho nhiều khách: kho khoá local được bọc bằng **một** khoá KMS duy nhất (một lần gọi KMS
+  khi mở kho, thay vì một khoá KMS mỗi khách).
+- **Xoay khoá gốc**: bọc lại mọi file trong kho khoá theo cách atomic (từng file theo thứ tự ghi ở trên), giữ khoá gốc cũ ở
+  `_PREVIOUS` tới khi xong. RUNBOOK ghi: khôi phục bản backup kho khoá cần đúng khoá gốc đã bọc nó.
+- **Khoá đặt tên lock** cho blind index (mục g): một bí mật ngẫu nhiên cho mỗi (khách, purpose), lưu đã bọc trong
+  `kernel_data_keys` (kind `lock`); được bọc lại, không bao giờ sinh lại.
+- `kernel_data_keys` có partial unique index cho DEK đang hoạt động: `UNIQUE (tenant_id, purpose, kind) WHERE retired_at IS
+  NULL` (cú pháp chung của SQLite và Postgres). Tạo DEK bằng `INSERT … ON CONFLICT (tenant_id, purpose, kind) WHERE retired_at
+  IS NULL DO NOTHING` (target kèm vị từ, để cả hai database chọn đúng partial index) rồi đọc lại, nên hai instance cùng tạo
+  không sinh hai khoá. `db` chưa có `on_conflict` kèm vị từ: PR 1 của G13 thêm (`on_conflict_do_nothing_where`), test trên cả
+  hai database.
+
+#### c. Đọc: giải mã lười, `reveal` theo handle
+
+`Record::read` là hàm đồng bộ, không có khoá, nên **không giải mã**: `Sensitive<T, C>` đọc từ dòng chỉ giữ bản mã, `dek_id`,
+purpose, khoá chính và nút tổ chức của dòng (cột `#[record(org)]`). Chữ ký chốt từ giờ:
+
+```rust
+impl<T: DbValue, C: DataClass> Sensitive<T, C> {
+    pub async fn reveal<H: RevealHandle>(&self, handle: &H, principal: &Principal) -> Result<Classified<T, C>, Error>;
+}
+```
+
+- `RevealHandle` là trait niêm phong, chỉ handle của **một** khách cài; `AllTenants*` không cài.
+- `handle` là `TenantRead` / `TenantDb` (ngoài transaction: được nạp khoá từ `KeyProvider` khi trượt cache) hay `TenantTx`
+  (trong transaction ghi: **chỉ** đọc bộ khoá đã nạp của Tx, trượt là lỗi `db.data_key_unavailable`).
+- Khách lấy từ **handle**, không từ giá trị: AAD dựng với khách của handle, DEK tra theo cặp (khách của handle, `dek_id`), và
+  `principal.tenant_id()` phải bằng khách của handle. Giá trị chép sang khách khác thì AEAD báo lỗi. Test trên hai database.
+- Quyền: `<module>.read_<lớp>` (manifest tự khai khi module có trường `Sensitive` lớp đó) kiểm **tại nút tổ chức của
+  dòng**, tôn trọng giới hạn của API key (phạm vi nút, permission đã chọn).
+- Purpose không module nào khai: từ chối.
+- **Audit không ghi ngay** (một lần ghi mỗi `reveal` sẽ chiếm pool ghi một kết nối của SQLite và làm cạn pool Postgres): mỗi
+  `reveal` thêm vào bộ đệm gắn với request (hay với handle khi không có request). Kernel ghi bộ đệm **ở bước egress, trước khi
+  gửi response**, gộp mỗi (request, purpose) thành một dòng: danh sách khoá chính có trần (vd 100) cộng số đếm phần vượt trần.
+  Với lớp dữ liệu bắt buộc audit (`sensitive`, `financial`), ghi audit lỗi thì không đưa dữ liệu ra, lỗi
+  `kernel.audit_unavailable` (503, gọi lại được, có bản dịch i18n), theo từng đường:
+  - `reveal` trên `TenantTx`: ghi audit **ngay trong transaction đó** (commit cùng thay đổi); ghi ở egress chỉ cho đường đọc.
+  - REST: ghi trước khi gửi response; response dạng stream hay tải file: ghi trước khi gửi header.
+  - MCP: ghi trước khi trả kết quả tool; lỗi thì trả lỗi tool cùng mã.
+  - Job: ghi ở ranh giới lô và ranh giới job; ghi lỗi thì lô đó thất bại và thử lại **trước khi** bất kỳ đầu ra nào của lô
+    (file, webhook, mail) được gửi.
+- `Sensitive` không cài `Serialize`/`Display`; `Debug` của `Sensitive` và của `Classified` in `«sensitive»`.
+
+#### d. Job đọc dữ liệu nhạy cảm
+
+- `Principal` của job chỉ bộ chạy job của kernel tạo được, lấy từ `JobContext` (không có hàm dựng `pub`); tên là loại job
+  module đó đã đăng ký.
+- Quyền reveal của từng loại job khai trong manifest: `.job::<PayoutExport>().reveals::<class::Financial>("<lý do>")`; audit ghi
+  loại job và lý do.
+- Job do người dùng khởi tạo chạy bằng `PrincipalSnapshot` của người đó (quyền của người đó lúc tạo job).
+- Luật xtask mới `principal-constructors`: mọi hàm dựng `Principal` (`new`, `with_grants`, `with_all_permissions`…) và mọi hàm
+  đổi khách hay quyền (`in_tenant`, `operating`…) trong `src` chỉ được gọi ở kernel và `auth` (test thì được).
+  `PrincipalSnapshot::restore` thành `pub(crate)`: snapshot nằm trong envelope job do kernel giữ, kernel tự khôi phục.
+  Chỗ gọi còn lại (`modules/content/src/ai/translate.rs`: máy chủ dịch làm thay người yêu cầu bằng `with_all_permissions(by)
+  .in_tenant(…)`) vào baseline có hạn; bước chuyển: job dịch chạy bằng `PrincipalSnapshot` của người yêu cầu lấy từ
+  `JobContext`, baseline về rỗng trước G13 PR 1.
+
+#### e. Ghi: codec trong handle, khoá nạp trước transaction
+
+- Không gọi `KeyProvider` trong transaction ghi. Mỗi lần `begin_write()` / `write()` của handle khách **đọc lại danh sách id**
+  trong `kernel_data_keys` của khách trước `BEGIN` (một truy vấn nhỏ) và chỉ unwrap khoá mới so với cache; DEK còn thiếu
+  (purpose mới) được tạo trong một transaction ngắn riêng ngay lúc đó. Tx giữ `Arc` tới bộ khoá của nó (xoay khoá giữa chừng
+  không đổi khoá của Tx đang mở). `db.data_key_unavailable` là lỗi gọi lại được; `begin_write` tự thử lại một lần. Tiến trình
+  không đăng ký purpose nhạy cảm nào (không module nào khai `Sensitive`) bỏ bước đọc lại này.
+- Mã hoá ở `insert`/`insert_many` ngay sau bước kiểm `tenant_of(row) == khách của handle`, trước khi dựng câu.
+  `AllTenantsTx` chỉ ghi cột `Sensitive` khi đã khai trước danh sách khách (`all_tenants(…).for_tenants(&ids)` nạp khoá của
+  từng khách); không khai thì ghi cột đó bị từ chối. `AllTenantsTx::insert` lấy khách từ chính dòng.
+- Không `update().set(…)` hàng loạt cột `Sensitive` (loại `Sealed` không `Settable`). Đổi giá trị bằng cập nhật **một dòng
+  theo khoá chính**: `tx.update_one::<R>(pk).set_sensitive(R::PHONE, value).set(R::UPDATED_AT, now)` — nhận cả `.set` cột
+  thường, tự tính lại blind index đi kèm.
+- `db.sql`: `Sensitive` không bind được; hàm đọc của `Sql` đòi `R: NoSensitive` (derive sinh). `xtask` cảnh báo câu `db.sql` có
+  tên cột `Sensitive` (danh sách từ `RecordInfo`).
+- Cầu tạm `ConnectionTrait` (G2) không qua codec: module chỉ khai `Sensitive` khi đã bỏ hẳn thư viện bọc. `compliance` và
+  `ledger` vì vậy chuyển cụm trước PR 3 của G13.
+
+#### f. Trạng thái cột: không có đường quay về bản rõ
+
+- Bảng kernel cấp khách `kernel_field_states (tenant_id, purpose, state, updated_at)`, `state` ∈ `plaintext` → `migrating` →
+  `encrypted`, chỉ tiến. Khách tạo sau khi purpose có mặt bắt đầu ở `encrypted`; khách cũ còn dữ liệu rõ bắt đầu ở `plaintext`.
+- Đọc giá trị không có tiền tố `enc:`: ở `plaintext`/`migrating` là bản rõ cũ; ở `encrypted` là lỗi đọc
+  (`db.field_not_encrypted`, có trong `doctor`), không bao giờ quay về bản rõ. Không dùng ràng buộc `CHECK` (SQLite phải dựng
+  lại bảng).
+- Job `kernel.fields.rekey` mã hoá dữ liệu rõ nhưng **không** tự chuyển sang `encrypted`. Bước chuyển là lệnh tường minh
+  `autoxide keys finalize <purpose>`, chạy sau khi nâng cấp cuốn chiếu (rolling upgrade) xong — luật deploy ghi trong hướng dẫn
+  nâng cấp. Lệnh quét và chuyển trạng thái **trong cùng một transaction ghi**, không có `--force`: không record nào còn khai
+  `plaintext` cho purpose và không còn dòng rõ thì chuyển, không thì báo chỗ còn thiếu. Bản cũ còn chạy ghi dòng rõ sau đó thì
+  đọc báo `db.field_not_encrypted`; sửa bằng `autoxide keys rekey <purpose>`.
+
+#### g. AAD, định dạng, blind index
+
+- AAD dạng chuẩn, mỗi phần có tiền tố độ dài 4 byte: `"enc"`, `"v1"`, `dek_id`, purpose, khách (16 byte UUID thô), khoá chính
+  (16 byte UUID thô). Không dùng tên bảng hay tên cột vật lý. Định dạng `enc:v1:<dek_id>:<base64url(nonce 96 bit || bản mã ||
+  tag)>` của #577 giữ nguyên.
+- Nonce ngẫu nhiên 96 bit an toàn tới khoảng 2^32 lần mã hoá mỗi DEK: kernel đếm xấp xỉ theo lô, ghi khi trả lô; quá 2^31 thì
+  `doctor` cảnh báo và job xoay DEK chạy. Độ dài bản mã và việc có / không có giá trị (NULL) vẫn lộ; ghi trong tài liệu
+  người dùng.
+- `BlindIndex<T>` lưu `bidx:v1:<key_id>:<giá trị>`, khai `#[record(blind_index = "<trường Sensitive>")]`; handle tự tính khi
+  ghi trường nguồn (loại `Index` không `Settable`). `matches(&value)` tính với **mọi** khoá blind index đang hoạt động (thường
+  1, lúc xoay là 2) thành `IN`; ở `plaintext`/`migrating` so thêm cột nguồn dạng rõ.
+- Chống trùng (số CCCD) không dựa vào unique index (không bao được hai phiên bản khoá): giữ `tx.lock_key(<HMAC bằng khoá đặt
+  tên lock của (khách, purpose)>)` — khoá này không bao giờ sinh lại (mục b), nên hai giao dịch cùng giá trị luôn tranh cùng
+  một lock dù đang xoay khoá blind index — rồi `exists` theo `matches`.
+- Tách / gộp khách tính lại blind index bằng khoá của khách đích; xoá dữ liệu của chủ thể xoá cả blind index.
+
+#### h. Xoay khoá
+
+- DEK: job `kernel.fields.rekey` ghi bằng compare-and-swap `UPDATE … SET col = <mới> WHERE pk = ? AND col = <cũ>`; 0 dòng là dòng
+  đã đổi giữa chừng, đọc lại ở lô sau. Chạy lại được, idempotent nhờ `dek_id` trong giá trị.
+- **Không rekey DEK** của purpose `kernel.audit` và mọi purpose nằm trong chuỗi băm của audit (mã hoá lại đổi bản mã mà chuỗi đã
+  băm): DEK cũ chuyển sang chế độ chỉ giải mã tới hết hạn lưu; DEK mới dùng cho dòng mới. Bọc lại tenant key / DEK bằng KEK
+  mới thì vẫn làm (không đổi bản mã).
+
+#### i. Giá trị đã `reveal` không được lưu rõ ở chỗ khác
+
+- `Classified<T, C>` mang lớp dữ liệu: `#[derive(Schema)]` coi trường kiểu đó là `data_class = C` (sinh `x-autoxide-data-class`,
+  cài `Redact`). `Classified` **serialize ra dạng đã che** (`"«sensitive»"`), trừ khi đi qua serializer của bước egress của
+  kernel (§14.1), nên `serde_json::to_value` ở chỗ khác không làm lộ giá trị.
+- Trait đánh dấu `NoClassified`: cài cho kiểu nguyên thuỷ và kiểu của std; derive (`Schema`, event payload) cài cho kiểu khi mọi
+  trường cài, với bound đặt trên **kiểu của trường** qua mẹo `for<'a>` (`where for<'a> FieldTy: NoClassified`) — bound sai
+  thành impl không thoả (kiểu không cài trait) thay vì lỗi ở chỗ khai; lỗi hiện ra ở chỗ đòi `NoClassified`. `Classified`
+  không cài.
+- Payload được **lưu** — event, đầu vào job, tài liệu tìm kiếm, diff audit — đòi `P: NoClassified`. Bound này đến cùng PR 5b
+  (event có schema, `EventInfo::payload::<P>`) trên API mới. Đường hiện có `Outbox::record<C, E: Event>(&self, connection: &C,
+  event: &E)` (payload serialize qua `serde`) **không** gắn `#[deprecated]` — clippy chạy `-D warnings` và khoảng 25 module đang
+  gọi nó, mà luật không cho `allow(deprecated)` để qua gate. Chỗ gọi còn lại đếm bằng baseline xtask chỉ giảm (như
+  `module-contract-legacy`); chính sách chung cho đường cũ ở §2.3 (D-20261127-transition-paths). Trong lúc đó vẫn an toàn vì `Classified`
+  serialize ra dạng đã che. Các hàm đăng ký cũ của `StartContext` (§5.2 bước 2) xử lý cùng cách ở PR 5.
+- Muốn lưu giá trị đã phân loại thì bọc `Sealed<Classified<T, C>>`: mã hoá bằng cùng codec dưới purpose của kernel
+  (`kernel.outbox`, `kernel.jobs`, `kernel.search`, `kernel.audit`). `enqueue_database` (job chạy ở database khác) từ chối
+  `Sealed`.
+- Kho response của idempotency mã hoá thân response có trường đã phân loại (egress biết từ schema), purpose
+  `kernel.idempotency`.
+
+#### j. Khách: bảng, dời, tách / gộp, xoá, xuất, khôi phục, sandbox
+
+- `kernel_data_keys` và `kernel_field_states` là bảng cấp khách của kernel: có `tenant_id`, ở mọi placement, **không** trong
+  `control_plane_tables`, đi theo khách khi dời (cùng loại `kernel_shares`, §14); chỉ kernel ghi.
+- Dời placement giữ `tenant_id` và tenant key: không đụng bản mã.
+- **Tách / gộp khách** đặt lại `tenant_id` (`relocate::kernel_tables`), mà AAD có khách: trước transaction chép, nạp khoá của
+  nguồn và tạo khoá còn thiếu của đích; trong transaction, giải mã bằng khoá của nguồn, mã hoá lại bằng khoá của đích (cả dòng
+  còn rõ), tính lại blind index; danh sách cột từ `RecordInfo`.
+- **Xoá dữ liệu khách**: huỷ tenant key, giữ purpose phải lưu dưới retention key (mục b, D-20261126-tenant-delete-key-shred).
+  Huỷ chỉ có hiệu lực khi các bản backup kho khoá còn chứa tenant key đó hết hạn lưu `R`; RUNBOOK đặt `R` không dài hơn hạn
+  phải xoá dữ liệu.
+- **Xuất dữ liệu khách** (tenant export): chỉ giải mã lớp người yêu cầu có quyền, phần còn lại che; không bao giờ kèm DEK đã bọc.
+- **Khôi phục backup** cần cùng KEK và bản backup kho khoá **mới bằng hoặc mới hơn** bản backup database (khách tạo sau bản
+  backup kho khoá thì mất khoá); `doctor` cảnh báo khi có khách được tạo sau lần backup kho khoá gần nhất. Ghi trong RUNBOOK.
+- `SandboxCopy`: cột `Sensitive` chép ở dạng đã che, mã hoá bằng DEK của sandbox (sandbox có tenant key riêng, bắt đầu ở
+  `encrypted`).
+
+#### k. Egress
+
+Che theo **lớp của trường DTO**, không theo cách lưu: trường lưu rõ (`plaintext`) vẫn bị che như trường mã hoá. `reveal` kiểm
+**người đang thao tác**; bước egress (§14.1) kiểm **người nhận** (chủ webhook, người nhận thông báo, bên tải file xuất) — giá
+trị đã `reveal` cho A vẫn bị che khi tới B thiếu quyền lớp đó.
+
+#### l. Hạng và crate
+
+Việc tách crate đã dời sau 1.0, nên tất cả ở `autoxide-kernel`:
+
+- `Sensitive`, `BlindIndex`, `Classified`, `class::*`, `NoClassified`, `Sealed`, `RevealHandle`: ổn định (điều kiện ở mục a).
+- `KeyProvider`, `AuditAnchor`: **thử nghiệm**, `autoxide_kernel::unstable::security` — hợp đồng của bộ nối nhà cung cấp (KMS,
+  Vault, Object Lock, RFC 3161), cùng tiêu chí với `payment`/`sms` (§2.1). `audit` (official) dùng được bên trong, miễn `api`
+  của nó không lộ kiểu này.
+- Codec `enc:v1`, bộ khoá theo Tx, bộ đệm audit: nội bộ của kernel. `LocalKeyProvider`, kho tenant key, lệnh `autoxide keys …`,
+  job rekey: sang `autoxide-host` khi tách.
+
 ## 15. Kết quả ba spike (trước PR 2)
 
 Mã nháp ở nhánh `claude/kernel-contract-spikes` (PR nháp, **không merge**): crate `spikes/db-api` (nguyên mẫu `db`),
@@ -827,6 +1069,56 @@ sinh `#[derive(Record)]` thật (spike dùng `macro_rules!` đứng thay).
   — dưới ngưỡng 20% → **dời sau 1.0**, trước 1.0 chỉ tách `autoxide-host` (đã quyết).
 - Cái rút thời gian thật nằm ở phía module (70–75%), không ở kernel: ghi để xét sau 1.0 (vd module chỉ phụ thuộc phần kernel
   mình dùng, hay giảm mã sinh ra của derive).
+
+### 15.4 Spike F9 (trước PR 4): `#[endpoint]` + `Params` trên module trọn vẹn
+
+Mã nháp ở nhánh `claude/kernel-contract-spike-f9` (**không merge**), dựng trên PR 2 (#568). `autoxide-macros` có thêm
+`#[endpoint]`, `#[derive(Schema)]`, `#[derive(Params)]`; kernel có `http::{Endpoint, Routes, ModuleRouter}` và `routes!`.
+Hai module chuyển trọn: `notes` (6 endpoint, dùng `etag`) và `audit` (3 endpoint, `IntoParams` có `#[into_params]`,
+`#[param(example)]`, `#[param(inline)]` trên enum cũng đổi sang `Schema`). **Cả hai không còn khai `utoipa` / `utoipa-axum`**.
+
+- **Tài liệu bằng nhau sau khi chuẩn hoá `serde_json`.** Mọi phép so đều qua `serde_json::Value` (khoá sắp theo tên), như
+  `autoxide openapi` sinh `docs/openapi.json`: extension của operation nằm trong `HashMap` của utoipa nên thứ tự khoá đổi mỗi
+  lần chạy, so chuỗi thô là sai. `audit` có trong binary: `cargo xtask regen --check` không lệch `docs/openapi.json` lẫn
+  `docs/mcp-tools.json` (file đã chuẩn hoá, so từng byte); đối chứng: sửa một chữ trong mô tả thì lệnh báo lệch. `notes` không
+  có trong binary: test `spike_f9_openapi_giong_tung_byte` so tài liệu OpenAPI của app có `notes` (đã chuẩn hoá) với bản chụp
+  từ mã cũ; đối chứng tương tự cho đỏ.
+- **Thời gian biên dịch: không đo được khác biệt.** `-Ztime-passes` của `audit`: 2,04 s (mới) và 2,08 s (cũ). Đo xen kẽ
+  bản mới / bản cũ, chạm file nguồn rồi biên dịch lại riêng module, 6 lần mỗi ô; trung vị (nhỏ nhất – lớn nhất):
+
+  | Module | `check` cũ | `check` mới | `build` cũ | `build` mới |
+  | --- | --- | --- | --- | --- |
+  | `notes` | 1,43 s (1,28–1,59) | 1,43 s (1,26–1,58) | 2,76 s (2,67–2,95) | 2,94 s (2,69–3,07) |
+  | `audit` | 2,55 s (2,36–2,85) | 2,52 s (2,49–2,91) | 4,62 s (4,37–4,74) | 4,57 s (4,34–4,86) |
+
+  Khoảng trải của mỗi ô (±10%) lớn hơn chênh lệch giữa hai bản. Lượt đo đầu (đo hết bản cũ rồi mới đo bản mới) cho `audit`
+  +20%, `notes` −12%: nhiễu do điều kiện máy đổi giữa hai đợt. Luật đo cho PR 4 (§4.2): **đo xen kẽ hai bản trong cùng một
+  đợt**, ít nhất 10 lần mỗi bản (hay dùng `hyperfine`), so trung vị; đo **`cargo check` toàn workspace** (không chỉ module
+  đã chuyển), ngưỡng chấp nhận tăng ≤ 5%.
+- **Cách làm đã chạy** (giữ cho PR 4):
+  - `#[endpoint]` giữ nguyên hàm của module, sinh thêm một struct đánh dấu **cùng tên hàm** cài `http::Endpoint`.
+    Struct phải có ngoặc nhọn (`struct x {}`): struct đơn vị `struct x;` chiếm cả namespace giá trị nên trùng tên hàm.
+    `routes![a, b]` vì vậy chỉ cần tên hàm, không cần `paste`.
+  - Trong thân `Endpoint::__describe` có một bản sao chữ ký của hàm (thân `loop {}`, không bao giờ chạy) mang
+    `#[utoipa::path]`, với `utoipa` lấy từ `::autoxide_kernel::__private`. Bản sao giữ nguyên mẫu tham số, vì feature
+    `axum_extras` của utoipa đọc extractor (`Path(id): Path<Uuid>`, `Query<T>`) để điền tham số.
+  - Ba đường tắt đã dùng: `permission = "…"` (sinh `x-permissions` + `security`), `operation_id` mặc định là tên hàm, `etag`
+    trên response (header `ETag` chuẩn).
+  - `Routes` thêm từng endpoint một: axum gộp các method của cùng một path, utoipa gộp operation, nên không cần gom theo
+    path như `utoipa_axum::routes!`.
+- **Đã chốt cho PR 4** (phiên điều phối, 26/11/2026):
+  - Mỗi endpoint khai rõ ai được gọi: `permission = "…"` (hay danh sách), `signed_in` (đăng nhập, không cần permission:
+    `x-permissions: []`), hoặc `public`; thiếu là lỗi biên dịch, không có mặc định ngầm. `security(…)` viết tay thay mặc định.
+  - Response 401/403 chuẩn tự sinh khi endpoint cần đăng nhập / permission mà module không tự viết; module tự viết thì giữ
+    bản của module.
+  - Bí danh tạm `ModuleRouter` không cần: PR 4 thêm `Module::endpoints() -> Routes` có cài mặc định (D-038), kernel ghép với
+    `Module::routes`; manifest (PR 5) thay cả hai. Kernel báo lỗi rõ (lúc khởi động) khi `routes` và `endpoints` của một module trùng cặp
+    path + method; `endpoints` ghi vào danh sách đếm của luật `module-contract-legacy` (PR 5) như `routes`. Lý do: bí danh `#[deprecated]` buộc module dùng nó phải tắt cảnh báo
+    `deprecated`, mà luật không cho tắt lint để qua gate.
+  - `ValidJson` và tool MCP đổi ràng buộc sang trait `http::Validate` của kernel (impl chung cho kiểu của `validator`), nên
+    module chưa chuyển không phải sửa; `#[derive(Validate)]` của kernel sinh đúng mã của `validator_derive`.
+- **Bẫy khi đo:** nhiều worktree dùng chung `CARGO_TARGET_DIR` ghi đè bản build của nhau, vì hash của crate path trong
+  workspace không gồm đường dẫn. Mỗi worktree một thư mục target, như luật chia agent.
 
 ## 16. Mở rộng hợp đồng: CLI và định dạng file (71-G14 mục 4, D-20261126-operations-baseline)
 

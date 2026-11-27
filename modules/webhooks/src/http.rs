@@ -137,7 +137,7 @@ impl From<Endpoint> for EndpointResponse {
 pub(crate) struct CreatedEndpointResponse {
     /// Verify the `webhook-signature` header of each request with this secret (Standard
     /// Webhooks). Store it now: it cannot be shown again, only replaced.
-    #[schema(example = "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw")]
+    #[schema(example = "whsec_EXAMPLE-not-a-real-secret")]
     secret: String,
     #[serde(flatten)]
     endpoint: EndpointResponse,
@@ -146,7 +146,7 @@ pub(crate) struct CreatedEndpointResponse {
 /// A new signing secret, shown only once.
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub(crate) struct SecretResponse {
-    #[schema(example = "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw")]
+    #[schema(example = "whsec_EXAMPLE-not-a-real-secret")]
     secret: String,
 }
 

@@ -12,8 +12,8 @@ use serde_json::{Value, json};
 use crate::http::test_support::{PASSWORD, app_built, call, call_with};
 use crate::registration_tests::OrgValues;
 
-/// Mật khẩu 14 ký tự: đủ mức của máy chủ (12), thiếu mức 16 của khách.
-const FOURTEEN: &str = "fourteen chars";
+/// Mật khẩu 17 ký tự: đủ mức của máy chủ (15), thiếu mức 18 của khách.
+const SEVENTEEN: &str = "seventeen letters";
 /// Khách của `ada` (khách mặc định), nêu bằng header như mọi request chưa đăng nhập khi có nhiều khách.
 const HOME: [(&str, &str); 1] = [("autoxide-tenant", "default")];
 
@@ -39,17 +39,17 @@ async fn chinh_sach_cua_khach_chi_ap_cho_khach_do() {
         })
         .await;
         let home = services.tenant.id();
-        orgs.set(home, "auth.password_min_length", json!(16));
+        orgs.set(home, "auth.password_min_length", json!(18));
         orgs.set(home, "auth.session_days", json!(1));
         orgs.set(home, "auth.totp_issuer", json!("Shop A"));
 
-        // Mật khẩu: khách siết lên 16; khách `b` vẫn theo máy chủ (12).
-        let body = json!({"email": "bob@example.com", "name": "Bob", "password": FOURTEEN});
+        // Mật khẩu: khách siết lên 18; khách `b` vẫn theo máy chủ (15).
+        let body = json!({"email": "bob@example.com", "name": "Bob", "password": SEVENTEEN});
         let (status, _, refused) = call_with(&app, "POST", "/register", &HOME, Some(body)).await;
         assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{refused}");
         assert_eq!(refused["errors"][0]["field"], "password", "{refused}");
-        assert!(refused["errors"][0].to_string().contains("16"), "{refused}");
-        let other = json!({"email": "bob@example.com", "name": "Bob", "password": FOURTEEN});
+        assert!(refused["errors"][0].to_string().contains("18"), "{refused}");
+        let other = json!({"email": "bob@example.com", "name": "Bob", "password": SEVENTEEN});
         let headers = [("autoxide-tenant", "b")];
         let (status, _, created) =
             call_with(&app, "POST", "/register", &headers, Some(other)).await;

@@ -51,6 +51,26 @@ impl Probe for TokenSecret {
     }
 }
 
+/// Đăng nhập OAuth cho client MCP có bật không (D-20261126-mcp-oauth). Tắt không phải lỗi (client vẫn dùng API key)
+/// nên chỉ nêu cách bật.
+pub(crate) struct McpOAuth {
+    pub issuer: Option<String>,
+}
+
+#[async_trait::async_trait]
+impl Probe for McpOAuth {
+    async fn probe(&self) -> Finding {
+        match &self.issuer {
+            Some(issuer) => Finding::ok(format!("MCP clients sign in with OAuth at issuer {issuer}.")),
+            None => Finding::ok("OAuth sign-in for MCP clients is off: they connect with an API key.").with_hint(
+                "To let Claude, ChatGPT and other MCP clients connect without pasting a key, set \
+                 AUTOXIDE_HTTP_PUBLIC_URL (no path) and AUTOXIDE_AUTH_OAUTH_CONSENT_URL (the consent page of your \
+                 interface).",
+            ),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use autoxide_kernel::doctor::Status;
@@ -105,5 +125,13 @@ mod tests {
         assert!(missing.message.contains("AUTOXIDE_AUTH_TOKEN_SECRET"), "{missing:?}");
         assert!(missing.hint.unwrap().contains("openssl rand"));
         assert_eq!(TokenSecret { configured: true }.probe().await.status, Status::Ok);
+    }
+
+    #[tokio::test]
+    async fn bao_cach_bat_oauth_cho_mcp() {
+        let off = McpOAuth { issuer: None }.probe().await;
+        assert!(off.hint.unwrap().contains("AUTOXIDE_AUTH_OAUTH_CONSENT_URL"));
+        let on = McpOAuth { issuer: Some("https://api.example.com".to_owned()) }.probe().await;
+        assert!(on.message.contains("https://api.example.com"));
     }
 }

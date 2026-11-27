@@ -14,6 +14,7 @@ mod e2e;
 mod modules;
 mod observability;
 mod registry;
+mod releases;
 mod runtime;
 mod settings;
 mod startup;
@@ -81,6 +82,25 @@ enum Command {
     /// invalid; warnings do not fail.
     Doctor(commands::doctor::Arguments),
 
+    /// Ask the server running on this machine whether it is healthy (for container health checks).
+    ///
+    /// Sends `GET /health/ready` (or `/health/live` with `--live`) to the address of
+    /// `AUTOXIDE_HTTP_ADDRESS` over plain HTTP (it reads only that one setting, so it needs no other configuration), and
+    /// exits with status 0 when it answers 200, 1 when it does not answer or answers anything else,
+    /// 2 when the configuration is invalid. It needs no shell, `curl` or `wget`, so it works in an
+    /// image that has none. It does not touch the database itself.
+    Healthcheck(commands::healthcheck::Arguments),
+
+    /// Print the generated password of the first administrator, or delete the file that holds it.
+    ///
+    /// `autoxide serve` writes the email and the generated password to the file named by
+    /// `AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD_OUT` (default `data/initial-admin-password`, readable only by the
+    /// server's user) when it creates the first administrator without a password you gave. This prints that
+    /// file (the email, then the password) and, with `--remove`, deletes it once you have changed the
+    /// password. It exists because the Docker image has no shell, `cat` or `rm`. Exits with status 1 when the
+    /// file does not exist, 2 when the configuration is invalid. The password never goes to the log.
+    InitialPassword(commands::initial_password::Arguments),
+
     /// Inspect and retry background jobs that failed for good (the dead-letter queue).
     Jobs(commands::jobs::Arguments),
 
@@ -115,6 +135,15 @@ enum Command {
     /// `add` stores the connection URL encrypted; `check` compares each placement's migrations
     /// with the program. Run `autoxide migrate up --all` to bring placements up to date.
     Placement(commands::placement::Arguments),
+
+    /// Roll the main database and every tenant database back to the migrations of an earlier release.
+    ///
+    /// Run it with the binary of the CURRENT release, then start the servers of the earlier one.
+    /// `--dry-run` lists, per database, what would be reverted and the tables and columns that
+    /// would be dropped with the rows they hold. A rollback that drops data needs
+    /// `--accept-data-loss`; every real run needs `--yes` once the servers are stopped. Modules
+    /// this binary adds with `.module(…)` are left as they are unless `--revert-untracked`.
+    Rollback(commands::rollback::Arguments),
 
     /// Restore a backup made by `autoxide backup` into a new, empty database.
     ///
@@ -270,8 +299,11 @@ fn dispatch(command: Command) -> ExitCode {
         Command::Copy(arguments) => commands::copy::run(&arguments),
         Command::Demo(arguments) => commands::demo::run(&arguments),
         Command::Doctor(arguments) => commands::doctor::run(&arguments),
+        Command::Healthcheck(arguments) => commands::healthcheck::run(&arguments),
+        Command::InitialPassword(arguments) => commands::initial_password::run(&arguments),
         Command::Jobs(arguments) => commands::jobs::run(&arguments),
         Command::Migrate(arguments) => commands::migrate::run(&arguments),
+        Command::Rollback(arguments) => commands::rollback::run(&arguments),
         Command::Modules(arguments) => commands::modules::run(&arguments),
         Command::Openapi => commands::openapi::run(),
         Command::McpManifest => commands::mcp_manifest::run(),

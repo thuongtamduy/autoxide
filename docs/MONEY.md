@@ -64,7 +64,9 @@ Each unit has a **money-flow mode** (`PUT /ledger/flow-settings/{org_id}`, inher
 Holds are released by a job (every 5 minutes) or by hand (`POST /ledger/holds/{id}/release`). Payouts
 (`POST /ledger/payouts`) go through a `PayoutGateway` partner and never exceed the available balance,
 even when sent at the same time. Platform fees carry their own VAT; withholding for household
-businesses (Decree 117/2025/ND-CP — needs checking) only happens in the collect modes.
+businesses (Decree 117/2025/ND-CP — needs checking) only happens in the collect modes; core computes and
+books it, but does not yet withhold on each payout by itself, issue the withholding certificate or prepare
+the declaration (with the marketplace module, after 1.0 — see `TAX.md`).
 
 ## VietQR bank transfers
 
@@ -87,7 +89,12 @@ with the bank or service.
   booked in the seller's ledger (receivable, revenue, output VAT).
 - **E-invoices** go to a provider (`EInvoiceProvider`, including invoices from cash registers) in a
   background job; a refused invoice is fixed and sent again with the same number. Issued documents
-  are corrected only by an adjustment or a replacement, or cancelled.
+  are corrected only by an adjustment or a replacement, or cancelled. An e-invoice already sent to the tax
+  authority cannot be cancelled where the seller's tax jurisdiction forbids it (Vietnam since 2025-06-01,
+  Decree 70/2025/ND-CP; tax pack rule `einvoice.cancel_after_submission`): `409
+  invoices.einvoice_not_cancellable` with the legal basis — issue an adjustment (`direction: decrease`) or a
+  replacement. One the tax authority rejected is cancelled locally. Autoxide does not send the error notice
+  form 04/SS; lodge it at the provider's or tax authority's portal when it is required.
 - A unit may issue for a seller under a **mandate** (`/invoices/mandates`).
 
 ## Exchange rates and foreign-currency documents

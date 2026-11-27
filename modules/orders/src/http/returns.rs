@@ -462,7 +462,8 @@ pub(crate) struct ReturnTransitionRequest {
         (status = 401, description = "Not signed in; code `unauthenticated`.", body = Problem),
         (status = 403, description = "Missing `orders.returns.manage` at the order's shop; code `permission_denied`.", body = Problem),
         (status = 404, description = "No such return; code `orders.return_not_found`.", body = Problem),
-        (status = 409, description = "The step is not allowed now (`orders.return_invalid_transition`), or the refund is more than what is left to refund (`orders.refund_exceeds_paid`).", body = Problem),
+        (status = 409, description = "The step is not allowed now (`orders.return_invalid_transition`), or the refund is more than what is left to refund (`orders.refund_exceeds_paid`): final. Any other code (for example `ledger.payment_state`) means the payment partner is still busy with the payment: not a refusal; the refund stays `pending` — send the same step again later (it is never refunded twice).", body = Problem),
+        (status = 429, description = "The payment partner limits calls (`Retry-After`): the refund stays `pending`; send the same step again after that many seconds.", body = Problem),
         (status = 422, description = "Unknown action, reason, line or condition (see `errors`).", body = Problem),
     )
 )]
@@ -605,8 +606,9 @@ pub(crate) struct RefundRequestBody {
         (status = 401, description = "Not signed in; code `unauthenticated`.", body = Problem),
         (status = 403, description = "Missing `orders.refund` at the order's shop; code `permission_denied`.", body = Problem),
         (status = 404, description = "No such order; code `orders.order_not_found`.", body = Problem),
-        (status = 409, description = "More than what is left to refund; code `orders.refund_exceeds_paid`.", body = Problem),
-        (status = 422, description = "Invalid amount, reason or reference, or the reference was used for another refund (`reference_reused`).", body = Problem),
+        (status = 409, description = "More than what is left to refund (`orders.refund_exceeds_paid`): final. Any other code (for example `ledger.payment_state`) means the payment partner is still busy with the payment: not a refusal; the refund stays `pending` — send the same request with the same `reference` again later (it is never refunded twice).", body = Problem),
+        (status = 422, description = "Invalid amount, reason or reference, or the reference was used for another refund (`reference_reused`); or the payment partner refused the refund (e.g. `payment.not_supported`, `ledger.gateway_not_configured`): the refund is `failed` and a `refund_failed` item is opened in `GET /api/v1/ledger/exceptions` to refund the buyer by hand.", body = Problem),
+        (status = 429, description = "The payment partner limits calls (`Retry-After`): the refund stays `pending`; send the same request with the same `reference` again after that many seconds.", body = Problem),
     )
 )]
 pub(crate) async fn refund_order(

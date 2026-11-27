@@ -31,6 +31,8 @@ curl -sS "$API/api/v1/auth/me" -H "Authorization: Bearer $AGENT_KEY"
 
 ## 2. Connect the client
 
+When the server has OAuth sign-in on, clients that support it (Claude, ChatGPT, Claude Code, IDEs) connect with the address alone and the person approves them in your interface: see [Connecting MCP clients with OAuth sign-in](mcp-oauth.md). The rest of this section connects with an API key, which works with every client.
+
 Claude Code:
 
 ```bash
@@ -160,6 +162,7 @@ The tools of this version, by module (`docs/mcp-tools.json` has their full input
 | `compliance.set_website_status` | `compliance.legal.manage` | writes |
 | `compliance.subject_requests` | `compliance.privacy.manage` | read-only |
 | `compliance.tracking_tags` | `compliance.tracking.manage` | writes |
+| `compliance.unlock_phone` | `compliance.phone_locks.manage` | writes |
 | `compliance.verification_status` | — | read-only |
 | `compliance.website_checklist` | `compliance.legal.read` | read-only |
 | `compliance.website_dossier` | `compliance.legal.read` | read-only |
@@ -433,7 +436,7 @@ curl -sS "$API/api/v1/openapi/content.json"
 
 A walk-through on your own machine, from an empty directory to an assistant that answers questions about stock and sales. It starts from the [Quickstart](../../README.md#quickstart) (`compose.quickstart.yml`), so the server is at `http://127.0.0.1:8080`.
 
-**1. Sign in and make a key for the assistant.** Use the administrator's password from the file the server wrote (`docker compose -f compose.quickstart.yml exec autoxide cat data/initial-admin-password`). Give the key only what the assistant needs — here, reading stock, products, prices and reports, and drafting invoices:
+**1. Sign in and make a key for the assistant.** Use the administrator's password from the file the server wrote (`docker compose -f compose.quickstart.yml exec autoxide autoxide initial-password`). Give the key only what the assistant needs — here, reading stock, products, prices and reports, and drafting invoices:
 
 ```bash
 API=http://127.0.0.1:8080

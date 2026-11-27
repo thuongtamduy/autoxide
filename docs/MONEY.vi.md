@@ -61,7 +61,8 @@ Mỗi nút có một **chế độ dòng tiền** (`PUT /ledger/flow-settings/{o
 Tạm giữ được nhả bởi job (5 phút một lần) hay bằng tay (`POST /ledger/holds/{id}/release`). Chi trả
 (`POST /ledger/payouts`) đi qua đối tác `PayoutGateway` và không bao giờ vượt số dư khả dụng, kể cả
 khi gửi đồng thời. Phí sàn tách GTGT riêng; khấu trừ thay cho hộ kinh doanh (NĐ 117/2025/NĐ-CP — cần
-đối chiếu) chỉ có ở chế độ thu hộ.
+đối chiếu) chỉ có ở chế độ thu hộ; core tính và ghi sổ, nhưng chưa tự khấu trừ ở mỗi lần chi trả, chưa lập chứng từ
+khấu trừ, chưa chuẩn bị tờ khai (cùng module sàn, sau 1.0 — xem `TAX.vi.md`).
 
 ## Chuyển khoản VietQR
 
@@ -83,7 +84,11 @@ có nguồn giả: bộ nối thật cần hợp đồng với ngân hàng hay d
   (phải thu, doanh thu, GTGT đầu ra).
 - **Hoá đơn điện tử** gửi tới nhà cung cấp (`EInvoiceProvider`, kể cả hoá đơn từ máy tính tiền) trong
   job nền; bị từ chối thì sửa rồi gửi lại cùng số. Chứng từ đã phát hành chỉ sửa bằng chứng từ điều
-  chỉnh, thay thế, hay huỷ.
+  chỉnh, thay thế, hay huỷ. Hoá đơn điện tử đã gửi cơ quan thuế không huỷ được khi luật của vùng thuế người
+  bán cấm (Việt Nam từ 01/6/2025, NĐ 70/2025/NĐ-CP; quy tắc gói thuế `einvoice.cancel_after_submission`): `409
+  invoices.einvoice_not_cancellable` kèm căn cứ — lập hoá đơn điều chỉnh (`direction: decrease`) hay thay thế.
+  Hoá đơn bị cơ quan thuế từ chối thì huỷ tại chỗ. Autoxide không gửi thông báo sai sót mẫu 04/SS; khi cần thì
+  nộp ở cổng của nhà cung cấp hay cơ quan thuế.
 - Một nút lập thay người bán khi có **uỷ nhiệm** (`/invoices/mandates`).
 
 ## Tỉ giá và chứng từ ngoại tệ

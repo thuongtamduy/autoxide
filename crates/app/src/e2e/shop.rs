@@ -348,6 +348,21 @@ async fn mo_cua_hang_ban_don_dau_tien_tu_dau_den_cuoi() {
         }
         let (_, order) = shop.admin("GET", &format!("/api/v1/orders/{order_id}"), None).await;
         assert_eq!(order["data"]["status"], "delivered", "{order}");
+        // Hàng tới tay người mua thì rời kho (UT-1): dòng `sale −2`, tồn 8, không còn giữ.
+        assert_eq!(order["data"]["fulfillment_status"], "fulfilled", "{order}");
+        let (status, levels) = shop.admin("GET", &format!("/api/v1/inventory/levels?variant_id={variant}"), None).await;
+        assert_eq!(status, StatusCode::OK, "{levels}");
+        let level = &levels["data"][0];
+        assert_eq!(
+            (level["on_hand"].as_i64(), level["reserved"].as_i64(), level["available"].as_i64()),
+            (Some(8), Some(0), Some(8)),
+            "{levels}"
+        );
+        let uri = format!("/api/v1/inventory/movements?variant_id={variant}&kind=sale");
+        let (status, sales) = shop.admin("GET", &uri, None).await;
+        assert_eq!(status, StatusCode::OK, "{sales}");
+        let sold: Vec<i64> = sales["data"].as_array().unwrap().iter().filter_map(|m| m["quantity"].as_i64()).collect();
+        assert_eq!(sold, [-2], "{sales}");
         let created = einvoice.take_requests().into_iter().find(|r| r.path == "/v1/invoices/create").expect("e-invoice sent").json();
         assert_eq!(created["provider_account_id"], SEPAY_ACCOUNT);
         assert_eq!(created["currency"], "VND");

@@ -15,8 +15,13 @@ use axum::http::{Method, StatusCode};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
-const ALL: [&str; 4] =
-    ["kernel.settings.manage", "ledger.read", "ledger.payments_create", "ledger.refunds_create"];
+const ALL: [&str; 5] = [
+    "kernel.settings.manage",
+    "ledger.read",
+    "ledger.payments_create",
+    "ledger.refunds_create",
+    "ledger.reconcile",
+];
 const PUBLIC: &str = "https://api.shop.example";
 const CREATE: &str = "/v2/gateway/api/create";
 const QUERY: &str = "/v2/gateway/api/query";
@@ -483,6 +488,43 @@ async fn ipn_bao_so_tien_khac_thi_cho_nguoi_doi_soat() {
         drain(app).await;
         assert_eq!(status_of(app, &payment).await, "needs_review");
         assert_eq!(clearing(app, "one").await, 0);
+
+        // Thông báo "đúng số" gửi sau cho cùng giao dịch (cùng `transId`): bỏ qua, không gỡ được lệch
+        // (UT-6 L5) — chỉ người đối soát gỡ.
+        let corrected = ipn(ONE, &payment.id.to_string(), 150_000, 4_088_878_654, 0);
+        assert_eq!(push(app, &one, &corrected).await.0, StatusCode::NO_CONTENT);
+        drain(app).await;
+        assert_eq!(status_of(app, &payment).await, "needs_review");
+
+        // Người đối soát: mục `amount_mismatch` đang mở → nhận số thực thu → đã thu đúng số đó.
+        let listed = app
+            .get("/api/v1/ledger/exceptions?status=open")
+            .token("one")
+            .send()
+            .await
+            .unwrap()
+            .json();
+        let item = listed["data"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|item| item["kind"] == "amount_mismatch")
+            .unwrap_or_else(|| panic!("{listed}"))
+            .clone();
+        assert_eq!(item["subject"], format!("ledger.payment:{}", payment.id));
+        let resolved = app
+            .post(&format!("/api/v1/ledger/exceptions/{}/resolve", item["id"].as_str().unwrap()))
+            .token("one")
+            .json(json!({"action": "accept_received", "payment_id": payment.id,
+                         "note": "MoMo confirmed 100,000 by phone"}))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(resolved.status(), StatusCode::OK, "{}", resolved.json());
+        assert_eq!(resolved.json()["data"]["status"], "resolved");
+        drain(app).await;
+        assert_eq!(status_of(app, &payment).await, "succeeded");
+        assert_eq!(clearing(app, "one").await, 100_000);
 
         // Thanh toán thất bại ở MoMo (người mua từ chối, mã 1006).
         let other = pay(app, "one", 80_000, "P-2").await.unwrap();

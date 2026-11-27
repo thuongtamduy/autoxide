@@ -131,7 +131,7 @@ pub(crate) struct InstallmentRequest {
     request_body = CheckoutRequest,
     responses(
         (status = 201, description = "Ordered.", body = Data<CheckoutResponse>),
-        (status = 200, description = "Same `Idempotency-Key` as an earlier checkout: its result.", body = Data<CheckoutResponse>),
+        (status = 200, description = "Same `Idempotency-Key` as an earlier checkout: its result.", body = Data<CheckoutResponse>, headers(("Idempotent-Replayed" = String, description = "`true`: the orders of the earlier checkout with this key, as they are now; nothing was ordered again."))),
         (status = 401, description = "Guest cart without the right `Cart-Token`; code `orders.cart_token_invalid`.", body = Problem),
         (status = 404, description = "No such cart; code `orders.cart_not_found`.", body = Problem),
         (status = 409, description = "Prices changed (`orders.quote_changed`) or the quote expired (`orders.quote_expired`), not enough stock (`orders.out_of_stock`), a promotion ran out (`orders.promotion_unavailable`), the cart was already ordered (`orders.cart_closed`), or the same key is still being processed (`orders.checkout_in_progress`) or failed (`orders.checkout_failed`), or a tender cannot pay (e.g. `customers.insufficient_points`).", body = Problem),
@@ -208,7 +208,7 @@ pub(crate) async fn checkout(
         let location = format!("/orders/me/orders/{}", placed.order_ids[0]);
         Created::new(location, body).into_response()
     } else {
-        Data { data: body }.into_response()
+        super::replay::marked(Data { data: body }, true)
     })
 }
 
@@ -334,6 +334,8 @@ pub(crate) async fn list_orders(
     Query(query): Query<OrderListQuery>,
     Query(page): Query<PageQuery>,
 ) -> Result<Page<OrderResponse>, Error> {
+    // Quyền trước tham số trang: thiếu quyền là 403, không phải 422 (luật `permission-first` của xtask).
+    principal.require(&crate::permissions::READ)?;
     let filter = OrderFilter {
         status: query.status,
         payment_status: query.payment_status,
