@@ -12,6 +12,7 @@ pub mod migrate;
 pub mod modules;
 pub mod openapi;
 pub mod placement;
+pub mod rollback;
 pub mod secrets;
 pub mod serve;
 pub mod task;

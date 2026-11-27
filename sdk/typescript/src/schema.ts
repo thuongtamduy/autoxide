@@ -10319,12 +10319,18 @@ export type Data_MigrationRun = {
      * applied is skipped.
      */
     error?: string | null;
+    /** The release a rollback goes from; `null` for a placement run. */
+    from_version?: string | null;
     id: string;
+    /** `placements` (migrations of the tenant databases) or `rollback` (`autoxide rollback --to`). */
+    kind: string;
     /** The placement it runs on; `null`: every placement, by name. */
     placement?: string | null;
     requested_by?: string | null;
     /** `pending`, `running`, `done` or `failed`. */
     status: string;
+    /** The release a rollback goes to; `null` for a placement run. */
+    to_version?: string | null;
     updated_at: string;
   };
 };
@@ -18080,12 +18086,18 @@ export type MigrationRun = {
    * applied is skipped.
    */
   error?: string | null;
+  /** The release a rollback goes from; `null` for a placement run. */
+  from_version?: string | null;
   id: string;
+  /** `placements` (migrations of the tenant databases) or `rollback` (`autoxide rollback --to`). */
+  kind: string;
   /** The placement it runs on; `null`: every placement, by name. */
   placement?: string | null;
   requested_by?: string | null;
   /** `pending`, `running`, `done` or `failed`. */
   status: string;
+  /** The release a rollback goes to; `null` for a placement run. */
+  to_version?: string | null;
   updated_at: string;
 };
 
@@ -23784,12 +23796,18 @@ export type Page_MigrationRun = {
      * applied is skipped.
      */
     error?: string | null;
+    /** The release a rollback goes from; `null` for a placement run. */
+    from_version?: string | null;
     id: string;
+    /** `placements` (migrations of the tenant databases) or `rollback` (`autoxide rollback --to`). */
+    kind: string;
     /** The placement it runs on; `null`: every placement, by name. */
     placement?: string | null;
     requested_by?: string | null;
     /** `pending`, `running`, `done` or `failed`. */
     status: string;
+    /** The release a rollback goes to; `null` for a placement run. */
+    to_version?: string | null;
     updated_at: string;
   }[];
   pagination: Pagination;
@@ -40538,7 +40556,7 @@ export interface paths {
   "/api/v1/content/public/terms": {
     /** List categories and tags that have published posts (public). */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { locale: string; taxonomy?: Taxonomy; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { locale: string; taxonomy?: Taxonomy; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean; site?: string }; };
       responses: {
         200: Page_PublicTermCount;
         403: Problem;
@@ -40550,7 +40568,7 @@ export interface paths {
   "/api/v1/content/public/terms/{taxonomy}/{slug}": {
     /** Get a category or tag by slug (public). */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; path: { taxonomy: Taxonomy; slug: string }; query: { locale: string }; };
+      parameters: { header: { "Accept-Language"?: string }; path: { taxonomy: Taxonomy; slug: string }; query: { locale: string; site?: string }; };
       responses: {
         200: Data_PublicTermPage;
         403: Problem;
