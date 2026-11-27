@@ -59,7 +59,12 @@ impl ComplianceService {
         surface: &str,
         reason: &str,
     ) -> Result<(), Error> {
-        let (allowed, _) = self.hide_reasons(tenant, surface).await?;
+        let (allowed, legal_basis) = self.hide_reasons(tenant, surface).await?;
+        // Vùng pháp lý không có quy tắc ẩn đang hiệu lực: luật không giới hạn lý do — module tự quyết theo
+        // danh sách của nó (kiểm độc lập #575).
+        if legal_basis.is_none() {
+            return Ok(());
+        }
         if allowed.iter().any(|item| item == reason) {
             Ok(())
         } else {

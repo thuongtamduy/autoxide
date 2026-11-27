@@ -12,6 +12,7 @@ pub(crate) mod compliance;
 pub(crate) mod content;
 pub(crate) mod customers;
 pub(crate) mod foundation;
+pub(crate) mod invoice_vs_order;
 pub(crate) mod kernel;
 pub(crate) mod kit;
 pub(crate) mod ledger_invoices;

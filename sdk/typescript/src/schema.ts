@@ -19727,6 +19727,19 @@ export type OrdersContactRequest = {
 
 /** A document of an order (invoice or adjustment). */
 export type OrdersDocument = {
+  /**
+   * `true`: this invoice differs from what was settled on the order — the tax of a line (lines
+   * matched by SKU; the shipping fee by its line without an item code) or the total differs by more
+   * than one minor unit per line (two for a line partly cancelled), or the order mixes
+   * tax-inclusive and tax-exclusive prices (one invoice has a single price mode). The invoice
+   * computes tax at its own date (the tax point), so a rate change between ordering and invoicing
+   * (e.g. the end of the 8% VAT on 2026-12-31) shows here. Check the invoice and settle the
+   * difference with the buyer: correct the invoice with an adjustment
+   * (`POST /api/v1/invoices/documents/{id}/adjust`) or a replacement
+   * (`POST /api/v1/invoices/documents/{id}/replace`) — always needed for an order mixing price
+   * modes, whose invoice cannot match it. Always `false` for an adjustment.
+   */
+  differs_from_order: boolean;
   document_id: string;
   issue_date?: string | null;
   /** `sales`, `cash_register` or `adjustment` (after a return). */
@@ -24363,6 +24376,19 @@ export type Page_OrdersCodRule = {
 export type Page_OrdersDocument = {
   /** The items of this page, in the requested order. */
   data: {
+    /**
+     * `true`: this invoice differs from what was settled on the order — the tax of a line (lines
+     * matched by SKU; the shipping fee by its line without an item code) or the total differs by more
+     * than one minor unit per line (two for a line partly cancelled), or the order mixes
+     * tax-inclusive and tax-exclusive prices (one invoice has a single price mode). The invoice
+     * computes tax at its own date (the tax point), so a rate change between ordering and invoicing
+     * (e.g. the end of the 8% VAT on 2026-12-31) shows here. Check the invoice and settle the
+     * difference with the buyer: correct the invoice with an adjustment
+     * (`POST /api/v1/invoices/documents/{id}/adjust`) or a replacement
+     * (`POST /api/v1/invoices/documents/{id}/replace`) — always needed for an order mixing price
+     * modes, whose invoice cannot match it. Always `false` for an adjustment.
+     */
+    differs_from_order: boolean;
     document_id: string;
     issue_date?: string | null;
     /** `sales`, `cash_register` or `adjustment` (after a return). */

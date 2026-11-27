@@ -301,8 +301,19 @@ impl LedgerService {
         }
     }
 
-    /// Hôm nay theo múi giờ của nút (`organizations.timezone`; mặc định UTC).
+    /// Hôm nay của nút theo ngày thuế (`TaxEngine::tax_date`: múi giờ của vùng thuế trong hồ sơ thuế, rồi
+    /// `organizations.timezone`, rồi UTC). Ngày ghi sổ phải trùng ngày lập hoá đơn và ngày thuế của đơn — bút
+    /// toán GTGT đầu ra lúc 00:30 ngày 01/01/2027 giờ Việt Nam thuộc năm 2027 (LG-2). Không có `tax`: múi giờ
+    /// của nút.
     pub(crate) async fn today(&self, tenant: &TenantContext, org: OrgId) -> Date {
+        if let Some(engine) = &self.tax {
+            match engine.tax_date(tenant, org, Timestamp::now()).await {
+                Ok(day) => return day,
+                Err(error) => {
+                    tracing::warn!(error = %error, "cannot compute the tax date; using the unit time zone");
+                }
+            }
+        }
         let zone = self
             .setting(tenant, org, "organizations.timezone")
             .await

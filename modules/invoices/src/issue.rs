@@ -35,8 +35,8 @@ use crate::entity::{document, line, series};
 use crate::events;
 use crate::permissions::{CORRECT, ISSUE, READ};
 use crate::service::{
-    InvoicesService, describe, document_not_found, mandate_missing, money, now, retention_until,
-    series_inactive, series_not_found,
+    InvoicesService, describe, document_not_found, mandate_missing, money, no_active_series, now,
+    retention_until, series_inactive, series_not_found,
 };
 
 pub(crate) const SUBMIT_EINVOICE: &str = "invoices.submit_einvoice";
@@ -89,9 +89,9 @@ pub(crate) struct FxSnapshot {
 }
 
 /// Trạng thái của chứng từ còn thay thế / điều chỉnh được.
-const CORRECTABLE: [&str; 3] = ["issued", "submitting", "accepted"];
+pub(crate) const CORRECTABLE: [&str; 3] = ["issued", "submitting", "accepted"];
 
-fn not_correctable(status: &str) -> Error {
+pub(crate) fn not_correctable(status: &str) -> Error {
     Error::conflict(
         "invoices.not_correctable",
         "Only an issued document can be adjusted or replaced (this one is `{status}`).",
@@ -172,6 +172,34 @@ impl InvoicesService {
         self.issue_inner(tenant, Actor::from(principal), id, Some(principal)).await
     }
 
+    /// Tính lại thuế của nháp `row` theo ngày lập `on` khi ảnh chụp thuế của nó mang ngày thuế khác
+    /// (`tax_point`); `None`: không cần (cùng ngày, hay chứng từ không tính thuế).
+    async fn recompute_for(
+        &self,
+        tenant: &TenantContext,
+        row: &document::Model,
+        seller: OrgId,
+        on: Date,
+    ) -> Result<Option<crate::documents::Computed>, Error> {
+        let snapshot: Value = serde_json::from_str(&row.tax_snapshot).unwrap_or_default();
+        let Some(tax_point) = snapshot["tax_point"].as_str() else { return Ok(None) };
+        if *tax_point == *on.format("%Y-%m-%d").to_string() {
+            return Ok(None);
+        }
+        let lines = self.stored_lines(tenant, row.id).await?;
+        let buyer: crate::api::Buyer = serde_json::from_str(&row.buyer).unwrap_or_default();
+        let spec = crate::documents::Spec {
+            seller,
+            kind: &row.kind,
+            prices_include_tax: row.prices_include_tax,
+            currency: Currency::parse(&row.currency)?,
+            buyer: &buyer,
+            on,
+            lines: &lines,
+        };
+        Ok(Some(self.compute(tenant, &spec).await?))
+    }
+
     async fn issue_inner(
         &self,
         tenant: &TenantContext,
@@ -180,9 +208,11 @@ impl InvoicesService {
         guard: Option<&Principal>,
     ) -> Result<Document, Error> {
         let database = tenant.database();
+        // Đường ghi, không qua read replica: `version_seen` lấy từ đây, replica trễ sẽ cho `draft_changed` giả
+        // ngay sau một PATCH (hay sau `adjust` / `create_document` của job).
         let current = document::Entity::find_by_id(id)
             .scoped(tenant)
-            .one(database.read())
+            .one(database.write())
             .await?
             .ok_or_else(document_not_found)?;
         let seller_org = OrgId::from_uuid(current.on_behalf_of_org_id.unwrap_or(current.org_id));
@@ -192,7 +222,29 @@ impl InvoicesService {
         } else {
             Value::Null
         };
-        let today = Timestamp::now().date_utc();
+        // Ngày lập theo múi giờ của vùng thuế người bán (giờ Việt Nam), không theo UTC (LG-2).
+        let today = self.tax.tax_date(tenant, seller_org, Timestamp::now()).await?;
+        // Nháp tính thuế theo ngày tạo hay sửa cuối; lập vào ngày khác (vd tạo 31/12/2026, lập 02/01/2027)
+        // thì tính lại theo ngày lập — thuế suất là của ngày lập, không của ngày tạo nháp. Ngoài transaction:
+        // `TaxEngine` đọc database điều khiển.
+        let mut current = current;
+        let recomputed = if current.status == "draft" {
+            // Điều chỉnh / thay thế: thuế theo ngày của chứng từ gốc, không theo ngày lập. Đường ghi như `current`:
+            // replica trễ chưa có gốc vừa lập thì điều chỉnh sẽ tính theo thuế suất hôm nay.
+            let original = match current.related_document_id {
+                Some(original) => {
+                    self.original_tax_date(database.write(), tenant, original).await?
+                }
+                None => None,
+            };
+            let on = original.or(current.issue_date).unwrap_or(today);
+            self.recompute_for(tenant, &current, seller_org, on).await?
+        } else {
+            None
+        };
+        if let Some(computed) = &recomputed {
+            current.total_minor = computed.total.minor();
+        }
         // Chứng từ ngoại tệ: chụp tỉ giá ngày lập (đọc `ledger` NGOÀI transaction ghi).
         let fx = if current.status == "draft" {
             self.fx_snapshot(tenant, &current, seller_org, current.issue_date.unwrap_or(today))
@@ -200,13 +252,21 @@ impl InvoicesService {
         } else {
             None
         };
-        let (outbox, jobs, seller, fx) = (&self.outbox, &self.jobs, &seller, &fx);
+        // Phiên bản của nháp lúc tính lại (như `If-Match`): ảnh chụp thuế không chứa số tiền nên không đủ.
+        let version_seen = current.updated_at;
+        let (outbox, jobs, seller, fx, recomputed) =
+            (&self.outbox, &self.jobs, &seller, &fx, &recomputed);
         let issued = database
             .write_with_retry(move || async move {
                 let transaction = database.begin_write().await?;
                 let row = rows::lock_one(&transaction, document::Entity::find_by_id(id).scoped(tenant))
                     .await?
                     .ok_or_else(document_not_found)?;
+                // Nháp bị sửa sau khi đọc (thuế tính lại, tỉ giá chụp, ngày lập — mọi thứ quyết ngoài transaction
+                // theo bản đọc): kết quả không còn khớp nháp đang lưu. Kiểm ngay sau khi khoá, trước khi cấp số.
+                if row.status == "draft" && row.updated_at != version_seen {
+                    return Err(draft_changed());
+                }
                 if let Some(principal) = guard {
                     let target = OrgTarget::new(OrgId::from_uuid(row.org_id), None);
                     principal.require_write_at(&transaction, &ISSUE, target).await?;
@@ -233,12 +293,23 @@ impl InvoicesService {
                     _ => return Ok(row),
                 }
                 let issue_date = row.issue_date.unwrap_or(today);
-                let symbol_row = match row.series_id {
-                    Some(series_id) => series::Entity::find_by_id(series_id)
-                        .scoped(tenant)
-                        .one(&transaction)
-                        .await?
-                        .ok_or_else(series_not_found)?,
+                let pinned = match row.series_id {
+                    Some(series_id) => Some(
+                        series::Entity::find_by_id(series_id)
+                            .scoped(tenant)
+                            .one(&transaction)
+                            .await?
+                            .ok_or_else(series_not_found)?,
+                    ),
+                    None => None,
+                };
+                // Điều chỉnh / thay thế mang dãy số của gốc: gốc năm trước thì dãy đó khác năm lập — chọn dãy
+                // đang hoạt động cùng nút, loại, năm lập như chứng từ không ghim dãy (kiểm độc lập #575).
+                let pinned = pinned.filter(|found| {
+                    row.related_document_id.is_none() || found.year == i32::from(issue_date.year())
+                });
+                let symbol_row = match pinned {
+                    Some(found) => found,
                     None => {
                         let found = series::Entity::find()
                             .scoped(tenant)
@@ -251,7 +322,7 @@ impl InvoicesService {
                             .await?;
                         match found.as_slice() {
                             [only] => only.clone(),
-                            [] => return Err(series_not_found()),
+                            [] => return Err(no_active_series(issue_date.year())),
                             _ => {
                                 return Err(Error::validation(vec![FieldError::new(
                                     "series_id",
@@ -283,6 +354,13 @@ impl InvoicesService {
                 let number = numbering::next(&transaction, tenant.id(), &format!("invoices:{}", symbol_row.id)).await?;
                 let at = now();
                 let mut active: document::ActiveModel = row.clone().into();
+                if let Some(computed) = recomputed {
+                    active.subtotal_minor = Set(computed.subtotal.minor());
+                    active.tax_minor = Set(computed.tax.minor());
+                    active.total_minor = Set(computed.total.minor());
+                    active.tax_snapshot = Set(computed.snapshot.to_string());
+                    Self::write_lines(&transaction, tenant, id, computed).await?;
+                }
                 active.series_id = Set(Some(symbol_row.id));
                 active.number = Set(Some(number));
                 active.status = Set("issued".to_owned());
@@ -290,10 +368,18 @@ impl InvoicesService {
                 active.retention_until = Set(Some(retention_until(issue_date)));
                 active.seller = Set(seller.to_string());
                 if let Some(fx) = fx {
+                    // Quy đổi từ đúng tổng sẽ lưu (tính lại, hay tổng đang khoá), không từ tổng đọc ngoài
+                    // transaction — một lần sửa nháp xen giữa không làm sai tổng quy đổi.
+                    let total = recomputed.as_ref().map_or(row.total_minor, |computed| computed.total.minor());
+                    let base_total = Money::new(total, Currency::parse(&row.currency)?).convert(
+                        fx.rate,
+                        fx.base_total.currency(),
+                        autoxide_kernel::decimal::Rounding::HalfUp,
+                    )?;
                     active.exchange_rate = Set(Some(autoxide_kernel::decimal::to_column(fx.rate)));
                     active.exchange_rate_id = Set(Some(fx.rate_id));
-                    active.base_currency = Set(Some(fx.base_total.currency().code().to_owned()));
-                    active.base_total_minor = Set(Some(fx.base_total.minor()));
+                    active.base_currency = Set(Some(base_total.currency().code().to_owned()));
+                    active.base_total_minor = Set(Some(base_total.minor()));
                 }
                 active.issued_by = Set(actor.user_id);
                 active.issued_at = Set(Some(at));
@@ -706,7 +792,12 @@ impl InvoicesService {
             .await?
             .ok_or_else(document_not_found)?;
         match row.status.as_str() {
-            "cancelled" => return describe(database.read(), tenant, row).await,
+            "cancelled" => {
+                // Lần trước đã ghi `cancelled` nhưng đảo bút toán (sau commit) có thể đã hỏng (lỗi tạm, kỳ sổ đã
+                // khoá…): gọi lại mỗi lần — `ledger` trả lại theo `reference`, `already_reversed` là xong.
+                self.reverse_posting(tenant, id, &format!("invoices:{id}:cancelled")).await?;
+                return describe(database.read(), tenant, row).await;
+            }
             "issued" | "submitting" | "accepted" | "rejected" => {}
             _ => {
                 return Err(Error::conflict(
@@ -716,17 +807,37 @@ impl InvoicesService {
                 .with_param("status", row.status));
             }
         }
-        // Ngoài transaction: báo nhà cung cấp.
-        if let (Some(provider_ref), Some(series_id)) = (&row.provider_ref, row.series_id)
-            && let Some(found) =
-                series::Entity::find_by_id(series_id).scoped(tenant).one(database.read()).await?
-            && let Some(name) = found.einvoice_provider
-        {
-            self.provider(&name)?
-                .cancel(tenant.id(), &EInvoiceCancel::new(provider_ref.clone(), reason.clone()))
-                .await?;
+        // Hoá đơn điện tử đã (hay sắp) gửi cơ quan thuế: luật của vùng thuế có thể cấm huỷ — Việt Nam từ
+        // 01/6/2025 (NĐ 70/2025) chỉ điều chỉnh hay thay thế (LG-9). Bị cơ quan thuế từ chối thì chưa có hoá đơn
+        // hợp lệ nào, huỷ ở đây không cần báo nhà cung cấp.
+        let provider = match row.series_id {
+            Some(series_id) => series::Entity::find_by_id(series_id)
+                .scoped(tenant)
+                .one(database.read())
+                .await?
+                .and_then(|found| found.einvoice_provider),
+            None => None,
+        };
+        if let Some(name) = provider.filter(|_| row.status != "rejected") {
+            let seller = OrgId::from_uuid(row.on_behalf_of_org_id.unwrap_or(row.org_id));
+            // Luật áp ở thời điểm huỷ (chặt hơn: hoá đơn lập trước mốc vẫn không huỷ được sau mốc) — ngày
+            // thuế của lúc này, theo múi giờ vùng thuế (cần đối chiếu quy định chuyển tiếp của NĐ 70/2025).
+            let on = self.tax.tax_date(tenant, seller, Timestamp::now()).await?;
+            if let Some(basis) = self.tax.einvoice_cancel_forbidden(tenant, seller, on).await? {
+                return Err(einvoice_not_cancellable(basis));
+            }
+            // Ngoài transaction: báo nhà cung cấp.
+            if let Some(provider_ref) = &row.provider_ref {
+                self.provider(&name)?
+                    .cancel(tenant.id(), &EInvoiceCancel::new(provider_ref.clone(), reason.clone()))
+                    .await
+                    // Nhà cung cấp không có lệnh huỷ (SePay eInvoice): thường gặp khi người bán chưa có hồ sơ thuế
+                    // nên quy tắc cấm huỷ của vùng thuế chưa áp — báo rõ đường điều chỉnh / thay thế (kiểm độc
+                    // lập #575, N2) thay vì `einvoice.not_supported` khó hiểu.
+                    .map_err(|error| provider_cancel_error(error, &name))?;
+            }
         }
-        let outbox = &self.outbox;
+        let (outbox, seen) = (&self.outbox, &row.status);
         let saved = database
             .write_with_retry(move || async move {
                 let transaction = database.begin_write().await?;
@@ -735,6 +846,15 @@ impl InvoicesService {
                     .ok_or_else(document_not_found)?;
                 if row.status == "cancelled" {
                     return Ok(row);
+                }
+                // Trạng thái đã đổi từ lúc kiểm (vd `rejected` vừa được gửi lại): quyết định ở trên không còn
+                // đúng — từ chối, người gọi thử lại.
+                if &row.status != seen {
+                    return Err(Error::conflict(
+                        "invoices.not_cancellable",
+                        "A document in status `{status}` cannot be cancelled.",
+                    )
+                    .with_param("status", row.status));
                 }
                 let mut active: document::ActiveModel = row.into();
                 active.status = Set("cancelled".to_owned());
@@ -787,9 +907,8 @@ impl InvoicesService {
         correction: Correction,
     ) -> Result<Submitted<Document>, Error> {
         let Correction { relation, direction, buyer, lines, reference } = correction;
-        if !CORRECTABLE.contains(&original.status.as_str()) {
-            return Err(not_correctable(&original.status));
-        }
+        // Trạng thái của chứng từ gốc được kiểm trong transaction tạo nháp, SAU bước replay (`create_inner`):
+        // gọi lại sau khi điều chỉnh đã phát hành (gốc thành `adjusted`) trả lại đúng điều chỉnh đó.
         let direction = direction.unwrap_or_else(|| "increase".to_owned());
         if relation == "adjustment" && !["increase", "decrease"].contains(&direction.as_str()) {
             return Err(Error::validation(vec![FieldError::new(
@@ -811,6 +930,7 @@ impl InvoicesService {
         )
         .source_id(original.id.to_string());
         draft.on_behalf_of = original.on_behalf_of_org_id.map(OrgId::from_uuid);
+        // Giữ dãy số của chứng từ gốc; lúc phát hành, dãy khác năm lập thì tự chọn dãy của năm lập.
         draft.series = original.series_id;
         draft.prices_include_tax = original.prices_include_tax;
         draft.booked_by_source = original.booked_by_source;
@@ -908,4 +1028,44 @@ impl JobHandler for PollJob {
     async fn run(&self, job: &JobContext) -> Result<(), Error> {
         self.0.poll_einvoices(&job.database).await.map(|_| ())
     }
+}
+
+/// Hoá đơn điện tử đã gửi cơ quan thuế mà luật của vùng thuế không cho huỷ (LG-9).
+fn einvoice_not_cancellable(legal_basis: String) -> Error {
+    Error::conflict(
+        "invoices.einvoice_not_cancellable",
+        "This e-invoice was sent (or is being sent) to the tax authority and the law of the seller's tax jurisdiction does not \
+         allow cancelling it ({legal_basis}). Issue an adjustment instead (`POST .../documents/<id>/adjust`, \
+         `direction` `decrease` to cancel the whole amount) or a replacement (`POST .../documents/<id>/replace`).",
+    )
+    .with_param("legal_basis", legal_basis)
+}
+
+/// Lỗi của `cancel` ở nhà cung cấp `provider`: không hỗ trợ huỷ → [`einvoice_cancel_unsupported`], còn lại giữ nguyên.
+pub(crate) fn provider_cancel_error(error: Error, provider: &str) -> Error {
+    if error.code() == "einvoice.not_supported" {
+        einvoice_cancel_unsupported(provider)
+    } else {
+        error
+    }
+}
+
+/// Nhà cung cấp hoá đơn điện tử không huỷ được hoá đơn đã gửi.
+fn einvoice_cancel_unsupported(provider: &str) -> Error {
+    Error::conflict(
+        "invoices.einvoice_cancel_unsupported",
+        "The e-invoice provider `{provider}` cannot cancel an invoice it has sent. Issue an adjustment instead \
+         (`POST .../documents/<id>/adjust`, `direction` `decrease` to cancel the whole amount) or a replacement \
+         (`POST .../documents/<id>/replace`), and give the seller a tax profile (`PUT /api/v1/tax/profiles/<org>`) \
+         so the rules of its tax jurisdiction apply.",
+    )
+    .with_param("provider", provider)
+}
+
+/// Nháp bị sửa trong lúc phát hành.
+fn draft_changed() -> Error {
+    Error::conflict(
+        "invoices.draft_changed",
+        "The draft changed while it was being issued; issue it again.",
+    )
 }

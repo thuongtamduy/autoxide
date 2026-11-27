@@ -73,9 +73,17 @@ pub(crate) struct TaxService {
     pub tables: TablesCache,
     /// Kiểm địa chỉ của hồ sơ thuế (module `address`).
     pub units: Option<Arc<dyn autoxide_address::api::AdministrativeUnits>>,
+    /// Múi giờ của nút (`organizations.timezone`) cho vùng thuế không khai múi giờ trong gói.
+    pub orgs: Option<Arc<dyn autoxide_organizations::api::OrgDirectory>>,
     /// `AUTOXIDE_TAX_EXPIRY_WARNING_DAYS`.
     pub warning_days: i64,
 }
+
+/// Mã quy tắc trong gói thuế khai múi giờ của vùng thuế: ngày thuế, ngày lập hoá đơn tính theo nó.
+pub(crate) const TIME_ZONE_RULE: &str = "tax_date.time_zone";
+
+/// Mã quy tắc trong gói thuế: có được huỷ hoá đơn điện tử đã gửi cơ quan thuế không (`{"allowed": bool}`).
+pub(crate) const CANCEL_RULE: &str = "einvoice.cancel_after_submission";
 
 pub(crate) const REGIMES: [&str; 4] = ["vat_credit", "vat_direct", "household", "exempt"];
 pub(crate) const BUSINESS_LINES: [&str; 4] = ["goods", "services", "production_transport", "other"];
@@ -114,6 +122,15 @@ pub(crate) fn profile_not_found() -> Error {
         "tax.profile_not_found",
         "Neither this unit nor any unit above it has a tax profile. Create one first.",
     )
+}
+
+/// Ngày của lúc `at` theo múi giờ trong giá trị JSON (dạng chuỗi) của quy tắc [`TIME_ZONE_RULE`]
+/// (`{"time_zone": "…"}`); `None` khi giá trị không có múi giờ hợp lệ. Kiểu múi giờ của kernel không lộ ra đây:
+/// module không phụ thuộc thẳng thư viện thời gian (D-20261126-kernel-data-layer).
+pub(crate) fn rule_date(raw: &str, at: Timestamp) -> Option<Date> {
+    let value: serde_json::Value = serde_json::from_str(raw).ok()?;
+    let zone = value["time_zone"].as_str().and_then(autoxide_kernel::time::zone)?;
+    Some(at.date_in(&zone))
 }
 
 /// `from <= on < to` (nửa mở), ngày dạng `YYYY-MM-DD` so sánh như chữ.
@@ -433,6 +450,105 @@ impl TaxService {
             }
         }
         Ok(InvoiceRequirements { cash_register_required: false, legal_basis: None })
+    }
+
+    /// Căn cứ cấm huỷ hoá đơn điện tử đã gửi cơ quan thuế của vùng thuế người bán `org`, cho hoá đơn ngày
+    /// `on` (quy tắc [`CANCEL_RULE`] của gói, `{"allowed": false}`); `None`: không cấm hay không có hồ sơ thuế.
+    pub(crate) async fn einvoice_cancel_forbidden(
+        &self,
+        tenant: &TenantContext,
+        org: OrgId,
+        on: Date,
+    ) -> Result<Option<String>, Error> {
+        let Some(found) = self.nearest_profile(tenant, org).await? else { return Ok(None) };
+        let tables = self.tables().await?;
+        let day = on.format("%Y-%m-%d").to_string();
+        Ok(tables
+            .rules
+            .iter()
+            .filter(|rule| {
+                rule.jurisdiction == found.jurisdiction
+                    && rule.code == CANCEL_RULE
+                    && in_force(&rule.effective_from, rule.effective_to.as_deref(), &day)
+            })
+            .find(|rule| {
+                let value: serde_json::Value =
+                    serde_json::from_str(&rule.value).unwrap_or_default();
+                value["allowed"] == serde_json::Value::Bool(false)
+            })
+            .map(|rule| rule.legal_basis.clone()))
+    }
+
+    /// Ngày thuế của thời điểm `at` với người bán `org` (LG-2, D-20261126-tax-date-time-zone): ngày theo
+    /// múi giờ của vùng thuế trong hồ sơ thuế (quy tắc [`TIME_ZONE_RULE`] của gói, vd `Asia/Ho_Chi_Minh`);
+    /// vùng không khai thì theo `organizations.timezone` của nút; không có gì thì UTC.
+    //
+    // Vùng thuế thắng cài đặt của nút: luật Việt Nam tính ngày theo giờ Việt Nam bất kể nút đặt múi giờ
+    // nào (mặc định của `organizations.timezone` là UTC — chính là lỗi LG-2).
+    pub(crate) async fn tax_date(
+        &self,
+        tenant: &TenantContext,
+        org: OrgId,
+        at: Timestamp,
+    ) -> Result<Date, Error> {
+        if let Some(found) = self.nearest_profile(tenant, org).await?
+            && let Some(day) = self.jurisdiction_date(&found.jurisdiction, at).await?
+        {
+            return Ok(day);
+        }
+        if let Some(orgs) = &self.orgs {
+            match orgs.setting(tenant, org, "organizations.timezone").await {
+                Ok(found) => {
+                    let zone = found
+                        .and_then(|found| found.value)
+                        .and_then(|value| value.as_str().and_then(autoxide_kernel::time::zone));
+                    if let Some(zone) = zone {
+                        return Ok(at.date_in(&zone));
+                    }
+                }
+                Err(error) => {
+                    tracing::warn!(error = %error, "cannot read the unit time zone; tax date in UTC");
+                }
+            }
+        }
+        Ok(at.date_utc())
+    }
+
+    /// Ngày của thời điểm `at` theo múi giờ của vùng thuế `jurisdiction` (quy tắc [`TIME_ZONE_RULE`]);
+    /// `None`: vùng không khai múi giờ.
+    pub(crate) async fn jurisdiction_date(
+        &self,
+        jurisdiction: &str,
+        at: Timestamp,
+    ) -> Result<Option<Date>, Error> {
+        let tables = self.tables().await?;
+        // Tìm quy tắc theo ngày UTC: múi giờ của một vùng không đổi sát ranh giới ngày.
+        let day = at.date_utc().format("%Y-%m-%d").to_string();
+        Ok(tables
+            .rules
+            .iter()
+            .filter(|rule| {
+                rule.jurisdiction == jurisdiction
+                    && rule.code == TIME_ZONE_RULE
+                    && in_force(&rule.effective_from, rule.effective_to.as_deref(), &day)
+            })
+            .find_map(|rule| rule_date(&rule.value, at)))
+    }
+
+    /// Vùng thuế đã nhập không có quy tắc [`TIME_ZONE_RULE`] đang hiệu lực vào lúc `at`.
+    pub(crate) async fn jurisdictions_without_time_zone(
+        &self,
+        at: Timestamp,
+    ) -> Result<Vec<String>, Error> {
+        let codes: Vec<String> =
+            self.tables().await?.jurisdictions.iter().map(|found| found.code.clone()).collect();
+        let mut missing = Vec::new();
+        for code in codes {
+            if self.jurisdiction_date(&code, at).await?.is_none() {
+                missing.push(code);
+            }
+        }
+        Ok(missing)
     }
 
     /// Thuế suất hết hạn trong `warning_days` ngày tính từ `today` mà không có thuế suất nối tiếp

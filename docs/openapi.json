@@ -59278,6 +59278,10 @@
       "OrdersDocument": {
         "description": "A document of an order (invoice or adjustment).",
         "properties": {
+          "differs_from_order": {
+            "description": "`true`: this invoice differs from what was settled on the order — the tax of a line (lines\nmatched by SKU; the shipping fee by its line without an item code) or the total differs by more\nthan one minor unit per line (two for a line partly cancelled), or the order mixes\ntax-inclusive and tax-exclusive prices (one invoice has a single price mode). The invoice\ncomputes tax at its own date (the tax point), so a rate change between ordering and invoicing\n(e.g. the end of the 8% VAT on 2026-12-31) shows here. Check the invoice and settle the\ndifference with the buyer: correct the invoice with an adjustment\n(`POST /api/v1/invoices/documents/{id}/adjust`) or a replacement\n(`POST /api/v1/invoices/documents/{id}/replace`) — always needed for an order mixing price\nmodes, whose invoice cannot match it. Always `false` for an adjustment.",
+            "type": "boolean"
+          },
           "document_id": {
             "format": "uuid",
             "type": "string"
@@ -59340,7 +59344,8 @@
         "required": [
           "document_id",
           "kind",
-          "status"
+          "status",
+          "differs_from_order"
         ],
         "type": "object"
       },
@@ -74770,6 +74775,10 @@
             "items": {
               "description": "A document of an order (invoice or adjustment).",
               "properties": {
+                "differs_from_order": {
+                  "description": "`true`: this invoice differs from what was settled on the order — the tax of a line (lines\nmatched by SKU; the shipping fee by its line without an item code) or the total differs by more\nthan one minor unit per line (two for a line partly cancelled), or the order mixes\ntax-inclusive and tax-exclusive prices (one invoice has a single price mode). The invoice\ncomputes tax at its own date (the tax point), so a rate change between ordering and invoicing\n(e.g. the end of the 8% VAT on 2026-12-31) shows here. Check the invoice and settle the\ndifference with the buyer: correct the invoice with an adjustment\n(`POST /api/v1/invoices/documents/{id}/adjust`) or a replacement\n(`POST /api/v1/invoices/documents/{id}/replace`) — always needed for an order mixing price\nmodes, whose invoice cannot match it. Always `false` for an adjustment.",
+                  "type": "boolean"
+                },
                 "document_id": {
                   "format": "uuid",
                   "type": "string"
@@ -74832,7 +74841,8 @@
               "required": [
                 "document_id",
                 "kind",
-                "status"
+                "status",
+                "differs_from_order"
               ],
               "type": "object"
             },
@@ -196878,7 +196888,7 @@
     },
     "/api/v1/invoices/documents/{id}/cancel": {
       "post": {
-        "description": "Requires `invoices.correct` on the unit. Tells the e-invoice provider, and reverses the booking.\nCancelling a cancelled document returns it.",
+        "description": "Requires `invoices.correct` on the unit. Tells the e-invoice provider, and reverses the booking.\nCancelling a cancelled document returns it. An e-invoice sent to the tax authority cannot be cancelled\nwhere the seller's tax jurisdiction forbids it (Vietnam since 2025-06-01): use `adjust` (decrease) or\n`replace` instead. An e-invoice the tax authority rejected is cancelled here only.",
         "operationId": "invoices_cancel_invoice_document",
         "parameters": [
           {
@@ -196976,7 +196986,7 @@
                 }
               }
             },
-            "description": "A draft or a corrected document cannot be cancelled; code `invoices.not_cancellable`."
+            "description": "A draft or a corrected document cannot be cancelled (`invoices.not_cancellable`); an e-invoice sent to the tax authority whose law forbids cancelling (`invoices.einvoice_not_cancellable`, with `legal_basis`), or whose provider cannot cancel it (`invoices.einvoice_cancel_unsupported`); adjust or replace it instead."
           },
           "503": {
             "content": {
@@ -197241,7 +197251,7 @@
                 }
               }
             },
-            "description": "The series is retired (`invoices.series_inactive`) or the booking day is in a closed period (`ledger.period_closed`)."
+            "description": "No active series for the unit, kind and year of issue (`invoices.no_active_series`; create one), the series is retired (`invoices.series_inactive`), the booking day is in a closed period (`ledger.period_closed`), or the draft was edited while being issued (`invoices.draft_changed`; issue again)."
           },
           "422": {
             "content": {
@@ -241027,7 +241037,7 @@
     },
     "/api/v1/orders/reviews/{id}/moderation": {
       "post": {
-        "description": "Requires `orders.reviews.moderate` at the shop. A review is hidden only for a reason of the list\n`orders.review_hidden` (Consumer Protection Law 19/2023: reviews are not blocked or hidden\notherwise); the author is told. Votes are kept and come back on reopening.",
+        "description": "Requires `orders.reviews.moderate` at the shop. A review is hidden only for a reason of the list\n`orders.review_hidden` that the legal rule `moderation.hide_reasons` also allows, when the\n`compliance` module is installed and the tenant's jurisdiction has that rule (Consumer Protection\nLaw 19/2023: reviews are not blocked or hidden otherwise); the author is told. Votes are kept and\ncome back on reopening.",
         "operationId": "orders_moderate_review",
         "parameters": [
           {
@@ -241112,7 +241122,7 @@
                 }
               }
             },
-            "description": "Reason missing or not listed (`orders.moderation_reason_invalid`) or bad action (see `errors`)."
+            "description": "Reason missing or not listed (`orders.moderation_reason_invalid`), not allowed by the legal rule `moderation.hide_reasons` (`compliance.hide_reason_not_allowed`, with `allowed`), or bad action (see `errors`)."
           },
           "default": {
             "content": {
@@ -247719,7 +247729,7 @@
     },
     "/api/v1/plans/billing-periods/{id}/void": {
       "post": {
-        "description": "Platform staff with `plans.subscriptions.manage`.",
+        "description": "Platform staff with `plans.subscriptions.manage`. When the period already has an invoice, it is cancelled\nafterwards by a background job, not within this request: an e-invoice the tax rules no longer let cancel\n(Vietnam since 2025-06-01) gets a full decrease adjustment instead. Read the invoice later to see the result.",
         "operationId": "plans_void_billing_period",
         "parameters": [
           {
@@ -247767,7 +247777,7 @@
                 }
               }
             },
-            "description": "The billing period, now `void`."
+            "description": "The billing period, now `void`; its invoice is cancelled or adjusted asynchronously."
           },
           "401": {
             "content": {

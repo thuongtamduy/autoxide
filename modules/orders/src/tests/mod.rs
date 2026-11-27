@@ -10,6 +10,7 @@ mod carts;
 mod checkout;
 mod fakes;
 mod guests;
+mod invoice_settled;
 mod invoices_pos;
 mod lifecycle;
 mod pages;
@@ -20,6 +21,7 @@ mod returns;
 mod reviews;
 mod risk_reports;
 mod statements;
+mod tax_point;
 mod tenders;
 mod warranty_fields;
 

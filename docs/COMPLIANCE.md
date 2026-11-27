@@ -385,7 +385,10 @@ MCP tools: `compliance.list_cases`, `compliance.get_case` (read), `compliance.ad
 
 - **Hiding reviews.** Content of consumers may be hidden only for the reasons of the legal rule
   `moderation.hide_reasons` (`spam`, `illegal_content`, `personal_data`, `unrelated`, `offensive` — to
-  check). Modules that moderate reviews ask the trait `ModerationPolicy` before hiding
+  check). Modules that moderate reviews ask the trait `ModerationPolicy` (`autoxide_kernel::moderation`)
+  before hiding — `orders` maps its own reasons (`unlawful_content` → `illegal_content`, `abusive_language` →
+  `offensive`, `spam_or_advertising` → `spam`, `not_about_product` → `unrelated`), so a reason a tenant adds
+  to its list cannot hide a review while `compliance` is installed
   (`compliance.hide_reason_not_allowed`, 422) and record the reason in their own event; the list is
   public at `GET /public/moderation-reasons`. A negative but lawful review stays visible.
 - **General conditions of trade** are a versioned legal document of kind `general_conditions`, public at

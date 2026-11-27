@@ -73,13 +73,28 @@ pub(crate) struct DocumentResponse {
     total: Option<Money>,
     /// Code to look the invoice up at the tax authority's portal.
     lookup_code: Option<String>,
+    /// `true`: this invoice differs from what was settled on the order — the tax of a line (lines
+    /// matched by SKU; the shipping fee by its line without an item code) or the total differs by more
+    /// than one minor unit per line (two for a line partly cancelled), or the order mixes
+    /// tax-inclusive and tax-exclusive prices (one invoice has a single price mode). The invoice
+    /// computes tax at its own date (the tax point), so a rate change between ordering and invoicing
+    /// (e.g. the end of the 8% VAT on 2026-12-31) shows here. Check the invoice and settle the
+    /// difference with the buyer: correct the invoice with an adjustment
+    /// (`POST /api/v1/invoices/documents/{id}/adjust`) or a replacement
+    /// (`POST /api/v1/invoices/documents/{id}/replace`) — always needed for an order mixing price
+    /// modes, whose invoice cannot match it. Always `false` for an adjustment.
+    differs_from_order: bool,
 }
 
 fn document_response(
+    settled: crate::invoicing::Settled,
     link: invoice_link::Model,
     document: Option<autoxide_invoices::api::Document>,
 ) -> DocumentResponse {
+    let differs_from_order =
+        crate::invoicing::differs_from_order(&settled, &link.kind, document.as_ref());
     DocumentResponse {
+        differs_from_order,
         document_id: link.document_id,
         kind: link.kind,
         return_id: link.return_id,
@@ -113,7 +128,7 @@ async fn requested(
         Some(link) => service
             .order_document(tenant, id, link.id)
             .await?
-            .map(|(link, document)| document_response(link, document)),
+            .map(|(link, document, settled)| document_response(settled, link, document)),
         None => None,
     };
     Ok(Data { data: InvoiceRequestedResponse { document } })
@@ -185,8 +200,8 @@ async fn documents(
     id: Uuid,
     page: &PageRequest,
 ) -> Result<Page<DocumentResponse>, Error> {
-    let found = service.order_documents(tenant, id, page).await?;
-    Ok(found.map(|(link, document)| document_response(link, document)))
+    let (found, settled) = service.order_documents(tenant, id, page).await?;
+    Ok(found.map(|(link, document)| document_response(settled.clone(), link, document)))
 }
 
 /// Documents of one of your orders.
