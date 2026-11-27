@@ -9,7 +9,7 @@
 
 use autoxide_kernel::access::{ActorKind, OAuthAccess, Principal};
 use autoxide_kernel::error::Error;
-use autoxide_kernel::secret::{random_token, sha256};
+use autoxide_kernel::secret::random_token;
 use autoxide_kernel::tenancy::{ScopeExt as _, TenantContext, TenantId};
 use autoxide_kernel::time::Timestamp;
 use axum::http::StatusCode;
@@ -27,7 +27,7 @@ use uuid::Uuid;
 
 use super::consent::CODE_PREFIX;
 use super::entity::{grant, token};
-use super::{OAuthError, OAuthService};
+use super::{OAuthError, OAuthService, token_digest};
 
 /// Tiền tố của access token và refresh token.
 pub(crate) const ACCESS_PREFIX: &str = "axo1_";
@@ -137,7 +137,7 @@ impl OAuthService {
         // lần, kể cả khi lần này sai), đọc grant.
         let transaction = tenant.db().begin_write().await?;
         let row = token::Entity::find()
-            .filter(token::Column::TokenHash.eq(sha256(secret)))
+            .filter(token::Column::TokenHash.eq(token_digest(secret)))
             .filter(token::Column::Kind.eq(CODE))
             .scoped(&tenant)
             .one(&transaction)
@@ -198,7 +198,7 @@ impl OAuthService {
         // Đường xoay vòng đọc trên kết nối ghi (transaction ngắn): không đọc bản trễ của read replica.
         let transaction = tenant.db().begin_write().await?;
         let row = token::Entity::find()
-            .filter(token::Column::TokenHash.eq(sha256(presented)))
+            .filter(token::Column::TokenHash.eq(token_digest(presented)))
             .filter(token::Column::Kind.eq(REFRESH))
             .scoped(&tenant)
             .one(&transaction)
@@ -272,7 +272,7 @@ impl OAuthService {
                 id: Set(Uuid::now_v7()),
                 grant_id: Set(grant.id),
                 kind: Set(kind.to_owned()),
-                token_hash: Set(sha256(value)),
+                token_hash: Set(token_digest(value)),
                 expires_at: Set(expires_at),
                 used_at: Set(None),
                 created_at: Set(now),
@@ -302,7 +302,7 @@ impl OAuthService {
         autoxide_kernel::tenancy::ensure_serving(&tenant)?;
         let now = Timestamp::now();
         let row = token::Entity::find()
-            .filter(token::Column::TokenHash.eq(sha256(token)))
+            .filter(token::Column::TokenHash.eq(token_digest(token)))
             .filter(token::Column::Kind.eq(ACCESS))
             .filter(token::Column::ExpiresAt.gt(now))
             .scoped(&tenant)
@@ -350,7 +350,7 @@ impl OAuthService {
         let Some(tenant_id) = tenant_id else { return Ok(()) };
         let Ok(tenant) = self.databases.tenant(tenant_id).await else { return Ok(()) };
         let row = token::Entity::find()
-            .filter(token::Column::TokenHash.eq(sha256(token)))
+            .filter(token::Column::TokenHash.eq(token_digest(token)))
             .filter(token::Column::Kind.is_in([ACCESS, REFRESH]))
             .scoped(&tenant)
             .one(&tenant.db().read())
@@ -445,13 +445,18 @@ mod tests {
     use super::*;
 
     #[test]
-    fn pkce_theo_vi_du_rfc_7636() {
-        // RFC 7636 phụ lục B.
-        let verifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
-        let challenge = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM";
-        assert!(pkce_matches(verifier, challenge));
-        assert!(!pkce_matches(verifier, "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cN"));
-        assert!(!pkce_matches("short", challenge));
+    fn pkce_s256_theo_rfc_7636() {
+        // Verifier sinh ngẫu nhiên mỗi lần chạy; challenge tính theo định nghĩa của RFC 7636 §4.2:
+        // BASE64URL(SHA256(ASCII(code_verifier))).
+        use sha2::Digest as _;
+        let verifier = random_token(32).unwrap();
+        let challenge = URL_SAFE_NO_PAD.encode(sha2::Sha256::digest(verifier.as_bytes()));
+        assert!(pkce_matches(&verifier, &challenge));
+        // Đổi một ký tự của challenge: không khớp.
+        let mut other = challenge.clone().into_bytes();
+        other[0] = if other[0] == b'A' { b'B' } else { b'A' };
+        assert!(!pkce_matches(&verifier, &String::from_utf8(other).unwrap()));
+        assert!(!pkce_matches("short", &challenge));
     }
 
     #[test]

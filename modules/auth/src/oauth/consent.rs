@@ -10,7 +10,7 @@ use std::collections::BTreeSet;
 use autoxide_kernel::access::{Principal, Risk, scope_allows};
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
-use autoxide_kernel::secret::{random_token, sha256};
+use autoxide_kernel::secret::random_token;
 use autoxide_kernel::tenancy::{ScopeExt as _, TenantContext};
 use autoxide_kernel::throttle::{Throttle, address_key};
 use autoxide_kernel::time::Timestamp;
@@ -27,7 +27,7 @@ use uuid::Uuid;
 
 use super::clients::{host_of, localhost_only};
 use super::entity::{grant, token};
-use super::{OAuthService, require_person};
+use super::{OAuthService, require_person, token_digest};
 use crate::events;
 
 const PURPOSE: &str = "oauth_request";
@@ -477,7 +477,7 @@ impl OAuthService {
             id: Set(Uuid::now_v7()),
             grant_id: Set(grant_id),
             kind: Set(super::tokens::CODE.to_owned()),
-            token_hash: Set(sha256(&code)),
+            token_hash: Set(token_digest(&code)),
             expires_at: Set(now + SignedDuration::from_secs(CODE_SECONDS)),
             used_at: Set(None),
             created_at: Set(now),

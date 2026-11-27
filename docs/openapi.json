@@ -57567,7 +57567,7 @@
         "description": "Dynamic client registration request (RFC 7591 §2). Unknown fields are ignored (RFC 7591 §3.1).",
         "properties": {
           "client_name": {
-            "description": "Name shown to the person approving the client.",
+            "description": "Name shown to the person approving the client (at most 1000 characters; the first 200 are kept).",
             "type": [
               "string",
               "null"
@@ -57584,7 +57584,7 @@
             ]
           },
           "redirect_uris": {
-            "description": "Where the browser comes back with the code: `https` URLs, or `http` to a loopback address.",
+            "description": "Where the browser comes back with the code: `https` URLs, or `http` to a loopback address. 1 to 10.",
             "items": {
               "type": "string"
             },

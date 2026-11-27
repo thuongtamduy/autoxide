@@ -29,6 +29,10 @@ use crate::oauth::{
 };
 use crate::permissions::OAUTH_GRANTS_MANAGE;
 
+/// Trần thân request của các endpoint OAuth nhận body thô (đăng ký, token, thu hồi): siêu dữ liệu RFC 7591 và form
+/// RFC 6749 chỉ vài trăm byte; 16 KiB dư cho mọi client thật mà chặn sớm đầu vào quá cỡ.
+const MAX_BODY: usize = 16 * 1024;
+
 pub(super) fn routes() -> OpenApiRouter<Arc<HttpState>> {
     OpenApiRouter::new()
         .routes(routes!(authorize))
@@ -177,6 +181,14 @@ async fn register(
         if !service.config.dynamic_registration {
             return Err(OAuthError::unavailable());
         }
+        if body.len() > MAX_BODY {
+            return Err(OAuthError::new(
+                StatusCode::BAD_REQUEST,
+                "invalid_client_metadata",
+                format!("The body must be at most {MAX_BODY} bytes."),
+            ));
+        }
+        // Đọc vào struct có kiểu (không thực thi gì); giới hạn và luật từng trường kiểm ở `service.register`.
         let input: Registration = serde_json::from_slice(&body).map_err(|_| {
             OAuthError::new(
                 StatusCode::BAD_REQUEST,
@@ -395,6 +407,11 @@ async fn revoke_grant(
 
 /// Thân `application/x-www-form-urlencoded` → kiểu `T` (trường lặp lại: lỗi, OAuth 2.1 §3.1).
 fn form_of<T: serde::de::DeserializeOwned>(body: &[u8]) -> Result<T, OAuthError> {
+    if body.len() > MAX_BODY {
+        return Err(OAuthError::invalid_request(format!(
+            "The body must be at most {MAX_BODY} bytes."
+        )));
+    }
     let invalid =
         || OAuthError::invalid_request("The body must be application/x-www-form-urlencoded.");
     let text = std::str::from_utf8(body).map_err(|_| invalid())?;

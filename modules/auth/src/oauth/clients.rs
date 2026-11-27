@@ -503,19 +503,29 @@ fn max_age(value: &str) -> Option<Duration> {
 }
 
 /// Dynamic client registration request (RFC 7591 §2). Unknown fields are ignored (RFC 7591 §3.1).
-#[derive(Debug, Deserialize, utoipa::ToSchema)]
+//
+// Kiểm bằng `validator` nhưng không qua `ValidJson`: endpoint này trả lỗi theo RFC 7591 §3.2.2
+// (`{error, error_description}`), không theo `Problem` (ngoại lệ định dạng của D-20261126-mcp-oauth mục 10).
+// Trần ở đây chặn đầu vào quá cỡ trước mọi xử lý; luật nội dung (scheme, loopback, độ dài từng URI) ở
+// `checked_redirects`.
+#[derive(Debug, Deserialize, utoipa::ToSchema, validator::Validate)]
 #[schema(as = OAuthClientRegistration)]
 pub(crate) struct Registration {
-    /// Where the browser comes back with the code: `https` URLs, or `http` to a loopback address.
+    /// Where the browser comes back with the code: `https` URLs, or `http` to a loopback address. 1 to 10.
     #[serde(default)]
+    #[validate(length(min = 1, max = 10))]
     pub redirect_uris: Vec<String>,
-    /// Name shown to the person approving the client.
+    /// Name shown to the person approving the client (at most 1000 characters; the first 200 are kept).
+    #[validate(length(max = 1000))]
     pub client_name: Option<String>,
     /// Only `none` (public client using PKCE).
+    #[validate(length(max = 64))]
     pub token_endpoint_auth_method: Option<String>,
     /// `authorization_code` and optionally `refresh_token`.
+    #[validate(length(max = 4))]
     pub grant_types: Option<Vec<String>>,
     /// Only `code`.
+    #[validate(length(max = 4))]
     pub response_types: Option<Vec<String>>,
 }
 
@@ -557,6 +567,18 @@ pub(crate) async fn register(
     let metadata = |description: String| {
         OAuthError::new(StatusCode::BAD_REQUEST, "invalid_client_metadata", description)
     };
+    if let Err(errors) = validator::Validate::validate(&input) {
+        // Tên trường theo thứ tự cố định để thông báo ổn định.
+        let fields_by_name = errors.field_errors();
+        let mut fields: Vec<&str> = fields_by_name.keys().map(|name| name.as_ref()).collect();
+        fields.sort_unstable();
+        let description = format!("These fields are out of bounds: {}.", fields.join(", "));
+        return Err(if fields == ["redirect_uris"] {
+            OAuthError::new(StatusCode::BAD_REQUEST, "invalid_redirect_uri", description)
+        } else {
+            metadata(description)
+        });
+    }
     if input.token_endpoint_auth_method.as_deref().is_some_and(|method| method != "none") {
         return Err(metadata(
             "Only public clients are accepted: token_endpoint_auth_method `none`.".to_owned(),
@@ -612,7 +634,9 @@ mod tests {
         assert_eq!(validate(ID, good).unwrap().name, "Example");
         let wrong_id = json_doc(serde_json::json!({"client_id": "https://other.example/c.json"}));
         assert!(validate(ID, wrong_id).is_err());
-        let secret = json_doc(serde_json::json!({"client_secret": "x"}));
+        // Giá trị sinh ngẫu nhiên: chỉ cần có trường `client_secret`, không viết cứng bí mật nào.
+        let value = autoxide_kernel::secret::random_token(16).unwrap();
+        let secret = json_doc(serde_json::json!({"client_secret": value}));
         assert!(validate(ID, secret).is_err());
         let confidential =
             json_doc(serde_json::json!({"token_endpoint_auth_method": "client_secret_basic"}));

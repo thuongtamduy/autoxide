@@ -19151,11 +19151,11 @@ export type OAuthClientRegistered = {
 
 /** Dynamic client registration request (RFC 7591 §2). Unknown fields are ignored (RFC 7591 §3.1). */
 export type OAuthClientRegistration = {
-  /** Name shown to the person approving the client. */
+  /** Name shown to the person approving the client (at most 1000 characters; the first 200 are kept). */
   client_name?: string | null;
   /** `authorization_code` and optionally `refresh_token`. */
   grant_types?: string[] | null;
-  /** Where the browser comes back with the code: `https` URLs, or `http` to a loopback address. */
+  /** Where the browser comes back with the code: `https` URLs, or `http` to a loopback address. 1 to 10. */
   redirect_uris?: string[];
   /** Only `code`. */
   response_types?: string[] | null;

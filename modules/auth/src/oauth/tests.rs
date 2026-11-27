@@ -12,9 +12,26 @@ use crate::user::NewUser;
 const PUBLIC: &str = "https://api.example.test";
 const CONSENT: &str = "https://app.example.test/connect?request={token}";
 const REDIRECT: &str = "http://127.0.0.1/cb";
-/// RFC 7636 phụ lục B.
-const VERIFIER: &str = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
-const CHALLENGE: &str = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM";
+/// Cặp PKCE sinh ngẫu nhiên mỗi lần chạy: test không viết cứng giá trị bí mật nào. `LazyLock`: tạo một lần khi
+/// dùng lần đầu, dùng chung cho mọi test của chương trình.
+static PKCE: std::sync::LazyLock<(String, String)> = std::sync::LazyLock::new(|| {
+    use base64::Engine as _;
+    use sha2::Digest as _;
+    let verifier = autoxide_kernel::secret::random_token(32).unwrap();
+    let challenge = base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .encode(sha2::Sha256::digest(verifier.as_bytes()));
+    (verifier, challenge)
+});
+
+/// `code_verifier` của các test (RFC 7636).
+fn pkce_verifier() -> &'static str {
+    &PKCE.0
+}
+
+/// `code_challenge` (S256) khớp với [`pkce_verifier`].
+fn pkce_challenge() -> &'static str {
+    &PKCE.1
+}
 
 async fn oauth_app(test: &TestDatabase) -> (TestApp, String) {
     let (app, services) = app_built(test, false, |builder| {
@@ -83,8 +100,9 @@ async fn approved_code_for(
     let (status, _, client) = call(app, "POST", "/oauth/register", None, Some(registration)).await;
     assert_eq!(status, StatusCode::CREATED, "{client}");
     let client_id = client["client_id"].as_str().unwrap().to_owned();
+    let challenge = pkce_challenge();
     let authorize = format!(
-        "/api/v1/auth/oauth/authorize?response_type=code&client_id={client_id}&redirect_uri={}&code_challenge={CHALLENGE}\
+        "/api/v1/auth/oauth/authorize?response_type=code&client_id={client_id}&redirect_uri={}&code_challenge={challenge}\
          &code_challenge_method=S256&state=xyz&resource={}",
         // Cổng loopback do client chọn lúc chạy: khớp bỏ qua cổng.
         encode("http://127.0.0.1:51234/cb"),
@@ -190,7 +208,7 @@ async fn luong_day_du_tu_dang_ky_toi_goi_mcp_va_thu_hoi() {
         );
 
         let (client_id, code) = approved_code(&app, &session, &["notes.write"]).await;
-        let (status, tokens) = exchange(&app, &client_id, &code, VERIFIER).await;
+        let (status, tokens) = exchange(&app, &client_id, &code, pkce_verifier()).await;
         assert_eq!(status, StatusCode::OK, "{tokens}");
         assert_eq!(tokens["token_type"], "Bearer");
         assert_eq!(tokens["scope"], "notes.write");
@@ -229,10 +247,10 @@ async fn luong_day_du_tu_dang_ky_toi_goi_mcp_va_thu_hoi() {
 
         // Mã dùng lại: thu hồi cả grant, mọi token của nó ngừng ngay.
         let (client_id, code) = approved_code(&app, &session, &["notes.write"]).await;
-        let (_, tokens) = exchange(&app, &client_id, &code, VERIFIER).await;
+        let (_, tokens) = exchange(&app, &client_id, &code, pkce_verifier()).await;
         let access = tokens["access_token"].as_str().unwrap().to_owned();
         assert_eq!(mcp_status(&app, &access).await, StatusCode::OK);
-        let (status, _) = exchange(&app, &client_id, &code, VERIFIER).await;
+        let (status, _) = exchange(&app, &client_id, &code, pkce_verifier()).await;
         assert_eq!(status, StatusCode::BAD_REQUEST);
         assert_eq!(mcp_status(&app, &access).await, StatusCode::UNAUTHORIZED);
 
@@ -251,7 +269,7 @@ async fn nguoi_dung_thu_hoi_grant_va_redirect_la_khong_chuyen_huong() {
     TestDatabase::run(async |test| {
         let (app, session) = oauth_app(test).await;
         let (client_id, code) = approved_code(&app, &session, &["notes.write"]).await;
-        let (_, tokens) = exchange(&app, &client_id, &code, VERIFIER).await;
+        let (_, tokens) = exchange(&app, &client_id, &code, pkce_verifier()).await;
         let access = tokens["access_token"].as_str().unwrap().to_owned();
 
         // Token OAuth không tự quản lý grant (chỉ phiên đăng nhập).
@@ -264,9 +282,10 @@ async fn nguoi_dung_thu_hoi_grant_va_redirect_la_khong_chuyen_huong() {
         assert_eq!(mcp_status(&app, &access).await, StatusCode::UNAUTHORIZED);
 
         // `redirect_uri` client không đăng ký: 400 ở đây, không bao giờ chuyển hướng tới đó.
+        let challenge = pkce_challenge();
         let authorize = format!(
             "/api/v1/auth/oauth/authorize?response_type=code&client_id={client_id}&redirect_uri={}\
-             &code_challenge={CHALLENGE}&code_challenge_method=S256",
+             &code_challenge={challenge}&code_challenge_method=S256",
             encode("https://evil.example/cb"),
         );
         let answer = app.get(&authorize).unchecked().send().await.unwrap();
@@ -288,12 +307,58 @@ async fn nguoi_dung_thu_hoi_grant_va_redirect_la_khong_chuyen_huong() {
     .unwrap();
 }
 
+/// `POST /oauth/register` với thân `body`: mã HTTP và thân trả về.
+async fn register(app: &TestApp, body: Value) -> (StatusCode, Value) {
+    let (status, _, answer) = call(app, "POST", "/oauth/register", None, Some(body)).await;
+    (status, answer)
+}
+
+/// Đầu vào quá cỡ của các endpoint nhận body thô bị chặn trước mọi xử lý, lỗi đúng định dạng RFC.
+#[tokio::test]
+async fn dang_ky_va_form_qua_co_bi_tu_choi_theo_rfc() {
+    TestDatabase::run(async |test| {
+        let (app, _) = oauth_app(test).await;
+        // Quá 10 redirect_uri: lỗi của redirect.
+        let many: Vec<String> = (0..11).map(|port| format!("http://127.0.0.1:{port}/cb")).collect();
+        let (status, answer) = register(&app, json!({"redirect_uris": many})).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(answer["error"], "invalid_redirect_uri");
+        // Tên quá dài, danh sách grant quá dài: lỗi metadata, nêu tên trường.
+        let (status, answer) =
+            register(&app, json!({"redirect_uris": [REDIRECT], "client_name": "n".repeat(1001)}))
+                .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(answer["error"], "invalid_client_metadata");
+        assert!(answer["error_description"].as_str().unwrap().contains("client_name"));
+        let grants = vec!["authorization_code"; 5];
+        let (status, answer) =
+            register(&app, json!({"redirect_uris": [REDIRECT], "grant_types": grants})).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(answer["error"], "invalid_client_metadata");
+        // Thân quá 16 KiB.
+        let padding = "p".repeat(17 * 1024);
+        let (status, answer) =
+            register(&app, json!({"redirect_uris": [REDIRECT], "software_id": padding})).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(answer["error"], "invalid_client_metadata");
+        let (status, answer) =
+            form(&app, "/oauth/token", &[("grant_type", "refresh_token"), ("pad", &padding)]).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(answer["error"], "invalid_request");
+        let (status, answer) = form(&app, "/oauth/revoke", &[("token", &padding)]).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(answer["error"], "invalid_request");
+    })
+    .await
+    .unwrap();
+}
+
 #[tokio::test]
 async fn hai_lan_doi_cung_refresh_token_dong_thoi_chi_mot_lan_thang() {
     TestDatabase::run(async |test| {
         let (app, session) = oauth_app(test).await;
         let (client_id, code) = approved_code(&app, &session, &["notes.write"]).await;
-        let (_, tokens) = exchange(&app, &client_id, &code, VERIFIER).await;
+        let (_, tokens) = exchange(&app, &client_id, &code, pkce_verifier()).await;
         let refresh = tokens["refresh_token"].as_str().unwrap().to_owned();
         let pairs = [
             ("grant_type", "refresh_token"),
@@ -315,8 +380,9 @@ async fn hai_lan_doi_cung_refresh_token_dong_thoi_chi_mot_lan_thang() {
 
 /// Mở `/authorize` cho `client_id`, trả token của yêu cầu đang chờ.
 async fn request_token(app: &TestApp, client_id: &str, redirect: &str) -> String {
+    let challenge = pkce_challenge();
     let authorize = format!(
-        "/api/v1/auth/oauth/authorize?response_type=code&client_id={}&redirect_uri={}&code_challenge={CHALLENGE}\
+        "/api/v1/auth/oauth/authorize?response_type=code&client_id={}&redirect_uri={}&code_challenge={challenge}\
          &code_challenge_method=S256",
         encode(client_id),
         encode(redirect),
@@ -388,7 +454,7 @@ async fn api_key_va_token_oauth_khong_goi_duoc_api_consent() {
         assert_eq!(status, StatusCode::FORBIDDEN);
         // Token OAuth (cấp cho `/mcp`) không tới được REST của consent.
         let (client_id, code) = approved_code(&app, &session, &["notes.write"]).await;
-        let (_, tokens) = exchange(&app, &client_id, &code, VERIFIER).await;
+        let (_, tokens) = exchange(&app, &client_id, &code, pkce_verifier()).await;
         let oauth = format!("Bearer {}", tokens["access_token"].as_str().unwrap());
         let (status, _, _) = call(&app, "GET", "/me/oauth-grants", Some(&oauth), None).await;
         assert_eq!(status, StatusCode::UNAUTHORIZED);
@@ -402,7 +468,7 @@ async fn dang_xuat_khap_noi_thu_hoi_grant_va_token_sai_khach_bi_tu_choi() {
     TestDatabase::run(async |test| {
         let (app, session) = oauth_app(test).await;
         let (client_id, code) = approved_code(&app, &session, &["notes.write"]).await;
-        let (_, tokens) = exchange(&app, &client_id, &code, VERIFIER).await;
+        let (_, tokens) = exchange(&app, &client_id, &code, pkce_verifier()).await;
         let access = tokens["access_token"].as_str().unwrap().to_owned();
         assert_eq!(mcp_status(&app, &access).await, StatusCode::OK);
         // Đổi ID khách trong token: không khớp băm, không lộ khách nào tồn tại.
@@ -475,7 +541,7 @@ async fn client_nhan_dien_bang_tai_lieu_metadata() {
             &[
                 ("grant_type", "authorization_code"),
                 ("code", &code),
-                ("code_verifier", VERIFIER),
+                ("code_verifier", pkce_verifier()),
                 ("client_id", &client_id),
                 ("redirect_uri", "http://127.0.0.1:40000/cb"),
             ],
@@ -503,7 +569,7 @@ async fn token_oauth_that_khong_quan_ly_duoc_api_key_va_passkey() {
 
         let rest = format!("{PUBLIC}/api/v1");
         let (client_id, code) = approved_code_for(&app, &session, &["notes.write"], &rest).await;
-        let (status, tokens) = exchange_for(&app, &client_id, &code, VERIFIER, &rest).await;
+        let (status, tokens) = exchange_for(&app, &client_id, &code, pkce_verifier(), &rest).await;
         assert_eq!(status, StatusCode::OK, "{tokens}");
         let oauth = format!("Bearer {}", tokens["access_token"].as_str().unwrap());
 

@@ -312,6 +312,16 @@ impl IntoResponse for OAuthError {
     }
 }
 
+/// Dấu vân tay của một token OAuth (mã, access token, refresh token) để lưu và tra trong database: chỉ lưu dấu này,
+/// không lưu token, nên lộ bảng không dùng được token.
+///
+/// Vì sao SHA-256 là đủ, không cần hàm băm chậm (Argon2) như mật khẩu: token do server sinh bằng 256 bit ngẫu nhiên
+/// (`random_token(32)`), không đoán hay dò từ điển được; hàm chậm chỉ cần cho bí mật do người chọn. Tra theo dấu
+/// bằng điều kiện bằng của database (index), không so chuỗi trong bộ nhớ, nên không có rò rỉ thời gian theo từng ký tự.
+pub(crate) fn token_digest(token: &str) -> String {
+    autoxide_kernel::secret::sha256(token)
+}
+
 /// Người duyệt / quản lý grant phải là phiên đăng nhập của người làm nhân sự (không API key, không token OAuth).
 pub(crate) fn require_person(principal: &Principal) -> Result<(), Error> {
     crate::access::require_session(principal)?;
