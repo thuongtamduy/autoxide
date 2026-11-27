@@ -450,6 +450,18 @@ impl NewPayment {
     }
 }
 
+/// Whether `error`, returned by [`Ledger::refund`] (or by a partner's refund call), is a final refusal:
+/// sending the same refund again will never work (not supported, more than what is left, not configured,
+/// not found…). A server error (5xx), a conflict with work still in progress (409) and a rate limit (429)
+/// are not final: send the same refund again later, with the same `reference` (it is never refunded twice).
+/// When a refund is refused, the ledger opens a `refund_failed` item in its reconciliation queue unless a
+/// `late_payment` item of the payment is still open.
+pub fn refund_refused(error: &Error) -> bool {
+    use autoxide_kernel::error::ErrorKind;
+    let kind = error.kind();
+    kind.status() < 500 && !matches!(kind, ErrorKind::Conflict | ErrorKind::TooManyRequests)
+}
+
 /// A refund. `reference` is unique per payment.
 #[derive(Debug, Clone)]
 #[non_exhaustive]

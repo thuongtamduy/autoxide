@@ -397,7 +397,10 @@ async fn receive_tenant_webhook(
 pub(crate) struct ExceptionResponse {
     id: Uuid,
     /// `amount_mismatch`, `unmatched_credit`, `duplicate_payment`, `missing_in_statement`,
-    /// `unknown_in_statement` or `late_payment`.
+    /// `unknown_in_statement`, `late_payment` (money arrived after the payment's deadline or after the
+    /// partner reported it failed) or `refund_failed` (the partner refused a refund: the money is still
+    /// to be returned by hand, then resolve with `refunded_outside`; it closes on its own once the
+    /// payment is refunded in full through the partner).
     kind: String,
     /// The record concerned, e.g. `ledger.payment:<id>`.
     subject: String,

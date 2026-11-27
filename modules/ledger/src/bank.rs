@@ -730,9 +730,12 @@ impl LedgerService {
                         ("exception", Some(paid.id))
                     }
                     Claim::Ours { was } => {
-                        self.capture(tenant, paid.id, amount, "bank_feed").await?;
+                        // Về muộn (hết hạn, quá hạn hay đối tác đã báo hỏng): cùng luật với `capture`, không
+                        // phải "khớp sạch" — mục `late_payment` đã mở.
+                        let late = self.capture(tenant, paid.id, amount, "bank_feed").await?;
                         let after = Self::find_payment(database.write(), tenant, paid.id).await?;
-                        let clean = was != "expired"
+                        let clean = !late
+                            && was != "expired"
                             && after.is_some_and(|row| {
                                 row.status == "succeeded" && row.amount_minor == amount.minor()
                             });

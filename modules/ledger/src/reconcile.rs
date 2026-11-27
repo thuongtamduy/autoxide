@@ -89,7 +89,9 @@ fn matchable(
             "must be the payment named in the item",
         )]));
     }
-    if !matches!(payment.status.as_str(), "pending" | "expired" | "needs_review") {
+    // Cùng luật với `capture`: tiền về cho thanh toán đã hết hạn hay đối tác đã báo hỏng vẫn ghi được (thành
+    // `late_payment`), không trả 409.
+    if !matches!(payment.status.as_str(), "pending" | "expired" | "failed" | "needs_review") {
         return Err(crate::payments::payment_state(&payment.status));
     }
     // Số thực thu: `received_minor` (+ tiền tệ của `received` / `amount`), hay `amount` / `received`
@@ -113,13 +115,24 @@ fn matchable(
     Ok(received)
 }
 
-/// Ghi chú của mục `late_payment` do `ledger` tự đóng.
+/// Ghi chú của mục `late_payment` / `refund_failed` do `ledger` tự đóng.
 const CLOSED_BY_REFUND: &str =
     "Closed by the ledger: the payment was refunded in full through the partner.";
 
+/// Khoá chống trùng của mục `late_payment` của thanh toán `payment`.
+pub(crate) fn late_payment_key(payment: Uuid) -> String {
+    format!("late_payment:{payment}")
+}
+
+/// Khoá chống trùng của mục `refund_failed` của lượt hoàn `refund`.
+pub(crate) fn refund_failed_key(refund: Uuid) -> String {
+    format!("refund_failed:{refund}")
+}
+
 /// Trong `transaction` của lượt hoàn vừa xong: thanh toán `paid` đã hoàn đủ số thực thu (các lượt hoàn
-/// `succeeded`) thì mục `late_payment` đang mở của nó tự đóng (`resolved`, `refunded`, không người xử lý),
-/// phát `ledger.exception_resolved` — người vận hành chỉ còn thấy khoản thật sự phải hoàn tay (UT-6).
+/// `succeeded`) thì mục `late_payment` và các mục `refund_failed` (lượt hoàn trước bị từ chối) đang mở của
+/// nó tự đóng (`resolved`, `refunded`, không người xử lý), phát `ledger.exception_resolved` — người vận
+/// hành chỉ còn thấy khoản thật sự phải hoàn tay (UT-6).
 pub(crate) async fn close_late_payment_if_refunded(
     transaction: &impl ConnectionTrait,
     tenant: &TenantContext,
@@ -129,21 +142,23 @@ pub(crate) async fn close_late_payment_if_refunded(
     // Khoá dòng thanh toán trước khi cộng: hai lượt hoàn một phần xong cùng lúc chạy nối đuôi, lượt sau
     // thấy lượt trước đã `succeeded` (Postgres READ COMMITTED không tự bảo đảm điều đó).
     rows::lock_one(transaction, payment::Entity::find_by_id(paid.id).scoped(tenant)).await?;
-    let refunded: i64 = refund::Entity::find()
+    let refunds = refund::Entity::find()
         .filter(refund::Column::PaymentId.eq(paid.id))
-        .filter(refund::Column::Status.eq("succeeded"))
         .scoped(tenant)
         .all(transaction)
-        .await?
-        .iter()
-        .map(|row| row.amount_minor)
-        .sum();
+        .await?;
+    let refunded: i64 =
+        refunds.iter().filter(|row| row.status == "succeeded").map(|row| row.amount_minor).sum();
     if refunded < paid.captured_minor.unwrap_or(paid.amount_minor) {
         return Ok(());
     }
-    // Mục do `capture` mở, tra đúng theo khoá chống trùng (`late_payment:<id>`, unique theo khách).
+    // Mục do `capture` (`late_payment:<thanh toán>`) và `fail_refund` (`refund_failed:<lượt hoàn>`) mở, tra
+    // đúng theo khoá chống trùng (unique theo khách).
+    let keys = std::iter::once(late_payment_key(paid.id)).chain(
+        refunds.iter().filter(|row| row.status == "failed").map(|row| refund_failed_key(row.id)),
+    );
     let open = exception::Entity::find()
-        .filter(exception::Column::DedupeKey.eq(format!("late_payment:{}", paid.id)))
+        .filter(exception::Column::DedupeKey.is_in(keys))
         .filter(exception::Column::Status.eq("open"))
         .scoped(tenant)
         .all(transaction)
@@ -178,6 +193,56 @@ pub(crate) async fn close_late_payment_if_refunded(
     Ok(())
 }
 
+/// Trong `transaction`: mở một mục chờ (một lần cho mỗi `dedupe_key`), phát `ledger.exception_opened`.
+pub(crate) async fn insert_exception(
+    transaction: &impl ConnectionTrait,
+    tenant: &TenantContext,
+    outbox: &autoxide_kernel::event::Outbox,
+    kind: &str,
+    subject: &str,
+    details: &Value,
+    dedupe_key: &str,
+) -> Result<(), Error> {
+    let id = Uuid::now_v7();
+    let at = now();
+    let inserted = exception::Entity::insert(exception::ActiveModel {
+        id: Set(id),
+        tenant_id: Set(tenant.id().as_uuid()),
+        kind: Set(kind.to_owned()),
+        subject: Set(subject.to_owned()),
+        details: Set(details.to_string()),
+        dedupe_key: Set(dedupe_key.to_owned()),
+        status: Set("open".to_owned()),
+        resolution: Set(None),
+        note: Set(None),
+        resolved_by: Set(None),
+        created_at: Set(at),
+        updated_at: Set(at),
+    })
+    .on_conflict(
+        OnConflict::columns([exception::Column::TenantId, exception::Column::DedupeKey])
+            .do_nothing()
+            .to_owned(),
+    )
+    .exec_without_returning(transaction)
+    .await?;
+    if inserted == 1 {
+        let event = events::ExceptionOpened(json!({
+            "exception_id": id, "kind": kind, "subject": subject,
+        }));
+        outbox
+            .record(
+                transaction,
+                tenant,
+                Actor::system(),
+                Some(format!("ledger.exception:{id}")),
+                &event,
+            )
+            .await?;
+    }
+    Ok(())
+}
+
 impl LedgerService {
     /// Mở một mục chờ (một lần cho mỗi `dedupe_key`), phát `ledger.exception_opened`.
     pub(crate) async fn open_exception(
@@ -190,55 +255,14 @@ impl LedgerService {
     ) -> Result<(), Error> {
         let database = tenant.database();
         let outbox = &self.outbox;
-        let details = details.to_string();
+        let details = &details;
         database
-            .write_with_retry(move || {
-                let details = details.clone();
-                async move {
-                    let transaction = database.begin_write().await?;
-                    let id = Uuid::now_v7();
-                    let at = now();
-                    let inserted = exception::Entity::insert(exception::ActiveModel {
-                        id: Set(id),
-                        tenant_id: Set(tenant.id().as_uuid()),
-                        kind: Set(kind.to_owned()),
-                        subject: Set(subject.to_owned()),
-                        details: Set(details),
-                        dedupe_key: Set(dedupe_key.to_owned()),
-                        status: Set("open".to_owned()),
-                        resolution: Set(None),
-                        note: Set(None),
-                        resolved_by: Set(None),
-                        created_at: Set(at),
-                        updated_at: Set(at),
-                    })
-                    .on_conflict(
-                        OnConflict::columns([
-                            exception::Column::TenantId,
-                            exception::Column::DedupeKey,
-                        ])
-                        .do_nothing()
-                        .to_owned(),
-                    )
-                    .exec_without_returning(&transaction)
+            .write_with_retry(move || async move {
+                let transaction = database.begin_write().await?;
+                insert_exception(&transaction, tenant, outbox, kind, subject, details, dedupe_key)
                     .await?;
-                    if inserted == 1 {
-                        let event = events::ExceptionOpened(json!({
-                            "exception_id": id, "kind": kind, "subject": subject,
-                        }));
-                        outbox
-                            .record(
-                                &transaction,
-                                tenant,
-                                Actor::system(),
-                                Some(format!("ledger.exception:{id}")),
-                                &event,
-                            )
-                            .await?;
-                    }
-                    transaction.commit().await?;
-                    Ok(())
-                }
+                transaction.commit().await?;
+                Ok(())
             })
             .await
     }
@@ -561,7 +585,7 @@ impl LedgerService {
                     "succeeded" if found.amount_minor == line.amount.minor() => {
                         Ok(("matched", Some(found.id)))
                     }
-                    "pending" | "expired" | "needs_review" | "succeeded" => {
+                    "pending" | "expired" | "failed" | "needs_review" | "succeeded" => {
                         // Webhook bị lạc: sao kê là bằng chứng đã thu.
                         self.capture(tenant, found.id, line.amount, "reconcile").await?;
                         let after = Self::find_payment(database.write(), tenant, found.id).await?;

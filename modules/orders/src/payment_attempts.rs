@@ -193,9 +193,9 @@ impl OrdersService {
             // `Replayed`: lần trước đã gửi lệnh hoàn này — xong.
             Ok(_) => Ok(()),
             // Đối tác / sổ từ chối hẳn (không hỗ trợ hoàn, đã hoàn tay, chưa cấu hình): gửi lại không
-            // bao giờ được, nên không để event thử lại tới dead-letter. `ledger` đã mở mục `late_payment`
-            // cho lượt thu này ở hàng chờ đối soát: người vận hành thấy và hoàn tay.
-            Err(error) if error.kind().status() < 500 => {
+            // bao giờ được, nên không để event thử lại tới dead-letter. `ledger` để lại mục ở hàng chờ đối
+            // soát (`late_payment` của lượt thu này, hay `refund_failed`): người vận hành thấy và hoàn tay.
+            Err(error) if autoxide_ledger::api::refund_refused(&error) => {
                 tracing::warn!(
                     order_id = %row.order_id,
                     code = error.code(),
@@ -203,7 +203,7 @@ impl OrdersService {
                 );
                 Ok(())
             }
-            // Lỗi tạm (5xx): event thử lại, cùng mã tham chiếu — `ledger` không hoàn hai lần.
+            // Lỗi tạm (5xx, 409, 429): event thử lại, cùng mã tham chiếu — `ledger` không hoàn hai lần.
             Err(error) => {
                 tracing::warn!(order_id = %row.order_id, code = error.code(), "superseded payment not refunded yet");
                 Err(error)

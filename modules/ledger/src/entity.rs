@@ -387,7 +387,7 @@ pub(crate) mod exception {
         pub id: Uuid,
         pub tenant_id: Uuid,
         /// `amount_mismatch`, `unmatched_credit`, `duplicate_payment`, `missing_in_statement`,
-        /// `unknown_in_statement`, `late_payment`.
+        /// `unknown_in_statement`, `late_payment`, `refund_failed`.
         pub kind: String,
         /// Bản ghi liên quan, vd `ledger.payment:<id>`.
         pub subject: String,

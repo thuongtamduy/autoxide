@@ -302,3 +302,30 @@ async fn doi_tac_tu_choi_hoan_luot_cu_thi_khong_thu_lai_mai() {
     .await
     .unwrap();
 }
+
+/// Rà #591 (M1): 409 từ `ledger` khi hoàn lượt cũ không phải từ chối cuối — event nằm chờ thử lại (cùng mã
+/// tham chiếu), không bị coi là xong và bỏ tiền ở đối tác.
+#[tokio::test]
+async fn hoan_luot_cu_gap_409_thi_thu_lai() {
+    TestDatabase::run(async |test| {
+        let guests = guests(test, false).await;
+        let shop = &guests.shop;
+        let (order, number, _) = card_order(shop).await;
+        let old = shop.ledger.payments()[0].clone();
+        shop.ledger.fail(old.id);
+        let token = access_token(&guests, &number).await;
+        let uri = format!("/public/orders/{order}/payment-link");
+        let (status, _, opened) =
+            send(shop, &uri, &[("Order-Token", &token), ("Idempotency-Key", "x1")], json!({}))
+                .await;
+        assert_eq!(status, StatusCode::OK, "{opened}");
+        shop.ledger.conflict_next_refunds(1);
+        paid(shop, &old).await;
+        drain(shop).await;
+        assert!(shop.ledger.refunds().is_empty());
+        assert_eq!(undelivered(shop).await, 1, "409 is retried, not dropped");
+        assert_eq!(superseded_events(shop).await, 1);
+    })
+    .await
+    .unwrap();
+}

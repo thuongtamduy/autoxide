@@ -96,6 +96,7 @@ struct State {
     /// Number of upcoming `create_payment` calls that return `ledger.gateway_not_configured`.
     fail_payments: usize,
     refuse_refunds: usize,
+    busy_refunds: usize,
     /// The `return_url` the caller sent for each payment through the gateway, in order.
     return_urls: Vec<Option<String>>,
 }
@@ -231,6 +232,12 @@ impl FakeLedger {
     /// refund; sending again never helps).
     pub fn refuse_next_refunds(&self, count: usize) {
         lock(&self.state).refuse_refunds = count;
+    }
+
+    /// The next `count` `refund` calls answer a conflict (409 `ledger.payment_state`: not a final refusal;
+    /// sending the same refund again later works).
+    pub fn conflict_next_refunds(&self, count: usize) {
+        lock(&self.state).busy_refunds = count;
     }
 
     /// The partner collected `payment`: marks it `succeeded` as the real `ledger` does before it emits
@@ -575,6 +582,15 @@ impl Ledger for FakeLedger {
         if state.refuse_refunds > 0 {
             state.refuse_refunds -= 1;
             return Err(autoxide_kernel::payment::not_supported(FAKE_LEDGER_PROVIDER));
+        }
+        if state.busy_refunds > 0 {
+            state.busy_refunds -= 1;
+            // Mã có sẵn của `ledger` (đã có bản dịch): thanh toán đang ở trạng thái chưa hoàn được.
+            return Err(Error::conflict(
+                "ledger.payment_state",
+                "The payment is `{status}`; this cannot be done now.",
+            )
+            .with_param("status", "pending"));
         }
         let now = Timestamp::now();
         if let Some(payment) = state.payments.iter_mut().find(|found| found.id == refund.payment) {

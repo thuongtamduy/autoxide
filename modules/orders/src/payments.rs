@@ -461,10 +461,10 @@ impl OrdersService {
             match ledger.refund(tenant, Actor::system(), refund).await {
                 Ok(_) => {}
                 // Đối tác / sổ từ chối hẳn: gửi lại không bao giờ được, không để event thử lại tới
-                // dead-letter. `ledger` đã mở mục `late_payment` (lượt thu hết hạn hay hỏng) ở hàng chờ đối
-                // soát: người vận hành thấy và hoàn tay. Tiền về khi lượt thu còn `pending` thì `ledger`
-                // không mở mục — hạn của lượt thu không vượt hạn của đơn nên trường hợp đó không xảy ra.
-                Err(error) if error.kind().status() < 500 => {
+                // dead-letter. `ledger` để lại mục ở hàng chờ đối soát cho người vận hành hoàn tay:
+                // `late_payment` (lượt thu về muộn) hay `refund_failed` (mọi lượt hoàn bị từ chối khác, vd
+                // đơn bị huỷ trước hạn rồi tiền mới về). 409 / 429 / 5xx là lỗi tạm: event thử lại cùng mã.
+                Err(error) if autoxide_ledger::api::refund_refused(&error) => {
                     tracing::warn!(
                         order_id = %row.order_id,
                         code = error.code(),
