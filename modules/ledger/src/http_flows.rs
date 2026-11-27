@@ -186,6 +186,8 @@ async fn list_holds(
     Query(query): Query<HoldsQuery>,
     Query(page): Query<PageQuery>,
 ) -> Result<Page<Hold>, Error> {
+    // Quyền trước tham số trang: thiếu quyền là 403, không phải 422 (luật `permission-first` của xtask).
+    principal.require(&crate::permissions::READ)?;
     let filter = HoldFilter {
         status: query.status,
         seller_org_id: query.seller_org_id,
@@ -320,6 +322,8 @@ async fn list_payouts(
     Query(query): Query<PayoutsQuery>,
     Query(page): Query<PageQuery>,
 ) -> Result<Page<Payout>, Error> {
+    // Quyền trước tham số trang: thiếu quyền là 403, không phải 422 (luật `permission-first` của xtask).
+    principal.require(&crate::permissions::READ)?;
     let filter = PayoutFilter { status: query.status, payee_org_id: query.payee_org_id };
     let page =
         service.list_payouts(&tenant, &principal, filter, &PageRequest::try_from(page)?).await?;
@@ -432,6 +436,8 @@ async fn list_bank_accounts(
     principal: Principal,
     Query(page): Query<PageQuery>,
 ) -> Result<Page<BankAccountResponse>, Error> {
+    // Quyền trước tham số trang: thiếu quyền là 403, không phải 422 (luật `permission-first` của xtask).
+    principal.require(&crate::permissions::READ)?;
     let page =
         service.list_bank_accounts(&tenant, &principal, &PageRequest::try_from(page)?).await?;
     Ok(page.map(BankAccountResponse::from))

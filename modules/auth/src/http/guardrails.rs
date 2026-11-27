@@ -99,6 +99,8 @@ async fn list_guardrails(
     principal: Principal,
     Query(query): Query<PageQuery>,
 ) -> Result<Page<GuardrailResponse>, Error> {
+    // Quyền trước tham số trang: thiếu quyền là 403, không phải 422 (luật `permission-first` của xtask).
+    principal.require(&crate::permissions::GUARDRAILS_MANAGE)?;
     let page = PageRequest::try_from(query)?;
     Ok(state.guardrails.list_set(&principal, &page).await?.map(GuardrailResponse::from))
 }

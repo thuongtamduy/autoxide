@@ -134,6 +134,13 @@ embedding, nên tìm theo ý nghĩa có ngân sách mỗi phút
 | Dịch | chữ của revision đã ghim, theo từng mẩu — tiêu đề, tóm tắt, trường SEO, alt text của ảnh, đoạn văn và tiêu đề với định dạng thành thẻ có số; không bao giờ gửi link, ID ảnh hay khối code |
 | Tìm kiếm | chữ của mỗi mục theo đoạn (khi lập index), và mỗi câu tìm |
 
+Module khác cũng gửi: `conversations` gửi các tin nhắn gần nhất của hội thoại để soạn nháp trả lời, `orders`
+gửi đánh giá sản phẩm để tóm tắt, `support` gửi câu hỏi để gợi ý trả lời. Các đoạn chữ này có thể chứa **dữ liệu
+cá nhân**, và phần lớn nhà cung cấp xử lý ngoài Việt Nam: đó là chuyển dữ liệu cá nhân ra nước ngoài (Luật
+91/2025/QH15, NĐ 356/2025/NĐ-CP — đối chiếu cùng người có chuyên môn pháp lý). Ghi nhà cung cấp làm bên nhận kèm
+nước trong các mục đích dùng AI (`/api/v1/compliance/purposes`), lưu hồ sơ đánh giá tác động chuyển dữ liệu, hoặc
+dùng nhà cung cấp / mô hình tự chạy ở Việt Nam. Sổ xử lý chưa tự liệt kê nhà cung cấp AI (sau 1.0).
+
 **Ảnh riêng tư** chỉ được gửi khi `AUTOXIDE_MEDIA_AI_SEND_PRIVATE=true`. Log không bao giờ chứa
 prompt, nội dung, ảnh hay key — chỉ việc gì, mô hình, số token và thời gian.
 
