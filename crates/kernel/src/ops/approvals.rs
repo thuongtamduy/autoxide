@@ -354,7 +354,10 @@ fn visible_to(principal: &Principal) -> sea_orm::sea_query::Condition {
     use sea_orm::sea_query::{Condition, LikeExpr};
     let mine = Expr::col(Alias::new("requested_by")).eq(principal.user_id());
     let mut visible = Condition::any().add(mine);
-    if matches!(principal.actor_kind(), ActorKind::Human | ActorKind::Support) {
+    // Yêu cầu của người khác chỉ hiện cho người quyết được: phiên đăng nhập (D-20261126-mcp-oauth).
+    if principal.is_session()
+        && matches!(principal.actor_kind(), ActorKind::Human | ActorKind::Support)
+    {
         if principal.has_all_permissions() {
             return Condition::all();
         }

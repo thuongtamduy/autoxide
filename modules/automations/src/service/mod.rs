@@ -86,11 +86,16 @@ pub(crate) fn bounded(
     if let Some(fence) = limit.fence() {
         bounded = bounded.with_fence(fence);
     }
-    // `run_as_api_key` giữ ID credential uỷ quyền; với client OAuth, bản chụp `limit` đã mang grant (loại credential
-    // giữ nguyên, D-20261126-mcp-oauth) — không gắn nhầm thành API key.
-    if let Some(key) = rule.run_as_api_key
-        && bounded.oauth().is_none()
-    {
+    // Loại credential của người lưu luật nằm trong bản chụp: client OAuth thì luật chạy dưới danh nghĩa grant đó (loại
+    // `agent`, audit thấy grant; `run_as_api_key` giữ ID grant để tạm dừng khi grant bị thu hồi), API key thì gắn key
+    // (D-20261126-mcp-oauth).
+    if let Some(oauth) = limit.oauth() {
+        bounded = bounded.with_oauth(autoxide_kernel::access::OAuthAccess::new(
+            oauth.grant_id(),
+            oauth.client_id().to_owned(),
+            String::new(),
+        ));
+    } else if let Some(key) = rule.run_as_api_key {
         bounded = bounded.via_api_key(key);
     }
     Ok(bounded.with_actor_kind(limit.actor_kind()))

@@ -245,6 +245,41 @@ async fn luat_tao_bang_api_key_mang_quyen_cua_key() {
     .unwrap();
 }
 
+/// Luật tạo qua client OAuth (D-20261126-mcp-oauth): lưu ID grant để tạm dừng khi grant bị thu hồi, chạy đúng loại
+/// credential (grant, loại `agent` — không thành API key), và event của lần chạy vẫn mang đường vào `automation` (chốt
+/// chống lặp giữ nguyên).
+#[tokio::test]
+async fn luat_tao_qua_client_oauth_giu_loai_credential() {
+    TestDatabase::run(async |test| {
+        let harness = Harness::new(test).await;
+        let grant = Uuid::now_v7();
+        let by_client = harness
+            .owner
+            .clone()
+            .only(["automations.read", "automations.manage", "shop.write", "shop.read"])
+            .with_oauth(autoxide_kernel::access::OAuthAccess::new(
+                grant,
+                "https://client.example/app.json",
+                "https://api.example.com/mcp",
+            ));
+        let actions =
+            json!([{"tool": "shop.tag_order", "arguments": {"order_id": "1", "tag": "x"}}]);
+        let rule = harness.rule_by(&by_client, on_order(), json!(null), actions).await.unwrap();
+        assert_eq!(rule.run_as_api_key, Some(grant));
+        let runner = harness.service.rule_principal(&harness.tenant, &rule).await.unwrap().unwrap();
+        assert_eq!(runner.credential(), autoxide_kernel::access::Credential::OAuthGrant(grant));
+        assert_eq!(runner.api_key_id(), None);
+        assert_eq!(runner.actor_kind(), ActorKind::Agent);
+        let run = Uuid::now_v7();
+        let actor = autoxide_kernel::event::Actor::from(
+            &runner.with_access(autoxide_kernel::access::AccessPath::Automation(run)),
+        );
+        assert_eq!(actor.access, autoxide_kernel::access::AccessPath::Automation(run));
+    })
+    .await
+    .unwrap();
+}
+
 /// Rà soát bảo mật 2026-11: lưu luật gọi tool có permission `money` cần phiên vừa xác nhận lại như
 /// gọi REST — token cũ không lưu được luật để làm hộ việc REST đòi xác nhận.
 #[tokio::test]

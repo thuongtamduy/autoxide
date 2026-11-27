@@ -607,6 +607,7 @@ pub(crate) async fn get_recording(
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `conversations.voice.manage`; code `permission_denied`.", body = Problem),
         (status = 404, description = "No such call in your scope; code `conversations.call_not_found`.", body = Problem),
+        (status = 503, description = "The recording cannot be deleted yet: file storage is missing (`conversations.storage_unavailable`) or the recording is still kept by a voice provider whose connector is off (`conversations.voice_provider_unavailable`); nothing was deleted, try again once it is on.", body = Problem),
     )
 )]
 pub(crate) async fn delete_recording(

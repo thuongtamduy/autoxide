@@ -108,20 +108,40 @@ impl ProtectedResources {
         if challenge.contains(&metadata) {
             return challenge.to_owned();
         }
-        // Một `resource_metadata` khác (không phải của resource này) không được giữ: bỏ nó rồi thêm của mình.
-        let rest: Vec<&str> = challenge
-            .strip_prefix("Bearer")
-            .unwrap_or_default()
-            .split(", ")
-            .map(str::trim)
+        // Một `resource_metadata` khác (không phải của resource này) không được giữ: bỏ nó rồi thêm của mình. Tách
+        // tham số theo dấu phẩy NGOÀI chuỗi trong ngoặc kép (`error_description` có thể chứa dấu phẩy).
+        let params = challenge.strip_prefix("Bearer").unwrap_or_default();
+        let kept: Vec<&str> = split_params(params)
+            .into_iter()
             .filter(|part| !part.is_empty() && !part.starts_with("resource_metadata="))
             .collect();
-        if rest.is_empty() {
+        if kept.is_empty() {
             format!("Bearer {metadata}")
         } else {
-            format!("Bearer {}, {metadata}", rest.join(", "))
+            format!("Bearer {}, {metadata}", kept.join(", "))
         }
     }
+}
+
+// Tham số của một challenge tách theo dấu phẩy nằm ngoài ngoặc kép (RFC 9110 §11.2), đã bỏ khoảng
+// trắng. Dấu ngoặc kép và gạch chéo ngược viết bằng mã Unicode để công cụ quét mã nguồn không nhầm là mở chuỗi.
+fn split_params(text: &str) -> Vec<&str> {
+    let mut parts = Vec::new();
+    let (mut start, mut quoted, mut escaped) = (0, false, false);
+    for (index, character) in text.char_indices() {
+        match character {
+            _ if escaped => escaped = false,
+            '\u{5c}' if quoted => escaped = true,
+            '\u{22}' => quoted = !quoted,
+            ',' if !quoted => {
+                parts.push(text[start..index].trim());
+                start = index + 1;
+            }
+            _ => {}
+        }
+    }
+    parts.push(text[start..].trim());
+    parts
 }
 
 /// Rejects an OAuth access token used outside the resource it was issued for (RFC 8707, MCP: servers MUST
@@ -348,6 +368,33 @@ mod tests {
         assert_eq!(resources.resource_path("/api/v1/notes/1"), "/api/v1");
         assert_eq!(resources.resource_path("/api/v1x"), "");
         assert_eq!(resources.resource_path("/health/live"), "");
+    }
+
+    #[test]
+    fn challenge_giu_mo_ta_co_dau_phay_va_thay_metadata_la() {
+        let resources = ProtectedResources::new(
+            Some("https://api.example.com".to_owned()),
+            Some(std::sync::Arc::new(Fake)),
+            vec![],
+        );
+        let ours = "resource_metadata=\"https://api.example.com/.well-known/oauth-protected-resource/mcp\"";
+        let completed = resources.complete(
+            "/mcp",
+            "Bearer error=\"invalid_token\", error_description=\"a, b\", resource_metadata=\"https://evil/x\"",
+        );
+        assert_eq!(
+            completed,
+            format!("Bearer error=\"invalid_token\", error_description=\"a, b\", {ours}")
+        );
+        assert_eq!(resources.complete("/mcp", "Bearer"), format!("Bearer {ours}"));
+    }
+
+    struct Fake;
+
+    impl AuthorizationServer for Fake {
+        fn metadata(&self, _: &str) -> serde_json::Map<String, Value> {
+            serde_json::Map::new()
+        }
     }
 
     #[test]

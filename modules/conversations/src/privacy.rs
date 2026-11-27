@@ -51,8 +51,9 @@ impl EventHandler for ConversationsService {
 }
 
 /// Phần dữ liệu cá nhân của `conversations` khi module đang tắt (chế độ nghỉ, bước 70 P9): cùng hàm
-/// với lúc bật, không cần service. Bản ghi âm xoá bằng kho dùng chung và bộ nối thoại đang bật; thiếu thì
-/// báo lỗi để event được thử lại (không báo xong khi bản ghi còn nằm lại).
+/// với lúc bật, không cần service. Bản ghi âm xoá bằng kho dùng chung và bộ nối thoại đang bật; thiếu kho thì
+/// báo lỗi để event được thử lại (không báo xong khi bản ghi còn nằm lại), thiếu bộ nối thì giữ dấu vết ở nhà cung
+/// cấp cho job dọn theo hạn (D-20261127-voice-recording-provider-off).
 pub(crate) struct DormantPrivacy {
     /// Kho dùng chung (của `files` đang bật, hay `files` "nghỉ" tự mở) — đọc lúc xử lý.
     pub tenancy: autoxide_kernel::tenancy::DatabaseRegistry,
