@@ -118,8 +118,15 @@ pub(crate) const DISCLOSURES_MANAGE: Permission = Permission::new(
 )
 .with_risk(Risk::SensitiveData);
 
+pub(crate) const PHONE_LOCKS_MANAGE: Permission = Permission::new(
+    "compliance.phone_locks.manage",
+    "Unlock sign-in codes for a phone number locked after too many wrong codes in a row: the way back \
+     in for an account that signs in only with its number.",
+);
+
 pub(crate) fn all() -> Vec<Permission> {
     vec![
+        PHONE_LOCKS_MANAGE,
         KYC_READ,
         KYC_SUBMIT,
         KYC_REVIEW,

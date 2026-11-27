@@ -136,6 +136,10 @@ const FIXES: &[(&str, &str)] = &[
         "Remove the entry from scripts/rust-free-paths.txt: the file is read by Rust (a crate directory, `include_str!`, or a test that reads it at run time), so a change to it must run the Rust tests.",
     ),
     (
+        "single-copy",
+        "Use the same version as the library that pins it (for `matchit`: the one axum uses); align it in [workspace.dependencies] so Cargo.lock keeps one copy.",
+    ),
+    (
         "site-links",
         "Declare a `TenantSetting::link(…)` that names this `AUTOXIDE_…_URL` setting (so each tenant can set its own page), or add the variable to NOT_SITE_LINKS in xtask/src/site_links.rs if it is a partner API or platform address.",
     ),

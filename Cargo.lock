@@ -816,6 +816,7 @@ dependencies = [
  "hyper",
  "hyper-util",
  "jiff",
+ "matchit",
  "metrics",
  "metrics-exporter-prometheus",
  "minijinja",
@@ -1001,20 +1002,15 @@ dependencies = [
 name = "autoxide-notes"
 version = "0.19.0"
 dependencies = [
- "async-trait",
  "autoxide-kernel",
  "autoxide-testkit",
  "axum",
- "jiff",
  "serde",
  "serde_json",
  "tokio",
  "tower",
  "tracing",
- "utoipa",
- "utoipa-axum",
  "uuid",
- "validator",
 ]
 
 [[package]]

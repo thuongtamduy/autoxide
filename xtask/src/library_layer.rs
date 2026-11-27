@@ -11,7 +11,7 @@ use std::fs;
 use std::path::Path;
 
 use crate::boundaries::{Violation, rust_files};
-use crate::workspace::{Role, Workspace};
+use crate::workspace::{DepKind, Role, Workspace};
 
 /// Thư viện đã có (hay sẽ có) lớp của kernel; module không khai trực tiếp.
 pub const LIBRARIES: &str = "xtask/wrapped-libraries.txt";
@@ -35,13 +35,26 @@ pub fn check(workspace: &Workspace) -> Result<Vec<Violation>, String> {
     let mut violations = Vec::new();
     for package in workspace.packages.iter().filter(|package| package.role == Role::Module) {
         let manifest = format!("{}/Cargo.toml", package.dir);
-        for dep in package.deps.iter().filter(|dep| libraries.contains(&dep.name)) {
+        // `tower` trong test của module được phép (thiết kế §1.1): chỉ ở `[dev-dependencies]`.
+        let allowed_in_dev =
+            |dep: &crate::workspace::Dep| dep.kind == DepKind::Dev && dep.name == "tower";
+        for dep in
+            package.deps.iter().filter(|dep| libraries.contains(&dep.name) && !allowed_in_dev(dep))
+        {
+            // Phụ thuộc của test / bench tính riêng: testkit còn lộ kiểu `http` (`StatusCode`, `Method`), nên test của
+            // module đã chuyển vẫn cần `axum` tới khi testkit bọc chúng; baseline riêng, cũng chỉ giảm.
+            let (rule, section) = match dep.kind {
+                DepKind::Dev => ("wrapped-libraries-dev", "[dev-dependencies]"),
+                DepKind::Build => ("wrapped-libraries", "[build-dependencies]"),
+                DepKind::Normal => ("wrapped-libraries", "[dependencies]"),
+            };
             violations.push(Violation {
-                rule: "wrapped-libraries",
+                rule,
                 location: manifest.clone(),
                 message: format!(
-                    "module depends on `{}`, which the kernel wraps: use the kernel layer instead (`autoxide_kernel::db` \
-                     for queries; see docs/research/kernel-contract-1-0.md) and remove the dependency",
+                    "module depends on `{}` ({section}), which the kernel wraps: use the kernel layer instead \
+                     (`autoxide_kernel::db` for queries, `autoxide_kernel::http` for endpoints; see \
+                     docs/research/kernel-contract-1-0.md) and remove the dependency",
                     dep.name
                 ),
             });
@@ -110,7 +123,10 @@ pub fn check_strict(workspace: &Workspace) -> Result<Vec<Violation>, String> {
         }
     }
     for package in workspace.packages.iter().filter(|package| package.role == Role::Module) {
-        let converted = !package.deps.iter().any(|dep| libraries.contains(&dep.name));
+        let converted = !package
+            .deps
+            .iter()
+            .any(|dep| dep.kind != DepKind::Dev && libraries.contains(&dep.name));
         let files = module_files(workspace, package)?;
         if converted {
             for (file, text) in &files {
@@ -373,8 +389,9 @@ fn code_lines(text: &str) -> impl Iterator<Item = (usize, &str)> {
     text.lines().enumerate().filter(|(_, line)| !line.trim_start().starts_with("//"))
 }
 
-/// `private-paths`: `__private` trong mã viết tay của mọi crate trừ kernel (nơi khai đường đó) và crate macro
-/// (nơi sinh mã gọi nó). Không có danh sách chỗ cũ.
+/// `private-paths`: `__private`, các hàm dựng ẩn của lớp HTTP (`__add`, `__new`, `__describe`, `__filters`) và `impl
+/// Endpoint for` viết tay, trong mã của mọi crate trừ kernel (nơi khai chúng) và crate macro (nơi sinh mã gọi chúng);
+/// `check-module` áp cho module ngoài repo. Không có danh sách chỗ cũ.
 pub fn check_private_paths(workspace: &Workspace) -> Result<Vec<Violation>, String> {
     let mut violations = Vec::new();
     for package in &workspace.packages {
@@ -392,21 +409,89 @@ pub fn check_private_paths(workspace: &Workspace) -> Result<Vec<Violation>, Stri
                 let path = base.join(file.trim_start_matches("src/"));
                 let text = fs::read_to_string(&path)
                     .map_err(|error| format!("{}: {error}", path.display()))?;
-                for (index, line) in text.lines().enumerate() {
-                    if line.contains("__private") {
-                        violations.push(Violation {
-                            rule: "private-paths",
-                            location: format!("{}/{sub}/{}:{}", package.dir, file.trim_start_matches("src/"), index + 1),
-                            message: "`autoxide_kernel::__private` is for code the kernel's macros generate, not part \
-                                      of the contract: use the public path"
-                                .to_owned(),
-                        });
-                    }
+                for (index, message) in private_uses(&text) {
+                    violations.push(Violation {
+                        rule: "private-paths",
+                        location: format!(
+                            "{}/{sub}/{}:{}",
+                            package.dir,
+                            file.trim_start_matches("src/"),
+                            index + 1
+                        ),
+                        message,
+                    });
                 }
             }
         }
     }
     Ok(violations)
+}
+
+/// Hàm ẩn mà chỉ mã do macro của kernel sinh được gọi: viết tay thì dựng được route bỏ qua `#[endpoint]` (không khai ai
+/// được gọi, không có trong tài liệu mà permission gate dựa vào).
+const GENERATED_ONLY: &[&str] = &["__add", "__new", "__describe", "__filters"];
+
+/// (số dòng, lời báo) của mỗi chỗ dùng đường riêng của kernel trong `text`, bỏ dòng chú thích.
+fn private_uses(text: &str) -> Vec<(usize, String)> {
+    let mut found = Vec::new();
+    for (index, line) in code_lines(text) {
+        let words: Vec<&str> = line.split(|c: char| !c.is_alphanumeric() && c != '_').collect();
+        if line.contains("__private") {
+            found.push((
+                index,
+                "`autoxide_kernel::__private` is for code the kernel's macros generate, not part of the contract: \
+                 use the public path"
+                    .to_owned(),
+            ));
+        }
+        if let Some(name) = GENERATED_ONLY.iter().find(|name| words.contains(name)) {
+            found.push((
+                index,
+                format!(
+                    "`{name}` is called only by code `#[endpoint]` / `routes!` generate: declare the endpoint with \
+                     `#[endpoint(…)]` and list it in `routes![…]`"
+                ),
+            ));
+        }
+        // `impl Endpoint for X` (hay `impl …::http::Endpoint for X`) viết tay: chỉ `#[endpoint]` cài trait này.
+        let compact: String = line.chars().filter(|c| !c.is_whitespace()).collect();
+        if compact.starts_with("impl") && compact.contains("Endpointfor") {
+            found.push((
+                index,
+                "`Endpoint` is implemented only by `#[endpoint]`: declare the handler with `#[endpoint(…)]`".to_owned(),
+            ));
+        }
+    }
+    found
+}
+
+/// Thư viện mà kernel dùng ĐÚNG bản thư viện khác dùng, nên `Cargo.lock` chỉ được có một bản: `matchit` (bộ khớp route
+/// của axum, kernel hỏi nó để báo route xung đột như axum sẽ thấy — D-20261127-http-layer-choices).
+const SINGLE_COPY: &[&str] = &["matchit"];
+
+/// `single-copy`: mỗi thư viện trong [`SINGLE_COPY`] có đúng một bản trong `Cargo.lock`.
+pub fn check_single_copies(root: &Path) -> Result<Vec<Violation>, String> {
+    let lock = fs::read_to_string(root.join("Cargo.lock"))
+        .map_err(|error| format!("Cargo.lock: {error}"))?;
+    Ok(single_copy_problems(&lock))
+}
+
+fn single_copy_problems(lock: &str) -> Vec<Violation> {
+    SINGLE_COPY
+        .iter()
+        .filter_map(|name| {
+            let wanted = format!("name = \"{name}\"");
+            let copies = lock.lines().filter(|line| line.trim() == wanted).count();
+            (copies > 1).then(|| Violation {
+                rule: "single-copy",
+                location: "Cargo.lock".to_owned(),
+                message: format!(
+                    "`{name}` appears {copies} times: the kernel must use the same version as axum; align the \
+                     version in [workspace.dependencies] (D-20261127-http-layer-choices)"
+                ),
+            })
+        })
+        .collect()
 }
 
 /// File test của module: `tests.rs`, `*_tests.rs`, hay nằm trong thư mục `tests/`.
@@ -418,6 +503,56 @@ fn is_test_file(file: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn matchit_chi_mot_ban() {
+        let one = "[[package]]\nname = \"matchit\"\nversion = \"0.8.4\"\n";
+        assert!(single_copy_problems(one).is_empty());
+        let two = format!("{one}\n[[package]]\nname = \"matchit\"\nversion = \"0.9.0\"\n");
+        let found = single_copy_problems(&two);
+        assert_eq!(found.len(), 1);
+        assert!(found[0].message.contains("2 times"));
+    }
+
+    // Đường riêng của kernel: `__private`, hàm dựng ẩn của lớp HTTP, `impl Endpoint for` viết tay; chú thích thì bỏ qua.
+    #[test]
+    fn duong_rieng_cua_kernel_bi_chan() {
+        let text = "use autoxide_kernel::__private::utoipa;\nlet r = routes.__add(doc, router);\n\
+                    let d = EndpointDoc::__new(p, m, o, s);\nimpl autoxide_kernel::http::Endpoint for Fake {}\n\
+                    impl Endpoint for Fake {}\n// __add trong chú thích\nlet added = add(1);\n";
+        let lines: Vec<usize> = private_uses(text).iter().map(|(line, _)| *line).collect();
+        assert_eq!(lines, [0, 1, 2, 3, 4]);
+    }
+    use crate::workspace::{Dep, Package};
+
+    // Phụ thuộc thường và phụ thuộc của test tính hai luật riêng; module chỉ còn thư viện bọc ở dev vẫn là "đã chuyển".
+    #[test]
+    fn thu_vien_boc_tach_phu_thuoc_thuong_va_dev() {
+        let root = std::env::temp_dir().join(format!("xtask-wrapped-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(root.join("xtask")).unwrap();
+        fs::create_dir_all(root.join("modules/notes/src")).unwrap();
+        fs::write(root.join(LIBRARIES), "# chú thích\naxum\ntower\nutoipa\n").unwrap();
+        fs::write(root.join("modules/notes/src/lib.rs"), "pub fn module() {}\n").unwrap();
+        let dep = |name: &str, kind| Dep { name: name.into(), kind };
+        let package = Package {
+            name: "autoxide-notes".into(),
+            license: None,
+            dir: "modules/notes".into(),
+            role: Role::Module,
+            deps: vec![
+                dep("utoipa", DepKind::Normal),
+                dep("axum", DepKind::Dev),
+                dep("tower", DepKind::Dev),
+                dep("serde", DepKind::Normal),
+            ],
+        };
+        let workspace = Workspace { root: root.clone(), packages: vec![package] };
+        let rules: Vec<&str> =
+            check(&workspace).unwrap().iter().map(|violation| violation.rule).collect();
+        assert_eq!(rules, ["wrapped-libraries", "wrapped-libraries-dev"]);
+        let _ = fs::remove_dir_all(&root);
+    }
 
     #[test]
     fn record_nhieu_dong_cfg_attr_module_long() {

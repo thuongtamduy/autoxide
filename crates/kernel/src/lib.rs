@@ -48,11 +48,18 @@ pub mod mcp;
 pub mod module;
 pub mod response;
 
+/// Lets a trait have `async fn` and still be used as `dyn Trait` (`#[async_trait]` on the trait and on each impl).
+/// Modules write `autoxide_kernel::async_trait` instead of depending on the `async-trait` crate.
+pub use async_trait::async_trait;
+
 /// Paths used by the code the kernel's macros generate. Not part of the contract: never write them by hand
 /// (`cargo xtask check` refuses `__private` in module code).
 #[doc(hidden)]
 pub mod __private {
+    pub use axum;
+    pub use utoipa;
     pub use uuid::Uuid;
+    pub use validator;
 
     /// Written only by `#[derive(Record)]`: a hand-written `impl Record` cannot exist.
     pub trait RecordSeal {}

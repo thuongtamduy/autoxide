@@ -7,7 +7,7 @@
 //! đó mà service vẫn từ chối (permission cần step-up, danh sách "một trong" mà service cần một cái cụ thể, route
 //! dựng không kèm lớp đó) sẽ thấy 422 trước 403 nếu handler đọc trang trước khi service kiểm quyền.
 //!
-//! Cách kiểm, trên mỗi hàm có `#[utoipa::path(…)]` (code đã che comment/chuỗi/test — xem `source.rs`):
+//! Cách kiểm, trên mỗi hàm có `#[utoipa::path(…)]` hay `#[endpoint(…)]` (code đã che comment/chuỗi/test — xem `source.rs`):
 //!
 //! 1. Chỗ đọc trang đầu tiên trong thân hàm: `PageRequest::try_from(` hay `.into_request(`. Không có thì bỏ qua.
 //! 2. "Đã kiểm quyền" = trước chỗ đó có một câu lệnh trọn (kết thúc bằng `;`) nhắc tới `principal` và có `?` hay
@@ -40,7 +40,7 @@ pub fn check(root: &Path) -> Result<Vec<Violation>, String> {
         }
         let text = fs::read_to_string(root.join(&file))
             .map_err(|error| format!("cannot read {file}: {error}"))?;
-        if !text.contains("utoipa::path") {
+        if !text.contains("utoipa::path") && !text.contains("endpoint(") {
             continue;
         }
         violations.extend(check_text(&file, &text));
@@ -54,8 +54,15 @@ fn check_text(file: &str, text: &str) -> Vec<Violation> {
     let code = &source.code;
     let mut violations = Vec::new();
     let mut search = 0;
-    while let Some(offset) = code[search..].find("#[utoipa::path(") {
-        let open = search + offset + "#[utoipa::path".len();
+    // Hai cách khai endpoint: `#[utoipa::path(…)]` (module chưa chuyển) và `#[endpoint(…)]` của kernel.
+    let next = |from: usize| {
+        ["#[utoipa::path(", "#[endpoint("]
+            .iter()
+            .filter_map(|pattern| code[from..].find(pattern).map(|at| (at, pattern.len() - 1)))
+            .min()
+    };
+    while let Some((offset, head)) = next(search) {
+        let open = search + offset + head;
         search = open;
         let Some(close) = matching(code, open, b'(', b')') else { break };
         // Chuỗi trong `code` đã bị che: đọc khai báo ở bản nguyên văn, cùng vị trí.
@@ -100,8 +107,13 @@ fn check_text(file: &str, text: &str) -> Vec<Violation> {
     violations
 }
 
-/// `extensions(("x-permissions" = json!([...])))` với ít nhất một tên.
+/// `extensions(("x-permissions" = json!([...])))` với ít nhất một tên, hay `permission = "…"` / `permission = [..]`
+/// của `#[endpoint]`.
 fn declares_permissions(attribute: &str) -> bool {
+    let compact: String = attribute.chars().filter(|c| !c.is_whitespace()).collect();
+    if compact.contains("permission=\"") || compact.contains("permission=[\"") {
+        return true;
+    }
     let Some(at) = attribute.find("\"x-permissions\"") else { return false };
     let rest = &attribute[at..];
     let Some(start) = rest.find('[') else { return false };
@@ -178,6 +190,25 @@ mod tests {
              async fn list_things(\n    principal: Principal,\n    Query(page): Query<PageQuery>,\n\
              ) -> Result<Page<Thing>, Error> {{\n{body}\n}}\n"
         )
+    }
+
+    // `#[endpoint(…, permission = "…")]` của kernel cũng bị kiểm như `#[utoipa::path]`.
+    #[test]
+    fn endpoint_cua_kernel_cung_bi_kiem() {
+        let body = "    let page = PageRequest::try_from(page)?;\n    service.list(&principal, &page).await";
+        let make = |access: &str| {
+            format!(
+                "#[endpoint(\n    get,\n    path = \"/\",\n    {access},\n    responses((status = 200, description = \"Ok.\")),\n)]\n\
+                 async fn list_things(\n    principal: Principal,\n    Query(page): Query<PageQuery>,\n\
+                 ) -> Result<Page<Thing>, Error> {{\n{body}\n}}\n"
+            )
+        };
+        assert_eq!(check_text("a.rs", &make("permission = \"things.read\"")).len(), 1);
+        assert_eq!(
+            check_text("a.rs", &make("permission = [\"things.read\", \"things.audit\"]")).len(),
+            1
+        );
+        assert!(check_text("a.rs", &make("signed_in")).is_empty());
     }
 
     #[test]

@@ -145,7 +145,7 @@ async fn my_verification(
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 409, description = "The number is verified for another account; code `compliance.phone_in_use`.", body = Problem),
         (status = 422, description = "Not a phone number (`errors`), or not an accepted mobile number; code `compliance.phone_not_allowed`.", body = Problem),
-        (status = 429, description = "Too many codes asked for; code `compliance.otp_throttled`, wait `Retry-After` seconds.", body = Problem),
+        (status = 429, description = "Too many codes asked for (code `compliance.otp_throttled`), or too many wrong codes for this number today (code `compliance.otp_daily_limit`); wait `Retry-After` seconds.", body = Problem),
         (status = 503, description = "Sending SMS is not set up (code `sms_disabled`) or the provider failed; try again later.", body = Problem),
     )
 )]
@@ -206,7 +206,7 @@ async fn get_phone_verification(
         (status = 404, description = "No such verification of yours; code `compliance.challenge_not_found`.", body = Problem),
         (status = 409, description = "The number was verified for another account meanwhile; code `compliance.phone_in_use`.", body = Problem),
         (status = 422, description = "Wrong, used or expired code; code `compliance.otp_invalid`.", body = Problem),
-        (status = 429, description = "Too many wrong codes; code `compliance.otp_attempts_exceeded` — ask for a new code.", body = Problem),
+        (status = 429, description = "Too many wrong tries of this code (code `compliance.otp_attempts_exceeded`): ask for a new code. Or too many wrong codes for this number today (code `compliance.otp_daily_limit`): a new code does not help, wait `Retry-After` seconds.", body = Problem),
     )
 )]
 async fn confirm_phone_verification(

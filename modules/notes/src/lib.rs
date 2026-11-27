@@ -31,7 +31,6 @@ use autoxide_kernel::event::{EventInfo, Subscription};
 use autoxide_kernel::mcp::Tool;
 use autoxide_kernel::migration::MigrationTrait;
 use autoxide_kernel::module::{Module, StartContext};
-use utoipa_axum::router::OpenApiRouter;
 
 use crate::service::NoteService;
 
@@ -110,8 +109,8 @@ impl Module for NotesModule {
         context.on_user_deleted(part)
     }
 
-    fn routes(&self) -> OpenApiRouter {
-        self.service.clone().map_or_else(OpenApiRouter::new, http::routes)
+    fn endpoints(&self) -> autoxide_kernel::http::Routes {
+        self.service.clone().map_or_else(autoxide_kernel::http::Routes::new, http::routes)
     }
 
     fn tools(&self) -> Vec<Tool> {
