@@ -10319,12 +10319,18 @@ export type Data_MigrationRun = {
      * applied is skipped.
      */
     error?: string | null;
+    /** The release a rollback goes from; `null` for a placement run. */
+    from_version?: string | null;
     id: string;
+    /** `placements` (migrations of the tenant databases) or `rollback` (`autoxide rollback --to`). */
+    kind: string;
     /** The placement it runs on; `null`: every placement, by name. */
     placement?: string | null;
     requested_by?: string | null;
     /** `pending`, `running`, `done` or `failed`. */
     status: string;
+    /** The release a rollback goes to; `null` for a placement run. */
+    to_version?: string | null;
     updated_at: string;
   };
 };
@@ -11464,6 +11470,15 @@ export type Data_PhoneCodeResponse = {
     challenge_id: string;
     /** The code stops working at this time. */
     expires_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_PhoneUnlocked = {
+  /** The result of an unlock. */
+  data: {
+    /** `true` when the number was locked and is now unlocked; `false` when it was not locked. */
+    unlocked: boolean;
   };
 };
 
@@ -18080,12 +18095,18 @@ export type MigrationRun = {
    * applied is skipped.
    */
   error?: string | null;
+  /** The release a rollback goes from; `null` for a placement run. */
+  from_version?: string | null;
   id: string;
+  /** `placements` (migrations of the tenant databases) or `rollback` (`autoxide rollback --to`). */
+  kind: string;
   /** The placement it runs on; `null`: every placement, by name. */
   placement?: string | null;
   requested_by?: string | null;
   /** `pending`, `running`, `done` or `failed`. */
   status: string;
+  /** The release a rollback goes to; `null` for a placement run. */
+  to_version?: string | null;
   updated_at: string;
 };
 
@@ -23776,12 +23797,18 @@ export type Page_MigrationRun = {
      * applied is skipped.
      */
     error?: string | null;
+    /** The release a rollback goes from; `null` for a placement run. */
+    from_version?: string | null;
     id: string;
+    /** `placements` (migrations of the tenant databases) or `rollback` (`autoxide rollback --to`). */
+    kind: string;
     /** The placement it runs on; `null`: every placement, by name. */
     placement?: string | null;
     requested_by?: string | null;
     /** `pending`, `running`, `done` or `failed`. */
     status: string;
+    /** The release a rollback goes to; `null` for a placement run. */
+    to_version?: string | null;
     updated_at: string;
   }[];
   pagination: Pagination;
@@ -27054,6 +27081,12 @@ export type PhoneSignupRequest = {
    * the masked number.
    */
   name?: string | null;
+};
+
+/** The result of an unlock. */
+export type PhoneUnlocked = {
+  /** `true` when the number was locked and is now unlocked; `false` when it was not locked. */
+  unlocked: boolean;
 };
 
 /** A shortcut the signed-in user pinned: a screen of the navigation or a record. */
@@ -33316,6 +33349,12 @@ export type UnitTypeResponse = {
   updated_at: string;
 };
 
+/** A phone number whose sign-in codes should be unlocked. */
+export type UnlockPhone = {
+  /** The number, e.g. `0912345678`; outside Vietnam `+` and the country code (`+6591234567`). */
+  phone: string;
+};
+
 /** Stop reply mails. */
 export type UnsubscribeRequest = {
   /** Stop mails about every comment followed with this address, not just this one. */
@@ -35213,6 +35252,7 @@ export interface paths {
       requestBody: PhoneCodeRequest;
       responses: {
         202: Data_PhoneCodeResponse;
+        403: Problem;
         422: Problem;
         429: Problem;
         503: Problem;
@@ -35232,6 +35272,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -38967,6 +39008,20 @@ export interface paths {
       };
     };
   };
+  "/api/v1/compliance/phone-locks/unlock": {
+    /** Unlock sign-in codes for a phone number. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: UnlockPhone;
+      responses: {
+        200: Data_PhoneUnlocked;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/compliance/policies": {
     /** List the compliance policies set by the tenant. */
     get: {
@@ -40522,7 +40577,7 @@ export interface paths {
   "/api/v1/content/public/terms": {
     /** List categories and tags that have published posts (public). */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { locale: string; taxonomy?: Taxonomy; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { locale: string; taxonomy?: Taxonomy; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean; site?: string }; };
       responses: {
         200: Page_PublicTermCount;
         403: Problem;
@@ -40534,7 +40589,7 @@ export interface paths {
   "/api/v1/content/public/terms/{taxonomy}/{slug}": {
     /** Get a category or tag by slug (public). */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; path: { taxonomy: Taxonomy; slug: string }; query: { locale: string }; };
+      parameters: { header: { "Accept-Language"?: string }; path: { taxonomy: Taxonomy; slug: string }; query: { locale: string; site?: string }; };
       responses: {
         200: Data_PublicTermPage;
         403: Problem;

@@ -375,6 +375,13 @@ pub trait Module: Send + Sync {
         OpenApiRouter::new()
     }
 
+    /// The module's REST endpoints (functions with `#[endpoint]`, listed in [`routes!`](crate::routes)), mounted
+    /// like [`routes`](Self::routes) under `/api/v1/<module name>`. Called after `start`. A module uses this or
+    /// `routes`; the module manifest replaces both.
+    fn endpoints(&self) -> crate::http::Routes {
+        crate::http::Routes::new()
+    }
+
     /// Report figures that the module's events produce (step 38, D-20261118-step38-report-facts): each
     /// [`FactSource`](crate::report::FactSource) says which figure one event of the module ITSELF
     /// (`<module>.…`, declared in [`events`](Self::events)) produces. The `reporting` module listens to

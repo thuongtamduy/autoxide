@@ -154,6 +154,14 @@ impl AnalyticsService {
                 throttle(self.config.events_per_minute)?.take(tenant, &block, wanted).await?;
             checked.truncate(usize::try_from(granted.granted).unwrap_or(0));
         }
+        // Trần mỗi ngày của khối mạng (PT-12): client ngoài trình duyệt giả được `Origin` và user agent, nên chỉ giới
+        // hạn được lượng — một mạng làm lệch báo cáo tối đa chừng này sự kiện mỗi ngày.
+        if !checked.is_empty() {
+            let wanted = u32::try_from(checked.len()).unwrap_or(u32::MAX);
+            let daily = Throttle::new("analytics", self.config.events_per_day, DAY)?;
+            let granted = daily.take(tenant, &format!("day:{block}"), wanted).await?;
+            checked.truncate(usize::try_from(granted.granted).unwrap_or(0));
+        }
         if checked.is_empty() {
             return Ok(dropped_all);
         }
@@ -351,6 +359,9 @@ impl AnalyticsService {
         Ok(())
     }
 }
+
+/// Cửa sổ của trần mỗi ngày.
+const DAY: Duration = Duration::from_secs(24 * 60 * 60);
 
 fn throttle(per_minute: u32) -> Result<Throttle, Error> {
     Throttle::new("analytics", per_minute, Duration::from_secs(60))

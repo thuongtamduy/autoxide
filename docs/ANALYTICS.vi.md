@@ -73,7 +73,10 @@ addEventListener("visibilitychange", () => document.visibilityState === "hidden"
 - Sự kiện bị bỏ (không bị từ chối) khi: loại chưa ai khai hay chỉ máy chủ ghi; `props` có tên chưa
   khai hay sai kiểu; thiếu `object` hay sai loại với loại sự kiện có đối tượng; bên gọi là bot đã
   biết hay không gửi user agent; trang gửi (`Origin`, không có thì `Referer`) không thuộc website;
-  quá `AUTOXIDE_ANALYTICS_EVENTS_PER_MINUTE` (120) sự kiện mỗi phút từ cùng một khối mạng.
+  quá `AUTOXIDE_ANALYTICS_EVENTS_PER_MINUTE` (120) sự kiện mỗi phút, hay quá
+  `AUTOXIDE_ANALYTICS_EVENTS_PER_DAY` (20000) sự kiện mỗi ngày, từ cùng một khối mạng. Client ngoài
+  trình duyệt giả được `Origin` và user agent, nên các hạn mức này chặn lượng một mạng làm lệch báo
+  cáo; xem báo cáo là số ước lượng, không dùng để trả tiền hay xếp hạng.
 - Website là website của tên miền được gọi. Trang phục vụ từ tên miền khác API (một khách, chưa có
   tên miền xác minh) được nhận khi tên miền đó có trong `AUTOXIDE_ANALYTICS_ALLOWED_HOSTS`. Gọi API
   không qua tên miền của website thì thêm `?site=<id của nút>`.
@@ -136,6 +139,7 @@ Module khác đọc số qua `autoxide_analytics::api::Analytics`: `top_objects`
 | `AUTOXIDE_ANALYTICS_RAW_RETENTION_DAYS` | `7` | số ngày giữ sự kiện lẻ (2–90) |
 | `AUTOXIDE_ANALYTICS_RETENTION_DAYS` | `790` | số ngày giữ số gộp (30–3650) |
 | `AUTOXIDE_ANALYTICS_EVENTS_PER_MINUTE` | `120` | số sự kiện mỗi khối mạng mỗi phút |
+| `AUTOXIDE_ANALYTICS_EVENTS_PER_DAY` | `20000` | số sự kiện mỗi khối mạng mỗi ngày |
 | `AUTOXIDE_ANALYTICS_ALLOWED_HOSTS` | rỗng | tên miền website khác được gửi |
 
 ## Ghi chú pháp lý

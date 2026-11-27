@@ -511,3 +511,20 @@ async fn khai_bang_control_plane_khong_lach_duoc_chot_global() {
     .await
     .unwrap();
 }
+
+/// Hợp đồng OpenAPI của `notes` (path của module và mọi schema chúng trỏ tới) khớp `openapi.json` của module: đổi
+/// mô tả một endpoint là đổi hợp đồng, phải sửa file có chủ ý. Bản đầu chụp từ mã viết bằng `#[utoipa::path]` trước khi
+/// chuyển sang `#[endpoint]` (PR 4 của D-20261126-kernel-web-layer).
+#[tokio::test]
+async fn hop_dong_openapi_cua_notes_khop_ban_chup() {
+    TestDatabase::run(async |test| {
+        let app = app(test).await;
+        let actual = autoxide_testkit::module_openapi(app.openapi(), "notes");
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("openapi.json");
+        if let Err(problem) = autoxide_testkit::check_openapi_snapshot(&actual, &path) {
+            panic!("{problem}");
+        }
+    })
+    .await
+    .unwrap();
+}

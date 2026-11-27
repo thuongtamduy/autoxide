@@ -60,6 +60,11 @@ mod entity {
         /// `active` while the run is unfinished (`pending` / `running`), empty once finished; unique, so only
         /// one run at a time (m0039).
         pub active_key: Option<String>,
+        /// `placements`, `rollback` (m0043).
+        pub kind: String,
+        /// Release the run goes from / to (rollback, upgrade).
+        pub from_version: Option<String>,
+        pub to_version: Option<String>,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -68,6 +73,7 @@ mod entity {
 use entity::{Column, Entity, Model};
 
 pub(crate) mod claim;
+pub(crate) mod kind;
 
 /// The `kernel_migration_runs` table.
 pub(crate) struct CreateMigrationRuns;
@@ -202,6 +208,13 @@ pub struct MigrationRun {
     /// `pending`, `running`, `done` or `failed`.
     #[schema(example = "done")]
     pub status: String,
+    /// `placements` (migrations of the tenant databases) or `rollback` (`autoxide rollback --to`).
+    #[schema(example = "placements")]
+    pub kind: String,
+    /// The release a rollback goes from; `null` for a placement run.
+    pub from_version: Option<String>,
+    /// The release a rollback goes to; `null` for a placement run.
+    pub to_version: Option<String>,
     pub requested_by: Option<Uuid>,
     /// Migrations applied, per placement done (also when a later placement failed).
     pub applied: Vec<PlacementMigrationList>,
@@ -218,6 +231,9 @@ impl From<Model> for MigrationRun {
             id: row.id,
             placement: row.placement,
             status: row.status,
+            kind: row.kind,
+            from_version: row.from_version,
+            to_version: row.to_version,
             requested_by: row.requested_by,
             applied: serde_json::from_str(&row.result).unwrap_or_default(),
             error: row.error,
@@ -296,6 +312,9 @@ impl MigrationRuns {
             created_at: Set(at),
             updated_at: Set(at),
             active_key: Set(Some(ACTIVE.to_owned())),
+            kind: Set(kind::PLACEMENTS.to_owned()),
+            from_version: Set(None),
+            to_version: Set(None),
         }
         .insert(&transaction)
         .await;
@@ -610,7 +629,8 @@ pub(crate) struct MigrationRunRef {
 #[serde(untagged)]
 enum ToolAnswer {
     DryRun(MigrationDryRun),
-    Run(MigrationRun),
+    // `Box`: lượt lớn hơn nhiều so với kết quả chạy thử; serde in như không có `Box`.
+    Run(Box<MigrationRun>),
 }
 
 pub(crate) fn tools(runs: Arc<MigrationRuns>) -> Vec<crate::mcp::Tool> {
@@ -639,7 +659,9 @@ pub(crate) fn tools(runs: Arc<MigrationRuns>) -> Vec<crate::mcp::Tool> {
                             pending,
                         }));
                     }
-                    Ok(ToolAnswer::Run(runs.start(Actor::from(&principal), placement).await?))
+                    Ok(ToolAnswer::Run(Box::new(
+                        runs.start(Actor::from(&principal), placement).await?,
+                    )))
                 }
             },
         )

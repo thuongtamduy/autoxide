@@ -260,6 +260,32 @@ for example its first administrator:
 sudo -u autoxide autoxide user create --tenant acme --email owner@acme.example --name "Owner" --admin
 ```
 
+### 3b. Try it by hand
+
+Before setting up a service, run it in the foreground and read something back. Order matters: `migrate up`
+(step 3) creates the tables, and `serve` refuses to start while migrations are pending (a first start applies
+about four hundred of them, around twenty seconds).
+
+```bash
+cd /var/lib/autoxide
+sudo -u autoxide autoxide task address.import        # reference data: the administrative units of Vietnam
+sudo -u autoxide autoxide serve                      # listens on 127.0.0.1:8080
+```
+
+In another terminal:
+
+```bash
+curl http://127.0.0.1:8080/health/ready
+curl "http://127.0.0.1:8080/api/v1/address/provinces?limit=2"    # real data, no sign-in needed
+```
+
+Another port or address: `AUTOXIDE_HTTP_ADDRESS=0.0.0.0:9000` in `.env` (the name is exactly that: there is no
+`AUTOXIDE_PORT`). A misspelled `AUTOXIDE_…` variable is ignored, but `autoxide config` and the start-up log now
+name it and suggest the right one.
+
+A value with spaces or special characters in `.env` goes in double quotes (`NAME="my value"`); the error names
+the variable when a line cannot be read.
+
 ### 4. Run as a service
 
 `/etc/systemd/system/autoxide.service`:
@@ -321,6 +347,21 @@ placements nor a placement's own file storage; the command prints a warning nami
 those up with the database's (and the storage's) own tools. Keep
 `AUTOXIDE_SECRET_KEY` in a safe place apart from the backups: without it, the encrypted secrets in
 a backup cannot be read.
+
+## B+. One binary with PostgreSQL, from scratch
+
+Same as B, with a PostgreSQL server you already run (a package, a cloud database; Docker is not needed). Create
+a database and a user, then put the URL in `.env` instead of the SQLite file:
+
+```bash
+sudo -u postgres psql -c "CREATE USER autoxide WITH PASSWORD 'choose-a-long-password'" \
+  -c "CREATE DATABASE autoxide OWNER autoxide"
+printf 'DATABASE_URL=postgres://autoxide:choose-a-long-password@127.0.0.1:5432/autoxide\n' >> /var/lib/autoxide/.env
+```
+
+Then B steps 3, 3b and 4 as written (`migrate up`, create the administrator, `serve`). If the server cannot connect,
+the error now says why (for example "connection refused" for a wrong port) next to the pool message; `autoxide
+doctor` checks the connection and says what to fix.
 
 ## C. One container with SQLite
 
@@ -397,7 +438,7 @@ into a new database.
 | --- | --- |
 | `DATABASE_URL` | `sqlite://data/autoxide.sqlite` (default) or `postgres://user:password@host:5432/db` |
 | `AUTOXIDE_MODULES` | Which modules run: `official` (default), `core`, `all`, names to add, `-name` to leave out. Experimental modules must be named. See [MODULES.md](MODULES.md) |
-| `AUTOXIDE_AUTH_TOKEN_SECRET` | Signs access tokens; required in production, the same on every server |
+| `AUTOXIDE_AUTH_TOKEN_SECRET` | Signs access tokens; recommended in production (without it a random key is made at start and tokens stop working after a restart), the same on every server |
 | `AUTOXIDE_SECRET_KEY` | Signs short-lived tokens of every module and keys the hashes of visitors' IP addresses; optional: when unset, one is generated once and kept in the database. Set it (outside the database, the same on every server) in production: with the key in the database, anyone holding a database backup can open the secrets stored encrypted and work the IP blocks back out of the stored hashes |
 | `AUTOXIDE_SECRET_KEY_PREVIOUS` | Old values of `AUTOXIDE_SECRET_KEY`, separated by commas, while rotating the key; remove them after `autoxide secrets reseal` |
 | `AUTOXIDE_AUTH_TOKEN_SECRET_PREVIOUS` | Old values of `AUTOXIDE_AUTH_TOKEN_SECRET`, separated by commas, while rotating it; only used to check tokens, remove after the access token lifetime |
@@ -1304,6 +1345,39 @@ changes the database in two steps ("expand, then contract"):
 (the main database, then every tenant database; the same as `migrate up` in single-tenant mode)
 before starting the new servers, then replace the old ones as in
 "Updating without dropping requests".
+
+### Rolling back to an earlier release
+
+`autoxide rollback --to X.Y.Z` brings the main database and every tenant database back to the
+migrations of release `X.Y.Z` (0.14.0 or later), so the servers of that release start again. Run it
+with the binary of the release you are leaving: only it knows how to revert its own migrations.
+
+1. `autoxide rollback --to X.Y.Z --dry-run` lists, per database, the migrations it would revert, the
+   tables and columns it would drop with how many rows or values they hold (a column that only holds
+   its default value loses nothing), and the rows a revert deletes. It changes nothing. On SQLite it
+   works on a copy of the database, in a private directory (`.autoxide-rollback-…`, readable by the
+   server's user only) next to the database file, deleted when it is done: keep free space the size
+   of the database there. The real run, once the servers are stopped, measures without a copy. On
+   PostgreSQL it runs the reverts inside a transaction that is
+   rolled back, so for that time it holds locks on the tables it changes: it waits at most
+   `--lock-timeout-seconds` (default 2) for a busy table, then stops and says so — run it when the
+   load is low, or once the servers are stopped.
+2. Stop every server and worker of the current release. If the dry run shows data that would be
+   dropped, take a backup first (`autoxide backup`).
+3. `autoxide rollback --to X.Y.Z --yes`, adding `--accept-data-loss` when data is dropped. Tenant
+   databases go first, the main database last; if a tenant database fails, the main database is
+   left as it is: fix the cause and run the same command again.
+4. Start the servers of `X.Y.Z`.
+
+Modules your own binary adds (`.module(…)`) are not in the release table: the rollback leaves their
+migrations as they are and says so; `--revert-untracked` reverts them too. The rollback is recorded as
+a migration run of kind `rollback`; when the target release predates that record (0.19.0 and
+earlier), the run is closed before the main database is rolled back, and an error there is only
+printed.
+
+A migration that cannot give an earlier release its data back (the contract step of an expand–contract
+change) refuses the rollback; the changelog lists such migrations under the upgrade notes, and the way
+back across them is the backup taken before the upgrade.
 
 ## Checklist before going live
 

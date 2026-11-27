@@ -235,6 +235,10 @@ rồi thêm `-v "$PWD/backups:/backups"` và chạy `backup /backups/<tên>`). �
 [Cấu hình](#cấu-hình) (dùng `http://127.0.0.1:8080`). Với PostgreSQL, reverse proxy có HTTPS,
 cập nhật và restore, xem [`docs/DEPLOY.vi.md`](docs/DEPLOY.vi.md).
 
+**Không có Docker?** Build binary và chạy bằng tay: [`docs/DEPLOY.vi.md`, mục B](docs/DEPLOY.vi.md#b-một-binary-với-sqlite)
+(SQLite) hay [B+](docs/DEPLOY.vi.md#b-một-binary-với-postgresql-từ-đầu) (PostgreSQL). Hai secret để trong `.env`,
+`autoxide migrate up` chạy trước `autoxide serve`, và `AUTOXIDE_HTTP_ADDRESS` đổi địa chỉ nghe.
+
 ## Yêu cầu
 
 Chỉ cần khi build từ mã nguồn (muốn chạy image đã phát hành thì xem mục trên).

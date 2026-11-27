@@ -3,8 +3,8 @@
 //! không thấy ghi chú ngoài phạm vi, hai máy cùng sửa một ghi chú — một bên thắng. Chạy trên cả
 //! SQLite và Postgres.
 
+use autoxide_kernel::time::SignedDuration;
 use autoxide_kernel::time::Timestamp;
-use jiff::SignedDuration;
 use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, Mutex};
 
@@ -365,7 +365,7 @@ async fn lo_ghi_chi_nhan_duong_dan_dong_bo_va_quyen_nhu_rest() {
 #[derive(Default)]
 struct MemoryStore(Mutex<HashMap<String, (Uuid, Option<StoredResponse>)>>);
 
-#[async_trait::async_trait]
+#[autoxide_kernel::async_trait]
 impl IdempotencyStore for MemoryStore {
     async fn begin(
         &self,

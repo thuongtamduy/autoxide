@@ -44,15 +44,16 @@ mới nhất ngày 11/11/2026; **`Cargo.lock` là nguồn sự thật** sau khi 
 | ------------------ | ------------------------------- | --------- | --------------------------------------------------- |
 | Async runtime      | `tokio`                         | 1.54      | Chuẩn thực tế của Rust async                        |
 | HTTP / REST        | `axum`                          | 0.8       | Do nhóm tokio làm                                   |
+| Khớp route        | `matchit`                       | 0.8       | Bộ khớp route của axum, cùng bản lớn với axum (cargo gộp về một bản, luật `single-copy` của `xtask check` đỏ khi có hai bản; test chống lệch `matchit_khop_voi_axum` đỏ khi luật khớp lệch): kernel hỏi nó trước khi ghép router để báo route xung đột bằng lỗi rõ thay vì để axum dừng tiến trình (D-20261127-http-layer-choices) |
 | WebSocket          | `axum` feature `ws` (`tokio-tungstenite` 0.29) | 0.8 | `GET /api/v1/kernel/events/ws` (bước 69); test dùng client `tokio-tungstenite` cùng bản |
 | Middleware HTTP    | `tower-http`                    | 0.7       | Trace, CORS, timeout, giới hạn body, request id, nén response (gzip, brotli — D-20261119-step39-compression) |
 | ORM                | `sea-orm`                       | 2.0       | Một bộ code cho SQLite và Postgres. Module mới truy vấn qua lớp `autoxide_kernel::db` của kernel (dựng trên sea-query + kết nối của SeaORM), không khai SeaORM (D-20261126-kernel-data-layer, luật `wrapped-libraries`) |
-| Macro của kernel   | `syn` 2 + `quote` + `proc-macro2` (crate `autoxide-macros`) | 2.0 / 1.0 / 1.0 | `#[derive(Record)]`; module dùng qua `autoxide_kernel::db`, không khai crate này. Đã có trong cây phụ thuộc qua serde, utoipa (D-20261126-kernel-data-layer) |
+| Macro của kernel   | `syn` 2 + `quote` + `proc-macro2` (crate `autoxide-macros`) | 2.0 / 1.0 / 1.0 | `#[derive(Record)]`, `#[endpoint]`, `#[derive(Schema/Params/Validate)]`; module dùng qua `autoxide_kernel::db` / `::http`, không khai crate này. Đã có trong cây phụ thuộc qua serde, utoipa (D-20261126-kernel-data-layer) |
 | Migration          | Kernel tự chạy (`autoxide_kernel::migration`: `MigrationTrait`, `SchemaManager`, `schema::*` — cùng tên `sea-orm-migration` cũ) | — | Viết bằng Rust, chạy được trên cả hai database; mỗi migration một transaction; thay `sea-orm-migration` (bật bộ feature mặc định của SeaORM, kéo `chrono`; D-20261121-own-migrations) |
-| OpenAPI            | `utoipa` + `utoipa-axum`        | 6.0 / 0.3 | Route và tài liệu đăng ký cùng một lệnh, không lệch |
+| OpenAPI            | `utoipa` + `utoipa-axum`        | 6.0 / 0.3 | Route và tài liệu đăng ký cùng một lệnh, không lệch. Module đã chuyển không khai: dùng `#[endpoint]` + `routes!` của kernel (D-20261126-kernel-web-layer) |
 | Trang xem API      | `utoipa-scalar`                 | 0.4       | Tắt mặc định; bật bằng `AUTOXIDE_HTTP_API_DOCS=true` |
 | JSON               | `serde` + `serde_json`          | 1.0       |                                                     |
-| Validate đầu vào   | `validator`                     | 0.21      |                                                     |
+| Validate đầu vào   | `validator`                     | 0.21      | Module đã chuyển dùng `#[derive(Validate)]` của kernel (sinh đúng mã của `validator`) |
 | ID                 | `uuid` (v7)                     | 1.29      |                                                     |
 | Thời gian          | `jiff` qua `autoxide_kernel::time` (`Timestamp`, `Date`) | 1.0 | Lưu UTC; dạng lưu, JSON, OpenAPI như `chrono` trước đây (giá trị đối chiếu ở `crates/kernel/src/values/time/golden.json`). `chrono` / `chrono-tz` đã gỡ khỏi cây phụ thuộc (D-20261121-time-library) |
 | Số thập phân       | `rust_decimal` (chỉ `std`)      | 1.43      | Chỉ để TÍNH tiền, thuế, tỉ giá; lưu tiền vẫn là số nguyên `Money`, lưu số thập phân dạng chữ (D-322). Đã có trong cây phụ thuộc qua SeaORM |
