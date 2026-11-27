@@ -103,7 +103,12 @@ pub(crate) fn all() -> Vec<EventInfo> {
             "A carrier pickup was requested for a return; `after.shipment` is the shipment request.",
         ),
         EventInfo::new(names::STOCK_SHORTAGE, "An order imported from a channel lacks stock."),
-        EventInfo::new(names::PAYMENT_RECORDED, "A payment of an order was recorded."),
+        EventInfo::new(
+            names::PAYMENT_RECORDED,
+            "A payment of an order was recorded. `late: true`: it arrived after the order was cancelled \
+             and is refunded. `superseded: true`: it is an attempt replaced by a newer one; it does not \
+             count towards the order and is refunded through the payment partner.",
+        ),
         EventInfo::new(names::REFUND_COMPLETED, "A refund of an order was completed."),
         EventInfo::new(names::RETURN_REQUESTED, "A buyer asked to return items of an order."),
         EventInfo::new(

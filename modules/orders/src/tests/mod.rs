@@ -14,6 +14,7 @@ mod invoice_settled;
 mod invoices_pos;
 mod lifecycle;
 mod pages;
+mod payment_attempts;
 mod payment_retry;
 mod pickups;
 mod preorders;

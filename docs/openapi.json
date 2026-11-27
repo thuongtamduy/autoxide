@@ -29407,7 +29407,7 @@
                 "type": "string"
               },
               "kind": {
-                "description": "`amount_mismatch`, `unmatched_credit`, `duplicate_payment`, `missing_in_statement`,\n`unknown_in_statement` or `late_payment`.",
+                "description": "`amount_mismatch`, `unmatched_credit`, `duplicate_payment`, `missing_in_statement`,\n`unknown_in_statement`, `late_payment` (money arrived after the payment's deadline or after the\npartner reported it failed) or `refund_failed` (the partner refused a refund: the money is still\nto be returned by hand, then resolve with `refunded_outside`; it closes on its own once the\npayment is refunded in full through the partner).",
                 "type": "string"
               },
               "note": {
@@ -29417,6 +29417,7 @@
                 ]
               },
               "resolution": {
+                "description": "How it was closed: `match`, `accept_received`, `ignore`, `refunded_outside` (by a person), or\nby the ledger (`resolved_by` is empty): `refunded` (the payment was refunded in full through the\npartner) or `kept` (a `late_payment` the source module counted, e.g. the order went on). Empty\nwhile `open`.",
                 "type": [
                   "string",
                   "null"
@@ -33431,11 +33432,20 @@
                 "description": "`redirect` (go to `redirect_url`), `qr` (show `qr_payload`), `cod` (pay on delivery) or\n`none` (the payment could not be started yet; retry from the order).",
                 "type": "string"
               },
+              "ledger_payment_id": {
+                "description": "Id of the collection at the payment partner, in the `ledger` module\n(`GET /api/v1/ledger/payments/{id}`, its refunds, its exceptions). `null` while the payment\nis not started yet (`kind = none`) and for cash on delivery or tenders.",
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
               "order_id": {
                 "format": "uuid",
                 "type": "string"
               },
               "payment_id": {
+                "description": "Id of this payment of the order (it stays the same while the buyer pays it; a new attempt\nafter a failed payment gets a new id). Not an id of the `ledger` module: use\n`ledger_payment_id` with `GET /api/v1/ledger/payments/{id}`.",
                 "format": "uuid",
                 "type": "string"
               },
@@ -33453,7 +33463,7 @@
                 ]
               },
               "status": {
-                "description": "`pending`, `succeeded`, `failed`, `expired`…",
+                "description": "`pending`, `succeeded`, `expired`, `superseded` (replaced by a new attempt after the\npartner reported its collection failed; start the payment again from the order)…",
                 "type": "string"
               },
               "status_token": {
@@ -44072,11 +44082,20 @@
                   "description": "`redirect` (go to `redirect_url`), `qr` (show `qr_payload`), `cod` (pay on delivery) or\n`none` (the payment could not be started yet; retry from the order).",
                   "type": "string"
                 },
+                "ledger_payment_id": {
+                  "description": "Id of the collection at the payment partner, in the `ledger` module\n(`GET /api/v1/ledger/payments/{id}`, its refunds, its exceptions). `null` while the payment\nis not started yet (`kind = none`) and for cash on delivery or tenders.",
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "order_id": {
                   "format": "uuid",
                   "type": "string"
                 },
                 "payment_id": {
+                  "description": "Id of this payment of the order (it stays the same while the buyer pays it; a new attempt\nafter a failed payment gets a new id). Not an id of the `ledger` module: use\n`ledger_payment_id` with `GET /api/v1/ledger/payments/{id}`.",
                   "format": "uuid",
                   "type": "string"
                 },
@@ -44094,7 +44113,7 @@
                   ]
                 },
                 "status": {
-                  "description": "`pending`, `succeeded`, `failed`, `expired`…",
+                  "description": "`pending`, `succeeded`, `expired`, `superseded` (replaced by a new attempt after the\npartner reported its collection failed; start the payment again from the order)…",
                   "type": "string"
                 },
                 "status_token": {
@@ -52128,7 +52147,7 @@
             "type": "string"
           },
           "kind": {
-            "description": "`amount_mismatch`, `unmatched_credit`, `duplicate_payment`, `missing_in_statement`,\n`unknown_in_statement` or `late_payment`.",
+            "description": "`amount_mismatch`, `unmatched_credit`, `duplicate_payment`, `missing_in_statement`,\n`unknown_in_statement`, `late_payment` (money arrived after the payment's deadline or after the\npartner reported it failed) or `refund_failed` (the partner refused a refund: the money is still\nto be returned by hand, then resolve with `refunded_outside`; it closes on its own once the\npayment is refunded in full through the partner).",
             "type": "string"
           },
           "note": {
@@ -52138,6 +52157,7 @@
             ]
           },
           "resolution": {
+            "description": "How it was closed: `match`, `accept_received`, `ignore`, `refunded_outside` (by a person), or\nby the ledger (`resolved_by` is empty): `refunded` (the payment was refunded in full through the\npartner) or `kept` (a `late_payment` the source module counted, e.g. the order went on). Empty\nwhile `open`.",
             "type": [
               "string",
               "null"
@@ -59961,11 +59981,20 @@
             "description": "`redirect` (go to `redirect_url`), `qr` (show `qr_payload`), `cod` (pay on delivery) or\n`none` (the payment could not be started yet; retry from the order).",
             "type": "string"
           },
+          "ledger_payment_id": {
+            "description": "Id of the collection at the payment partner, in the `ledger` module\n(`GET /api/v1/ledger/payments/{id}`, its refunds, its exceptions). `null` while the payment\nis not started yet (`kind = none`) and for cash on delivery or tenders.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "order_id": {
             "format": "uuid",
             "type": "string"
           },
           "payment_id": {
+            "description": "Id of this payment of the order (it stays the same while the buyer pays it; a new attempt\nafter a failed payment gets a new id). Not an id of the `ledger` module: use\n`ledger_payment_id` with `GET /api/v1/ledger/payments/{id}`.",
             "format": "uuid",
             "type": "string"
           },
@@ -59983,7 +60012,7 @@
             ]
           },
           "status": {
-            "description": "`pending`, `succeeded`, `failed`, `expired`…",
+            "description": "`pending`, `succeeded`, `expired`, `superseded` (replaced by a new attempt after the\npartner reported its collection failed; start the payment again from the order)…",
             "type": "string"
           },
           "status_token": {
@@ -72213,7 +72242,7 @@
                   "type": "string"
                 },
                 "kind": {
-                  "description": "`amount_mismatch`, `unmatched_credit`, `duplicate_payment`, `missing_in_statement`,\n`unknown_in_statement` or `late_payment`.",
+                  "description": "`amount_mismatch`, `unmatched_credit`, `duplicate_payment`, `missing_in_statement`,\n`unknown_in_statement`, `late_payment` (money arrived after the payment's deadline or after the\npartner reported it failed) or `refund_failed` (the partner refused a refund: the money is still\nto be returned by hand, then resolve with `refunded_outside`; it closes on its own once the\npayment is refunded in full through the partner).",
                   "type": "string"
                 },
                 "note": {
@@ -72223,6 +72252,7 @@
                   ]
                 },
                 "resolution": {
+                  "description": "How it was closed: `match`, `accept_received`, `ignore`, `refunded_outside` (by a person), or\nby the ledger (`resolved_by` is empty): `refunded` (the payment was refunded in full through the\npartner) or `kept` (a `late_payment` the source module counted, e.g. the order went on). Empty\nwhile `open`.",
                   "type": [
                     "string",
                     "null"
@@ -216818,7 +216848,7 @@
     },
     "/api/v1/ledger/payments/{id}": {
       "get": {
-        "description": "Requires `ledger.read` on the unit that receives it.",
+        "description": "Requires `ledger.read` on the unit that receives it. An order's payment action gives this id as\n`ledger_payment_id` (its `payment_id` is the order's own payment, not this id). A payment in\n`needs_review` was reported with another amount than the amount due; a later notification for the\nsame partner transaction does not change it. Find its `amount_mismatch` item in\n`GET /api/v1/ledger/exceptions?status=open` (subject `ledger.payment:<id>`) and resolve it with\n`POST /api/v1/ledger/exceptions/{id}/resolve` (`ledger.reconcile`): `accept_received` records the\namount collected: the order goes on if it is still waiting for payment; after the order's payment\ndeadline the order is already cancelled and the amount is refunded through the partner on its own.\n`refunded_outside` or `ignore` close the item and leave the payment unpaid.",
         "operationId": "ledger_get_ledger_payment",
         "parameters": [
           {
@@ -235351,7 +235381,15 @@
                 }
               }
             },
-            "description": "Same `Idempotency-Key` as an earlier checkout: its result."
+            "description": "Same `Idempotency-Key` as an earlier checkout: its result.",
+            "headers": {
+              "Idempotent-Replayed": {
+                "description": "`true`: the orders of the earlier checkout with this key, as they are now; nothing was ordered again.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "201": {
             "content": {
@@ -236558,7 +236596,15 @@
                 }
               }
             },
-            "description": "The payment actions of the order."
+            "description": "The payment actions of the order.",
+            "headers": {
+              "Idempotent-Replayed": {
+                "description": "`true` when the same `Idempotency-Key` was sent before: the current state; nothing was done again.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "401": {
             "content": {
@@ -238511,7 +238557,15 @@
                 }
               }
             },
-            "description": "The order with the new address."
+            "description": "The order with the new address.",
+            "headers": {
+              "Idempotent-Replayed": {
+                "description": "`true` when the same `Idempotency-Key` was sent before: the current state; nothing was done again.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "401": {
             "content": {
@@ -238794,7 +238848,15 @@
                 }
               }
             },
-            "description": "The cancelled order."
+            "description": "The cancelled order.",
+            "headers": {
+              "Idempotent-Replayed": {
+                "description": "`true` when the same `Idempotency-Key` was sent before: the current state; nothing was done again.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "401": {
             "content": {
@@ -239213,7 +239275,15 @@
                 }
               }
             },
-            "description": "The payment actions of the order."
+            "description": "The payment actions of the order.",
+            "headers": {
+              "Idempotent-Replayed": {
+                "description": "`true` when the same `Idempotency-Key` was sent before: the current state; nothing was done again.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "401": {
             "content": {
@@ -240526,7 +240596,7 @@
                 }
               }
             },
-            "description": "The step is not allowed now (`orders.return_invalid_transition`), or the refund is more than what is left to refund (`orders.refund_exceeds_paid`)."
+            "description": "The step is not allowed now (`orders.return_invalid_transition`), or the refund is more than what is left to refund (`orders.refund_exceeds_paid`): final. Any other code (for example `ledger.payment_state`) means the payment partner is still busy with the payment: not a refusal; the refund stays `pending` — send the same step again later (it is never refunded twice)."
           },
           "422": {
             "content": {
@@ -240537,6 +240607,16 @@
               }
             },
             "description": "Unknown action, reason, line or condition (see `errors`)."
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The payment partner limits calls (`Retry-After`): the refund stays `pending`; send the same step again after that many seconds."
           },
           "default": {
             "content": {
@@ -243286,7 +243366,7 @@
                 }
               }
             },
-            "description": "More than what is left to refund; code `orders.refund_exceeds_paid`."
+            "description": "More than what is left to refund (`orders.refund_exceeds_paid`): final. Any other code (for example `ledger.payment_state`) means the payment partner is still busy with the payment: not a refusal; the refund stays `pending` — send the same request with the same `reference` again later (it is never refunded twice)."
           },
           "422": {
             "content": {
@@ -243296,7 +243376,17 @@
                 }
               }
             },
-            "description": "Invalid amount, reason or reference, or the reference was used for another refund (`reference_reused`)."
+            "description": "Invalid amount, reason or reference, or the reference was used for another refund (`reference_reused`); or the payment partner refused the refund (e.g. `payment.not_supported`, `ledger.gateway_not_configured`): the refund is `failed` and a `refund_failed` item is opened in `GET /api/v1/ledger/exceptions` to refund the buyer by hand."
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The payment partner limits calls (`Retry-After`): the refund stays `pending`; send the same request with the same `reference` again after that many seconds."
           },
           "default": {
             "content": {

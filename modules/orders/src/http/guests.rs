@@ -17,6 +17,7 @@ use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, State};
 use axum::http::HeaderMap;
+use axum::response::Response;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::ToSchema;
@@ -279,7 +280,7 @@ pub(crate) struct GuestCancelRequest {
     ),
     request_body = GuestCancelRequest,
     responses(
-        (status = 200, description = "The cancelled order.", body = Data<GuestOrderResponse>),
+        (status = 200, description = "The cancelled order.", body = Data<GuestOrderResponse>, headers(("Idempotent-Replayed" = String, description = "`true` when the same `Idempotency-Key` was sent before: the current state; nothing was done again."))),
         (status = 401, description = "Missing, wrong or expired token; code `orders.lookup_token_invalid`.", body = Problem),
         (status = 404, description = "The token opens another order; code `orders.order_not_found`.", body = Problem),
         (status = 409, description = "Too late to cancel by yourself; code `orders.cancel_not_allowed`.", body = Problem),
@@ -292,11 +293,12 @@ pub(crate) async fn cancel_guest_order(
     headers: HeaderMap,
     Path(id): Path<Uuid>,
     ValidJson(input): ValidJson<GuestCancelRequest>,
-) -> Result<Data<GuestOrderResponse>, Error> {
+) -> Result<Response, Error> {
     let access = access(&service, &tenant, &headers).await?;
     let key = idempotency_key(&headers).unwrap_or_else(|| Uuid::now_v7().to_string());
-    let row = service.guest_cancel(&tenant, &access, id, input.reason, &key).await?;
-    guest_view(&service, &tenant, row).await
+    let submitted = service.guest_cancel(&tenant, &access, id, input.reason, &key).await?;
+    let (replayed, row) = super::replay::split(submitted);
+    Ok(super::replay::marked(guest_view(&service, &tenant, row).await?, replayed))
 }
 
 /// Ask for a code to change the delivery address.
@@ -368,7 +370,7 @@ pub(crate) struct AddressRequest {
     ),
     request_body = AddressRequest,
     responses(
-        (status = 200, description = "The order with the new address.", body = Data<GuestOrderResponse>),
+        (status = 200, description = "The order with the new address.", body = Data<GuestOrderResponse>, headers(("Idempotent-Replayed" = String, description = "`true` when the same `Idempotency-Key` was sent before: the current state; nothing was done again."))),
         (status = 401, description = "Missing, wrong or expired token; code `orders.lookup_token_invalid`.", body = Problem),
         (status = 404, description = "The token opens another order; code `orders.order_not_found`.", body = Problem),
         (status = 409, description = "The goods left the warehouse (`orders.address_locked`) or the fee changes (`orders.address_change_needs_payment`).", body = Problem),
@@ -381,7 +383,7 @@ pub(crate) async fn change_address(
     headers: HeaderMap,
     Path(id): Path<Uuid>,
     ValidJson(input): ValidJson<AddressRequest>,
-) -> Result<Data<GuestOrderResponse>, Error> {
+) -> Result<Response, Error> {
     let access = access(&service, &tenant, &headers).await?;
     let key = idempotency_key(&headers).unwrap_or_else(|| Uuid::now_v7().to_string());
     let change = AddressChange {
@@ -390,8 +392,9 @@ pub(crate) async fn change_address(
         phone: input.phone,
         code: input.code,
     };
-    let row = service.guest_change_address(&tenant, &access, id, change, &key).await?;
-    guest_view(&service, &tenant, row).await
+    let submitted = service.guest_change_address(&tenant, &access, id, change, &key).await?;
+    let (replayed, row) = super::replay::split(submitted);
+    Ok(super::replay::marked(guest_view(&service, &tenant, row).await?, replayed))
 }
 
 /// A message to customer support about an order.

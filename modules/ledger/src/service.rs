@@ -164,6 +164,23 @@ pub(crate) fn check_key(key: &AccountKey, field: &str, problems: &mut Vec<FieldE
 
 // ---- Mô tả ----------------------------------------------------------------------------------------
 
+/// Hạn của lượt thu mới: hạn thường (`at + expiry`) hay `expires_by` của bên tạo, cái nào sớm hơn — link ở
+/// đối tác hết hạn cùng lúc với chứng từ nguồn (UT-6). `expires_by` đã qua → lỗi của ô đó vào `problems`.
+pub(crate) fn payment_deadline(
+    usual: Timestamp,
+    expires_by: Option<Timestamp>,
+    problems: &mut Vec<FieldError>,
+) -> Timestamp {
+    match expires_by {
+        Some(cap) if cap <= Timestamp::now() => {
+            problems.push(FieldError::new("expires_by", "past", "must be in the future"));
+            usual
+        }
+        Some(cap) => cap.min(usual),
+        None => usual,
+    }
+}
+
 pub(crate) fn money(minor: i64, currency: &str) -> Result<Money, Error> {
     Money::from_columns(minor, currency)
 }

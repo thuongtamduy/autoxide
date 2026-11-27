@@ -387,7 +387,7 @@ pub(crate) mod exception {
         pub id: Uuid,
         pub tenant_id: Uuid,
         /// `amount_mismatch`, `unmatched_credit`, `duplicate_payment`, `missing_in_statement`,
-        /// `unknown_in_statement`, `late_payment`.
+        /// `unknown_in_statement`, `late_payment`, `refund_failed`.
         pub kind: String,
         /// Bản ghi liên quan, vd `ledger.payment:<id>`.
         pub subject: String,
@@ -397,7 +397,7 @@ pub(crate) mod exception {
         pub dedupe_key: String,
         /// `open`, `resolved`, `ignored`.
         pub status: String,
-        /// `match`, `ignore`, `refunded_outside`.
+        /// Người xử lý: `match`, `accept_received`, `ignore`, `refunded_outside`; `ledger` tự đóng: `refunded`.
         pub resolution: Option<String>,
         pub note: Option<String>,
         pub resolved_by: Option<Uuid>,
