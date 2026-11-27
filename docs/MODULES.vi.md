@@ -160,7 +160,7 @@ không tool MCP, không job, không nhận event khác, nhưng:
   xong khi nội dung còn nằm lại).
 
 Đây là nghĩa vụ của pháp luật bảo vệ dữ liệu cá nhân (Việt Nam: Luật 91/2025/QH15, Nghị định
-13/2023/NĐ-CP), nên không phụ thuộc bạn còn dùng module hay không. Những việc vẫn chưa làm khi tắt:
+356/2025/NĐ-CP), nên không phụ thuộc bạn còn dùng module hay không. Những việc vẫn chưa làm khi tắt:
 
 - dọn dữ liệu của nó theo thời hạn lưu không chạy (job của module không chạy);
 - khách tạo trong lúc đó không có dữ liệu khởi đầu của module;

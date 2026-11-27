@@ -66,6 +66,8 @@ async fn list_rates(
     Query(filter): Query<RatesQuery>,
     Query(page): Query<PageQuery>,
 ) -> Result<Page<ExchangeRate>, Error> {
+    // Quyền trước tham số trang: thiếu quyền là 403, không phải 422 (luật `permission-first` của xtask).
+    principal.require(&crate::permissions::READ)?;
     let page = PageRequest::try_from(page)?;
     service.list_rates(&tenant, &principal, filter.base, filter.quote, &page).await
 }

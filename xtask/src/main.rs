@@ -13,7 +13,8 @@
 //!   (`i18n.rs`), tài liệu EN / VI (`docs.rs`), doc comment tiếng Anh của phần công khai
 //!   (`doc_language.rs`), mục lục quyết định (`decisions.rs`), mảnh thay đổi
 //!   (`changelog.rs`), lọc theo khách (`tenant_scope.rs`), tool MCP theo phạm vi
-//!   (`mcp_principal.rs`; chỗ cũ chờ sửa ở `baseline.rs`) và độ dài
+//!   (`mcp_principal.rs`; chỗ cũ chờ sửa ở `baseline.rs`), handler kiểm quyền trước khi đọc tham số trang
+//!   (`permission_first.rs`) và độ dài
 //!   file `.rs` (`lengths.rs`: quá 800 dòng thì cảnh báo, quá 1200 thì chặn trừ file miễn), hình
 //!   dạng thống nhất của API trên `docs/openapi.json` (`api_shape.rs`: thân request đóng, lỗi
 //!   `Problem`, danh sách `Page<T>`).
@@ -69,6 +70,7 @@ mod library_layer;
 mod mcp_principal;
 mod metric_labels;
 mod migration_releases;
+mod permission_first;
 mod publish;
 mod regen;
 mod rust_free;
@@ -383,6 +385,8 @@ fn check() -> ExitCode {
         // Link giao diện trong thư theo khách (D-20261125-tenant-link-templates).
         violations.extend(site_links::check(&workspace.root)?);
         violations.extend(deploy_metrics::check(&workspace.root)?);
+        // Handler kiểm quyền trước khi đọc tham số trang (D-20261126-permission-before-page).
+        violations.extend(permission_first::check(&workspace.root)?);
         violations.extend(toolchain::check(&workspace.root)?);
         // Danh sách file mà PR chỉ đổi chúng thì CI bỏ phần Rust (D-20261125-ci-skip-rust).
         violations.extend(rust_free::check(&workspace)?);
