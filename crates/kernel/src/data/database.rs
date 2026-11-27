@@ -275,10 +275,39 @@ async fn open(
     options: ConnectOptions,
     url: &DatabaseUrl,
 ) -> Result<DatabaseConnection, DatabaseError> {
-    sea_orm::Database::connect(options).await.map_err(|error| {
-        // Thông báo dùng URL đã che mật khẩu; lỗi của driver không chứa mật khẩu.
-        DatabaseError(format!("cannot connect to `{}`: {error}", url.redacted()))
-    })
+    match sea_orm::Database::connect(options).await {
+        Ok(connection) => Ok(connection),
+        Err(error) => {
+            // Thông báo dùng URL đã che mật khẩu; lỗi của driver không chứa mật khẩu.
+            let mut message = format!("cannot connect to `{}`: {error}", url.redacted());
+            // Sai cổng hay máy chưa chạy thì driver chỉ báo "pool timed out" sau chục giây, giấu nguyên nhân thật
+            // ("connection refused"): thử mở TCP một lần để nói nguyên nhân gốc.
+            if let Some(cause) = tcp_cause(url).await {
+                message.push_str(&format!(" (root cause: {cause})"));
+            }
+            Err(DatabaseError(message))
+        }
+    }
+}
+
+/// Nếu không mở được kết nối TCP tới máy chủ trong URL PostgreSQL thì trả lý do (đã nói máy và cổng); ngược lại `None`.
+async fn tcp_cause(url: &DatabaseUrl) -> Option<String> {
+    if url.backend() != DatabaseBackend::Postgres {
+        return None;
+    }
+    let parsed = url::Url::parse(url.expose()).ok()?;
+    let host = parsed.host_str()?.to_owned();
+    let port = parsed.port().unwrap_or(5432);
+    let attempt = tokio::time::timeout(
+        Duration::from_secs(3),
+        tokio::net::TcpStream::connect((host.as_str(), port)),
+    )
+    .await;
+    match attempt {
+        Ok(Ok(_)) => None,
+        Ok(Err(error)) => Some(format!("cannot reach {host}:{port}: {error}")),
+        Err(_) => Some(format!("no answer from {host}:{port} within 3 seconds")),
+    }
 }
 
 /// A dedicated connection to the main database, outside the two pools: the migration lock on Postgres
@@ -377,6 +406,16 @@ fn read_options(config: &DatabaseConfig, url: &DatabaseUrl) -> ConnectOptions {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Cổng 1 không có ai nghe: nguyên nhân gốc là "không tới được", không phải "pool timed out" chung chung.
+    #[tokio::test]
+    async fn postgres_sai_cong_noi_nguyen_nhan_goc() {
+        let url: DatabaseUrl = "postgres://u:p@127.0.0.1:1/db".parse().unwrap();
+        let cause = tcp_cause(&url).await.unwrap();
+        assert!(cause.contains("127.0.0.1:1"), "{cause}");
+        let sqlite: DatabaseUrl = "sqlite://data/x.sqlite".parse().unwrap();
+        assert_eq!(tcp_cause(&sqlite).await, None);
+    }
 
     #[test]
     fn ma_loi_tam_thoi() {

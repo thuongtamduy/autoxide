@@ -134,7 +134,8 @@ pub async fn copy_modules(
     let mut copied = Vec::with_capacity(tables.len());
     for (table, from, to) in plans {
         let rows = copy_table(&snapshot, &transaction, table, &from, &to, None).await?;
-        tracing::info!(table, rows, "table copied");
+        // Hàng trăm bảng: từng bảng ở mức debug, kết quả tóm tắt do lệnh gọi in ra.
+        tracing::debug!(table, rows, "table copied");
         copied.push(CopiedTable { table: table.clone(), rows });
     }
     transaction.commit().await?;

@@ -44,7 +44,7 @@ pub enum Action {
         /// Name of the module whose migrations to revert.
         module: String,
         /// How many migrations to revert, newest first.
-        #[arg(long, default_value_t = 1)]
+        #[arg(long, default_value_t = 1, value_parser = clap::value_parser!(u32).range(1..))]
         steps: u32,
     },
 }
@@ -262,14 +262,36 @@ fn render_status(states: &[MigrationState]) -> String {
     output
 }
 
+/// Từ chừng này migration trở lên thì tóm tắt theo module.
+const SUMMARY_ABOVE: usize = 20;
+
 fn render_changes(changed: &[MigrationState], verb: &str, nothing: &str) -> String {
+    let lines: Vec<(&str, &str)> =
+        changed.iter().map(|state| (state.module, state.name.as_str())).collect();
+    render_lines(&lines, verb, nothing)
+}
+
+/// `(module, tên migration)` đã áp dụng hay đã gỡ, thành chữ cho người đọc.
+fn render_lines(changed: &[(&str, &str)], verb: &str, nothing: &str) -> String {
     if changed.is_empty() {
         return format!("{nothing}\n");
     }
     let noun = if changed.len() == 1 { "migration" } else { "migrations" };
     let mut output = format!("{verb} {} {noun}:\n", changed.len());
-    for state in changed {
-        output.push_str(&format!("  {}/{}\n", state.module, state.name));
+    // Lần đầu có hàng trăm migration: mỗi module một dòng thay vì từng cái (`autoxide migrate status` liệt kê hết).
+    if changed.len() > SUMMARY_ABOVE {
+        let mut per_module: std::collections::BTreeMap<&str, usize> = Default::default();
+        for (module, _) in changed {
+            *per_module.entry(module).or_default() += 1;
+        }
+        for (module, count) in per_module {
+            output.push_str(&format!("  {module}: {count}\n"));
+        }
+        output.push_str("List each one with `autoxide migrate status`.\n");
+        return output;
+    }
+    for (module, name) in changed {
+        output.push_str(&format!("  {module}/{name}\n"));
     }
     output
 }
@@ -278,6 +300,34 @@ fn render_changes(changed: &[MigrationState], verb: &str, nothing: &str) -> Stri
 mod tests {
     use super::*;
     use autoxide_kernel::config::ConfigSource;
+
+    #[test]
+    fn nhieu_migration_thi_tom_tat_theo_module() {
+        let names: Vec<String> = (0..30).map(|n| format!("m{n:04}")).collect();
+        let lines: Vec<(&str, &str)> = names
+            .iter()
+            .enumerate()
+            .map(|(i, name)| (if i < 20 { "auth" } else { "files" }, name.as_str()))
+            .collect();
+        let text = render_lines(&lines, "Applied", "none");
+        assert!(text.starts_with("Applied 30 migrations:\n"), "{text}");
+        assert!(text.contains("  auth: 20\n") && text.contains("  files: 10\n"), "{text}");
+        assert!(!text.contains("m0001"), "{text}");
+        let few = render_lines(&lines[..2], "Applied", "none");
+        assert!(few.contains("  auth/m0000\n"), "{few}");
+    }
+
+    #[test]
+    fn steps_bang_khong_bi_tu_choi() {
+        use clap::Parser;
+        #[derive(Parser)]
+        struct Cli {
+            #[command(flatten)]
+            arguments: Arguments,
+        }
+        assert!(Cli::try_parse_from(["x", "down", "notes", "--steps", "0"]).is_err());
+        assert!(Cli::try_parse_from(["x", "down", "notes", "--steps", "2"]).is_ok());
+    }
     use autoxide_kernel::migration::ModuleMigrations;
     use autoxide_kernel::migration::prelude::*;
     use autoxide_testkit::TestDatabase;

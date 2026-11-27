@@ -25,7 +25,17 @@ pub fn run() -> ExitCode {
         Err(errors) => return report_invalid_configuration(&errors),
     };
     let config = settings.config.clone();
-    match run_with_observability(&config, serve(settings, http::shutdown_signal())) {
+    let task = async move {
+        for (name, nearest) in settings::unknown_variables() {
+            tracing::warn!(
+                variable = %name,
+                did_you_mean = nearest.as_deref().unwrap_or(""),
+                "this AUTOXIDE_ variable is not a setting and is ignored (run `autoxide config` for the list)"
+            );
+        }
+        serve(settings, http::shutdown_signal()).await
+    };
+    match run_with_observability(&config, task) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => report_failure(&error),
     }
