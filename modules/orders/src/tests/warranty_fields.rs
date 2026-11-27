@@ -202,6 +202,15 @@ async fn bao_hanh_theo_serial_va_theo_dong_phieu_bao_hanh() {
 
         // Giao xong: mỗi serial một bảo hành 12 tháng; event giao lại không mở thêm.
         deliver(&shop, order).await;
+        // Kho nhận số serial đã ghi cùng phần giao (UT-1); ghi trước khi giao thì không có event ghi serial.
+        let delivered = last_event(&shop, "orders.order_delivered").await;
+        assert_eq!(
+            delivered["delivered_lines"],
+            json!([{"line_key": delivered["lines"][0]["line_key"], "variant_id": delivered["delivered_lines"][0]["variant_id"],
+                "quantity": 2, "delivered_quantity": 2, "serials": ["SN-001", "SN-002"]}]),
+            "{delivered}"
+        );
+        assert_eq!(super::lifecycle::count_events(&shop, "orders.line_serials_recorded").await, 0);
         let (other, _) = order_of(&shop, case, 1, "w-2").await;
         deliver(&shop, other).await;
         let (none, _) = order_of(&shop, plain, 1, "w-3").await;
@@ -295,6 +304,54 @@ async fn bao_hanh_theo_serial_va_theo_dong_phieu_bao_hanh() {
             .await;
         assert_eq!(status, StatusCode::CONFLICT, "{problem}");
         assert_eq!(problem["code"], "orders.warranty_expired");
+    })
+    .await
+    .unwrap();
+}
+
+/// `after` của event `name` mới nhất.
+async fn last_event(shop: &Shop, name: &str) -> Value {
+    use sea_orm::ConnectionTrait as _;
+    let read = shop.database().read();
+    let backend = read.get_database_backend();
+    let sql = "SELECT payload FROM orders_events WHERE name = $1 ORDER BY id DESC";
+    let row = read
+        .query_one_raw(autoxide_kernel::database::statement(backend, sql, [name.into()]))
+        .await
+        .unwrap()
+        .unwrap();
+    let payload: Value = serde_json::from_str(&row.try_get_by_index::<String>(0).unwrap()).unwrap();
+    payload["after"].clone()
+}
+
+/// Hàng theo serial giao khi chưa ghi serial: ghi sau thì báo kho (`orders.line_serials_recorded`) kèm phần đã
+/// giao và mọi số của dòng; mỗi lần ghi thêm một event.
+#[tokio::test]
+async fn ghi_serial_sau_khi_giao_bao_kho() {
+    TestDatabase::run(async |test| {
+        let shop = world(test).await;
+        let phone = shop.catalog.add_with(shop.tree.a, 5_000_000, |variant| {
+            variant.serial_tracked = true;
+        });
+        shop.inventory.stock(shop.tree.a, phone, 10);
+        let boss = Call::as_user(&shop, "boss");
+        let (order, line) = order_of(&shop, phone, 2, "s-1").await;
+        deliver(&shop, order).await;
+        let delivered = last_event(&shop, "orders.order_delivered").await;
+        assert_eq!(delivered["delivered_lines"][0]["serials"], json!([]), "{delivered}");
+        let uri = format!("/{order}/lines/{line}/serials");
+        let (status, saved) = boss.send("POST", &uri, Some(json!({"serials": ["SN-9"]}))).await;
+        assert_eq!(status, StatusCode::OK, "{saved}");
+        let recorded = last_event(&shop, "orders.line_serials_recorded").await;
+        assert_eq!(recorded["delivered_quantity"], 2, "{recorded}");
+        assert_eq!(recorded["serials"], json!(["SN-9"]));
+        assert_eq!(recorded["line_id"], line.to_string());
+        let (_, _) = boss.send("POST", &uri, Some(json!({"serials": ["SN-10"]}))).await;
+        let recorded = last_event(&shop, "orders.line_serials_recorded").await;
+        assert_eq!(recorded["serials"], json!(["SN-9", "SN-10"]));
+        // Gửi lại không có số mới: không event.
+        boss.send("POST", &uri, Some(json!({"serials": []}))).await;
+        assert_eq!(super::lifecycle::count_events(&shop, "orders.line_serials_recorded").await, 2);
     })
     .await
     .unwrap();

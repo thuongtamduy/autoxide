@@ -246,8 +246,9 @@ fn probe_hsts(
              browser may still try plain HTTP first.",
         )
         .with_hint(
-            "Set AUTOXIDE_HTTP_HSTS_SECONDS (for example `31536000`, one year) once every client \
-             reaches the API over HTTPS.",
+            "HSTS is on by default with an `https` public URL: remove AUTOXIDE_HTTP_HSTS_SECONDS=0 \
+             (or set it, for example `31536000`, one year) and keep \
+             AUTOXIDE_HTTP_SECURITY_HEADERS on, once every client reaches the API over HTTPS.",
         )
     } else {
         Finding::ok(format!(
@@ -335,8 +336,14 @@ mod tests {
         assert_eq!(probe(&[]), None);
         assert_eq!(probe(&[("AUTOXIDE_HTTP_PUBLIC_URL", "http://localhost:8080")]), None);
         let https = ("AUTOXIDE_HTTP_PUBLIC_URL", "https://api.example.com");
-        assert_eq!(probe(&[https]), Some(Status::Warning));
-        assert_eq!(probe(&[https, ("AUTOXIDE_HTTP_HSTS_SECONDS", "31536000")]), Some(Status::Ok));
+        // Bước 71 G7: URL `https` tự bật HSTS; chỉ cảnh báo khi người vận hành tắt nó.
+        assert_eq!(probe(&[https]), Some(Status::Ok));
+        assert_eq!(probe(&[https, ("AUTOXIDE_HTTP_HSTS_SECONDS", "0")]), Some(Status::Warning));
+        assert_eq!(
+            probe(&[https, ("AUTOXIDE_HTTP_SECURITY_HEADERS", "false")]),
+            Some(Status::Warning)
+        );
+        assert_eq!(probe(&[https, ("AUTOXIDE_HTTP_HSTS_SECONDS", "600")]), Some(Status::Ok));
     }
 
     /// `database` + SQLite: nhắc dùng `memory` (bước 40 P6).

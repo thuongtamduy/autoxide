@@ -469,6 +469,7 @@ name = "autoxide-catalog"
 version = "0.19.0"
 dependencies = [
  "async-trait",
+ "autoxide-compliance",
  "autoxide-files",
  "autoxide-kernel",
  "autoxide-media",
@@ -756,6 +757,7 @@ dependencies = [
  "axum",
  "futures-util",
  "jiff",
+ "metrics",
  "sea-orm",
  "serde",
  "serde_json",
@@ -882,7 +884,7 @@ version = "0.19.0"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.119",
+ "syn 3.0.10",
 ]
 
 [[package]]
@@ -6684,7 +6686,7 @@ dependencies = [
  "quote",
  "serde",
  "serde_json",
- "syn 2.0.119",
+ "syn 3.0.10",
 ]
 
 [[package]]

@@ -173,6 +173,17 @@ pub(crate) fn category_slug_not_found(slug: &str) -> Error {
 }
 
 /// Module cắm điều kiện mở bán (bước 46) từ chối: `reason` là mã của module đó, `detail` lời của nó.
+/// Sàn mà không có `KycGate` (module `compliance` tắt): không kiểm được định danh người bán nên không mở bán.
+pub(crate) fn seller_verification_unavailable() -> Error {
+    Error::new(
+        ErrorKind::Forbidden,
+        "catalog.seller_verification_unavailable",
+        "This tenant is a marketplace, but seller identity verification (module `compliance`) is not \
+         enabled, so goods of a seller cannot go on sale. Enable module `compliance`, or list the goods \
+         under the tenant's root.",
+    )
+}
+
 pub(crate) fn listing_denied(reason: &str, detail: &str) -> Error {
     Error::new(
         ErrorKind::Validation,

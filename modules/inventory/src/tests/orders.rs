@@ -179,3 +179,65 @@ async fn huy_rieng_phan_dat_truoc_tra_suat_dung_mot_lan() {
     .await
     .unwrap();
 }
+
+raw_event!(FulfillmentDelivered, "orders.fulfillment_delivered");
+raw_event!(OrderDelivered, "orders.order_delivered");
+
+/// Hàng tới tay người mua thì rời kho (UT-1): lần giao lẻ xuất đúng phần của nó, `orders.order_delivered` xuất
+/// phần còn lại; mỗi event nhận hai lần, rồi giao lại toàn bộ outbox — vẫn chỉ một lần dòng `sale`.
+#[tokio::test]
+async fn giao_hang_xuat_kho_mot_lan_du_nhan_lai_event() {
+    TestDatabase::run(async |test| {
+        let names = ["orders.fulfillment_delivered", "orders.order_delivered"];
+        let (orders, outbox) = Emitter::new("orders", &names);
+        let shop = shop_with(test, |builder, _| builder.module(orders)).await;
+        let item = shop.catalog.item();
+        stock_in(&shop, shop.tree.a, item, 10, None).await;
+        let api = shop.api::<dyn Inventory>().unwrap();
+        let tenant = shop.default_tenant();
+        let order = Uuid::now_v7();
+        let request = ReserveRequest::new(
+            order,
+            shop.tree.a,
+            Timestamp::now() + SignedDuration::from_mins(30),
+            vec![ReserveLine::new("1", item, 3)],
+        );
+        api.reserve(&tenant, &request).await.unwrap();
+        api.confirm(&tenant, order).await.unwrap();
+
+        // Lần giao lẻ: 1 đơn vị.
+        let arrived = FulfillmentDelivered(json!({"after": {
+            "order_id": order, "fulfillment_id": Uuid::now_v7(), "lines": [{"line_key": "1", "quantity": 1}],
+        }}));
+        twice(&shop, &outbox, &arrived).await;
+        let found = level(&shop, shop.tree.a, item).await;
+        assert_eq!((found["on_hand"].as_i64(), found["reserved"].as_i64()), (Some(9), Some(2)), "{found}");
+        // Đơn giao xong: phần còn lại.
+        twice(&shop, &outbox, &OrderDelivered(json!({"after": {"order_id": order}}))).await;
+        redeliver(&shop).await;
+        let found = level(&shop, shop.tree.a, item).await;
+        assert_eq!(
+            (found["on_hand"].as_i64(), found["reserved"].as_i64(), found["available"].as_i64()),
+            (Some(7), Some(0), Some(7)),
+            "{found}"
+        );
+        assert_eq!(status(&shop, order).await, "fulfilled");
+        let (_, sales) = super::call(
+            &shop,
+            "GET",
+            &format!("/movements?variant_id={item}&kind=sale"),
+            "boss",
+            None,
+        )
+        .await;
+        let mut sold: Vec<i64> =
+            sales["data"].as_array().unwrap().iter().filter_map(|m| m["quantity"].as_i64()).collect();
+        sold.sort_unstable();
+        assert_eq!(sold, [-2, -1], "{sales}");
+        // Đơn không có chỗ giữ (hàng số): bỏ qua, không lỗi.
+        twice(&shop, &outbox, &OrderDelivered(json!({"after": {"order_id": Uuid::now_v7()}}))).await;
+        assert_consistent(&shop).await;
+    })
+    .await
+    .unwrap();
+}

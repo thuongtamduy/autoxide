@@ -15,6 +15,9 @@ mod api_key;
 mod api_key_scope_tests;
 #[cfg(any(test, feature = "bench-seed"))]
 mod bench_seed;
+mod breached;
+#[cfg(test)]
+mod breached_tests;
 mod cleanup;
 mod client_config;
 mod config;

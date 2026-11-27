@@ -771,18 +771,30 @@ impl CatalogService {
 
     /// Chuyển trạng thái bán của sản phẩm. Mở bán kiểm: có nhóm thuế, có nội dung, có biến thể
     /// đang bật, `readiness = ready`.
-    /// Hỏi điều kiện mở bán đã cắm (nếu có); từ chối → 422 với mã của module cắm vào.
+    /// Hỏi điều kiện mở bán đã cắm (nếu có); từ chối → 422 với mã của module cắm vào. Trên sàn, hỏi thêm
+    /// định danh người bán ([`Self::check_seller_identity`]).
     async fn check_listing_gate(
         &self,
         tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
     ) -> Result<(), Error> {
-        let Some(gate) = self.listing_gate.get() else { return Ok(()) };
+        // Mô hình kinh doanh đọc trước (cài đặt có bộ nhớ đệm): khách không phải sàn và không có điều kiện
+        // mở bán cắm vào thì không đọc sản phẩm.
+        let marketplace = self.is_marketplace(tenant).await?;
+        let gate = self.listing_gate.get();
+        if !marketplace && gate.is_none() {
+            return Ok(());
+        }
         let detail = self.get_product(tenant, principal, id).await?;
+        let owner = OrgId::from_uuid(detail.product.org_id);
+        if marketplace {
+            self.check_seller_identity(tenant, owner).await?;
+        }
+        let Some(gate) = gate else { return Ok(()) };
         let candidate = crate::api::ListingCandidate::new(
             id,
-            autoxide_kernel::tenancy::OrgId::from_uuid(detail.product.org_id),
+            owner,
             detail.category_ids.clone(),
             parse_kind(&detail.product.kind),
         );
@@ -792,6 +804,54 @@ impl CatalogService {
                 Err(errors::listing_denied(&code, &message))
             }
         }
+    }
+
+    /// Khách là sàn (`kernel.business_model = marketplace`, D-185)?
+    async fn is_marketplace(&self, tenant: &TenantContext) -> Result<bool, Error> {
+        let Some(settings) = &self.settings else { return Ok(false) };
+        let model = settings.get(tenant, &autoxide_kernel::tenancy::BUSINESS_MODEL).await?;
+        Ok(model.is_some_and(|value| value.as_str().trim() == "marketplace"))
+    }
+
+    /// Sàn: sản phẩm của người bán (nút không phải gốc của khách) chỉ mở bán khi người bán đã định danh —
+    /// Luật TMĐT 122/2025/QH15, NĐ 248/2026/NĐ-CP Điều 18 (chủ nền tảng trung gian xác thực danh tính người
+    /// bán; áp dụng 01/01/2027, cần đối chiếu văn bản gốc). Có cần hay không do quy tắc
+    /// `kyc.required_activities` của `compliance` (dữ liệu có ngày hiệu lực) quyết; thiếu thì
+    /// `compliance.kyc_required` (403).
+    ///
+    /// Người bán là nút sở hữu hay một nút tổ tiên của nó dưới gốc (D-185: sàn → người bán → kho / cửa
+    /// hàng): một nút trong chuỗi đã định danh là đủ. Không có `KycGate` (module `compliance` bị tắt, vd
+    /// `AUTOXIDE_MODULES=official,-compliance`): không kiểm được nên từ chối
+    /// (`catalog.seller_verification_unavailable`) — hướng an toàn theo luật số hai.
+    async fn check_seller_identity(&self, tenant: &TenantContext, org: OrgId) -> Result<(), Error> {
+        let root = autoxide_kernel::tenancy::root_of(tenant.id());
+        if org == root {
+            return Ok(());
+        }
+        let Some(kyc) = &self.kyc else {
+            return Err(errors::seller_verification_unavailable());
+        };
+        // Chuỗi nút của kernel (nút, rồi các nút trên nó, gốc cuối) đọc qua `Site` — lớp có lọc theo khách.
+        // Nút không có trong cây (không xảy ra: sản phẩm chỉ gắn nút có thật) → chỉ hỏi chính nút đó, hướng
+        // chặt hơn.
+        let chain = match autoxide_kernel::tenancy::Site::of(tenant, org).await {
+            Ok(site) => site.lineage().to_vec(),
+            Err(_) => vec![org],
+        };
+        let mut refused = None;
+        for node in chain.into_iter().filter(|node| *node != root) {
+            let seller = autoxide_compliance::api::Subject::Org(node);
+            let sell = autoxide_compliance::api::Activity::Sell;
+            match kyc.require_verified(tenant.id(), seller, sell).await {
+                Ok(()) => return Ok(()),
+                // Lỗi của nút gần nhất (chính nút sở hữu) là lỗi báo cho người gọi.
+                Err(error) if error.code() == "compliance.kyc_required" => {
+                    refused.get_or_insert(error);
+                }
+                Err(error) => return Err(error),
+            }
+        }
+        refused.map_or(Ok(()), Err)
     }
 
     pub(crate) async fn set_status(
