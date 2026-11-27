@@ -584,9 +584,15 @@ impl InvoicesService {
         };
         let currency = Currency::parse(&found.currency)?;
         let seller = OrgId::from_uuid(found.on_behalf_of_org_id.unwrap_or(found.org_id));
-        let on = match issue_date {
-            Some(day) => day,
-            None => self.tax.tax_date(tenant, seller, Timestamp::now()).await?,
+        let database = tenant.database();
+        // Nháp điều chỉnh / thay thế: thuế theo ngày của chứng từ gốc, như lúc tạo.
+        let original_date = match found.related_document_id {
+            Some(original) => self.original_tax_date(database.read(), tenant, original).await?,
+            None => None,
+        };
+        let on = match (original_date, issue_date) {
+            (Some(day), _) | (None, Some(day)) => day,
+            (None, None) => self.tax.tax_date(tenant, seller, Timestamp::now()).await?,
         };
         let computed = match &lines {
             Some(lines) => Some(
@@ -606,7 +612,6 @@ impl InvoicesService {
             ),
             None => None,
         };
-        let database = tenant.database();
         let transaction = database.begin_write().await?;
         principal
             .require_write_at(

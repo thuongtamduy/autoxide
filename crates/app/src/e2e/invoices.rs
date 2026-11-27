@@ -778,3 +778,74 @@ async fn nhap_tinh_lai_thue_theo_ngay_lap() {
     .await
     .unwrap();
 }
+
+/// Nháp điều chỉnh bị sửa cùng lúc với lập (kiểm độc lập #560, F3): thuế luôn theo ngày của hoá đơn gốc — lập
+/// báo `invoices.draft_changed`, hoặc hoá đơn mang thuế suất của gốc; không bao giờ thuế suất của hôm nay.
+#[tokio::test]
+async fn nhap_dieu_chinh_sua_cung_luc_voi_lap_giu_thue_suat_goc() {
+    use sea_orm::ConnectionTrait as _;
+    TestDatabase::run(async |test| {
+        let Setup { app, .. } = setup(test).await;
+        let root = root_of(DEFAULT_TENANT).as_uuid();
+        let profile = json!({"jurisdiction": "VN", "regime": "vat_credit"});
+        let answer =
+            app.request(Method::PUT, &format!("/api/v1/tax/profiles/{root}")).token("clerk").json(profile).send().await.unwrap();
+        assert_eq!(answer.status(), StatusCode::OK, "{}", answer.text());
+        let vietnam = autoxide_kernel::time::zone("Asia/Ho_Chi_Minh").unwrap();
+        let today = Timestamp::now().date_in(&vietnam);
+        // Ngày của gốc ở phía kia mốc hết giảm GTGT so với hôm nay.
+        let (original_day, original_rate) = if today < Date::new(2027, 1, 1).unwrap() {
+            (Date::new(2027, 1, 5).unwrap(), "10")
+        } else {
+            (Date::new(2025, 8, 1).unwrap(), "8")
+        };
+        let body = json!({"kind": "vat_invoice", "symbol": "1C26TAA", "year": today.year()});
+        let (status, created) = call(&app, "POST", "/series", Some(body)).await;
+        assert_eq!(status, StatusCode::CREATED, "{created}");
+        let line = |price: i64| {
+            json!({"description": "Goods", "kind": "goods", "quantity": "1",
+                   "unit_price": {"amount": price.to_string(), "currency": "VND"}, "tax_category": "vat.standard_reducible"})
+        };
+        let tenant = app.default_tenant();
+        let write = app.database().write();
+        let backend = write.get_database_backend();
+        for round in 0..6 {
+            let body = json!({"kind": "vat_invoice", "currency": "VND", "reference": format!("O-{round}"),
+                "buyer": {"kind": "business", "name": "Buyer Co", "tax_code": "0101234567"}, "lines": [line(100_000)]});
+            let (status, created) = call(&app, "POST", "/documents", Some(body)).await;
+            assert_eq!(status, StatusCode::CREATED, "{created}");
+            let id = created["data"]["id"].as_str().unwrap().to_owned();
+            let (status, issued) = call(&app, "POST", &format!("/documents/{id}/issue"), None).await;
+            assert_eq!(status, StatusCode::OK, "{issued}");
+            write
+                .execute_raw(autoxide_kernel::database::statement(
+                    backend,
+                    "UPDATE invoices_documents SET issue_date = $1 WHERE id = $2",
+                    [original_day.into(), id.parse::<Uuid>().unwrap().into()],
+                ))
+                .await
+                .unwrap();
+            let adjust = json!({"direction": "decrease", "reference": format!("A-{round}"), "lines": [line(50_000)]});
+            let (status, adjusted) = call(&app, "POST", &format!("/documents/{id}/adjust"), Some(adjust)).await;
+            assert_eq!(status, StatusCode::CREATED, "{adjusted}");
+            let draft: Uuid = adjusted["data"]["id"].as_str().unwrap().parse().unwrap();
+            let path = format!("/documents/{draft}");
+            let service = invoices(&app);
+            let (patched, issued) = tokio::join!(
+                call(&app, "PATCH", &path, Some(json!({"lines": [line(60_000)]}))),
+                service.issue(&tenant, Actor::system(), draft)
+            );
+            match issued {
+                Ok(issued) => {
+                    assert_eq!(issued.lines[0].rate_percent.as_deref(), Some(original_rate), "round {round}: {issued:?}");
+                    if patched.0 == StatusCode::OK {
+                        assert_eq!(issued.lines[0].unit_price.minor(), 60_000, "round {round}");
+                    }
+                }
+                Err(error) => assert_eq!(error.code(), "invoices.draft_changed", "round {round}"),
+            }
+        }
+    })
+    .await
+    .unwrap();
+}
