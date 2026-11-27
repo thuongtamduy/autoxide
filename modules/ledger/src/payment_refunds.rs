@@ -9,8 +9,8 @@ use autoxide_kernel::payment::{RefundIntent, RefundStatus};
 use autoxide_kernel::reference::{self, Reference, Submitted};
 use autoxide_kernel::rows::{self, Bounds};
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext};
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
-use serde_json::json;
+use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, Set};
+use serde_json::{Value, json};
 use uuid::Uuid;
 
 use crate::api::{AccountKey, Counterparty, LineAccount, NewEntry, NewLine, NewRefund, Refund};
@@ -54,6 +54,29 @@ impl LedgerService {
         let found = Self::find_payment(tenant.database().read(), tenant, input.payment)
             .await?
             .ok_or_else(payment_not_found)?;
+        match self.refund_found(tenant, &found, &input, &reference, &reason).await {
+            // Từ chối hẳn ở bất cứ bước nào sau khi đã có thanh toán (chưa cấu hình đối tác, đối tác không hoàn,
+            // sai tiền tệ, vượt số còn lại, đối tác từ chối): tiền có thể vẫn ở đối tác — mở `refund_failed`
+            // (rà #591 C2). 409 / 429 / 5xx không phải từ chối: bên gọi gửi lại cùng mã.
+            Err(error) if crate::api::refund_refused(&error) => {
+                let details = json!({"payment_id": found.id, "reference": reference.as_str(),
+                    "amount": input.amount, "reason": reason, "code": error.code()});
+                self.open_refund_failed(tenant, found.id, reference.as_str(), &details).await?;
+                Err(error)
+            }
+            other => other,
+        }
+    }
+
+    /// Phần của [`LedgerService::refund`] sau khi đã tìm thấy thanh toán `found`.
+    async fn refund_found(
+        &self,
+        tenant: &TenantContext,
+        found: &payment::Model,
+        input: &NewRefund,
+        reference: &Reference,
+        reason: &String,
+    ) -> Result<Submitted<Refund>, Error> {
         let gateway = self.gateway(Some(&found.provider))?;
         let capabilities = gateway.capabilities();
         if !capabilities.refunds
@@ -68,7 +91,7 @@ impl LedgerService {
             "payment": input.payment, "amount": input.amount.minor(), "reason": reason,
         }))?;
         let database = tenant.database();
-        let (reference, fingerprint, input, reason) = (&reference, &fingerprint, &input, &reason);
+        let fingerprint = &fingerprint;
         let submitted = reference::submit_once(database, move || async move {
             let transaction = database.begin_write().await?;
             let stored = refund::Entity::find()
@@ -284,39 +307,90 @@ impl LedgerService {
                 .await?;
                 let (refund_id, payment_id) = (row.id, row.payment_id);
                 let amount = money(row.amount_minor, &row.amount_currency)?;
-                let reason = row.reason.clone();
+                let (reason, reference) = (row.reason.clone(), row.reference.clone());
                 let mut active: refund::ActiveModel = row.into();
                 active.status = Set("failed".to_owned());
                 active.updated_at = Set(now());
                 refund::Entity::update(active).exec(&transaction).await?;
-                // Tiền vẫn ở đối tác mà lượt hoàn hỏng: người vận hành phải thấy (UT-6). Mục `late_payment`
-                // của thanh toán còn mở thì nó đã bảo hoàn tay — không mở mục thứ hai cho cùng khoản tiền.
-                let late_open = exception::Entity::find()
-                    .filter(
-                        exception::Column::DedupeKey
-                            .eq(crate::reconcile::late_payment_key(payment_id)),
-                    )
-                    .filter(exception::Column::Status.eq("open"))
-                    .scoped(tenant)
-                    .one(&transaction)
-                    .await?
-                    .is_some();
-                if !late_open {
-                    crate::reconcile::insert_exception(
-                        &transaction,
-                        tenant,
-                        outbox,
-                        "refund_failed",
-                        &format!("ledger.payment:{payment_id}"),
-                        &json!({"payment_id": payment_id, "refund_id": refund_id,
-                                "amount": amount, "reason": reason}),
-                        &crate::reconcile::refund_failed_key(refund_id),
-                    )
+                // Tiền vẫn ở đối tác mà lượt hoàn hỏng: người vận hành phải thấy (UT-6).
+                let details = json!({"payment_id": payment_id, "refund_id": refund_id,
+                    "reference": reference, "amount": amount, "reason": reason});
+                open_refund_failed(&transaction, tenant, outbox, payment_id, &reference, &details)
                     .await?;
-                }
                 transaction.commit().await?;
                 Ok(())
             })
             .await
     }
+
+    /// [`open_refund_failed`] trong transaction riêng (lượt hoàn bị từ chối trước khi có dòng hoàn).
+    async fn open_refund_failed(
+        &self,
+        tenant: &TenantContext,
+        payment_id: Uuid,
+        reference: &str,
+        details: &Value,
+    ) -> Result<(), Error> {
+        let database = tenant.database();
+        let outbox = &self.outbox;
+        database
+            .write_with_retry(move || async move {
+                let transaction = database.begin_write().await?;
+                open_refund_failed(&transaction, tenant, outbox, payment_id, reference, details)
+                    .await?;
+                transaction.commit().await?;
+                Ok(())
+            })
+            .await
+    }
+}
+
+/// Trong `transaction`: lượt hoàn mã `reference` của thanh toán `payment_id` bị từ chối — mở mục
+/// `refund_failed` (một lần cho mỗi mã) để người vận hành hoàn tay. Không mở khi không còn gì để hoàn (đã hoàn
+/// đủ), khi một lượt hoàn khác cùng mã đang chờ hay đã xong (mã dùng lại với nội dung khác), hay khi mục
+/// `late_payment` của thanh toán còn mở (nó đã bảo hoàn tay — một mục cho một khoản tiền).
+async fn open_refund_failed(
+    transaction: &impl ConnectionTrait,
+    tenant: &TenantContext,
+    outbox: &autoxide_kernel::event::Outbox,
+    payment_id: Uuid,
+    reference: &str,
+    details: &Value,
+) -> Result<(), Error> {
+    let Some(paid) =
+        payment::Entity::find_by_id(payment_id).scoped(tenant).one(transaction).await?
+    else {
+        return Ok(());
+    };
+    if collected(&paid) <= paid.refunded_minor {
+        return Ok(());
+    }
+    let live = refund::Entity::find()
+        .filter(refund::Column::PaymentId.eq(payment_id))
+        .filter(refund::Column::Reference.eq(reference))
+        .filter(refund::Column::Status.ne("failed"))
+        .scoped(tenant)
+        .one(transaction)
+        .await?
+        .is_some();
+    let late_open = exception::Entity::find()
+        .filter(exception::Column::DedupeKey.eq(crate::reconcile::late_payment_key(payment_id)))
+        .filter(exception::Column::Status.eq("open"))
+        .scoped(tenant)
+        .one(transaction)
+        .await?
+        .is_some();
+    if live || late_open {
+        return Ok(());
+    }
+    crate::reconcile::insert_exception(
+        transaction,
+        tenant,
+        outbox,
+        crate::reconcile::REFUND_FAILED,
+        &format!("ledger.payment:{payment_id}"),
+        details,
+        &crate::reconcile::refund_failed_key(payment_id, reference),
+    )
+    .await
 }

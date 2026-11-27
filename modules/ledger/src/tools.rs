@@ -156,8 +156,9 @@ pub(crate) struct ExceptionItem {
     /// `open`, `resolved` or `ignored`.
     status: String,
     /// How it was closed: `match`, `accept_received`, `ignore`, `refunded_outside` (by a person), or
-    /// `refunded` (closed by the ledger once the payment was refunded in full through the partner;
-    /// `resolved_by` is empty). Empty while `open`.
+    /// by the ledger (`resolved_by` is empty): `refunded` (the payment was refunded in full through the
+    /// partner) or `kept` (a `late_payment` the source module counted, e.g. the order went on). Empty
+    /// while `open`.
     resolution: Option<String>,
 }
 

@@ -730,14 +730,17 @@ impl LedgerService {
         )
         .source_id(id.to_string());
         self.post(tenant, Actor::system(), entry).await?;
-        let late = arrived_late(&current);
+        // Một mốc thời gian cho cả lần đọc và lần kiểm sau khoá: hạn trôi qua giữa hai lần không làm job hỏng
+        // (rà #591 N3) — chỉ trạng thái đổi (vừa báo hỏng / hết hạn) mới bắt chạy lại.
+        let read_at = now();
+        let late = arrived_late(&current, read_at);
         if late {
             // Tiền về sau khi đã hết hạn / đã hỏng: vẫn ghi (tiền đã ở đối tác), mở hàng chờ để người
             // quyết giữ hay hoàn. Mở TRƯỚC khi chuyển `succeeded` (event tới module nguồn): lượt hoàn tự
             // động của module nguồn xong sau đó thì tự đóng mục (`close_late_payment_if_refunded`).
             self.open_exception(
                 tenant,
-                "late_payment",
+                crate::reconcile::LATE_PAYMENT,
                 &format!("ledger.payment:{id}"),
                 json!({"payment_id": id, "amount": received}),
                 &crate::reconcile::late_payment_key(id),
@@ -759,7 +762,7 @@ impl LedgerService {
                 }
                 // Trạng thái đổi giữa lần đọc trên và lúc khoá (vd vừa báo hỏng): chưa mở mục mà giờ phải
                 // mở thì dừng — job chạy lại, đọc lại, mở mục rồi mới ghi thu.
-                if !late && arrived_late(&row) {
+                if !late && arrived_late(&row, read_at) {
                     return Err(payment_state(&row.status));
                 }
                 let at = now();
@@ -909,8 +912,8 @@ impl JobHandler for ExpirePaymentsJob {
 /// bảo mật 2026-11).
 /// Tiền về muộn (UT-6): sau hạn của lượt thu, hay sau khi đối tác đã báo hỏng (thông báo sai thứ tự) —
 /// module nguồn có thể đã huỷ chứng từ hay mở lượt thu khác, người vận hành phải thấy (`late_payment`).
-fn arrived_late(row: &payment::Model) -> bool {
-    matches!(row.status.as_str(), "expired" | "failed") || row.expires_at <= now()
+fn arrived_late(row: &payment::Model, at: Timestamp) -> bool {
+    matches!(row.status.as_str(), "expired" | "failed") || row.expires_at <= at
 }
 
 pub(crate) fn collected(row: &payment::Model) -> i64 {

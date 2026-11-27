@@ -97,6 +97,8 @@ struct State {
     fail_payments: usize,
     refuse_refunds: usize,
     busy_refunds: usize,
+    /// Payments the source module kept with `keep_late_payment`, in order.
+    kept: Vec<Uuid>,
     /// The `return_url` the caller sent for each payment through the gateway, in order.
     return_urls: Vec<Option<String>>,
 }
@@ -238,6 +240,11 @@ impl FakeLedger {
     /// sending the same refund again later works).
     pub fn conflict_next_refunds(&self, count: usize) {
         lock(&self.state).busy_refunds = count;
+    }
+
+    /// The payments the source module kept with [`Ledger::keep_late_payment`], in order of the calls.
+    pub fn kept(&self) -> Vec<Uuid> {
+        lock(&self.state).kept.clone()
     }
 
     /// The partner collected `payment`: marks it `succeeded` as the real `ledger` does before it emits
@@ -563,6 +570,11 @@ impl Ledger for FakeLedger {
             expires_by: payment.expires_by,
         };
         Ok(self.create_payment_of(org, request, false))
+    }
+
+    async fn keep_late_payment(&self, _: &TenantContext, payment: Uuid) -> Result<(), Error> {
+        lock(&self.state).kept.push(payment);
+        Ok(())
     }
 
     async fn refund(

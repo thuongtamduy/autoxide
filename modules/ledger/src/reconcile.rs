@@ -115,6 +115,15 @@ fn matchable(
     Ok(received)
 }
 
+/// Loại mục: tiền về sau hạn / sau khi đối tác báo hỏng.
+pub(crate) const LATE_PAYMENT: &str = "late_payment";
+/// Loại mục: đối tác (hay sổ) từ chối hoàn — tiền còn phải trả lại tay.
+pub(crate) const REFUND_FAILED: &str = "refund_failed";
+
+/// Ghi chú của mục `late_payment` do `ledger` đóng khi module nguồn giữ khoản tiền.
+const CLOSED_BY_SOURCE: &str =
+    "Closed by the ledger: the source module counted this payment (e.g. the order went on).";
+
 /// Ghi chú của mục `late_payment` / `refund_failed` do `ledger` tự đóng.
 const CLOSED_BY_REFUND: &str =
     "Closed by the ledger: the payment was refunded in full through the partner.";
@@ -124,9 +133,40 @@ pub(crate) fn late_payment_key(payment: Uuid) -> String {
     format!("late_payment:{payment}")
 }
 
-/// Khoá chống trùng của mục `refund_failed` của lượt hoàn `refund`.
-pub(crate) fn refund_failed_key(refund: Uuid) -> String {
-    format!("refund_failed:{refund}")
+/// Khoá chống trùng của mục `refund_failed` của lượt hoàn `reference` (mã của bên gọi, duy nhất theo thanh
+/// toán) — có cả khi lượt hoàn bị từ chối trước khi có dòng hoàn.
+pub(crate) fn refund_failed_key(payment: Uuid, reference: &str) -> String {
+    format!("refund_failed:{payment}:{reference}")
+}
+
+impl LedgerService {
+    /// `dyn Ledger::keep_late_payment`: module nguồn đã tính khoản `payment` (vd đơn đi tiếp) — đóng mục
+    /// `late_payment` của nó (`kept`) để không ai hoàn tay tiền đơn đang dùng. Gọi lại vô hại.
+    pub(crate) async fn keep_late_payment(
+        &self,
+        tenant: &TenantContext,
+        payment: Uuid,
+    ) -> Result<(), Error> {
+        let database = tenant.database();
+        let outbox = &self.outbox;
+        database
+            .write_with_retry(move || async move {
+                let transaction = database.begin_write().await?;
+                close_payment_items(
+                    &transaction,
+                    tenant,
+                    outbox,
+                    payment,
+                    &[LATE_PAYMENT],
+                    "kept",
+                    CLOSED_BY_SOURCE,
+                )
+                .await?;
+                transaction.commit().await?;
+                Ok(())
+            })
+            .await
+    }
 }
 
 /// Trong `transaction` của lượt hoàn vừa xong: thanh toán `paid` đã hoàn đủ số thực thu (các lượt hoàn
@@ -142,32 +182,53 @@ pub(crate) async fn close_late_payment_if_refunded(
     // Khoá dòng thanh toán trước khi cộng: hai lượt hoàn một phần xong cùng lúc chạy nối đuôi, lượt sau
     // thấy lượt trước đã `succeeded` (Postgres READ COMMITTED không tự bảo đảm điều đó).
     rows::lock_one(transaction, payment::Entity::find_by_id(paid.id).scoped(tenant)).await?;
-    let refunds = refund::Entity::find()
+    let refunded: i64 = refund::Entity::find()
         .filter(refund::Column::PaymentId.eq(paid.id))
+        .filter(refund::Column::Status.eq("succeeded"))
         .scoped(tenant)
         .all(transaction)
-        .await?;
-    let refunded: i64 =
-        refunds.iter().filter(|row| row.status == "succeeded").map(|row| row.amount_minor).sum();
+        .await?
+        .iter()
+        .map(|row| row.amount_minor)
+        .sum();
     if refunded < paid.captured_minor.unwrap_or(paid.amount_minor) {
         return Ok(());
     }
-    // Mục do `capture` (`late_payment:<thanh toán>`) và `fail_refund` (`refund_failed:<lượt hoàn>`) mở, tra
-    // đúng theo khoá chống trùng (unique theo khách).
-    let keys = std::iter::once(late_payment_key(paid.id)).chain(
-        refunds.iter().filter(|row| row.status == "failed").map(|row| refund_failed_key(row.id)),
-    );
+    close_payment_items(
+        transaction,
+        tenant,
+        outbox,
+        paid.id,
+        &[LATE_PAYMENT, REFUND_FAILED],
+        "refunded",
+        CLOSED_BY_REFUND,
+    )
+    .await
+}
+
+/// Trong `transaction`: đóng (`resolved`, `resolution`, không người xử lý) các mục loại `kinds` đang mở của
+/// thanh toán `payment` (subject `ledger.payment:<id>`), mỗi mục phát `ledger.exception_resolved` một lần.
+pub(crate) async fn close_payment_items(
+    transaction: &impl ConnectionTrait,
+    tenant: &TenantContext,
+    outbox: &autoxide_kernel::event::Outbox,
+    payment: Uuid,
+    kinds: &[&str],
+    resolution: &str,
+    note: &str,
+) -> Result<(), Error> {
     let open = exception::Entity::find()
-        .filter(exception::Column::DedupeKey.is_in(keys))
         .filter(exception::Column::Status.eq("open"))
+        .filter(exception::Column::Subject.eq(format!("ledger.payment:{payment}")))
+        .filter(exception::Column::Kind.is_in(kinds.iter().copied()))
         .scoped(tenant)
         .all(transaction)
         .await?;
     for row in open {
         let closed = exception::Entity::update_many()
             .col_expr(exception::Column::Status, Expr::value("resolved"))
-            .col_expr(exception::Column::Resolution, Expr::value("refunded"))
-            .col_expr(exception::Column::Note, Expr::value(CLOSED_BY_REFUND))
+            .col_expr(exception::Column::Resolution, Expr::value(resolution))
+            .col_expr(exception::Column::Note, Expr::value(note))
             .col_expr(exception::Column::UpdatedAt, Expr::value(now()))
             .filter(exception::Column::Id.eq(row.id))
             .filter(exception::Column::Status.eq("open"))
@@ -177,7 +238,7 @@ pub(crate) async fn close_late_payment_if_refunded(
         if closed.rows_affected == 1 {
             let event = events::ExceptionResolved(json!({
                 "exception_id": row.id, "kind": row.kind, "subject": row.subject,
-                "resolution": "refunded",
+                "resolution": resolution,
             }));
             outbox
                 .record(

@@ -179,6 +179,8 @@ async fn luot_thu_hong_thi_mo_lai_ra_lan_thu_moi_va_luot_cu_thu_muon_duoc_hoan()
         let (_, view) = boss.send("GET", &format!("/{order}"), None).await;
         assert_eq!(view["data"]["status"], "confirmed", "{view}");
         assert_eq!(super::minor(&view["data"]["totals"]["paid"]), new.amount.minor());
+        // Đơn đi tiếp nên `orders` báo `ledger` giữ khoản (rà #591 C1: mục `late_payment` nếu có thì đóng).
+        assert_eq!(shop.ledger.kept(), vec![new.id]);
 
         // Đối tác vẫn báo đã thu lượt cũ (hai lần): hoàn qua đối tác đúng một lần, đơn không cộng thêm,
         // một event audit.
@@ -193,6 +195,7 @@ async fn luot_thu_hong_thi_mo_lai_ra_lan_thu_moi_va_luot_cu_thu_muon_duoc_hoan()
         let (_, view) = boss.send("GET", &format!("/{order}"), None).await;
         assert_eq!(super::minor(&view["data"]["totals"]["paid"]), new.amount.minor());
         assert_eq!(superseded_events(shop).await, 1);
+        assert_eq!(shop.ledger.kept(), vec![new.id], "a superseded payment is refunded, not kept");
     })
     .await
     .unwrap();
@@ -325,6 +328,44 @@ async fn hoan_luot_cu_gap_409_thi_thu_lai() {
         assert!(shop.ledger.refunds().is_empty());
         assert_eq!(undelivered(shop).await, 1, "409 is retried, not dropped");
         assert_eq!(superseded_events(shop).await, 1);
+    })
+    .await
+    .unwrap();
+}
+
+/// Rà #591 V2: hai lần `payment-link` cùng lúc (khoá khác nhau) sau lượt thu hỏng chỉ mở MỘT lần thử mới
+/// (khoá dòng đơn + cập nhật có điều kiện); cả hai trả cùng khoản mới.
+#[tokio::test]
+async fn hai_lan_mo_lai_cung_luc_chi_mot_lan_thu_moi() {
+    TestDatabase::run(async |test| {
+        let guests = guests(test, false).await;
+        let shop = &guests.shop;
+        let (order, number, _) = card_order(shop).await;
+        let old = shop.ledger.payments()[0].clone();
+        shop.ledger.fail(old.id);
+        let token = access_token(&guests, &number).await;
+        let uri = format!("/public/orders/{order}/payment-link");
+        let first = [("Order-Token", token.as_str()), ("Idempotency-Key", "c1")];
+        let second = [("Order-Token", token.as_str()), ("Idempotency-Key", "c2")];
+        let ((one, _, a), (two, _, b)) =
+            tokio::join!(send(shop, &uri, &first, json!({})), send(shop, &uri, &second, json!({})));
+        assert_eq!((one, two), (StatusCode::OK, StatusCode::OK), "{a} {b}");
+        assert_eq!(a["data"].as_array().unwrap().len(), 1, "{a}");
+        assert_eq!(a["data"][0]["payment_id"], b["data"][0]["payment_id"], "{a} {b}");
+        assert_eq!(a["data"][0]["ledger_payment_id"], b["data"][0]["ledger_payment_id"]);
+        // Một lượt thu mới ở `ledger` (lần 2), không phải hai.
+        let payments = shop.ledger.payments();
+        assert_eq!(payments.len(), 2, "{payments:?}");
+        assert_eq!(payments[1].reference, format!("orders:{order}:order:2"));
+        let database = shop.database();
+        let backend = database.read().get_database_backend();
+        let sql = "SELECT status FROM orders_payments WHERE order_id = $1 ORDER BY id";
+        let id: Uuid = order.parse().unwrap();
+        let rows =
+            database.read().query_all_raw(statement(backend, sql, [id.into()])).await.unwrap();
+        let statuses: Vec<String> =
+            rows.iter().map(|row| row.try_get::<String>("", "status").unwrap()).collect();
+        assert_eq!(statuses, vec!["superseded".to_owned(), "pending".to_owned()]);
     })
     .await
     .unwrap();

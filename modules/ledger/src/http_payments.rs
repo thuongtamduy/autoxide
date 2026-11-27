@@ -229,8 +229,9 @@ async fn list_payments(
 /// same partner transaction does not change it. Find its `amount_mismatch` item in
 /// `GET /api/v1/ledger/exceptions?status=open` (subject `ledger.payment:<id>`) and resolve it with
 /// `POST /api/v1/ledger/exceptions/{id}/resolve` (`ledger.reconcile`): `accept_received` records the
-/// amount collected and lets the order go on; `refunded_outside` or `ignore` close the item and leave
-/// the payment unpaid.
+/// amount collected: the order goes on if it is still waiting for payment; after the order's payment
+/// deadline the order is already cancelled and the amount is refunded through the partner on its own.
+/// `refunded_outside` or `ignore` close the item and leave the payment unpaid.
 #[utoipa::path(
     get,
     path = "/payments/{id}",
@@ -409,8 +410,9 @@ pub(crate) struct ExceptionResponse {
     /// `open`, `resolved` or `ignored`.
     status: String,
     /// How it was closed: `match`, `accept_received`, `ignore`, `refunded_outside` (by a person), or
-    /// `refunded` (closed by the ledger once the payment was refunded in full through the partner;
-    /// `resolved_by` is empty). Empty while `open`.
+    /// by the ledger (`resolved_by` is empty): `refunded` (the payment was refunded in full through the
+    /// partner) or `kept` (a `late_payment` the source module counted, e.g. the order went on). Empty
+    /// while `open`.
     resolution: Option<String>,
     note: Option<String>,
     resolved_by: Option<Uuid>,

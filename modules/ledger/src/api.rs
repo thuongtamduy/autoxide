@@ -454,8 +454,9 @@ impl NewPayment {
 /// sending the same refund again will never work (not supported, more than what is left, not configured,
 /// not found…). A server error (5xx), a conflict with work still in progress (409) and a rate limit (429)
 /// are not final: send the same refund again later, with the same `reference` (it is never refunded twice).
-/// When a refund is refused, the ledger opens a `refund_failed` item in its reconciliation queue unless a
-/// `late_payment` item of the payment is still open.
+/// When a refund of a payment the ledger knows is refused, the ledger opens a `refund_failed` item in its
+/// reconciliation queue (once per `reference`), unless nothing is left to refund or a `late_payment` item of
+/// the payment is still open.
 pub fn refund_refused(error: &Error) -> bool {
     use autoxide_kernel::error::ErrorKind;
     let kind = error.kind();
@@ -950,6 +951,18 @@ pub trait Ledger: Send + Sync {
         actor: Actor,
         refund: NewRefund,
     ) -> Result<Submitted<Refund>, Error>;
+
+    /// The source module counted `payment` towards its record (for example the order went on) although the
+    /// ledger received the money late (after the payment's deadline, or after the partner reported it
+    /// failed): closes the payment's open `late_payment` item (`resolved`, resolution `kept`), so nobody
+    /// refunds money that is in use. The source module decides whether late money is kept or refunded; it
+    /// calls this when it keeps it, and `refund` when it does not. Calling it again, or for a payment
+    /// without such an item, does nothing.
+    async fn keep_late_payment(&self, tenant: &TenantContext, payment: Uuid) -> Result<(), Error> {
+        // Mặc định không làm gì: giữ tương thích cho bên ngoài tự cài `Ledger` (thêm hàm không phá vỡ).
+        let _ = (tenant, payment);
+        Ok(())
+    }
 
     /// A payment, or `None`.
     async fn payment(&self, tenant: &TenantContext, id: Uuid) -> Result<Option<Payment>, Error>;

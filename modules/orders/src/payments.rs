@@ -71,8 +71,11 @@ pub(crate) fn funds_flow(mode: FlowMode) -> FundsFlow {
 /// Kết quả ghi một lượt thu `ledger` báo đã thu vào khoản của đơn.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Recorded {
-    /// Đã ghi từ trước (event giao lại).
+    /// Đã ghi từ trước (event giao lại), đơn đã huỷ: không làm gì thêm.
     Already,
+    /// Đã ghi từ trước (event giao lại), đơn còn đi tiếp: đã tính vào đơn — báo lại `ledger` giữ khoản
+    /// (lần trước có thể lỗi sau commit).
+    AlreadyCounted,
     /// Tính vào đơn.
     Counted,
     /// Đơn đã huỷ: ghi đã thu, hoàn tự động (`late_payment`).
@@ -165,6 +168,11 @@ impl OrdersService {
         // Lần thử lại (UT-6 L4) không sống quá hạn cũ của đơn: `ledger` cho lượt thu — và link ở đối tác —
         // hết hạn đúng lúc đó; tiền về sau đó đi đường `late_payment` của `ledger`.
         let cap = order.payment_due_at.filter(|_| crate::payment_attempts::is_retry(&row));
+        // Hạn đã qua (đơn vừa quá hạn giữa lúc kiểm và lúc tạo lượt thu): báo đúng lỗi hết hạn, không để
+        // `ledger` từ chối `expires_by` rồi bị đổi thành "phương thức không dùng được" (rà #591 N1).
+        if cap.is_some_and(|cap| cap <= crate::service::now()) {
+            return Err(errors::payment_expired());
+        }
         let description = format!("Order {}", order.number);
         let created =
             match Method::parse(&row.method) {
@@ -339,7 +347,11 @@ impl OrdersService {
                     .await?
                     .ok_or_else(errors::order_not_found)?;
                 if stored.status == SUCCEEDED {
-                    return Ok(Recorded::Already);
+                    return Ok(if current.status == OrderStatus::Cancelled.as_str() {
+                        Recorded::Already
+                    } else {
+                        Recorded::AlreadyCounted
+                    });
                 }
                 // Quyết định "đã bị thay" đọc trên dòng sau khoá đơn (UT-6 L4): lần thay lượt cũng khoá
                 // dòng đơn, nên không có khe giữa lúc đọc và lúc ghi. Không tính vào đơn; hoàn sau commit.
@@ -446,6 +458,14 @@ impl OrdersService {
                 Ok(if late { Recorded::Late } else { Recorded::Counted })
             })
             .await?;
+        // Một luật "muộn" (rà #591 C1): `orders` quyết giữ hay hoàn. Đã tính vào đơn thì báo `ledger` giữ
+        // khoản — mục `late_payment` (nếu `ledger` thấy tiền về sau hạn / sau khi báo hỏng) đóng, không ai hoàn
+        // tay tiền của đơn đang đi tiếp. Lỗi thì event thử lại (`AlreadyCounted` gọi lại).
+        if matches!(recorded, Recorded::Counted | Recorded::AlreadyCounted)
+            && let Some(ledger) = &self.ledger
+        {
+            ledger.keep_late_payment(tenant, ledger_payment).await?;
+        }
         if recorded == Recorded::Superseded {
             return self.refund_superseded(tenant, &row, ledger_payment, amount).await;
         }
