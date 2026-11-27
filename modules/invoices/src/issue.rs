@@ -257,9 +257,12 @@ impl InvoicesService {
                 let row = rows::lock_one(&transaction, document::Entity::find_by_id(id).scoped(tenant))
                     .await?
                     .ok_or_else(document_not_found)?;
-                // Nháp bị sửa sau khi thuế được tính lại ngoài transaction: dòng vừa tính không còn khớp dòng
-                // đã lưu (kiểm ngay sau khi khoá, trước khi cấp số).
-                if recomputed.is_some() && row.status == "draft" && row.updated_at != version_seen {
+                // Nháp bị sửa sau khi thuế được tính lại hay tỉ giá được chụp ngoài transaction (theo ngày lập của
+                // nháp lúc đọc): kết quả không còn khớp nháp đang lưu (kiểm ngay sau khi khoá, trước khi cấp số).
+                if (recomputed.is_some() || fx.is_some())
+                    && row.status == "draft"
+                    && row.updated_at != version_seen
+                {
                     return Err(draft_changed());
                 }
                 if let Some(principal) = guard {

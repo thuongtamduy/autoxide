@@ -19,3 +19,4 @@
 
 /sdk/node_modules/
 /docs/decisions/INDEX.md
+__pycache__/

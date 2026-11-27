@@ -710,9 +710,8 @@ async fn nhap_tinh_lai_thue_theo_ngay_lap() {
         write
             .execute_raw(autoxide_kernel::database::statement(
                 backend,
-                "UPDATE invoices_documents SET tax_minor = 8000, total_minor = 108000, \
-                 tax_snapshot = '{\"tax_point\": \"2026-01-01\"}' WHERE id = $1",
-                [found.id.into()],
+                "UPDATE invoices_documents SET tax_minor = $1, total_minor = $2, tax_snapshot = $3 WHERE id = $4",
+                [8000_i64.into(), 108_000_i64.into(), r#"{"tax_point": "2026-01-01"}"#.into(), found.id.into()],
             ))
             .await
             .unwrap();
