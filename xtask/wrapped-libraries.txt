@@ -10,6 +10,7 @@ sqlx
 axum
 axum-core
 http
+matchit
 tower
 utoipa
 utoipa-axum

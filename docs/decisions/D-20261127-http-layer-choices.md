@@ -17,7 +17,8 @@ khác bản thiết kế ở bốn chỗ:
 4. **`Path`, `Query`, `State` của kernel bọc extractor cùng tên của axum và trả nguyên rejection.** Lớp `problem` của
    kernel đổi rejection thành `Problem` như trước, nên hành vi không đổi. utoipa nhận extractor theo tên kiểu, nên
    OpenAPI cũng không đổi.
-5. **Kiểm route xung đột bằng chính `matchit`** (bộ khớp route của axum, khai thẳng và ghim đúng bản axum ghim) thay vì
+5. **Kiểm route xung đột bằng chính `matchit`** (bộ khớp route của axum, khai thẳng cùng bản lớn với axum để cargo gộp
+   về một bản, có test chống lệch dựng router axum thật với cùng các cặp route) thay vì
    tự đoán luật khớp: `/{id}` với `/{key}`, hay `/{id}` với `/{*rest}`, xung đột với axum dù khác method. Lúc khởi động
    kernel báo lỗi rõ thay vì để axum dừng tiến trình lúc ghép router.
 

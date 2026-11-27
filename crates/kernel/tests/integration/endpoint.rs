@@ -172,3 +172,30 @@ async fn nest_len_path_da_co_giu_ca_hai_operation() {
     .await
     .unwrap();
 }
+
+/// Chống lệch: kernel hỏi `matchit` (khai thẳng, cùng bản lớn với axum) để báo route xung đột lúc khởi động. Cặp route
+/// mà `matchit` coi là xung đột thì axum cũng dừng tiến trình khi dựng router, và ngược lại. Axum đổi bản lớn của
+/// `matchit` (luật khớp đổi) thì test này đỏ thay vì phép kiểm lúc khởi động lặng lẽ sai.
+#[test]
+fn matchit_khop_voi_axum() {
+    let cases = [
+        ("/{id}", "/{*rest}", true),
+        ("/{id}", "/{key}", true),
+        ("/files/{*rest}", "/{id}", false),
+        ("/things", "/{id}", false),
+        ("/{id}/items", "/{id}", false),
+    ];
+    for (first, second, conflict) in cases {
+        let mut matcher = matchit::Router::new();
+        matcher.insert(first, ()).unwrap();
+        let matchit_conflict = matcher.insert(second, ()).is_err();
+        let axum_conflict = std::panic::catch_unwind(|| {
+            let _router: axum::Router = axum::Router::new()
+                .route(first, axum::routing::get(|| async {}))
+                .route(second, axum::routing::delete(|| async {}));
+        })
+        .is_err();
+        assert_eq!(matchit_conflict, conflict, "matchit {first} {second}");
+        assert_eq!(axum_conflict, conflict, "axum {first} {second}");
+    }
+}
