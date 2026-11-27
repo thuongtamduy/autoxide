@@ -407,7 +407,8 @@ async fn nhan_thieu_roi_chap_nhan_thi_hoan_toi_da_so_da_thu() {
 }
 
 /// UT-6: đối tác báo hỏng rồi lại báo đã thu (sai thứ tự): vẫn ghi thu, và mở `late_payment` ở hàng chờ
-/// như tiền về sau hạn — module nguồn có thể đã mở lượt thu khác, người vận hành phải thấy.
+/// như tiền về sau hạn — module nguồn có thể đã mở lượt thu khác, người vận hành phải thấy. Hoàn đủ qua
+/// đối tác thì mục tự đóng; chưa hoàn (vd đối tác từ chối) thì mục còn mở.
 #[tokio::test]
 async fn hong_roi_lai_bao_da_thu_thi_vao_hang_cho() {
     TestDatabase::run(async |test| {
@@ -432,6 +433,20 @@ async fn hong_roi_lai_bao_da_thu_thi_vao_hang_cho() {
         assert_eq!(open.len(), 1, "{open:?}");
         assert_eq!(open[0]["kind"], "late_payment");
         assert_eq!(open[0]["subject"], format!("ledger.payment:{}", payment.id));
+
+        // Hoàn một phần: mục vẫn mở. Module nguồn hoàn nốt qua đối tác: mục tự đóng, không người xử lý.
+        let tenant = app.default_tenant();
+        let part = NewRefund::new(payment.id, vnd(40_000), "superseded_payment", "R-part");
+        ledger(&app).refund(&tenant, Actor::system(), part).await.unwrap();
+        assert_eq!(exceptions(&app).await.len(), 1);
+        let rest = NewRefund::new(payment.id, vnd(60_000), "superseded_payment", "R-rest");
+        ledger(&app).refund(&tenant, Actor::system(), rest).await.unwrap();
+        assert!(exceptions(&app).await.is_empty());
+        let (_, closed) = call(&app, "GET", "/exceptions?status=resolved", None).await;
+        let closed = &closed["data"][0];
+        assert_eq!(closed["kind"], "late_payment", "{closed}");
+        assert_eq!(closed["resolution"], "refunded");
+        assert!(closed["resolved_by"].is_null());
     })
     .await
     .unwrap();

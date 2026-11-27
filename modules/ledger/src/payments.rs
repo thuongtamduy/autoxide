@@ -733,6 +733,19 @@ impl LedgerService {
         // Hết hạn, hay đối tác đã báo hỏng rồi lại báo đã thu (thông báo sai thứ tự): tiền về khi nguồn
         // có thể đã mở lượt thu khác — người vận hành phải thấy.
         let late = matches!(current.status.as_str(), "expired" | "failed");
+        if late {
+            // Tiền về sau khi đã hết hạn / đã hỏng: vẫn ghi (tiền đã ở đối tác), mở hàng chờ để người
+            // quyết giữ hay hoàn. Mở TRƯỚC khi chuyển `succeeded` (event tới module nguồn): lượt hoàn tự
+            // động của module nguồn xong sau đó thì tự đóng mục (`close_late_payment_if_refunded`).
+            self.open_exception(
+                tenant,
+                "late_payment",
+                &format!("ledger.payment:{id}"),
+                json!({"payment_id": id, "amount": received}),
+                &format!("late_payment:{id}"),
+            )
+            .await?;
+        }
         let outbox = &self.outbox;
         database
             .write_with_retry(move || async move {
@@ -765,18 +778,6 @@ impl LedgerService {
                 Ok(())
             })
             .await?;
-        if late {
-            // Tiền về sau khi đã hết hạn / đã hỏng: vẫn ghi (tiền đã ở đối tác), mở hàng chờ để người
-            // quyết giữ hay hoàn (module nguồn có thể đã tự hoàn; khi đó xử lý mục bằng `refunded_outside`).
-            self.open_exception(
-                tenant,
-                "late_payment",
-                &format!("ledger.payment:{id}"),
-                json!({"payment_id": id, "amount": received}),
-                &format!("late_payment:{id}"),
-            )
-            .await?;
-        }
         Ok(())
     }
 
@@ -1067,6 +1068,8 @@ impl LedgerService {
                 active.status = Set("succeeded".to_owned());
                 active.updated_at = Set(now());
                 refund::Entity::update(active).exec(&transaction).await?;
+                crate::reconcile::close_late_payment_if_refunded(&transaction, tenant, outbox, paid)
+                    .await?;
                 let event = events::PaymentRefunded(json!({
                     "payment_id": row.payment_id, "refund_id": row.id,
                     "amount": money(row.amount_minor, &row.amount_currency)?,

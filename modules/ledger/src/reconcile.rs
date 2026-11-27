@@ -20,7 +20,7 @@ use autoxide_kernel::payment::StatementKind;
 use autoxide_kernel::rows;
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext, TenantId};
 use sea_orm::sea_query::{Expr, OnConflict};
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QuerySelect, Set};
+use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QuerySelect, Set};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
@@ -111,6 +111,68 @@ fn matchable(
         )]));
     }
     Ok(received)
+}
+
+/// Ghi chú của mục `late_payment` do `ledger` tự đóng.
+const CLOSED_BY_REFUND: &str =
+    "Closed by the ledger: the payment was refunded in full through the partner.";
+
+/// Trong `transaction` của lượt hoàn vừa xong: thanh toán `paid` đã hoàn đủ số thực thu (các lượt hoàn
+/// `succeeded`) thì mục `late_payment` đang mở của nó tự đóng (`resolved`, `refunded`, không người xử lý),
+/// phát `ledger.exception_resolved` — người vận hành chỉ còn thấy khoản thật sự phải hoàn tay (UT-6).
+pub(crate) async fn close_late_payment_if_refunded(
+    transaction: &impl ConnectionTrait,
+    tenant: &TenantContext,
+    outbox: &autoxide_kernel::event::Outbox,
+    paid: &payment::Model,
+) -> Result<(), Error> {
+    let refunded: i64 = refund::Entity::find()
+        .filter(refund::Column::PaymentId.eq(paid.id))
+        .filter(refund::Column::Status.eq("succeeded"))
+        .scoped(tenant)
+        .all(transaction)
+        .await?
+        .iter()
+        .map(|row| row.amount_minor)
+        .sum();
+    if refunded < paid.captured_minor.unwrap_or(paid.amount_minor) {
+        return Ok(());
+    }
+    let open = exception::Entity::find()
+        .filter(exception::Column::Kind.eq("late_payment"))
+        .filter(exception::Column::Subject.eq(format!("ledger.payment:{}", paid.id)))
+        .filter(exception::Column::Status.eq("open"))
+        .scoped(tenant)
+        .all(transaction)
+        .await?;
+    for row in open {
+        let closed = exception::Entity::update_many()
+            .col_expr(exception::Column::Status, Expr::value("resolved"))
+            .col_expr(exception::Column::Resolution, Expr::value("refunded"))
+            .col_expr(exception::Column::Note, Expr::value(CLOSED_BY_REFUND))
+            .col_expr(exception::Column::UpdatedAt, Expr::value(now()))
+            .filter(exception::Column::Id.eq(row.id))
+            .filter(exception::Column::Status.eq("open"))
+            .scoped(tenant)
+            .exec(transaction)
+            .await?;
+        if closed.rows_affected == 1 {
+            let event = events::ExceptionResolved(json!({
+                "exception_id": row.id, "kind": row.kind, "subject": row.subject,
+                "resolution": "refunded",
+            }));
+            outbox
+                .record(
+                    transaction,
+                    tenant,
+                    Actor::system(),
+                    Some(format!("ledger.exception:{}", row.id)),
+                    &event,
+                )
+                .await?;
+        }
+    }
+    Ok(())
 }
 
 impl LedgerService {
