@@ -347,6 +347,7 @@ Việc từ rà pháp lý vòng 1 do AI đóng vai (`docs/legal/review-2026-11-r
 - [ ] Mô hình mối đe doạ của core (`docs/THREAT_MODEL.md`, EN + VI) làm đầu vào cho đợt kiểm thử bên ngoài; mã hoá ở mức
       trường cho dữ liệu cá nhân nhạy cảm (khoá quản lý được, xoay khoá); nhật ký kiểm toán khó sửa lén (chuỗi băm hay tương
       đương)
+      — thiết kế: [`docs/research/g13-field-encryption-audit.md`](research/g13-field-encryption-audit.md) (code sau G1 PR 2–5)
 - [ ] Mục tiêu khôi phục sau sự cố: RPO / RTO ghi rõ cho từng cách triển khai; diễn tập khôi phục trong CI cả trường hợp
       nhiều khách có database riêng và kho file
 - [x] Rà giấy phép thư viện: `cargo deny` chặn giấy phép không hợp MIT/Apache; danh sách giấy phép của bên thứ ba đi kèm
