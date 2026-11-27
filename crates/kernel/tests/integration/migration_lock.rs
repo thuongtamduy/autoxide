@@ -91,7 +91,8 @@ async fn verify_bao_khi_mat_khoa() {
             let backend = sea_orm::ConnectionTrait::get_database_backend(write);
             let key = i64::from_be_bytes(*b"autoxplc");
             let sql = "SELECT pg_terminate_backend(pid) FROM pg_locks WHERE locktype = 'advisory' \
-                       AND classid::bigint = $1 AND objid::bigint = $2 AND objsubid = 1";
+                       AND classid::bigint = $1 AND objid::bigint = $2 AND objsubid = 1 \
+                       AND database = (SELECT oid FROM pg_database WHERE datname = current_database())";
             let statement = autoxide_kernel::database::statement(
                 backend,
                 sql,

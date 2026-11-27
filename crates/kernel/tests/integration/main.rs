@@ -38,6 +38,7 @@ mod me_pages;
 mod metrics;
 mod migration;
 mod migration_lock;
+mod migration_rollback;
 mod module;
 mod module_catalog;
 mod money;

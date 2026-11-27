@@ -431,6 +431,51 @@ impl Placements {
         }
     }
 
+    /// Records a rollback (`autoxide rollback --to`) as a `kernel_migration_runs` row of kind `rollback`, holding
+    /// the `active` slot so no placement run starts meanwhile. `held` is the placements lock ([`lock`](Self::lock))
+    /// the caller holds for the whole rollback. A run left unfinished by a stopped process is closed first;
+    /// another run waiting: `kernel.migration_run_busy`.
+    pub async fn begin_rollback_run(
+        &self,
+        held: &MigrationLock,
+        from: &str,
+        to: &str,
+    ) -> Result<Uuid, Error> {
+        let _ = held;
+        self.recover_migrating().await?;
+        let kind = super::migration_runs::claim::RunKind {
+            name: super::migration_runs::kind::ROLLBACK,
+            from: Some(from),
+            to: Some(to),
+        };
+        let claim = super::migration_runs::claim::Claim::Direct { placement: None, kind };
+        super::migration_runs::claim::claim(self.registry.control(), claim)
+            .await?
+            .ok_or_else(|| Error::internal("the rollback run was not recorded"))
+    }
+
+    /// Holding the placements lock: marks placement `name` `migrating` while a rollback reverts its migrations
+    /// (its tenants get 503 instead of SQL errors; if the process stops, the next run sets it `behind`), or, with
+    /// `done`, `behind` once reverted (the servers of the earlier release mark it `ready` again when they check it).
+    pub async fn mark_rollback(
+        &self,
+        held: &MigrationLock,
+        name: &str,
+        done: bool,
+    ) -> Result<(), Error> {
+        let _ = held;
+        let Some(row) = self.selected(Some(name)).await?.into_iter().next() else {
+            return Err(super::errors::tenant_placement_not_found(name));
+        };
+        let state = if done { SchemaState::Behind } else { SchemaState::Migrating };
+        self.set_state(PlacementId::from_uuid(row.id), &row.schema_state, state).await
+    }
+
+    /// Closes a run started with [`begin_rollback_run`](Self::begin_rollback_run): `done`, or `failed` with `error`.
+    pub async fn finish_run(&self, run: Uuid, error: Option<String>) -> Result<(), Error> {
+        super::migration_runs::claim::finish(self.registry.control(), run, None, error).await
+    }
+
     /// Holding the lock: a placement still `migrating` was left so by a process that stopped midway (whoever
     /// migrates holds the lock); it becomes `behind` (its tenants keep getting 503 until migrated).
     pub(crate) async fn recover_migrating(&self) -> Result<(), Error> {
@@ -458,7 +503,10 @@ impl Placements {
     ) -> Result<(), Error> {
         let control = self.registry.control();
         self.recover_migrating().await?;
-        let claim = super::migration_runs::claim::Claim::Direct { placement: only };
+        let claim = super::migration_runs::claim::Claim::Direct {
+            placement: only,
+            kind: super::migration_runs::claim::RunKind::PLACEMENTS,
+        };
         let Some(run) = super::migration_runs::claim::claim(control, claim).await? else {
             return Ok(());
         };
