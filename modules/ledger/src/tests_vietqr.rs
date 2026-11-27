@@ -564,3 +564,38 @@ async fn hai_lenh_khop_cung_luc_mot_khoan_chi_ghi_thu_mot_lan() {
     .await
     .unwrap();
 }
+
+/// Rà #591 C2: hoàn một khoản chuyển khoản VietQR (không có cổng nào hoàn được) bị từ chối trước khi có dòng
+/// hoàn (`ledger.gateway_not_configured`): vẫn mở `refund_failed` để người vận hành hoàn tay — một lần dù bên
+/// gọi gửi lại cùng mã; mã khác thì mục khác.
+#[tokio::test]
+async fn hoan_chuyen_khoan_bi_tu_choi_som_van_mo_muc_cho() {
+    TestDatabase::run(async |test| {
+        let (app, _feed, _account) = setup(test).await;
+        let created = pay(&app, 150_000, "P-1").await;
+        let id: uuid::Uuid = created["id"].as_str().unwrap().parse().unwrap();
+        let code = created["transfer_code"].as_str().unwrap().to_owned();
+        push(&app, &[FakeBankFeed::credit("T-1", ACCOUNT, vnd(150_000), &code)]).await;
+        drain(&app).await;
+        assert_eq!(status(&app, &id.to_string()).await, "succeeded");
+        assert!(exceptions(&app).await.is_empty());
+
+        let tenant = app.default_tenant();
+        let ledger = app.api::<dyn Ledger>().unwrap();
+        for _ in 0..2 {
+            let refund = crate::api::NewRefund::new(id, vnd(150_000), "cancelled", "R-1");
+            let refused = ledger
+                .refund(&tenant, autoxide_kernel::event::Actor::system(), refund)
+                .await
+                .unwrap_err();
+            assert!(crate::api::refund_refused(&refused), "{}", refused.code());
+        }
+        let open = exceptions(&app).await;
+        assert_eq!(open.len(), 1, "{open:?}");
+        assert_eq!(open[0]["kind"], "refund_failed");
+        assert_eq!(open[0]["subject"], format!("ledger.payment:{id}"));
+        assert_eq!(open[0]["details"]["reference"], "R-1");
+    })
+    .await
+    .unwrap();
+}

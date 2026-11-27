@@ -32,6 +32,7 @@ mod lifecycle;
 mod migration;
 mod notices;
 mod orders_read;
+mod payment_attempts;
 mod payment_retry;
 mod payments;
 mod permissions;
@@ -195,6 +196,8 @@ impl Module for OrdersModule {
             posting: context.posting_verification(),
             text_model: context.require::<dyn autoxide_kernel::ai::TextModel>().ok(),
             custom_fields: context.custom_fields(),
+            // `compliance` đăng ký trước `orders`: ẩn đánh giá chỉ vì lý do luật cho (LG-12).
+            moderation: context.require::<dyn autoxide_kernel::moderation::ModerationPolicy>().ok(),
         };
         if let Some(notifier) = &parts.notifier {
             notices::declare(notifier.as_ref())?;

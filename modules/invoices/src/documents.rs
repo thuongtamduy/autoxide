@@ -312,6 +312,20 @@ impl InvoicesService {
         self.create_inner(tenant, actor, draft, None).await
     }
 
+    /// Ngày tính thuế của chứng từ gốc `id` (điều chỉnh, thay thế giữ thuế suất của nó): ngày lập của nó.
+    pub(crate) async fn original_tax_date(
+        &self,
+        connection: &impl ConnectionTrait,
+        tenant: &TenantContext,
+        id: Uuid,
+    ) -> Result<Option<Date>, Error> {
+        Ok(document::Entity::find_by_id(id)
+            .scoped(tenant)
+            .one(connection)
+            .await?
+            .and_then(|found| found.issue_date))
+    }
+
     /// Lập nháp; `related`: (chứng từ gốc, `adjustment` / `replacement`, hướng).
     pub(crate) async fn create_inner(
         &self,
@@ -345,8 +359,20 @@ impl InvoicesService {
         let Some(reference) = reference else {
             return Err(Error::internal("a checked reference went missing"));
         };
-        let on = draft.issue_date.unwrap_or_else(|| Timestamp::now().date_utc());
         let seller = draft.on_behalf_of.unwrap_or(draft.org);
+        let database = tenant.database();
+        // Ngày tính thuế: điều chỉnh / thay thế theo ngày của chứng từ gốc (thuế suất của hoá đơn bị điều
+        // chỉnh); không thì ngày lập đã nêu, hay hôm nay theo múi giờ của vùng thuế người bán (LG-2).
+        let original_date = match &related {
+            Some((original, _, _)) => {
+                self.original_tax_date(database.read(), tenant, *original).await?
+            }
+            None => None,
+        };
+        let on = match (original_date, draft.issue_date) {
+            (Some(day), _) | (None, Some(day)) => day,
+            (None, None) => self.tax.tax_date(tenant, seller, Timestamp::now()).await?,
+        };
         let computed = self
             .compute(
                 tenant,
@@ -368,7 +394,6 @@ impl InvoicesService {
             "buyer": draft.buyer, "lines": draft.lines, "source_id": draft.source_id,
             "related": related.as_ref().map(|(id, relation, direction)| json!([id, relation, direction])),
         }))?;
-        let database = tenant.database();
         let (reference, fingerprint, draft, computed, related) =
             (&reference, &fingerprint, &draft, &computed, &related);
         let outcome = reference::submit_once(database, move || async move {
@@ -385,6 +410,17 @@ impl InvoicesService {
                 });
             if let Some(existing) = reference::replayed(stored, reference, fingerprint)? {
                 return Ok(Submitted::Replayed(existing));
+            }
+            // Điều chỉnh / thay thế: chứng từ gốc phải còn sửa được (đọc trong transaction, sau replay).
+            if let Some((original, _, _)) = related {
+                let found = document::Entity::find_by_id(*original)
+                    .scoped(tenant)
+                    .one(&transaction)
+                    .await?
+                    .ok_or_else(document_not_found)?;
+                if !crate::issue::CORRECTABLE.contains(&found.status.as_str()) {
+                    return Err(crate::issue::not_correctable(&found.status));
+                }
             }
             let at = now();
             let id = Uuid::now_v7();
@@ -559,7 +595,16 @@ impl InvoicesService {
         };
         let currency = Currency::parse(&found.currency)?;
         let seller = OrgId::from_uuid(found.on_behalf_of_org_id.unwrap_or(found.org_id));
-        let on = issue_date.unwrap_or_else(|| Timestamp::now().date_utc());
+        let database = tenant.database();
+        // Nháp điều chỉnh / thay thế: thuế theo ngày của chứng từ gốc, như lúc tạo.
+        let original_date = match found.related_document_id {
+            Some(original) => self.original_tax_date(database.write(), tenant, original).await?,
+            None => None,
+        };
+        let on = match (original_date, issue_date) {
+            (Some(day), _) | (None, Some(day)) => day,
+            (None, None) => self.tax.tax_date(tenant, seller, Timestamp::now()).await?,
+        };
         let computed = match &lines {
             Some(lines) => Some(
                 self.compute(
@@ -578,7 +623,6 @@ impl InvoicesService {
             ),
             None => None,
         };
-        let database = tenant.database();
         let transaction = database.begin_write().await?;
         principal
             .require_write_at(
@@ -614,18 +658,20 @@ impl InvoicesService {
         Ok(described)
     }
 
-    /// Dòng đã lưu, dạng đầu vào (để tính lại khi đổi người mua / ngày).
+    /// Dòng đã lưu, dạng đầu vào (để tính lại khi đổi người mua / ngày). Đọc qua đường ghi, không qua read
+    /// replica: hai nơi gọi (sửa nháp, lập) ghi lại các dòng này — replica trễ sẽ ghi đè dòng vừa sửa bằng dòng cũ
+    /// (kiểm độc lập #575, V1).
     pub(crate) async fn stored_lines(
         &self,
         tenant: &TenantContext,
         id: Uuid,
     ) -> Result<Vec<NewDocumentLine>, Error> {
         let found = describe(
-            tenant.database().read(),
+            tenant.database().write(),
             tenant,
             document::Entity::find_by_id(id)
                 .scoped(tenant)
-                .one(tenant.database().read())
+                .one(tenant.database().write())
                 .await?
                 .ok_or_else(document_not_found)?,
         )

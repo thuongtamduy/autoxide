@@ -18,7 +18,7 @@ use autoxide_address::api::AddressInput;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::i18n::Language;
-use autoxide_kernel::reference::fingerprint;
+use autoxide_kernel::reference::{Submitted, fingerprint};
 use autoxide_kernel::rows::{self, Bounds};
 use autoxide_kernel::secret::{random_token, sha256};
 use autoxide_kernel::sms::{
@@ -551,11 +551,11 @@ impl OrdersService {
         id: Uuid,
         reason: Option<String>,
         reference: &str,
-    ) -> Result<order::Model, Error> {
+    ) -> Result<Submitted<order::Model>, Error> {
         let row = self.guest_order(tenant, access, id).await?;
         let print = fingerprint(&json!({"reason": reason}))?;
         if self.guest_replayed(tenant, id, "cancel", reference, &print).await? {
-            return Ok(row);
+            return Ok(Submitted::Replayed(row));
         }
         let row = self.cancel_as_buyer(tenant, row, Actor::public(), reason).await?;
         Self::remember_guest_request(
@@ -567,7 +567,7 @@ impl OrdersService {
             &print,
         )
         .await?;
-        Ok(row)
+        Ok(Submitted::Created(row))
     }
 
     /// `POST /public/orders/{id}/address/otp`: mã lần hai để đổi địa chỉ, gửi tới số của đơn.
@@ -619,12 +619,12 @@ impl OrdersService {
         id: Uuid,
         change: AddressChange,
         reference: &str,
-    ) -> Result<order::Model, Error> {
+    ) -> Result<Submitted<order::Model>, Error> {
         let row = self.guest_order(tenant, access, id).await?;
         let print = fingerprint(&json!({"address": change.address,
             "recipient_name": change.recipient_name, "phone": change.phone}))?;
         if self.guest_replayed(tenant, id, "address", reference, &print).await? {
-            return Ok(row);
+            return Ok(Submitted::Replayed(row));
         }
         let mut problems = Vec::new();
         if change.phone.as_deref().is_some_and(|phone| !crate::checkout::phone_valid(phone)) {
@@ -715,6 +715,7 @@ impl OrdersService {
                 }
             })
             .await
+            .map(Submitted::Created)
     }
 
     /// Mã đổi địa chỉ phải do chính token này xin (người khác cầm mã cũng không dùng được).

@@ -91,6 +91,10 @@ autoxide-customers = { path = "modules/customers", version = "=0.19.0" }
 # --- Thư viện nền (STACK.md, bảng "Nền") ---
 tokio = { version = "1.54", features = ["macros", "rt-multi-thread", "net", "signal", "sync", "time"] }
 axum = { version = "0.8", features = ["ws"] }
+# Bộ khớp route của axum, cùng bản lớn với bản axum dùng (cargo gộp về một bản): kernel hỏi nó trước khi ghép router
+# để báo route xung đột bằng lỗi rõ thay vì để axum dừng tiến trình. Luật `single-copy` của `xtask check` đỏ khi
+# Cargo.lock có hai bản; test `matchit_khop_voi_axum` của kernel đỏ khi luật khớp lệch (D-20261127-http-layer-choices).
+matchit = "0.8"
 tower-http = { version = "0.7", features = [
   "catch-panic",
   "compression-br",
@@ -216,7 +220,7 @@ sha2 = "0.11"
 # Macro thủ tục của kernel (`autoxide-macros`, D-20261126-kernel-data-layer): đọc cú pháp Rust và sinh mã.
 proc-macro2 = "1.0.107"
 quote = "1.0.47"
-syn = { version = "2.0.119", features = ["full"] }
+syn = { version = "3.0.10", features = ["full"] }
 base64 = "0.23"
 getrandom = "0.4"
 # Mã hoá secret khi lưu (AES-256-GCM, bước 33, D-257). Cả hai đã có trong cây phụ thuộc (`ring` qua

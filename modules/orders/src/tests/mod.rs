@@ -10,9 +10,11 @@ mod carts;
 mod checkout;
 mod fakes;
 mod guests;
+mod invoice_settled;
 mod invoices_pos;
 mod lifecycle;
 mod pages;
+mod payment_attempts;
 mod payment_retry;
 mod pickups;
 mod preorders;
@@ -20,6 +22,7 @@ mod returns;
 mod reviews;
 mod risk_reports;
 mod statements;
+mod tax_point;
 mod tenders;
 mod warranty_fields;
 
@@ -468,6 +471,7 @@ macro_rules! shipping_event {
 }
 
 shipping_event!(ShipmentDelivered, autoxide_shipping::api::events::SHIPMENT_DELIVERED);
+shipping_event!(ShipmentStatusChanged, autoxide_shipping::api::events::SHIPMENT_STATUS_CHANGED);
 shipping_event!(CodCollected, autoxide_shipping::api::events::COD_COLLECTED);
 shipping_event!(PreorderAllocated, crate::preorders::PREORDER_ALLOCATED);
 shipping_event!(PreorderDateChanged, crate::preorders::PREORDER_DATE_CHANGED);

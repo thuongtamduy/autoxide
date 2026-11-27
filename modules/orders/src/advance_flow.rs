@@ -233,8 +233,13 @@ impl OrdersService {
                     if moved.rows_affected == 0 {
                         return Ok(());
                     }
+                    // Link cũ đã bị thay: `superseded` — đối tác vẫn thu nó muộn thì hoàn, không tính
+                    // vào đơn (cùng đường với lần thử lại của tiền đơn, UT-6).
                     payment::Entity::update_many()
-                        .col_expr(payment::Column::Status, Expr::value("expired"))
+                        .col_expr(
+                            payment::Column::Status,
+                            Expr::value(crate::payment_attempts::SUPERSEDED),
+                        )
                         .col_expr(payment::Column::UpdatedAt, Expr::value(at))
                         .filter(payment::Column::OrderId.eq(order_id))
                         .filter(payment::Column::Purpose.eq(PURPOSE_BALANCE))

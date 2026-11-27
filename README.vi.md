@@ -48,7 +48,7 @@ printf 'AUTOXIDE_AUTH_TOKEN_SECRET=%s\nAUTOXIDE_SECRET_KEY=%s\n' \
 
 docker compose -f compose.quickstart.yml up -d
 # Mật khẩu tự sinh của quản trị viên (xem bên dưới)
-docker compose -f compose.quickstart.yml exec autoxide cat data/initial-admin-password
+docker compose -f compose.quickstart.yml exec autoxide autoxide initial-password
 ```
 
 **Mật khẩu của quản trị viên đầu tiên.** Lần chạy đầu, máy chủ tạo quản trị viên `admin@example.com`
@@ -57,9 +57,9 @@ ghi một lần vào file `data/initial-admin-password`, chỉ người dùng c�
 đó là `/var/lib/autoxide/data/initial-admin-password`, nằm trong Docker volume `data` (Compose đặt tên
 `<thư mục>_data`), nên còn nguyên qua các lần khởi động lại. Lệnh trên in hai dòng của nó: email, rồi
 mật khẩu. Log chỉ nói file ở đâu (`docker compose -f compose.quickstart.yml logs autoxide | grep "first
-administrator"`). Nếu `cat` báo "No such file" thì quản trị viên đã có từ trước (volume đã dùng rồi),
+administrator"`). Nếu lệnh báo file "does not exist" thì quản trị viên đã có từ trước (volume đã dùng rồi),
 hoặc bạn đã tự đặt `AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD`. Đăng nhập và đổi mật khẩu xong thì xoá file:
-`docker compose -f compose.quickstart.yml exec autoxide rm data/initial-admin-password`.
+`docker compose -f compose.quickstart.yml exec autoxide autoxide initial-password --remove`.
 
 Rồi mở <http://127.0.0.1:8080/> (tên, phiên bản và các đường dẫn) và đăng nhập. Trang xem API
 (`/api/docs`, nạp script từ CDN) tắt trong bản chạy nhanh: thêm `AUTOXIDE_HTTP_API_DOCS=true` vào `.env`
@@ -234,6 +234,10 @@ vào, không phải một đường dẫn bên trong container (`mkdir backups &
 rồi thêm `-v "$PWD/backups:/backups"` và chạy `backup /backups/<tên>`). Đăng nhập như ở mục
 [Cấu hình](#cấu-hình) (dùng `http://127.0.0.1:8080`). Với PostgreSQL, reverse proxy có HTTPS,
 cập nhật và restore, xem [`docs/DEPLOY.vi.md`](docs/DEPLOY.vi.md).
+
+**Không có Docker?** Build binary và chạy bằng tay: [`docs/DEPLOY.vi.md`, mục B](docs/DEPLOY.vi.md#b-một-binary-với-sqlite)
+(SQLite) hay [B+](docs/DEPLOY.vi.md#b-một-binary-với-postgresql-từ-đầu) (PostgreSQL). Hai secret để trong `.env`,
+`autoxide migrate up` chạy trước `autoxide serve`, và `AUTOXIDE_HTTP_ADDRESS` đổi địa chỉ nghe.
 
 ## Yêu cầu
 

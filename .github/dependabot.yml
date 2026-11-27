@@ -41,6 +41,16 @@ updates:
     groups:
       npm:
         patterns: ["*"]
+  # Client MCP chính thức cho bài kiểm OAuth đầu-cuối của CI (job `mcp-oauth`, D-20261127-mcp-sdk-ci-check).
+  - package-ecosystem: npm
+    directory: /scripts/mcp-oauth
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      mcp-oauth:
+        patterns: ["*"]
   # Image nền của Dockerfile và image gitleaks của secret scan (.github/gitleaks/Dockerfile), đều ghim theo digest.
   - package-ecosystem: docker
     directories: ["/", "/.github/gitleaks"]

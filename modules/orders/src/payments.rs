@@ -68,6 +68,22 @@ pub(crate) fn funds_flow(mode: FlowMode) -> FundsFlow {
     }
 }
 
+/// Kết quả ghi một lượt thu `ledger` báo đã thu vào khoản của đơn.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Recorded {
+    /// Đã ghi từ trước (event giao lại), đơn đã huỷ: không làm gì thêm.
+    Already,
+    /// Đã ghi từ trước (event giao lại), đơn còn đi tiếp: đã tính vào đơn — báo lại `ledger` giữ khoản
+    /// (lần trước có thể lỗi sau commit).
+    AlreadyCounted,
+    /// Tính vào đơn.
+    Counted,
+    /// Đơn đã huỷ: ghi đã thu, hoàn tự động (`late_payment`).
+    Late,
+    /// Khoản đã bị thay bằng lần thử mới: không tính vào đơn, hoàn qua đối tác (UT-6 L4).
+    Superseded,
+}
+
 /// Mã tham chiếu của khoản thu gửi `ledger`: `orders:<order>:<purpose>:<lần>`.
 pub(crate) fn reference(order: Uuid, purpose: &str, attempt: u32) -> String {
     format!("orders:{order}:{purpose}:{attempt}")
@@ -140,7 +156,8 @@ impl OrdersService {
             .filter(payment::Column::Status.eq(PENDING))
             .scoped(tenant)
             .order_by_desc(payment::Column::Id)
-            .one(tenant.database().read())
+            // Kết nối ghi: ngay sau khi một lần thử mới vừa commit (`replace_ended_attempt`) vẫn thấy nó.
+            .one(tenant.database().write())
             .await?
             .ok_or_else(errors::order_not_found)?;
         if row.ledger_payment_id.is_some() {
@@ -148,6 +165,14 @@ impl OrdersService {
         }
         let amount = Money::from_columns(row.amount_minor, &row.currency)?;
         let org = OrgId::from_uuid(order.org_id);
+        // Lần thử lại (UT-6 L4) không sống quá hạn cũ của đơn: `ledger` cho lượt thu — và link ở đối tác —
+        // hết hạn đúng lúc đó; tiền về sau đó đi đường `late_payment` của `ledger`.
+        let cap = order.payment_due_at.filter(|_| crate::payment_attempts::is_retry(&row));
+        // Hạn đã qua (đơn vừa quá hạn giữa lúc kiểm và lúc tạo lượt thu): báo đúng lỗi hết hạn, không để
+        // `ledger` từ chối `expires_by` rồi bị đổi thành "phương thức không dùng được" (rà #591 N1).
+        if cap.is_some_and(|cap| cap <= crate::service::now()) {
+            return Err(errors::payment_expired());
+        }
         let description = format!("Order {}", order.number);
         let created =
             match Method::parse(&row.method) {
@@ -160,6 +185,10 @@ impl OrdersService {
                         row.reference.clone(),
                     )
                     .source_id(order_id.to_string());
+                    let request = match cap {
+                        Some(cap) => request.expires_by(cap),
+                        None => request,
+                    };
                     ledger.create_transfer_payment(tenant, Actor::system(), request).await
                 }
                 Method::Gateway => {
@@ -180,6 +209,9 @@ impl OrdersService {
                     }
                     if let Some(url) = return_url {
                         request = request.return_url(url);
+                    }
+                    if let Some(cap) = cap {
+                        request = request.expires_by(cap);
                     }
                     ledger.create_payment(tenant, Actor::system(), request).await
                 }
@@ -220,20 +252,23 @@ impl OrdersService {
             transfer_code: created.transfer_code.clone(),
             error: None,
         };
+        // Lần thử lại (UT-6 L4) không kéo dài hạn của đơn: hạn là hạn cũ hay hạn của lượt thu mới, cái
+        // nào sớm hơn — từ chối rồi mở lại nhiều lần không giữ hàng mãi.
+        let due = match order.payment_due_at {
+            Some(old) if crate::payment_attempts::is_retry(&row) => old.min(created.expires_at),
+            _ => created.expires_at,
+        };
         let mut updated: payment::ActiveModel = row.into();
         updated.ledger_payment_id = Set(Some(created.id));
         updated.gateway = Set(Some(created.provider.clone()));
         updated.action = Set(Some(serde_json::to_string(&action).map_err(Error::internal)?));
-        updated.expires_at = Set(Some(created.expires_at));
+        updated.expires_at = Set(Some(due));
         updated.updated_at = Set(crate::service::now());
         let database = tenant.database();
         let transaction = database.begin_write().await?;
         updated.update(&transaction).await?;
         order::Entity::update_many()
-            .col_expr(
-                order::Column::PaymentDueAt,
-                sea_orm::sea_query::Expr::value(created.expires_at),
-            )
+            .col_expr(order::Column::PaymentDueAt, sea_orm::sea_query::Expr::value(due))
             .filter(order::Column::Id.eq(order_id))
             .scoped(tenant)
             .exec(&transaction)
@@ -302,7 +337,7 @@ impl OrdersService {
         };
         let (database, outbox) = (tenant.database(), &self.outbox);
         let payment_id = row.id;
-        let late = database
+        let recorded = database
             .write_with_retry(move || async move {
                 let transaction = database.begin_write().await?;
                 let current = lifecycle::lock(&transaction, tenant, row.order_id).await?;
@@ -312,7 +347,16 @@ impl OrdersService {
                     .await?
                     .ok_or_else(errors::order_not_found)?;
                 if stored.status == SUCCEEDED {
-                    return Ok(false);
+                    return Ok(if current.status == OrderStatus::Cancelled.as_str() {
+                        Recorded::Already
+                    } else {
+                        Recorded::AlreadyCounted
+                    });
+                }
+                // Quyết định "đã bị thay" đọc trên dòng sau khoá đơn (UT-6 L4): lần thay lượt cũng khoá
+                // dòng đơn, nên không có khe giữa lúc đọc và lúc ghi. Không tính vào đơn; hoàn sau commit.
+                if crate::payment_attempts::superseded(&stored) {
+                    return Ok(Recorded::Superseded);
                 }
                 let now = crate::service::now();
                 let purpose = stored.purpose.clone();
@@ -411,19 +455,46 @@ impl OrdersService {
                     )
                     .await?;
                 transaction.commit().await?;
-                Ok(late)
+                Ok(if late { Recorded::Late } else { Recorded::Counted })
             })
             .await?;
-        if late && let Some(ledger) = &self.ledger {
+        // Một luật "muộn" (rà #591 C1): `orders` quyết giữ hay hoàn. Đã tính vào đơn thì báo `ledger` giữ
+        // khoản — mục `late_payment` (nếu `ledger` thấy tiền về sau hạn / sau khi báo hỏng) đóng, không ai hoàn
+        // tay tiền của đơn đang đi tiếp. Lỗi thì event thử lại (`AlreadyCounted` gọi lại).
+        if matches!(recorded, Recorded::Counted | Recorded::AlreadyCounted)
+            && let Some(ledger) = &self.ledger
+        {
+            ledger.keep_late_payment(tenant, ledger_payment).await?;
+        }
+        if recorded == Recorded::Superseded {
+            return self.refund_superseded(tenant, &row, ledger_payment, amount).await;
+        }
+        if recorded == Recorded::Late
+            && let Some(ledger) = &self.ledger
+        {
             let refund = NewRefund::new(
                 ledger_payment,
                 amount,
                 "late_payment",
                 format!("orders:{}:late", row.order_id),
             );
-            if let Err(error) = ledger.refund(tenant, Actor::system(), refund).await {
-                tracing::warn!(order_id = %row.order_id, code = error.code(), "late payment not refunded yet");
-                return Err(error);
+            match ledger.refund(tenant, Actor::system(), refund).await {
+                Ok(_) => {}
+                // Đối tác / sổ từ chối hẳn: gửi lại không bao giờ được, không để event thử lại tới
+                // dead-letter. `ledger` để lại mục ở hàng chờ đối soát cho người vận hành hoàn tay:
+                // `late_payment` (lượt thu về muộn) hay `refund_failed` (mọi lượt hoàn bị từ chối khác, vd
+                // đơn bị huỷ trước hạn rồi tiền mới về). 409 / 429 / 5xx là lỗi tạm: event thử lại cùng mã.
+                Err(error) if autoxide_ledger::api::refund_refused(&error) => {
+                    tracing::warn!(
+                        order_id = %row.order_id,
+                        code = error.code(),
+                        "late payment refused by the partner; left to the reconciliation queue"
+                    );
+                }
+                Err(error) => {
+                    tracing::warn!(order_id = %row.order_id, code = error.code(), "late payment not refunded yet");
+                    return Err(error);
+                }
             }
         }
         Ok(())

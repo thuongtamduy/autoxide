@@ -111,9 +111,9 @@ fn missing(field: &str) -> Error {
         (status = 202, description = "With `email_link`: the token is on its way to your address.", body = Data<ReauthResponse>),
         (status = 400, description = "The password is wrong; code `auth.wrong_password`.", body = Problem),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "Called with an API key; code `auth.session_required`.", body = Problem),
-        (status = 422, description = "A field the method needs is missing, or the code or passkey answer is wrong; see `errors`.", body = Problem),
-        (status = 429, description = "Too many wrong attempts for this email; code `auth.login_throttled`.", body = Problem),
+        (status = 403, description = "Called with an API key (`auth.session_required`), or, with `phone_code`, sign-in codes of the number are locked after too many wrong codes in a row (`compliance.otp_locked`).", body = Problem),
+        (status = 422, description = "A field the method needs is missing, or the code or passkey answer is wrong; see `errors`. With `phone_code`: `compliance.otp_invalid`, `compliance.otp_attempts_exceeded`.", body = Problem),
+        (status = 429, description = "Too many wrong attempts for this email (`auth.login_throttled`), or, with `phone_code`, too many wrong codes for this number today (`compliance.otp_daily_limit`).", body = Problem),
     )
 )]
 async fn reauthenticate(

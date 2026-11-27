@@ -145,8 +145,10 @@ pub(crate) async fn lots_out<C: ConnectionTrait>(
     level: Uuid,
     code: Option<&str>,
     quantity: i64,
+    allow_expired: bool,
 ) -> Result<Vec<(Option<Uuid>, i64)>, Error> {
     let today = now().date_utc();
+    let expired = |row: &lot::Model| row.expires_on.is_some_and(|day| day < today);
     let all = lot::Entity::find()
         .filter(lot::Column::LevelId.eq(level))
         .scoped(tenant)
@@ -155,11 +157,12 @@ pub(crate) async fn lots_out<C: ConnectionTrait>(
         .await?;
     let mut usable: Vec<&lot::Model> = all
         .iter()
-        .filter(|row| row.on_hand > 0 && row.expires_on.is_none_or(|day| day >= today))
+        .filter(|row| row.on_hand > 0 && (allow_expired || !expired(row)))
         .filter(|row| code.is_none_or(|code| row.lot_code == code))
         .collect();
-    // Lô không hạn xếp sau lô có hạn (SQLite và Postgres xếp NULL khác nhau: sắp ở đây).
-    usable.sort_by_key(|row| (row.expires_on.is_none(), row.expires_on, row.id));
+    // Lô không hạn xếp sau lô có hạn (SQLite và Postgres xếp NULL khác nhau: sắp ở đây). Lô quá hạn (chỉ khi
+    // được phép) xếp sau cùng: chỉ lấy khi lô còn hạn không đủ.
+    usable.sort_by_key(|row| (expired(row), row.expires_on.is_none(), row.expires_on, row.id));
     let mut left = quantity;
     let mut picks = Vec::new();
     for row in usable {
@@ -167,6 +170,10 @@ pub(crate) async fn lots_out<C: ConnectionTrait>(
             break;
         }
         let take = left.min(row.on_hand);
+        if expired(row) {
+            // Hàng đã tới tay người mua (event giao hàng): sổ kho phải ghi đúng, kể cả lô đã quá hạn.
+            tracing::warn!(lot_id = %row.id, quantity = take, "issuing units of an expired lot for a delivered order");
+        }
         stock::move_lot(transaction, tenant, row.id, -take).await?;
         picks.push((Some(row.id), take));
         left -= take;
@@ -199,6 +206,8 @@ pub(crate) struct Tracking<'a> {
     /// Trạng thái mới của serial: `sold`, `written_off`, `in_transit`.
     pub serial_status: &'a str,
     pub order: Option<Uuid>,
+    /// Cho lấy lô đã quá hạn khi lô còn hạn không đủ (chỉ đường xuất theo event giao hàng: hàng đã giao rồi).
+    pub allow_expired: bool,
 }
 
 /// Ghi hàng RA (`new.quantity` âm): serial đổi trạng thái, lô trừ theo [`lots_out`], một dòng sổ
@@ -227,7 +236,15 @@ pub(crate) async fn record_out<C: ConnectionTrait>(
         return Ok((vec![row], Vec::new()));
     }
     let level = stock::level_id(transaction, tenant, new.org, new.variant).await?;
-    let picks = lots_out(transaction, tenant, level, tracking.lot_code, -new.quantity).await?;
+    let picks = lots_out(
+        transaction,
+        tenant,
+        level,
+        tracking.lot_code,
+        -new.quantity,
+        tracking.allow_expired,
+    )
+    .await?;
     let mut rows = Vec::with_capacity(picks.len());
     for (lot, quantity) in &picks {
         let mut part = new.clone();

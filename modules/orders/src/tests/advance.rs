@@ -226,3 +226,65 @@ async fn nguoi_mua_huy_truoc_moc_chot_duoc_hoan_du() {
     .await
     .unwrap();
 }
+
+/// UT-6 (rà #591): link trả phần còn lại hết hạn → mở link mới; link cũ bị thay (`superseded`). Đối tác
+/// vẫn thu link cũ muộn: hoàn qua đối tác đúng một lần, không tính vào đơn.
+#[tokio::test]
+async fn link_phan_con_lai_bi_thay_thu_muon_thi_hoan() {
+    TestDatabase::run(async |test| {
+        use crate::entity::payment;
+        let shop = shop(test).await;
+        shop.orgs.set(
+            shop.tree.a,
+            "orders.preorder_advance",
+            json!({"rate_bp": 3000, "balance_due_hours": 48}),
+        );
+        let shirt = shop.catalog.add(shop.tree.a, 100_000);
+        shop.inventory.stock(shop.tree.a, shirt, 10);
+        let phone = preorder_item(&shop, 300_000);
+        let (id, _) = place_paid(&shop, &[(shirt, 1), (phone, 1)]).await;
+        let (status, first) = ship(&shop, id).await;
+        assert_eq!(status, StatusCode::ACCEPTED, "{first}");
+        allocate(&shop, id, phone).await;
+        let old = shop.ledger.last_payment().unwrap();
+
+        // Link phần còn lại hết hạn → mở link mới.
+        payment::Entity::update_many()
+            .col_expr(
+                payment::Column::ExpiresAt,
+                Expr::value(Timestamp::now() - SignedDuration::from_mins(1)),
+            )
+            .filter(payment::Column::OrderId.eq(id))
+            .filter(payment::Column::Purpose.eq(crate::advance::PURPOSE_BALANCE))
+            .exec(shop.database().write())
+            .await
+            .unwrap();
+        let buyer = Call::as_user(&shop, "buyer1");
+        let (status, link) = buyer.send("POST", &format!("/me/orders/{id}/payments"), None).await;
+        assert_eq!(status, StatusCode::OK, "{link}");
+        let new = shop.ledger.last_payment().unwrap();
+        assert_ne!(new.id, old.id);
+        assert_eq!(pay_last(&shop).await, 225_750);
+        assert_eq!(minor(&mine(&shop, id).await["totals"]["paid"]), 430_000);
+
+        // Link cũ vẫn được thu (hai lần giao): hoàn đúng một lần, đơn không cộng thêm.
+        for _ in 0..2 {
+            shop.ledger.collect(old.id);
+            emit(
+                &shop,
+                &PaymentSucceeded(
+                    json!({"payment_id": old.id, "source_module": "orders", "amount": old.amount}),
+                ),
+            )
+            .await;
+            drain(&shop).await;
+        }
+        assert_eq!(
+            super::refund_rows(&shop.ledger),
+            vec![(old.id, old.amount.minor(), "superseded_payment".to_owned())]
+        );
+        assert_eq!(minor(&mine(&shop, id).await["totals"]["paid"]), 430_000);
+    })
+    .await
+    .unwrap();
+}

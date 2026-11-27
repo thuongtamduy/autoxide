@@ -20,3 +20,15 @@ fn han_luu_la_het_nam_cong_10() {
     assert_eq!(retention_until(day(2026, 3, 5)), day(2036, 12, 31));
     assert_eq!(retention_until(day(2026, 12, 31)), day(2036, 12, 31));
 }
+
+/// Nhà cung cấp không có lệnh huỷ (SePay eInvoice): lỗi rõ hướng điều chỉnh / thay thế (kiểm độc lập #575, N2).
+#[test]
+fn nha_cung_cap_khong_huy_duoc_thi_bao_dieu_chinh() {
+    use crate::issue::provider_cancel_error;
+    let mapped = provider_cancel_error(autoxide_kernel::einvoice::not_supported("sepay"), "sepay");
+    assert_eq!(mapped.code(), "invoices.einvoice_cancel_unsupported");
+    assert!(mapped.message().contains("adjust"), "{}", mapped.message());
+    let other = autoxide_kernel::einvoice::provider_unavailable();
+    let code = other.code().to_owned();
+    assert_eq!(provider_cancel_error(other, "sepay").code(), code);
+}

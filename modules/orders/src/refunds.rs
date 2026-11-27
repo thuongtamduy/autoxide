@@ -205,8 +205,9 @@ impl OrdersService {
                 let answer = match ledger.refund(tenant, Actor::system(), intent).await {
                     Ok(answer) => answer.into_inner(),
                     // Cổng / sổ từ chối hẳn (không hỗ trợ hoàn, vượt số còn lại): lượt hoàn hỏng,
-                    // trả lại phần đã giữ chỗ. Lỗi tạm (5xx) giữ `pending` để gửi lại.
-                    Err(error) if error.kind().status() < 500 => {
+                    // trả lại phần đã giữ chỗ. Lỗi tạm (5xx, 409, 429) giữ `pending`: gửi lại cùng
+                    // `Idempotency-Key` gửi lại lệnh hoàn cùng mã (cùng luật `refund_refused` của `ledger`).
+                    Err(error) if autoxide_ledger::api::refund_refused(&error) => {
                         self.finish(tenant, row.id, FAILED, None).await?;
                         return Err(error);
                     }

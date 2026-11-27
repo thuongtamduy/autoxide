@@ -13,6 +13,10 @@ const FIXES: &[(&str, &str)] = &[
         "Add `#[serde(deny_unknown_fields)]` to the request type, or list the operation in xtask/api-shape-allow.txt only if it is an old one waiting to be fixed.",
     ),
     (
+        "api-inline-field-doc",
+        "Remove the `///` doc from the `#[schema(inline)]` field (write `//` instead) and move its text to the doc of the containing type; `Option<T>` / `Vec<T>` fields may keep `///`. Then run `cargo xtask regen`.",
+    ),
+    (
         "api-page-params",
         "Take `limit`, `cursor` and `order` through `PageQuery` (see `fetch_page`) instead of hand-written paging parameters.",
     ),
@@ -134,6 +138,10 @@ const FIXES: &[(&str, &str)] = &[
     (
         "rust-free-paths",
         "Remove the entry from scripts/rust-free-paths.txt: the file is read by Rust (a crate directory, `include_str!`, or a test that reads it at run time), so a change to it must run the Rust tests.",
+    ),
+    (
+        "single-copy",
+        "Use the same version as the library that pins it (for `matchit`: the one axum uses); align it in [workspace.dependencies] so Cargo.lock keeps one copy.",
     ),
     (
         "site-links",

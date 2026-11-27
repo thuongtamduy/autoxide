@@ -117,6 +117,12 @@ Postgres; vòng kiểm thử bảo mật kiểu bên ngoài cuối cùng không 
       tính hạn mức
 - [ ] Hợp nhất hai hệ cài đặt theo khách (cài đặt khách của kernel và cài đặt theo cây của `organizations`): một hệ, kiểm
       chéo lúc lưu, có cache
+- [ ] Event: một module lỗi chặn các module nhận sau. `Dispatcher::deliver` (`crates/kernel/src/event/dispatcher.rs`) giao
+      một event cho mọi bên đăng ký khớp tên theo thứ tự đăng ký và dừng ở bên đầu tiên trả lỗi (hay panic, hay cả lượt
+      quá `DELIVERY_TIMEOUT`); cả event bị đánh dấu lỗi và thử lại với backoff từ bên đầu tiên — bên đã nhận rồi nhận lại
+      (D-054), bên sau chưa nhận gì. Sau `MAX_ATTEMPTS` lần event thành hỏng hẳn (bên sau không bao giờ nhận), riêng
+      `auth.user_deleted` thử lại mỗi giờ mãi mãi (D-149). Cân nhắc ghi trạng thái giao theo từng bên nhận (bảng con của
+      outbox hay cột theo module), để thử lại chỉ bên lỗi và bên khác không phải chờ
 
 ### G2 — Không để thư viện níu chân (D-20261126-library-isolation)
 
@@ -129,6 +135,16 @@ Postgres; vòng kiểm thử bảo mật kiểu bên ngoài cuối cùng không 
       - [ ] Chặn 1.0: gỡ cầu tạm `ConnectionTrait` trên handle của `db` (các hàm kernel nhận handle thay connection) và
             `TenantContext::database()` thô; baseline `raw-database` của `xtask/library-baseline.txt` về rỗng
             (D-20261126-kernel-data-layer)
+      - [x] Lớp HTTP: `#[endpoint]` (khai rõ ai được gọi, 401/403 chuẩn tự sinh), `routes!`, `Routes`,
+            `#[derive(Schema/Params/Validate)]`, `Path`/`Query`/`State`, `NoContent`, `Download`, `async_trait`;
+            `notes` không còn khai thư viện bọc ở `[dependencies]` (D-20261126-kernel-web-layer)
+      - [ ] Testkit bọc kiểu `http` (`StatusCode`, `Method`, `Request`) để test của module bỏ `axum` ở
+            `[dev-dependencies]`; baseline `wrapped-libraries-dev` về rỗng
+      - [ ] Chặn 1.0: quyết `http::Validate` còn gắn với `validator` hay không (impl chung cho kiểu của `validator`, derive
+            của kernel sinh mã của `validator_derive`); bỏ thì kernel tự kiểm năm luật, lỗi giữ nguyên mã
+            (D-20261127-http-layer-choices)
+      - [ ] `time::Duration` (thay `jiff::SignedDuration`) và các kiểu lịch dân sự của kernel, làm cùng cụm module đầu tiên
+            cần chúng
 - [ ] Chuyển 39 module sang lớp của kernel theo cụm; `cargo xtask check` và `check-module` chặn phụ thuộc trực tiếp vào
       thư viện đã có lớp
 - [ ] Nhịp và công cụ nâng thư viện: `cargo xtask upgrade` hỗ trợ bản lớn (chạy thử, báo chỗ vỡ), giảm crate trùng phiên
@@ -263,7 +279,7 @@ Việc từ rà pháp lý vòng 1 do AI đóng vai (`docs/legal/review-2026-11-r
 
 - [x] LG-1 (chặn 1.0): quy tắc `moit.checklist.*`, `cases.deadlines` phiên bản mới theo NĐ 248/2026 (thay NĐ 52/2013, 85/2021
       từ 01/7/2026), chuyển tiếp tới 30/6/2027; sửa `COMPLIANCE.md` / `.vi.md` và mẫu trang
-- [ ] LG-2 (chặn 1.0): ngày lập hoá đơn và `tax_point` của đơn theo múi giờ người bán, không theo UTC; test mốc
+- [x] LG-2 (chặn 1.0): ngày lập hoá đơn và `tax_point` của đơn theo múi giờ người bán, không theo UTC; test mốc
       31/12/2026 – 01/01/2027 giờ Việt Nam; xong trước 31/12/2026; qua kiểm độc lập
 - [ ] LG-3: tài liệu nói rõ cổng KYC người bán chưa chặn đăng bán; cài `ListingGate` gọi `KycGate` là điều kiện của module
       sàn; đối chiếu trường KYC với NĐ 248 Điều 18 (từ 01/01/2027)
@@ -275,10 +291,10 @@ Việc từ rà pháp lý vòng 1 do AI đóng vai (`docs/legal/review-2026-11-r
       `TaxEngine::invoice_requirements` thay vì quyết theo kênh `pos`
 - [x] LG-8 (phần tài liệu xong; code là dòng nợ **sau 1.0** bên dưới): tài liệu tách phần khấu trừ thay đã có và chưa có; phát `TaxWithheld`, chứng từ khấu trừ, dữ liệu tờ khai là điều
       kiện của module sàn
-- [ ] LG-9: huỷ hoá đơn đã gửi SePay — lỗi rõ hướng sang điều chỉnh / thay thế; xác định nghĩa vụ 04/SS sau NĐ 70/2025
-- [ ] LG-10: phát hiện và báo chênh lệch thuế giữa đơn và hoá đơn khi qua mốc đổi thuế suất
+- [x] LG-9: huỷ hoá đơn đã gửi SePay — lỗi rõ hướng sang điều chỉnh / thay thế; xác định nghĩa vụ 04/SS sau NĐ 70/2025
+- [x] LG-10: phát hiện và báo chênh lệch thuế giữa đơn và hoá đơn khi qua mốc đổi thuế suất
 - [x] LG-11: hạn mức và thủ tục khuyến mại theo NĐ 239/2026 và thông tư của Bộ Công Thương (thay căn cứ NĐ 81/2018 Điều 6, 7)
-- [ ] LG-12: `orders` ẩn đánh giá qua `ModerationPolicy` (ánh xạ mã lý do) hoặc sửa `COMPLIANCE.md` cho khớp code
+- [x] LG-12: `orders` ẩn đánh giá qua `ModerationPolicy` (ánh xạ mã lý do) hoặc sửa `COMPLIANCE.md` cho khớp code
 - [x] LG-13: căn cứ Luật An ninh mạng 116/2025 và nghị định hướng dẫn thay NĐ 53/2022 trong tài liệu lưu dữ liệu trong nước
 - [x] LG-3/5/6/8 tài liệu: `COMPLIANCE.md` mục "Chưa làm (trước 1.0)", `AI.md` dữ liệu gửi ra nước ngoài, `TAX.md` /
       `MONEY.md` phần khấu trừ thay đã có và chưa có (EN + VI)
@@ -318,8 +334,12 @@ Việc từ rà pháp lý vòng 1 do AI đóng vai (`docs/legal/review-2026-11-r
         kiểm `tax_category`, giá trị lọc sai (`readiness`, `module`, `subject`) báo lỗi, `version` nhận cả hai dạng, thông
         báo `precondition_failed` riêng cho MCP, ẩn tool luôn lỗi với API key, cách idempotency của MCP ghi trong `mcp.md`,
         lỗi `Idempotency-Key` trùng thành lỗi tool, gom lỗi của `invoices.create_draft`, tên key trong audit
-  - [ ] UT-6: `payment_id` của checkout / `payment-link` dùng được ở API ledger; header `Idempotent-Replayed` cho checkout
-        và huỷ đơn khách; `payment-link` gọi lại sau lần lỗi; cách gỡ khoản `needs_review`
+  - [x] UT-6: `payment_id` của checkout / `payment-link` dùng được ở API ledger; header `Idempotent-Replayed` cho checkout
+        và huỷ đơn khách; `payment-link` gọi lại sau lần lỗi; cách gỡ khoản `needs_review` — thêm `ledger_payment_id`,
+        header ở mọi thao tác vãng lai gửi lại, lần thử mới (`superseded`) và hoàn lượt cũ thu muộn qua đối tác, tài liệu
+        gỡ `needs_review`
+    - [ ] Nợ nhỏ (từ rà UT-6): hợp đồng `PaymentGateway` không có lệnh huỷ lượt thu ở đối tác, nên bộ nối chỉ được báo
+          `Failed` khi đối tác đã chốt kết quả cuối; khi thêm lệnh huỷ thì gọi nó lúc mở lần thử mới
   - [ ] UT-7: thời gian build lần đầu của module ngoài repo (đo ~30 phút debug trên 4 lõi): hướng dẫn nêu con số, đường dùng
         bản dựng sẵn hay cache, một cách gọi `check-module`; đo lại cho G9 trên máy rảnh
   - [ ] UT-8: thông báo và log cho người vận hành: `--steps 0`, log backup / restore chỉ tóm tắt, `migrate up` tóm tắt,
@@ -337,6 +357,7 @@ Việc từ rà pháp lý vòng 1 do AI đóng vai (`docs/legal/review-2026-11-r
 - [ ] Mô hình mối đe doạ của core (`docs/THREAT_MODEL.md`, EN + VI) làm đầu vào cho đợt kiểm thử bên ngoài; mã hoá ở mức
       trường cho dữ liệu cá nhân nhạy cảm (khoá quản lý được, xoay khoá); nhật ký kiểm toán khó sửa lén (chuỗi băm hay tương
       đương)
+      — thiết kế: [`docs/research/g13-field-encryption-audit.md`](research/g13-field-encryption-audit.md) (code sau G1 PR 2–5)
 - [ ] Mục tiêu khôi phục sau sự cố: RPO / RTO ghi rõ cho từng cách triển khai; diễn tập khôi phục trong CI cả trường hợp
       nhiều khách có database riêng và kho file
 - [x] Rà giấy phép thư viện: `cargo deny` chặn giấy phép không hợp MIT/Apache; danh sách giấy phép của bên thứ ba đi kèm
@@ -443,8 +464,15 @@ thật (P7).
     - [ ] Module tắt: dọn dữ liệu theo thời hạn lưu (job của module chưa chạy khi tắt)
     - [ ] Module tắt: gieo dữ liệu khởi đầu cho khách tạo trong lúc module tắt
     - [ ] `copy` / `backup create` / `backup restore` gồm cả bảng của module tắt (hiện từ chối khi còn dữ liệu)
-    - [ ] `conversations` đang bật mà bộ nối nhà cung cấp thoại tắt: `erase_recording` bỏ qua xoá ở nhà cung cấp nhưng
-          vẫn xoá `provider_recording_id` (bản ghi nằm lại không dấu vết) — làm như đường "nghỉ": báo lỗi, thử lại
+    - [x] `conversations` đang bật mà bộ nối nhà cung cấp thoại tắt: `erase_recording` bỏ qua xoá ở nhà cung cấp nhưng
+          vẫn xoá `provider_recording_id` (bản ghi nằm lại không dấu vết) — làm như đường "nghỉ": báo lỗi, thử lại —
+          báo 503 `conversations.voice_provider_unavailable` trước khi đụng tới gì, job dọn theo hạn bỏ qua dòng lỗi
+          (và khách lỗi) rồi báo lỗi để thử lại; xoá tài khoản không trả lỗi cho event (lỗi chặn mọi module nhận sau)
+          mà xoá bản sao trong nơi lưu, giữ `provider_recording_id`, đưa hạn lưu về bây giờ cho job dọn
+          (D-20261127-voice-recording-provider-off)
+    - [ ] Xoá khách (`crates/kernel/src/data/tenancy/erasure.rs`) xoá dòng `conversations_calls` và file trong kho mà
+          không xoá bản ghi âm còn ở nhà cung cấp thoại (`provider_recording_id`): module chưa có hook chạy trước khi
+          xoá khách. Khoảng hở có từ trước, không do D-20261127-voice-recording-provider-off
     - [ ] `forms` tắt: job dọn file CSV xuất theo `expires_at` không chạy (cần xác minh; thuộc mục dọn theo thời hạn lưu)
     - [ ] Kế hoạch tách / gộp (dry run) đếm cả dòng của module tắt chỉ có bảng ở nguồn (dời đã đếm)
     - [ ] Test chiều ngược cho tách / gộp, test lệch phiên bản migration của module tắt giữa hai database
@@ -464,9 +492,13 @@ thật (P7).
           tra cứu theo khoá client gửi (`catalog/variants?code=`, `comments/public/counts`,
           `inventory/public/availability`) được cho phép (chủ dự án giao phiên điều phối quyết, 26/11/2026,
           D-20261126-list-pages-done mục 2)
-  - [ ] `./gate.sh` chưa chạy tsc trên SDK và ví dụ trong `docs/guides` (CI có: `cargo xtask sdk --extract-examples` + `tsc
+  - [x] `./gate.sh` chưa chạy tsc trên SDK và ví dụ trong `docs/guides` (CI có: `cargo xtask sdk --extract-examples` + `tsc
         --noEmit`); `sdk --check` chỉ so SDK với `docs/openapi.json` nên kiểu SDK hỏng vẫn lọt tới CI (#517). Chạy khi SDK
-        hay ví dụ đổi và có Node; còn hai kiểu `& Record<string, unknown>` có sẵn trên `main` (`realm`, một kiểu tiền)
+        hay ví dụ đổi và có Node; còn hai kiểu `& Record<string, unknown>` có sẵn trên `main` (`realm`, một kiểu tiền) —
+        gate (cả gate nhẹ) chạy `sdk --extract-examples` + `tsc --noEmit` khi có Node và SDK, hợp đồng hay
+        `docs/guides` đổi (D-20261127-gate-tsc); hai kiểu sai do `///` trên trường `#[schema(inline)]` có kiểu là
+        thẳng struct / enum (thành `allOf` chuỗi giao object, `realm` không gán được giá trị nào) — bỏ doc ở trường,
+        mô tả chuyển lên kiểu; luật `api-inline-field-doc` chặn tái phạm (D-20261127-inline-field-docs)
   - [x] Rustdoc tiếng Anh cho phần công khai của kernel, testkit, `autoxide` và `api` của module (docs.rs); gate
         `doc-language` giữ phần viết mới là tiếng Anh (D-20261123-english-rustdoc)
   - [ ] Chạy thử năm bộ nối của P7 bằng tài khoản thử thật; đối chiếu các điểm "(?)" của MoMo với trang tài liệu gốc
@@ -604,8 +636,13 @@ thật (P7).
         dead-letter — chưa có test, chưa có hướng dẫn xử lý cho người vận hành
   - [ ] Luật `address-key` của `cargo xtask check` chỉ bắt `format!("…ip:{…")` trên một dòng; khoá dựng cách khác
         (`ip.to_string()`, nhiều dòng) lọt — cân nhắc kiểm theo kiểu (`IpAddr` vào `Throttle::hit`)
-  - [ ] PT-7: trần chung 5× nới giới hạn đoán mã mỗi số mỗi ngày, và trần chung còn cho phép khoá chủ số từ nhiều
-        client — cân nhắc trần chung thấp hơn, mã dài hơn, hay đếm theo người nhập mã (đổi `PhoneCodes::verify`)
+  - [x] PT-7: theo NIST SP 800-63B-4 — mã sống tối đa 10 phút; lần sai liên tiếp đếm bền (client lạ khoá từ 90, mọi client từ
+        100; quản trị viên mở khoá qua REST / MCP / CLI);
+        trần chung là setting riêng thay cho 5×; số mã mỗi giờ theo cặp (số, client); client đã đăng nhập bằng số không
+        bị trần "mọi client" khoá
+        (D-20261126-otp-nist)
+  - [ ] Mã đăng nhập SMS: token thiết bị có ký, cấp khi đăng nhập đúng, để nhận client quen thay cho địa chỉ (CGNAT di
+        động đổi địa chỉ) — cần đổi hợp đồng `PhoneCodes` của `auth` (D-20261126-otp-nist, rủi ro còn lại)
   - [x] PT-13, PT-14: lớp kiểm permission chung của kernel đọc `x-permissions` (403 trước validation / ETag / tra bản
         ghi), 18 `x-permissions` thiếu đã bổ sung, hai test e2e giữ (D-20261126-permission-gate)
   - [x] PT-16, PT-17: slug tự sinh tìm theo nhóm ứng viên `slug IN (…)` dùng unique index (content, catalog); bộ

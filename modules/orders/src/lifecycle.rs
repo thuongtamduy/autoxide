@@ -189,7 +189,11 @@ pub(crate) async fn create(
 fn stamp(row: &mut order::ActiveModel, to: OrderStatus, now: Timestamp) {
     match to {
         Confirmed => row.confirmed_at = Set(Some(now)),
-        Delivered => row.delivered_at = Set(Some(now)),
+        Delivered => {
+            row.delivered_at = Set(Some(now));
+            // Hàng đã tới tay người mua (kho ghi `sale` theo `orders.order_delivered`, UT-1).
+            row.fulfillment_status = Set("fulfilled".to_owned());
+        }
         Completed => row.completed_at = Set(Some(now)),
         Cancelled => row.cancelled_at = Set(Some(now)),
         PendingPayment | Preparing | Shipping | DeliveryFailed => {}
@@ -299,6 +303,13 @@ pub(crate) async fn emit(
             outbox.record(transaction, tenant, actor, subject, &OrderCancelled(change)).await
         }
         Delivered => {
+            // Phần mỗi dòng chưa đi theo lần giao lẻ nào (kho xuất đúng phần này, kèm serial đã ghi).
+            let mut change = change;
+            if let Some(after) = change.after.as_mut() {
+                after["delivered_lines"] = json!(
+                    crate::fulfillments::undelivered_lines(transaction, tenant, order.id).await?
+                );
+            }
             outbox.record(transaction, tenant, actor, subject, &OrderDelivered(change)).await
         }
         Completed => {

@@ -53,8 +53,22 @@ curl -X POST https://api.example.com/api/v1/tax/quote \
 - `price_mode`: `exclusive` (giá chưa thuế) hay `inclusive` (tách thuế ra).
 - Thuế làm tròn **một lần cho mỗi thuế suất trên cả chứng từ**, rồi chia lại về dòng: tổng các dòng
   luôn khớp tổng. Tầng sau (GTGT) tính trên giá cộng các tầng trước (TTĐB).
-- `tax_point` là ngày theo múi giờ của người bán. Không có thuế suất ngày đó: `422 tax.rate_missing` —
-  engine không bao giờ đoán.
+- `tax_point` là một ngày theo lịch, không phải một thời điểm. Đơn hàng và hoá đơn tính nó bằng
+  `TaxEngine::tax_date`: ngày theo múi giờ của vùng thuế người bán (quy tắc `tax_date.time_zone` của gói;
+  Việt Nam: `Asia/Ho_Chi_Minh`), không có thì theo `organizations.timezone` của nút, không có nữa thì UTC.
+  Vì vậy đơn đặt lúc 00:30 ngày 01/01/2027 giờ Việt Nam (17:30 UTC ngày 31/12) tính thuế suất của ngày
+  01/01. Không có thuế suất ngày đó: `422 tax.rate_missing` — engine không bao giờ đoán.
+- **Thuế của đơn là ước tính; hoá đơn quyết định.** Luật gắn thời điểm xác định thuế GTGT với lúc chuyển
+  giao quyền sở hữu hàng (giao hàng) hay hoàn thành dịch vụ. Đơn tính thuế theo ngày đặt; hoá đơn của đơn
+  tính theo ngày lập của nó (`orders.invoice_timing`, mặc định `on_delivered`). Thuế suất đổi ở giữa thì hoá
+  đơn dùng thuế suất mới và chứng từ của đơn (`GET …/orders/me/orders/{id}/documents`) hiện
+  `differs_from_order: true` — xử lý chênh lệch với người mua. Cờ so thuế từng dòng và tổng tiền, bỏ qua lệch làm
+  tròn 1 đơn vị tiền nhỏ nhất mỗi dòng (2 với dòng huỷ một phần, hoá đơn làm tròn lại): đơn giá chưa thuế ghi phí giao (đã gồm thuế) lên hoá đơn bằng phần trước thuế,
+  nên tổng hoá đơn có thể lệch đơn 1 đồng. Đơn trộn giá gồm thuế và giá chưa thuế luôn được báo — một hoá đơn chỉ có
+  một chế độ giá nên không ghi đúng được. Cờ là `true` thì sửa hoá đơn bằng hoá đơn điều chỉnh
+  (`POST /api/v1/invoices/documents/{id}/adjust`) hay hoá đơn thay thế (`POST /api/v1/invoices/documents/{id}/replace`). Nháp hoá đơn tính vào ngày khác được tính lại khi lập. Hoá đơn điều chỉnh, thay thế giữ ngày thuế
+  (thuế suất) của hoá đơn gốc. Bút toán sổ cái của đơn và hoá đơn ghi theo cùng ngày thuế. `autoxide doctor`
+  cảnh báo khi vùng thuế đã nhập không khai `tax_date.time_zone`.
 - Câu trả lời có `snapshot` (thuế suất và ID, phiên bản gói, cách làm tròn): lưu kèm chứng từ.
 
 `POST /api/v1/tax/withholding` tính số sàn khấu trừ khi trả tiền cho người bán. Tool MCP: `tax.quote`,

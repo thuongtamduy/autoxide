@@ -24,9 +24,25 @@ pub fn run(arguments: &Arguments) -> ExitCode {
     match settings::load() {
         Ok(settings) => {
             print!("{}", render_values(&settings.values));
+            // Biến lạ không làm cấu hình sai (chương trình bỏ qua chúng) nhưng gần như chắc là gõ nhầm tên.
+            for (name, nearest) in settings::unknown_variables() {
+                eprintln!("{}", unknown_variable_text(&name, nearest.as_deref()));
+            }
             ExitCode::SUCCESS
         }
         Err(errors) => report_invalid_configuration(&errors),
+    }
+}
+
+/// Cảnh báo một biến `AUTOXIDE_…` mà chương trình không đọc.
+pub(crate) fn unknown_variable_text(name: &str, nearest: Option<&str>) -> String {
+    match nearest {
+        Some(nearest) => {
+            format!("warning: {name} is not a setting and is ignored; did you mean {nearest}?")
+        }
+        None => format!(
+            "warning: {name} is not a setting and is ignored (see `autoxide config --env-example` for every name)"
+        ),
     }
 }
 

@@ -119,11 +119,73 @@ pub fn load() -> Result<Settings, ConfigErrors> {
     read_with(&ConfigSource::load(Path::new(DOTENV_FILE))?, registry::all())
 }
 
+/// Nguồn cấu hình (biến môi trường và `.env`) để một lệnh nhỏ đọc đúng vài biến của nó qua `ConfigReader`, không dựng cả
+/// [`Settings`] (database, secret…): `autoxide healthcheck`, `autoxide initial-password`.
+pub fn source() -> Result<ConfigSource, ConfigErrors> {
+    ConfigSource::load(Path::new(DOTENV_FILE))
+}
+
+/// Đọc đúng một biến: `read` nhận reader và trả giá trị đã đọc.
+pub fn read_one<T>(
+    source: &ConfigSource,
+    read: impl FnOnce(&mut ConfigReader<'_>) -> Result<T, autoxide_kernel::config::Invalid>,
+) -> Result<T, ConfigErrors> {
+    let mut reader = ConfigReader::new(source);
+    let value = read(&mut reader);
+    reader.finish(value).map(|(value, _)| value)
+}
+
 /// Như [`load`] nhưng với MỌI module, bỏ qua `AUTOXIDE_MODULES`: cho lệnh in hợp đồng đầy đủ
 /// (`autoxide openapi`, `autoxide mcp-manifest`).
 pub fn load_everything() -> Result<Settings, ConfigErrors> {
     let source = ConfigSource::load(Path::new(DOTENV_FILE))?;
     settings(&source, registry::all(), Choice::Everything)
+}
+
+/// Biến `AUTOXIDE_…` có trong môi trường hay `.env` mà chương trình không đọc (thường là gõ sai tên), kèm tên gần
+/// giống nhất nếu có. Chương trình bỏ qua biến lạ lặng lẽ (người dùng đặt `AUTOXIDE_PORT` rồi thấy máy chủ vẫn nghe
+/// cổng mặc định), nên `config` và `serve` nói ra.
+pub fn unknown_variables() -> Vec<(String, Option<String>)> {
+    let Ok(source) = ConfigSource::load(Path::new(DOTENV_FILE)) else { return Vec::new() };
+    let known: Vec<&'static str> = describe().iter().map(|value| value.setting.name).collect();
+    unknown_in(&source, &known)
+}
+
+/// Biến của `compose` hay công cụ khác dùng chung tiền tố `AUTOXIDE_`, không phải cấu hình của chương trình.
+const NOT_SETTINGS: &[&str] = &["AUTOXIDE_IMAGE"];
+
+fn unknown_in(source: &ConfigSource, known: &[&str]) -> Vec<(String, Option<String>)> {
+    source
+        .names()
+        .filter(|name| {
+            name.starts_with("AUTOXIDE_") && !known.contains(name) && !NOT_SETTINGS.contains(name)
+        })
+        .map(|name| {
+            let nearest = known
+                .iter()
+                .map(|candidate| (edit_distance(name, candidate), *candidate))
+                .filter(|(distance, _)| *distance <= 3)
+                .min()
+                .map(|(_, candidate)| candidate.to_owned());
+            (name.to_owned(), nearest)
+        })
+        .collect()
+}
+
+/// Khoảng cách Levenshtein, đủ cho gợi ý "ý bạn là…" (tên biến ngắn, vài trăm ứng viên).
+fn edit_distance(a: &str, b: &str) -> usize {
+    let b: Vec<char> = b.chars().collect();
+    let mut row: Vec<usize> = (0..=b.len()).collect();
+    for (i, ca) in a.chars().enumerate() {
+        let mut previous = row[0];
+        row[0] = i + 1;
+        for (j, cb) in b.iter().enumerate() {
+            let current = row[j + 1];
+            row[j + 1] = (previous + usize::from(ca != *cb)).min(row[j] + 1).min(current + 1);
+            previous = current;
+        }
+    }
+    row[b.len()]
 }
 
 /// Danh sách mọi biến chương trình đọc (kernel và mọi module), với giá trị mặc định
@@ -141,6 +203,35 @@ pub fn describe() -> Vec<SettingValue> {
 mod tests {
     use super::*;
     use autoxide_kernel::config::Setting;
+
+    #[test]
+    fn bien_la_duoc_bao_kem_goi_y() {
+        let source = ConfigSource::from_pairs([
+            ("AUTOXIDE_HTTP_ADRESS", "0.0.0.0:80"),
+            ("AUTOXIDE_PORT", "9000"),
+            ("AUTOXIDE_HTTP_ADDRESS", "0.0.0.0:8080"),
+            ("AUTOXIDE_IMAGE", "x"),
+            ("PATH", "/bin"),
+        ]);
+        let known = ["AUTOXIDE_HTTP_ADDRESS", "AUTOXIDE_LOG_LEVEL"];
+        let mut unknown = unknown_in(&source, &known);
+        unknown.sort();
+        assert_eq!(
+            unknown,
+            vec![
+                ("AUTOXIDE_HTTP_ADRESS".to_owned(), Some("AUTOXIDE_HTTP_ADDRESS".to_owned())),
+                ("AUTOXIDE_PORT".to_owned(), None),
+            ]
+        );
+    }
+
+    #[test]
+    fn moi_bien_cua_env_example_la_bien_da_biet() {
+        // Không có biến nào trong danh sách đã biết bị coi là lạ (tên trong `.env.example` đều được đọc).
+        let known: Vec<&str> = describe().iter().map(|value| value.setting.name).collect();
+        let source = ConfigSource::from_pairs(known.iter().map(|name| (*name, "x")));
+        assert!(unknown_in(&source, &known).is_empty());
+    }
 
     const GREETING: Setting =
         Setting::new("AUTOXIDE_HELLO_GREETING", "Greeting.").with_default("hi");

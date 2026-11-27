@@ -440,24 +440,9 @@ pub trait LegalProfiles: Send + Sync {
 /// changes (payload `website_id`, `domain`, `kind`, `status`, `previous_status`).
 pub const WEBSITE_STATUS_CHANGED: &str = "compliance.website_status_changed";
 
-/// Consumer content moderation rule (step 37, D-364; Law on Protection of Consumers' Rights 19/2023/QH15,
-/// Decree 55/2024/ND-CP — check against the original text): a platform must not hide reviews contrary to the
-/// rules. Modules that hide buyer reviews / content (e.g. step 45) ask before hiding and record the reason in
-/// their own event. The list of reasons is the rule `moderation.hide_reasons` (data with effective dates).
-#[async_trait::async_trait]
-pub trait ModerationPolicy: Send + Sync {
-    /// The reason codes allowed for hiding at `surface` (e.g. `reviews`, `comments`).
-    async fn hide_reasons(&self, tenant: TenantId, surface: &str) -> Result<Vec<String>, Error>;
-
-    /// Whether `reason` is allowed at `surface`; if not → `compliance.hide_reason_not_allowed`
-    /// (422, with `allowed`).
-    async fn check_hide_reason(
-        &self,
-        tenant: TenantId,
-        surface: &str,
-        reason: &str,
-    ) -> Result<(), Error>;
-}
+/// Consumer content moderation rule — moved to the kernel (`autoxide_kernel::moderation::ModerationPolicy`) so
+/// modules that hide reviews ask it without depending on `compliance`; re-exported here, same trait.
+pub use autoxide_kernel::moderation::ModerationPolicy;
 
 /// A consumer complaint forwarded from a support ticket (step 53): `compliance` creates a
 /// `consumer_complaint` case with a statutory deadline (Law 19/2023/QH15), whose target is the ticket.

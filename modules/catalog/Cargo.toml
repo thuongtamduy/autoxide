@@ -19,6 +19,7 @@ testing = []
 [dependencies]
 jiff.workspace = true
 async-trait.workspace = true
+autoxide-compliance.workspace = true
 autoxide-files.workspace = true
 autoxide-kernel.workspace = true
 autoxide-media.workspace = true

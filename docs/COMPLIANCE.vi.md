@@ -15,7 +15,7 @@ Module gồm:
 
 | Phần | Endpoint (dưới `/api/v1/compliance`) |
 | --- | --- |
-| Định danh (KYC) người bán, người livestream, người tiếp thị liên kết — hồ sơ, xác thực và cổng `KycGate`; **chưa chặn đăng bán** (xem dưới) | `/kyc/…`, `/me/kyc…` |
+| Định danh (KYC) người bán, người livestream, người tiếp thị liên kết — hồ sơ, xác thực và cổng `KycGate`; trên sàn, `catalog` chặn mở bán hàng của người bán chưa định danh (xem dưới) | `/kyc/…`, `/me/kyc…` |
 | Xác thực tài khoản đăng nội dung (số điện thoại / định danh) | `/me/verification`, `/me/phone-verifications…` |
 | Văn bản pháp lý có phiên bản và bằng chứng chấp nhận | `/documents…`, `/me/acceptances`, `/public/documents/{kind}` |
 | Sổ đồng ý | `/me/consents` |
@@ -219,9 +219,20 @@ chưa xử lý. Trong lúc chờ, người triển khai tự bù:
 
 - **Định danh người bán trước khi bán.** Quy tắc `kyc.required_activities` đòi người bán, người livestream, người tiếp
   thị liên kết đã định danh (Luật Thương mại điện tử 122/2025/QH15; NĐ 248/2026/NĐ-CP Điều 18, định danh điện tử
-  người bán từ 01/01/2027 — cần đối chiếu văn bản gốc). `compliance` giữ hồ sơ và có cổng `KycGate`, nhưng `catalog`
-  chưa hỏi nó: người bán chưa định danh vẫn đăng bán được. Nối `ListingGate` của `catalog` vào `KycGate` đã xếp
-  trước 1.0; trong lúc chờ, định danh người bán trước khi cấp `catalog.write`.
+  người bán từ 01/01/2027 — cần đối chiếu văn bản gốc). Khi khách là sàn (`kernel.business_model = marketplace`),
+  `catalog` hỏi `KycGate` trước khi sản phẩm của người bán (nút bất kỳ không phải nút gốc của khách) chuyển `active`.
+  Người bán là nút sở hữu hay một nút phía trên nó, dưới nút gốc (sàn → người bán → cửa hàng): một nút trong chuỗi
+  đã định danh là đủ. Người bán chưa định danh nhận `compliance.kyc_required` (403); hàng của nút gốc và khách tự bán
+  hàng của mình không bị hỏi. Module `compliance` bị tắt (vd `AUTOXIDE_MODULES=official,-compliance`) thì không kiểm
+  được định danh, nên trên sàn hàng của người bán không mở bán được (`catalog.seller_verification_unavailable`, 403).
+  Chỉ bước chuyển sang `active` được kiểm: hàng đang bán vẫn bán khi khách chuyển thành sàn, quy tắc bắt đầu áp dụng
+  hay định danh của người bán hết hạn / bị thu hồi — tự dừng chúng (`POST /api/v1/catalog/products/{id}/status`).
+  Sàn cho mỗi người bán một khách con thay vì một nút thì không được kiểm theo cách này: mỗi khách con tự bán hàng của
+  mình. Còn mở: luồng livestream và tiếp thị liên kết (chưa có module), và hồ sơ chưa ghi đủ mọi mục Điều 18
+  nêu — cá nhân: họ tên, ngày sinh, số định danh cá nhân (một nguồn thêm địa chỉ cư trú); tổ chức, hộ kinh doanh:
+  tên, trụ sở, số định danh, người đại diện theo pháp luật; cá nhân nước ngoài: số hộ chiếu (hay giấy tờ tương
+  đương) và nước cấp, còn hiệu lực ít nhất 6 tháng lúc xét duyệt. Hồ sơ giữ tên đã xác thực, mã băm và 4 số cuối của
+  giấy tờ; các mục còn lại nằm ở nhà cung cấp eKYC. Cần đối chiếu văn bản gốc trước khi dựa vào.
 - **Dữ liệu cá nhân của trẻ em.** Luật 91/2025/QH15 có quy định riêng cho trẻ em và người được giám hộ (đồng ý của
   cha mẹ / người giám hộ; từ đủ 7 tuổi thêm đồng ý của trẻ — điều luật và độ tuổi cần đối chiếu). Core không có ngày
   sinh, kiểm tuổi hay đồng ý của người giám hộ: dịch vụ hướng tới trẻ em phải tự thu và lưu đồng ý của người giám hộ.
@@ -355,7 +366,10 @@ Tool MCP: `compliance.list_cases`, `compliance.get_case` (đọc), `compliance.a
 
 - **Ẩn đánh giá.** Nội dung của người tiêu dùng chỉ được ẩn vì các lý do của quy tắc
   `moderation.hide_reasons` (`spam`, `illegal_content`, `personal_data`, `unrelated`, `offensive` — cần
-  đối chiếu). Module kiểm duyệt đánh giá hỏi trait `ModerationPolicy` trước khi ẩn
+  đối chiếu). Module kiểm duyệt đánh giá hỏi trait `ModerationPolicy` (`autoxide_kernel::moderation`) trước khi
+  ẩn — `orders` ánh xạ lý do của mình (`unlawful_content` → `illegal_content`, `abusive_language` → `offensive`,
+  `spam_or_advertising` → `spam`, `not_about_product` → `unrelated`), nên lý do khách tự thêm không ẩn được
+  đánh giá khi đã cài `compliance`
   (`compliance.hide_reason_not_allowed`, 422) và ghi lý do trong event của chính nó; danh sách công khai ở
   `GET /public/moderation-reasons`. Đánh giá tiêu cực mà hợp lệ vẫn hiện.
 - **Điều kiện giao dịch chung** là văn bản pháp lý có phiên bản loại `general_conditions`, công khai ở

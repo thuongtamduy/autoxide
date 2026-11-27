@@ -160,6 +160,9 @@ impl SessionService {
         }
         let ended = live.count(&transaction).await?;
         revoke.exec(&transaction).await?;
+        // Đăng xuất khắp nơi cũng cắt các client MCP người dùng đã duyệt (D-20261126-mcp-oauth mục 9).
+        crate::oauth::revoke_user_grants_in(&transaction, tenant, &self.outbox, actor, user_id)
+            .await?;
         if ended > 0 {
             let event = events::SessionsRevoked {
                 before: None,

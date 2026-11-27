@@ -84,7 +84,11 @@ có nguồn giả: bộ nối thật cần hợp đồng với ngân hàng hay d
   (phải thu, doanh thu, GTGT đầu ra).
 - **Hoá đơn điện tử** gửi tới nhà cung cấp (`EInvoiceProvider`, kể cả hoá đơn từ máy tính tiền) trong
   job nền; bị từ chối thì sửa rồi gửi lại cùng số. Chứng từ đã phát hành chỉ sửa bằng chứng từ điều
-  chỉnh, thay thế, hay huỷ.
+  chỉnh, thay thế, hay huỷ. Hoá đơn điện tử đã gửi cơ quan thuế không huỷ được khi luật của vùng thuế người
+  bán cấm (Việt Nam từ 01/6/2025, NĐ 70/2025/NĐ-CP; quy tắc gói thuế `einvoice.cancel_after_submission`): `409
+  invoices.einvoice_not_cancellable` kèm căn cứ — lập hoá đơn điều chỉnh (`direction: decrease`) hay thay thế.
+  Hoá đơn bị cơ quan thuế từ chối thì huỷ tại chỗ. Autoxide không gửi thông báo sai sót mẫu 04/SS; khi cần thì
+  nộp ở cổng của nhà cung cấp hay cơ quan thuế.
 - Một nút lập thay người bán khi có **uỷ nhiệm** (`/invoices/mandates`).
 
 ## Tỉ giá và chứng từ ngoại tệ

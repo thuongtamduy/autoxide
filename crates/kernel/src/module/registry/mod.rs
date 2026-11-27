@@ -620,6 +620,15 @@ impl Modules {
             dormant,
         });
         self.backlog.fill(self.job_modules(), self.events.modules());
+        // `Module::routes` và `Module::endpoints` ghép vào cùng một router: trùng path + method thì axum dừng tiến trình
+        // lúc ghép — báo lỗi rõ ở đây thay vì để panic.
+        let overlaps = self.overlapping_routes();
+        if !overlaps.is_empty() {
+            return Err(ModuleError(format!(
+                "routes of `Module::routes` and `Module::endpoints` collide: {}; keep one route per path and method",
+                overlaps.join(", ")
+            )));
+        }
         Ok(())
     }
 

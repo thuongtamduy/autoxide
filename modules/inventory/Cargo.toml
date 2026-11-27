@@ -22,6 +22,7 @@ autoxide-organizations.workspace = true
 axum.workspace = true
 sea-orm.workspace = true
 serde.workspace = true
+metrics.workspace = true
 serde_json.workspace = true
 tracing.workspace = true
 utoipa.workspace = true

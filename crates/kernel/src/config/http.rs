@@ -203,8 +203,9 @@ pub const SECURITY_HEADERS: Setting = Setting::new(
     "AUTOXIDE_HTTP_SECURITY_HEADERS",
     "Add security headers to every response (`true` or `false`): `X-Content-Type-Options`, \
      `Referrer-Policy`, `X-Frame-Options`, a strict `Content-Security-Policy`, and \
-     `Strict-Transport-Security` when AUTOXIDE_HTTP_HSTS_SECONDS is set. A header a handler sets \
-     itself is kept. Keep it on even when a reverse proxy adds its own headers.",
+     `Strict-Transport-Security` (see AUTOXIDE_HTTP_HSTS_SECONDS: on by default when \
+     AUTOXIDE_HTTP_PUBLIC_URL starts with `https://`). A header a handler sets itself is kept. \
+     Keep it on even when a reverse proxy adds its own headers.",
 )
 .with_default("true");
 
@@ -218,11 +219,17 @@ pub const REFERRER_POLICY: Setting = Setting::new(
 
 pub const HSTS_SECONDS: Setting = Setting::new(
     "AUTOXIDE_HTTP_HSTS_SECONDS",
-    "`max-age` of the `Strict-Transport-Security` header, in seconds (0 to 63072000). Set it \
-     only when the API is served over HTTPS (`31536000` is one year): browsers then refuse plain \
-     HTTP to this host for that long. `0` sends no such header.",
+    "`max-age` of the `Strict-Transport-Security` header, in seconds (0 to 63072000): browsers \
+     then refuse plain HTTP to this host for that long. When unset, it is `31536000` (one year) \
+     when AUTOXIDE_HTTP_PUBLIC_URL starts with `https://` (a production server reached over \
+     HTTPS), and `0` otherwise (development, or no public URL). `0` sends no such header: set it \
+     to turn HSTS off.",
 )
-.with_default("0");
+.with_example("31536000");
+
+/// `max-age` of HSTS when it is on by default (an `https` public URL): one year, the usual value
+/// (and the least that browsers' HSTS preload lists accept).
+pub const HSTS_DEFAULT_SECONDS: u64 = 31_536_000;
 
 pub const REQUEST_LOG_DAYS: Setting = Setting::new(
     "AUTOXIDE_REQUEST_LOG_DAYS",
@@ -469,11 +476,18 @@ pub struct RateLimit {
 }
 
 impl HttpConfig {
-    pub fn read(reader: &mut ConfigReader) -> Result<Self, Invalid> {
-        let address = reader.get_with(&ADDRESS, |raw| {
+    /// Reads only `AUTOXIDE_HTTP_ADDRESS`: the address the server listens on. For a command that must know where the
+    /// server is but needs no other setting (such as `autoxide healthcheck`), so that it works when the rest of the
+    /// configuration is missing and never builds a structure holding secrets.
+    pub fn read_address(reader: &mut ConfigReader) -> Result<SocketAddr, Invalid> {
+        reader.get_with(&ADDRESS, |raw| {
             raw.parse::<SocketAddr>()
                 .map_err(|_| "must be an IP address and a port, like `127.0.0.1:8080`".to_owned())
-        });
+        })
+    }
+
+    pub fn read(reader: &mut ConfigReader) -> Result<Self, Invalid> {
+        let address = Self::read_address(reader);
         let request_timeout =
             reader.get_with(&REQUEST_TIMEOUT_SECONDS, |raw| parse_in_range(raw, 1u64, 3600));
         let body_limit = reader
@@ -525,8 +539,21 @@ impl HttpConfig {
                 Err(format!("must be one of {}", REFERRER_POLICIES.join(", ")))
             }
         });
-        let hsts_seconds =
-            reader.get_with(&HSTS_SECONDS, |raw| parse_in_range(raw, 0u64, 63_072_000));
+        // Không đặt: bật một năm khi API công khai qua `https` (production), tắt khi không (máy phát triển
+        // thường là `http://localhost` hay không đặt URL) — D-20261127-hsts-production. Chỉ ĐỌC giá trị URL ở
+        // đây; kiểm và ghi nhận nó là việc của `public_url::read_setting`.
+        let hsts_seconds = reader
+            .optional_with(&HSTS_SECONDS, |raw| parse_in_range(raw, 0u64, 63_072_000))
+            .map(|seconds| {
+                seconds.unwrap_or_else(|| {
+                    let public = reader.configured(crate::public_url::PUBLIC_URL.name);
+                    if public.is_some_and(|url| url.trim().starts_with("https://")) {
+                        HSTS_DEFAULT_SECONDS
+                    } else {
+                        0
+                    }
+                })
+            });
         let hsts_include_subdomains = reader.get_with(&HSTS_INCLUDE_SUBDOMAINS, parse_bool);
         let request_log_days =
             reader.get_with(&REQUEST_LOG_DAYS, |raw| parse_in_range(raw, 0u16, 365));

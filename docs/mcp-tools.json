@@ -999,7 +999,7 @@
       "description": "Add a sign-in provider to this tenant; register the application at the provider first. The client secret is stored encrypted and never shown again.",
       "input_schema": {
         "additionalProperties": false,
-        "description": "A new sign-in provider.",
+        "description": "A new sign-in provider. `realm` is `staff` (default) or `customer`.",
         "properties": {
           "allow_signup": {
             "description": "Let someone without an account get one by signing in (still needs registration open, or\n`default_role_id`). Default `false`.",
@@ -1064,20 +1064,12 @@
             "type": "string"
           },
           "realm": {
-            "allOf": [
-              {
-                "description": "The kind of account: `staff` (has the permissions of their roles) or `customer` (an account of\none tenant's shop, without permissions).",
-                "enum": [
-                  "staff",
-                  "customer"
-                ],
-                "type": "string"
-              },
-              {
-                "description": "`staff` (default) or `customer`.",
-                "type": "object"
-              }
-            ]
+            "description": "The kind of account: `staff` (has the permissions of their roles) or `customer` (an account of\none tenant's shop, without permissions).",
+            "enum": [
+              "staff",
+              "customer"
+            ],
+            "type": "string"
           },
           "redirect_uris": {
             "description": "Pages of the interface the provider may send the browser back to (1 to 20, exact match).",
@@ -3709,7 +3701,7 @@
         "returns_secret": false
       },
       "deprecation": null,
-      "description": "Put a product on sale (`active`), stop it (`inactive`), archive it, or reopen an archived product as a `draft`.",
+      "description": "Put a product on sale (`active`), stop it (`inactive`), archive it, or reopen an archived product as a `draft`. On a marketplace, goods of a seller go on sale only once the seller has verified its identity (`compliance.kyc_required`, `catalog.seller_verification_unavailable`).",
       "input_schema": {
         "additionalProperties": false,
         "description": "The new sale status of a product.",
@@ -5536,6 +5528,37 @@
       "output_schema": null,
       "permissions": [
         "compliance.tracking.manage"
+      ],
+      "stability": "official"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Unlock sign-in codes for a phone number locked after too many wrong codes in a row, so its owner can sign in with a code again; a number that is not locked is left as it is. Write numbers outside Vietnam as + and the country code. Check who asks first; the audit log records who unlocked it.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A phone number whose sign-in codes should be unlocked.",
+        "properties": {
+          "phone": {
+            "description": "The number, e.g. `0912345678`; outside Vietnam `+` and the country code (`+6591234567`).",
+            "example": "0912345678",
+            "type": "string"
+          }
+        },
+        "required": [
+          "phone"
+        ],
+        "type": "object"
+      },
+      "name": "compliance.unlock_phone",
+      "output_schema": null,
+      "permissions": [
+        "compliance.phone_locks.manage"
       ],
       "stability": "official"
     },

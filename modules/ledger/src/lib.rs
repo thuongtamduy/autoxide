@@ -19,6 +19,7 @@ mod http_fx;
 mod http_payments;
 mod journal;
 mod migration;
+mod payment_refunds;
 mod payments;
 mod payouts;
 mod periods;

@@ -30,8 +30,9 @@ const PASSES: u32 = 2;
 /// Số luồng song song trong một lần hash.
 const LANES: u32 = 1;
 
-/// Độ dài tối thiểu của mật khẩu, tính theo ký tự.
-pub(crate) const MIN_LENGTH: usize = 12;
+/// Độ dài tối thiểu của mật khẩu, tính theo ký tự (code point). 15: NIST SP 800-63B-4 §3.1.1.2 buộc mật khẩu dùng
+/// làm yếu tố duy nhất dài ít nhất 15 ký tự, và ở đây mật khẩu một mình đăng nhập được (D-20261127-breached-passwords).
+pub(crate) const MIN_LENGTH: usize = 15;
 /// Độ dài tối đa: đủ cho cụm từ dài và trình quản lý mật khẩu, nhưng chặn việc gửi
 /// mật khẩu khổng lồ để làm máy chủ hash mãi.
 pub(crate) const MAX_LENGTH: usize = 128;
@@ -74,7 +75,8 @@ impl Passwords {
         self
     }
 
-    /// Lỗi của trường `field` nếu `password` không đạt luật độ dài của khách `tenant` (xem [`check_length`]).
+    /// Lỗi của trường `field` nếu `password` không đạt luật của khách `tenant`: độ dài (xem [`check_length`])
+    /// rồi danh sách mật khẩu phổ biến / đã lộ (xem [`check_common`]).
     pub(crate) async fn problem(
         &self,
         tenant: &autoxide_kernel::tenancy::TenantContext,
@@ -82,7 +84,7 @@ impl Passwords {
         password: &str,
     ) -> Result<Option<FieldError>, Error> {
         let min = self.policy.password_min_length(tenant).await?;
-        Ok(check_length(field, password, min))
+        Ok(check_length(field, password, min).or_else(|| check_common(field, password)))
     }
 
     /// Hash `password` với salt ngẫu nhiên; trả chuỗi PHC để lưu.
@@ -151,12 +153,29 @@ fn is_outdated(parsed: &PasswordHash) -> bool {
     }
 }
 
-/// Lỗi của trường `field` nếu `password` không đạt luật độ dài.
+/// Lỗi của trường `field` nếu `password` không đạt luật của server: độ dài, rồi danh sách mật khẩu phổ biến /
+/// đã lộ.
 ///
-/// Chỉ luật độ dài, không bắt buộc chữ hoa, số hay ký tự đặc biệt: theo NIST SP
-/// 800-63B, luật ghép ký tự làm mật khẩu dễ đoán hơn chứ không khó hơn.
+/// Không bắt buộc chữ hoa, số hay ký tự đặc biệt: theo NIST SP 800-63B-4 §3.1.1.2, luật ghép ký tự làm
+/// mật khẩu dễ đoán hơn chứ không khó hơn; thay vào đó chặn mật khẩu nằm trong danh sách đã lộ.
 pub(crate) fn check_rules(field: &str, password: &str) -> Option<FieldError> {
-    check_length(field, password, MIN_LENGTH)
+    check_length(field, password, MIN_LENGTH).or_else(|| check_common(field, password))
+}
+
+/// Mã lỗi của TRƯỜNG (như `length`, không phải `code` của lỗi — lỗi là `validation_failed`) khi mật khẩu nằm
+/// trong danh sách mật khẩu phổ biến / đã lộ; hợp đồng với client.
+pub(crate) const COMMON_PASSWORD: &str = "common_password";
+
+/// Lỗi của trường `field` nếu `password` là mật khẩu phổ biến hay đã lộ (D-20261127-breached-passwords).
+/// Lỗi không nhắc lại mật khẩu, và không mật khẩu nào được ghi vào log.
+pub(crate) fn check_common(field: &str, password: &str) -> Option<FieldError> {
+    crate::breached::is_common(password).then(|| {
+        FieldError::new(
+            field,
+            COMMON_PASSWORD,
+            "is a commonly used or breached password; choose one that is harder to guess",
+        )
+    })
 }
 
 /// Như [`check_rules`] với độ dài tối thiểu `min` (của khách, không dưới [`MIN_LENGTH`]).
@@ -174,93 +193,4 @@ pub(crate) fn check_length(field: &str, password: &str, min: usize) -> Option<Fi
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    const PASSWORD: &str = "correct horse battery staple";
-
-    #[tokio::test]
-    async fn hash_dung_argon2id_voi_tham_so_hien_hanh() {
-        let hash = Passwords::new().hash(PASSWORD.to_owned()).await.unwrap();
-
-        assert!(hash.starts_with("$argon2id$v=19$m=19456,t=2,p=1$"), "{hash}");
-        assert!(!hash.contains(PASSWORD));
-    }
-
-    #[tokio::test]
-    async fn cung_mat_khau_hai_lan_hash_khac_nhau() {
-        let passwords = Passwords::new();
-
-        let first = passwords.hash(PASSWORD.to_owned()).await.unwrap();
-        let second = passwords.hash(PASSWORD.to_owned()).await.unwrap();
-
-        // Salt ngẫu nhiên: hai người cùng mật khẩu không có cùng hash.
-        assert_ne!(first, second);
-    }
-
-    #[tokio::test]
-    async fn kiem_dung_va_sai_mat_khau() {
-        let passwords = Passwords::new();
-        let hash = passwords.hash(PASSWORD.to_owned()).await.unwrap();
-
-        let right = passwords.verify(PASSWORD.to_owned(), Some(hash.clone())).await.unwrap();
-        let wrong = passwords.verify("wrong password!".to_owned(), Some(hash)).await.unwrap();
-
-        assert_eq!(right, Verification::Valid { rehash: false });
-        assert_eq!(wrong, Verification::Invalid);
-    }
-
-    #[tokio::test]
-    async fn khong_co_hash_thi_luon_sai() {
-        let verification = Passwords::new().verify(PASSWORD.to_owned(), None).await.unwrap();
-
-        assert_eq!(verification, Verification::Invalid);
-    }
-
-    #[test]
-    fn hash_gia_dung_tham_so_hien_hanh() {
-        // Hash giả phải tốn đúng bằng hash thật, nếu không thời gian trả lời lộ
-        // email nào có thật.
-        let parsed = PasswordHash::new(DUMMY_HASH).unwrap();
-        assert!(!is_outdated(&parsed));
-    }
-
-    #[tokio::test]
-    async fn hash_theo_tham_so_cu_van_kiem_duoc_va_can_hash_lai() {
-        let weak = Argon2::new(
-            Algorithm::Argon2id,
-            Version::V0x13,
-            Params::new(8 * 1024, 1, 1, None).unwrap(),
-        );
-        let old = weak.hash_password(PASSWORD.as_bytes()).unwrap().to_string();
-
-        let verification = Passwords::new().verify(PASSWORD.to_owned(), Some(old)).await.unwrap();
-
-        assert_eq!(verification, Verification::Valid { rehash: true });
-    }
-
-    #[tokio::test]
-    async fn hash_hong_la_loi_noi_bo() {
-        let error = Passwords::new()
-            .verify(PASSWORD.to_owned(), Some("not a hash".to_owned()))
-            .await
-            .unwrap_err();
-
-        assert_eq!(error.code(), "internal_error");
-    }
-
-    #[test]
-    fn luat_do_dai_tinh_theo_ky_tu() {
-        assert!(check_rules("password", &"a".repeat(MIN_LENGTH - 1)).is_some());
-        assert_eq!(check_rules("password", &"a".repeat(MIN_LENGTH)), None);
-        assert_eq!(check_rules("password", &"a".repeat(MAX_LENGTH)), None);
-        assert!(check_rules("password", &"a".repeat(MAX_LENGTH + 1)).is_some());
-        // 12 ký tự tiếng Việt có dấu (nhiều byte mỗi ký tự) vẫn là 12 ký tự.
-        assert_eq!(check_rules("password", "mậtkhẩuđủdài"), None);
-
-        let error = check_rules("password", "short").unwrap();
-        assert_eq!(error.field, "password");
-        assert_eq!(error.code, "length");
-        assert_eq!(error.message, "must be between 12 and 128 characters long");
-    }
-}
+mod tests;

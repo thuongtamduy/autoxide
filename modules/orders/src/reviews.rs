@@ -548,6 +548,32 @@ impl OrdersService {
             if self.reasons.ensure(tenant, REVIEW_HIDDEN, code).await.is_err() {
                 return Err(errors::moderation_reason_invalid());
             }
+            // Luật chỉ cho ẩn đánh giá vì một số lý do (quy tắc `moderation.hide_reasons` của `compliance`, có
+            // ngày hiệu lực): mã khách tự thêm không ánh xạ được thì bị từ chối (LG-12).
+            if let Some(policy) = &self.moderation {
+                match policy
+                    .check_hide_reason(tenant.id(), "reviews", legal_hide_reason(code))
+                    .await
+                {
+                    Ok(()) => {}
+                    // Lỗi của quy tắc nêu mã của luật; người gọi gửi mã của `orders`: báo lại bằng mã người gọi gửi
+                    // và các mã `orders` được phép (kiểm độc lập #575, N3). Giữ nguyên mã lỗi, loại lỗi và câu mẫu.
+                    Err(error) if error.code() == "compliance.hide_reason_not_allowed" => {
+                        // Giữ danh sách trong một biến: `&str` bên dưới mượn từ nó.
+                        let legal = policy.hide_reasons(tenant.id(), "reviews").await?;
+                        let allowed: Vec<&str> =
+                            legal.iter().map(|legal| orders_hide_reason(legal)).collect();
+                        return Err(Error::new(
+                            error.kind(),
+                            error.code().to_owned(),
+                            error.template().to_owned(),
+                        )
+                        .with_param("reason", code)
+                        .with_param("allowed", allowed.join(", ")));
+                    }
+                    Err(error) => return Err(error),
+                }
+            }
         }
         let actor = Actor::user(principal.user_id());
         let moderator = principal.user_id();
@@ -1018,3 +1044,22 @@ impl BadgeResolver for VerifiedBuyer {
         }
     }
 }
+
+/// Mã lý do ẩn đánh giá của `orders` → mã của quy tắc luật `moderation.hide_reasons` (`compliance`). Mã khách tự
+/// thêm giữ nguyên — quy tắc không có thì bị từ chối.
+fn legal_hide_reason(code: &str) -> &str {
+    HIDE_REASON_MAP.iter().find(|(ours, _)| *ours == code).map_or(code, |(_, legal)| legal)
+}
+
+/// Chiều ngược của [`legal_hide_reason`]: mã của quy tắc luật → mã của `orders` (mã khác giữ nguyên).
+fn orders_hide_reason(legal: &str) -> &str {
+    HIDE_REASON_MAP.iter().find(|(_, found)| *found == legal).map_or(legal, |(ours, _)| ours)
+}
+
+/// (mã của `orders`, mã của quy tắc `moderation.hide_reasons`).
+const HIDE_REASON_MAP: [(&str, &str); 4] = [
+    ("unlawful_content", "illegal_content"),
+    ("abusive_language", "offensive"),
+    ("spam_or_advertising", "spam"),
+    ("not_about_product", "unrelated"),
+];

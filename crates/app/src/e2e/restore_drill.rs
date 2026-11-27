@@ -52,7 +52,8 @@ async fn dien_tap_backup_restore_roi_khoi_dong() {
 
         // 2. Backup như người vận hành chạy `autoxide backup <thư mục>`.
         let backup = scratch.join("backup");
-        let report = run_backup(settings(test.url(), &files_a), backup.clone()).await.unwrap();
+        let report =
+            run_backup(settings(test.url(), &files_a), backup.clone(), false).await.unwrap();
         assert!(report.starts_with("Backed up "), "{report}");
 
         // 3. Restore vào một database trống và một nơi lưu file trống.

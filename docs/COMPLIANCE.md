@@ -15,7 +15,7 @@ What the module covers:
 
 | Part | Endpoints (under `/api/v1/compliance`) |
 | --- | --- |
-| Identity verification (KYC) of sellers, livestreamers, affiliates — profiles, checks and the gate `KycGate`; listing goods is **not blocked yet** by it (see below) | `/kyc/…`, `/me/kyc…` |
+| Identity verification (KYC) of sellers, livestreamers, affiliates — profiles, checks and the gate `KycGate`; on a marketplace, `catalog` blocks listing goods of unverified sellers (see below) | `/kyc/…`, `/me/kyc…` |
 | Account verification for posting (phone / identity) | `/me/verification`, `/me/phone-verifications…` |
 | Versioned legal documents and proof of acceptance | `/documents…`, `/me/acceptances`, `/public/documents/{kind}` |
 | Consent ledger | `/me/consents` |
@@ -227,9 +227,23 @@ not handle yet. Until they are done, the deployer covers them:
 
 - **Seller identity before selling.** The legal rule `kyc.required_activities` asks for verified sellers,
   livestreamers and affiliates (E-commerce Law 122/2025/QH15; Decree 248/2026/ND-CP Article 18, electronic identity
-  of sellers from 1 January 2027 — check the originals). `compliance` keeps the profiles and offers `KycGate`, but
-  `catalog` does not ask it yet: a product can be listed by an unverified seller. Wiring `catalog`'s `ListingGate`
-  to `KycGate` is planned before 1.0; until then, verify sellers before giving them `catalog.write`.
+  of sellers from 1 January 2027 — check the originals). When the tenant is a marketplace
+  (`kernel.business_model = marketplace`), `catalog` asks `KycGate` before a product of a seller (any branch other
+  than the tenant's root) goes `active`. The seller is the owning branch or a branch above it, below the root
+  (marketplace → seller → store): one verified branch in that chain is enough. An unverified seller gets
+  `compliance.kyc_required` (403); goods of the root and tenants that sell their own goods are not asked. If module
+  `compliance` is turned off (for example `AUTOXIDE_MODULES=official,-compliance`), identity cannot be checked, so
+  goods of a seller cannot go on sale on a marketplace (`catalog.seller_verification_unavailable`, 403). Only the
+  change to `active` is checked: goods already on sale stay on sale when the tenant becomes a marketplace, the rule
+  starts to apply or a seller's verification expires or is revoked — stop them yourself
+  (`POST /api/v1/catalog/products/{id}/status`). A marketplace that gives each seller its own child tenant instead
+  of a branch is not checked this way: each child tenant sells its own goods. Still open: livestream and affiliate flows (no module
+  yet), and the profile does not record every item Article 18 lists — individuals: full name, date of birth,
+  personal identification number (one source adds residential address); organisations and household businesses:
+  name, head office, identification number, legal representative; foreign individuals: passport (or equivalent)
+  number and issuing country, valid at least 6 more months at review. The profile keeps the verified name and a
+  hash and last 4 digits of the document; the other items stay with the eKYC provider. Check the originals before
+  relying on this.
 - **Personal data of children.** Law 91/2025/QH15 sets special rules for children and persons under guardianship
   (consent of a parent or guardian; from age 7 also the child's — the article and ages need checking). Core has no
   birth date, age check or guardian consent: a service aimed at children must collect and keep the guardian's
@@ -371,7 +385,10 @@ MCP tools: `compliance.list_cases`, `compliance.get_case` (read), `compliance.ad
 
 - **Hiding reviews.** Content of consumers may be hidden only for the reasons of the legal rule
   `moderation.hide_reasons` (`spam`, `illegal_content`, `personal_data`, `unrelated`, `offensive` — to
-  check). Modules that moderate reviews ask the trait `ModerationPolicy` before hiding
+  check). Modules that moderate reviews ask the trait `ModerationPolicy` (`autoxide_kernel::moderation`)
+  before hiding — `orders` maps its own reasons (`unlawful_content` → `illegal_content`, `abusive_language` →
+  `offensive`, `spam_or_advertising` → `spam`, `not_about_product` → `unrelated`), so a reason a tenant adds
+  to its list cannot hide a review while `compliance` is installed
   (`compliance.hide_reason_not_allowed`, 422) and record the reason in their own event; the list is
   public at `GET /public/moderation-reasons`. A negative but lawful review stays visible.
 - **General conditions of trade** are a versioned legal document of kind `general_conditions`, public at

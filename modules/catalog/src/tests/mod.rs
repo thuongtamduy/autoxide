@@ -19,6 +19,7 @@ mod readiness;
 mod recommend;
 mod resources;
 mod search;
+mod seller_kyc;
 mod statements;
 mod suggestions;
 mod transfers;

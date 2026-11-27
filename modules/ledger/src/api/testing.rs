@@ -95,6 +95,10 @@ struct State {
     fail_posts: usize,
     /// Number of upcoming `create_payment` calls that return `ledger.gateway_not_configured`.
     fail_payments: usize,
+    refuse_refunds: usize,
+    busy_refunds: usize,
+    /// Payments the source module kept with `keep_late_payment`, in order.
+    kept: Vec<Uuid>,
     /// The `return_url` the caller sent for each payment through the gateway, in order.
     return_urls: Vec<Option<String>>,
 }
@@ -226,6 +230,44 @@ impl FakeLedger {
             .sum()
     }
 
+    /// The next `count` `refund` calls are refused with `payment.not_supported` (422: the partner cannot
+    /// refund; sending again never helps).
+    pub fn refuse_next_refunds(&self, count: usize) {
+        lock(&self.state).refuse_refunds = count;
+    }
+
+    /// The next `count` `refund` calls answer a conflict (409 `ledger.payment_state`: not a final refusal;
+    /// sending the same refund again later works).
+    pub fn conflict_next_refunds(&self, count: usize) {
+        lock(&self.state).busy_refunds = count;
+    }
+
+    /// The payments the source module kept with [`Ledger::keep_late_payment`], in order of the calls.
+    pub fn kept(&self) -> Vec<Uuid> {
+        lock(&self.state).kept.clone()
+    }
+
+    /// The partner collected `payment`: marks it `succeeded` as the real `ledger` does before it emits
+    /// `ledger.payment_succeeded` (for tests that emit the event themselves).
+    pub fn collect(&self, payment: Uuid) {
+        let mut state = lock(&self.state);
+        if let Some(found) = state.payments.iter_mut().find(|found| found.id == payment) {
+            found.status = "succeeded".to_owned();
+            found.captured_at = Some(Timestamp::now());
+            found.updated_at = Timestamp::now();
+        }
+    }
+
+    /// The partner reports `payment` failed (declined, abandoned): marks it `failed`, as the real `ledger`
+    /// does on a failure notification. No event (the source module reads the status when it needs it).
+    pub fn fail(&self, payment: Uuid) {
+        let mut state = lock(&self.state);
+        if let Some(found) = state.payments.iter_mut().find(|found| found.id == payment) {
+            found.status = "failed".to_owned();
+            found.updated_at = Timestamp::now();
+        }
+    }
+
     /// The partner reports `payment` fully collected: marks it collected and records the event
     /// `ledger.payment_succeeded` in the outbox (not delivered: the test runs the dispatcher). Needs an app
     /// built with [`FakeLedger::module`].
@@ -317,6 +359,7 @@ impl FakeLedger {
         }
         let id = Uuid::now_v7();
         let now = Timestamp::now();
+        let usual = now + SignedDuration::from_mins(PAYMENT_TTL_MINUTES);
         let number = state.payments.len() + 1;
         let payment = Payment {
             id,
@@ -333,7 +376,8 @@ impl FakeLedger {
             qr_payload: transfer.then(|| format!("000201-{id}")),
             transfer_code: transfer.then(|| format!("AX{number:04}")),
             bank_account_id: None,
-            expires_at: now + SignedDuration::from_mins(PAYMENT_TTL_MINUTES),
+            // Như `ledger` thật: hạn thường hay `expires_by` của bên tạo, cái nào sớm hơn.
+            expires_at: request.expires_by.map_or(usual, |cap| cap.min(usual)),
             captured_at: None,
             source_module: request.source_module,
             source_id: request.source_id,
@@ -356,6 +400,7 @@ struct PaymentRequest {
     source_module: String,
     source_id: Option<String>,
     reference: String,
+    expires_by: Option<Timestamp>,
 }
 
 #[async_trait::async_trait]
@@ -522,8 +567,14 @@ impl Ledger for FakeLedger {
             source_module: payment.source_module,
             source_id: payment.source_id,
             reference: payment.reference,
+            expires_by: payment.expires_by,
         };
         Ok(self.create_payment_of(org, request, false))
+    }
+
+    async fn keep_late_payment(&self, _: &TenantContext, payment: Uuid) -> Result<(), Error> {
+        lock(&self.state).kept.push(payment);
+        Ok(())
     }
 
     async fn refund(
@@ -539,6 +590,19 @@ impl Ledger for FakeLedger {
             .find(|found| found.payment_id == refund.payment && found.reference == refund.reference)
         {
             return Ok(Submitted::Replayed(found.clone()));
+        }
+        if state.refuse_refunds > 0 {
+            state.refuse_refunds -= 1;
+            return Err(autoxide_kernel::payment::not_supported(FAKE_LEDGER_PROVIDER));
+        }
+        if state.busy_refunds > 0 {
+            state.busy_refunds -= 1;
+            // Mã có sẵn của `ledger` (đã có bản dịch): thanh toán đang ở trạng thái chưa hoàn được.
+            return Err(Error::conflict(
+                "ledger.payment_state",
+                "The payment is `{status}`; this cannot be done now.",
+            )
+            .with_param("status", "pending"));
         }
         let now = Timestamp::now();
         if let Some(payment) = state.payments.iter_mut().find(|found| found.id == refund.payment) {
@@ -652,6 +716,7 @@ impl Ledger for FakeLedger {
             source_module: payment.source_module,
             source_id: payment.source_id,
             reference: payment.reference,
+            expires_by: payment.expires_by,
         };
         Ok(self.create_payment_of(org, request, true))
     }

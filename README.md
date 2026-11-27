@@ -48,7 +48,7 @@ printf 'AUTOXIDE_AUTH_TOKEN_SECRET=%s\nAUTOXIDE_SECRET_KEY=%s\n' \
 
 docker compose -f compose.quickstart.yml up -d
 # The administrator's generated password (see below)
-docker compose -f compose.quickstart.yml exec autoxide cat data/initial-admin-password
+docker compose -f compose.quickstart.yml exec autoxide autoxide initial-password
 ```
 
 **The first administrator's password.** On its first start the server creates the administrator
@@ -57,11 +57,11 @@ collected elsewhere): it is written once to the file `data/initial-admin-passwor
 server's user can read. Inside the container that is `/var/lib/autoxide/data/initial-admin-password`,
 in the Docker volume `data` (named `<directory>_data` by Compose), so it survives restarts. The
 command above prints its two lines: the email, then the password. The log only says where the file
-is (`docker compose -f compose.quickstart.yml logs autoxide | grep "first administrator"`). If `cat`
-answers "No such file", an administrator existed already (the volume was used before), or you set
+is (`docker compose -f compose.quickstart.yml logs autoxide | grep "first administrator"`). If the command
+says the file "does not exist", an administrator existed already (the volume was used before), or you set
 `AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD` yourself. Once you have signed in and changed the password,
 delete the file:
-`docker compose -f compose.quickstart.yml exec autoxide rm data/initial-admin-password`.
+`docker compose -f compose.quickstart.yml exec autoxide autoxide initial-password --remove`.
 
 Then open <http://127.0.0.1:8080/> (name, version and links) and sign in. The API reference page
 (`/api/docs`, it loads its script from a CDN) is off in the quickstart: add
@@ -241,6 +241,10 @@ to a directory you mount, not to a path inside the container (`mkdir backups && 
 backups`, then add `-v "$PWD/backups:/backups"` and run `backup /backups/<name>`). Sign in as
 shown under [Configuration](#configuration) (use `http://127.0.0.1:8080`). For PostgreSQL,
 a reverse proxy with HTTPS, updates and restore, see [`docs/DEPLOY.md`](docs/DEPLOY.md).
+
+**No Docker?** Build the binary and run it by hand: [`docs/DEPLOY.md`, section B](docs/DEPLOY.md#b-one-binary-with-sqlite)
+(SQLite) or [B+](docs/DEPLOY.md#b-one-binary-with-postgresql-from-scratch) (PostgreSQL). The two secrets go in `.env`,
+`autoxide migrate up` runs before `autoxide serve`, and `AUTOXIDE_HTTP_ADDRESS` changes the address.
 
 ## Requirements
 
