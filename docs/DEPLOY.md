@@ -367,7 +367,10 @@ A backup keeps the schema of its source exactly as it is: the command does not n
 migrated first, so you can back up right before an upgrade, and the release you upgrade from can
 restore that backup (`backup.json` lists the migrations it holds). A newer release restores it
 too. From this release on, an older release than the source refuses it with a clear message
-(earlier releases fail with a migration error). The backup holds the modules that are turned on: if
+(earlier releases fail with a migration error). A backup written before 0.20 has no list of
+migrations, so `restore` cannot tell whether it holds data of a module this build lacks: restore
+those with a build that has every module the source had. Do not add files to a backup directory
+(`restore` counts the files under `files/`, so even a `.DS_Store` makes it refuse). The backup holds the modules that are turned on: if
 a module that is turned off still has data, the command stops and says which setting turns it on.
 Keep
 `AUTOXIDE_SECRET_KEY` in a safe place apart from the backups: without it, the encrypted secrets in

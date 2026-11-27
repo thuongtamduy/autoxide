@@ -13,8 +13,8 @@ use std::path::{Path, PathBuf};
 use autoxide_kernel::backup::{self, BackupOf, BackupPlacement, FILES_DIR, private_dir};
 use autoxide_kernel::migration::MigrationLock;
 use autoxide_kernel::storage::Storage;
-use autoxide_kernel::tenancy::{MAIN_PLACEMENT, PlacementId, TenancyMode};
-use autoxide_kernel::transfer::copy_modules;
+use autoxide_kernel::tenancy::{MAIN_PLACEMENT, PlacementId, Placements, TenancyMode};
+use autoxide_kernel::transfer::{CopiedTable, copy_modules};
 
 use super::backup::{
     describe, load_files, migrations_behind, read_manifest, refuse_non_empty, summary,
@@ -199,13 +199,16 @@ async fn restore_into(
     let copied = async {
         let source =
             open_checked(&runtime.modules, &migrator, manifest, directory, &scratch).await?;
-        // Giữ lock migration và đặt placement `migrating` trong lúc chép: khách của nó nhận 503 thay vì đọc/ghi
-        // một database đang dở (máy chủ có thể vẫn chạy), và không ai migrate nó cùng lúc. Dừng giữa chừng thì lần
-        // chạy migrate sau đặt nó `behind`.
+        // Giữ lock migration và đặt placement `migrating` trong lúc chép (database lẫn file): khách của nó nhận 503
+        // thay vì đọc/ghi một placement đang dở (máy chủ có thể vẫn chạy), và không ai migrate nó cùng lúc.
+        let storage = match registry.placement_storage(id).await.map_err(describe)? {
+            Some(own) => Some(own),
+            None => runtime.modules.api::<dyn Storage>(),
+        };
+        let restore = Restore { name, migrator: &migrator, source: &source, target: &target };
         let copied = match placements.lock(LOCK_WAIT).await.map_err(describe) {
             Ok(held) => {
-                let copied =
-                    copy_into(runtime, &placements, &held, name, &migrator, &source, &target).await;
+                let copied = restore.run(runtime, &placements, &held, storage, directory).await;
                 if let Err(error) = held.release().await {
                     tracing::warn!(error = %error, "cannot release the migration lock");
                 }
@@ -218,39 +221,87 @@ async fn restore_into(
     }
     .await;
     let _ = std::fs::remove_dir_all(&scratch);
-    let tables = copied?;
-    let storage = match registry.placement_storage(id).await.map_err(describe)? {
-        Some(own) => Some(own),
-        None => runtime.modules.api::<dyn Storage>(),
-    };
-    let files = match storage {
-        Some(storage) => load_files(storage, &directory.join(FILES_DIR)).await?,
-        None => 0,
-    };
+    let (tables, files) = copied?;
     // Placement đủ migration: khách trên đó phục vụ lại được.
     placements.check().await.map_err(describe)?;
     Ok(summary(&format!("Restored placement {name}:"), &tables, files, directory))
 }
 
-/// Giữ lock: đặt placement `migrating`, migrate database trống của nó, chép dữ liệu, rồi đặt `behind` (lần `check`
-/// sau đặt `ready` khi đủ migration). Lỗi thì vẫn đặt `behind`: database dở, khách nhận 503 tới khi sửa.
-async fn copy_into(
-    runtime: &Runtime,
-    placements: &autoxide_kernel::tenancy::Placements,
+/// Một lần restore placement đã qua kiểm, chạy khi giữ lock migration.
+struct Restore<'a> {
+    name: &'a str,
+    migrator: &'a autoxide_kernel::migration::Migrator,
+    source: &'a autoxide_kernel::database::Database,
+    target: &'a autoxide_kernel::database::Database,
+}
+
+impl Restore<'_> {
+    /// Kiểm lại database đích còn trống (lúc này đã giữ lock), đặt placement `migrating`, migrate nó, chép dữ liệu và
+    /// file, rồi đặt `behind` (`check` sau đó đặt `ready`). Lỗi sau khi đã migrate đích: đưa đích về trống (gỡ mọi
+    /// migration) — placement còn thiếu migration nên giữ `behind`, khách nhận 503, không bao giờ được phục vụ một
+    /// database dở; chạy lại lệnh là đủ. Gỡ cũng lỗi: để `migrating` (không ai tự đưa nó về `ready`) và báo cả hai.
+    async fn run(
+        &self,
+        runtime: &Runtime,
+        placements: &Placements,
+        held: &MigrationLock,
+        storage: Option<std::sync::Arc<dyn Storage>>,
+        directory: &Path,
+    ) -> Result<(Vec<CopiedTable>, u64), String> {
+        let name = self.name;
+        // Kiểm lại khi đã giữ lock (lần kiểm trước lock chỉ để báo sớm), trước khi đổi trạng thái: placement đang phục
+        // vụ thì không bị đặt `migrating` oan.
+        let what = format!("the database of placement `{name}`");
+        refuse_non_empty(self.migrator, self.target, &what).await?;
+        placements.mark_rollback(held, name, false).await.map_err(describe)?;
+        let restored = async {
+            self.migrator.up(self.target).await.map_err(|error| error.to_string())?;
+            let tables = copy_modules(self.source, self.target, &runtime.modules.names())
+                .await
+                .map_err(|error| error.to_string())?;
+            let files = match storage {
+                Some(storage) => load_files(storage, &directory.join(FILES_DIR)).await?,
+                None => 0,
+            };
+            Ok::<_, String>((tables, files))
+        }
+        .await;
+        match restored {
+            Ok(done) => match placements.mark_rollback(held, name, true).await {
+                Ok(()) => Ok(done),
+                Err(error) => Err(describe(error)),
+            },
+            Err(error) => match self.migrator.rollback(self.target, &|_, _| false).await {
+                Ok(_) => Err(finish(
+                    placements,
+                    held,
+                    name,
+                    format!(
+                        "{error}. The database of placement `{name}` was emptied again; fix the cause and run \
+                         the command again"
+                    ),
+                )
+                .await),
+                Err(undo) => Err(format!(
+                    "{error}. Emptying the database of placement `{name}` again failed too ({undo}); it stays \
+                     `migrating` (its tenants get 503): drop and recreate that database, then run the command again"
+                )),
+            },
+        }
+    }
+}
+
+/// Đặt placement `behind` sau một lần restore không thành; lỗi khi đặt thì báo kèm, không che lỗi gốc.
+async fn finish(
+    placements: &Placements,
     held: &MigrationLock,
     name: &str,
-    migrator: &autoxide_kernel::migration::Migrator,
-    source: &autoxide_kernel::database::Database,
-    target: &autoxide_kernel::database::Database,
-) -> Result<Vec<autoxide_kernel::transfer::CopiedTable>, String> {
-    placements.mark_rollback(held, name, false).await.map_err(describe)?;
-    let copied = async {
-        migrator.up(target).await.map_err(|error| error.to_string())?;
-        copy_modules(source, target, &runtime.modules.names())
-            .await
-            .map_err(|error| error.to_string())
+    error: String,
+) -> String {
+    match placements.mark_rollback(held, name, true).await {
+        Ok(()) => error,
+        Err(mark) => {
+            format!("{error} (and cannot mark placement `{name}` `behind`: {})", describe(mark))
+        }
     }
-    .await;
-    placements.mark_rollback(held, name, true).await.map_err(describe)?;
-    copied
 }

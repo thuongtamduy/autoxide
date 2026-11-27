@@ -359,7 +359,10 @@ sau đó (đầy đĩa, mất kết nối), đích có một phần dữ liệu:
 Bản backup giữ nguyên schema của nguồn: lệnh không đòi database đã migrate, nên backup được ngay trước
 khi nâng cấp, và bản đang chạy trước khi nâng restore được bản backup đó (`backup.json` liệt kê các
 migration nó có). Bản mới hơn cũng restore được. Từ bản này trở đi, bản cũ hơn nguồn từ chối với
-thông báo rõ (các bản trước đó báo lỗi migration). Bản backup chứa các
+thông báo rõ (các bản trước đó báo lỗi migration). Bản backup làm trước 0.20 không có danh sách
+migration, nên `restore` không biết nó có dữ liệu của module mà bản build này thiếu hay không: restore
+chúng bằng bản build có đủ mọi module của nguồn. Đừng thêm file vào thư mục backup (`restore` đếm file
+trong `files/`, một file `.DS_Store` cũng làm nó từ chối). Bản backup chứa các
 module đang bật: module đang tắt mà còn dữ liệu thì lệnh dừng và nói cấu hình nào bật nó.
 Cất
 `AUTOXIDE_SECRET_KEY` ở nơi an toàn, tách khỏi bản

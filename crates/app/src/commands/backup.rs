@@ -662,17 +662,28 @@ mod tests {
             assert!(states.iter().all(|state| !state.applied), "eu-1 must stay untouched");
             sql(&copy_url, &["DROP TABLE newsletter_probe"]).await;
 
-            // Thư mục của bản backup chính (`--all`) cũng được: lấy `placements/eu-1/` của nó.
-            let restored = restore(backup.clone(), "eu-1").await.unwrap();
-            assert!(restored.starts_with("Restored placement eu-1:"), "{restored}");
+            // Chép lỗi SAU khi đích đã được migrate (bản sao thiếu một bảng): đích được đưa về trống, placement giữ
+            // `behind` — không bao giờ phục vụ lại một database dở.
+            let broken = scratch.0.join("broken");
+            std::fs::create_dir_all(&broken).unwrap();
+            for file in [MANIFEST, "database.sqlite"] {
+                std::fs::copy(eu1.join(file), broken.join(file)).unwrap();
+            }
+            let manifest = read(&broken);
+            let first = manifest["tables"][0]["table"].as_str().unwrap().to_owned();
+            let broken_url =
+                format!("sqlite://{}?mode=rw", broken.join("database.sqlite").display());
+            sql(&broken_url, &[format!("DROP TABLE {first}").as_str()]).await;
+            let failed = restore(broken, "eu-1").await.unwrap_err();
+            assert!(failed.contains("was emptied again"), "{failed}");
+            let states = migrator.status(&eu1_database).await.unwrap();
+            assert!(states.iter().all(|state| !state.applied), "eu-1 must be empty again");
+            placements.check().await.unwrap();
             let state =
                 placements.list().await.unwrap().into_iter().find(|p| p.name == "eu-1").unwrap();
-            assert_eq!(state.schema_state, "ready");
-            // Placement đã có bảng: từ chối.
-            let again = restore(eu1, "eu-1").await.unwrap_err();
-            assert!(again.contains("already has Autoxide tables"), "{again}");
+            assert_eq!(state.schema_state, "behind");
 
-            // `--all` khi một placement có dữ liệu của module đang tắt: từ chối, nêu module.
+            // Placement KHÁC (eu-2) có dữ liệu của module đang tắt: restore eu-1 không bị từ chối nhầm.
             let eu2_id =
                 placements.list().await.unwrap().into_iter().find(|p| p.name == "eu-2").unwrap().id;
             let eu2 = registry.placement_database(PlacementId::from_uuid(eu2_id)).await.unwrap();
@@ -683,6 +694,24 @@ mod tests {
             };
             run("CREATE TABLE newsletter_probe (id TEXT)").await;
             run("INSERT INTO newsletter_probe VALUES ('x')").await;
+
+            // Thư mục của bản backup chính (`--all`) cũng được: lấy `placements/eu-1/` của nó.
+            let restored = crate::commands::backup_placements::restore_placement(
+                with_modules(test.url(), "official"),
+                backup.clone(),
+                "eu-1".to_owned(),
+            )
+            .await
+            .unwrap();
+            assert!(restored.starts_with("Restored placement eu-1:"), "{restored}");
+            let state =
+                placements.list().await.unwrap().into_iter().find(|p| p.name == "eu-1").unwrap();
+            assert_eq!(state.schema_state, "ready");
+            // Placement đã có bảng: từ chối.
+            let again = restore(eu1, "eu-1").await.unwrap_err();
+            assert!(again.contains("already has Autoxide tables"), "{again}");
+
+            // `--all` khi một placement có dữ liệu của module đang tắt: từ chối, nêu module.
             let refused =
                 run_backup(with_modules(test.url(), "official"), scratch.0.join("dormant"), true)
                     .await
@@ -745,6 +774,35 @@ mod tests {
             let files_b = scratch.0.join("files-b");
             run_restore(settings(&restored, &files_b), backup.clone()).await.unwrap();
             check(&restored, &files_b).await;
+
+            // Bản backup có dữ liệu của `newsletter`, bản cài này tắt nó: từ chối, đích còn trống.
+            let copy_url = format!("sqlite://{}?mode=rw", backup.join("database.sqlite").display());
+            let probe = [
+                "CREATE TABLE newsletter_probe (id TEXT)",
+                "INSERT INTO newsletter_probe VALUES ('x')",
+            ];
+            sql(&copy_url, &probe).await;
+            let official = scratch.0.join("official.sqlite");
+            let official_url = format!("sqlite://{}?mode=rwc", official.display());
+            let files_c = scratch.0.join("files-c").display().to_string();
+            let source = ConfigSource::from_pairs([
+                ("DATABASE_URL", official_url.as_str()),
+                ("AUTOXIDE_FILES_DIR", files_c.as_str()),
+                ("AUTOXIDE_MODULES", "official"),
+            ]);
+            let official_settings = crate::settings::read(&source).unwrap();
+            let refused = run_restore(official_settings, backup.clone()).await.unwrap_err();
+            assert!(
+                refused.contains("the backup holds data") && refused.contains("newsletter"),
+                "{refused}"
+            );
+            let target = Database::connect(&settings(&official_url, &files_b).config.database)
+                .await
+                .unwrap();
+            let states = migrator.status(&target).await.unwrap();
+            assert!(states.iter().all(|state| !state.applied), "the target must stay untouched");
+            target.close().await.unwrap();
+            sql(&copy_url, &["DROP TABLE newsletter_probe"]).await;
 
             // Database do một bản Autoxide MỚI hơn migrate (có migration chương trình này không biết): báo rõ.
             let database =
