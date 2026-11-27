@@ -34,7 +34,7 @@ struct FakeInvoices {
     documents: Mutex<Vec<(Document, NewDocument)>>,
 }
 
-fn document(draft: &NewDocument, relation: Option<(&str, Uuid, &str)>) -> Document {
+pub(super) fn document(draft: &NewDocument, relation: Option<(&str, Uuid, &str)>) -> Document {
     let total: i64 = draft
         .lines
         .iter()

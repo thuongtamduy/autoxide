@@ -24,6 +24,7 @@ use autoxide_kernel::money::{Currency, Money};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::reference::Submitted;
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext};
+use rust_decimal::Decimal;
 use sea_orm::sea_query::Expr;
 use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, Set};
 use serde::Deserialize;
@@ -158,13 +159,16 @@ fn tax_category(row: &line::Model) -> String {
 }
 
 /// Số đã chốt của một dòng đơn (hay phí giao) để so với hoá đơn (LG-10, D-20261126-invoice-tax-difference):
-/// `item_ref` là SKU (`None`: phí giao); `tax`, `total` là thuế và tổng đơn đã tính cho phần còn lại (sau huỷ
-/// một phần, chia theo số lượng — như dòng hoá đơn).
+/// `item_ref` là SKU (`None`: phí giao); `amounts` là (thuế, tổng) đơn đã tính cho phần còn trên hoá đơn — số chính
+/// xác, chưa làm tròn; `None` khi không tính được (tràn số): khi đó luôn báo khác để người vận hành xem.
 #[derive(Debug, Clone)]
 struct SettledLine {
     item_ref: Option<String>,
-    tax: i64,
-    total: i64,
+    amounts: Option<(Decimal, Decimal)>,
+    /// Lệch làm tròn bỏ qua cho dòng này: [`TOLERANCE`], gấp đôi với dòng huỷ một phần (thuế của đơn đã làm tròn cho
+    /// cả dòng, hoá đơn làm tròn lại cho phần còn lại — hai lần làm tròn chồng nhau, và thuế nhiều tầng làm tròn từng
+    /// tầng).
+    tolerance: i64,
 }
 
 /// Số đã chốt của đơn để so với hoá đơn bán của nó.
@@ -172,8 +176,39 @@ struct SettledLine {
 pub(crate) struct Settled {
     lines: Vec<SettledLine>,
     /// Đơn trộn dòng giá gồm thuế và chưa thuế: hoá đơn chỉ có một chế độ giá nên không lập đúng được — luôn báo
-    /// khác (kiểm độc lập #575, V5; sửa tận gốc ở lộ trình).
+    /// khác (kiểm độc lập #575, V5).
     mixed_modes: bool,
+}
+
+/// Khoản giảm của `quantity` đơn vị dòng `row` trên hoá đơn: chia theo số lượng, làm tròn xuống (không bao giờ giảm
+/// quá phần của số lượng này). Nhân trong `i128`: không tràn.
+fn discount_part(row: &line::Model, quantity: i64) -> i64 {
+    if quantity == row.quantity || row.quantity == 0 {
+        return row.discount_minor;
+    }
+    let part = i128::from(row.discount_minor) * i128::from(quantity) / i128::from(row.quantity);
+    // Phần nhỏ hơn khoản giảm cả dòng nên luôn vừa `i64`.
+    i64::try_from(part).unwrap_or(row.discount_minor)
+}
+
+/// (thuế, tổng) đơn đã chốt cho phần còn trên hoá đơn của dòng `row`, dựng như dòng hoá đơn (kiểm độc lập #575,
+/// M1): tiền trước giảm của số lượng còn lại trừ khoản giảm [`discount_part`] — với giá gồm thuế đó là tổng, với giá
+/// chưa thuế là phần trước thuế; thuế chia theo tỉ lệ phần đó trên phần tương ứng của cả dòng. Số chính xác, không
+/// làm tròn trước khi so. Dòng không huỷ thì đúng bằng số của đơn.
+fn remaining_amounts(row: &line::Model) -> Option<(Decimal, Decimal)> {
+    let left = row.quantity - row.cancelled_quantity;
+    let (tax, total) = (Decimal::from(row.tax_minor), Decimal::from(row.total_minor));
+    if left == row.quantity {
+        return Some((tax, total));
+    }
+    let part = Decimal::from(row.unit_price_minor)
+        .checked_mul(Decimal::from(left))?
+        .checked_sub(Decimal::from(discount_part(row, left)))?;
+    let whole = if row.tax_inclusive { total } else { total.checked_sub(tax)? };
+    let part_tax =
+        if whole.is_zero() { Decimal::ZERO } else { tax.checked_mul(part)?.checked_div(whole)? };
+    let part_total = if row.tax_inclusive { part } else { part.checked_add(part_tax)? };
+    Some((part_tax, part_total))
 }
 
 /// Dòng đơn còn trên hoá đơn (chưa huỷ hết), như lúc lập hoá đơn.
@@ -192,27 +227,24 @@ fn shipping_tax(row: &order::Model, lines: &[line::Model]) -> i64 {
 }
 
 /// Số đã chốt của đơn `row` (dòng cấp trên `lines`).
-fn settled_lines(row: &order::Model, lines: &[line::Model]) -> Settled {
-    let part = |amount: i64, line: &line::Model| {
-        if line.cancelled_quantity == 0 || line.quantity == 0 {
-            amount
-        } else {
-            amount * (line.quantity - line.cancelled_quantity) / line.quantity
-        }
-    };
+pub(crate) fn settled_lines(row: &order::Model, lines: &[line::Model]) -> Settled {
     let mut settled: Vec<SettledLine> = lines
         .iter()
         .filter(|line| invoiced(line))
         .map(|line| SettledLine {
             item_ref: Some(line.sku.clone()),
-            tax: part(line.tax_minor, line),
-            total: part(line.total_minor, line),
+            amounts: remaining_amounts(line),
+            tolerance: if line.cancelled_quantity > 0 { 2 * TOLERANCE } else { TOLERANCE },
         })
         .collect();
     let shipping_gross = row.shipping_fee_minor - row.shipping_discount_minor;
     if shipping_gross > 0 {
-        let tax = shipping_tax(row, lines);
-        settled.push(SettledLine { item_ref: None, tax, total: shipping_gross });
+        let tax = Decimal::from(shipping_tax(row, lines));
+        settled.push(SettledLine {
+            item_ref: None,
+            amounts: Some((tax, Decimal::from(shipping_gross))),
+            tolerance: TOLERANCE,
+        });
     }
     let mut modes = lines.iter().filter(|line| invoiced(line)).map(|line| line.tax_inclusive);
     let mixed_modes = modes.next().is_some_and(|first| modes.any(|mode| mode != first));
@@ -257,16 +289,32 @@ pub(crate) fn differs_from_order(
     if settled.mixed_modes {
         return true;
     }
+    // Một dòng không tính được (tràn số): không so được — báo để người vận hành xem.
+    let Some(amounts) =
+        settled.lines.iter().map(|line| line.amounts).collect::<Option<Vec<(Decimal, Decimal)>>>()
+    else {
+        return true;
+    };
     let line_differs = document.lines.iter().any(|invoice_line| {
-        let mut candidates =
-            settled.lines.iter().filter(|line| line.item_ref == invoice_line.item_ref).peekable();
+        let mut candidates = settled
+            .lines
+            .iter()
+            .zip(&amounts)
+            .filter(|(line, _)| line.item_ref == invoice_line.item_ref)
+            .peekable();
         candidates.peek().is_some()
-            && candidates.all(|line| (invoice_line.tax.minor() - line.tax).abs() > TOLERANCE)
+            && candidates.all(|(line, (tax, _))| {
+                (Decimal::from(invoice_line.tax.minor()) - *tax).abs()
+                    > Decimal::from(line.tolerance)
+            })
     });
-    let expected: i64 = settled.lines.iter().map(|line| line.total).sum();
-    let allowed = TOLERANCE * i64::try_from(settled.lines.len()).unwrap_or(i64::MAX);
+    let expected =
+        amounts.iter().try_fold(Decimal::ZERO, |sum, (_, total)| sum.checked_add(*total));
+    let Some(expected) = expected else { return true };
+    let allowed = Decimal::from(settled.lines.iter().map(|line| line.tolerance).sum::<i64>());
     line_differs
-        || (!settled.lines.is_empty() && (document.total.minor() - expected).abs() > allowed)
+        || (!amounts.is_empty()
+            && (Decimal::from(document.total.minor()) - expected).abs() > allowed)
 }
 
 /// Lệch do làm tròn được bỏ qua khi so hoá đơn với đơn: 1 đơn vị tiền nhỏ nhất mỗi dòng.
@@ -281,12 +329,7 @@ fn document_line(row: &line::Model, quantity: i64, currency: Currency) -> NewDoc
     )
     .tax_category(tax_category(row))
     .item_ref(row.sku.clone());
-    let discount = if quantity == row.quantity || row.quantity == 0 {
-        row.discount_minor
-    } else {
-        // Làm tròn xuống: không bao giờ giảm quá phần của số lượng này.
-        row.discount_minor * quantity / row.quantity
-    };
+    let discount = discount_part(row, quantity);
     if discount > 0 {
         document_line.discount = Some(Money::new(discount, currency));
     }

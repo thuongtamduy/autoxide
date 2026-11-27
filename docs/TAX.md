@@ -65,10 +65,12 @@ curl -X POST https://api.example.com/api/v1/tax/quote \
   invoice taxes at its own issue date (`orders.invoice_timing`, `on_delivered` by default). When a rate
   changes in between, the invoice uses the new rate and the order's documents
   (`GET …/orders/me/orders/{id}/documents`) show `differs_from_order: true` — settle the difference with the
-  buyer. The flag compares the tax of each line and the total, ignoring one minor unit per line of rounding: an order
+  buyer. The flag compares the tax of each line and the total, ignoring one minor unit per line of rounding (two for a line partly cancelled, which the invoice rounds again): an order
   priced without tax carries its tax-inclusive shipping fee on the invoice at the pre-tax amount, so the invoice
   total can differ from the order by one minor unit. An order mixing tax-inclusive and tax-exclusive prices is always
-  flagged — one invoice has a single price mode and cannot carry it exactly. A draft invoice is re-taxed at issue
+  flagged — one invoice has a single price mode and cannot carry it exactly. When the flag is `true`, correct the
+  invoice with an adjustment (`POST /api/v1/invoices/documents/{id}/adjust`) or a replacement
+  (`POST /api/v1/invoices/documents/{id}/replace`). A draft invoice is re-taxed at issue
   when it was computed on another day. Adjustments and replacements keep the tax date (rate) of the invoice
   they correct. Ledger entries of orders and invoices are dated with the same tax date. `autoxide doctor`
   warns when an imported tax jurisdiction declares no `tax_date.time_zone`.

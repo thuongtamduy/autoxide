@@ -4,7 +4,7 @@
   cancellation through SePay failed with `not_supported`. An e-invoice the tax authority rejected is cancelled locally.
 - Order documents (`GET …/orders/me/orders/{id}/documents` and the staff and guest variants) have
   `differs_from_order`: `true` when the tax of an invoice line, or the invoice total, differs from what the order
-  settled by more than one minor unit per line (e.g. when the VAT rate changed between ordering and invoicing), and
+  settled by more than one minor unit per line (two for a line partly cancelled; e.g. when the VAT rate changed between ordering and invoicing), and
   always for an order mixing tax-inclusive and tax-exclusive prices, which one invoice cannot carry exactly.
 - The invoice of an order priced without tax now carries the shipping fee at its pre-tax amount: the order treats the
   shipping fee as tax-inclusive, and before the invoice added the tax a second time. The invoice total can still

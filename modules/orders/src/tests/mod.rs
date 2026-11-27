@@ -10,6 +10,7 @@ mod carts;
 mod checkout;
 mod fakes;
 mod guests;
+mod invoice_settled;
 mod invoices_pos;
 mod lifecycle;
 mod pages;
