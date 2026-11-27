@@ -114,8 +114,9 @@ pub(crate) struct SearchCache {
     public_budget: Mutex<HashMap<TenantId, (Instant, u32)>>,
     /// Chốt của tìm công khai: số lượt cùng lúc, số lượt mỗi phút theo địa chỉ (PT-15).
     pub(crate) public_limits: super::public_limits::PublicLimits,
-    /// Chỗ chạy riêng của gợi ý tìm (cùng sức chứa, bộ đếm riêng): endpoint gợi ý không đếm theo địa chỉ, nên gợi ý
-    /// không được lấy chỗ của tìm kiếm — một địa chỉ gọi gợi ý dồn dập chỉ làm gợi ý bỏ nguồn `content`.
+    /// Chỗ chạy riêng của gợi ý tìm (phần riêng trong cùng một trần với tìm kiếm, `public_limits::capacities`): endpoint
+    /// gợi ý không đếm theo địa chỉ, nên gợi ý không được lấy chỗ của tìm kiếm — một địa chỉ gọi gợi ý dồn dập chỉ làm
+    /// gợi ý bỏ nguồn `content`.
     pub(crate) suggest_limits: super::public_limits::PublicLimits,
     /// Số lần thật sự đọc vector từ database (cho test single-flight).
     #[cfg(test)]
@@ -407,25 +408,41 @@ impl ContentService {
         Ok(missing.len())
     }
 
-    /// Giữ một chỗ của tìm công khai cho người đọc ở địa chỉ `ip` (không biết địa chỉ: chỉ tính số lượt cùng lúc): 429
-    /// khi vượt. Dùng cho mọi đường tìm theo chữ công khai (danh sách bài với `q`, gợi ý tìm).
+    /// Giữ một chỗ của tìm công khai trên database của khách `tenant` cho người đọc ở địa chỉ `ip` (không biết địa chỉ:
+    /// chỉ tính số lượt cùng lúc): 429 khi vượt. Dùng cho `GET /public/search` và danh sách bài có `q`. Số chỗ theo
+    /// [`capacities`](super::public_limits::capacities): dưới pool đọc của database đó.
     pub(crate) fn admit_public_search(
         &self,
+        tenant: &TenantContext,
         ip: Option<std::net::IpAddr>,
     ) -> Result<super::public_limits::Slot, Error> {
+        let (search, _) = super::public_limits::capacities(
+            self.config.public_search_concurrency,
+            tenant.database().read_pool_size(),
+        );
         self.search_cache.public_limits.admit(
+            tenant.placement(),
             ip,
             self.config.public_search_per_address,
-            self.config.public_search_concurrency,
+            search,
         )
     }
 
-    /// Giữ một chỗ của gợi ý tìm công khai (bộ đếm riêng, không đếm theo địa chỉ): 429 khi hết chỗ.
-    pub(crate) fn admit_public_suggest(&self) -> Result<super::public_limits::Slot, Error> {
+    /// Giữ một chỗ của gợi ý tìm công khai trên database của khách `tenant` (phần riêng của gợi ý trong
+    /// [`capacities`](super::public_limits::capacities), không đếm theo địa chỉ): 429 khi hết chỗ.
+    pub(crate) fn admit_public_suggest(
+        &self,
+        tenant: &TenantContext,
+    ) -> Result<super::public_limits::Slot, Error> {
+        let (_, suggest) = super::public_limits::capacities(
+            self.config.public_search_concurrency,
+            tenant.database().read_pool_size(),
+        );
         self.search_cache.suggest_limits.admit(
+            tenant.placement(),
             None,
             self.config.public_search_per_address,
-            self.config.public_search_concurrency,
+            suggest,
         )
     }
 
@@ -443,7 +460,7 @@ impl ContentService {
         if !self.config.public_semantic_search {
             return self.search(tenant, principal, query, Some(site)).await;
         }
-        let slot = self.admit_public_search(ip)?;
+        let slot = self.admit_public_search(tenant, ip)?;
         // Lượt tìm chạy trong task riêng giữ `slot` tới khi việc xong thật: hết giờ trả lời hay client ngắt chỉ bỏ phần
         // chờ ở đây; câu truy vấn và việc tính vector đang chạy vẫn chiếm chỗ cho tới khi xong (`tokio::spawn` cần dữ
         // liệu sở hữu: chép `Arc` của service và các tham số).

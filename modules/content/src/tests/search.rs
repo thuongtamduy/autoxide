@@ -212,7 +212,7 @@ async fn tim_cong_khai_co_cho_va_gioi_han_theo_dia_chi() {
         let search = |ip| content.search_public(&tenant, None, &q, &site, ip);
         // Hai lượt đang chạy giữ hết chỗ: lượt mới bị từ chối ngay.
         let limits = &content.search_cache.public_limits;
-        let held = (limits.admit(None, 100, 2).unwrap(), limits.admit(None, 100, 2).unwrap());
+        let held = (limits.admit(tenant.placement(), None, 100, 2).unwrap(), limits.admit(tenant.placement(), None, 100, 2).unwrap());
         assert_eq!(search(other).await.unwrap_err().code(), "content.public_search_busy");
         drop(held);
         // Theo địa chỉ: 3 lượt mỗi phút (lượt bị từ chối vì hết chỗ ở trên là của địa chỉ khác).
@@ -262,10 +262,15 @@ async fn danh_sach_co_q_va_goi_y_qua_cung_chot() {
         let first = PageRequest::first(10, Order::Desc);
         let reader: Option<std::net::IpAddr> = "203.0.113.7".parse().ok();
         let suggest = crate::suggest::Entries(content.clone());
+        // Tìm và gợi ý cộng lại luôn để dành kết nối đọc cho phần còn lại của ứng dụng.
+        let pool = database.read_pool_size();
+        let (searching_slots, suggesting_slots) =
+            crate::ai::public_limits::capacities(content.config.public_search_concurrency, pool);
+        assert!(searching_slots + suggesting_slots < pool, "{pool}");
 
         // Hết chỗ chạy: danh sách có `q` và gợi ý bị từ chối ngay; danh sách không có `q` vẫn chạy.
         let limits = &content.search_cache.public_limits;
-        let held = (limits.admit(None, 100, 2).unwrap(), limits.admit(None, 100, 2).unwrap());
+        let held = (limits.admit(tenant.placement(), None, 100, 2).unwrap(), limits.admit(tenant.placement(), None, 100, 2).unwrap());
         let busy = content.public_posts_for(&tenant, &searching, &first, reader).await;
         assert_eq!(busy.unwrap_err().code(), "content.public_search_busy");
         let plain = content.public_posts_for(&tenant, &filter, &first, reader).await.unwrap();
@@ -277,7 +282,7 @@ async fn danh_sach_co_q_va_goi_y_qua_cung_chot() {
         // …và gợi ý hết chỗ không chặn tìm kiếm.
         let suggesting = &content.search_cache.suggest_limits;
         let held =
-            (suggesting.admit(None, 100, 2).unwrap(), suggesting.admit(None, 100, 2).unwrap());
+            (suggesting.admit(tenant.placement(), None, 100, 2).unwrap(), suggesting.admit(tenant.placement(), None, 100, 2).unwrap());
         let busy = suggest.suggest(&tenant, &site, "en", "da lat", 5).await;
         assert_eq!(busy.unwrap_err().code(), "content.public_search_busy");
         let page = content.public_posts_for(&tenant, &searching, &first, None).await.unwrap();

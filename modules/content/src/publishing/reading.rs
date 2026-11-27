@@ -251,7 +251,7 @@ impl ContentService {
         ip: Option<std::net::IpAddr>,
     ) -> Result<Page<Published>, Error> {
         let searching = filter.search.as_deref().is_some_and(|search| !search.trim().is_empty());
-        let _slot = if searching { Some(self.admit_public_search(ip)?) } else { None };
+        let _slot = if searching { Some(self.admit_public_search(tenant, ip)?) } else { None };
         self.public_posts(tenant, filter, page).await
     }
 

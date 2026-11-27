@@ -1263,7 +1263,9 @@ Mỗi tình huống: dấu hiệu, cách kiểm, cách sửa.
 - **Sửa:** dừng thứ đang giữ kết nối (truy vấn chậm, job kẹt), rồi tăng
   `AUTOXIDE_DATABASE_READ_CONNECTIONS` / `AUTOXIDE_DATABASE_WRITE_CONNECTIONS` — mỗi tiến trình mở chừng
   ấy kết nối, nên giữ tổng dưới `max_connections` của máy chủ database. SQLite theo thiết kế chỉ có một
-  kết nối ghi.
+  kết nối ghi. Tìm chữ công khai (bài có `q`, `/public/search`, gợi ý) không bao giờ dùng quá pool đọc trừ 2
+  trên mỗi database (`AUTOXIDE_CONTENT_PUBLIC_SEARCH_CONCURRENCY`, tự hạ), và bỏ sau 2 giây, kể cả thời gian
+  chờ kết nối.
 
 ### Database đầy
 

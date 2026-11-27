@@ -59,8 +59,14 @@ async fn postgres(
     statement: Statement,
     limit: Duration,
 ) -> Result<Vec<QueryResult>, Error> {
-    let millis = limit.as_millis().max(1);
-    let transaction = connection.begin_with_config(None, Some(AccessMode::ReadOnly)).await?;
+    // Chờ kết nối của pool cũng tính vào trần: pool đầy thì không chờ quá `limit` (thời gian chờ chung của pool dài
+    // hơn nhiều).
+    let started = Instant::now();
+    let opened =
+        tokio::time::timeout(limit, connection.begin_with_config(None, Some(AccessMode::ReadOnly)));
+    let transaction = opened.await.map_err(|_| query_timeout())??;
+    let left = limit.saturating_sub(started.elapsed());
+    let millis = left.as_millis().max(1);
     // `SET LOCAL`: chỉ trong transaction này; kết nối về pool với cấu hình cũ. Số nguyên do kernel tính, không
     // phải dữ liệu người dùng.
     transaction.execute_unprepared(&format!("SET LOCAL statement_timeout = {millis}")).await?;
@@ -142,12 +148,13 @@ async fn sqlite(
     let arguments = sqlite_arguments(statement.values.map(|values| values.0).unwrap_or_default())?;
     let pool = connection.get_sqlite_connection_pool();
     let stop = Arc::new(AtomicBool::new(false));
-    let mut guard =
-        Guard { connection: Some(pool.acquire().await.map_err(sqlx_error)?), stop: stop.clone() };
+    // Hạn tính từ lúc gọi: chờ kết nối của pool cũng tính vào trần (pool đầy thì không chờ quá `limit`).
+    let deadline = Instant::now() + limit;
+    let acquired = tokio::time::timeout(limit, pool.acquire()).await.map_err(|_| query_timeout())?;
+    let mut guard = Guard { connection: Some(acquired.map_err(sqlx_error)?), stop: stop.clone() };
     let Some(pooled) = guard.connection.as_mut() else {
         return Err(Error::internal("time-limited read lost its connection"));
     };
-    let deadline = Instant::now() + limit;
     {
         let mut handle = pooled.lock_handle().await.map_err(sqlx_error)?;
         // Trả `false` thì SQLite dừng câu đang chạy (`SQLITE_INTERRUPT`). Kiểm cả cờ `stop`: future bị drop.

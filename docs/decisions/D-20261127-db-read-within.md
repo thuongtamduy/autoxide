@@ -19,6 +19,11 @@ Database tự dừng câu khi nó chạy quá `limit` và khi người gọi th�
 - Giá trị bind trên SQLite đi thẳng qua sqlx, như sea-query-sqlx: bool, số nguyên (cả không dấu của `LIMIT`), số
   thực, chuỗi, byte, UUID, ngày giờ của kernel (biến thể `Enum` mang kiểu, bind là chuỗi). Kiểu khác là lỗi nội bộ,
   không đoán.
+- Chờ kết nối của pool cũng tính vào trần: pool đọc đầy thì `within` trả `db.query_timeout` sau `limit`, không chờ hết
+  thời gian chờ chung của pool; trần câu lệnh (Postgres `statement_timeout`, hạn của progress handler SQLite) là phần
+  còn lại sau khi có kết nối.
+- `Database::read_pool_size()`: số kết nối tối đa của pool đọc, để module giới hạn số câu đọc của mình dưới pool
+  (tìm công khai của `content`).
 - `within` trên transaction ghi là lỗi: câu ghi không bị cắt giữa chừng.
 - Mọi cách đọc của bộ dựng câu tôn trọng `within`: `all`, `one`, `exists`, `count`, `select`, và `page` (câu đếm và
   câu lấy dòng, mỗi câu một trần `limit`).

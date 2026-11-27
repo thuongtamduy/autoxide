@@ -7,5 +7,6 @@
   indexed, and a run is found by its beginning.
 - `GET /api/v1/content/public/posts?q=` now shares the public search limits
   (`AUTOXIDE_CONTENT_PUBLIC_SEARCH_CONCURRENCY`, `AUTOXIDE_CONTENT_PUBLIC_SEARCH_PER_ADDRESS_PER_MINUTE`) and
-  answers `429` past them. Content suggestions have their own count of searches running at the same time (same
-  size); past it, suggestions leave out posts and pages.
+  answers `429` past them. `AUTOXIDE_CONTENT_PUBLIC_SEARCH_CONCURRENCY` now counts searches and content suggestions
+  together on each database and is lowered automatically to the read pool minus 2, so public search never takes
+  every read connection; a quarter is kept for suggestions, which leave out posts and pages when it is full.

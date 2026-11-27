@@ -1312,7 +1312,9 @@ mass revocation, restoring one tenant, lost data) are in [`RUNBOOK.md`](RUNBOOK.
 - **Fix:** end what holds connections (a slow query, a stuck job), then raise
   `AUTOXIDE_DATABASE_READ_CONNECTIONS` / `AUTOXIDE_DATABASE_WRITE_CONNECTIONS` — every process opens
   that many, so keep the total under the server's `max_connections`. SQLite has one write connection
-  by design.
+  by design. Public text search (content posts with `q`, `/public/search`, suggestions) never takes
+  more than the read pool minus 2 per database (`AUTOXIDE_CONTENT_PUBLIC_SEARCH_CONCURRENCY`, lowered
+  automatically), and gives up after 2 seconds, waiting for a connection included.
 
 ### Database full
 

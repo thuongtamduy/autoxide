@@ -68,12 +68,17 @@ Thay bằng chỉ mục đảo `content_published_words` — bảng thường c�
 - **Trần thời gian** (điểm còn lại của #548): `Find::within` của kernel (D-20261127-db-read-within), mọi câu của một
   lần tìm chung hạn 2 s — database dừng câu khi quá hạn và khi người gọi thôi chờ; quá hạn → `503
   content.public_search_timeout` (mã đã có).
-- **Chốt tìm công khai**: danh sách bài có `q` đi qua cùng chốt với `GET /public/search`
-  (`AUTOXIDE_CONTENT_PUBLIC_SEARCH_CONCURRENCY`, `…_PER_ADDRESS_PER_MINUTE`): 429 khi vượt. Gợi ý tìm có bộ đếm số
-  lượt cùng lúc **riêng** (cùng sức chứa): nguồn gợi ý không biết địa chỉ người đọc, nên nếu dùng chung chỗ, một địa
-  chỉ gọi gợi ý dồn dập sẽ làm tìm kiếm của mọi khách trả 429. Hết chỗ thì bộ gợi ý bỏ nguồn `content`. Rủi ro còn
-  lại: một địa chỉ vẫn có thể giữ hết chỗ của gợi ý (gợi ý bài viết tạm vắng; tìm kiếm không ảnh hưởng). Việc sau:
-  truyền địa chỉ người đọc tới nguồn gợi ý qua kernel (`SuggestSource`) để đếm theo địa chỉ.
+- **Chốt tìm công khai** (review thứ ba của #573): một trần chung cho tìm và gợi ý **trên mỗi database** (mỗi
+  placement một pool đọc): `min(AUTOXIDE_CONTENT_PUBLIC_SEARCH_CONCURRENCY, pool đọc − 2)`, ít nhất 2; gợi ý được một
+  phần tư (ít nhất 1), tìm kiếm (`GET /public/search`, danh sách bài có `q`) phần còn lại — hai bên không lấy chỗ của
+  nhau, và cộng lại luôn để dành ít nhất 2 kết nối đọc cho phần còn lại của ứng dụng (pool từ 4 trở lên; pool mặc định
+  10 → 6 tìm + 2 gợi ý; pool của placement mặc định 4 → 1 + 1). Trần tự hạ theo pool thật (`Database::read_pool_size`
+  của kernel), không cần kiểm lúc khởi động. Tìm kiếm còn đếm theo địa chỉ (`…_PER_ADDRESS_PER_MINUTE`); gợi ý không
+  biết địa chỉ người đọc nên không đếm theo địa chỉ. Hết chỗ: tìm trả 429 `content.public_search_busy`, gợi ý bỏ nguồn
+  `content`. Rủi ro còn lại: một địa chỉ vẫn có thể giữ hết phần chỗ của gợi ý (gợi ý bài viết tạm vắng; tìm kiếm và
+  các câu đọc khác không ảnh hưởng). Việc sau: truyền địa chỉ người đọc tới nguồn gợi ý qua kernel (`SuggestSource`).
+  Hạn 2 s tính cả thời gian chờ kết nối của pool (`within` của kernel), nên một lượt không kéo dài tới thời gian chờ
+  chung của pool.
 - **Ghi**: mỗi câu `INSERT` tối đa 200 dòng (800 tham số bind), cả khi đăng lẫn trong backfill, dưới trần của SQLite
   (999 ở bản cũ) và Postgres (65 535). Migration xoá bảng nếu còn từ lần chạy hỏng trước rồi dựng lại (dữ liệu dẫn
   xuất), nên chạy lại được.

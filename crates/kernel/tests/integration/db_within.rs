@@ -162,3 +162,37 @@ async fn nguoi_goi_thoi_cho_thi_cau_dung_that() {
     .await
     .unwrap();
 }
+
+/// Pool đọc đầy (mọi kết nối đang bận): đọc có trần không chờ hết thời gian chờ của pool mà trả quá hạn đúng trần —
+/// chờ kết nối cũng tính vào trần. Trả kết nối xong thì đọc lại được.
+#[tokio::test]
+async fn pool_day_thi_cho_ket_noi_tinh_vao_tran() {
+    TestDatabase::run(async |test| {
+        use sea_orm::TransactionTrait as _;
+        let (database, tenant) = open(test).await;
+        let size = database.read_pool_size();
+        assert!(size >= 1);
+        // Giữ mọi kết nối của pool đọc (mỗi transaction đọc giữ một kết nối).
+        let mut held = Vec::new();
+        for _ in 0..size {
+            held.push(database.read().begin().await.unwrap());
+        }
+        let started = Instant::now();
+        let refused = tenant
+            .db()
+            .read()
+            .sql("SELECT :tenant")
+            .within(Duration::from_millis(300))
+            .all::<(Uuid,)>()
+            .await
+            .unwrap_err();
+        assert!(is_query_timeout(&refused), "{refused:?}");
+        assert!(started.elapsed() < Duration::from_secs(2), "{:?}", started.elapsed());
+        for transaction in held {
+            transaction.rollback().await.unwrap();
+        }
+        quick(&tenant).await;
+    })
+    .await
+    .unwrap();
+}

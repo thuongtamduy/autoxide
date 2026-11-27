@@ -34,7 +34,7 @@ impl SuggestSource for Entries {
     ) -> Result<Vec<Suggestion>, Error> {
         // Chỗ chạy riêng của gợi ý (nguồn gợi ý không biết địa chỉ người đọc nên không đếm theo địa chỉ, và không lấy
         // chỗ của tìm kiếm). Hết chỗ thì lỗi: bộ gợi ý bỏ nguồn này, không chờ.
-        let _slot = self.0.admit_public_suggest()?;
+        let _slot = self.0.admit_public_suggest(tenant)?;
         // Lấy dư một ít để tầng "khớp đúng dấu" có chỗ chen lên trước khi cắt còn `limit`.
         let fetch = u64::from(limit).saturating_mul(2);
         let read = tenant.database().read();
