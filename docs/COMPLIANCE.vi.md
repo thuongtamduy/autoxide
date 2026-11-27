@@ -15,7 +15,7 @@ Module gồm:
 
 | Phần | Endpoint (dưới `/api/v1/compliance`) |
 | --- | --- |
-| Định danh (KYC) người bán, người livestream, người tiếp thị liên kết | `/kyc/…`, `/me/kyc…` |
+| Định danh (KYC) người bán, người livestream, người tiếp thị liên kết — hồ sơ, xác thực và cổng `KycGate`; **chưa chặn đăng bán** (xem dưới) | `/kyc/…`, `/me/kyc…` |
 | Xác thực tài khoản đăng nội dung (số điện thoại / định danh) | `/me/verification`, `/me/phone-verifications…` |
 | Văn bản pháp lý có phiên bản và bằng chứng chấp nhận | `/documents…`, `/me/acceptances`, `/public/documents/{kind}` |
 | Sổ đồng ý | `/me/consents` |
@@ -212,10 +212,30 @@ thận trọng, không phải con số của luật. `autoxide doctor` cảnh b�
 `GET /processing-register` trả mục đích, căn cứ, loại dữ liệu, bên nhận, thời hạn lưu và nơi lưu dữ liệu — đầu
 vào cho hồ sơ đánh giá tác động xử lý dữ liệu cá nhân; mẫu hồ sơ chính thức cần người có chuyên môn pháp lý.
 
+### Chưa làm (trước 1.0)
+
+Phát hiện của đợt rà pháp lý vòng 1 (AI thực hiện, không phải ý kiến pháp lý; `docs/legal/review-2026-11-r1/`) mà core
+chưa xử lý. Trong lúc chờ, người triển khai tự bù:
+
+- **Định danh người bán trước khi bán.** Quy tắc `kyc.required_activities` đòi người bán, người livestream, người tiếp
+  thị liên kết đã định danh (Luật Thương mại điện tử 122/2025/QH15; NĐ 248/2026/NĐ-CP Điều 18, định danh điện tử
+  người bán từ 01/01/2027 — cần đối chiếu văn bản gốc). `compliance` giữ hồ sơ và có cổng `KycGate`, nhưng `catalog`
+  chưa hỏi nó: người bán chưa định danh vẫn đăng bán được. Nối `ListingGate` của `catalog` vào `KycGate` đã xếp
+  trước 1.0; trong lúc chờ, định danh người bán trước khi cấp `catalog.write`.
+- **Dữ liệu cá nhân của trẻ em.** Luật 91/2025/QH15 có quy định riêng cho trẻ em và người được giám hộ (đồng ý của
+  cha mẹ / người giám hộ; từ đủ 7 tuổi thêm đồng ý của trẻ — điều luật và độ tuổi cần đối chiếu). Core không có ngày
+  sinh, kiểm tuổi hay đồng ý của người giám hộ: dịch vụ hướng tới trẻ em phải tự thu và lưu đồng ý của người giám hộ.
+  Sau 1.0: cấu hình theo khách, tự khai tuổi khi đăng ký và sổ đồng ý ghi người đồng ý thay.
+- **Dữ liệu gửi ra nước ngoài qua nhà cung cấp.** Nhà cung cấp AI của module `ai`, mail, SMS và nơi lưu file có thể
+  xử lý dữ liệu cá nhân ngoài Việt Nam; họ không tự vào sổ xử lý. Thêm từng nhà cung cấp làm bên nhận (tên, nước) của
+  mục đích dùng nó (`POST /purposes`, `PATCH /purposes/{key}`) và lập hồ sơ đánh giá tác động chuyển dữ liệu ra nước
+  ngoài (NĐ 356/2025/NĐ-CP — mẫu và miễn trừ cho doanh nghiệp nhỏ cần đối chiếu). Sau 1.0: module khai bên xử lý
+  (`Module::processors`) và `autoxide doctor` cảnh báo bên nhận ở nước ngoài.
+
 ### Nơi lưu dữ liệu
 
 Có thể buộc một khách lưu dữ liệu ở một nước (Luật An ninh mạng 116/2025/QH15, hiệu lực 01/7/2026, thay Luật
-An ninh mạng 2018 và Luật An toàn thông tin mạng 2015; nghị định hướng dẫn, theo nguồn thứ cấp là NĐ 333/2026/NĐ-CP,
+An ninh mạng 2018 và Luật An toàn thông tin mạng 2015 — nguồn thứ cấp, cần đối chiếu; nghị định hướng dẫn, theo nguồn thứ cấp là NĐ 333/2026/NĐ-CP,
 thay NĐ 53/2022/NĐ-CP — chưa xác nhận. Ai bắt buộc lưu tại Việt Nam cần đối chiếu pháp lý):
 
 ```bash

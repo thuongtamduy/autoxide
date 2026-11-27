@@ -44,10 +44,10 @@ fn referrer_of(row: entry::Model, media: Option<Uuid>) -> KeyedReferrer {
         Some(media) if row.og_media_id == Some(media) => "og_media",
         _ => "body",
     };
-    KeyedReferrer {
-        key: row.id,
-        referrer: Referrer::new(crate::resource::ENTRY, row.id.to_string(), row.title, field),
-    }
+    KeyedReferrer::new(
+        row.id,
+        Referrer::new(crate::resource::ENTRY, row.id.to_string(), row.title, field),
+    )
 }
 
 #[async_trait::async_trait]
