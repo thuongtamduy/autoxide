@@ -17,6 +17,10 @@ use crate::boundaries::Violation;
 /// Biến `*_URL` không phải trang giao diện của từng khách, kèm lý do.
 const NOT_SITE_LINKS: &[(&str, &str)] = &[
     ("AUTOXIDE_HTTP_PUBLIC_URL", "địa chỉ của máy chủ API; khách thay bằng `kernel.public_url`"),
+    (
+        "AUTOXIDE_AUTH_OAUTH_CONSENT_URL",
+        "trang consent của máy chủ uỷ quyền OAuth: một issuer cho cả nền tảng, không gửi qua mail (D-20261126-mcp-oauth)",
+    ),
     ("AUTOXIDE_MAIL_SMTP_URL", "máy chủ gửi thư; khách thay bằng `mail.connection.smtp.url`"),
     ("AUTOXIDE_AI_BASE_URL", "API đối tác"),
     ("AUTOXIDE_EMBEDDING_BASE_URL", "API đối tác"),
