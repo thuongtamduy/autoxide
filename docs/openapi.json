@@ -150853,7 +150853,7 @@
                 }
               }
             },
-            "description": "Too many codes asked for; code `compliance.otp_throttled`, wait `Retry-After` seconds."
+            "description": "Too many codes asked for (code `compliance.otp_throttled`), or too many wrong codes for this number today (code `compliance.otp_daily_limit`); wait `Retry-After` seconds."
           },
           "503": {
             "content": {
@@ -151080,7 +151080,7 @@
                 }
               }
             },
-            "description": "Too many wrong codes; code `compliance.otp_attempts_exceeded` — ask for a new code."
+            "description": "Too many wrong tries of this code (code `compliance.otp_attempts_exceeded`): ask for a new code. Or too many wrong codes for this number today (code `compliance.otp_daily_limit`): a new code does not help, wait `Retry-After` seconds."
           },
           "default": {
             "content": {

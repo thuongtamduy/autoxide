@@ -293,9 +293,9 @@ impl ComplianceService {
         let phone_key = sha256(phone.as_str());
         // Kiểm sớm để không gửi tin vô ích; xác nhận kiểm lại dưới khoá.
         let max = self.max_accounts_per_phone(tenant).await?;
-        if Self::others_with_phone(tenant.database().read(), tenant, &phone_key, user_id).await?
-            >= max
-        {
+        // Một kết nối đọc cho cả hàm (luật `raw-database`: bảng SeaORM chưa chuyển sang lớp `db`).
+        let read = tenant.database().read();
+        if Self::others_with_phone(read, tenant, &phone_key, user_id).await? >= max {
             return Err(phone_in_use());
         }
         // Hạn mức mã sai mỗi ngày trên mã xác minh của chính người này với số (như khi xác nhận): đã chạm thì không gửi
@@ -308,10 +308,9 @@ impl ComplianceService {
                 phone_challenge::Column::CreatedAt.gt(now() - crate::sign_in_codes::WRONG_WINDOW),
             )
             .scoped(tenant)
-            .all(tenant.database().read())
+            .all(read)
             .await?;
-        let unlocked =
-            crate::phone_lock::unlocked_at(tenant.database().read(), tenant, &lock_key).await?;
+        let unlocked = crate::phone_lock::unlocked_at(read, tenant, &lock_key).await?;
         self.check_wrong_today(&mine, None, true, unlocked, now())?;
         let otp = self.otp;
         let mut limits = vec![
